@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
@@ -75,6 +76,13 @@ import de.letzgo.stashy.ui.Chevron
 import de.letzgo.stashy.ui.IosTypography
 import de.letzgo.stashy.ui.SF
 import de.letzgo.stashy.ui.Theme
+import de.letzgo.stashy.ui.NativeDivider
+import de.letzgo.stashy.ui.NativeGroup
+import de.letzgo.stashy.ui.NativeListItem
+import de.letzgo.stashy.ui.NativeSearchField
+import de.letzgo.stashy.ui.NativeSectionHeader
+import de.letzgo.stashy.ui.NativeType
+import de.letzgo.stashy.ui.nativeAccent
 import de.letzgo.stashy.ui.Tokens
 import de.letzgo.stashy.ui.tools.NoServerPlaceholder
 import de.letzgo.stashy.ui.tools.SmallSpinner
@@ -387,7 +395,7 @@ private fun <T : MergeableItem> MergeToolsContent(config: MergeToolsConfig<T>, n
             Modifier.fillMaxWidth()
                 .background(p.background)
                 .padding(horizontal = ToolsTokens.contentPadding)
-                .padding(top = toolsTopPadding() + ToolsTokens.menuTopPadding, bottom = Tokens.Spacing.xs),
+                .padding(top = toolsTopPadding() + ToolsTokens.menuTopPadding),
         ) {
             DestinationField(destination?.name, destination?.mergeUsageSummary) { showingDestinationPicker = true }
 
@@ -446,32 +454,23 @@ private fun <T : MergeableItem> MergeToolsContent(config: MergeToolsConfig<T>, n
                 }
             }
 
+            NativeSearchField(searchText, { searchText = it }, "Search ${config.nounPlural}", Modifier.padding(top = Tokens.Spacing.sm))
+
             // Category heading over the list, Settings style.
-            Text(
-                nounTitle.uppercase(), style = IosTypography.footnote, color = p.secondaryText,
-                modifier = Modifier.fillMaxWidth().padding(top = Tokens.Spacing.md),
-            )
+            NativeSectionHeader(nounTitle, Modifier.padding(top = 12.dp))
         }
 
         // MARK: List card — search as first row, then the rows it filters.
         val shown = filtered.take(visibleCount)
         val showsMoreFooter = shown.isNotEmpty() && (visibleCount < filtered.size || isLoading)
-        val divider = p.text.copy(alpha = 0.15f)
         LazyColumn(
             Modifier.weight(1f).fillMaxWidth(),
             contentPadding = PaddingValues(start = ToolsTokens.contentPadding, end = ToolsTokens.contentPadding, bottom = Tokens.Spacing.sm),
         ) {
-            val stateRowLast = shown.isEmpty()
-            item(key = "search") {
-                Column(Modifier.fillMaxWidth().background(p.secondaryBackground, cardShape(first = true, last = false))) {
-                    MergeSearchField("Search ${config.nounPlural}", searchText, { searchText = it }, Modifier.padding(horizontal = Tokens.Spacing.md, vertical = Tokens.Spacing.sm))
-                    Box(Modifier.fillMaxWidth().height(0.5.dp).background(divider))
-                }
-            }
             when {
                 isLoading && allItems.isEmpty() -> item(key = "loading") {
                     Row(
-                        Modifier.fillMaxWidth().background(p.secondaryBackground, cardShape(false, stateRowLast)).padding(vertical = Tokens.Spacing.lg),
+                        Modifier.fillMaxWidth().background(p.secondaryBackground, cardShape(true, true)).padding(vertical = Tokens.Spacing.lg),
                         horizontalArrangement = Arrangement.spacedBy(Tokens.Spacing.xs, Alignment.CenterHorizontally),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
@@ -482,8 +481,8 @@ private fun <T : MergeableItem> MergeToolsContent(config: MergeToolsConfig<T>, n
                 filtered.isEmpty() -> item(key = "empty") {
                     Text(
                         if (allItems.isEmpty()) "This server has no ${config.nounPlural} yet." else "No matches",
-                        style = IosTypography.callout, color = p.secondaryText,
-                        modifier = Modifier.fillMaxWidth().background(p.secondaryBackground, cardShape(false, true)).padding(Tokens.Spacing.md),
+                        style = NativeType.bodyMedium, color = p.secondaryText,
+                        modifier = Modifier.fillMaxWidth().background(p.secondaryBackground, cardShape(true, true)).padding(16.dp),
                     )
                 }
                 else -> {
@@ -494,22 +493,15 @@ private fun <T : MergeableItem> MergeToolsContent(config: MergeToolsConfig<T>, n
                             }
                         }
                         val last = index == shown.lastIndex && !showsMoreFooter
-                        Column(Modifier.fillMaxWidth().background(p.secondaryBackground, cardShape(false, last))) {
-                            if (index > 0) Box(Modifier.fillMaxWidth().padding(start = Tokens.Spacing.md).height(0.5.dp).background(divider))
+                        Column(Modifier.fillMaxWidth().background(p.secondaryBackground, cardShape(index == 0, last))) {
+                            if (index > 0) NativeDivider()
                             MergeItemRow(item.name, item.mergeUsageSummary, checked = item.id in sources) { toggle(item) }
                         }
                     }
                     if (showsMoreFooter) item(key = "more") {
                         Column(Modifier.fillMaxWidth().background(p.secondaryBackground, cardShape(false, true))) {
-                            Box(Modifier.fillMaxWidth().padding(start = Tokens.Spacing.md).height(0.5.dp).background(divider))
-                            Row(
-                                Modifier.fillMaxWidth().padding(horizontal = Tokens.Spacing.md, vertical = Tokens.Spacing.sm),
-                                horizontalArrangement = Arrangement.spacedBy(Tokens.Spacing.xs),
-                                verticalAlignment = Alignment.CenterVertically,
-                            ) {
-                                SmallSpinner()
-                                Text("Loading more...", style = IosTypography.caption, color = p.secondaryText)
-                            }
+                            NativeDivider()
+                            NativeListItem("Loading more...", headlineColor = p.secondaryText, leading = { SmallSpinner() })
                         }
                     }
                 }
@@ -562,7 +554,7 @@ private fun <T : MergeableItem> MergeToolsContent(config: MergeToolsConfig<T>, n
         MergeDestinationSheet(
             items = allItems,
             excludedIds = sources,
-            sectionTitle = "Search $nounTitle",
+            sectionTitle = nounTitle,
             onPick = { picked ->
                 destination = picked
                 sources = sources - picked.id
@@ -636,78 +628,39 @@ private fun <T : MergeableItem> MergeToolsContent(config: MergeToolsConfig<T>, n
     }
 }
 
+/** Slice of a [de.letzgo.stashy.ui.NativeGroup] for lazily emitted rows (same 16 dp corners). */
 private fun cardShape(first: Boolean, last: Boolean): RoundedCornerShape {
-    val r = Tokens.Radius.card
+    val r = 16.dp
     return RoundedCornerShape(
         topStart = if (first) r else 0.dp, topEnd = if (first) r else 0.dp,
         bottomStart = if (last) r else 0.dp, bottomEnd = if (last) r else 0.dp,
     )
 }
 
-/** The destination picker field — first field of the header, carries its own label. */
+/** The destination picker — first row of the header, a one-row Material group. */
 @Composable
 private fun DestinationField(name: String?, summary: String?, onClick: () -> Unit) {
-    val p = Theme.palette
-    Row(
-        Modifier.fillMaxWidth()
-            .clip(RoundedCornerShape(Tokens.Radius.card))
-            .background(p.secondaryBackground)
-            .clickable(onClick = onClick)
-            .heightIn(min = 22.dp)
-            .padding(horizontal = Tokens.Spacing.sm, vertical = Tokens.Spacing.xs + 2.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(Tokens.Spacing.sm),
-    ) {
-        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-            if (name != null) {
-                Text("Merge into", style = IosTypography.caption, color = p.secondaryText)
-                Text(name, style = IosTypography.body, color = p.text)
-                if (summary != null) Text(summary, style = IosTypography.caption, color = p.secondaryText)
-            } else {
-                Text("Merge into…", style = IosTypography.body, color = p.secondaryText)
-            }
+    NativeGroup {
+        if (name != null) {
+            NativeListItem(
+                name,
+                supporting = listOfNotNull("Merge into", summary).joinToString(" · "),
+                icon = SF.arrowTriangleMerge,
+                onClick = onClick,
+            )
+        } else {
+            NativeListItem("Merge into…", icon = SF.arrowTriangleMerge, headlineColor = Theme.palette.secondaryText, onClick = onClick)
         }
-        Icon(Icons.Chevron, null, tint = p.secondaryText, modifier = Modifier.size(18.dp))
     }
 }
 
 /** One list row: name, usage line, checkmark when selected as a source. */
 @Composable
 private fun MergeItemRow(name: String, summary: String, checked: Boolean, onClick: () -> Unit) {
-    val p = Theme.palette
-    Row(
-        Modifier.fillMaxWidth().clickable(onClick = onClick).padding(horizontal = Tokens.Spacing.md, vertical = Tokens.Spacing.sm),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(Tokens.Spacing.sm),
-    ) {
-        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-            Text(name, style = IosTypography.body, color = p.text)
-            Text(summary, style = IosTypography.caption, color = p.secondaryText)
-        }
-        if (checked) Icon(Icons.Filled.Check, null, tint = Appearance.tint, modifier = Modifier.size(20.dp))
-    }
-}
-
-/** iOS: the search row of the card / `ToolsSearchField` — magnifier, field, clear button. */
-@Composable
-private fun MergeSearchField(prompt: String, text: String, onChange: (String) -> Unit, modifier: Modifier = Modifier) {
-    val p = Theme.palette
-    Row(modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Tokens.Spacing.xs)) {
-        Icon(SF.magnifyingglass, null, tint = p.secondaryText, modifier = Modifier.size(18.dp))
-        Box(Modifier.weight(1f)) {
-            if (text.isEmpty()) Text(prompt, style = IosTypography.body, color = p.tertiaryText)
-            BasicTextField(
-                value = text, onValueChange = onChange, singleLine = true,
-                textStyle = IosTypography.body.copy(color = p.text),
-                cursorBrush = SolidColor(Appearance.tint),
-                keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.None, autoCorrectEnabled = false),
-                modifier = Modifier.fillMaxWidth(),
-            )
-        }
-        if (text.isNotEmpty()) {
-            Icon(Icons.Filled.Cancel, "Clear search", tint = p.secondaryText, modifier = Modifier.size(18.dp).clickable { onChange("") })
-        }
-    }
+    NativeListItem(
+        name, supporting = summary, onClick = onClick,
+        trailing = if (checked) ({ Icon(Icons.Filled.Check, null, tint = nativeAccent(), modifier = Modifier.size(24.dp)) }) else null,
+    )
 }
 
 @Composable
@@ -793,27 +746,19 @@ private fun <T : MergeableItem> MergeDestinationSheet(
         if (searchText.isEmpty()) base else base.filter { it.name.contains(searchText, ignoreCase = true) }
     }
     val shown = filtered.take(visibleCount)
-    val divider = p.text.copy(alpha = 0.15f)
 
     ModalBottomSheet(onDismissRequest = onCancel, sheetState = state, containerColor = p.background, dragHandle = null) {
-        Column(Modifier.fillMaxSize()) {
-            // iOS: `stashyModalSheetChrome("Merge into", onBack:)`.
-            Box(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp)) {
-                Text("Merge into", style = IosTypography.headline, color = p.text, modifier = Modifier.align(Alignment.Center))
-                Text(
-                    "Cancel", style = IosTypography.body, color = Appearance.tint,
-                    modifier = Modifier.align(Alignment.CenterStart).clickable(onClick = onCancel),
-                )
+        Column(Modifier.fillMaxSize().statusBarsPadding()) {
+            // iOS: `stashyModalSheetChrome("Merge into", onBack:)` — Material sheet header: close ✕ · title.
+            Row(Modifier.fillMaxWidth().padding(horizontal = 4.dp, vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+                androidx.compose.material3.IconButton(onClick = onCancel) { Icon(SF.xmark, "Cancel", tint = p.text) }
+                Text("Merge into", style = NativeType.titleLarge, color = p.text, modifier = Modifier.weight(1f).padding(start = 4.dp))
             }
-            LazyColumn(Modifier.weight(1f).fillMaxWidth(), contentPadding = PaddingValues(horizontal = 20.dp, vertical = 8.dp)) {
-                item(key = "header") {
-                    Text(sectionTitle.uppercase(), style = IosTypography.footnote, color = p.secondaryText, modifier = Modifier.padding(start = 16.dp, bottom = 8.dp))
-                }
+            LazyColumn(Modifier.weight(1f).fillMaxWidth(), contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp)) {
                 item(key = "search") {
-                    Column(Modifier.fillMaxWidth().background(p.secondaryBackground, cardShape(true, shown.isEmpty()))) {
-                        MergeSearchField("Search...", searchText, { searchText = it }, Modifier.padding(horizontal = Tokens.Spacing.md, vertical = Tokens.Spacing.sm))
-                    }
+                    NativeSearchField(searchText, { searchText = it }, "Search...", Modifier.padding(bottom = 12.dp))
                 }
+                item(key = "header") { NativeSectionHeader(sectionTitle) }
                 val more = visibleCount < filtered.size
                 itemsIndexed(shown, key = { _, item -> item.id }) { index, item ->
                     if (index == shown.lastIndex) {
@@ -821,20 +766,15 @@ private fun <T : MergeableItem> MergeDestinationSheet(
                             if (visibleCount < filtered.size) visibleCount += MergeToolsLayout.PAGE_SIZE
                         }
                     }
-                    Column(Modifier.fillMaxWidth().background(p.secondaryBackground, cardShape(false, index == shown.lastIndex && !more))) {
-                        Box(Modifier.fillMaxWidth().padding(start = Tokens.Spacing.md).height(0.5.dp).background(divider))
+                    Column(Modifier.fillMaxWidth().background(p.secondaryBackground, cardShape(index == 0, index == shown.lastIndex && !more))) {
+                        if (index > 0) NativeDivider()
                         MergeItemRow(item.name, item.mergeUsageSummary, checked = false) { onPick(item) }
                     }
                 }
                 if (more) item(key = "more") {
-                    Row(
-                        Modifier.fillMaxWidth().background(p.secondaryBackground, cardShape(false, true))
-                            .padding(horizontal = Tokens.Spacing.md, vertical = Tokens.Spacing.sm),
-                        horizontalArrangement = Arrangement.spacedBy(Tokens.Spacing.xs),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        SmallSpinner()
-                        Text("Loading more...", style = IosTypography.caption, color = p.secondaryText)
+                    Column(Modifier.fillMaxWidth().background(p.secondaryBackground, cardShape(shown.isEmpty(), true))) {
+                        if (shown.isNotEmpty()) NativeDivider()
+                        NativeListItem("Loading more...", headlineColor = p.secondaryText, leading = { SmallSpinner() })
                     }
                 }
                 item { Spacer(Modifier.height(32.dp)) }

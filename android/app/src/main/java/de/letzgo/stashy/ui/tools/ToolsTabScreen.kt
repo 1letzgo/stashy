@@ -174,17 +174,19 @@ private fun ToolsLandingView(onSelect: (ToolsTab) -> Unit) {
             Modifier.fillMaxSize().verticalScroll(rememberScrollState())
                 .padding(horizontal = ToolsTokens.contentPadding)
                 .padding(top = toolsTopPadding() + ToolsTokens.menuTopPadding, bottom = ToolsBottomPadding),
-            verticalArrangement = Arrangement.spacedBy(Tokens.Spacing.lg),
+            verticalArrangement = Arrangement.spacedBy(20.dp),
         ) {
             ToolsTab.groups.forEach { (title, tools) ->
-                Column(verticalArrangement = Arrangement.spacedBy(Tokens.Spacing.xs)) {
-                    Text(title, style = IosTypography.headline, color = p.text, modifier = Modifier.padding(horizontal = 4.dp))
-                    tools.chunked(columns).forEach { row ->
-                        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                            row.forEach { tool -> ToolTile(tool, Modifier.weight(1f)) { onSelect(tool) } }
-                            repeat(columns - row.size) { Spacer(Modifier.weight(1f)) }
+                Column {
+                    // Material section header, as in Settings.
+                    de.letzgo.stashy.ui.NativeSectionHeader(title)
+                    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                        tools.chunked(columns).forEach { row ->
+                            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                                row.forEach { tool -> ToolTile(tool, Modifier.weight(1f)) { onSelect(tool) } }
+                                repeat(columns - row.size) { Spacer(Modifier.weight(1f)) }
+                            }
                         }
-                        Spacer(Modifier.size(0.dp))
                     }
                 }
             }

@@ -2,27 +2,25 @@ package de.letzgo.stashy.ui
 
 import androidx.compose.material3.Typography
 import androidx.compose.ui.text.TextStyle
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.unit.sp
 
-/** iOS Dynamic Type sizes (default content size) so text reads like on the iPhone. */
+/**
+ * The iOS Dynamic Type role names the port grew up with, now resolved to the Material 3 type
+ * scale ([NativeType]) so every screen reads like a native Android app. Prefer [NativeType] in
+ * new code; these names stay so existing call sites keep their semantic role.
+ */
 object IosTypography {
-    val largeTitle = TextStyle(fontSize = 34.sp, fontWeight = FontWeight.Bold, lineHeight = 41.sp)
-    val title = TextStyle(fontSize = 28.sp, fontWeight = FontWeight.Bold, lineHeight = 34.sp)
-    val title2 = TextStyle(fontSize = 22.sp, fontWeight = FontWeight.SemiBold, lineHeight = 28.sp)
-    val title3 = TextStyle(fontSize = 20.sp, fontWeight = FontWeight.SemiBold, lineHeight = 25.sp)
-    val headline = TextStyle(fontSize = 17.sp, fontWeight = FontWeight.SemiBold, lineHeight = 22.sp)
-    val body = TextStyle(fontSize = 17.sp, lineHeight = 22.sp)
-    val callout = TextStyle(fontSize = 16.sp, lineHeight = 21.sp)
-    val subheadline = TextStyle(fontSize = 15.sp, lineHeight = 20.sp)
-    val footnote = TextStyle(fontSize = 13.sp, lineHeight = 18.sp)
-    val caption = TextStyle(fontSize = 12.sp, lineHeight = 16.sp)
-    val caption2 = TextStyle(fontSize = 11.sp, lineHeight = 13.sp)
+    val largeTitle: TextStyle get() = NativeType.headlineLarge
+    val title: TextStyle get() = NativeType.headlineMedium
+    val title2: TextStyle get() = NativeType.headlineSmall
+    val title3: TextStyle get() = NativeType.titleLarge
+    val headline: TextStyle get() = NativeType.titleMedium
+    val body: TextStyle get() = NativeType.bodyLarge
+    val callout: TextStyle get() = NativeType.bodyLarge
+    val subheadline: TextStyle get() = NativeType.bodyMedium
+    val footnote: TextStyle get() = NativeType.bodySmall
+    val caption: TextStyle get() = NativeType.bodySmall
+    val caption2: TextStyle get() = NativeType.labelSmall
 
-    val material = Typography(
-        displayLarge = largeTitle, headlineLarge = title, headlineMedium = title2, headlineSmall = title3,
-        titleLarge = title3, titleMedium = headline, titleSmall = subheadline,
-        bodyLarge = body, bodyMedium = subheadline, bodySmall = footnote,
-        labelLarge = subheadline, labelMedium = caption, labelSmall = caption2,
-    )
+    /** The app's MaterialTheme typography: the stock Material 3 scale. */
+    val material: Typography get() = NativeType
 }

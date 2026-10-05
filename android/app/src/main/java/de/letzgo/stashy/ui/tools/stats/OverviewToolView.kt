@@ -46,6 +46,10 @@ import de.letzgo.stashy.ui.IosTypography
 import de.letzgo.stashy.ui.Nav
 import de.letzgo.stashy.ui.SF
 import de.letzgo.stashy.ui.Theme
+import de.letzgo.stashy.ui.NativeDivider
+import de.letzgo.stashy.ui.NativeGroup
+import de.letzgo.stashy.ui.NativeListItem
+import de.letzgo.stashy.ui.NativeType
 import de.letzgo.stashy.ui.Tokens
 import de.letzgo.stashy.ui.oCounterIcon
 import de.letzgo.stashy.ui.tools.NoServerPlaceholder
@@ -96,7 +100,7 @@ private fun ServerStatisticsContent(serverID: String) {
                     .verticalScroll(rememberScrollState())
                     .padding(horizontal = ToolsTokens.contentPadding)
                     .padding(top = toolsTopPadding() + ToolsTokens.menuTopPadding, bottom = ToolsBottomPadding),
-                verticalArrangement = Arrangement.spacedBy(16.dp),
+                verticalArrangement = Arrangement.spacedBy(20.dp),
             ) {
                 HeroCard(stats)
                 CatalogsCard(stats)
@@ -124,7 +128,7 @@ private fun HeroCard(stats: OverviewStatistics) {
             Triple(Icons.Filled.PieChart, playedShare(stats.scenesPlayed, stats.sceneCount), "Played Share"),
         )
         Column(
-            Modifier.padding(horizontal = 12.dp).padding(top = 4.dp),
+            Modifier.padding(horizontal = 16.dp).padding(top = 8.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
             entries.chunked(2).forEach { row ->
@@ -135,9 +139,9 @@ private fun HeroCard(stats: OverviewStatistics) {
         }
         Text(
             "Library ${statDuration(stats.scenesDuration)}  ·  Ø ${statDuration(avgWatch)}/play  ·  ${statCount(unplayed)} unplayed",
-            style = IosTypography.caption,
+            style = NativeType.bodySmall,
             color = Theme.palette.secondaryText,
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp).padding(top = 6.dp, bottom = 10.dp),
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp).padding(top = 6.dp, bottom = 12.dp),
         )
     }
 }
@@ -146,17 +150,13 @@ private fun HeroCard(stats: OverviewStatistics) {
 private fun HeroStat(icon: ImageVector, value: String, label: String, modifier: Modifier = Modifier) {
     val p = Theme.palette
     Column(modifier, verticalArrangement = Arrangement.spacedBy(6.dp)) {
-        Icon(icon, null, tint = Appearance.tint, modifier = Modifier.size(16.dp))
+        Icon(icon, null, tint = Appearance.tint, modifier = Modifier.size(24.dp))
         Text(
             value,
-            style = IosTypography.title2.copy(fontWeight = FontWeight.Bold).monoDigits(),
+            style = NativeType.headlineSmall.monoDigits(),
             color = p.text, maxLines = 1, softWrap = false, overflow = TextOverflow.Ellipsis,
         )
-        Text(
-            label.uppercase(),
-            fontSize = 10.sp, fontWeight = FontWeight.SemiBold, letterSpacing = 0.8.sp,
-            color = p.secondaryText, maxLines = 1,
-        )
+        Text(label, style = NativeType.bodyMedium, color = p.secondaryText, maxLines = 1)
     }
 }
 
@@ -177,43 +177,12 @@ private fun CatalogsCard(stats: OverviewStatistics) {
         CatalogStatEntry("Tags", stats.tagCount, SF.tag, CatalogTab.Tags),
     )
     StatsCard("Catalogs") {
-        Column(
-            Modifier.padding(horizontal = 12.dp).padding(bottom = 12.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            entries.chunked(2).forEach { row ->
-                Row(horizontalArrangement = Arrangement.spacedBy(ToolsTokens.rankedGridSpacing)) {
-                    row.forEach { CatalogTile(it, Modifier.weight(1f)) }
-                }
+        entries.forEachIndexed { index, entry ->
+            if (index > 0) NativeDivider()
+            NativeListItem(entry.title, icon = entry.icon, onClick = { Nav.openCatalog(entry.tab) }) {
+                Text(statCount(entry.value), style = NativeType.bodyMedium.monoDigits(), color = Theme.palette.secondaryText, maxLines = 1)
             }
         }
-    }
-}
-
-@Composable
-private fun CatalogTile(entry: CatalogStatEntry, modifier: Modifier = Modifier) {
-    val p = Theme.palette
-    val shape = RoundedCornerShape(Tokens.Radius.small)
-    Row(
-        modifier
-            .height(36.dp)
-            .background(p.text.copy(alpha = 0.06f), shape)
-            .clickable { Nav.openCatalog(entry.tab) }
-            .padding(horizontal = 10.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-    ) {
-        Box(Modifier.width(18.dp), contentAlignment = Alignment.Center) {
-            Icon(entry.icon, null, tint = Appearance.tint, modifier = Modifier.size(16.dp))
-        }
-        Text(
-            entry.title, style = IosTypography.caption.copy(fontWeight = FontWeight.SemiBold),
-            color = p.text, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f),
-        )
-        Text(
-            statCount(entry.value), style = IosTypography.subheadline.copy(fontWeight = FontWeight.Bold).monoDigits(),
-            color = p.text, maxLines = 1,
-        )
     }
 }
 
@@ -222,37 +191,28 @@ private fun CatalogTile(entry: CatalogStatEntry, modifier: Modifier = Modifier) 
 @Composable
 private fun StorageCard(stats: OverviewStatistics) {
     StatsCard("Storage") {
-        Column {
-            StatRow("Scenes", formatBytes(stats.scenesSize))
-            Box(Modifier.fillMaxWidth().padding(start = 12.dp).height(0.5.dp).background(Theme.palette.separator))
-            StatRow("Images", formatBytes(stats.imagesSize))
-            Box(Modifier.fillMaxWidth().padding(start = 12.dp).height(0.5.dp).background(Theme.palette.separator))
-            StatRow("Total", formatBytes(stats.scenesSize + stats.imagesSize), emphasize = true)
-        }
+        StatRow("Scenes", formatBytes(stats.scenesSize))
+        NativeDivider()
+        StatRow("Images", formatBytes(stats.imagesSize))
+        NativeDivider()
+        StatRow("Total", formatBytes(stats.scenesSize + stats.imagesSize), emphasize = true)
     }
 }
 
 @Composable
 private fun StatRow(title: String, value: String, emphasize: Boolean = false) {
     val p = Theme.palette
-    val weight = if (emphasize) FontWeight.SemiBold else FontWeight.Normal
-    Row(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
-        Text(title, style = IosTypography.subheadline.copy(fontWeight = weight), color = p.text)
-        Spacer(Modifier.weight(1f))
-        Text(value, style = IosTypography.subheadline.copy(fontWeight = weight).monoDigits(), color = if (emphasize) p.text else p.secondaryText)
+    NativeListItem(title) {
+        Text(value, style = NativeType.bodyMedium.monoDigits(), color = if (emphasize) p.text else p.secondaryText)
     }
 }
 
-/** iOS `statsCard(title:content:)` — category heading above the card, as in Settings. */
+/** iOS `statsCard(title:content:)` — Material section header above a Material group, as in Settings. */
 @Composable
 private fun StatsCard(title: String, content: @Composable ColumnScope.() -> Unit) {
-    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+    Column {
         InsightsSectionHeading(title)
-        Column(
-            Modifier.fillMaxWidth().insightsCard().padding(vertical = 8.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
-            content = content,
-        )
+        NativeGroup(content = content)
     }
 }
 

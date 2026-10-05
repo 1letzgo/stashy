@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -68,6 +69,9 @@ import de.letzgo.stashy.ui.SF
 import de.letzgo.stashy.ui.Screen
 import de.letzgo.stashy.ui.StashyColors
 import de.letzgo.stashy.ui.Theme
+import de.letzgo.stashy.ui.NativeDivider
+import de.letzgo.stashy.ui.NativeGroup
+import de.letzgo.stashy.ui.NativeType
 import de.letzgo.stashy.ui.Tokens
 import de.letzgo.stashy.ui.detail.ImageViewerScreen
 import de.letzgo.stashy.ui.scene.SceneDetailScreen
@@ -410,11 +414,11 @@ private fun SummaryCard(heatmap: OCountMonthHeatmap, selectedDayKey: String?) {
         "O-Count" to countLabel(heatmap.totalInMonth)
     }
     Column(
-        Modifier.fillMaxWidth().insightsCard().padding(12.dp),
+        Modifier.fillMaxWidth().insightsCard().padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(4.dp),
     ) {
-        Text(title.uppercase(), style = IosTypography.caption.copy(fontWeight = FontWeight.SemiBold), color = p.secondaryText, maxLines = 2)
-        Text(value, style = IosTypography.title2.copy(fontWeight = FontWeight.Bold).monoDigits(), color = p.text, maxLines = 1)
+        Text(title, style = NativeType.bodyMedium, color = p.secondaryText, maxLines = 2)
+        Text(value, style = NativeType.headlineSmall.monoDigits(), color = p.text, maxLines = 1)
     }
 }
 
@@ -423,7 +427,7 @@ private fun DayItemsList(items: List<OCountHeatmapItem>) {
     if (items.isEmpty()) return
     val scenes = items.filter { it.kind == OCountHeatmapItem.Kind.Scene }
     val images = items.filter { it.kind == OCountHeatmapItem.Kind.Image }
-    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+    Column(verticalArrangement = Arrangement.spacedBy(20.dp)) {
         if (scenes.isNotEmpty()) DayItemsSection("Scenes", scenes)
         if (images.isNotEmpty()) DayItemsSection("Images", images)
     }
@@ -431,9 +435,14 @@ private fun DayItemsList(items: List<OCountHeatmapItem>) {
 
 @Composable
 private fun DayItemsSection(title: String, items: List<OCountHeatmapItem>) {
-    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+    Column {
         InsightsSectionHeading(title)
-        items.forEach { item -> DayItemRow(item) { openOCountItem(item) } }
+        NativeGroup {
+            items.forEachIndexed { index, item ->
+                if (index > 0) NativeDivider()
+                DayItemRow(item) { openOCountItem(item) }
+            }
+        }
     }
 }
 
@@ -445,21 +454,19 @@ internal fun openOCountItem(item: OCountHeatmapItem) {
     }
 }
 
-/** iOS: `OCountDayItemRow`. */
+/** iOS: `OCountDayItemRow` — Material list row with a leading thumbnail and the day's count. */
 @Composable
 private fun DayItemRow(item: OCountHeatmapItem, onClick: () -> Unit) {
     val p = Theme.palette
     val thumbHeight = 56.dp
     val thumbWidth = if (item.kind == OCountHeatmapItem.Kind.Scene) thumbHeight * 16f / 9f else thumbHeight
-    val radius = Tokens.Radius.card
     Row(
-        Modifier.fillMaxWidth().insightsCard().clickable(onClick = onClick).padding(end = 12.dp),
+        Modifier.fillMaxWidth().heightIn(min = 72.dp).clickable(onClick = onClick).padding(horizontal = 16.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        horizontalArrangement = Arrangement.spacedBy(16.dp),
     ) {
         ThumbPlaceholder(
-            Modifier.width(thumbWidth).height(thumbHeight)
-                .clip(RoundedCornerShape(topStart = radius, bottomStart = radius)),
+            Modifier.width(thumbWidth).height(thumbHeight).clip(RoundedCornerShape(8.dp)),
         ) {
             Icon(
                 when {
@@ -473,15 +480,15 @@ private fun DayItemRow(item: OCountHeatmapItem, onClick: () -> Unit) {
         }
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
             Text(
-                item.displayTitle, style = IosTypography.subheadline.copy(fontWeight = FontWeight.SemiBold),
+                item.displayTitle, style = NativeType.bodyLarge,
                 color = p.text, maxLines = 2, overflow = TextOverflow.Ellipsis,
             )
             val subtitle = if (item.kind == OCountHeatmapItem.Kind.Image && item.performers.isNotEmpty()) {
                 if (item.title == "Untitled") item.kindTitle else item.performerNamesLine
             } else item.rowSubtitle
-            Text(subtitle, style = IosTypography.caption, color = p.secondaryText, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(subtitle, style = NativeType.bodyMedium, color = p.secondaryText, maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
-        Text("${item.countOnDay}", style = IosTypography.title3.copy(fontWeight = FontWeight.Bold).monoDigits(), color = p.text)
+        Text("${item.countOnDay}", style = NativeType.titleMedium.monoDigits(), color = p.text)
     }
 }
 

@@ -45,25 +45,19 @@ import de.letzgo.stashy.ui.cardShadow
 /** iOS `.monospacedDigit()`. */
 internal fun TextStyle.monoDigits(): TextStyle = copy(fontFeatureSettings = "tnum")
 
-/**
- * iOS card chrome used by the stats cards: secondary background, card radius, 0.5 pt
- * `primary.opacity(0.1)` stroke and `cardShadow()`.
- */
+/** Card chrome of the stats cards — the flat Material group surface (16 dp, secondary background). */
 @Composable
-internal fun Modifier.insightsCard(shape: Shape = RoundedCornerShape(Tokens.Radius.card), fill: Color? = null): Modifier {
+internal fun Modifier.insightsCard(shape: Shape = de.letzgo.stashy.ui.NativeGroupShape, fill: Color? = null): Modifier {
     val p = Theme.palette
     return this
-        .cardShadow(shape)
         .clip(shape)
         .background(fill ?: p.secondaryBackground, shape)
-        .border(0.5.dp, p.text.copy(alpha = 0.1f), shape)
 }
 
-/** iOS: `StashySectionHeading` — footnote, secondary, uppercase. */
+/** iOS: `StashySectionHeading` — Material section header (titleSmall, accent), as in Settings. */
 @Composable
-internal fun InsightsSectionHeading(title: String, modifier: Modifier = Modifier) {
-    Text(title.uppercase(), style = IosTypography.footnote, color = Theme.palette.secondaryText, modifier = modifier.fillMaxWidth())
-}
+internal fun InsightsSectionHeading(title: String, modifier: Modifier = Modifier) =
+    de.letzgo.stashy.ui.NativeSectionHeader(title, modifier)
 
 /** iOS: `StandardLoadingView(message:)` — `ProgressView(message)`. */
 @Composable

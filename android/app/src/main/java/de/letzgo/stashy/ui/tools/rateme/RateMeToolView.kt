@@ -98,6 +98,12 @@ import de.letzgo.stashy.ui.Nav
 import de.letzgo.stashy.ui.SF
 import de.letzgo.stashy.ui.StashyColors
 import de.letzgo.stashy.ui.Theme
+import de.letzgo.stashy.ui.NativeDivider
+import de.letzgo.stashy.ui.NativeGroup
+import de.letzgo.stashy.ui.NativeListItem
+import de.letzgo.stashy.ui.NativeSearchField
+import de.letzgo.stashy.ui.NativeSectionFooter
+import de.letzgo.stashy.ui.NativeSectionHeader
 import de.letzgo.stashy.ui.Tokens
 import de.letzgo.stashy.ui.cardShadow
 import de.letzgo.stashy.ui.detail.ImageViewerScreen
@@ -700,84 +706,41 @@ private fun ThemePickerSheet(
             }
             LazyColumn(
                 Modifier.fillMaxWidth(),
-                contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 8.dp, bottom = 32.dp),
+                contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 32.dp),
             ) {
                 item {
-                    Text(
-                        "Search ${kind.title}s".uppercase(), style = IosTypography.footnote, color = p.secondaryText,
-                        modifier = Modifier.padding(start = 16.dp, bottom = 8.dp),
+                    NativeSearchField(
+                        query, { query = it }, "Search ${kind.title}s",
+                        Modifier.padding(bottom = 12.dp),
+                        keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.None, autoCorrectEnabled = false),
+                        trailing = if (RateMePickerOptions.isSearching(storeKind)) ({
+                            CircularProgressIndicator(Modifier.size(20.dp), color = p.secondaryText, strokeWidth = 2.dp)
+                        }) else null,
                     )
                 }
+                item { NativeSectionHeader("${kind.title}s") }
                 item {
-                    Box(
-                        Modifier
-                            .fillMaxWidth()
-                            .background(p.secondaryBackground, RoundedCornerShape(topStart = Tokens.Radius.small, topEnd = Tokens.Radius.small))
-                            .padding(horizontal = 16.dp, vertical = 12.dp),
-                    ) {
-                        if (query.isEmpty()) Text("Search...", style = IosTypography.body, color = p.tertiaryText)
-                        BasicTextField(
-                            value = query,
-                            onValueChange = { query = it },
-                            singleLine = true,
-                            textStyle = IosTypography.body.copy(color = p.text),
-                            cursorBrush = SolidColor(Appearance.tint),
-                            keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.None, autoCorrectEnabled = false),
-                            modifier = Modifier.fillMaxWidth(),
-                        )
-                    }
-                }
-                val rowBg = Modifier.fillMaxWidth().background(p.secondaryBackground)
-                if (RateMePickerOptions.isLoading(storeKind) && options.isEmpty()) {
-                    item {
-                        Row(rowBg.padding(16.dp), horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically) {
-                            CircularProgressIndicator(Modifier.size(18.dp), color = p.secondaryText, strokeWidth = 2.dp)
-                            Spacer(Modifier.width(8.dp))
-                            Text("Loading...", style = IosTypography.subheadline, color = p.secondaryText)
-                        }
-                    }
-                } else {
-                    items(options.take(50), key = { it.id }) { option ->
-                        Column(rowBg) {
-                            Box(Modifier.fillMaxWidth().padding(start = 16.dp).height(0.5.dp).background(p.separator))
-                            Text(
-                                option.name, style = IosTypography.body, color = p.text,
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .clickable {
-                                        view.performRateMeHaptic(RateMeHaptic.Selection)
-                                        onPick(option)
-                                    }
-                                    .padding(horizontal = 16.dp, vertical = 12.dp),
-                            )
-                        }
-                    }
-                    if (options.size > 50) {
-                        item { Text("Type more to refine...", style = IosTypography.caption, color = p.secondaryText, modifier = rowBg.padding(16.dp)) }
-                    }
-                    if (RateMePickerOptions.isSearching(storeKind)) {
-                        item {
-                            Box(rowBg.padding(12.dp), contentAlignment = Alignment.Center) {
-                                CircularProgressIndicator(Modifier.size(18.dp), color = p.secondaryText, strokeWidth = 2.dp)
+                    NativeGroup {
+                        if (RateMePickerOptions.isLoading(storeKind) && options.isEmpty()) {
+                            NativeListItem("Loading...", headlineColor = p.secondaryText, leading = {
+                                CircularProgressIndicator(Modifier.size(24.dp), color = p.secondaryText, strokeWidth = 2.dp)
+                            })
+                        } else if (options.isEmpty()) {
+                            if (query.isNotEmpty() && !RateMePickerOptions.isSearching(storeKind)) {
+                                NativeListItem("No ${kind.title.lowercase()}s match '$query'", headlineColor = p.secondaryText)
+                            }
+                        } else {
+                            options.take(50).forEachIndexed { index, option ->
+                                if (index > 0) NativeDivider()
+                                NativeListItem(option.name, onClick = {
+                                    view.performRateMeHaptic(RateMeHaptic.Selection)
+                                    onPick(option)
+                                })
                             }
                         }
-                    } else if (query.isNotEmpty() && options.isEmpty()) {
-                        item {
-                            Text(
-                                "No ${kind.title.lowercase()}s match '$query'", style = IosTypography.body, color = p.secondaryText,
-                                modifier = rowBg.padding(16.dp),
-                            )
-                        }
                     }
                 }
-                item {
-                    Box(
-                        Modifier
-                            .fillMaxWidth()
-                            .height(Tokens.Radius.small)
-                            .background(p.secondaryBackground, RoundedCornerShape(bottomStart = Tokens.Radius.small, bottomEnd = Tokens.Radius.small)),
-                    )
-                }
+                if (options.size > 50) item { NativeSectionFooter("Type more to refine...") }
             }
         }
     }

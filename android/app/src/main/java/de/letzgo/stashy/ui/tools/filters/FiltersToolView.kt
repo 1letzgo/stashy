@@ -56,7 +56,11 @@ import de.letzgo.stashy.data.ServerConfigManager
 import de.letzgo.stashy.data.tools.FiltersLogic
 import de.letzgo.stashy.data.tools.FiltersToolEntry
 import de.letzgo.stashy.ui.Appearance
-import de.letzgo.stashy.ui.Chevron
+import de.letzgo.stashy.ui.NativeDivider
+import de.letzgo.stashy.ui.NativeGroup
+import de.letzgo.stashy.ui.NativeListItem
+import de.letzgo.stashy.ui.NativeSearchField
+import de.letzgo.stashy.ui.NativeSectionHeader
 import de.letzgo.stashy.ui.IosTypography
 import de.letzgo.stashy.ui.SF
 import de.letzgo.stashy.ui.StashyColors
@@ -70,8 +74,8 @@ import de.letzgo.stashy.ui.tools.showToast
 import de.letzgo.stashy.ui.tools.toolsTopPadding
 
 /** iOS: `StashyExpandingDock.circleSize` / `iconSize`. */
-private val AddButtonSize = 40.dp
-private val AddIconSize = 18.dp
+private val AddButtonSize = 48.dp
+private val AddIconSize = 24.dp
 
 /**
  * iOS: `FiltersToolsView` — Tools › Filters: every saved filter of the server grouped by mode,
@@ -114,7 +118,7 @@ fun FiltersToolView() {
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(Tokens.Spacing.sm),
         ) {
-            FiltersSearchField("Search filters", searchText, { searchText = it }, Modifier.weight(1f))
+            NativeSearchField(searchText, { searchText = it }, "Search filters", Modifier.weight(1f))
             FiltersAddMenu { mode -> createMode = mode }
         }
 
@@ -136,26 +140,21 @@ fun FiltersToolView() {
                         ),
                     ) {
                         grouped.forEachIndexed { sectionIndex, section ->
-                            if (sectionIndex > 0) item(key = "gap-${section.mode}") { Spacer(Modifier.height(Tokens.Spacing.md)) }
+                            if (sectionIndex > 0) item(key = "gap-${section.mode}") { Spacer(Modifier.height(20.dp)) }
                             item(key = "header-${section.mode}") {
-                                // iOS: footnote, secondary, uppercase, zero row insets.
-                                Text(
-                                    FiltersLogic.modeTitle(section.mode).uppercase(),
-                                    style = IosTypography.footnote, color = p.secondaryText,
-                                    modifier = Modifier.fillMaxWidth().padding(bottom = 6.dp),
-                                )
+                                NativeSectionHeader(FiltersLogic.modeTitle(section.mode))
                             }
-                            val count = section.entries.size
-                            section.entries.forEachIndexed { index, entry ->
-                                item(key = "filter-${entry.filter.id}") {
-                                    FilterRow(
-                                        entry = entry,
-                                        isFirst = index == 0,
-                                        isLast = index == count - 1,
-                                        onOpen = { editingEntry = entry },
-                                        onRename = { renameTarget = entry; renameText = entry.filter.name },
-                                        onDelete = { deleteTarget = entry },
-                                    )
+                            item(key = "group-${section.mode}") {
+                                NativeGroup {
+                                    section.entries.forEachIndexed { index, entry ->
+                                        if (index > 0) NativeDivider()
+                                        FilterRow(
+                                            entry = entry,
+                                            onOpen = { editingEntry = entry },
+                                            onRename = { renameTarget = entry; renameText = entry.filter.name },
+                                            onDelete = { deleteTarget = entry },
+                                        )
+                                    }
                                 }
                             }
                         }
@@ -216,15 +215,12 @@ fun FiltersToolView() {
 }
 
 /**
- * One filter row of an inset-grouped section: name, criteria summary, chevron. Tap opens the
- * editor; long press shows Rename / Delete (iOS: context menu + swipe actions).
+ * One filter row of a grouped section: Material list item with name and criteria summary. Tap
+ * opens the editor; long press shows Rename / Delete (iOS: context menu + swipe actions).
  */
-@OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun FilterRow(
     entry: FiltersToolEntry,
-    isFirst: Boolean,
-    isLast: Boolean,
     onOpen: () -> Unit,
     onRename: () -> Unit,
     onDelete: () -> Unit,
@@ -232,44 +228,18 @@ private fun FilterRow(
     val p = Theme.palette
     val haptics = LocalHapticFeedback.current
     var menuOpen by remember { mutableStateOf(false) }
-    val r = Tokens.Radius.small
-    val shape = RoundedCornerShape(
-        topStart = if (isFirst) r else 0.dp, topEnd = if (isFirst) r else 0.dp,
-        bottomStart = if (isLast) r else 0.dp, bottomEnd = if (isLast) r else 0.dp,
-    )
-    Box(Modifier.fillMaxWidth().clip(shape).background(p.secondaryBackground, shape)) {
-        Column {
-            if (!isFirst) {
-                // iOS: `listRowSeparatorTint(Color.primary.opacity(0.15))`, inset like the text.
-                Box(Modifier.fillMaxWidth().padding(start = 16.dp).height(0.5.dp).background(p.text.copy(alpha = 0.15f)))
-            }
-            Row(
-                Modifier
-                    .fillMaxWidth()
-                    .heightIn(min = 44.dp)
-                    .combinedClickable(
-                        onClick = onOpen,
-                        onLongClick = {
-                            haptics.performHapticFeedback(HapticFeedbackType.LongPress)
-                            menuOpen = true
-                        },
-                    )
-                    .padding(horizontal = 16.dp, vertical = 10.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(Tokens.Spacing.sm),
-            ) {
-                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                    Text(entry.filter.name, style = IosTypography.body.copy(fontWeight = FontWeight.Medium), color = p.text)
-                    Text(
-                        FiltersLogic.criteriaSummary(entry),
-                        style = IosTypography.caption, color = p.secondaryText,
-                        maxLines = 1, overflow = TextOverflow.Ellipsis,
-                    )
-                }
-                Icon(Icons.Chevron, null, tint = p.secondaryText, modifier = Modifier.size(18.dp))
-            }
-        }
-        DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
+    Box(Modifier.fillMaxWidth()) {
+        NativeListItem(
+            entry.filter.name,
+            supporting = FiltersLogic.criteriaSummary(entry),
+            supportingMaxLines = 1,
+            onClick = onOpen,
+            onLongClick = {
+                haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                menuOpen = true
+            },
+        )
+        DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }, containerColor = p.secondaryBackground) {
             DropdownMenuItem(
                 text = { Text("Rename", color = p.text) },
                 leadingIcon = { Icon(SF.pencil, null, tint = p.text) },
@@ -279,39 +249,6 @@ private fun FilterRow(
                 text = { Text("Delete", color = StashyColors.systemRed) },
                 leadingIcon = { Icon(SF.trash, null, tint = StashyColors.systemRed) },
                 onClick = { menuOpen = false; onDelete() },
-            )
-        }
-    }
-}
-
-/** iOS: `ToolsSearchField`. */
-@Composable
-private fun FiltersSearchField(prompt: String, text: String, onChange: (String) -> Unit, modifier: Modifier = Modifier) {
-    val p = Theme.palette
-    Row(
-        modifier
-            .clip(RoundedCornerShape(Tokens.Radius.card))
-            .background(p.secondaryBackground)
-            .padding(horizontal = Tokens.Spacing.sm, vertical = Tokens.Spacing.xs + 2.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(Tokens.Spacing.xs),
-    ) {
-        Icon(SF.magnifyingglass, null, tint = p.secondaryText, modifier = Modifier.size(18.dp))
-        Box(Modifier.weight(1f)) {
-            if (text.isEmpty()) Text(prompt, style = IosTypography.body, color = p.secondaryText, maxLines = 1)
-            BasicTextField(
-                value = text,
-                onValueChange = onChange,
-                singleLine = true,
-                textStyle = IosTypography.body.copy(color = p.text),
-                cursorBrush = SolidColor(Appearance.tint),
-                modifier = Modifier.fillMaxWidth(),
-            )
-        }
-        if (text.isNotEmpty()) {
-            Icon(
-                Icons.Filled.Cancel, "Clear search", tint = p.secondaryText,
-                modifier = Modifier.size(18.dp).clip(CircleShape).clickable { onChange("") },
             )
         }
     }

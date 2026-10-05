@@ -98,6 +98,14 @@ import de.letzgo.stashy.ui.Nav
 import de.letzgo.stashy.ui.SF
 import de.letzgo.stashy.ui.StashyColors
 import de.letzgo.stashy.ui.Theme
+import de.letzgo.stashy.ui.NativeDivider
+import de.letzgo.stashy.ui.NativeGroup
+import de.letzgo.stashy.ui.NativeListItem
+import de.letzgo.stashy.ui.NativeSearchField
+import de.letzgo.stashy.ui.NativeSectionHeader
+import de.letzgo.stashy.ui.NativeSwitchItem
+import de.letzgo.stashy.ui.NativeType
+import de.letzgo.stashy.ui.nativeAccent
 import de.letzgo.stashy.ui.Tokens
 import de.letzgo.stashy.ui.cardShadow
 import de.letzgo.stashy.ui.components.formatDuration
@@ -157,11 +165,11 @@ fun DownloadsToolView() {
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(Tokens.Spacing.sm),
         ) {
-            DownloadsSearchField("Search downloads", search, { search = it }, Modifier.weight(1f))
+            NativeSearchField(search, { search = it }, "Search downloads", Modifier.weight(1f))
             Box(
-                Modifier.size(DownloadsCircleSize).clip(CircleShape).background(Appearance.tint).clickable { showingJobSheet = true },
+                Modifier.size(48.dp).clip(CircleShape).background(Appearance.tint).clickable { showingJobSheet = true },
                 contentAlignment = Alignment.Center,
-            ) { Icon(SF.plus, "New sync job", tint = Color.White, modifier = Modifier.size(DownloadsIconSize)) }
+            ) { Icon(SF.plus, "New sync job", tint = Color.White, modifier = Modifier.size(24.dp)) }
         }
 
         if (jobs.isNotEmpty()) SyncJobRow(
@@ -203,17 +211,27 @@ fun DownloadsToolView() {
             ) {
                 if (running.isNotEmpty()) {
                     sectionHeading("Active Downloads")
-                    items(running, key = { "active-${it.id}" }) { d ->
-                        ActiveDownloadRow(d, Modifier.padding(horizontal = ToolsTokens.contentPadding).padding(bottom = 12.dp))
+                    item(key = "active-group") {
+                        NativeGroup(Modifier.padding(horizontal = ToolsTokens.contentPadding)) {
+                            running.forEachIndexed { index, d ->
+                                if (index > 0) NativeDivider()
+                                ActiveDownloadRow(d)
+                            }
+                        }
                     }
-                    item { Spacer(Modifier.height(8.dp)) }
+                    item { Spacer(Modifier.height(20.dp)) }
                 }
                 if (queued.isNotEmpty()) {
                     sectionHeading("Queued")
-                    items(queued, key = { "queued-${it.id}" }) { d ->
-                        QueuedDownloadRow(d, Modifier.padding(horizontal = ToolsTokens.contentPadding).padding(bottom = 12.dp))
+                    item(key = "queued-group") {
+                        NativeGroup(Modifier.padding(horizontal = ToolsTokens.contentPadding)) {
+                            queued.forEachIndexed { index, d ->
+                                if (index > 0) NativeDivider()
+                                QueuedDownloadRow(d)
+                            }
+                        }
                     }
-                    item { Spacer(Modifier.height(8.dp)) }
+                    item { Spacer(Modifier.height(20.dp)) }
                 }
                 if (scenes.isNotEmpty()) {
                     sectionHeading("Scenes")
@@ -286,13 +304,10 @@ internal fun downloadsGridColumns(ideal: Dp, minimum: Int, maximum: Int, spacing
     return count.coerceIn(minimum, maximum)
 }
 
-/** iOS: `downloadsSectionHeading` — small caps footnote flush with the content edge, 8 pt above the cards. */
+/** Material section header (Settings style) above a downloads section. */
 private fun LazyListScope.sectionHeading(title: String) {
     item(key = "heading-$title") {
-        Text(
-            title.uppercase(), style = IosTypography.footnote, color = Theme.palette.secondaryText,
-            modifier = Modifier.fillMaxWidth().padding(horizontal = ToolsTokens.contentPadding).padding(bottom = 8.dp),
-        )
+        NativeSectionHeader(title, Modifier.padding(horizontal = ToolsTokens.contentPadding))
     }
 }
 
@@ -334,40 +349,6 @@ private fun LazyListScope.downloadSection(
     item { Spacer(Modifier.height(8.dp)) }
 }
 
-// MARK: - Search field
-
-/** iOS: `ToolsSearchField` — magnifier, field, clear button on the secondary background. */
-@Composable
-internal fun DownloadsSearchField(prompt: String, text: String, onChange: (String) -> Unit, modifier: Modifier = Modifier) {
-    val p = Theme.palette
-    Row(
-        modifier
-            .background(p.secondaryBackground, RoundedCornerShape(Tokens.Radius.card))
-            .padding(horizontal = Tokens.Spacing.sm, vertical = Tokens.Spacing.xs + 2.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(Tokens.Spacing.xs),
-    ) {
-        Icon(SF.magnifyingglass, null, tint = p.secondaryText, modifier = Modifier.size(18.dp))
-        Box(Modifier.weight(1f)) {
-            if (text.isEmpty()) Text(prompt, style = IosTypography.body, color = p.tertiaryText, maxLines = 1)
-            BasicTextField(
-                value = text,
-                onValueChange = onChange,
-                singleLine = true,
-                textStyle = IosTypography.body.copy(color = p.text),
-                cursorBrush = SolidColor(Appearance.tint),
-                modifier = Modifier.fillMaxWidth(),
-            )
-        }
-        if (text.isNotEmpty()) {
-            Icon(
-                Icons.Filled.Cancel, "Clear search", tint = p.secondaryText,
-                modifier = Modifier.size(18.dp).clip(CircleShape).clickable { onChange("") },
-            )
-        }
-    }
-}
-
 // MARK: - Sync jobs
 
 /** iOS: `syncJobRow` — heading, run-all button and one pill per job (long press deletes). */
@@ -382,12 +363,8 @@ private fun SyncJobRow(
     val p = Theme.palette
     Column(
         Modifier.fillMaxWidth().padding(top = Tokens.Spacing.sm, bottom = Tokens.Spacing.md),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        Text(
-            "SYNC JOBS", style = IosTypography.footnote, color = p.secondaryText,
-            modifier = Modifier.padding(horizontal = ToolsTokens.contentPadding),
-        )
+        NativeSectionHeader("Sync jobs", Modifier.padding(horizontal = ToolsTokens.contentPadding))
         Row(
             Modifier.padding(horizontal = ToolsTokens.contentPadding),
             horizontalArrangement = Arrangement.spacedBy(Tokens.Spacing.xs),
@@ -459,53 +436,34 @@ private fun DownloadSyncJobSheet(
                 Modifier.weight(1f).fillMaxWidth(),
                 contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = ToolsTokens.contentPadding, vertical = 8.dp),
             ) {
-                item { SheetHeader("Search …") }
-                item { DownloadsSearchField("Search filters", search, { search = it }, Modifier.fillMaxWidth()) }
-                item { Spacer(Modifier.height(Tokens.Spacing.md)) }
-                item { SheetHeader("Filter") }
+                item { NativeSearchField(search, { search = it }, "Search filters") }
+                item { Spacer(Modifier.height(20.dp)) }
+                item { NativeSectionHeader("Filter") }
                 item {
                     GroupedCard {
                         if (usable.isEmpty()) {
-                            Text(
-                                "No scene or image filters on this server", style = IosTypography.body, color = p.secondaryText,
-                                modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
-                            )
+                            NativeListItem("No scene or image filters on this server", headlineColor = p.secondaryText)
                         }
                         usable.forEachIndexed { index, filter ->
-                            if (index > 0) RowDivider(startInset = 16.dp)
-                            Row(
-                                Modifier.fillMaxWidth().clickable { selectedId = filter.id }.padding(horizontal = 16.dp, vertical = 12.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(Tokens.Spacing.sm),
-                            ) {
-                                Icon(if (filter.isScenes) SF.film else SF.photo, null, tint = p.secondaryText, modifier = Modifier.size(20.dp))
-                                Text(filter.name, style = IosTypography.body.copy(fontWeight = FontWeight.Medium), color = p.text, modifier = Modifier.weight(1f))
-                                if (selectedId == filter.id) Icon(Icons.Filled.Check, null, tint = Appearance.tint, modifier = Modifier.size(20.dp))
-                            }
+                            if (index > 0) RowDivider()
+                            NativeListItem(
+                                filter.name,
+                                icon = if (filter.isScenes) SF.film else SF.photo,
+                                iconTint = p.secondaryText,
+                                onClick = { selectedId = filter.id },
+                                trailing = if (selectedId == filter.id) ({ Icon(Icons.Filled.Check, null, tint = nativeAccent(), modifier = Modifier.size(24.dp)) }) else null,
+                            )
                         }
                     }
                 }
-                item { Spacer(Modifier.height(Tokens.Spacing.md)) }
-                item { SheetHeader("Amount per run") }
+                item { Spacer(Modifier.height(20.dp)) }
+                item { NativeSectionHeader("Amount per run") }
                 item {
                     GroupedCard {
-                        Row(
-                            Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            Text("All matching items", style = IosTypography.body, color = p.text, modifier = Modifier.weight(1f))
-                            Switch(
-                                checked = everything, onCheckedChange = { everything = it },
-                                colors = SwitchDefaults.colors(checkedTrackColor = Appearance.tint, checkedThumbColor = Color.White),
-                            )
-                        }
+                        NativeSwitchItem("All matching items", everything, onCheckedChange = { everything = it })
                         if (!everything) {
-                            RowDivider(startInset = 16.dp)
-                            Row(
-                                Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                            ) {
-                                Text("Newest $amount", style = IosTypography.body, color = p.text, modifier = Modifier.weight(1f))
+                            NativeDivider()
+                            NativeListItem("Newest $amount") {
                                 StepperControl(
                                     onDecrement = { amount = (amount - (if (amount < 20) 1 else 10)).coerceAtLeast(1) },
                                     onIncrement = { amount = (amount + (if (amount < 20) 1 else 10)).coerceAtMost(500) },
@@ -521,36 +479,21 @@ private fun DownloadSyncJobSheet(
                 Modifier.fillMaxWidth().background(p.background)
                     .padding(horizontal = ToolsTokens.contentPadding).padding(top = 6.dp, bottom = 12.dp).navigationBarsPadding(),
             ) {
-                Box(
-                    Modifier.fillMaxWidth().clip(RoundedCornerShape(50)).background(p.secondaryBackground)
-                        .clickable(enabled = enabled) {
-                            val id = selectedId ?: return@clickable
-                            val filter = savedFilters[id] ?: return@clickable
-                            onSave(
-                                DownloadSyncJob(
-                                    filterId = id, filterName = filter.name,
-                                    kind = if (filter.isImages) DownloadSyncJob.Kind.Images else DownloadSyncJob.Kind.Scenes,
-                                    amount = if (everything) 0 else amount,
-                                ),
-                            )
-                            onDismiss()
-                        }
-                        .padding(vertical = 14.dp),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Text(
-                        "Save job", style = IosTypography.subheadline.copy(fontWeight = FontWeight.SemiBold),
-                        color = if (enabled) p.text else p.secondaryText,
+                de.letzgo.stashy.ui.NativeButton("Save job", Modifier.fillMaxWidth(), enabled = enabled) {
+                    val id = selectedId ?: return@NativeButton
+                    val filter = savedFilters[id] ?: return@NativeButton
+                    onSave(
+                        DownloadSyncJob(
+                            filterId = id, filterName = filter.name,
+                            kind = if (filter.isImages) DownloadSyncJob.Kind.Images else DownloadSyncJob.Kind.Scenes,
+                            amount = if (everything) 0 else amount,
+                        ),
                     )
+                    onDismiss()
                 }
             }
         }
     }
-}
-
-@Composable
-private fun SheetHeader(title: String) {
-    Text(title.uppercase(), style = IosTypography.footnote, color = Theme.palette.secondaryText, modifier = Modifier.padding(bottom = 8.dp))
 }
 
 /** iOS `Stepper` look: − | + in one rounded capsule. */
@@ -573,17 +516,17 @@ private fun StepperControl(onDecrement: () -> Unit, onIncrement: () -> Unit, can
 
 // MARK: - Active / queued rows
 
-/** iOS: `activeDownloadRow` — title, cancel, progress bar, caption. */
+/** iOS: `activeDownloadRow` — title, cancel, progress bar, caption (row of a Material group). */
 @Composable
 private fun ActiveDownloadRow(download: ActiveDownload, modifier: Modifier = Modifier) {
     val p = Theme.palette
     Column(
-        modifier.fillMaxWidth().clip(RoundedCornerShape(Tokens.Radius.card)).background(p.secondaryBackground).padding(16.dp),
+        modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp),
         verticalArrangement = Arrangement.spacedBy(6.dp),
     ) {
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Tokens.Spacing.sm)) {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
             Text(
-                download.title, style = IosTypography.subheadline.copy(fontWeight = FontWeight.Medium), color = p.text,
+                download.title, style = NativeType.bodyLarge, color = p.text,
                 maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f),
             )
             CancelDownloadButton(download.id)
@@ -595,27 +538,18 @@ private fun ActiveDownloadRow(download: ActiveDownload, modifier: Modifier = Mod
             color = Appearance.tint,
             trackColor = p.separator,
         )
-        Text(DownloadsFormat.progressCaption(download), style = IosTypography.caption2, color = p.secondaryText)
+        Text(DownloadsFormat.progressCaption(download), style = NativeType.bodyMedium, color = p.secondaryText)
     }
 }
 
 /** iOS: `queuedDownloadRow` — waiting for one of the two transfer slots. */
 @Composable
 private fun QueuedDownloadRow(download: ActiveDownload, modifier: Modifier = Modifier) {
-    val p = Theme.palette
-    Row(
-        modifier.fillMaxWidth().clip(RoundedCornerShape(Tokens.Radius.card)).background(p.secondaryBackground).padding(16.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(Tokens.Spacing.sm),
-    ) {
-        Icon(SF.clock, null, tint = p.secondaryText, modifier = Modifier.size(18.dp))
-        Text(
-            download.title, style = IosTypography.subheadline.copy(fontWeight = FontWeight.Medium), color = p.text,
-            maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f),
-        )
-        Text("Queued", style = IosTypography.caption2, color = p.secondaryText)
-        CancelDownloadButton(download.id)
-    }
+    NativeListItem(
+        download.title, modifier, supporting = "Queued", supportingMaxLines = 1,
+        icon = SF.clock, iconTint = Theme.palette.secondaryText,
+        trailing = { CancelDownloadButton(download.id) },
+    )
 }
 
 @Composable

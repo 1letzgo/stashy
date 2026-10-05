@@ -72,53 +72,55 @@ fun FeedsFilterSortSheet(
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = state, containerColor = p.background) {
         Column(Modifier.fillMaxSize().navigationBarsPadding().imePadding()) {
             // iOS `CatalogSettingsSheetChromeBar`.
-            Row(
-                Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                SheetPill("Reset", StashyColors.systemRed, onReset)
-                Text("Settings", Modifier.weight(1f), style = IosTypography.title3, color = p.text, maxLines = 1)
-                SheetPill("Done", Color.White, onDismiss)
-            }
-            Spacer(Modifier.height(16.dp))
-            Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                // Filter
-                ControlCard {
-                    ControlLabel("Filter")
-                    Spacer(Modifier.weight(1f))
-                    val entries = buildList {
-                        add(MenuEntry<String?>(null, "None", 0))
-                        filters.forEach { add(MenuEntry<String?>(it.id, it.name, 1)) }
-                    }
-                    MenuPicker(selectedFilter?.id, entries, selectedLabel = selectedFilter?.name ?: "None") { id ->
-                        onFilter(id?.let { fid -> filters.firstOrNull { it.id == fid } })
-                    }
-                }
-                // Sort (iOS `sortControlsCard` / `markerSortControlsCard`)
-                val kinds: List<SortFieldKind> = when (mode) {
-                    ReelsModeType.Markers -> FeedSortKinds.marker
-                    ReelsModeType.Clips, ReelsModeType.Pics -> FeedSortKinds.image
-                    else -> FeedSortKinds.scene
-                }
-                val ascending = sort.direction == "ASC"
-                val random = sort.isRandom
-                ControlCard {
-                    ControlLabel("Sort")
-                    Row(Modifier.alpha(if (random) 0.4f else 1f), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                        CatalogFilterChip("Asc", ascending && !random) { if (!random) FeedSortKinds.option(sortOptions, sort.sortField, true)?.let(onSort) }
-                        CatalogFilterChip("Desc", !ascending && !random) { if (!random) FeedSortKinds.option(sortOptions, sort.sortField, false)?.let(onSort) }
-                    }
-                    Spacer(Modifier.weight(1f))
-                    MenuPicker(sort.sortField, kinds.map { MenuEntry(it.field, it.menuLabel) }) { field ->
-                        val asc = if (random) false else ascending
-                        FeedSortKinds.option(sortOptions, field, asc)?.let(onSort)
+            de.letzgo.stashy.ui.filter.SheetChromeBar(onReset = onReset, onSave = null, onDone = onDismiss)
+            Spacer(Modifier.height(8.dp))
+            Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(20.dp)) {
+                Column {
+                    de.letzgo.stashy.ui.NativeSectionHeader("Filter & sort", Modifier.padding(horizontal = 16.dp))
+                    de.letzgo.stashy.ui.filter.ControlGroup {
+                        // Filter
+                        ControlCard {
+                            ControlLabel("Filter")
+                            Spacer(Modifier.weight(1f))
+                            val entries = buildList {
+                                add(MenuEntry<String?>(null, "None", 0))
+                                filters.forEach { add(MenuEntry<String?>(it.id, it.name, 1)) }
+                            }
+                            MenuPicker(selectedFilter?.id, entries, selectedLabel = selectedFilter?.name ?: "None") { id ->
+                                onFilter(id?.let { fid -> filters.firstOrNull { it.id == fid } })
+                            }
+                        }
+                        // Sort (iOS `sortControlsCard` / `markerSortControlsCard`)
+                        val kinds: List<SortFieldKind> = when (mode) {
+                            ReelsModeType.Markers -> FeedSortKinds.marker
+                            ReelsModeType.Clips, ReelsModeType.Pics -> FeedSortKinds.image
+                            else -> FeedSortKinds.scene
+                        }
+                        val ascending = sort.direction == "ASC"
+                        val random = sort.isRandom
+                        de.letzgo.stashy.ui.NativeDivider()
+                        ControlCard {
+                            ControlLabel("Sort")
+                            Row(Modifier.alpha(if (random) 0.4f else 1f), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                CatalogFilterChip("Asc", ascending && !random) { if (!random) FeedSortKinds.option(sortOptions, sort.sortField, true)?.let(onSort) }
+                                CatalogFilterChip("Desc", !ascending && !random) { if (!random) FeedSortKinds.option(sortOptions, sort.sortField, false)?.let(onSort) }
+                            }
+                            Spacer(Modifier.weight(1f))
+                            MenuPicker(sort.sortField, kinds.map { MenuEntry(it.field, it.menuLabel) }) { field ->
+                                val asc = if (random) false else ascending
+                                FeedSortKinds.option(sortOptions, field, asc)?.let(onSort)
+                            }
+                        }
                     }
                 }
                 // iOS `FeedsPlaybackSettingsCard`.
-                ControlToggleRow("Immersive", FeedsConfig.fillHeight) { FeedsConfig.updateFillHeight(it) }
-                ControlToggleRow("Continuous", FeedsConfig.continuousPlay) { FeedsConfig.updateContinuousPlay(it) }
-                ControlToggleRow("Delete button", FeedsConfig.showsDeleteButton) { FeedsConfig.updateShowsDeleteButton(it) }
+                de.letzgo.stashy.ui.filter.ControlGroup {
+                    ControlToggleRow("Immersive", FeedsConfig.fillHeight) { FeedsConfig.updateFillHeight(it) }
+                    de.letzgo.stashy.ui.NativeDivider()
+                    ControlToggleRow("Continuous", FeedsConfig.continuousPlay) { FeedsConfig.updateContinuousPlay(it) }
+                    de.letzgo.stashy.ui.NativeDivider()
+                    ControlToggleRow("Delete button", FeedsConfig.showsDeleteButton) { FeedsConfig.updateShowsDeleteButton(it) }
+                }
                 androidx.compose.runtime.key(mode, selectedFilter?.id) {
                     FilterCriteriaEditor(FeedsModel.criteriaDocument(mode), onChange = onCriteriaChanged)
                 }
@@ -128,11 +130,3 @@ fun FeedsFilterSortSheet(
     }
 }
 
-@Composable
-private fun SheetPill(title: String, color: Color, onClick: () -> Unit) {
-    Text(
-        title,
-        Modifier.stashyGlass(RoundedCornerShape(50)).noIndicationClick(onClick).padding(horizontal = 14.dp, vertical = 9.dp),
-        style = IosTypography.subheadline.copy(fontWeight = FontWeight.SemiBold), color = color,
-    )
-}

@@ -4,6 +4,8 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
@@ -22,6 +24,8 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -42,38 +46,64 @@ import de.letzgo.stashy.ui.Appearance
 import de.letzgo.stashy.ui.IosTypography
 import de.letzgo.stashy.ui.SF
 import de.letzgo.stashy.ui.Theme
+import de.letzgo.stashy.ui.NativeGroup
+import de.letzgo.stashy.ui.NativeGroupShape
+import de.letzgo.stashy.ui.NativeSwitch
+import de.letzgo.stashy.ui.NativeType
+import de.letzgo.stashy.ui.NativeValueLabel
 import de.letzgo.stashy.ui.Tokens
 
 /** iOS: `CatalogFilterSortSheetLayout`. */
 object FilterSheetLayout {
     val labelColumnWidth = 80.dp
-    val controlCardMinHeight = 52.dp
+    /** Material list item height (Settings rows). */
+    val controlCardMinHeight = 56.dp
 }
 
-/** iOS: `catalogFilterSortControlCardChrome()` — card with 16 inset inside a 16 page margin. */
+/** True inside a [ControlGroup]: [ControlCard]s render as plain rows of that group. */
+private val LocalControlCardInGroup = compositionLocalOf { false }
+
+/** iOS: `catalogFilterSortControlCardChrome()` — a one-row Material group inside a 16 dp page margin. */
 fun Modifier.controlCardChrome(): Modifier = this
     .padding(horizontal = 16.dp)
     .fillMaxWidth()
     .defaultMinSize(minHeight = FilterSheetLayout.controlCardMinHeight)
-    .clip(RoundedCornerShape(12.dp))
+    .clip(NativeGroupShape)
 
+/**
+ * Several control rows in one Material group (Settings look) — put [ControlCard]s inside and
+ * separate them with [NativeDivider].
+ */
+@Composable
+fun ControlGroup(modifier: Modifier = Modifier, content: @Composable ColumnScope.() -> Unit) {
+    NativeGroup(modifier.padding(horizontal = 16.dp)) {
+        CompositionLocalProvider(LocalControlCardInGroup provides true) { content() }
+    }
+}
+
+/** One control row (Material list item metrics); standalone it is its own rounded group. */
 @Composable
 fun ControlCard(modifier: Modifier = Modifier, content: @Composable RowScope.() -> Unit) {
     val p = Theme.palette
+    val base = if (LocalControlCardInGroup.current) {
+        modifier.fillMaxWidth().defaultMinSize(minHeight = FilterSheetLayout.controlCardMinHeight)
+    } else {
+        modifier.controlCardChrome().background(p.secondaryBackground)
+    }
     Row(
-        modifier.controlCardChrome().background(p.secondaryBackground).padding(horizontal = 16.dp, vertical = 10.dp),
+        base.padding(horizontal = 16.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(12.dp),
         content = content,
     )
 }
 
-/** Label column of the Filter / Sort / Type rows (`.subheadline.semibold`, secondary, 80 wide). */
+/** Headline of the Filter / Sort / Type rows — Material list headline (bodyLarge), ≥ 80 wide. */
 @Composable
 fun ControlLabel(text: String) {
     Text(
-        text, Modifier.width(FilterSheetLayout.labelColumnWidth),
-        style = IosTypography.subheadline.copy(fontWeight = FontWeight.SemiBold), color = Theme.palette.secondaryText, maxLines = 1,
+        text, Modifier.widthIn(min = FilterSheetLayout.labelColumnWidth),
+        style = NativeType.bodyLarge, color = Theme.palette.text, maxLines = 1,
     )
 }
 
@@ -111,13 +141,9 @@ fun <T> MenuPicker(
     var open by remember { mutableStateOf(false) }
     val label = selectedLabel ?: entries.firstOrNull { it.value == selected }?.label ?: ""
     Box(modifier) {
-        Row(
-            Modifier.clip(RoundedCornerShape(8.dp)).clickable { open = true }.padding(vertical = 4.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(4.dp),
-        ) {
-            Text(label, style = IosTypography.body, color = Appearance.tint, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            Icon(SF.chevronUpChevronDown, null, tint = Appearance.tint, modifier = Modifier.size(16.dp))
+        // Settings value-picker look: value + Material dropdown arrow.
+        Box(Modifier.clip(RoundedCornerShape(8.dp)).clickable { open = true }.padding(start = 8.dp, top = 4.dp, bottom = 4.dp)) {
+            NativeValueLabel(label)
         }
         DropdownMenu(open, onDismissRequest = { open = false }, containerColor = Theme.palette.secondaryBackground) {
             var lastSection = entries.firstOrNull()?.section ?: 0
@@ -173,9 +199,6 @@ fun ControlToggleRow(label: String, checked: Boolean, onChange: (Boolean) -> Uni
     ControlCard {
         ControlLabel(label)
         Spacer(Modifier.weight(1f))
-        androidx.compose.material3.Switch(
-            checked, onChange,
-            colors = androidx.compose.material3.SwitchDefaults.colors(checkedTrackColor = Appearance.tint),
-        )
+        NativeSwitch(checked, onChange)
     }
 }

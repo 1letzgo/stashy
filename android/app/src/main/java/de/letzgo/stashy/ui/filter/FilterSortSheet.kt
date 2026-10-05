@@ -44,6 +44,10 @@ import de.letzgo.stashy.ui.Appearance
 import de.letzgo.stashy.ui.IosTypography
 import de.letzgo.stashy.ui.StashyColors
 import de.letzgo.stashy.ui.Theme
+import de.letzgo.stashy.ui.NativeDivider
+import de.letzgo.stashy.ui.NativeSectionHeader
+import de.letzgo.stashy.ui.NativeTextButton
+import de.letzgo.stashy.ui.NativeType
 import de.letzgo.stashy.ui.catalog.CatalogController
 import de.letzgo.stashy.ui.stashyGlass
 
@@ -78,11 +82,17 @@ fun CatalogFilterSortSheet(
                 onSave = { showSaveChoice = true },
                 onDone = { controller.isSheetPresented = false },
             )
-            Spacer(Modifier.height(16.dp))
-            Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                FilterPickerCard(controller)
-                if (controller.mode == FilterMode.Groups) GroupSortCard(controller.sort) { controller.changeSort(it) }
-                else SortCard(controller.mode, controller.sort) { controller.changeSort(it) }
+            Spacer(Modifier.height(8.dp))
+            Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(20.dp)) {
+                Column {
+                    NativeSectionHeader("Filter & sort", Modifier.padding(horizontal = 16.dp))
+                    ControlGroup {
+                        FilterPickerCard(controller)
+                        NativeDivider()
+                        if (controller.mode == FilterMode.Groups) GroupSortCard(controller.sort) { controller.changeSort(it) }
+                        else SortCard(controller.mode, controller.sort) { controller.changeSort(it) }
+                    }
+                }
                 extraCards()
                 FilterCriteriaEditor(controller.criteria, onChange = { controller.applyLive() })
                 Spacer(Modifier.height(24.dp))
@@ -120,28 +130,18 @@ fun CatalogFilterSortSheet(
 
 private enum class NameDialog { SaveAs, Rename }
 
-/** iOS: `CatalogSettingsSheetChromeBar` — Reset (red) · "Settings" · Save · Done. */
+/** iOS: `CatalogSettingsSheetChromeBar` — Material sheet header: "Settings" · Reset (red) · Save · Done. */
 @Composable
-private fun SheetChromeBar(onReset: () -> Unit, onSave: () -> Unit, onDone: () -> Unit) {
+internal fun SheetChromeBar(onReset: () -> Unit, onSave: (() -> Unit)?, onDone: () -> Unit, title: String = "Settings") {
     Row(
-        Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp),
+        Modifier.fillMaxWidth().padding(start = 16.dp, end = 8.dp, top = 4.dp, bottom = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        ChromePill("Reset", StashyColors.systemRed, onReset)
-        Text("Settings", Modifier.weight(1f), style = IosTypography.title3, color = Theme.palette.text, maxLines = 1)
-        ChromePill("Save", Color.White, onSave)
-        ChromePill("Done", Color.White, onDone)
+        Text(title, Modifier.weight(1f), style = NativeType.titleLarge, color = Theme.palette.text, maxLines = 1)
+        NativeTextButton("Reset", color = StashyColors.systemRed, onClick = onReset)
+        if (onSave != null) NativeTextButton("Save", onClick = onSave)
+        NativeTextButton("Done", onClick = onDone)
     }
-}
-
-@Composable
-private fun ChromePill(title: String, color: Color, onClick: () -> Unit) {
-    Text(
-        title,
-        Modifier.stashyGlass(RoundedCornerShape(50)).clickable(onClick = onClick).padding(horizontal = 14.dp, vertical = 9.dp),
-        style = IosTypography.subheadline.copy(fontWeight = FontWeight.SemiBold), color = color,
-    )
 }
 
 /** iOS: `filterPickerCard` — None, server filters (section), local presets (section). */
@@ -195,8 +195,9 @@ fun SortCard(mode: FilterMode, sort: SortOption, onChange: (SortOption) -> Unit)
 /** iOS: `GroupsCatalogFilterSortSheet` — "Sort" heading and a menu over every `GroupSortOption`. */
 @Composable
 private fun GroupSortCard(sort: SortOption, onChange: (SortOption) -> Unit) {
-    Column(Modifier.padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Text("Sort", style = IosTypography.subheadline.copy(fontWeight = FontWeight.SemiBold), color = Theme.palette.secondaryText)
+    ControlCard {
+        ControlLabel("Sort")
+        Spacer(Modifier.weight(1f))
         MenuPicker(sort.raw, SortCatalog.groups.map { MenuEntry(it.raw, it.label) }) { raw ->
             SortCatalog.option(FilterMode.Groups, raw)?.let(onChange)
         }

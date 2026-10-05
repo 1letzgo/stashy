@@ -152,20 +152,13 @@ fun SceneModalSheet(
         containerColor = p.background,
         dragHandle = null,
     ) {
-        Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
-            Box(Modifier.size(36.dp).clip(CircleShape).background(p.secondaryBackground).clickable(onClick = onDismiss), contentAlignment = Alignment.Center) {
-                Icon(PlayerIcons.close, "Close", tint = p.text, modifier = Modifier.size(18.dp))
-            }
-            Text(title, Modifier.weight(1f).padding(horizontal = 12.dp), style = IosTypography.headline, color = p.text, maxLines = 1)
+        // Material sheet header: close ✕ · title · text action (like the other tool sheets).
+        Row(Modifier.fillMaxWidth().padding(horizontal = 4.dp, vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+            androidx.compose.material3.IconButton(onClick = onDismiss) { Icon(PlayerIcons.close, "Close", tint = p.text) }
+            Text(title, Modifier.weight(1f).padding(start = 4.dp), style = de.letzgo.stashy.ui.NativeType.titleLarge, color = p.text, maxLines = 1)
             if (actionTitle != null) {
-                if (actionBusy) CircularProgressIndicator(Modifier.size(20.dp), color = Appearance.tint, strokeWidth = 2.dp)
-                else Text(
-                    actionTitle,
-                    Modifier.clip(RoundedCornerShape(50)).background(if (actionEnabled) Appearance.tint else p.secondaryBackground)
-                        .clickable(enabled = actionEnabled, onClick = onAction).padding(horizontal = 14.dp, vertical = 8.dp),
-                    style = IosTypography.subheadline.copy(fontWeight = FontWeight.SemiBold),
-                    color = if (actionEnabled) Color.White else p.secondaryText,
-                )
+                if (actionBusy) CircularProgressIndicator(Modifier.padding(horizontal = 16.dp).size(20.dp), color = Appearance.tint, strokeWidth = 2.dp)
+                else de.letzgo.stashy.ui.NativeTextButton(actionTitle, enabled = actionEnabled, onClick = onAction)
             }
         }
         Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp), content = content)
@@ -177,10 +170,11 @@ fun SceneModalSheet(
 @Composable
 fun FormSection(header: String?, footer: String? = null, content: @Composable ColumnScope.() -> Unit) {
     val p = Theme.palette
-    Column(Modifier.fillMaxWidth().padding(vertical = 8.dp)) {
-        header?.let { Text(it.uppercase(), Modifier.padding(start = 16.dp, bottom = 6.dp), style = IosTypography.footnote, color = p.secondaryText) }
-        Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(Tokens.Radius.small)).background(p.secondaryBackground).padding(vertical = 4.dp), content = content)
-        footer?.let { Text(it, Modifier.padding(start = 16.dp, top = 6.dp, end = 16.dp), style = IosTypography.footnote, color = p.secondaryText) }
+    // Material settings section: titleSmall accent header, 16 dp group, bodySmall footer.
+    Column(Modifier.fillMaxWidth().padding(vertical = 10.dp)) {
+        header?.let { de.letzgo.stashy.ui.NativeSectionHeader(it) }
+        de.letzgo.stashy.ui.NativeGroup(content = content)
+        footer?.let { de.letzgo.stashy.ui.NativeSectionFooter(it) }
     }
 }
 

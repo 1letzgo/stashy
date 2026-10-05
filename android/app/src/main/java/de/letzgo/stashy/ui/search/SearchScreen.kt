@@ -148,21 +148,12 @@ fun SearchScreen() {
         Column(Modifier.fillMaxSize().statusBarsPadding().imePadding()) {
             Text("Search", style = IosTypography.headline, color = p.text, modifier = Modifier.align(Alignment.CenterHorizontally).padding(top = 12.dp))
             // iOS `.searchable(prompt: "Search everything...")`
-            Row(
-                Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp).height(40.dp)
-                    .background(p.secondaryBackground, RoundedCornerShape(10.dp)).padding(horizontal = 10.dp),
-                verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp),
-            ) {
-                Icon(SF.magnifyingglass, null, tint = p.secondaryText, modifier = Modifier.size(18.dp))
-                BasicTextField(
-                    text, { text = it }, Modifier.weight(1f), singleLine = true,
-                    textStyle = IosTypography.body.copy(color = p.text), cursorBrush = SolidColor(Appearance.tint),
-                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search, autoCorrectEnabled = false),
-                    keyboardActions = KeyboardActions(onSearch = { focus.clearFocus() }),
-                    decorationBox = { inner -> Box { if (text.isEmpty()) Text("Search everything...", style = IosTypography.body, color = p.tertiaryText); inner() } },
-                )
-                if (text.isNotEmpty()) Icon(SFS.xmarkCircleFill, "Clear", tint = p.tertiaryText, modifier = Modifier.size(18.dp).clickable { text = "" })
-            }
+            de.letzgo.stashy.ui.NativeSearchField(
+                text, { text = it }, "Search everything...",
+                Modifier.padding(horizontal = 16.dp, vertical = 10.dp),
+                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search, autoCorrectEnabled = false),
+                keyboardActions = KeyboardActions(onSearch = { focus.clearFocus() }),
+            )
             when {
                 ServerConfigManager.activeConfig == null -> Placeholder(SFS.serverRack, "Server not reachable", null) { Nav.select(MainTab.Settings) }
                 query.isEmpty() -> Placeholder(SF.magnifyingglass, "Search Your Library", "Find scenes, images, performers, studios, tags, galleries, groups and markers")

@@ -88,9 +88,9 @@ fun SettingsList(
     )
 }
 
-/** iOS: `listSectionSpacing(24)`. */
+/** Gap between sections — 20 dp like the Settings list. */
 @Composable
-fun SectionSpacer() = Spacer(Modifier.height(24.dp))
+fun SectionSpacer() = Spacer(Modifier.height(20.dp))
 
 /** iOS: `stashyScrollingSectionHeader(_:isBeta:)` — Material section header (titleSmall, accent). */
 @Composable
@@ -120,13 +120,13 @@ fun BetaBadge() {
 fun GroupedCard(modifier: Modifier = Modifier, content: @Composable ColumnScope.() -> Unit) =
     de.letzgo.stashy.ui.NativeGroup(modifier, content)
 
-/** Divider between grouped rows, inset past the icon. */
+/** Divider between grouped rows — 16 dp inset like the Settings rows. */
 @Composable
-fun RowDivider(startInset: Dp = 56.dp) = de.letzgo.stashy.ui.NativeDivider(startInset)
+fun RowDivider(startInset: Dp = 16.dp) = de.letzgo.stashy.ui.NativeDivider(startInset)
 
 /**
- * iOS: `Label(title, systemImage:)` row in a grouped list — tinted icon in a 24 pt column,
- * primary text, optional trailing content, 44 pt minimum height.
+ * iOS: `Label(title, systemImage:)` row in a grouped list — identical to [de.letzgo.stashy.ui.NativeListItem]
+ * (56 dp / 72 dp with subtitle, 24 dp leading icon, bodyLarge / bodyMedium, trailing content).
  */
 @Composable
 fun SettingsRow(
@@ -139,28 +139,10 @@ fun SettingsRow(
     enabled: Boolean = true,
     onClick: (() -> Unit)? = null,
     trailing: @Composable RowScope.() -> Unit = {},
-) {
-    val p = Theme.palette
-    // Material list item: 56 dp, 24 dp leading icon, bodyLarge / bodyMedium.
-    Row(
-        modifier
-            .fillMaxWidth()
-            .heightIn(min = if (subtitle != null) 72.dp else 56.dp)
-            .let { if (onClick != null && enabled) it.clickable(onClick = onClick) else it }
-            .padding(horizontal = 16.dp, vertical = 8.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(16.dp),
-    ) {
-        if (icon != null) Box(Modifier.width(24.dp), contentAlignment = Alignment.Center) {
-            Icon(icon, null, tint = if (enabled) iconTint else p.secondaryText, modifier = Modifier.size(24.dp))
-        }
-        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-            Text(title, style = de.letzgo.stashy.ui.NativeType.bodyLarge, color = if (enabled) titleColor else p.secondaryText)
-            if (subtitle != null) Text(subtitle, style = de.letzgo.stashy.ui.NativeType.bodyMedium, color = p.secondaryText)
-        }
-        trailing()
-    }
-}
+) = de.letzgo.stashy.ui.NativeListItem(
+    title, modifier, supporting = subtitle, icon = icon, iconTint = iconTint, headlineColor = titleColor,
+    enabled = enabled, onClick = onClick, trailing = trailing,
+)
 
 /** Small spinner like iOS `ProgressView()` in a row. */
 @Composable

@@ -5,6 +5,7 @@ import androidx.compose.animation.animateColorAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -22,6 +23,8 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.filled.ArrowDropDown
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material3.AlertDialog
@@ -412,7 +415,7 @@ fun NativeTopBar(
 // Shared by Settings, Server setup, stashy+ and the tools' settings pages; reusable by every
 // screen that moves to the native Android look. Colours come from `Theme.palette` and
 // `Appearance.tint` ([nativeAccent]); type sizes from the Material 3 baseline scale
-// ([NativeType]) — the app's own `MaterialTheme` typography maps the iOS Dynamic Type sizes.
+// ([NativeType]), which is also the app's `MaterialTheme` typography (IosTypography resolves to it).
 
 /** Material 3 baseline type scale (bodyLarge 16 sp, bodyMedium 14 sp, titleSmall 14 sp medium …). */
 val NativeType: Typography = Typography()
@@ -470,6 +473,7 @@ fun NativeDivider(startInset: Dp = 16.dp) =
  * headline (bodyLarge), supporting text (bodyMedium), trailing content. 56 dp high, 72 dp with
  * supporting text. Whole row clickable when [onClick] is set.
  */
+@OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
 @Composable
 fun NativeListItem(
     headline: String,
@@ -480,6 +484,8 @@ fun NativeListItem(
     headlineColor: Color = Theme.palette.text,
     enabled: Boolean = true,
     onClick: (() -> Unit)? = null,
+    onLongClick: (() -> Unit)? = null,
+    supportingMaxLines: Int = 3,
     leading: (@Composable () -> Unit)? = null,
     trailing: (@Composable RowScope.() -> Unit)? = null,
 ) {
@@ -488,7 +494,13 @@ fun NativeListItem(
     Row(
         modifier.fillMaxWidth()
             .heightIn(min = if (supporting != null) 72.dp else 56.dp)
-            .let { if (onClick != null) it.clickable(enabled = enabled, onClick = onClick) else it }
+            .let {
+                when {
+                    onLongClick != null -> it.combinedClickable(enabled = enabled, onClick = onClick ?: {}, onLongClick = onLongClick)
+                    onClick != null -> it.clickable(enabled = enabled, onClick = onClick)
+                    else -> it
+                }
+            }
             .padding(horizontal = 16.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(16.dp),
@@ -499,7 +511,7 @@ fun NativeListItem(
         }
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
             Text(headline, style = NativeType.bodyLarge, color = headlineColor.copy(alpha = headlineColor.alpha * alpha), maxLines = 2, overflow = TextOverflow.Ellipsis)
-            if (supporting != null) Text(supporting, style = NativeType.bodyMedium, color = p.secondaryText.copy(alpha = p.secondaryText.alpha * alpha), maxLines = 3, overflow = TextOverflow.Ellipsis)
+            if (supporting != null) Text(supporting, style = NativeType.bodyMedium, color = p.secondaryText.copy(alpha = p.secondaryText.alpha * alpha), maxLines = supportingMaxLines, overflow = TextOverflow.Ellipsis)
         }
         if (trailing != null) Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp), content = trailing)
     }
@@ -830,5 +842,57 @@ fun NativeTonalButton(text: String, modifier: Modifier = Modifier, enabled: Bool
 fun NativeTextButton(text: String, modifier: Modifier = Modifier, enabled: Boolean = true, color: Color = nativeAccent(), onClick: () -> Unit) {
     TextButton(onClick, modifier, enabled = enabled) {
         Text(text, style = NativeType.labelLarge, color = if (enabled) color else Theme.palette.text.copy(alpha = 0.38f))
+    }
+}
+
+/**
+ * Material search field used above every searchable list (Tools › Filters, Merge, Downloads,
+ * Search, filter pickers): full-pill surface in the secondary background, 24 dp search icon,
+ * bodyLarge text, clear button. [trailing] replaces the clear button (e.g. a busy spinner).
+ */
+@Composable
+fun NativeSearchField(
+    text: String,
+    onChange: (String) -> Unit,
+    placeholder: String,
+    modifier: Modifier = Modifier,
+    keyboardOptions: KeyboardOptions = KeyboardOptions(autoCorrectEnabled = false),
+    keyboardActions: androidx.compose.foundation.text.KeyboardActions = androidx.compose.foundation.text.KeyboardActions.Default,
+    containerColor: Color = Theme.palette.secondaryBackground,
+    trailing: (@Composable () -> Unit)? = null,
+) {
+    val p = Theme.palette
+    Row(
+        modifier
+            .fillMaxWidth()
+            .height(48.dp)
+            .clip(RoundedCornerShape(50))
+            .background(containerColor)
+            .padding(start = 16.dp, end = 4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        Icon(Icons.Filled.Search, null, tint = p.secondaryText, modifier = Modifier.size(24.dp))
+        androidx.compose.foundation.text.BasicTextField(
+            text, onChange, Modifier.weight(1f),
+            singleLine = true,
+            textStyle = NativeType.bodyLarge.copy(color = p.text),
+            cursorBrush = androidx.compose.ui.graphics.SolidColor(nativeAccent()),
+            keyboardOptions = keyboardOptions,
+            keyboardActions = keyboardActions,
+            decorationBox = { inner ->
+                Box(contentAlignment = Alignment.CenterStart) {
+                    if (text.isEmpty()) Text(placeholder, style = NativeType.bodyLarge, color = p.secondaryText, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    inner()
+                }
+            },
+        )
+        when {
+            trailing != null -> Box(Modifier.size(40.dp), contentAlignment = Alignment.Center) { trailing() }
+            text.isNotEmpty() -> IconButton({ onChange("") }, Modifier.size(40.dp)) {
+                Icon(Icons.Filled.Close, "Clear search", tint = p.secondaryText, modifier = Modifier.size(24.dp))
+            }
+            else -> Spacer(Modifier.width(12.dp))
+        }
     }
 }

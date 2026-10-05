@@ -426,9 +426,11 @@ internal fun EditEntitySheet(
     Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false)) {
         Box(Modifier.fillMaxSize().background(p.background)) {
             Column(Modifier.fillMaxSize().imePadding().verticalScroll(rememberScrollState()).padding(top = nativeTopBarPadding()).navigationBarsPadding().padding(16.dp)) {
-                sections.forEach { section ->
-                    Text(section.title.uppercase(), style = IosTypography.footnote, color = p.secondaryText, modifier = Modifier.padding(start = 16.dp, top = 16.dp, bottom = 6.dp))
-                    Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(Tokens.Radius.small)).background(p.secondaryBackground).padding(horizontal = 12.dp, vertical = 4.dp)) {
+                sections.forEachIndexed { index, section ->
+                    if (index > 0) Spacer(Modifier.height(20.dp))
+                    de.letzgo.stashy.ui.NativeSectionHeader(section.title)
+                    de.letzgo.stashy.ui.NativeGroup(Modifier.padding(0.dp)) {
+                        Column(Modifier.padding(horizontal = 4.dp, vertical = 4.dp)) {
                         section.fields.forEach { f ->
                             OutlinedTextField(
                                 value = f.value, onValueChange = { f.value = it },
@@ -441,23 +443,22 @@ internal fun EditEntitySheet(
                                     focusedTextColor = p.text, unfocusedTextColor = p.text, cursorColor = Appearance.tint,
                                     focusedLabelColor = Appearance.tint, unfocusedLabelColor = p.secondaryText,
                                 ),
+                                textStyle = de.letzgo.stashy.ui.NativeType.bodyLarge,
                                 modifier = Modifier.fillMaxWidth(),
                             )
                         }
+                        }
                     }
                 }
-                Spacer(Modifier.height(24.dp))
-                Row(
-                    Modifier.fillMaxWidth().clip(RoundedCornerShape(Tokens.Radius.small)).background(p.secondaryBackground)
-                        .clickable(enabled = !saving && !deleting) { confirmDelete = true }.padding(14.dp),
-                    horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    if (deleting) CircularProgressIndicator(Modifier.size(18.dp), color = StashyColors.systemRed, strokeWidth = 2.dp)
-                    else {
-                        Icon(SF.trash, null, tint = StashyColors.systemRed, modifier = Modifier.size(18.dp))
-                        Spacer(Modifier.width(6.dp))
-                        Text(deleteLabel, color = StashyColors.systemRed, style = IosTypography.body)
-                    }
+                Spacer(Modifier.height(20.dp))
+                de.letzgo.stashy.ui.NativeGroup {
+                    de.letzgo.stashy.ui.NativeListItem(
+                        deleteLabel,
+                        icon = SF.trash, iconTint = StashyColors.systemRed, headlineColor = StashyColors.systemRed,
+                        enabled = !saving && !deleting,
+                        onClick = { confirmDelete = true },
+                        leading = if (deleting) ({ CircularProgressIndicator(Modifier.size(24.dp), color = StashyColors.systemRed, strokeWidth = 2.dp) }) else null,
+                    )
                 }
                 Spacer(Modifier.height(40.dp))
             }

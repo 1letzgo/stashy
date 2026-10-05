@@ -59,6 +59,11 @@ import de.letzgo.stashy.data.Tag
 import de.letzgo.stashy.ui.Appearance
 import de.letzgo.stashy.ui.IosTypography
 import de.letzgo.stashy.ui.Theme
+import de.letzgo.stashy.ui.NativeDivider
+import de.letzgo.stashy.ui.NativeListItem
+import de.letzgo.stashy.ui.NativeSearchField
+import de.letzgo.stashy.ui.NativeType
+import de.letzgo.stashy.ui.nativeAccent
 import de.letzgo.stashy.ui.player.PlaybackFormat
 import de.letzgo.stashy.ui.player.PlayerIcons
 import kotlinx.coroutines.launch
@@ -68,12 +73,12 @@ import kotlinx.coroutines.launch
 fun FormTextField(value: String, onChange: (String) -> Unit, placeholder: String, modifier: Modifier = Modifier, singleLine: Boolean = true, keyboardType: KeyboardType = KeyboardType.Text, textAlign: TextAlign = TextAlign.Start) {
     val p = Theme.palette
     BasicTextField(
-        value, onChange, modifier.padding(horizontal = 16.dp, vertical = 12.dp),
-        singleLine = singleLine, textStyle = IosTypography.body.copy(color = p.text, textAlign = textAlign),
+        value, onChange, modifier.padding(horizontal = 16.dp, vertical = 16.dp),
+        singleLine = singleLine, textStyle = NativeType.bodyLarge.copy(color = p.text, textAlign = textAlign),
         cursorBrush = SolidColor(Appearance.tint), keyboardOptions = KeyboardOptions(keyboardType = keyboardType),
         decorationBox = { inner ->
             Box {
-                if (value.isEmpty()) Text(placeholder, Modifier.fillMaxWidth(), style = IosTypography.body.copy(textAlign = textAlign), color = p.tertiaryText)
+                if (value.isEmpty()) Text(placeholder, Modifier.fillMaxWidth(), style = NativeType.bodyLarge.copy(textAlign = textAlign), color = p.secondaryText)
                 inner()
             }
         },
@@ -82,19 +87,21 @@ fun FormTextField(value: String, onChange: (String) -> Unit, placeholder: String
 
 @Composable
 private fun FormRow(onClick: (() -> Unit)? = null, content: @Composable androidx.compose.foundation.layout.RowScope.() -> Unit) {
-    Row(
-        Modifier.fillMaxWidth().then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier).padding(horizontal = 16.dp, vertical = 12.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        content = content,
-    )
+    // Material list item metrics (56 dp, 16 dp insets, bodyLarge), like the Settings rows.
+    androidx.compose.runtime.CompositionLocalProvider(androidx.compose.material3.LocalTextStyle provides NativeType.bodyLarge) {
+        Row(
+            Modifier.fillMaxWidth().heightIn(min = 56.dp).then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier).padding(horizontal = 16.dp, vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            content = content,
+        )
+    }
 }
 
 @Composable
 private fun LoadingRow(text: String = "Loading...") {
-    Row(Modifier.fillMaxWidth().padding(16.dp), horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically) {
-        CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp, color = Theme.palette.secondaryText)
-        Spacer(Modifier.width(8.dp)); Text(text, color = Theme.palette.secondaryText)
-    }
+    NativeListItem(text, headlineColor = Theme.palette.secondaryText, leading = {
+        CircularProgressIndicator(Modifier.size(24.dp), strokeWidth = 2.dp, color = Theme.palette.secondaryText)
+    })
 }
 
 /** iOS: `EditSceneTitleSheet` ("Edit Scene": Title + Description). */
@@ -159,19 +166,19 @@ fun EntityPickerSheet(
         }
     }) {
         Column(Modifier.verticalScroll(rememberScrollState())) {
-            FormSection(searchHeader) {
-                FormTextField(search, { search = it }, "Search...", Modifier.fillMaxWidth())
+            NativeSearchField(search, { search = it }, searchHeader, Modifier.padding(top = 8.dp))
+            FormSection(null) {
                 if (loading) LoadingRow()
                 else {
-                    filtered.take(30).forEach { e ->
-                        HorizontalDivider(color = p.separator)
+                    filtered.take(30).forEachIndexed { index, e ->
+                        if (index > 0) NativeDivider()
                         FormRow({ if (e.id in selected) selected.remove(e.id) else { if (!multiple) selected.clear(); selected.add(e.id) } }) {
                             Text(e.name, Modifier.weight(1f), color = p.text)
-                            e.subtitle?.let { Text(it, style = IosTypography.caption, color = p.secondaryText) }
-                            if (e.id in selected) { Spacer(Modifier.width(8.dp)); Icon(PlayerIcons.check, null, tint = Appearance.tint, modifier = Modifier.size(18.dp)) }
+                            e.subtitle?.let { Text(it, style = NativeType.bodyMedium, color = p.secondaryText) }
+                            if (e.id in selected) { Spacer(Modifier.width(8.dp)); Icon(PlayerIcons.check, null, tint = nativeAccent(), modifier = Modifier.size(24.dp)) }
                         }
                     }
-                    if (filtered.size > 30) Text("Type more to refine...", Modifier.padding(16.dp), style = IosTypography.caption, color = p.secondaryText)
+                    if (filtered.size > 30) Text("Type more to refine...", Modifier.padding(16.dp), style = NativeType.bodyMedium, color = p.secondaryText)
                     if (search.isNotEmpty() && filtered.isEmpty()) {
                         FormRow(if (creating) null else ({
                             creating = true
@@ -286,8 +293,8 @@ fun EditGalleriesSheet(scene: Scene, onDismiss: () -> Unit, onSaved: (List<Scene
     val performerSet = performerGalleries.map { it.id }.toSet()
 
     @Composable
-    fun row(g: Gallery) {
-        HorizontalDivider(color = p.separator)
+    fun row(g: Gallery, divider: Boolean) {
+        if (divider) NativeDivider()
         FormRow({ if (g.id in selected) selected.remove(g.id) else selected.add(g.id) }) {
             Box(Modifier.size(52.dp).clip(RoundedCornerShape(8.dp)).background(Appearance.tint.copy(alpha = 0.12f)), contentAlignment = Alignment.Center) {
                 Icon(PlayerIcons.gallery, null, tint = Appearance.tint.copy(alpha = 0.5f), modifier = Modifier.size(18.dp))
@@ -295,7 +302,7 @@ fun EditGalleriesSheet(scene: Scene, onDismiss: () -> Unit, onSaved: (List<Scene
             }
             Column(Modifier.weight(1f).padding(horizontal = 12.dp)) {
                 Text(g.displayTitle, color = p.text, maxLines = 2)
-                g.imageCount?.let { Text("$it images", style = IosTypography.caption, color = p.secondaryText) }
+                g.imageCount?.let { Text("$it images", style = NativeType.bodyMedium, color = p.secondaryText) }
             }
             Icon(if (g.id in selected) PlayerIcons.checkCircle else PlayerIcons.circle, null, tint = if (g.id in selected) Appearance.tint else p.secondaryText)
         }
@@ -313,27 +320,27 @@ fun EditGalleriesSheet(scene: Scene, onDismiss: () -> Unit, onSaved: (List<Scene
         }
     }) {
         Column(Modifier.verticalScroll(rememberScrollState())) {
-            FormSection("Search Galleries") { FormTextField(search, { search = it }, "Search...", Modifier.fillMaxWidth()) }
+            NativeSearchField(search, { search = it }, "Search Galleries", Modifier.padding(top = 8.dp))
             if (loading && performerGalleries.isEmpty() && allGalleries.isEmpty()) FormSection(null) { LoadingRow() }
             else {
                 if (performerIds.isNotEmpty()) FormSection(if (searching) "From Scene Performers" else "Galleries from Scene Performers") {
                     val list = filter(performerGalleries)
-                    if (list.isEmpty()) Text(if (searching) "No matching performer galleries" else "No galleries for linked performers", Modifier.padding(16.dp), style = IosTypography.caption, color = p.secondaryText)
-                    else list.take(if (searching) 30 else 50).forEach { row(it) }
+                    if (list.isEmpty()) Text(if (searching) "No matching performer galleries" else "No galleries for linked performers", Modifier.padding(16.dp), style = NativeType.bodyMedium, color = p.secondaryText)
+                    else list.take(if (searching) 30 else 50).forEachIndexed { i, g -> row(g, i > 0) }
                 }
                 if (searching) FormSection(if (performerIds.isEmpty()) "Galleries" else "Other Galleries") {
                     val others = filter(allGalleries).filter { it.id !in performerSet }
                     when {
                         !didLoadAll || loading -> LoadingRow()
-                        others.isEmpty() -> Text("No matching galleries", Modifier.padding(16.dp), style = IosTypography.caption, color = p.secondaryText)
+                        others.isEmpty() -> Text("No matching galleries", Modifier.padding(16.dp), style = NativeType.bodyMedium, color = p.secondaryText)
                         else -> {
-                            others.take(30).forEach { row(it) }
-                            if (others.size > 30) Text("Type more to refine...", Modifier.padding(16.dp), style = IosTypography.caption, color = p.secondaryText)
+                            others.take(30).forEachIndexed { i, g -> row(g, i > 0) }
+                            if (others.size > 30) Text("Type more to refine...", Modifier.padding(16.dp), style = NativeType.bodyMedium, color = p.secondaryText)
                         }
                     }
                 } else if (performerIds.isEmpty()) FormSection("All Galleries") {
-                    allGalleries.take(30).forEach { row(it) }
-                    if (allGalleries.size > 30) Text("Type to search...", Modifier.padding(16.dp), style = IosTypography.caption, color = p.secondaryText)
+                    allGalleries.take(30).forEachIndexed { i, g -> row(g, i > 0) }
+                    if (allGalleries.size > 30) Text("Type to search...", Modifier.padding(16.dp), style = NativeType.bodyMedium, color = p.secondaryText)
                 }
             }
         }
@@ -381,7 +388,7 @@ fun AddMarkerSheet(scene: Scene, seconds: Double, onDismiss: () -> Unit, onCompl
         Column(Modifier.verticalScroll(rememberScrollState())) {
             FormSection("Marker Details") {
                 FormRow { Text("Start Time:", Modifier.weight(1f), color = p.text); Text(PlaybackFormat.markerTime(seconds), color = p.secondaryText) }
-                HorizontalDivider(color = p.separator)
+                NativeDivider()
                 Row(Modifier.fillMaxWidth().padding(start = 16.dp), verticalAlignment = Alignment.CenterVertically) {
                     Text("End Time (optional):", color = p.text)
                     FormTextField(endText, { v -> endText = v; quick?.let { if (v != quickEnd(it)) quick = null } }, "Seconds or MM:SS", Modifier.weight(1f), keyboardType = KeyboardType.Number, textAlign = TextAlign.End)
@@ -400,21 +407,21 @@ fun AddMarkerSheet(scene: Scene, seconds: Double, onDismiss: () -> Unit, onCompl
                 }
             }
             FormSection("Primary Tag") {
-                FormTextField(search, { search = it }, "Search Tags...", Modifier.fillMaxWidth())
+                NativeSearchField(search, { search = it }, "Search Tags...", Modifier.padding(8.dp))
                 when {
                     loading -> LoadingRow("Loading tags...")
-                    tags.isEmpty() -> Text("No tags found on server", Modifier.padding(16.dp), color = p.secondaryText)
+                    tags.isEmpty() -> Text("No tags found on server", Modifier.padding(16.dp), style = NativeType.bodyMedium, color = p.secondaryText)
                     else -> {
                         filtered.take(20).forEach { tag ->
-                            HorizontalDivider(color = p.separator)
+                            NativeDivider()
                             FormRow({ primaryTagId = tag.id }) {
                                 Text(tag.name, Modifier.weight(1f), color = p.text)
-                                tag.sceneCount?.let { Text("$it", style = IosTypography.caption, color = p.secondaryText) }
-                                if (primaryTagId == tag.id) { Spacer(Modifier.width(8.dp)); Icon(PlayerIcons.check, null, tint = Appearance.tint, modifier = Modifier.size(18.dp)) }
+                                tag.sceneCount?.let { Text("$it", style = NativeType.bodyMedium, color = p.secondaryText) }
+                                if (primaryTagId == tag.id) { Spacer(Modifier.width(8.dp)); Icon(PlayerIcons.check, null, tint = nativeAccent(), modifier = Modifier.size(24.dp)) }
                             }
                         }
-                        if (filtered.size > 20) Text("Type more to refine search...", Modifier.padding(16.dp), style = IosTypography.caption, color = p.secondaryText)
-                        else if (search.isNotEmpty() && filtered.isEmpty()) Text("No tags match '$search'", Modifier.padding(16.dp), color = p.secondaryText)
+                        if (filtered.size > 20) Text("Type more to refine search...", Modifier.padding(16.dp), style = NativeType.bodyMedium, color = p.secondaryText)
+                        else if (search.isNotEmpty() && filtered.isEmpty()) Text("No tags match '$search'", Modifier.padding(16.dp), style = NativeType.bodyMedium, color = p.secondaryText)
                     }
                 }
             }
@@ -472,13 +479,13 @@ fun SetTagImageFromFrameSheet(imageDataURL: String, sceneTags: List<Tag>, onDism
         Column(Modifier.verticalScroll(rememberScrollState())) {
             preview?.let { Image(it, null, Modifier.fillMaxWidth().height(160.dp).padding(top = 4.dp, bottom = 8.dp).clip(RoundedCornerShape(12.dp)), contentScale = ContentScale.Fit) }
             FormSection(if (search.isEmpty() && sceneTags.isNotEmpty()) "Scene Tags" else "Tags", footer = "The selected tag’s image will be replaced with this video frame.") {
-                FormTextField(search, { search = it }, "Search Tags...", Modifier.fillMaxWidth())
+                NativeSearchField(search, { search = it }, "Search Tags...", Modifier.padding(8.dp))
                 when {
                     loading && allTags.isEmpty() -> LoadingRow("Loading tags...")
-                    selectable.isEmpty() -> Text(if (search.isEmpty()) "No tags available" else "No tags match '$search'", Modifier.padding(16.dp), color = p.secondaryText)
+                    selectable.isEmpty() -> Text(if (search.isEmpty()) "No tags available" else "No tags match '$search'", Modifier.padding(16.dp), style = NativeType.bodyMedium, color = p.secondaryText)
                     else -> {
                         selectable.take(40).forEach { tag ->
-                            HorizontalDivider(color = p.separator)
+                            NativeDivider()
                             FormRow({ selectedId = tag.id }) {
                                 Box(Modifier.size(64.dp, 36.dp).clip(RoundedCornerShape(8.dp)).background(Color.Gray.copy(alpha = 0.2f)), contentAlignment = Alignment.Center) {
                                     if (tag.hasImage) AsyncImage(tag.imageURL, null, Modifier.size(64.dp, 36.dp), contentScale = ContentScale.Crop)
@@ -486,12 +493,12 @@ fun SetTagImageFromFrameSheet(imageDataURL: String, sceneTags: List<Tag>, onDism
                                 }
                                 Column(Modifier.weight(1f).padding(horizontal = 10.dp)) {
                                     Text(tag.name, color = p.text)
-                                    if (sceneTags.any { it.id == tag.id }) Text("On this scene", style = IosTypography.caption2, color = p.secondaryText)
+                                    if (sceneTags.any { it.id == tag.id }) Text("On this scene", style = NativeType.bodyMedium, color = p.secondaryText)
                                 }
-                                if (selectedId == tag.id) Icon(PlayerIcons.check, null, tint = Appearance.tint, modifier = Modifier.size(18.dp))
+                                if (selectedId == tag.id) Icon(PlayerIcons.check, null, tint = nativeAccent(), modifier = Modifier.size(24.dp))
                             }
                         }
-                        if (selectable.size > 40) Text("Type more to refine search...", Modifier.padding(16.dp), style = IosTypography.caption, color = p.secondaryText)
+                        if (selectable.size > 40) Text("Type more to refine search...", Modifier.padding(16.dp), style = NativeType.bodyMedium, color = p.secondaryText)
                     }
                 }
             }

@@ -157,26 +157,28 @@ fun FiltersToolEditorSheet(
                 onSave = { showSaveChoice = true },
             )
             Column(
-                Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(top = 16.dp + Tokens.Spacing.xs, bottom = Tokens.Spacing.xl),
-                verticalArrangement = Arrangement.spacedBy(Tokens.Spacing.md),
+                Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(top = 8.dp, bottom = Tokens.Spacing.xl),
+                verticalArrangement = Arrangement.spacedBy(20.dp),
             ) {
+                de.letzgo.stashy.ui.filter.ControlGroup {
                 ControlCard {
                     ControlLabel("Name")
                     Box(Modifier.weight(1f)) {
                         if (name.isEmpty()) {
-                            Text("Filter name", Modifier.fillMaxWidth(), style = IosTypography.body, color = p.tertiaryText, textAlign = TextAlign.End)
+                            Text("Filter name", Modifier.fillMaxWidth(), style = de.letzgo.stashy.ui.NativeType.bodyLarge, color = p.secondaryText, textAlign = TextAlign.End)
                         }
                         BasicTextField(
                             value = name,
                             onValueChange = { name = it },
                             singleLine = true,
-                            textStyle = IosTypography.body.copy(color = p.text, textAlign = TextAlign.End),
+                            textStyle = de.letzgo.stashy.ui.NativeType.bodyLarge.copy(color = p.text, textAlign = TextAlign.End),
                             cursorBrush = SolidColor(Appearance.tint),
                             modifier = Modifier.fillMaxWidth(),
                         )
                     }
                 }
                 if (sortChoices.isNotEmpty()) {
+                    de.letzgo.stashy.ui.NativeDivider()
                     ControlCard {
                         ControlLabel("Sort")
                         Spacer(Modifier.weight(1f))
@@ -184,6 +186,7 @@ fun FiltersToolEditorSheet(
                             sortChoices.firstOrNull { it.raw == raw }?.let { selectedSort = it }
                         }
                     }
+                }
                 }
                 FilterCriteriaEditor(document, onChange = {}, levelTitle = FiltersLogic.modeTitle(modeRaw))
             }
@@ -284,13 +287,9 @@ private fun SortMenu(selected: String?, entries: List<Pair<String, String>>, lab
     val p = Theme.palette
     var open by remember { mutableStateOf(false) }
     Box {
-        Row(
-            Modifier.clip(RoundedCornerShape(8.dp)).clickable { open = true }.padding(vertical = 4.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(Tokens.Spacing.xxs),
-        ) {
-            Text(label, style = IosTypography.body, color = p.text, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            Icon(SF.chevronUpChevronDown, null, tint = p.text, modifier = Modifier.size(12.dp))
+        // Settings value-picker look: value + Material dropdown arrow.
+        Box(Modifier.clip(RoundedCornerShape(8.dp)).clickable { open = true }.padding(start = 8.dp, top = 4.dp, bottom = 4.dp)) {
+            de.letzgo.stashy.ui.NativeValueLabel(label)
         }
         DropdownMenu(open, onDismissRequest = { open = false }, Modifier.heightIn(max = 480.dp), containerColor = p.secondaryBackground) {
             entries.forEach { (raw, title) ->

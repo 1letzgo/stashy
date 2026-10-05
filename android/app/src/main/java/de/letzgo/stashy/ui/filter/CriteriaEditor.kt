@@ -15,7 +15,11 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.material.icons.filled.ArrowDropDown
+import androidx.compose.material.icons.filled.ExpandLess
+import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -76,6 +80,14 @@ import de.letzgo.stashy.ui.IosTypography
 import de.letzgo.stashy.ui.SF
 import de.letzgo.stashy.ui.StashyColors
 import de.letzgo.stashy.ui.Theme
+import de.letzgo.stashy.ui.NativeDivider
+import de.letzgo.stashy.ui.NativeGroup
+import de.letzgo.stashy.ui.NativeGroupShape
+import de.letzgo.stashy.ui.NativeListItem
+import de.letzgo.stashy.ui.NativeSectionFooter
+import de.letzgo.stashy.ui.NativeSectionHeader
+import de.letzgo.stashy.ui.NativeType
+import de.letzgo.stashy.ui.nativeAccent
 import de.letzgo.stashy.ui.Tokens
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -151,23 +163,21 @@ fun FilterCriteriaEditor(
         else -> "All conditions must be true."
     }
 
+    // Settings look: section header, one Material group (a row per condition + "Add condition"),
+    // the level's rule as supporting footer, nested AND/OR/NOT groups below.
     Column(
         modifier.padding(horizontal = if (embedsInCard) Tokens.Spacing.md else 0.dp).padding(bottom = if (embedsInCard) Tokens.Spacing.xs else 0.dp),
-        verticalArrangement = Arrangement.spacedBy(Tokens.Spacing.sm),
     ) {
-        if (isRoot && !levelTitle.isNullOrEmpty()) {
-            Text(levelTitle, Modifier.fillMaxWidth().padding(horizontal = 10.dp), style = IosTypography.caption, color = p.secondaryText)
-        }
-        Text(explanation, Modifier.fillMaxWidth().padding(horizontal = 10.dp), style = IosTypography.caption, color = p.secondaryText)
+        if (isRoot) NativeSectionHeader(levelTitle?.takeIf { it.isNotEmpty() } ?: "Conditions")
+        NativeGroup {
         if (levelKeys.isEmpty()) {
-            Text(
+            NativeListItem(
                 if (groupKeys.isEmpty()) "No conditions yet — use Add below." else "No direct conditions.",
-                Modifier.fillMaxWidth().clip(RoundedCornerShape(Tokens.Radius.card)).background(p.secondaryBackground)
-                    .padding(horizontal = Tokens.Spacing.md, vertical = 14.dp),
-                style = IosTypography.subheadline, color = p.secondaryText,
+                headlineColor = p.secondaryText,
             )
         } else {
-            levelKeys.forEach { key ->
+            levelKeys.forEachIndexed { index, key ->
+                if (index > 0) NativeDivider()
                 val field = FilterFieldCatalog.field(key, document.mode) ?: FilterFieldDescriptor(key, key, CriterionKind.raw)
                 val isPinned = isRoot && key in document.pinnedKeys
                 CriterionCard(
@@ -184,11 +194,17 @@ fun FilterCriteriaEditor(
                 )
             }
         }
+        NativeDivider()
         AddConditionBar(addable) { field ->
             if (field.key !in stickyKeys) stickyKeys.add(field.key)
             if (field.key !in expandedKeys) expandedKeys.add(field.key)
         }
-        groupKeys.forEach { group -> GroupCard(document, group, path, onChange, applyChange) }
+        }
+        NativeSectionFooter(explanation)
+        groupKeys.forEach { group ->
+            Spacer(Modifier.height(12.dp))
+            GroupCard(document, group, path, onChange, applyChange)
+        }
     }
 
     nestedKey?.let { key ->
@@ -211,18 +227,13 @@ fun FilterCriteriaEditor(
 private fun AddConditionBar(addable: List<FilterFieldDescriptor>, onAdd: (FilterFieldDescriptor) -> Unit) {
     val p = Theme.palette
     var open by remember { mutableStateOf(false) }
-    Box(Modifier.fillMaxWidth().clip(RoundedCornerShape(Tokens.Radius.card)).background(p.secondaryBackground)) {
-        Row(
-            Modifier.fillMaxWidth().clickable(enabled = addable.isNotEmpty()) { open = true }
-                .padding(horizontal = Tokens.Spacing.md, vertical = 14.dp),
-            horizontalArrangement = Arrangement.End,
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Icon(SF.plusCircleFill, null, tint = if (addable.isEmpty()) p.secondaryText else Appearance.tint, modifier = Modifier.size(20.dp))
-            Spacer(Modifier.size(Tokens.Spacing.xs))
-            Text("Add condition", style = IosTypography.subheadline.copy(fontWeight = FontWeight.SemiBold), color = if (addable.isEmpty()) p.secondaryText else p.text)
-        }
-        Box(Modifier.align(Alignment.TopEnd)) {
+    Box(Modifier.fillMaxWidth()) {
+        // Last row of the conditions group, like Settings' "Add New Server".
+        NativeListItem(
+            "Add condition", icon = SF.plus, iconTint = p.secondaryText,
+            enabled = addable.isNotEmpty(), onClick = { open = true },
+        )
+        Box(Modifier.align(Alignment.TopStart)) {
             DropdownMenu(open, { open = false }, Modifier.heightIn(max = 420.dp), containerColor = p.secondaryBackground) {
                 addable.forEach { f ->
                     DropdownMenuItem(text = { Text(f.label, color = p.text) }, onClick = { open = false; onAdd(f) })
@@ -239,19 +250,19 @@ fun groupTitle(group: String) = when (group) { "AND" -> "All of"; "OR" -> "Any o
 private fun GroupCard(document: CriteriaDocument, group: String, path: List<String>, onChange: () -> Unit, applyChange: () -> Unit) {
     val p = Theme.palette
     var menu by remember { mutableStateOf(false) }
-    val shape = RoundedCornerShape(Tokens.Radius.card)
+    val shape = NativeGroupShape
     Column(
-        Modifier.fillMaxWidth().clip(shape).background(p.background).border(1.dp, Appearance.tint.copy(alpha = 0.35f), shape),
-        verticalArrangement = Arrangement.spacedBy(Tokens.Spacing.xs),
+        Modifier.fillMaxWidth().clip(shape).border(1.dp, p.separator, shape).padding(start = 8.dp, end = 8.dp, bottom = 8.dp),
     ) {
-        Row(Modifier.fillMaxWidth().padding(horizontal = Tokens.Spacing.sm).padding(top = Tokens.Spacing.sm), verticalAlignment = Alignment.CenterVertically) {
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             Box {
+                // Section-header look (titleSmall, accent) with a Material dropdown arrow.
                 Row(
-                    Modifier.clip(RoundedCornerShape(50)).background(Appearance.tint).clickable { menu = true }.padding(horizontal = 8.dp, vertical = 4.dp),
+                    Modifier.clip(RoundedCornerShape(8.dp)).clickable { menu = true }.padding(start = 8.dp, top = 12.dp, bottom = 12.dp, end = 4.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    Text(groupTitle(group).uppercase(), style = IosTypography.caption.copy(fontWeight = FontWeight.Bold), color = Color.White)
-                    Icon(SF.chevronUpChevronDown, null, tint = Color.White, modifier = Modifier.size(12.dp))
+                    Text(groupTitle(group), style = NativeType.titleSmall, color = nativeAccent())
+                    Icon(androidx.compose.material.icons.Icons.Filled.ArrowDropDown, null, tint = nativeAccent(), modifier = Modifier.size(24.dp))
                 }
                 DropdownMenu(menu, { menu = false }, containerColor = p.secondaryBackground) {
                     CriteriaDocument.GROUP_KEYS.forEach { candidate ->
@@ -266,12 +277,11 @@ private fun GroupCard(document: CriteriaDocument, group: String, path: List<Stri
                 }
             }
             Spacer(Modifier.weight(1f))
-            Icon(
-                SF.xmarkCircleFill, "Remove ${groupTitle(group)} group", tint = p.secondaryText.copy(alpha = 0.55f),
-                modifier = Modifier.size(22.dp).clip(RoundedCornerShape(50)).clickable { document.removeGroup(group, path); applyChange() },
-            )
+            androidx.compose.material3.IconButton(onClick = { document.removeGroup(group, path); applyChange() }) {
+                Icon(SF.xmark, "Remove ${groupTitle(group)} group", tint = p.secondaryText)
+            }
         }
-        FilterCriteriaEditor(document, onChange, Modifier.padding(horizontal = Tokens.Spacing.xs).padding(bottom = Tokens.Spacing.xs), embedsInCard = false, path = path + group)
+        FilterCriteriaEditor(document, onChange, embedsInCard = false, path = path + group)
     }
 }
 
@@ -290,36 +300,35 @@ private fun CriterionCard(
     val p = Theme.palette
     val value = document.value(field.key, path)
     val isSet = value != null
-    Column(
-        Modifier.fillMaxWidth().clip(RoundedCornerShape(Tokens.Radius.card)).background(p.secondaryBackground).padding(horizontal = Tokens.Spacing.md),
-    ) {
+    // A Material list row of the conditions group: label (bodyLarge) over the summary
+    // (bodyMedium, accent when set), expand arrow and clear button; the editor expands below.
+    Column(Modifier.fillMaxWidth()) {
         Row(
-            Modifier.fillMaxWidth().defaultMinSize(minHeight = FilterSheetLayout.controlCardMinHeight),
+            Modifier.fillMaxWidth().heightIn(min = 72.dp).clickable(onClick = onToggle)
+                .padding(start = 16.dp, end = if (isSet || !isPinned) 4.dp else 16.dp, top = 8.dp, bottom = 8.dp),
             verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            Row(
-                Modifier.weight(1f).clickable(onClick = onToggle).padding(vertical = 10.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(Tokens.Spacing.sm),
-            ) {
-                Text(field.label, style = IosTypography.subheadline.copy(fontWeight = FontWeight.SemiBold), color = p.text, maxLines = 1)
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Text(field.label, style = NativeType.bodyLarge, color = p.text, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 Text(
-                    FilterCriterionSummary.text(field, value), Modifier.weight(1f),
-                    style = IosTypography.subheadline, color = if (isSet) Appearance.tint else p.secondaryText,
+                    FilterCriterionSummary.text(field, value),
+                    style = NativeType.bodyMedium, color = if (isSet) nativeAccent() else p.secondaryText,
                     maxLines = 1, overflow = TextOverflow.Ellipsis,
                 )
-                Icon(if (expanded) SF.chevronUp else SF.chevronDown, null, tint = p.secondaryText, modifier = Modifier.size(18.dp))
             }
+            Icon(
+                if (expanded) androidx.compose.material.icons.Icons.Filled.ExpandLess else androidx.compose.material.icons.Icons.Filled.ExpandMore,
+                null, tint = p.secondaryText, modifier = Modifier.size(24.dp),
+            )
             if (isSet || !isPinned) {
-                Icon(
-                    SF.xmarkCircleFill, if (isPinned) "Clear ${field.label}" else "Remove ${field.label}",
-                    tint = p.secondaryText.copy(alpha = 0.55f),
-                    modifier = Modifier.padding(start = Tokens.Spacing.sm).size(22.dp).clip(RoundedCornerShape(50)).clickable { onClear(isSet) },
-                )
+                androidx.compose.material3.IconButton(onClick = { onClear(isSet) }) {
+                    Icon(SF.xmark, if (isPinned) "Clear ${field.label}" else "Remove ${field.label}", tint = p.secondaryText)
+                }
             }
         }
         AnimatedVisibility(expanded) {
-            Column(Modifier.fillMaxWidth().padding(bottom = 14.dp), verticalArrangement = Arrangement.spacedBy(Tokens.Spacing.xs)) {
+            Column(Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, bottom = 16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 CriterionEditorBody(document, field, path, onApply, onOpenNested)
             }
         }
@@ -680,19 +689,15 @@ fun MultiEntityPicker(
         }
         if (expanded) Column(Modifier.padding(bottom = 8.dp)) {
             if (kind != null && !isNone) {
-                Row(
-                    Modifier.padding(vertical = 4.dp).fillMaxWidth().clip(RoundedCornerShape(50)).background(p.background).padding(horizontal = 12.dp, vertical = 8.dp),
-                    verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp),
-                ) {
-                    Icon(SF.magnifyingglass, null, tint = p.secondaryText, modifier = Modifier.size(14.dp))
-                    BasicTextField(
-                        searchText, { searchText = it; FilterPickerOptionsStore.search(kind, it) }, Modifier.weight(1f),
-                        textStyle = IosTypography.body.copy(color = p.text), singleLine = true, cursorBrush = SolidColor(Appearance.tint),
-                        decorationBox = { inner -> Box { if (searchText.isEmpty()) Text("Search", style = IosTypography.body, color = p.tertiaryText); inner() } },
-                    )
-                    if (FilterPickerOptionsStore.isSearching(kind)) CircularProgressIndicator(Modifier.size(14.dp), strokeWidth = 2.dp, color = p.secondaryText)
-                    else if (searchText.isNotEmpty()) Icon(SF.xmarkCircleFill, null, tint = p.secondaryText, modifier = Modifier.size(16.dp).clickable { searchText = ""; FilterPickerOptionsStore.search(kind, "") })
-                }
+                de.letzgo.stashy.ui.NativeSearchField(
+                    searchText, { searchText = it; FilterPickerOptionsStore.search(kind, it) }, "Search",
+                    Modifier.padding(vertical = 4.dp),
+                    // The field sits inside the secondary-background group.
+                    containerColor = p.background,
+                    trailing = if (FilterPickerOptionsStore.isSearching(kind)) ({
+                        CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp, color = p.secondaryText)
+                    }) else null,
+                )
             }
             if (!isNone) Row(Modifier.padding(horizontal = 4.dp).padding(bottom = 6.dp), horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
                 Icon(SF.checkmarkCircleFill, null, tint = Appearance.tint, modifier = Modifier.size(12.dp))
@@ -763,11 +768,11 @@ private fun NestedEditorSheet(title: String, mode: FilterMode, initial: JsonObje
     val doc = remember { CriteriaDocument(mode, initial) }
     ModalBottomSheet(onCancel, sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true), containerColor = p.background) {
         Column(Modifier.fillMaxSize().navigationBarsPadding()) {
-            Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-                Text("Cancel", Modifier.clickable(onClick = onCancel), style = IosTypography.body, color = Appearance.tint)
-                Text(title, Modifier.weight(1f).padding(horizontal = 8.dp), style = IosTypography.headline, color = p.text, maxLines = 1,
-                    textAlign = androidx.compose.ui.text.style.TextAlign.Center)
-                Text("Done", Modifier.clickable { onDone(doc.sanitizedObjectFilter) }, style = IosTypography.headline, color = Appearance.tint)
+            // Material sheet header: close ✕ · title · Done.
+            Row(Modifier.fillMaxWidth().padding(start = 4.dp, end = 8.dp, top = 4.dp, bottom = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+                androidx.compose.material3.IconButton(onClick = onCancel) { Icon(SF.xmark, "Cancel", tint = p.text) }
+                Text(title, Modifier.weight(1f).padding(start = 4.dp), style = NativeType.titleLarge, color = p.text, maxLines = 1)
+                de.letzgo.stashy.ui.NativeTextButton("Done", onClick = { onDone(doc.sanitizedObjectFilter) })
             }
             Column(Modifier.verticalScroll(rememberScrollState()).padding(top = Tokens.Spacing.xs)) {
                 FilterCriteriaEditor(doc, onChange = {})
