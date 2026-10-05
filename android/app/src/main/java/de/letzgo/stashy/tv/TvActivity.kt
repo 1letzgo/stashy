@@ -27,6 +27,7 @@ class TvActivity : FragmentActivity() {
     override fun onResume() {
         super.onResume()
         StashyPlus.refresh()
+        de.letzgo.stashy.data.BetaExpiry.refresh()
         // Sideload builds: look for a newer APK (same check as the phone app, data/AppUpdate.kt).
         lifecycleScope.launch { AppUpdate.autoCheck(this@TvActivity) }
     }

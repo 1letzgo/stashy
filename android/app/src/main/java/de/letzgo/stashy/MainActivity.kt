@@ -35,6 +35,7 @@ class MainActivity : FragmentActivity() {
     override fun onResume() {
         super.onResume()
         de.letzgo.stashy.data.StashyPlus.refresh()
+        de.letzgo.stashy.data.BetaExpiry.refresh()
         // Sideload builds: look for a newer APK on the update server (throttled, see AppUpdate).
         lifecycleScope.launch { de.letzgo.stashy.data.AppUpdate.autoCheck(this@MainActivity) }
     }

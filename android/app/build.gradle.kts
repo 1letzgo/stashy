@@ -16,6 +16,11 @@ val localProps = Properties().apply {
 }
 fun localString(key: String) = "\"" + (localProps.getProperty(key) ?: "").replace("\"", "\\\"") + "\""
 
+/** Commit time (epoch seconds) — stable per commit, so BuildConfig doesn't change on every build. */
+fun gitCommitTime(): Long = runCatching {
+    providers.exec { commandLine("git", "log", "-1", "--format=%ct") }.standardOutput.asText.get().trim().toLong()
+}.getOrDefault(0L)
+
 fun gitCommitCount(): Int = runCatching {
     providers.exec { commandLine("git", "rev-list", "--count", "HEAD") }.standardOutput.asText.get().trim().toInt()
 }.getOrDefault(1)
@@ -39,11 +44,16 @@ android {
     productFlavors {
         create("sideload") {
             dimension = "distribution"
+            // Beta builds expire N days after their commit (-PstashyBetaDays=…, 0 = never, negative = already expired for testing).
+            val betaDays = (project.findProperty("stashyBetaDays") as String?)?.toLongOrNull() ?: 30L
+            val expires = if (betaDays != 0L) (gitCommitTime() + betaDays * 86_400L) * 1000L else 0L
+            buildConfigField("long", "EXPIRES_AT", "${expires}L")
             buildConfigField("boolean", "PLUS_INCLUDED", "true")
             buildConfigField("String", "UPDATE_URL", "\"https://buntes.am/app/stashy.apk\"")
         }
         create("play") {
             dimension = "distribution"
+            buildConfigField("long", "EXPIRES_AT", "0L")
             buildConfigField("boolean", "PLUS_INCLUDED", "false")
             buildConfigField("String", "UPDATE_URL", "\"\"")
         }

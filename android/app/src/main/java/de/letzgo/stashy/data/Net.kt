@@ -59,6 +59,8 @@ object Net {
                     javax.net.ssl.HttpsURLConnection.getDefaultHostnameVerifier().verify(host, session)
             }
             .addInterceptor(authInterceptor)
+            // Latest server time for the beta expiry (device clock can be turned back).
+            .addNetworkInterceptor { chain -> chain.proceed(chain.request()).also { BetaExpiry.recordServerDate(it.header("Date")) } }
             .build()
     }
 
