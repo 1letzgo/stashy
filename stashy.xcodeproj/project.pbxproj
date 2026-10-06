@@ -126,7 +126,6 @@
 		CA7A10D12F500001 /* ListCatalogFilterSortModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = CA7A10D02F500000 /* ListCatalogFilterSortModels.swift */; };
 		CA7A10D42F500003 /* ListCatalogFilterSortSheets.swift in Sources */ = {isa = PBXBuildFile; fileRef = CA7A10D32F500002 /* ListCatalogFilterSortSheets.swift */; };
 		CA7A10E12F500010 /* DetailLinkedCatalogControllers.swift in Sources */ = {isa = PBXBuildFile; fileRef = CA7A10E02F500011 /* DetailLinkedCatalogControllers.swift */; };
-		CD4CA6C2CB694838903FF516 /* graphql in Resources */ = {isa = PBXBuildFile; fileRef = DFGQGRAPHQLREF001 /* graphql */; };
 		DED26B5AB7A04A979AF74BAE /* SceneVideoPlayerCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = DF675E772F2A6392004CA019 /* SceneVideoPlayerCard.swift */; };
 		DF06EF262F18EC1300299105 /* SceneCardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DF06EF252F18EC1100299105 /* SceneCardView.swift */; };
 		DF22BB152F167223007C2090 /* CatalogsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DF22BB142F167223007C2090 /* CatalogsView.swift */; };
@@ -662,6 +661,7 @@
 				F0A11E1B0B0B0B0B0B0B0B03 /* Embed Frameworks */,
 				37D3E24B2F3932C400AB8FAD /* Frameworks */,
 				37D3E24C2F3932C400AB8FAD /* Resources */,
+				TVGQ00000000000000000001 /* Copy GraphQL (tvOS) */,
 			);
 			buildRules = (
 			);
@@ -734,13 +734,32 @@
 			buildActionMask = 2147483647;
 			files = (
 				37D3E3262F39444C00AB8FAD /* Assets.xcassets in Resources */,
-				CD4CA6C2CB694838903FF516 /* graphql in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXShellScriptBuildPhase section */
+		TVGQ00000000000000000001 /* Copy GraphQL (tvOS) */ = {
+			isa = PBXShellScriptBuildPhase;
+			alwaysOutOfDate = 1;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+			);
+			name = "Copy GraphQL (tvOS)";
+			outputFileListPaths = (
+			);
+			outputPaths = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "set -euo pipefail\n# tvOS ships only the documents it uses: no Match (Hot or Not) and no device-sync\n# fields (funscript, interactive, interactive_heatmap) — tvOS has neither feature.\nSRC=\"${SRCROOT}/graphql\"\nDST=\"${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/graphql\"\nrm -rf \"${DST}\"\nmkdir -p \"${DST}\"\nfor f in \"${SRC}\"/*.graphql; do\n  name=\"$(basename \"${f}\")\"\n  case \"${name}\" in\n    hotOrNot*|fragment_HotOrNot*) continue ;;\n  esac\n  perl -pe 's/\\b(interactive_heatmap|funscript|interactive)\\b//g; s/[ \\t]+$//' \"${f}\" > \"${DST}/${name}\"\ndone\nif grep -rqE \"\\b(funscript|interactive|hotOrNot|HotOrNot)\" \"${DST}\"; then\n  echo \"error: tvOS GraphQL documents still reference device-sync or Match fields\"\n  exit 1\nfi\n";
+			showEnvVarsInLog = 0;
+		};
 		DFC0E8A42F10EA1C004BBEB2 /* ShellScript */ = {
 			isa = PBXShellScriptBuildPhase;
 			alwaysOutOfDate = 1;
@@ -1166,7 +1185,7 @@
 				CURRENT_PROJECT_VERSION = 340;
 				DEVELOPMENT_TEAM = 699G2QY959;
 				ENABLE_PREVIEWS = YES;
-				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = NO;
 				GCC_C_LANGUAGE_STANDARD = gnu17;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = "stashyTV-Info.plist";
@@ -1208,7 +1227,7 @@
 				CURRENT_PROJECT_VERSION = 340;
 				DEVELOPMENT_TEAM = 699G2QY959;
 				ENABLE_PREVIEWS = YES;
-				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = NO;
 				GCC_C_LANGUAGE_STANDARD = gnu17;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = "stashyTV-Info.plist";

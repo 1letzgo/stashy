@@ -166,9 +166,11 @@ class GraphQLQueries {
         case "findPerformers":
             fragments = loadQuery(named: "fragment_PerformerFields")
             
+        #if !os(tvOS)
         case "hotOrNotFindPerformers":
             fragments = loadQuery(named: "fragment_HotOrNotPerformerFields")
-            
+        #endif
+
         case "findStudios", "findStudio":
             fragments = loadQuery(named: "fragment_StudioFields")
             

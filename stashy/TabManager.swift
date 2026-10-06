@@ -364,7 +364,9 @@ enum ToolsItem: String, Codable, CaseIterable, Identifiable {
     case timeline
     case topLists
     case filters
+    #if !os(tvOS)
     case hotOrNot
+    #endif
     case rateMe
     
     var id: String { rawValue }
@@ -378,17 +380,19 @@ enum ToolsItem: String, Codable, CaseIterable, Identifiable {
         case .timeline: return "Timeline"
         case .topLists: return "Charts"
         case .filters: return "Filters"
+        #if !os(tvOS)
         case .hotOrNot: return "Match"
+        #endif
         case .rateMe: return "RateMe"
         }
     }
 
     /// Name used in stashy+ settings / paywall lists.
     var plusFeatureTitle: String {
-        switch self {
-        case .hotOrNot: return "Performer Match"
-        default: return title
-        }
+        #if !os(tvOS)
+        if self == .hotOrNot { return "Performer Match" }
+        #endif
+        return title
     }
     
     var icon: String {
@@ -400,7 +404,9 @@ enum ToolsItem: String, Codable, CaseIterable, Identifiable {
         case .timeline: return "calendar.day.timeline.left"
         case .topLists: return "list.number"
         case .filters: return "line.3.horizontal.decrease.circle"
+        #if !os(tvOS)
         case .hotOrNot: return "flame.fill"
+        #endif
         case .rateMe: return "star.fill"
         }
     }
@@ -1450,10 +1456,12 @@ class TabManager: ObservableObject {
                 ToolsItemConfig(id: .oCount, isEnabled: true, sortOrder: 3),
                 ToolsItemConfig(id: .timeline, isEnabled: true, sortOrder: 4),
                 ToolsItemConfig(id: .topLists, isEnabled: true, sortOrder: 5),
-                ToolsItemConfig(id: .filters, isEnabled: true, sortOrder: 6),
-                ToolsItemConfig(id: .hotOrNot, isEnabled: true, sortOrder: 7),
-                ToolsItemConfig(id: .rateMe, isEnabled: true, sortOrder: 8)
+                ToolsItemConfig(id: .filters, isEnabled: true, sortOrder: 6)
             ]
+            #if !os(tvOS)
+            self.tools.append(ToolsItemConfig(id: .hotOrNot, isEnabled: true, sortOrder: 7))
+            #endif
+            self.tools.append(ToolsItemConfig(id: .rateMe, isEnabled: true, sortOrder: 8))
             enforceFixedTools()
             saveTools()
         }
@@ -1495,7 +1503,10 @@ class TabManager: ObservableObject {
 
     /// Tools managed / gated under stashy+.
     static func isStashyPlusTool(_ item: ToolsItem) -> Bool {
-        item == .downloads || item == .statistics || item == .oCount || item == .timeline || item == .topLists || item == .filters || item == .hotOrNot || item == .rateMe
+        #if !os(tvOS)
+        if item == .hotOrNot { return true }
+        #endif
+        return item == .downloads || item == .statistics || item == .oCount || item == .timeline || item == .topLists || item == .filters || item == .rateMe
     }
     
     func toggleTool(_ item: ToolsItem) {
