@@ -21,6 +21,12 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.SideEffect
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
@@ -132,7 +138,17 @@ fun AppShell() {
         }
     }
 
-    Box(Modifier.fillMaxSize().background(p.background)) {
+    // Auto-hide (Settings › Appearance): Feeds owns its chrome (tap toggles it), so the bar
+    // stays put there; any tab or screen change brings a hidden bar back.
+    val autoHideSuspended = top == null && Nav.tab == MainTab.Feeds
+    SideEffect { TabBarAutoHide.suspended = autoHideSuspended }
+    LaunchedEffect(Nav.tab, top?.key, autoHideSuspended) { TabBarAutoHide.show() }
+    val density = androidx.compose.ui.platform.LocalDensity.current
+    SideEffect { TabBarAutoHide.thresholdPx = with(density) { 24.dp.toPx() } }
+    val barHidden = TabBarAutoHide.enabled && TabBarAutoHide.hidden && !autoHideSuspended
+    val barOffset by animateFloatAsState(if (barHidden) 1f else 0f, tween(220), label = "tabBarAutoHide")
+
+    Box(Modifier.fillMaxSize().background(p.background).nestedScroll(TabBarAutoHide.connection)) {
         AnimatedContent(
             targetState = Nav.tab to top,
             transitionSpec = {
@@ -152,7 +168,8 @@ fun AppShell() {
         }
         val showBar = top?.hidesTabBar != true && !(top == null && Nav.rootHidesTabBar)
         AnimatedVisibility(showBar, Modifier.align(Alignment.BottomCenter), enter = fadeIn(), exit = fadeOut()) {
-            FloatingTabBar()
+            // Slides down by its own height (system inset included) when auto-hidden.
+            FloatingTabBar(Modifier.graphicsLayer { translationY = barOffset * size.height })
         }
     }
     AppUpdateDialog()
@@ -176,7 +193,7 @@ private data class TabItem(val tab: MainTab, val title: String, val icon: ImageV
  * with Search as fifth destination instead of the separate search circle.
  */
 @Composable
-private fun FloatingTabBar() {
+private fun FloatingTabBar(modifier: Modifier = Modifier) {
     val p = Theme.palette
     val items = listOf(
         // Material convention: outlined when inactive, filled when selected.
@@ -190,7 +207,7 @@ private fun FloatingTabBar() {
     val navInset = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
     NavigationBar(
         // Feeds [bottomBarContentPadding] with the bar's real height (without the system inset).
-        modifier = Modifier.onSizeChanged { size ->
+        modifier = modifier.onSizeChanged { size ->
             val container = with(density) { size.height.toDp() } - navInset
             if (container > 0.dp) TabBarMetrics.containerHeight = container
         },
