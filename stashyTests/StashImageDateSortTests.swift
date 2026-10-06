@@ -115,6 +115,18 @@ struct StashImageDateSortTests {
         #expect(posts.map(\.id) == ["set|i0", "set|i30", "set|i60"])
     }
 
+    @Test func setsRespectAConfiguredMaxSize() {
+        let images = (0..<25).map { img("i\($0)", nil, galleries: ["g"]) }
+        let ten = group(images, maxSize: 10)
+        #expect(ten.map(\.images.count) == [10, 10, 5])
+        #expect(ten.map(\.id) == ["set|i0", "set|i10", "set|i20"])
+        #expect(group(images, maxSize: 100).map(\.images.count) == [25])
+        // canJoin itself: a post of 20 is full at 20, not at 50.
+        let post = Array(images.prefix(20))
+        #expect(!StashImageSetGrouping.canJoin(post, images[20], mode: .gallery, gapMinutes: 10, maxSetSize: 20))
+        #expect(StashImageSetGrouping.canJoin(post, images[20], mode: .gallery, gapMinutes: 10, maxSetSize: 50))
+    }
+
     @Test func clipAndPhotoNeverShareASet() {
         let a = img("a", "2026-01-01T10:00:00Z", galleries: ["g"])
         let v = img("v", "2026-01-01T10:00:01Z", galleries: ["g"], video: true)
@@ -164,6 +176,12 @@ struct StashImageDateSortTests {
         #expect(StashImageGroupingPrefs.normalizedGap(60) == 60)
         #expect(StashImageGroupingPrefs.normalizedGap(5) == 10)
         #expect(StashImageGroupingPrefs.normalizedGap(nil) == 10)
+        #expect(StashImageGroupingPrefs.maxSizeKey == "stashline_group_max_size")
+        #expect(StashImageGroupingPrefs.maxSizeOptions == [10, 20, 30, 50, 100])
+        #expect(StashImageGroupingPrefs.normalizedMaxSize(10) == 10)
+        #expect(StashImageGroupingPrefs.normalizedMaxSize(100) == 100)
+        #expect(StashImageGroupingPrefs.normalizedMaxSize(40) == 30)
+        #expect(StashImageGroupingPrefs.normalizedMaxSize(nil) == 30)
     }
 
     @Test func resolvedModeMigratesFromLegacyKey() {
@@ -185,9 +203,10 @@ struct StashImageDateSortTests {
         _ images: [StashImage],
         sort: StashDBViewModel.ImageSortOption = .dateDesc,
         mode: StashImageGroupMode = .gallerySession,
-        gap: Int = 10
+        gap: Int = 10,
+        maxSize: Int = 30
     ) -> [(id: String, images: [StashImage])] {
-        StashImageSetGrouping.buildPosts(from: images, sort: sort, mode: mode, gapMinutes: gap)
+        StashImageSetGrouping.buildPosts(from: images, sort: sort, mode: mode, gapMinutes: gap, maxSetSize: maxSize)
     }
 
     private func ids(_ posts: [(id: String, images: [StashImage])]) -> [[String]] {

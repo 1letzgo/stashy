@@ -11,6 +11,8 @@ import SwiftUI
 struct DashboardSettingsView: View {
     @ObservedObject var tabManager = TabManager.shared
     @ObservedObject var appearanceManager = AppearanceManager.shared
+    /// Channels are stashy+ — row toggle and the Channels section only show while unlocked.
+    @ObservedObject private var stashyPlus = StashyPlusManager.shared
     @StateObject private var viewModel = StashDBViewModel()
 
     private var catalogTabs: [TabConfig] {
@@ -48,7 +50,7 @@ struct DashboardSettingsView: View {
 
             Section {
                 stashyScrollingSectionHeader("Visible Dashboard Rows")
-                ForEach(Array(tabManager.homeRows.enumerated()), id: \.element.id) { index, row in
+                ForEach(Array(visibleHomeRows.enumerated()), id: \.element.id) { index, row in
                     Toggle(isOn: Binding(
                         get: { row.isEnabled },
                         set: { _ in tabManager.toggleHomeRow(row.id) }
@@ -56,38 +58,40 @@ struct DashboardSettingsView: View {
                         Text(row.title)
                     }
                     .tint(appearanceManager.tintColor)
-                    .stashyGroupedBlockRow(index: index, count: tabManager.homeRows.count)
+                    .stashyGroupedBlockRow(index: index, count: visibleHomeRows.count)
                 }
                 .onMove { indices, newOffset in
-                    tabManager.moveHomeRow(from: indices, to: newOffset)
+                    moveVisibleHomeRows(from: indices, to: newOffset)
                 }
             }
 
-            Section {
-                stashyScrollingSectionHeader("Channels")
-                if channelSettingItems.isEmpty {
-                    Text(viewModel.isLoadingSavedFilters ? "Loading filters…" : "No saved scene or image filters")
-                        .foregroundColor(.secondary)
-                        .stashyGroupedBlockRow(index: 0, count: 1)
-                        .moveDisabled(true)
-                } else {
-                    ForEach(Array(channelSettingItems.enumerated()), id: \.element.id) { index, item in
-                        Toggle(isOn: Binding(
-                            get: { item.isEnabled },
-                            set: { _ in tabManager.toggleHomeChannelItem(item.id) }
-                        )) {
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text(channelTitle(for: item))
-                                Text(item.destination.title)
-                                    .font(.caption)
-                                    .foregroundColor(.secondary)
+            if stashyPlus.isUnlocked {
+                Section {
+                    stashyScrollingSectionHeader("Channels")
+                    if channelSettingItems.isEmpty {
+                        Text(viewModel.isLoadingSavedFilters ? "Loading filters…" : "No saved scene or image filters")
+                            .foregroundColor(.secondary)
+                            .stashyGroupedBlockRow(index: 0, count: 1)
+                            .moveDisabled(true)
+                    } else {
+                        ForEach(Array(channelSettingItems.enumerated()), id: \.element.id) { index, item in
+                            Toggle(isOn: Binding(
+                                get: { item.isEnabled },
+                                set: { _ in tabManager.toggleHomeChannelItem(item.id) }
+                            )) {
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text(channelTitle(for: item))
+                                    Text(item.destination.title)
+                                        .font(.caption)
+                                        .foregroundColor(.secondary)
+                                }
                             }
+                            .tint(appearanceManager.tintColor)
+                            .stashyGroupedBlockRow(index: index, count: channelSettingItems.count)
                         }
-                        .tint(appearanceManager.tintColor)
-                        .stashyGroupedBlockRow(index: index, count: channelSettingItems.count)
-                    }
-                    .onMove { indices, newOffset in
-                        tabManager.moveHomeChannelItem(from: indices, to: newOffset)
+                        .onMove { indices, newOffset in
+                            tabManager.moveHomeChannelItem(from: indices, to: newOffset)
+                        }
                     }
                 }
             }
@@ -105,6 +109,33 @@ struct DashboardSettingsView: View {
         .onChange(of: viewModel.savedFilters) { _, newValue in
             tabManager.syncHomeChannelItems(with: Array(newValue.values))
         }
+    }
+
+    /// Dashboard rows offered in Settings; the Channels row (stashy+) is hidden while locked.
+    private var visibleHomeRows: [HomeRowConfig] {
+        stashyPlus.isUnlocked ? tabManager.homeRows : tabManager.homeRows.filter { $0.type != .channels }
+    }
+
+    /// Maps a move in `visibleHomeRows` onto `tabManager.homeRows` (hidden rows keep their place).
+    private func moveVisibleHomeRows(from source: IndexSet, to destination: Int) {
+        let visible = visibleHomeRows
+        let all = tabManager.homeRows
+        guard visible.count != all.count else {
+            tabManager.moveHomeRow(from: source, to: destination)
+            return
+        }
+        let fullSource = IndexSet(source.compactMap { i in
+            visible.indices.contains(i) ? all.firstIndex(where: { $0.id == visible[i].id }) : nil
+        })
+        let fullDestination: Int
+        if destination < visible.count {
+            fullDestination = all.firstIndex(where: { $0.id == visible[destination].id }) ?? all.count
+        } else if let last = visible.last, let lastIndex = all.firstIndex(where: { $0.id == last.id }) {
+            fullDestination = lastIndex + 1
+        } else {
+            fullDestination = all.count
+        }
+        tabManager.moveHomeRow(from: fullSource, to: fullDestination)
     }
 
     private var channelSettingItems: [HomeChannelItemConfig] {

@@ -26,6 +26,7 @@ struct LinkedImagesCatalogGrid: View {
     @ObservedObject private var tabManager = TabManager.shared
     @AppStorage(StashImageGroupingPrefs.modeKey) private var groupModeRaw: String = StashImageGroupingPrefs.resolvedModeRaw()
     @AppStorage(StashImageGroupingPrefs.gapKey) private var groupGapMinutes: Int = StashImageGroupingPrefs.defaultGapMinutes
+    @AppStorage(StashImageGroupingPrefs.maxSizeKey) private var groupMaxSize: Int = StashImageGroupingPrefs.defaultMaxSetSize
     @AppStorage("images_feed_video_autoplay") private var imagesFeedVideoAutoplay = true
     /// Only updated while idle — avoids SwiftUI invalidation on every scroll frame.
     @State private var videoCardFrames: [String: CGRect] = [:]
@@ -56,7 +57,8 @@ struct LinkedImagesCatalogGrid: View {
             from: images,
             sort: sortOption,
             mode: StashImageGroupingPrefs.mode(fromRaw: groupModeRaw),
-            gapMinutes: StashImageGroupingPrefs.normalizedGap(groupGapMinutes)
+            gapMinutes: StashImageGroupingPrefs.normalizedGap(groupGapMinutes),
+            maxSetSize: StashImageGroupingPrefs.normalizedMaxSize(groupMaxSize)
         )
     }
 
