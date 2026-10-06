@@ -1,5 +1,7 @@
 package de.letzgo.stashy.ui.tools.match
 
+import de.letzgo.stashy.ui.tabBarHeight
+import de.letzgo.stashy.ui.bottomBarContentPadding
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import android.os.Build
@@ -26,7 +28,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
-import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -104,7 +105,6 @@ import de.letzgo.stashy.ui.Tokens
 import de.letzgo.stashy.ui.cardShadow
 import de.letzgo.stashy.ui.detail.PerformerDetailScreen
 import de.letzgo.stashy.ui.tools.NoServerPlaceholder
-import de.letzgo.stashy.ui.tools.ToolsBottomPadding
 import de.letzgo.stashy.ui.tools.ToolsTokens
 import de.letzgo.stashy.ui.tools.toolsTopPadding
 
@@ -112,8 +112,6 @@ import de.letzgo.stashy.ui.tools.toolsTopPadding
 
 /** iOS: `StashyExpandingDock.activeHeight` / `itemSpacing`. */
 internal val MatchPillSpacing: Dp = 10.dp
-/** Space between the floating tab bar's top edge and the screen bottom (bar 64 + 2 × 8 padding). */
-private val TabBarStackHeight: Dp = 80.dp
 
 /** iOS `HapticManager` counterpart on a [View]. */
 internal fun View.performMatchHaptic(kind: MatchHaptic) {
@@ -168,7 +166,7 @@ fun MatchToolView() {
                     model.selectSection(MatchViewModel.Section.entries[idx])
                 },
             )
-            val bottom = ToolsBottomPadding + if (model.section == MatchViewModel.Section.Battle) bottomChrome else 0.dp
+            val bottom = bottomBarContentPadding() + if (model.section == MatchViewModel.Section.Battle) bottomChrome else 0.dp
             when (model.section) {
                 MatchViewModel.Section.Battle -> BattleContent(model, hPad, isRegular, bottom)
                 MatchViewModel.Section.Leaderboard -> LeaderboardContent(model, hPad, isRegular, bottom)
@@ -182,8 +180,7 @@ fun MatchToolView() {
                 Modifier
                     .align(Alignment.BottomCenter)
                     .fillMaxWidth()
-                    .navigationBarsPadding()
-                    .padding(bottom = TabBarStackHeight)
+                    .padding(bottom = tabBarHeight())
                     .onSizeChanged { bottomChromePx = it.height },
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {

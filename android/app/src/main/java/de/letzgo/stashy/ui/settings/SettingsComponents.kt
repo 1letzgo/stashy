@@ -1,5 +1,6 @@
 package de.letzgo.stashy.ui.settings
 
+import de.letzgo.stashy.ui.bottomBarContentPadding
 import de.letzgo.stashy.ui.scaledMaxLines
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -49,7 +50,6 @@ import de.letzgo.stashy.ui.NativeTopBar
 import de.letzgo.stashy.ui.NativeType
 import de.letzgo.stashy.ui.NativeValueLabel
 import de.letzgo.stashy.ui.Nav
-import de.letzgo.stashy.ui.TabBarClearance
 import de.letzgo.stashy.ui.Theme
 import de.letzgo.stashy.ui.nativeAccent
 import de.letzgo.stashy.ui.nativeTopBarPadding
@@ -65,7 +65,7 @@ import de.letzgo.stashy.ui.nativeTopBarPadding
 fun SettingsList(topPadding: Dp, modifier: Modifier = Modifier, content: LazyListScope.() -> Unit) {
     LazyColumn(
         modifier.fillMaxSize(),
-        contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = topPadding + 12.dp, bottom = TabBarClearance + 28.dp),
+        contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = topPadding + 12.dp, bottom = bottomBarContentPadding()),
         verticalArrangement = Arrangement.spacedBy(0.dp),
         content = content,
     )

@@ -1,5 +1,6 @@
 package de.letzgo.stashy.ui.tools.merge
 
+import de.letzgo.stashy.ui.bottomBarContentPadding
 import de.letzgo.stashy.ui.scaledIconSize
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
@@ -83,7 +84,6 @@ import de.letzgo.stashy.ui.Tokens
 import de.letzgo.stashy.ui.tools.NoServerPlaceholder
 import de.letzgo.stashy.ui.tools.SmallSpinner
 import de.letzgo.stashy.ui.tools.StashyAlert
-import de.letzgo.stashy.ui.tools.ToolsBottomPadding
 import de.letzgo.stashy.ui.tools.ToolsTokens
 import de.letzgo.stashy.ui.tools.showToast
 import de.letzgo.stashy.ui.tools.toolsTopPadding
@@ -509,7 +509,7 @@ private fun <T : MergeableItem> MergeToolsContent(config: MergeToolsConfig<T>, n
         Column(
             Modifier.fillMaxWidth().background(p.background)
                 .padding(horizontal = ToolsTokens.contentPadding)
-                .padding(top = Tokens.Spacing.sm, bottom = ToolsBottomPadding),
+                .padding(top = Tokens.Spacing.sm, bottom = bottomBarContentPadding()),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(Tokens.Spacing.xs),
         ) {

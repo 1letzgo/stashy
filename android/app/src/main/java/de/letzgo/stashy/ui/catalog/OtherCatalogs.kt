@@ -1,5 +1,6 @@
 package de.letzgo.stashy.ui.catalog
 
+import de.letzgo.stashy.ui.bottomBarContentPadding
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
@@ -24,7 +25,6 @@ import de.letzgo.stashy.data.StashImage
 import de.letzgo.stashy.data.Studio
 import de.letzgo.stashy.data.Tag
 import de.letzgo.stashy.data.adaptiveColumnCount
-import de.letzgo.stashy.ui.TabBarClearance
 import de.letzgo.stashy.ui.Nav
 import de.letzgo.stashy.ui.SF
 import de.letzgo.stashy.ui.components.GalleryCard
@@ -190,7 +190,7 @@ fun ImagesList(c: CatalogController<StashImage>, holder: ImageMediaKindHolder, c
                 sortRaw = c.sort.raw,
                 isLoading = c.list.isLoading,
                 onLoadMore = { c.list.loadMore() },
-                contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = top, bottom = TabBarClearance + 16.dp),
+                contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = top, bottom = bottomBarContentPadding()),
                 onImageUpdated = { updated -> c.list.patch { if (it.id == updated.id) updated else it } },
                 header = if (c.search.isNotEmpty()) ({
                     Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) { SearchClearChip(c.search, { c.search = "" }) }

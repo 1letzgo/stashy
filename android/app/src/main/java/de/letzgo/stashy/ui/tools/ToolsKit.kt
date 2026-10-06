@@ -1,5 +1,6 @@
 package de.letzgo.stashy.ui.tools
 
+import de.letzgo.stashy.ui.bottomBarContentPadding
 import android.widget.Toast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -42,7 +43,6 @@ import de.letzgo.stashy.data.Prefs
 import de.letzgo.stashy.ui.Appearance
 import de.letzgo.stashy.ui.IosTypography
 import de.letzgo.stashy.ui.StashyColors
-import de.letzgo.stashy.ui.TabBarClearance
 import de.letzgo.stashy.ui.Theme
 import de.letzgo.stashy.ui.Tokens
 import de.letzgo.stashy.ui.catalog.catalogTopPadding
@@ -65,9 +65,6 @@ object ToolsTokens {
 @Composable
 fun toolsTopPadding(): Dp = catalogTopPadding()
 
-/** Bottom padding for every scrolling tool root (floating tab bar). */
-val ToolsBottomPadding: Dp = TabBarClearance + 16.dp
-
 /**
  * iOS: `List { … }.stashySettingsList()` — plain list, 20 pt horizontal margins, 20 pt top,
  * 24 pt between sections. Use [SettingsSectionHeader] / [GroupedCard] / [SettingsSectionFooter]
@@ -83,7 +80,7 @@ fun SettingsList(
     LazyColumn(
         modifier.fillMaxSize(),
         state = state,
-        contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = topPadding + 12.dp, bottom = TabBarClearance + 28.dp),
+        contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = topPadding + 12.dp, bottom = bottomBarContentPadding()),
         content = content,
     )
 }

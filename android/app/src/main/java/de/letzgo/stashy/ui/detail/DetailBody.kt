@@ -1,5 +1,6 @@
 package de.letzgo.stashy.ui.detail
 
+import de.letzgo.stashy.ui.bottomBarContentPadding
 import de.letzgo.stashy.ui.uniqueItemsIndexed
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -36,7 +37,6 @@ import de.letzgo.stashy.data.FindFilter
 import de.letzgo.stashy.ui.Nav
 import de.letzgo.stashy.ui.PagedList
 import de.letzgo.stashy.ui.SF
-import de.letzgo.stashy.ui.TabBarClearance
 import de.letzgo.stashy.ui.components.SceneCard
 import de.letzgo.stashy.ui.noRippleClickable
 import de.letzgo.stashy.ui.scene.SceneDetailScreen
@@ -233,7 +233,7 @@ internal fun DetailGrid(
         LazyVerticalGrid(
             columns = GridCells.Fixed(columns),
             state = state,
-            contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = detailTopPadding(hasTabs), bottom = TabBarClearance + 16.dp),
+            contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = detailTopPadding(hasTabs), bottom = bottomBarContentPadding()),
             verticalArrangement = Arrangement.spacedBy(12.dp),
             horizontalArrangement = Arrangement.spacedBy(12.dp),
             modifier = Modifier.fillMaxSize(),

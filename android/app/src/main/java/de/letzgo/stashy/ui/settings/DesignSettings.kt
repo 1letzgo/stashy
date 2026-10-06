@@ -1,5 +1,6 @@
 package de.letzgo.stashy.ui.settings
 
+import androidx.compose.material.icons.outlined.VerticalAlignBottom
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.heightIn
@@ -62,6 +63,14 @@ class AppearanceSettingsScreen : Screen {
         SettingsList(top) {
             settingsSection(header = "App Theme", footer = "Choose the appearance of the app.", key = "theme") {
                 SettingsPickerRow("Theme", AppTheme.entries, Appearance.theme, { it.raw }, SFS.circleLeftHalf) { Appearance.updateTheme(it) }
+            }
+            settingsSection(
+                header = "Tab Bar", key = "tabbar",
+                footer = "Slides the tab bar away while you scroll down a list and brings it back when you scroll up. Feeds keeps its own behaviour.",
+            ) {
+                SettingsToggleRow("Auto-hide tab bar", de.letzgo.stashy.ui.TabBarAutoHide.enabled, androidx.compose.material.icons.Icons.Outlined.VerticalAlignBottom) {
+                    de.letzgo.stashy.ui.TabBarAutoHide.enabled = it
+                }
             }
             settingsSection(
                 header = "App Accent Color", key = "accent",

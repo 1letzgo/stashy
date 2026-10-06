@@ -1,5 +1,6 @@
 package de.letzgo.stashy.ui.tools.stats
 
+import de.letzgo.stashy.ui.bottomBarContentPadding
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -75,7 +76,6 @@ import de.letzgo.stashy.ui.NativeType
 import de.letzgo.stashy.ui.Tokens
 import de.letzgo.stashy.ui.detail.ImageViewerScreen
 import de.letzgo.stashy.ui.scene.SceneDetailScreen
-import de.letzgo.stashy.ui.tools.ToolsBottomPadding
 import de.letzgo.stashy.ui.tools.ToolsTokens
 import de.letzgo.stashy.ui.tools.toolsTopPadding
 import kotlinx.coroutines.launch
@@ -108,7 +108,7 @@ fun OCountHeatmapToolView() {
                 .fillMaxSize()
                 .verticalScroll(rememberScrollState())
                 .padding(horizontal = ToolsTokens.contentPadding)
-                .padding(top = top, bottom = ToolsBottomPadding),
+                .padding(top = top, bottom = bottomBarContentPadding()),
         ) {
             OCountHeatmapCard()
         }
