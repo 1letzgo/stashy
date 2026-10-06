@@ -35,7 +35,7 @@ android {
         // Monotonic without manual bumps: number of commits on the checked-out branch
         // (-PstashyVersionCode=… overrides it for update tests).
         versionCode = (project.findProperty("stashyVersionCode") as String?)?.toIntOrNull() ?: gitCommitCount()
-        versionName = "3.3.6"
+        versionName = "3.3.7"
         buildConfigField("String", "DEBUG_SERVER", "\"\"")
         buildConfigField("String", "DEBUG_API_KEY", "\"\"")
     }
