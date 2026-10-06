@@ -1,5 +1,6 @@
 package de.letzgo.stashy.ui.tools.charts
 
+import de.letzgo.stashy.ui.bottomBarContentPadding
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.background
@@ -78,7 +79,6 @@ import de.letzgo.stashy.ui.detail.TagDetailScreen
 import de.letzgo.stashy.ui.noRippleClickable
 import de.letzgo.stashy.ui.scene.SceneDetailScreen
 import de.letzgo.stashy.ui.tools.NoServerPlaceholder
-import de.letzgo.stashy.ui.tools.ToolsBottomPadding
 import de.letzgo.stashy.ui.tools.ToolsTokens
 import de.letzgo.stashy.ui.tools.toolsTopPadding
 import kotlinx.coroutines.launch
@@ -229,7 +229,7 @@ private fun <M : TopListsMetric, T> TopListSection(
             val metric = state.metric
             LazyColumn(
                 Modifier.fillMaxSize(),
-                contentPadding = PaddingValues(start = ToolsTokens.contentPadding, end = ToolsTokens.contentPadding, bottom = ToolsBottomPadding),
+                contentPadding = PaddingValues(start = ToolsTokens.contentPadding, end = ToolsTokens.contentPadding, bottom = bottomBarContentPadding()),
                 verticalArrangement = Arrangement.spacedBy(ToolsTokens.rankedGridSpacing),
             ) {
                 item(key = "metrics") {

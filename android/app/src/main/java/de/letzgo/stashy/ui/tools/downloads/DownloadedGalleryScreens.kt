@@ -1,5 +1,6 @@
 package de.letzgo.stashy.ui.tools.downloads
 
+import de.letzgo.stashy.ui.bottomBarContentPadding
 import androidx.compose.foundation.layout.heightIn
 import de.letzgo.stashy.ui.uniqueItemsIndexed
 import android.net.Uri
@@ -24,7 +25,6 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -114,7 +114,6 @@ class DownloadedGalleryScreen(val entryId: String) : Screen {
         val isSyncing = Downloads.activeDownloads[entryId] != null
         var confirmDelete by remember { mutableStateOf(false) }
         val topInset = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
-        val bottomInset = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
         LaunchedEffect(Unit) { Downloads.backfillMissingImageTitles() }
 
         Box(Modifier.fillMaxSize().background(p.background)) {
@@ -125,7 +124,7 @@ class DownloadedGalleryScreen(val entryId: String) : Screen {
                     modifier = Modifier.fillMaxSize(),
                     contentPadding = PaddingValues(
                         start = ToolsTokens.contentPadding, end = ToolsTokens.contentPadding,
-                        top = nativeTopBarPadding() + 16.dp, bottom = bottomInset + 24.dp,
+                        top = nativeTopBarPadding() + 16.dp, bottom = bottomBarContentPadding(),
                     ),
                     verticalArrangement = Arrangement.spacedBy(12.dp),
                     horizontalArrangement = Arrangement.spacedBy(12.dp),

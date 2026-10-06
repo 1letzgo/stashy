@@ -1,5 +1,6 @@
 package de.letzgo.stashy.ui.tools.rateme
 
+import de.letzgo.stashy.ui.bottomBarContentPadding
 import de.letzgo.stashy.ui.scaledIconSize
 import android.os.Build
 import android.view.HapticFeedbackConstants
@@ -114,7 +115,6 @@ import de.letzgo.stashy.ui.oCounterIcon
 import de.letzgo.stashy.ui.scene.SceneDetailScreen
 import de.letzgo.stashy.ui.tools.NoServerPlaceholder
 import de.letzgo.stashy.ui.tools.StashyAlert
-import de.letzgo.stashy.ui.tools.ToolsBottomPadding
 import de.letzgo.stashy.ui.tools.ToolsTokens
 import de.letzgo.stashy.ui.tools.toolsTopPadding
 import kotlinx.coroutines.delay
@@ -362,7 +362,7 @@ private fun Content(model: RateMeViewModel, hPad: Dp, isRegular: Boolean, onDele
         Modifier
             .fillMaxSize()
             .padding(horizontal = hPad)
-            .padding(bottom = ToolsBottomPadding + ToolsTokens.menuBottomPadding),
+            .padding(bottom = bottomBarContentPadding() + ToolsTokens.menuBottomPadding),
         contentAlignment = Alignment.TopCenter,
     ) {
         val item = model.item

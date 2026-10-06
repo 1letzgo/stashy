@@ -15,6 +15,12 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.asPaddingValues
+import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
@@ -58,8 +64,35 @@ import de.letzgo.stashy.ui.settings.SettingsScreen
 import de.letzgo.stashy.ui.setup.ServerSetupScreen
 import de.letzgo.stashy.ui.tools.ToolsTabScreen
 
-/** Height the floating tab bar occupies; screens add it as bottom content padding. */
-val TabBarClearance: Dp = 104.dp
+/**
+ * Real height of the bottom [NavigationBar] *without* the system navigation-bar inset, measured
+ * in [AppShell]. Falls back to the Material 3 container height (80 dp) before the first layout.
+ */
+internal object TabBarMetrics {
+    val fallbackContainerHeight: Dp = 80.dp
+    var containerHeight by mutableStateOf(fallbackContainerHeight)
+}
+
+/**
+ * Height the bottom tab bar covers at the bottom of the window: the bar itself plus the system
+ * navigation bar / gesture inset it sits on. Content that scrolls under the bar pads by this.
+ */
+@Composable
+fun tabBarHeight(): Dp {
+    val nav = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
+    return maxOf(TabBarMetrics.containerHeight, TabBarMetrics.fallbackContainerHeight) + nav
+}
+
+/**
+ * Bottom content padding for every scrolling root above the tab bar: [tabBarHeight] plus
+ * [extra] breathing room, so the last card ends fully visible above the bar. The padding stays
+ * while the bar auto-hides ([TabBarAutoHide]) — content is never covered, it just gains room.
+ */
+@Composable
+fun bottomBarContentPadding(extra: Dp = BottomBarContentGap): Dp = tabBarHeight() + extra
+
+/** Default gap between the last item of a list and the top edge of the tab bar. */
+val BottomBarContentGap: Dp = 24.dp
 
 /** True while the floating tab bar is shown, so lists can pad for it. */
 val LocalTabBarVisible = compositionLocalOf { true }
@@ -153,7 +186,14 @@ private fun FloatingTabBar() {
         TabItem(MainTab.Settings, "Settings", androidx.compose.material.icons.Icons.Outlined.Settings, androidx.compose.material.icons.Icons.Filled.Settings),
         TabItem(MainTab.Search, "Search", androidx.compose.material.icons.Icons.Outlined.Search, androidx.compose.material.icons.Icons.Filled.Search),
     )
+    val density = androidx.compose.ui.platform.LocalDensity.current
+    val navInset = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
     NavigationBar(
+        // Feeds [bottomBarContentPadding] with the bar's real height (without the system inset).
+        modifier = Modifier.onSizeChanged { size ->
+            val container = with(density) { size.height.toDp() } - navInset
+            if (container > 0.dp) TabBarMetrics.containerHeight = container
+        },
         containerColor = p.secondaryBackground,
         contentColor = p.text,
         tonalElevation = 0.dp,

@@ -1,5 +1,6 @@
 package de.letzgo.stashy.ui.tools
 
+import de.letzgo.stashy.ui.bottomBarContentPadding
 import de.letzgo.stashy.ui.scaledMaxLines
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -173,7 +174,7 @@ private fun ToolsLandingView(onSelect: (ToolsTab) -> Unit) {
         Column(
             Modifier.fillMaxSize().verticalScroll(rememberScrollState())
                 .padding(horizontal = ToolsTokens.contentPadding)
-                .padding(top = toolsTopPadding() + ToolsTokens.menuTopPadding, bottom = ToolsBottomPadding),
+                .padding(top = toolsTopPadding() + ToolsTokens.menuTopPadding, bottom = bottomBarContentPadding()),
             verticalArrangement = Arrangement.spacedBy(20.dp),
         ) {
             ToolsTab.groups.forEach { (title, tools) ->
