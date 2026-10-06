@@ -214,7 +214,10 @@ class ImageViewerScreen(
             if (!continuousPlay || !isPlaying) return@LaunchedEffect
             if (image.isVideo && !DetailFormatting.isAnimated(image)) return@LaunchedEffect
             delay(continuousSeconds * 1000L)
-            advance(pager)
+            // Own scope: the page switch happens halfway through the scroll animation and
+            // restarts this effect (`currentIndex` changes) — run in the effect, the animation
+            // was cancelled and the pager stuck between two images.
+            scope.launch { advance(pager) }
         }
 
         Box(Modifier.fillMaxSize().background(Color.Black)) {
