@@ -6,6 +6,7 @@ Auth: service account key at ~/Library/Application Support/stashy-signing/play-p
 
   play_publish.py tracks                               list tracks and their releases
   play_publish.py upload <aab> [--track internal] [--notes "…"] [--draft] [--no-review]
+  play_publish.py assign <versionCode> [--track …]     put an already uploaded bundle on another track
 """
 import argparse, glob, json, os, sys, time, urllib.error, urllib.parse, urllib.request
 
@@ -82,6 +83,10 @@ def upload(edit, args):
                       data=f.read(), ctype="application/octet-stream")
     code = str(bundle["versionCode"])
     print("versionCode", code)
+    release_to_track(edit, code, args)
+
+
+def release_to_track(edit, code, args):
     release = {"versionCodes": [code], "status": "draft" if args.draft else "completed"}
     if args.notes:
         release["releaseNotes"] = [{"language": "en-US", "text": args.notes}]
@@ -96,13 +101,14 @@ def main():
     p = argparse.ArgumentParser()
     sub = p.add_subparsers(dest="cmd", required=True)
     sub.add_parser("tracks")
-    u = sub.add_parser("upload")
-    u.add_argument("aab")
-    u.add_argument("--track", default="internal")
-    u.add_argument("--notes")
-    u.add_argument("--draft", action="store_true", help="create the release as draft (no rollout)")
-    u.add_argument("--no-review", action="store_true",
-                   help="commit without sending to review (needed when Play asks for it)")
+    for name in ("upload", "assign"):
+        u = sub.add_parser(name)
+        u.add_argument("aab" if name == "upload" else "version_code")
+        u.add_argument("--track", default="internal")
+        u.add_argument("--notes")
+        u.add_argument("--draft", action="store_true", help="create the release as draft (no rollout)")
+        u.add_argument("--no-review", action="store_true",
+                       help="commit without sending to review (needed when Play asks for it)")
     args = p.parse_args()
 
     global TOKEN
@@ -111,6 +117,8 @@ def main():
     if args.cmd == "tracks":
         tracks(edit)
         call("DELETE", f"{API}/edits/{edit}")
+    elif args.cmd == "assign":
+        release_to_track(edit, args.version_code, args)
     else:
         upload(edit, args)
 
