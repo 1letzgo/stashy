@@ -8985,7 +8985,12 @@ struct Scene: Codable, Identifiable, Equatable {
     let updatedAt: String?
     let paths: ScenePaths?
     let sceneMarkers: [SceneMarker]?
+    #if !os(tvOS)
     let interactive: Bool?
+    #else
+    /// tvOS has no device sync: the field is never requested or decoded there.
+    var interactive: Bool? { nil }
+    #endif
     let stashIds: [StashID]?
     let captions: [VideoCaption]?
     let customFields: [String: StashJSONValue]?
@@ -9051,7 +9056,10 @@ struct Scene: Codable, Identifiable, Equatable {
     
     
     enum CodingKeys: String, CodingKey {
-        case id, title, details, director, date, duration, studio, performers, files, tags, galleries, groups, organized, rating100, paths, interactive, captions
+        case id, title, details, director, date, duration, studio, performers, files, tags, galleries, groups, organized, rating100, paths, captions
+        #if !os(tvOS)
+        case interactive
+        #endif
         case resumeTime = "resume_time"
         case playCount = "play_count"
         case playDuration = "play_duration"
@@ -9089,7 +9097,9 @@ struct Scene: Codable, Identifiable, Equatable {
         self.updatedAt = updatedAt
         self.paths = paths
         self.sceneMarkers = sceneMarkers
+        #if !os(tvOS)
         self.interactive = interactive
+        #endif
         self.stashIds = stashIds
         self.captions = captions
         self.customFields = customFields
@@ -9121,7 +9131,9 @@ struct Scene: Codable, Identifiable, Equatable {
         updatedAt = try container.decodeIfPresent(String.self, forKey: .updatedAt)
         paths = try container.decodeIfPresent(ScenePaths.self, forKey: .paths)
         sceneMarkers = try container.decodeIfPresent([SceneMarker].self, forKey: .sceneMarkers)
+        #if !os(tvOS)
         interactive = try container.decodeIfPresent(Bool.self, forKey: .interactive)
+        #endif
         stashIds = try container.decodeIfPresent([StashID].self, forKey: .stashIds)
         captions = try container.decodeIfPresent([VideoCaption].self, forKey: .captions)
         customFields = try container.decodeIfPresent([String: StashJSONValue].self, forKey: .customFields)
@@ -9157,10 +9169,12 @@ struct Scene: Codable, Identifiable, Equatable {
         return false
     }
 
+    #if !os(tvOS)
     // Computed property to determine if scene is truly interactive (has funscript)
     var hasInteractive: Bool {
         return paths?.funscript != nil
     }
+    #endif
 
     // Total duration from files if not at top level
     var sceneDuration: Double? {
@@ -9221,6 +9235,7 @@ struct Scene: Codable, Identifiable, Equatable {
         return signed(URL(string: manualPath))
     }
 
+    #if !os(tvOS)
     var heatmapURL: URL? {
         guard let path = paths?.interactive_heatmap, let url = URL(string: path) else { return nil }
         guard let config = ServerConfigManager.shared.activeConfig, let key = config.secureApiKey, !key.isEmpty else { return url }
@@ -9245,6 +9260,7 @@ struct Scene: Codable, Identifiable, Equatable {
         comps?.queryItems = items
         return comps?.url ?? url
     }
+    #endif
 
     /// Download source: always the signed original file (`paths.stream`).
     /// No MP4-transcode preference and no "incompatible format" bail-out — the local player
@@ -9524,10 +9540,31 @@ struct ScenePaths: Codable, Equatable {
     let webp: String?
     let vtt: String?
     let sprite: String?
+    #if !os(tvOS)
     let funscript: String?
     let interactive_heatmap: String?
+    #endif
     let caption: String?
 }
+
+#if os(tvOS)
+extension ScenePaths {
+    /// tvOS has no device sync: script and heatmap paths are never requested there.
+    /// Same labels as the iOS memberwise init so shared call sites compile unchanged.
+    init(screenshot: String?, preview: String?, stream: String?, webp: String?, vtt: String?, sprite: String?, funscript: String?, interactive_heatmap: String?, caption: String?) {
+        self.init(screenshot: screenshot, preview: preview, stream: stream, webp: webp, vtt: vtt, sprite: sprite, caption: caption)
+    }
+}
+#endif
+
+#if os(tvOS)
+extension MarkerScene {
+    /// Same labels as the iOS memberwise init; `interactive` does not exist on tvOS.
+    init(id: String, title: String?, date: String?, files: [SceneFile]?, performers: [ScenePerformer]?, rating100: Int?, playCount: Int?, oCounter: Int?, interactive: Bool?, paths: ScenePaths?) {
+        self.init(id: id, title: title, date: date, files: files, performers: performers, rating100: rating100, playCount: playCount, oCounter: oCounter, paths: paths)
+    }
+}
+#endif
 
 struct MarkerScene: Codable, Identifiable, Equatable {
     let id: String
@@ -9538,11 +9575,18 @@ struct MarkerScene: Codable, Identifiable, Equatable {
     let rating100: Int?
     let playCount: Int?
     let oCounter: Int?
+    #if !os(tvOS)
     let interactive: Bool?
+    #else
+    var interactive: Bool? { nil }
+    #endif
     let paths: ScenePaths?
 
     enum CodingKeys: String, CodingKey {
-        case id, title, date, files, performers, rating100, interactive, paths
+        case id, title, date, files, performers, rating100, paths
+        #if !os(tvOS)
+        case interactive
+        #endif
         case playCount = "play_count"
         case oCounter = "o_counter"
     }
@@ -9585,10 +9629,12 @@ struct MarkerScene: Codable, Identifiable, Equatable {
         )
     }
 
+    #if !os(tvOS)
     // Computed property to determine if scene is truly interactive (has funscript)
     var hasInteractive: Bool {
         return paths?.funscript != nil
     }
+    #endif
 
     var thumbnailURL: URL? {
         // 0. Check local first — but only for downloaded scenes. A `fileExists`

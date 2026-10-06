@@ -29,7 +29,7 @@ GraphQL documents live under `graphql/`, are shared by all platforms and loaded 
 | Platform | Status |
 |----------|--------|
 | **iOS** | [App Store](https://apps.apple.com/us/app/stashy/id6754876029) |
-| **tvOS** | [App Store](https://apps.apple.com/us/app/stashy/id6754876029) |
+| **tvOS** | In App Review |
 | **Android** | In development — no public release yet |
 | **Android TV** | In development — no public release yet |
 

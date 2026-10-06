@@ -153,6 +153,9 @@ class GraphQLQueries {
         case "findScenes":
             // List: schlankes Fragment (ohne Marker/Tags/Galleries/Groups und ohne riesige PerformerFields-Streuung).
             fragments = loadQuery(named: "fragment_SceneListFields")
+        case "findScenesFeed":
+            // Feeds › Scenes: list fragment plus the marker times the query adds itself.
+            fragments = loadQuery(named: "fragment_SceneListFields")
         case "findScenesSimilar":
             // Same slim list fragment; the query itself adds `tags` for the ranking.
             fragments = loadQuery(named: "fragment_SceneListFields")
@@ -163,9 +166,11 @@ class GraphQLQueries {
         case "findPerformers":
             fragments = loadQuery(named: "fragment_PerformerFields")
             
+        #if !os(tvOS)
         case "hotOrNotFindPerformers":
             fragments = loadQuery(named: "fragment_HotOrNotPerformerFields")
-            
+        #endif
+
         case "findStudios", "findStudio":
             fragments = loadQuery(named: "fragment_StudioFields")
             

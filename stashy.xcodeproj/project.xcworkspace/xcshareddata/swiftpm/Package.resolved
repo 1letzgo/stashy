@@ -1,5 +1,5 @@
 {
-  "originHash" : "cf68f451986d41aa806707fcba6fc7b4f07760d1cbab47e4913aeabfbacba855",
+  "originHash" : "7714676e2ce09105e91cc4c83f06313b1b0b71929a083a2596e1f012e7b37131",
   "pins" : [
     {
       "identity" : "aetherengine",
@@ -26,6 +26,15 @@
       "state" : {
         "revision" : "0d7cce1d6836a30d13a3a2326e50a153af53f014",
         "version" : "2.1.0"
+      }
+    },
+    {
+      "identity" : "purchases-ios-spm",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/RevenueCat/purchases-ios-spm",
+      "state" : {
+        "revision" : "e45bb84b726885492ce4e7ee94ddb252d171a205",
+        "version" : "5.92.0"
       }
     },
     {
