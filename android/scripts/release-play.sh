@@ -10,4 +10,6 @@ export JAVA_HOME=/opt/homebrew/opt/openjdk@17/libexec/openjdk.jdk/Contents/Home 
 ./gradlew bundlePlayRelease -q --max-workers=2 -Dorg.gradle.jvmargs=-Xmx2g -Pkotlin.compiler.execution.strategy=in-process
 AAB=$(ls -t ~/Library/Caches/stashy-android/*/app/outputs/bundle/playRelease/app-play-release.aab | head -1)
 echo "built $AAB (versionCode $(git -C .. rev-list --count HEAD))"
-python3 scripts/play_publish.py upload "$AAB" --track "$TRACK" ${NOTES:+--notes "$NOTES"}
+ARGS=(upload "$AAB" --track "$TRACK")
+[ -n "$NOTES" ] && ARGS+=(--notes "$NOTES")
+python3 scripts/play_publish.py "${ARGS[@]}"
