@@ -139,7 +139,8 @@ struct StashyPlusAppIconSettings: View {
     @ObservedObject private var icons = AppIconManager.shared
     @ObservedObject private var appearanceManager = AppearanceManager.shared
 
-    private let columns = [GridItem(.adaptive(minimum: 72), spacing: 12)]
+    /// Always four per row, whatever the width.
+    private let columns = Array(repeating: GridItem(.flexible(), spacing: 12), count: 4)
 
     var body: some View {
         LazyVGrid(columns: columns, spacing: 14) {
