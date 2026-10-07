@@ -174,7 +174,55 @@ fun AppShell() {
             FloatingTabBar(Modifier.graphicsLayer { translationY = barOffset * size.height })
         }
     }
+    ShellAlerts()
     AppUpdateDialog()
+}
+
+/** Which of the iOS `MainTabView` configuration alerts is showing. */
+private enum class ShellAlert { IncompleteSetup, AuthExpired }
+
+/**
+ * iOS `MainTabView` alerts: "Incomplete Setup" when the active server config lacks details
+ * (`checkConfiguration()` on appear) and "Authentication Required" on a 401 ("AuthError401").
+ * Both open the active server's configuration in Settings.
+ */
+@Composable
+private fun ShellAlerts() {
+    val config = ServerConfigManager.activeConfig
+    var incompleteFor by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf<String?>(null) }
+    var incompleteDismissed by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf<String?>(null) }
+    LaunchedEffect(config?.id, config?.hasValidConfig) {
+        incompleteFor = config?.takeIf { !it.hasValidConfig && incompleteDismissed != it.id }?.id
+    }
+    val authFor = de.letzgo.stashy.data.AuthEvents.pendingServerId
+    val alert = when {
+        incompleteFor != null && incompleteFor == config?.id -> ShellAlert.IncompleteSetup
+        authFor != null && authFor == config?.id -> ShellAlert.AuthExpired
+        else -> null
+    } ?: return
+    fun dismiss() {
+        when (alert) {
+            ShellAlert.IncompleteSetup -> { incompleteDismissed = incompleteFor; incompleteFor = null }
+            ShellAlert.AuthExpired -> de.letzgo.stashy.data.AuthEvents.consume()
+        }
+    }
+    fun openServerSettings() {
+        dismiss()
+        val id = ServerConfigManager.activeConfig?.id
+        Nav.tab = MainTab.Settings
+        Nav.popToRoot(MainTab.Settings)
+        if (id != null) Nav.push(de.letzgo.stashy.ui.settings.ServerFormScreen(id))
+    }
+    when (alert) {
+        ShellAlert.IncompleteSetup -> NativeConfirmDialog(
+            "Incomplete Setup", "Your server configuration is missing some details.",
+            onDismiss = ::dismiss, confirmLabel = "Check Settings", dismissLabel = null, onConfirm = ::openServerSettings,
+        )
+        ShellAlert.AuthExpired -> NativeConfirmDialog(
+            "Authentication Required", "Your API key is invalid or expired. Please check your server configuration.",
+            onDismiss = ::dismiss, confirmLabel = "Update API Key", dismissLabel = null, onConfirm = ::openServerSettings,
+        )
+    }
 }
 
 @Composable
