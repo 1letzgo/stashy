@@ -498,14 +498,14 @@ private fun FeedPager(
                     pausesAdvance = activeItem.isAnimated && continuous,
                 )
                 if (!activeItem.isAnimated) {
-                    // Markers: the bar spans the segment (the player is clipped to it), the
-                    // scrub still comes from the scene's sprite sheet at the matching scene time.
+                    // iOS `ReelsView` scrub preview: the scene's sprite sheet + VTT index, like the
+                    // scene player. Scenes scrub in scene time; Markers' bar spans the segment
+                    // (the player is clipped to it), so the still is read at the matching scene
+                    // time. Previews (a generated clip) and scenes without sprites keep the poster.
                     val segment = activeItem.segment
-                    val sprites = remember(activeItem.id) {
-                        (activeItem as? FeedItem.MarkerItem)?.marker?.scene?.paths?.let {
-                            de.letzgo.stashy.ui.player.SceneScrubSprites.create(it.vtt, it.sprite)
-                        }
-                    }
+                    val sprites = remember(activeItem.id) { feedScrubSprites(activeItem) }
+                    // Fetched as soon as the row is active, so the first scrub already has stills.
+                    LaunchedEffect(sprites) { sprites?.prepare() }
                     val previewAt = remember(sprites, segment) {
                         sprites?.let { sp -> { s: Double -> sp.prepare(); sp.thumbnail(segment?.sceneTime(s) ?: s) } }
                     }
@@ -524,6 +524,16 @@ private fun FeedPager(
             }
         }
     }
+}
+
+/** Sprite sheet of the scene a row scrubs through (Scenes, Markers); null for clips / previews. */
+private fun feedScrubSprites(item: FeedItem): de.letzgo.stashy.ui.player.SceneScrubSprites? {
+    val paths = when (item) {
+        is FeedItem.SceneItem -> item.scene.paths
+        is FeedItem.MarkerItem -> item.marker.scene?.paths
+        else -> null
+    } ?: return null
+    return de.letzgo.stashy.ui.player.SceneScrubSprites.create(paths.vtt, paths.sprite)
 }
 
 private fun emptyIcon(mode: ReelsModeType) = when (mode) {
