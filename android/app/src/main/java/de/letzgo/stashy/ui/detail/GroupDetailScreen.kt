@@ -69,16 +69,15 @@ class GroupDetailScreen(val groupId: String, val preview: StashGroup? = null) : 
             DetailGrid(gridState, { w -> columnsFor(tab, w, catalog.imageColumns) }, hasTabs = catalog.available.size > 1, header = { group?.let { Header(it) } }) {
                 linkedSection(catalog, tab, gridState)
             }
-            val (slots, menu) = catalog.slots(tab)
             // iOS: the scenes tab adds `SceneBulkDownloadChrome.slot` (contextual, before filter & sort).
             val extra = when (tab) {
                 DetailTab.Scenes -> listOf(sceneBulkDownloadSlot { showSceneDownloadOptions = true })
                 else -> emptyList()
             }
-            DetailTopBar(group?.name ?: "", catalog.available, tab, { tab = it }, slots + extra, menu,
-                settings = catalog.imagesSettingsSlot(tab), onEdit = { editing = true }, editLabel = "Edit group")
+            DetailTopBar(group?.name ?: "", catalog.available, tab, { tab = it }, extra,
+                settings = catalog.settingsSlot(tab), onEdit = { editing = true }, editLabel = "Edit group")
         }
-        LinkedImagesSettingsSheet(catalog)
+        LinkedSettingsSheets(catalog)
         val g = group
         if (editing && g != null) EditGroupSheet(g, { editing = false }) { group = it }
         if (showSceneDownloadOptions) {

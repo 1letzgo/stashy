@@ -15,9 +15,6 @@ import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.itemsIndexed
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
@@ -33,7 +30,8 @@ import de.letzgo.stashy.data.StashGroup
 import de.letzgo.stashy.data.StashImage
 import de.letzgo.stashy.data.Studio
 import de.letzgo.stashy.data.Tag
-import de.letzgo.stashy.data.FindFilter
+import de.letzgo.stashy.data.CatalogRepository
+import de.letzgo.stashy.data.SortOption
 import de.letzgo.stashy.ui.Nav
 import de.letzgo.stashy.ui.PagedList
 import de.letzgo.stashy.ui.SF
@@ -61,17 +59,23 @@ internal fun screenScope() = CoroutineScope(SupervisorJob() + Dispatchers.Main.i
 /**
  * The linked lists of one detail screen (iOS: `DetailLinked*FilterModel`s + the
  * `StashDBViewModel` detail arrays). A null scope means the section does not exist there.
+ *
+ * Every section is a [CatalogController] of its [FilterMode] — the same filter & sort sheet as
+ * the Home catalog of that type (saved filters, sort, presets, criteria editor) — with the
+ * entity scope layered last (`CatalogQuery.scope`), so nothing in the sheet can widen the list
+ * beyond this entity. Sorts are session only; the Settings default filter never applies here
+ * (`scope != null`).
  */
 internal class LinkedCatalog(
     private val scope: CoroutineScope,
     val order: List<DetailTab>,
-    private val sceneScope: JsonObject? = null,
-    private val galleryScope: JsonObject? = null,
-    private val studioScope: JsonObject? = null,
-    private val performerScope: JsonObject? = null,
-    private val tagScope: JsonObject? = null,
-    private val groupScope: JsonObject? = null,
-    private val imageScope: JsonObject? = null,
+    sceneScope: JsonObject? = null,
+    galleryScope: JsonObject? = null,
+    studioScope: JsonObject? = null,
+    performerScope: JsonObject? = null,
+    tagScope: JsonObject? = null,
+    groupScope: JsonObject? = null,
+    imageScope: JsonObject? = null,
     val sceneContext: DetailViewContext? = null,
     /** Scene / gallery counts known from the list item, so the first tab is right before loading. */
     var previewScenes: Int = 0,
@@ -80,120 +84,139 @@ internal class LinkedCatalog(
     /** 1/row draws the grouped feed (false: always the thumbnail grid, iOS Studio detail). */
     val usesImageFeed: Boolean = true,
 ) {
-    var sceneSort by mutableStateOf(sceneContext?.let { DetailViewConfig.sceneSort(it) } ?: DetailSort.Scene.DateDesc)
-    var gallerySort by mutableStateOf(DetailSort.Gallery.DateDesc)
-    var studioSort by mutableStateOf(DetailSort.Studio.NameAsc)
-    var performerSort by mutableStateOf(DetailSort.Performer.NameAsc)
-    var tagSort by mutableStateOf(DetailSort.Tag.SceneCountDesc)
     /** Per row of the Images section (iOS `CatalogCardColumnScope.images`, set in the images sheet). */
     val imageColumns: Int get() = CatalogPrefs.cardColumns(CatalogCardColumnScope.Images).raw
 
-    val scenes = sceneScope?.let { s -> PagedList<Scene>(scope, 20) { page, per -> DetailRepository.scenes(DetailSort.findFilter(page, per, sceneSort), s) } }
-    val galleries = galleryScope?.let { s -> PagedList<Gallery>(scope, 20) { page, per -> DetailRepository.galleries(DetailSort.findFilter(page, per, gallerySort), s) } }
-    val studios = studioScope?.let { s -> PagedList<Studio>(scope, 20) { page, per -> DetailRepository.studios(DetailSort.findFilter(page, per, studioSort), s) } }
-    val performers = performerScope?.let { s -> PagedList<Performer>(scope, 20) { page, per -> DetailRepository.performers(DetailSort.findFilter(page, per, performerSort), s) } }
-    val tags = tagScope?.let { s -> PagedList<Tag>(scope, 40) { page, per -> DetailRepository.tags(DetailSort.findFilter(page, per, tagSort), s) } }
-    val groups = groupScope?.let { s -> PagedList<StashGroup>(scope, 20) { page, per -> DetailRepository.groups(FindFilter(page, per, "name", "ASC"), s) } }
+    private fun <T> controller(
+        mode: FilterMode,
+        entityScope: JsonObject?,
+        sortRaw: String,
+        perPage: Int,
+        persistSort: (SortOption) -> Unit = {},
+        extraLive: () -> JsonObject = { JsonObject(emptyMap()) },
+    ): CatalogController<T>? = entityScope?.let { s ->
+        CatalogController(
+            mode, scope,
+            tabId = null,
+            scope = s,
+            initialSort = SortCatalog.option(mode, sortRaw) ?: SortCatalog.option(mode, SortCatalog.defaultRaw(mode)),
+            extraLive = extraLive,
+            persistSort = persistSort,
+            perPage = perPage,
+            fetch = { q, page, per -> DetailRepository.findScoped(q, page, per) },
+        )
+    }
+
+    /** Scenes (iOS detail scene sort: `DetailViewsSortConfig_<context>`, session override on change). */
+    val sceneController = controller<Scene>(
+        FilterMode.Scenes, sceneScope,
+        sortRaw = sceneContext?.let { DetailViewConfig.sceneSort(it).raw } ?: DetailSort.Scene.DateDesc.raw,
+        perPage = 20,
+        persistSort = { s -> sceneContext?.let { DetailViewConfig.setSortOption(it, s.raw) } },
+    )
+    val galleryController = controller<Gallery>(FilterMode.Galleries, galleryScope, "dateDesc", 20)
+    val studioController = controller<Studio>(FilterMode.Studios, studioScope, "nameAsc", 20)
+    val performerController = controller<Performer>(FilterMode.Performers, performerScope, "nameAsc", 20)
+    val tagController = controller<Tag>(FilterMode.Tags, tagScope, "sceneCountDesc", 40)
+    val groupController = controller<StashGroup>(FilterMode.Groups, groupScope, "nameAsc", 20)
+
     /** iOS `liveFilterMediaKind` of the Images section ("Type": Any / Image / Video). */
     val imageKind = ImageMediaKindHolder()
     /**
      * Images section (iOS `DetailLinkedImagesFilterModel`): filter, sort (`dateDesc`, session
-     * only), Type and criteria from the images sheet; [imageScope] is layered last, so nothing
-     * in the sheet can widen the list beyond this entity.
+     * only), Type and criteria from the images sheet.
      */
-    val imageController = imageScope?.let { s ->
-        CatalogController<StashImage>(
-            FilterMode.Images, scope,
-            tabId = null,
-            scope = s,
-            initialSort = SortCatalog.option(FilterMode.Images, DetailSort.Image.DateDesc.raw),
-            extraLive = { imageKind.kind.pathCriterion?.let { JsonObject(mapOf("path" to it)) } ?: JsonObject(emptyMap()) },
-            persistSort = {},
-        )
-    }
-    val images: PagedList<StashImage>? = imageController?.list
+    val imageController = controller<StashImage>(
+        FilterMode.Images, imageScope, DetailSort.Image.DateDesc.raw, CatalogRepository.pageSize(FilterMode.Images),
+        extraLive = { imageKind.kind.pathCriterion?.let { JsonObject(mapOf("path" to it)) } ?: JsonObject(emptyMap()) },
+    )
+
+    val scenes: PagedList<Scene>? get() = sceneController?.list
+    val galleries: PagedList<Gallery>? get() = galleryController?.list
+    val studios: PagedList<Studio>? get() = studioController?.list
+    val performers: PagedList<Performer>? get() = performerController?.list
+    val tags: PagedList<Tag>? get() = tagController?.list
+    val groups: PagedList<StashGroup>? get() = groupController?.list
+    val images: PagedList<StashImage>? get() = imageController?.list
     /** Grouped 1/row feed of the Images section (iOS `LinkedImagesCatalogGrid` / `ImagesView(gallery:)`). */
     val imageFeed = ImageFeedGridModel()
+
+    /** Every section except Images (whose sheet adds its own cards). */
+    val plainControllers: List<CatalogController<*>> get() =
+        listOfNotNull(sceneController, galleryController, studioController, performerController, tagController, groupController)
+
+    private val controllers: List<CatalogController<*>> get() = plainControllers + listOfNotNull(imageController)
 
     private var started = false
 
     fun loadAll(force: Boolean = false) {
         if (started && !force) return
         started = true
-        listOfNotNull(scenes, galleries, studios, performers, tags, groups).forEach { it.refresh() }
-        // First appearance also loads the saved filters the images sheet offers.
-        imageController?.let { c -> if (c.list.loadedOnce) c.refresh() else c.onAppear() }
+        // First appearance also loads the saved filters the sheets offer.
+        controllers.forEach { c -> if (c.list.loadedOnce) c.refresh() else c.onAppear() }
     }
 
-    fun list(tab: DetailTab): PagedList<*>? = when (tab) {
-        DetailTab.Scenes -> scenes; DetailTab.Galleries -> galleries; DetailTab.Studios -> studios
-        DetailTab.Performers -> performers; DetailTab.Tags -> tags; DetailTab.Groups -> groups; DetailTab.Images -> images
+    fun controller(tab: DetailTab): CatalogController<*>? = when (tab) {
+        DetailTab.Scenes -> sceneController
+        DetailTab.Galleries -> galleryController
+        DetailTab.Studios -> studioController
+        DetailTab.Performers -> performerController
+        DetailTab.Tags -> tagController
+        DetailTab.Groups -> groupController
+        DetailTab.Images -> imageController
+    }
+
+    fun list(tab: DetailTab): PagedList<*>? = controller(tab)?.list
+
+    /** The sheet narrows [tab] (filter, preset, criteria — and Type for Images). */
+    fun isFiltered(tab: DetailTab): Boolean {
+        val c = controller(tab) ?: return false
+        return c.isFilterActive || (tab == DetailTab.Images && imageKind.kind != ImageListMediaKind.All)
     }
 
     /** iOS `effectiveScenes` — once the first fetch is done the server count wins. */
     val effectiveScenes: Int get() = scenes?.let { if (it.loadedOnce) it.totalCount else maxOf(it.totalCount, previewScenes) } ?: 0
     val effectiveGalleries: Int get() = maxOf(galleries?.totalCount ?: 0, previewGalleries)
-    val effectiveImages: Int get() {
-        val total = maxOf(images?.totalCount ?: 0, previewImages)
-        // A sheet filter / Type that matches nothing keeps the tab (empty state), no auto-switch away.
-        return if (imagesFiltered) maxOf(total, 1) else total
-    }
+    val effectiveImages: Int get() = maxOf(images?.totalCount ?: 0, previewImages)
 
-    /** The images sheet narrows the list (filter, preset, criteria or Type). */
-    val imagesFiltered: Boolean get() = imageController?.let { it.isFilterActive || imageKind.kind != ImageListMediaKind.All } ?: false
-
-    fun count(tab: DetailTab): Int = when (tab) {
-        DetailTab.Scenes -> effectiveScenes
-        DetailTab.Galleries -> effectiveGalleries
-        DetailTab.Images -> effectiveImages
-        else -> list(tab)?.totalCount ?: 0
-    }
+    fun count(tab: DetailTab): Int = visibleCount(
+        when (tab) {
+            DetailTab.Scenes -> effectiveScenes
+            DetailTab.Galleries -> effectiveGalleries
+            DetailTab.Images -> effectiveImages
+            else -> list(tab)?.totalCount ?: 0
+        },
+        isFiltered(tab),
+    )
 
     /** iOS `availableTabs`. */
     val available: List<DetailTab> get() = order.filter { count(it) > 0 }
 
-    val isSettled: Boolean get() = listOfNotNull(scenes, galleries, studios, performers, tags, groups, images).all { it.loadedOnce && !it.isLoading }
+    val isSettled: Boolean get() = controllers.all { it.list.loadedOnce && !it.list.isLoading }
 
-    fun changeSceneSort(s: DetailSort.Scene) {
-        if (s == DetailSort.Scene.Random && sceneSort == DetailSort.Scene.Random) DetailSort.refreshRandomSeed()
-        sceneSort = s
-        sceneContext?.let { DetailViewConfig.setSortOption(it, s.raw) }
-        scenes?.refresh()
+    /** Top-bar "Settings" of [tab] (iOS filter & sort FAB of the `DetailLinked*` lists). */
+    fun settingsSlot(tab: DetailTab): CatalogChromeSlot? {
+        val c = controller(tab) ?: return null
+        return CatalogChromeSlot(SF.sliderHorizontal3, isFiltered(tab), "Settings") { c.isSheetPresented = true }
     }
 
-    fun <S : SortChoice> resort(tab: DetailTab, old: S, new: S, apply: (S) -> Unit) {
-        if (new.field == "random" && old.field == "random") DetailSort.refreshRandomSeed()
-        apply(new)
-        list(tab)?.refresh()
-    }
-
-    /** Footer slots + sort menu for [tab] (iOS `*DetailListSlots`). */
-    fun slots(tab: DetailTab): Pair<List<ChromeSlot>, (@Composable (() -> Unit) -> Unit)?> = when (tab) {
-        DetailTab.Scenes -> emptyList<ChromeSlot>() to { d -> SortMenuItems(DetailSort.Scene.entries, sceneSort, d) { changeSceneSort(it) } }
-        DetailTab.Galleries -> emptyList<ChromeSlot>() to { d -> SortMenuItems(DetailSort.Gallery.entries, gallerySort, d) { resort(tab, gallerySort, it) { s -> gallerySort = s } } }
-        DetailTab.Studios -> emptyList<ChromeSlot>() to { d -> SortMenuItems(DetailSort.Studio.entries, studioSort, d) { resort(tab, studioSort, it) { s -> studioSort = s } } }
-        DetailTab.Performers -> emptyList<ChromeSlot>() to { d -> SortMenuItems(DetailSort.Performer.entries, performerSort, d) { resort(tab, performerSort, it) { s -> performerSort = s } } }
-        DetailTab.Tags -> emptyList<ChromeSlot>() to { d -> SortMenuItems(DetailSort.Tag.entries, tagSort, d) { resort(tab, tagSort, it) { s -> tagSort = s } } }
-        // Images: no sort menu — the top bar's Settings opens the images sheet ([imagesSettingsSlot]).
-        DetailTab.Groups, DetailTab.Images -> emptyList<ChromeSlot>() to null
-    }
-
-    /** Top-bar "Settings" of the Images section (iOS filter & sort FAB of `LinkedImagesCatalogGrid`). */
-    fun imagesSettingsSlot(tab: DetailTab): CatalogChromeSlot? {
-        val c = imageController ?: return null
-        if (tab != DetailTab.Images) return null
-        return CatalogChromeSlot(SF.sliderHorizontal3, imagesFiltered, "Settings") {
-            c.isSheetPresented = true
-        }
+    companion object {
+        /**
+         * A sheet filter that matches nothing keeps its tab (empty state) instead of hiding it,
+         * so the auto-switch never jumps away from a list the user is filtering.
+         */
+        fun visibleCount(total: Int, filtered: Boolean): Int = if (filtered) maxOf(total, 1) else total
     }
 }
 
 /**
- * iOS `ImagesCatalogFilterSortSheet` of a detail screen's Images section: filter & sort, Type,
- * Per row (`CatalogCardColumnScope.images`), feed autoplay and the criteria editor.
+ * The filter & sort sheets of a detail screen's sections — the Home catalog sheet of each type;
+ * the Images one adds Type, Per row (`CatalogCardColumnScope.images`) and feed autoplay
+ * (iOS `ImagesCatalogFilterSortSheet`).
  */
 @Composable
-internal fun LinkedImagesSettingsSheet(catalog: LinkedCatalog) {
+internal fun LinkedSettingsSheets(catalog: LinkedCatalog) {
+    catalog.plainControllers.forEach { CatalogFilterSortSheet(it) }
     val c = catalog.imageController ?: return
     CatalogFilterSortSheet(c, onReset = { catalog.imageKind.kind = ImageListMediaKind.All }) {
         ImageMediaTypeCard(catalog.imageKind.kind) { catalog.imageKind.kind = it; c.applyLive() }

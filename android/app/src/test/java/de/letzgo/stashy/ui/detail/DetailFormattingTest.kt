@@ -119,12 +119,7 @@ class DetailFormattingTest {
         assertEquals(DetailSort.Scene.DateDesc, DetailSort.Scene.from("dateDesc"))
         assertEquals("o_counter", DetailSort.Scene.OCounterDesc.field)
         assertEquals("Most Viewed", DetailSort.Scene.PlayCountDesc.label)
-        assertEquals("images_count", DetailSort.Gallery.ImageCountDesc.field)
-        assertEquals("scene_markers_count", DetailSort.Tag.MarkerCountAsc.field)
-        assertEquals("ASC", DetailSort.Tag.MarkerCountAsc.direction)
-        val f = DetailSort.findFilter(2, 40, DetailSort.Image.Random)
-        assertTrue(f.sort!!.startsWith("random_"))
-        assertEquals("DESC", f.direction)
+        assertEquals(DetailSort.Image.DateDesc, DetailSort.Image.from("dateDesc"))
         assertEquals("DetailViewsSortConfig_performer_detail_ABC", DetailViewConfig.key(DetailViewContext.Performer, "ABC"))
         assertEquals("Images Sort", DetailViewContext.Gallery.settingsRowTitle)
     }

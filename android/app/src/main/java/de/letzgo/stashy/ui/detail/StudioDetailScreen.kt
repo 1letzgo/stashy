@@ -116,20 +116,19 @@ class StudioDetailScreen(val studioId: String, val preview: Studio? = null) : Sc
             DetailGrid(gridState, { w -> columnsFor(tab, w, if (catalog.usesImageFeed) catalog.imageColumns else 2) }, hasTabs = catalog.available.size > 1, header = { studio?.let { Header(it) } }) {
                 linkedSection(catalog, tab, gridState)
             }
-            val (slots, menu) = catalog.slots(tab)
             // iOS: the scenes tab adds `SceneBulkDownloadChrome.slot` (contextual, before filter & sort).
             val extra = when (tab) {
                 DetailTab.Scenes -> listOf(sceneBulkDownloadSlot { showSceneDownloadOptions = true })
                 else -> emptyList()
             }
             DetailTopBar(
-                studio?.name ?: "", catalog.available, tab, { tab = it }, slots + extra, menu,
-                settings = catalog.imagesSettingsSlot(tab),
+                studio?.name ?: "", catalog.available, tab, { tab = it }, extra,
+                settings = catalog.settingsSlot(tab),
                 isFavorite = isFavorite, favoriteBusy = favoriteBusy, onFavorite = ::toggleFavorite,
                 onEdit = { editing = true }, editLabel = "Edit studio",
             )
         }
-        LinkedImagesSettingsSheet(catalog)
+        LinkedSettingsSheets(catalog)
         val s = studio
         if (editing && s != null) EditStudioSheet(s, { editing = false }) { studio = it }
         if (showSceneDownloadOptions) {

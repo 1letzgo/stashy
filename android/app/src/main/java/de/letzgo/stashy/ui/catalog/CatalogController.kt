@@ -19,6 +19,7 @@ import de.letzgo.stashy.data.FilterMode
 import de.letzgo.stashy.data.ListLivePresetTag
 import de.letzgo.stashy.data.LocalFilterPreset
 import de.letzgo.stashy.data.LocalFilterPresetStore
+import de.letzgo.stashy.data.Page
 import de.letzgo.stashy.data.Prefs
 import de.letzgo.stashy.data.RandomSeeds
 import de.letzgo.stashy.data.SavedFilter
@@ -71,6 +72,10 @@ class CatalogController<T>(
     private val extraLive: () -> JsonObject = { JsonObject(emptyMap()) },
     /** Where a session sort change goes (catalog tab vs. detail context). */
     private val persistSort: (SortOption) -> Unit = { s -> tabId?.let { CatalogPrefs.setSortOption(it, s.raw) } },
+    /** Page size (detail tabs keep their smaller iOS pages). */
+    perPage: Int = CatalogRepository.pageSize(mode),
+    /** Page loader; detail tabs route through `DetailRepository.findScoped` (old-server fallback). */
+    private val fetch: (suspend (CatalogQuery, Int, Int) -> Page<T>)? = null,
 ) {
     var sort by mutableStateOf(initialSort ?: CatalogPrefs.resolvedSort(mode))
         private set
@@ -85,8 +90,9 @@ class CatalogController<T>(
     var isSheetPresented by mutableStateOf(false)
     private var didApplyDefaultFilter = false
 
-    val list = PagedList<T>(coroutineScope, CatalogRepository.pageSize(mode)) { page, per ->
-        CatalogRepository.find(query(), page, per)
+    val list = PagedList<T>(coroutineScope, perPage) { page, per ->
+        val q = query()
+        fetch?.invoke(q, page, per) ?: CatalogRepository.find(q, page, per)
     }
 
     /** Search term of the last query — the debounced search only refetches when it differs. */

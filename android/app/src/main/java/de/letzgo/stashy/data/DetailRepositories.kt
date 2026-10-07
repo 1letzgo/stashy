@@ -27,17 +27,24 @@ object DetailRepository {
     /**
      * Older Stash servers reject some iOS scopes (`tag_filter.performers`, `studio_filter.groups` …).
      * Then the same criterion is retried through the entity's `scenes_filter`, which every
-     * supported server knows; a second failure yields an empty page (tab stays hidden like on iOS).
+     * supported server knows. Only Performers / Studios / Tags / Groups tabs retry, and never the
+     * child-studio scope (`parents` is a real `StudioFilterType` key). The scope stays the last
+     * layer of the retried query, so the fallback can't widen the list either.
      */
-    private suspend fun <T> scoped(
-        document: String, field: String, listField: String,
-        item: kotlinx.serialization.KSerializer<T>,
-        filter: FindFilter, filterVar: String, scope: JsonObject, sceneFallback: Boolean,
-    ): Page<T> = try {
-        findPage(document, field, listField, item, filter, filterVar, scope)
+    fun sceneFilterFallback(query: CatalogQuery): CatalogQuery? {
+        val scope = query.scope?.takeIf { it.isNotEmpty() } ?: return null
+        if (query.mode !in SCENE_FALLBACK_MODES || scope.containsKey("parents")) return null
+        return query.copy(scope = buildJsonObject { put("scenes_filter", scope) })
+    }
+
+    private val SCENE_FALLBACK_MODES = setOf(FilterMode.Performers, FilterMode.Studios, FilterMode.Tags, FilterMode.Groups)
+
+    /** One page of a detail tab's scoped catalog query, with the [sceneFilterFallback] retry. */
+    suspend fun <T> findScoped(query: CatalogQuery, page: Int, perPage: Int): Page<T> = try {
+        CatalogRepository.find(query, page, perPage)
     } catch (e: GraphQLError) {
-        if (!sceneFallback || scope.isEmpty()) throw e
-        findPage(document, field, listField, item, filter, filterVar, buildJsonObject { put("scenes_filter", scope) })
+        val fallback = sceneFilterFallback(query) ?: throw e
+        CatalogRepository.find(fallback, page, perPage)
     }
 
     // MARK: Entities
@@ -61,28 +68,6 @@ object DetailRepository {
 
     suspend fun gallery(id: String): Gallery? =
         findPage("findGalleries", "findGalleries", "galleries", Gallery.serializer(), FindFilter(1, 1), extra = mapOf("ids" to listOf(id))).items.firstOrNull()
-
-    // MARK: Linked lists
-
-    suspend fun scenes(filter: FindFilter, sceneFilter: JsonObject): Page<Scene> = ScenesRepository.find(filter, sceneFilter)
-
-    suspend fun galleries(filter: FindFilter, scope: JsonObject): Page<Gallery> =
-        findPage("findGalleries", "findGalleries", "galleries", Gallery.serializer(), filter, "gallery_filter", scope)
-
-    suspend fun images(filter: FindFilter, scope: JsonObject): Page<StashImage> =
-        findPage("findImages", "findImages", "images", StashImage.serializer(), filter, "image_filter", scope)
-
-    suspend fun performers(filter: FindFilter, scope: JsonObject): Page<Performer> =
-        scoped("findPerformers", "findPerformers", "performers", Performer.serializer(), filter, "performer_filter", scope, true)
-
-    suspend fun studios(filter: FindFilter, scope: JsonObject): Page<Studio> =
-        scoped("findStudios", "findStudios", "studios", Studio.serializer(), filter, "studio_filter", scope, !scope.containsKey("parents"))
-
-    suspend fun tags(filter: FindFilter, scope: JsonObject): Page<Tag> =
-        scoped("findTags", "findTags", "tags", Tag.serializer(), filter, "tag_filter", scope, true)
-
-    suspend fun groups(filter: FindFilter, scope: JsonObject): Page<StashGroup> =
-        scoped("findGroups", "findGroups", "groups", StashGroup.serializer(), filter, "group_filter", scope, true)
 
     // MARK: Favorites
 
