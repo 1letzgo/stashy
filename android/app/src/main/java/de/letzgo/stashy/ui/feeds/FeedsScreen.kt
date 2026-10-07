@@ -65,6 +65,8 @@ import de.letzgo.stashy.ui.IosTypography
 import de.letzgo.stashy.ui.MainTab
 import de.letzgo.stashy.ui.Nav
 import de.letzgo.stashy.ui.SF
+import de.letzgo.stashy.ui.FeedsTabBarPolicy
+import de.letzgo.stashy.ui.TabBarAutoHide
 import de.letzgo.stashy.ui.detail.PerformerDetailScreen
 import de.letzgo.stashy.ui.scene.SceneDetailScreen
 import de.letzgo.stashy.ui.stashyGlass
@@ -77,7 +79,9 @@ import kotlinx.coroutines.launch
  * Edge-to-edge vertical pager (one row per screen) with autoplay of the settled row and
  * preloading of its neighbours ([FeedPlayerPool]); the section chrome (mode dock + Filter &
  * Sort) floats on top, the info overlay and scrubber sit right above the floating tab bar.
- * Tapping the media hides all chrome including the tab bar, like iOS. Pics is the Images
+ * Tapping the media hides all chrome including the tab bar, like iOS. With "Auto-hide tab bar"
+ * on, a swipe to a later row also slides the bar away (the overlay follows it down); the first
+ * row, a tab / mode switch or tapping the chrome back in returns it. Pics is the Images
  * catalog's 1/row feed under the same chrome ([PicsFeed]); loading / empty / error states and
  * Pics sit on the app background like iOS (`StashyThemeFill(.app)`), video rows on black.
  *
@@ -154,7 +158,11 @@ fun FeedsScreen() {
             pool.release()
         }
     }
-    LaunchedEffect(isUIVisible) { Nav.rootHidesTabBar = !isUIVisible }
+    LaunchedEffect(isUIVisible) {
+        Nav.rootHidesTabBar = !isUIVisible
+        // Auto-hide: tapping the chrome back in brings an auto-hidden tab bar with it.
+        TabBarAutoHide.apply(FeedsTabBarPolicy.onChromeVisibilityChanged(isUIVisible))
+    }
 
     // Toast-like messages (iOS `ToastManager`).
     var toast by remember { mutableStateOf<String?>(null) }
@@ -165,8 +173,16 @@ fun FeedsScreen() {
     val mode = model.mode
     val list = model.list(mode)
     val navBottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
-    // Height the tab bar covers (bar + system nav inset, measured in AppShell) while the chrome shows.
-    val tabBarOverlap = if (isUIVisible) tabBarHeight() else navBottom
+    // Height the tab bar covers (bar + system nav inset, measured in AppShell) while the chrome
+    // shows. An auto-hidden bar (Settings › Appearance) slides away; the overlay and scrubber
+    // follow it down to the system inset with the bar's own animation.
+    val barShown by animateFloatAsState(
+        if (TabBarAutoHide.enabled && TabBarAutoHide.hidden) 0f else 1f,
+        tween(TabBarAutoHide.ANIMATION_MS), label = "feedsTabBarInset",
+    )
+    val tabBarOverlap = FeedsTabBarPolicy.overlayInset(isUIVisible, barShown, tabBarHeight().value, navBottom.value).dp
+    // Sheets and dialogs keep the bar where it is.
+    val overlayOpen = showSheet || tagEditorTarget != null || deleteTarget != null || model.pics.isSheetPresented
 
     // Height of the top chrome (bar + criterion chips): Pics content starts below it (iOS safeAreaInset).
     val density = LocalDensity.current
@@ -178,7 +194,8 @@ fun FeedsScreen() {
     Box(Modifier.fillMaxSize().background(Theme.palette.background)) {
         val items = model.visibleItems(mode)
         when {
-            mode == ReelsModeType.Pics -> PicsFeed(model, topPadding = chromeHeight, bottomPadding = tabBarOverlap)
+            // Pics keeps the full bar padding while the bar auto-hides, like every other list.
+            mode == ReelsModeType.Pics -> PicsFeed(model, topPadding = chromeHeight, bottomPadding = if (isUIVisible) tabBarHeight() else navBottom)
             ServerConfigManager.activeConfig == null -> StatusPlaceholder(SF.server, "Server not reachable", "Retry Connection", { model.refetch(mode) })
             items.isEmpty() && list.isLoading -> StandardLoading("Loading feeds...")
             items.isEmpty() && list.error != null -> StatusPlaceholder(SF.server, "Server not reachable", "Retry Connection", { model.refetch(mode) })
@@ -189,6 +206,7 @@ fun FeedsScreen() {
                     model = model, mode = mode, items = items, pool = pool,
                     isUIVisible = isUIVisible, isZoomed = isZoomed, lifecycleActive = lifecycleActive,
                     tabBarOverlap = tabBarOverlap,
+                    overlayOpen = overlayOpen,
                     onToggleUI = { isUIVisible = !isUIVisible },
                     onZoom = { isZoomed = it },
                     onDelete = { deleteTarget = it },
@@ -279,6 +297,7 @@ private fun FeedPager(
     isZoomed: Boolean,
     lifecycleActive: Boolean,
     tabBarOverlap: androidx.compose.ui.unit.Dp,
+    overlayOpen: Boolean,
     onToggleUI: () -> Unit,
     onZoom: (Boolean) -> Unit,
     onDelete: (FeedItem) -> Unit,
@@ -294,6 +313,26 @@ private fun FeedPager(
     LaunchedEffect(pagerState) {
         snapshotFlow { pagerState.settledPage }.collect { idx ->
             currentItems.getOrNull(idx)?.let { model.currentIds[mode] = it.id }
+        }
+    }
+    // Auto-hide tab bar (Settings › Appearance): a user swipe on to a later row slides the bar
+    // away, the first row brings it back (FeedsTabBarPolicy). Programmatic moves (continuous
+    // play, restore) only count when they land on the first row.
+    val overlayOpenNow by rememberUpdatedState(overlayOpen)
+    LaunchedEffect(pagerState) {
+        var swiped = false
+        launch {
+            pagerState.interactionSource.interactions.collect {
+                if (it is androidx.compose.foundation.interaction.DragInteraction.Start) swiped = true
+            }
+        }
+        var from = pagerState.settledPage
+        snapshotFlow { pagerState.isScrollInProgress }.collect { inProgress ->
+            if (inProgress) return@collect
+            val to = pagerState.currentPage
+            TabBarAutoHide.apply(FeedsTabBarPolicy.onPageSettled(from, to, swiped, overlayOpenNow))
+            from = to
+            swiped = false
         }
     }
     val activeId = model.currentIds[mode]

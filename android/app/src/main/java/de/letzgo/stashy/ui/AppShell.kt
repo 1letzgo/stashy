@@ -138,15 +138,17 @@ fun AppShell() {
         }
     }
 
-    // Auto-hide (Settings › Appearance): Feeds owns its chrome (tap toggles it), so the bar
-    // stays put there; any tab or screen change brings a hidden bar back.
-    val autoHideSuspended = top == null && Nav.tab == MainTab.Feeds
+    // Auto-hide (Settings › Appearance): the Feeds pager drives the bar itself (page changes,
+    // chrome toggle — see FeedsTabBarPolicy), so scroll tracking is off there; Feeds › Pics is a
+    // plain list and tracks like the others. Any tab, screen or Feeds mode change shows the bar.
+    val autoHideSuspended = top == null && Nav.tab == MainTab.Feeds &&
+        de.letzgo.stashy.ui.feeds.FeedsModel.mode != de.letzgo.stashy.data.ReelsModeType.Pics
     SideEffect { TabBarAutoHide.suspended = autoHideSuspended }
     LaunchedEffect(Nav.tab, top?.key, autoHideSuspended) { TabBarAutoHide.show() }
     val density = androidx.compose.ui.platform.LocalDensity.current
     SideEffect { TabBarAutoHide.thresholdPx = with(density) { 24.dp.toPx() } }
-    val barHidden = TabBarAutoHide.enabled && TabBarAutoHide.hidden && !autoHideSuspended
-    val barOffset by animateFloatAsState(if (barHidden) 1f else 0f, tween(220), label = "tabBarAutoHide")
+    val barHidden = TabBarAutoHide.enabled && TabBarAutoHide.hidden
+    val barOffset by animateFloatAsState(if (barHidden) 1f else 0f, tween(TabBarAutoHide.ANIMATION_MS), label = "tabBarAutoHide")
 
     Box(Modifier.fillMaxSize().background(p.background).nestedScroll(TabBarAutoHide.connection)) {
         AnimatedContent(
