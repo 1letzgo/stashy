@@ -33,9 +33,11 @@ final class TVAetherPlaybackModel: ObservableObject {
 
     private var cancellables = Set<AnyCancellable>()
     private var progressTimer: AnyCancellable?
-    /// Settings › Playback › "Count as played": the play is credited once the playhead has
-    /// passed the threshold, not when playback starts.
+    /// Settings › Playback › "Count as played": the play is credited once the scene has been
+    /// watched that long in this session (`playCreditClock`), not when playback starts.
     private var playCreditTimer: AnyCancellable?
+    /// Time actually watched of the current item — resume position and seeks add nothing.
+    private var playCreditClock = PlayCountWatchClock()
     private var creditedSceneIds: Set<String> = []
     private var sceneId: String?
     private var viewModel: StashDBViewModel?
@@ -217,6 +219,7 @@ final class TVAetherPlaybackModel: ObservableObject {
 
     private func startPlayCreditTimer() {
         playCreditTimer = nil
+        playCreditClock.reset()
         creditPlayIfDue()
         guard TabManager.shared.playCountPlayerSeconds > 0 else { return }
         playCreditTimer = Timer.publish(every: 1, on: .main, in: .common)
@@ -224,13 +227,18 @@ final class TVAetherPlaybackModel: ObservableObject {
             .sink { [weak self] _ in self?.creditPlayIfDue() }
     }
 
-    /// Credits the scene once its playhead passed the configured threshold. Seeking ahead counts
-    /// as well — the same as the phone player, which also reads the playhead.
+    /// Credits the scene once it has been watched for the configured threshold in this session.
+    /// Where playback started (resume) and seeks do not count — the same rule as the phone player.
     private func creditPlayIfDue() {
         guard let sceneId, let viewModel, !creditedSceneIds.contains(sceneId) else { return }
         let threshold = max(0, TabManager.shared.playCountPlayerSeconds)
         if threshold > 0 {
-            guard let engine, playheadBelongsToCurrentItem, engine.currentTime >= threshold else { return }
+            guard let engine, playheadBelongsToCurrentItem else {
+                playCreditClock.breakInterval()
+                return
+            }
+            playCreditClock.sample(playhead: engine.currentTime, isPlaying: engine.isPlaying)
+            guard playCreditClock.watchedSeconds >= threshold else { return }
         }
         creditedSceneIds.insert(sceneId)
         playCreditTimer = nil

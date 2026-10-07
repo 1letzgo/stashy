@@ -54,6 +54,9 @@ struct SceneDetailView: View {
     @State private var tagsTotalHeight: CGFloat = 0
     @State private var isMuted = ScenePlayerMute.initialValue()
     @State private var hasAddedPlay = false
+    /// Seconds actually watched on this page — what "Count as played" measures. Resume
+    /// position and seeks add nothing.
+    @State private var playCountClock = PlayCountWatchClock()
     /// Set when the page is left while the video plays (another tab, a pushed page). The engine
     /// is torn down then, so coming back starts it again at the position it had.
     @State private var resumeOnReturn: (wasPlaying: Bool, position: Double)?
@@ -904,9 +907,7 @@ struct SceneDetailView: View {
             playbackActivityTracker.setPosition(currentTime: currentTime, duration: duration)
             ensurePlaybackActivityConfigured()
             playbackActivityTracker.start()
-            if !hasAddedPlay, currentTime >= playCountThreshold {
-                registerScenePlay()
-            }
+            creditPlayIfWatchedEnough()
         }
     }
 
@@ -977,9 +978,9 @@ struct SceneDetailView: View {
                         playbackActivityTracker.start()
                     }
                 }
-                if !hasAddedPlay, seconds >= playCountThreshold {
-                    registerScenePlay()
-                }
+                playCountClock.sample(playhead: seconds,
+                                      isPlaying: engine?.isPlaying == true && !isScrubbing)
+                creditPlayIfWatchedEnough()
             }
             engine.onPlayingChanged = { [weak engine] playing in
                 guard let engine else { return }
@@ -1043,10 +1044,16 @@ struct SceneDetailView: View {
     }
 
     /// Settings › Playback › "Count as played — Player": seconds of playback before the scene
-    /// gets its play count. The threshold is measured on the playhead, so a resumed scene needs
-    /// that many seconds of new playback too.
+    /// gets its play count. Measured as time actually watched on this page (`playCountClock`),
+    /// never on the playhead: a resumed scene, or one skipped ahead, needs that many seconds of
+    /// real playback too.
     private var playCountThreshold: Double {
         max(0, TabManager.shared.playCountPlayerSeconds)
+    }
+
+    private func creditPlayIfWatchedEnough() {
+        guard !hasAddedPlay, playCountClock.watchedSeconds >= playCountThreshold else { return }
+        registerScenePlay()
     }
 
     /// Stash's server captions as selectable external subtitle tracks on the engine. Registering
@@ -1097,6 +1104,8 @@ struct SceneDetailView: View {
 
     /// One in-flight engine seek at a time; the latest scrub target wins.
     private func enqueueAetherSeek(_ aether: AetherSceneEngine, to seconds: Double) {
+        // A seek is not watch time: restart the "Count as played" interval at the new spot.
+        playCountClock.breakInterval()
         pendingAetherSeek = seconds
         guard !aetherSeekInFlight else { return }
         aetherSeekInFlight = true

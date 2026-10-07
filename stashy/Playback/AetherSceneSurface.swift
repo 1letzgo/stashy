@@ -461,6 +461,18 @@ struct AetherSceneSurface: View {
                     topRow(volumeWidth: 130)
                     topRow(volumeWidth: nil)
                 }
+                // Hidden MPVolumeView: the only way to set the system volume from the slider.
+                // Exactly one, outside `ViewThatFits`: it used to sit in every candidate row, so
+                // a rotation in fullscreen (which switches the candidate) built a fresh
+                // MPVolumeView mid-layout whose system slider showed up on screen and stayed
+                // there until the next scene. Still under `autoHiding`, so the system volume HUD
+                // shows / is suppressed exactly as before.
+                .background(alignment: .topLeading) {
+                    AetherSystemVolumeView(control: systemVolume)
+                        .frame(width: 1, height: 1)
+                        .allowsHitTesting(false)
+                        .accessibilityHidden(true)
+                }
                 .padding(.horizontal, 16)
                 .padding(.top, 12)
                 Spacer()
@@ -549,12 +561,6 @@ struct AetherSceneSurface: View {
             .frame(height: chromeButtonSize)
             .stashyGlass(shape: Capsule())
         }
-        // Hidden MPVolumeView: the only way to set the system volume from the slider.
-        AetherSystemVolumeView(control: systemVolume)
-            .frame(width: 1, height: 1)
-            .opacity(0.01)
-            .allowsHitTesting(false)
-            .accessibilityHidden(true)
     }
 
     private func topRow(volumeWidth: CGFloat?) -> some View {
@@ -1356,17 +1362,48 @@ final class AetherSystemVolumeControl {
 
 private struct AetherSystemVolumeView: UIViewRepresentable {
     var control: AetherSystemVolumeControl
-    func makeUIView(context: Context) -> MPVolumeView {
-        let view = MPVolumeView(frame: CGRect(x: 0, y: 0, width: 1, height: 1))
-        view.showsVolumeSlider = true
-        view.alpha = 0.01
-        control.slider = view.subviews.compactMap { $0 as? UISlider }.first
+    func makeUIView(context: Context) -> AetherHiddenVolumeContainer {
+        let view = AetherHiddenVolumeContainer()
+        control.slider = view.slider
         return view
     }
-    func updateUIView(_ uiView: MPVolumeView, context: Context) {
-        if control.slider == nil {
-            control.slider = uiView.subviews.compactMap { $0 as? UISlider }.first
+    func updateUIView(_ uiView: AetherHiddenVolumeContainer, context: Context) {
+        if control.slider == nil || control.slider !== uiView.slider {
+            control.slider = uiView.slider
         }
+    }
+}
+
+/// Keeps the MPVolumeView invisible whatever layout pass comes along. SwiftUI owns the alpha
+/// of a representable's root view (its `.opacity` / `autoHiding` write it), and MPVolumeView
+/// lays its slider out at the slider's own width, past a 1 pt frame — so the volume view sits
+/// in a clipping 1 pt container and has its own alpha and frame re-pinned on every layout.
+final class AetherHiddenVolumeContainer: UIView {
+    private let volumeView = MPVolumeView(frame: CGRect(x: 0, y: 0, width: 1, height: 1))
+
+    var slider: UISlider? { volumeView.subviews.compactMap { $0 as? UISlider }.first }
+
+    override init(frame: CGRect) {
+        super.init(frame: frame)
+        clipsToBounds = true
+        isUserInteractionEnabled = false
+        isAccessibilityElement = false
+        accessibilityElementsHidden = true
+        volumeView.showsVolumeSlider = true
+        volumeView.isUserInteractionEnabled = false
+        volumeView.clipsToBounds = true
+        volumeView.alpha = 0.01
+        addSubview(volumeView)
+    }
+
+    required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
+
+    override var intrinsicContentSize: CGSize { CGSize(width: 1, height: 1) }
+
+    override func layoutSubviews() {
+        super.layoutSubviews()
+        volumeView.frame = CGRect(x: 0, y: 0, width: 1, height: 1)
+        if volumeView.alpha != 0.01 { volumeView.alpha = 0.01 }
     }
 }
 

@@ -1880,3 +1880,56 @@ class TabManager: ObservableObject {
         }
     }
 }
+
+/// "Count as played" clock: seconds actually watched in this playback session.
+///
+/// Only time that elapsed while the video was playing *and* the playhead moved forward with it
+/// counts. Where playback starts (resume position, Feeds start, marker) is irrelevant, a seek
+/// or skip — a playhead jump the wall clock cannot account for — adds nothing, and neither do
+/// stalls (playhead not moving) or paused time. Feed it every playhead tick.
+struct PlayCountWatchClock {
+    /// Seconds watched so far.
+    private(set) var watchedSeconds: Double = 0
+    private var lastPlayhead: Double?
+    private var lastUptime: TimeInterval?
+
+    /// Highest playback rate a tick may account for (hold-to-speed-up, scrub boosts).
+    private static let maxRate: Double = 4
+    /// Tick jitter / decoder catch-up the playhead may run ahead of the wall clock.
+    private static let jitterTolerance: Double = 0.35
+    /// A gap longer than this between ticks (backgrounding, hitch) only counts this much.
+    private static let maxStep: Double = 1.5
+
+    /// Records one playhead sample. Not playing (or scrubbing) breaks the chain, so the next
+    /// sample starts a fresh interval instead of crediting the gap.
+    mutating func sample(playhead: Double, isPlaying: Bool,
+                         now: TimeInterval = ProcessInfo.processInfo.systemUptime) {
+        guard isPlaying, playhead.isFinite else {
+            lastPlayhead = nil
+            lastUptime = nil
+            return
+        }
+        defer {
+            lastPlayhead = playhead
+            lastUptime = now
+        }
+        guard let previousPlayhead = lastPlayhead, let previousUptime = lastUptime else { return }
+        let wallDelta = now - previousUptime
+        let mediaDelta = playhead - previousPlayhead
+        guard wallDelta > 0, mediaDelta > 0 else { return }
+        // A forward jump beyond what playback could cover in that time is a seek, not watching.
+        guard mediaDelta <= wallDelta * Self.maxRate + Self.jitterTolerance else { return }
+        // Wall time, so slow-motion and 2x both count what the user really spent watching.
+        watchedSeconds += min(wallDelta, Self.maxStep)
+    }
+
+    /// Ends the current interval (pause, seek, scrub) without resetting the total.
+    mutating func breakInterval() {
+        lastPlayhead = nil
+        lastUptime = nil
+    }
+
+    mutating func reset() {
+        self = PlayCountWatchClock()
+    }
+}

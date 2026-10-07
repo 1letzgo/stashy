@@ -5257,7 +5257,9 @@ struct ReelItemView: View {
     @State private var playbackActivityTracker = ScenePlaybackActivityTracker()
     /// Skipped Reels must not hit `sceneAddPlay` / `sceneSaveActivity` (those set last_played).
     @State private var didCreditReelsWatch = false
-    @State private var reelsWatchedSeconds: Double = 0
+    /// Seconds actually watched on this row — what "Count as played — Feeds" measures. The
+    /// row's start position (resume / Feeds start / marker) and seeks add nothing.
+    @State private var reelsWatchClock = PlayCountWatchClock()
     @State private var heldReelsPlayDuration: Double = 0
     /// Marker rows: the segment end has been acted on (loop seek / advance) and must not fire
     /// again until the playhead is back inside the segment.
@@ -6145,16 +6147,22 @@ extension ReelItemView {
         }
     }
 
-    /// Count real playback only. Skipping away before 30s must not call `sceneAddPlay`.
-    private func noteReelsWatchProgress(delta: Double = 0.1) {
+    /// Count real playback only: time that elapsed while the row played and its playhead moved
+    /// with it. Skipping away before the threshold must not call `sceneAddPlay`, and neither
+    /// the start position nor a seek counts as watched.
+    private func noteReelsWatchProgress(playhead: Double) {
         switch item {
         case .scene, .marker: break
         case .preview, .clip: return
         }
-        guard isPlaying, isPlaybackActive, !isRotating else { return }
-        guard !ReelsPlayerRegistry.isPlaybackSuspended else { return }
-        reelsWatchedSeconds += delta
-        guard !didCreditReelsWatch, reelsWatchedSeconds >= reelsMinWatchSecondsBeforePlayCredit else { return }
+        let watching = isPlaying && isPlaybackActive && !isRotating
+            && !ReelsPlayerRegistry.isPlaybackSuspended
+            && !scrubberState.seeking
+            && aetherEngine?.isPlaying == true
+        reelsWatchClock.sample(playhead: playhead, isPlaying: watching)
+        guard watching else { return }
+        guard !didCreditReelsWatch,
+              reelsWatchClock.watchedSeconds >= reelsMinWatchSecondsBeforePlayCredit else { return }
         didCreditReelsWatch = true
         incrementPlayCount()
         playbackActivityTracker.flush()
@@ -6215,7 +6223,7 @@ extension ReelItemView {
         syncPlaybackActivityPosition()
         playbackActivityTracker.stop()
         didCreditReelsWatch = false
-        reelsWatchedSeconds = 0
+        reelsWatchClock.reset()
         heldReelsPlayDuration = 0
         cleanupAetherEngine()
         videoSurfaceReadiness.reset()
@@ -6224,6 +6232,7 @@ extension ReelItemView {
 
     func seek(to time: Double) {
         guard let aether = aetherEngine else { return }
+        reelsWatchClock.breakInterval()
         Task {
             await aether.seek(to: time)
             if self.isPlaying && self.isPlaybackActive && !self.isRotating {
@@ -6421,7 +6430,7 @@ extension ReelItemView {
 
             self.syncPlaybackPresentationSize(aether)
             self.syncPlaybackActivityPosition()
-            self.noteReelsWatchProgress()
+            self.noteReelsWatchProgress(playhead: time)
             if self.isPlaying && self.isPlaybackActive && !self.isRotating {
                 self.startPlaybackActivityTrackingIfNeeded()
             }
