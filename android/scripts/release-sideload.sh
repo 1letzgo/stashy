@@ -3,6 +3,10 @@
 # (asset stashy.apk, marked latest — the in-app self-update downloads it from there).
 # NAS=1 additionally copies the APK to the Tower (old update path, kept for the transition).
 set -e
+# Retired: stashy for Android is released through Google Play only (play-upload).
+# No more APKs on GitHub Releases.
+echo "release-sideload.sh is retired — Android releases go through Google Play only." >&2
+exit 1
 cd "$(dirname "$0")/.."
 export JAVA_HOME=/opt/homebrew/opt/openjdk@17/libexec/openjdk.jdk/Contents/Home ANDROID_HOME=/opt/homebrew/share/android-commandlinetools
 ./gradlew assembleSideloadRelease -q --max-workers=2 -Dorg.gradle.jvmargs=-Xmx2g -Pkotlin.compiler.execution.strategy=in-process
