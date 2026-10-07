@@ -1,6 +1,7 @@
 package de.letzgo.stashy.tv
 
 import de.letzgo.stashy.ui.uniqueItemsIndexed
+import android.os.SystemClock
 import android.view.KeyEvent as AndroidKeyEvent
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
@@ -66,6 +67,7 @@ import de.letzgo.stashy.data.SceneEvent
 import de.letzgo.stashy.data.SceneEvents
 import de.letzgo.stashy.data.SceneMarker
 import de.letzgo.stashy.data.TabManager
+import de.letzgo.stashy.ui.player.PlayCountCredit
 import de.letzgo.stashy.ui.player.PlaybackActivityTracker
 import de.letzgo.stashy.ui.player.PlayerSettings
 import de.letzgo.stashy.ui.player.SceneNowPlaying
@@ -107,6 +109,8 @@ class TvPlaybackModel {
 
     private val tracker = PlaybackActivityTracker(scope)
     private val credited = HashSet<String>()
+    /** Count-as-played: real watch time of the current item, not its playhead (resume ≠ watched). */
+    private val playCredit = PlayCountCredit(0.0)
 
     private fun ensurePlayer(): StashPlayer = player ?: StashPlayer(Prefs.appContext, StashPlayer.Role.Main).also { p ->
         p.autoSelectsPreferredSubtitleTrack = true
@@ -158,7 +162,9 @@ class TvPlaybackModel {
         p.fallbackDeclaredDuration = scene.sceneDuration
         p.nowPlaying = SceneNowPlaying.of(scene)
         sprites = SceneScrubSprites.create(scene.paths?.vtt, scene.paths?.sprite)?.also { it.prepare(scope) }
-        if (playThreshold <= 0) credit(sceneId)
+        playCredit.reset()
+        playCredit.thresholdSeconds = playThreshold
+        if (playCredit.onStart()) credit(sceneId)
     }
 
     private val playThreshold: Double get() = maxOf(0.0, TabManager.playCountPlayerSeconds)
@@ -169,10 +175,11 @@ class TvPlaybackModel {
         tracker.setPosition(t, if (d > 0) d else scene?.sceneDuration ?: 0.0)
         if (p.isPlaying) tracker.start()
         val id = scene?.id ?: return
-        if (t >= playThreshold) credit(id)
+        playCredit.thresholdSeconds = playThreshold
+        if (playCredit.onTime(t, p.isPlaying, SystemClock.elapsedRealtime() / 1000.0)) credit(id)
     }
 
-    /** Credits the play once the playhead passed the threshold (seeking ahead counts too). */
+    /** Credits the play once per scene, after [playThreshold] seconds actually watched ([PlayCountCredit]). */
     private fun credit(sceneId: String) {
         if (!credited.add(sceneId)) return
         if (!de.letzgo.stashy.data.TabManager.tracksActivity(sceneId)) return
@@ -195,6 +202,7 @@ class TvPlaybackModel {
         val p = player ?: return
         p.seek(seconds)
         tracker.noteSeek(seconds)
+        playCredit.noteSeek()
     }
 
     /** Back on the player: save and pause, keep the player until the page is gone. */
@@ -206,6 +214,7 @@ class TvPlaybackModel {
     fun clear() {
         tracker.stop()
         credited.clear()
+        playCredit.reset()
         player?.release()
         player = null
         sprites = null
