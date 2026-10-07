@@ -85,7 +85,6 @@ enum class TvSettingsEntry(val title: String, val summary: String) {
     DefaultFilters("Default Filters", "A saved server filter to apply automatically when a section opens."),
     VisibleTabs("Visible Tabs", "Hide sections you do not use. They disappear from the sidebar."),
     Subtitles("Subtitles", "Turn subtitles on automatically, choose the language a scene should start with, and set how the cues look."),
-    DolbyVision("Dolby Vision", "Turn off if a Dolby Vision scene shows green or purple colors. It then plays as HDR10, which your TV still shows in HDR."),
     PlayCount("Count As Played", "How long a scene has to play before it counts as played and its position is saved."),
     Maintenance("Maintenance", "Clear the cached artwork for the active server. Images are re-downloaded as they are shown again."),
     About("About", "Version, build number and updates.");
@@ -99,7 +98,6 @@ enum class TvSettingsEntry(val title: String, val summary: String) {
         DefaultFilters -> TvIcons.filter
         VisibleTabs -> TvIcons.gridGroup
         Subtitles -> TvIcons.captions
-        DolbyVision -> TvIcons.tv
         PlayCount -> TvIcons.playCircle
         Maintenance -> TvIcons.drive
         About -> TvIcons.info
@@ -131,10 +129,6 @@ fun TvSettings(model: TvSettingsModel) {
             item { EntryRow(model, TvSettingsEntry.VisibleTabs) }
             item { TvSectionHeader("Playback") }
             item { EntryRow(model, TvSettingsEntry.Subtitles) }
-            item {
-                TvToggleRow("Dolby Vision", TabManager.playerDolbyVisionEnabled, { TabManager.playerDolbyVisionEnabled = it },
-                    Modifier.tvFocusMemory(model.focus, TvSettingsEntry.DolbyVision.name), onFocus = { model.detailEntry = TvSettingsEntry.DolbyVision })
-            }
             item { EntryRow(model, TvSettingsEntry.PlayCount, TabConfigLogic.playCountThresholdLabel(TabManager.playCountPlayerSeconds)) }
             item { Spacer(Modifier.height(pt(28))) }
             item { EntryRow(model, TvSettingsEntry.Maintenance) }
@@ -194,7 +188,6 @@ class TvSettingsPageRoute(private val entry: TvSettingsEntry) : TvRoute {
             TvSettingsEntry.PlayCount -> PlayCountPage()
             TvSettingsEntry.Maintenance -> MaintenancePage()
             TvSettingsEntry.About -> AboutPage()
-            TvSettingsEntry.DolbyVision -> {}
         }
     }
 }
@@ -611,14 +604,14 @@ private fun PlayCountPage() {
 private fun MaintenancePage() {
     val first = remember { FocusRequester() }
     val context = LocalContext.current
+    val scope = androidx.compose.runtime.rememberCoroutineScope()
     var cleared by remember { mutableStateOf(false) }
-    TvSettingsPage("Maintenance", "Removes the cached artwork. Images are downloaded again as they appear.", firstFocus = first) {
+    TvSettingsPage("Maintenance", "Removes the cached artwork for the active server. Images are downloaded again as they appear.", firstFocus = first) {
         item {
-            // Never disabled: it is the page's only button.
+            // Never disabled: it is the page's only button. iOS `clearCurrentServerCache()`.
             TvListRow("Clear Image Cache", {
                 if (ServerConfigManager.activeConfig == null) return@TvListRow
-                coil3.SingletonImageLoader.get(context).let { it.memoryCache?.clear(); it.diskCache?.clear() }
-                cleared = true
+                scope.launch { cleared = de.letzgo.stashy.data.ServerImageCache.clearActiveServer(context) }
             }, Modifier.focusRequester(first), value = if (cleared) "Cleared" else null)
         }
     }

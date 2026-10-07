@@ -47,8 +47,6 @@ fun LazyListScope.playbackSections() {
         SettingsDivider()
         SettingsToggleRow("Autozoom", TabManager.playerAutoZoom, SFS.arrowUpLeftDownRight) { TabManager.playerAutoZoom = it }
         SettingsDivider()
-        SettingsToggleRow("Dolby Vision", TabManager.playerDolbyVisionEnabled, SFS.sparklesTv) { TabManager.playerDolbyVisionEnabled = it }
-        SettingsDivider()
         SettingsPickerRow("Hold to speed up", TabManager.holdSpeedOptions, TabManager.holdSpeedPlayer, TabConfigLogic::holdSpeedLabel, SFS.forwardFill) { TabManager.holdSpeedPlayer = it }
         SettingsDivider()
         SettingsPickerRow("Count as played", TabManager.playCountThresholdOptions, TabManager.playCountPlayerSeconds, TabConfigLogic::playCountThresholdLabel, SFS.playCircle) { TabManager.playCountPlayerSeconds = it }

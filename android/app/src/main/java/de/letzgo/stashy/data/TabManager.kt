@@ -123,8 +123,6 @@ object TabManager {
     val activityPausedSceneIds: MutableSet<String> = java.util.concurrent.ConcurrentHashMap.newKeySet()
     /** The global switch and the per-scene pause from the player menu. */
     fun tracksActivity(sceneId: String): Boolean = tracksPlaybackActivity && sceneId !in activityPausedSceneIds
-    private val _playerDolbyVision = bool("player_dolby_vision_enabled", true)
-    var playerDolbyVisionEnabled: Boolean get() = _playerDolbyVision.value; set(v) { _playerDolbyVision.value = v; Prefs.setBool("player_dolby_vision_enabled", v) }
     private val _playCountPlayerSeconds = dbl("play_count_player_seconds", 1.0, playCountThresholdOptions)
     var playCountPlayerSeconds: Double get() = _playCountPlayerSeconds.value; set(v) { _playCountPlayerSeconds.value = v; Prefs.setFloat("play_count_player_seconds", v.toFloat()) }
     private val _playCountFeedsSeconds = dbl("play_count_feeds_seconds", 30.0, playCountThresholdOptions)
