@@ -45,6 +45,12 @@ object PlayerSettings {
     val subtitleFontSize: Float get() = when (Prefs.string("subtitle_font_size")) {
         "small" -> 14f; "large" -> 22f; "extraLarge" -> 28f; else -> 18f
     }
+    /** iOS: `SubtitleFontFamily.font` (`subtitle_font_family`; Rounded has no Android system face → default). */
+    val subtitleFontFamily: androidx.compose.ui.text.font.FontFamily get() = when (Prefs.string("subtitle_font_family")) {
+        "serif" -> androidx.compose.ui.text.font.FontFamily.Serif
+        "monospaced" -> androidx.compose.ui.text.font.FontFamily.Monospace
+        else -> androidx.compose.ui.text.font.FontFamily.Default
+    }
     /** iOS: `SubtitleTextColorChoice.color`. */
     val subtitleTextColor: Color get() = when (Prefs.string("subtitle_text_color")) {
         "yellow" -> Color(1f, 0.87f, 0.25f); "cyan" -> Color(0.45f, 0.9f, 1f)

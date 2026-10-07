@@ -280,13 +280,19 @@ fun ImageMediaTypeCard(kind: ImageListMediaKind, onChange: (ImageListMediaKind) 
  * gallery); state lives in [CatalogPrefs], so the list recomposes on change.
  */
 @Composable
-fun CardColumnsCard(scope: CatalogCardColumnScope) {
-    val current = CatalogPrefs.cardColumns(scope)
+fun CardColumnsCard(
+    scope: CatalogCardColumnScope,
+    /** iOS `forcedCardColumns` — shown instead of the stored value while a screen forces it. */
+    forced: CatalogCardColumns? = null,
+    /** iOS `onCardColumnsChange`. */
+    onChange: () -> Unit = {},
+) {
+    val current = forced ?: CatalogPrefs.cardColumns(scope)
     ControlCard {
         ControlLabel("Per row")
         Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-            CatalogFilterChip("1", current == CatalogCardColumns.One) { CatalogPrefs.setCardColumns(scope, CatalogCardColumns.One) }
-            CatalogFilterChip("2", current == CatalogCardColumns.Two) { CatalogPrefs.setCardColumns(scope, CatalogCardColumns.Two) }
+            CatalogFilterChip("1", current == CatalogCardColumns.One) { CatalogPrefs.setCardColumns(scope, CatalogCardColumns.One); onChange() }
+            CatalogFilterChip("2", current == CatalogCardColumns.Two) { CatalogPrefs.setCardColumns(scope, CatalogCardColumns.Two); onChange() }
         }
         Spacer(Modifier.weight(1f))
     }

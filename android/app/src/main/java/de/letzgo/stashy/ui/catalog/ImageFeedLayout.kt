@@ -428,8 +428,9 @@ private fun FeedHero(image: StashImage, autoplay: Boolean, fit: Boolean = false,
 private fun FeedHeader(image: StashImage, currentGalleryId: String?) {
     val performers = image.performers.orEmpty()
     val gallery = image.galleries?.let { gs -> if (currentGalleryId != null) gs.firstOrNull { it.id != currentGalleryId } else gs.firstOrNull() }
-    val openGallery: (() -> Unit)? = gallery?.let { g -> { Nav.push(GalleryDetailScreen(g.id, Gallery(id = g.id, title = g.title ?: g.name ?: "Gallery"))) } }
-    fun openPerformer(p: IdName) = Nav.push(PerformerDetailScreen(p.id, Performer(id = p.id, name = p.name.orEmpty())))
+    val openGallery: (() -> Unit)? = gallery?.let { g -> { Nav.push(GalleryDetailScreen(g.id, Gallery(id = g.id, title = g.title ?: g.name ?: "Gallery"), forceOneColumnFeed = true)) } }
+    // iOS: `PerformerDetailView(performer:initialTab: .images)`.
+    fun openPerformer(p: IdName) = Nav.push(PerformerDetailScreen(p.id, Performer(id = p.id, name = p.name.orEmpty()), initialTab = de.letzgo.stashy.ui.detail.DetailTab.Images))
     val nameStyle = IosTypography.subheadline.copy(fontWeight = FontWeight.SemiBold, shadow = textShadow)
     val smallStyle = IosTypography.caption2.copy(shadow = textShadow)
 

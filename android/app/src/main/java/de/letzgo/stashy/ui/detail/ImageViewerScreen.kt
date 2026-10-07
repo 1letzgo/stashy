@@ -115,6 +115,7 @@ import de.letzgo.stashy.data.await
 import de.letzgo.stashy.ui.Appearance
 import de.letzgo.stashy.ui.Nav
 import de.letzgo.stashy.ui.SF
+import de.letzgo.stashy.ui.stashyGlass
 import de.letzgo.stashy.ui.Screen
 import de.letzgo.stashy.ui.StashyColors
 import de.letzgo.stashy.ui.oCounterIcon
@@ -237,6 +238,12 @@ class ImageViewerScreen(
             }
 
             AnimatedVisibility(showUI, Modifier.align(Alignment.TopCenter), enter = fadeIn(), exit = fadeOut()) { TopBar(context) }
+            // iOS `fastForwardOverlay` (top 130, glass capsule with `chevron.right.2`).
+            AnimatedVisibility(fastForwarding, Modifier.align(Alignment.TopCenter).padding(top = 130.dp), enter = fadeIn(), exit = fadeOut()) {
+                Box(Modifier.stashyGlass(RoundedCornerShape(50)).padding(horizontal = 22.dp, vertical = 14.dp)) {
+                    Icon(SF.chevronRight2, "2×", tint = Color.White, modifier = Modifier.size(32.dp))
+                }
+            }
             AnimatedVisibility(showUI, Modifier.align(Alignment.BottomCenter), enter = fadeIn(), exit = fadeOut()) {
                 // Over the media: font scale capped at OverlayMaxFontScale (like Feeds).
                 current?.let { de.letzgo.stashy.ui.CappedFontScale { BottomOverlay(it) } }
@@ -293,10 +300,13 @@ class ImageViewerScreen(
         val portraitImage = image.visualFiles?.firstOrNull()?.let { (it.height ?: 0) > (it.width ?: 0) } ?: false
         // iOS `shouldFill`: immersive on and content orientation matches the device.
         val fill = immersiveScaling && (portraitDevice == portraitImage)
+        val isClip = image.isVideo && !animated
         ZoomableBox(
             onTap = { showUI = !showUI },
             onZoomChange = { zoomed = it },
-            zoomEnabled = !(image.isVideo && !animated),
+            zoomEnabled = !isClip,
+            onHold = if (isClip) ({ holdFastForward(it) }) else null,
+            onDoubleTapAt = if (isClip) ({ x, w -> skipOnDoubleTap(x, w) }) else null,
         ) {
             if (image.isVideo && !animated) {
                 VideoPage(image, active, fill, onEnded)
@@ -314,6 +324,41 @@ class ImageViewerScreen(
                 )
             }
         }
+    }
+
+    /** iOS `isFastForwarding` (press-and-hold 2× on a playing clip). */
+    private var fastForwarding by mutableStateOf(false)
+    private var rateBeforeFastForward = 1f
+
+    /** iOS `setFastForwarding`: 2× while held, previous rate restored on release. */
+    private fun holdFastForward(active: Boolean) {
+        val exo = player ?: return
+        if (active == fastForwarding) return
+        if (active) {
+            if (!isPlaying) return
+            rateBeforeFastForward = exo.playbackParameters.speed
+            exo.setPlaybackSpeed(2f)
+        } else {
+            exo.setPlaybackSpeed(rateBeforeFastForward)
+        }
+        fastForwarding = active
+    }
+
+    /** iOS `handleDoubleTapSkip`: outer thirds skip ±`playerSkipSeconds`, the middle does nothing. */
+    private fun skipOnDoubleTap(x: Float, width: Float): Boolean {
+        val exo = player ?: return false
+        val third = width / 3f
+        val deltaMs = (de.letzgo.stashy.ui.player.PlayerSettings.skipSeconds * 1000).toLong()
+        val delta = when {
+            x < third -> -deltaMs
+            x > width - third -> deltaMs
+            else -> return false
+        }
+        val dur = exo.duration.takeIf { it > 0 }
+        val target = (exo.currentPosition + delta).coerceAtLeast(0).let { t -> dur?.let { minOf(t, it) } ?: t }
+        exo.seekTo(target)
+        position = target
+        return true
     }
 
     @Composable
@@ -343,7 +388,7 @@ class ImageViewerScreen(
                 player = exo
                 onDispose {
                     exo.removeListener(listener)
-                    if (player === exo) player = null
+                    if (player === exo) { player = null; fastForwarding = false }
                     exo.release()
                 }
             }
@@ -710,7 +755,16 @@ internal fun formatClock(ms: Long): String {
  * through to the pager while not zoomed; [onTap] toggles the chrome.
  */
 @Composable
-internal fun ZoomableBox(onTap: () -> Unit, onZoomChange: (Boolean) -> Unit, zoomEnabled: Boolean = true, content: @Composable () -> Unit) {
+internal fun ZoomableBox(
+    onTap: () -> Unit,
+    onZoomChange: (Boolean) -> Unit,
+    zoomEnabled: Boolean = true,
+    /** iOS `onLongPress(pressing)`: true on hold, false on release (video 2×). */
+    onHold: ((Boolean) -> Unit)? = null,
+    /** iOS `onDoubleTap(location)` → skip; returns whether it handled the tap (outer thirds of a video). */
+    onDoubleTapAt: ((x: Float, width: Float) -> Boolean)? = null,
+    content: @Composable () -> Unit,
+) {
     var scale by remember { mutableFloatStateOf(1f) }
     var offset by remember { mutableStateOf(Offset.Zero) }
     BoxWithConstraints(Modifier.fillMaxSize()) {
@@ -723,10 +777,17 @@ internal fun ZoomableBox(onTap: () -> Unit, onZoomChange: (Boolean) -> Unit, zoo
         }
         Box(
             Modifier.fillMaxSize()
-                .pointerInput(zoomEnabled) {
+                .pointerInput(zoomEnabled, onHold != null, onDoubleTapAt != null) {
+                    var holding = false
                     detectTapGestures(
                         onTap = { onTap() },
+                        onLongPress = if (onHold == null) null else { _ -> holding = true; onHold(true) },
+                        onPress = {
+                            tryAwaitRelease()
+                            if (holding) { holding = false; onHold?.invoke(false) }
+                        },
                         onDoubleTap = { tap ->
+                            if (onDoubleTapAt?.invoke(tap.x, w) == true) return@detectTapGestures
                             if (!zoomEnabled) return@detectTapGestures
                             if (scale > 1f) { scale = 1f; offset = Offset.Zero; onZoomChange(false) }
                             else {

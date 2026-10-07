@@ -18,6 +18,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import de.letzgo.stashy.data.CatalogCardColumnScope
+import de.letzgo.stashy.data.CatalogCardColumns
 import de.letzgo.stashy.data.CatalogPrefs
 import de.letzgo.stashy.data.DetailRepository
 import de.letzgo.stashy.data.FilterMode
@@ -50,7 +51,12 @@ import kotlinx.serialization.json.JsonObject
  * scope is layered last, so no saved filter or criterion can widen the list beyond this gallery.
  * Tapping an image opens [ImageViewerScreen].
  */
-class GalleryDetailScreen(val galleryId: String, val preview: Gallery? = null) : Screen {
+class GalleryDetailScreen(
+    val galleryId: String,
+    val preview: Gallery? = null,
+    /** iOS `forceOneColumnFeed` (opened from an image-feed avatar): 1/row until the sheet's "Per row" is used. */
+    val forceOneColumnFeed: Boolean = false,
+) : Screen {
     override val key = "gallery-$galleryId"
 
     private val scope = screenScope()
@@ -60,6 +66,9 @@ class GalleryDetailScreen(val galleryId: String, val preview: Gallery? = null) :
     /** iOS `showingGalleryDownloadOptions` (`GalleryDownloadOptionsAlert`). */
     private var showDownloadOptions by mutableStateOf(false)
     private var started = false
+    /** iOS `ignoreForcedOneColumnFeed`. */
+    private var ignoreForcedColumns by mutableStateOf(false)
+    private val forcedColumns: CatalogCardColumns? get() = if (forceOneColumnFeed && !ignoreForcedColumns) CatalogCardColumns.One else null
     private val gridState = LazyGridState()
 
     /** iOS `liveFilterMediaKind` ("Type": Any / Image / Video). */
@@ -85,7 +94,7 @@ class GalleryDetailScreen(val galleryId: String, val preview: Gallery? = null) :
     override fun Content() {
         LaunchedEffect(Unit) { if (!started) { started = true; load() } }
         Box(Modifier.fillMaxSize().background(Theme.palette.background)) {
-            val columns = CatalogPrefs.cardColumns(CatalogCardColumnScope.OpenedGallery).raw
+            val columns = (forcedColumns ?: CatalogPrefs.cardColumns(CatalogCardColumnScope.OpenedGallery)).raw
             DetailGrid(gridState, { w -> columnsFor(DetailTab.Images, w, columns) }, header = { gallery?.let { Header(it) } }) {
                 imageSection(
                     images.list, useFeed = columns == 1, feedModel = imageFeed, sortRaw = images.sort.raw,
@@ -104,7 +113,7 @@ class GalleryDetailScreen(val galleryId: String, val preview: Gallery? = null) :
         }
         CatalogFilterSortSheet(images, onReset = { kind.kind = ImageListMediaKind.All }) {
             ImageMediaTypeCard(kind.kind) { kind.kind = it; images.applyLive() }
-            CardColumnsCard(CatalogCardColumnScope.OpenedGallery)
+            CardColumnsCard(CatalogCardColumnScope.OpenedGallery, forced = forcedColumns) { ignoreForcedColumns = true }
             ImagesFeedAutoplaySettingsCard()
         }
         val g = gallery

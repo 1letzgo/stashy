@@ -82,8 +82,7 @@ import kotlinx.coroutines.launch
  * Pics sit on the app background like iOS (`StashyThemeFill(.app)`), video rows on black.
  *
  * Known differences to iOS: the AI Motion pill (device control) is not ported (Play policy);
- * the Feeds sheet has no Save / presets (see [FeedsFilterSortSheet]); the performer avatar opens the
- * performer's default detail section (iOS jumps to Images for Clips / Pics); the scrubber shows
+ * the Feeds sheet has no Save / presets (see [FeedsFilterSortSheet]); the scrubber shows
  * the row's poster (Markers: the scene's sprite tile) instead of decoded scrub stills; the mode
  * chip's label appears without iOS's delayed fade.
  *
@@ -431,7 +430,11 @@ private fun FeedPager(
                     isPlaying = isPlaying,
                     showsDelete = FeedsConfig.showsDeleteButton,
                     onPerformerFilter = { p -> model.filterByPerformer(IdName(p.id, p.name)) },
-                    onPerformerOpen = { p -> Nav.push(PerformerDetailScreen(p.id, Performer(id = p.id, name = p.name))) },
+                    // iOS: Clips (and Pics) are image feeds — open the performer on Images.
+                    onPerformerOpen = { p ->
+                        val images = mode == ReelsModeType.Clips || mode == ReelsModeType.Pics
+                        Nav.push(PerformerDetailScreen(p.id, Performer(id = p.id, name = p.name), initialTab = if (images) de.letzgo.stashy.ui.detail.DetailTab.Images else null))
+                    },
                     onTitle = {
                         activeItem.titleLinkScene?.let { s -> Nav.push(SceneDetailScreen(s.id, s)) }
                     },

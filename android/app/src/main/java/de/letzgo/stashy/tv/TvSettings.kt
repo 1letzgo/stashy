@@ -612,7 +612,7 @@ private fun MaintenancePage() {
     val first = remember { FocusRequester() }
     val context = LocalContext.current
     var cleared by remember { mutableStateOf(false) }
-    TvSettingsPage("Maintenance", "Removes the cached artwork for the active server. Images are downloaded again as they appear.", firstFocus = first) {
+    TvSettingsPage("Maintenance", "Removes the cached artwork. Images are downloaded again as they appear.", firstFocus = first) {
         item {
             // Never disabled: it is the page's only button.
             TvListRow("Clear Image Cache", {

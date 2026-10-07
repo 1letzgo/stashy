@@ -116,7 +116,8 @@ fun TvSearch(model: TvSearchModel) {
     val fieldFocus = remember { FocusRequester() }
     Box(Modifier.fillMaxSize().background(TvColors.background)) {
         if (ServerConfigManager.activeConfig?.hasValidConfig != true) {
-            TvConnectionError(subtitle = "Add a server in Settings.") {}
+            // iOS `viewModel.testConnection()`: re-run the current query once a server is back.
+            TvConnectionError(subtitle = "Add a server in Settings.") { model.commit() }
             return@Box
         }
         LazyColumn(

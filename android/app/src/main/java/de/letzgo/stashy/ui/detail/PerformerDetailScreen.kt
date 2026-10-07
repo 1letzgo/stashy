@@ -27,8 +27,10 @@ import kotlinx.coroutines.launch
  * iOS: `PerformerDetailView` — custom chrome bar (Back · sections · Favorite · Edit), header
  * card with portrait strip and the performer facts, then Scenes / Galleries / Studios / Tags /
  * Groups / Images. [preview] is the list item shown until the full performer has loaded.
+ * [initialTab] (iOS `initialTab`, e.g. Images from the image feed / Feeds Clips & Pics) opens
+ * that section and turns the empty-section auto-switch off, like iOS `preferredInitialTab`.
  */
-class PerformerDetailScreen(val performerId: String, val preview: Performer? = null) : Screen {
+class PerformerDetailScreen(val performerId: String, val preview: Performer? = null, val initialTab: DetailTab? = null) : Screen {
     override val key = "performer-$performerId"
 
     private val scope = screenScope()
@@ -59,7 +61,7 @@ class PerformerDetailScreen(val performerId: String, val preview: Performer? = n
     )
 
     // iOS init: no scene signal → open Galleries instead of an empty Scenes stack.
-    private var tab by mutableStateOf(if ((preview?.sceneCount ?: 1) > 0) DetailTab.Scenes else DetailTab.Galleries)
+    private var tab by mutableStateOf(initialTab ?: if ((preview?.sceneCount ?: 1) > 0) DetailTab.Scenes else DetailTab.Galleries)
 
     private fun load() {
         catalog.loadAll(force = true)
@@ -90,7 +92,7 @@ class PerformerDetailScreen(val performerId: String, val preview: Performer? = n
         LaunchedEffect(Unit) { if (!started) { started = true; load() } }
         // iOS: `.task(id: displayPerformer.id)` → `HotOrNotBattleDisplay.fetchRankSlashTotal`.
         LaunchedEffect(performerId) { battleLine = MatchRepository.fetchRankSlashTotal(performerId) }
-        AutoSwitchTab(catalog, tab) { tab = it }
+        if (initialTab == null) AutoSwitchTab(catalog, tab) { tab = it }
         val p = performer
 
         Box(Modifier.fillMaxSize().background(Theme.palette.background)) {

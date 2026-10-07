@@ -493,6 +493,7 @@ fun SubtitleOverlay(text: String?, scale: Float, modifier: Modifier = Modifier) 
     val box = PlayerSettings.subtitleBoxColor
     val style = TextStyle(
         fontSize = (PlayerSettings.subtitleFontSize * scale).sp, fontWeight = FontWeight.SemiBold, textAlign = TextAlign.Center,
+        fontFamily = PlayerSettings.subtitleFontFamily,
         shadow = if (box == null) Shadow(Color.Black.copy(alpha = 0.9f), blurRadius = 3f * scale) else null,
     )
     Box(modifier.padding(start = 16.dp, end = 16.dp, bottom = 14.dp)) {
