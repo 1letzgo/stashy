@@ -94,6 +94,7 @@ import java.util.Locale
 class TvPlaybackModel {
     companion object {
         private val live = java.util.Collections.newSetFromMap(java.util.WeakHashMap<TvPlaybackModel, Boolean>())
+        private const val NO_STREAM = "The server has no playable file for this scene (no stream path)."
 
         /** Pauses every TV player (app left via Home / another app in front). */
         fun pauseAll() = live.toList().forEach { it.player?.pause() }
@@ -104,6 +105,8 @@ class TvPlaybackModel {
     val hasPlayer: Boolean get() = player != null
     var scene by mutableStateOf<Scene?>(null); private set
     var sprites by mutableStateOf<SceneScrubSprites?>(null); private set
+    /** iOS `model.error` — why no player could be started (shown by [TvPlayerError]). */
+    var error by mutableStateOf<String?>(null); private set
     /** Called when the current item finishes (channel continuous play). */
     var onPlaybackEnded: (() -> Unit)? = null
 
@@ -112,7 +115,15 @@ class TvPlaybackModel {
     /** Count-as-played: real watch time of the current item, not its playhead (resume ≠ watched). */
     private val playCredit = PlayCountCredit(0.0)
 
-    private fun ensurePlayer(): StashPlayer = player ?: StashPlayer(Prefs.appContext, StashPlayer.Role.Main).also { p ->
+    private fun ensurePlayer(): StashPlayer? = player ?: try {
+        createPlayer()
+    } catch (e: Exception) {
+        android.util.Log.e("TvPlayer", "player init failed", e)
+        error = "The video player could not be started: ${e.localizedMessage ?: e.javaClass.simpleName}"
+        null
+    }
+
+    private fun createPlayer(): StashPlayer = StashPlayer(Prefs.appContext, StashPlayer.Role.Main).also { p ->
         p.autoSelectsPreferredSubtitleTrack = true
         p.onTime = { t, d -> onTime(p, t, d) }
         p.onPlayingChanged = { playing ->
@@ -132,8 +143,10 @@ class TvPlaybackModel {
 
     /** First load of a session. */
     fun setup(scene: Scene, startAt: Double, subtitle: String? = scene.studio?.name) {
-        val url = scene.streamURL ?: return
-        val p = ensurePlayer()
+        this.scene = scene
+        val url = scene.streamURL ?: run { error = NO_STREAM; return }
+        val p = ensurePlayer() ?: return
+        error = null
         configure(p, scene)
         p.load(url, startAt.takeIf { it > 0.25 }, autoplay = true)
         registerCaptions(p, scene)
@@ -143,8 +156,10 @@ class TvPlaybackModel {
     fun playNext(scene: Scene, subtitle: String? = scene.studio?.name) {
         val p = player ?: return setup(scene, 0.0, subtitle)
         tracker.reset()
+        val url = scene.streamURL ?: run { this.scene = scene; p.stop(); error = NO_STREAM; return }
+        error = null
         configure(p, scene)
-        p.load(scene.streamURL ?: return, null, autoplay = true)
+        p.load(url, null, autoplay = true)
         registerCaptions(p, scene)
     }
 
@@ -218,6 +233,7 @@ class TvPlaybackModel {
         player?.release()
         player = null
         sprites = null
+        error = null
     }
 }
 
@@ -249,8 +265,12 @@ fun TvPlayerScreen(
 ) {
     val player = model.player
     Box(Modifier.fillMaxSize().background(Color.Black)) {
-        if (player == null) {
-            TvPlayerError(null, onExit)
+        // iOS `TVPlayerErrorView(error: model.error)`: the reason, not just "unable to play".
+        // A player whose every source failed before showing a frame lands here too (the
+        // transcode ladder is exhausted by then), with Media3's reason.
+        val fatal = model.error ?: player?.errorMessage?.takeIf { !player.hasPresentedFrame }
+        if (player == null || fatal != null) {
+            TvPlayerError(fatal, onExit)
         } else {
             TvPlayerContent(model, player, title, subtitle, posterURL, onExit, canGoPrevious, canGoNext, onPrevious, onNext, panelExtra)
         }
@@ -719,7 +739,7 @@ class TvChannelPlayerRoute(channel: TvChannel) : TvRoute {
                     }
                     TvRequestFocus(focus, "player.close")
                 }
-                session.player.hasPlayer -> {
+                session.player.hasPlayer || session.player.error != null -> {
                     val scene = session.currentScene
                     val label = session.indexLabel
                     TvPlayerScreen(

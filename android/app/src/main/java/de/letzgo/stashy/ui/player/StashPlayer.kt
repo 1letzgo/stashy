@@ -187,7 +187,7 @@ class StashPlayer(context: Context, val role: Role = Role.Main) {
 
         override fun onPlayerError(error: PlaybackException) {
             if (!escalate("player error: ${error.errorCodeName}")) {
-                errorMessage = error.localizedMessage ?: "Playback failed"
+                errorMessage = playbackErrorReason(error)
             }
         }
 
@@ -532,5 +532,43 @@ class StashPlayer(context: Context, val role: Role = Role.Main) {
 
     companion object {
         private const val FIRST_FRAME_WATCHDOG_MS = 20_000L
+
+        /**
+         * A readable reason for a fatal [PlaybackException] (iOS shows the engine's
+         * `localizedDescription`): Media3's own message plus what caused it — the HTTP status of
+         * a refused request, the decoder that failed, the parser's complaint.
+         */
+        fun playbackErrorReason(error: PlaybackException): String {
+            val http = generateSequence<Throwable>(error) { it.cause }
+                .filterIsInstance<androidx.media3.datasource.HttpDataSource.InvalidResponseCodeException>().firstOrNull()
+            val detail = when {
+                http != null -> "The server answered HTTP ${http.responseCode}${http.responseMessage?.takeIf { it.isNotBlank() }?.let { " ($it)" } ?: ""}."
+                else -> generateSequence(error.cause) { it.cause }.mapNotNull { it.localizedMessage?.takeIf { m -> m.isNotBlank() } }.firstOrNull()
+            }
+            return playbackErrorText(error.errorCode, error.localizedMessage, detail)
+        }
+
+        /** Pure part of [playbackErrorReason] (unit-tested). */
+        fun playbackErrorText(code: Int, message: String?, detail: String?): String {
+            val headline = when (code) {
+                PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_FAILED,
+                PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_TIMEOUT -> "Could not reach the server."
+                PlaybackException.ERROR_CODE_IO_BAD_HTTP_STATUS -> "The server refused the video."
+                PlaybackException.ERROR_CODE_IO_FILE_NOT_FOUND -> "The video file was not found."
+                PlaybackException.ERROR_CODE_IO_NO_PERMISSION -> "No permission to read the video."
+                PlaybackException.ERROR_CODE_PARSING_CONTAINER_UNSUPPORTED,
+                PlaybackException.ERROR_CODE_PARSING_CONTAINER_MALFORMED -> "The file's container can't be read on this device."
+                PlaybackException.ERROR_CODE_DECODER_INIT_FAILED,
+                PlaybackException.ERROR_CODE_DECODER_QUERY_FAILED,
+                PlaybackException.ERROR_CODE_DECODING_FAILED,
+                PlaybackException.ERROR_CODE_DECODING_FORMAT_EXCEEDS_CAPABILITIES,
+                PlaybackException.ERROR_CODE_DECODING_FORMAT_UNSUPPORTED -> "This device can't decode the video."
+                PlaybackException.ERROR_CODE_AUDIO_TRACK_INIT_FAILED,
+                PlaybackException.ERROR_CODE_AUDIO_TRACK_WRITE_FAILED -> "The audio output failed."
+                else -> message?.takeIf { it.isNotBlank() } ?: "Playback failed."
+            }
+            val extra = detail?.trim()?.takeIf { it.isNotEmpty() && it != headline && it != message }
+            return if (extra != null) "$headline\n$extra" else headline
+        }
     }
 }
