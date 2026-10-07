@@ -64,6 +64,8 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
@@ -568,7 +570,7 @@ private fun RatingRow(model: RateMeViewModel, item: RateMeItem, onDelete: () -> 
                 .size(44.dp)
                 .clip(inner)
                 .background(p.background, inner)
-                .clickable(enabled = !model.isSubmitting && !model.isDeleting && !model.isLoading) {
+                .clickable(enabled = !model.isSubmitting && !model.isDeleting && !model.isLoading, onClickLabel = "Deletes this item and its files after confirmation") {
                     view.performRateMeHaptic(RateMeHaptic.Light)
                     onDelete()
                 },
@@ -593,14 +595,14 @@ private fun ActionRow(model: RateMeViewModel, item: RateMeItem) {
             model.skipAsync()
         }
         if (item.mode == RateMeMode.Scenes) {
-            ActionButton("Watch", SF.playFill, Color.White, tint, shape, enabled, Modifier.weight(1f)) {
+            ActionButton("Watch", SF.playFill, Color.White, tint, shape, enabled, Modifier.weight(1f), "Watch Scene", "Opens this scene; Back returns to RateMe") {
                 view.performRateMeHaptic(RateMeHaptic.Light)
                 // Minimal Scene; the detail screen loads the full scene.
                 Nav.push(SceneDetailScreen(item.id, Scene(id = item.id, title = item.title, oCounter = item.oCounter)))
             }
         } else {
             item.openableImage?.let { image ->
-                ActionButton("Open", Icons.Filled.OpenInFull, Color.White, tint, shape, enabled, Modifier.weight(1f)) {
+                ActionButton("Open", Icons.Filled.OpenInFull, Color.White, tint, shape, enabled, Modifier.weight(1f), "Open Image", "Opens this image; Back returns to RateMe") {
                     view.performRateMeHaptic(RateMeHaptic.Light)
                     Nav.push(ImageViewerScreen(listOf(image), 0))
                 }
@@ -618,6 +620,8 @@ private fun ActionButton(
     shape: RoundedCornerShape,
     enabled: Boolean,
     modifier: Modifier,
+    accessibilityLabel: String? = null,
+    accessibilityHint: String? = null,
     onClick: () -> Unit,
 ) {
     Row(
@@ -625,7 +629,9 @@ private fun ActionButton(
             .heightIn(min = 46.dp)
             .clip(shape)
             .background(bg, shape)
-            .clickable(enabled = enabled, onClick = onClick)
+            .then(if (accessibilityLabel != null) Modifier.semantics { contentDescription = accessibilityLabel } else Modifier)
+            // iOS `accessibilityHint` → TalkBack's action label ("Double tap to …").
+            .clickable(enabled = enabled, onClickLabel = accessibilityHint, onClick = onClick)
             .alpha(if (enabled) 1f else 0.5f),
         horizontalArrangement = Arrangement.Center,
         verticalAlignment = Alignment.CenterVertically,
