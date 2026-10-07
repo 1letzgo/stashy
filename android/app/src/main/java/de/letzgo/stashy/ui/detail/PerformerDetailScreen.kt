@@ -99,21 +99,20 @@ class PerformerDetailScreen(val performerId: String, val preview: Performer? = n
             DetailGrid(gridState, { w -> columnsFor(tab, w, catalog.imageColumns) }, hasTabs = catalog.available.size > 1, header = { Header(p) }) {
                 linkedSection(catalog, tab, gridState)
             }
-            val (slots, menu) = catalog.slots(tab)
             // iOS: the scenes tab adds `SceneBulkDownloadChrome.slot` (contextual, before filter & sort).
             val extra = when (tab) {
                 DetailTab.Scenes -> listOf(sceneBulkDownloadSlot { showSceneDownloadOptions = true })
                 else -> emptyList()
             }
             DetailTopBar(
-                p?.name ?: "", catalog.available, tab, { tab = it }, slots + extra, menu,
-                settings = catalog.imagesSettingsSlot(tab),
+                p?.name ?: "", catalog.available, tab, { tab = it }, extra,
+                settings = catalog.settingsSlot(tab),
                 isFavorite = isFavorite, favoriteBusy = favoriteBusy, onFavorite = ::toggleFavorite,
                 onEdit = { editing = true }, editLabel = "Edit performer",
             )
         }
 
-        LinkedImagesSettingsSheet(catalog)
+        LinkedSettingsSheets(catalog)
         if (editing && p != null) EditPerformerSheet(p, onDismiss = { editing = false }, onSaved = { performer = it })
         if (showSceneDownloadOptions) {
             SceneBulkDownloadDialog(Downloads.SceneDownloadScope.Performer(performerId), performer?.name ?: "", performer?.sceneCount) { showSceneDownloadOptions = false }

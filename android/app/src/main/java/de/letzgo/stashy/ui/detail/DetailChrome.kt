@@ -38,7 +38,6 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -72,7 +71,6 @@ import de.letzgo.stashy.ui.NativeTabStrip
 import de.letzgo.stashy.ui.NativeTopBar
 import de.letzgo.stashy.ui.OverflowItem
 import de.letzgo.stashy.ui.TopBarAction
-import de.letzgo.stashy.ui.TopBarMenuAction
 import de.letzgo.stashy.ui.TopBarOverflowMenu
 import de.letzgo.stashy.ui.nativeTopBarPadding
 import de.letzgo.stashy.ui.SF
@@ -149,7 +147,7 @@ internal fun DockIconButton(
 /**
  * iOS: the detail chrome bar (`StashySectionChromeBar`: Back · section icons · Favorite · Edit)
  * plus the floating list slots (`CatalogSlotBar`), as one native Material top app bar:
- * back arrow · [title] · slot icons (download state …) · sort `DropdownMenu` or the catalog
+ * back arrow · [title] · slot icons (download state …) · the catalog
  * "Settings" action ([settings], opens the filter & sort sheet) · favorite ·
  * "⋮" overflow (slots marked [ChromeSlot.inOverflow] such as card columns, and Edit). The
  * sections become a [NativeTabStrip] under the bar, shown only when more than one has content.
@@ -161,7 +159,6 @@ internal fun DetailTopBar(
     selected: DetailTab?,
     onSelect: (DetailTab) -> Unit,
     slots: List<ChromeSlot> = emptyList(),
-    sortMenu: (@Composable (dismiss: () -> Unit) -> Unit)? = null,
     settings: de.letzgo.stashy.ui.catalog.CatalogChromeSlot? = null,
     isFavorite: Boolean? = null,
     favoriteBusy: Boolean = false,
@@ -173,9 +170,6 @@ internal fun DetailTopBar(
         NativeTopBar(title) {
             slots.filter { !it.inOverflow }.forEach { s ->
                 TopBarAction(s.icon, s.label, tint = if (s.isActive) Appearance.tint else null, onClick = s.onClick)
-            }
-            if (sortMenu != null) {
-                TopBarMenuAction(androidx.compose.material.icons.Icons.AutoMirrored.Filled.Sort, "Sort") { dismiss -> sortMenu(dismiss) }
             }
             settings?.let { de.letzgo.stashy.ui.catalog.FilterSortAction(it) }
             if (isFavorite != null) {
@@ -365,18 +359,6 @@ internal class ChromeSlot(
     val inOverflow: Boolean = false,
     val onClick: () -> Unit,
 )
-
-/** Sort entries with a checkmark on the current one (iOS sort `Picker` in the filter sheet). */
-@Composable
-internal fun <S : SortChoice> SortMenuItems(options: List<S>, current: S, dismiss: () -> Unit, onPick: (S) -> Unit) {
-    options.forEach { o ->
-        DropdownMenuItem(
-            text = { Text(o.label) },
-            trailingIcon = { if (o == current) Icon(SF.checkmark, null) },
-            onClick = { dismiss(); onPick(o) },
-        )
-    }
-}
 
 // MARK: - Edit sheets
 

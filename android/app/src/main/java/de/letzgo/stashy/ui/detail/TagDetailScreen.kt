@@ -102,7 +102,6 @@ class TagDetailScreen(val tagId: String, val preview: Tag? = null) : Screen {
             DetailGrid(gridState, { w -> columnsFor(tab, w, catalog.imageColumns) }, hasTabs = catalog.available.size > 1, header = { tag?.let { Header(it) } }) {
                 linkedSection(catalog, tab, gridState)
             }
-            val (slots, menu) = catalog.slots(tab)
             // iOS: the scenes tab adds `SceneBulkDownloadChrome.slot` (contextual, before filter & sort).
             val extra = when (tab) {
                 DetailTab.Scenes -> listOf(sceneBulkDownloadSlot { showSceneDownloadOptions = true })
@@ -111,13 +110,13 @@ class TagDetailScreen(val tagId: String, val preview: Tag? = null) : Screen {
                 else -> emptyList()
             }
             DetailTopBar(
-                tag?.name ?: "", catalog.available, tab, { tab = it }, slots + extra, menu,
-                settings = catalog.imagesSettingsSlot(tab),
+                tag?.name ?: "", catalog.available, tab, { tab = it }, extra,
+                settings = catalog.settingsSlot(tab),
                 isFavorite = isFavorite, favoriteBusy = favoriteBusy, onFavorite = ::toggleFavorite,
                 onEdit = { editing = true }, editLabel = "Edit tag",
             )
         }
-        LinkedImagesSettingsSheet(catalog)
+        LinkedSettingsSheets(catalog)
         val t = tag
         if (editing && t != null) EditTagSheet(t, { editing = false }) { tag = it }
         if (showSceneDownloadOptions) {
