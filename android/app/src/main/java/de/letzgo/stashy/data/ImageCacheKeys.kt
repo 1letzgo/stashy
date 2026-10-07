@@ -12,7 +12,17 @@ object ImageCacheKeys {
     /** `srv:<serverId>|<url without apikey>`; null for local files (cached by path anyway). */
     fun key(url: String, serverId: String?): String? {
         if (!url.startsWith("http://") && !url.startsWith("https://")) return null
-        return "srv:${serverId ?: "none"}|${stripApiKey(url)}"
+        return "${prefix(serverId)}${stripApiKey(url)}"
+    }
+
+    /** Key prefix of every image of [serverId]. */
+    fun prefix(serverId: String?): String = "srv:${serverId ?: "none"}|"
+
+    /** Server id encoded in a [key] (null for keys not built here or without a server). */
+    fun serverId(key: String): String? {
+        if (!key.startsWith("srv:")) return null
+        val end = key.indexOf('|').takeIf { it > 4 } ?: return null
+        return key.substring(4, end).takeIf { it != "none" }
     }
 
     internal fun stripApiKey(url: String): String {
