@@ -201,11 +201,20 @@ fun ScenePlayerSurface(
     LaunchedEffect(Unit) { player.autoSelectsPreferredSubtitleTrack = true; scheduleHide() }
 
     // Hardware volume buttons move the slider (and unmute, iOS `unmutesOnHardwareVolume`).
+    // `Settings.System` fires for every system-settings write (rotation, brightness, …), not just
+    // volume, so react only when the media stream's index really moved — comparing against the
+    // slider's float level (rounded by `setSystemVolume`) unmuted the player and filled the
+    // volume bar on an orientation change.
     DisposableEffect(Unit) {
+        var lastIndex = systemVolumeIndex(context)
         val observer = object : ContentObserver(Handler(Looper.getMainLooper())) {
             override fun onChange(selfChange: Boolean) {
+                val index = systemVolumeIndex(context)
+                if (index == lastIndex) return
+                lastIndex = index
                 val level = systemVolume(context)
-                if (abs(level - volumeLevel) > 0.001f) { volumeLevel = level; if (level > 0 && mutedNow) mutedChange(false) }
+                volumeLevel = level
+                if (level > 0 && mutedNow) mutedChange(false)
             }
         }
         context.contentResolver.registerContentObserver(Settings.System.CONTENT_URI, true, observer)
@@ -556,6 +565,9 @@ private fun systemVolume(context: Context): Float {
     val max = am.getStreamMaxVolume(AudioManager.STREAM_MUSIC).coerceAtLeast(1)
     return am.getStreamVolume(AudioManager.STREAM_MUSIC).toFloat() / max
 }
+
+private fun systemVolumeIndex(context: Context): Int =
+    (context.getSystemService(Context.AUDIO_SERVICE) as AudioManager).getStreamVolume(AudioManager.STREAM_MUSIC)
 
 private fun setSystemVolume(context: Context, level: Float) {
     val am = context.getSystemService(Context.AUDIO_SERVICE) as AudioManager

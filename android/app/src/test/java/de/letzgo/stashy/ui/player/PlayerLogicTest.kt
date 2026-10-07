@@ -3,6 +3,7 @@ package de.letzgo.stashy.ui.player
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -172,5 +173,90 @@ class PlaybackActivityTrackerTest {
         val t = tracker(saves).apply { updatesResumeTime = false }
         t.setPosition(0.0, 100.0); t.setPosition(2.0, 100.0); t.tick(); t.flush()
         assertNull(saves.single().first)
+    }
+}
+
+class PlayCountCreditTest {
+    /** Plays from [from] for [seconds] in 0.2 s player ticks; returns how often a credit fired. */
+    private fun PlayCountCredit.play(from: Double, seconds: Double, clock: DoubleArray, rate: Double = 1.0): Int {
+        var fired = 0
+        var t = 0.0
+        if (onTime(from, true, clock[0])) fired++
+        while (t < seconds - 1e-9) {
+            t += 0.2; clock[0] += 0.2
+            if (onTime(from + t * rate, true, clock[0])) fired++
+        }
+        return fired
+    }
+
+    @Test fun resumeAtFiveMinutesDoesNotCreditUntilThresholdWatched() {
+        val c = PlayCountCredit(30.0)
+        val clock = doubleArrayOf(1000.0)
+        // Loading at 0, then the resume seek lands at 5:00.
+        assertFalse(c.onTime(0.0, false, clock[0]))
+        assertFalse(c.onTime(300.0, true, clock[0]))
+        assertEquals(0, c.play(300.0, 29.0, clock))
+        assertFalse(c.isCredited)
+        assertEquals(29.0, c.watchedSeconds, 1e-6)
+        assertEquals(1, c.play(329.0, 1.4, clock))
+        assertTrue(c.isCredited)
+        // Once only.
+        assertEquals(0, c.play(331.0, 60.0, clock))
+    }
+
+    @Test fun seeksDoNotAdd() {
+        val c = PlayCountCredit(30.0)
+        val clock = doubleArrayOf(0.0)
+        c.play(0.0, 10.0, clock)
+        c.noteSeek()
+        clock[0] += 0.2
+        assertFalse(c.onTime(600.0, true, clock[0])) // seek target: re-anchors, adds nothing
+        assertEquals(10.0, c.watchedSeconds, 1e-6)
+        // A jump the host did not report (> 2 s per tick) is not counted either.
+        clock[0] += 0.2
+        assertFalse(c.onTime(615.0, true, clock[0]))
+        assertEquals(10.0, c.watchedSeconds, 1e-6)
+        assertEquals(1, c.play(615.0, 20.2, clock))
+    }
+
+    @Test fun pauseStopsAccumulation() {
+        val c = PlayCountCredit(30.0)
+        val clock = doubleArrayOf(0.0)
+        c.play(0.0, 20.0, clock)
+        // Paused for a minute; the paused clock ticks never count.
+        repeat(300) { clock[0] += 0.2; assertFalse(c.onTime(20.0, false, clock[0])) }
+        assertEquals(20.0, c.watchedSeconds, 1e-6)
+        assertEquals(0, c.play(20.0, 9.8, clock))
+        assertEquals(1, c.play(29.8, 0.4, clock))
+    }
+
+    @Test fun fastForwardCountsWallClockOnly() {
+        val c = PlayCountCredit(30.0)
+        val clock = doubleArrayOf(0.0)
+        assertEquals(0, c.play(0.0, 20.0, clock, rate = 2.0)) // 40 s of content in 20 s
+        assertEquals(20.0, c.watchedSeconds, 1e-6)
+    }
+
+    @Test fun zeroThresholdCreditsOnStart() {
+        val c = PlayCountCredit(0.0)
+        assertTrue(c.onStart())
+        assertFalse(c.onStart())
+        assertFalse(c.onTime(300.0, true, 0.0))
+    }
+
+    @Test fun nonZeroThresholdDoesNotCreditOnStart() {
+        val c = PlayCountCredit(1.0)
+        assertFalse(c.onStart())
+        assertFalse(c.onTime(300.0, true, 0.0))
+    }
+
+    @Test fun resetStartsOver() {
+        val c = PlayCountCredit(5.0)
+        val clock = doubleArrayOf(0.0)
+        assertEquals(1, c.play(0.0, 6.0, clock))
+        c.reset()
+        assertFalse(c.isCredited)
+        assertEquals(0.0, c.watchedSeconds, 1e-9)
+        assertEquals(1, c.play(100.0, 5.2, clock))
     }
 }

@@ -1,6 +1,7 @@
 package de.letzgo.stashy.ui.scene
 
 import android.graphics.Bitmap
+import android.os.SystemClock
 import android.util.Base64
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableDoubleStateOf
@@ -18,6 +19,7 @@ import de.letzgo.stashy.data.SceneStamps
 import de.letzgo.stashy.data.ScenesRepository
 import de.letzgo.stashy.data.ServerConfigManager
 import de.letzgo.stashy.data.VideoCaption
+import de.letzgo.stashy.ui.player.PlayCountCredit
 import de.letzgo.stashy.ui.player.PlaybackActivityTracker
 import de.letzgo.stashy.ui.player.PlayerIcons
 import de.letzgo.stashy.ui.player.PlayerMute
@@ -122,7 +124,8 @@ class SceneDetailModel(initial: Scene, private val autoPlay: Boolean) {
     var isDeleting by mutableStateOf(false); private set
     var isIdentifying by mutableStateOf(false); private set
 
-    private var hasAddedPlay = false
+    /** Count-as-played: real watch time of this page, not the playhead (a resume is not watching). */
+    private val playCredit = PlayCountCredit(0.0)
     private var didAnnounceTranscodeFallback = false
     private var resumeOnReturn: Pair<Boolean, Double>? = null
     private var hasAppeared = false
@@ -224,7 +227,7 @@ class SceneDetailModel(initial: Scene, private val autoPlay: Boolean) {
                     tracker.setPosition(seconds, if (duration > 0) duration else scene.sceneDuration ?: 0.0)
                     if (p.isPlaying) { configureTracker(); tracker.start() }
                 }
-                if (!hasAddedPlay && seconds >= playCountThreshold) registerPlay()
+                creditIfDue(seconds, p.isPlaying && !isScrubbing)
             }
             p.onPlayingChanged = { playing -> handlePlayingChange(p, playing) }
             p.fallbackSources = scene.transcodeFallbackURLs
@@ -242,16 +245,23 @@ class SceneDetailModel(initial: Scene, private val autoPlay: Boolean) {
             registerCaptions(p)
         } else if (resumeTarget != null) {
             existing.seek(resumeTarget)
+            playCredit.noteSeek()
         }
         isPlaybackStarted = true
         player?.play()
         configureTracker()
         tracker.start()
-        if (!hasAddedPlay && playCountThreshold <= 0) registerPlay()
+        playCredit.thresholdSeconds = playCountThreshold
+        if (playCredit.onStart()) registerPlay()
     }
 
     /** Settings › Playback › "Count as played — Player". */
     private val playCountThreshold: Double get() = maxOf(0.0, PlayerSettings.playCountPlayerSeconds)
+
+    private fun creditIfDue(position: Double, playing: Boolean) {
+        playCredit.thresholdSeconds = playCountThreshold
+        if (playCredit.onTime(position, playing, SystemClock.elapsedRealtime() / 1000.0)) registerPlay()
+    }
 
     /** iOS: `registerAetherCaptions` — server captions as selectable external tracks. */
     private fun registerCaptions(p: StashPlayer) {
@@ -276,6 +286,7 @@ class SceneDetailModel(initial: Scene, private val autoPlay: Boolean) {
         val p = player ?: return
         p.seek(seconds)
         tracker.noteSeek(seconds)
+        playCredit.noteSeek()
         if (!isScrubbing) p.play()
     }
 
@@ -284,6 +295,7 @@ class SceneDetailModel(initial: Scene, private val autoPlay: Boolean) {
         val p = player ?: return
         p.seek(seconds)
         tracker.noteSeek(seconds)
+        playCredit.noteSeek()
         p.play()
     }
 
@@ -305,7 +317,6 @@ class SceneDetailModel(initial: Scene, private val autoPlay: Boolean) {
         tracker.setPosition(p.currentTime, if (p.duration > 0) p.duration else scene.sceneDuration ?: 0.0)
         configureTracker()
         tracker.start()
-        if (!hasAddedPlay && p.currentTime >= playCountThreshold) registerPlay()
     }
 
     private fun persistPlaybackActivity(stopTracking: Boolean) {
@@ -333,7 +344,6 @@ class SceneDetailModel(initial: Scene, private val autoPlay: Boolean) {
 
     /** iOS: `registerScenePlay` — `sceneAddPlay` once per page. */
     private fun registerPlay() {
-        hasAddedPlay = true
         if (!de.letzgo.stashy.data.TabManager.tracksActivity(scene.id)) return
         val id = scene.id
         scope.launch {
