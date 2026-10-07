@@ -177,14 +177,27 @@ private val imagesKindHolder = ImageMediaKindHolder()
 @Composable
 fun ImagesList(c: CatalogController<StashImage>, holder: ImageMediaKindHolder, columnScope: CatalogCardColumnScope, topPadding: androidx.compose.ui.unit.Dp = catalogTopPadding()) {
     val cols = CatalogPrefs.cardColumns(columnScope)
+    // iOS `isSelectionMode` / `selectedImageIds` (ImagesView multi-select).
+    val selection = androidx.compose.runtime.remember { ImageSelectionController() }
+    androidx.activity.compose.BackHandler(enabled = selection.isActive) { selection.end() }
     CatalogScaffold(
         c, CatalogTexts("Loading images...", SF.photo, "No images found", "Reload"),
         CatalogSlots(
+            contextual = CatalogChromeSlot(SF.checkmarkCircle, false, "Select images") { selection.begin() },
             filterSort = de.letzgo.stashy.ui.catalog.CatalogChromeSlot(SF.sliderHorizontal3, c.isFilterActive || holder.kind != ImageListMediaKind.All, "Settings") { c.isSheetPresented = true },
+            selection = CatalogSelectionChrome(
+                isActive = selection.isActive,
+                count = selection.state.count,
+                isDeleting = selection.isDeleting,
+                onDone = { selection.end() },
+                onSelectAll = { selection.selectAll(c.list.items) },
+                onDelete = { selection.requestDelete() },
+            ),
         ),
         columns = { cols.columnCount(it) }, itemKey = { it.id }, topPadding = topPadding, gridKey = cols,
-        // iOS `usesOneColumnFeedLayout`: 1/row is the grouped feed, not a grid of cards.
-        listBody = if (cols == CatalogCardColumns.One) { top ->
+        // iOS `usesOneColumnFeedLayout`: 1/row is the grouped feed, not a grid of cards —
+        // except while selecting, where every image is its own selectable card.
+        listBody = if (cols == CatalogCardColumns.One && !selection.isActive) { top ->
             ImageFeedList(
                 images = c.list.items,
                 sortRaw = c.sort.raw,
@@ -198,8 +211,15 @@ fun ImagesList(c: CatalogController<StashImage>, holder: ImageMediaKindHolder, c
             )
         } else null,
     ) { index, image ->
-        ImageCard(image, aspectRatio = 1f, onClick = { Nav.push(ImageViewerScreen(c.list.items.toList(), index)) })
+        if (selection.isActive) {
+            SelectableImageCell(selection.state.isSelected(image.id), { selection.toggle(image.id) }) {
+                ImageCard(image, aspectRatio = 1f)
+            }
+        } else {
+            ImageCard(image, aspectRatio = 1f, onClick = { Nav.push(ImageViewerScreen(c.list.items.toList(), index)) })
+        }
     }
+    ImageDeleteConfirmation(selection, c.list)
     CatalogFilterSortSheet(c, onReset = { holder.kind = ImageListMediaKind.All }) {
         ImageMediaTypeCard(holder.kind) { holder.kind = it; c.applyLive() }
         CardColumnsCard(columnScope)

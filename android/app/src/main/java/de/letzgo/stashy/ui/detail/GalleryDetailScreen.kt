@@ -29,7 +29,14 @@ import de.letzgo.stashy.ui.Nav
 import de.letzgo.stashy.ui.SF
 import de.letzgo.stashy.ui.catalog.CatalogChromeSlot
 import de.letzgo.stashy.ui.catalog.CatalogController
+import de.letzgo.stashy.ui.catalog.ImageDeleteConfirmation
 import de.letzgo.stashy.ui.catalog.ImageFeedGridModel
+import de.letzgo.stashy.ui.catalog.ImageSelectionController
+import de.letzgo.stashy.ui.catalog.SelectableImageCell
+import de.letzgo.stashy.ui.PagedList
+import androidx.compose.foundation.lazy.grid.LazyGridScope
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.SelectAll
 import de.letzgo.stashy.ui.catalog.ImageMediaKindHolder
 import de.letzgo.stashy.ui.filter.CardColumnsCard
 import de.letzgo.stashy.ui.filter.CatalogFilterSortSheet
@@ -83,6 +90,8 @@ class GalleryDetailScreen(
     )
     /** Grouped 1/row feed (iOS `ImagesView(gallery:)` one-column layout). */
     private val imageFeed = ImageFeedGridModel()
+    /** iOS `isSelectionMode` / `selectedImageIds` (multi-select + bulk delete). */
+    private val selection = ImageSelectionController()
 
     private fun load() {
         images.onAppear()
@@ -93,24 +102,41 @@ class GalleryDetailScreen(
     @Composable
     override fun Content() {
         LaunchedEffect(Unit) { if (!started) { started = true; load() } }
+        androidx.activity.compose.BackHandler(enabled = selection.isActive) { selection.end() }
         Box(Modifier.fillMaxSize().background(Theme.palette.background)) {
             val columns = (forcedColumns ?: CatalogPrefs.cardColumns(CatalogCardColumnScope.OpenedGallery)).raw
             DetailGrid(gridState, { w -> columnsFor(DetailTab.Images, w, columns) }, header = { gallery?.let { Header(it) } }) {
-                imageSection(
+                // iOS: while selecting, 1/row drops the grouped feed for per-image cards.
+                if (selection.isActive) selectableImageSection(images.list, selection)
+                else imageSection(
                     images.list, useFeed = columns == 1, feedModel = imageFeed, sortRaw = images.sort.raw,
                     gridState = gridState, currentGalleryId = galleryId,
                 )
             }
-            // iOS `galleryDownloadSlot` (secondary contextual, before filter & sort).
-            val download = gallery?.let { imageSetDownloadSlot(it.id, "Download gallery") { showDownloadOptions = true } }
-            DetailTopBar(
-                gallery?.displayTitle ?: "", emptyList(), null, {}, listOfNotNull(download),
-                settings = CatalogChromeSlot(SF.sliderHorizontal3, images.isFilterActive || kind.kind != ImageListMediaKind.All, "Settings") {
-                    images.isSheetPresented = true
-                },
-                onEdit = { editing = true }, editLabel = "Edit gallery",
-            )
+            if (selection.isActive) {
+                // iOS `CatalogSelectionChrome`: Select all · Delete · Done.
+                DetailTopBar(
+                    "${selection.state.count} Selected", emptyList(), null, {},
+                    listOf(
+                        ChromeSlot(Icons.Filled.SelectAll, "Select all") { selection.selectAll(images.list.items) },
+                        ChromeSlot(SF.trash, "Delete") { selection.requestDelete() },
+                        ChromeSlot(SF.checkmark, "Done", isActive = true) { selection.end() },
+                    ),
+                )
+            } else {
+                // iOS `galleryDownloadSlot` (secondary contextual, before filter & sort).
+                val download = gallery?.let { imageSetDownloadSlot(it.id, "Download gallery") { showDownloadOptions = true } }
+                val select = ChromeSlot(SF.checkmarkCircle, "Select images") { selection.begin() }
+                DetailTopBar(
+                    gallery?.displayTitle ?: "", emptyList(), null, {}, listOfNotNull(select, download),
+                    settings = CatalogChromeSlot(SF.sliderHorizontal3, images.isFilterActive || kind.kind != ImageListMediaKind.All, "Settings") {
+                        images.isSheetPresented = true
+                    },
+                    onEdit = { editing = true }, editLabel = "Edit gallery",
+                )
+            }
         }
+        ImageDeleteConfirmation(selection, images.list)
         CatalogFilterSortSheet(images, onReset = { kind.kind = ImageListMediaKind.All }) {
             ImageMediaTypeCard(kind.kind) { kind.kind = it; images.applyLive() }
             CardColumnsCard(CatalogCardColumnScope.OpenedGallery, forced = forcedColumns) { ignoreForcedColumns = true }
@@ -170,6 +196,15 @@ class GalleryDetailScreen(
                 Nav.pop()
             },
         )
+    }
+}
+
+/** [imageSection] in selection mode: per-image cards with the selection overlay (iOS `imageCell`). */
+private fun LazyGridScope.selectableImageSection(list: PagedList<StashImage>, selection: ImageSelectionController) {
+    pagedSection(list, { it.id }, "Loading images...", SF.cameraFill, "No images found") { _, image ->
+        SelectableImageCell(selection.state.isSelected(image.id), { selection.toggle(image.id) }) {
+            DetailImageCard(image)
+        }
     }
 }
 

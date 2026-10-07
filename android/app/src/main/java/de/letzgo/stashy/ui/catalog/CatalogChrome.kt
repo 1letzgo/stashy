@@ -75,6 +75,8 @@ import de.letzgo.stashy.ui.SF
 import de.letzgo.stashy.ui.Theme
 import de.letzgo.stashy.ui.floatingShadow
 import de.letzgo.stashy.ui.stashyGlass
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.SelectAll
 
 /** iOS: `CatalogChromeSlot`. */
 data class CatalogChromeSlot(
@@ -103,6 +105,18 @@ data class CatalogSlots(
     val quickFilter: CatalogQuickFilterMenu? = null,
     val contextual: CatalogChromeSlot? = null,
     val filterSort: CatalogChromeSlot? = null,
+    /** iOS `CatalogSelectionChrome`: while active it replaces the other slots (Images multi-select). */
+    val selection: CatalogSelectionChrome? = null,
+)
+
+/** iOS: `CatalogSelectionChrome` — count · Select all · Delete · Done while selecting. */
+data class CatalogSelectionChrome(
+    val isActive: Boolean,
+    val count: Int,
+    val isDeleting: Boolean,
+    val onDone: () -> Unit,
+    val onSelectAll: () -> Unit,
+    val onDelete: () -> Unit,
 )
 
 /**
@@ -113,7 +127,7 @@ object CatalogTopActions {
     var slots by mutableStateOf<CatalogSlots?>(null)
     internal var owner: Any? = null
 
-    val hasActions: Boolean get() = slots?.let { it.quickFilter != null || it.contextual != null || it.filterSort != null } == true
+    val hasActions: Boolean get() = slots?.let { it.quickFilter != null || it.contextual != null || it.filterSort != null || it.selection?.isActive == true } == true
 }
 
 /**
@@ -124,6 +138,7 @@ object CatalogTopActions {
  */
 @Composable
 fun CatalogTopActionIcons(slots: CatalogSlots) {
+    slots.selection?.takeIf { it.isActive }?.let { SelectionActions(it); return }
     slots.quickFilter?.let { QuickFilterAction(it) }
     slots.contextual?.let { TopBarSlot(it) }
     slots.filterSort?.let { FilterSortAction(it) }
@@ -137,6 +152,21 @@ internal fun FilterSortAction(slot: CatalogChromeSlot) {
         BadgedBox(badge = { if (slot.isActive) Badge(containerColor = accent) }) {
             Icon(slot.icon, slot.contentDescription, tint = if (slot.isActive) accent else Theme.palette.text)
         }
+    }
+}
+
+/** Selection mode actions in the Home strip: "N selected", Select all, Delete (red), Done. */
+@Composable
+private fun SelectionActions(sel: CatalogSelectionChrome) {
+    val p = Theme.palette
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Text("${sel.count} selected", style = NativeType.labelLarge, color = p.secondaryText, maxLines = 1, modifier = Modifier.padding(horizontal = 4.dp))
+        de.letzgo.stashy.ui.TopBarAction(Icons.Filled.SelectAll, "Select all", tint = p.text, enabled = !sel.isDeleting, onClick = sel.onSelectAll)
+        de.letzgo.stashy.ui.TopBarAction(
+            SF.trash, "Delete", tint = if (sel.count > 0) de.letzgo.stashy.ui.StashyColors.systemRed else p.tertiaryText,
+            enabled = sel.count > 0, busy = sel.isDeleting, onClick = sel.onDelete,
+        )
+        androidx.compose.material3.TextButton(onClick = sel.onDone) { Text("Done", style = NativeType.labelLarge, color = nativeAccent()) }
     }
 }
 
