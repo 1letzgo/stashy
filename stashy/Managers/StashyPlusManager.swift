@@ -477,8 +477,9 @@ enum StashyRevenueCat {
     static let apiKey = "appl_BBvgPSYjRtUoELlmlEJJJjZcOTy"
     /// Entitlement identifier in the RevenueCat dashboard (display name "stashy+").
     static let entitlementID = "stashy"
-    /// Set once existing StoreKit purchases were handed to RevenueCat.
-    nonisolated static let migrationSyncedKey = "stashy_plus_revenuecat_synced"
+    /// Set once the StoreKit purchase history was handed to RevenueCat. v2: every device syncs once
+    /// (v1 only synced devices with an active stashy+ entitlement).
+    nonisolated static let migrationSyncedKey = "stashy_plus_revenuecat_synced_v2"
 
     static var purchases: Purchases {
         configureIfNeeded()
@@ -526,15 +527,12 @@ enum StashyRevenueCat {
         }
     }
 
-    /// Hands purchases made before the RevenueCat switch to RevenueCat once, so they
-    /// show up in the dashboard. Only runs for devices that actually own stashy+.
+    /// Hands the StoreKit history from before the RevenueCat switch (expired subscriptions,
+    /// lifetime, tips, paid-app purchase) to RevenueCat once per device, so revenue and
+    /// customers show up in the dashboard. No UI: StoreKit 2 syncs without a sign-in prompt.
     static func migrateExistingPurchasesIfNeeded() async {
         let defaults = UserDefaults.standard
         guard !defaults.bool(forKey: migrationSyncedKey) else { return }
-        guard await storeKitSnapshot().hasAny else {
-            defaults.set(true, forKey: migrationSyncedKey)
-            return
-        }
         do {
             _ = try await purchases.syncPurchases()
             defaults.set(true, forKey: migrationSyncedKey)
@@ -549,7 +547,6 @@ enum StashyRevenueCat {
         var subscriptionProductID: String?
         var subscriptionExpiration: Date?
 
-        var hasAny: Bool { hasLifetimePurchase || subscriptionProductID != nil }
 
         mutating func addSubscription(_ productID: String, expiration: Date?) {
             let exp = expiration ?? .distantFuture
