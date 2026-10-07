@@ -125,7 +125,8 @@ dependencies {
     implementation("io.coil-kt.coil3:coil-network-okhttp:3.0.4")
     implementation("io.coil-kt.coil3:coil-svg:3.0.4")
     implementation("io.coil-kt.coil3:coil-gif:3.0.4")
-    val media3 = "1.5.1"
+    // 1.6: VobSub parser (picture subtitles in MKV next to PGS / DVB).
+    val media3 = "1.6.1"
     implementation("androidx.media3:media3-exoplayer:$media3")
     implementation("androidx.media3:media3-exoplayer-hls:$media3")
     implementation("androidx.media3:media3-datasource-okhttp:$media3")

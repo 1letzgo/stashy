@@ -393,8 +393,8 @@ private fun PerformerThumbnail(p: FeedPerformer, onClick: () -> Unit) {
 /**
  * iOS: `IsolatedScrubberBar` — the shared `AetherTimeBar` (44 pt glass capsule: elapsed · track ·
  * remaining) with 16 pt sides and 8 pt above / below. The scrub preview shows
- * [previewImageAt] (Markers: the scene's sprite tile) when it has one for the scrubbed time,
- * else the row's poster ([placeholderURL]) — Android decodes no frames here.
+ * [previewImageAt] (Scenes / Markers: the scene's sprite tile, iOS `ReelsView` scrub stills)
+ * when it has one for the scrubbed time, else the row's poster ([placeholderURL]).
  */
 @Composable
 fun FeedsScrubber(
@@ -420,6 +420,7 @@ fun FeedsScrubber(
         modifier = Modifier.padding(horizontal = 16.dp).padding(top = 8.dp, bottom = 8.dp),
         onScrubChanged = { s ->
             scrubbing = true
+            // A missing tile (sheet still loading, gap in the VTT) keeps the last still.
             previewImageAt?.invoke(s)?.let { previewImage = it }
             onScrub(s)
         },

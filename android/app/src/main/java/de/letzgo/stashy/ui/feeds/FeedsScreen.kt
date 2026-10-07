@@ -86,9 +86,7 @@ import kotlinx.coroutines.launch
  * Pics sit on the app background like iOS (`StashyThemeFill(.app)`), video rows on black.
  *
  * Known differences to iOS: the AI Motion pill (device control) is not ported (Play policy);
- * the Feeds sheet has no Save / presets (see [FeedsFilterSortSheet]); the scrubber shows
- * the row's poster (Markers: the scene's sprite tile) instead of decoded scrub stills; the mode
- * chip's label appears without iOS's delayed fade.
+ * the mode chip's label appears without iOS's delayed fade.
  *
  * Markers play their window of the original scene (`seconds … end_seconds`, else 30 s — see
  * [FeedSegment]) with audio, not Stash's generated marker clip; the scrubber spans that window.
@@ -255,10 +253,18 @@ fun FeedsScreen() {
         FeedsFilterSortSheet(
             mode = mode,
             filters = model.filtersFor(mode),
+            localPresets = model.localPresets(mode),
+            presetRow = model.presetRow(mode),
+            presetName = model.presetName(mode),
             selectedFilter = model.filters[mode],
             sort = model.sort(mode),
             sortOptions = model.sortOptions(mode),
-            onFilter = { pool.teardown(); model.setFilter(mode, it) },
+            onPresetRow = { pool.teardown(); model.selectPresetRow(mode, it) },
+            onSaveOverwrite = { model.saveOverwrite(mode) },
+            onSaveAs = { model.saveAs(mode, it) },
+            onRename = { model.rename(mode, it) },
+            onDelete = { model.deletePreset(mode) },
+            deleteConfirmationText = { model.deleteConfirmationText(mode) },
             onSort = { pool.teardown(); model.setSort(mode, it) },
             onCriteriaChanged = { pool.teardown(); model.applyCriteriaDocument(mode) },
             onReset = { pool.teardown(); model.reset(mode) },
@@ -492,14 +498,14 @@ private fun FeedPager(
                     pausesAdvance = activeItem.isAnimated && continuous,
                 )
                 if (!activeItem.isAnimated) {
-                    // Markers: the bar spans the segment (the player is clipped to it), the
-                    // scrub still comes from the scene's sprite sheet at the matching scene time.
+                    // iOS `ReelsView` scrub preview: the scene's sprite sheet + VTT index, like the
+                    // scene player. Scenes scrub in scene time; Markers' bar spans the segment
+                    // (the player is clipped to it), so the still is read at the matching scene
+                    // time. Previews (a generated clip) and scenes without sprites keep the poster.
                     val segment = activeItem.segment
-                    val sprites = remember(activeItem.id) {
-                        (activeItem as? FeedItem.MarkerItem)?.marker?.scene?.paths?.let {
-                            de.letzgo.stashy.ui.player.SceneScrubSprites.create(it.vtt, it.sprite)
-                        }
-                    }
+                    val sprites = remember(activeItem.id) { feedScrubSprites(activeItem) }
+                    // Fetched as soon as the row is active, so the first scrub already has stills.
+                    LaunchedEffect(sprites) { sprites?.prepare() }
                     val previewAt = remember(sprites, segment) {
                         sprites?.let { sp -> { s: Double -> sp.prepare(); sp.thumbnail(segment?.sceneTime(s) ?: s) } }
                     }
@@ -518,6 +524,16 @@ private fun FeedPager(
             }
         }
     }
+}
+
+/** Sprite sheet of the scene a row scrubs through (Scenes, Markers); null for clips / previews. */
+private fun feedScrubSprites(item: FeedItem): de.letzgo.stashy.ui.player.SceneScrubSprites? {
+    val paths = when (item) {
+        is FeedItem.SceneItem -> item.scene.paths
+        is FeedItem.MarkerItem -> item.marker.scene?.paths
+        else -> null
+    } ?: return null
+    return de.letzgo.stashy.ui.player.SceneScrubSprites.create(paths.vtt, paths.sprite)
 }
 
 private fun emptyIcon(mode: ReelsModeType) = when (mode) {

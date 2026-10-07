@@ -255,7 +255,7 @@ fun ScenePlayerSurface(
             min(inset, maxOf(0f, (surfaceW.value - 520f) / 2)).dp
         } else 0.dp
 
-        VideoSurface(player, Modifier.fillMaxSize(), fill = fillsScreen)
+        VideoSurface(player, Modifier.fillMaxSize(), fill = fillsScreen, showsBitmapSubtitles = true)
 
         if (!player.hasPresentedFrame) {
             Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {

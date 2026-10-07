@@ -207,7 +207,7 @@ private fun GroupSortCard(sort: SortOption, onChange: (SortOption) -> Unit) {
 
 /** iOS: `CatalogSettingsSheetChromeBar` save alert. */
 @Composable
-private fun SaveChoiceDialog(
+internal fun SaveChoiceDialog(
     presetName: String?,
     hasPreset: Boolean,
     onUpdate: () -> Unit,
@@ -243,7 +243,7 @@ private fun DialogOption(label: String, color: Color, action: () -> Unit) = Text
 )
 
 @Composable
-private fun NameInputDialog(title: String, message: String, initial: String, onSave: (String) -> Unit, onCancel: () -> Unit) {
+internal fun NameInputDialog(title: String, message: String, initial: String, onSave: (String) -> Unit, onCancel: () -> Unit) {
     val p = Theme.palette
     var text by remember { mutableStateOf(initial) }
     AlertDialog(
