@@ -21,6 +21,7 @@ import androidx.media3.common.Player
 import androidx.media3.common.TrackSelectionOverride
 import androidx.media3.common.Tracks
 import androidx.media3.common.VideoSize
+import androidx.media3.common.text.Cue
 import androidx.media3.common.text.CueGroup
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.datasource.DefaultDataSource
@@ -102,6 +103,12 @@ class StashPlayer(context: Context, val role: Role = Role.Main) {
     var activeSubtitleTrackId by mutableStateOf<String?>(null); private set
     /** The cue covering the playhead (embedded text track or a server caption). */
     var currentSubtitleText by mutableStateOf<String?>(null); private set
+    /**
+     * Picture-based cues (PGS, VobSub, DVB) of the selected embedded track — Media3 hands them
+     * over as [Cue]s with a bitmap and a position in the video frame. Drawn by
+     * [BitmapSubtitleLayer] inside the picture rect, not by the text overlay.
+     */
+    var currentBitmapCues by mutableStateOf<List<Cue>>(emptyList()); private set
     var currentURL: String? = null; private set
 
     var isMuted: Boolean = false
@@ -140,6 +147,7 @@ class StashPlayer(context: Context, val role: Role = Role.Main) {
     private var externalCaptions = listOf<ExternalCaption>()
     private var externalCues: List<SubtitleCue> = emptyList()
     private var embeddedCueText: String? = null
+    private var embeddedBitmapCues: List<Cue> = emptyList()
     private var didAutoSelectSubtitle = false
     private var released = false
     private var session: MediaSession? = null
@@ -198,6 +206,7 @@ class StashPlayer(context: Context, val role: Role = Role.Main) {
 
         override fun onCues(cueGroup: CueGroup) {
             embeddedCueText = cueGroup.cues.mapNotNull { it.text?.toString() }.joinToString("\n").trim().takeIf { it.isNotEmpty() }
+            embeddedBitmapCues = cueGroup.cues.filter { it.bitmap != null }
             updateSubtitleText()
         }
     }
@@ -408,6 +417,7 @@ class StashPlayer(context: Context, val role: Role = Role.Main) {
         if (id == null || id.startsWith("ext:")) {
             exo.trackSelectionParameters = exo.trackSelectionParameters.buildUpon().setTrackTypeDisabled(C.TRACK_TYPE_TEXT, true).build()
             embeddedCueText = null
+            embeddedBitmapCues = emptyList()
             id?.let { loadExternal(it) }
         } else {
             val (g, i) = id.split(":").map { it.toInt() }
@@ -458,6 +468,8 @@ class StashPlayer(context: Context, val role: Role = Role.Main) {
             id.startsWith("ext:") -> WebVtt.cueText(externalCues, currentTime)
             else -> embeddedCueText
         }
+        val bitmaps = if (id == null || id.startsWith("ext:")) emptyList() else embeddedBitmapCues
+        if (bitmaps != currentBitmapCues) currentBitmapCues = bitmaps
     }
 
     // MARK: AI captions (iOS: the live channel of `SubtitleController`)
@@ -468,6 +480,8 @@ class StashPlayer(context: Context, val role: Role = Role.Main) {
 
     /** What the subtitle overlay draws: the AI line while live captions run, else the track's cue. */
     val displayedSubtitleText: String? get() = if (isLiveCaptionsActive) liveCaptionText else currentSubtitleText
+    /** Picture cues the surface draws (none while the AI line owns the overlay). */
+    val displayedBitmapCues: List<Cue> get() = if (isLiveCaptionsActive) emptyList() else currentBitmapCues
 
     /** iOS: `beginLiveCaptions` + `engine.clearSubtitle()`. */
     fun beginLiveCaptions() {

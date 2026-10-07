@@ -409,7 +409,7 @@ private fun TvPlayerContent(
             }
         },
     ) {
-        VideoSurface(player, Modifier.fillMaxSize())
+        VideoSurface(player, Modifier.fillMaxSize(), showsBitmapSubtitles = true)
 
         if (!player.hasPresentedFrame) {
             Box(Modifier.fillMaxSize().background(Color.Black), contentAlignment = Alignment.Center) {
