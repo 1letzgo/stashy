@@ -4,7 +4,6 @@ import android.app.Application
 import coil3.ImageLoader
 import coil3.PlatformContext
 import coil3.SingletonImageLoader
-import coil3.disk.DiskCache
 import coil3.gif.AnimatedImageDecoder
 import coil3.memory.MemoryCache
 import coil3.network.okhttp.OkHttpNetworkFetcherFactory
@@ -48,11 +47,12 @@ class StashyApplication : Application(), SingletonImageLoader.Factory {
                 add(AnimatedImageDecoder.Factory())
             }
             .memoryCache { MemoryCache.Builder().maxSizePercent(context, 0.25).build() }
+            // One directory per server (iOS `StashyImageCache/<serverID>`).
             .diskCache {
-                DiskCache.Builder()
-                    .directory(cacheDir.resolve("StashyImageCache").toOkioPath())
-                    .maxSizeBytes(500L * 1024 * 1024)
-                    .build()
+                de.letzgo.stashy.data.ServerScopedDiskCache(
+                    base = cacheDir.resolve("StashyImageCache").toOkioPath(),
+                    maxSizePerServer = 500L * 1024 * 1024,
+                )
             }
             .build()
 }

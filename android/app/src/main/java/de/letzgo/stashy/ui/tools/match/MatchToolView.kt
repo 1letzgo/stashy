@@ -66,6 +66,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
@@ -237,10 +239,13 @@ private fun MatchActionButton(
     prominent: Boolean,
     enabled: Boolean,
     modifier: Modifier = Modifier,
+    accessibilityLabel: String? = null,
     onClick: () -> Unit,
 ) {
     val tint = Appearance.tint
     val padding = PaddingValues(horizontal = 10.dp)
+    @Suppress("NAME_SHADOWING")
+    val modifier = if (accessibilityLabel != null) modifier.semantics { contentDescription = accessibilityLabel } else modifier
     val label: @Composable RowScope.() -> Unit = {
         Icon(icon, null, modifier = Modifier.size(ButtonDefaults.IconSize))
         Spacer(Modifier.width(ButtonDefaults.IconSpacing))
@@ -267,7 +272,7 @@ private fun DuelActionsRow(model: MatchViewModel, hPad: Dp) {
     val view = LocalView.current
     Row(Modifier.fillMaxWidth().padding(horizontal = hPad), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
         if (model.duelMode == MatchDuelMode.Champion) {
-            MatchActionButton("Stop", Icons.Outlined.StopCircle, prominent = false, enabled = !model.isSubmitting, modifier = Modifier.weight(1f)) {
+            MatchActionButton("Stop", Icons.Outlined.StopCircle, prominent = false, enabled = !model.isSubmitting, modifier = Modifier.weight(1f), accessibilityLabel = "End Legend run") {
                 view.performMatchHaptic(MatchHaptic.Light)
                 model.startNewClimbRun()
             }
@@ -277,8 +282,8 @@ private fun DuelActionsRow(model: MatchViewModel, hPad: Dp) {
             }
         }
         if (model.duelMode == MatchDuelMode.Placement) {
-            MatchActionButton("New pair", Icons.Filled.Autorenew, prominent = false, enabled = false, modifier = Modifier.weight(1f)) {}
-            MatchActionButton("Stop", Icons.Outlined.StopCircle, prominent = true, enabled = !model.isSubmitting, modifier = Modifier.weight(1f)) {
+            MatchActionButton("New pair", Icons.Filled.Autorenew, prominent = false, enabled = false, modifier = Modifier.weight(1f), accessibilityLabel = "New pair, not available in Rise") {}
+            MatchActionButton("Stop", Icons.Outlined.StopCircle, prominent = true, enabled = !model.isSubmitting, modifier = Modifier.weight(1f), accessibilityLabel = "End Rise run") {
                 view.performMatchHaptic(MatchHaptic.Light)
                 model.startNewClimbRun()
             }
@@ -435,6 +440,7 @@ private fun BattleColumn(
         Modifier
             .fillMaxWidth()
             .matchCard(shape)
+            .semantics { contentDescription = "Choose ${performer.name}" }
             .clickable(
                 enabled = !model.isSubmitting,
                 interactionSource = remember { MutableInteractionSource() },
@@ -532,6 +538,7 @@ private fun ProfileLinkCard(performer: Performer) {
         Modifier
             .fillMaxWidth()
             .matchCard()
+            .semantics { contentDescription = "Profile, ${performer.name}" }
             .clickable { Nav.push(PerformerDetailScreen(performer.id, performer)) }
             .padding(12.dp),
         horizontalArrangement = Arrangement.Center,
@@ -571,6 +578,7 @@ private fun StarterPickCard(model: MatchViewModel, performer: Performer, modifie
     Column(
         modifier
             .matchCard()
+            .semantics { contentDescription = "Pick ${performer.name} as Rise starter" }
             .clickable(enabled = !model.isSubmitting, onClick = onPick),
     ) {
         PerformerPhoto(
