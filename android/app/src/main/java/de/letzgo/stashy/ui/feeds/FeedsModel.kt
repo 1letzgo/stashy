@@ -38,6 +38,14 @@ import de.letzgo.stashy.data.ListLivePresetTag
 import de.letzgo.stashy.data.SavedFiltersStore
 import de.letzgo.stashy.data.SortCatalog
 import de.letzgo.stashy.data.criteriaObjectFilter
+import de.letzgo.stashy.data.encodedSortPair
+import de.letzgo.stashy.data.filterMode
+import de.letzgo.stashy.data.stashyMetadata
+import de.letzgo.stashy.data.LocalFilterPreset
+import de.letzgo.stashy.data.LocalFilterPresetStore
+import de.letzgo.stashy.data.SavedFiltersRepository
+import de.letzgo.stashy.data.SortOption
+import de.letzgo.stashy.data.mergedObjectFilterForSave
 import de.letzgo.stashy.data.StashImage
 import de.letzgo.stashy.data.Tag
 import de.letzgo.stashy.data.tools.AITagSuggestions
@@ -271,7 +279,7 @@ object FeedsModel {
         savedFiltersLoaded = false
         savedFilters = emptyList()
         lists.values.forEach { it.job?.cancel(); it.items.clear(); it.loadedOnce = false; it.signature = null; it.page = 0; it.error = null }
-        sorts.clear(); filters.clear(); advanced.clear(); criteriaDocs.clear(); currentIds.clear(); unplayable.clear(); probed.clear(); seeds.clear()
+        sorts.clear(); filters.clear(); advanced.clear(); criteriaDocs.clear(); presetRows.clear(); currentIds.clear(); unplayable.clear(); probed.clear(); seeds.clear()
         criteria = FeedCriteria()
         checkpoint = null
         startPositions.clear()
@@ -437,6 +445,7 @@ object FeedsModel {
     }
 
     fun setFilter(m: ReelsModeType, filter: SavedFilter?) {
+        presetRows.remove(m)
         if (filter == null) filters.remove(m) else filters[m] = filter
         // iOS: picking a filter reloads the editor from it; "None" empties it.
         advanced.remove(m)
@@ -486,8 +495,226 @@ object FeedsModel {
 
     /** iOS sheet "Reset": no filter, no criteria; sort stays. */
     fun reset(m: ReelsModeType) {
-        filters.remove(m); advanced.remove(m); criteriaDocs.remove(m)
+        filters.remove(m); advanced.remove(m); criteriaDocs.remove(m); presetRows.remove(m)
         refetch(m)
+    }
+
+    // MARK: - Presets (iOS `reelsSaveSceneLivePresetOverwrite` / `…As` / `reelsRenameSceneLivePreset` /
+    // `reelsDeleteSceneLivePreset`, the clip model's `savePresetOverwrite` & co.)
+
+    /**
+     * Selected row of the sheet's Filter picker per mode (`""` | `server:<id>` | `local:<uuid>`,
+     * iOS `ListLivePresetTag`). Only a local preset needs an entry; a server filter is derived
+     * from [filters].
+     */
+    private val presetRows = mutableStateMapOf<ReelsModeType, String>()
+    /** Bumped when a mode's on-device presets change, so the sheet re-reads them. */
+    var localPresetsVersion by mutableStateOf(0)
+        private set
+
+    /** Catalog list whose filters / presets a Feeds mode shares (Scenes & Previews → scenes …). */
+    fun filterMode(m: ReelsModeType): FilterMode = when (m) {
+        ReelsModeType.Markers -> FilterMode.SceneMarkers
+        ReelsModeType.Clips, ReelsModeType.Pics -> FilterMode.Images
+        else -> FilterMode.Scenes
+    }
+
+    fun presetRow(m: ReelsModeType): String =
+        presetRows[m] ?: filters[m]?.let { ListLivePresetTag.serverRow(it.id) } ?: ""
+
+    /** On-device presets of the mode's list (same store as the catalog sheet). */
+    fun localPresets(m: ReelsModeType): List<LocalFilterPreset> {
+        localPresetsVersion // read so callers recompose after a change
+        return LocalFilterPresetStore.load(filterMode(m))
+    }
+
+    fun presetName(m: ReelsModeType): String? {
+        val row = presetRow(m)
+        ListLivePresetTag.parseServerId(row)?.let { sid -> return savedFilters.firstOrNull { it.id == sid }?.name ?: filters[m]?.name }
+        ListLivePresetTag.parseLocalId(row)?.let { lid -> return localPresets(m).firstOrNull { it.id == lid }?.name }
+        return null
+    }
+
+    /** Sort of a raw value in the mode's enum (`sortRaw` of a preset / stashy filter). */
+    private fun feedSort(m: ReelsModeType, raw: String?): FeedSort? = when (m) {
+        ReelsModeType.Scenes, ReelsModeType.Previews -> SceneSortOption.from(raw)
+        ReelsModeType.Markers -> SceneMarkerSortOption.from(raw)
+        ReelsModeType.Clips, ReelsModeType.Pics -> ImageSortOption.from(raw)
+    }
+
+    /** iOS `reelsHandleScenePresetSelectionChange`. */
+    fun selectPresetRow(m: ReelsModeType, row: String) {
+        ListLivePresetTag.parseServerId(row)?.let { sid ->
+            val f = savedFilters.firstOrNull { it.id == sid } ?: return
+            // iOS `reelsApplyServerSceneSavedFilterForReels`: a stashy filter brings its sort.
+            feedSort(m, FeedsQuery.stashySortRaw(f))?.let { sorts[m] = it }
+            setFilter(m, f)
+            return
+        }
+        val lid = ListLivePresetTag.parseLocalId(row)
+        val preset = lid?.let { id -> localPresets(m).firstOrNull { it.id == id } }
+        if (preset == null) { setFilter(m, null); return }
+        // iOS `reelsApplyLiveScenePresetForReels`: sort, base filter, then the fragment on top.
+        feedSort(m, preset.sortRaw)?.let { sorts[m] = it }
+        val base = preset.baseSavedFilterId?.let { id -> savedFilters.firstOrNull { it.id == id } }
+        if (base == null) filters.remove(m) else filters[m] = base
+        presetRows[m] = row
+        val merged = LinkedHashMap<String, JsonElement>(base?.criteriaObjectFilter() ?: JsonObject(emptyMap()))
+        merged.putAll(de.letzgo.stashy.data.FilterMapper.sanitize(preset.liveFragment, m == ReelsModeType.Markers))
+        criteriaDocs.remove(m)
+        val doc = criteriaDocument(m)
+        doc.load(JsonObject(merged))
+        val dict = doc.sanitizedObjectFilter
+        if (dict.isEmpty()) advanced.remove(m) else advanced[m] = dict
+        refetch(m)
+    }
+
+    /** iOS `reelsActivePresetLiveFragment` — the editor document of the mode. */
+    private fun liveFragment(m: ReelsModeType): JsonObject = criteriaDocument(m).sanitizedObjectFilter
+
+    /** Sort as the catalog's [SortOption] (same raw names as iOS). */
+    private fun catalogSort(m: ReelsModeType): SortOption {
+        val s = sort(m)
+        return SortCatalog.option(filterMode(m), s.raw) ?: SortOption(s.raw, s.displayName, s.sortField, s.direction)
+    }
+
+    /** "Update <name>" — overwrites the selected server filter or local preset. */
+    fun saveOverwrite(m: ReelsModeType) {
+        val row = presetRow(m)
+        ListLivePresetTag.parseServerId(row)?.let { sid ->
+            val existing = savedFilters.firstOrNull { it.id == sid } ?: filters[m] ?: return
+            saveServer(m, existing.id, existing.name)
+            return
+        }
+        val lid = ListLivePresetTag.parseLocalId(row) ?: return
+        val old = localPresets(m).firstOrNull { it.id == lid } ?: return
+        LocalFilterPresetStore.upsert(
+            filterMode(m), LocalFilterPreset.create(old.name, sort(m).raw, filters[m]?.id, liveFragment(m), id = old.id),
+        )
+        localPresetsVersion++
+    }
+
+    /** "Save as new" — always a Stash saved filter of the mode (iOS). */
+    fun saveAs(m: ReelsModeType, name: String) {
+        val trimmed = name.trim()
+        if (trimmed.isEmpty()) return
+        saveServer(m, null, trimmed)
+    }
+
+    private fun saveServer(m: ReelsModeType, existingId: String?, name: String) {
+        val isMarker = m == ReelsModeType.Markers
+        val live = liveFragment(m)
+        val previousLive = existingId?.let { id -> savedFilters.firstOrNull { it.id == id } }
+            ?.let { FeedsQuery.stashyLiveFragment(it) } ?: JsonObject(emptyMap())
+        val base = filters[m]?.takeIf { it.id != existingId }
+        val merged = mergedObjectFilterForSave(base, live, previousLive, isMarker)
+        val input = SavedFiltersRepository.saveInput(
+            filterMode(m), existingId, name, catalogSort(m), merged, live, base?.id,
+            de.letzgo.stashy.ui.filter.FilterPickerOptionsStore.knownLabels(),
+        )
+        scope.launch {
+            try {
+                val saved = SavedFiltersRepository.save(input)
+                savedFilters = savedFilters.filter { it.id != saved.id } + saved
+                SavedFiltersStore.byId[saved.id] = saved
+                if (existingId == null) {
+                    // The new filter becomes the selection; the editor keeps its criteria, so
+                    // the feed itself does not change.
+                    filters[m] = saved
+                    presetRows.remove(m)
+                } else {
+                    ReelsModeType.entries.forEach { mm -> if (filters[mm]?.id == saved.id) filters[mm] = saved }
+                }
+                list(m).signature = signature(m)
+                SavedFiltersStore.fetch()
+                message = if (existingId == null) "Saved “$name”" else "Updated “$name”"
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                message = "Save failed: ${e.message}"
+            }
+        }
+    }
+
+    /** iOS `reelsRenameSceneLivePreset` — a server rename keeps criteria, sort and metadata. */
+    fun rename(m: ReelsModeType, name: String) {
+        val trimmed = name.trim()
+        if (trimmed.isEmpty()) return
+        val row = presetRow(m)
+        ListLivePresetTag.parseServerId(row)?.let { sid ->
+            val existing = savedFilters.firstOrNull { it.id == sid } ?: return
+            val fm = existing.filterMode
+            val meta = existing.stashyMetadata
+            val sortForRename = SortCatalog.choice(fm, meta?.sortRaw, existing.encodedSortPair) ?: catalogSort(m)
+            val input = SavedFiltersRepository.saveInput(
+                fm, existing.id, trimmed, sortForRename, existing.criteriaObjectFilter(),
+                meta?.liveFragment, meta?.baseSavedFilterId, de.letzgo.stashy.ui.filter.FilterPickerOptionsStore.knownLabels(),
+            )
+            scope.launch {
+                try {
+                    val saved = SavedFiltersRepository.save(input)
+                    savedFilters = savedFilters.map { if (it.id == saved.id) saved else it }
+                    SavedFiltersStore.byId[saved.id] = saved
+                    // Same criteria: swap the reference without a refetch (the signature uses the id).
+                    ReelsModeType.entries.forEach { mm -> if (filters[mm]?.id == saved.id) filters[mm] = saved }
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (e: Exception) {
+                    message = "Rename failed: ${e.message}"
+                }
+            }
+            return
+        }
+        val lid = ListLivePresetTag.parseLocalId(row) ?: return
+        val p = localPresets(m).firstOrNull { it.id == lid } ?: return
+        LocalFilterPresetStore.upsert(filterMode(m), p.renamed(trimmed))
+        localPresetsVersion++
+    }
+
+    /** iOS `reelsDeleteSceneLivePreset`. */
+    fun deletePreset(m: ReelsModeType) {
+        val row = presetRow(m)
+        ListLivePresetTag.parseServerId(row)?.let { sid ->
+            scope.launch {
+                try {
+                    SavedFiltersRepository.destroy(sid)
+                    savedFilters = savedFilters.filter { it.id != sid }
+                    SavedFiltersStore.byId.remove(sid)
+                    // Every mode that ran the deleted filter falls back to None.
+                    ReelsModeType.entries.forEach { mm ->
+                        if (filters[mm]?.id == sid) {
+                            filters.remove(mm); advanced.remove(mm); criteriaDocs.remove(mm); presetRows.remove(mm)
+                            if (mm != ReelsModeType.Pics) refetch(mm)
+                        }
+                    }
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (e: Exception) {
+                    message = "Delete failed: ${e.message}"
+                }
+            }
+            return
+        }
+        val lid = ListLivePresetTag.parseLocalId(row) ?: return
+        LocalFilterPresetStore.remove(filterMode(m), lid)
+        localPresetsVersion++
+        // iOS only clears the picker row; the editor keeps the criteria, so the feed stays.
+        presetRows.remove(m)
+        filters.remove(m)
+        liveFragment(m).let { if (it.isEmpty()) advanced.remove(m) else advanced[m] = it }
+        list(m).signature = signature(m)
+    }
+
+    /** iOS `reelsSceneDeletePresetConfirmationText`. */
+    fun deleteConfirmationText(m: ReelsModeType): String {
+        val row = presetRow(m)
+        ListLivePresetTag.parseServerId(row)?.let { sid ->
+            savedFilters.firstOrNull { it.id == sid }?.let { return "Remove “${it.name}” from Stash? Other devices will lose this saved filter." }
+        }
+        ListLivePresetTag.parseLocalId(row)?.let { lid ->
+            localPresets(m).firstOrNull { it.id == lid }?.let { return "Remove “${it.name}” from this device? This cannot be undone." }
+        }
+        return "Remove this filter? This cannot be undone."
     }
 
     /** Tab icon reselect (iOS `reelsWillRemount` → `refetchCurrentReelsModeFromTop`). */
@@ -532,7 +759,7 @@ object FeedsModel {
             link.clipFilter != null -> {
                 mode = ReelsModeType.Clips
                 criteria = FeedCriteria()
-                advanced.remove(ReelsModeType.Clips); criteriaDocs.remove(ReelsModeType.Clips)
+                advanced.remove(ReelsModeType.Clips); criteriaDocs.remove(ReelsModeType.Clips); presetRows.remove(ReelsModeType.Clips)
                 filters[ReelsModeType.Clips] = link.clipFilter
                 sorts[ReelsModeType.Clips] = ImageSortOption.from(link.clipSort) ?: defaultSort(ReelsModeType.Clips)
                 refetch(ReelsModeType.Clips)
@@ -540,7 +767,7 @@ object FeedsModel {
             link.sceneFilter != null -> {
                 mode = ReelsModeType.Scenes
                 criteria = FeedCriteria()
-                advanced.remove(ReelsModeType.Scenes); criteriaDocs.remove(ReelsModeType.Scenes)
+                advanced.remove(ReelsModeType.Scenes); criteriaDocs.remove(ReelsModeType.Scenes); presetRows.remove(ReelsModeType.Scenes)
                 filters[ReelsModeType.Scenes] = link.sceneFilter
                 sorts[ReelsModeType.Scenes] = SceneSortOption.from(link.sceneSort) ?: defaultSort(ReelsModeType.Scenes)
                 refetch(ReelsModeType.Scenes)
@@ -548,7 +775,7 @@ object FeedsModel {
             link.performer != null || link.tags.isNotEmpty() || link.studio != null -> {
                 // iOS `reelsClearSessionFiltersForDeepLink`: only the handed criteria plus the
                 // mode's Settings default filter and default sort survive.
-                filters.clear(); advanced.clear(); criteriaDocs.clear(); sorts.clear()
+                filters.clear(); advanced.clear(); criteriaDocs.clear(); presetRows.clear(); sorts.clear()
                 mode = target ?: FeedsConfig.enabledModes.firstOrNull() ?: ReelsModeType.Scenes
                 criteria = FeedCriteria(link.performer, link.tags, link.studio)
                 // iOS: every Feeds view starts from its Settings default filter; the handed

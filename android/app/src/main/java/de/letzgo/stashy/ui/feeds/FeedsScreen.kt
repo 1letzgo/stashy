@@ -86,9 +86,7 @@ import kotlinx.coroutines.launch
  * Pics sit on the app background like iOS (`StashyThemeFill(.app)`), video rows on black.
  *
  * Known differences to iOS: the AI Motion pill (device control) is not ported (Play policy);
- * the Feeds sheet has no Save / presets (see [FeedsFilterSortSheet]); the scrubber shows
- * the row's poster (Markers: the scene's sprite tile) instead of decoded scrub stills; the mode
- * chip's label appears without iOS's delayed fade.
+ * the mode chip's label appears without iOS's delayed fade.
  *
  * Markers play their window of the original scene (`seconds … end_seconds`, else 30 s — see
  * [FeedSegment]) with audio, not Stash's generated marker clip; the scrubber spans that window.
@@ -255,10 +253,18 @@ fun FeedsScreen() {
         FeedsFilterSortSheet(
             mode = mode,
             filters = model.filtersFor(mode),
+            localPresets = model.localPresets(mode),
+            presetRow = model.presetRow(mode),
+            presetName = model.presetName(mode),
             selectedFilter = model.filters[mode],
             sort = model.sort(mode),
             sortOptions = model.sortOptions(mode),
-            onFilter = { pool.teardown(); model.setFilter(mode, it) },
+            onPresetRow = { pool.teardown(); model.selectPresetRow(mode, it) },
+            onSaveOverwrite = { model.saveOverwrite(mode) },
+            onSaveAs = { model.saveAs(mode, it) },
+            onRename = { model.rename(mode, it) },
+            onDelete = { model.deletePreset(mode) },
+            deleteConfirmationText = { model.deleteConfirmationText(mode) },
             onSort = { pool.teardown(); model.setSort(mode, it) },
             onCriteriaChanged = { pool.teardown(); model.applyCriteriaDocument(mode) },
             onReset = { pool.teardown(); model.reset(mode) },
