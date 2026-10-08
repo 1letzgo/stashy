@@ -488,6 +488,16 @@ class TabManager: ObservableObject {
         isPlaybackActivityTracked && !activityPausedSceneIds.contains(sceneId)
     }
 
+    /// Settings › Playback › Player › "Auto-rotate fullscreen": fullscreen turns to landscape
+    /// for landscape videos while the phone is upright.
+    @Published var playerAutoRotateFullscreen: Bool = true {
+        didSet { UserDefaults.standard.set(playerAutoRotateFullscreen, forKey: Self.playerAutoRotateFullscreenKey) }
+    }
+    static let playerAutoRotateFullscreenKey = "playerAutoRotateFullscreen"
+    nonisolated static var isFullscreenAutoRotateOn: Bool {
+        UserDefaults.standard.object(forKey: playerAutoRotateFullscreenKey) as? Bool ?? true
+    }
+
     /// Share of the picture the fill may cut off before Autozoom leaves it letterboxed.
     static let autoZoomMaximumCrop: Double = 0.15
 
@@ -738,6 +748,7 @@ class TabManager: ObservableObject {
         self.showsPlayerSkipButtons = UserDefaults.standard.object(forKey: showsPlayerSkipButtonsKey) as? Bool ?? true
         self.playerAutoZoom = UserDefaults.standard.object(forKey: playerAutoZoomKey) as? Bool ?? false
         self.tracksPlaybackActivity = Self.isPlaybackActivityTracked
+        self.playerAutoRotateFullscreen = Self.isFullscreenAutoRotateOn
         self.playerDolbyVisionEnabled = UserDefaults.standard.object(forKey: playerDolbyVisionEnabledKey) as? Bool ?? true
         let storedBatch = UserDefaults.standard.object(forKey: downloadBatchSizeKey) as? Int ?? 50
         self.downloadBatchSize = Self.downloadBatchSizeOptions.contains(storedBatch) ? storedBatch : 50

@@ -219,7 +219,11 @@ struct AetherSceneSurface: View {
         .onDisappear {
             rewindTimer?.invalidate()
             rewindTimer = nil
-            if isFullscreen { engine.setVideoGravity(.resizeAspect) }
+            if isFullscreen {
+                engine.setVideoGravity(.resizeAspect)
+                // Every fullscreen host (scene detail, downloads) gets the orientation back.
+                Self.releaseOrientationOverride()
+            }
             pip.update(layer: nil)
             endScrubPreview()
         }
@@ -744,7 +748,7 @@ struct AetherSceneSurface: View {
             .first(where: { $0.activationState == .foregroundActive })
             ?? UIApplication.shared.connectedScenes.compactMap({ $0 as? UIWindowScene }).first
         else { return }
-        let target: UIInterfaceOrientationMask = scene.interfaceOrientation.isLandscape ? .portrait : .landscapeRight
+        let target: UIInterfaceOrientationMask = scene.interfaceOrientation.isLandscape ? .portrait : .landscape
         // Only the geometry request: the app's supported orientations stay `.all`. Narrowing
         // them to one orientation crashed UIKit as soon as a sheet + keyboard came up in
         // landscape ("no common orientation with the application"). With the device's
@@ -765,25 +769,25 @@ struct AetherSceneSurface: View {
         }
     }
 
-    /// Rotates the interface: the app's allowed orientations are narrowed to the target for a
-    /// moment (otherwise SwiftUI's fullscreen cover ignores the request), then opened up again.
+    /// Rotates the interface and keeps it there: the app's allowed orientations are narrowed to
+    /// the target (SwiftUI's fullscreen cover ignores plain geometry requests, and with `.all`
+    /// the device orientation would turn it straight back). Fullscreen holds the lock until it
+    /// closes (`releaseOrientationOverride`), like Android's sensorLandscape.
     private static func rotate(_ scene: UIWindowScene, to target: UIInterfaceOrientationMask) {
         AppDelegate.orientationLock = target
         refreshSupportedOrientations(in: scene)
         scene.requestGeometryUpdate(.iOS(interfaceOrientations: target)) { error in
             AppLog.debug("Rotate request failed: \(error)")
         }
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) {
-            AppDelegate.orientationLock = .all
-            refreshSupportedOrientations(in: scene)
-        }
     }
+
 
     /// Entering fullscreen with a landscape video while the phone is upright turns the interface
     /// to landscape (like Android); closing fullscreen turns it back (`releaseOrientationOverride`).
     /// Once per fullscreen session, so a manual rotate back to portrait sticks.
     private func rotateToLandscapeForWideVideo(attempt: Int = 0) {
-        guard !didAutoRotate, UIDevice.current.userInterfaceIdiom == .phone else { return }
+        guard !didAutoRotate, TabManager.isFullscreenAutoRotateOn,
+              UIDevice.current.userInterfaceIdiom == .phone else { return }
         // The video size can still be unknown when fullscreen opens (and may arrive without a
         // new first frame): ask again for up to ~3 s.
         guard let size = engine.sourceSize else {
@@ -796,27 +800,34 @@ struct AetherSceneSurface: View {
         }
         guard size.width > size.height else { return }
         didAutoRotate = true
-        // After the fullScreenCover's present animation: a geometry request made while it is
-        // still animating in is dropped.
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.45) {
+        // Next run loop: the cover is presented without animation, so it is already up.
+        DispatchQueue.main.async {
             guard let scene = UIApplication.shared.connectedScenes
                 .compactMap({ $0 as? UIWindowScene })
                 .first(where: { $0.activationState == .foregroundActive })
                 ?? UIApplication.shared.connectedScenes.compactMap({ $0 as? UIWindowScene }).first,
                   !scene.interfaceOrientation.isLandscape else { return }
             Self.didRotateInFullscreen = true
-            Self.rotate(scene, to: .landscapeRight)
+            Self.rotate(scene, to: .landscape)
         }
     }
 
     /// Back to portrait on the phone once fullscreen goes away, if the button rotated it.
     static func releaseOrientationOverride() {
-        guard didRotateInFullscreen else { return }
+        guard didRotateInFullscreen || AppDelegate.orientationLock != .all else { return }
         didRotateInFullscreen = false
-        guard UIDevice.current.userInterfaceIdiom == .phone else { return }
-        UIApplication.shared.connectedScenes
-            .compactMap { $0 as? UIWindowScene }
-            .forEach { rotate($0, to: .portrait) }
+        let scenes = UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }
+        guard UIDevice.current.userInterfaceIdiom == .phone else {
+            AppDelegate.orientationLock = .all
+            scenes.forEach { refreshSupportedOrientations(in: $0) }
+            return
+        }
+        // Back upright, then free again (after the rotation) so the device decides from here on.
+        scenes.forEach { rotate($0, to: .portrait) }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) {
+            AppDelegate.orientationLock = .all
+            scenes.forEach { refreshSupportedOrientations(in: $0) }
+        }
     }
 
     /// Fullscreen only: the fill toggle. (Options live next to the volume capsule.)
