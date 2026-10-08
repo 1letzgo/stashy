@@ -201,8 +201,9 @@ struct AetherSceneSurface: View {
         .onChange(of: engine.hasFirstFrame) { _, ready in
             if ready { applyAutoZoomIfNeeded() }
         }
-        .onChange(of: isFullscreen) { _, _ in
+        .onChange(of: isFullscreen) { _, fullscreen in
             applyFillForGeometry()
+            if fullscreen { rotateToLandscapeForWideVideo() }
         }
         .onChange(of: fillsScreen) { _, fills in
             engine.setVideoGravity(fills ? .resizeAspectFill : .resizeAspect)
@@ -747,6 +748,21 @@ struct AetherSceneSurface: View {
     }
 
     private static var didRotateInFullscreen = false
+
+    /// Entering fullscreen with a landscape video while the phone is upright turns the interface
+    /// to landscape (like Android); closing fullscreen turns it back (`releaseOrientationOverride`).
+    private func rotateToLandscapeForWideVideo() {
+        guard UIDevice.current.userInterfaceIdiom == .phone,
+              let size = engine.sourceSize, size.width > size.height else { return }
+        guard let scene = UIApplication.shared.connectedScenes
+            .compactMap({ $0 as? UIWindowScene })
+            .first(where: { $0.activationState == .foregroundActive }),
+              !scene.interfaceOrientation.isLandscape else { return }
+        Self.didRotateInFullscreen = true
+        scene.requestGeometryUpdate(.iOS(interfaceOrientations: .landscapeRight)) { error in
+            AppLog.debug("Auto-rotate request failed: \(error)")
+        }
+    }
 
     /// Back to portrait on the phone once fullscreen goes away, if the button rotated it.
     static func releaseOrientationOverride() {
