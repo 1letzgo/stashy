@@ -217,6 +217,15 @@ struct StashImageDateSortTests {
         #expect(ids(group([a, b, c, d])) == [["a", "b"], ["c", "d"]])
     }
 
+    @Test func differentShootDaySplitsEvenInsideAGallery() {
+        let a = img("a", "2026-01-01T10:00:00Z", galleries: ["g1"], date: "2025-12-24")
+        let b = img("b", "2026-01-01T10:01:00Z", galleries: ["g1"], date: "2025-12-24")
+        let c = img("c", "2026-01-01T10:02:00Z", galleries: ["g1"], date: "2025-12-25")
+        let d = img("d", "2026-01-01T10:03:00Z", galleries: ["g1"])
+        #expect(ids(group([a, b, c, d])) == [["a", "b"], ["c", "d"]])
+        #expect(ids(group([a, b, c, d], mode: .gallery)) == [["a", "b"], ["c", "d"]])
+    }
+
     @Test func shootDayParsing() {
         #expect(StashImageSetGrouping.shootDay(img("x", nil, date: "2025-12-24")) == "2025-12-24")
         #expect(StashImageSetGrouping.shootDay(img("x", nil, date: "2025-12-24T08:00:00Z")) == "2025-12-24")

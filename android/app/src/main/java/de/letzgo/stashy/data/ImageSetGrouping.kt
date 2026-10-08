@@ -188,6 +188,7 @@ object ImageSetGrouping {
     /**
      * Whether [image] may join [post] (non-empty, API order):
      * - at most [maxSetSize] images (`stashline_group_max_size`, default 30); a clip and a photo never share a set;
+     * - both images carry a `date` and it differs → never (any mode, galleries included);
      * - galleries first, against the post's last image: both have galleries → join when they
      *   share one; exactly one has galleries → no join;
      * - [ImageGroupMode.GallerySession], both without galleries: performers equal to the post's
@@ -207,6 +208,10 @@ object ImageSetGrouping {
         val last = post.last()
         if (post.size >= maxSetSize) return false
         if (first.isVideo != image.isVideo) return false
+        // A different shoot day never shares a set — not even inside one gallery.
+        val lastDay = shootDay(last)
+        val day = shootDay(image)
+        if (lastDay != null && day != null && lastDay != day) return false
 
         val lastGalleries = galleryIds(last)
         val galleries = galleryIds(image)
@@ -222,9 +227,7 @@ object ImageSetGrouping {
         if (performers.isEmpty() && !sameStudio) return false
 
         // Session by shoot day when both carry one; else by import time.
-        val d0 = shootDay(last)
-        val d1 = shootDay(image)
-        if (d0 != null && d1 != null) return d0 == d1
+        if (lastDay != null && day != null) return true // same day (a different one returned above)
         val t0 = timestamp(last) ?: return false
         val t1 = timestamp(image) ?: return false
         return abs(t1 - t0) <= gapMinutes * 60L

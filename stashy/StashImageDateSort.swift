@@ -243,6 +243,7 @@ enum StashImageSetGrouping {
 
     /// Whether `image` may join `post` (non-empty, API order):
     /// - at most `maxSetSize` images (`stashline_group_max_size`, default 30); a clip and a photo never share a set;
+    /// - both images carry a `date` and it differs → never (any mode, galleries included);
     /// - galleries first, against the post's last image: both have galleries → join when they
     ///   share one; exactly one has galleries → no join;
     /// - `.gallerySession`, both without galleries: performers equal to the post's first image
@@ -259,6 +260,10 @@ enum StashImageSetGrouping {
         guard mode != .off, let first = post.first, let last = post.last else { return false }
         guard post.count < maxSetSize else { return false }
         guard first.isVideo == image.isVideo else { return false }
+        // A different shoot day never shares a set — not even inside one gallery.
+        let lastDay = shootDay(last)
+        let day = shootDay(image)
+        if let lastDay, let day, lastDay != day { return false }
 
         let lastGalleries = galleryIDs(last)
         let galleries = galleryIDs(image)
@@ -273,7 +278,7 @@ enum StashImageSetGrouping {
         guard !performers.isEmpty || sameStudio else { return false }
 
         // Session by shoot day when both carry one; else by import time.
-        if let d0 = shootDay(last), let d1 = shootDay(image) { return d0 == d1 }
+        if lastDay != nil, day != nil { return true }  // same day (a different one returned above)
         guard let t0 = timestamp(for: last), let t1 = timestamp(for: image) else { return false }
         return abs(t1 - t0) <= gapMinutes * 60
     }

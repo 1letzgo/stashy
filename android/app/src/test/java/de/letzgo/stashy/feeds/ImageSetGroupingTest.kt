@@ -239,4 +239,13 @@ class ImageSetGroupingTest {
         assertEquals(null, ImageSetGrouping.shootDay(img("x", date = "")))
         assertEquals(null, ImageSetGrouping.shootDay(img("x")))
     }
+
+    @Test fun differentShootDaySplitsEvenInsideAGallery() {
+        val a = img("a", "2026-01-01T10:00:00Z", galleries = listOf("g1"), date = "2025-12-24")
+        val b = img("b", "2026-01-01T10:01:00Z", galleries = listOf("g1"), date = "2025-12-24")
+        val c = img("c", "2026-01-01T10:02:00Z", galleries = listOf("g1"), date = "2025-12-25")
+        val d = img("d", "2026-01-01T10:03:00Z", galleries = listOf("g1"))
+        assertEquals(listOf(listOf("a", "b"), listOf("c", "d")), ids(group(a, b, c, d)))
+        assertEquals(listOf(listOf("a", "b"), listOf("c", "d")), ids(group(a, b, c, d, mode = ImageGroupMode.Gallery)))
+    }
 }
