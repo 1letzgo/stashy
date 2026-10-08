@@ -53,6 +53,8 @@ struct AetherSceneSurface: View {
     @State private var systemVolume = AetherSystemVolumeControl()
 
     @State private var areControlsVisible = true
+    /// Fullscreen auto-rotate to landscape ran for this surface.
+    @State private var didAutoRotate = false
     /// Fullscreen only: crop to fill the whole screen instead of letterboxing.
     @State private var fillsScreen = false
     @State private var controlsHideToken = UUID()
@@ -200,6 +202,12 @@ struct AetherSceneSurface: View {
         // settled — Autozoom needs both that and the surface geometry.
         .onChange(of: engine.hasFirstFrame) { _, ready in
             if ready { applyAutoZoomIfNeeded() }
+            // The video size is only known now when fullscreen opened before the first frame.
+            if ready, isFullscreen { rotateToLandscapeForWideVideo() }
+        }
+        // The fullscreen surface is created with `isFullscreen: true` (no change to observe).
+        .onAppear {
+            if isFullscreen { rotateToLandscapeForWideVideo() }
         }
         .onChange(of: isFullscreen) { _, fullscreen in
             applyFillForGeometry()
@@ -742,25 +750,62 @@ struct AetherSceneSurface: View {
         // landscape ("no common orientation with the application"). With the device's
         // orientation lock on there is no rotation event, so the new orientation holds anyway.
         Self.didRotateInFullscreen = true
-        scene.requestGeometryUpdate(.iOS(interfaceOrientations: target)) { error in
-            AppLog.debug("Rotate request failed: \(error)")
-        }
+        Self.rotate(scene, to: target)
     }
 
     private static var didRotateInFullscreen = false
 
+    /// A geometry request only takes once the presented controllers re-read their supported
+    /// orientations — without this the fullscreen cover often stayed upright.
+    private static func refreshSupportedOrientations(in scene: UIWindowScene) {
+        var controller = scene.keyWindow?.rootViewController
+        while let current = controller {
+            current.setNeedsUpdateOfSupportedInterfaceOrientations()
+            controller = current.presentedViewController
+        }
+    }
+
+    /// Rotates the interface: the app's allowed orientations are narrowed to the target for a
+    /// moment (otherwise SwiftUI's fullscreen cover ignores the request), then opened up again.
+    private static func rotate(_ scene: UIWindowScene, to target: UIInterfaceOrientationMask) {
+        AppDelegate.orientationLock = target
+        refreshSupportedOrientations(in: scene)
+        scene.requestGeometryUpdate(.iOS(interfaceOrientations: target)) { error in
+            AppLog.debug("Rotate request failed: \(error)")
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) {
+            AppDelegate.orientationLock = .all
+            refreshSupportedOrientations(in: scene)
+        }
+    }
+
     /// Entering fullscreen with a landscape video while the phone is upright turns the interface
     /// to landscape (like Android); closing fullscreen turns it back (`releaseOrientationOverride`).
-    private func rotateToLandscapeForWideVideo() {
-        guard UIDevice.current.userInterfaceIdiom == .phone,
-              let size = engine.sourceSize, size.width > size.height else { return }
-        guard let scene = UIApplication.shared.connectedScenes
-            .compactMap({ $0 as? UIWindowScene })
-            .first(where: { $0.activationState == .foregroundActive }),
-              !scene.interfaceOrientation.isLandscape else { return }
-        Self.didRotateInFullscreen = true
-        scene.requestGeometryUpdate(.iOS(interfaceOrientations: .landscapeRight)) { error in
-            AppLog.debug("Auto-rotate request failed: \(error)")
+    /// Once per fullscreen session, so a manual rotate back to portrait sticks.
+    private func rotateToLandscapeForWideVideo(attempt: Int = 0) {
+        guard !didAutoRotate, UIDevice.current.userInterfaceIdiom == .phone else { return }
+        // The video size can still be unknown when fullscreen opens (and may arrive without a
+        // new first frame): ask again for up to ~3 s.
+        guard let size = engine.sourceSize else {
+            if attempt < 12 {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) {
+                    rotateToLandscapeForWideVideo(attempt: attempt + 1)
+                }
+            }
+            return
+        }
+        guard size.width > size.height else { return }
+        didAutoRotate = true
+        // After the fullScreenCover's present animation: a geometry request made while it is
+        // still animating in is dropped.
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.45) {
+            guard let scene = UIApplication.shared.connectedScenes
+                .compactMap({ $0 as? UIWindowScene })
+                .first(where: { $0.activationState == .foregroundActive })
+                ?? UIApplication.shared.connectedScenes.compactMap({ $0 as? UIWindowScene }).first,
+                  !scene.interfaceOrientation.isLandscape else { return }
+            Self.didRotateInFullscreen = true
+            Self.rotate(scene, to: .landscapeRight)
         }
     }
 
@@ -771,7 +816,7 @@ struct AetherSceneSurface: View {
         guard UIDevice.current.userInterfaceIdiom == .phone else { return }
         UIApplication.shared.connectedScenes
             .compactMap { $0 as? UIWindowScene }
-            .forEach { $0.requestGeometryUpdate(.iOS(interfaceOrientations: .portrait)) { _ in } }
+            .forEach { rotate($0, to: .portrait) }
     }
 
     /// Fullscreen only: the fill toggle. (Options live next to the volume capsule.)

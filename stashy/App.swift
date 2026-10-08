@@ -39,6 +39,15 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
         return UISceneConfiguration(name: "Default Configuration", sessionRole: connectingSceneSession.role)
     }
 
+    /// Orientations the app allows right now. `.all` normally; the fullscreen player narrows it
+    /// to landscape for a moment so a programmatic rotation takes, then restores it (keeping it
+    /// narrowed crashed UIKit with a sheet + keyboard in landscape).
+    static var orientationLock: UIInterfaceOrientationMask = .all
+
+    func application(_ application: UIApplication, supportedInterfaceOrientationsFor window: UIWindow?) -> UIInterfaceOrientationMask {
+        AppDelegate.orientationLock
+    }
+
     func application(_ application: UIApplication, didDiscardSceneSessions sceneSessions: Set<UISceneSession>) {
     }
 }
