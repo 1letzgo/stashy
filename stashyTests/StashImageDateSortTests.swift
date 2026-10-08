@@ -209,6 +209,21 @@ struct StashImageDateSortTests {
         StashImageSetGrouping.buildPosts(from: images, sort: sort, mode: mode, gapMinutes: gap, maxSetSize: maxSize)
     }
 
+    @Test func shootDaySessionWinsOverImportTime() {
+        let a = img("a", "2026-01-01T10:00:00Z", performers: ["p1"], date: "2025-12-24")
+        let b = img("b", "2026-01-01T15:00:00Z", performers: ["p1"], date: "2025-12-24")
+        let c = img("c", "2026-01-01T15:01:00Z", performers: ["p1"], date: "2025-12-25")
+        let d = img("d", "2026-01-01T15:02:00Z", performers: ["p1"])
+        #expect(ids(group([a, b, c, d])) == [["a", "b"], ["c", "d"]])
+    }
+
+    @Test func shootDayParsing() {
+        #expect(StashImageSetGrouping.shootDay(img("x", nil, date: "2025-12-24")) == "2025-12-24")
+        #expect(StashImageSetGrouping.shootDay(img("x", nil, date: "2025-12-24T08:00:00Z")) == "2025-12-24")
+        #expect(StashImageSetGrouping.shootDay(img("x", nil, date: "2025")) == nil)
+        #expect(StashImageSetGrouping.shootDay(img("x", nil)) == nil)
+    }
+
     private func ids(_ posts: [(id: String, images: [StashImage])]) -> [[String]] {
         posts.map { $0.images.map(\.id) }
     }
@@ -220,7 +235,8 @@ struct StashImageDateSortTests {
         galleries: [String] = [],
         studio: String? = nil,
         basename: String? = nil,
-        video: Bool = false
+        video: Bool = false,
+        date: String? = nil
     ) -> StashImage {
         let name = basename ?? (video ? "\(id).mp4" : "\(id).jpg")
         return StashImage(
@@ -229,7 +245,7 @@ struct StashImageDateSortTests {
             rating100: nil,
             o_counter: nil,
             organized: nil,
-            date: nil,
+            date: date,
             createdAt: createdAt,
             updatedAt: nil,
             paths: ImagePaths(thumbnail: nil, preview: nil, image: "/image/\(id)/image"),

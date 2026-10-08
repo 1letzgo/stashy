@@ -24,8 +24,9 @@ class ImageSetGroupingTest {
         studio: String? = null,
         basename: String? = null,
         video: Boolean = false,
+        date: String? = null,
     ) = StashImage(
-        id = id, createdAt = created,
+        id = id, createdAt = created, date = date,
         performers = performers.map { IdName(it, "P$it") },
         galleries = galleries.map { IdName(it, title = "G$it") },
         studio = studio?.let { IdName(it, "S$it") },
@@ -218,5 +219,24 @@ class ImageSetGroupingTest {
         assertEquals("b", ImageFeedAutoplay.target(frames, 0f, 1000f))
         assertEquals("a", ImageFeedAutoplay.target(mapOf("a" to (-100f to 200f), "c" to (1200f to 1500f)), 0f, 1000f))
         assertNull(ImageFeedAutoplay.target(mapOf("c" to (1200f to 1500f)), 0f, 1000f))
+    }
+
+    @Test fun shootDaySessionWinsOverImportTime() {
+        // Same day: joins even when imported hours apart.
+        val a = img("a", "2026-01-01T10:00:00Z", performers = listOf("p1"), date = "2025-12-24")
+        val b = img("b", "2026-01-01T15:00:00Z", performers = listOf("p1"), date = "2025-12-24")
+        // Different day: never joins, even when imported a minute later.
+        val c = img("c", "2026-01-01T15:01:00Z", performers = listOf("p1"), date = "2025-12-25")
+        // No day on one side: the created_at gap decides (1 min → joins c).
+        val d = img("d", "2026-01-01T15:02:00Z", performers = listOf("p1"))
+        assertEquals(listOf(listOf("a", "b"), listOf("c", "d")), ids(group(a, b, c, d)))
+    }
+
+    @Test fun shootDayParsing() {
+        assertEquals("2025-12-24", ImageSetGrouping.shootDay(img("x", date = "2025-12-24")))
+        assertEquals("2025-12-24", ImageSetGrouping.shootDay(img("x", date = "2025-12-24T08:00:00Z")))
+        assertEquals(null, ImageSetGrouping.shootDay(img("x", date = "2025")))
+        assertEquals(null, ImageSetGrouping.shootDay(img("x", date = "")))
+        assertEquals(null, ImageSetGrouping.shootDay(img("x")))
     }
 }
