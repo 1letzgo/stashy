@@ -35,11 +35,13 @@ class AppearanceManager: ObservableObject {
         }
     }
 
+    #if !os(tvOS)
     @Published var oCounterIcon: String {
         didSet {
             UserDefaults.standard.set(oCounterIcon, forKey: kOCounterIcon)
         }
     }
+    #endif
 
     /// How see-through the glass chrome is, 0.2 (nearly opaque) … 1 (pure glass).
     /// Applied by `stashyGlass` as a dark wash under the content.
@@ -74,15 +76,19 @@ class AppearanceManager: ObservableObject {
         return preferredTheme
     }
 
+    #if !os(tvOS)
     var oCounterIconFilled: String {
         return oCounterIcon.hasSuffix(".fill") ? oCounterIcon : oCounterIcon + ".fill"
     }
+    #endif
 
     private let kTintColorRed = "kTintColorRed"
     private let kTintColorGreen = "kTintColorGreen"
     private let kTintColorBlue = "kTintColorBlue"
     private let kTintColorAlpha = "kTintColorAlpha"
+    #if !os(tvOS)
     private let kOCounterIcon = "kOCounterIcon"
+    #endif
     private let kGlassTransparency = "kGlassTransparency"
     private let kPreferredTheme = "kPreferredTheme"
     private let kEditModeEnabled = "kEditModeEnabled"
@@ -91,7 +97,9 @@ class AppearanceManager: ObservableObject {
     private init() {
         // Load from UserDefaults or use fresh-install defaults (Dark Blue + Gray).
         self.tintColor = .appDefaultTint
+        #if !os(tvOS)
         self.oCounterIcon = UserDefaults.standard.string(forKey: "kOCounterIcon") ?? "heart"
+        #endif
         let storedGlass = UserDefaults.standard.object(forKey: "kGlassTransparency") as? Double
         self.glassTransparency = min(1, max(0.2, storedGlass ?? Self.defaultGlassTransparency))
 
@@ -161,6 +169,7 @@ class AppearanceManager: ObservableObject {
                abs(a1 - a2) < threshold
     }
     
+    #if !os(tvOS)
     // Counter Icon Presets
     let oCounterIconPresets: [IconOption] = [
         IconOption(icon: "heart", label: "Heart"),
@@ -179,6 +188,7 @@ class AppearanceManager: ObservableObject {
         IconOption(icon: "tag", label: "Tag"),
         IconOption(icon: "eye", label: "Eye"),
     ]
+    #endif
 
     // Preset Colors
     let presets: [ColorOption] = [

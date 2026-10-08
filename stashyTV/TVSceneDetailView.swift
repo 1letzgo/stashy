@@ -317,15 +317,6 @@ struct TVSceneDetailView: View {
                     .font(.headline)
                 }
 
-                // O-Count Pill
-                if let oCounter = scene.oCounter, oCounter > 0 {
-                    HStack(spacing: 6) {
-                        Image(systemName: "heart.circle")
-                        Text("\(oCounter)")
-                    }
-                    .font(.headline)
-                }
-                
                 // Progress Bar inline with metadata
                 if let resumeTime = scene.resumeTime, resumeTime > 0,
                    let duration = scene.sceneDuration, duration > 0,
@@ -384,22 +375,6 @@ struct TVSceneDetailView: View {
                     .padding(.horizontal, 8)
                     .focusable(false)
                     .accessibilityHidden(true)
-
-                heroCardButton {
-                    viewModel.incrementOCounter(sceneId: scene.id) { newCount in
-                        guard let count = newCount else { return }
-                        if let current = sceneDetail {
-                            sceneDetail = current.withOCounter(count)
-                        }
-                        NotificationCenter.default.post(
-                            name: NSNotification.Name("SceneOCounterUpdated"),
-                            object: nil,
-                            userInfo: ["sceneId": scene.id, "oCounter": count]
-                        )
-                    }
-                } label: {
-                    heroActionLabel(icon: "heart.circle.fill", title: "\(scene.oCounter ?? 0)")
-                }
 
                 heroCardButton {
                     showingRatingPicker = true

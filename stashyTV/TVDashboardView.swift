@@ -105,11 +105,6 @@ struct TVDashboardView: View {
             guard let updated = Scene.fromListMetadataNotification(note) else { return }
             patchScene(id: updated.id) { $0.mergingListMetadata(from: updated) }
         }
-        .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("SceneOCounterUpdated"))) { note in
-            guard let id = note.userInfo?["sceneId"] as? String,
-                  let count = note.userInfo?["oCounter"] as? Int else { return }
-            patchScene(id: id) { $0.withOCounter(count) }
-        }
         .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("SceneRatingUpdated"))) { note in
             guard let id = note.userInfo?["sceneId"] as? String else { return }
             let rating = note.userInfo?["rating100"] as? Int

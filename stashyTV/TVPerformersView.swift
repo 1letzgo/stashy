@@ -24,7 +24,7 @@ struct TVPerformersView: View {
         _sortBy = State(initialValue: defaultSort)
     }
 
-    private static let sortOrder: [StashDBViewModel.PerformerSortOption] = [.random, .nameAsc, .nameDesc, .sceneCountDesc, .sceneCountAsc, .birthdateDesc, .birthdateAsc, .oCountDesc, .oCountAsc, .ratingDesc, .ratingAsc, .createdAtDesc, .createdAtAsc, .updatedAtDesc, .updatedAtAsc]
+    private static let sortOrder: [StashDBViewModel.PerformerSortOption] = [.random, .nameAsc, .nameDesc, .sceneCountDesc, .sceneCountAsc, .birthdateDesc, .birthdateAsc, .ratingDesc, .ratingAsc, .createdAtDesc, .createdAtAsc, .updatedAtDesc, .updatedAtAsc]
 
     private var sortOptions: [TVPickerOption<StashDBViewModel.PerformerSortOption>] {
         Self.sortOrder.map { TVPickerOption($0, label(for: $0)) }
@@ -137,8 +137,6 @@ struct TVPerformersView: View {
         case .createdAtAsc: return "Oldest Added"
         case .updatedAtDesc: return "Recently Updated"
         case .updatedAtAsc: return "Least Recently Updated"
-        case .oCountDesc: return "O Count (High-Low)"
-        case .oCountAsc: return "O Count (Low-High)"
         case .ratingDesc: return "Highest Rated"
         case .ratingAsc: return "Lowest Rated"
         case .random: return "Random"

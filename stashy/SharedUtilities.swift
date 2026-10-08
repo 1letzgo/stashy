@@ -82,7 +82,9 @@ enum PerformerBadgeType {
     case sceneCount
     case imageCount
     case galleryCount
+    #if !os(tvOS)
     case oCount
+    #endif
     case rating
 
     /// Count badge driven by the active Performers list sort.
@@ -91,7 +93,9 @@ enum PerformerBadgeType {
         case .sceneCountAsc, .sceneCountDesc: return .sceneCount
         case .imageCountAsc, .imageCountDesc: return .imageCount
         case .galleryCountAsc, .galleryCountDesc: return .galleryCount
+        #if !os(tvOS)
         case .oCountAsc, .oCountDesc: return .oCount
+        #endif
         default: return .sceneCount
         }
     }
@@ -1979,7 +1983,11 @@ public struct FilterMapper {
         }
         
         // Integer field casting
+        #if !os(tvOS)
         let intFields: Set<String> = ["rating", "rating100", "play_count", "resume_time", "scene_count", "duration", "o_counter", "id"]
+        #else
+        let intFields: Set<String> = ["rating", "rating100", "play_count", "resume_time", "scene_count", "duration", "id"]
+        #endif
         if intFields.contains(key) || key.hasSuffix("_count") {
             if let v = subDict["value"] { subDict["value"] = castToInt(v) }
             if let v = subDict["value2"] { subDict["value2"] = castToInt(v) }
@@ -2022,7 +2030,11 @@ public struct FilterMapper {
         }
         
         // Single enum field mapping (flatten array to string, uppercase)
+        #if !os(tvOS)
         let singleEnumFields: Set<String> = ["gender", "ethnicity", "fake_tits", "hair_color", "eye_color", "career_length"]
+        #else
+        let singleEnumFields: Set<String> = ["gender", "ethnicity", "hair_color", "eye_color", "career_length"]
+        #endif
         if singleEnumFields.contains(key) {
             if let valArray = subDict["value"] as? [Any], let first = valArray.first as? String {
                 subDict["value"] = first.uppercased()

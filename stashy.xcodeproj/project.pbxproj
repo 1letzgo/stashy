@@ -31,7 +31,6 @@
 		372E2DA92F646B0100603361 /* SceneTranscodeAudioPrefetcher.swift in Sources */ = {isa = PBXBuildFile; fileRef = 372E2DA82F646B0100603361 /* SceneTranscodeAudioPrefetcher.swift */; };
 		372E2DAB2F646B0100603361 /* SceneCaptionTranslator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 372E2DAA2F646B0100603361 /* SceneCaptionTranslator.swift */; };
 		372E2DB12F64C10000603361 /* OCountHeatmapLoader.swift in Sources */ = {isa = PBXBuildFile; fileRef = 372E2DB02F64C10000603361 /* OCountHeatmapLoader.swift */; };
-		372E2DB22F64C10000603361 /* OCountHeatmapLoader.swift in Sources */ = {isa = PBXBuildFile; fileRef = 372E2DB02F64C10000603361 /* OCountHeatmapLoader.swift */; };
 		372E2DB42F64C11000603361 /* OCountHeatmapCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 372E2DB32F64C11000603361 /* OCountHeatmapCard.swift */; };
 		37D092D62F8980B400DB7A08 /* MarkersView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 37D092D52F8980B400DB7A08 /* MarkersView.swift */; };
 		37D3E2E52F39384000AB8FAD /* ServerConfig.swift in Sources */ = {isa = PBXBuildFile; fileRef = 08FB779EFE84155DC02AAC07 /* ServerConfig.swift */; };
@@ -757,7 +756,7 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
-			shellScript = "set -euo pipefail\n# tvOS ships only the documents it uses: no Match (Hot or Not) and no device-sync\n# fields (funscript, interactive, interactive_heatmap) — tvOS has neither feature.\nSRC=\"${SRCROOT}/graphql\"\nDST=\"${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/graphql\"\nrm -rf \"${DST}\"\nmkdir -p \"${DST}\"\nfor f in \"${SRC}\"/*.graphql; do\n  name=\"$(basename \"${f}\")\"\n  case \"${name}\" in\n    hotOrNot*|fragment_HotOrNot*) continue ;;\n  esac\n  perl -pe 's/\\b(interactive_heatmap|funscript|interactive)\\b//g; s/[ \\t]+$//' \"${f}\" > \"${DST}/${name}\"\ndone\nif grep -rqE \"\\b(funscript|interactive|hotOrNot|HotOrNot)\" \"${DST}\"; then\n  echo \"error: tvOS GraphQL documents still reference device-sync or Match fields\"\n  exit 1\nfi\n";
+			shellScript = "set -euo pipefail\n# tvOS ships only the documents it uses: no Match (Hot or Not), no device-sync fields\n# (funscript, interactive, interactive_heatmap) and no O-Count / adult performer\n# attributes — tvOS has none of these features (App Review 2.3.1).\nSRC=\"${SRCROOT}/graphql\"\nDST=\"${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/graphql\"\nrm -rf \"${DST}\"\nmkdir -p \"${DST}\"\nfor f in \"${SRC}\"/*.graphql; do\n  name=\"$(basename \"${f}\")\"\n  case \"${name}\" in\n    hotOrNot*|fragment_HotOrNot*|sceneIncrementO*) continue ;;\n  esac\n  perl -pe 's/\\b(interactive_heatmap|funscript|interactive|o_counter|fake_tits|penis_length|circumcised|measurements)\\b//g; s/[ \\t]+$//' \"${f}\" > \"${DST}/${name}\"\ndone\nif grep -rqE \"\\b(funscript|interactive|hotOrNot|HotOrNot|o_counter|fake_tits|penis_length|circumcised|measurements)\\b\" \"${DST}\"; then\n  echo \"error: tvOS GraphQL documents still reference fields tvOS must not ship\"\n  exit 1\nfi\n";
 			showEnvVarsInLog = 0;
 		};
 		DFC0E8A42F10EA1C004BBEB2 /* ShellScript */ = {
@@ -928,7 +927,6 @@
 				FDFEA639517B4DF2B8490448 /* App.swift in Sources */,
 				AAB8EA012D744BBCB254F7D6 /* MainTabView.swift in Sources */,
 				4641A386019F4F5F81B587A8 /* StashDBViewModel.swift in Sources */,
-				372E2DB22F64C10000603361 /* OCountHeatmapLoader.swift in Sources */,
 				91CF530080674BF98FF154C4 /* SceneCardView.swift in Sources */,
 				C7F3A10700000000000000E7 /* StudioLogoStore.swift in Sources */,
 				5B0100661A854DEDA5E55778 /* CatalogsView.swift in Sources */,
@@ -1182,7 +1180,7 @@
 				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 340;
+				CURRENT_PROJECT_VERSION = 342;
 				DEVELOPMENT_TEAM = 699G2QY959;
 				ENABLE_PREVIEWS = YES;
 				ENABLE_USER_SCRIPT_SANDBOXING = NO;
@@ -1224,7 +1222,7 @@
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 340;
+				CURRENT_PROJECT_VERSION = 342;
 				DEVELOPMENT_TEAM = 699G2QY959;
 				ENABLE_PREVIEWS = YES;
 				ENABLE_USER_SCRIPT_SANDBOXING = NO;

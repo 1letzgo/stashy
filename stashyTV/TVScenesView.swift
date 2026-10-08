@@ -24,7 +24,7 @@ struct TVScenesView: View {
         _sortBy = State(initialValue: sortBy ?? defaultSort)
     }
 
-    private static let sortOrder: [StashDBViewModel.SceneSortOption] = [.random, .dateDesc, .dateAsc, .createdAtDesc, .createdAtAsc, .lastPlayedAtDesc, .lastPlayedAtAsc, .titleAsc, .titleDesc, .durationDesc, .durationAsc, .playCountDesc, .playCountAsc, .oCounterDesc, .oCounterAsc, .ratingDesc, .ratingAsc]
+    private static let sortOrder: [StashDBViewModel.SceneSortOption] = [.random, .dateDesc, .dateAsc, .createdAtDesc, .createdAtAsc, .lastPlayedAtDesc, .lastPlayedAtAsc, .titleAsc, .titleDesc, .durationDesc, .durationAsc, .playCountDesc, .playCountAsc, .ratingDesc, .ratingAsc]
 
     private var sortOptions: [TVPickerOption<StashDBViewModel.SceneSortOption>] {
         Self.sortOrder.map { TVPickerOption($0, label(for: $0)) }
@@ -139,8 +139,6 @@ struct TVScenesView: View {
         case .playCountAsc: return "Least Viewed"
         case .playDurationDesc: return "Most Watch Time"
         case .playDurationAsc: return "Least Watch Time"
-        case .oCounterDesc: return "O Count (High-Low)"
-        case .oCounterAsc: return "O Count (Low-High)"
         case .ratingDesc: return "Highest Rated"
         case .ratingAsc: return "Lowest Rated"
         case .random: return "Random"

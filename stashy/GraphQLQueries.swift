@@ -213,9 +213,15 @@ class GraphQLQueries {
         }
         """
 
+    #if os(tvOS)
+    private static let serverStatsExtraFields = ""
+    #else
+    private static let serverStatsExtraFields = "total_o_count "
+    #endif
+
     static let serverStatsQuery = """
         {
-          "query": "{ stats { scene_count scenes_size scenes_duration image_count images_size gallery_count performer_count studio_count group_count tag_count total_o_count total_play_duration total_play_count scenes_played movie_count } }"
+          "query": "{ stats { scene_count scenes_size scenes_duration image_count images_size gallery_count performer_count studio_count group_count tag_count \(serverStatsExtraFields)total_play_duration total_play_count scenes_played movie_count } }"
         }
         """
 
@@ -490,11 +496,13 @@ class GraphQLQueries {
         }
         """
 
+    #if !os(tvOS)
     static let imageUpdateOCounterMutation = """
         mutation ImageUpdate($input: ImageUpdateInput!) {
             imageUpdate(input: $input) { id o_counter }
         }
         """
+    #endif
 
     static let performerCreateMutation = """
         mutation PerformerCreate($input: PerformerCreateInput!) {
@@ -514,6 +522,7 @@ class GraphQLQueries {
         }
         """
 
+    #if !os(tvOS)
     static let performerUpdateDetailsMutation = """
         mutation PerformerUpdate($input: PerformerUpdateInput!) {
             performerUpdate(input: $input) {
@@ -523,6 +532,7 @@ class GraphQLQueries {
             }
         }
         """
+    #endif
 
     static let studioCreateMutation = """
         mutation StudioCreate($input: StudioCreateInput!) {

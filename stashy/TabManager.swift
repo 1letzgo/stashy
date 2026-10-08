@@ -242,7 +242,9 @@ enum HomeRowType: String, Codable {
     case lastAdded3Min
     case newest3Min
     case mostViewed3Min
+    #if !os(tvOS)
     case topCounter3Min
+    #endif
     case topRating3Min
     case random
     case statistics
@@ -252,7 +254,9 @@ enum HomeRowType: String, Codable {
     case studiosHighestSceneCount
     case newGalleries
     case recentlyUpdatedGalleries
+    #if !os(tvOS)
     case performersHighestOCount
+    #endif
     case performersHighestRating
     case galleriesHighestImageCount
     case channels
@@ -263,7 +267,9 @@ enum HomeRowType: String, Codable {
         case .lastAdded3Min: return "Scenes - Recently Added"
         case .newest3Min: return "Scenes - New"
         case .mostViewed3Min: return "Scenes - Most Viewed"
+        #if !os(tvOS)
         case .topCounter3Min: return "Scenes - Top Counter"
+        #endif
         case .topRating3Min: return "Scenes - Top Rated"
         case .random: return "Scenes - Random"
         case .statistics: return "Statistics"
@@ -273,7 +279,9 @@ enum HomeRowType: String, Codable {
         case .studiosHighestSceneCount: return "Studios - Top"
         case .newGalleries: return "Galleries - New"
         case .recentlyUpdatedGalleries: return "Galleries - Recently Updated"
+        #if !os(tvOS)
         case .performersHighestOCount: return "Performers - Counter"
+        #endif
         case .performersHighestRating: return "Performers - Rating"
         case .galleriesHighestImageCount: return "Galleries - Image Count"
         case .channels: return "Channels"
@@ -360,7 +368,9 @@ enum ToolsItem: String, Codable, CaseIterable, Identifiable {
     case server
     case downloads
     case statistics
+    #if !os(tvOS)
     case oCount
+    #endif
     case timeline
     case topLists
     case filters
@@ -376,7 +386,9 @@ enum ToolsItem: String, Codable, CaseIterable, Identifiable {
         case .server: return "Server"
         case .downloads: return "Downloads"
         case .statistics: return "Overview"
+        #if !os(tvOS)
         case .oCount: return "O-Count"
+        #endif
         case .timeline: return "Timeline"
         case .topLists: return "Charts"
         case .filters: return "Filters"
@@ -400,7 +412,9 @@ enum ToolsItem: String, Codable, CaseIterable, Identifiable {
         case .server: return "server.rack"
         case .downloads: return "square.and.arrow.down"
         case .statistics: return "chart.bar.fill"
+        #if !os(tvOS)
         case .oCount: return "calendar"
+        #endif
         case .timeline: return "calendar.day.timeline.left"
         case .topLists: return "list.number"
         case .filters: return "line.3.horizontal.decrease.circle"
@@ -1044,14 +1058,18 @@ class TabManager: ObservableObject {
             ensureLastPlayedRow()
             ensureMostViewedRow()
             ensureRandomRow()
+            #if !os(tvOS)
             ensureTopCounterRow()
+            #endif
             ensureTopRatingRow()
             ensureNewPerformersRow()
             ensureHighestSceneCountPerformersRow()
             ensureNewStudiosRow()
             ensureHighestSceneCountStudiosRow()
             ensureRecentlyUpdatedGalleriesRow()
+            #if !os(tvOS)
             ensurePerformersHighestOCountRow()
+            #endif
             ensurePerformersHighestRatingRow()
             ensureGalleriesHighestImageCountRow()
             ensureChannelsRow()
@@ -1070,14 +1088,17 @@ class TabManager: ObservableObject {
                 HomeRowConfig(id: UUID(), title: HomeRowType.recentlyUpdatedGalleries.defaultTitle, isEnabled: true, sortOrder: 8, type: .recentlyUpdatedGalleries),
                 HomeRowConfig(id: UUID(), title: HomeRowType.galleriesHighestImageCount.defaultTitle, isEnabled: true, sortOrder: 9, type: .galleriesHighestImageCount),
                 HomeRowConfig(id: UUID(), title: HomeRowType.newest3Min.defaultTitle, isEnabled: true, sortOrder: 10, type: .newest3Min),
-                HomeRowConfig(id: UUID(), title: HomeRowType.performersHighestOCount.defaultTitle, isEnabled: true, sortOrder: 11, type: .performersHighestOCount),
                 HomeRowConfig(id: UUID(), title: HomeRowType.performersHighestRating.defaultTitle, isEnabled: true, sortOrder: 12, type: .performersHighestRating),
                 HomeRowConfig(id: UUID(), title: HomeRowType.mostViewed3Min.defaultTitle, isEnabled: true, sortOrder: 13, type: .mostViewed3Min),
                 HomeRowConfig(id: UUID(), title: HomeRowType.random.defaultTitle, isEnabled: true, sortOrder: 14, type: .random),
-                HomeRowConfig(id: UUID(), title: HomeRowType.topCounter3Min.defaultTitle, isEnabled: false, sortOrder: 15, type: .topCounter3Min),
                 HomeRowConfig(id: UUID(), title: HomeRowType.topRating3Min.defaultTitle, isEnabled: false, sortOrder: 16, type: .topRating3Min),
                 HomeRowConfig(id: UUID(), title: HomeRowType.channels.defaultTitle, isEnabled: true, sortOrder: 17, type: .channels)
             ]
+            #if !os(tvOS)
+            self.homeRows.append(HomeRowConfig(id: UUID(), title: HomeRowType.performersHighestOCount.defaultTitle, isEnabled: true, sortOrder: 11, type: .performersHighestOCount))
+            self.homeRows.append(HomeRowConfig(id: UUID(), title: HomeRowType.topCounter3Min.defaultTitle, isEnabled: false, sortOrder: 15, type: .topCounter3Min))
+            self.homeRows.sort { $0.sortOrder < $1.sortOrder }
+            #endif
             saveHomeRows()
         }
     }
@@ -1139,6 +1160,7 @@ class TabManager: ObservableObject {
          }
     }
     
+    #if !os(tvOS)
     private func ensureTopCounterRow() {
          if !homeRows.contains(where: { $0.type == .topCounter3Min }) {
              let newRow = HomeRowConfig(id: UUID(), title: HomeRowType.topCounter3Min.defaultTitle, isEnabled: false, sortOrder: homeRows.count, type: .topCounter3Min)
@@ -1146,6 +1168,7 @@ class TabManager: ObservableObject {
              saveHomeRows()
          }
     }
+    #endif
     
     private func ensureTopRatingRow() {
          if !homeRows.contains(where: { $0.type == .topRating3Min }) {
@@ -1203,6 +1226,7 @@ class TabManager: ObservableObject {
          }
     }
 
+    #if !os(tvOS)
     private func ensurePerformersHighestOCountRow() {
          if !homeRows.contains(where: { $0.type == .performersHighestOCount }) {
              let newRow = HomeRowConfig(id: UUID(), title: HomeRowType.performersHighestOCount.defaultTitle, isEnabled: true, sortOrder: homeRows.count, type: .performersHighestOCount)
@@ -1210,6 +1234,7 @@ class TabManager: ObservableObject {
              saveHomeRows()
          }
     }
+    #endif
 
     private func ensurePerformersHighestRatingRow() {
          if !homeRows.contains(where: { $0.type == .performersHighestRating }) {
@@ -1432,8 +1457,12 @@ class TabManager: ObservableObject {
 
             ensureTool(.statistics, after: .downloads, enabled: true)
             let statsEnabled = result.first(where: { $0.id == .statistics })?.isEnabled ?? true
+            #if !os(tvOS)
             ensureTool(.oCount, after: .statistics, enabled: statsEnabled)
             ensureTool(.timeline, after: .oCount, enabled: statsEnabled)
+            #else
+            ensureTool(.timeline, after: .statistics, enabled: statsEnabled)
+            #endif
             ensureTool(.topLists, after: .timeline, enabled: statsEnabled)
             ensureTool(.filters, after: .topLists, enabled: true)
             for item in ToolsItem.allCases {
@@ -1453,7 +1482,6 @@ class TabManager: ObservableObject {
                 ToolsItemConfig(id: .downloads, isEnabled: true, sortOrder: 0),
                 ToolsItemConfig(id: .server, isEnabled: true, sortOrder: 1),
                 ToolsItemConfig(id: .statistics, isEnabled: true, sortOrder: 2),
-                ToolsItemConfig(id: .oCount, isEnabled: true, sortOrder: 3),
                 ToolsItemConfig(id: .timeline, isEnabled: true, sortOrder: 4),
                 ToolsItemConfig(id: .topLists, isEnabled: true, sortOrder: 5),
                 ToolsItemConfig(id: .filters, isEnabled: true, sortOrder: 6)
@@ -1462,6 +1490,10 @@ class TabManager: ObservableObject {
             self.tools.append(ToolsItemConfig(id: .hotOrNot, isEnabled: true, sortOrder: 7))
             #endif
             self.tools.append(ToolsItemConfig(id: .rateMe, isEnabled: true, sortOrder: 8))
+            #if !os(tvOS)
+            self.tools.append(ToolsItemConfig(id: .oCount, isEnabled: true, sortOrder: 3))
+            #endif
+            self.tools.sort { $0.sortOrder < $1.sortOrder }
             enforceFixedTools()
             saveTools()
         }
@@ -1506,7 +1538,10 @@ class TabManager: ObservableObject {
         #if !os(tvOS)
         if item == .hotOrNot { return true }
         #endif
-        return item == .downloads || item == .statistics || item == .oCount || item == .timeline || item == .topLists || item == .filters || item == .rateMe
+        #if !os(tvOS)
+        if item == .oCount { return true }
+        #endif
+        return item == .downloads || item == .statistics || item == .timeline || item == .topLists || item == .filters || item == .rateMe
     }
     
     func toggleTool(_ item: ToolsItem) {
@@ -1534,6 +1569,7 @@ class TabManager: ObservableObject {
         if !tools.contains(where: { $0.id == .downloads }) {
             tools.append(ToolsItemConfig(id: .downloads, isEnabled: true, sortOrder: (tools.map(\.sortOrder).max() ?? 0) + 1))
         }
+        #if !os(tvOS)
         // Re-insert O-Count if an older Tools reorder wiped it from persistence.
         if !tools.contains(where: { $0.id == .oCount }) {
             let statsEnabled = tools.first(where: { $0.id == .statistics })?.isEnabled ?? true
@@ -1547,6 +1583,7 @@ class TabManager: ObservableObject {
                 ToolsItemConfig(id: item.id, isEnabled: item.isEnabled, sortOrder: idx)
             }
         }
+        #endif
     }
 
     func saveReelsModes() {
