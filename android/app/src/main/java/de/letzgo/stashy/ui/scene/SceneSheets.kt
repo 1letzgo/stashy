@@ -383,10 +383,8 @@ fun AddMarkerSheet(scene: Scene, seconds: Double, onDismiss: () -> Unit, onCompl
             if (created.isFailure) return@launch
             onDismiss()
             onComplete()
-            // Video + animated preview, then the still at start time (Stash has no marker image upload).
-            launch { runCatching { SceneEditing.generateMarkerPreviews(scene.id) } }
-            val jobId = runCatching { SceneEditing.generateMarkerScreenshots(scene.id) }.getOrNull()
-            if (jobId != null) { if (SceneEditing.waitForJob(jobId, 120).first) onComplete() }
+            // Not in this sheet's scope: dismissing cancelled it, so the jobs never reached Stash.
+            SceneEditing.generateForNewMarker(scene.id) { onComplete() }
         }
     }) {
         Column(Modifier.verticalScroll(rememberScrollState())) {
