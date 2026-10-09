@@ -1,7 +1,7 @@
 fragment GalleryFields on Gallery {
   id title details url date rating100 organized image_count created_at updated_at
-  studio { id name image_path scene_count }
-  performers { id name image_path birthdate scene_count }
+  studio { id name image_path scene_count updated_at }
+  performers { id name image_path birthdate scene_count updated_at }
   tags { id name }
   cover {
     id

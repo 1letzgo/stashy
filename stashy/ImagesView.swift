@@ -316,8 +316,11 @@ private struct ImagesViewBody: View {
             } else if showsBlockingInitialLoad {
                 VStack(spacing: 0) {
                     if let gallery {
-                        openedGalleryHeader(gallery)
-                            .padding(16)
+                        VStack(spacing: 12) {
+                            openedGalleryHeader(gallery)
+                            openedGalleryLinkedCards(gallery)
+                        }
+                        .padding(16)
                     }
                     StandardLoadingView(message: "Loading images...")
                 }
@@ -329,8 +332,11 @@ private struct ImagesViewBody: View {
             } else if displayedImages.isEmpty {
                 VStack(spacing: 0) {
                     if let gallery {
-                        openedGalleryHeader(gallery)
-                            .padding(16)
+                        VStack(spacing: 12) {
+                            openedGalleryHeader(gallery)
+                            openedGalleryLinkedCards(gallery)
+                        }
+                        .padding(16)
                     }
                     SharedEmptyStateView(
                         icon: "camera.fill",
@@ -348,6 +354,7 @@ private struct ImagesViewBody: View {
                             VStack(spacing: 12) {
                                 if let gallery {
                                     openedGalleryHeader(gallery)
+                                    openedGalleryLinkedCards(gallery)
                                 }
                                 gridContent
                             }
@@ -758,6 +765,48 @@ private struct ImagesViewBody: View {
         }
     }
 
+    /// Scene-detail Performers / Studio cards for an opened gallery — each only when
+    /// the gallery has one, or always in edit mode so one can be assigned (like Android).
+    /// Edits write through `galleryUpdate`.
+    @ViewBuilder
+    private func openedGalleryLinkedCards(_ gallery: Gallery) -> some View {
+        let editing = appearanceManager.isEditModeEnabled
+        let performers = gallery.performers ?? []
+        if !performers.isEmpty || editing {
+            ScenePerformersCard(
+                sceneId: gallery.id,
+                sceneDate: gallery.date,
+                performers: performers.map { $0.toScenePerformer() },
+                onPerformersUpdated: { updated in
+                    guard var current = self.gallery, current.id == gallery.id else { return }
+                    current.performers = updated.map { $0.toGalleryPerformer() }
+                    self.gallery = current
+                },
+                savePerformerIds: { ids, done in
+                    viewModel.updateGalleryPerformers(galleryId: gallery.id, performerIds: ids, completion: done)
+                },
+                viewModel: viewModel
+            )
+        }
+        if gallery.studio != nil || editing {
+            SceneStudioCard(
+                sceneId: gallery.id,
+                studio: gallery.studio?.toSceneStudio(),
+                onStudioUpdated: { updated in
+                    guard var current = self.gallery, current.id == gallery.id else { return }
+                    current.studio = updated.map {
+                        GalleryStudio(id: $0.id, name: $0.name, image_path: $0.imagePath, updated_at: $0.updatedAt)
+                    }
+                    self.gallery = current
+                },
+                saveStudioId: { id, done in
+                    viewModel.updateGalleryStudio(galleryId: gallery.id, studioId: id, completion: done)
+                },
+                viewModel: viewModel
+            )
+        }
+    }
+
     private func galleryHeaderPlaceholder(width: CGFloat) -> some View {
         Rectangle().fill(Color.gray.opacity(DesignTokens.Opacity.placeholder))
             .frame(width: width)
@@ -771,7 +820,9 @@ private struct ImagesViewBody: View {
 
     /// Image 1-row avatar navigation passes a stub Gallery (`cover: nil`). Load full metadata for the header.
     private func hydrateOpenedGalleryIfNeeded() async {
-        guard let current = gallery, current.cover == nil else { return }
+        // Stubs (`cover: nil`) and partial galleries from scene/other queries
+        // (`performers` not fetched) both need the full GalleryFields set.
+        guard let current = gallery, current.cover == nil || current.performers == nil else { return }
         let query = GraphQLQueries.queryWithFragments("findGalleries")
         let variables: [String: Any] = [
             "ids": [current.id],
@@ -799,13 +850,7 @@ private struct ImagesViewBody: View {
         if let date = gallery.date, !date.isEmpty {
             list.append((label: "DATE", value: date))
         }
-        if let studio = gallery.studio {
-            list.append((label: "STUDIO", value: studio.name))
-        }
-        if let performers = gallery.performers, !performers.isEmpty {
-            let names = performers.map(\.name).joined(separator: ", ")
-            list.append((label: "PERFORMERS", value: names))
-        }
+        // Studio and performers live in their own cards below the header.
         if gallery.organized == true {
             list.append((label: "ORGANIZED", value: "Yes"))
         }

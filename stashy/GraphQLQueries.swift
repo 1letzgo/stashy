@@ -564,6 +564,18 @@ class GraphQLQueries {
         }
         """
 
+    static let galleryUpdatePerformersMutation = """
+        mutation GalleryUpdatePerformers($input: GalleryUpdateInput!) {
+            galleryUpdate(input: $input) { id }
+        }
+        """
+
+    static let galleryUpdateStudioMutation = """
+        mutation GalleryUpdateStudio($input: GalleryUpdateInput!) {
+            galleryUpdate(input: $input) { id }
+        }
+        """
+
     static let galleryUpdateDetailsMutation = """
         mutation GalleryUpdate($input: GalleryUpdateInput!) {
             galleryUpdate(input: $input) { id title date details }
