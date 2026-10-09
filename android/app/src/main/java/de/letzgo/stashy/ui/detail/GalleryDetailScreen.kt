@@ -45,23 +45,18 @@ import de.letzgo.stashy.ui.filter.ImageMediaTypeCard
 import de.letzgo.stashy.ui.filter.ImagesFeedAutoplaySettingsCard
 import de.letzgo.stashy.ui.Screen
 import de.letzgo.stashy.ui.Theme
-import de.letzgo.stashy.ui.Appearance
 import de.letzgo.stashy.ui.scene.EditPerformersSheet
 import de.letzgo.stashy.ui.scene.EditStudioSheet
-import de.letzgo.stashy.ui.scene.ScenePerformersCard
-import de.letzgo.stashy.ui.scene.SceneStudioCard
+import de.letzgo.stashy.ui.scene.ScenePerformersStudioCard
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxWidth
 import kotlinx.coroutines.launch
 import kotlinx.serialization.json.JsonObject
 
 /**
  * iOS: `ImagesView(gallery:)` for an opened gallery — chrome bar Back · Edit, the gallery
  * header (cover strip, IMAGES / DATE / STUDIO / PERFORMERS / ORGANIZED, details when
- * expanded), the scene-detail Performers and Studio cards (only when set), then the image grid (2/row) or the grouped feed (1/row). The top bar's "Settings"
+ * expanded), the scene-detail Performers & Studio card (only when set), then the image grid (2/row) or the grouped feed (1/row). The top bar's "Settings"
  * opens the images filter & sort sheet (iOS `ImagesCatalogFilterSortSheet` with
  * `DetailLinkedImagesFilterModel(scope: .gallery(id))`): filter, sort, Type, Per row
  * (`openedGallery` scope), autoplay toggles and the criteria editor. The `galleries` INCLUDES
@@ -169,25 +164,18 @@ class GalleryDetailScreen(
     }
 
     /**
-     * Header, then the scene detail's Performers card (full width) and Studio card (half width,
-     * like scene detail's Studio | Groups row). Each card only shows when the gallery has
-     * performers / a studio — or in edit mode, empty, so one can be assigned via its pencil.
+     * Header, then the scene detail's Performers & Studio card (full width). The card only shows
+     * when the gallery has a studio or performers — or in edit mode, empty, so they can be
+     * assigned via its pencil menu.
      */
     @Composable
     private fun HeaderWithCards(g: Gallery) {
-        val edit = Appearance.isEditModeEnabled
-        val performers = g.performers.orEmpty()
         Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
             Header(g)
-            if (performers.isNotEmpty() || edit) {
-                ScenePerformersCard(g.date, performers, director = null, onEdit = { editingPerformers = true })
-            }
-            if (g.studio != null || edit) {
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    SceneStudioCard(g.studio, { editingStudio = true }, Modifier.weight(1f))
-                    Spacer(Modifier.weight(1f))
-                }
-            }
+            ScenePerformersStudioCard(
+                g.date, g.studio, g.performers.orEmpty(), director = null,
+                onEditStudio = { editingStudio = true }, onEditPerformers = { editingPerformers = true },
+            )
         }
     }
 
