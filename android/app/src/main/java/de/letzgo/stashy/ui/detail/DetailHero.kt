@@ -47,7 +47,11 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.layout.Layout
+import androidx.compose.ui.graphics.compositeOver
 import coil3.compose.AsyncImage
 import coil3.compose.SubcomposeAsyncImage
 import de.letzgo.stashy.ui.Appearance
@@ -60,16 +64,18 @@ import de.letzgo.stashy.ui.scaledIconSize
 
 /**
  * The picture of a [DetailHeroCard]. [backdropUrl] is blurred behind the band (dashboard
- * `HeroBackdrop` technique); [content] fills the sharp circle avatar in front of the title.
+ * `HeroBackdrop` technique); without one the band is a muted tinted solid. [content] fills the
+ * sharp circle avatar (the picture, or [HeroPlaceholder] when there is none).
  * [Cover] center-crops in the circle (gallery cover, tag image); [Logo] keeps the whole picture
  * (studio logo, ContentScale.Fit by the caller), inset on [background], never cropped.
+ * [onClick] (fullscreen) is null when there is no picture to open.
  */
 internal class DetailHero(
     val style: Style,
     val backdropUrl: String?,
     val background: Color,
     val clickLabel: String,
-    val onClick: () -> Unit,
+    val onClick: (() -> Unit)?,
     /** Fills the circle; the card clips and positions it. */
     val content: @Composable BoxScope.() -> Unit,
 ) {
@@ -77,12 +83,13 @@ internal class DetailHero(
 }
 
 /**
- * Detail header as one hero card (gallery, tag, studio). With a [hero], a compact band (160dp,
- * grows with large font scales) shows the picture blurred as a backdrop with a sharp circle
- * avatar (Feeds ring style) and the [title] + [titleAccessory] in white next to it; tapping the
- * band runs [DetailHero.onClick]. Below it, on the plain card background with the normal text
- * colours: the label/value grid, [footer] (e.g. the studio URL) and the [description], clamped to
- * three lines with the expand chevron when longer. Without a hero, title + grid on the plain card.
+ * Detail header as a profile-style hero card (gallery, tag, studio). Top: a band (min 130dp,
+ * grows with the grid) with the picture blurred as backdrop, or a muted tinted solid without a
+ * picture, holding the label/value grid in white to the end side of the circle. The circle avatar
+ * straddles the band's lower edge exactly half/half, start-aligned. Below the edge, on the plain
+ * card background: the [title] + [titleAccessory] (Feeds pill) next to the circle's lower half,
+ * then [footer] (e.g. the studio URL) and the [description], clamped to three lines with the
+ * expand chevron when longer. Tapping the band or circle runs [DetailHero.onClick].
  * [collapsedItemCount] limits the grid until expanded.
  */
 @Composable
@@ -92,9 +99,9 @@ internal fun DetailHeroCard(
     description: String?,
     expanded: Boolean,
     onToggle: () -> Unit,
-    hero: DetailHero?,
+    hero: DetailHero,
     collapsedItemCount: Int = Int.MAX_VALUE,
-    /** Next to the title (Feeds pill); gets the content colour to use (white on the band). */
+    /** Next to the title (Feeds pill); gets the content colour to use (null = default). */
     titleAccessory: (@Composable (Color?) -> Unit)? = null,
     footer: (@Composable ColumnScope.() -> Unit)? = null,
 ) {
@@ -104,22 +111,13 @@ internal fun DetailHeroCard(
     val visible = if (expanded) items else items.take(collapsedItemCount)
     HeaderCardFrame {
         Column(Modifier.fillMaxWidth()) {
-            if (hero != null) {
-                HeroBand(hero, title, expanded, titleAccessory)
-                if (visible.isNotEmpty()) {
-                    Box(Modifier.fillMaxWidth().padding(start = 12.dp, end = 12.dp, top = 10.dp, bottom = if (description != null || footer != null || expandable) 0.dp else 10.dp)) {
-                        DetailItemsGrid(visible, labelColor = p.secondaryText, valueColor = p.text)
-                    }
-                }
-            } else {
-                PlainTitleAndItems(title, visible, expanded, titleAccessory)
-            }
+            HeroHeaderLayout(hero, title, visible, expanded, titleAccessory)
             if (description != null || footer != null || expandable) {
                 Column(
-                    Modifier.fillMaxWidth().padding(start = 12.dp, end = 12.dp, top = if (hero != null) 8.dp else 0.dp, bottom = 10.dp),
+                    Modifier.fillMaxWidth().padding(start = 12.dp, end = 12.dp, top = 4.dp, bottom = 10.dp),
                     verticalArrangement = Arrangement.spacedBy(4.dp),
                 ) {
-                    if ((hero == null || visible.isNotEmpty()) && (description != null || footer != null)) HorizontalDivider(color = p.separator)
+                    if (description != null || footer != null) HorizontalDivider(color = p.separator)
                     if (footer != null) Column(Modifier.padding(vertical = 4.dp)) { footer() }
                     if (description != null) {
                         Text(
@@ -131,23 +129,93 @@ internal fun DetailHeroCard(
                     }
                     if (expandable) Spacer(Modifier.height(scaledIconSize(18.dp)))
                 }
+            } else {
+                Spacer(Modifier.height(10.dp))
             }
         }
         if (expandable) HeaderExpandButton(expanded, onToggle)
     }
 }
 
+private val HeroAvatar = 84.dp
+private val HeroAvatarGap = 3.dp
+private val HeroInset = 12.dp
+
 /**
- * Blurred backdrop band: the picture scaled 1.3 and blurred 40dp (API 31+; older APIs show it
- * dimmed unblurred, as the dashboard does) under a dark scrim, then the circle avatar + title.
+ * Band + title row + the circle on their shared edge. A custom layout so the circle's vertical
+ * center lands exactly on the band's measured bottom, whatever height the grid gives the band.
  */
 @Composable
-private fun HeroBand(hero: DetailHero, title: String, expanded: Boolean, accessory: (@Composable (Color?) -> Unit)?) {
-    val avatar = 72.dp
-    Box(
-        Modifier.fillMaxWidth().heightIn(min = 160.dp).background(hero.background).clipToBounds()
-            .clickable(onClickLabel = hero.clickLabel, onClick = hero.onClick),
-    ) {
+private fun HeroHeaderLayout(
+    hero: DetailHero,
+    title: String,
+    items: List<DetailItem>,
+    expanded: Boolean,
+    accessory: (@Composable (Color?) -> Unit)?,
+) {
+    val p = Theme.palette
+    val outer = HeroAvatar + HeroAvatarGap * 2
+    // Text column start: past the circle, so neither grid nor title ever meets it.
+    val textStart = HeroInset + outer + 10.dp
+    val tap = hero.onClick?.let { Modifier.clickable(onClickLabel = hero.clickLabel, onClick = it) } ?: Modifier
+    Layout(
+        content = {
+            HeroBand(hero, items, textStart, tap)
+            Row(
+                Modifier.fillMaxWidth().heightIn(min = outer / 2 + 6.dp)
+                    .padding(start = textStart, end = HeroInset, top = 6.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                Text(
+                    title, Modifier.weight(1f), style = IosTypography.title2.copy(fontWeight = FontWeight.Bold), color = p.text,
+                    maxLines = if (expanded) Int.MAX_VALUE else 2, overflow = TextOverflow.Ellipsis,
+                )
+                accessory?.invoke(null)
+            }
+            // Card-coloured gap ring, then the Feeds performer-thumbnail ring (tinted fill, 2dp tint border).
+            Box(
+                Modifier.size(outer).clip(CircleShape).background(p.secondaryBackground).then(tap).padding(HeroAvatarGap),
+                contentAlignment = Alignment.Center,
+            ) {
+                Box(
+                    Modifier.size(HeroAvatar).clip(CircleShape)
+                        .background(if (hero.style == DetailHero.Style.Logo && hero.backdropUrl != null) hero.background else Appearance.tint.copy(alpha = 0.2f))
+                        .border(2.dp, Appearance.tint, CircleShape),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    val inner = when (hero.style) {
+                        DetailHero.Style.Cover -> Modifier.matchParentSize().clip(CircleShape)
+                        // Inscribed square-ish inset so a wide logo is never cut by the circle.
+                        DetailHero.Style.Logo -> Modifier.matchParentSize().padding(HeroAvatar * 0.15f)
+                    }
+                    Box(inner, content = hero.content)
+                }
+            }
+        },
+    ) { measurables, constraints ->
+        val loose = constraints.copy(minHeight = 0, maxHeight = Constraints.Infinity)
+        val band = measurables[0].measure(loose)
+        val titleRow = measurables[1].measure(loose)
+        val avatar = measurables[2].measure(Constraints())
+        val width = constraints.maxWidth
+        layout(width, band.height + titleRow.height) {
+            band.place(0, 0)
+            titleRow.place(0, band.height)
+            avatar.place(HeroInset.roundToPx(), band.height - avatar.height / 2)
+        }
+    }
+}
+
+/**
+ * Band: with a picture it is scaled 1.3 and blurred 40dp (API 31+; older APIs show it dimmed
+ * unblurred, as the dashboard does) under a dark scrim; without one a muted tint on a dark base,
+ * so the white grid reads in both themes. The grid sits to the end side of the circle.
+ */
+@Composable
+private fun HeroBand(hero: DetailHero, items: List<DetailItem>, textStart: Dp, tap: Modifier) {
+    val base = if (hero.backdropUrl != null) hero.background else Appearance.tint.copy(alpha = 0.45f).compositeOver(Color(0xFF26262A))
+    Box(Modifier.fillMaxWidth().heightIn(min = 130.dp).background(base).clipToBounds().then(tap)) {
         hero.backdropUrl?.let { u ->
             val canBlur = Build.VERSION.SDK_INT >= 31
             AsyncImage(
@@ -156,59 +224,25 @@ private fun HeroBand(hero: DetailHero, title: String, expanded: Boolean, accesso
                     .graphicsLayer { scaleX = 1.3f; scaleY = 1.3f; alpha = if (canBlur) 1f else 0.45f }.blur(40.dp),
             )
         }
-        Box(
-            Modifier.matchParentSize()
-                .background(Brush.verticalGradient(0f to Color.Black.copy(alpha = 0.15f), 1f to Color.Black.copy(alpha = 0.55f))),
-        )
-        Row(
-            Modifier.align(Alignment.BottomStart).fillMaxWidth().padding(start = 12.dp, end = 12.dp, top = 16.dp, bottom = 14.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-        ) {
-            // Feeds performer-thumbnail ring: tinted fill, 2dp tint border.
+        if (hero.backdropUrl != null) {
             Box(
-                Modifier.size(avatar).clip(CircleShape)
-                    .background(if (hero.style == DetailHero.Style.Logo) hero.background else Appearance.tint.copy(alpha = 0.2f))
-                    .border(2.dp, Appearance.tint, CircleShape),
-                contentAlignment = Alignment.Center,
-            ) {
-                val inner = when (hero.style) {
-                    DetailHero.Style.Cover -> Modifier.matchParentSize().clip(CircleShape)
-                    // Inscribed square-ish inset so a wide logo is never cut by the circle.
-                    DetailHero.Style.Logo -> Modifier.matchParentSize().padding(avatar * 0.15f)
-                }
-                Box(inner, content = hero.content)
-            }
-            Text(
-                title, Modifier.weight(1f), style = IosTypography.title2.copy(fontWeight = FontWeight.Bold), color = Color.White,
-                maxLines = if (expanded) Int.MAX_VALUE else 2, overflow = TextOverflow.Ellipsis,
+                Modifier.matchParentSize()
+                    .background(Brush.verticalGradient(0f to Color.Black.copy(alpha = 0.15f), 1f to Color.Black.copy(alpha = 0.55f))),
             )
-            accessory?.invoke(Color.White)
+        }
+        if (items.isNotEmpty()) {
+            Box(Modifier.align(Alignment.CenterStart).fillMaxWidth().padding(start = textStart, end = HeroInset, top = 14.dp, bottom = 14.dp)) {
+                DetailItemsGrid(items, labelColor = Color.White.copy(alpha = 0.72f), valueColor = Color.White)
+            }
         }
     }
 }
 
-/** No picture: title (title2 bold, two lines; all when expanded) + accessory, then the grid. */
+/** Circle content without a picture: the type icon, tinted. */
 @Composable
-private fun PlainTitleAndItems(
-    title: String,
-    items: List<DetailItem>,
-    expanded: Boolean,
-    accessory: (@Composable (Color?) -> Unit)?,
-) {
-    val p = Theme.palette
-    Column(
-        Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 10.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
-    ) {
-        Row(verticalAlignment = Alignment.Top, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text(
-                title, Modifier.weight(1f), style = IosTypography.title2.copy(fontWeight = FontWeight.Bold), color = p.text,
-                maxLines = if (expanded) Int.MAX_VALUE else 2, overflow = TextOverflow.Ellipsis,
-            )
-            accessory?.invoke(null)
-        }
-        if (items.isNotEmpty()) DetailItemsGrid(items, labelColor = p.secondaryText, valueColor = p.text)
+internal fun HeroPlaceholder(icon: ImageVector) {
+    Box(Modifier.fillMaxSize(), Alignment.Center) {
+        Icon(icon, null, tint = Appearance.tint.copy(alpha = 0.8f), modifier = Modifier.size(34.dp))
     }
 }
 

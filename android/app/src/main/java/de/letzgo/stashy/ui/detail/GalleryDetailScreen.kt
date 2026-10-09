@@ -200,9 +200,9 @@ class GalleryDetailScreen(
 
     /**
      * iOS `openedGalleryHeader` merged with the cover hero ([DetailHeroCard]): the cover (thumbnail)
-     * blurred as the band backdrop and center-cropped in the circle before the title; tapping the
-     * band opens the fullscreen viewer. Details and description (three lines, expandable) below on
-     * the card. Without a picture, all on the plain card.
+     * blurred as the band backdrop (with the details on it) and center-cropped in the circle on the
+     * band edge; tapping band or circle opens the fullscreen viewer. Title and description (three
+     * lines, expandable) below. Without a picture, a tinted band and the gallery icon in the circle.
      */
     @Composable
     private fun HeroHeader(g: Gallery) {
@@ -219,7 +219,7 @@ class GalleryDetailScreen(
                 val (image, coverIndex, isCover) = hero
                 val thumb = image.thumbnailURL
                 DetailHero(DetailHero.Style.Cover, thumb ?: url, Color.Black, "Open image", { openHero(image, coverIndex, isCover) }) {
-                    // 72dp circle: the thumbnail is plenty; full picture only when there is none.
+                    // 84dp circle: the thumbnail is plenty; full picture only when there is none.
                     SubcomposeAsyncImage(
                         thumb ?: url, g.displayTitle, Modifier.fillMaxSize(), contentScale = ContentScale.Crop, alignment = Alignment.Center,
                         loading = { Box(Modifier.fillMaxSize(), Alignment.Center) { CircularProgressIndicator(Modifier.size(20.dp), color = Color.White.copy(alpha = 0.7f), strokeWidth = 2.dp) } },
@@ -230,7 +230,7 @@ class GalleryDetailScreen(
                         },
                     )
                 }
-            } else null,
+            } else DetailHero(DetailHero.Style.Cover, null, Color.Black, "Open image", null) { HeroPlaceholder(photoOnRectangleIcon()) },
         )
     }
 

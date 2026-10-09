@@ -121,10 +121,10 @@ class StudioDetailScreen(val studioId: String, val preview: Studio? = null) : Sc
     }
 
     /**
-     * iOS `headerCard` as a [DetailHeroCard]: the logo blurred as the band backdrop and, never
-     * cropped (fit, inset on the dark studio backdrop), in the circle before the name + Feeds pill
-     * (tap → fullscreen); details, URL and description below on the card. Without a logo, all on
-     * the plain card.
+     * iOS `headerCard` as a [DetailHeroCard]: the logo blurred as the band backdrop (with the
+     * details on it) and, never cropped (fit, inset on the dark studio backdrop), in the circle on
+     * the band edge (tap → fullscreen); name + Feeds pill, URL and description below. Without a
+     * logo, a tinted band and the studio icon in the circle.
      */
     @Composable
     private fun Header(s: Studio) {
@@ -140,7 +140,7 @@ class StudioDetailScreen(val studioId: String, val preview: Studio? = null) : Sc
                 DetailHero(DetailHero.Style.Logo, it, p.studioHeader, "Open logo", { Nav.push(HeroPictureViewerScreen(it, s.name, p.studioHeader, inset = true)) }) {
                     HeroPicture(it, s.name, ContentScale.Fit, SF.building2)
                 }
-            },
+            } ?: DetailHero(DetailHero.Style.Cover, null, p.studioHeader, "Open logo", null) { HeroPlaceholder(SF.building2) },
             collapsedItemCount = 4,
             titleAccessory = { color -> FeedsPill(color) { DetailFeedsLink.navigate(DetailFeedsLink.Target.Studio(s.id, s.name)) } },
             footer = s.url?.takeIf { it.isNotEmpty() }?.let { link -> { HeaderLink(link) } },
