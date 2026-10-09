@@ -91,4 +91,15 @@ object CoPerformerLogic {
                     .thenBy(String.CASE_INSENSITIVE_ORDER) { it.performer.name }
                     .thenBy { it.performer.id },
             )
+
+    /**
+     * Scene scope of the scenes [performerId] and [otherId] share:
+     * `performers: { value: [a, b], modifier: INCLUDES_ALL }` (Stash `MultiCriterionInput`).
+     */
+    fun sharedScenesScope(performerId: String, otherId: String): JsonObject = buildJsonObject {
+        put("performers", buildJsonObject {
+            put("value", JsonArray(listOf(JsonPrimitive(performerId), JsonPrimitive(otherId))))
+            put("modifier", JsonPrimitive("INCLUDES_ALL"))
+        })
+    }
 }
