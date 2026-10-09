@@ -4,9 +4,7 @@ import de.letzgo.stashy.ui.tools.downloads.GalleryDownloadOptionsDialog
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.grid.LazyGridState
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -49,27 +47,13 @@ import de.letzgo.stashy.ui.scene.EditStudioSheet
 import de.letzgo.stashy.ui.scene.ScenePerformersStudioCard
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.BoxWithConstraints
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.size
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.ui.Alignment
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.heightIn
-import androidx.compose.material3.HorizontalDivider
-import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextOverflow
-import de.letzgo.stashy.ui.IosTypography
-import de.letzgo.stashy.ui.scaledIconSize
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.platform.LocalConfiguration
-import androidx.compose.ui.unit.min
 import coil3.compose.AsyncImage
 import coil3.compose.SubcomposeAsyncImage
 import de.letzgo.stashy.ui.StashyColors
@@ -216,94 +200,43 @@ class GalleryDetailScreen(
     }
 
     /**
-     * iOS `openedGalleryHeader` merged with the cover hero: one card in the detail header frame.
-     * With a picture, the cover fills a 16:9 crop (centered, capped to 70% of the screen height
-     * in landscape) and the title + details sit on it over a bottom gradient; tapping the picture
-     * opens the fullscreen viewer. Without one, the same title + details on the plain card (like
-     * the studio header). The gallery description sits below inside the same card, clamped to
-     * three lines with the expand chevron when it is longer.
+     * iOS `openedGalleryHeader` merged with the cover hero ([DetailHeroCard]): the cover fills a
+     * 16:9 center crop with the title + details over a bottom gradient; tapping it opens the
+     * fullscreen viewer. Without a picture, title + details on the plain card. The description
+     * sits below inside the same card (three lines, expandable).
      */
     @Composable
     private fun HeroHeader(g: Gallery) {
-        val p = Theme.palette
-        val items = DetailFormatting.gallery(g, images.list.totalCount)
-        val details = g.details?.takeIf { it.isNotEmpty() }
         val hero = heroImage(g)
         // Full picture for the large frame (Coil downsamples to the frame); a video clip as cover
         // fails to decode there, so it uses the thumbnail.
         val url = hero?.first?.let { img -> (if (img.isVideo) null else img.imageURL) ?: img.thumbnailURL }
-        val hasPicture = hero != null && url != null
-        var detailsOverflow by remember(details) { mutableStateOf(false) }
-        val expandable = details != null && (expanded || detailsOverflow)
-        HeaderCardFrame {
-            Column(Modifier.fillMaxWidth()) {
-                if (hero != null && url != null) {
-                    val (image, coverIndex, isCover) = hero
-                    val thumb = image.thumbnailURL
-                    val screenHeight = LocalConfiguration.current.screenHeightDp.dp
-                    BoxWithConstraints(Modifier.fillMaxWidth()) {
-                        val height = min(maxWidth * 9f / 16f, screenHeight * 0.7f)
-                        // Grows past 16:9 only when a large font scale needs room for the overlay.
-                        Box(
-                            Modifier.fillMaxWidth().heightIn(min = height).background(Color.Black)
-                                .clickable(onClickLabel = "Open image") { openHero(image, coverIndex, isCover) },
-                        ) {
-                            SubcomposeAsyncImage(
-                                url, g.displayTitle, Modifier.matchParentSize(), contentScale = ContentScale.Crop, alignment = Alignment.Center,
-                                loading = {
-                                    if (thumb != null && thumb != url) AsyncImage(thumb, null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop, alignment = Alignment.Center)
-                                    else Box(Modifier.fillMaxSize(), Alignment.Center) { CircularProgressIndicator(Modifier.size(20.dp), color = Color.White.copy(alpha = 0.7f), strokeWidth = 2.dp) }
-                                },
-                                error = {
-                                    if (thumb != null && thumb != url) AsyncImage(thumb, null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop, alignment = Alignment.Center)
-                                    else Box(Modifier.fillMaxSize().background(Color.Gray.copy(alpha = 0.1f)), Alignment.Center) {
-                                        Icon(photoOnRectangleIcon(), null, tint = StashyColors.appAccent.copy(alpha = 0.5f), modifier = Modifier.size(34.dp))
-                                    }
-                                },
-                            )
-                            Box(
-                                Modifier.matchParentSize()
-                                    .background(Brush.verticalGradient(0.35f to Color.Transparent, 1f to Color.Black.copy(alpha = 0.8f))),
-                            )
-                            HeaderTitleAndItems(
-                                g.displayTitle, items, Color.White, Color.White.copy(alpha = 0.75f),
-                                Modifier.align(Alignment.BottomStart).padding(top = 24.dp),
-                            )
-                        }
-                    }
-                } else {
-                    HeaderTitleAndItems(g.displayTitle, items, p.text, p.secondaryText, Modifier)
+        DetailHeroCard(
+            title = g.displayTitle,
+            items = DetailFormatting.gallery(g, images.list.totalCount),
+            description = g.details?.takeIf { it.isNotEmpty() },
+            expanded = expanded,
+            onToggle = { expanded = !expanded },
+            hero = if (hero != null && url != null) {
+                val (image, coverIndex, isCover) = hero
+                val thumb = image.thumbnailURL
+                DetailHero(DetailHero.Style.Cover, Color.Black, "Open image", { openHero(image, coverIndex, isCover) }) {
+                    SubcomposeAsyncImage(
+                        url, g.displayTitle, Modifier.fillMaxSize(), contentScale = ContentScale.Crop, alignment = Alignment.Center,
+                        loading = {
+                            if (thumb != null && thumb != url) AsyncImage(thumb, null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop, alignment = Alignment.Center)
+                            else Box(Modifier.fillMaxSize(), Alignment.Center) { CircularProgressIndicator(Modifier.size(20.dp), color = Color.White.copy(alpha = 0.7f), strokeWidth = 2.dp) }
+                        },
+                        error = {
+                            if (thumb != null && thumb != url) AsyncImage(thumb, null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop, alignment = Alignment.Center)
+                            else Box(Modifier.fillMaxSize().background(Color.Gray.copy(alpha = 0.1f)), Alignment.Center) {
+                                Icon(photoOnRectangleIcon(), null, tint = StashyColors.appAccent.copy(alpha = 0.5f), modifier = Modifier.size(34.dp))
+                            }
+                        },
+                    )
                 }
-                if (details != null) {
-                    Column(
-                        Modifier.fillMaxWidth().padding(start = 12.dp, end = 12.dp, top = if (hasPicture) 6.dp else 0.dp, bottom = 10.dp),
-                        verticalArrangement = Arrangement.spacedBy(4.dp),
-                    ) {
-                        if (!hasPicture) HorizontalDivider(color = p.separator)
-                        Text(
-                            details, style = IosTypography.caption, color = p.secondaryText,
-                            maxLines = if (expanded) Int.MAX_VALUE else 3, overflow = TextOverflow.Ellipsis,
-                            onTextLayout = { if (!expanded) detailsOverflow = it.hasVisualOverflow },
-                            modifier = Modifier.padding(vertical = 4.dp),
-                        )
-                        if (expandable) Spacer(Modifier.height(scaledIconSize(18.dp)))
-                    }
-                }
-            }
-            if (expandable) HeaderExpandButton(expanded) { expanded = !expanded }
-        }
-    }
-
-    /** Title (title2 bold, two lines) and the detail grid, padded like the studio header. */
-    @Composable
-    private fun HeaderTitleAndItems(title: String, items: List<DetailItem>, titleColor: Color, labelColor: Color, modifier: Modifier) {
-        Column(
-            modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 10.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            Text(title, style = IosTypography.title2.copy(fontWeight = FontWeight.Bold), color = titleColor, maxLines = 2, overflow = TextOverflow.Ellipsis)
-            if (items.isNotEmpty()) DetailItemsGrid(items, labelColor = labelColor, valueColor = titleColor)
-        }
+            } else null,
+        )
     }
 
     /** Viewer on the hero picture: inside the loaded list when it is there, else just that picture. */
