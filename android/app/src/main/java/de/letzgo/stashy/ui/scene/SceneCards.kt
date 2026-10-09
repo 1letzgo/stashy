@@ -11,6 +11,7 @@ import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -132,13 +133,27 @@ fun ScenePerformersStudioCard(
  * Performer entry of [ScenePerformersStudioCard] (also the "Appears with" tab of the performer
  * detail): 88 dp round portrait with the tint ring, optional [badge] top-right (the age at the
  * scene date there, the shared scene count on the performer detail), name pill overlapping the bottom.
+ * [selected] (performer detail only) marks the chosen tile of a selectable row (null: plain tile);
+ * [onLongClick] opens the tile's context menu.
  */
+@OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
 @Composable
-internal fun ScenePerformerTile(performer: Performer, badge: String?, modifier: Modifier = Modifier, onClick: () -> Unit) {
+internal fun ScenePerformerTile(
+    performer: Performer,
+    badge: String?,
+    modifier: Modifier = Modifier,
+    selected: Boolean? = null,
+    onLongClick: (() -> Unit)? = null,
+    onClick: () -> Unit,
+) {
     val tint = Appearance.tint
+    // Selectable row: only the selected tile keeps the full tint ring, the others fade.
+    val ring = if (selected == false) tint.copy(alpha = 0.25f) else tint
     val p = Theme.palette
-    Box(modifier.padding(bottom = 8.dp).plainClick(onClick), contentAlignment = Alignment.BottomCenter) {
-        Box(Modifier.size(88.dp).clip(CircleShape).background(tint).padding(4.dp).clip(CircleShape)) {
+    val click = if (onLongClick == null) Modifier.plainClick(onClick)
+    else Modifier.combinedClickable(interactionSource = null, indication = null, onClick = onClick, onLongClick = onLongClick)
+    Box(modifier.padding(bottom = 8.dp).then(click), contentAlignment = Alignment.BottomCenter) {
+        Box(Modifier.size(88.dp).clip(CircleShape).background(ring).padding(4.dp).clip(CircleShape)) {
             val url = performer.imageURL
             if (url != null) AsyncImage(url, performer.name, Modifier.fillMaxSize().background(Color.Gray.copy(alpha = 0.2f)), contentScale = ContentScale.Crop, alignment = Alignment.TopCenter)
             else Icon(PlayerIcons.person, null, tint = tint.copy(alpha = 0.4f), modifier = Modifier.fillMaxSize())
