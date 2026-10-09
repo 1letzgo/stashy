@@ -105,6 +105,28 @@ fun ActionChip(
 }
 
 /**
+ * Icon-only [ActionChip]: the same `AssistChip` (height, shape, border, colours) with just the
+ * accent icon as its content, for a compact action next to labelled chips (header expand chevron).
+ */
+@Composable
+fun IconActionChip(
+    icon: ImageVector,
+    contentDescription: String,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    contentColor: Color? = null,
+) {
+    val p = Theme.palette
+    AssistChip(
+        onClick = onClick,
+        modifier = modifier,
+        label = { Icon(icon, contentDescription, Modifier.size(scaledIconSize(AssistChipDefaults.IconSize)), tint = contentColor ?: nativeAccent()) },
+        colors = AssistChipDefaults.assistChipColors(containerColor = Color.Transparent, labelColor = contentColor ?: p.text),
+        border = AssistChipDefaults.assistChipBorder(enabled = true, borderColor = contentColor?.copy(alpha = 0.5f) ?: p.separator),
+    )
+}
+
+/**
  * Read-only Material label: small-shape `Surface` with `labelMedium` (+ optional icon).
  * [container] defaults to a light wash of [content]; [elevation] lifts it off a picture it overlaps.
  */
