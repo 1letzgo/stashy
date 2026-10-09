@@ -403,30 +403,13 @@ struct SceneDetailView: View {
                         SceneSimilarScenesCard(scenes: similarScenes, isLoading: isLoadingSimilarScenes)
                             .gridCellColumns(2)
 
-                        // Item 1: Performers (+ Director, full scroll row, spans both columns)
-                        ScenePerformersCard(
-                            sceneId: activeScene.id,
-                            sceneDate: activeScene.date,
-                            performers: activeScene.performers,
-                            director: activeScene.normalizedDirector,
-                            onPerformersUpdated: { updated in
-                                applyLocalSceneEdit(Scene(id: activeScene.id, title: activeScene.title, details: activeScene.details, director: activeScene.director, date: activeScene.date, duration: activeScene.duration, studio: activeScene.studio, performers: updated, files: activeScene.files, tags: activeScene.tags, galleries: activeScene.galleries, groups: activeScene.groups, organized: activeScene.organized, resumeTime: activeScene.resumeTime, playCount: activeScene.playCount, oCounter: activeScene.oCounter, rating100: activeScene.rating100, createdAt: activeScene.createdAt, updatedAt: activeScene.updatedAt, paths: activeScene.paths, sceneMarkers: activeScene.sceneMarkers, interactive: activeScene.interactive, stashIds: activeScene.stashIds, captions: activeScene.captions, customFields: activeScene.customFields))
-                            },
-                            viewModel: viewModel
-                        )
-                        .gridCellColumns(2)
+                        // Item 1: Performers & Studio (+ Director, full scroll row, spans both columns)
+                        if showsPerformersStudioCard {
+                            performersStudioCard
+                                .gridCellColumns(2)
+                        }
 
-                        // Item 2: Studio
-                        SceneStudioCard(
-                            sceneId: activeScene.id,
-                            studio: activeScene.studio,
-                            onStudioUpdated: { updated in
-                                applyLocalSceneEdit(Scene(id: activeScene.id, title: activeScene.title, details: activeScene.details, director: activeScene.director, date: activeScene.date, duration: activeScene.duration, studio: updated, performers: activeScene.performers, files: activeScene.files, tags: activeScene.tags, galleries: activeScene.galleries, groups: activeScene.groups, organized: activeScene.organized, resumeTime: activeScene.resumeTime, playCount: activeScene.playCount, oCounter: activeScene.oCounter, rating100: activeScene.rating100, createdAt: activeScene.createdAt, updatedAt: activeScene.updatedAt, paths: activeScene.paths, sceneMarkers: activeScene.sceneMarkers, interactive: activeScene.interactive, stashIds: activeScene.stashIds, captions: activeScene.captions, customFields: activeScene.customFields))
-                            },
-                            viewModel: viewModel
-                        )
-
-                        // Item 3: Groups
+                        // Item 2: Groups (pairs with Tags)
                         SceneGroupsCard(
                             sceneId: activeScene.id,
                             groups: activeScene.groups ?? [],
@@ -436,7 +419,7 @@ struct SceneDetailView: View {
                             viewModel: viewModel
                         )
 
-                        // Item 4: Tags — always visible
+                        // Item 3: Tags — always visible
                         SceneTagsCard(
                             sceneId: activeScene.id,
                             tags: activeScene.tags,
@@ -448,7 +431,7 @@ struct SceneDetailView: View {
                             tagsTotalHeight: $tagsTotalHeight
                         )
 
-                        // Item 5: Galleries — always visible (full width)
+                        // Item 4: Galleries — always visible (full width)
                         SceneGalleriesCard(
                             sceneId: activeScene.id,
                             galleries: activeScene.galleries,
@@ -466,37 +449,20 @@ struct SceneDetailView: View {
                     // stashy+ — hides itself when Suggestions is off or nothing is similar.
                     SceneSimilarScenesCard(scenes: similarScenes, isLoading: isLoadingSimilarScenes)
 
-                    // Row 1: Performers (+ Director, full width, horizontal scroll)
-                    ScenePerformersCard(
+                    // Row 1: Performers & Studio (+ Director, full width, horizontal scroll)
+                    if showsPerformersStudioCard {
+                        performersStudioCard
+                    }
+
+                    // Row 2: Groups (full width)
+                    SceneGroupsCard(
                         sceneId: activeScene.id,
-                        sceneDate: activeScene.date,
-                        performers: activeScene.performers,
-                        director: activeScene.normalizedDirector,
-                        onPerformersUpdated: { updated in
-                            applyLocalSceneEdit(Scene(id: activeScene.id, title: activeScene.title, details: activeScene.details, director: activeScene.director, date: activeScene.date, duration: activeScene.duration, studio: activeScene.studio, performers: updated, files: activeScene.files, tags: activeScene.tags, galleries: activeScene.galleries, groups: activeScene.groups, organized: activeScene.organized, resumeTime: activeScene.resumeTime, playCount: activeScene.playCount, oCounter: activeScene.oCounter, rating100: activeScene.rating100, createdAt: activeScene.createdAt, updatedAt: activeScene.updatedAt, paths: activeScene.paths, sceneMarkers: activeScene.sceneMarkers, interactive: activeScene.interactive, stashIds: activeScene.stashIds, captions: activeScene.captions, customFields: activeScene.customFields))
+                        groups: activeScene.groups ?? [],
+                        onGroupsUpdated: { updated in
+                            applyLocalSceneEdit(Scene(id: activeScene.id, title: activeScene.title, details: activeScene.details, director: activeScene.director, date: activeScene.date, duration: activeScene.duration, studio: activeScene.studio, performers: activeScene.performers, files: activeScene.files, tags: activeScene.tags, galleries: activeScene.galleries, groups: updated, organized: activeScene.organized, resumeTime: activeScene.resumeTime, playCount: activeScene.playCount, oCounter: activeScene.oCounter, rating100: activeScene.rating100, createdAt: activeScene.createdAt, updatedAt: activeScene.updatedAt, paths: activeScene.paths, sceneMarkers: activeScene.sceneMarkers, interactive: activeScene.interactive, stashIds: activeScene.stashIds, captions: activeScene.captions, customFields: activeScene.customFields))
                         },
                         viewModel: viewModel
                     )
-
-                    // Row 2: Studio + Groups side by side
-                    HStack(alignment: .top, spacing: 12) {
-                        SceneStudioCard(
-                            sceneId: activeScene.id,
-                            studio: activeScene.studio,
-                            onStudioUpdated: { updated in
-                                applyLocalSceneEdit(Scene(id: activeScene.id, title: activeScene.title, details: activeScene.details, director: activeScene.director, date: activeScene.date, duration: activeScene.duration, studio: updated, performers: activeScene.performers, files: activeScene.files, tags: activeScene.tags, galleries: activeScene.galleries, groups: activeScene.groups, organized: activeScene.organized, resumeTime: activeScene.resumeTime, playCount: activeScene.playCount, oCounter: activeScene.oCounter, rating100: activeScene.rating100, createdAt: activeScene.createdAt, updatedAt: activeScene.updatedAt, paths: activeScene.paths, sceneMarkers: activeScene.sceneMarkers, interactive: activeScene.interactive, stashIds: activeScene.stashIds, captions: activeScene.captions, customFields: activeScene.customFields))
-                            },
-                            viewModel: viewModel
-                        )
-                        SceneGroupsCard(
-                            sceneId: activeScene.id,
-                            groups: activeScene.groups ?? [],
-                            onGroupsUpdated: { updated in
-                                applyLocalSceneEdit(Scene(id: activeScene.id, title: activeScene.title, details: activeScene.details, director: activeScene.director, date: activeScene.date, duration: activeScene.duration, studio: activeScene.studio, performers: activeScene.performers, files: activeScene.files, tags: activeScene.tags, galleries: activeScene.galleries, groups: updated, organized: activeScene.organized, resumeTime: activeScene.resumeTime, playCount: activeScene.playCount, oCounter: activeScene.oCounter, rating100: activeScene.rating100, createdAt: activeScene.createdAt, updatedAt: activeScene.updatedAt, paths: activeScene.paths, sceneMarkers: activeScene.sceneMarkers, interactive: activeScene.interactive, stashIds: activeScene.stashIds, captions: activeScene.captions, customFields: activeScene.customFields))
-                            },
-                            viewModel: viewModel
-                        )
-                    }
 
                     // Row 3: Tags — always visible
                     SceneTagsCard(
@@ -931,6 +897,33 @@ struct SceneDetailView: View {
                 }
             }
         }
+    }
+
+    private var showsPerformersStudioCard: Bool {
+        ScenePerformersStudioCard.isVisible(
+            performers: activeScene.performers,
+            studio: activeScene.studio,
+            director: activeScene.normalizedDirector,
+            editing: appearanceManager.isEditModeEnabled
+        )
+    }
+
+    /// Studio first, then performers (+ director) — writes through `sceneUpdate`.
+    private var performersStudioCard: some View {
+        ScenePerformersStudioCard(
+            sceneId: activeScene.id,
+            sceneDate: activeScene.date,
+            performers: activeScene.performers,
+            studio: activeScene.studio,
+            director: activeScene.normalizedDirector,
+            onPerformersUpdated: { updated in
+                applyLocalSceneEdit(Scene(id: activeScene.id, title: activeScene.title, details: activeScene.details, director: activeScene.director, date: activeScene.date, duration: activeScene.duration, studio: activeScene.studio, performers: updated, files: activeScene.files, tags: activeScene.tags, galleries: activeScene.galleries, groups: activeScene.groups, organized: activeScene.organized, resumeTime: activeScene.resumeTime, playCount: activeScene.playCount, oCounter: activeScene.oCounter, rating100: activeScene.rating100, createdAt: activeScene.createdAt, updatedAt: activeScene.updatedAt, paths: activeScene.paths, sceneMarkers: activeScene.sceneMarkers, interactive: activeScene.interactive, stashIds: activeScene.stashIds, captions: activeScene.captions, customFields: activeScene.customFields))
+            },
+            onStudioUpdated: { updated in
+                applyLocalSceneEdit(Scene(id: activeScene.id, title: activeScene.title, details: activeScene.details, director: activeScene.director, date: activeScene.date, duration: activeScene.duration, studio: updated, performers: activeScene.performers, files: activeScene.files, tags: activeScene.tags, galleries: activeScene.galleries, groups: activeScene.groups, organized: activeScene.organized, resumeTime: activeScene.resumeTime, playCount: activeScene.playCount, oCounter: activeScene.oCounter, rating100: activeScene.rating100, createdAt: activeScene.createdAt, updatedAt: activeScene.updatedAt, paths: activeScene.paths, sceneMarkers: activeScene.sceneMarkers, interactive: activeScene.interactive, stashIds: activeScene.stashIds, captions: activeScene.captions, customFields: activeScene.customFields))
+            },
+            viewModel: viewModel
+        )
     }
 
     /// Updates local Scene Detail state and notifies catalog lists (title, studio, tags, …).

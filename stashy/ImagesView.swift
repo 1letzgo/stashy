@@ -765,39 +765,33 @@ private struct ImagesViewBody: View {
         }
     }
 
-    /// Scene-detail Performers / Studio cards for an opened gallery — each only when
-    /// the gallery has one, or always in edit mode so one can be assigned (like Android).
-    /// Edits write through `galleryUpdate`.
+    /// Scene-detail "Performers & Studio" card for an opened gallery — only when the
+    /// gallery has a studio or performers, or always in edit mode so one can be
+    /// assigned (like Android). Edits write through `galleryUpdate`.
     @ViewBuilder
     private func openedGalleryLinkedCards(_ gallery: Gallery) -> some View {
-        let editing = appearanceManager.isEditModeEnabled
-        let performers = gallery.performers ?? []
-        if !performers.isEmpty || editing {
-            ScenePerformersCard(
+        let performers = (gallery.performers ?? []).map { $0.toScenePerformer() }
+        let studio = gallery.studio?.toSceneStudio()
+        if ScenePerformersStudioCard.isVisible(performers: performers, studio: studio, editing: appearanceManager.isEditModeEnabled) {
+            ScenePerformersStudioCard(
                 sceneId: gallery.id,
                 sceneDate: gallery.date,
-                performers: performers.map { $0.toScenePerformer() },
+                performers: performers,
+                studio: studio,
                 onPerformersUpdated: { updated in
                     guard var current = self.gallery, current.id == gallery.id else { return }
                     current.performers = updated.map { $0.toGalleryPerformer() }
                     self.gallery = current
                 },
-                savePerformerIds: { ids, done in
-                    viewModel.updateGalleryPerformers(galleryId: gallery.id, performerIds: ids, completion: done)
-                },
-                viewModel: viewModel
-            )
-        }
-        if gallery.studio != nil || editing {
-            SceneStudioCard(
-                sceneId: gallery.id,
-                studio: gallery.studio?.toSceneStudio(),
                 onStudioUpdated: { updated in
                     guard var current = self.gallery, current.id == gallery.id else { return }
                     current.studio = updated.map {
                         GalleryStudio(id: $0.id, name: $0.name, image_path: $0.imagePath, updated_at: $0.updatedAt)
                     }
                     self.gallery = current
+                },
+                savePerformerIds: { ids, done in
+                    viewModel.updateGalleryPerformers(galleryId: gallery.id, performerIds: ids, completion: done)
                 },
                 saveStudioId: { id, done in
                     viewModel.updateGalleryStudio(galleryId: gallery.id, studioId: id, completion: done)
