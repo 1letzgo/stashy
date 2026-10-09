@@ -126,10 +126,10 @@ class TagDetailScreen(val tagId: String, val preview: Tag? = null) : Screen {
     }
 
     /**
-     * iOS `tagHeaderView` as a [DetailHeroCard]: the tag image blurred as the band backdrop and
-     * center-cropped in the circle before the name + Feeds pill (tap → fullscreen); details and
-     * description below on the card. Without an image (or Stash's `default=true` placeholder),
-     * all on the plain card.
+     * iOS `tagHeaderView` as a [DetailHeroCard]: the tag image blurred as the band backdrop (with
+     * the details on it) and center-cropped in the circle on the band edge (tap → fullscreen); name
+     * + Feeds pill and description below. Without an image (or Stash's `default=true`
+     * placeholder), a tinted band and the tag icon in the circle.
      */
     @Composable
     private fun Header(t: Tag) {
@@ -144,7 +144,7 @@ class TagDetailScreen(val tagId: String, val preview: Tag? = null) : Screen {
                 DetailHero(DetailHero.Style.Cover, it, Color.Black, "Open image", { Nav.push(HeroPictureViewerScreen(it, t.name)) }) {
                     HeroPicture(it, t.name, ContentScale.Crop, SF.number)
                 }
-            },
+            } ?: DetailHero(DetailHero.Style.Cover, null, Color.Black, "Open image", null) { HeroPlaceholder(SF.number) },
             collapsedItemCount = 4,
             titleAccessory = { color -> FeedsPill(color) { DetailFeedsLink.navigate(DetailFeedsLink.Target.Tag(t.id, t.name)) } },
         )
