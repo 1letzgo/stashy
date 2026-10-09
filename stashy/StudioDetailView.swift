@@ -827,10 +827,10 @@ struct StudioDetailView: View {
         return !path.contains("default=true")
     }
 
-    /// Header card (`DetailHeroCard`, gallery design). The studio image is a logo, so it is
-    /// never cropped: aspect-fit and centred with padding on the studio-logo backdrop (plus a
-    /// blurred, tinted copy behind), kept above the name/info gradient. Logos come from
-    /// `StudioLogoStore` via `StudioImageView`. Favorite / Edit live in the nav bar.
+    /// Header card (`DetailHeroCard`). The studio image is a logo, so it is never cropped:
+    /// aspect-fit with padding inside the avatar circle on the studio-logo backdrop, with a
+    /// blurred, tinted copy as the band backdrop. Logos come from `StudioLogoStore` via
+    /// `StudioImageView`. Favorite / Edit live in the nav bar.
     private var headerCard: some View {
         let url = (studio.url ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
         let linkURL = url.isEmpty ? nil : URL(string: url)
@@ -840,23 +840,20 @@ struct StudioDetailView: View {
             description: studio.details,
             showsHero: studioHasCustomImage,
             isExpanded: $isHeaderExpanded,
-            hero: {
+            placeholderSystemImage: AppTab.studios.icon,
+            backdrop: {
                 ZStack {
                     Color.studioHeaderGray(for: appearanceManager.currentTheme)
                     StudioImageView(studio: studio)
-                        .scaleEffect(1.6)
-                        .blur(radius: 30)
-                        .opacity(0.35)
-                        .accessibilityHidden(true)
-                    LinearGradient(
-                        colors: [appearanceManager.tintColor.opacity(0.18), .black.opacity(0.25)],
-                        startPoint: .top,
-                        endPoint: .bottom
-                    )
+                    appearanceManager.tintColor.opacity(0.18)
+                }
+            },
+            avatar: {
+                // Logo: aspect-fit on the logo backdrop, never cropped by the circle.
+                ZStack {
+                    Color.studioHeaderGray(for: appearanceManager.currentTheme)
                     StudioImageView(studio: studio)
-                        .padding(.horizontal, 40)
-                        .padding(.top, 20)
-                        .padding(.bottom, 78) // clear of the name/info block
+                        .padding(14)
                 }
             },
             accessory: { onImage in
@@ -886,7 +883,6 @@ struct StudioDetailView: View {
                         }
                     }
                     .padding(.horizontal, 12)
-                    .padding(.top, studioHasCustomImage ? 10 : 0)
                     .padding(.bottom, (studio.details ?? "").trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? 10 : 6)
                     .padding(.trailing, 28)
                     .frame(maxWidth: .infinity, alignment: .leading)

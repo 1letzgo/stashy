@@ -690,10 +690,11 @@ private struct ImagesViewBody: View {
         return displayedImages.first?.id
     }
 
-    /// Single header card for an opened gallery (`DetailHeroCard`): cover hero cropped from
-    /// the centre with name and details overlaid, description below. Without a cover or
-    /// loaded image the same block renders as a plain card. Tap opens the cover (or first
-    /// image) fullscreen. Editing stays on the nav-bar pencil.
+    /// Single header card for an opened gallery (`DetailHeroCard`): the cover blurred as the
+    /// band backdrop and centre-cropped in the avatar circle next to the name; details and
+    /// description below on the solid card. Without a cover or loaded image the plain card
+    /// with a gallery placeholder circle. Tap opens the cover (or first image) fullscreen.
+    /// Editing stays on the nav-bar pencil.
     private func openedGalleryHeaderCard(_ gallery: Gallery) -> some View {
         let heroURL = openedGalleryHeroURL(gallery)
         let heroImageId = openedGalleryHeroImageId(gallery)
@@ -704,7 +705,8 @@ private struct ImagesViewBody: View {
             showsHero: heroURL != nil,
             heroAccessibilityLabel: "Open cover image",
             onHeroTap: heroImageId.map { id in { fullscreenImageId = id } },
-            isExpanded: $isHeaderExpanded
+            isExpanded: $isHeaderExpanded,
+            placeholderSystemImage: AppTab.galleries.icon
         ) {
             if let heroURL {
                 CustomAsyncImage(url: heroURL) { loader in

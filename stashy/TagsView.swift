@@ -1507,8 +1507,9 @@ struct TagDetailView: View {
         return !path.contains("default=true")
     }
 
-    /// Header card (`DetailHeroCard`, gallery design): tag image as centre-cropped hero
-    /// with name + counts overlaid, description below. Edit / Favorite live in the nav bar.
+    /// Header card (`DetailHeroCard`): tag image blurred as the band backdrop and
+    /// centre-cropped in the avatar circle next to the name; counts and description below.
+    /// Tap opens the image fullscreen. Edit / Favorite live in the nav bar.
     private var tagHeaderView: some View {
         DetailHeroCard(
             title: selectedTag.name,
@@ -1518,7 +1519,12 @@ struct TagDetailView: View {
             heroAccessibilityLabel: "Open tag image",
             onHeroTap: { showingTagImageFullscreen = true },
             isExpanded: $isHeaderExpanded,
-            hero: {
+            placeholderSystemImage: AppTab.tags.icon,
+            backdrop: {
+                TagImageView(tag: selectedTag)
+                    .frame(minWidth: 0, maxWidth: .infinity, minHeight: 0, maxHeight: .infinity, alignment: .center)
+            },
+            avatar: {
                 TagImageView(tag: selectedTag)
                     .frame(minWidth: 0, maxWidth: .infinity, minHeight: 0, maxHeight: .infinity, alignment: .center)
             },
