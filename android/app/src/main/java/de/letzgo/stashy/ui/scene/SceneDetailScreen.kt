@@ -10,7 +10,6 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -202,23 +201,20 @@ private fun SceneDetailContent(model: SceneDetailModel) {
                 }
                 // stashy+ — hides itself when Similar Scenes is off or nothing is similar.
                 SceneSimilarScenesCard(model.similarScenes, model.isLoadingSimilarScenes)
-                ScenePerformersCard(scene.date, scene.performers, scene.normalizedDirector) { sheet = EditSheet.Performers }
+                // Hides itself without studio, performers and director (unless edit mode is on).
+                ScenePerformersStudioCard(
+                    scene.date, scene.studio, scene.performers, scene.normalizedDirector,
+                    onEditStudio = { sheet = EditSheet.Studio }, onEditPerformers = { sheet = EditSheet.Performers },
+                )
                 if (landscape) {
-                    // iOS landscape: two-column grid (Studio | Groups, Tags, Galleries full width). Delete lives in the top bar's ⋮ menu.
+                    // Landscape: Groups | Tags side by side, Galleries full width. Delete lives in the top bar's ⋮ menu.
                     Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                        SceneStudioCard(scene.studio, { sheet = EditSheet.Studio }, Modifier.weight(1f))
                         SceneGroupsCard(scene.groups.orEmpty(), { sheet = EditSheet.Groups }, Modifier.weight(1f))
-                    }
-                    Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                         SceneTagsCard(scene.tags, model.isTagsExpanded, { model.isTagsExpanded = !model.isTagsExpanded }, { sheet = EditSheet.Tags }, Modifier.weight(1f))
-                        Spacer(Modifier.weight(1f))
                     }
                     SceneGalleriesCard(scene.galleries) { sheet = EditSheet.Galleries }
                 } else {
-                    Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                        SceneStudioCard(scene.studio, { sheet = EditSheet.Studio }, Modifier.weight(1f))
-                        SceneGroupsCard(scene.groups.orEmpty(), { sheet = EditSheet.Groups }, Modifier.weight(1f))
-                    }
+                    SceneGroupsCard(scene.groups.orEmpty(), { sheet = EditSheet.Groups })
                     SceneTagsCard(scene.tags, model.isTagsExpanded, { model.isTagsExpanded = !model.isTagsExpanded }, { sheet = EditSheet.Tags })
                     SceneGalleriesCard(scene.galleries) { sheet = EditSheet.Galleries }
                 }

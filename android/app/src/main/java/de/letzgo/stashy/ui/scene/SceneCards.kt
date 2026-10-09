@@ -2,7 +2,6 @@ package de.letzgo.stashy.ui.scene
 
 import de.letzgo.stashy.ui.cappedFontScale
 import de.letzgo.stashy.ui.scaledIconSize
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.foundation.layout.sizeIn
 import de.letzgo.stashy.ui.uniqueItems
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
@@ -65,6 +64,9 @@ import de.letzgo.stashy.data.Studio
 import de.letzgo.stashy.data.Tag
 import de.letzgo.stashy.data.Net
 import de.letzgo.stashy.ui.Appearance
+import de.letzgo.stashy.ui.OverflowItem
+import de.letzgo.stashy.ui.SF
+import androidx.compose.material3.DropdownMenu
 import de.letzgo.stashy.ui.IosTypography
 import de.letzgo.stashy.ui.Theme
 import de.letzgo.stashy.ui.Tokens
@@ -82,20 +84,33 @@ internal fun ageAt(birthdate: String?, sceneDate: String?): Int? {
 }
 
 /**
- * iOS: `ScenePerformersCard` — round portraits (age badge, name pill) + director, horizontal scroll.
- * Shared with the opened gallery ([de.letzgo.stashy.ui.detail.GalleryDetailScreen]); `sceneDate`
- * is then the gallery date. `onEdit == null` hides the pencil.
+ * Performers & Studio — one horizontal row that always starts with the studio, then the performers
+ * (round portraits with age badge and name pill), then the director. Shared by scene detail and the
+ * opened gallery ([de.letzgo.stashy.ui.detail.GalleryDetailScreen]); `date` is then the gallery date.
+ * Hidden when there is nothing to show, except in edit mode, where the pencil opens a menu
+ * ("Edit Studio" / "Edit Performers") leading to the existing picker sheets.
  */
 @Composable
-fun ScenePerformersCard(sceneDate: String?, performers: List<Performer>, director: String?, onEdit: (() -> Unit)?) {
+fun ScenePerformersStudioCard(
+    date: String?,
+    studio: Studio?,
+    performers: List<Performer>,
+    director: String?,
+    onEditStudio: () -> Unit,
+    onEditPerformers: () -> Unit,
+) {
+    val edit = Appearance.isEditModeEnabled
+    val isEmpty = studio == null && performers.isEmpty() && director == null
+    if (isEmpty && !edit) return
     val tint = Appearance.tint
     val p = Theme.palette
     SceneCardContainer(Modifier.fillMaxWidth()) {
-        SceneCardHeader("Performers", onEdit)
-        if (performers.isEmpty() && director == null) {
-            Box(Modifier.padding(top = 8.dp)) { SceneCardEmpty("No performers assigned") }
+        SceneCardHeader("Performers & Studio", onEdit = null, trailing = if (edit) { { PerformersStudioEditMenu(onEditStudio, onEditPerformers) } } else null)
+        if (isEmpty) {
+            Box(Modifier.padding(top = 8.dp)) { SceneCardEmpty("No performers or studio assigned") }
         } else {
             LazyRow(Modifier.padding(top = 8.dp, bottom = 12.dp), contentPadding = PaddingValues(horizontal = 12.dp), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                if (studio != null) item("studio-${studio.id}") { StudioItem(studio) }
                 uniqueItems(performers.sortedBy { it.name }, { it.id }) { performer ->
                     Box(Modifier.padding(bottom = 8.dp).plainClick { DetailLinks.performer(performer) }, contentAlignment = Alignment.BottomCenter) {
                         Box(Modifier.size(88.dp).clip(CircleShape).background(tint).padding(4.dp).clip(CircleShape)) {
@@ -103,7 +118,7 @@ fun ScenePerformersCard(sceneDate: String?, performers: List<Performer>, directo
                             if (url != null) AsyncImage(url, performer.name, Modifier.fillMaxSize().background(Color.Gray.copy(alpha = 0.2f)), contentScale = ContentScale.Crop, alignment = Alignment.TopCenter)
                             else Icon(PlayerIcons.person, null, tint = tint.copy(alpha = 0.4f), modifier = Modifier.fillMaxSize())
                         }
-                        ageAt(performer.birthdate, sceneDate)?.let { age ->
+                        ageAt(performer.birthdate, date)?.let { age ->
                             Box(
                                 // Min 22 dp circle that widens into a capsule when the font scale grows the number.
                                 Modifier.align(Alignment.TopEnd).sizeIn(minWidth = 22.dp, minHeight = 22.dp).clip(RoundedCornerShape(50)).background(tint)
@@ -127,34 +142,48 @@ fun ScenePerformersCard(sceneDate: String?, performers: List<Performer>, directo
     }
 }
 
-/** iOS: `SceneStudioCard` — 110×105 tile in the tint colour with the logo (or name), name pill. Also used by the opened gallery. */
+/**
+ * Studio entry of [ScenePerformersStudioCard]: an 88 dp rounded tile (same size and tint ring as the
+ * performer portraits; a tile rather than a circle so wide logos aren't cropped) with the logo fitted
+ * on the neutral studio-header background, name pill below.
+ */
 @Composable
-fun SceneStudioCard(studio: Studio?, onEdit: (() -> Unit)?, modifier: Modifier = Modifier) {
-    val tint = Appearance.tint
-    SceneCardContainer(modifier.fillMaxWidth()) {
-        SceneCardHeader("Studio", onEdit)
-        if (studio == null) Box(Modifier.padding(top = 8.dp)) { SceneCardEmpty("No studio assigned") }
-        else Box(Modifier.fillMaxWidth().padding(start = 12.dp, end = 12.dp, top = 8.dp, bottom = 20.dp), contentAlignment = Alignment.Center) {
-            Box(Modifier.plainClick { DetailLinks.studio(studio) }, contentAlignment = Alignment.BottomCenter) {
-                Box(Modifier.size(110.dp, 105.dp).clip(RoundedCornerShape(Tokens.Radius.card)).background(tint).padding(8.dp), contentAlignment = Alignment.Center) {
-                    if (studio.hasImage) AsyncImage(studio.imageURL, studio.name, Modifier.fillMaxSize(), contentScale = ContentScale.Fit)
-                    else Text(studio.name, style = IosTypography.headline, color = Color.White, maxLines = 3, overflow = TextOverflow.Ellipsis)
-                }
-                NamePill(studio.name, Modifier.offset(y = 8.dp))
-            }
+private fun StudioItem(studio: Studio) {
+    val p = Theme.palette
+    val outer = RoundedCornerShape(Tokens.Radius.card + 4.dp)
+    val inner = RoundedCornerShape(Tokens.Radius.card)
+    var failed by remember(studio.id, studio.imagePath) { mutableStateOf(!studio.hasImage) }
+    Box(Modifier.padding(bottom = 8.dp).plainClick { DetailLinks.studio(studio) }, contentAlignment = Alignment.BottomCenter) {
+        Box(Modifier.size(88.dp).clip(outer).background(Appearance.tint).padding(4.dp).clip(inner).background(p.studioHeader).padding(8.dp), contentAlignment = Alignment.Center) {
+            if (failed) Icon(SF.building2, null, tint = p.secondaryText, modifier = Modifier.size(34.dp))
+            else AsyncImage(studio.imageURL, studio.name, Modifier.fillMaxSize(), contentScale = ContentScale.Fit, onError = { failed = true })
+        }
+        NamePill(studio.name, Modifier.offset(y = 8.dp))
+    }
+}
+
+/** Edit-mode pencil of [ScenePerformersStudioCard] with its "Edit Studio" / "Edit Performers" menu. */
+@Composable
+private fun PerformersStudioEditMenu(onEditStudio: () -> Unit, onEditPerformers: () -> Unit) {
+    var open by remember { mutableStateOf(false) }
+    Box {
+        EditCircleButton { open = true }
+        DropdownMenu(open, onDismissRequest = { open = false }, containerColor = Theme.palette.secondaryBackground) {
+            OverflowItem("Edit Studio", SF.building2, { open = false }, onClick = onEditStudio)
+            OverflowItem("Edit Performers", PlayerIcons.person, { open = false }, onClick = onEditPerformers)
         }
     }
 }
 
-/** iOS: `SceneGroupsCard` — 70×105 posters with name pills. */
+/** iOS: `SceneGroupsCard` — 70×105 posters with name pills, in a horizontal row. */
 @Composable
 fun SceneGroupsCard(groups: List<SceneGroupEntry>, onEdit: () -> Unit, modifier: Modifier = Modifier) {
     val tint = Appearance.tint
     SceneCardContainer(modifier.fillMaxWidth()) {
         SceneCardHeader("Groups", onEdit)
         if (groups.isEmpty()) Box(Modifier.padding(top = 8.dp)) { SceneCardEmpty("No groups assigned") }
-        else Column(Modifier.fillMaxWidth().padding(start = 12.dp, end = 12.dp, top = 8.dp, bottom = 12.dp), verticalArrangement = Arrangement.spacedBy(12.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-            groups.sortedBy { it.group.name }.forEach { entry ->
+        else LazyRow(Modifier.padding(top = 8.dp, bottom = 12.dp), contentPadding = PaddingValues(horizontal = 12.dp), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+            uniqueItems(groups.sortedBy { it.group.name }, { it.group.id }) { entry ->
                 Box(Modifier.padding(bottom = 8.dp).plainClick { DetailLinks.group(entry.group) }, contentAlignment = Alignment.BottomCenter) {
                     Box(Modifier.size(70.dp, 105.dp).clip(RoundedCornerShape(Tokens.Radius.card)).background(tint), contentAlignment = Alignment.Center) {
                         val url = Net.signed(entry.group.frontImagePath)
