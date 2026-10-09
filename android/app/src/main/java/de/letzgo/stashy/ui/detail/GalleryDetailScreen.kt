@@ -50,13 +50,33 @@ import de.letzgo.stashy.ui.scene.EditStudioSheet
 import de.letzgo.stashy.ui.scene.ScenePerformersStudioCard
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.Icon
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.BiasAlignment
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.unit.min
+import coil3.compose.AsyncImage
+import coil3.compose.SubcomposeAsyncImage
+import de.letzgo.stashy.ui.StashyColors
+import de.letzgo.stashy.ui.Tokens
+import de.letzgo.stashy.ui.cardShadow
 import kotlinx.coroutines.launch
 import kotlinx.serialization.json.JsonObject
 
 /**
- * iOS: `ImagesView(gallery:)` for an opened gallery — chrome bar Back · Edit, the gallery
- * header (cover strip, IMAGES / DATE / STUDIO / PERFORMERS / ORGANIZED, details when
- * expanded), the scene-detail Performers & Studio card (only when set), then the image grid (2/row) or the grouped feed (1/row). The top bar's "Settings"
+ * iOS: `ImagesView(gallery:)` for an opened gallery — chrome bar Back · Edit, the cover as a
+ * hero at the top (placed like the scene detail's player card), the gallery header
+ * (IMAGES / DATE / STUDIO / PERFORMERS / ORGANIZED, details when expanded), the scene-detail Performers & Studio card (only when set), then the image grid (2/row) or the grouped feed (1/row). The top bar's "Settings"
  * opens the images filter & sort sheet (iOS `ImagesCatalogFilterSortSheet` with
  * `DetailLinkedImagesFilterModel(scope: .gallery(id))`): filter, sort, Type, Per row
  * (`openedGallery` scope), autoplay toggles and the criteria editor. The `galleries` INCLUDES
@@ -171,6 +191,7 @@ class GalleryDetailScreen(
     @Composable
     private fun HeaderWithCards(g: Gallery) {
         Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            GalleryHero(g)
             Header(g)
             ScenePerformersStudioCard(
                 g.date, g.studio, g.performers.orEmpty(), director = null,
@@ -193,7 +214,69 @@ class GalleryDetailScreen(
             expanded = expanded,
             onToggle = { expanded = !expanded },
             expandedContent = details?.let { d -> { Text(d, fontSize = 11.sp, color = Theme.palette.secondaryText, modifier = Modifier.padding(top = 4.dp)) } },
+            showsImageStrip = false,
         )
+    }
+
+    /**
+     * The gallery cover (else the first image) as a hero, in the scene detail player's frame:
+     * full-width card, 16:9 crop-fill — capped to most of the screen height in landscape, like a
+     * portrait cover would otherwise push everything below off screen. Hidden without any picture.
+     * Tap opens the fullscreen viewer on that picture.
+     */
+    @Composable
+    private fun GalleryHero(g: Gallery) {
+        val items = images.list.items
+        val cover = g.cover?.takeIf { it.paths != null && it.id != null }
+        val coverIndex = cover?.id?.let { id -> items.indexOfFirst { it.id == id } } ?: -1
+        val heroImage: StashImage? = when {
+            coverIndex >= 0 -> items[coverIndex]
+            cover != null -> StashImage(id = cover.id!!, paths = cover.paths)
+            else -> items.firstOrNull()
+        }
+        heroImage ?: return
+        val thumb = heroImage.thumbnailURL
+        // Full picture for the large frame (Coil downsamples to the frame); a video clip as cover
+        // fails to decode there, so the error slot falls back to the thumbnail.
+        val full = if (heroImage.isVideo) null else heroImage.imageURL
+        val url = full ?: thumb ?: return
+        val shape = RoundedCornerShape(Tokens.Radius.card)
+        val screenHeight = LocalConfiguration.current.screenHeightDp.dp
+        BoxWithConstraints(Modifier.fillMaxWidth()) {
+            val height = min(maxWidth * 9f / 16f, screenHeight * 0.7f)
+            Box(
+                Modifier.fillMaxWidth().height(height).cardShadow(shape).clip(shape).background(Theme.palette.secondaryBackground)
+                    .clickable(onClickLabel = "Open image") { openHero(heroImage, coverIndex, cover != null) },
+            ) {
+                // Slightly above center: portrait covers keep faces in the wide frame.
+                val alignment = BiasAlignment(0f, -0.4f)
+                SubcomposeAsyncImage(
+                    url, g.displayTitle, Modifier.fillMaxSize(), contentScale = ContentScale.Crop, alignment = alignment,
+                    loading = {
+                        if (thumb != null && thumb != url) AsyncImage(thumb, null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop, alignment = alignment)
+                        else Box(Modifier.fillMaxSize(), Alignment.Center) { CircularProgressIndicator(Modifier.size(20.dp), color = Theme.palette.secondaryText, strokeWidth = 2.dp) }
+                    },
+                    error = {
+                        if (thumb != null && thumb != url) AsyncImage(thumb, null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop, alignment = alignment)
+                        else Box(Modifier.fillMaxSize().background(Color.Gray.copy(alpha = 0.1f)), Alignment.Center) {
+                            Icon(photoOnRectangleIcon(), null, tint = StashyColors.appAccent.copy(alpha = 0.5f), modifier = Modifier.size(34.dp))
+                        }
+                    },
+                )
+            }
+        }
+    }
+
+    /** Viewer on the hero picture: inside the loaded list when it is there, else just that picture. */
+    private fun openHero(image: StashImage, coverIndex: Int, isCover: Boolean) {
+        val list = images.list
+        val index = when {
+            coverIndex >= 0 -> coverIndex
+            !isCover && list.items.isNotEmpty() -> 0
+            else -> -1
+        }
+        if (index >= 0) Nav.push(ImageViewerScreen(list.items, index, onLoadMore = { list.loadMore() }))
+        else Nav.push(ImageViewerScreen(listOf(image), 0))
     }
 
     /** iOS: `EditGallerySheet`. */
