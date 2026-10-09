@@ -86,7 +86,7 @@ class GroupDetailScreen(val groupId: String, val preview: StashGroup? = null) : 
     /**
      * iOS `headerView` as a [DetailHeroCard] (like performer / tag / studio): the front cover
      * blurred as the band backdrop with the details on it, sharp in the circle on the band edge
-     * (poster -> top-biased crop; tap -> fullscreen cover); name + aliases below, then the URLs and
+     * (poster -> top-biased crop; tap -> fullscreen cover); name + aliases below, then the
      * the synopsis. Without a cover (or Stash's `default=true` placeholder), a tinted band and the
      * group icon in the circle.
      */
@@ -99,10 +99,9 @@ class GroupDetailScreen(val groupId: String, val preview: StashGroup? = null) : 
         g.subGroupCount?.takeIf { it > 0 }?.let { items += DetailItem("SUB-GROUPS", "$it") }
         val thumb = groupThumbnailURL(g)?.takeIf { g.frontImagePath?.contains("default=true") != true }
         val full = g.frontImageURL
-        val urls = g.urls.orEmpty().filter { it.isNotBlank() }
         DetailHeroCard(
             title = g.name,
-            // iOS shows no aliases / URLs in the header; they appear only expanded here.
+            // iOS shows no aliases in the header (URLs are never shown); they appear only expanded here.
             subtitle = g.aliases?.takeIf { it.isNotBlank() && expanded },
             items = items,
             description = g.synopsis?.takeIf { it.isNotBlank() },
@@ -115,8 +114,8 @@ class GroupDetailScreen(val groupId: String, val preview: StashGroup? = null) : 
                 ) { HeroPicture(thumb, g.name, ContentScale.Crop, rectangleStackIcon(), alignment = HeroPortraitBias) }
             } else DetailHero(DetailHero.Style.Cover, null, Color.Black, "Open cover", null) { HeroPlaceholder(rectangleStackIcon()) },
             collapsedItemCount = 4,
-            footer = if (urls.isEmpty() || !expanded) null else ({ urls.forEach { HeaderLink(it) } }),
-            footerHasMore = urls.isNotEmpty() || !g.aliases.isNullOrBlank(),
+            footer = null,
+            footerHasMore = !g.aliases.isNullOrBlank(),
         )
     }
 
