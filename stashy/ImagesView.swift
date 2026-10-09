@@ -79,6 +79,7 @@ private struct ImagesViewBody: View {
     @State private var didApplyDefaultFilter = false
     @State private var showingEditGallerySheet = false
     @State private var isHeaderExpanded = false
+    @Environment(\.verticalSizeClass) private var verticalSizeClass
     /// After the user picks a per-row layout in the sheet, stop locking `forceOneColumnFeed`.
     @State private var ignoreForcedOneColumnFeed = false
     /// True while the Images feed ScrollView is dragging / decelerating.
@@ -316,11 +317,8 @@ private struct ImagesViewBody: View {
             } else if showsBlockingInitialLoad {
                 VStack(spacing: 0) {
                     if let gallery {
-                        VStack(spacing: 12) {
-                            openedGalleryHeader(gallery)
-                            openedGalleryLinkedCards(gallery)
-                        }
-                        .padding(16)
+                        openedGalleryTop(gallery)
+                            .padding(16)
                     }
                     StandardLoadingView(message: "Loading images...")
                 }
@@ -332,11 +330,8 @@ private struct ImagesViewBody: View {
             } else if displayedImages.isEmpty {
                 VStack(spacing: 0) {
                     if let gallery {
-                        VStack(spacing: 12) {
-                            openedGalleryHeader(gallery)
-                            openedGalleryLinkedCards(gallery)
-                        }
-                        .padding(16)
+                        openedGalleryTop(gallery)
+                            .padding(16)
                     }
                     SharedEmptyStateView(
                         icon: "camera.fill",
@@ -353,8 +348,7 @@ private struct ImagesViewBody: View {
                         ScrollView {
                             VStack(spacing: 12) {
                                 if let gallery {
-                                    openedGalleryHeader(gallery)
-                                    openedGalleryLinkedCards(gallery)
+                                    openedGalleryTop(gallery)
                                 }
                                 gridContent
                             }
@@ -669,9 +663,99 @@ private struct ImagesViewBody: View {
         }
     }
 
-    /// Performer/Tag-style detail header for an opened gallery.
+    /// Opened-gallery top block, laid out like scene detail: hero where the player sits,
+    /// then the title/details card, then Performers & Studio. The grid follows below.
     @ViewBuilder
-    private func openedGalleryHeader(_ gallery: Gallery) -> some View {
+    private func openedGalleryTop(_ gallery: Gallery) -> some View {
+        let heroURL = openedGalleryHeroURL(gallery)
+        VStack(spacing: 12) {
+            if let heroURL {
+                openedGalleryHero(gallery, url: heroURL)
+            }
+            openedGalleryHeader(gallery, showsThumbnail: heroURL == nil)
+            openedGalleryLinkedCards(gallery)
+        }
+    }
+
+    /// Cover first; without one the first loaded image; nothing -> no hero.
+    private func openedGalleryHeroURL(_ gallery: Gallery) -> URL? {
+        if gallery.cover != nil, let url = gallery.coverURL {
+            return url
+        }
+        return displayedImages.first?.thumbnailURL
+    }
+
+    /// Image to open fullscreen from the hero: the cover when it is in the loaded list,
+    /// otherwise the first image.
+    private func openedGalleryHeroImageId(_ gallery: Gallery) -> String? {
+        if let coverId = gallery.cover?.id, displayedImages.contains(where: { $0.id == coverId }) {
+            return coverId
+        }
+        return displayedImages.first?.id
+    }
+
+    /// Empty sizing box for the hero: 16:9 like the player card, fixed height in landscape.
+    @ViewBuilder
+    private var openedGalleryHeroFrame: some View {
+        if verticalSizeClass == .compact {
+            Color.clear
+                .frame(maxWidth: .infinity)
+                .frame(height: 240)
+        } else {
+            Color.clear
+                .frame(maxWidth: .infinity)
+                .aspectRatio(16.0 / 9.0, contentMode: .fit)
+        }
+    }
+
+    /// Cover hero in the scene player's slot: same width, corner radius and shadow,
+    /// aspect-filled into 16:9. Landscape caps the height so it does not fill the screen.
+    @ViewBuilder
+    private func openedGalleryHero(_ gallery: Gallery, url: URL) -> some View {
+        let frame = openedGalleryHeroFrame
+            .overlay {
+                CustomAsyncImage(url: url) { loader in
+                    if let image = loader.image {
+                        // Top-anchored: portrait covers keep the head instead of a mid crop.
+                        image.resizable()
+                            .scaledToFill()
+                            .frame(minWidth: 0, maxWidth: .infinity, minHeight: 0, maxHeight: .infinity, alignment: .top)
+                    } else if loader.isLoading {
+                        Rectangle().fill(Color.gray.opacity(DesignTokens.Opacity.placeholder))
+                            .overlay(InlineSpinner(scale: .compact))
+                    } else {
+                        Rectangle().fill(Color.gray.opacity(DesignTokens.Opacity.placeholder))
+                            .overlay(
+                                Image(systemName: "photo.on.rectangle")
+                                    .font(.system(size: 32))
+                                    .foregroundColor(.appAccent.opacity(0.5))
+                            )
+                    }
+                }
+            }
+            .background(Color.secondaryAppBackground)
+            .clipShape(RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.card))
+            .contentShape(RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.card))
+            .cardShadow()
+
+        if let imageId = openedGalleryHeroImageId(gallery) {
+            Button {
+                HapticManager.light()
+                fullscreenImageId = imageId
+            } label: {
+                frame
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Open cover image")
+        } else {
+            frame
+        }
+    }
+
+    /// Performer/Tag-style detail header for an opened gallery. With a hero above it the
+    /// side thumbnail is dropped and the card carries only title and details.
+    @ViewBuilder
+    private func openedGalleryHeader(_ gallery: Gallery, showsThumbnail: Bool = true) -> some View {
         let collapsedHeight: CGFloat = 115
         let imageWidth: CGFloat = 72
         let allDetails = getGalleryHeaderDetails(gallery)
@@ -679,6 +763,7 @@ private struct ImagesViewBody: View {
         let hasExpandableContent = allDetails.count > 4 || !(gallery.details ?? "").isEmpty
 
         HStack(alignment: .top, spacing: 0) {
+            if showsThumbnail {
             ZStack(alignment: .top) {
                 if let url = gallery.coverURL {
                     CustomAsyncImage(url: url) { loader in
@@ -702,6 +787,7 @@ private struct ImagesViewBody: View {
             .frame(minHeight: collapsedHeight)
             .frame(maxHeight: isHeaderExpanded ? nil : collapsedHeight, alignment: .top)
             .background(Color.gray.opacity(DesignTokens.Opacity.placeholder))
+            }
 
             VStack(alignment: .leading, spacing: 4) {
                 Text(gallery.displayName)
@@ -736,7 +822,7 @@ private struct ImagesViewBody: View {
             }
             .padding(.vertical, 10)
             .padding(.horizontal, 12)
-            .frame(maxWidth: .infinity, minHeight: collapsedHeight, alignment: .topLeading)
+            .frame(maxWidth: .infinity, minHeight: showsThumbnail ? collapsedHeight : nil, alignment: .topLeading)
         }
         .background(Color.secondaryAppBackground)
         .clipShape(RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.card))
