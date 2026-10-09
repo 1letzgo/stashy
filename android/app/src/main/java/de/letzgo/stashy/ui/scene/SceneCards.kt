@@ -26,6 +26,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import de.letzgo.stashy.ui.detail.DirectorDetailScreen
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.CircularProgressIndicator
@@ -129,7 +130,7 @@ fun ScenePerformersStudioCard(
                         NamePill(performer.name, Modifier.offset(y = 8.dp))
                     }
                 }
-                if (director != null) item("director") {
+                items(DirectorDetailScreen.directorNames(director), key = { "director:$it" }) { director ->
                     Box(Modifier.padding(bottom = 8.dp).plainClick { DetailLinks.director(director) }, contentAlignment = Alignment.BottomCenter) {
                         Box(Modifier.size(88.dp).clip(CircleShape).background(tint).padding(4.dp).clip(CircleShape).background(p.secondaryBackground), contentAlignment = Alignment.Center) {
                             Icon(PlayerIcons.director, null, tint = p.pillAccent, modifier = Modifier.size(30.dp))

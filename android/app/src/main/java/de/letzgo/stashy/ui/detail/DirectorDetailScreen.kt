@@ -89,9 +89,22 @@ class DirectorDetailScreen(val director: String) : Screen {
     }
 
     companion object {
-        /** `director: { value, modifier: EQUALS }` (Stash `StringCriterionInput`). */
+        /**
+         * Stash keeps `director` as one free-text field, so a scene with two directors reads
+         * "Director A, Director B". The UI shows one entry per name (iOS `SceneDirectors.names`).
+         */
+        fun directorNames(raw: String?): List<String> =
+            raw.orEmpty().split(',').map { it.trim() }.filter { it.isNotEmpty() }.distinct()
+
+        /** Matches [name] as one entry of the comma-separated field (RE2, as Stash uses Go regexp). */
+        internal fun directorRegex(name: String): String {
+            val escaped = buildString { name.forEach { if (it in "\\.+*?()|[]{}^$") append('\\'); append(it) } }
+            return "(^|,)\\s*$escaped\\s*(,|$)"
+        }
+
+        /** `director: { value: <regex>, modifier: MATCHES_REGEX }` (Stash `StringCriterionInput`). */
         internal fun directorScope(director: String): JsonObject = buildJsonObject {
-            put("director", buildJsonObject { put("value", JsonPrimitive(director)); put("modifier", JsonPrimitive("EQUALS")) })
+            put("director", buildJsonObject { put("value", JsonPrimitive(directorRegex(director))); put("modifier", JsonPrimitive("MATCHES_REGEX")) })
         }
     }
 }

@@ -107,7 +107,7 @@ struct ScenePerformersStudioCard: View {
                             .buttonStyle(.plain)
                         }
 
-                        if let director {
+                        ForEach(SceneDirectors.names(director), id: \.self) { director in
                             NavigationLink(destination: DirectorDetailView(director: director)) {
                                 tile(name: director) {
                                     ZStack {

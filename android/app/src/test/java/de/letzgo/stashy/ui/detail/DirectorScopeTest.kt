@@ -17,7 +17,13 @@ class DirectorScopeTest {
         val live = JsonObject(mapOf("director" to buildJsonObject { put("value", JsonPrimitive("Other")); put("modifier", JsonPrimitive("INCLUDES")) }))
         val f = CatalogQuery(FilterMode.Scenes, SortCatalog.scenes[1], live = live, scope = scope).entityFilter()!!
         val director = f["director"]!!.jsonObject
-        assertEquals(JsonPrimitive("Jane Doe"), director["value"])
-        assertEquals(JsonPrimitive("EQUALS"), director["modifier"])
+        assertEquals(JsonPrimitive("(^|,)\\s*Jane Doe\\s*(,|$)"), director["value"])
+        assertEquals(JsonPrimitive("MATCHES_REGEX"), director["modifier"])
+    }
+
+    @Test fun splitsCommaSeparatedDirectors() {
+        assertEquals(listOf("A One", "B Two"), DirectorDetailScreen.directorNames(" A One, B Two ,A One,"))
+        assertEquals(emptyList<String>(), DirectorDetailScreen.directorNames(null))
+        assertEquals("(^|,)\\s*J\\.D\\s*(,|$)", DirectorDetailScreen.directorRegex("J.D"))
     }
 }

@@ -8,6 +8,25 @@
 #if !os(tvOS)
 import SwiftUI
 
+/// Stash keeps `director` as one free-text field, so a scene with two directors reads
+/// "Director A, Director B". The UI shows one entry per name.
+enum SceneDirectors {
+    static func names(_ raw: String?) -> [String] {
+        guard let raw else { return [] }
+        var seen = Set<String>()
+        return raw.split(separator: ",")
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty && seen.insert($0).inserted }
+    }
+
+    /// Matches `name` as one entry of the comma-separated field (RE2 syntax, as Stash uses Go regexp).
+    static func regex(for name: String) -> String {
+        let special = Set("\\.+*?()|[]{}^$")
+        let escaped = name.map { special.contains($0) ? "\\\($0)" : String($0) }.joined()
+        return "(^|,)\\s*" + escaped + "\\s*(,|$)"
+    }
+}
+
 extension StashDBViewModel.SavedFilter {
     /// Stash has no director entity — `director` is a free-text field on the scene,
     /// so the list is scoped with a string criterion instead of an id.
@@ -19,8 +38,8 @@ extension StashDBViewModel.SavedFilter {
             filter: nil,
             object_filter: .object([
                 "director": .object([
-                    "value": .string(director),
-                    "modifier": .string("EQUALS")
+                    "value": .string(SceneDirectors.regex(for: director)),
+                    "modifier": .string("MATCHES_REGEX")
                 ])
             ]),
             ui_options: nil
