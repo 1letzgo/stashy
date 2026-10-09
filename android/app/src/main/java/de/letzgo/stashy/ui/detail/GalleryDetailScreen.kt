@@ -54,7 +54,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
-import coil3.compose.AsyncImage
 import coil3.compose.SubcomposeAsyncImage
 import de.letzgo.stashy.ui.StashyColors
 import kotlinx.coroutines.launch
@@ -200,16 +199,15 @@ class GalleryDetailScreen(
     }
 
     /**
-     * iOS `openedGalleryHeader` merged with the cover hero ([DetailHeroCard]): the cover fills a
-     * 16:9 center crop with the title + details over a bottom gradient; tapping it opens the
-     * fullscreen viewer. Without a picture, title + details on the plain card. The description
-     * sits below inside the same card (three lines, expandable).
+     * iOS `openedGalleryHeader` merged with the cover hero ([DetailHeroCard]): the cover (thumbnail)
+     * blurred as the band backdrop and center-cropped in the circle before the title; tapping the
+     * band opens the fullscreen viewer. Details and description (three lines, expandable) below on
+     * the card. Without a picture, all on the plain card.
      */
     @Composable
     private fun HeroHeader(g: Gallery) {
         val hero = heroImage(g)
-        // Full picture for the large frame (Coil downsamples to the frame); a video clip as cover
-        // fails to decode there, so it uses the thumbnail.
+        // A video clip as cover fails to decode as a picture, so it uses the thumbnail.
         val url = hero?.first?.let { img -> (if (img.isVideo) null else img.imageURL) ?: img.thumbnailURL }
         DetailHeroCard(
             title = g.displayTitle,
@@ -220,17 +218,14 @@ class GalleryDetailScreen(
             hero = if (hero != null && url != null) {
                 val (image, coverIndex, isCover) = hero
                 val thumb = image.thumbnailURL
-                DetailHero(DetailHero.Style.Cover, Color.Black, "Open image", { openHero(image, coverIndex, isCover) }) {
+                DetailHero(DetailHero.Style.Cover, thumb ?: url, Color.Black, "Open image", { openHero(image, coverIndex, isCover) }) {
+                    // 72dp circle: the thumbnail is plenty; full picture only when there is none.
                     SubcomposeAsyncImage(
-                        url, g.displayTitle, Modifier.fillMaxSize(), contentScale = ContentScale.Crop, alignment = Alignment.Center,
-                        loading = {
-                            if (thumb != null && thumb != url) AsyncImage(thumb, null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop, alignment = Alignment.Center)
-                            else Box(Modifier.fillMaxSize(), Alignment.Center) { CircularProgressIndicator(Modifier.size(20.dp), color = Color.White.copy(alpha = 0.7f), strokeWidth = 2.dp) }
-                        },
+                        thumb ?: url, g.displayTitle, Modifier.fillMaxSize(), contentScale = ContentScale.Crop, alignment = Alignment.Center,
+                        loading = { Box(Modifier.fillMaxSize(), Alignment.Center) { CircularProgressIndicator(Modifier.size(20.dp), color = Color.White.copy(alpha = 0.7f), strokeWidth = 2.dp) } },
                         error = {
-                            if (thumb != null && thumb != url) AsyncImage(thumb, null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop, alignment = Alignment.Center)
-                            else Box(Modifier.fillMaxSize().background(Color.Gray.copy(alpha = 0.1f)), Alignment.Center) {
-                                Icon(photoOnRectangleIcon(), null, tint = StashyColors.appAccent.copy(alpha = 0.5f), modifier = Modifier.size(34.dp))
+                            Box(Modifier.fillMaxSize().background(Color.Gray.copy(alpha = 0.1f)), Alignment.Center) {
+                                Icon(photoOnRectangleIcon(), null, tint = StashyColors.appAccent.copy(alpha = 0.5f), modifier = Modifier.size(28.dp))
                             }
                         },
                     )
