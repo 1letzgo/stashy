@@ -285,14 +285,16 @@ internal fun DetailHeaderCard(
     imageContent: (@Composable BoxScope.() -> Unit)? = null,
     onFeeds: (() -> Unit)? = null,
     expandedContent: (@Composable ColumnScope.() -> Unit)? = null,
+    /** false: no thumbnail strip (the screen already shows the picture, e.g. the gallery hero). */
+    showsImageStrip: Boolean = true,
 ) {
     val p = Theme.palette
-    val collapsedHeight = 115.dp
+    val collapsedHeight = if (showsImageStrip) 115.dp else 0.dp
     HeaderCardFrame {
         // The text column sets the height; the strip matches it (no intrinsics: Coil's
         // SubcomposeAsyncImage cannot answer intrinsic measurements).
         Box(Modifier.fillMaxWidth().heightIn(min = collapsedHeight)) {
-            Box(Modifier.matchParentSize()) {
+            if (showsImageStrip) Box(Modifier.matchParentSize()) {
             Box(
                 Modifier.width(72.dp).fillMaxHeight()
                     .background(Color.Gray.copy(alpha = 0.1f)),
@@ -308,7 +310,7 @@ internal fun DetailHeaderCard(
             }
             }
             Column(
-                Modifier.fillMaxWidth().heightIn(min = collapsedHeight).padding(start = 72.dp + 12.dp, end = 12.dp, top = 10.dp, bottom = 10.dp),
+                Modifier.fillMaxWidth().heightIn(min = collapsedHeight).padding(start = if (showsImageStrip) 72.dp + 12.dp else 12.dp, end = 12.dp, top = 10.dp, bottom = 10.dp),
                 verticalArrangement = Arrangement.spacedBy(4.dp),
             ) {
                 Row(verticalAlignment = Alignment.Top, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
