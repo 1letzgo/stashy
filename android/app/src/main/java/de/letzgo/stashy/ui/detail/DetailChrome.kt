@@ -223,6 +223,17 @@ internal fun FeedsPill(contentColor: Color? = null, onClick: () -> Unit) {
     de.letzgo.stashy.ui.components.ActionChip("Feeds", onClick, icon = SF.playRectangleOnRectangle, contentColor = contentColor)
 }
 
+/** Expand/collapse chevron as a pill matching [FeedsPill] (same `AssistChip`), for the hero title row. */
+@Composable
+internal fun ExpandPill(expanded: Boolean, onToggle: () -> Unit) {
+    de.letzgo.stashy.ui.components.IconActionChip(
+        if (expanded) SF.chevronUp else SF.chevronDown, if (expanded) "Collapse" else "Expand", onToggle,
+    )
+}
+
+/** Columns of [DetailItemsGrid]; collapsed headers show whole rows of it. */
+internal const val DetailGridColumns = 2
+
 /** 2-column label/value grid of the detail headers (8pt uppercase label, 11pt medium value). */
 @Composable
 internal fun DetailItemsGrid(
@@ -231,7 +242,7 @@ internal fun DetailItemsGrid(
     valueColor: Color = Theme.palette.text,
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-        items.chunked(2).forEach { row ->
+        items.chunked(DetailGridColumns).forEach { row ->
             Row(Modifier.fillMaxWidth()) {
                 row.forEach { d ->
                     Column(Modifier.weight(1f)) {
@@ -240,13 +251,13 @@ internal fun DetailItemsGrid(
                         Text(d.value, fontSize = 11.sp, lineHeight = 13.sp, fontWeight = FontWeight.Medium, color = valueColor, maxLines = 2, overflow = TextOverflow.Ellipsis)
                     }
                 }
-                if (row.size == 1) Spacer(Modifier.weight(1f))
+                repeat(DetailGridColumns - row.size) { Spacer(Modifier.weight(1f)) }
             }
         }
     }
 }
 
-/** Round expand/collapse chevron at the header's bottom-right. */
+/** Round expand/collapse chevron at the header's bottom-right ([DetailHeaderCard]). */
 @Composable
 internal fun BoxScope.HeaderExpandButton(expanded: Boolean, onToggle: () -> Unit) {
     Box(

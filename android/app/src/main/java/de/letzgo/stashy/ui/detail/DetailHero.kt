@@ -61,7 +61,6 @@ import de.letzgo.stashy.ui.NativeTopBar
 import de.letzgo.stashy.ui.Screen
 import de.letzgo.stashy.ui.StashyColors
 import de.letzgo.stashy.ui.Theme
-import de.letzgo.stashy.ui.scaledIconSize
 
 /**
  * The picture of a [DetailHeroCard]. [backdropUrl] is blurred behind the band (dashboard
@@ -91,8 +90,9 @@ internal class DetailHero(
  * picture, holding the label/value grid in white to the end side of the circle. The circle avatar
  * straddles the band's lower edge exactly half/half, start-aligned. Below the edge, on the plain
  * card background: the [title] + [titleAccessory] (Feeds pill) next to the circle's lower half,
- * then [footer] (e.g. the studio URL) and the [description], clamped to three lines with the
- * expand chevron when longer. Tapping the band or circle runs [DetailHero.onClick].
+ * then [footer] (e.g. the studio URL) and the [description], clamped to three lines. When
+ * anything can expand, an expand pill (same chip as Feeds) ends the title row.
+ * Tapping the band or circle runs [DetailHero.onClick].
  * [collapsedItemCount] limits the grid until expanded.
  */
 @Composable
@@ -118,13 +118,13 @@ internal fun DetailHeroCard(
     val visible = if (expanded) items else items.take(collapsedItemCount)
     HeaderCardFrame {
         Column(Modifier.fillMaxWidth()) {
-            HeroHeaderLayout(hero, title, subtitle, visible, expanded, titleAccessory)
-            if (description != null || footer != null || expandable) {
+            HeroHeaderLayout(hero, title, subtitle, visible, expanded, titleAccessory, if (expandable) onToggle else null)
+            if (description != null || footer != null) {
                 Column(
                     Modifier.fillMaxWidth().padding(start = 12.dp, end = 12.dp, top = 4.dp, bottom = 10.dp),
                     verticalArrangement = Arrangement.spacedBy(4.dp),
                 ) {
-                    if (description != null || footer != null) HorizontalDivider(color = p.separator)
+                    HorizontalDivider(color = p.separator)
                     if (footer != null) Column(Modifier.padding(vertical = 4.dp)) { footer() }
                     if (description != null) {
                         Text(
@@ -134,13 +134,11 @@ internal fun DetailHeroCard(
                             modifier = Modifier.padding(vertical = 4.dp),
                         )
                     }
-                    if (expandable) Spacer(Modifier.height(scaledIconSize(18.dp)))
                 }
             } else {
                 Spacer(Modifier.height(10.dp))
             }
         }
-        if (expandable) HeaderExpandButton(expanded, onToggle)
     }
 }
 
@@ -163,6 +161,8 @@ private fun HeroHeaderLayout(
     items: List<DetailItem>,
     expanded: Boolean,
     accessory: (@Composable (Color?) -> Unit)?,
+    /** Non-null when something can expand: the chevron pill at the row end. */
+    onToggle: (() -> Unit)?,
 ) {
     val p = Theme.palette
     val outer = HeroAvatar + HeroAvatarGap * 2
@@ -192,6 +192,7 @@ private fun HeroHeaderLayout(
                     }
                 }
                 accessory?.invoke(null)
+                onToggle?.let { ExpandPill(expanded, it) }
             }
             // Card-coloured gap ring, then the Feeds performer-thumbnail ring (tinted fill, 2dp tint border).
             Box(

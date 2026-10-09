@@ -159,7 +159,7 @@ class PerformerDetailScreen(val performerId: String, val preview: Performer? = n
                     backdropAlignment = HeroPortraitBias,
                 ) { HeroPicture(it, name, ContentScale.Crop, SF.personFill, alignment = HeroPortraitBias) }
             } ?: DetailHero(DetailHero.Style.Cover, null, Color.Black, "Open image", null) { HeroPlaceholder(SF.personFill) },
-            collapsedItemCount = 6,
+            collapsedItemCount = DetailGridColumns * 2,
             titleAccessory = p?.let { perf -> { color -> FeedsPill(color) { DetailFeedsLink.navigate(DetailFeedsLink.Target.Performer(perf.id, perf.name)) } } },
             footer = if (urls.isEmpty()) null else ({
                 (if (expanded) urls else urls.take(1)).forEach { HeaderLink(it) }
