@@ -113,22 +113,7 @@ fun ScenePerformersStudioCard(
             LazyRow(Modifier.padding(top = 8.dp, bottom = 12.dp), contentPadding = PaddingValues(horizontal = 12.dp), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
                 if (studio != null) item("studio-${studio.id}") { StudioItem(studio) }
                 uniqueItems(performers.sortedBy { it.name }, { it.id }) { performer ->
-                    Box(Modifier.padding(bottom = 8.dp).plainClick { DetailLinks.performer(performer) }, contentAlignment = Alignment.BottomCenter) {
-                        Box(Modifier.size(88.dp).clip(CircleShape).background(tint).padding(4.dp).clip(CircleShape)) {
-                            val url = performer.imageURL
-                            if (url != null) AsyncImage(url, performer.name, Modifier.fillMaxSize().background(Color.Gray.copy(alpha = 0.2f)), contentScale = ContentScale.Crop, alignment = Alignment.TopCenter)
-                            else Icon(PlayerIcons.person, null, tint = tint.copy(alpha = 0.4f), modifier = Modifier.fillMaxSize())
-                        }
-                        ageAt(performer.birthdate, date)?.let { age ->
-                            Box(
-                                // Min 22 dp circle that widens into a capsule when the font scale grows the number.
-                                Modifier.align(Alignment.TopEnd).sizeIn(minWidth = 22.dp, minHeight = 22.dp).clip(RoundedCornerShape(50)).background(tint)
-                                    .border(1.5.dp, p.secondaryBackground, RoundedCornerShape(50)).padding(horizontal = 4.dp, vertical = 2.dp),
-                                contentAlignment = Alignment.Center,
-                            ) { Text("$age", style = pillTextStyle, color = Color.White, maxLines = 1) }
-                        }
-                        NamePill(performer.name, Modifier.offset(y = 8.dp))
-                    }
+                    ScenePerformerTile(performer, ageAt(performer.birthdate, date)?.toString()) { DetailLinks.performer(performer) }
                 }
                 items(DirectorDetailScreen.directorNames(director), key = { "director:$it" }) { director ->
                     Box(Modifier.padding(bottom = 8.dp).plainClick { DetailLinks.director(director) }, contentAlignment = Alignment.BottomCenter) {
@@ -140,6 +125,33 @@ fun ScenePerformersStudioCard(
                 }
             }
         }
+    }
+}
+
+/**
+ * Performer entry of [ScenePerformersStudioCard] (also the "Appears with" tab of the performer
+ * detail): 88 dp round portrait with the tint ring, optional [badge] top-right (the age at the
+ * scene date there, the shared scene count on the performer detail), name pill overlapping the bottom.
+ */
+@Composable
+internal fun ScenePerformerTile(performer: Performer, badge: String?, modifier: Modifier = Modifier, onClick: () -> Unit) {
+    val tint = Appearance.tint
+    val p = Theme.palette
+    Box(modifier.padding(bottom = 8.dp).plainClick(onClick), contentAlignment = Alignment.BottomCenter) {
+        Box(Modifier.size(88.dp).clip(CircleShape).background(tint).padding(4.dp).clip(CircleShape)) {
+            val url = performer.imageURL
+            if (url != null) AsyncImage(url, performer.name, Modifier.fillMaxSize().background(Color.Gray.copy(alpha = 0.2f)), contentScale = ContentScale.Crop, alignment = Alignment.TopCenter)
+            else Icon(PlayerIcons.person, null, tint = tint.copy(alpha = 0.4f), modifier = Modifier.fillMaxSize())
+        }
+        badge?.let { text ->
+            Box(
+                // Min 22 dp circle that widens into a capsule when the font scale grows the number.
+                Modifier.align(Alignment.TopEnd).sizeIn(minWidth = 22.dp, minHeight = 22.dp).clip(RoundedCornerShape(50)).background(tint)
+                    .border(1.5.dp, p.secondaryBackground, RoundedCornerShape(50)).padding(horizontal = 4.dp, vertical = 2.dp),
+                contentAlignment = Alignment.Center,
+            ) { Text(text, style = pillTextStyle, color = Color.White, maxLines = 1) }
+        }
+        NamePill(performer.name, Modifier.offset(y = 8.dp))
     }
 }
 

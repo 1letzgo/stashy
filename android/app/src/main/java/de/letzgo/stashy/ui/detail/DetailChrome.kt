@@ -106,11 +106,13 @@ internal object Dock {
 /** Section icons in the detail chrome bar (iOS `PerformerDetailView.DetailTab` & co.). */
 enum class DetailTab(val title: String) {
     Scenes("Scenes"), Galleries("Galleries"), Studios("Studios"), Performers("Performers"),
-    Tags("Tags"), Groups("Groups"), Images("Images");
+    Tags("Tags"), Groups("Groups"), Images("Images"),
+    /** Performer detail only: performers who share scenes with this one ([de.letzgo.stashy.data.CoPerformersRepository]). */
+    AppearsWith("Appears with");
 
     val icon: ImageVector get() = when (this) {
         Scenes -> SF.film; Galleries -> SF.photoStack; Studios -> SF.building2; Performers -> SF.personFill
-        Tags -> SF.tag; Groups -> SF.rectangleStackFill; Images -> SF.photo
+        Tags -> SF.tag; Groups -> SF.rectangleStackFill; Images -> SF.photo; AppearsWith -> SF.person2
     }
 }
 
