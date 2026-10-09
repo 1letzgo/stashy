@@ -69,6 +69,7 @@
 		9BA6D13B444E433980610D36 /* SceneGroupsCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA617C2A62174FFFB0912B44 /* SceneGroupsCard.swift */; };
 		A1B2C3D40002400180011002 /* FilterPickerOptionsStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D40001400180011001 /* FilterPickerOptionsStore.swift */; };
 		A1ED4C0012345678901234AB /* EditModeSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1ED4C0112345678901234AB /* EditModeSettingsView.swift */; };
+		5CDL00012F80A00000000001 /* SceneDetailLayoutSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5CDL00022F80A00000000002 /* SceneDetailLayoutSettingsView.swift */; };
 		A1ED4C0212345678901234AB /* EditModeSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1ED4C0112345678901234AB /* EditModeSettingsView.swift */; };
 		A1ICON012F30B00000000001 /* AppIconManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1ICON022F30B00000000002 /* AppIconManager.swift */; };
 		A1IMGDS012345678901234AB /* StashImageDateSort.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1IMGDS022345678901234AB /* StashImageDateSort.swift */; };
@@ -262,6 +263,7 @@
 		971A00092F999009 /* SessionTimelineLoader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionTimelineLoader.swift; sourceTree = "<group>"; };
 		A1B2C3D40001400180011001 /* FilterPickerOptionsStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FilterPickerOptionsStore.swift; sourceTree = "<group>"; };
 		A1ED4C0112345678901234AB /* EditModeSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EditModeSettingsView.swift; sourceTree = "<group>"; };
+		5CDL00022F80A00000000002 /* SceneDetailLayoutSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SceneDetailLayoutSettingsView.swift; sourceTree = "<group>"; };
 		A1ICON022F30B00000000002 /* AppIconManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppIconManager.swift; sourceTree = "<group>"; };
 		A1IMGDS022345678901234AB /* StashImageDateSort.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StashImageDateSort.swift; sourceTree = "<group>"; };
 		A1PLUS022F30B00000000002 /* StashyPlusManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StashyPlusManager.swift; sourceTree = "<group>"; };
@@ -610,6 +612,7 @@
 				AITAG00062F70A00000000006 /* AITagsSettingsView.swift */,
 				DF22BB332F1831C7007C2090 /* AppearanceSettingsView.swift */,
 				A1ED4C0112345678901234AB /* EditModeSettingsView.swift */,
+				5CDL00022F80A00000000002 /* SceneDetailLayoutSettingsView.swift */,
 				DFSEC0062F2A000100000006 /* SecuritySettingsView.swift */,
 				DFST0000A2F30A000000000A /* ContentSettingsSection.swift */,
 				DFST0000C2F30A000000000C /* DashboardSettingsView.swift */,
@@ -888,6 +891,7 @@
 				DFE504622E8A8C4000323FF0 /* StudiosView.swift in Sources */,
 				DF22BB342F1831C7007C2090 /* AppearanceSettingsView.swift in Sources */,
 				A1ED4C0012345678901234AB /* EditModeSettingsView.swift in Sources */,
+				5CDL00012F80A00000000001 /* SceneDetailLayoutSettingsView.swift in Sources */,
 				DF90B7642F1ACEA3003ED852 /* ServerSetupWizardView.swift in Sources */,
 				DFGQ000012F28A0000000001 /* GraphQLClient.swift in Sources */,
 				DFGQ000032F28A0000000003 /* GraphQLQueries.swift in Sources */,

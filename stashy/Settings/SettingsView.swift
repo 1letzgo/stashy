@@ -177,11 +177,15 @@ struct SettingsView: View {
             NavigationLink(destination: AppearanceSettingsView()) {
                 Label("Appearance", systemImage: "paintbrush")
             }
-            .stashyGroupedBlockRow(index: 0, count: 2)
+            .stashyGroupedBlockRow(index: 0, count: 3)
             NavigationLink(destination: EditModeSettingsView()) {
                 Label("Editing", systemImage: "pencil.circle")
             }
-            .stashyGroupedBlockRow(index: 1, count: 2)
+            .stashyGroupedBlockRow(index: 1, count: 3)
+            NavigationLink(destination: SceneDetailLayoutSettingsView()) {
+                Label("Scene View", systemImage: "rectangle.stack")
+            }
+            .stashyGroupedBlockRow(index: 2, count: 3)
         }
 
         Section {
