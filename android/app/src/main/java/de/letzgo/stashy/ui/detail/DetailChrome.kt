@@ -225,16 +225,19 @@ internal fun FeedsPill(onClick: () -> Unit) {
 
 /** 2-column label/value grid of the detail headers (8pt uppercase label, 11pt medium value). */
 @Composable
-internal fun DetailItemsGrid(items: List<DetailItem>) {
-    val p = Theme.palette
+internal fun DetailItemsGrid(
+    items: List<DetailItem>,
+    labelColor: Color = Theme.palette.secondaryText,
+    valueColor: Color = Theme.palette.text,
+) {
     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
         items.chunked(2).forEach { row ->
             Row(Modifier.fillMaxWidth()) {
                 row.forEach { d ->
                     Column(Modifier.weight(1f)) {
-                        Text(d.label.uppercase(), fontSize = 8.sp, lineHeight = 10.sp, color = p.secondaryText)
+                        Text(d.label.uppercase(), fontSize = 8.sp, lineHeight = 10.sp, color = labelColor)
                         // 2 lines: half-width column, so a large font scale wraps instead of cutting the value.
-                        Text(d.value, fontSize = 11.sp, lineHeight = 13.sp, fontWeight = FontWeight.Medium, color = p.text, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                        Text(d.value, fontSize = 11.sp, lineHeight = 13.sp, fontWeight = FontWeight.Medium, color = valueColor, maxLines = 2, overflow = TextOverflow.Ellipsis)
                     }
                 }
                 if (row.size == 1) Spacer(Modifier.weight(1f))
@@ -285,16 +288,13 @@ internal fun DetailHeaderCard(
     imageContent: (@Composable BoxScope.() -> Unit)? = null,
     onFeeds: (() -> Unit)? = null,
     expandedContent: (@Composable ColumnScope.() -> Unit)? = null,
-    /** false: no thumbnail strip (the screen already shows the picture, e.g. the gallery hero). */
-    showsImageStrip: Boolean = true,
 ) {
     val p = Theme.palette
-    val collapsedHeight = if (showsImageStrip) 115.dp else 0.dp
     HeaderCardFrame {
         // The text column sets the height; the strip matches it (no intrinsics: Coil's
         // SubcomposeAsyncImage cannot answer intrinsic measurements).
-        Box(Modifier.fillMaxWidth().heightIn(min = collapsedHeight)) {
-            if (showsImageStrip) Box(Modifier.matchParentSize()) {
+        Box(Modifier.fillMaxWidth().heightIn(min = 115.dp)) {
+            Box(Modifier.matchParentSize()) {
             Box(
                 Modifier.width(72.dp).fillMaxHeight()
                     .background(Color.Gray.copy(alpha = 0.1f)),
@@ -310,7 +310,7 @@ internal fun DetailHeaderCard(
             }
             }
             Column(
-                Modifier.fillMaxWidth().heightIn(min = collapsedHeight).padding(start = if (showsImageStrip) 72.dp + 12.dp else 12.dp, end = 12.dp, top = 10.dp, bottom = 10.dp),
+                Modifier.fillMaxWidth().heightIn(min = 115.dp).padding(start = 72.dp + 12.dp, end = 12.dp, top = 10.dp, bottom = 10.dp),
                 verticalArrangement = Arrangement.spacedBy(4.dp),
             ) {
                 Row(verticalAlignment = Alignment.Top, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
