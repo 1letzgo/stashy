@@ -690,9 +690,9 @@ private struct ImagesViewBody: View {
         return displayedImages.first?.id
     }
 
-    /// Single header card for an opened gallery (`DetailHeroCard`): details on the cover
-    /// blurred as the band backdrop, the cover centre-cropped in the circle straddling the
-    /// band edge, name and description in the solid section. Without a cover or loaded image
+    /// Single header card for an opened gallery (`DetailHeroCard`): the cover blurred as
+    /// the compact band backdrop, the cover centre-cropped in the circle straddling the band
+    /// edge, name, details and description in the solid section. Without a cover or loaded image
     /// a tinted band and a gallery placeholder circle. Tap opens the cover (or first image) fullscreen.
     /// Editing stays on the nav-bar pencil.
     private func openedGalleryHeaderCard(_ gallery: Gallery) -> some View {

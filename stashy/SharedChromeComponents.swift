@@ -1079,18 +1079,17 @@ struct DetailHeroItem: Identifiable {
 
 /// Header card shared by the opened gallery, tag, studio, performer and group detail screens.
 ///
-/// Profile-header layout: a band on top carries the uppercase label/value grid in white
-/// over the image as a blurred backdrop (dashboard hero technique, scaled, but a lighter 18pt blur);
-/// below it the solid card section holds the name in normal text colour. A sharp circular
-/// avatar of the image (tinted ring, as in the Feeds overlay) straddles the edge between
-/// the two exactly half/half, leading-aligned with the content padding; the name sits to
-/// the right of its lower half (vertically centred on it when it fits on one line). The
-/// band grows with the grid (min `minBandHeight`) and
-/// always keeps the circle's upper half clear. `footer` and the description (two lines)
-/// follow in the solid section. The expand chevron is a pill in the title row, trailing
-/// the accessory (Feeds pill) and sized like it; it only shows when there is more to show.
-/// Without an image the structure stays: the band is a muted tint fill (grid in normal
-/// text colours) and the circle shows `placeholderSystemImage`.
+/// Profile-header layout: a compact band on top shows the image as a blurred backdrop
+/// (dashboard hero technique, scaled, but a lighter 18pt blur) and is only as tall as the
+/// circle's upper half plus a little top padding (`bandHeight`). A sharp circular avatar of
+/// the image (tinted ring, as in the Feeds overlay) straddles the edge between band and
+/// solid section exactly half/half, leading-aligned with the content padding; the name sits
+/// to the right of its lower half (vertically centred on it when it fits on one line).
+/// Below the title row the solid section holds the uppercase label/value grid in normal
+/// text colours, then `footer` and the description (two lines). The expand chevron is a
+/// pill in the title row, trailing the accessory (Feeds pill) and sized like it; it only
+/// shows when there is more to show. Without an image the structure stays: the band is a
+/// muted tint fill and the circle shows `placeholderSystemImage`.
 ///
 /// `backdrop` fills the band (blurred by the card), `avatar` fills the circle (clipped by
 /// the card). `onHeroTap` (e.g. fullscreen) makes band and circle a button when there is
@@ -1114,8 +1113,9 @@ struct DetailHeroCard<Backdrop: View, Avatar: View, Accessory: View, Footer: Vie
 
     @ObservedObject private var appearanceManager = AppearanceManager.shared
 
-    private static var minBandHeight: CGFloat { 130 }
     private static var avatarSize: CGFloat { 76 }
+    /// Circle's upper half plus a little padding above it.
+    private static var bandHeight: CGFloat { avatarSize / 2 + 14 }
     private static var contentPadding: CGFloat { 16 }
 
     private var trimmedDescription: String {
@@ -1137,6 +1137,10 @@ struct DetailHeroCard<Backdrop: View, Avatar: View, Accessory: View, Footer: Vie
             heroButton(band)
             // Later sibling draws above the band, so the circle's upper half overlaps it.
             titleRow
+
+            infoGrid
+                .padding(.horizontal, Self.contentPadding)
+                .padding(.bottom, 10)
 
             footer()
 
@@ -1165,19 +1169,15 @@ struct DetailHeroCard<Backdrop: View, Avatar: View, Accessory: View, Footer: Vie
 
     // MARK: Band
 
-    /// Info grid over the blurred backdrop (or the muted tint fill without an image). The
-    /// bottom `avatarSize / 2` stays empty for the circle's upper half.
+    /// Blurred backdrop (or the muted tint fill without an image); holds nothing but the
+    /// circle's upper half plus a little padding above it.
     private var band: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            infoGrid
-                .padding(.top, 14)
-                .padding(.horizontal, Self.contentPadding)
-            Spacer(minLength: Self.avatarSize / 2 + 10)
-        }
-        .frame(maxWidth: .infinity, minHeight: Self.minBandHeight, alignment: .topLeading)
-        .background { bandBackground }
-        .clipped()
-        .contentShape(Rectangle())
+        Color.clear
+            .frame(maxWidth: .infinity)
+            .frame(height: Self.bandHeight)
+            .background { bandBackground }
+            .clipped()
+            .contentShape(Rectangle())
     }
 
     @ViewBuilder
@@ -1308,7 +1308,7 @@ struct DetailHeroCard<Backdrop: View, Avatar: View, Accessory: View, Footer: Vie
     // MARK: Info
 
     /// Uppercase label/value grid in the studio-header type scale (8pt labels, 11pt values),
-    /// white on the image, normal text colours on the tint fill.
+    /// normal text colours in the solid section below the title row.
     @ViewBuilder
     private var infoGrid: some View {
         let visible = isExpanded ? items : Array(items.prefix(collapsedItemLimit))
@@ -1322,14 +1322,13 @@ struct DetailHeroCard<Backdrop: View, Avatar: View, Accessory: View, Footer: Vie
                     VStack(alignment: .leading, spacing: 1) {
                         Text(item.label)
                             .font(.system(size: 8))
-                            .foregroundColor(showsHero ? .white.opacity(0.75) : .secondary)
+                            .foregroundColor(.secondary)
                             .textCase(.uppercase)
                         Text(item.value)
                             .font(.system(size: 11, weight: .medium))
-                            .foregroundColor(showsHero ? .white : .primary)
+                            .foregroundColor(.primary)
                             .lineLimit(1)
                     }
-                    .shadow(color: showsHero ? .black.opacity(0.4) : .clear, radius: 2, y: 1)
                 }
             }
         }

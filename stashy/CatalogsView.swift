@@ -1474,9 +1474,9 @@ struct GroupDetailView: View {
         .padding(.bottom, 32)
     }
 
-    /// Header card (`DetailHeroCard`): stats on the front cover blurred as the band backdrop,
-    /// the cover (a poster) top-cropped in the circle straddling the band edge, name and
-    /// synopsis in the solid section. Editing stays on the nav-bar pencil.
+    /// Header card (`DetailHeroCard`): the front cover blurred as the compact band backdrop,
+    /// the cover (a poster) top-cropped in the circle straddling the band edge, name, stats
+    /// and synopsis in the solid section. Editing stays on the nav-bar pencil.
     private var headerView: some View {
         let coverURL = selectedGroup.thumbnailURL
         return DetailHeroCard(

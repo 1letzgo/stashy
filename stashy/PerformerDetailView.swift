@@ -904,9 +904,9 @@ struct PerformerDetailView: View {
         )
     }
     
-    /// Header card (`DetailHeroCard`): stats on the performer image blurred as the band
-    /// backdrop, the portrait top-cropped in the circle straddling the band edge (keeps the
-    /// face visible), name and Feeds pill in the solid section. Two full rows of stats (8 at
+    /// Header card (`DetailHeroCard`): the performer image blurred as the compact
+    /// band backdrop, the portrait top-cropped in the circle straddling the band edge (keeps the
+    /// face visible), name, Feeds pill and stats in the solid section. Two full rows of stats (8 at
     /// the grid's 4 columns) show collapsed, the rest behind the chevron pill. Favorite / Edit / image change stay in the nav bar.
     private func headerView(displayPerformer: Performer, battleLine: String?) -> some View {
         let imageURL = displayPerformer.thumbnailURL

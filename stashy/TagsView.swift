@@ -1507,9 +1507,9 @@ struct TagDetailView: View {
         return !path.contains("default=true")
     }
 
-    /// Header card (`DetailHeroCard`): counts on the tag image blurred as the band backdrop,
-    /// the image centre-cropped in the circle straddling the band edge, name, Feeds pill and
-    /// description in the solid section.
+    /// Header card (`DetailHeroCard`): the tag image blurred as the compact band backdrop,
+    /// the image centre-cropped in the circle straddling the band edge, name, Feeds pill,
+    /// counts and description in the solid section.
     /// Tap opens the image fullscreen. Edit / Favorite live in the nav bar.
     private var tagHeaderView: some View {
         DetailHeroCard(
