@@ -663,16 +663,12 @@ private struct ImagesViewBody: View {
         }
     }
 
-    /// Opened-gallery top block, laid out like scene detail: hero where the player sits,
-    /// then the title/details card, then Performers & Studio. The grid follows below.
+    /// Opened-gallery top block, laid out like scene detail: one header card (cover hero
+    /// with name and details overlaid), then Performers & Studio. The grid follows below.
     @ViewBuilder
     private func openedGalleryTop(_ gallery: Gallery) -> some View {
-        let heroURL = openedGalleryHeroURL(gallery)
         VStack(spacing: 12) {
-            if let heroURL {
-                openedGalleryHero(gallery, url: heroURL)
-            }
-            openedGalleryHeader(gallery, showsThumbnail: heroURL == nil)
+            openedGalleryHeaderCard(gallery)
             openedGalleryLinkedCards(gallery)
         }
     }
@@ -708,121 +704,40 @@ private struct ImagesViewBody: View {
         }
     }
 
-    /// Cover hero in the scene player's slot: same width, corner radius and shadow,
-    /// aspect-filled into 16:9. Landscape caps the height so it does not fill the screen.
+    /// Single header card for an opened gallery. With a cover (or first image) the name and
+    /// details sit on the hero over a bottom gradient; without one the same block renders as
+    /// a plain card so the info never disappears. The description lives below the hero
+    /// inside the same card and expands with the chevron. Editing stays on the nav-bar pencil.
     @ViewBuilder
-    private func openedGalleryHero(_ gallery: Gallery, url: URL) -> some View {
-        let frame = openedGalleryHeroFrame
-            .overlay {
-                CustomAsyncImage(url: url) { loader in
-                    if let image = loader.image {
-                        // Top-anchored: portrait covers keep the head instead of a mid crop.
-                        image.resizable()
-                            .scaledToFill()
-                            .frame(minWidth: 0, maxWidth: .infinity, minHeight: 0, maxHeight: .infinity, alignment: .top)
-                    } else if loader.isLoading {
-                        Rectangle().fill(Color.gray.opacity(DesignTokens.Opacity.placeholder))
-                            .overlay(InlineSpinner(scale: .compact))
-                    } else {
-                        Rectangle().fill(Color.gray.opacity(DesignTokens.Opacity.placeholder))
-                            .overlay(
-                                Image(systemName: "photo.on.rectangle")
-                                    .font(.system(size: 32))
-                                    .foregroundColor(.appAccent.opacity(0.5))
-                            )
-                    }
-                }
-            }
-            .background(Color.secondaryAppBackground)
-            .clipShape(RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.card))
-            .contentShape(RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.card))
-            .cardShadow()
+    private func openedGalleryHeaderCard(_ gallery: Gallery) -> some View {
+        let heroURL = openedGalleryHeroURL(gallery)
+        let description = (gallery.details ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
 
-        if let imageId = openedGalleryHeroImageId(gallery) {
-            Button {
-                HapticManager.light()
-                fullscreenImageId = imageId
-            } label: {
-                frame
-            }
-            .buttonStyle(.plain)
-            .accessibilityLabel("Open cover image")
-        } else {
-            frame
-        }
-    }
-
-    /// Performer/Tag-style detail header for an opened gallery. With a hero above it the
-    /// side thumbnail is dropped and the card carries only title and details.
-    @ViewBuilder
-    private func openedGalleryHeader(_ gallery: Gallery, showsThumbnail: Bool = true) -> some View {
-        let collapsedHeight: CGFloat = 115
-        let imageWidth: CGFloat = 72
-        let allDetails = getGalleryHeaderDetails(gallery)
-        let visibleDetails = isHeaderExpanded ? allDetails : Array(allDetails.prefix(4))
-        let hasExpandableContent = allDetails.count > 4 || !(gallery.details ?? "").isEmpty
-
-        HStack(alignment: .top, spacing: 0) {
-            if showsThumbnail {
-            ZStack(alignment: .top) {
-                if let url = gallery.coverURL {
-                    CustomAsyncImage(url: url) { loader in
-                        if loader.isLoading {
-                            Rectangle().fill(Color.gray.opacity(DesignTokens.Opacity.placeholder))
-                                .overlay(InlineSpinner(scale: .compact))
-                        } else if let image = loader.image {
-                            image.resizable()
-                                .scaledToFill()
-                                .frame(width: imageWidth)
-                                .clipped()
-                        } else {
-                            galleryHeaderPlaceholder(width: imageWidth)
-                        }
-                    }
-                } else {
-                    galleryHeaderPlaceholder(width: imageWidth)
-                }
-            }
-            .frame(width: imageWidth, alignment: .top)
-            .frame(minHeight: collapsedHeight)
-            .frame(maxHeight: isHeaderExpanded ? nil : collapsedHeight, alignment: .top)
-            .background(Color.gray.opacity(DesignTokens.Opacity.placeholder))
+        VStack(alignment: .leading, spacing: 0) {
+            if let heroURL {
+                openedGalleryHero(gallery, url: heroURL)
+            } else {
+                openedGalleryInfoBlock(gallery, onImage: false)
+                    .padding(.vertical, 10)
+                    .padding(.horizontal, 12)
+                    .frame(maxWidth: .infinity, alignment: .leading)
             }
 
-            VStack(alignment: .leading, spacing: 4) {
-                Text(gallery.displayName)
-                    .font(.title2)
-                    .fontWeight(.bold)
-                    .foregroundColor(.primary)
-                    .lineLimit(isHeaderExpanded ? nil : 1)
-
-                if !visibleDetails.isEmpty {
-                    LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], alignment: .leading, spacing: 6) {
-                        ForEach(visibleDetails, id: \.label) { detail in
-                            VStack(alignment: .leading, spacing: 0) {
-                                Text(detail.label)
-                                    .font(.system(size: 8))
-                                    .foregroundColor(.secondary)
-                                    .textCase(.uppercase)
-                                Text(detail.value)
-                                    .font(.system(size: 11, weight: .medium))
-                                    .foregroundColor(.primary)
-                                    .lineLimit(1)
-                            }
-                        }
-                    }
-                }
-
-                if isHeaderExpanded, let details = gallery.details, !details.isEmpty {
-                    Text(details)
-                        .font(.system(size: 11))
+            if !description.isEmpty {
+                VStack(alignment: .leading, spacing: 4) {
+                    if heroURL == nil { Divider() }
+                    Text(description)
+                        .font(.caption)
                         .foregroundColor(.secondary)
-                        .padding(.top, 4)
+                        .lineLimit(isHeaderExpanded ? nil : 2)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .padding(.trailing, 28) // keep clear of the chevron
                 }
+                .padding(.horizontal, 12)
+                .padding(.top, heroURL == nil ? 0 : 10)
+                .padding(.bottom, 10)
+                .frame(maxWidth: .infinity, alignment: .leading)
             }
-            .padding(.vertical, 10)
-            .padding(.horizontal, 12)
-            .frame(maxWidth: .infinity, minHeight: showsThumbnail ? collapsedHeight : nil, alignment: .topLeading)
         }
         .background(Color.secondaryAppBackground)
         .clipShape(RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.card))
@@ -831,9 +746,8 @@ private struct ImagesViewBody: View {
                 .stroke(Color.primary.opacity(0.1), lineWidth: 0.5)
         )
         .cardShadow()
-        .fixedSize(horizontal: false, vertical: true)
         .overlay(alignment: .bottomTrailing) {
-            if hasExpandableContent {
+            if !description.isEmpty {
                 Button {
                     withAnimation(.spring()) {
                         isHeaderExpanded.toggle()
@@ -847,6 +761,100 @@ private struct ImagesViewBody: View {
                         .clipShape(Circle())
                 }
                 .padding(8)
+                .accessibilityLabel(isHeaderExpanded ? "Show less" : "Show more")
+            }
+        }
+    }
+
+    /// Cover hero in the scene player's slot: full width, 16:9 aspect-fill cropped from the
+    /// centre (240pt tall in landscape). Name and details overlay the bottom on a gradient.
+    /// Tap opens the cover (or first image) fullscreen.
+    @ViewBuilder
+    private func openedGalleryHero(_ gallery: Gallery, url: URL) -> some View {
+        let image = openedGalleryHeroFrame
+            .overlay {
+                CustomAsyncImage(url: url) { loader in
+                    if let image = loader.image {
+                        image.resizable()
+                            .scaledToFill()
+                            .frame(minWidth: 0, maxWidth: .infinity, minHeight: 0, maxHeight: .infinity, alignment: .center)
+                    } else if loader.isLoading {
+                        Rectangle().fill(Color.gray.opacity(DesignTokens.Opacity.placeholder))
+                            .overlay(InlineSpinner(scale: .compact))
+                    } else {
+                        Rectangle().fill(Color.gray.opacity(DesignTokens.Opacity.placeholder))
+                            .overlay(
+                                Image(systemName: "photo.on.rectangle")
+                                    .font(.system(size: 32))
+                                    .foregroundColor(.appAccent.opacity(0.5))
+                            )
+                    }
+                }
+            }
+            .clipped()
+            .contentShape(Rectangle())
+
+        ZStack(alignment: .bottomLeading) {
+            if let imageId = openedGalleryHeroImageId(gallery) {
+                Button {
+                    HapticManager.light()
+                    fullscreenImageId = imageId
+                } label: {
+                    image
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Open cover image")
+            } else {
+                image
+            }
+
+            openedGalleryInfoBlock(gallery, onImage: true)
+                .padding(.horizontal, 12)
+                .padding(.top, 28)
+                .padding(.bottom, 10)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(
+                    LinearGradient(
+                        gradient: Gradient(colors: [.clear, .black.opacity(0.55), .black.opacity(0.85)]),
+                        startPoint: .top,
+                        endPoint: .bottom
+                    )
+                )
+                .allowsHitTesting(false)
+        }
+    }
+
+    /// Name + detail grid in the studio-header type scale (title2 bold, 8pt uppercase
+    /// labels, 11pt values). `onImage` switches to white text for the hero overlay.
+    private func openedGalleryInfoBlock(_ gallery: Gallery, onImage: Bool) -> some View {
+        let details = getGalleryHeaderDetails(gallery)
+        return VStack(alignment: .leading, spacing: 4) {
+            Text(gallery.displayName)
+                .font(.title2)
+                .fontWeight(.bold)
+                .foregroundColor(onImage ? .white : .primary)
+                .lineLimit(isHeaderExpanded ? nil : 2)
+                .shadow(color: onImage ? .black.opacity(0.4) : .clear, radius: 2, y: 1)
+
+            if !details.isEmpty {
+                LazyVGrid(
+                    columns: Array(repeating: GridItem(.flexible(), alignment: .leading), count: min(max(details.count, 2), 4)),
+                    alignment: .leading,
+                    spacing: 6
+                ) {
+                    ForEach(details, id: \.label) { detail in
+                        VStack(alignment: .leading, spacing: 0) {
+                            Text(detail.label)
+                                .font(.system(size: 8))
+                                .foregroundColor(onImage ? .white.opacity(0.75) : .secondary)
+                                .textCase(.uppercase)
+                            Text(detail.value)
+                                .font(.system(size: 11, weight: .medium))
+                                .foregroundColor(onImage ? .white : .primary)
+                                .lineLimit(1)
+                        }
+                    }
+                }
             }
         }
     }
@@ -887,17 +895,6 @@ private struct ImagesViewBody: View {
         }
     }
 
-    private func galleryHeaderPlaceholder(width: CGFloat) -> some View {
-        Rectangle().fill(Color.gray.opacity(DesignTokens.Opacity.placeholder))
-            .frame(width: width)
-            .frame(maxHeight: .infinity, alignment: .top)
-            .overlay(
-                Image(systemName: "photo.on.rectangle")
-                    .font(.system(size: 24))
-                    .foregroundColor(.appAccent.opacity(0.5))
-            )
-    }
-
     /// Image 1-row avatar navigation passes a stub Gallery (`cover: nil`). Load full metadata for the header.
     private func hydrateOpenedGalleryIfNeeded() async {
         // Stubs (`cover: nil`) and partial galleries from scene/other queries
@@ -929,6 +926,9 @@ private struct ImagesViewBody: View {
         }
         if let date = gallery.date, !date.isEmpty {
             list.append((label: "DATE", value: date))
+        }
+        if let rating = gallery.rating100 {
+            list.append((label: "RATING", value: "\(rating)%"))
         }
         // Studio and performers live in their own cards below the header.
         if gallery.organized == true {
