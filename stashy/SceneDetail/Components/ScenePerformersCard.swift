@@ -8,6 +8,9 @@ struct ScenePerformersCard: View {
     let performers: [ScenePerformer]
     var director: String?
     var onPerformersUpdated: (([ScenePerformer]) -> Void)?
+    /// Writes the chosen performer IDs somewhere other than the scene (e.g. a gallery).
+    /// `nil` keeps the scene mutation.
+    var savePerformerIds: (([String], @escaping (Bool) -> Void) -> Void)? = nil
     @ObservedObject var viewModel: StashDBViewModel
     @ObservedObject var appearanceManager = AppearanceManager.shared
     @State private var showingAddSheet = false
@@ -166,7 +169,8 @@ struct ScenePerformersCard: View {
             AddPerformerToSceneSheet(
                 sceneId: sceneId,
                 currentPerformers: performers,
-                viewModel: viewModel
+                viewModel: viewModel,
+                savePerformerIds: savePerformerIds
             ) { updated in
                 onPerformersUpdated?(updated)
             }
@@ -178,6 +182,7 @@ struct AddPerformerToSceneSheet: View {
     let sceneId: String
     let currentPerformers: [ScenePerformer]
     @ObservedObject var viewModel: StashDBViewModel
+    var savePerformerIds: (([String], @escaping (Bool) -> Void) -> Void)? = nil
     var onComplete: ([ScenePerformer]) -> Void
 
     @Environment(\.dismiss) var dismiss
@@ -285,7 +290,10 @@ struct AddPerformerToSceneSheet: View {
     private func save() {
         isSaving = true
         let ids = Array(selectedIds)
-        viewModel.updateScenePerformers(sceneId: sceneId, performerIds: ids) { success in
+        let persist = savePerformerIds ?? { ids, done in
+            viewModel.updateScenePerformers(sceneId: sceneId, performerIds: ids, completion: done)
+        }
+        persist(ids) { success in
             DispatchQueue.main.async {
                 isSaving = false
                 if success {

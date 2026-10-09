@@ -6,6 +6,9 @@ struct SceneStudioCard: View {
     let sceneId: String
     let studio: SceneStudio?
     var onStudioUpdated: ((SceneStudio?) -> Void)?
+    /// Writes the chosen studio somewhere other than the scene (e.g. a gallery).
+    /// `nil` keeps the scene mutation.
+    var saveStudioId: ((String?, @escaping (Bool) -> Void) -> Void)? = nil
     @ObservedObject var viewModel: StashDBViewModel
     @ObservedObject var appearanceManager = AppearanceManager.shared
     @State private var showingAddSheet = false
@@ -55,7 +58,8 @@ struct SceneStudioCard: View {
             AddStudioToSceneSheet(
                 sceneId: sceneId,
                 currentStudio: studio,
-                viewModel: viewModel
+                viewModel: viewModel,
+                saveStudioId: saveStudioId
             ) { updated in
                 onStudioUpdated?(updated)
             }
@@ -99,6 +103,7 @@ struct AddStudioToSceneSheet: View {
     let sceneId: String
     let currentStudio: SceneStudio?
     @ObservedObject var viewModel: StashDBViewModel
+    var saveStudioId: ((String?, @escaping (Bool) -> Void) -> Void)? = nil
     var onComplete: (SceneStudio?) -> Void
 
     @Environment(\.dismiss) var dismiss
@@ -197,7 +202,10 @@ struct AddStudioToSceneSheet: View {
     private func save() {
         isSaving = true
         let studioId: String? = (selectedId == "__none__") ? nil : (selectedId.isEmpty ? nil : selectedId)
-        viewModel.updateSceneStudio(sceneId: sceneId, studioId: studioId) { success in
+        let persist = saveStudioId ?? { id, done in
+            viewModel.updateSceneStudio(sceneId: sceneId, studioId: id, completion: done)
+        }
+        persist(studioId) { success in
             DispatchQueue.main.async {
                 isSaving = false
                 if success {

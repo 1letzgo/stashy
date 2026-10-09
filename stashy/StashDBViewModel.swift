@@ -8447,6 +8447,31 @@ struct GenerateData: Codable {
         }
     }
 
+    func updateGalleryPerformers(galleryId: String, performerIds: [String], completion: @escaping (Bool) -> Void) {
+        let mutation = GraphQLQueries.galleryUpdatePerformersMutation
+        let variables: [String: Any] = ["input": ["id": galleryId, "performer_ids": performerIds]]
+        guard let bodyData = try? JSONSerialization.data(withJSONObject: ["query": mutation, "variables": variables]),
+              let bodyString = String(data: bodyData, encoding: .utf8) else {
+            completion(false); return
+        }
+        performGraphQLQuery(query: bodyString) { (response: GalleryUpdateResponse?) in
+            completion(response?.data?.galleryUpdate != nil)
+        }
+    }
+
+    func updateGalleryStudio(galleryId: String, studioId: String?, completion: @escaping (Bool) -> Void) {
+        let mutation = GraphQLQueries.galleryUpdateStudioMutation
+        let input: [String: Any] = ["id": galleryId, "studio_id": studioId ?? NSNull()]
+        let variables: [String: Any] = ["input": input]
+        guard let bodyData = try? JSONSerialization.data(withJSONObject: ["query": mutation, "variables": variables]),
+              let bodyString = String(data: bodyData, encoding: .utf8) else {
+            completion(false); return
+        }
+        performGraphQLQuery(query: bodyString) { (response: GalleryUpdateResponse?) in
+            completion(response?.data?.galleryUpdate != nil)
+        }
+    }
+
     /// Updates gallery metadata shown on the opened-gallery screen (edit mode).
     func updateGalleryDetails(
         galleryId: String,
@@ -9942,7 +9967,7 @@ struct ScenePerformer: Codable, Identifiable, Equatable {
     }
 
     func toGalleryPerformer() -> GalleryPerformer {
-        GalleryPerformer(id: id, name: name, image_path: nil)
+        GalleryPerformer(id: id, name: name, image_path: nil, birthdate: birthdate, updated_at: updatedAt)
     }
 }
 
@@ -10540,7 +10565,7 @@ struct Gallery: Codable, Identifiable, Equatable {
     let organized: Bool?
     let createdAt: String?
     let updatedAt: String?
-    let studio: GalleryStudio?
+    var studio: GalleryStudio?
     var performers: [GalleryPerformer]?
     let cover: GalleryCover?
 
@@ -10590,12 +10615,27 @@ struct Gallery: Codable, Identifiable, Equatable {
 struct GalleryStudio: Codable, Equatable {
     let id: String
     let name: String
+    var image_path: String? = nil
+    var updated_at: String? = nil
+
+    /// Same shape the scene detail Studio card consumes.
+    func toSceneStudio() -> SceneStudio {
+        SceneStudio(id: id, name: name, updatedAt: updated_at, imagePath: image_path)
+    }
 }
 
 struct GalleryPerformer: Codable, Identifiable, Equatable, Hashable {
     let id: String
     let name: String
     var image_path: String?
+    var birthdate: String? = nil
+    var updated_at: String? = nil
+
+    /// Same shape the scene detail Performers card consumes.
+    func toScenePerformer() -> ScenePerformer {
+        ScenePerformer(id: id, name: name, birthdate: birthdate, sceneCount: 0, galleryCount: 0,
+                       oCounter: 0, updatedAt: updated_at)
+    }
 
     func toPerformer() -> Performer {
         Performer(id: id, name: name, disambiguation: nil, birthdate: nil, country: nil,
@@ -10618,10 +10658,6 @@ struct GalleryPerformer: Codable, Identifiable, Equatable, Hashable {
         // Fallback when GraphQL omitted image_path (same endpoint as ScenePerformer).
         guard let config = ServerConfigManager.shared.loadConfig() else { return nil }
         return signedURL(URL(string: "\(config.baseURL)/performer/\(id)/image"))
-    }
-
-    func toScenePerformer() -> ScenePerformer {
-        ScenePerformer(id: id, name: name, birthdate: nil, sceneCount: 0, galleryCount: 0, oCounter: 0, updatedAt: nil)
     }
 }
 
