@@ -1068,4 +1068,283 @@ final class KeyboardDoneAccessory: NSObject {
     }
 }
 
+// MARK: - Detail hero card
+
+/// One label/value cell of a `DetailHeroCard` info grid.
+struct DetailHeroItem: Identifiable {
+    let label: String
+    let value: String
+    var id: String { label }
+}
+
+/// Header card shared by the opened gallery, tag and studio detail screens: a 16:9 hero
+/// (240pt tall in landscape) in the scene player's slot with name + uppercase label/value
+/// grid in white over a bottom gradient, and the description below the hero inside the same
+/// card (two lines, chevron expands). Without a hero the same info renders on the plain card
+/// background so it never disappears.
+///
+/// `hero` fills the frame and is clipped by the card; `onHeroTap` (e.g. fullscreen) makes it a
+/// button. `accessory` sits top-trailing (on the hero, or next to the name on the plain card;
+/// `onImage` says which). `footer` renders under the hero before the description.
+struct DetailHeroCard<Hero: View, Accessory: View, Footer: View>: View {
+    let title: String
+    let items: [DetailHeroItem]
+    let description: String?
+    let showsHero: Bool
+    var heroAccessibilityLabel: String = "Open image"
+    var onHeroTap: (() -> Void)? = nil
+    @Binding var isExpanded: Bool
+    /// Collapsed cell count; the rest appears when expanded.
+    var collapsedItemLimit: Int = 4
+    @ViewBuilder var hero: () -> Hero
+    @ViewBuilder var accessory: (_ onImage: Bool) -> Accessory
+    @ViewBuilder var footer: () -> Footer
+
+    @Environment(\.verticalSizeClass) private var verticalSizeClass
+    @ObservedObject private var appearanceManager = AppearanceManager.shared
+
+    private var trimmedDescription: String {
+        (description ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    private var hasExpandableContent: Bool {
+        !trimmedDescription.isEmpty || items.count > collapsedItemLimit
+    }
+
+    /// Without a description the chevron sits on the info block; keep text clear of it.
+    private var chevronInset: CGFloat {
+        trimmedDescription.isEmpty && hasExpandableContent ? 28 : 0
+    }
+
+    var body: some View {
+        let desc = trimmedDescription
+        VStack(alignment: .leading, spacing: 0) {
+            if showsHero {
+                heroSection
+            } else {
+                HStack(alignment: .top, spacing: 8) {
+                    infoBlock(onImage: false)
+                    accessory(false)
+                }
+                .padding(.vertical, 10)
+                .padding(.horizontal, 12)
+                .frame(maxWidth: .infinity, alignment: .leading)
+            }
+
+            footer()
+
+            if !desc.isEmpty {
+                VStack(alignment: .leading, spacing: 4) {
+                    if !showsHero { Divider() }
+                    Text(desc)
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                        .lineLimit(isExpanded ? nil : 2)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .padding(.trailing, 28) // keep clear of the chevron
+                }
+                .padding(.horizontal, 12)
+                .padding(.top, showsHero ? 10 : 0)
+                .padding(.bottom, 10)
+                .frame(maxWidth: .infinity, alignment: .leading)
+            }
+        }
+        .background(Color.secondaryAppBackground)
+        .clipShape(RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.card))
+        .overlay(
+            RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.card)
+                .stroke(Color.primary.opacity(0.1), lineWidth: 0.5)
+        )
+        .cardShadow()
+        .overlay(alignment: .bottomTrailing) {
+            if hasExpandableContent {
+                Button {
+                    withAnimation(.spring()) {
+                        isExpanded.toggle()
+                    }
+                } label: {
+                    Image(systemName: isExpanded ? "chevron.up" : "chevron.down")
+                        .font(.system(size: 10, weight: .bold))
+                        .foregroundColor(Color.pillAccent)
+                        .padding(6)
+                        .background(appearanceManager.tintColor.opacity(0.15))
+                        .background(Circle().fill(Color.secondaryAppBackground.opacity(chevronInset > 0 ? 0.85 : 0)))
+                        .clipShape(Circle())
+                }
+                .padding(8)
+                .accessibilityLabel(isExpanded ? "Show less" : "Show more")
+            }
+        }
+    }
+
+    /// Empty sizing box: 16:9 like the player card, fixed height in landscape.
+    @ViewBuilder
+    private var heroFrame: some View {
+        if verticalSizeClass == .compact {
+            Color.clear
+                .frame(maxWidth: .infinity)
+                .frame(height: 240)
+        } else {
+            Color.clear
+                .frame(maxWidth: .infinity)
+                .aspectRatio(16.0 / 9.0, contentMode: .fit)
+        }
+    }
+
+    private var heroSection: some View {
+        let image = heroFrame
+            .overlay { hero() }
+            .clipped()
+            .contentShape(Rectangle())
+
+        return ZStack(alignment: .bottomLeading) {
+            if let onHeroTap {
+                Button {
+                    HapticManager.light()
+                    onHeroTap()
+                } label: {
+                    image
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel(heroAccessibilityLabel)
+            } else {
+                image
+            }
+
+            infoBlock(onImage: true)
+                .padding(.horizontal, 12)
+                .padding(.top, 28)
+                .padding(.bottom, 10)
+                .padding(.trailing, chevronInset)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(
+                    LinearGradient(
+                        gradient: Gradient(colors: [.clear, .black.opacity(0.55), .black.opacity(0.85)]),
+                        startPoint: .top,
+                        endPoint: .bottom
+                    )
+                )
+                .allowsHitTesting(false)
+        }
+        .overlay(alignment: .topTrailing) {
+            accessory(true)
+                .padding(8)
+        }
+    }
+
+    /// Name + detail grid in the studio-header type scale (title2 bold, 8pt uppercase
+    /// labels, 11pt values). `onImage` switches to white text for the hero overlay.
+    private func infoBlock(onImage: Bool) -> some View {
+        let visible = isExpanded ? items : Array(items.prefix(collapsedItemLimit))
+        return VStack(alignment: .leading, spacing: 4) {
+            Text(title)
+                .font(.title2)
+                .fontWeight(.bold)
+                .foregroundColor(onImage ? .white : .primary)
+                .lineLimit(isExpanded ? nil : 2)
+                .shadow(color: onImage ? .black.opacity(0.4) : .clear, radius: 2, y: 1)
+                .frame(maxWidth: .infinity, alignment: .leading)
+
+            if !visible.isEmpty {
+                LazyVGrid(
+                    columns: Array(repeating: GridItem(.flexible(), alignment: .leading), count: min(max(visible.count, 2), 4)),
+                    alignment: .leading,
+                    spacing: 6
+                ) {
+                    ForEach(visible) { item in
+                        VStack(alignment: .leading, spacing: 0) {
+                            Text(item.label)
+                                .font(.system(size: 8))
+                                .foregroundColor(onImage ? .white.opacity(0.75) : .secondary)
+                                .textCase(.uppercase)
+                            Text(item.value)
+                                .font(.system(size: 11, weight: .medium))
+                                .foregroundColor(onImage ? .white : .primary)
+                                .lineLimit(1)
+                        }
+                    }
+                }
+            }
+        }
+        .padding(.trailing, onImage ? 0 : chevronInset)
+    }
+}
+
+extension DetailHeroCard where Accessory == EmptyView, Footer == EmptyView {
+    init(
+        title: String,
+        items: [DetailHeroItem],
+        description: String?,
+        showsHero: Bool,
+        heroAccessibilityLabel: String = "Open image",
+        onHeroTap: (() -> Void)? = nil,
+        isExpanded: Binding<Bool>,
+        @ViewBuilder hero: @escaping () -> Hero
+    ) {
+        self.init(
+            title: title, items: items, description: description, showsHero: showsHero,
+            heroAccessibilityLabel: heroAccessibilityLabel, onHeroTap: onHeroTap,
+            isExpanded: isExpanded, hero: hero,
+            accessory: { _ in EmptyView() }, footer: { EmptyView() }
+        )
+    }
+}
+
+/// "Feeds" pill for detail hero cards: tinted on the plain card, dark glass on the hero.
+struct DetailHeroFeedsButton: View {
+    let onImage: Bool
+    let action: () -> Void
+    @ObservedObject private var appearanceManager = AppearanceManager.shared
+
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: 4) {
+                Image(systemName: AppTab.reels.icon)
+                    .font(.system(size: 12, weight: .bold))
+                Text("Feeds")
+                    .font(.system(size: 11, weight: .bold))
+            }
+            .foregroundColor(onImage ? .white : Color.pillAccent)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 5)
+            .background(onImage ? Color.black.opacity(0.45) : appearanceManager.tintColor.opacity(0.15))
+            .clipShape(Capsule())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("Open in Feeds")
+    }
+}
+
+/// Minimal fullscreen viewer for a single hero image (pinch to zoom, tap or X to close).
+struct DetailHeroFullscreenViewer<Content: View>: View {
+    @ViewBuilder var content: () -> Content
+    @Environment(\.dismiss) private var dismiss
+    @State private var isZoomed = false
+
+    var body: some View {
+        ZStack(alignment: .topTrailing) {
+            Color.black.ignoresSafeArea()
+            ZoomableScrollView(isZoomed: $isZoomed, onTap: { _ in dismiss() }) {
+                content()
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+            }
+            .ignoresSafeArea()
+
+            Button {
+                dismiss()
+            } label: {
+                Image(systemName: "xmark")
+                    .font(.system(size: 15, weight: .bold))
+                    .foregroundColor(.white)
+                    .frame(width: 36, height: 36)
+                    .background(Color.black.opacity(0.5))
+                    .clipShape(Circle())
+            }
+            .buttonStyle(.plain)
+            .padding(16)
+            .accessibilityLabel("Close")
+        }
+    }
+}
+
 #endif

@@ -819,147 +819,79 @@ struct StudioDetailView: View {
     }
     
     // MARK: - Subviews
-    
+
+    /// Stash serves a generic placeholder (`…&default=true`) for studios without a logo;
+    /// those get the plain card instead of a hero.
+    private var studioHasCustomImage: Bool {
+        guard let path = studio.imagePath, !path.isEmpty else { return false }
+        return !path.contains("default=true")
+    }
+
+    /// Header card (`DetailHeroCard`, gallery design). The studio image is a logo, so it is
+    /// never cropped: aspect-fit and centred with padding on the studio-logo backdrop (plus a
+    /// blurred, tinted copy behind), kept above the name/info gradient. Logos come from
+    /// `StudioLogoStore` via `StudioImageView`. Favorite / Edit live in the nav bar.
     private var headerCard: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack(alignment: .top, spacing: 8) {
-                Text(studio.name)
-                    .font(.title2)
-                    .fontWeight(.bold)
-                    .foregroundColor(.primary)
-                    .lineLimit(isHeaderExpanded ? nil : 2)
-
-                Spacer()
-
+        let url = (studio.url ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+        let linkURL = url.isEmpty ? nil : URL(string: url)
+        return DetailHeroCard(
+            title: studio.name,
+            items: getStudioDetails(studio).map { DetailHeroItem(label: $0.label, value: $0.value) },
+            description: studio.details,
+            showsHero: studioHasCustomImage,
+            isExpanded: $isHeaderExpanded,
+            hero: {
+                ZStack {
+                    Color.studioHeaderGray(for: appearanceManager.currentTheme)
+                    StudioImageView(studio: studio)
+                        .scaleEffect(1.6)
+                        .blur(radius: 30)
+                        .opacity(0.35)
+                        .accessibilityHidden(true)
+                    LinearGradient(
+                        colors: [appearanceManager.tintColor.opacity(0.18), .black.opacity(0.25)],
+                        startPoint: .top,
+                        endPoint: .bottom
+                    )
+                    StudioImageView(studio: studio)
+                        .padding(.horizontal, 40)
+                        .padding(.top, 20)
+                        .padding(.bottom, 78) // clear of the name/info block
+                }
+            },
+            accessory: { onImage in
                 if showsFeedsNavButton {
-                    Button(action: {
+                    DetailHeroFeedsButton(onImage: onImage) {
                         let sceneStudio = SceneStudio(
                             id: studio.id,
                             name: studio.name,
                             updatedAt: studio.updatedAt
                         )
                         coordinator.navigateToReels(studio: sceneStudio, mode: nil)
-                    }) {
-                        HStack(spacing: 4) {
-                            Image(systemName: AppTab.reels.icon)
-                                .font(.system(size: 12, weight: .bold))
-                            Text("Feeds")
-                                .font(.system(size: 11, weight: .bold))
-                        }
-                        .foregroundColor(Color.pillAccent)
-                        .padding(.horizontal, 10)
-                        .padding(.vertical, 5)
-                        .background(appearanceManager.tintColor.opacity(0.15))
-                        .clipShape(Capsule())
                     }
-                }
-            }
-            
-            // Info List
-            let details = getStudioDetails(studio)
-            // User wants "hide starting from 3rd line".
-            // Line 1: Details 1-2
-            // Line 2: Details 3-4 OR URL (if <= 2 details)
-            // So we always allow up to 4 details (2 rows) visible if no URL conflict,
-            // or if URL exists but we prioritize details 3-4 over URL to maximize info density?
-            // User complaint: "You hide the second row [Item 3] already".
-            // So we MUST show Item 3+4 if present. This takes 2 rows.
-            // If 2 rows taken by details, URL (Row 3) must be hidden.
-            let visibleDetails = isHeaderExpanded ? details : Array(details.prefix(4))
-            let hasURL = studio.url != nil && !studio.url!.isEmpty
-            
-            if !visibleDetails.isEmpty {
-                VStack(alignment: .leading, spacing: 4) {
-                    LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], alignment: .leading, spacing: 6) {
-                        ForEach(visibleDetails, id: \.label) { detail in
-                            VStack(alignment: .leading, spacing: 0) {
-                                Text(detail.label)
-                                    .font(.system(size: 8))
-                                    .foregroundColor(.secondary)
-                                    .textCase(.uppercase)
-                                Text(detail.value)
-                                    .font(.system(size: 11, weight: .medium))
-                                    .foregroundColor(.primary)
-                                    .lineLimit(1)
-                            }
-                        }
-                    }
-                }
-            }
-            
-            // URL Link (Always on its own row)
-            // Show if expanded OR if we have space (details <= 2, i.e. 1 row used)
-            if hasURL && (isHeaderExpanded || details.count <= 2) {
-                 VStack(alignment: .leading, spacing: 2) {
-                     Text("URL")
-                         .font(.system(size: 8))
-                         .foregroundColor(.secondary)
-                         .textCase(.uppercase)
-                     Link(destination: URL(string: studio.url!) ?? URL(string: "https://google.com")!) {
-                         Text(studio.url!)
-                             .font(.system(size: 11, weight: .bold))
-                             .foregroundColor(appearanceManager.tintColor)
-                             .lineLimit(1)
-                     }
-                 }
-            }
-            
-            // Description (Full width if present)
-            if let desc = studio.details, !desc.isEmpty {
-                VStack(alignment: .leading, spacing: 4) {
-                    Divider()
-                    Text(desc)
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                        .padding(.vertical, 4)
-                }
-            }
-        }
-        .padding(.leading, 140 + 12) // Logo width + spacing
-        .padding(.trailing, 12)
-        .padding(.vertical, 10)
-        .frame(minWidth: 0, maxWidth: .infinity, minHeight: 115, alignment: .topLeading) // Ensure minimum height for logo and top alignment
-        .overlay(
-            ZStack {
-                Color.studioHeaderGray
-                StudioImageView(studio: studio)
-                    .padding(8)
-            }
-            .frame(width: 140)
-            , alignment: .leading
-        )
-        .background(Color.secondaryAppBackground)
-        .clipShape(RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.card))
-        .overlay(
-            RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.card)
-                .stroke(Color.primary.opacity(0.1), lineWidth: 0.5)
-        )
-        .cardShadow()
-        .overlay(
-            Group {
-                let details = getStudioDetails(studio)
-                let hasURL = studio.url != nil && !studio.url!.isEmpty
-                
-                // Button needed if:
-                // 1. More details than shown (count > 4)
-                // 2. URL exists but is hidden (count > 2)
-                if details.count > 4 || (hasURL && details.count > 2) {
-                    Button(action: {
-                        withAnimation(.spring()) {
-                            isHeaderExpanded.toggle()
-                        }
-                    }) {
-                        Image(systemName: isHeaderExpanded ? "chevron.up" : "chevron.down")
-                            .font(.system(size: 10, weight: .bold))
-                            .foregroundColor(Color.pillAccent)
-                            .padding(6)
-                            .background(appearanceManager.tintColor.opacity(0.15))
-                            .clipShape(Circle())
-                    }
-                    .padding(8)
                 }
             },
-            alignment: .bottomTrailing
+            footer: {
+                if let linkURL {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("URL")
+                            .font(.system(size: 8))
+                            .foregroundColor(.secondary)
+                            .textCase(.uppercase)
+                        Link(destination: linkURL) {
+                            Text(url)
+                                .font(.system(size: 11, weight: .bold))
+                                .foregroundColor(appearanceManager.tintColor)
+                                .lineLimit(1)
+                        }
+                    }
+                    .padding(.horizontal, 12)
+                    .padding(.top, studioHasCustomImage ? 10 : 0)
+                    .padding(.bottom, (studio.details ?? "").trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? 10 : 6)
+                    .padding(.trailing, 28)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                }
+            }
         )
     }
 
@@ -978,9 +910,13 @@ struct StudioDetailView: View {
         if let count = s.performerCount, count > 0 {
             list.append((label: "PERFORMERS", value: "\(count)"))
         }
-        
-        // URL is now handled separately in the view to ensure it gets its own row
-        
+
+        if let rating = s.rating100 {
+            list.append((label: "RATING", value: "\(rating)%"))
+        }
+
+        // URL renders as its own tappable row under the hero (footer).
+
         return list
     }
 

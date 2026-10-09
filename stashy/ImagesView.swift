@@ -690,90 +690,24 @@ private struct ImagesViewBody: View {
         return displayedImages.first?.id
     }
 
-    /// Empty sizing box for the hero: 16:9 like the player card, fixed height in landscape.
-    @ViewBuilder
-    private var openedGalleryHeroFrame: some View {
-        if verticalSizeClass == .compact {
-            Color.clear
-                .frame(maxWidth: .infinity)
-                .frame(height: 240)
-        } else {
-            Color.clear
-                .frame(maxWidth: .infinity)
-                .aspectRatio(16.0 / 9.0, contentMode: .fit)
-        }
-    }
-
-    /// Single header card for an opened gallery. With a cover (or first image) the name and
-    /// details sit on the hero over a bottom gradient; without one the same block renders as
-    /// a plain card so the info never disappears. The description lives below the hero
-    /// inside the same card and expands with the chevron. Editing stays on the nav-bar pencil.
-    @ViewBuilder
+    /// Single header card for an opened gallery (`DetailHeroCard`): cover hero cropped from
+    /// the centre with name and details overlaid, description below. Without a cover or
+    /// loaded image the same block renders as a plain card. Tap opens the cover (or first
+    /// image) fullscreen. Editing stays on the nav-bar pencil.
     private func openedGalleryHeaderCard(_ gallery: Gallery) -> some View {
         let heroURL = openedGalleryHeroURL(gallery)
-        let description = (gallery.details ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
-
-        VStack(alignment: .leading, spacing: 0) {
+        let heroImageId = openedGalleryHeroImageId(gallery)
+        return DetailHeroCard(
+            title: gallery.displayName,
+            items: getGalleryHeaderDetails(gallery).map { DetailHeroItem(label: $0.label, value: $0.value) },
+            description: gallery.details,
+            showsHero: heroURL != nil,
+            heroAccessibilityLabel: "Open cover image",
+            onHeroTap: heroImageId.map { id in { fullscreenImageId = id } },
+            isExpanded: $isHeaderExpanded
+        ) {
             if let heroURL {
-                openedGalleryHero(gallery, url: heroURL)
-            } else {
-                openedGalleryInfoBlock(gallery, onImage: false)
-                    .padding(.vertical, 10)
-                    .padding(.horizontal, 12)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-            }
-
-            if !description.isEmpty {
-                VStack(alignment: .leading, spacing: 4) {
-                    if heroURL == nil { Divider() }
-                    Text(description)
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                        .lineLimit(isHeaderExpanded ? nil : 2)
-                        .fixedSize(horizontal: false, vertical: true)
-                        .padding(.trailing, 28) // keep clear of the chevron
-                }
-                .padding(.horizontal, 12)
-                .padding(.top, heroURL == nil ? 0 : 10)
-                .padding(.bottom, 10)
-                .frame(maxWidth: .infinity, alignment: .leading)
-            }
-        }
-        .background(Color.secondaryAppBackground)
-        .clipShape(RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.card))
-        .overlay(
-            RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.card)
-                .stroke(Color.primary.opacity(0.1), lineWidth: 0.5)
-        )
-        .cardShadow()
-        .overlay(alignment: .bottomTrailing) {
-            if !description.isEmpty {
-                Button {
-                    withAnimation(.spring()) {
-                        isHeaderExpanded.toggle()
-                    }
-                } label: {
-                    Image(systemName: isHeaderExpanded ? "chevron.up" : "chevron.down")
-                        .font(.system(size: 10, weight: .bold))
-                        .foregroundColor(Color.pillAccent)
-                        .padding(6)
-                        .background(appearanceManager.tintColor.opacity(0.15))
-                        .clipShape(Circle())
-                }
-                .padding(8)
-                .accessibilityLabel(isHeaderExpanded ? "Show less" : "Show more")
-            }
-        }
-    }
-
-    /// Cover hero in the scene player's slot: full width, 16:9 aspect-fill cropped from the
-    /// centre (240pt tall in landscape). Name and details overlay the bottom on a gradient.
-    /// Tap opens the cover (or first image) fullscreen.
-    @ViewBuilder
-    private func openedGalleryHero(_ gallery: Gallery, url: URL) -> some View {
-        let image = openedGalleryHeroFrame
-            .overlay {
-                CustomAsyncImage(url: url) { loader in
+                CustomAsyncImage(url: heroURL) { loader in
                     if let image = loader.image {
                         image.resizable()
                             .scaledToFill()
@@ -788,71 +722,6 @@ private struct ImagesViewBody: View {
                                     .font(.system(size: 32))
                                     .foregroundColor(.appAccent.opacity(0.5))
                             )
-                    }
-                }
-            }
-            .clipped()
-            .contentShape(Rectangle())
-
-        ZStack(alignment: .bottomLeading) {
-            if let imageId = openedGalleryHeroImageId(gallery) {
-                Button {
-                    HapticManager.light()
-                    fullscreenImageId = imageId
-                } label: {
-                    image
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel("Open cover image")
-            } else {
-                image
-            }
-
-            openedGalleryInfoBlock(gallery, onImage: true)
-                .padding(.horizontal, 12)
-                .padding(.top, 28)
-                .padding(.bottom, 10)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .background(
-                    LinearGradient(
-                        gradient: Gradient(colors: [.clear, .black.opacity(0.55), .black.opacity(0.85)]),
-                        startPoint: .top,
-                        endPoint: .bottom
-                    )
-                )
-                .allowsHitTesting(false)
-        }
-    }
-
-    /// Name + detail grid in the studio-header type scale (title2 bold, 8pt uppercase
-    /// labels, 11pt values). `onImage` switches to white text for the hero overlay.
-    private func openedGalleryInfoBlock(_ gallery: Gallery, onImage: Bool) -> some View {
-        let details = getGalleryHeaderDetails(gallery)
-        return VStack(alignment: .leading, spacing: 4) {
-            Text(gallery.displayName)
-                .font(.title2)
-                .fontWeight(.bold)
-                .foregroundColor(onImage ? .white : .primary)
-                .lineLimit(isHeaderExpanded ? nil : 2)
-                .shadow(color: onImage ? .black.opacity(0.4) : .clear, radius: 2, y: 1)
-
-            if !details.isEmpty {
-                LazyVGrid(
-                    columns: Array(repeating: GridItem(.flexible(), alignment: .leading), count: min(max(details.count, 2), 4)),
-                    alignment: .leading,
-                    spacing: 6
-                ) {
-                    ForEach(details, id: \.label) { detail in
-                        VStack(alignment: .leading, spacing: 0) {
-                            Text(detail.label)
-                                .font(.system(size: 8))
-                                .foregroundColor(onImage ? .white.opacity(0.75) : .secondary)
-                                .textCase(.uppercase)
-                            Text(detail.value)
-                                .font(.system(size: 11, weight: .medium))
-                                .foregroundColor(onImage ? .white : .primary)
-                                .lineLimit(1)
-                        }
                     }
                 }
             }

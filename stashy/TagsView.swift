@@ -725,6 +725,7 @@ struct TagDetailView: View {
     @State private var isUpdatingFavorite: Bool = false
     @State private var isHeaderExpanded = false
     @State private var showingEditTagSheet = false
+    @State private var showingTagImageFullscreen = false
     @StateObject private var linkedStudios: DetailLinkedStudiosFilterModel
     @StateObject private var linkedGalleries: DetailLinkedGalleriesFilterModel
     @StateObject private var linkedImages: DetailLinkedImagesFilterModel
@@ -1162,6 +1163,9 @@ struct TagDetailView: View {
             }
         }
         .applyAppBackground()
+        .fullScreenCover(isPresented: $showingTagImageFullscreen) {
+            tagImageFullscreen
+        }
         .onAppear {
             loadDetailData()
             isFavorite = selectedTag.favorite ?? false
@@ -1495,117 +1499,60 @@ struct TagDetailView: View {
             linkedImages.refetchImages(viewModel: viewModel, initial: true)
         }
     }
-    
+
+    /// Stash serves a generic placeholder (`…&default=true`) for tags without their own
+    /// image; those (and not-yet-hydrated tags) get the plain card instead of a hero.
+    private var tagHasCustomImage: Bool {
+        guard let path = selectedTag.imagePath, !path.isEmpty else { return false }
+        return !path.contains("default=true")
+    }
+
+    /// Header card (`DetailHeroCard`, gallery design): tag image as centre-cropped hero
+    /// with name + counts overlaid, description below. Edit / Favorite live in the nav bar.
     private var tagHeaderView: some View {
-        let collapsedHeight: CGFloat = 115
-        let imageWidth: CGFloat = 72
-        
-        return HStack(alignment: .top, spacing: 0) {
-            // Thumbnail: 9:16 portrait style strip, flush to edges
-            ZStack(alignment: .bottom) {
+        DetailHeroCard(
+            title: selectedTag.name,
+            items: getTagDetails(selectedTag).map { DetailHeroItem(label: $0.label, value: $0.value) },
+            description: selectedTag.description,
+            showsHero: tagHasCustomImage,
+            heroAccessibilityLabel: "Open tag image",
+            onHeroTap: { showingTagImageFullscreen = true },
+            isExpanded: $isHeaderExpanded,
+            hero: {
                 TagImageView(tag: selectedTag)
-                    .frame(width: imageWidth)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    .clipped()
-            }
-            .frame(width: imageWidth)
-            .frame(minHeight: collapsedHeight)
-            .frame(maxHeight: isHeaderExpanded ? .infinity : collapsedHeight)
-            .background(Color.gray.opacity(DesignTokens.Opacity.placeholder))
-            
-            // Details Section
-            VStack(alignment: .leading, spacing: 4) {
-                // Header: Name and Feeds (Edit / Favorite live in the custom navbar)
-                HStack(alignment: .top, spacing: 8) {
-                    Text(selectedTag.name)
-                        .font(.title2)
-                        .fontWeight(.bold)
-                        .foregroundColor(.primary)
-                        .lineLimit(isHeaderExpanded ? nil : 1)
-                    
-                    Spacer()
-                    
-                    if showsFeedsNavButton {
-                        Button(action: {
-                            coordinator.navigateToReels(tags: [selectedTag], mode: nil)
-                        }) {
-                            HStack(spacing: 4) {
-                                Image(systemName: AppTab.reels.icon)
-                                    .font(.system(size: 12, weight: .bold))
-                                Text("Feeds")
-                                    .font(.system(size: 11, weight: .bold))
-                            }
-                            .foregroundColor(Color.pillAccent)
-                            .padding(.horizontal, 10)
-                            .padding(.vertical, 5)
-                            .background(appearanceManager.tintColor.opacity(0.15))
-                            .clipShape(Capsule())
-                        }
+                    .frame(minWidth: 0, maxWidth: .infinity, minHeight: 0, maxHeight: .infinity, alignment: .center)
+            },
+            accessory: { onImage in
+                if showsFeedsNavButton {
+                    DetailHeroFeedsButton(onImage: onImage) {
+                        coordinator.navigateToReels(tags: [selectedTag], mode: nil)
                     }
-                }
-                
-                // Grid for Tag Info
-                let allDetails = getTagDetails(selectedTag)
-                let visibleDetails = isHeaderExpanded ? allDetails : Array(allDetails.prefix(4))
-                
-                if !visibleDetails.isEmpty {
-                    LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], alignment: .leading, spacing: 6) {
-                        ForEach(visibleDetails, id: \.label) { detail in
-                            VStack(alignment: .leading, spacing: 0) {
-                                Text(detail.label)
-                                    .font(.system(size: 8))
-                                    .foregroundColor(.secondary)
-                                    .textCase(.uppercase)
-                                Text(detail.value)
-                                    .font(.system(size: 11, weight: .medium))
-                                    .foregroundColor(.primary)
-                                    .lineLimit(1)
-                            }
-                        }
-                    }
-                }
-                
-                if let desc = selectedTag.description, !desc.isEmpty, isHeaderExpanded {
-                    Text(desc)
-                        .font(.system(size: 11))
-                        .foregroundColor(.secondary)
-                        .padding(.top, 4)
-                }
-            }
-            .padding(.vertical, 10)
-            .padding(.horizontal, 12)
-            .frame(maxWidth: .infinity, minHeight: collapsedHeight, alignment: .topLeading)
-        }
-        .background(Color.secondaryAppBackground)
-        .clipShape(RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.card))
-        .overlay(
-            RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.card)
-                .stroke(Color.primary.opacity(0.1), lineWidth: 0.5)
-        )
-        .cardShadow()
-        .overlay(
-            Group {
-                let allDetails = getTagDetails(selectedTag)
-                if allDetails.count > 4 || (selectedTag.description?.count ?? 0) > 0 {
-                    Button(action: {
-                        withAnimation(.spring()) {
-                            isHeaderExpanded.toggle()
-                        }
-                    }) {
-                        Image(systemName: isHeaderExpanded ? "chevron.up" : "chevron.down")
-                            .font(.system(size: 10, weight: .bold))
-                            .foregroundColor(Color.pillAccent)
-                            .padding(6)
-                            .background(appearanceManager.tintColor.opacity(0.15))
-                            .clipShape(Circle())
-                    }
-                    .padding(8)
                 }
             },
-            alignment: .bottomTrailing
+            footer: { EmptyView() }
         )
     }
-    
+
+    /// Fullscreen tag image (aspect-fit; SVG tags go through the shared rasterizer).
+    private var tagImageFullscreen: some View {
+        DetailHeroFullscreenViewer {
+            CustomAsyncImage(url: selectedTag.thumbnailURL) { loader in
+                if let image = loader.image {
+                    image.resizable().scaledToFit()
+                } else if let data = loader.imageData,
+                          (String(data: data.prefix(100), encoding: .utf8) ?? "").lowercased().contains("<svg") {
+                    RasterizedSVGImage(data: data, height: 600)
+                } else if loader.isLoading {
+                    InlineSpinner(tint: .white)
+                } else {
+                    Image(systemName: "number")
+                        .font(.system(size: 48, weight: .bold))
+                        .foregroundColor(.white.opacity(0.6))
+                }
+            }
+        }
+    }
+
     private func getTagDetails(_ t: Tag) -> [(label: String, value: String)] {
         var list: [(label: String, value: String)] = []
         
