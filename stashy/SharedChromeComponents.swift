@@ -1077,14 +1077,15 @@ struct DetailHeroItem: Identifiable {
     var id: String { label }
 }
 
-/// Header card shared by the opened gallery, tag and studio detail screens.
+/// Header card shared by the opened gallery, tag, studio, performer and group detail screens.
 ///
 /// Profile-header layout: a band on top carries the uppercase label/value grid in white
-/// over the image as a blurred backdrop (dashboard hero technique: scaled + 40pt blur);
+/// over the image as a blurred backdrop (dashboard hero technique, scaled, but a lighter 18pt blur);
 /// below it the solid card section holds the name in normal text colour. A sharp circular
 /// avatar of the image (tinted ring, as in the Feeds overlay) straddles the edge between
 /// the two exactly half/half, leading-aligned with the content padding; the name sits to
-/// the right of its lower half. The band grows with the grid (min `minBandHeight`) and
+/// the right of its lower half (vertically centred on it when it fits on one line). The
+/// band grows with the grid (min `minBandHeight`) and
 /// always keeps the circle's upper half clear. `footer` and the description (two lines,
 /// chevron expands) follow in the solid section.
 /// Without an image the structure stays: the band is a muted tint fill (grid in normal
@@ -1210,12 +1211,12 @@ struct DetailHeroCard<Backdrop: View, Avatar: View, Accessory: View, Footer: Vie
                     backdrop()
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
                         .scaleEffect(1.3)
-                        .blur(radius: 40, opaque: true)
+                        .blur(radius: 18, opaque: true)
                         .accessibilityHidden(true)
                 }
                 .overlay(
                     LinearGradient(
-                        colors: [.black.opacity(0.15), .black.opacity(0.45)],
+                        colors: [.black.opacity(0.3), .black.opacity(0.5)],
                         startPoint: .top,
                         endPoint: .bottom
                     )
@@ -1232,22 +1233,39 @@ struct DetailHeroCard<Backdrop: View, Avatar: View, Accessory: View, Footer: Vie
         HStack(alignment: .top, spacing: 12) {
             heroButton(avatarCircle)
                 .padding(.top, -Self.avatarSize / 2)
-            HStack(alignment: .firstTextBaseline, spacing: 8) {
-                Text(title)
-                    .font(.title2)
-                    .fontWeight(.bold)
-                    .foregroundColor(.primary)
-                    .lineLimit(isExpanded ? 4 : 2)
-                    .minimumScaleFactor(0.8)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                accessory(false)
+            // One-line title: centred against the circle's lower half (band edge → circle
+            // bottom). Longer titles fall back to the wrapping, top-aligned layout.
+            ViewThatFits(in: .horizontal) {
+                HStack(alignment: .center, spacing: 8) {
+                    titleText
+                        .lineLimit(1)
+                        .fixedSize(horizontal: true, vertical: false)
+                    Spacer(minLength: 0)
+                    accessory(false)
+                }
+                .frame(minHeight: Self.avatarSize / 2, alignment: .center)
+
+                HStack(alignment: .firstTextBaseline, spacing: 8) {
+                    titleText
+                        .lineLimit(isExpanded ? 4 : 2)
+                        .minimumScaleFactor(0.8)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                    accessory(false)
+                }
+                .padding(.top, 6)
             }
-            .padding(.top, 6)
             .padding(.trailing, chevronInset)
         }
         .padding(.horizontal, Self.contentPadding)
         .padding(.bottom, 10)
         .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private var titleText: some View {
+        Text(title)
+            .font(.title2)
+            .fontWeight(.bold)
+            .foregroundColor(.primary)
     }
 
     @ViewBuilder

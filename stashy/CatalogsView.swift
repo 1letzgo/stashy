@@ -1474,119 +1474,51 @@ struct GroupDetailView: View {
         .padding(.bottom, 32)
     }
 
+    /// Header card (`DetailHeroCard`): stats on the front cover blurred as the band backdrop,
+    /// the cover (a poster) top-cropped in the circle straddling the band edge, name and
+    /// synopsis in the solid section. Editing stays on the nav-bar pencil.
     private var headerView: some View {
-        let collapsedHeight: CGFloat = 115
-        let imageWidth: CGFloat = 72
-        
-        return HStack(alignment: .top, spacing: 0) {
-            // Thumbnail: 9:16 portrait
-            ZStack(alignment: .bottom) {
-                if let url = selectedGroup.thumbnailURL {
-                    CustomAsyncImage(url: url) { loader in
-                        if loader.isLoading {
-                            Rectangle().fill(Color.gray.opacity(DesignTokens.Opacity.placeholder))
-                                .overlay(InlineSpinner(scale: .compact))
-                        } else if let image = loader.image {
-                            image.resizable()
-                                .scaledToFill()
-                                .frame(width: imageWidth)
-                                .frame(maxWidth: .infinity, maxHeight: .infinity)
-                                .clipped()
-                        } else {
-                            defaultThumbnailContent(width: imageWidth)
-                        }
-                    }
-                } else {
-                    defaultThumbnailContent(width: imageWidth)
-                }
-            }
-            .frame(width: imageWidth)
-            .frame(minHeight: collapsedHeight)
-            .frame(maxHeight: isHeaderExpanded ? .infinity : collapsedHeight)
-            .background(Color.gray.opacity(DesignTokens.Opacity.placeholder))
-            
-            // Details Section
-            VStack(alignment: .leading, spacing: 4) {
-                // Header: Name
-                Text(selectedGroup.name)
-                    .font(.title2)
-                    .fontWeight(.bold)
-                    .foregroundColor(.primary)
-                    .lineLimit(isHeaderExpanded ? nil : 2)
-                
-                // Grid for Group Info
-                let allDetails = getGroupDetails()
-                let visibleDetails = isHeaderExpanded ? allDetails : Array(allDetails.prefix(4))
-                
-                if !visibleDetails.isEmpty {
-                    LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], alignment: .leading, spacing: 6) {
-                        ForEach(visibleDetails, id: \.label) { detail in
-                            VStack(alignment: .leading, spacing: 0) {
-                                Text(detail.label)
-                                    .font(.system(size: 8))
-                                    .foregroundColor(.secondary)
-                                    .textCase(.uppercase)
-                                Text(detail.value)
-                                    .font(.system(size: 11, weight: .medium))
-                                    .foregroundColor(.primary)
-                                    .lineLimit(1)
-                            }
-                        }
-                    }
-                }
-                
-                if isHeaderExpanded && !(selectedGroup.synopsis ?? "").isEmpty {
-                    Text("Synopsis")
-                        .font(.system(size: 8))
-                        .foregroundColor(.secondary)
-                        .textCase(.uppercase)
-                        .padding(.top, 4)
-                    Text(selectedGroup.synopsis ?? "")
-                        .font(.system(size: 11))
-                        .foregroundColor(.primary)
-                }
-            }
-            .padding(.vertical, 10)
-            .padding(.horizontal, 12)
-            .frame(maxWidth: .infinity, minHeight: collapsedHeight, alignment: .topLeading)
-        }
-        .background(Color.secondaryAppBackground)
-        .clipShape(RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.card))
-        .overlay(
-            RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.card)
-                .stroke(Color.primary.opacity(0.1), lineWidth: 0.5)
+        let coverURL = selectedGroup.thumbnailURL
+        return DetailHeroCard(
+            title: selectedGroup.name,
+            items: getGroupDetails().map { DetailHeroItem(label: $0.label, value: $0.value) },
+            description: selectedGroup.synopsis,
+            showsHero: coverURL != nil,
+            heroAccessibilityLabel: "Group cover",
+            onHeroTap: nil,
+            isExpanded: $isHeaderExpanded,
+            placeholderSystemImage: "rectangle.stack",
+            backdrop: { groupHeroImage(coverURL, alignment: .center) },
+            avatar: { groupHeroImage(coverURL, alignment: .top) },
+            accessory: { _ in EmptyView() },
+            footer: { EmptyView() }
         )
-        .cardShadow()
         .padding(.horizontal, 16)
-        .overlay(
-            Group {
-                let allDetails = getGroupDetails()
-                if allDetails.count > 4 || !(selectedGroup.synopsis ?? "").isEmpty {
-                    Button(action: {
-                        withAnimation(.spring()) {
-                            isHeaderExpanded.toggle()
-                        }
-                    }) {
-                        Image(systemName: isHeaderExpanded ? "chevron.up" : "chevron.down")
-                            .font(.system(size: 10, weight: .bold))
-                            .foregroundColor(appearanceManager.tintColor)
-                            .padding(6)
-                            .background(appearanceManager.tintColor.opacity(0.1))
-                            .clipShape(Circle())
-                    }
-                    .padding(.trailing, 24)
-                    .padding(.bottom, 8)
-                }
-            },
-            alignment: .bottomTrailing
-        )
     }
 
-    private func defaultThumbnailContent(width: CGFloat) -> some View {
-        Rectangle().fill(Color.gray.opacity(DesignTokens.Opacity.placeholder))
-            .frame(width: width)
-            .frame(maxHeight: .infinity)
-            .overlay(Image(systemName: "rectangle.stack").font(.system(size: 24)).foregroundColor(.appAccent.opacity(0.5)))
+    /// Front cover filling its frame; `alignment` picks the crop (top for the circle).
+    @ViewBuilder
+    private func groupHeroImage(_ url: URL?, alignment: Alignment) -> some View {
+        if let url {
+            CustomAsyncImage(url: url) { loader in
+                if let image = loader.image {
+                    image.resizable()
+                        .scaledToFill()
+                        .frame(minWidth: 0, maxWidth: .infinity, minHeight: 0, maxHeight: .infinity, alignment: alignment)
+                        .clipped()
+                } else if loader.isLoading {
+                    Rectangle().fill(Color.gray.opacity(DesignTokens.Opacity.placeholder))
+                        .overlay(InlineSpinner(scale: .compact))
+                } else {
+                    Rectangle().fill(Color.gray.opacity(DesignTokens.Opacity.placeholder))
+                        .overlay(
+                            Image(systemName: "rectangle.stack")
+                                .font(.system(size: 24))
+                                .foregroundColor(.appAccent.opacity(0.5))
+                        )
+                }
+            }
+        }
     }
 
     private func getGroupDetails() -> [(label: String, value: String)] {

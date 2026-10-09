@@ -904,132 +904,68 @@ struct PerformerDetailView: View {
         )
     }
     
+    /// Header card (`DetailHeroCard`): stats on the performer image blurred as the band
+    /// backdrop, the portrait top-cropped in the circle straddling the band edge (keeps the
+    /// face visible), name and Feeds pill in the solid section. The first four stats show
+    /// collapsed, the rest behind the chevron. Favorite / Edit / image change stay in the nav bar.
     private func headerView(displayPerformer: Performer, battleLine: String?) -> some View {
-        let collapsedHeight: CGFloat = 115
-        let imageWidth: CGFloat = 72
-        
-        return HStack(alignment: .top, spacing: 0) {
-            // Thumbnail: 9:16 portrait, flush to edges, cropped from top
-            ZStack(alignment: .top) {
-                if let thumbnailURL = displayPerformer.thumbnailURL {
-                    CustomAsyncImage(url: thumbnailURL) { loader in
-                        if loader.isLoading {
-                            Rectangle().fill(Color.gray.opacity(DesignTokens.Opacity.placeholder))
-                                .overlay(InlineSpinner(scale: .compact))
-                        } else if let image = loader.image {
-                            image.resizable()
-                                .scaledToFill()
-                                .frame(width: imageWidth)
-                                .clipped()
-                        } else {
-                            defaultThumbnailContent(width: imageWidth)
-                        }
+        let imageURL = displayPerformer.thumbnailURL
+        return DetailHeroCard(
+            title: displayPerformer.name,
+            items: getPerformerDetails(displayPerformer, battleLine: battleLine)
+                .map { DetailHeroItem(label: $0.label, value: $0.value) },
+            description: nil,
+            showsHero: imageURL != nil,
+            heroAccessibilityLabel: "Performer image",
+            onHeroTap: nil,
+            isExpanded: $isHeaderExpanded,
+            placeholderSystemImage: "person.fill",
+            backdrop: { performerHeroImage(imageURL, alignment: .center) },
+            avatar: { performerHeroImage(imageURL, alignment: .top) },
+            accessory: { onImage in
+                if showsFeedsNavButton {
+                    DetailHeroFeedsButton(onImage: onImage) {
+                        let sp = ScenePerformer(
+                            id: displayPerformer.id,
+                            name: displayPerformer.name,
+                            birthdate: displayPerformer.birthdate,
+                            sceneCount: displayPerformer.sceneCount,
+                            galleryCount: displayPerformer.galleryCount,
+                            oCounter: displayPerformer.oCounter,
+                            updatedAt: nil
+                        )
+                        coordinator.navigateToReels(performer: sp, mode: nil)
                     }
-                } else {
-                    defaultThumbnailContent(width: imageWidth)
-                }
-            }
-            .frame(width: imageWidth, alignment: .top)
-            .frame(minHeight: collapsedHeight)
-            // Wenn ausgeklappt: Zeilenhöhe = Detailbereich, kein Füllen des übergeordneten VStack (siehe fixedSize am Header)
-            .frame(maxHeight: isHeaderExpanded ? nil : collapsedHeight, alignment: .top)
-            .background(Color.gray.opacity(DesignTokens.Opacity.placeholder))
-            
-            // Details Section
-            VStack(alignment: .leading, spacing: 4) {
-                // Header: Name and Feeds
-                HStack(alignment: .top, spacing: 8) {
-                    Text(displayPerformer.name)
-                        .font(.title2)
-                        .fontWeight(.bold)
-                        .foregroundColor(.primary)
-                        .lineLimit(isHeaderExpanded ? nil : 1)
-
-                    Spacer()
-
-                    if showsFeedsNavButton {
-                        Button(action: {
-                            let sp = ScenePerformer(
-                                id: displayPerformer.id,
-                                name: displayPerformer.name,
-                                birthdate: displayPerformer.birthdate,
-                                sceneCount: displayPerformer.sceneCount,
-                                galleryCount: displayPerformer.galleryCount,
-                                oCounter: displayPerformer.oCounter,
-                                updatedAt: nil
-                            )
-                            coordinator.navigateToReels(performer: sp, mode: nil)
-                        }) {
-                            HStack(spacing: 4) {
-                                Image(systemName: AppTab.reels.icon)
-                                    .font(.system(size: 12, weight: .bold))
-                                Text("Feeds")
-                                    .font(.system(size: 11, weight: .bold))
-                            }
-                            .foregroundColor(Color.pillAccent)
-                            .padding(.horizontal, 10)
-                            .padding(.vertical, 5)
-                            .background(appearanceManager.tintColor.opacity(0.15))
-                            .clipShape(Capsule())
-                        }
-                    }
-                }
-                
-                // Grid for Performer Info
-                let allDetails = getPerformerDetails(displayPerformer, battleLine: battleLine)
-                let visibleDetails = isHeaderExpanded ? allDetails : Array(allDetails.prefix(4))
-                
-                if !visibleDetails.isEmpty {
-                    LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], alignment: .leading, spacing: 6) {
-                        ForEach(visibleDetails, id: \.label) { detail in
-                            VStack(alignment: .leading, spacing: 0) {
-                                Text(detail.label)
-                                    .font(.system(size: 8))
-                                    .foregroundColor(.secondary)
-                                    .textCase(.uppercase)
-                                Text(detail.value)
-                                    .font(.system(size: 11, weight: .medium))
-                                    .foregroundColor(.primary)
-                                    .lineLimit(1)
-                            }
-                        }
-                    }
-                }
-            }
-            .padding(.vertical, 10)
-            .padding(.horizontal, 12)
-            .frame(maxWidth: .infinity, minHeight: collapsedHeight, alignment: .topLeading)
-        }
-        .background(Color.secondaryAppBackground)
-        .clipShape(RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.card))
-        .overlay(
-            RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.card)
-                .stroke(Color.primary.opacity(0.1), lineWidth: 0.5)
-        )
-        .cardShadow()
-        // Nur so hoch wie Inhalt (Name/Details), nicht so hoch wie die komplette übergeordnete Fläche
-        .fixedSize(horizontal: false, vertical: true)
-        .overlay(
-            Group {
-                let allDetails = getPerformerDetails(displayPerformer, battleLine: battleLine)
-                if allDetails.count > 4 {
-                    Button(action: {
-                        withAnimation(.spring()) {
-                            isHeaderExpanded.toggle()
-                        }
-                    }) {
-                        Image(systemName: isHeaderExpanded ? "chevron.up" : "chevron.down")
-                            .font(.system(size: 10, weight: .bold))
-                            .foregroundColor(Color.pillAccent)
-                            .padding(6)
-                            .background(appearanceManager.tintColor.opacity(0.15))
-                            .clipShape(Circle())
-                    }
-                    .padding(8)
                 }
             },
-            alignment: .bottomTrailing
+            footer: { EmptyView() }
         )
+    }
+
+    /// Performer image filling its frame; `alignment` picks the crop (top for the circle so
+    /// the face of a portrait stays visible).
+    @ViewBuilder
+    private func performerHeroImage(_ url: URL?, alignment: Alignment) -> some View {
+        if let url {
+            CustomAsyncImage(url: url) { loader in
+                if let image = loader.image {
+                    image.resizable()
+                        .scaledToFill()
+                        .frame(minWidth: 0, maxWidth: .infinity, minHeight: 0, maxHeight: .infinity, alignment: alignment)
+                        .clipped()
+                } else if loader.isLoading {
+                    Rectangle().fill(Color.gray.opacity(DesignTokens.Opacity.placeholder))
+                        .overlay(InlineSpinner(scale: .compact))
+                } else {
+                    Rectangle().fill(Color.gray.opacity(DesignTokens.Opacity.placeholder))
+                        .overlay(
+                            Image(systemName: "person.fill")
+                                .font(.system(size: 28))
+                                .foregroundColor(.appAccent.opacity(0.5))
+                        )
+                }
+            }
+        }
     }
 
     private func cardBadge(icon: String, text: String) -> some View {
@@ -1042,13 +978,6 @@ struct PerformerDetailView: View {
         .padding(.vertical, 3)
         .background(appearanceManager.tintColor.opacity(0.15))
         .clipShape(Capsule())
-    }
-
-    private func defaultThumbnailContent(width: CGFloat) -> some View {
-        Rectangle().fill(Color.gray.opacity(DesignTokens.Opacity.placeholder))
-            .frame(width: width)
-            .frame(maxHeight: .infinity, alignment: .top)
-            .overlay(Image(systemName: "person.fill").font(.system(size: 32)).foregroundColor(.appAccent.opacity(0.5)))
     }
 
     private func thumbnailBadge(icon: String, text: String) -> some View {
