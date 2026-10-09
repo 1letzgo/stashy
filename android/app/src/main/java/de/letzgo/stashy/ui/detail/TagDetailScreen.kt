@@ -126,9 +126,10 @@ class TagDetailScreen(val tagId: String, val preview: Tag? = null) : Screen {
     }
 
     /**
-     * iOS `tagHeaderView` as a [DetailHeroCard]: the tag image fills a 16:9 center crop with the
-     * name, Feeds pill and details over a bottom gradient (tap → fullscreen); without an image
-     * (or Stash's `default=true` placeholder) the same on the plain card. Description below.
+     * iOS `tagHeaderView` as a [DetailHeroCard]: the tag image blurred as the band backdrop and
+     * center-cropped in the circle before the name + Feeds pill (tap → fullscreen); details and
+     * description below on the card. Without an image (or Stash's `default=true` placeholder),
+     * all on the plain card.
      */
     @Composable
     private fun Header(t: Tag) {
@@ -140,7 +141,7 @@ class TagDetailScreen(val tagId: String, val preview: Tag? = null) : Screen {
             expanded = expanded,
             onToggle = { expanded = !expanded },
             hero = url?.let {
-                DetailHero(DetailHero.Style.Cover, Color.Black, "Open image", { Nav.push(HeroPictureViewerScreen(it, t.name)) }) {
+                DetailHero(DetailHero.Style.Cover, it, Color.Black, "Open image", { Nav.push(HeroPictureViewerScreen(it, t.name)) }) {
                     HeroPicture(it, t.name, ContentScale.Crop, SF.number)
                 }
             },

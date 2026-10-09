@@ -121,10 +121,10 @@ class StudioDetailScreen(val studioId: String, val preview: Studio? = null) : Sc
     }
 
     /**
-     * iOS `headerCard` as a [DetailHeroCard]: the studio logo is never cropped — fit, inset on the
-     * dark studio backdrop in the 16:9 frame — with the name, Feeds pill and details over a bottom
-     * gradient (tap → fullscreen); without a logo the same on the plain card. URL and description
-     * below the picture.
+     * iOS `headerCard` as a [DetailHeroCard]: the logo blurred as the band backdrop and, never
+     * cropped (fit, inset on the dark studio backdrop), in the circle before the name + Feeds pill
+     * (tap → fullscreen); details, URL and description below on the card. Without a logo, all on
+     * the plain card.
      */
     @Composable
     private fun Header(s: Studio) {
@@ -137,7 +137,7 @@ class StudioDetailScreen(val studioId: String, val preview: Studio? = null) : Sc
             expanded = expanded,
             onToggle = { expanded = !expanded },
             hero = url?.let {
-                DetailHero(DetailHero.Style.Logo, p.studioHeader, "Open logo", { Nav.push(HeroPictureViewerScreen(it, s.name, p.studioHeader, inset = true)) }) {
+                DetailHero(DetailHero.Style.Logo, it, p.studioHeader, "Open logo", { Nav.push(HeroPictureViewerScreen(it, s.name, p.studioHeader, inset = true)) }) {
                     HeroPicture(it, s.name, ContentScale.Fit, SF.building2)
                 }
             },
