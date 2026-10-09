@@ -40,6 +40,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import de.letzgo.stashy.data.AppTab
+import de.letzgo.stashy.data.SceneDetailLayout
 import de.letzgo.stashy.data.TabManager
 import de.letzgo.stashy.ui.AppTheme
 import de.letzgo.stashy.ui.Appearance
@@ -144,6 +145,45 @@ val oCounterPresets = listOf(
     "circle" to "Circle", "diamond" to "Diamond", "crown" to "Crown", "trophy" to "Trophy", "moon" to "Moon",
     "drop" to "Drop", "leaf" to "Leaf", "bell" to "Bell", "tag" to "Tag", "eye" to "Eye",
 )
+
+/**
+ * Settings › Design › Scene View — order and visibility of the cards on the scene detail page.
+ * The video player always stays on top and isn't part of the list.
+ */
+class SceneViewSettingsScreen : Screen {
+    override val key = "settings-scene-view"
+
+    @Composable override fun Content() = SettingsDetailScaffold("Scene View") { top ->
+        SettingsList(top) {
+            item(key = "cards") {
+                Column(Modifier.fillMaxWidth().padding(bottom = 20.dp)) {
+                    SectionHeaderText("Cards")
+                    val cards = SceneDetailLayout.order
+                    val hidden = SceneDetailLayout.hidden
+                    SettingsGroup {
+                        ReorderableColumn(cards, { it.id }, { from, to -> SceneDetailLayout.move(from, to) }) { card, i, handle ->
+                            Column {
+                                SettingsRow(verticalPadding = 6.dp) {
+                                    Text(card.title, style = NativeType.bodyLarge, color = Theme.palette.text, modifier = Modifier.weight(1f))
+                                    SettingsSwitch(card !in hidden) { SceneDetailLayout.setVisible(card, it) }
+                                    DragHandle(handle)
+                                }
+                                if (i < cards.lastIndex) SettingsDivider()
+                            }
+                        }
+                    }
+                    SectionFooterText("Drag to reorder the cards below the video player; switch a card off to hide it. In landscape, Groups and Tags share a row when they sit next to each other.")
+                }
+            }
+            settingsSection(key = "reset") {
+                val isDefault = SceneDetailLayout.isDefault
+                SettingsRow(onClick = { SceneDetailLayout.reset() }, enabled = !isDefault) {
+                    Text("Reset to Default", style = NativeType.bodyLarge, color = if (isDefault) Theme.palette.tertiaryText else nativeAccent())
+                }
+            }
+        }
+    }
+}
 
 private fun sameColor(a: Color, b: Color) = abs(a.red - b.red) < 0.01f && abs(a.green - b.green) < 0.01f && abs(a.blue - b.blue) < 0.01f
 

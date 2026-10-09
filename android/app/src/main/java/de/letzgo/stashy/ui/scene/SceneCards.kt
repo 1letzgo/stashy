@@ -234,8 +234,8 @@ fun SceneTagsCard(tags: List<Tag>?, expanded: Boolean, onToggleExpanded: () -> U
 
 /** iOS: `SceneGalleriesCard` — one strip per gallery: link tile with the image count, then its images. */
 @Composable
-fun SceneGalleriesCard(galleries: List<SceneGalleryStub>?, onEdit: () -> Unit) {
-    SceneCardContainer(Modifier.fillMaxWidth()) {
+fun SceneGalleriesCard(galleries: List<SceneGalleryStub>?, modifier: Modifier = Modifier, onEdit: () -> Unit) {
+    SceneCardContainer(modifier.fillMaxWidth()) {
         SceneCardHeader("Galleries", onEdit)
         if (galleries.isNullOrEmpty()) Box(Modifier.padding(top = 8.dp)) { SceneCardEmpty("No galleries assigned") }
         else Column(Modifier.padding(top = 8.dp, bottom = 12.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {

@@ -73,6 +73,8 @@ private fun androidx.compose.foundation.lazy.LazyListScope.designSettings() {
         SettingsNavRow("Appearance", SFS.paintbrush) { Nav.push(AppearanceSettingsScreen()) }
         SettingsDivider()
         SettingsNavRow("Editing", SFS.pencilCircle) { Nav.push(EditModeSettingsScreen()) }
+        SettingsDivider()
+        SettingsNavRow("Scene View", SF.rectangleGrid1x2) { Nav.push(SceneViewSettingsScreen()) }
     }
     settingsSection(header = "Security", key = "security") {
         SettingsNavRow("Security", SFS.lockShield) { Nav.push(SecuritySettingsScreen()) }

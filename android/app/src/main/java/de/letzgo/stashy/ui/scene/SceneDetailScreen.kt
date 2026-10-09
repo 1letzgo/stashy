@@ -44,6 +44,9 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import de.letzgo.stashy.data.Scene
+import de.letzgo.stashy.data.SceneDetailCard
+import de.letzgo.stashy.data.SceneDetailLayout
+import de.letzgo.stashy.data.SceneDetailLayoutLogic
 import de.letzgo.stashy.ui.Appearance
 import de.letzgo.stashy.ui.NativeTopBar
 import de.letzgo.stashy.ui.OverflowItem
@@ -192,31 +195,33 @@ private fun SceneDetailContent(model: SceneDetailModel) {
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
                 if (!pinned) playerCard()
-                SceneCardContainer(Modifier.fillMaxWidth()) { SceneMetadataCard(model) { sheet = EditSheet.Title } }
-                if (scene.interactive == true && scene.hasFunscript) {
-                    SceneHeatmapCard(
-                        scene.heatmapURL, scene.sceneDuration ?: 0.0, model.currentPlaybackTime,
-                        onSeek = model::seekTo, onSeekCommit = model::commitScrub, onScrubStateChange = model::updateScrubbing,
-                    )
-                }
-                // stashy+ — hides itself when Similar Scenes is off or nothing is similar.
-                SceneSimilarScenesCard(model.similarScenes, model.isLoadingSimilarScenes)
-                // Hides itself without studio, performers and director (unless edit mode is on).
-                ScenePerformersStudioCard(
-                    scene.date, scene.studio, scene.performers, scene.normalizedDirector,
-                    onEditStudio = { sheet = EditSheet.Studio }, onEditPerformers = { sheet = EditSheet.Performers },
-                )
-                if (landscape) {
-                    // Landscape: Groups | Tags side by side, Galleries full width. Delete lives in the top bar's ⋮ menu.
-                    Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                        SceneGroupsCard(scene.groups.orEmpty(), { sheet = EditSheet.Groups }, Modifier.weight(1f))
-                        SceneTagsCard(scene.tags, model.isTagsExpanded, { model.isTagsExpanded = !model.isTagsExpanded }, { sheet = EditSheet.Tags }, Modifier.weight(1f))
+                // Settings › Design › Scene View: card order and visibility (applies live). In
+                // landscape adjacent half-width cards (Groups, Tags) share a row.
+                @Composable
+                fun card(c: SceneDetailCard, modifier: Modifier) {
+                    when (c) {
+                        SceneDetailCard.Details -> SceneCardContainer(modifier.fillMaxWidth()) { SceneMetadataCard(model) { sheet = EditSheet.Title } }
+                        SceneDetailCard.Heatmap -> if (scene.interactive == true && scene.hasFunscript) {
+                            SceneHeatmapCard(
+                                scene.heatmapURL, scene.sceneDuration ?: 0.0, model.currentPlaybackTime,
+                                onSeek = model::seekTo, onSeekCommit = model::commitScrub, onScrubStateChange = model::updateScrubbing,
+                            )
+                        }
+                        // stashy+ — hides itself when Similar Scenes is off or nothing is similar.
+                        SceneDetailCard.SimilarScenes -> SceneSimilarScenesCard(model.similarScenes, model.isLoadingSimilarScenes)
+                        // Hides itself without studio, performers and director (unless edit mode is on).
+                        SceneDetailCard.PerformersStudio -> ScenePerformersStudioCard(
+                            scene.date, scene.studio, scene.performers, scene.normalizedDirector,
+                            onEditStudio = { sheet = EditSheet.Studio }, onEditPerformers = { sheet = EditSheet.Performers },
+                        )
+                        SceneDetailCard.Groups -> SceneGroupsCard(scene.groups.orEmpty(), { sheet = EditSheet.Groups }, modifier)
+                        SceneDetailCard.Tags -> SceneTagsCard(scene.tags, model.isTagsExpanded, { model.isTagsExpanded = !model.isTagsExpanded }, { sheet = EditSheet.Tags }, modifier)
+                        SceneDetailCard.Galleries -> SceneGalleriesCard(scene.galleries, modifier) { sheet = EditSheet.Galleries }
                     }
-                    SceneGalleriesCard(scene.galleries) { sheet = EditSheet.Galleries }
-                } else {
-                    SceneGroupsCard(scene.groups.orEmpty(), { sheet = EditSheet.Groups })
-                    SceneTagsCard(scene.tags, model.isTagsExpanded, { model.isTagsExpanded = !model.isTagsExpanded }, { sheet = EditSheet.Tags })
-                    SceneGalleriesCard(scene.galleries) { sheet = EditSheet.Galleries }
+                }
+                SceneDetailLayoutLogic.rows(SceneDetailLayout.order, SceneDetailLayout.hidden, landscape).forEach { row ->
+                    if (row.size == 1) card(row[0], Modifier)
+                    else Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) { row.forEach { card(it, Modifier.weight(1f)) } }
                 }
             }
         }
