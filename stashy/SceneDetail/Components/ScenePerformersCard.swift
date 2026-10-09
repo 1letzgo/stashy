@@ -158,41 +158,39 @@ struct ScenePerformersStudioCard: View {
 
     @ViewBuilder
     private func performerPortrait(_ scenePerformer: ScenePerformer) -> some View {
-        if let url = scenePerformer.thumbnailURL {
-            CustomAsyncImage(url: url) { loader in
-                if let image = loader.image {
-                    image
-                        .resizable()
-                        .scaledToFill()
-                        .frame(width: Self.tileSize, height: Self.tileSize, alignment: .top)
-                        .clipShape(Circle())
-                } else {
-                    Circle()
-                        .fill(Color.gray.opacity(DesignTokens.Opacity.placeholder))
-                        .frame(width: Self.tileSize, height: Self.tileSize)
-                        .skeleton()
-                }
-            }
-        } else {
-            Image(systemName: "person.circle.fill")
-                .resizable()
-                .frame(width: Self.tileSize, height: Self.tileSize)
-                .foregroundColor(appearanceManager.tintColor.opacity(0.4))
-        }
+        PerformerCirclePortrait(url: scenePerformer.thumbnailURL, size: Self.tileSize)
     }
 
-    /// Shared shape language for every row item: tinted ring around a circle,
-    /// optional badge top-right, name pill overlapping the bottom edge.
     private func tile<Content: View>(name: String, badge: Int? = nil, @ViewBuilder content: () -> Content) -> some View {
+        CircleNameTile(name: name, badge: badge.map { "\($0)" }, content: content)
+    }
+}
+
+/// Shared shape language for every "Performers & Studio" item: tinted ring around a circle,
+/// optional badge top-right, name pill overlapping the bottom edge. Also used by
+/// Performer detail › "Appears with".
+struct CircleNameTile<Content: View>: View {
+    let name: String
+    var badge: String? = nil
+    let content: Content
+    @ObservedObject private var appearanceManager = AppearanceManager.shared
+
+    init(name: String, badge: String? = nil, @ViewBuilder content: () -> Content) {
+        self.name = name
+        self.badge = badge
+        self.content = content()
+    }
+
+    var body: some View {
         ZStack(alignment: .bottom) {
-            content()
+            content
                 .padding(4)
                 .background(appearanceManager.tintColor)
                 .clipShape(Circle())
                 .overlay(Circle().stroke(appearanceManager.tintColor.opacity(0.1), lineWidth: 0.2))
                 .overlay(alignment: .topTrailing) {
                     if let badge {
-                        Text("\(badge)")
+                        Text(badge)
                             .font(.system(size: 10, weight: .bold))
                             .foregroundColor(.white)
                             .frame(width: 22, height: 22)
@@ -220,6 +218,37 @@ struct ScenePerformersStudioCard: View {
                 .offset(y: 8)
         }
         .padding(.bottom, 8)
+    }
+}
+
+/// Round, top-anchored performer portrait used inside `CircleNameTile`.
+struct PerformerCirclePortrait: View {
+    let url: URL?
+    var size: CGFloat = 80
+    @ObservedObject private var appearanceManager = AppearanceManager.shared
+
+    var body: some View {
+        if let url {
+            CustomAsyncImage(url: url) { loader in
+                if let image = loader.image {
+                    image
+                        .resizable()
+                        .scaledToFill()
+                        .frame(width: size, height: size, alignment: .top)
+                        .clipShape(Circle())
+                } else {
+                    Circle()
+                        .fill(Color.gray.opacity(DesignTokens.Opacity.placeholder))
+                        .frame(width: size, height: size)
+                        .skeleton()
+                }
+            }
+        } else {
+            Image(systemName: "person.circle.fill")
+                .resizable()
+                .frame(width: size, height: size)
+                .foregroundColor(appearanceManager.tintColor.opacity(0.4))
+        }
     }
 }
 

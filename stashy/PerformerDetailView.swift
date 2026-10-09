@@ -37,6 +37,10 @@ struct PerformerDetailView: View {
     @StateObject private var linkedImages: DetailLinkedImagesFilterModel
     /// Images 1/row autoplay: parent ScrollView drag/decelerate.
     @State private var imagesFeedScrolling = false
+    /// "Appears with": co-performers sorted by shared scenes; `nil` until loaded (session cache in `CoPerformerCache`).
+    @State private var coPerformers: [CoPerformer]?
+    @State private var isLoadingCoPerformers = false
+    @State private var coPerformersError: String?
 
     private var showsFeedsNavButton: Bool {
         tabManager.tabs.first(where: { $0.id == .reels })?.isVisible ?? true
@@ -49,6 +53,7 @@ struct PerformerDetailView: View {
         case tags = "Tags"
         case groups = "Groups"
         case images = "Images"
+        case appearsWith = "Appears with"
 
         var icon: String {
             switch self {
@@ -58,6 +63,7 @@ struct PerformerDetailView: View {
             case .tags: return "tag"
             case .groups: return "rectangle.stack.fill"
             case .images: return "photo"
+            case .appearsWith: return "person.2"
             }
         }
     }
@@ -114,6 +120,7 @@ struct PerformerDetailView: View {
         if viewModel.totalDetailTags > 0 { tabs.append(.tags) }
         if viewModel.totalDetailGroups > 0 { tabs.append(.groups) }
         if viewModel.totalDetailImages > 0 { tabs.append(.images) }
+        if effectiveScenes > 0 { tabs.append(.appearsWith) }
         return tabs
     }
 
@@ -130,6 +137,7 @@ struct PerformerDetailView: View {
             case .tags: return viewModel.detailTags.isEmpty
             case .groups: return viewModel.detailGroups.isEmpty
             case .images: return viewModel.detailImages.isEmpty
+            case .appearsWith: return coPerformers?.isEmpty ?? true
             }
         }()
         return CatalogFloatingChromeState(
@@ -190,6 +198,8 @@ struct PerformerDetailView: View {
                     groupGrid
                 } else if selectedDetailTab == .images {
                     imageGrid
+                } else if selectedDetailTab == .appearsWith {
+                    appearsWithContent
                 } else if selectedDetailTab == .scenes {
                     InlineEmptyStateView(icon: "film", title: "No scenes found")
                 }
@@ -203,6 +213,12 @@ struct PerformerDetailView: View {
                 return
             }
             imagesFeedScrolling = newPhase != .idle
+        }
+        .modifier(OptionalRefreshable(action: appearsWithRefreshAction))
+        .onChange(of: selectedDetailTab, initial: true) { _, tab in
+            // Unstructured on purpose: switching tabs mid-load must not cancel the fetch.
+            guard tab == .appearsWith else { return }
+            Task { await loadCoPerformers(force: false) }
         }
     }
 
@@ -602,7 +618,7 @@ struct PerformerDetailView: View {
                 HapticManager.light()
                 linkedImages.showFilterSortSheet = true
             }
-        case .groups:
+        case .groups, .appearsWith:
             break
         }
         return slots
@@ -891,6 +907,67 @@ struct PerformerDetailView: View {
         .measuresGridWidth($galleryGridWidth)
     }
     
+    /// Pull-to-refresh only on "Appears with"; other tabs keep their existing (no refresh) behavior.
+    private var appearsWithRefreshAction: (() async -> Void)? {
+        guard selectedDetailTab == .appearsWith else { return nil }
+        return { await loadCoPerformers(force: true) }
+    }
+
+    /// Same circle tiles as the scene detail's "Performers & Studio" row, wrapped in an adaptive grid.
+    private var appearsWithColumns: [GridItem] {
+        [GridItem(.adaptive(minimum: 96, maximum: 120), spacing: 12, alignment: .top)]
+    }
+
+    @ViewBuilder
+    private var appearsWithContent: some View {
+        if let coPerformers, !coPerformers.isEmpty {
+            LazyVGrid(columns: appearsWithColumns, spacing: 16) {
+                ForEach(coPerformers) { co in
+                    NavigationLink(destination: LazyView { PerformerDetailView(performer: co.performer) }) {
+                        CircleNameTile(name: co.performer.name, badge: "\(co.sharedSceneCount)") {
+                            PerformerCirclePortrait(url: co.performer.thumbnailURL)
+                        }
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel(co.performer.name)
+                    .accessibilityValue("\(co.sharedSceneCount) shared \(co.sharedSceneCount == 1 ? "scene" : "scenes")")
+                }
+            }
+            .padding(.top, 4)
+        } else if isLoadingCoPerformers || coPerformers == nil && coPerformersError == nil {
+            VStack {
+                InlineSpinner()
+                Text("Loading performers...").font(.caption).foregroundColor(.secondary)
+            }.padding(.top, 40)
+        } else if let coPerformersError {
+            InlineEmptyStateView(icon: "exclamationmark.triangle", title: coPerformersError)
+        } else {
+            InlineEmptyStateView(icon: "person.2", title: "No shared scenes")
+        }
+    }
+
+    /// Loads "Appears with" once per performer per session; `force` (pull-to-refresh) bypasses the cache.
+    private func loadCoPerformers(force: Bool) async {
+        let performerId = performer.id
+        if !force, coPerformers != nil { return }
+        if !force, let cached = CoPerformerCache.shared.get(performerId) {
+            coPerformers = cached
+            return
+        }
+        guard !isLoadingCoPerformers else { return }
+        isLoadingCoPerformers = true
+        coPerformersError = nil
+        defer { isLoadingCoPerformers = false }
+        do {
+            let result = try await PerformerRepository().fetchCoPerformers(performerId: performerId)
+            CoPerformerCache.shared.set(performerId, result)
+            coPerformers = result
+        } catch {
+            AppLog.error("Appears with: \(error.localizedDescription)")
+            if coPerformers == nil { coPerformersError = "Couldn't load performers" }
+        }
+    }
+
     private var imageGrid: some View {
         LinkedImagesCatalogGrid(
             images: $viewModel.detailImages,
@@ -1052,6 +1129,19 @@ struct PerformerDetailView: View {
         performer = updated
         if fullPerformer != nil {
             fullPerformer = updated
+        }
+    }
+}
+
+/// `.refreshable` only when an action is provided, so tabs without pull-to-refresh keep their behavior.
+private struct OptionalRefreshable: ViewModifier {
+    let action: (() async -> Void)?
+
+    func body(content: Content) -> some View {
+        if let action {
+            content.refreshable { await action() }
+        } else {
+            content
         }
     }
 }
