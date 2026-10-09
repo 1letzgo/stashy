@@ -16,7 +16,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import de.letzgo.stashy.data.CatalogCardColumnScope
 import de.letzgo.stashy.data.CatalogCardColumns
 import de.letzgo.stashy.data.CatalogPrefs
@@ -55,11 +54,17 @@ import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.ui.Alignment
-import androidx.compose.ui.BiasAlignment
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
+import de.letzgo.stashy.ui.IosTypography
+import de.letzgo.stashy.ui.scaledIconSize
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
@@ -68,15 +73,13 @@ import androidx.compose.ui.unit.min
 import coil3.compose.AsyncImage
 import coil3.compose.SubcomposeAsyncImage
 import de.letzgo.stashy.ui.StashyColors
-import de.letzgo.stashy.ui.Tokens
-import de.letzgo.stashy.ui.cardShadow
 import kotlinx.coroutines.launch
 import kotlinx.serialization.json.JsonObject
 
 /**
- * iOS: `ImagesView(gallery:)` for an opened gallery — chrome bar Back · Edit, the cover as a
- * hero at the top (placed like the scene detail's player card), the gallery header
- * (IMAGES / DATE / STUDIO / PERFORMERS / ORGANIZED, details when expanded), the scene-detail Performers & Studio card (only when set), then the image grid (2/row) or the grouped feed (1/row). The top bar's "Settings"
+ * iOS: `ImagesView(gallery:)` for an opened gallery — chrome bar Back · Edit, one header card
+ * with the cover as a hero and the gallery title + IMAGES / DATE / ORGANIZED overlaid on it
+ * (plain card without a picture; description below, expandable), the scene-detail Performers & Studio card (only when set), then the image grid (2/row) or the grouped feed (1/row). The top bar's "Settings"
  * opens the images filter & sort sheet (iOS `ImagesCatalogFilterSortSheet` with
  * `DetailLinkedImagesFilterModel(scope: .gallery(id))`): filter, sort, Type, Per row
  * (`openedGallery` scope), autoplay toggles and the criteria editor. The `galleries` INCLUDES
@@ -184,15 +187,14 @@ class GalleryDetailScreen(
     }
 
     /**
-     * Header, then the scene detail's Performers & Studio card (full width). The card only shows
-     * when the gallery has a studio or performers — or in edit mode, empty, so they can be
+     * Hero header, then the scene detail's Performers & Studio card (full width). The card only
+     * shows when the gallery has a studio or performers — or in edit mode, empty, so they can be
      * assigned via its pencil menu.
      */
     @Composable
     private fun HeaderWithCards(g: Gallery) {
         Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            GalleryHero(g)
-            Header(g)
+            HeroHeader(g)
             ScenePerformersStudioCard(
                 g.date, g.studio, g.performers.orEmpty(), director = null,
                 onEditStudio = { editingStudio = true }, onEditPerformers = { editingPerformers = true },
@@ -200,70 +202,107 @@ class GalleryDetailScreen(
         }
     }
 
-    /** iOS `openedGalleryHeader`. */
-    @Composable
-    private fun Header(g: Gallery) {
-        val items = DetailFormatting.gallery(g, images.list.totalCount)
-        val details = g.details?.takeIf { it.isNotEmpty() }
-        DetailHeaderCard(
-            title = g.displayTitle,
-            imageUrl = g.coverURL,
-            placeholderIcon = photoOnRectangleIcon(),
-            items = items,
-            expandable = items.size > 4 || details != null,
-            expanded = expanded,
-            onToggle = { expanded = !expanded },
-            expandedContent = details?.let { d -> { Text(d, fontSize = 11.sp, color = Theme.palette.secondaryText, modifier = Modifier.padding(top = 4.dp)) } },
-            showsImageStrip = false,
-        )
-    }
-
-    /**
-     * The gallery cover (else the first image) as a hero, in the scene detail player's frame:
-     * full-width card, 16:9 crop-fill — capped to most of the screen height in landscape, like a
-     * portrait cover would otherwise push everything below off screen. Hidden without any picture.
-     * Tap opens the fullscreen viewer on that picture.
-     */
-    @Composable
-    private fun GalleryHero(g: Gallery) {
+    /** The gallery cover, else the first loaded image (with its list index and whether it is the cover); null without any picture. */
+    private fun heroImage(g: Gallery): Triple<StashImage, Int, Boolean>? {
         val items = images.list.items
         val cover = g.cover?.takeIf { it.paths != null && it.id != null }
         val coverIndex = cover?.id?.let { id -> items.indexOfFirst { it.id == id } } ?: -1
-        val heroImage: StashImage? = when {
+        val image = when {
             coverIndex >= 0 -> items[coverIndex]
             cover != null -> StashImage(id = cover.id!!, paths = cover.paths)
             else -> items.firstOrNull()
-        }
-        heroImage ?: return
-        val thumb = heroImage.thumbnailURL
+        } ?: return null
+        return Triple(image, coverIndex, cover != null)
+    }
+
+    /**
+     * iOS `openedGalleryHeader` merged with the cover hero: one card in the detail header frame.
+     * With a picture, the cover fills a 16:9 crop (centered, capped to 70% of the screen height
+     * in landscape) and the title + details sit on it over a bottom gradient; tapping the picture
+     * opens the fullscreen viewer. Without one, the same title + details on the plain card (like
+     * the studio header). The gallery description sits below inside the same card, clamped to
+     * three lines with the expand chevron when it is longer.
+     */
+    @Composable
+    private fun HeroHeader(g: Gallery) {
+        val p = Theme.palette
+        val items = DetailFormatting.gallery(g, images.list.totalCount)
+        val details = g.details?.takeIf { it.isNotEmpty() }
+        val hero = heroImage(g)
         // Full picture for the large frame (Coil downsamples to the frame); a video clip as cover
-        // fails to decode there, so the error slot falls back to the thumbnail.
-        val full = if (heroImage.isVideo) null else heroImage.imageURL
-        val url = full ?: thumb ?: return
-        val shape = RoundedCornerShape(Tokens.Radius.card)
-        val screenHeight = LocalConfiguration.current.screenHeightDp.dp
-        BoxWithConstraints(Modifier.fillMaxWidth()) {
-            val height = min(maxWidth * 9f / 16f, screenHeight * 0.7f)
-            Box(
-                Modifier.fillMaxWidth().height(height).cardShadow(shape).clip(shape).background(Theme.palette.secondaryBackground)
-                    .clickable(onClickLabel = "Open image") { openHero(heroImage, coverIndex, cover != null) },
-            ) {
-                // Slightly above center: portrait covers keep faces in the wide frame.
-                val alignment = BiasAlignment(0f, -0.4f)
-                SubcomposeAsyncImage(
-                    url, g.displayTitle, Modifier.fillMaxSize(), contentScale = ContentScale.Crop, alignment = alignment,
-                    loading = {
-                        if (thumb != null && thumb != url) AsyncImage(thumb, null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop, alignment = alignment)
-                        else Box(Modifier.fillMaxSize(), Alignment.Center) { CircularProgressIndicator(Modifier.size(20.dp), color = Theme.palette.secondaryText, strokeWidth = 2.dp) }
-                    },
-                    error = {
-                        if (thumb != null && thumb != url) AsyncImage(thumb, null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop, alignment = alignment)
-                        else Box(Modifier.fillMaxSize().background(Color.Gray.copy(alpha = 0.1f)), Alignment.Center) {
-                            Icon(photoOnRectangleIcon(), null, tint = StashyColors.appAccent.copy(alpha = 0.5f), modifier = Modifier.size(34.dp))
+        // fails to decode there, so it uses the thumbnail.
+        val url = hero?.first?.let { img -> (if (img.isVideo) null else img.imageURL) ?: img.thumbnailURL }
+        val hasPicture = hero != null && url != null
+        var detailsOverflow by remember(details) { mutableStateOf(false) }
+        val expandable = details != null && (expanded || detailsOverflow)
+        HeaderCardFrame {
+            Column(Modifier.fillMaxWidth()) {
+                if (hero != null && url != null) {
+                    val (image, coverIndex, isCover) = hero
+                    val thumb = image.thumbnailURL
+                    val screenHeight = LocalConfiguration.current.screenHeightDp.dp
+                    BoxWithConstraints(Modifier.fillMaxWidth()) {
+                        val height = min(maxWidth * 9f / 16f, screenHeight * 0.7f)
+                        // Grows past 16:9 only when a large font scale needs room for the overlay.
+                        Box(
+                            Modifier.fillMaxWidth().heightIn(min = height).background(Color.Black)
+                                .clickable(onClickLabel = "Open image") { openHero(image, coverIndex, isCover) },
+                        ) {
+                            SubcomposeAsyncImage(
+                                url, g.displayTitle, Modifier.matchParentSize(), contentScale = ContentScale.Crop, alignment = Alignment.Center,
+                                loading = {
+                                    if (thumb != null && thumb != url) AsyncImage(thumb, null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop, alignment = Alignment.Center)
+                                    else Box(Modifier.fillMaxSize(), Alignment.Center) { CircularProgressIndicator(Modifier.size(20.dp), color = Color.White.copy(alpha = 0.7f), strokeWidth = 2.dp) }
+                                },
+                                error = {
+                                    if (thumb != null && thumb != url) AsyncImage(thumb, null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop, alignment = Alignment.Center)
+                                    else Box(Modifier.fillMaxSize().background(Color.Gray.copy(alpha = 0.1f)), Alignment.Center) {
+                                        Icon(photoOnRectangleIcon(), null, tint = StashyColors.appAccent.copy(alpha = 0.5f), modifier = Modifier.size(34.dp))
+                                    }
+                                },
+                            )
+                            Box(
+                                Modifier.matchParentSize()
+                                    .background(Brush.verticalGradient(0.35f to Color.Transparent, 1f to Color.Black.copy(alpha = 0.8f))),
+                            )
+                            HeaderTitleAndItems(
+                                g.displayTitle, items, Color.White, Color.White.copy(alpha = 0.75f),
+                                Modifier.align(Alignment.BottomStart).padding(top = 24.dp),
+                            )
                         }
-                    },
-                )
+                    }
+                } else {
+                    HeaderTitleAndItems(g.displayTitle, items, p.text, p.secondaryText, Modifier)
+                }
+                if (details != null) {
+                    Column(
+                        Modifier.fillMaxWidth().padding(start = 12.dp, end = 12.dp, top = if (hasPicture) 6.dp else 0.dp, bottom = 10.dp),
+                        verticalArrangement = Arrangement.spacedBy(4.dp),
+                    ) {
+                        if (!hasPicture) HorizontalDivider(color = p.separator)
+                        Text(
+                            details, style = IosTypography.caption, color = p.secondaryText,
+                            maxLines = if (expanded) Int.MAX_VALUE else 3, overflow = TextOverflow.Ellipsis,
+                            onTextLayout = { if (!expanded) detailsOverflow = it.hasVisualOverflow },
+                            modifier = Modifier.padding(vertical = 4.dp),
+                        )
+                        if (expandable) Spacer(Modifier.height(scaledIconSize(18.dp)))
+                    }
+                }
             }
+            if (expandable) HeaderExpandButton(expanded) { expanded = !expanded }
+        }
+    }
+
+    /** Title (title2 bold, two lines) and the detail grid, padded like the studio header. */
+    @Composable
+    private fun HeaderTitleAndItems(title: String, items: List<DetailItem>, titleColor: Color, labelColor: Color, modifier: Modifier) {
+        Column(
+            modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 10.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            Text(title, style = IosTypography.title2.copy(fontWeight = FontWeight.Bold), color = titleColor, maxLines = 2, overflow = TextOverflow.Ellipsis)
+            if (items.isNotEmpty()) DetailItemsGrid(items, labelColor = labelColor, valueColor = titleColor)
         }
     }
 
