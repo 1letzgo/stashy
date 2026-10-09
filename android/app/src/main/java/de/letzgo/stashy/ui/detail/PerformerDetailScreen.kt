@@ -24,6 +24,18 @@ import de.letzgo.stashy.ui.SF
 import de.letzgo.stashy.ui.Screen
 import de.letzgo.stashy.ui.Theme
 import kotlinx.coroutines.launch
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.lazy.grid.GridItemSpan
+import androidx.compose.foundation.lazy.grid.LazyGridScope
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.pulltorefresh.PullToRefreshDefaults
+import androidx.compose.material3.pulltorefresh.pullToRefresh
+import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
+import androidx.compose.ui.Alignment
+import de.letzgo.stashy.data.CoPerformersRepository
+import de.letzgo.stashy.ui.scene.ScenePerformerTile
+import de.letzgo.stashy.ui.uniqueItemsIndexed
 
 /**
  * iOS: `PerformerDetailView` — custom chrome bar (Back · sections · Favorite · Edit), header
@@ -50,9 +62,14 @@ class PerformerDetailScreen(val performerId: String, val preview: Performer? = n
     private var started = false
     private val gridState = LazyGridState()
 
+    /** "Appears with" (performers sharing scenes), loaded the first time the tab opens; session cache. */
+    private var coPerformers by mutableStateOf(CoPerformersRepository.cached(performerId))
+    private var coLoading by mutableStateOf(false)
+    private var coFailed by mutableStateOf(false)
+
     private val catalog = LinkedCatalog(
         scope,
-        order = listOf(DetailTab.Scenes, DetailTab.Galleries, DetailTab.Studios, DetailTab.Tags, DetailTab.Groups, DetailTab.Images),
+        order = listOf(DetailTab.Scenes, DetailTab.Galleries, DetailTab.Studios, DetailTab.Tags, DetailTab.Groups, DetailTab.Images, DetailTab.AppearsWith),
         sceneScope = DetailRepository.scope("performers", performerId),
         galleryScope = DetailRepository.scope("performers", performerId),
         studioScope = DetailRepository.scope("performers", performerId),
@@ -62,6 +79,8 @@ class PerformerDetailScreen(val performerId: String, val preview: Performer? = n
         sceneContext = DetailViewContext.Performer,
         previewScenes = preview?.sceneCount ?: 0,
         previewGalleries = preview?.galleryCount ?: 0,
+        // "Appears with" only for a performer with at least one scene.
+        screenCount = { tab -> if (tab == DetailTab.AppearsWith && (performer?.sceneCount ?: 0) > 0) 1 else 0 },
     )
 
     // iOS init: no scene signal → open Galleries instead of an empty Scenes stack.
@@ -87,6 +106,38 @@ class PerformerDetailScreen(val performerId: String, val preview: Performer? = n
         scope.launch { DetailRepository.performerProfile(performerId)?.let { profile = it } }
     }
 
+    private fun loadCoPerformers(force: Boolean) {
+        if (coLoading || (!force && coPerformers != null)) return
+        coLoading = true
+        coFailed = false
+        scope.launch {
+            runCatching { CoPerformersRepository.load(performerId, force) }
+                .onSuccess { coPerformers = it }
+                .onFailure { if (it is kotlinx.coroutines.CancellationException) throw it; coFailed = true }
+            coLoading = false
+        }
+    }
+
+    /** Round performer tiles with the shared-scene count as badge (scene detail "Performers & Studio" look). */
+    private fun LazyGridScope.appearsWithSection() {
+        val list = coPerformers
+        if (list.isNullOrEmpty()) {
+            item(key = "state", span = { GridItemSpan(maxLineSpan) }) {
+                when {
+                    list == null && coFailed -> InlineEmptyState(SF.exclamationTriangle, "Couldn't load performers")
+                    list == null -> LoadingFooter("Loading performers...")
+                    else -> InlineEmptyState(SF.person2, "No shared scenes")
+                }
+            }
+            return
+        }
+        uniqueItemsIndexed(list, { "co-${it.performer.id}" }) { _, co ->
+            Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.TopCenter) {
+                ScenePerformerTile(co.performer, "${co.sharedScenes}") { Nav.push(PerformerDetailScreen(co.performer.id, co.performer)) }
+            }
+        }
+    }
+
     private fun toggleFavorite() {
         if (favoriteBusy) return
         favoriteBusy = true
@@ -101,17 +152,32 @@ class PerformerDetailScreen(val performerId: String, val preview: Performer? = n
         }
     }
 
+    @OptIn(ExperimentalMaterial3Api::class)
     @Composable
     override fun Content() {
         LaunchedEffect(Unit) { if (!started) { started = true; load() } }
         // iOS: `.task(id: displayPerformer.id)` → `HotOrNotBattleDisplay.fetchRankSlashTotal`.
         LaunchedEffect(performerId) { battleLine = MatchRepository.fetchRankSlashTotal(performerId) }
         if (initialTab == null) AutoSwitchTab(catalog, tab) { tab = it }
+        LaunchedEffect(tab) { if (tab == DetailTab.AppearsWith) loadCoPerformers(force = false) }
         val p = performer
+        val hasTabs = catalog.available.size > 1
+        // Pull-to-refresh only on "Appears with" (the catalog tabs keep their behavior).
+        val pullState = rememberPullToRefreshState()
+        val appearsWith = tab == DetailTab.AppearsWith
 
-        Box(Modifier.fillMaxSize().background(Theme.palette.background)) {
-            DetailGrid(gridState, { w -> columnsFor(tab, w, catalog.imageColumns) }, hasTabs = catalog.available.size > 1, header = { Header(p) }) {
-                linkedSection(catalog, tab, gridState)
+        Box(
+            Modifier.fillMaxSize().background(Theme.palette.background)
+                .pullToRefresh(coLoading && coPerformers != null, pullState, enabled = appearsWith) { loadCoPerformers(force = true) },
+        ) {
+            DetailGrid(gridState, { w -> columnsFor(tab, w, catalog.imageColumns) }, hasTabs = hasTabs, header = { Header(p) }) {
+                if (appearsWith) appearsWithSection() else linkedSection(catalog, tab, gridState)
+            }
+            if (appearsWith) {
+                PullToRefreshDefaults.Indicator(
+                    state = pullState, isRefreshing = coLoading && coPerformers != null,
+                    modifier = Modifier.align(Alignment.TopCenter).padding(top = detailTopPadding(hasTabs)),
+                )
             }
             // iOS: the scenes tab adds `SceneBulkDownloadChrome.slot` (contextual, before filter & sort).
             val extra = when (tab) {

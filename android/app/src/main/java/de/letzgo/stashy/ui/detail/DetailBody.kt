@@ -83,6 +83,8 @@ internal class LinkedCatalog(
     var previewImages: Int = 0,
     /** 1/row draws the grouped feed (false: always the thumbnail grid, iOS Studio detail). */
     val usesImageFeed: Boolean = true,
+    /** Count of sections the owning screen draws itself ([DetailTab.AppearsWith]); 0 hides them. */
+    private val screenCount: (DetailTab) -> Int = { 0 },
 ) {
     /** Per row of the Images section (iOS `CatalogCardColumnScope.images`, set in the images sheet). */
     val imageColumns: Int get() = CatalogPrefs.cardColumns(CatalogCardColumnScope.Images).raw
@@ -164,6 +166,7 @@ internal class LinkedCatalog(
         DetailTab.Tags -> tagController
         DetailTab.Groups -> groupController
         DetailTab.Images -> imageController
+        DetailTab.AppearsWith -> null
     }
 
     fun list(tab: DetailTab): PagedList<*>? = controller(tab)?.list
@@ -184,6 +187,7 @@ internal class LinkedCatalog(
             DetailTab.Scenes -> effectiveScenes
             DetailTab.Galleries -> effectiveGalleries
             DetailTab.Images -> effectiveImages
+            DetailTab.AppearsWith -> screenCount(tab)
             else -> list(tab)?.totalCount ?: 0
         },
         isFiltered(tab),
@@ -272,6 +276,8 @@ internal fun columnsFor(tab: DetailTab, widthDp: Float, imageColumns: Int): Int 
     DetailTab.Scenes -> adaptiveColumnCount(widthDp, 560f, 1, 4)
     // 1/row is the grouped feed: one flexible column like iOS, whatever the width.
     DetailTab.Images -> if (imageColumns == 1) 1 else adaptiveColumnCount(widthDp, 220f, 2, 8)
+    // 88 dp round performer tiles (scene detail "Performers & Studio" look), as many as fit per row.
+    DetailTab.AppearsWith -> ((widthDp + 12f) / 108f).toInt().coerceIn(2, 12)
     else -> adaptiveColumnCount(widthDp, 220f, 2, 8)
 }
 
@@ -327,6 +333,8 @@ internal fun LazyGridScope.linkedSection(catalog: LinkedCatalog, tab: DetailTab,
             pagedSection(l, { it.id }) { _, g -> DetailGroupCard(g, onClick = { Nav.push(GroupDetailScreen(g.id, g)) }) }
         }
         DetailTab.Images -> imageSection(catalog, gridState)
+        // Drawn by PerformerDetailScreen (not a catalog list).
+        DetailTab.AppearsWith -> Unit
     }
 }
 
