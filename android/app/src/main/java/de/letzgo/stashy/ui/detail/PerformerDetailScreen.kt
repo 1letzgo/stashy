@@ -63,6 +63,15 @@ class PerformerDetailScreen(val performerId: String, val preview: Performer? = n
     // iOS init: no scene signal → open Galleries instead of an empty Scenes stack.
     private var tab by mutableStateOf(initialTab ?: if ((preview?.sceneCount ?: 1) > 0) DetailTab.Scenes else DetailTab.Galleries)
 
+    init {
+        // iOS `PerformerDetailView.onReceive(PerformerImageUpdated)` — the header shows the new picture.
+        scope.launch {
+            de.letzgo.stashy.data.PerformerEvents.events.collect { event ->
+                performer?.let { p -> event.applyTo(p).takeIf { it != p }?.let { performer = it } }
+            }
+        }
+    }
+
     private fun load() {
         catalog.loadAll(force = true)
         scope.launch {

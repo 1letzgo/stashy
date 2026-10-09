@@ -466,7 +466,9 @@ private fun FeedHeader(image: StashImage, currentGalleryId: String?) {
 }
 
 /** Performer portrait (`/performer/<id>/image`, like the Feeds overlay). */
-private fun performerImageURL(id: String): String? = ServerConfigManager.activeConfig?.baseURL?.let { Net.signed("$it/performer/$id/image") }
+private fun performerImageURL(id: String): String? = ServerConfigManager.activeConfig?.baseURL?.let {
+    Net.signed(de.letzgo.stashy.data.ImageBusters.apply("$it/performer/$id/image", de.letzgo.stashy.data.ImageBusters.Kind.Performer, id))
+}
 
 @Composable
 private fun Avatar(performer: IdName?, url: String?, onClick: (() -> Unit)?) {

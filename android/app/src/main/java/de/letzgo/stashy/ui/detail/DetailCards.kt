@@ -59,7 +59,7 @@ import de.letzgo.stashy.ui.stashyGlass
 
 /** iOS `Performer.thumbnailURL` — `image_path`, else `<base>/performer/<id>/image`. */
 internal fun performerThumbnailURL(id: String, imagePath: String?): String? =
-    Net.signed(imagePath?.takeIf { it.startsWith("http") } ?: ServerConfigManager.activeConfig?.let { "${it.baseURL}/performer/$id/image" })
+    Net.signed(de.letzgo.stashy.data.ImageBusters.apply(imagePath?.takeIf { it.startsWith("http") } ?: ServerConfigManager.activeConfig?.let { "${it.baseURL}/performer/$id/image" }, de.letzgo.stashy.data.ImageBusters.Kind.Performer, id))
 
 /** iOS `StashGroup.thumbnailURL` — front image at width 320 with `t=updated_at`. */
 internal fun groupThumbnailURL(g: StashGroup): String? {

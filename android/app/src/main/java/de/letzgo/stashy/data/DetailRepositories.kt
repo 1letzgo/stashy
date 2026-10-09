@@ -195,11 +195,25 @@ object DetailRepository {
         return true
     }
 
-    /** iOS `setPerformerImage` (`performerUpdate(image:)` with a URL Stash downloads itself). */
-    suspend fun setPerformerImage(performerId: String, imageURL: String): Boolean = input(
-        "mutation PerformerUpdate(\$input: PerformerUpdateInput!) { performerUpdate(input: \$input) { id image_path } }",
-        "performerUpdate", mapOf("id" to performerId, "image" to imageURL),
-    )
+    /** Outcome of [setPerformerImage]: the new `image_path` (null when Stash returned none). */
+    data class PerformerImageUpdate(val imagePath: String?)
+
+    /**
+     * iOS `setPerformerImage` (`performerUpdate(image:)` with a URL Stash downloads itself).
+     * Returns null on failure, else the new `image_path` (carries the new `?t=`) — refetched
+     * when the mutation response lacks it.
+     */
+    suspend fun setPerformerImage(performerId: String, imageURL: String): PerformerImageUpdate? {
+        val result = runCatching {
+            mutate(
+                "mutation PerformerUpdate(\$input: PerformerUpdateInput!) { performerUpdate(input: \$input) { id image_path } }",
+                vars("input" to mapOf("id" to performerId, "image" to imageURL)), "performerUpdate",
+            )
+        }.getOrNull() ?: return null
+        val path = (result["image_path"] as? kotlinx.serialization.json.JsonPrimitive)?.takeIf { it.isString }?.content?.takeIf { it.isNotBlank() }
+            ?: runCatching { performer(performerId)?.imagePath }.getOrNull()
+        return PerformerImageUpdate(path)
+    }
 
     /** iOS `AITagSuggestionManager.write(tags:to: .image)` — replaces the image's tag ids. */
     suspend fun setImageTags(imageId: String, tagIds: List<String>): Boolean = input(

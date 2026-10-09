@@ -684,7 +684,7 @@ fun TvMarkerRail(markers: List<SceneMarker>, currentTime: Double, entry: FocusRe
 }
 
 /** Marker screenshot URL (signed). */
-fun markerThumbnail(marker: SceneMarker): String? = de.letzgo.stashy.data.Net.signed(marker.screenshot)
+fun markerThumbnail(marker: SceneMarker): String? = marker.screenshotURL
 
 // MARK: - Routes
 

@@ -339,7 +339,7 @@ private fun Modifier.matchCard(shape: RoundedCornerShape = RoundedCornerShape(To
 /** Performer photo with spinner while loading and the `person.fill` placeholder (iOS `photoOverlay`). */
 @Composable
 private fun PerformerPhoto(performer: Performer, modifier: Modifier = Modifier, placeholderSize: Dp = 34.dp) {
-    val url = remember(performer.id, performer.imagePath) { MatchRepository.thumbnailURL(performer) }
+    val url = remember(performer.id, performer.imagePath, de.letzgo.stashy.data.ImageBusters.stamp(de.letzgo.stashy.data.ImageBusters.Kind.Performer, performer.id)) { MatchRepository.thumbnailURL(performer) }
     var state by remember(url) { mutableStateOf<AsyncImagePainter.State?>(null) }
     Box(modifier.background(Color.Gray.copy(alpha = 0.1f)), contentAlignment = Alignment.Center) {
         if (url != null) {

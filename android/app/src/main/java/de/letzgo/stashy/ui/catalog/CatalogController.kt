@@ -25,6 +25,8 @@ import de.letzgo.stashy.data.RandomSeeds
 import de.letzgo.stashy.data.SavedFilter
 import de.letzgo.stashy.data.Scene
 import de.letzgo.stashy.data.SceneEvents
+import de.letzgo.stashy.data.Performer
+import de.letzgo.stashy.data.PerformerEvents
 import de.letzgo.stashy.data.SavedFiltersRepository
 import de.letzgo.stashy.data.SavedFiltersStore
 import de.letzgo.stashy.data.ServerConfigManager
@@ -114,6 +116,13 @@ class CatalogController<T>(
             SceneEvents.events.collect { event ->
                 @Suppress("UNCHECKED_CAST")
                 (list as PagedList<Scene>).applySceneEvent(event)
+            }
+        }
+        // iOS `PerformerImageUpdated` → `patchPerformerImageInLists`.
+        if (mode == FilterMode.Performers) coroutineScope.launch {
+            PerformerEvents.events.collect { event ->
+                @Suppress("UNCHECKED_CAST")
+                (list as PagedList<Performer>).patch { event.applyTo(it) }
             }
         }
     }

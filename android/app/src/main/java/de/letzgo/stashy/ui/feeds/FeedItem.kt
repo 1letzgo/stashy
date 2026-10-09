@@ -18,7 +18,7 @@ data class FeedPerformer(val id: String, val name: String, val updatedAt: String
         val base = ServerConfigManager.activeConfig?.baseURL ?: return null
         var url = "$base/performer/$id/image"
         updatedAt?.let { url += "?t=" + android.net.Uri.encode(it) }
-        return Net.signed(url)
+        return Net.signed(de.letzgo.stashy.data.ImageBusters.apply(url, de.letzgo.stashy.data.ImageBusters.Kind.Performer, id))
     }
 }
 
@@ -158,7 +158,7 @@ sealed class FeedItem {
     val posterURL: String? get() = when (this) {
         is SceneItem -> scene.thumbnailURL
         is PreviewItem -> scene.thumbnailURL
-        is MarkerItem -> Net.signed(marker.screenshot)
+        is MarkerItem -> marker.screenshotURL
         is ClipItem -> image.thumbnailURL
     }
 

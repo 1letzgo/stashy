@@ -102,6 +102,7 @@ private fun SceneDetailContent(model: SceneDetailModel) {
     }
     // iOS: `Timer.publish(every: 10)` → periodic activity sync.
     LaunchedEffect(model) { while (true) { delay(10_000); model.periodicSync() } }
+    LaunchedEffect(model) { de.letzgo.stashy.data.PerformerEvents.events.collect { model.applyPerformerEvent(it) } }
     // PiP window closed (not expanded back): stop like iOS ending PiP.
     LaunchedEffect(PlayerWindow.isInPictureInPicture) {
         if (!PlayerWindow.isInPictureInPicture) {
@@ -262,7 +263,7 @@ private fun SceneDetailContent(model: SceneDetailModel) {
         EditSheet.Galleries -> EditGalleriesSheet(scene, { sheet = null }) { model.applyEdit(model.scene.copy(galleries = it)) }
         null -> {}
     }
-    if (model.showAddMarker) AddMarkerSheet(scene, model.capturedMarkerTime, { model.showAddMarker = false }) { model.refreshDetails() }
+    if (model.showAddMarker) AddMarkerSheet(scene, model.capturedMarkerTime, model.capturedMarkerFrame, { model.showAddMarker = false; model.capturedMarkerFrame = null }) { model.refreshDetails() }
     model.tagImageDataURL?.let { url -> SetTagImageFromFrameSheet(url, scene.tags.orEmpty()) { model.tagImageDataURL = null } }
     if (model.showReplaceCoverConfirm) AlertDialog(
         onDismissRequest = { model.showReplaceCoverConfirm = false },

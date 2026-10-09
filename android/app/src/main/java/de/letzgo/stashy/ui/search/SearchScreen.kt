@@ -56,6 +56,9 @@ import de.letzgo.stashy.data.Gallery
 import de.letzgo.stashy.data.Performer
 import de.letzgo.stashy.data.Scene
 import de.letzgo.stashy.data.SceneMarker
+import de.letzgo.stashy.data.applying
+import de.letzgo.stashy.data.applyingPerformerEvent
+import kotlinx.coroutines.launch
 import de.letzgo.stashy.data.ServerConfigManager
 import de.letzgo.stashy.data.StashGroup
 import de.letzgo.stashy.data.StashImage
@@ -106,6 +109,27 @@ private data class SearchResults(
 private object SearchState {
     var results by mutableStateOf(SearchResults())
     var resultsFor by mutableStateOf("")
+
+    init {
+        // iOS `UniversalSearchView`: `PerformerImageUpdated` / scene live updates patch the hits.
+        val scope = kotlinx.coroutines.MainScope()
+        scope.launch {
+            de.letzgo.stashy.data.SceneEvents.events.collect { event ->
+                val r = results
+                val scenes = r.scenes.applying(event)
+                val markers = r.markers.map { m -> m.scene?.let { s -> event.applyTo(s)?.takeIf { it != s }?.let { m.copy(scene = it) } } ?: m }
+                if (scenes != null || markers != r.markers) results = r.copy(scenes = scenes ?: r.scenes, markers = markers)
+            }
+        }
+        scope.launch {
+            de.letzgo.stashy.data.PerformerEvents.events.collect { event ->
+                val r = results
+                val performers = r.performers.applying(event)
+                val scenes = r.scenes.applyingPerformerEvent(event)
+                if (performers != null || scenes != null) results = r.copy(performers = performers ?: r.performers, scenes = scenes ?: r.scenes)
+            }
+        }
+    }
 }
 
 /**
@@ -330,7 +354,7 @@ private fun MarkerCard(marker: SceneMarker) {
     Column(Modifier.width(160.dp).noRippleClickable { DetailLinks.marker(marker) }, verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Box(Modifier.size(160.dp, 90.dp).clip(RoundedCornerShape(Tokens.Radius.card)).background(Color.Gray.copy(alpha = 0.2f)), contentAlignment = Alignment.Center) {
             Icon(SF.bookmarkFill, null, tint = p.secondaryText)
-            AsyncImage(de.letzgo.stashy.data.Net.signed(marker.screenshot), null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
+            AsyncImage(marker.screenshotURL, null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
             Text(formatDuration(marker.seconds) ?: "0:00", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = Color.White,
                 modifier = Modifier.align(Alignment.BottomEnd).padding(4.dp).background(Color.Black.copy(alpha = 0.7f), RoundedCornerShape(4.dp)).padding(horizontal = 4.dp, vertical = 2.dp))
         }

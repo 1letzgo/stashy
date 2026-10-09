@@ -882,6 +882,27 @@ object FeedsModel {
         // Tag Suggestion accepts, the "+" editor and bulk "Set on all of …" patch the rows in
         // place (iOS `patch*TagsInLists`, `patchBulkAppliedTag`) instead of refetching the feed.
         scope.launch { AITagSuggestions.events.collect { applyTagEvent(it) } }
+        // iOS `SceneCoverUpdated` / `PerformerImageUpdated`: a new cover or performer picture
+        // (scene page, image viewer) shows in the feed rows and their performer overlay.
+        scope.launch {
+            de.letzgo.stashy.data.SceneEvents.events.collect { event ->
+                if (event is de.letzgo.stashy.data.SceneEvent.CoverUpdated) patchScene(event.sceneId) { event.applyTo(it) ?: it }
+            }
+        }
+        scope.launch {
+            de.letzgo.stashy.data.PerformerEvents.events.collect { event ->
+                val sceneIds = lists.values.flatMap { l -> l.items.mapNotNull { it.sceneForPerformerPatch() } }
+                    .filter { s -> s.performers.any { it.id == event.performerId } }.map { it.id }.toSet()
+                sceneIds.forEach { id -> patchScene(id) { event.applyTo(it) ?: it } }
+            }
+        }
+    }
+
+    private fun FeedItem.sceneForPerformerPatch(): de.letzgo.stashy.data.Scene? = when (this) {
+        is FeedItem.SceneItem -> scene
+        is FeedItem.PreviewItem -> scene
+        is FeedItem.MarkerItem -> marker.scene
+        is FeedItem.ClipItem -> null
     }
 
     private fun applyTagEvent(event: AITagUpdateEvent) {

@@ -698,8 +698,13 @@ class ImageViewerScreen(
         val ext = DetailFormatting.fileExtension(image)
         val url = if (ext in listOf("JPG", "JPEG", "PNG", "WEBP")) image.imageURL else image.thumbnailURL
         if (url == null) return
-        if (DetailRepository.setPerformerImage(performer.id, url)) detailToast("Performer image updated")
-        else detailToast("Failed to update performer image")
+        val updated = DetailRepository.setPerformerImage(performer.id, url)
+        if (updated != null) {
+            // iOS: `invalidatePerformerProfileImage` + `PerformerImageUpdated` — every list,
+            // header and card showing this performer reloads its image.
+            de.letzgo.stashy.data.ImageRefresh.performerImageChanged(performer.id, updated.imagePath)
+            detailToast("Performer image updated")
+        } else detailToast("Failed to update performer image")
     }
 
     /** iOS `shareCurrentImage` — downloads the original and hands it to the share sheet. */

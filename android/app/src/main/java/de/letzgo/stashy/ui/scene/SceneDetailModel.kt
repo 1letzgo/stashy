@@ -14,6 +14,8 @@ import de.letzgo.stashy.data.Prefs
 import de.letzgo.stashy.data.Scene
 import de.letzgo.stashy.data.SceneEditing
 import de.letzgo.stashy.data.SceneEvent
+import de.letzgo.stashy.data.ImageRefresh
+import de.letzgo.stashy.data.PerformerEvent
 import de.letzgo.stashy.data.SceneEvents
 import de.letzgo.stashy.data.SceneStamps
 import de.letzgo.stashy.data.ScenesRepository
@@ -117,6 +119,8 @@ class SceneDetailModel(initial: Scene, private val autoPlay: Boolean) {
     var showDeleteConfirmation by mutableStateOf(false)
     var showAddMarker by mutableStateOf(false)
     var capturedMarkerTime by mutableDoubleStateOf(0.0)
+    /** The frame on screen when "Add Marker" opened (iOS `frameDataURL`): shown until Stash generated the still. */
+    var capturedMarkerFrame: android.graphics.Bitmap? = null
     var showReplaceCoverConfirm by mutableStateOf(false)
     var tagImageDataURL by mutableStateOf<String?>(null)
     var isCapturing by mutableStateOf(false); private set
@@ -203,6 +207,11 @@ class SceneDetailModel(initial: Scene, private val autoPlay: Boolean) {
             player?.nowPlaying = SceneNowPlaying.of(next)
             refreshScrubSprites()
         }
+    }
+
+    /** iOS `PerformerImageUpdated` on the scene page: the performer row shows the new image. */
+    fun applyPerformerEvent(event: PerformerEvent) {
+        event.applyTo(scene)?.let { scene = it }
     }
 
     private fun refreshScrubSprites() {
@@ -355,6 +364,8 @@ class SceneDetailModel(initial: Scene, private val autoPlay: Boolean) {
 
     fun beginAddMarker() {
         capturedMarkerTime = player?.currentTime ?: 0.0
+        // Thumbnail size is plenty for the marker strip and cards.
+        capturedMarkerFrame = runCatching { player?.captureFrame(640) }.getOrNull()
         showAddMarker = true
     }
 
@@ -427,9 +438,9 @@ class SceneDetailModel(initial: Scene, private val autoPlay: Boolean) {
             val ok = runCatching { SceneEditing.setCoverImage(current.id, dataURL) }.isSuccess
             isCapturing = false
             if (ok) {
-                val bust = System.currentTimeMillis().toString()
+                // Drops the cached cover everywhere, then patches every list (iOS `SceneCoverUpdated`).
+                val bust = ImageRefresh.sceneCoverChanged(current.id, listOf(current.thumbnailURL))
                 scene = scene.copy(updatedAt = bust)
-                SceneEvents.post(SceneEvent.CoverUpdated(current.id, bust))
                 SceneToast.show("Scene cover updated", PlayerIcons.photo, SceneToast.Style.Success)
             } else SceneToast.show("Failed to update scene cover", PlayerIcons.close, SceneToast.Style.Error)
         }
@@ -460,9 +471,8 @@ class SceneDetailModel(initial: Scene, private val autoPlay: Boolean) {
                 scene.resumeTime?.takeIf { it > 0 }?.let { next = next.copy(resumeTime = it) }
                 if (ok) {
                     // Identify usually replaces the cover: bust like "Set as cover".
-                    val bust = System.currentTimeMillis().toString()
+                    val bust = ImageRefresh.sceneCoverChanged(next.id, listOf(scene.thumbnailURL))
                     next = next.copy(updatedAt = bust)
-                    SceneEvents.post(SceneEvent.CoverUpdated(next.id, bust))
                 }
                 scene = next
                 SceneEvents.post(SceneEvent.Updated(next))

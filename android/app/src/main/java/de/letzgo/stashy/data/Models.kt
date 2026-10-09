@@ -97,7 +97,8 @@ data class Performer(
     @SerialName("created_at") val createdAt: String? = null,
     @SerialName("updated_at") val updatedAt: String? = null,
 ) {
-    val imageURL: String? get() = imagePath?.let { Net.signed(it) }
+    /** `image_path`, plus the cache-buster of a just-changed image ([ImageRefresh.performerImageChanged]). */
+    val imageURL: String? get() = imagePath?.let { Net.signed(ImageBusters.apply(it, ImageBusters.Kind.Performer, id)) }
 }
 
 @Serializable
@@ -232,6 +233,13 @@ data class SceneMarker(
     val scene: Scene? = null,
 ) {
     val displayTitle: String get() = title?.takeIf { it.isNotBlank() } ?: primaryTag?.name ?: "Marker"
+
+    /**
+     * iOS: `SceneMarker.thumbnailURL` — the signed screenshot. Its URL never changes, so a new
+     * marker's stamp ([ImageRefresh.markerCreated] / [ImageRefresh.markerScreenshotReady])
+     * makes the cards reload once Stash generated the still.
+     */
+    val screenshotURL: String? get() = screenshot?.takeIf { it.isNotBlank() }?.let { Net.signed(ImageBusters.apply(it, ImageBusters.Kind.Marker, id)) }
 }
 
 @Serializable
@@ -292,7 +300,7 @@ data class Scene(
         val sep = if (base.contains("?")) "&" else "?"
         var url = "$base${sep}width=640"
         updatedAt?.let { url += "&t=" + android.net.Uri.encode(it) }
-        return Net.signed(url)
+        return Net.signed(ImageBusters.apply(url, ImageBusters.Kind.Scene, id))
     }
 
     val previewURL: String? get() = Net.signed(paths?.preview)

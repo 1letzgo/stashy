@@ -357,7 +357,7 @@ fun EditGalleriesSheet(scene: Scene, onDismiss: () -> Unit, onSaved: (List<Scene
  * After creating: refresh, then generate marker previews and screenshots (refresh again when done).
  */
 @Composable
-fun AddMarkerSheet(scene: Scene, seconds: Double, onDismiss: () -> Unit, onComplete: () -> Unit) {
+fun AddMarkerSheet(scene: Scene, seconds: Double, frame: android.graphics.Bitmap?, onDismiss: () -> Unit, onComplete: () -> Unit) {
     val p = Theme.palette
     val scope = rememberCoroutineScope()
     val sceneTagIds = scene.tags.orEmpty().map { it.id }.toSet()
@@ -380,11 +380,17 @@ fun AddMarkerSheet(scene: Scene, seconds: Double, onDismiss: () -> Unit, onCompl
         scope.launch {
             val created = runCatching { SceneEditing.createMarker(scene.id, title, seconds, end, primaryTagId) }
             creating = false
-            if (created.isFailure) return@launch
+            val marker = created.getOrNull() ?: return@launch
+            // iOS `seedMarkerThumbnailCache`: the captured frame stands in until Stash rendered the still.
+            de.letzgo.stashy.data.ImageRefresh.markerCreated(marker, frame)
             onDismiss()
             onComplete()
             // Not in this sheet's scope: dismissing cancelled it, so the jobs never reached Stash.
-            SceneEditing.generateForNewMarker(scene.id) { onComplete() }
+            // The screenshot URL is stable: drop the seed / any cached miss and reload (iOS `invalidateMarkerScreenshot`).
+            SceneEditing.generateForNewMarker(scene.id) {
+                de.letzgo.stashy.data.ImageRefresh.markerScreenshotReady(marker, scene.id)
+                onComplete()
+            }
         }
     }) {
         Column(Modifier.verticalScroll(rememberScrollState())) {
