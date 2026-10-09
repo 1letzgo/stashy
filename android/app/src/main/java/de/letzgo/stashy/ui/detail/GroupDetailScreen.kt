@@ -102,7 +102,8 @@ class GroupDetailScreen(val groupId: String, val preview: StashGroup? = null) : 
         val urls = g.urls.orEmpty().filter { it.isNotBlank() }
         DetailHeroCard(
             title = g.name,
-            subtitle = g.aliases?.takeIf { it.isNotBlank() },
+            // iOS shows no aliases / URLs in the header; they appear only expanded here.
+            subtitle = g.aliases?.takeIf { it.isNotBlank() && expanded },
             items = items,
             description = g.synopsis?.takeIf { it.isNotBlank() },
             expanded = expanded,
@@ -114,10 +115,8 @@ class GroupDetailScreen(val groupId: String, val preview: StashGroup? = null) : 
                 ) { HeroPicture(thumb, g.name, ContentScale.Crop, rectangleStackIcon(), alignment = HeroPortraitBias) }
             } else DetailHero(DetailHero.Style.Cover, null, Color.Black, "Open cover", null) { HeroPlaceholder(rectangleStackIcon()) },
             collapsedItemCount = 4,
-            footer = if (urls.isEmpty()) null else ({
-                (if (expanded) urls else urls.take(1)).forEach { HeaderLink(it) }
-            }),
-            footerHasMore = urls.size > 1,
+            footer = if (urls.isEmpty() || !expanded) null else ({ urls.forEach { HeaderLink(it) } }),
+            footerHasMore = urls.isNotEmpty() || !g.aliases.isNullOrBlank(),
         )
     }
 

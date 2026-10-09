@@ -50,6 +50,7 @@ object DetailFormatting {
         val list = mutableListOf(DetailItem("SCENES", "$scenes"))
         if (galleries > 0) list += DetailItem("GALLERIES", "$galleries")
         s.performerCount?.takeIf { it > 0 }?.let { list += DetailItem("PERFORMERS", "$it") }
+        s.rating100?.let { list += DetailItem("RATING", "$it%") }
         return list
     }
 
@@ -83,6 +84,7 @@ object DetailFormatting {
         val count = maxOf(totalImages, g.imageCount ?: 0)
         if (count > 0) list += DetailItem("IMAGES", "$count")
         g.date?.takeIf { it.isNotEmpty() }?.let { list += DetailItem("DATE", it) }
+        g.rating100?.let { list += DetailItem("RATING", "$it%") }
         if (g.organized == true) list += DetailItem("ORGANIZED", "Yes")
         return list
     }

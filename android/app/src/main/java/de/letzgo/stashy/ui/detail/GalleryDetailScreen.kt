@@ -219,7 +219,7 @@ class GalleryDetailScreen(
                 val (image, coverIndex, isCover) = hero
                 val thumb = image.thumbnailURL
                 DetailHero(DetailHero.Style.Cover, thumb ?: url, Color.Black, "Open image", { openHero(image, coverIndex, isCover) }) {
-                    // 84dp circle: the thumbnail is plenty; full picture only when there is none.
+                    // 76dp circle: the thumbnail is plenty; full picture only when there is none.
                     SubcomposeAsyncImage(
                         thumb ?: url, g.displayTitle, Modifier.fillMaxSize(), contentScale = ContentScale.Crop, alignment = Alignment.Center,
                         loading = { Box(Modifier.fillMaxSize(), Alignment.Center) { CircularProgressIndicator(Modifier.size(20.dp), color = Color.White.copy(alpha = 0.7f), strokeWidth = 2.dp) } },

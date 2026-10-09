@@ -54,6 +54,12 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Shadow
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
@@ -217,41 +223,70 @@ object DetailFeedsLink {
     }
 }
 
-/** iOS: Feeds pill in the header (`AppTab.reels.icon` + "Feeds") — Material `AssistChip`. */
+/**
+ * iOS `DetailHeroFeedsButton`: compact 24dp capsule, tint-washed fill, pill-accent icon + "Feeds".
+ * [contentColor] overrides the accent (over a picture).
+ */
 @Composable
 internal fun FeedsPill(contentColor: Color? = null, onClick: () -> Unit) {
-    de.letzgo.stashy.ui.components.ActionChip("Feeds", onClick, icon = SF.playRectangleOnRectangle, contentColor = contentColor)
+    HeroPill("Open in Feeds", onClick, contentColor) { color ->
+        Icon(SF.playRectangleOnRectangle, null, tint = color, modifier = Modifier.size(13.dp))
+        Text("Feeds", fontSize = 12.sp, lineHeight = 14.sp, fontWeight = FontWeight.Bold, color = color, maxLines = 1)
+    }
 }
 
-/** Expand/collapse chevron as a pill matching [FeedsPill] (same `AssistChip`), for the hero title row. */
+/** Expand/collapse chevron pill, same chrome and height as [FeedsPill] (iOS `detailHeroPill`). */
 @Composable
 internal fun ExpandPill(expanded: Boolean, onToggle: () -> Unit) {
-    de.letzgo.stashy.ui.components.IconActionChip(
-        if (expanded) SF.chevronUp else SF.chevronDown, if (expanded) "Collapse" else "Expand", onToggle,
-    )
+    HeroPill(if (expanded) "Show less" else "Show more", onToggle) { color ->
+        Icon(if (expanded) SF.chevronUp else SF.chevronDown, null, tint = color, modifier = Modifier.size(13.dp))
+    }
 }
 
-/** Columns of [DetailItemsGrid]; collapsed headers show whole rows of it. */
+/** iOS `DetailHeroPillModifier`: 24pt capsule, 10pt horizontal padding, tint 0.15 fill. */
+@Composable
+private fun HeroPill(label: String, onClick: () -> Unit, contentColor: Color? = null, content: @Composable RowScope.(Color) -> Unit) {
+    val color = contentColor ?: Theme.palette.pillAccent
+    Row(
+        Modifier.heightIn(min = 24.dp).clip(CircleShape)
+            .background(if (contentColor != null) Color.Black.copy(alpha = 0.45f) else Appearance.tint.copy(alpha = 0.15f))
+            .clickable(onClickLabel = label, role = Role.Button, onClick = onClick)
+            .semantics { contentDescription = label }
+            .padding(horizontal = 10.dp, vertical = 4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(4.dp),
+    ) { content(color) }
+}
+
+/** Columns of the legacy [DetailHeaderCard] grid; collapsed headers show whole rows of it. */
 internal const val DetailGridColumns = 2
 
-/** 2-column label/value grid of the detail headers (8pt uppercase label, 11pt medium value). */
+/** iOS `DetailHeroCard.infoGrid`: `min(max(count, 2), 4)` flexible columns. */
+internal fun heroGridColumns(count: Int): Int = count.coerceIn(2, 4)
+
+/**
+ * Label/value grid of the detail headers (8pt uppercase label, 11pt medium value, one line each).
+ * [shadow] adds the iOS text shadow used on a picture.
+ */
 @Composable
 internal fun DetailItemsGrid(
     items: List<DetailItem>,
     labelColor: Color = Theme.palette.secondaryText,
     valueColor: Color = Theme.palette.text,
+    columns: Int = DetailGridColumns,
+    shadow: Boolean = false,
 ) {
-    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-        items.chunked(DetailGridColumns).forEach { row ->
-            Row(Modifier.fillMaxWidth()) {
+    val textShadow = if (shadow) Shadow(Color.Black.copy(alpha = 0.4f), Offset(0f, 2f), 4f) else null
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        items.chunked(columns).forEach { row ->
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 row.forEach { d ->
-                    Column(Modifier.weight(1f)) {
-                        Text(d.label.uppercase(), fontSize = 8.sp, lineHeight = 10.sp, color = labelColor)
-                        // 2 lines: half-width column, so a large font scale wraps instead of cutting the value.
-                        Text(d.value, fontSize = 11.sp, lineHeight = 13.sp, fontWeight = FontWeight.Medium, color = valueColor, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(1.dp)) {
+                        Text(d.label.uppercase(), fontSize = 8.sp, lineHeight = 10.sp, color = labelColor, maxLines = 1, overflow = TextOverflow.Ellipsis, style = TextStyle(shadow = textShadow))
+                        Text(d.value, fontSize = 11.sp, lineHeight = 13.sp, fontWeight = FontWeight.Medium, color = valueColor, maxLines = 1, overflow = TextOverflow.Ellipsis, style = TextStyle(shadow = textShadow))
                     }
                 }
-                repeat(DetailGridColumns - row.size) { Spacer(Modifier.weight(1f)) }
+                repeat(columns - row.size) { Spacer(Modifier.weight(1f)) }
             }
         }
     }

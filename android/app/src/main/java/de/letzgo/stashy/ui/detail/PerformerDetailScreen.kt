@@ -145,12 +145,15 @@ class PerformerDetailScreen(val performerId: String, val preview: Performer? = n
         val name = p?.name ?: ""
         val items = p?.let { DetailFormatting.performer(it, catalog.galleries?.totalCount ?: 0, battleLine) } ?: emptyList()
         val url = p?.let { performerThumbnailURL(it.id, it.imagePath) }
-        val urls = profile?.urls.orEmpty()
+        val urls = profile?.urls.orEmpty().filter { it.isNotBlank() }
+        val disambiguation = p?.disambiguation?.takeIf { it.isNotBlank() }
+        val details = profile?.details?.takeIf { it.isNotBlank() }
         DetailHeroCard(
             title = name,
-            subtitle = p?.disambiguation?.takeIf { it.isNotBlank() },
+            // iOS shows no disambiguation / details / URLs in the header; they appear only expanded here.
+            subtitle = disambiguation.takeIf { expanded },
             items = items,
-            description = profile?.details,
+            description = details.takeIf { expanded },
             expanded = expanded,
             onToggle = { expanded = !expanded },
             hero = url?.let {
@@ -159,12 +162,11 @@ class PerformerDetailScreen(val performerId: String, val preview: Performer? = n
                     backdropAlignment = HeroPortraitBias,
                 ) { HeroPicture(it, name, ContentScale.Crop, SF.personFill, alignment = HeroPortraitBias) }
             } ?: DetailHero(DetailHero.Style.Cover, null, Color.Black, "Open image", null) { HeroPlaceholder(SF.personFill) },
-            collapsedItemCount = DetailGridColumns * 2,
+            // iOS: two full rows of the 4-column grid.
+            collapsedItemCount = 8,
             titleAccessory = p?.let { perf -> { color -> FeedsPill(color) { DetailFeedsLink.navigate(DetailFeedsLink.Target.Performer(perf.id, perf.name)) } } },
-            footer = if (urls.isEmpty()) null else ({
-                (if (expanded) urls else urls.take(1)).forEach { HeaderLink(it) }
-            }),
-            footerHasMore = urls.size > 1,
+            footer = if (urls.isEmpty() || !expanded) null else ({ urls.forEach { HeaderLink(it) } }),
+            footerHasMore = urls.isNotEmpty() || disambiguation != null || details != null,
         )
     }
 
