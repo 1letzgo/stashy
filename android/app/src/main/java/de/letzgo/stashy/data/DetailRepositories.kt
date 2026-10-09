@@ -6,6 +6,7 @@ import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.intOrNull
 import kotlinx.serialization.json.jsonPrimitive
 
@@ -51,6 +52,26 @@ object DetailRepository {
 
     suspend fun performer(id: String): Performer? =
         findPage("findPerformers", "findPerformers", "performers", Performer.serializer(), FindFilter(1, 1), extra = mapOf("ids" to listOf(id))).items.firstOrNull()
+
+    /**
+     * Header extras the shared `PerformerFields` fragment leaves out (it also feeds the lists):
+     * `details` and `urls`. `urls` only exists on Stash v0.25+, so an older server falls back to
+     * the singular `url`. Null when neither query succeeds.
+     */
+    suspend fun performerProfile(id: String): PerformerProfile? {
+        suspend fun load(fields: String): JsonObject? = runCatching {
+            GraphQL.data("query(\$id: ID!) { findPerformer(id: \$id) { $fields } }", vars("id" to id))["findPerformer"] as? JsonObject
+        }.getOrNull()
+        load("details urls")?.let { o ->
+            val urls = (o["urls"] as? JsonArray).orEmpty()
+                .mapNotNull { (it as? JsonPrimitive)?.contentOrNull?.takeIf(String::isNotBlank) }
+            return PerformerProfile(o.string("details"), urls)
+        }
+        return load("details url")?.let { o -> PerformerProfile(o.string("details"), listOfNotNull(o.string("url"))) }
+    }
+
+    private fun JsonObject.string(key: String): String? =
+        (this[key] as? JsonPrimitive)?.contentOrNull?.takeIf { it.isNotBlank() }
 
     suspend fun studio(id: String): Studio? {
         val data = GraphQL.named("findStudio", vars("id" to id))
@@ -257,3 +278,6 @@ data class PerformerEdit(
     val aliasList: List<String>?,
     val rating100: Int?,
 )
+
+/** Performer `details` + `urls` for the detail header ([DetailRepository.performerProfile]). */
+data class PerformerProfile(val details: String?, val urls: List<String>)
