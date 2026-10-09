@@ -13,6 +13,8 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.input.KeyboardType
 import de.letzgo.stashy.data.DetailRepository
 import de.letzgo.stashy.data.Performer
@@ -39,6 +41,8 @@ class PerformerDetailScreen(val performerId: String, val preview: Performer? = n
     private var favoriteBusy by mutableStateOf(false)
     /** iOS `hotOrNotBattleLine` — "rank/total" in the Match pool, null when not listed. */
     private var battleLine by mutableStateOf<String?>(null)
+    /** `details` + `urls` (not in the list fragment), loaded with the performer. */
+    private var profile by mutableStateOf<de.letzgo.stashy.data.PerformerProfile?>(null)
     private var expanded by mutableStateOf(false)
     private var editing by mutableStateOf(false)
     /** iOS `showingSceneDownloadOptions` (`sceneBulkDownloadDialog`). */
@@ -80,6 +84,7 @@ class PerformerDetailScreen(val performerId: String, val preview: Performer? = n
                 isFavorite = it.favorite ?: false
             }
         }
+        scope.launch { DetailRepository.performerProfile(performerId)?.let { profile = it } }
     }
 
     private fun toggleFavorite() {
@@ -128,19 +133,38 @@ class PerformerDetailScreen(val performerId: String, val preview: Performer? = n
         }
     }
 
+    /**
+     * Header as a [DetailHeroCard] (like tag / studio / gallery): the portrait blurred as the band
+     * backdrop with the facts on it, sharp in the circle on the band edge (top-biased crop so the
+     * face shows; tap → fullscreen); name + disambiguation + Feeds pill below, then the URLs and
+     * the details text. The image URL follows [Performer.imagePath], so an image changed via
+     * [de.letzgo.stashy.data.PerformerEvents] updates band and circle.
+     */
     @Composable
     private fun Header(p: Performer?) {
         val name = p?.name ?: ""
         val items = p?.let { DetailFormatting.performer(it, catalog.galleries?.totalCount ?: 0, battleLine) } ?: emptyList()
-        DetailHeaderCard(
+        val url = p?.let { performerThumbnailURL(it.id, it.imagePath) }
+        val urls = profile?.urls.orEmpty()
+        DetailHeroCard(
             title = name,
-            imageUrl = p?.let { performerThumbnailURL(it.id, it.imagePath) },
-            placeholderIcon = SF.personFill,
+            subtitle = p?.disambiguation?.takeIf { it.isNotBlank() },
             items = items,
-            expandable = items.size > 4,
+            description = profile?.details,
             expanded = expanded,
             onToggle = { expanded = !expanded },
-            onFeeds = p?.let { { DetailFeedsLink.navigate(DetailFeedsLink.Target.Performer(it.id, it.name)) } },
+            hero = url?.let {
+                DetailHero(
+                    DetailHero.Style.Cover, it, Color.Black, "Open image", { Nav.push(HeroPictureViewerScreen(it, name)) },
+                    backdropAlignment = HeroPortraitBias,
+                ) { HeroPicture(it, name, ContentScale.Crop, SF.personFill, alignment = HeroPortraitBias) }
+            } ?: DetailHero(DetailHero.Style.Cover, null, Color.Black, "Open image", null) { HeroPlaceholder(SF.personFill) },
+            collapsedItemCount = 6,
+            titleAccessory = p?.let { perf -> { color -> FeedsPill(color) { DetailFeedsLink.navigate(DetailFeedsLink.Target.Performer(perf.id, perf.name)) } } },
+            footer = if (urls.isEmpty()) null else ({
+                (if (expanded) urls else urls.take(1)).forEach { HeaderLink(it) }
+            }),
+            footerHasMore = urls.size > 1,
         )
     }
 

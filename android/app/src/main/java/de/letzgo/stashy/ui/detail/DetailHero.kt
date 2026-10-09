@@ -34,6 +34,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.BiasAlignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
@@ -76,6 +77,8 @@ internal class DetailHero(
     val background: Color,
     val clickLabel: String,
     val onClick: (() -> Unit)?,
+    /** Where the blurred backdrop is cropped (performer portraits: top-biased, toward the face). */
+    val backdropAlignment: Alignment = Alignment.Center,
     /** Fills the circle; the card clips and positions it. */
     val content: @Composable BoxScope.() -> Unit,
 ) {
@@ -83,7 +86,7 @@ internal class DetailHero(
 }
 
 /**
- * Detail header as a profile-style hero card (gallery, tag, studio). Top: a band (min 130dp,
+ * Detail header as a profile-style hero card (gallery, tag, studio, performer). Top: a band (min 130dp,
  * grows with the grid) with the picture blurred as backdrop, or a muted tinted solid without a
  * picture, holding the label/value grid in white to the end side of the circle. The circle avatar
  * straddles the band's lower edge exactly half/half, start-aligned. Below the edge, on the plain
@@ -104,14 +107,18 @@ internal fun DetailHeroCard(
     /** Next to the title (Feeds pill); gets the content colour to use (null = default). */
     titleAccessory: (@Composable (Color?) -> Unit)? = null,
     footer: (@Composable ColumnScope.() -> Unit)? = null,
+    /** Secondary line under the title (performer disambiguation). */
+    subtitle: String? = null,
+    /** The [footer] shows more when expanded (performer URLs beyond the first). */
+    footerHasMore: Boolean = false,
 ) {
     val p = Theme.palette
     var descriptionOverflow by remember(description) { mutableStateOf(false) }
-    val expandable = items.size > collapsedItemCount || (description != null && (expanded || descriptionOverflow))
+    val expandable = footerHasMore || items.size > collapsedItemCount || (description != null && (expanded || descriptionOverflow))
     val visible = if (expanded) items else items.take(collapsedItemCount)
     HeaderCardFrame {
         Column(Modifier.fillMaxWidth()) {
-            HeroHeaderLayout(hero, title, visible, expanded, titleAccessory)
+            HeroHeaderLayout(hero, title, subtitle, visible, expanded, titleAccessory)
             if (description != null || footer != null || expandable) {
                 Column(
                     Modifier.fillMaxWidth().padding(start = 12.dp, end = 12.dp, top = 4.dp, bottom = 10.dp),
@@ -137,6 +144,9 @@ internal fun DetailHeroCard(
     }
 }
 
+/** Top-biased crop for portraits / posters (performer image, group cover): keeps the face in view. */
+internal val HeroPortraitBias = BiasAlignment(0f, -0.6f)
+
 private val HeroAvatar = 84.dp
 private val HeroAvatarGap = 3.dp
 private val HeroInset = 12.dp
@@ -149,6 +159,7 @@ private val HeroInset = 12.dp
 private fun HeroHeaderLayout(
     hero: DetailHero,
     title: String,
+    subtitle: String?,
     items: List<DetailItem>,
     expanded: Boolean,
     accessory: (@Composable (Color?) -> Unit)?,
@@ -158,19 +169,28 @@ private fun HeroHeaderLayout(
     // Text column start: past the circle, so neither grid nor title ever meets it.
     val textStart = HeroInset + outer + 10.dp
     val tap = hero.onClick?.let { Modifier.clickable(onClickLabel = hero.clickLabel, onClick = it) } ?: Modifier
+    // A one-line title (+ pill) is centred on the circle's lower half (band edge → circle bottom);
+    // a wrapping title starts a little below the edge and lets the row grow.
+    var singleLine by remember(title) { mutableStateOf(true) }
     Layout(
         content = {
             HeroBand(hero, items, textStart, tap)
             Row(
                 Modifier.fillMaxWidth().heightIn(min = outer / 2 + 6.dp)
-                    .padding(start = textStart, end = HeroInset, top = 6.dp),
+                    .padding(start = textStart, end = HeroInset, top = if (singleLine) 0.dp else 6.dp, bottom = if (singleLine) 6.dp else 0.dp),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                Text(
-                    title, Modifier.weight(1f), style = IosTypography.title2.copy(fontWeight = FontWeight.Bold), color = p.text,
-                    maxLines = if (expanded) Int.MAX_VALUE else 2, overflow = TextOverflow.Ellipsis,
-                )
+                Column(Modifier.weight(1f)) {
+                    Text(
+                        title, style = IosTypography.title2.copy(fontWeight = FontWeight.Bold), color = p.text,
+                        maxLines = if (expanded) Int.MAX_VALUE else 2, overflow = TextOverflow.Ellipsis,
+                        onTextLayout = { singleLine = it.lineCount <= 1 },
+                    )
+                    if (!subtitle.isNullOrEmpty()) {
+                        Text(subtitle, style = IosTypography.caption, color = p.secondaryText, maxLines = if (expanded) Int.MAX_VALUE else 1, overflow = TextOverflow.Ellipsis)
+                    }
+                }
                 accessory?.invoke(null)
             }
             // Card-coloured gap ring, then the Feeds performer-thumbnail ring (tinted fill, 2dp tint border).
@@ -208,7 +228,7 @@ private fun HeroHeaderLayout(
 }
 
 /**
- * Band: with a picture it is scaled 1.3 and blurred 40dp (API 31+; older APIs show it dimmed
+ * Band: with a picture it is scaled 1.3 and blurred 18dp (soft but still recognisable) (API 31+; older APIs show it dimmed
  * unblurred, as the dashboard does) under a dark scrim; without one a muted tint on a dark base,
  * so the white grid reads in both themes. The grid sits to the end side of the circle.
  */
@@ -219,15 +239,18 @@ private fun HeroBand(hero: DetailHero, items: List<DetailItem>, textStart: Dp, t
         hero.backdropUrl?.let { u ->
             val canBlur = Build.VERSION.SDK_INT >= 31
             AsyncImage(
-                u, null, contentScale = ContentScale.Crop,
+                u, null, contentScale = ContentScale.Crop, alignment = hero.backdropAlignment,
                 modifier = Modifier.matchParentSize()
-                    .graphicsLayer { scaleX = 1.3f; scaleY = 1.3f; alpha = if (canBlur) 1f else 0.45f }.blur(40.dp),
+                    .graphicsLayer { scaleX = 1.3f; scaleY = 1.3f; alpha = if (canBlur) 1f else 0.45f }.blur(18.dp),
             )
         }
         if (hero.backdropUrl != null) {
             Box(
                 Modifier.matchParentSize()
-                    .background(Brush.verticalGradient(0f to Color.Black.copy(alpha = 0.15f), 1f to Color.Black.copy(alpha = 0.55f))),
+                    // Less blur leaves more detail behind the white grid: a slightly darker scrim,
+                    // plus a horizontal one deepening toward the grid side.
+                    .background(Brush.verticalGradient(0f to Color.Black.copy(alpha = 0.22f), 1f to Color.Black.copy(alpha = 0.6f)))
+                    .background(Brush.horizontalGradient(0f to Color.Transparent, 0.35f to Color.Black.copy(alpha = 0.12f), 1f to Color.Black.copy(alpha = 0.22f))),
             )
         }
         if (items.isNotEmpty()) {
@@ -248,9 +271,15 @@ internal fun HeroPlaceholder(icon: ImageVector) {
 
 /** Remote picture for a [DetailHero]: spinner while loading, [placeholderIcon] when it fails. */
 @Composable
-internal fun HeroPicture(url: String?, contentDescription: String?, contentScale: ContentScale, placeholderIcon: ImageVector) {
+internal fun HeroPicture(
+    url: String?,
+    contentDescription: String?,
+    contentScale: ContentScale,
+    placeholderIcon: ImageVector,
+    alignment: Alignment = Alignment.Center,
+) {
     SubcomposeAsyncImage(
-        url, contentDescription, Modifier.fillMaxSize(), contentScale = contentScale, alignment = Alignment.Center,
+        url, contentDescription, Modifier.fillMaxSize(), contentScale = contentScale, alignment = alignment,
         loading = { Box(Modifier.fillMaxSize(), Alignment.Center) { CircularProgressIndicator(Modifier.size(20.dp), color = Color.White.copy(alpha = 0.7f), strokeWidth = 2.dp) } },
         error = {
             Box(Modifier.fillMaxSize().background(Color.Gray.copy(alpha = 0.1f)), Alignment.Center) {
