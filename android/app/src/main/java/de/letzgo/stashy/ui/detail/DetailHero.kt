@@ -88,13 +88,14 @@ internal class DetailHero(
 
 /**
  * Detail header as a profile-style hero card (gallery, tag, studio, performer, group), 1:1 with
- * iOS `DetailHeroCard`. Top: a band (min 130dp, grows with the grid) with the picture blurred as
- * backdrop (or a tint wash without one) holding the label/value grid across its full width
- * (iOS column rule: `min(max(n, 2), 4)`). The 76dp circle avatar straddles the band's lower edge
- * half/half, start-aligned at the content padding. Below the edge: the [title] (22sp bold, one
- * line centred on the circle's lower half; wraps to two when it does not fit) with the compact
- * [titleAccessory] (Feeds pill) and, when anything can expand, the chevron pill; then [footer]
- * (e.g. the studio URL) and the [description] under a divider, clamped to two lines.
+ * iOS `DetailHeroCard`. Top: a compact band ([HeroBandHeight]: a little padding above the
+ * circle's upper half) with the picture blurred as backdrop (or a tint wash without one). The
+ * 76dp circle avatar straddles the band's lower edge half/half, start-aligned at the content
+ * padding. Below the edge: the [title] (22sp bold, one line centred on the circle's lower half;
+ * wraps to two when it does not fit) with the compact [titleAccessory] (Feeds pill) and, when
+ * anything can expand, the chevron pill; then the label/value grid in the normal text colours
+ * (iOS column rule: `min(max(n, 2), 4)`), [footer] (e.g. the studio URL) and the [description]
+ * under a divider, clamped to two lines.
  * Tapping the band or circle runs [DetailHero.onClick].
  * [collapsedItemCount] limits the grid until expanded (iOS default 4).
  */
@@ -122,7 +123,17 @@ internal fun DetailHeroCard(
     val visible = if (expanded) items else items.take(collapsedItemCount)
     HeaderCardFrame {
         Column(Modifier.fillMaxWidth()) {
-            HeroHeaderLayout(hero, title, subtitle, visible, expanded, titleAccessory, if (expandable) onToggle else null)
+            HeroHeaderLayout(hero, title, subtitle, expanded, titleAccessory, if (expandable) onToggle else null)
+            if (visible.isNotEmpty()) {
+                Box(
+                    Modifier.fillMaxWidth().padding(
+                        start = HeroInset, end = HeroInset,
+                        bottom = if (footer == null && desc.isEmpty()) 12.dp else 8.dp,
+                    ),
+                ) {
+                    DetailItemsGrid(visible, columns = heroGridColumns(visible.size))
+                }
+            }
             if (footer != null) {
                 Column(
                     Modifier.fillMaxWidth().padding(start = HeroInset, end = HeroInset + 28.dp, bottom = if (desc.isEmpty()) 10.dp else 6.dp),
@@ -151,17 +162,18 @@ internal val HeroPortraitBias = BiasAlignment(0f, -0.6f)
 private val HeroAvatar = 76.dp
 private val HeroInset = 16.dp
 private val HeroTitleGap = 12.dp
+/** Band = top padding + the circle's upper half (the circle straddles the band edge). */
+private val HeroBandHeight = 14.dp + HeroAvatar / 2
 
 /**
  * Band + title row + the circle on their shared edge. A custom layout so the circle's vertical
- * center lands exactly on the band's measured bottom, whatever height the grid gives the band.
+ * center lands exactly on the band's bottom edge.
  */
 @Composable
 private fun HeroHeaderLayout(
     hero: DetailHero,
     title: String,
     subtitle: String?,
-    items: List<DetailItem>,
     expanded: Boolean,
     accessory: (@Composable (Color?) -> Unit)?,
     /** Non-null when something can expand: the chevron pill at the row end. */
@@ -176,7 +188,7 @@ private fun HeroHeaderLayout(
     val oneLine = singleLine && subtitle.isNullOrEmpty()
     Layout(
         content = {
-            HeroBand(hero, items, tap)
+            HeroBand(hero, tap)
             Row(
                 Modifier.fillMaxWidth()
                     .padding(start = textStart, end = HeroInset, top = if (oneLine) 0.dp else 6.dp, bottom = 10.dp)
@@ -251,16 +263,14 @@ private fun HeroAvatarCircle(hero: DetailHero, tap: Modifier) {
 
 /**
  * iOS `bandBackground`: the picture scaled 1.3 and blurred 18dp over black (API 31+; older APIs
- * show it dimmed unblurred), under a 0.3 → 0.5 black gradient, grid in white. Without a picture a
- * tint wash and the grid in the normal text colours. The grid sits at the top across the full
- * width; the bottom keeps the circle's upper half clear.
+ * show it dimmed unblurred), under a 0.3 → 0.5 black gradient; without a picture a tint wash.
+ * Only as tall as the circle's upper half plus a little padding.
  */
 @Composable
-private fun HeroBand(hero: DetailHero, items: List<DetailItem>, tap: Modifier) {
-    val p = Theme.palette
+private fun HeroBand(hero: DetailHero, tap: Modifier) {
     val hasPicture = hero.backdropUrl != null
     val base = if (hasPicture) Color.Black else Appearance.tint.copy(alpha = 0.15f)
-    Box(Modifier.fillMaxWidth().heightIn(min = 130.dp).background(base).clipToBounds().then(tap)) {
+    Box(Modifier.fillMaxWidth().height(HeroBandHeight).background(base).clipToBounds().then(tap)) {
         hero.backdropUrl?.let { u ->
             val canBlur = Build.VERSION.SDK_INT >= 31
             val logo = hero.style == DetailHero.Style.Logo
@@ -278,17 +288,6 @@ private fun HeroBand(hero: DetailHero, items: List<DetailItem>, tap: Modifier) {
                 if (logo) Box(Modifier.matchParentSize().background(Appearance.tint.copy(alpha = 0.18f)))
             }
             Box(Modifier.matchParentSize().background(Brush.verticalGradient(0f to Color.Black.copy(alpha = 0.3f), 1f to Color.Black.copy(alpha = 0.5f))))
-        }
-        if (items.isNotEmpty()) {
-            Box(Modifier.align(Alignment.TopStart).fillMaxWidth().padding(start = HeroInset, end = HeroInset, top = 14.dp, bottom = HeroAvatar / 2 + 10.dp)) {
-                DetailItemsGrid(
-                    items,
-                    labelColor = if (hasPicture) Color.White.copy(alpha = 0.75f) else p.secondaryText,
-                    valueColor = if (hasPicture) Color.White else p.text,
-                    columns = heroGridColumns(items.size),
-                    shadow = hasPicture,
-                )
-            }
         }
     }
 }
