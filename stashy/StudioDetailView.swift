@@ -882,7 +882,7 @@ struct StudioDetailView: View {
                                 .lineLimit(1)
                         }
                     }
-                    .padding(.horizontal, 12)
+                    .padding(.horizontal, 16)
                     .padding(.bottom, (studio.details ?? "").trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? 10 : 6)
                     .padding(.trailing, 28)
                     .frame(maxWidth: .infinity, alignment: .leading)

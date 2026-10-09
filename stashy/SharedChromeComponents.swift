@@ -1079,17 +1079,20 @@ struct DetailHeroItem: Identifiable {
 
 /// Header card shared by the opened gallery, tag and studio detail screens.
 ///
-/// With an image: a compact band (fixed height, also in landscape) showing the image as a
-/// blurred backdrop (dashboard hero technique: scaled + 40pt blur), a sharp circular avatar
-/// of the same image with the tinted ring used by the Feeds overlay, and the name in white
-/// next to it. The uppercase label/value grid, `footer` and description (two lines, chevron
-/// expands) sit below the band on the solid card background in normal text colours.
-/// Without an image the band is skipped; the name moves into the solid section, optionally
-/// behind a placeholder circle (`placeholderSystemImage`).
+/// Profile-header layout: a band on top carries the uppercase label/value grid in white
+/// over the image as a blurred backdrop (dashboard hero technique: scaled + 40pt blur);
+/// below it the solid card section holds the name in normal text colour. A sharp circular
+/// avatar of the image (tinted ring, as in the Feeds overlay) straddles the edge between
+/// the two exactly half/half, leading-aligned with the content padding; the name sits to
+/// the right of its lower half. The band grows with the grid (min `minBandHeight`) and
+/// always keeps the circle's upper half clear. `footer` and the description (two lines,
+/// chevron expands) follow in the solid section.
+/// Without an image the structure stays: the band is a muted tint fill (grid in normal
+/// text colours) and the circle shows `placeholderSystemImage`.
 ///
 /// `backdrop` fills the band (blurred by the card), `avatar` fills the circle (clipped by
-/// the card). `onHeroTap` (e.g. fullscreen) makes the band a button. `accessory` sits
-/// top-trailing on the band, or next to the name on the plain card (`onImage` says which).
+/// the card). `onHeroTap` (e.g. fullscreen) makes band and circle a button when there is
+/// an image. `accessory` sits next to the name (`onImage` is always `false` there).
 struct DetailHeroCard<Backdrop: View, Avatar: View, Accessory: View, Footer: View>: View {
     let title: String
     let items: [DetailHeroItem]
@@ -1100,7 +1103,7 @@ struct DetailHeroCard<Backdrop: View, Avatar: View, Accessory: View, Footer: Vie
     @Binding var isExpanded: Bool
     /// Collapsed cell count; the rest appears when expanded.
     var collapsedItemLimit: Int = 4
-    /// SF Symbol for the circle when there is no image; `nil` shows no circle.
+    /// SF Symbol for the circle when there is no image.
     var placeholderSystemImage: String? = nil
     @ViewBuilder var backdrop: () -> Backdrop
     @ViewBuilder var avatar: () -> Avatar
@@ -1109,9 +1112,9 @@ struct DetailHeroCard<Backdrop: View, Avatar: View, Accessory: View, Footer: Vie
 
     @ObservedObject private var appearanceManager = AppearanceManager.shared
 
-    private static var bandHeight: CGFloat { 150 }
+    private static var minBandHeight: CGFloat { 130 }
     private static var avatarSize: CGFloat { 76 }
-    private static var placeholderSize: CGFloat { 52 }
+    private static var contentPadding: CGFloat { 16 }
 
     private var trimmedDescription: String {
         (description ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
@@ -1121,55 +1124,28 @@ struct DetailHeroCard<Backdrop: View, Avatar: View, Accessory: View, Footer: Vie
         !trimmedDescription.isEmpty || items.count > collapsedItemLimit
     }
 
-    /// Without a description the chevron sits on the info block; keep text clear of it.
+    /// Without a description the chevron sits next to the name; keep text clear of it.
     private var chevronInset: CGFloat {
         trimmedDescription.isEmpty && hasExpandableContent ? 28 : 0
     }
 
-    /// Whether the solid section shows anything above the description.
-    private var hasInfoSection: Bool {
-        !showsHero || !items.isEmpty
+    /// Tap target only when there is an image to open.
+    private var heroTap: (() -> Void)? {
+        showsHero ? onHeroTap : nil
     }
 
     var body: some View {
         let desc = trimmedDescription
         VStack(alignment: .leading, spacing: 0) {
-            if showsHero {
-                heroBand
-                if !items.isEmpty {
-                    infoGrid
-                        .padding(.vertical, 10)
-                        .padding(.horizontal, 12)
-                        .padding(.trailing, chevronInset)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                }
-            } else {
-                HStack(alignment: .top, spacing: 10) {
-                    if let placeholderSystemImage {
-                        placeholderCircle(systemImage: placeholderSystemImage)
-                    }
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text(title)
-                            .font(.title2)
-                            .fontWeight(.bold)
-                            .foregroundColor(.primary)
-                            .lineLimit(isExpanded ? nil : 2)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                        infoGrid
-                    }
-                    .padding(.trailing, chevronInset)
-                    accessory(false)
-                }
-                .padding(.vertical, 10)
-                .padding(.horizontal, 12)
-                .frame(maxWidth: .infinity, alignment: .leading)
-            }
+            heroButton(band)
+            // Later sibling draws above the band, so the circle's upper half overlaps it.
+            titleRow
 
             footer()
 
             if !desc.isEmpty {
                 VStack(alignment: .leading, spacing: 4) {
-                    if hasInfoSection { Divider() }
+                    Divider()
                     Text(desc)
                         .font(.caption)
                         .foregroundColor(.secondary)
@@ -1177,8 +1153,7 @@ struct DetailHeroCard<Backdrop: View, Avatar: View, Accessory: View, Footer: Vie
                         .fixedSize(horizontal: false, vertical: true)
                         .padding(.trailing, 28) // keep clear of the chevron
                 }
-                .padding(.horizontal, 12)
-                .padding(.top, hasInfoSection ? 0 : 10)
+                .padding(.horizontal, Self.contentPadding)
                 .padding(.bottom, 10)
                 .frame(maxWidth: .infinity, alignment: .leading)
             }
@@ -1212,13 +1187,25 @@ struct DetailHeroCard<Backdrop: View, Avatar: View, Accessory: View, Footer: Vie
 
     // MARK: Band
 
-    /// Blurred backdrop + sharp avatar circle + name. The whole band (minus the accessory)
-    /// is the tap target when `onHeroTap` is set.
-    private var heroBand: some View {
-        let content = ZStack(alignment: .leading) {
+    /// Info grid over the blurred backdrop (or the muted tint fill without an image). The
+    /// bottom `avatarSize / 2` stays empty for the circle's upper half.
+    private var band: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            infoGrid
+                .padding(.top, 14)
+                .padding(.horizontal, Self.contentPadding)
+            Spacer(minLength: Self.avatarSize / 2 + 10)
+        }
+        .frame(maxWidth: .infinity, minHeight: Self.minBandHeight, alignment: .topLeading)
+        .background { bandBackground }
+        .clipped()
+        .contentShape(Rectangle())
+    }
+
+    @ViewBuilder
+    private var bandBackground: some View {
+        if showsHero {
             Color.black
-                .frame(maxWidth: .infinity)
-                .frame(height: Self.bandHeight)
                 .overlay {
                     backdrop()
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -1234,75 +1221,78 @@ struct DetailHeroCard<Backdrop: View, Avatar: View, Accessory: View, Footer: Vie
                     )
                 )
                 .clipped()
+        } else {
+            appearanceManager.tintColor.opacity(0.15)
+        }
+    }
 
-            HStack(spacing: 14) {
-                avatarCircle
+    /// Circle (lower half) + name + accessory. The circle's negative top padding pulls its
+    /// upper half onto the band, so its centre sits exactly on the edge.
+    private var titleRow: some View {
+        HStack(alignment: .top, spacing: 12) {
+            heroButton(avatarCircle)
+                .padding(.top, -Self.avatarSize / 2)
+            HStack(alignment: .firstTextBaseline, spacing: 8) {
                 Text(title)
                     .font(.title2)
                     .fontWeight(.bold)
-                    .foregroundColor(.white)
+                    .foregroundColor(.primary)
                     .lineLimit(isExpanded ? 4 : 2)
                     .minimumScaleFactor(0.8)
-                    .shadow(color: .black.opacity(0.4), radius: 2, y: 1)
                     .frame(maxWidth: .infinity, alignment: .leading)
+                accessory(false)
             }
-            .padding(.leading, 16)
-            // Clear of the top-trailing accessory.
-            .padding(.trailing, 72)
+            .padding(.top, 6)
+            .padding(.trailing, chevronInset)
         }
-        .frame(height: Self.bandHeight)
-        .contentShape(Rectangle())
+        .padding(.horizontal, Self.contentPadding)
+        .padding(.bottom, 10)
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
 
-        return Group {
-            if let onHeroTap {
-                Button {
-                    HapticManager.light()
-                    onHeroTap()
-                } label: {
-                    content
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel(heroAccessibilityLabel)
-            } else {
+    @ViewBuilder
+    private func heroButton<Content: View>(_ content: Content) -> some View {
+        if let heroTap {
+            Button {
+                HapticManager.light()
+                heroTap()
+            } label: {
                 content
             }
-        }
-        .overlay(alignment: .topTrailing) {
-            accessory(true)
-                .padding(8)
+            .buttonStyle(.plain)
+            .accessibilityLabel(heroAccessibilityLabel)
+        } else {
+            content
         }
     }
 
-    /// Sharp copy of the image in a circle with the Feeds overlay's tinted ring.
+    /// Sharp copy of the image (or the type placeholder) in a circle with the Feeds
+    /// overlay's tinted ring; opaque so the band never shows through.
     private var avatarCircle: some View {
-        Circle()
-            .fill(Color.black.opacity(0.3))
-            .frame(width: Self.avatarSize, height: Self.avatarSize)
-            .overlay {
+        ZStack {
+            Circle().fill(Color.secondaryAppBackground)
+            if showsHero {
+                Circle().fill(Color.black.opacity(0.3))
                 avatar()
                     .frame(width: Self.avatarSize, height: Self.avatarSize)
-            }
-            .clipShape(Circle())
-            .overlay(Circle().stroke(appearanceManager.tintColor, lineWidth: 2))
-            .shadow(color: .black.opacity(0.35), radius: 6, y: 2)
-    }
-
-    private func placeholderCircle(systemImage: String) -> some View {
-        Circle()
-            .fill(appearanceManager.tintColor.opacity(0.15))
-            .frame(width: Self.placeholderSize, height: Self.placeholderSize)
-            .overlay(
-                Image(systemName: systemImage)
-                    .font(.system(size: 20, weight: .semibold))
+            } else {
+                Circle().fill(appearanceManager.tintColor.opacity(0.15))
+                Image(systemName: placeholderSystemImage ?? "photo")
+                    .font(.system(size: 28, weight: .semibold))
                     .foregroundColor(Color.pillAccent)
-            )
-            .overlay(Circle().stroke(appearanceManager.tintColor, lineWidth: 2))
-            .accessibilityHidden(true)
+                    .accessibilityHidden(true)
+            }
+        }
+        .frame(width: Self.avatarSize, height: Self.avatarSize)
+        .clipShape(Circle())
+        .overlay(Circle().stroke(appearanceManager.tintColor, lineWidth: 2))
+        .shadow(color: .black.opacity(0.3), radius: 6, y: 2)
     }
 
     // MARK: Info
 
-    /// Uppercase label/value grid in the studio-header type scale (8pt labels, 11pt values).
+    /// Uppercase label/value grid in the studio-header type scale (8pt labels, 11pt values),
+    /// white on the image, normal text colours on the tint fill.
     @ViewBuilder
     private var infoGrid: some View {
         let visible = isExpanded ? items : Array(items.prefix(collapsedItemLimit))
@@ -1310,19 +1300,20 @@ struct DetailHeroCard<Backdrop: View, Avatar: View, Accessory: View, Footer: Vie
             LazyVGrid(
                 columns: Array(repeating: GridItem(.flexible(), alignment: .leading), count: min(max(visible.count, 2), 4)),
                 alignment: .leading,
-                spacing: 6
+                spacing: 8
             ) {
                 ForEach(visible) { item in
-                    VStack(alignment: .leading, spacing: 0) {
+                    VStack(alignment: .leading, spacing: 1) {
                         Text(item.label)
                             .font(.system(size: 8))
-                            .foregroundColor(.secondary)
+                            .foregroundColor(showsHero ? .white.opacity(0.75) : .secondary)
                             .textCase(.uppercase)
                         Text(item.value)
                             .font(.system(size: 11, weight: .medium))
-                            .foregroundColor(.primary)
+                            .foregroundColor(showsHero ? .white : .primary)
                             .lineLimit(1)
                     }
+                    .shadow(color: showsHero ? .black.opacity(0.4) : .clear, radius: 2, y: 1)
                 }
             }
         }
@@ -1352,7 +1343,7 @@ extension DetailHeroCard where Backdrop == Avatar, Accessory == EmptyView, Foote
     }
 }
 
-/// "Feeds" pill for detail hero cards: tinted on the plain card, dark glass on the hero.
+/// "Feeds" pill for detail hero cards: tinted on the solid card, dark glass on an image.
 struct DetailHeroFeedsButton: View {
     let onImage: Bool
     let action: () -> Void
