@@ -219,8 +219,8 @@ object DetailFeedsLink {
 
 /** iOS: Feeds pill in the header (`AppTab.reels.icon` + "Feeds") — Material `AssistChip`. */
 @Composable
-internal fun FeedsPill(onClick: () -> Unit) {
-    de.letzgo.stashy.ui.components.ActionChip("Feeds", onClick, icon = SF.playRectangleOnRectangle)
+internal fun FeedsPill(contentColor: Color? = null, onClick: () -> Unit) {
+    de.letzgo.stashy.ui.components.ActionChip("Feeds", onClick, icon = SF.playRectangleOnRectangle, contentColor = contentColor)
 }
 
 /** 2-column label/value grid of the detail headers (8pt uppercase label, 11pt medium value). */
@@ -318,7 +318,7 @@ internal fun DetailHeaderCard(
                         title, Modifier.weight(1f), style = IosTypography.title2.copy(fontWeight = FontWeight.Bold), color = p.text,
                         maxLines = if (expanded) Int.MAX_VALUE else titleMaxLines, overflow = TextOverflow.Ellipsis,
                     )
-                    if (onFeeds != null) FeedsPill(onFeeds)
+                    if (onFeeds != null) FeedsPill(onClick = onFeeds)
                 }
                 val visible = if (expanded) items else items.take(4)
                 if (visible.isNotEmpty()) DetailItemsGrid(visible)
