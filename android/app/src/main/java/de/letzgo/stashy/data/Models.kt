@@ -138,8 +138,9 @@ data class Gallery(
     @SerialName("image_count") val imageCount: Int? = null,
     @SerialName("created_at") val createdAt: String? = null,
     @SerialName("updated_at") val updatedAt: String? = null,
-    val studio: IdName? = null,
-    val performers: List<IdName>? = null,
+    /** Full [Studio] / [Performer] rows (logo, portrait, birthdate, counts) for the gallery detail cards. */
+    val studio: Studio? = null,
+    val performers: List<Performer>? = null,
     val tags: List<IdName>? = null,
     val cover: GalleryCover? = null,
 ) {

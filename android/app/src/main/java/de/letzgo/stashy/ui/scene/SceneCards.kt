@@ -81,9 +81,13 @@ internal fun ageAt(birthdate: String?, sceneDate: String?): Int? {
     return runCatching { Period.between(LocalDate.parse(birthdate.take(10)), LocalDate.parse(sceneDate.take(10))).years }.getOrNull()
 }
 
-/** iOS: `ScenePerformersCard` — round portraits (age badge, name pill) + director, horizontal scroll. */
+/**
+ * iOS: `ScenePerformersCard` — round portraits (age badge, name pill) + director, horizontal scroll.
+ * Shared with the opened gallery ([de.letzgo.stashy.ui.detail.GalleryDetailScreen]); `sceneDate`
+ * is then the gallery date. `onEdit == null` hides the pencil.
+ */
 @Composable
-fun ScenePerformersCard(sceneDate: String?, performers: List<Performer>, director: String?, onEdit: () -> Unit) {
+fun ScenePerformersCard(sceneDate: String?, performers: List<Performer>, director: String?, onEdit: (() -> Unit)?) {
     val tint = Appearance.tint
     val p = Theme.palette
     SceneCardContainer(Modifier.fillMaxWidth()) {
@@ -123,9 +127,9 @@ fun ScenePerformersCard(sceneDate: String?, performers: List<Performer>, directo
     }
 }
 
-/** iOS: `SceneStudioCard` — 110×105 tile in the tint colour with the logo (or name), name pill. */
+/** iOS: `SceneStudioCard` — 110×105 tile in the tint colour with the logo (or name), name pill. Also used by the opened gallery. */
 @Composable
-fun SceneStudioCard(studio: Studio?, onEdit: () -> Unit, modifier: Modifier = Modifier) {
+fun SceneStudioCard(studio: Studio?, onEdit: (() -> Unit)?, modifier: Modifier = Modifier) {
     val tint = Appearance.tint
     SceneCardContainer(modifier.fillMaxWidth()) {
         SceneCardHeader("Studio", onEdit)

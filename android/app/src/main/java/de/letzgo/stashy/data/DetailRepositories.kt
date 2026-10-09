@@ -120,6 +120,22 @@ object DetailRepository {
         "galleryUpdate", mapOf("id" to id, "title" to title, "date" to date, "details" to details),
     )
 
+    /** `galleryUpdate(performer_ids:)` — the opened gallery's Performers card. Throws on failure (picker shows the error). */
+    suspend fun updateGalleryPerformers(id: String, performerIds: List<String>) {
+        GraphQL.data(
+            "mutation GalleryUpdate(\$input: GalleryUpdateInput!) { galleryUpdate(input: \$input) { id } }",
+            vars("input" to mapOf("id" to id, "performer_ids" to performerIds)),
+        )
+    }
+
+    /** `galleryUpdate(studio_id:)` — null clears the studio. Throws on failure. */
+    suspend fun updateGalleryStudio(id: String, studioId: String?) {
+        GraphQL.data(
+            "mutation GalleryUpdate(\$input: GalleryUpdateInput!) { galleryUpdate(input: \$input) { id } }",
+            vars("input" to mapOf("id" to id, "studio_id" to studioId)),
+        )
+    }
+
     // MARK: Create (iOS `create*` — used by the scene detail pickers)
 
     suspend fun createPerformer(name: String): Performer? = create(

@@ -208,27 +208,37 @@ fun EntityPickerSheet(
 private fun count(n: Int?, unit: String) = n?.let { "$it $unit" }
 
 @Composable
-fun EditPerformersSheet(scene: Scene, onDismiss: () -> Unit, onSaved: (List<Performer>) -> Unit) {
+fun EditPerformersSheet(scene: Scene, onDismiss: () -> Unit, onSaved: (List<Performer>) -> Unit) =
+    EditPerformersSheet(scene.performers.map { it.id }.toSet(), { SceneEditing.updatePerformers(scene.id, it) }, onDismiss, onSaved)
+
+/** Performer picker for any owner (scene, gallery): `save` writes the chosen ids. */
+@Composable
+fun EditPerformersSheet(initialIds: Set<String>, save: suspend (List<String>) -> Unit, onDismiss: () -> Unit, onSaved: (List<Performer>) -> Unit) {
     val byId = remember { mutableMapOf<String, Performer>() }
     EntityPickerSheet(
-        "Edit Performers", "Search Performers", scene.performers.map { it.id }.toSet(), multiple = true,
+        "Edit Performers", "Search Performers", initialIds, multiple = true,
         load = { SceneEditing.allPerformers().onEach { byId[it.id] = it }.map { PickerEntry(it.id, it.name, count(it.sceneCount ?: 0, "scenes")) } },
         create = { name -> SceneEditing.createPerformer(name).also { byId[it.id] = it }.let { PickerEntry(it.id, it.name, count(it.sceneCount ?: 0, "scenes")) } },
         createFailedText = "Failed to create performer",
-        save = { SceneEditing.updatePerformers(scene.id, it) }, saveFailedText = "Failed to update performers",
+        save = save, saveFailedText = "Failed to update performers",
         onSaved = { picked -> onSaved(picked.mapNotNull { byId[it.id] }) }, onDismiss = onDismiss,
     )
 }
 
 @Composable
-fun EditStudioSheet(scene: Scene, onDismiss: () -> Unit, onSaved: (Studio?) -> Unit) {
+fun EditStudioSheet(scene: Scene, onDismiss: () -> Unit, onSaved: (Studio?) -> Unit) =
+    EditStudioSheet(scene.studio?.id, { SceneEditing.updateStudio(scene.id, it) }, onDismiss, onSaved)
+
+/** Studio picker for any owner (scene, gallery): `save` writes the chosen id (null clears it). */
+@Composable
+fun EditStudioSheet(initialId: String?, save: suspend (String?) -> Unit, onDismiss: () -> Unit, onSaved: (Studio?) -> Unit) {
     val byId = remember { mutableMapOf<String, Studio>() }
     EntityPickerSheet(
-        "Set Studio", "Search Studio", setOfNotNull(scene.studio?.id), multiple = false,
+        "Set Studio", "Search Studio", setOfNotNull(initialId), multiple = false,
         load = { SceneEditing.allStudios().onEach { byId[it.id] = it }.map { PickerEntry(it.id, it.name, count(it.sceneCount ?: 0, "scenes")) } },
         create = { name -> SceneEditing.createStudio(name).also { byId[it.id] = it }.let { PickerEntry(it.id, it.name, count(it.sceneCount ?: 0, "scenes")) } },
         createFailedText = "Failed to create studio",
-        save = { SceneEditing.updateStudio(scene.id, it.firstOrNull()) }, saveFailedText = "Failed to update studio",
+        save = { save(it.firstOrNull()) }, saveFailedText = "Failed to update studio",
         onSaved = { picked -> onSaved(picked.firstOrNull()?.let { byId[it.id] }) }, onDismiss = onDismiss,
     )
 }

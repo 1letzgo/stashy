@@ -45,13 +45,23 @@ import de.letzgo.stashy.ui.filter.ImageMediaTypeCard
 import de.letzgo.stashy.ui.filter.ImagesFeedAutoplaySettingsCard
 import de.letzgo.stashy.ui.Screen
 import de.letzgo.stashy.ui.Theme
+import de.letzgo.stashy.ui.Appearance
+import de.letzgo.stashy.ui.scene.EditPerformersSheet
+import de.letzgo.stashy.ui.scene.EditStudioSheet
+import de.letzgo.stashy.ui.scene.ScenePerformersCard
+import de.letzgo.stashy.ui.scene.SceneStudioCard
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxWidth
 import kotlinx.coroutines.launch
 import kotlinx.serialization.json.JsonObject
 
 /**
  * iOS: `ImagesView(gallery:)` for an opened gallery — chrome bar Back · Edit, the gallery
  * header (cover strip, IMAGES / DATE / STUDIO / PERFORMERS / ORGANIZED, details when
- * expanded), then the image grid (2/row) or the grouped feed (1/row). The top bar's "Settings"
+ * expanded), the scene-detail Performers and Studio cards (only when set), then the image grid (2/row) or the grouped feed (1/row). The top bar's "Settings"
  * opens the images filter & sort sheet (iOS `ImagesCatalogFilterSortSheet` with
  * `DetailLinkedImagesFilterModel(scope: .gallery(id))`): filter, sort, Type, Per row
  * (`openedGallery` scope), autoplay toggles and the criteria editor. The `galleries` INCLUDES
@@ -70,6 +80,9 @@ class GalleryDetailScreen(
     private var gallery by mutableStateOf(preview)
     private var expanded by mutableStateOf(false)
     private var editing by mutableStateOf(false)
+    /** Performers / Studio card pencils (`galleryUpdate` performer_ids / studio_id). */
+    private var editingPerformers by mutableStateOf(false)
+    private var editingStudio by mutableStateOf(false)
     /** iOS `showingGalleryDownloadOptions` (`GalleryDownloadOptionsAlert`). */
     private var showDownloadOptions by mutableStateOf(false)
     private var started = false
@@ -105,7 +118,7 @@ class GalleryDetailScreen(
         androidx.activity.compose.BackHandler(enabled = selection.isActive) { selection.end() }
         Box(Modifier.fillMaxSize().background(Theme.palette.background)) {
             val columns = (forcedColumns ?: CatalogPrefs.cardColumns(CatalogCardColumnScope.OpenedGallery)).raw
-            DetailGrid(gridState, { w -> columnsFor(DetailTab.Images, w, columns) }, header = { gallery?.let { Header(it) } }) {
+            DetailGrid(gridState, { w -> columnsFor(DetailTab.Images, w, columns) }, header = { gallery?.let { HeaderWithCards(it) } }) {
                 // iOS: while selecting, 1/row drops the grouped feed for per-image cards.
                 if (selection.isActive) selectableImageSection(images.list, selection)
                 else imageSection(
@@ -144,7 +157,38 @@ class GalleryDetailScreen(
         }
         val g = gallery
         if (editing && g != null) EditGallerySheet(g, { editing = false }) { gallery = it }
+        if (editingPerformers && g != null) EditPerformersSheet(
+            g.performers.orEmpty().map { it.id }.toSet(), { DetailRepository.updateGalleryPerformers(g.id, it) },
+            { editingPerformers = false },
+        ) { picked -> gallery = gallery?.copy(performers = picked) }
+        if (editingStudio && g != null) EditStudioSheet(
+            g.studio?.id, { DetailRepository.updateGalleryStudio(g.id, it) },
+            { editingStudio = false },
+        ) { picked -> gallery = gallery?.copy(studio = picked) }
         if (showDownloadOptions && g != null) GalleryDownloadOptionsDialog(g) { showDownloadOptions = false }
+    }
+
+    /**
+     * Header, then the scene detail's Performers card (full width) and Studio card (half width,
+     * like scene detail's Studio | Groups row). Each card only shows when the gallery has
+     * performers / a studio — or in edit mode, empty, so one can be assigned via its pencil.
+     */
+    @Composable
+    private fun HeaderWithCards(g: Gallery) {
+        val edit = Appearance.isEditModeEnabled
+        val performers = g.performers.orEmpty()
+        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Header(g)
+            if (performers.isNotEmpty() || edit) {
+                ScenePerformersCard(g.date, performers, director = null, onEdit = { editingPerformers = true })
+            }
+            if (g.studio != null || edit) {
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    SceneStudioCard(g.studio, { editingStudio = true }, Modifier.weight(1f))
+                    Spacer(Modifier.weight(1f))
+                }
+            }
+        }
     }
 
     /** iOS `openedGalleryHeader`. */

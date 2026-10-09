@@ -74,14 +74,15 @@ object DetailFormatting {
         return list
     }
 
-    /** iOS `ImagesView.getGalleryHeaderDetails`. */
+    /**
+     * iOS `ImagesView.getGalleryHeaderDetails`, minus STUDIO / PERFORMERS: the opened gallery
+     * shows those as the Performers and Studio cards under the header, so the rows would repeat them.
+     */
     fun gallery(g: Gallery, totalImages: Int): List<DetailItem> {
         val list = mutableListOf<DetailItem>()
         val count = maxOf(totalImages, g.imageCount ?: 0)
         if (count > 0) list += DetailItem("IMAGES", "$count")
         g.date?.takeIf { it.isNotEmpty() }?.let { list += DetailItem("DATE", it) }
-        g.studio?.name?.let { list += DetailItem("STUDIO", it) }
-        g.performers?.takeIf { it.isNotEmpty() }?.let { ps -> list += DetailItem("PERFORMERS", ps.mapNotNull { it.name }.joinToString(", ")) }
         if (g.organized == true) list += DetailItem("ORGANIZED", "Yes")
         return list
     }
