@@ -906,8 +906,8 @@ struct PerformerDetailView: View {
     
     /// Header card (`DetailHeroCard`): stats on the performer image blurred as the band
     /// backdrop, the portrait top-cropped in the circle straddling the band edge (keeps the
-    /// face visible), name and Feeds pill in the solid section. The first four stats show
-    /// collapsed, the rest behind the chevron. Favorite / Edit / image change stay in the nav bar.
+    /// face visible), name and Feeds pill in the solid section. Two full rows of stats (8 at
+    /// the grid's 4 columns) show collapsed, the rest behind the chevron pill. Favorite / Edit / image change stay in the nav bar.
     private func headerView(displayPerformer: Performer, battleLine: String?) -> some View {
         let imageURL = displayPerformer.thumbnailURL
         return DetailHeroCard(
@@ -919,6 +919,7 @@ struct PerformerDetailView: View {
             heroAccessibilityLabel: "Performer image",
             onHeroTap: nil,
             isExpanded: $isHeaderExpanded,
+            collapsedItemLimit: 8,
             placeholderSystemImage: "person.fill",
             backdrop: { performerHeroImage(imageURL, alignment: .center) },
             avatar: { performerHeroImage(imageURL, alignment: .top) },

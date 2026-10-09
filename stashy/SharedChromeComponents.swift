@@ -1086,8 +1086,9 @@ struct DetailHeroItem: Identifiable {
 /// the two exactly half/half, leading-aligned with the content padding; the name sits to
 /// the right of its lower half (vertically centred on it when it fits on one line). The
 /// band grows with the grid (min `minBandHeight`) and
-/// always keeps the circle's upper half clear. `footer` and the description (two lines,
-/// chevron expands) follow in the solid section.
+/// always keeps the circle's upper half clear. `footer` and the description (two lines)
+/// follow in the solid section. The expand chevron is a pill in the title row, trailing
+/// the accessory (Feeds pill) and sized like it; it only shows when there is more to show.
 /// Without an image the structure stays: the band is a muted tint fill (grid in normal
 /// text colours) and the circle shows `placeholderSystemImage`.
 ///
@@ -1125,11 +1126,6 @@ struct DetailHeroCard<Backdrop: View, Avatar: View, Accessory: View, Footer: Vie
         !trimmedDescription.isEmpty || items.count > collapsedItemLimit
     }
 
-    /// Without a description the chevron sits next to the name; keep text clear of it.
-    private var chevronInset: CGFloat {
-        trimmedDescription.isEmpty && hasExpandableContent ? 28 : 0
-    }
-
     /// Tap target only when there is an image to open.
     private var heroTap: (() -> Void)? {
         showsHero ? onHeroTap : nil
@@ -1152,7 +1148,6 @@ struct DetailHeroCard<Backdrop: View, Avatar: View, Accessory: View, Footer: Vie
                         .foregroundColor(.secondary)
                         .lineLimit(isExpanded ? nil : 2)
                         .fixedSize(horizontal: false, vertical: true)
-                        .padding(.trailing, 28) // keep clear of the chevron
                 }
                 .padding(.horizontal, Self.contentPadding)
                 .padding(.bottom, 10)
@@ -1166,24 +1161,6 @@ struct DetailHeroCard<Backdrop: View, Avatar: View, Accessory: View, Footer: Vie
                 .stroke(Color.primary.opacity(0.1), lineWidth: 0.5)
         )
         .cardShadow()
-        .overlay(alignment: .bottomTrailing) {
-            if hasExpandableContent {
-                Button {
-                    withAnimation(.spring()) {
-                        isExpanded.toggle()
-                    }
-                } label: {
-                    Image(systemName: isExpanded ? "chevron.up" : "chevron.down")
-                        .font(.system(size: 10, weight: .bold))
-                        .foregroundColor(Color.pillAccent)
-                        .padding(6)
-                        .background(appearanceManager.tintColor.opacity(0.15))
-                        .clipShape(Circle())
-                }
-                .padding(8)
-                .accessibilityLabel(isExpanded ? "Show less" : "Show more")
-            }
-        }
     }
 
     // MARK: Band
@@ -1241,7 +1218,7 @@ struct DetailHeroCard<Backdrop: View, Avatar: View, Accessory: View, Footer: Vie
                         .lineLimit(1)
                         .fixedSize(horizontal: true, vertical: false)
                     Spacer(minLength: 0)
-                    accessory(false)
+                    trailingPills
                 }
                 .frame(minHeight: Self.avatarSize / 2, alignment: .center)
 
@@ -1250,15 +1227,36 @@ struct DetailHeroCard<Backdrop: View, Avatar: View, Accessory: View, Footer: Vie
                         .lineLimit(isExpanded ? 4 : 2)
                         .minimumScaleFactor(0.8)
                         .frame(maxWidth: .infinity, alignment: .leading)
-                    accessory(false)
+                    trailingPills
                 }
                 .padding(.top, 6)
             }
-            .padding(.trailing, chevronInset)
         }
         .padding(.horizontal, Self.contentPadding)
         .padding(.bottom, 10)
         .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    /// Accessory (Feeds pill) followed by the expand chevron pill, at their natural size so a
+    /// wrapping title never squeezes them.
+    private var trailingPills: some View {
+        HStack(spacing: 6) {
+            accessory(false)
+            if hasExpandableContent {
+                Button {
+                    withAnimation(.spring()) {
+                        isExpanded.toggle()
+                    }
+                } label: {
+                    Image(systemName: isExpanded ? "chevron.up" : "chevron.down")
+                        .font(.system(size: 12, weight: .bold))
+                        .detailHeroPill(onImage: false)
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel(isExpanded ? "Show less" : "Show more")
+            }
+        }
+        .fixedSize()
     }
 
     private var titleText: some View {
@@ -1365,7 +1363,6 @@ extension DetailHeroCard where Backdrop == Avatar, Accessory == EmptyView, Foote
 struct DetailHeroFeedsButton: View {
     let onImage: Bool
     let action: () -> Void
-    @ObservedObject private var appearanceManager = AppearanceManager.shared
 
     var body: some View {
         Button(action: action) {
@@ -1375,14 +1372,33 @@ struct DetailHeroFeedsButton: View {
                 Text("Feeds")
                     .font(.system(size: 11, weight: .bold))
             }
-            .foregroundColor(onImage ? .white : Color.pillAccent)
-            .padding(.horizontal, 10)
-            .padding(.vertical, 5)
-            .background(onImage ? Color.black.opacity(0.45) : appearanceManager.tintColor.opacity(0.15))
-            .clipShape(Capsule())
+            .detailHeroPill(onImage: onImage)
         }
         .buttonStyle(.plain)
         .accessibilityLabel("Open in Feeds")
+    }
+}
+
+/// Shared pill chrome for the detail hero title row (Feeds pill, expand chevron): same
+/// height, padding, capsule and fill so the two read as one set.
+private struct DetailHeroPillModifier: ViewModifier {
+    let onImage: Bool
+    @ObservedObject private var appearanceManager = AppearanceManager.shared
+
+    func body(content: Content) -> some View {
+        content
+            .foregroundColor(onImage ? .white : Color.pillAccent)
+            .padding(.horizontal, 10)
+            .frame(height: 24)
+            .background(onImage ? Color.black.opacity(0.45) : appearanceManager.tintColor.opacity(0.15))
+            .clipShape(Capsule())
+            .contentShape(Capsule())
+    }
+}
+
+extension View {
+    func detailHeroPill(onImage: Bool) -> some View {
+        modifier(DetailHeroPillModifier(onImage: onImage))
     }
 }
 
