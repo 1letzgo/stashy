@@ -162,7 +162,7 @@ object FeedsModel {
      */
     private fun picsCriteriaChanged() {
         if (!criteria.isEmpty) {
-            if (pics.presetRow.isNotEmpty() || pics.selectedFilter != null || !pics.criteria.isEmpty) { pics.reset(); return }
+            if (pics.isFilterActive) { pics.reset(); return }
         } else if (pics.selectedFilter == null && pics.presetRow.isEmpty()) {
             FeedsConfig.defaultFilterId(ReelsModeType.Pics)?.let { SavedFiltersStore.byId[it] }?.let {
                 pics.selectPresetRow(ListLivePresetTag.serverRow(it.id)); return
