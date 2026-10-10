@@ -26,9 +26,37 @@ private struct TagsViewContent: View {
     @State private var isSearchVisible = false
     var hideTitle: Bool = false
 
-    init(viewModel: StashDBViewModel, hideTitle: Bool = false) {
+    init(viewModel: StashDBViewModel, hideTitle: Bool = false, filterMemory: CatalogListFilterMemory<CatalogListFilterSnapshot<StashDBViewModel.TagSortOption>>? = nil) {
         self.viewModel = viewModel
         self.hideTitle = hideTitle
+        self.filterMemory = filterMemory
+        if let filterMemory {
+            _criteriaDocument = StateObject(wrappedValue: filterMemory.criteriaDocument)
+            // Remount (Home sub-tab switch): restore what the list was fetched with.
+            if let snap = filterMemory.snapshot {
+                _selectedSortOption = State(initialValue: snap.sortOption)
+                _selectedFilter = State(initialValue: snap.selectedFilter)
+                _catalogPresetRowSelection = State(initialValue: snap.presetSelection)
+                _searchText = State(initialValue: snap.searchText)
+                _isSearchVisible = State(initialValue: snap.isSearchVisible)
+                _didApplyDefaultFilter = State(initialValue: snap.didApplyDefaultFilter)
+            }
+        }
+    }
+
+    /// Host-owned filter state (Home sub-tab, see `CatalogRootFilterMemories`); `nil` = the
+    /// state lives and dies with this view.
+    private let filterMemory: CatalogListFilterMemory<CatalogListFilterSnapshot<StashDBViewModel.TagSortOption>>?
+
+    private var filterMemorySnapshot: CatalogListFilterSnapshot<StashDBViewModel.TagSortOption> {
+        CatalogListFilterSnapshot(
+            sortOption: selectedSortOption,
+            selectedFilter: selectedFilter,
+            presetSelection: catalogPresetRowSelection,
+            searchText: searchText,
+            isSearchVisible: isSearchVisible,
+            didApplyDefaultFilter: didApplyDefaultFilter
+        )
     }
 
     // Filter & sort sheet
@@ -391,10 +419,14 @@ private struct TagsViewContent: View {
                     changeTagSortOption(to: newSort)
                 }
             }
+            .onDisappear {
+                filterMemory?.snapshot = filterMemorySnapshot
+            }
             .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("ServerConfigChanged"))) { _ in
                 selectedFilter = nil
                 didApplyDefaultFilter = false
                 catalogPresetRowSelection = ""
+                criteriaDocument.clear()
                 refreshTagLocalPresets()
                 performSearch()
             }
@@ -630,14 +662,16 @@ struct TagsView: View {
     @StateObject private var ownedViewModel = StashDBViewModel()
     let catalogBrowserViewModel: StashDBViewModel?
     var hideTitle: Bool = false
+    let filterMemory: CatalogListFilterMemory<CatalogListFilterSnapshot<StashDBViewModel.TagSortOption>>?
 
-    init(hideTitle: Bool = false, catalogBrowserViewModel: StashDBViewModel? = nil) {
+    init(hideTitle: Bool = false, catalogBrowserViewModel: StashDBViewModel? = nil, filterMemory: CatalogListFilterMemory<CatalogListFilterSnapshot<StashDBViewModel.TagSortOption>>? = nil) {
         self.hideTitle = hideTitle
         self.catalogBrowserViewModel = catalogBrowserViewModel
+        self.filterMemory = filterMemory
     }
 
     var body: some View {
-        var content = TagsViewContent(viewModel: catalogBrowserViewModel ?? ownedViewModel, hideTitle: hideTitle)
+        var content = TagsViewContent(viewModel: catalogBrowserViewModel ?? ownedViewModel, hideTitle: hideTitle, filterMemory: filterMemory)
         content.hostsInSectionChrome = catalogBrowserViewModel != nil
         return content
     }

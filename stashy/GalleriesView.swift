@@ -365,11 +365,44 @@ private struct GalleriesViewContent: View {
         }
     }
     
-    init(viewModel: StashDBViewModel, initialSort: StashDBViewModel.GallerySortOption? = nil, hideTitle: Bool = false) {
+    init(
+        viewModel: StashDBViewModel,
+        initialSort: StashDBViewModel.GallerySortOption? = nil,
+        hideTitle: Bool = false,
+        filterMemory: CatalogListFilterMemory<CatalogListFilterSnapshot<StashDBViewModel.GallerySortOption>>? = nil
+    ) {
         self.viewModel = viewModel
         self.hideTitle = hideTitle
+        self.filterMemory = filterMemory
         let savedSort = StashDBViewModel.GallerySortOption(rawValue: TabManager.shared.getSortOption(for: .galleries) ?? "")
         _selectedSortOption = State(initialValue: initialSort ?? savedSort ?? .dateDesc)
+        if let filterMemory {
+            _criteriaDocument = StateObject(wrappedValue: filterMemory.criteriaDocument)
+            // Remount (Home sub-tab switch): restore what the list was fetched with.
+            if let snap = filterMemory.snapshot {
+                _selectedSortOption = State(initialValue: snap.sortOption)
+                _selectedFilter = State(initialValue: snap.selectedFilter)
+                _catalogPresetRowSelection = State(initialValue: snap.presetSelection)
+                _searchText = State(initialValue: snap.searchText)
+                _isSearchVisible = State(initialValue: snap.isSearchVisible)
+                _didApplyDefaultFilter = State(initialValue: snap.didApplyDefaultFilter)
+            }
+        }
+    }
+
+    /// Host-owned filter state (Home sub-tab, see `CatalogRootFilterMemories`); `nil` = the
+    /// state lives and dies with this view.
+    private let filterMemory: CatalogListFilterMemory<CatalogListFilterSnapshot<StashDBViewModel.GallerySortOption>>?
+
+    private var filterMemorySnapshot: CatalogListFilterSnapshot<StashDBViewModel.GallerySortOption> {
+        CatalogListFilterSnapshot(
+            sortOption: selectedSortOption,
+            selectedFilter: selectedFilter,
+            presetSelection: catalogPresetRowSelection,
+            searchText: searchText,
+            isSearchVisible: isSearchVisible,
+            didApplyDefaultFilter: didApplyDefaultFilter
+        )
     }
     
     @ObservedObject private var tabManager = TabManager.shared
@@ -545,10 +578,14 @@ private struct GalleriesViewContent: View {
             .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("DefaultSortChanged"))) { notification in
                 handleGalleriesDefaultSortChanged(notification)
             }
+            .onDisappear {
+                filterMemory?.snapshot = filterMemorySnapshot
+            }
             .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("ServerConfigChanged"))) { _ in
                 selectedFilter = nil
                 didApplyDefaultFilter = false
                 catalogPresetRowSelection = ""
+                criteriaDocument.clear()
                 clearGalleryLiveChipsOnly()
                 refreshGalleryLocalPresets()
                 performSearch()
@@ -720,18 +757,26 @@ struct GalleriesView: View {
     let catalogBrowserViewModel: StashDBViewModel?
     let initialSort: StashDBViewModel.GallerySortOption?
     var hideTitle: Bool = false
+    let filterMemory: CatalogListFilterMemory<CatalogListFilterSnapshot<StashDBViewModel.GallerySortOption>>?
 
-    init(initialSort: StashDBViewModel.GallerySortOption? = nil, hideTitle: Bool = false, catalogBrowserViewModel: StashDBViewModel? = nil) {
+    init(
+        initialSort: StashDBViewModel.GallerySortOption? = nil,
+        hideTitle: Bool = false,
+        catalogBrowserViewModel: StashDBViewModel? = nil,
+        filterMemory: CatalogListFilterMemory<CatalogListFilterSnapshot<StashDBViewModel.GallerySortOption>>? = nil
+    ) {
         self.catalogBrowserViewModel = catalogBrowserViewModel
         self.initialSort = initialSort
         self.hideTitle = hideTitle
+        self.filterMemory = filterMemory
     }
 
     var body: some View {
         var content = GalleriesViewContent(
                 viewModel: catalogBrowserViewModel ?? ownedViewModel,
                 initialSort: initialSort,
-                hideTitle: hideTitle
+                hideTitle: hideTitle,
+                filterMemory: filterMemory
             )
         content.hostsInSectionChrome = catalogBrowserViewModel != nil
         return content

@@ -307,9 +307,10 @@ extension ScenesListScope {
     }
 }
 
-/// Filter / sort state of a scoped `ScenesView`, owned by the hosting detail screen so it
-/// survives the list being remounted (detail tab switches). The scene list itself already
-/// lives in the shared view model; without this the sheet reopened blank over a filtered list.
+/// Filter / sort state of a `ScenesView`, owned by the hosting screen (detail screen, or
+/// `CatalogsView` for the Home sub-tab) so it survives the list being remounted (tab switches).
+/// The scene list itself already lives in the shared view model; without this the sheet
+/// reopened blank over a filtered list.
 @MainActor
 final class ScenesListFilterMemory: ObservableObject {
     struct Snapshot {
@@ -322,10 +323,16 @@ final class ScenesListFilterMemory: ObservableObject {
         var minRating: Int
         var searchText: String
         var isSearchVisible: Bool
+        var didApplyDefaultFilter: Bool
     }
 
     let criteriaDocument = FilterCriteriaDocument(mode: .scenes, pinsDefaults: true)
     var snapshot: Snapshot?
+
+    func reset() {
+        snapshot = nil
+        criteriaDocument.clear()
+    }
 }
 
 private struct ScenesViewContent: View {
@@ -499,7 +506,8 @@ private struct ScenesViewContent: View {
             groupIds: liveFilterGroupIds,
             minRating: liveFilterMinRating,
             searchText: searchText,
-            isSearchVisible: isSearchVisible
+            isSearchVisible: isSearchVisible,
+            didApplyDefaultFilter: didApplyDefaultFilter
         )
     }
 
@@ -911,6 +919,7 @@ private struct ScenesViewContent: View {
                 _liveFilterMinRating = State(initialValue: snap.minRating)
                 _searchText = State(initialValue: snap.searchText)
                 _isSearchVisible = State(initialValue: snap.isSearchVisible)
+                _didApplyDefaultFilter = State(initialValue: snap.didApplyDefaultFilter)
             }
         }
     }
@@ -1291,6 +1300,7 @@ private struct ScenesViewContent: View {
             selectedFilter = nil
             didApplyDefaultFilter = false
             liveSheetPresetSelection = ""
+            criteriaDocument.clear()
             refreshLivePresets()
             performSearch()
         }
@@ -1535,7 +1545,7 @@ struct ScenesView: View {
     }
 
     /// Katalog-Tab unter ``CatalogsView``: ein über Tab-Wechsel hinweg bleibendes ViewModel.
-    static func catalogTab(viewModel: StashDBViewModel) -> some View {
+    static func catalogTab(viewModel: StashDBViewModel, filterMemory: ScenesListFilterMemory? = nil) -> some View {
         var content = ScenesViewContent(
             viewModel: viewModel,
             sort: nil,
@@ -1543,7 +1553,8 @@ struct ScenesView: View {
             hideTitle: false,
             scope: .catalog,
             externalLiveFilterSheetBinding: nil,
-            showsFloatingFilterButton: true
+            showsFloatingFilterButton: true,
+            filterMemory: filterMemory
         )
         content.hostsInSectionChrome = true
         return content

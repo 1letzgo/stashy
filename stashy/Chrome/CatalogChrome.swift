@@ -112,17 +112,20 @@ extension View {
 // MARK: - Section chrome actions (Home)
 
 /// The slots a Home sub-tab root hands up to the Home chrome. Equality only looks at what is
-/// drawn, so a re-render with fresh closures does not churn the preference.
+/// drawn plus which view instance sent it, so a re-render with fresh closures does not churn the
+/// preference, but a remounted list (sub-tab switch) never keeps the previous list's closures.
 struct SectionChromeActions: Equatable {
     var slots: CatalogSlotSet
     var selection: CatalogSelectionChrome?
+    /// Identity of the sending view instance: equal drawings from different lists still differ.
+    var owner = UUID()
 
     private var signature: String {
         let drawn = [slots.contextual, slots.secondaryContextual, slots.filterSort].map { slot in
             slot.map { "\($0.systemImage)|\($0.isActive)|\($0.accessibilityLabel)" } ?? "-"
         }
         let sel = selection.map { "\($0.isActive)|\($0.count)" } ?? "-"
-        return drawn.joined(separator: ";") + ";" + sel
+        return owner.uuidString + ";" + drawn.joined(separator: ";") + ";" + sel
     }
 
     static func == (lhs: SectionChromeActions, rhs: SectionChromeActions) -> Bool {
@@ -342,6 +345,8 @@ struct CatalogSlotBar: View {
 /// action bar with the slots in fixed order.
 struct CatalogChromeModifier: ViewModifier {
     let config: CatalogChromeConfig
+    /// Stable for this view's lifetime, new on remount (see `SectionChromeActions.owner`).
+    @State private var sectionActionsOwner = UUID()
 
     func body(content: Content) -> some View {
         // Same structure either way (see `floatingActionBar`): only the flags differ.
@@ -358,7 +363,7 @@ struct CatalogChromeModifier: ViewModifier {
     private var sectionActions: SectionChromeActions? {
         guard config.hostsInSectionChrome,
               config.visibility.floatingBarVisible(isPresented: config.isPresented) else { return nil }
-        return SectionChromeActions(slots: config.slotSet, selection: config.selection)
+        return SectionChromeActions(slots: config.slotSet, selection: config.selection, owner: sectionActionsOwner)
     }
 
     @ViewBuilder

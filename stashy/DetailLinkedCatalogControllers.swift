@@ -1492,6 +1492,18 @@ final class DetailLinkedImagesFilterModel: ObservableObject {
         }
     }
 
+    /// Catalog root: the model outlives ImagesView, so a server switch while the list is not on
+    /// screen must clear the previous server's filter / preset / criteria here.
+    func resetForServerChange() {
+        selectedFilter = nil
+        catalogPresetRowSelection = ""
+        clearLiveChipsOnly()
+        criteriaDocument.clear()
+        refreshLocalPresets()
+        hasCompletedInitialBootstrap = false
+        sessionLastOpenedImageId = nil
+    }
+
     /// After an ImagesView remount, restore chip/filter UI from the shared catalog VM session.
     func rehydrateFromViewModelSessionIfNeeded(_ viewModel: StashDBViewModel) {
         guard case .catalogRoot = scope else { return }

@@ -35,9 +35,40 @@ private struct MarkersViewContent: View {
     @State private var groupPickerLoading = false
     var hideTitle: Bool = false
 
-    init(viewModel: StashDBViewModel, hideTitle: Bool = false) {
+    init(viewModel: StashDBViewModel, hideTitle: Bool = false, filterMemory: CatalogListFilterMemory<MarkersListFilterSnapshot>? = nil) {
         self.viewModel = viewModel
         self.hideTitle = hideTitle
+        self.filterMemory = filterMemory
+        if let filterMemory {
+            _criteriaDocument = StateObject(wrappedValue: filterMemory.criteriaDocument)
+            // Remount (Home sub-tab switch): restore what the list was fetched with.
+            if let snap = filterMemory.snapshot {
+                _selectedSortOption = State(initialValue: snap.base.sortOption)
+                _selectedFilter = State(initialValue: snap.base.selectedFilter)
+                _liveSheetPresetSelection = State(initialValue: snap.base.presetSelection)
+                _searchText = State(initialValue: snap.base.searchText)
+                _isSearchVisible = State(initialValue: snap.base.isSearchVisible)
+                _markerLiveChips = State(initialValue: snap.chips)
+            }
+        }
+    }
+
+    /// Host-owned filter state (Home sub-tab, see `CatalogRootFilterMemories`); `nil` = the
+    /// state lives and dies with this view.
+    private let filterMemory: CatalogListFilterMemory<MarkersListFilterSnapshot>?
+
+    private var filterMemorySnapshot: MarkersListFilterSnapshot {
+        MarkersListFilterSnapshot(
+            base: CatalogListFilterSnapshot(
+                sortOption: selectedSortOption,
+                selectedFilter: selectedFilter,
+                presetSelection: liveSheetPresetSelection,
+                searchText: searchText,
+                isSearchVisible: isSearchVisible,
+                didApplyDefaultFilter: false
+            ),
+            chips: markerLiveChips
+        )
     }
     
     @Environment(\.verticalSizeClass) var verticalSizeClass
@@ -602,9 +633,13 @@ private struct MarkersViewContent: View {
                 changeSortOption(to: newSort)
             }
         }
+        .onDisappear {
+            filterMemory?.snapshot = filterMemorySnapshot
+        }
         .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("ServerConfigChanged"))) { _ in
             selectedFilter = nil
             liveSheetPresetSelection = ""
+            criteriaDocument.clear()
             clearMarkerLiveChipsOnly()
             refreshMarkerLocalPresets()
             performSearch()
@@ -684,14 +719,16 @@ struct MarkersView: View {
     @StateObject private var ownedViewModel = StashDBViewModel()
     let catalogBrowserViewModel: StashDBViewModel?
     var hideTitle: Bool = false
+    let filterMemory: CatalogListFilterMemory<MarkersListFilterSnapshot>?
 
-    init(hideTitle: Bool = false, catalogBrowserViewModel: StashDBViewModel? = nil) {
+    init(hideTitle: Bool = false, catalogBrowserViewModel: StashDBViewModel? = nil, filterMemory: CatalogListFilterMemory<MarkersListFilterSnapshot>? = nil) {
         self.hideTitle = hideTitle
         self.catalogBrowserViewModel = catalogBrowserViewModel
+        self.filterMemory = filterMemory
     }
 
     var body: some View {
-        var content = MarkersViewContent(viewModel: catalogBrowserViewModel ?? ownedViewModel, hideTitle: hideTitle)
+        var content = MarkersViewContent(viewModel: catalogBrowserViewModel ?? ownedViewModel, hideTitle: hideTitle, filterMemory: filterMemory)
         content.hostsInSectionChrome = catalogBrowserViewModel != nil
         return content
     }
