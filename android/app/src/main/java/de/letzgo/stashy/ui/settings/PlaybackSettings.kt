@@ -2,6 +2,7 @@ package de.letzgo.stashy.ui.settings
 
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Headphones
 import androidx.compose.material.icons.outlined.History
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
@@ -46,6 +47,12 @@ fun LazyListScope.playbackSections() {
         SettingsToggleRow("Skip buttons", TabManager.showsPlayerSkipButtons, SFS.goforward10) { TabManager.showsPlayerSkipButtons = it }
         SettingsDivider()
         SettingsToggleRow("Autozoom", TabManager.playerAutoZoom, SFS.arrowUpLeftDownRight) { TabManager.playerAutoZoom = it }
+        SettingsDivider()
+        // Scene player, Feeds and image-viewer videos (card previews stay muted regardless).
+        SettingsToggleRow(
+            "Start muted without headphones", TabManager.playbackMuteWithoutHeadphones, Icons.Outlined.Headphones,
+            subtitle = "When off, videos start with sound even through the speaker.",
+        ) { TabManager.playbackMuteWithoutHeadphones = it }
         SettingsDivider()
         SettingsPickerRow("Hold to speed up", TabManager.holdSpeedOptions, TabManager.holdSpeedPlayer, TabConfigLogic::holdSpeedLabel, SFS.forwardFill) { TabManager.holdSpeedPlayer = it }
         SettingsDivider()

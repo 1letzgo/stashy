@@ -19,12 +19,13 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.platform.LocalContext
 import androidx.core.content.ContextCompat
 import de.letzgo.stashy.data.Prefs
+import de.letzgo.stashy.ui.player.PlayerMute
 
 /**
  * iOS: `ScenePlayerMute` + `HardwareVolumeMonitor` / `UnmuteOnHardwareVolume`.
  *
- * Without headphones playback always starts muted; with headphones the stored choice
- * (`stashy_scene_player_muted`, default unmuted) applies. Unplugging mutes at once, plugging in
+ * Without headphones playback starts muted (unless "Start muted without headphones" is off);
+ * otherwise the stored choice (`stashy_scene_player_muted`, default unmuted) applies. Unplugging mutes at once, plugging in
  * restores the stored choice, and a hardware volume press while muted unmutes (and persists).
  */
 object FeedAudio {
@@ -42,10 +43,8 @@ object FeedAudio {
     }
 
     /** iOS: `ScenePlayerMute.initialValue()`. */
-    fun initialMuted(context: Context): Boolean {
-        if (!isHeadphonesConnected(context)) return true
-        return if (Prefs.has(MUTE_KEY)) Prefs.bool(MUTE_KEY) else false
-    }
+    fun initialMuted(context: Context): Boolean =
+        PlayerMute.decide(isHeadphonesConnected(context), PlayerMute.muteWithoutHeadphones, PlayerMute.storedMuted)
 
     /** iOS: `ScenePlayerMute.persist(_:)` — only from explicit user actions. */
     fun persist(muted: Boolean) = Prefs.setBool(MUTE_KEY, muted)
@@ -70,7 +69,8 @@ fun HeadphoneMuteEffect(isMuted: Boolean, onMutedChange: (Boolean) -> Unit) {
             val now = FeedAudio.isHeadphonesConnected(context)
             if (now == connected) return
             connected = now
-            setMuted(if (now) FeedAudio.initialMuted(context) else true)
+            // Unplugged: muted, unless "Start muted without headphones" is off (then the stored choice).
+            setMuted(FeedAudio.initialMuted(context))
         }
 
         val deviceCallback = object : AudioDeviceCallback() {

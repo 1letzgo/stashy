@@ -733,7 +733,7 @@ class ImageViewerScreen(
     }
 
     private companion object {
-        /** iOS `ScenePlayerMute.initialValue` — always muted without headphones. */
+        /** iOS `ScenePlayerMute.initialValue` — muted without headphones (unless the setting is off). */
         fun initialMute(context: Context): Boolean {
             val am = context.getSystemService(Context.AUDIO_SERVICE) as AudioManager
             val headphones = am.getDevices(AudioManager.GET_DEVICES_OUTPUTS).any {
@@ -742,8 +742,8 @@ class ImageViewerScreen(
                     AudioDeviceInfo.TYPE_BLUETOOTH_A2DP, AudioDeviceInfo.TYPE_USB_HEADSET, 26 /* TYPE_BLE_HEADSET */,
                 )
             }
-            if (!headphones) return true
-            return if (Prefs.has("stashy_scene_player_muted")) Prefs.bool("stashy_scene_player_muted") else false
+            val mute = de.letzgo.stashy.ui.player.PlayerMute
+            return mute.decide(headphones, mute.muteWithoutHeadphones, mute.storedMuted)
         }
     }
 }
