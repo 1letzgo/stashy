@@ -6,6 +6,7 @@
 //
 
 #if !os(tvOS)
+import Combine
 import SwiftUI
 
 struct CatalogsView: View {
@@ -13,9 +14,9 @@ struct CatalogsView: View {
     @EnvironmentObject var coordinator: NavigationCoordinator
     /// Ein ViewModel für alle Katalog-Listen-Tabs (Scenes, Images, …): Daten bleiben beim Unter-Tab-Wechsel warm, ein Verbindungstest.
     @StateObject private var catalogBrowserViewModel = StashDBViewModel()
-    /// Images filter/sort session — lives on CatalogsView so it survives ImagesView remounts
-    /// when pushing FullScreenImageView (especially 1/row video).
-    @StateObject private var catalogImagesFilters = DetailLinkedImagesFilterModel(scope: .catalogRoot)
+    /// Filter / sort state of every catalog sub-tab list — lives here so it survives the sub-tab
+    /// switch remounting the list (and, for Images, pushing FullScreenImageView).
+    @StateObject private var rootFilters = CatalogRootFilterMemories()
     /// Settings / select actions of the active sub-tab, shown pinned right in the Home chrome.
     @State private var sectionActions: SectionChromeActions?
     
@@ -114,25 +115,28 @@ struct CatalogsView: View {
         case .dashboard:
             HomeView(catalogBrowserViewModel: catalogBrowserViewModel)
         case .scenes:
-            ScenesView.catalogTab(viewModel: catalogBrowserViewModel)
+            ScenesView.catalogTab(viewModel: catalogBrowserViewModel, filterMemory: rootFilters.scenes)
         case .images:
             ImagesView(
                 catalogBrowserViewModel: catalogBrowserViewModel,
-                sharedImageListFilters: catalogImagesFilters,
-                initialSearch: coordinator.activeSearchText
+                sharedImageListFilters: rootFilters.images,
+                // A remount keeps the list's search: the shared view model still fetches with it.
+                initialSearch: coordinator.activeSearchText.isEmpty
+                    ? catalogBrowserViewModel.currentImageSearchQuery
+                    : coordinator.activeSearchText
             )
         case .galleries:
-            GalleriesView(catalogBrowserViewModel: catalogBrowserViewModel)
+            GalleriesView(catalogBrowserViewModel: catalogBrowserViewModel, filterMemory: rootFilters.galleries)
         case .performers:
-            PerformersView(catalogBrowserViewModel: catalogBrowserViewModel)
+            PerformersView(catalogBrowserViewModel: catalogBrowserViewModel, filterMemory: rootFilters.performers)
         case .studios:
-            StudiosView(hideTitle: false, catalogBrowserViewModel: catalogBrowserViewModel)
+            StudiosView(hideTitle: false, catalogBrowserViewModel: catalogBrowserViewModel, filterMemory: rootFilters.studios)
         case .tags:
-            TagsView(hideTitle: false, catalogBrowserViewModel: catalogBrowserViewModel)
+            TagsView(hideTitle: false, catalogBrowserViewModel: catalogBrowserViewModel, filterMemory: rootFilters.tags)
         case .groups:
-            GroupsView(hideTitle: false, catalogBrowserViewModel: catalogBrowserViewModel)
+            GroupsView(hideTitle: false, catalogBrowserViewModel: catalogBrowserViewModel, filterMemory: rootFilters.groups)
         case .markers:
-            MarkersView(hideTitle: false, catalogBrowserViewModel: catalogBrowserViewModel)
+            MarkersView(hideTitle: false, catalogBrowserViewModel: catalogBrowserViewModel, filterMemory: rootFilters.markers)
         }
     }
     
@@ -166,6 +170,79 @@ struct CatalogsView: View {
         }
     }
 }
+
+// MARK: - Catalog root filter memory
+
+/// Sheet / chrome state of a catalog list that is not kept in the shared view model.
+struct CatalogListFilterSnapshot<Sort> {
+    var sortOption: Sort
+    var selectedFilter: StashDBViewModel.SavedFilter?
+    var presetSelection: String
+    var searchText: String
+    var isSearchVisible: Bool
+    var didApplyDefaultFilter: Bool
+}
+
+/// Filter / sort state of one catalog list, owned above the view so a remount (Home sub-tab
+/// switch) restores what the list was fetched with. The criteria document is shared live; the
+/// remaining `@State` is captured on disappear and restored in the list's `init`.
+@MainActor
+final class CatalogListFilterMemory<Snapshot> {
+    let criteriaDocument: FilterCriteriaDocument
+    var snapshot: Snapshot?
+
+    init(mode: StashDBViewModel.FilterMode) {
+        criteriaDocument = FilterCriteriaDocument(mode: mode, pinsDefaults: true)
+    }
+
+    func reset() {
+        snapshot = nil
+        criteriaDocument.clear()
+    }
+}
+
+/// Markers also keep live scene chips (they feed the fetch).
+struct MarkersListFilterSnapshot {
+    var base: CatalogListFilterSnapshot<StashDBViewModel.SceneMarkerSortOption>
+    var chips: SceneLiveChipRowState
+}
+
+/// One filter memory per `CatalogsView` sub-tab list. Cleared on `"ServerConfigChanged"`: saved
+/// filters, presets and criteria ids belong to the previous server.
+@MainActor
+final class CatalogRootFilterMemories: ObservableObject {
+    let scenes = ScenesListFilterMemory()
+    let performers = CatalogListFilterMemory<CatalogListFilterSnapshot<StashDBViewModel.PerformerSortOption>>(mode: .performers)
+    let studios = CatalogListFilterMemory<CatalogListFilterSnapshot<StashDBViewModel.StudioSortOption>>(mode: .studios)
+    let tags = CatalogListFilterMemory<CatalogListFilterSnapshot<StashDBViewModel.TagSortOption>>(mode: .tags)
+    let galleries = CatalogListFilterMemory<CatalogListFilterSnapshot<StashDBViewModel.GallerySortOption>>(mode: .galleries)
+    let groups = CatalogListFilterMemory<CatalogListFilterSnapshot<StashDBViewModel.GroupSortOption>>(mode: .groups)
+    let markers = CatalogListFilterMemory<MarkersListFilterSnapshot>(mode: .sceneMarkers)
+    /// Images keep their whole session in the filter model (also survives FullScreenImageView).
+    let images = DetailLinkedImagesFilterModel(scope: .catalogRoot)
+
+    private var serverChangeObserver: AnyCancellable?
+
+    init() {
+        serverChangeObserver = NotificationCenter.default
+            .publisher(for: NSNotification.Name("ServerConfigChanged"))
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] _ in
+                MainActor.assumeIsolated { self?.resetAll() }
+            }
+    }
+
+    private func resetAll() {
+        scenes.reset()
+        performers.reset()
+        studios.reset()
+        tags.reset()
+        galleries.reset()
+        groups.reset()
+        markers.reset()
+        images.resetForServerChange()
+    }
+}
 #endif
 
 // MARK: - Groups Support Views
@@ -175,14 +252,16 @@ struct GroupsView: View {
     @StateObject private var ownedViewModel = StashDBViewModel()
     let catalogBrowserViewModel: StashDBViewModel?
     var hideTitle: Bool = false
+    let filterMemory: CatalogListFilterMemory<CatalogListFilterSnapshot<StashDBViewModel.GroupSortOption>>?
 
-    init(hideTitle: Bool = false, catalogBrowserViewModel: StashDBViewModel? = nil) {
+    init(hideTitle: Bool = false, catalogBrowserViewModel: StashDBViewModel? = nil, filterMemory: CatalogListFilterMemory<CatalogListFilterSnapshot<StashDBViewModel.GroupSortOption>>? = nil) {
         self.hideTitle = hideTitle
         self.catalogBrowserViewModel = catalogBrowserViewModel
+        self.filterMemory = filterMemory
     }
 
     var body: some View {
-        var content = GroupsViewContent(viewModel: catalogBrowserViewModel ?? ownedViewModel, hideTitle: hideTitle)
+        var content = GroupsViewContent(viewModel: catalogBrowserViewModel ?? ownedViewModel, hideTitle: hideTitle, filterMemory: filterMemory)
         content.hostsInSectionChrome = catalogBrowserViewModel != nil
         return content
     }
@@ -209,11 +288,38 @@ private struct GroupsViewContent: View {
     @State private var lastOpenedGroupId: String?
     @Environment(\.horizontalSizeClass) var horizontalSizeClass
     var hideTitle: Bool = false
+    /// Host-owned filter state (Home sub-tab, see `CatalogRootFilterMemories`); `nil` = the
+    /// state lives and dies with this view.
+    private let filterMemory: CatalogListFilterMemory<CatalogListFilterSnapshot<StashDBViewModel.GroupSortOption>>?
 
-    init(viewModel: StashDBViewModel, hideTitle: Bool = false) {
+    init(viewModel: StashDBViewModel, hideTitle: Bool = false, filterMemory: CatalogListFilterMemory<CatalogListFilterSnapshot<StashDBViewModel.GroupSortOption>>? = nil) {
         self.viewModel = viewModel
         self.hideTitle = hideTitle
+        self.filterMemory = filterMemory
+        if let filterMemory {
+            _groupsCriteriaDocument = StateObject(wrappedValue: filterMemory.criteriaDocument)
+            // Remount (Home sub-tab switch): restore what the list was fetched with.
+            if let snap = filterMemory.snapshot {
+                _selectedSortOption = State(initialValue: snap.sortOption)
+                _selectedFilter = State(initialValue: snap.selectedFilter)
+                _groupsPresetRowSelection = State(initialValue: snap.presetSelection)
+                _searchText = State(initialValue: snap.searchText)
+                _isSearchVisible = State(initialValue: snap.isSearchVisible)
+            }
+        }
     }
+
+    private var filterMemorySnapshot: CatalogListFilterSnapshot<StashDBViewModel.GroupSortOption> {
+        CatalogListFilterSnapshot(
+            sortOption: selectedSortOption,
+            selectedFilter: selectedFilter,
+            presetSelection: groupsPresetRowSelection,
+            searchText: searchText,
+            isSearchVisible: isSearchVisible,
+            didApplyDefaultFilter: false
+        )
+    }
+
     
 
     /// Advanced criteria are sent as `liveFilter`, so edits apply without saving to the server first.
@@ -451,6 +557,16 @@ private struct GroupsViewContent: View {
                     performSearch()
                 }
             }
+        }
+        .onDisappear {
+            filterMemory?.snapshot = filterMemorySnapshot
+        }
+        .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("ServerConfigChanged"))) { _ in
+            // Saved filter / criteria ids belong to the previous server.
+            selectedFilter = nil
+            groupsPresetRowSelection = ""
+            groupsCriteriaDocument.clear()
+            performSearch()
         }
         .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("DefaultSortChanged"))) { notification in
             if let tabId = notification.userInfo?["tab"] as? String, tabId == AppTab.groups.rawValue {

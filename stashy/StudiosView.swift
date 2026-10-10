@@ -341,11 +341,44 @@ private struct StudiosViewContent: View {
         showDeleteCatalogPresetAlert = false
     }
 
-    init(viewModel: StashDBViewModel, initialSort: StashDBViewModel.StudioSortOption? = nil, hideTitle: Bool = false) {
+    init(
+        viewModel: StashDBViewModel,
+        initialSort: StashDBViewModel.StudioSortOption? = nil,
+        hideTitle: Bool = false,
+        filterMemory: CatalogListFilterMemory<CatalogListFilterSnapshot<StashDBViewModel.StudioSortOption>>? = nil
+    ) {
         self.viewModel = viewModel
+        self.filterMemory = filterMemory
         let savedSort = StashDBViewModel.StudioSortOption(rawValue: TabManager.shared.getSortOption(for: .studios) ?? "")
         _selectedSortOption = State(initialValue: initialSort ?? savedSort ?? .nameAsc)
         self.hideTitle = hideTitle
+        if let filterMemory {
+            _criteriaDocument = StateObject(wrappedValue: filterMemory.criteriaDocument)
+            // Remount (Home sub-tab switch): restore what the list was fetched with.
+            if let snap = filterMemory.snapshot {
+                _selectedSortOption = State(initialValue: snap.sortOption)
+                _selectedFilter = State(initialValue: snap.selectedFilter)
+                _catalogPresetRowSelection = State(initialValue: snap.presetSelection)
+                _searchText = State(initialValue: snap.searchText)
+                _isSearchVisible = State(initialValue: snap.isSearchVisible)
+                _didApplyDefaultFilter = State(initialValue: snap.didApplyDefaultFilter)
+            }
+        }
+    }
+
+    /// Host-owned filter state (Home sub-tab, see `CatalogRootFilterMemories`); `nil` = the
+    /// state lives and dies with this view.
+    private let filterMemory: CatalogListFilterMemory<CatalogListFilterSnapshot<StashDBViewModel.StudioSortOption>>?
+
+    private var filterMemorySnapshot: CatalogListFilterSnapshot<StashDBViewModel.StudioSortOption> {
+        CatalogListFilterSnapshot(
+            sortOption: selectedSortOption,
+            selectedFilter: selectedFilter,
+            presetSelection: catalogPresetRowSelection,
+            searchText: searchText,
+            isSearchVisible: isSearchVisible,
+            didApplyDefaultFilter: didApplyDefaultFilter
+        )
     }
 
     // Safe sort change function
@@ -430,10 +463,14 @@ private struct StudiosViewContent: View {
                     changeSortOption(to: newSort)
                 }
             }
+            .onDisappear {
+                filterMemory?.snapshot = filterMemorySnapshot
+            }
             .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("ServerConfigChanged"))) { _ in
                 selectedFilter = nil
                 didApplyDefaultFilter = false
                 catalogPresetRowSelection = ""
+                criteriaDocument.clear()
                 refreshStudioLocalPresets()
                 performSearch()
             }
@@ -883,18 +920,26 @@ struct StudiosView: View {
     let catalogBrowserViewModel: StashDBViewModel?
     let initialSort: StashDBViewModel.StudioSortOption?
     var hideTitle: Bool = false
+    let filterMemory: CatalogListFilterMemory<CatalogListFilterSnapshot<StashDBViewModel.StudioSortOption>>?
 
-    init(initialSort: StashDBViewModel.StudioSortOption? = nil, hideTitle: Bool = false, catalogBrowserViewModel: StashDBViewModel? = nil) {
+    init(
+        initialSort: StashDBViewModel.StudioSortOption? = nil,
+        hideTitle: Bool = false,
+        catalogBrowserViewModel: StashDBViewModel? = nil,
+        filterMemory: CatalogListFilterMemory<CatalogListFilterSnapshot<StashDBViewModel.StudioSortOption>>? = nil
+    ) {
         self.catalogBrowserViewModel = catalogBrowserViewModel
         self.initialSort = initialSort
         self.hideTitle = hideTitle
+        self.filterMemory = filterMemory
     }
 
     var body: some View {
         var content = StudiosViewContent(
                 viewModel: catalogBrowserViewModel ?? ownedViewModel,
                 initialSort: initialSort,
-                hideTitle: hideTitle
+                hideTitle: hideTitle,
+                filterMemory: filterMemory
             )
         content.hostsInSectionChrome = catalogBrowserViewModel != nil
         return content

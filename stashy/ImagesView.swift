@@ -114,6 +114,8 @@ private struct ImagesViewBody: View {
         self.imageListFilters = imageListFilters
         let seeded = initialSearch.trimmingCharacters(in: .whitespacesAndNewlines)
         _searchText = State(initialValue: seeded)
+        // A seeded search (deep link, or the catalog list's search kept across a remount) shows its field.
+        _isSearchVisible = State(initialValue: !seeded.isEmpty)
         if !seeded.isEmpty {
             viewModel.currentImageSearchQuery = seeded
         }
@@ -529,6 +531,7 @@ private struct ImagesViewBody: View {
             imageListFilters.catalogPresetRowSelection = ""
             imageListFilters.selectedFilter = nil
             imageListFilters.clearLiveChipsOnly()
+            imageListFilters.criteriaDocument.clear()
             imageListFilters.refreshLocalPresets()
             imageListFilters.hasCompletedInitialBootstrap = false
             imageListFilters.sessionLastOpenedImageId = nil
