@@ -741,6 +741,8 @@ private struct PerformersViewContent: View {
 struct PerformerCardView: View {
     let performer: Performer
     var badgeType: PerformerBadgeType = .sceneCount
+    /// "Appears with": replaces the count badge with the number of scenes shared with the host performer.
+    var sharedSceneCount: Int? = nil
     @ObservedObject var appearanceManager = AppearanceManager.shared
 
     private var ageText: String? {
@@ -756,6 +758,7 @@ struct PerformerCardView: View {
     }
 
     private var countBadgeIcon: String {
+        if sharedSceneCount != nil { return "person.2" }
         switch badgeType {
         case .sceneCount: return "film"
         case .imageCount: return "photo"
@@ -766,6 +769,7 @@ struct PerformerCardView: View {
     }
 
     private var countBadgeText: String {
+        if let sharedSceneCount { return "\(sharedSceneCount)" }
         switch badgeType {
         case .sceneCount: return "\(performer.sceneCount)"
         case .imageCount: return "\(performer.imageCount ?? 0)"

@@ -41,10 +41,6 @@ struct PerformerDetailView: View {
     @State private var coPerformers: [CoPerformer]?
     @State private var isLoadingCoPerformers = false
     @State private var coPerformersError: String?
-    /// Co-performer whose shared scenes are listed under the "Appears with" card; `nil` → first (most shared).
-    @State private var selectedCoPerformerId: String?
-    @State private var sharedScenesFilterSheetPresented = false
-    @State private var sharedScenesFilterActive = false
 
     private var showsFeedsNavButton: Bool {
         tabManager.tabs.first(where: { $0.id == .reels })?.isVisible ?? true
@@ -491,8 +487,6 @@ struct PerformerDetailView: View {
         Group {
             if showsPerformerScenesStack {
                 performerScenesStack
-            } else if selectedDetailTab == .appearsWith, let selectedCoPerformer {
-                sharedScenesStack(with: selectedCoPerformer)
             } else {
                 nonScenesScrollContent
             }
@@ -627,20 +621,8 @@ struct PerformerDetailView: View {
         case .groups:
             break
         case .appearsWith:
-            if selectedCoPerformer != nil {
-                // Filter / sort for the shared-scenes list below the card.
-                slots.filterSort = CatalogChromeSlot(
-                    systemImage: "slider.horizontal.3",
-                    isActive: sharedScenesFilterActive,
-                    accessibilityLabel: "Filter and sort"
-                ) {
-                    HapticManager.light()
-                    sharedScenesFilterSheetPresented = true
-                }
-            } else {
-                // Nothing to filter yet — don't show an empty floating bar.
-                slots.isPresented = false
-            }
+            // Plain co-performer grid without filter / sort — no floating bar.
+            slots.isPresented = false
         }
         return slots
     }
@@ -934,45 +916,10 @@ struct PerformerDetailView: View {
         return { await loadCoPerformers(force: true) }
     }
 
-    private var selectedCoPerformer: Performer? {
-        guard let coPerformers, let first = coPerformers.first else { return nil }
-        if let selectedCoPerformerId,
-           let match = coPerformers.first(where: { $0.performer.id == selectedCoPerformerId }) {
-            return match.performer
-        }
-        return first.performer
-    }
-
-    /// "Appears with" with a selection: performer header + card as the scroll header, shared
-    /// scenes (both performers, `INCLUDES_ALL`) as a normal scene list below.
-    /// `.id` remounts the list per co-performer so it starts on a fresh view model.
-    private func sharedScenesStack(with coPerformer: Performer) -> some View {
-        ScenesView(
-            filter: .scenesShared(by: displayPerformer, and: coPerformer),
-            hideTitle: true,
-            scope: .catalog,
-            externalLiveFilterSheetBinding: $sharedScenesFilterSheetPresented,
-            externalLiveFilterActiveBinding: $sharedScenesFilterActive,
-            showsFloatingFilterButton: false,
-            scrollHeader: AnyView(
-                VStack(spacing: 12) {
-                    headerView(displayPerformer: displayPerformer, battleLine: hotOrNotBattleLine)
-                    if let coPerformers {
-                        appearsWithCard(coPerformers, selectedId: coPerformer.id)
-                    }
-                }
-                .padding(.horizontal, 16)
-            )
-        )
-        .id("shared_\(coPerformer.id)")
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-    }
-
     @ViewBuilder
     private var appearsWithContent: some View {
         if let coPerformers, !coPerformers.isEmpty {
-            // Normally replaced by `sharedScenesStack`; kept as a fallback.
-            appearsWithCard(coPerformers, selectedId: selectedCoPerformer?.id)
+            appearsWithGrid(coPerformers)
         } else if isLoadingCoPerformers || coPerformers == nil && coPerformersError == nil {
             VStack {
                 InlineSpinner()
@@ -985,62 +932,27 @@ struct PerformerDetailView: View {
         }
     }
 
-    /// Card styled like the scene detail's "Performers & Studio" card: one horizontal row of
-    /// circle tiles. Tapping a tile selects it (shared scenes list below); long press opens the performer.
-    private func appearsWithCard(_ coPerformers: [CoPerformer], selectedId: String?) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text("Appears with")
-                .font(.title3)
-                .fontWeight(.semibold)
-                .padding(.horizontal, 12)
-                .padding(.top, 8)
-
-            ScrollViewReader { proxy in
-                ScrollView(.horizontal, showsIndicators: false) {
-                    LazyHStack(alignment: .top, spacing: 16) {
-                        ForEach(coPerformers) { co in
-                            let isSelected = co.performer.id == selectedId
-                            Button {
-                                guard !isSelected else { return }
-                                HapticManager.light()
-                                selectedCoPerformerId = co.performer.id
-                            } label: {
-                                CircleNameTile(
-                                    name: co.performer.name,
-                                    badge: "\(co.sharedSceneCount)",
-                                    isSelected: isSelected
-                                ) {
-                                    PerformerCirclePortrait(url: co.performer.thumbnailURL)
-                                }
-                            }
-                            .buttonStyle(.plain)
-                            .contextMenu {
-                                NavigationLink(destination: LazyView { PerformerDetailView(performer: co.performer) }) {
-                                    Label("Open Performer", systemImage: "person.crop.circle")
-                                }
-                            }
-                            .id(co.performer.id)
-                            .accessibilityLabel(co.performer.name)
-                            .accessibilityValue("\(co.sharedSceneCount) shared \(co.sharedSceneCount == 1 ? "scene" : "scenes")")
-                            .accessibilityAddTraits(isSelected ? .isSelected : [])
-                        }
-                    }
-                    .padding(.horizontal, 12)
-                    .padding(.top, 8) // room for the selected tile's outer ring
-                    .padding(.bottom, 12)
+    /// Same cards / columns as the Performers catalog; the badge shows the shared-scene count.
+    /// Tap → scenes with both performers; context menu → the co-performer's detail.
+    private func appearsWithGrid(_ coPerformers: [CoPerformer]) -> some View {
+        LazyVGrid(columns: galleryColumns, spacing: 12) {
+            ForEach(coPerformers) { co in
+                NavigationLink(destination: LazyView {
+                    SharedScenesView(first: displayPerformer, second: co.performer)
+                }) {
+                    PerformerCardView(performer: co.performer, sharedSceneCount: co.sharedSceneCount)
                 }
-                .onAppear {
-                    // The list remounts per selection; keep the selected tile in view.
-                    if let selectedId, selectedId != coPerformers.first?.performer.id {
-                        proxy.scrollTo(selectedId, anchor: .center)
+                .buttonStyle(.plain)
+                .contextMenu {
+                    NavigationLink(destination: LazyView { PerformerDetailView(performer: co.performer) }) {
+                        Label("Open Performer", systemImage: "person.crop.circle")
                     }
                 }
+                .accessibilityLabel(co.performer.name)
+                .accessibilityValue("\(co.sharedSceneCount) shared \(co.sharedSceneCount == 1 ? "scene" : "scenes")")
             }
         }
-        .frame(maxWidth: .infinity, alignment: .topLeading)
-        .background(Color.secondaryAppBackground)
-        .clipShape(RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.card))
-        .cardShadow()
+        .measuresGridWidth($galleryGridWidth)
     }
 
     /// Loads "Appears with" once per performer per session; `force` (pull-to-refresh) bypasses the cache.
@@ -1460,10 +1372,99 @@ struct EditPerformerSheet: View {
     }
 }
 
-// MARK: - Shared scenes ("Appears with" → tile)
+// MARK: - Shared scenes ("Appears with" → card)
+
+/// Scenes with both performers, pushed from an "Appears with" card. Fixed scope like
+/// `DirectorDetailView`: the filter is injected, so sort changes stay local to this list.
+struct SharedScenesView: View {
+    let first: Performer
+    let second: Performer
+
+    @Environment(\.dismiss) private var dismiss
+    @ObservedObject private var appearanceManager = AppearanceManager.shared
+    @StateObject private var viewModel = StashDBViewModel()
+
+    var body: some View {
+        ScenesView(
+            filter: .scenesShared(by: first, and: second),
+            hideTitle: true,
+            scope: .catalog,
+            sharedViewModel: viewModel,
+            showsFloatingFilterButton: true,
+            scrollHeader: AnyView(
+                heroHeader
+                    .padding(.horizontal, 16)
+            )
+        )
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+        .stashyDetailChrome(StashyDetailChromeConfig(insetSpacing: 0)) { navBar }
+    }
+
+    // Hero modeled after DirectorDetailView.heroHeader.
+    private var heroHeader: some View {
+        let collapsedHeight: CGFloat = 115
+        let iconWidth: CGFloat = 96
+
+        return HStack(alignment: .top, spacing: 0) {
+            ZStack {
+                appearanceManager.tintColor.opacity(0.12)
+                HStack(spacing: -14) {
+                    PerformerCirclePortrait(url: first.thumbnailURL, size: 44)
+                        .overlay(Circle().stroke(Color.secondaryAppBackground, lineWidth: 2))
+                    PerformerCirclePortrait(url: second.thumbnailURL, size: 44)
+                        .overlay(Circle().stroke(Color.secondaryAppBackground, lineWidth: 2))
+                }
+            }
+            .frame(width: iconWidth, alignment: .center)
+            .frame(minHeight: collapsedHeight)
+
+            VStack(alignment: .leading, spacing: 4) {
+                Text("\(first.name) & \(second.name)")
+                    .font(.title2)
+                    .fontWeight(.bold)
+                    .foregroundColor(.primary)
+                    .lineLimit(2)
+
+                VStack(alignment: .leading, spacing: 0) {
+                    Text("Shared scenes")
+                        .font(.system(size: 8))
+                        .foregroundColor(.secondary)
+                        .textCase(.uppercase)
+                    Text("\(viewModel.totalScenes)")
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundColor(.primary)
+                        .lineLimit(1)
+                }
+            }
+            .padding(.vertical, 10)
+            .padding(.horizontal, 12)
+            .frame(maxWidth: .infinity, minHeight: collapsedHeight, alignment: .topLeading)
+        }
+        .background(Color.secondaryAppBackground)
+        .clipShape(RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.card))
+        .overlay(
+            RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.card)
+                .stroke(Color.primary.opacity(0.1), lineWidth: 0.5)
+        )
+        .cardShadow()
+        .fixedSize(horizontal: false, vertical: true)
+    }
+
+    @ViewBuilder
+    private var navBar: some View {
+        StashySectionChromeBar {
+            HStack(spacing: 8) {
+                StashyChromeBackButton { dismiss() }
+                Spacer(minLength: 8)
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 6)
+        }
+    }
+}
 
 extension StashDBViewModel.SavedFilter {
-    /// Scenes featuring both performers (`INCLUDES_ALL`), used by the "Appears with" tiles.
+    /// Scenes featuring both performers (`INCLUDES_ALL`), used by the "Appears with" cards.
     static func scenesShared(by first: Performer, and second: Performer) -> StashDBViewModel.SavedFilter {
         StashDBViewModel.SavedFilter(
             id: "stashy_shared_\(first.id)_\(second.id)",

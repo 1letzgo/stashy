@@ -172,15 +172,12 @@ struct ScenePerformersStudioCard: View {
 struct CircleNameTile<Content: View>: View {
     let name: String
     var badge: String? = nil
-    /// `nil` = not selectable (plain tile). `true` adds an outer accent ring, `false` dims the tile.
-    var isSelected: Bool? = nil
     let content: Content
     @ObservedObject private var appearanceManager = AppearanceManager.shared
 
-    init(name: String, badge: String? = nil, isSelected: Bool? = nil, @ViewBuilder content: () -> Content) {
+    init(name: String, badge: String? = nil, @ViewBuilder content: () -> Content) {
         self.name = name
         self.badge = badge
-        self.isSelected = isSelected
         self.content = content()
     }
 
@@ -191,13 +188,6 @@ struct CircleNameTile<Content: View>: View {
                 .background(appearanceManager.tintColor)
                 .clipShape(Circle())
                 .overlay(Circle().stroke(appearanceManager.tintColor.opacity(0.1), lineWidth: 0.2))
-                .overlay {
-                    if isSelected == true {
-                        Circle()
-                            .inset(by: -4)
-                            .stroke(appearanceManager.tintColor, lineWidth: 2.5)
-                    }
-                }
                 .overlay(alignment: .topTrailing) {
                     if let badge {
                         Text(badge)
@@ -228,8 +218,6 @@ struct CircleNameTile<Content: View>: View {
                 .offset(y: 8)
         }
         .padding(.bottom, 8)
-        .opacity(isSelected == false ? 0.55 : 1)
-        .animation(DesignTokens.Animation.quick, value: isSelected)
     }
 }
 

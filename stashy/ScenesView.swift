@@ -442,6 +442,9 @@ private struct ScenesViewContent: View {
     private func persistSceneSort(_ option: StashDBViewModel.SceneSortOption) {
         switch scope {
         case .catalog:
+            // An injected filter (Director, "Appears with" shared scenes) is its own fixed list:
+            // its sort stays local and must not overwrite the Scenes tab's saved sort.
+            guard !hasInjectedFilter else { return }
             TabManager.shared.setSortOption(for: .scenes, option: option.rawValue)
         case .group:
             TabManager.shared.setPersistentDetailSortOption(for: DetailViewContext.group.rawValue, option: option.rawValue)
