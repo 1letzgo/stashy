@@ -34,27 +34,13 @@ import androidx.compose.material3.pulltorefresh.pullToRefresh
 import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
 import androidx.compose.ui.Alignment
 import de.letzgo.stashy.data.CoPerformersRepository
-import de.letzgo.stashy.ui.scene.ScenePerformerTile
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.lazy.LazyRow
-import de.letzgo.stashy.data.CoPerformerLogic
-import de.letzgo.stashy.data.FilterMode
-import de.letzgo.stashy.data.Scene
-import de.letzgo.stashy.ui.catalog.CatalogController
-import de.letzgo.stashy.ui.catalog.filterSortSlot
-import de.letzgo.stashy.ui.components.SceneCard
-import de.letzgo.stashy.ui.filter.CatalogFilterSortSheet
-import de.letzgo.stashy.ui.scene.SceneDetailScreen
-import de.letzgo.stashy.ui.uniqueItems
+import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.runtime.remember
-import androidx.compose.ui.unit.dp
 import de.letzgo.stashy.data.CoPerformer
+import de.letzgo.stashy.ui.components.PerformerCard
+import de.letzgo.stashy.ui.components.onLongPress
 import de.letzgo.stashy.ui.OverflowItem
-import de.letzgo.stashy.ui.scene.SceneCardContainer
-import de.letzgo.stashy.ui.scene.SceneCardEmpty
-import de.letzgo.stashy.ui.scene.SceneCardHeader
 
 /**
  * iOS: `PerformerDetailView` — custom chrome bar (Back · sections · Favorite · Edit), header
@@ -138,68 +124,35 @@ class PerformerDetailScreen(val performerId: String, val preview: Performer? = n
     }
 
     /**
-     * Co-performer selected in the "Appears with" card (default: the first, i.e. most shared
-     * scenes) and the list of the scenes both share, shown below the card.
-     */
-    private var selectedCoId by mutableStateOf<String?>(null)
-    private var sharedScenes by mutableStateOf<CatalogController<Scene>?>(null)
-
-    private fun selectCoPerformer(otherId: String) {
-        if (otherId == selectedCoId && sharedScenes != null) return
-        val previousSort = sharedScenes?.sort ?: catalog.sceneController?.sort
-        selectedCoId = otherId
-        sharedScenes = CatalogController<Scene>(
-            FilterMode.Scenes, scope,
-            tabId = null,
-            scope = CoPerformerLogic.sharedScenesScope(performerId, otherId),
-            initialSort = previousSort,
-            persistSort = {},
-            perPage = 20,
-            fetch = { q, page, per -> DetailRepository.findScoped(q, page, per) },
-        ).also { it.onAppear() }
-    }
-
-    /**
-     * "Appears with" tab: one full-width card in the scene detail "Performers & Studio" style
-     * (title, every co-performer in one horizontal row with the shared-scene count as badge), then
-     * the scenes shared with the selected one. Tap selects; long-press → "Open performer".
+     * "Appears with" tab: the co-performers as the Performers catalog grid ([PerformerCard], shared
+     * scene count as badge), most shared scenes first. Tap → the scenes both share
+     * ([SharedScenesScreen]); long-press → "Open performer".
      */
     private fun LazyGridScope.appearsWithSection() {
         val list = coPerformers
-        item(key = "appears-with", span = { GridItemSpan(maxLineSpan) }) {
-            SceneCardContainer(Modifier.fillMaxWidth()) {
-                SceneCardHeader("Appears with", onEdit = null)
-                when {
-                    list == null && coFailed -> InlineEmptyState(SF.exclamationTriangle, "Couldn't load performers")
-                    list == null -> LoadingFooter("Loading performers...")
-                    list.isEmpty() -> Box(Modifier.padding(top = 8.dp)) { SceneCardEmpty("No shared scenes") }
-                    else -> LazyRow(
-                        Modifier.padding(top = 8.dp, bottom = 12.dp),
-                        contentPadding = PaddingValues(horizontal = 12.dp),
-                        horizontalArrangement = Arrangement.spacedBy(16.dp),
-                    ) {
-                        uniqueItems(list, { "co-${it.performer.id}" }) { co -> CoPerformerTile(co) }
-                    }
-                }
+        when {
+            list == null -> item(key = "appears-with-state", span = { GridItemSpan(maxLineSpan) }) {
+                if (coFailed) InlineEmptyState(SF.exclamationTriangle, "Couldn't load performers")
+                else LoadingFooter("Loading performers...")
             }
-        }
-        val shared = sharedScenes
-        if (!list.isNullOrEmpty() && shared != null) {
-            pagedSection(shared.list, { "shared-${it.id}" }, null, SF.film, "No shared scenes") { _, s ->
-                SceneCard(s, onClick = { Nav.push(SceneDetailScreen(s.id, s)) })
+            list.isEmpty() -> item(key = "appears-with-state", span = { GridItemSpan(maxLineSpan) }) {
+                InlineEmptyState(SF.person2, "No shared scenes")
             }
+            // Repository list is distinctBy id, so the keys are unique.
+            else -> items(list, key = { "co-${it.performer.id}" }) { co -> CoPerformerCard(co) }
         }
     }
 
     @Composable
-    private fun CoPerformerTile(co: CoPerformer) {
+    private fun CoPerformerCard(co: CoPerformer) {
         var menu by remember { mutableStateOf(false) }
         val other = co.performer
         Box {
-            ScenePerformerTile(
-                other, "${co.sharedScenes}", selected = other.id == selectedCoId,
-                onLongClick = { menu = true },
-            ) { selectCoPerformer(other.id) }
+            PerformerCard(
+                other, Modifier.onLongPress { menu = true },
+                badge = SF.person2 to "${co.sharedScenes}",
+                onClick = { Nav.push(SharedScenesScreen(performerId, performer?.name ?: "", other.id, other.name)) },
+            )
             DropdownMenu(menu, onDismissRequest = { menu = false }, containerColor = Theme.palette.secondaryBackground) {
                 OverflowItem("Open performer", SF.personFill, { menu = false }) { Nav.push(PerformerDetailScreen(other.id, other)) }
             }
@@ -228,13 +181,6 @@ class PerformerDetailScreen(val performerId: String, val preview: Performer? = n
         LaunchedEffect(performerId) { battleLine = MatchRepository.fetchRankSlashTotal(performerId) }
         if (initialTab == null) AutoSwitchTab(catalog, tab) { tab = it }
         LaunchedEffect(tab) { if (tab == DetailTab.AppearsWith) loadCoPerformers(force = false) }
-        // Preselect the co-performer with the most shared scenes; reselect when a refresh drops the current one.
-        LaunchedEffect(tab, coPerformers) {
-            val list = coPerformers
-            if (tab == DetailTab.AppearsWith && !list.isNullOrEmpty() && list.none { it.performer.id == selectedCoId }) {
-                selectCoPerformer(list.first().performer.id)
-            }
-        }
         val p = performer
         val hasTabs = catalog.available.size > 1
         // Pull-to-refresh only on "Appears with" (the catalog tabs keep their behavior).
@@ -243,10 +189,9 @@ class PerformerDetailScreen(val performerId: String, val preview: Performer? = n
 
         Box(
             Modifier.fillMaxSize().background(Theme.palette.background)
-                .pullToRefresh(coLoading && coPerformers != null, pullState, enabled = appearsWith) { loadCoPerformers(force = true); sharedScenes?.refresh() },
+                .pullToRefresh(coLoading && coPerformers != null, pullState, enabled = appearsWith) { loadCoPerformers(force = true) },
         ) {
-            // "Appears with" lays its shared scenes out like the Scenes tab.
-            DetailGrid(gridState, { w -> columnsFor(if (appearsWith) DetailTab.Scenes else tab, w, catalog.imageColumns) }, hasTabs = hasTabs, header = { Header(p) }) {
+            DetailGrid(gridState, { w -> columnsFor(tab, w, catalog.imageColumns) }, hasTabs = hasTabs, header = { Header(p) }) {
                 if (appearsWith) appearsWithSection() else linkedSection(catalog, tab, gridState)
             }
             if (appearsWith) {
@@ -262,14 +207,13 @@ class PerformerDetailScreen(val performerId: String, val preview: Performer? = n
             }
             DetailTopBar(
                 p?.name ?: "", catalog.available, tab, { tab = it }, extra,
-                settings = if (appearsWith) sharedScenes?.let { filterSortSlot(it) } else catalog.settingsSlot(tab),
+                settings = if (appearsWith) null else catalog.settingsSlot(tab),
                 isFavorite = isFavorite, favoriteBusy = favoriteBusy, onFavorite = ::toggleFavorite,
                 onEdit = { editing = true }, editLabel = "Edit performer",
             )
         }
 
         LinkedSettingsSheets(catalog)
-        sharedScenes?.let { CatalogFilterSortSheet(it) }
         if (editing && p != null) EditPerformerSheet(p, onDismiss = { editing = false }, onSaved = { performer = it })
         if (showSceneDownloadOptions) {
             SceneBulkDownloadDialog(Downloads.SceneDownloadScope.Performer(performerId), performer?.name ?: "", performer?.sceneCount) { showSceneDownloadOptions = false }

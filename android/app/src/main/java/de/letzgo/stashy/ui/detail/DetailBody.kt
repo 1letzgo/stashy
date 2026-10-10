@@ -276,8 +276,6 @@ internal fun columnsFor(tab: DetailTab, widthDp: Float, imageColumns: Int): Int 
     DetailTab.Scenes -> adaptiveColumnCount(widthDp, 560f, 1, 4)
     // 1/row is the grouped feed: one flexible column like iOS, whatever the width.
     DetailTab.Images -> if (imageColumns == 1) 1 else adaptiveColumnCount(widthDp, 220f, 2, 8)
-    // 88 dp round performer tiles (scene detail "Performers & Studio" look), as many as fit per row.
-    DetailTab.AppearsWith -> ((widthDp + 12f) / 108f).toInt().coerceIn(2, 12)
     else -> adaptiveColumnCount(widthDp, 220f, 2, 8)
 }
 
