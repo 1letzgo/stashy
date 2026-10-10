@@ -96,7 +96,6 @@ struct PlaybackSettingsSection: View {
             }
             .tint(appearanceManager.tintColor)
             .stashyGroupedBlockRow(index: 8, count: 9)
-            stashyScrollingSectionFooter("When off, videos start with sound even through the speaker.")
         }
     }
 

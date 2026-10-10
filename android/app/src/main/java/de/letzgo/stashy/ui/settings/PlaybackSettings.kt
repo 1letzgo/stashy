@@ -49,10 +49,9 @@ fun LazyListScope.playbackSections() {
         SettingsToggleRow("Autozoom", TabManager.playerAutoZoom, SFS.arrowUpLeftDownRight) { TabManager.playerAutoZoom = it }
         SettingsDivider()
         // Scene player, Feeds and image-viewer videos (card previews stay muted regardless).
-        SettingsToggleRow(
-            "Start muted without headphones", TabManager.playbackMuteWithoutHeadphones, Icons.Outlined.Headphones,
-            subtitle = "When off, videos start with sound even through the speaker.",
-        ) { TabManager.playbackMuteWithoutHeadphones = it }
+        SettingsToggleRow("Start muted without headphones", TabManager.playbackMuteWithoutHeadphones, Icons.Outlined.Headphones) {
+            TabManager.playbackMuteWithoutHeadphones = it
+        }
         SettingsDivider()
         SettingsPickerRow("Hold to speed up", TabManager.holdSpeedOptions, TabManager.holdSpeedPlayer, TabConfigLogic::holdSpeedLabel, SFS.forwardFill) { TabManager.holdSpeedPlayer = it }
         SettingsDivider()
