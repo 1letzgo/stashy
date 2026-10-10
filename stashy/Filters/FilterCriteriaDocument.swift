@@ -35,11 +35,58 @@ final class FilterCriteriaDocument: ObservableObject {
     }
 
     /// Root-level display order: pinned first (catalog order), then everything else as inserted.
+    /// The name/title regex owned by the sheet's search field is not listed here.
     func displayedCriterionKeys() -> [String] {
-        let present = criterionKeys(at: [])
+        let hidden = nameSearchPattern != nil ? nameSearchKey : nil
+        let present = criterionKeys(at: []).filter { $0 != hidden }
         var out = pinnedKeys
         out.append(contentsOf: present.filter { !pinnedKeys.contains($0) })
         return out
+    }
+
+    // MARK: - Name / title regex search
+
+    /// Stash runs Go RE2; this prefix makes the search field case-insensitive and marks a
+    /// `MATCHES_REGEX` criterion as owned by the field rather than the editor rows.
+    nonisolated static let nameSearchRegexPrefix = "(?i)"
+
+    /// Stash `*FilterType` name/title key per mode; `nil` = no such criterion (markers).
+    nonisolated static func nameSearchKey(for mode: StashDBViewModel.FilterMode) -> String? {
+        switch mode {
+        case .performers, .studios, .tags, .groups: return "name"
+        case .scenes, .galleries, .images: return "title"
+        case .sceneMarkers, .unknown: return nil
+        }
+    }
+
+    /// Only catalog sheets (they pin default rows) host the search field.
+    var nameSearchKey: String? {
+        pinnedKeys.isEmpty ? nil : Self.nameSearchKey(for: mode)
+    }
+
+    /// The search field's pattern (without the `(?i)` prefix) while the root holds one.
+    var nameSearchPattern: String? {
+        guard let key = nameSearchKey else { return nil }
+        let criterion = dictValue(forKey: key)
+        guard (criterion["modifier"] as? String) == StashCriterionModifier.matchesRegex.rawValue,
+              let value = criterion["value"] as? String,
+              value.hasPrefix(Self.nameSearchRegexPrefix) else { return nil }
+        return String(value.dropFirst(Self.nameSearchRegexPrefix.count))
+    }
+
+    /// Sets (non-empty pattern) or removes the search field's regex. A name/title criterion the
+    /// editor owns is replaced by a new pattern — the field wins for its key — but never removed.
+    func setNameSearchPattern(_ pattern: String) {
+        guard let key = nameSearchKey else { return }
+        if pattern.isEmpty {
+            guard nameSearchPattern != nil else { return }
+            removeCriterion(key: key)
+        } else {
+            setCriterion(key: key, value: [
+                "value": Self.nameSearchRegexPrefix + pattern,
+                "modifier": StashCriterionModifier.matchesRegex.rawValue
+            ])
+        }
     }
 
     /// Reconfigure for nested editors (AND/OR/NOT / `*_filter`) without allocating a new object.

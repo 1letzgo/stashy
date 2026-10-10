@@ -167,6 +167,111 @@ struct CatalogFilterRow<Chips: View>: View {
     }
 }
 
+// MARK: - Name / title regex search
+
+/// Compact "Name or regex" field at the top of every catalog Settings sheet.
+///
+/// Writes a `MATCHES_REGEX` `StringCriterionInput` (`(?i)<pattern>`) on the entity's name/title
+/// key straight into the sheet's `FilterCriteriaDocument` — the live filter state the host keeps
+/// (FAB dot, Reset, tab switches, Save / Save as all read it). The editor rows below hide that
+/// criterion, so a loaded preset's name regex shows up here instead. Commits on submit, focus
+/// loss, sheet dismissal and clear — never per keystroke. Hidden for markers (no title criterion).
+struct CatalogNameRegexSearchCard: View {
+    @ObservedObject var document: FilterCriteriaDocument
+    var onApply: () -> Void
+
+    @State private var text = ""
+    @State private var showsInvalidHint = false
+    @FocusState private var isFocused: Bool
+
+    /// NSRegularExpression (ICU) as the gate, minus the ICU-only constructs RE2 rejects.
+    static func isValidPattern(_ pattern: String) -> Bool {
+        guard (try? NSRegularExpression(pattern: pattern)) != nil else { return false }
+        let re2Unsupported = ["(?=", "(?!", "(?<=", "(?<!", "(?>"]
+        if re2Unsupported.contains(where: { pattern.contains($0) }) { return false }
+        // Backreferences (\1 … \9) do not exist in RE2.
+        if pattern.range(of: #"\\[1-9]"#, options: .regularExpression) != nil { return false }
+        return true
+    }
+
+    private var committedPattern: String { document.nameSearchPattern ?? "" }
+
+    var body: some View {
+        if document.nameSearchKey != nil {
+            VStack(alignment: .leading, spacing: 4) {
+                HStack(spacing: 8) {
+                    Image(systemName: "magnifyingglass")
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundColor(.secondary)
+                    TextField("Name or regex", text: $text)
+                        .font(.subheadline)
+                        .textInputAutocapitalization(.never)
+                        .autocorrectionDisabled()
+                        .textContentType(.none)
+                        .submitLabel(.search)
+                        .focused($isFocused)
+                        .onSubmit { commit() }
+                    if !text.isEmpty {
+                        Button {
+                            clear()
+                        } label: {
+                            Image(systemName: "xmark.circle.fill")
+                                .foregroundColor(.secondary)
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel("Clear search")
+                    }
+                }
+                if showsInvalidHint {
+                    Text("Invalid regex")
+                        .font(.caption)
+                        .foregroundColor(.red)
+                }
+            }
+            .catalogFilterSortControlCardChrome()
+            .onAppear { text = committedPattern }
+            // Reset or a loaded preset / saved filter changed the criterion: mirror it.
+            .onChange(of: committedPattern) { _, newValue in
+                guard !isFocused else { return }
+                text = newValue
+                showsInvalidHint = false
+            }
+            .onChange(of: text) { _, _ in showsInvalidHint = false }
+            .onChange(of: isFocused) { _, focused in
+                if !focused { commit() }
+            }
+            .onDisappear { commit() }
+        }
+    }
+
+    private func commit() {
+        var pattern = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        let prefix = FilterCriteriaDocument.nameSearchRegexPrefix
+        if pattern.hasPrefix(prefix) {
+            pattern = String(pattern.dropFirst(prefix.count)).trimmingCharacters(in: .whitespacesAndNewlines)
+        }
+        guard pattern != committedPattern else { return }
+        if !pattern.isEmpty {
+            guard Self.isValidPattern(prefix + pattern) else {
+                showsInvalidHint = true
+                return
+            }
+        }
+        showsInvalidHint = false
+        let hadPattern = document.nameSearchPattern != nil
+        document.setNameSearchPattern(pattern)
+        if !pattern.isEmpty || hadPattern { onApply() }
+    }
+
+    private func clear() {
+        text = ""
+        showsInvalidHint = false
+        guard document.nameSearchPattern != nil else { return }
+        document.setNameSearchPattern("")
+        onApply()
+    }
+}
+
 /// Single-select studio for live filters (scenes / images / galleries); `nil` = any.
 struct CatalogStudioLiveFilterPickerRow: View {
     @Binding var selectedStudioId: String?
@@ -914,6 +1019,7 @@ struct PerformersCatalogFilterSortSheet: View {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: 16) {
+                    CatalogNameRegexSearchCard(document: criteriaDocument, onApply: onApply)
                     filterPickerCard
                     performerSortCard
                     FilterCriteriaEditorView(document: criteriaDocument, onChange: onApply)
@@ -1069,6 +1175,7 @@ struct TagsCatalogFilterSortSheet: View {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: 16) {
+                    CatalogNameRegexSearchCard(document: criteriaDocument, onApply: onApply)
                     filterPickerCard
                     tagSortCard
                     FilterCriteriaEditorView(document: criteriaDocument, onChange: onApply)
@@ -1209,6 +1316,7 @@ struct StudiosCatalogFilterSortSheet: View {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: 16) {
+                    CatalogNameRegexSearchCard(document: criteriaDocument, onApply: onApply)
                     filterPickerCard
                     studioSortCard
                     FilterCriteriaEditorView(document: criteriaDocument, onChange: onApply)
@@ -1418,6 +1526,7 @@ struct GalleriesCatalogFilterSortSheet: View {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: 16) {
+                    CatalogNameRegexSearchCard(document: criteriaDocument, onApply: onApply)
                     filterPickerCard
                     gallerySortCard
                     FilterCriteriaEditorView(document: criteriaDocument, onChange: onApply)
@@ -1656,6 +1765,7 @@ struct ImagesCatalogFilterSortSheet: View {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: 16) {
+                    CatalogNameRegexSearchCard(document: criteriaDocument, onApply: onApply)
                     filterPickerCard
                     imageSortCard
                     if showMediaTypeFilter {
@@ -2065,6 +2175,7 @@ struct GroupsCatalogFilterSortSheet: View {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: 16) {
+                    CatalogNameRegexSearchCard(document: criteriaDocument, onApply: onApply)
                     HStack(alignment: .center, spacing: 12) {
                         Text("Filter")
                             .font(.subheadline.weight(.semibold))

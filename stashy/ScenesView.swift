@@ -1699,6 +1699,7 @@ struct SceneLiveFilterSheet: View {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: 16) {
+                    CatalogNameRegexSearchCard(document: criteriaDocument, onApply: onApply)
                     HStack(alignment: .center, spacing: 12) {
                         Text("Filter")
                             .font(.subheadline.weight(.semibold))
