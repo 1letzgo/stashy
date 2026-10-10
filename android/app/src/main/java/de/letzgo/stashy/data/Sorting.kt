@@ -137,6 +137,23 @@ object SortCatalog {
         return null
     }
 
+    /**
+     * [fieldKinds] with list-specific [extra] sorts first (menu label = option label up to " (").
+     * [optionFor] / [optionAfterPickingField] take the same [extra] list.
+     */
+    fun fieldKinds(mode: FilterMode, extra: List<SortOption>): List<SortFieldKind> =
+        extra.distinctBy { it.field }.map { SortFieldKind(it.field, it.label.substringBefore(" (")) } + fieldKinds(mode)
+
+    fun optionFor(mode: FilterMode, field: String, ascending: Boolean, extra: List<SortOption>): SortOption? =
+        extra.firstOrNull { it.field == field && it.isAscending == ascending } ?: optionFor(mode, field, ascending)
+
+    fun optionAfterPickingField(mode: FilterMode, current: SortOption, field: String, extra: List<SortOption>): SortOption? = when {
+        extra.none { it.field == field } -> optionAfterPickingField(mode, current, field)
+        // Shared-style counts start with the most first, like a fresh numeric sort.
+        current.isRandom -> optionFor(mode, field, false, extra)
+        else -> optionFor(mode, field, current.isAscending, extra)
+    }
+
     /** Field kinds offered by each sheet's sort picker, in iOS order. */
     fun fieldKinds(mode: FilterMode): List<SortFieldKind> = when (mode) {
         FilterMode.Scenes -> listOf(

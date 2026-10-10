@@ -67,6 +67,8 @@ fun CatalogFilterSortSheet(
     controller: CatalogController<*>,
     /** Resets chip state the controller does not own (images "Type") before the criteria reset. */
     onReset: () -> Unit = {},
+    /** List-specific sorts offered first in the sort menu (performer "Appears with": Shared scenes). */
+    extraSorts: List<SortOption> = emptyList(),
     extraCards: @Composable () -> Unit = {},
 ) {
     if (!controller.isSheetPresented) return
@@ -96,7 +98,7 @@ fun CatalogFilterSortSheet(
                         FilterPickerCard(controller)
                         NativeDivider()
                         if (controller.mode == FilterMode.Groups) GroupSortCard(controller.sort) { controller.changeSort(it) }
-                        else SortCard(controller.mode, controller.sort) { controller.changeSort(it) }
+                        else SortCard(controller.mode, controller.sort, extraSorts) { controller.changeSort(it) }
                     }
                 }
                 extraCards()
@@ -168,18 +170,18 @@ fun FilterPickerCard(controller: CatalogController<*>) {
  * unmapped server sort) and the sort field menu ("Other (field)" for unknown fields).
  */
 @Composable
-fun SortCard(mode: FilterMode, sort: SortOption, onChange: (SortOption) -> Unit) {
-    val kinds = SortCatalog.fieldKinds(mode)
+fun SortCard(mode: FilterMode, sort: SortOption, extraSorts: List<SortOption> = emptyList(), onChange: (SortOption) -> Unit) {
+    val kinds = SortCatalog.fieldKinds(mode, extraSorts)
     val known = kinds.firstOrNull { it.field == sort.field }
     val orderDisabled = sort.isRandom || known == null
     ControlCard {
         ControlLabel("Sort")
         Row(Modifier.alpha(if (orderDisabled) 0.4f else 1f), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
             CatalogFilterChip("Asc", sort.isAscending && !orderDisabled) {
-                if (!orderDisabled) SortCatalog.optionFor(mode, sort.field, true)?.let(onChange)
+                if (!orderDisabled) SortCatalog.optionFor(mode, sort.field, true, extraSorts)?.let(onChange)
             }
             CatalogFilterChip("Desc", !sort.isAscending && !orderDisabled) {
-                if (!orderDisabled) SortCatalog.optionFor(mode, sort.field, false)?.let(onChange)
+                if (!orderDisabled) SortCatalog.optionFor(mode, sort.field, false, extraSorts)?.let(onChange)
             }
         }
         Spacer(Modifier.weight(1f))
@@ -188,7 +190,7 @@ fun SortCard(mode: FilterMode, sort: SortOption, onChange: (SortOption) -> Unit)
             kinds.forEach { add(MenuEntry(it.field, it.menuLabel)) }
         }
         MenuPicker(sort.field, entries) { field ->
-            if (kinds.any { it.field == field }) SortCatalog.optionAfterPickingField(mode, sort, field)?.let(onChange)
+            if (kinds.any { it.field == field }) SortCatalog.optionAfterPickingField(mode, sort, field, extraSorts)?.let(onChange)
         }
     }
 }
