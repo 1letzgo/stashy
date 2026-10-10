@@ -1687,6 +1687,9 @@ private struct SceneDetailLifecycleModifier: ViewModifier {
             // headphones in mid-playback must turn the sound on, unplugging must mute again.
             .onReceive(NotificationCenter.default.publisher(for: AVAudioSession.routeChangeNotification)
                 .receive(on: DispatchQueue.main)) { _ in
+                // "Start muted without headphones" off: the route never decides the mute state,
+                // so unplugging does not force-mute (playback pause on unplug is the system's).
+                guard TabManager.mutesWithoutHeadphones else { return }
                 let muted = ScenePlayerMute.initialValue()
                 if muted != isMuted { isMuted = muted }
             }

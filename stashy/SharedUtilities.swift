@@ -534,11 +534,13 @@ func isHeadphonesConnected() -> Bool {
 enum ScenePlayerMute {
     private static let key = "stashy_scene_player_muted"
 
-    /// Without headphones playback always starts muted — the stored choice only applies while
+    /// Without headphones playback starts muted — the stored choice only applies while
     /// headphones are connected. Gating before the lookup also neutralises a `false` that an
     /// earlier build persisted from a player's own mute reset.
+    /// Settings › Playback › Player › "Start muted without headphones" off drops the gate: the
+    /// speaker is then treated like headphones.
     static func initialValue() -> Bool {
-        guard isHeadphonesConnected() else { return true }
+        if TabManager.mutesWithoutHeadphones, !isHeadphonesConnected() { return true }
         if UserDefaults.standard.object(forKey: key) == nil {
             return false
         }
