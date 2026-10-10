@@ -349,8 +349,10 @@ class CatalogController<T>(
         val previousLive = existingId?.let { SavedFiltersStore.byId[it]?.stashyMetadata?.liveFragment } ?: JsonObject(emptyMap())
         val base = selectedFilter?.takeIf { it.id != existingId }
         val merged = mergedObjectFilterForSave(base, liveFragment, previousLive, isMarker = mode == FilterMode.SceneMarkers)
+        // A list-only sort (performer "Appears with": Shared scenes) means nothing to Stash.
+        val saveSort = SortCatalog.option(mode, sort.raw) ?: SortCatalog.option(mode, SortCatalog.defaultRaw(mode)) ?: sort
         val input = SavedFiltersRepository.saveInput(
-            mode, existingId, name, sort, merged, liveFragment, base?.id, FilterPickerOptionsStore.knownLabels(),
+            mode, existingId, name, saveSort, merged, liveFragment, base?.id, FilterPickerOptionsStore.knownLabels(),
         )
         coroutineScope.launch {
             try {

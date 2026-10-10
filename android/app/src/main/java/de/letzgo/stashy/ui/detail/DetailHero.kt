@@ -115,6 +115,11 @@ internal fun DetailHeroCard(
     subtitle: String? = null,
     /** Something beyond grid and description appears when expanded (performer / group links). */
     footerHasMore: Boolean = false,
+    /**
+     * A second circle overlapping [hero]'s to its right (shared scenes of two performers). Each
+     * circle runs its own [DetailHero.onClick]; the band is then not tappable.
+     */
+    secondHero: DetailHero? = null,
 ) {
     val p = Theme.palette
     val desc = description?.trim().orEmpty()
@@ -123,7 +128,7 @@ internal fun DetailHeroCard(
     val visible = if (expanded) items else items.take(collapsedItemCount)
     HeaderCardFrame {
         Column(Modifier.fillMaxWidth()) {
-            HeroHeaderLayout(hero, title, subtitle, expanded, titleAccessory, if (expandable) onToggle else null)
+            HeroHeaderLayout(hero, title, subtitle, expanded, titleAccessory, if (expandable) onToggle else null, secondHero)
             if (visible.isNotEmpty()) {
                 Box(
                     Modifier.fillMaxWidth().padding(
@@ -162,6 +167,8 @@ internal val HeroPortraitBias = BiasAlignment(0f, -0.6f)
 private val HeroAvatar = 76.dp
 private val HeroInset = 16.dp
 private val HeroTitleGap = 12.dp
+/** Offset of the second circle: overlaps the first by a quarter of its width. */
+private val HeroSecondAvatarShift = HeroAvatar * 0.75f
 /** Band = top padding + the circle's upper half (the circle straddles the band edge). */
 private val HeroBandHeight = 14.dp + HeroAvatar / 2
 
@@ -178,17 +185,20 @@ private fun HeroHeaderLayout(
     accessory: (@Composable (Color?) -> Unit)?,
     /** Non-null when something can expand: the chevron pill at the row end. */
     onToggle: (() -> Unit)?,
+    second: DetailHero? = null,
 ) {
     val p = Theme.palette
-    val textStart = HeroInset + HeroAvatar + HeroTitleGap
-    val tap = hero.onClick?.let { Modifier.clickable(onClickLabel = hero.clickLabel, onClick = it) } ?: Modifier
+    val secondShift = if (second != null) HeroSecondAvatarShift else 0.dp
+    val textStart = HeroInset + HeroAvatar + secondShift + HeroTitleGap
+    fun tapOf(h: DetailHero) = h.onClick?.let { Modifier.clickable(onClickLabel = h.clickLabel, onClick = it) } ?: Modifier
+    val tap = tapOf(hero)
     // iOS `ViewThatFits`: a one-line title (+ pills) is centred on the circle's lower half
     // (band edge → circle bottom); a longer one wraps to two lines, starting a little below the edge.
     var singleLine by remember(title) { mutableStateOf(true) }
     val oneLine = singleLine && subtitle.isNullOrEmpty()
     Layout(
         content = {
-            HeroBand(hero, tap)
+            HeroBand(hero, if (second == null) tap else Modifier)
             Row(
                 Modifier.fillMaxWidth()
                     .padding(start = textStart, end = HeroInset, top = if (oneLine) 0.dp else 6.dp, bottom = 10.dp)
@@ -218,18 +228,21 @@ private fun HeroHeaderLayout(
                 }
             }
             HeroAvatarCircle(hero, tap)
+            if (second != null) HeroAvatarCircle(second, tapOf(second))
         },
     ) { measurables, constraints ->
         val loose = constraints.copy(minHeight = 0, maxHeight = Constraints.Infinity)
         val band = measurables[0].measure(loose)
         val titleRow = measurables[1].measure(loose)
         val avatar = measurables[2].measure(Constraints())
+        val secondAvatar = measurables.getOrNull(3)?.measure(Constraints())
         val width = constraints.maxWidth
         val below = maxOf(titleRow.height, avatar.height / 2 + 10.dp.roundToPx())
         layout(width, band.height + below) {
             band.place(0, 0)
             titleRow.place(0, band.height)
             avatar.place(HeroInset.roundToPx(), band.height - avatar.height / 2)
+            secondAvatar?.place((HeroInset + secondShift).roundToPx(), band.height - secondAvatar.height / 2)
         }
     }
 }

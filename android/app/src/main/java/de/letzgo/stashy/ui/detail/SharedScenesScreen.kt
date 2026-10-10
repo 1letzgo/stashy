@@ -3,21 +3,23 @@ package de.letzgo.stashy.ui.detail
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.grid.LazyGridState
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.Icon
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.ui.Alignment
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.unit.dp
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
 import de.letzgo.stashy.data.CatalogPrefs
 import de.letzgo.stashy.data.CoPerformerLogic
+import de.letzgo.stashy.data.DetailRepository
 import de.letzgo.stashy.data.FilterMode
+import de.letzgo.stashy.data.Performer
 import de.letzgo.stashy.data.Scene
-import de.letzgo.stashy.ui.Appearance
 import de.letzgo.stashy.ui.Nav
 import de.letzgo.stashy.ui.SF
 import de.letzgo.stashy.ui.Screen
@@ -27,18 +29,26 @@ import de.letzgo.stashy.ui.catalog.filterSortSlot
 import de.letzgo.stashy.ui.components.SceneCard
 import de.letzgo.stashy.ui.filter.CatalogFilterSortSheet
 import de.letzgo.stashy.ui.scene.SceneDetailScreen
+import kotlinx.coroutines.launch
 
 /**
- * Scenes two performers share (performer detail "Appears with" → co-performer card), laid out
- * like [DirectorDetailScreen]: scenes catalog list under a small hero titled "A & B", filter &
- * sort sheet in the top bar (Scenes tab session sort). `performers INCLUDES_ALL [a, b]` is the
- * fixed scope ([CoPerformerLogic.sharedScenesScope]), so nothing in the sheet can widen the list.
+ * Scenes two performers share (performer detail "Appears with" → co-performer card): a
+ * [DetailHeroCard] like the other details — band blurred from the first performer's portrait,
+ * both portraits side by side on the band edge (each opens that performer), title "A & B" and
+ * the shared scene count — then the scenes catalog list with the filter & sort sheet in the top
+ * bar (Scenes tab session sort). `performers INCLUDES_ALL [a, b]` is the fixed scope
+ * ([CoPerformerLogic.sharedScenesScope]), so nothing in the sheet can widen the list.
+ * [performer] / [other] are list items shown until the full performers have loaded.
  */
 class SharedScenesScreen(
     val performerId: String,
     val performerName: String,
     val otherId: String,
     val otherName: String,
+    performer: Performer? = null,
+    other: Performer? = null,
+    /** Shared scene count known from "Appears with"; else the unfiltered list's total. */
+    private val sharedScenes: Int? = null,
 ) : Screen {
     override val key = "shared-scenes-$performerId-$otherId"
 
@@ -46,6 +56,8 @@ class SharedScenesScreen(
     private var started = false
     private val gridState = LazyGridState()
     private val title = "$performerName & $otherName"
+    private var first by mutableStateOf(performer)
+    private var second by mutableStateOf(other)
 
     private val scenes = CatalogController<Scene>(
         FilterMode.Scenes, scope,
@@ -55,10 +67,17 @@ class SharedScenesScreen(
         persistSort = { CatalogPrefs.setSortOption(CatalogPrefs.tabId(FilterMode.Scenes), it.raw) },
     )
 
+    private fun load() {
+        scenes.onAppear()
+        // Portraits (image paths) of both performers.
+        scope.launch { runCatching { DetailRepository.performer(performerId) }.getOrNull()?.let { first = it } }
+        scope.launch { runCatching { DetailRepository.performer(otherId) }.getOrNull()?.let { second = it } }
+    }
+
     @OptIn(ExperimentalMaterial3Api::class)
     @Composable
     override fun Content() {
-        LaunchedEffect(Unit) { if (!started) { started = true; scenes.onAppear() } }
+        LaunchedEffect(Unit) { if (!started) { started = true; load() } }
         Box(Modifier.fillMaxSize().background(Theme.palette.background)) {
             PullToRefreshBox(isRefreshing = false, onRefresh = { scenes.refresh() }, modifier = Modifier.fillMaxSize()) {
                 DetailGrid(gridState, { w -> columnsFor(DetailTab.Scenes, w, 1) }, header = { Header() }) {
@@ -72,17 +91,32 @@ class SharedScenesScreen(
         CatalogFilterSortSheet(scenes)
     }
 
+    /** Circle of one performer: the portrait (top-biased crop), tap → that performer's detail. */
+    private fun avatar(id: String, name: String, p: Performer?): DetailHero {
+        val url = performerThumbnailURL(id, p?.imagePath)
+        return DetailHero(
+            DetailHero.Style.Cover, url, Color.Black, "Open $name",
+            { Nav.push(PerformerDetailScreen(id, p)) },
+            backdropAlignment = HeroPortraitBias,
+        ) {
+            if (url != null) HeroPicture(url, name, ContentScale.Crop, SF.personFill, alignment = HeroPortraitBias)
+            else HeroPlaceholder(SF.personFill)
+        }
+    }
+
     @Composable
     private fun Header() {
-        DetailHeaderCard(
-            title = title, imageUrl = null, placeholderIcon = SF.person2,
-            items = listOf(DetailItem("Scenes", "${scenes.list.totalCount}")),
-            expandable = false, expanded = false, onToggle = {}, titleMaxLines = 2,
-            imageContent = {
-                Box(Modifier.fillMaxSize().background(Appearance.tint.copy(alpha = 0.12f)), Alignment.Center) {
-                    Icon(SF.person2, null, tint = Appearance.tint, modifier = Modifier.size(28.dp))
-                }
-            },
+        val list = scenes.list
+        // The sheet may narrow the list; the header keeps the real shared count.
+        val count = sharedScenes ?: list.totalCount.takeIf { list.loadedOnce && !scenes.isFilterActive }
+        DetailHeroCard(
+            title = title,
+            items = listOf(DetailItem("Shared scenes", count?.toString() ?: "—")),
+            description = null,
+            expanded = false,
+            onToggle = {},
+            hero = avatar(performerId, performerName, first),
+            secondHero = avatar(otherId, otherName, second),
         )
     }
 }
