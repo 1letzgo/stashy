@@ -15,7 +15,22 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardCapitalization
+import androidx.compose.ui.text.input.KeyboardType
+import de.letzgo.stashy.ui.NativeGroupShape
+import de.letzgo.stashy.ui.SF
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
@@ -92,6 +107,7 @@ fun CatalogFilterSortSheet(
             )
             Spacer(Modifier.height(8.dp))
             Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(20.dp)) {
+                if (controller.supportsNameRegex) NameRegexSearchField(controller.nameRegex) { controller.commitNameRegex(it) }
                 Column {
                     NativeSectionHeader("Filter & sort", Modifier.padding(horizontal = 16.dp))
                     ControlGroup {
@@ -137,6 +153,59 @@ fun CatalogFilterSortSheet(
 }
 
 private enum class NameDialog { SaveAs, Rename }
+
+/**
+ * Mini search field at the top of the catalog sheet: "Name or regex" → a live chip on the
+ * entity's name / title ([de.letzgo.stashy.data.NameRegexFilter]). Commits only on IME
+ * Search / Done and on clear — never per keystroke; [onCommit] returns false for an invalid
+ * pattern, which stays in the field with "Invalid regex" and is not applied.
+ */
+@Composable
+fun NameRegexSearchField(committed: String, onCommit: (String) -> Boolean) {
+    val p = Theme.palette
+    // Re-seeded whenever the committed value changes elsewhere (Reset, preset load).
+    var draft by remember(committed) { mutableStateOf(committed) }
+    var invalid by remember(committed) { mutableStateOf(false) }
+    val focusManager = LocalFocusManager.current
+    val commit = {
+        if (onCommit(draft)) { invalid = false; focusManager.clearFocus() } else invalid = true
+    }
+    Column(Modifier.padding(horizontal = 16.dp)) {
+        Row(
+            Modifier.fillMaxWidth().height(44.dp).clip(NativeGroupShape).background(p.secondaryBackground)
+                .padding(start = 12.dp, end = 4.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Icon(SF.magnifyingglass, null, Modifier.size(20.dp), tint = p.secondaryText)
+            Spacer(Modifier.width(8.dp))
+            Box(Modifier.weight(1f), contentAlignment = Alignment.CenterStart) {
+                if (draft.isEmpty()) Text("Name or regex", style = NativeType.bodyLarge, color = p.secondaryText, maxLines = 1)
+                BasicTextField(
+                    value = draft,
+                    onValueChange = { draft = it; invalid = false },
+                    singleLine = true,
+                    textStyle = NativeType.bodyLarge.copy(color = if (invalid) StashyColors.systemRed else p.text),
+                    cursorBrush = SolidColor(Appearance.tint),
+                    keyboardOptions = KeyboardOptions(
+                        capitalization = KeyboardCapitalization.None, autoCorrectEnabled = false,
+                        keyboardType = KeyboardType.Text, imeAction = ImeAction.Search,
+                    ),
+                    keyboardActions = KeyboardActions(onSearch = { commit() }, onDone = { commit() }),
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
+            if (draft.isNotEmpty() || committed.isNotEmpty()) {
+                IconButton({ draft = ""; invalid = false; onCommit(""); focusManager.clearFocus() }, Modifier.size(40.dp)) {
+                    Icon(SF.xmarkCircleFill, "Clear", Modifier.size(18.dp), tint = p.secondaryText)
+                }
+            }
+        }
+        if (invalid) Text(
+            "Invalid regex", Modifier.padding(start = 12.dp, top = 4.dp),
+            style = NativeType.bodySmall, color = StashyColors.systemRed,
+        )
+    }
+}
 
 /** iOS: `CatalogSettingsSheetChromeBar` (Reset · "Settings" · Save · Done) → Material sheet top bar. */
 @Composable

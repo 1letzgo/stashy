@@ -19,6 +19,7 @@ import de.letzgo.stashy.data.FilterMode
 import de.letzgo.stashy.data.ListLivePresetTag
 import de.letzgo.stashy.data.LocalFilterPreset
 import de.letzgo.stashy.data.LocalFilterPresetStore
+import de.letzgo.stashy.data.NameRegexFilter
 import de.letzgo.stashy.data.Page
 import de.letzgo.stashy.data.Prefs
 import de.letzgo.stashy.data.RandomSeeds
@@ -92,6 +93,40 @@ class CatalogController<T>(
     var isSheetPresented by mutableStateOf(false)
     private var didApplyDefaultFilter = false
 
+    /**
+     * Committed text of the sheet's "Name or regex" field — a live chip on `name` / `title`
+     * (see [NameRegexFilter]); always valid, `""` = off. Layered over the criteria like any chip.
+     */
+    var nameRegex by mutableStateOf("")
+        private set
+
+    val supportsNameRegex: Boolean get() = NameRegexFilter.isSupported(mode)
+
+    /** Applies the field (IME search / Done / clear). Invalid input is rejected and not applied. */
+    fun commitNameRegex(input: String): Boolean {
+        if (!supportsNameRegex || !NameRegexFilter.isValid(input)) return false
+        val text = NameRegexFilter.normalized(input)
+        if (text == nameRegex) return true
+        nameRegex = text
+        applyLive()
+        return true
+    }
+
+    /** Live chips (Images "Type", the name regex) layered on top of the criteria. */
+    private fun liveChips(): JsonObject = NameRegexFilter.layered(extraLive(), mode, nameRegex)
+
+    /** Loads preset / saved-filter criteria; a chip-shaped name regex goes back into the field. */
+    private fun loadCriteria(dict: JsonObject) {
+        val (text, rest) = NameRegexFilter.extract(mode, dict)
+        nameRegex = text
+        criteria.load(rest)
+    }
+
+    private fun clearCriteria() {
+        nameRegex = ""
+        criteria.clear()
+    }
+
     val list = PagedList<T>(coroutineScope, perPage) { page, per ->
         val q = query()
         fetch?.invoke(q, page, per) ?: CatalogRepository.find(q, page, per)
@@ -128,18 +163,17 @@ class CatalogController<T>(
     }
 
     /** Passed as `filter:` only while the editor holds no copy of it (iOS `fetchBaseFilter`). */
-    private val fetchBaseFilter: SavedFilter? get() = if (criteria.isEmpty) selectedFilter else null
+    private val fetchBaseFilter: SavedFilter? get() = if (criteria.isEmpty && nameRegex.isEmpty()) selectedFilter else null
 
     fun query(): CatalogQuery {
         lastQueriedSearch = search
-        val extra = extraLive()
-        return CatalogQuery(mode, sort, search, fetchBaseFilter, criteria.merged(extra), scope)
+        return CatalogQuery(mode, sort, search, fetchBaseFilter, criteria.merged(liveChips()), scope)
     }
 
     val serverFilters: List<SavedFilter> get() = SavedFiltersStore.forMode(mode)
 
     /** iOS: `catalogFilterSortFABActive`. */
-    val isFilterActive: Boolean get() = selectedFilter != null || !criteria.isEmpty || presetRow.isNotEmpty()
+    val isFilterActive: Boolean get() = selectedFilter != null || !criteria.isEmpty || nameRegex.isNotEmpty() || presetRow.isNotEmpty()
 
     val selectedPresetName: String? get() {
         ListLivePresetTag.parseServerId(presetRow)?.let { sid -> return SavedFiltersStore.byId[sid]?.name }
@@ -202,7 +236,7 @@ class CatalogController<T>(
             val filter = defId?.let { SavedFiltersStore.byId[it] }
             if (filter != null) {
                 didApplyDefaultFilter = true
-                criteria.clear()
+                clearCriteria()
                 applyServerFilter(filter)
                 presetRow = ListLivePresetTag.serverRow(filter.id)
             } else {
@@ -210,7 +244,7 @@ class CatalogController<T>(
                 didApplyDefaultFilter = false
                 selectedFilter = null
                 presetRow = ""
-                criteria.clear()
+                clearCriteria()
                 applyLive()
             }
         }
@@ -237,7 +271,7 @@ class CatalogController<T>(
             if (defId != null && selectedFilter?.id == defId) {
                 selectedFilter = null
                 presetRow = ""
-                criteria.clear()
+                clearCriteria()
                 changed = true
             }
         }
@@ -250,7 +284,7 @@ class CatalogController<T>(
     /** Sheet opened: re-apply the selected row so the editor shows its criteria (iOS sheet `onAppear`). */
     fun onSheetAppear() {
         localPresets = LocalFilterPresetStore.load(mode)
-        if (presetRow.isNotEmpty() && criteria.isEmpty) applyPresetRow(presetRow)
+        if (presetRow.isNotEmpty() && criteria.isEmpty && nameRegex.isEmpty()) applyPresetRow(presetRow)
     }
 
     /** iOS `handle…PresetSelectionChange`. */
@@ -285,7 +319,7 @@ class CatalogController<T>(
                 meta.liveFragment.isNotEmpty() -> FilterMapper.sanitize(meta.liveFragment, isMarker)
                 else -> f.criteriaObjectFilter()
             }
-            criteria.load(merged)
+            loadCriteria(merged)
             val parsed = SortCatalog.option(mode, meta.sortRaw)
             if (parsed != null && parsed != sort) {
                 if (parsed.isRandom && sort.isRandom) RandomSeeds.refresh(mode)
@@ -293,7 +327,7 @@ class CatalogController<T>(
                 persistSort(parsed)
             }
         } else {
-            criteria.load(f.criteriaObjectFilter())
+            loadCriteria(f.criteriaObjectFilter())
         }
         applyLive()
     }
@@ -305,7 +339,7 @@ class CatalogController<T>(
         selectedFilter = base
         val m = LinkedHashMap<String, JsonElement>(base?.criteriaObjectFilter() ?: JsonObject(emptyMap()))
         FilterMapper.sanitize(p.liveFragment, mode == FilterMode.SceneMarkers).forEach { (k, v) -> m[k] = v }
-        criteria.load(JsonObject(m))
+        loadCriteria(JsonObject(m))
         applyLive()
     }
 
@@ -319,11 +353,11 @@ class CatalogController<T>(
     fun reset() {
         presetRow = ""
         selectedFilter = null
-        criteria.clear()
+        clearCriteria()
         applyLive()
     }
 
-    private val liveFragment: JsonObject get() = criteria.merged(extraLive()) ?: JsonObject(emptyMap())
+    private val liveFragment: JsonObject get() = criteria.merged(liveChips()) ?: JsonObject(emptyMap())
 
     /** "Update <name>" — overwrites the selected server filter or local preset. */
     fun saveOverwrite() {
@@ -410,7 +444,7 @@ class CatalogController<T>(
                     SavedFiltersStore.byId.remove(sid)
                     if (selectedFilter?.id == sid) selectedFilter = null
                     presetRow = ""
-                    criteria.clear()
+                    clearCriteria()
                     refresh()
                 } catch (e: kotlinx.coroutines.CancellationException) {
                     throw e
