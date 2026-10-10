@@ -80,12 +80,19 @@ fun performerAge(birthdate: String?): Int? {
 
 /**
  * iOS: `PerformerCardView` — 9:12 portrait (top-anchored crop), age pill top-left, count pill
- * top-right (depends on the sort), bottom gradient with the name.
+ * top-right (depends on the sort), bottom gradient with the name. [badge] (icon + text) replaces
+ * the sort-driven count pill (performer detail "Appears with": shared scene count).
  */
 @Composable
-fun PerformerCard(performer: Performer, modifier: Modifier = Modifier, badgeType: PerformerBadgeType = PerformerBadgeType.SceneCount, onClick: (() -> Unit)? = null) {
+fun PerformerCard(
+    performer: Performer,
+    modifier: Modifier = Modifier,
+    badgeType: PerformerBadgeType = PerformerBadgeType.SceneCount,
+    badge: Pair<ImageVector, String>? = null,
+    onClick: (() -> Unit)? = null,
+) {
     val p = Theme.palette
-    val (icon, text) = when (badgeType) {
+    val (icon, text) = badge ?: when (badgeType) {
         PerformerBadgeType.SceneCount -> SF.film to "${performer.sceneCount ?: 0}"
         PerformerBadgeType.ImageCount -> SF.photo to "${performer.imageCount ?: 0}"
         PerformerBadgeType.GalleryCount -> SF.photoStack to "${performer.galleryCount ?: 0}"
