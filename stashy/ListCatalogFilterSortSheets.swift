@@ -689,6 +689,8 @@ private enum PerformerCatalogSortFieldKind: String, CaseIterable, Identifiable {
 private enum PerformerCatalogSortPickerValue: Hashable {
     case known(PerformerCatalogSortFieldKind)
     case unmapped(sortField: String)
+    /// Performer detail › "Appears with" only: shared-scene count (client-side, fixed order).
+    case sharedScenes
 
     static func from(_ option: StashDBViewModel.PerformerSortOption) -> PerformerCatalogSortPickerValue {
         if option.sortField == "random" { return .known(.random) }
@@ -703,6 +705,11 @@ private enum PerformerCatalogSortPickerValue: Hashable {
 
     var isUnmapped: Bool {
         if case .unmapped = self { return true }
+        return false
+    }
+
+    var isSharedScenes: Bool {
+        if case .sharedScenes = self { return true }
         return false
     }
 
@@ -879,6 +886,10 @@ struct PerformersCatalogFilterSortSheet: View {
     var onRequestSaveAs: () -> Void
     var onRequestRename: () -> Void
     var onRequestDelete: () -> Void
+    /// Performer detail › "Appears with": offers a leading "Shared scenes" sort. `nil` = not offered;
+    /// `true` = it is the active sort (`sortOption` is then ignored).
+    var sharedScenesSortSelected: Bool? = nil
+    var onSelectSharedScenesSort: (() -> Void)? = nil
 
     @ObservedObject private var appearance = AppearanceManager.shared
 
@@ -891,6 +902,10 @@ struct PerformersCatalogFilterSortSheet: View {
             return localPresets.first { $0.id == uuid }?.name
         }
         return nil
+    }
+
+    private var currentSortPickerValue: PerformerCatalogSortPickerValue {
+        sharedScenesSortSelected == true ? .sharedScenes : PerformerCatalogSortPickerValue.from(sortOption)
     }
     /// Chip value for "field is not set" — see `CatalogLiveChipFilterSupport.noneChipValue`.
     private let noneChip = CatalogLiveChipFilterSupport.noneChipValue
@@ -954,11 +969,11 @@ struct PerformersCatalogFilterSortSheet: View {
     }
 
     private var performerSortCard: some View {
-        let pickerValue = PerformerCatalogSortPickerValue.from(sortOption)
+        let pickerValue = currentSortPickerValue
         let ascending = sortOption.direction == "ASC"
         let randomMode = pickerValue.isRandom
         let unmappedMode = pickerValue.isUnmapped
-        let orderDisabled = randomMode || unmappedMode
+        let orderDisabled = randomMode || unmappedMode || pickerValue.isSharedScenes
 
         return HStack(alignment: .center, spacing: 12) {
             Text("Sort")
@@ -980,22 +995,30 @@ struct PerformersCatalogFilterSortSheet: View {
             .allowsHitTesting(!orderDisabled)
             Spacer(minLength: 8)
             Picker("Sort type", selection: Binding(
-                get: { PerformerCatalogSortPickerValue.from(sortOption) },
+                get: { currentSortPickerValue },
                 set: { newVal in
                     switch newVal {
                     case .known(let newKind):
                         if newKind == .random {
                             onSortChange(.random)
-                        } else if PerformerCatalogSortPickerValue.from(sortOption).isRandom {
+                        } else if currentSortPickerValue.isSharedScenes {
+                            // Leaving the fixed "Shared scenes" order: names read A–Z, counts high first.
+                            onSortChange(newKind.performerSortOption(ascending: newKind == .name))
+                        } else if currentSortPickerValue.isRandom {
                             onSortChange(newKind.performerSortOption(ascending: false))
                         } else {
                             onSortChange(newKind.performerSortOption(ascending: sortOption.direction == "ASC"))
                         }
+                    case .sharedScenes:
+                        onSelectSharedScenesSort?()
                     case .unmapped:
                         break
                     }
                 }
             )) {
+                if sharedScenesSortSelected != nil {
+                    Text("Shared scenes").tag(PerformerCatalogSortPickerValue.sharedScenes)
+                }
                 if case .unmapped(let f) = pickerValue {
                     Text("Other (\(f))").tag(PerformerCatalogSortPickerValue.unmapped(sortField: f))
                 }
@@ -1006,6 +1029,8 @@ struct PerformersCatalogFilterSortSheet: View {
             .pickerStyle(.menu)
             .labelsHidden()
             .tint(appearance.tintColor)
+            // "Shared scenes" must not wrap to two lines and stretch the card.
+            .fixedSize()
         }
         .catalogFilterSortControlCardChrome()
     }

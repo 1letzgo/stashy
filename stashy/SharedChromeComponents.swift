@@ -1106,6 +1106,9 @@ struct DetailHeroCard<Backdrop: View, Avatar: View, Accessory: View, Footer: Vie
     var collapsedItemLimit: Int = 4
     /// SF Symbol for the circle when there is no image.
     var placeholderSystemImage: String? = nil
+    /// Replaces the single avatar circle (and `onHeroTap` on it), e.g. two overlapping
+    /// `DetailHeroAvatarCircle`s. Laid out like the circle: centred on the band edge.
+    var leadingAvatars: AnyView? = nil
     @ViewBuilder var backdrop: () -> Backdrop
     @ViewBuilder var avatar: () -> Avatar
     @ViewBuilder var accessory: (_ onImage: Bool) -> Accessory
@@ -1113,7 +1116,7 @@ struct DetailHeroCard<Backdrop: View, Avatar: View, Accessory: View, Footer: Vie
 
     @ObservedObject private var appearanceManager = AppearanceManager.shared
 
-    private static var avatarSize: CGFloat { 76 }
+    private static var avatarSize: CGFloat { DetailHeroAvatarCircle<EmptyView>.size }
     /// Circle's upper half plus a little padding above it.
     private static var bandHeight: CGFloat { avatarSize / 2 + 14 }
     private static var contentPadding: CGFloat { 16 }
@@ -1208,8 +1211,14 @@ struct DetailHeroCard<Backdrop: View, Avatar: View, Accessory: View, Footer: Vie
     /// upper half onto the band, so its centre sits exactly on the edge.
     private var titleRow: some View {
         HStack(alignment: .top, spacing: 12) {
-            heroButton(avatarCircle)
-                .padding(.top, -Self.avatarSize / 2)
+            Group {
+                if let leadingAvatars {
+                    leadingAvatars
+                } else {
+                    heroButton(avatarCircle)
+                }
+            }
+            .padding(.top, -Self.avatarSize / 2)
             // One-line title: centred against the circle's lower half (band edge → circle
             // bottom). Longer titles fall back to the wrapping, top-aligned layout.
             ViewThatFits(in: .horizontal) {
@@ -1285,24 +1294,11 @@ struct DetailHeroCard<Backdrop: View, Avatar: View, Accessory: View, Footer: Vie
     /// Sharp copy of the image (or the type placeholder) in a circle with the Feeds
     /// overlay's tinted ring; opaque so the band never shows through.
     private var avatarCircle: some View {
-        ZStack {
-            Circle().fill(Color.secondaryAppBackground)
-            if showsHero {
-                Circle().fill(Color.black.opacity(0.3))
-                avatar()
-                    .frame(width: Self.avatarSize, height: Self.avatarSize)
-            } else {
-                Circle().fill(appearanceManager.tintColor.opacity(0.15))
-                Image(systemName: placeholderSystemImage ?? "photo")
-                    .font(.system(size: 28, weight: .semibold))
-                    .foregroundColor(Color.pillAccent)
-                    .accessibilityHidden(true)
-            }
-        }
-        .frame(width: Self.avatarSize, height: Self.avatarSize)
-        .clipShape(Circle())
-        .overlay(Circle().stroke(appearanceManager.tintColor, lineWidth: 2))
-        .shadow(color: .black.opacity(0.3), radius: 6, y: 2)
+        DetailHeroAvatarCircle(
+            showsImage: showsHero,
+            placeholderSystemImage: placeholderSystemImage,
+            content: avatar
+        )
     }
 
     // MARK: Info
@@ -1332,6 +1328,39 @@ struct DetailHeroCard<Backdrop: View, Avatar: View, Accessory: View, Footer: Vie
                 }
             }
         }
+    }
+}
+
+/// The `DetailHeroCard` avatar: a sharp image (or the type placeholder) in a circle with the
+/// Feeds overlay's tinted ring; opaque so the band never shows through.
+struct DetailHeroAvatarCircle<Content: View>: View {
+    static var size: CGFloat { 76 }
+
+    let showsImage: Bool
+    var placeholderSystemImage: String? = nil
+    @ViewBuilder var content: () -> Content
+
+    @ObservedObject private var appearanceManager = AppearanceManager.shared
+
+    var body: some View {
+        ZStack {
+            Circle().fill(Color.secondaryAppBackground)
+            if showsImage {
+                Circle().fill(Color.black.opacity(0.3))
+                content()
+                    .frame(width: Self.size, height: Self.size)
+            } else {
+                Circle().fill(appearanceManager.tintColor.opacity(0.15))
+                Image(systemName: placeholderSystemImage ?? "photo")
+                    .font(.system(size: 28, weight: .semibold))
+                    .foregroundColor(Color.pillAccent)
+                    .accessibilityHidden(true)
+            }
+        }
+        .frame(width: Self.size, height: Self.size)
+        .clipShape(Circle())
+        .overlay(Circle().stroke(appearanceManager.tintColor, lineWidth: 2))
+        .shadow(color: .black.opacity(0.3), radius: 6, y: 2)
     }
 }
 

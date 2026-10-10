@@ -307,6 +307,27 @@ extension ScenesListScope {
     }
 }
 
+/// Filter / sort state of a scoped `ScenesView`, owned by the hosting detail screen so it
+/// survives the list being remounted (detail tab switches). The scene list itself already
+/// lives in the shared view model; without this the sheet reopened blank over a filtered list.
+@MainActor
+final class ScenesListFilterMemory: ObservableObject {
+    struct Snapshot {
+        var sortOption: StashDBViewModel.SceneSortOption
+        var selectedFilter: StashDBViewModel.SavedFilter?
+        var presetSelection: String
+        var studioIds: [String]
+        var tagIds: [String]
+        var groupIds: [String]
+        var minRating: Int
+        var searchText: String
+        var isSearchVisible: Bool
+    }
+
+    let criteriaDocument = FilterCriteriaDocument(mode: .scenes, pinsDefaults: true)
+    var snapshot: Snapshot?
+}
+
 private struct ScenesViewContent: View {
     /// Home sub-tab root: actions go into the Home chrome instead of a floating bar.
     var hostsInSectionChrome = false
@@ -319,6 +340,8 @@ private struct ScenesViewContent: View {
     /// Mirrors `liveFilterFABHasSomethingSet` for a hosting detail screen that renders its own filter button.
     let externalLiveFilterActiveBinding: Binding<Bool>?
     let showsFloatingFilterButton: Bool
+    /// Host-owned filter state (detail scopes); `nil` = the state lives and dies with this view.
+    let filterMemory: ScenesListFilterMemory?
     @State private var selectedSortOption: StashDBViewModel.SceneSortOption = StashDBViewModel.SceneSortOption(rawValue: TabManager.shared.getSortOption(for: .scenes) ?? "") ?? .dateDesc
     @State private var isChangingSort = false
     @State private var searchText = ""
@@ -463,7 +486,21 @@ private struct ScenesViewContent: View {
 
     /// Chips, saved scene filter, or a preset row in the sheet — drives FAB tint/dot now that toolbar filter/sort are gone.
     private var liveFilterFABHasSomethingSet: Bool {
-        selectedFilter != nil || !liveSheetPresetSelection.isEmpty
+        selectedFilter != nil || !liveSheetPresetSelection.isEmpty || !criteriaDocument.isEmpty
+    }
+
+    private var filterMemorySnapshot: ScenesListFilterMemory.Snapshot {
+        ScenesListFilterMemory.Snapshot(
+            sortOption: selectedSortOption,
+            selectedFilter: selectedFilter,
+            presetSelection: liveSheetPresetSelection,
+            studioIds: liveFilterStudioIds,
+            tagIds: liveFilterTagIds,
+            groupIds: liveFilterGroupIds,
+            minRating: liveFilterMinRating,
+            searchText: searchText,
+            isSearchVisible: isSearchVisible
+        )
     }
 
     /// Same resolution as Settings › Default Sorting for Scenes, then session sort, when a filter has no valid embedded sort.
@@ -835,10 +872,12 @@ private struct ScenesViewContent: View {
         externalLiveFilterSheetBinding: Binding<Bool>? = nil,
         externalLiveFilterActiveBinding: Binding<Bool>? = nil,
         showsFloatingFilterButton: Bool = true,
-        scrollHeader: AnyView? = nil
+        scrollHeader: AnyView? = nil,
+        filterMemory: ScenesListFilterMemory? = nil
     ) {
         self.viewModel = viewModel
         self.scope = scope
+        self.filterMemory = filterMemory
         self.externalLiveFilterSheetBinding = externalLiveFilterSheetBinding
         self.externalLiveFilterActiveBinding = externalLiveFilterActiveBinding
         self.showsFloatingFilterButton = showsFloatingFilterButton
@@ -859,6 +898,21 @@ private struct ScenesViewContent: View {
         _selectedFilter = State(initialValue: filter)
         _hasInjectedFilter = State(initialValue: filter != nil)
         _hasInjectedSort = State(initialValue: sort != nil)
+        if let filterMemory {
+            _criteriaDocument = StateObject(wrappedValue: filterMemory.criteriaDocument)
+            // Remount (e.g. detail tab switch): restore what the list was fetched with.
+            if let snap = filterMemory.snapshot {
+                _selectedSortOption = State(initialValue: snap.sortOption)
+                _selectedFilter = State(initialValue: snap.selectedFilter)
+                _liveSheetPresetSelection = State(initialValue: snap.presetSelection)
+                _liveFilterStudioIds = State(initialValue: snap.studioIds)
+                _liveFilterTagIds = State(initialValue: snap.tagIds)
+                _liveFilterGroupIds = State(initialValue: snap.groupIds)
+                _liveFilterMinRating = State(initialValue: snap.minRating)
+                _searchText = State(initialValue: snap.searchText)
+                _isSearchVisible = State(initialValue: snap.isSearchVisible)
+            }
+        }
     }
 
 
@@ -1346,6 +1400,9 @@ private struct ScenesViewContent: View {
         .onChange(of: scope) { _, _ in
             didRunEmptyListSavedFilterFallback = false
         }
+        .onDisappear {
+            filterMemory?.snapshot = filterMemorySnapshot
+        }
     }
 
     private var emptyStateView: some View {
@@ -1432,6 +1489,7 @@ struct ScenesView: View {
     let externalLiveFilterActiveBinding: Binding<Bool>?
     let showsFloatingFilterButton: Bool
     let scrollHeader: AnyView?
+    let filterMemory: ScenesListFilterMemory?
 
     init(
         sort: StashDBViewModel.SceneSortOption? = nil,
@@ -1442,7 +1500,8 @@ struct ScenesView: View {
         externalLiveFilterSheetBinding: Binding<Bool>? = nil,
         externalLiveFilterActiveBinding: Binding<Bool>? = nil,
         showsFloatingFilterButton: Bool? = nil,
-        scrollHeader: AnyView? = nil
+        scrollHeader: AnyView? = nil,
+        filterMemory: ScenesListFilterMemory? = nil
     ) {
         self.sort = sort
         self.filter = filter
@@ -1453,6 +1512,7 @@ struct ScenesView: View {
         self.externalLiveFilterActiveBinding = externalLiveFilterActiveBinding
         self.showsFloatingFilterButton = showsFloatingFilterButton ?? (externalLiveFilterSheetBinding == nil)
         self.scrollHeader = scrollHeader
+        self.filterMemory = filterMemory
     }
 
     var body: some View {
@@ -1465,7 +1525,8 @@ struct ScenesView: View {
             externalLiveFilterSheetBinding: externalLiveFilterSheetBinding,
             externalLiveFilterActiveBinding: externalLiveFilterActiveBinding,
             showsFloatingFilterButton: showsFloatingFilterButton,
-            scrollHeader: scrollHeader
+            scrollHeader: scrollHeader,
+            filterMemory: filterMemory
         )
     }
 

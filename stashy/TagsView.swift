@@ -728,6 +728,8 @@ struct TagDetailView: View {
     @State private var showingTagImageFullscreen = false
     @StateObject private var linkedStudios: DetailLinkedStudiosFilterModel
     @StateObject private var linkedGalleries: DetailLinkedGalleriesFilterModel
+    /// Scenes tab filter / sort, kept here so it survives the tab remounting `ScenesView`.
+    @StateObject private var scenesFilterMemory = ScenesListFilterMemory()
     @StateObject private var linkedImages: DetailLinkedImagesFilterModel
     @ObservedObject private var downloadManager = DownloadManager.shared
     @State private var showingTagDownloadOptions = false
@@ -892,7 +894,8 @@ struct TagDetailView: View {
             scrollHeader: AnyView(
                 tagHeaderView
                     .padding(.horizontal, 16)
-            )
+            ),
+            filterMemory: scenesFilterMemory
         )
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
     }

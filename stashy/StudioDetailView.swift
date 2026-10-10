@@ -25,6 +25,8 @@ struct StudioDetailView: View {
     @StateObject private var linkedTags: DetailLinkedTagsFilterModel
     @StateObject private var linkedChildStudios: DetailLinkedStudiosFilterModel
     @StateObject private var linkedGalleries: DetailLinkedGalleriesFilterModel
+    /// Scenes tab filter / sort, kept here so it survives the tab remounting `ScenesView`.
+    @StateObject private var scenesFilterMemory = ScenesListFilterMemory()
     @StateObject private var linkedImages: DetailLinkedImagesFilterModel
     @State private var isFavorite: Bool = false
     @State private var isUpdatingFavorite: Bool = false
@@ -140,7 +142,8 @@ struct StudioDetailView: View {
             scrollHeader: AnyView(
                 headerCard
                     .padding(.horizontal, 16)
-            )
+            ),
+            filterMemory: scenesFilterMemory
         )
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
     }
@@ -585,7 +588,8 @@ struct StudioDetailView: View {
                 linkedImages.showFilterSortSheet = true
             }
         case .groups:
-            break
+            // No groups filter model yet — hide the bar instead of showing an empty one.
+            slots.isPresented = false
         }
         return slots
     }

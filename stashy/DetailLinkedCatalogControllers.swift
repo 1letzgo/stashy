@@ -10,12 +10,14 @@
 import Combine
 import SwiftUI
 
-// MARK: - Performers (scoped to studio / tag / group)
+// MARK: - Performers (scoped to studio / tag / group / co-performers)
 
 enum DetailLinkedPerformersScope: Equatable {
     case studio(String)
     case tag(String)
     case group(String)
+    /// Performer detail › "Appears with": the host view loads the list itself (see `refetchGeneration`).
+    case coPerformers(String)
 }
 
 @MainActor
@@ -48,10 +50,17 @@ final class DetailLinkedPerformersFilterModel: ObservableObject {
     let criteriaDocument = FilterCriteriaDocument(mode: .performers, pinsDefaults: true)
     private var criteriaObserver: AnyCancellable?
 
+    /// "Appears with" only: the extra "Shared scenes" sort (count desc, then name) is active and
+    /// `selectedSortOption` is ignored until the user picks a regular sort.
+    @Published var sortsBySharedScenes = false
+    /// Bumped instead of a `StashDBViewModel` fetch for scopes whose list the host loads itself.
+    @Published private(set) var refetchGeneration = 0
+
     init(scope: DetailLinkedPerformersScope, initialSort: StashDBViewModel.PerformerSortOption = .nameAsc) {
         self.scope = scope
         self.selectedSortOption = initialSort
         self.selectedFilter = nil
+        if case .coPerformers = scope { sortsBySharedScenes = true }
         // Nested ObservableObject: forward its changes so FAB state / sheets refresh.
         criteriaObserver = criteriaDocument.objectWillChange.sink { [weak self] _ in
             self?.objectWillChange.send()
@@ -93,7 +102,37 @@ final class DetailLinkedPerformersFilterModel: ObservableObject {
             viewModel.fetchDetailPerformers(tagId: id, sortBy: selectedSortOption, isInitialLoad: initial, filter: fetchBaseFilter, liveFilter: live)
         case .group(let id):
             viewModel.fetchDetailPerformers(groupId: id, sortBy: selectedSortOption, isInitialLoad: initial, filter: fetchBaseFilter, liveFilter: live)
+        case .coPerformers:
+            // The full co-performer list loads at once; there is no next page.
+            if initial { refetchGeneration += 1 }
         }
+    }
+
+    /// "Appears with": the server-side `performer_filter` (saved base filter + criteria).
+    func coPerformersPerformerFilter(viewModel: StashDBViewModel) -> [String: Any] {
+        viewModel.mergeDetailScopeWithSavedAndLiveFilters(scope: [:], saved: fetchBaseFilter, live: effectiveLiveFilter)
+    }
+
+    /// "Appears with": `nil` = "Shared scenes" (client-side), else the server sort.
+    func coPerformersServerSort(viewModel: StashDBViewModel) -> (field: String, direction: String)? {
+        guard !sortsBySharedScenes else { return nil }
+        let field = selectedSortOption.sortField == "random" ? viewModel.randomSort(.performers) : selectedSortOption.sortField
+        return (field, selectedSortOption.direction)
+    }
+
+    /// Cache key for one filter + sort combination of the "Appears with" list.
+    func coPerformersQueryKey(viewModel: StashDBViewModel) -> String {
+        let filter = coPerformersPerformerFilter(viewModel: viewModel)
+        let filterJSON = (try? JSONSerialization.data(withJSONObject: filter, options: [.sortedKeys]))
+            .flatMap { String(data: $0, encoding: .utf8) } ?? ""
+        let sort = coPerformersServerSort(viewModel: viewModel).map { "\($0.field):\($0.direction)" } ?? "shared"
+        return "\(sort)|\(filterJSON)"
+    }
+
+    func selectSharedScenesSort(viewModel: StashDBViewModel) {
+        guard !sortsBySharedScenes else { return }
+        sortsBySharedScenes = true
+        refetchPerformers(viewModel: viewModel, initial: true)
     }
 
     func applyLiveFilter(viewModel: StashDBViewModel) {
@@ -109,9 +148,10 @@ final class DetailLinkedPerformersFilterModel: ObservableObject {
     func mapLiveFragmentToChips(_ frag: [String: Any]) {}
 
     func changeSortOption(to newOption: StashDBViewModel.PerformerSortOption, viewModel: StashDBViewModel) {
-        if newOption == .random && selectedSortOption == .random {
+        if newOption == .random && selectedSortOption == .random && !sortsBySharedScenes {
             viewModel.refreshRandomSeed()
         }
+        sortsBySharedScenes = false
         selectedSortOption = newOption
         refetchPerformers(viewModel: viewModel, initial: true)
     }
@@ -219,6 +259,9 @@ final class DetailLinkedPerformersFilterModel: ObservableObject {
     func applyCatalogPresetSelectionFromSheetIfNeeded(viewModel: StashDBViewModel) {
         let newId = catalogPresetRowSelection
         guard !newId.isEmpty else { return }
+        // Runs on every sheet open: reloading the preset would overwrite criteria edited since
+        // (the document already holds the preset's copy), so only fill an empty document.
+        guard criteriaDocument.isEmpty else { return }
         if let sid = ListLivePresetTag.parseServerId(newId), let f = viewModel.savedFilters[sid] {
             applyServerSavedFilter(f, viewModel: viewModel)
             return
@@ -550,6 +593,9 @@ final class DetailLinkedTagsFilterModel: ObservableObject {
     func applyCatalogPresetSelectionFromSheetIfNeeded(viewModel: StashDBViewModel) {
         let newId = catalogPresetRowSelection
         guard !newId.isEmpty else { return }
+        // Runs on every sheet open: reloading the preset would overwrite criteria edited since
+        // (the document already holds the preset's copy), so only fill an empty document.
+        guard criteriaDocument.isEmpty else { return }
         if let sid = ListLivePresetTag.parseServerId(newId), let f = viewModel.savedFilters[sid] {
             applyServerSavedFilter(f, viewModel: viewModel)
             return
@@ -884,6 +930,9 @@ final class DetailLinkedStudiosFilterModel: ObservableObject {
     func applyCatalogPresetSelectionFromSheetIfNeeded(viewModel: StashDBViewModel) {
         let newId = catalogPresetRowSelection
         guard !newId.isEmpty else { return }
+        // Runs on every sheet open: reloading the preset would overwrite criteria edited since
+        // (the document already holds the preset's copy), so only fill an empty document.
+        guard criteriaDocument.isEmpty else { return }
         if let sid = ListLivePresetTag.parseServerId(newId), let f = viewModel.savedFilters[sid] {
             applyServerSavedFilter(f, viewModel: viewModel)
             return
@@ -1231,6 +1280,9 @@ final class DetailLinkedGalleriesFilterModel: ObservableObject {
     func applyCatalogPresetSelectionFromSheetIfNeeded(viewModel: StashDBViewModel) {
         let newId = catalogPresetRowSelection
         guard !newId.isEmpty else { return }
+        // Runs on every sheet open: reloading the preset would overwrite criteria edited since
+        // (the document already holds the preset's copy), so only fill an empty document.
+        guard criteriaDocument.isEmpty else { return }
         if let sid = ListLivePresetTag.parseServerId(newId), let f = viewModel.savedFilters[sid] {
             applyServerSavedFilter(f, viewModel: viewModel)
             return
@@ -1834,6 +1886,9 @@ final class DetailLinkedImagesFilterModel: ObservableObject {
     func applyCatalogPresetSelectionFromSheetIfNeeded(viewModel: StashDBViewModel) {
         let newId = catalogPresetRowSelection
         guard !newId.isEmpty else { return }
+        // Runs on every sheet open: reloading the preset would overwrite criteria edited since
+        // (the document already holds the preset's copy), so only fill an empty document.
+        guard criteriaDocument.isEmpty else { return }
         if let sid = ListLivePresetTag.parseServerId(newId), let f = viewModel.savedFilters[sid] {
             applyServerSavedFilter(f, viewModel: viewModel)
             return

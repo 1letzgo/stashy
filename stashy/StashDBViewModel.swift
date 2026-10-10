@@ -164,7 +164,7 @@ class StashDBViewModel: ObservableObject {
     }
 
     /// Formats a "random_<seed>" sort field for the given kind.
-    private func randomSort(_ kind: RandomSeedKind) -> String {
+    func randomSort(_ kind: RandomSeedKind) -> String {
         "random_\(seed(for: kind))"
     }
 
@@ -4536,7 +4536,7 @@ class StashDBViewModel: ObservableObject {
     // MARK: - Detail Content Fetching
     
     /// Merges optional saved filter with `scope` (parent-entity constraint wins on key collision), then applies `live`.
-    private func mergeDetailScopeWithSavedAndLiveFilters(scope: [String: Any], saved: SavedFilter?, live: [String: Any]?) -> [String: Any] {
+    func mergeDetailScopeWithSavedAndLiveFilters(scope: [String: Any], saved: SavedFilter?, live: [String: Any]?) -> [String: Any] {
         var merged: [String: Any] = [:]
         if let saved {
             if let dict = saved.filterDict {

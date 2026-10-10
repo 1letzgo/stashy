@@ -661,6 +661,8 @@ struct GroupDetailView: View {
     @StateObject private var linkedTags: DetailLinkedTagsFilterModel
     @StateObject private var linkedStudios: DetailLinkedStudiosFilterModel
     @StateObject private var linkedGalleries: DetailLinkedGalleriesFilterModel
+    /// Scenes tab filter / sort, kept here so it survives the tab remounting `ScenesView`.
+    @StateObject private var scenesFilterMemory = ScenesListFilterMemory()
     @StateObject private var linkedImages: DetailLinkedImagesFilterModel
 
     private var chromePillHeight: CGFloat { StashyExpandingDock.activeHeight }
@@ -762,7 +764,8 @@ struct GroupDetailView: View {
             externalLiveFilterSheetBinding: $groupLiveFilterSheetPresented,
             externalLiveFilterActiveBinding: $groupSceneFilterActive,
             showsFloatingFilterButton: false,
-            scrollHeader: AnyView(headerView)
+            scrollHeader: AnyView(headerView),
+            filterMemory: scenesFilterMemory
         )
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
     }

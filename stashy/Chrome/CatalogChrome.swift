@@ -55,6 +55,11 @@ struct CatalogSlotSet {
     var filterSort: CatalogChromeSlot? = nil            // always rendered last (far right)
     var contextual: CatalogChromeSlot? = nil            // slot 3
     var secondaryContextual: CatalogChromeSlot? = nil   // slot 4
+
+    /// A bar without a single action would render as an empty pill.
+    var hasAnySlot: Bool {
+        columns != nil || quickFilter != nil || filterSort != nil || contextual != nil || secondaryContextual != nil
+    }
 }
 
 struct CatalogChromeConfig {
