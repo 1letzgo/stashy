@@ -385,8 +385,11 @@ class ImageViewerScreen(
                     }
                 }
                 exo.addListener(listener)
+                // Lazy audio focus: a muted / paused clip leaves other apps' audio alone.
+                val audioFocus = de.letzgo.stashy.ui.player.AudioFocusCoordinator(exo)
                 player = exo
                 onDispose {
+                    audioFocus.release()
                     exo.removeListener(listener)
                     if (player === exo) { player = null; fastForwarding = false }
                     exo.release()

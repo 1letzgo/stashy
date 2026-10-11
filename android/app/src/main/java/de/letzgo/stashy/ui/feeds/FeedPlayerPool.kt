@@ -9,7 +9,6 @@ import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.unit.IntSize
-import androidx.media3.common.AudioAttributes
 import androidx.media3.common.C
 import androidx.media3.common.MediaItem
 import androidx.media3.common.MimeTypes
@@ -22,6 +21,7 @@ import androidx.media3.exoplayer.DefaultLoadControl
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import de.letzgo.stashy.data.Net
+import de.letzgo.stashy.ui.player.AudioFocusCoordinator
 
 /** What one feed row wants played (iOS: `ReelItemData.videoURL` + engine options). */
 data class FeedMediaRequest(
@@ -59,6 +59,8 @@ class FeedPlayerPool(context: Context, val size: Int = 3) {
     private val appContext = context.applicationContext
 
     private inner class Slot(val player: ExoPlayer) : Player.Listener {
+        /** Lazy focus: only the audible, playing active row ever holds it (never muted rows). */
+        val audioFocus = AudioFocusCoordinator(player, allowed = false)
         var request: FeedMediaRequest? = null
         var sourceIndex = 0
         var lastUsed = 0L
@@ -138,13 +140,11 @@ class FeedPlayerPool(context: Context, val size: Int = 3) {
         return ExoPlayer.Builder(appContext)
             .setMediaSourceFactory(mediaSourceFactory)
             .setLoadControl(loadControl)
+            .setAudioAttributes(AudioFocusCoordinator.MEDIA_ATTRIBUTES, false)
             .build().apply {
                 volume = if (muted) 0f else 1f
-                setAudioAttributes(attributes, false)
             }
     }
-
-    private val attributes = AudioAttributes.Builder().setUsage(C.USAGE_MEDIA).setContentType(C.AUDIO_CONTENT_TYPE_MOVIE).build()
 
     private fun mediaItem(url: String, segment: FeedSegment?): MediaItem {
         val builder = MediaItem.Builder().setUri(url)
@@ -252,12 +252,15 @@ class FeedPlayerPool(context: Context, val size: Int = 3) {
         applyAudio()
     }
 
-    /** Only the audible active player takes audio focus (iOS: playback vs ambient session). */
+    /**
+     * Only the active row may take audio focus, and [AudioFocusCoordinator] takes it only while
+     * that row plays unmuted (iOS: playback vs ambient session) — muted Feeds never pause Spotify.
+     */
     private fun applyAudio() {
-        slots.forEach { s ->
+        // Active row first, so a swipe hands focus over without a gap for other apps.
+        slots.sortedByDescending { it.request?.id == activeId && activeId != null }.forEach { s ->
             s.player.volume = if (muted) 0f else 1f
-            val audible = !muted && s.request?.id == activeId && activeId != null
-            s.player.setAudioAttributes(attributes, audible)
+            s.audioFocus.allowed = s.request?.id == activeId && activeId != null
         }
     }
 
@@ -270,7 +273,7 @@ class FeedPlayerPool(context: Context, val size: Int = 3) {
     fun release() {
         released = true
         teardown()
-        slots.forEach { it.player.release() }
+        slots.forEach { it.audioFocus.release(); it.player.release() }
         slots.clear()
     }
 }
