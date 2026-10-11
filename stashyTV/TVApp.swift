@@ -23,15 +23,13 @@ struct TVApp: App {
         AetherPlaybackBootstrap.installOnce()
         #endif
 
-        // Konfiguriere Audio-Session einmal beim App-Start:
-        // - `.playback`: erlaubt Audio, auch wenn der Silent-Switch aktiv ist (irrelevant auf tvOS,
-        //   wichtig aber für Audio-Routing/Mixing-Verhalten)
-        // - dadurch wird Hintergrund-/System-Audio ordnungsgemäß unterbrochen statt zu konkurrieren.
-        // `setActive` blockiert; auf dem Main Thread meldet Xcode ein Hang-Risiko.
+        // Audio-Session beim Start nur deklarieren, nicht aktivieren: der App-Start soll laufendes
+        // System-Audio nicht unterbrechen. Aktiviert wird erst, wenn wirklich hörbar abgespielt wird
+        // (`AudioSessionCoordinator`, bzw. AVKit/Engine pro Wiedergabe). `setCategory` blockiert;
+        // auf dem Main Thread meldet Xcode ein Hang-Risiko.
         Task.detached(priority: .userInitiated) {
             do {
                 try AVAudioSession.sharedInstance().setCategory(.playback, mode: .moviePlayback, options: [])
-                try AVAudioSession.sharedInstance().setActive(true, options: [])
             } catch {
                 AppLog.error("AVAudioSession setup failed: \(error)")
             }

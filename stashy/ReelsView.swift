@@ -3380,21 +3380,7 @@ struct ReelsViewBody: View {
         reelsPausePlaybackForLocalTeardown()
         ReelsPlayerRegistry.suspendPlayback()
         UIApplication.shared.isIdleTimerDisabled = false
-        do {
-            try AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
-        } catch {
-            AppLog.debug("🎬 Reels: Audio deactivation error: \(error)")
-        }
-    }
-
-    /// Scenes / Markers / Clips / Previews take the playback session. Pics must not —
-    /// muted 1-row autoplay mixes with other audio instead of ducking it.
-    private func applyReelsAudioSession(for mode: ReelsMode) {
-        if mode == .pics {
-            applyAmbientMixingAudioSession()
-        } else {
-            applyPlaybackAudioSession()
-        }
+        AudioSessionCoordinator.shared.releaseSoon()
     }
 
     /// Resume scroll item + mid-clip time and continue autoplay after returning to Feeds — from
@@ -3412,7 +3398,6 @@ struct ReelsViewBody: View {
         currentItemShowRatingOverlay = false
 
         UIApplication.shared.isIdleTimerDisabled = true
-        applyReelsAudioSession(for: reelsMode)
 
         // Pics uses ImagesView muted autoplay and must not resume reel players / steal audio.
         if reelsMode == .pics { return }
@@ -3689,8 +3674,6 @@ struct ReelsViewBody: View {
         }
 
         ReelsSessionRAM.clearLegacyUserDefaultsIfNeeded()
-        
-        applyReelsAudioSession(for: reelsMode)
         if let kind = reelsFeedKind(for: reelsMode) {
             viewModel.setActiveReelsFeed(kind)
         }
@@ -3983,7 +3966,6 @@ struct ReelsViewBody: View {
 
         if skipNextReelsModeSessionRestore {
             skipNextReelsModeSessionRestore = false
-            applyReelsAudioSession(for: newValue)
             if newValue == .pics {
                 NotificationCenter.default.post(name: .reelsTeardownAllPlayers, object: nil)
                 currentVisibleSceneId = nil
@@ -3995,8 +3977,6 @@ struct ReelsViewBody: View {
 
         // Persist old mode position before clearing the active id (Pics teardown).
         saveCurrentPositionIfPossible(for: oldValue)
-
-        applyReelsAudioSession(for: newValue)
 
         if newValue == .pics {
             // Active row's `onDisappear` skips `cleanupPlayer` while still "active", so force

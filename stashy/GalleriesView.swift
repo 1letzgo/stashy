@@ -1132,12 +1132,8 @@ struct GalleryItemView: View {
         .onChange(of: isMuted) { _, newValue in
             // Persisting happens in the mute button, not here — this also fires for programmatic
             // writes, which is how the stored choice reaches the engine.
+            // The engine claims / releases the audio session itself (AudioSessionCoordinator).
             engine?.isMuted = newValue
-            if newValue {
-                applyAmbientMixingAudioSession()
-            } else {
-                applyPlaybackAudioSession()
-            }
         }
         .onChange(of: currentVisibleId) { _, _ in
             applyActivePlaybackState()
@@ -1504,14 +1500,8 @@ struct FullScreenImageView: View {
                 scrubberState.seeking = false
                 scrubberState.seekTarget = nil
             }
-            .onAppear {
-                if !isMuted {
-                    applyPlaybackAudioSession()
-                }
-            }
             .onDisappear {
                 showUI = true
-                applyAmbientMixingAudioSession()
             }
             .task(id: selectedImageId) {
                 currentVisibleId = selectedImageId

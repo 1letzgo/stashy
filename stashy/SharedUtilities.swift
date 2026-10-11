@@ -547,12 +547,11 @@ enum ScenePlayerMute {
         return UserDefaults.standard.bool(forKey: key)
     }
 
-    /// Same rule, but read *after* the playback session is live. `AVAudioSession.currentRoute`
-    /// only lists the headphone/Bluetooth output once the session is configured and active;
-    /// a `@State` initialiser runs long before that and would report the built-in speaker,
-    /// muting even with headphones connected.
+    /// Same rule, read when a player mounts. The route reflects the declared category, so the
+    /// (mixable) playback category is declared first — without activating, so other apps keep
+    /// playing until this player actually makes sound.
     static func initialValueForPlayback() -> Bool {
-        applyPlaybackAudioSession()
+        AudioSessionCoordinator.shared.prepareForRouteQuery()
         return initialValue()
     }
 
@@ -624,33 +623,190 @@ func makeAuthenticatedAsset(for url: URL) -> AVURLAsset {
     return AVURLAsset(url: authenticatedURL, options: ["AVURLAssetHTTPHeaderFieldsKey": headers])
 }
 
-/// `setCategory` / `setActive` block while the session is busy, which the runtime flags as a
-/// hang risk on the main thread. Both helpers run on this serial queue instead; serial keeps
-/// a playback-then-ambient sequence in the order it was asked for.
-private let audioSessionQueue = DispatchQueue(label: "de.letzgo.stashy.audio-session", qos: .userInitiated)
+/// Single owner of the shared `AVAudioSession`. The session is taken **only while something is
+/// audible**; browsing, muted card previews and muted Feeds/players never interrupt other apps
+/// (Music, podcasts).
+///
+/// - Idle (iOS): `.playback` / `.moviePlayback` with `.mixWithOthers`. A muted AVPlayer that
+///   activates the session implicitly then mixes instead of interrupting.
+/// - Audible (any registered owner playing with sound, or holding PiP): non-mixable `.playback`,
+///   activated — background audio, PiP and AirPlay keep working.
+/// - Back to idle after a grace period (pause) or almost at once (stop / mute):
+///   `setActive(false, .notifyOthersOnDeactivation)` so the interrupted app resumes. Never while
+///   AirPlay is the route and a player is still on screen.
+///
+/// Owners are reference-counted by `ObjectIdentifier`. All state lives on one serial queue, which
+/// also keeps the blocking `setCategory` / `setActive` XPC calls off the main thread.
+///
+/// tvOS keeps a non-mixable category (multichannel / HDMI passthrough) and only activates once
+/// something audible plays — no launch-time activation, no deactivation.
+final class AudioSessionCoordinator: @unchecked Sendable {
+    static let shared = AudioSessionCoordinator()
 
-func applyPlaybackAudioSession() {
-    audioSessionQueue.async {
-        let session = AVAudioSession.sharedInstance()
-        guard session.category != .playback else { return }
-        do {
-            try session.setCategory(.playback, mode: .moviePlayback, options: [])
-            try session.setActive(true)
-        } catch {
-            AppLog.error("🎬 VIDEO PLAYER: Error setting up AVAudioSession: \(error)")
+    /// Paused audible playback keeps the session this long, so a pause/resume or the reload
+    /// between two Feeds items does not bounce the other app's audio.
+    static let pauseGrace: TimeInterval = 3
+    /// Stop / close / mute.
+    static let stopGrace: TimeInterval = 0.5
+
+    private let queue = DispatchQueue(label: "de.letzgo.stashy.audio-session", qos: .userInitiated)
+
+    // Queue-confined state.
+    private var audibleOwners = Set<ObjectIdentifier>()
+    /// Owners with a loaded item (playing muted or paused). A release reactivates the mixable
+    /// session for them: the software route's audio clock and the hardware-volume KVO need it.
+    private var liveOwners = Set<ObjectIdentifier>()
+    private var isExclusive = false
+    private var pendingRelease: DispatchWorkItem?
+    private var pendingReleaseDeadline: DispatchTime?
+    private var promptReleaseUntil: DispatchTime?
+
+    private init() {}
+
+    /// Launch: declare the idle category, never activate.
+    func prepareIdleSession() {
+        #if os(iOS)
+        queue.async { self.applyIdleCategory() }
+        #endif
+    }
+
+    /// Before reading `currentRoute` for the "Start muted without headphones" rule: the route
+    /// is the one the declared category would get, so the category has to be the playback one.
+    /// Never activates, never interrupts.
+    func prepareForRouteQuery() {
+        #if os(iOS)
+        queue.async {
+            guard !self.isExclusive else { return }
+            self.applyIdleCategory()
+        }
+        #endif
+    }
+
+    /// Reports an owner's state. `audible` = playing with sound (or PiP holding the session);
+    /// `live` = it still has an item loaded. `grace` applies when this drops the last audible owner.
+    func update(owner: ObjectIdentifier, audible: Bool, live: Bool, grace: TimeInterval) {
+        queue.async {
+            if live { self.liveOwners.insert(owner) } else { self.liveOwners.remove(owner) }
+            if audible { self.audibleOwners.insert(owner) } else { self.audibleOwners.remove(owner) }
+            if !self.audibleOwners.isEmpty {
+                self.cancelPendingRelease()
+                if !self.isExclusive { self.acquireExclusive() }
+            } else if self.isExclusive {
+                self.scheduleRelease(after: grace)
+            }
         }
     }
-}
 
-/// Mixes with other audio (Music, podcasts). Used for muted previews and Feeds → Pics.
-func applyAmbientMixingAudioSession() {
-    audioSessionQueue.async {
-        do {
-            try AVAudioSession.sharedInstance().setCategory(.ambient, mode: .default, options: .mixWithOthers)
-            try AVAudioSession.sharedInstance().setActive(true)
-        } catch {
-            AppLog.error("🎬 PREVIEW PLAYER: Error setting up AVAudioSession: \(error)")
+    /// Leaving a playback surface wholesale (Feeds tab switch): the players are paused right
+    /// after, so the next drop to silence releases almost at once instead of after `pauseGrace`.
+    func releaseSoon() {
+        queue.async {
+            self.promptReleaseUntil = .now() + 2
+            if self.audibleOwners.isEmpty, self.isExclusive {
+                self.scheduleRelease(after: 0.2)
+            }
         }
+    }
+
+    /// `AetherEngine.init` declares a non-mixable `.playback` category on a detached task. Waits
+    /// for that write to land, then restores the mixable idle category, so a muted load that
+    /// follows activates without interrupting other audio. Awaited before an engine's first load.
+    func absorbEngineCategoryDeclaration() async {
+        #if os(iOS)
+        await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
+            queue.async {
+                defer { continuation.resume() }
+                guard !self.isExclusive else { return }
+                let session = AVAudioSession.sharedInstance()
+                let started = DispatchTime.now()
+                let deadline = started + 0.3
+                while session.categoryOptions.contains(.mixWithOthers), DispatchTime.now() < deadline {
+                    usleep(5_000)
+                }
+                guard !self.isExclusive else { return }
+                self.applyIdleCategory()
+                let waitedMs = (DispatchTime.now().uptimeNanoseconds - started.uptimeNanoseconds) / 1_000_000
+                AppLog.debug("🔈 AudioSession: engine category absorbed after \(waitedMs) ms, mixable=\(session.categoryOptions.contains(.mixWithOthers))")
+            }
+        }
+        #endif
+    }
+
+    // MARK: Queue-confined
+
+    private func applyIdleCategory() {
+        #if os(iOS)
+        let session = AVAudioSession.sharedInstance()
+        guard session.category != .playback
+            || session.mode != .moviePlayback
+            || !session.categoryOptions.contains(.mixWithOthers) else { return }
+        do {
+            try session.setCategory(.playback, mode: .moviePlayback, options: [.mixWithOthers])
+        } catch {
+            AppLog.error("🔈 AudioSession: idle category failed: \(error)")
+        }
+        #endif
+    }
+
+    private func acquireExclusive() {
+        let session = AVAudioSession.sharedInstance()
+        do {
+            if session.category != .playback || session.mode != .moviePlayback || !session.categoryOptions.isEmpty {
+                try session.setCategory(.playback, mode: .moviePlayback, options: [])
+            }
+            try session.setActive(true)
+            isExclusive = true
+            AppLog.debug("🔈 AudioSession: exclusive playback acquired")
+        } catch {
+            AppLog.error("🔈 AudioSession: acquire failed: \(error)")
+        }
+    }
+
+    private func cancelPendingRelease() {
+        pendingRelease?.cancel()
+        pendingRelease = nil
+        pendingReleaseDeadline = nil
+    }
+
+    private func scheduleRelease(after grace: TimeInterval) {
+        #if os(iOS)
+        var delay = grace
+        if let until = promptReleaseUntil, DispatchTime.now() < until { delay = min(delay, 0.2) }
+        let deadline = DispatchTime.now() + delay
+        // Keep an earlier pending release; only a shorter grace moves it forward.
+        if let existing = pendingReleaseDeadline, existing <= deadline { return }
+        cancelPendingRelease()
+        let work = DispatchWorkItem { [weak self] in self?.releaseIfSilent() }
+        pendingRelease = work
+        pendingReleaseDeadline = deadline
+        queue.asyncAfter(deadline: deadline, execute: work)
+        #endif
+    }
+
+    private func releaseIfSilent() {
+        #if os(iOS)
+        pendingRelease = nil
+        pendingReleaseDeadline = nil
+        guard audibleOwners.isEmpty, isExclusive else { return }
+        let session = AVAudioSession.sharedInstance()
+        // A paused AirPlay video still owns the receiver; give it up only once the player is gone.
+        if !liveOwners.isEmpty, session.currentRoute.outputs.contains(where: { $0.portType == .airPlay }) {
+            scheduleRelease(after: Self.pauseGrace)
+            return
+        }
+        applyIdleCategory()
+        do {
+            try session.setActive(false, options: .notifyOthersOnDeactivation)
+        } catch {
+            // `.isBusy` still deactivates (running I/O of a muted player); nothing to retry.
+            AppLog.debug("🔈 AudioSession: deactivate: \(error)")
+        }
+        isExclusive = false
+        AppLog.debug("🔈 AudioSession: released (live owners: \(liveOwners.count))")
+        if !liveOwners.isEmpty {
+            try? session.setActive(true)
+        }
+        #endif
     }
 }
 

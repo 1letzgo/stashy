@@ -23,6 +23,9 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
         // The statistics manager listens for the server-ready notification to refresh
         // stale tag statistics; a lazy singleton nobody touches before that misses it.
         _ = AITagSuggestionManager.shared
+        // Mixable idle audio category, never activated here: opening the app must not stop
+        // Music / podcasts. The session is taken only once a player makes sound.
+        AudioSessionCoordinator.shared.prepareIdleSession()
         #if !os(tvOS) && canImport(AetherEngine)
         AetherPlaybackBootstrap.installOnce()
         #endif

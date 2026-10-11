@@ -17,9 +17,9 @@ import CoreGraphics
 import UIKit
 import AetherEngine
 
-/// How a playback surface wants the shared audio session configured when it loads.
-/// Muted previews must not take the session away from a running scene, so they ask for
-/// `.ambient`; a surface that manages the session itself asks for `.none`.
+/// Whether a playback surface may claim the shared audio session. `.playback` claims it through
+/// `AudioSessionCoordinator` only while it actually plays with sound; muted card previews ask
+/// for `.ambient` and never claim it; a surface that manages the session itself asks for `.none`.
 enum AetherAudioSessionPolicy {
     case playback
     case ambient
@@ -124,9 +124,11 @@ final class AetherSceneEngine: ObservableObject {
     /// Fires once per switch, with the rung the ladder moved to. Hosts use it for a toast.
     var onTranscodeFallback: ((SourceKind) -> Void)?
 
-    /// Which audio session `load` installs. Previews use `.ambient` so they never steal the
-    /// session from a playing scene.
-    var audioSessionPolicy: AetherAudioSessionPolicy = .playback
+    /// Whether this engine may claim the audio session while audible. Previews use `.ambient`
+    /// so they never steal the session from a playing scene or another app.
+    var audioSessionPolicy: AetherAudioSessionPolicy = .playback {
+        didSet { updateAudioSessionClaim() }
+    }
 
     /// Surfaces that actually draw subtitles switch this on, so "Show subtitles automatically"
     /// (Settings → Playback) picks the preferred track once a load's tracks are known. Muted
@@ -206,6 +208,7 @@ final class AetherSceneEngine: ObservableObject {
             }
             _isMuted = newValue
             applyVolumeState()
+            updateAudioSessionClaim(grace: AudioSessionCoordinator.stopGrace)
         }
     }
 
@@ -220,11 +223,13 @@ final class AetherSceneEngine: ObservableObject {
                 // Zero is a level, not a mute: `unmutedVolume` keeps the remembered value so a
                 // later unmute does not resurrect silence.
                 engine.volume = 0
+                updateAudioSessionClaim(grace: AudioSessionCoordinator.stopGrace)
                 return
             }
             unmutedVolume = clamped
             _isMuted = false
             applyVolumeState()
+            updateAudioSessionClaim()
         }
     }
 
@@ -232,6 +237,31 @@ final class AetherSceneEngine: ObservableObject {
     /// every point where the audio output may have been (re)created.
     private func applyVolumeState() {
         engine.volume = _isMuted ? 0 : (unmutedVolume > 0 ? unmutedVolume : 1.0)
+    }
+
+    // MARK: - Audio session claim
+
+    /// Last state handed to the coordinator, so phase ticks do not flood its queue.
+    private var lastAudioClaim: (audible: Bool, live: Bool)?
+    /// The engine's init declares a non-mixable category off-main; the first load waits until
+    /// the coordinator has turned it back into the mixable idle one (iOS).
+    private var engineCategoryAbsorption: Task<Void, Never>?
+
+    /// Audible = playing (or holding a PiP window) with sound on a surface allowed to claim
+    /// the session. Only then does the app interrupt other audio.
+    private func updateAudioSessionClaim(grace: TimeInterval = AudioSessionCoordinator.pauseGrace) {
+        let hasSound = !_isMuted && engine.volume > 0
+        let audible = audioSessionPolicy == .playback
+            && hasSound
+            && currentURL != nil
+            && (isPlaying || engine.pictureInPictureActive)
+        let live = currentURL != nil
+        if let last = lastAudioClaim, last.audible == audible, last.live == live { return }
+        lastAudioClaim = (audible, live)
+        AudioSessionCoordinator.shared.update(owner: ObjectIdentifier(self),
+                                              audible: audible,
+                                              live: live,
+                                              grace: grace)
     }
 
     // MARK: - Internals
@@ -279,8 +309,17 @@ final class AetherSceneEngine: ObservableObject {
         engine.deactivatesAudioSessionOnStop = false
         #if os(iOS)
         engine.backgroundPlaybackEnabled = TabManager.shared.isPiPEnabled
+        engineCategoryAbsorption = Task { await AudioSessionCoordinator.shared.absorbEngineCategoryDeclaration() }
         #endif
         bind()
+    }
+
+    deinit {
+        // `stop()` is the contract; this only keeps a forgotten wrapper from pinning the session.
+        AudioSessionCoordinator.shared.update(owner: ObjectIdentifier(self),
+                                              audible: false,
+                                              live: false,
+                                              grace: AudioSessionCoordinator.stopGrace)
     }
 
     private func bind() {
@@ -484,6 +523,7 @@ final class AetherSceneEngine: ObservableObject {
             isPlaying = playing
             onPlayingChanged?(playing)
         }
+        defer { updateAudioSessionClaim() }
 
         switch phase {
         case .loading:
@@ -575,11 +615,8 @@ final class AetherSceneEngine: ObservableObject {
         loadGeneration &+= 1
         let generation = loadGeneration
 
-        switch audioSessionPolicy {
-        case .playback: applyPlaybackAudioSession()
-        case .ambient: applyAmbientMixingAudioSession()
-        case .none: break
-        }
+        // No session work here: loading (and muted playback) must not interrupt other audio.
+        // The claim follows `isPlaying` + mute (`updateAudioSessionClaim`).
 
         cancelFirstFrameWatchdog()
 
@@ -647,6 +684,12 @@ final class AetherSceneEngine: ObservableObject {
             options.declaredDurationSeconds = fallbackDeclaredDuration
         }
         hostCustomizeOptions?(&options)
+
+        if let absorption = engineCategoryAbsorption {
+            await absorption.value
+            engineCategoryAbsorption = nil
+            guard generation == loadGeneration else { return }
+        }
 
         do {
             _ = try await engine.load(url: signedURL(requestURL) ?? requestURL,
@@ -1022,6 +1065,7 @@ final class AetherSceneEngine: ObservableObject {
 
     func setPictureInPictureActive(_ active: Bool) {
         engine.pictureInPictureActive = active
+        updateAudioSessionClaim()
     }
 
     /// Callers must invoke this before releasing the wrapper: `@State` release is not deterministic.
@@ -1042,6 +1086,7 @@ final class AetherSceneEngine: ObservableObject {
         hasPresentedFrame = false
         currentSubtitleText = nil
         currentSubtitleImage = nil
+        updateAudioSessionClaim(grace: AudioSessionCoordinator.stopGrace)
     }
 }
 
