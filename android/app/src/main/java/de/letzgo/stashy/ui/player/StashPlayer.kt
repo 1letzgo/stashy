@@ -12,7 +12,6 @@ import androidx.compose.runtime.mutableDoubleStateOf
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
-import androidx.media3.common.AudioAttributes
 import androidx.media3.common.C
 import androidx.media3.common.MediaItem
 import androidx.media3.common.MimeTypes
@@ -64,7 +63,7 @@ data class PlayerTrack(val id: String, val label: String, val language: String?,
  *
  * All state is Compose state, so surfaces just read it. Reusable outside the scene detail
  * (Feeds): construct with [Role.Preview] for a muted looping player without audio focus or media
- * session, set [loops] / [isMuted], [load] and put a [VideoSurface] on screen.
+ * session (a Main player takes focus lazily, see [AudioFocusCoordinator]), set [loops] / [isMuted], [load] and put a [VideoSurface] on screen.
  */
 class StashPlayer(context: Context, val role: Role = Role.Main) {
     enum class Role { Main, Preview }
@@ -75,12 +74,13 @@ class StashPlayer(context: Context, val role: Role = Role.Main) {
     val exo: ExoPlayer = ExoPlayer.Builder(appContext)
         .setRenderersFactory(DefaultRenderersFactory(appContext).setEnableDecoderFallback(true))
         .setMediaSourceFactory(DefaultMediaSourceFactory(DefaultDataSource.Factory(appContext, OkHttpDataSource.Factory(Net.client))))
-        .setAudioAttributes(
-            AudioAttributes.Builder().setUsage(C.USAGE_MEDIA).setContentType(C.AUDIO_CONTENT_TYPE_MOVIE).build(),
-            role == Role.Main,
-        )
+        // No focus at build time: [audioFocus] takes it only once playback is audible.
+        .setAudioAttributes(AudioFocusCoordinator.MEDIA_ATTRIBUTES, false)
         .setHandleAudioBecomingNoisy(role == Role.Main)
         .build()
+
+    /** Lazy audio focus: muted / paused / preview playback never pauses other apps' audio. */
+    private val audioFocus = AudioFocusCoordinator(exo, allowed = role == Role.Main)
 
     // MARK: Published state
 
@@ -327,6 +327,7 @@ class StashPlayer(context: Context, val role: Role = Role.Main) {
         session?.let { PlaybackService.detach(it); it.release() }
         session = null
         exo.removeListener(listener)
+        audioFocus.release()
         exo.release()
         textureView = null
     }
