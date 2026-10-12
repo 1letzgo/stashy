@@ -67,7 +67,7 @@ private struct ImagesViewBody: View {
     @ObservedObject var appearanceManager = AppearanceManager.shared
     @ObservedObject var configManager = ServerConfigManager.shared
     @EnvironmentObject private var coordinator: NavigationCoordinator
-    @Environment(\.dismiss) private var dismiss
+    @Environment(\.stashyDismiss) private var dismiss
     @ObservedObject private var tabManager = TabManager.shared
     @ObservedObject private var downloadManager = DownloadManager.shared
     @State private var showingGalleryDownloadOptions = false
@@ -1251,6 +1251,26 @@ struct ImageGroupCatalogCell: View {
                 // fullscreen would pop the viewer.
                 if images.count > 1 {
                     // Grouped set: swipe through the images; the thumb strip below follows.
+                    #if os(macOS)
+                    // macOS has no paging TabView: a paging scroll view, trackpad-swipeable.
+                    ScrollView(.horizontal) {
+                        LazyHStack(spacing: 0) {
+                            ForEach(images) { img in
+                                heroButton(for: img)
+                                    .containerRelativeFrame(.horizontal)
+                                    .id(img.id)
+                            }
+                        }
+                        .scrollTargetLayout()
+                    }
+                    .scrollTargetBehavior(.paging)
+                    .scrollIndicators(.never)
+                    .scrollPosition(id: Binding(
+                        get: { Optional(visibleImageId) },
+                        set: { if let id = $0 { visibleImageId = id } }
+                    ))
+                    .aspectRatio(setAspectRatio, contentMode: .fit)
+                    #else
                     TabView(selection: $visibleImageId) {
                         ForEach(images) { img in
                             heroButton(for: img).tag(img.id)
@@ -1258,6 +1278,7 @@ struct ImageGroupCatalogCell: View {
                     }
                     .tabViewStyle(.page(indexDisplayMode: .never))
                     .aspectRatio(setAspectRatio, contentMode: .fit)
+                    #endif
                 } else {
                     heroButton(for: visibleImage)
                 }
@@ -2087,7 +2108,7 @@ struct EditGallerySheet: View {
     var onDeleted: (() -> Void)? = nil
     var onComplete: (Gallery) -> Void
 
-    @Environment(\.dismiss) private var dismiss
+    @Environment(\.stashyDismiss) private var dismiss
     @ObservedObject private var appearanceManager = AppearanceManager.shared
 
     @State private var title: String = ""

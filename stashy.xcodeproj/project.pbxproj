@@ -207,6 +207,135 @@
 		SWIPE0001000000000000001 /* SwipeActionCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = SWIPE0002000000000000002 /* SwipeActionCard.swift */; };
 		SYNCJOB01000000000000001 /* DownloadSyncJobs.swift in Sources */ = {isa = PBXBuildFile; fileRef = SYNCJOB02000000000000002 /* DownloadSyncJobs.swift */; };
 		SYNCJOB03000000000000003 /* DownloadSyncJobs.swift in Sources */ = {isa = PBXBuildFile; fileRef = SYNCJOB02000000000000002 /* DownloadSyncJobs.swift */; };
+		MAC000000000000000000001 /* AetherSceneEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE7E0000000000000000B011 /* AetherSceneEngine.swift */; };
+		MAC000000000000000000002 /* Scene+AetherPlayback.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE7E0000000000000000B021 /* Scene+AetherPlayback.swift */; };
+		MAC000000000000000000003 /* AetherSceneSurface.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE7E0000000000000000B041 /* AetherSceneSurface.swift */; };
+		MAC000000000000000000004 /* SceneScrubSprites.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE5C00000000000000000902 /* SceneScrubSprites.swift */; };
+		MAC000000000000000000005 /* AetherTimeBar.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE7E0000000000000000B0B1 /* AetherTimeBar.swift */; };
+		MAC000000000000000000006 /* PlayerMenuButton.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE7E0000000000000000B0C1 /* PlayerMenuButton.swift */; };
+		MAC000000000000000000007 /* LocalDownloadStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE7E0000000000000000B051 /* LocalDownloadStore.swift */; };
+		MAC000000000000000000008 /* AetherVideoSurface.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE7E0000000000000000B061 /* AetherVideoSurface.swift */; };
+		MAC000000000000000000009 /* AetherPreviewPlayer.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE7E0000000000000000B071 /* AetherPreviewPlayer.swift */; };
+		MAC00000000000000000000A /* AcknowledgementsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE7E0000000000000000B031 /* AcknowledgementsView.swift */; };
+		MAC00000000000000000000B /* SceneGalleriesCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = DF675E732F2A6392004CA019 /* SceneGalleriesCard.swift */; };
+		MAC00000000000000000000C /* SceneVideoPlayerCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = DF675E772F2A6392004CA019 /* SceneVideoPlayerCard.swift */; };
+		MAC00000000000000000000D /* ScenePlayerExtras.swift in Sources */ = {isa = PBXBuildFile; fileRef = DFEA0012F2A6392000000001 /* ScenePlayerExtras.swift */; };
+		MAC00000000000000000000E /* SceneStudioCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = DF675E752F2A6392004CA019 /* SceneStudioCard.swift */; };
+		MAC00000000000000000000F /* ScenePerformersCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = DF675E742F2A6392004CA019 /* ScenePerformersCard.swift */; };
+		MAC000000000000000000010 /* DirectorDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DFA1B2C52F3A6500004CA019 /* DirectorDetailView.swift */; };
+		MAC000000000000000000011 /* SceneTagsCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = DF675E762F2A6392004CA019 /* SceneTagsCard.swift */; };
+		MAC000000000000000000012 /* SceneGroupsCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA617C2A62174FFFB0912B44 /* SceneGroupsCard.swift */; };
+		MAC000000000000000000013 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DFST000022F30A0000000002 /* SettingsView.swift */; };
+		MAC000000000000000000014 /* ServerListSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = DFST000042F30A0000000004 /* ServerListSection.swift */; };
+		MAC000000000000000000015 /* SceneHeatmapCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 37D3E4912F3A305D00AB8FAD /* SceneHeatmapCard.swift */; };
+		MAC000000000000000000016 /* ServerDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DFST000062F30A0000000006 /* ServerDetailView.swift */; };
+		MAC000000000000000000017 /* PlaybackSettingsSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = DFST000082F30A0000000008 /* PlaybackSettingsSection.swift */; };
+		MAC000000000000000000018 /* ContentSettingsSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = DFST0000A2F30A000000000A /* ContentSettingsSection.swift */; };
+		MAC000000000000000000019 /* DashboardSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DFST0000C2F30A000000000C /* DashboardSettingsView.swift */; };
+		MAC00000000000000000001A /* ReelsModeSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DFST0000E2F30A000000000E /* ReelsModeSettingsView.swift */; };
+		MAC00000000000000000001B /* VideoAnalysisManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 372E2D982F64272300603361 /* VideoAnalysisManager.swift */; };
+		MAC00000000000000000001C /* StashyPlusManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1PLUS022F30B00000000002 /* StashyPlusManager.swift */; };
+		MAC00000000000000000001D /* AppIconManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1ICON022F30B00000000002 /* AppIconManager.swift */; };
+		MAC00000000000000000001E /* SubtitleController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 372E2D9C2F645A0100603361 /* SubtitleController.swift */; };
+		MAC00000000000000000001F /* OCountHeatmapLoader.swift in Sources */ = {isa = PBXBuildFile; fileRef = 372E2DB02F64C10000603361 /* OCountHeatmapLoader.swift */; };
+		MAC000000000000000000020 /* SceneTranscriptionSupport.swift in Sources */ = {isa = PBXBuildFile; fileRef = 372E2DA22F646B0100603361 /* SceneTranscriptionSupport.swift */; };
+		MAC000000000000000000021 /* SceneLiveTranscriptionController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 372E2DA42F646B0100603361 /* SceneLiveTranscriptionController.swift */; };
+		MAC000000000000000000022 /* SceneTranscodeAudioPrefetcher.swift in Sources */ = {isa = PBXBuildFile; fileRef = 372E2DA82F646B0100603361 /* SceneTranscodeAudioPrefetcher.swift */; };
+		MAC000000000000000000023 /* SceneCaptionTranslator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 372E2DAA2F646B0100603361 /* SceneCaptionTranslator.swift */; };
+		MAC000000000000000000024 /* DefaultFilterView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DFST000122F30A0000000012 /* DefaultFilterView.swift */; };
+		MAC000000000000000000025 /* ServerStatisticsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DFST000142F30A0000000014 /* ServerStatisticsView.swift */; };
+		MAC000000000000000000026 /* OCountHeatmapCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 372E2DB32F64C11000603361 /* OCountHeatmapCard.swift */; };
+		MAC000000000000000000027 /* ScenesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DFE5045D2E8A8C2000323FF0 /* ScenesView.swift */; };
+		MAC000000000000000000028 /* SceneDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DFE5045D2E8A8C2000323FF1 /* SceneDetailView.swift */; };
+		MAC000000000000000000029 /* GalleryRepository.swift in Sources */ = {isa = PBXBuildFile; fileRef = DF675E672F2A6386004CA019 /* GalleryRepository.swift */; };
+		MAC00000000000000000002A /* StudioRepository.swift in Sources */ = {isa = PBXBuildFile; fileRef = DF675E6A2F2A6386004CA019 /* StudioRepository.swift */; };
+		MAC00000000000000000002B /* TagRepository.swift in Sources */ = {isa = PBXBuildFile; fileRef = DF675E6B2F2A6386004CA019 /* TagRepository.swift */; };
+		MAC00000000000000000002C /* SceneRepository.swift in Sources */ = {isa = PBXBuildFile; fileRef = DF675E692F2A6386004CA019 /* SceneRepository.swift */; };
+		MAC00000000000000000002D /* PerformerRepository.swift in Sources */ = {isa = PBXBuildFile; fileRef = DF675E682F2A6386004CA019 /* PerformerRepository.swift */; };
+		MAC00000000000000000002E /* PerformerDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DFE5045D2E8A8C2000323FF2 /* PerformerDetailView.swift */; };
+		MAC00000000000000000002F /* LoginAuthHelper.swift in Sources */ = {isa = PBXBuildFile; fileRef = 372E2D692F6339EE00603361 /* LoginAuthHelper.swift */; };
+		MAC000000000000000000030 /* StudioDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DFE5045D2E8A8C2000323FF4 /* StudioDetailView.swift */; };
+		MAC000000000000000000031 /* SceneDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = DFE504632E8A8C5000323FF0 /* SceneDelegate.swift */; };
+		MAC000000000000000000032 /* App.swift in Sources */ = {isa = PBXBuildFile; fileRef = 08FB7794FE84155DC02AAC07 /* App.swift */; };
+		MAC000000000000000000033 /* MainTabView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 08FB7798FE84155DC02AAC07 /* MainTabView.swift */; };
+		MAC000000000000000000034 /* AppearanceManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = DF22BB312F1831C7007C2090 /* AppearanceManager.swift */; };
+		MAC000000000000000000035 /* HomeRowView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DF675E5D2F2A46A1004CA019 /* HomeRowView.swift */; };
+		MAC000000000000000000036 /* HomeStatisticsRowView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DF675E5F2F2A46A1004CA019 /* HomeStatisticsRowView.swift */; };
+		MAC000000000000000000037 /* HomeChannelsRowView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DFC1A2B32F3A46A1004CA019 /* HomeChannelsRowView.swift */; };
+		MAC000000000000000000038 /* HomeSceneCardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DF675E5E2F2A46A1004CA019 /* HomeSceneCardView.swift */; };
+		MAC000000000000000000039 /* ServerConfig.swift in Sources */ = {isa = PBXBuildFile; fileRef = 08FB779EFE84155DC02AAC07 /* ServerConfig.swift */; };
+		MAC00000000000000000003A /* NavigationCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = DF22BB352F1832AD007C2090 /* NavigationCoordinator.swift */; };
+		MAC00000000000000000003B /* ImageCacheManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = DF22BB262F167CDC007C2090 /* ImageCacheManager.swift */; };
+		MAC00000000000000000003C /* StashDBViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 08FB77A2FE84155DC02AAC07 /* StashDBViewModel.swift */; };
+		MAC00000000000000000003D /* MarkersView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 37D092D52F8980B400DB7A08 /* MarkersView.swift */; };
+		MAC00000000000000000003E /* UniversalSearchView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DF90B7652F1B72E5003ED852 /* UniversalSearchView.swift */; };
+		MAC00000000000000000003F /* PerformersView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DF22BB392F1832E8007C2090 /* PerformersView.swift */; };
+		MAC000000000000000000040 /* ListCatalogFilterSortModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = CA7A10D02F500000 /* ListCatalogFilterSortModels.swift */; };
+		MAC000000000000000000041 /* ListCatalogFilterSortSheets.swift in Sources */ = {isa = PBXBuildFile; fileRef = CA7A10D32F500002 /* ListCatalogFilterSortSheets.swift */; };
+		MAC000000000000000000042 /* DetailLinkedCatalogControllers.swift in Sources */ = {isa = PBXBuildFile; fileRef = CA7A10E02F500011 /* DetailLinkedCatalogControllers.swift */; };
+		MAC000000000000000000043 /* CatalogsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DF22BB142F167223007C2090 /* CatalogsView.swift */; };
+		MAC000000000000000000044 /* TagsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DF22BB1D2F16743C007C2090 /* TagsView.swift */; };
+		MAC000000000000000000045 /* TagMergeToolsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C7F3A10100000000000000E1 /* TagMergeToolsView.swift */; };
+		MAC000000000000000000046 /* MergeTools.swift in Sources */ = {isa = PBXBuildFile; fileRef = C7F3A10800000000000000E8 /* MergeTools.swift */; };
+		MAC000000000000000000047 /* StudioLogo.swift in Sources */ = {isa = PBXBuildFile; fileRef = C7F3A10300000000000000E3 /* StudioLogo.swift */; };
+		MAC000000000000000000048 /* StudioLogoStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = C7F3A10500000000000000E5 /* StudioLogoStore.swift */; };
+		MAC000000000000000000049 /* StarRatingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DF90B75D2F1A5ECE003ED852 /* StarRatingView.swift */; };
+		MAC00000000000000000004A /* DownloadsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DF22BB172F16743C007C2090 /* DownloadsView.swift */; };
+		MAC00000000000000000004B /* DownloadSyncJobs.swift in Sources */ = {isa = PBXBuildFile; fileRef = SYNCJOB02000000000000002 /* DownloadSyncJobs.swift */; };
+		MAC00000000000000000004C /* ImagesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DF4A022B2F1E8B6800E5EAFB /* ImagesView.swift */; };
+		MAC00000000000000000004D /* StashImageDateSort.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1IMGDS022345678901234AB /* StashImageDateSort.swift */; };
+		MAC00000000000000000004E /* GalleriesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DF22BB182F16743C007C2090 /* GalleriesView.swift */; };
+		MAC00000000000000000004F /* ReelsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DF22BB1B2F16743C007C2090 /* ReelsView.swift */; };
+		MAC000000000000000000050 /* SharedUtilities.swift in Sources */ = {isa = PBXBuildFile; fileRef = DF22BB1C2F16743C007C2090 /* SharedUtilities.swift */; };
+		MAC000000000000000000051 /* SceneCardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DF06EF252F18EC1100299105 /* SceneCardView.swift */; };
+		MAC000000000000000000052 /* HomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DF22BB192F16743C007C2090 /* HomeView.swift */; };
+		MAC000000000000000000053 /* FloatingCatalogBar.swift in Sources */ = {isa = PBXBuildFile; fileRef = FC10AB0112345678901234AB /* FloatingCatalogBar.swift */; };
+		MAC000000000000000000054 /* StashyTopNavStrip.swift in Sources */ = {isa = PBXBuildFile; fileRef = STNV000022345678901234AB /* StashyTopNavStrip.swift */; };
+		MAC000000000000000000055 /* SharedChromeComponents.swift in Sources */ = {isa = PBXBuildFile; fileRef = SCHR000022345678901234AB /* SharedChromeComponents.swift */; };
+		MAC000000000000000000056 /* LinkedImagesCatalogGrid.swift in Sources */ = {isa = PBXBuildFile; fileRef = LIMG000022345678901234AB /* LinkedImagesCatalogGrid.swift */; };
+		MAC000000000000000000057 /* HotOrNotToolsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 971A00022F999002 /* HotOrNotToolsView.swift */; };
+		MAC000000000000000000058 /* RateMeToolsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 971A00042F999004 /* RateMeToolsView.swift */; };
+		MAC000000000000000000059 /* FilterCriterionTypes.swift in Sources */ = {isa = PBXBuildFile; fileRef = D32D9793F36147319D8FF8BF /* FilterCriterionTypes.swift */; };
+		MAC00000000000000000005A /* FilterFieldCatalog.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEA1E8DCB9534BA393BDCA09 /* FilterFieldCatalog.swift */; };
+		MAC00000000000000000005B /* FilterCriteriaDocument.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2195D672B4B04628BD280AA1 /* FilterCriteriaDocument.swift */; };
+		MAC00000000000000000005C /* NativeChromeSupport.swift in Sources */ = {isa = PBXBuildFile; fileRef = C4B0E00100000000000000A1 /* NativeChromeSupport.swift */; };
+		MAC00000000000000000005D /* CatalogChrome.swift in Sources */ = {isa = PBXBuildFile; fileRef = C4B0E00100000000000000A2 /* CatalogChrome.swift */; };
+		MAC00000000000000000005E /* StashyDetailToolbar.swift in Sources */ = {isa = PBXBuildFile; fileRef = C4B0E00100000000000000A3 /* StashyDetailToolbar.swift */; };
+		MAC00000000000000000005F /* FilterPickerOptionsStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D40001400180011001 /* FilterPickerOptionsStore.swift */; };
+		MAC000000000000000000060 /* FilterCriteriaEditorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0D91ABA114F544C390FD6F8E /* FilterCriteriaEditorView.swift */; };
+		MAC000000000000000000061 /* FiltersToolsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 130472FFD9E64071BF78EDAE /* FiltersToolsView.swift */; };
+		MAC000000000000000000062 /* TopListsToolsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 971A00062F999006 /* TopListsToolsView.swift */; };
+		MAC000000000000000000063 /* SessionTimelineToolsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 971A00072F999007 /* SessionTimelineToolsView.swift */; };
+		MAC000000000000000000064 /* SessionTimelineLoader.swift in Sources */ = {isa = PBXBuildFile; fileRef = 971A00092F999009 /* SessionTimelineLoader.swift */; };
+		MAC000000000000000000065 /* TabManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = DFF7EE402F0D3D2800344A8B /* TabManager.swift */; };
+		MAC000000000000000000066 /* StudiosView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DFE504612E8A8C4000323FF0 /* StudiosView.swift */; };
+		MAC000000000000000000067 /* AppearanceSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DF22BB332F1831C7007C2090 /* AppearanceSettingsView.swift */; };
+		MAC000000000000000000068 /* EditModeSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1ED4C0112345678901234AB /* EditModeSettingsView.swift */; };
+		MAC000000000000000000069 /* ServerSetupWizardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DF90B7632F1ACEA3003ED852 /* ServerSetupWizardView.swift */; };
+		MAC00000000000000000006A /* GraphQLClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = DFGQ000022F28A0000000002 /* GraphQLClient.swift */; };
+		MAC00000000000000000006B /* GraphQLQueries.swift in Sources */ = {isa = PBXBuildFile; fileRef = DFGQ000042F28A0000000004 /* GraphQLQueries.swift */; };
+		MAC00000000000000000006C /* KeychainManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = DFSM000022F2NEWFILE002 /* KeychainManager.swift */; };
+		MAC00000000000000000006D /* ServerFormViewNew.swift in Sources */ = {isa = PBXBuildFile; fileRef = DFSM000062F2NEWFILE006 /* ServerFormViewNew.swift */; };
+		MAC00000000000000000006E /* StashSyncManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 372E2D9A2F64425000603361 /* StashSyncManager.swift */; };
+		MAC00000000000000000006F /* DesignTokens.swift in Sources */ = {isa = PBXBuildFile; fileRef = DFUI000022F3AUDIT002 /* DesignTokens.swift */; };
+		MAC000000000000000000070 /* HapticManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = DFUI000042F3AUDIT004 /* HapticManager.swift */; };
+		MAC000000000000000000071 /* ToastManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = DFUI000062F3AUDIT006 /* ToastManager.swift */; };
+		MAC000000000000000000072 /* SecurityManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = DFSEC0022F2A000100000002 /* SecurityManager.swift */; };
+		MAC000000000000000000073 /* PasscodeEntryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DFSEC0042F2A000100000004 /* PasscodeEntryView.swift */; };
+		MAC000000000000000000074 /* AITagSuggestionManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = AITAG00022F70A00000000002 /* AITagSuggestionManager.swift */; };
+		MAC000000000000000000075 /* SimilarScenesFinder.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5115C0020000000000000002 /* SimilarScenesFinder.swift */; };
+		MAC000000000000000000076 /* SceneSimilarScenesCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5115C0060000000000000006 /* SceneSimilarScenesCard.swift */; };
+		MAC000000000000000000077 /* AITagSuggestionBar.swift in Sources */ = {isa = PBXBuildFile; fileRef = AITAG00042F70A00000000004 /* AITagSuggestionBar.swift */; };
+		MAC000000000000000000078 /* SwipeActionCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = SWIPE0002000000000000002 /* SwipeActionCard.swift */; };
+		MAC000000000000000000079 /* SceneBulkDownloadControl.swift in Sources */ = {isa = PBXBuildFile; fileRef = SCENEDL02000000000000002 /* SceneBulkDownloadControl.swift */; };
+		MAC00000000000000000007A /* AddTagsSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = AITAG000A2F70A0000000000A /* AddTagsSheet.swift */; };
+		MAC00000000000000000007B /* AITagsSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AITAG00062F70A00000000006 /* AITagsSettingsView.swift */; };
+		MAC00000000000000000007C /* SecuritySettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DFSEC0062F2A000100000006 /* SecuritySettingsView.swift */; };
+		MAC000000000000000000089 /* AetherEngine in Frameworks */ = {isa = PBXBuildFile; productRef = MAC000000000000000000086 /* AetherEngine */; };
+		MAC00000000000000000008A /* SwiftDraw in Frameworks */ = {isa = PBXBuildFile; productRef = MAC000000000000000000087 /* SwiftDraw */; };
+		MAC00000000000000000008B /* RevenueCat in Frameworks */ = {isa = PBXBuildFile; productRef = MAC000000000000000000088 /* RevenueCat */; };
+		MAC00000000000000000008C /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = AA0000022E8A9C0000000001 /* Assets.xcassets */; };
+		MAC00000000000000000008D /* graphql in Resources */ = {isa = PBXBuildFile; fileRef = DFGQGRAPHQLREF001 /* graphql */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXCopyFilesBuildPhase section */
@@ -363,10 +492,12 @@
 		STNV000022345678901234AB /* StashyTopNavStrip.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StashyTopNavStrip.swift; sourceTree = "<group>"; };
 		SWIPE0002000000000000002 /* SwipeActionCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SwipeActionCard.swift; sourceTree = "<group>"; };
 		SYNCJOB02000000000000002 /* DownloadSyncJobs.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DownloadSyncJobs.swift; sourceTree = "<group>"; };
+		MAC000000000000000000084 /* stashyMac.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = stashyMac.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		37D3E24F2F3932C400AB8FAD /* stashyTV */ = {isa = PBXFileSystemSynchronizedRootGroup; explicitFileTypes = {}; explicitFolders = (); path = stashyTV; sourceTree = "<group>"; };
+		MAC000000000000000000085 /* stashyMac */ = {isa = PBXFileSystemSynchronizedRootGroup; explicitFileTypes = {}; explicitFolders = (); path = stashyMac; sourceTree = "<group>"; };
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -390,6 +521,16 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		MAC000000000000000000082 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				MAC000000000000000000089 /* AetherEngine in Frameworks */,
+				MAC00000000000000000008A /* SwiftDraw in Frameworks */,
+				MAC00000000000000000008B /* RevenueCat in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
@@ -403,6 +544,8 @@
 				DFGQGRAPHQLREF001 /* graphql */,
 				37D3E24E2F3932C400AB8FAD /* stashyTV.app */,
 				37D3E24F2F3932C400AB8FAD /* stashyTV */,
+				MAC000000000000000000084 /* stashyMac.app */,
+				MAC000000000000000000085 /* stashyMac */,
 			);
 			sourceTree = "<group>";
 		};
@@ -680,6 +823,31 @@
 			productReference = 37D3E24E2F3932C400AB8FAD /* stashyTV.app */;
 			productType = "com.apple.product-type.application";
 		};
+		MAC00000000000000000007D /* stashyMac */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = MAC00000000000000000007E /* Build configuration list for PBXNativeTarget "stashyMac" */;
+			buildPhases = (
+				MAC000000000000000000081 /* Sources */,
+				MAC000000000000000000082 /* Frameworks */,
+				MAC000000000000000000083 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				MAC000000000000000000085 /* stashyMac */,
+			);
+			name = stashyMac;
+			packageProductDependencies = (
+				MAC000000000000000000086 /* AetherEngine */,
+				MAC000000000000000000087 /* SwiftDraw */,
+				MAC000000000000000000088 /* RevenueCat */,
+			);
+			productName = stashyMac;
+			productReference = MAC000000000000000000084 /* stashyMac.app */;
+			productType = "com.apple.product-type.application";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -715,6 +883,7 @@
 			targets = (
 				08FB7790FE84155DC02AAC07 /* stashy */,
 				37D3E24D2F3932C400AB8FAD /* stashyTV */,
+				MAC00000000000000000007D /* stashyMac */,
 			);
 		};
 /* End PBXProject section */
@@ -734,6 +903,15 @@
 			buildActionMask = 2147483647;
 			files = (
 				37D3E3262F39444C00AB8FAD /* Assets.xcassets in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		MAC000000000000000000083 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				MAC00000000000000000008C /* Assets.xcassets in Resources */,
+				MAC00000000000000000008D /* graphql in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -983,6 +1161,137 @@
 				C047CE6380F048858A91E6C9 /* GraphQLClient.swift in Sources */,
 				E909C6E8F4744C4D939F78BD /* GraphQLQueries.swift in Sources */,
 				A1PLUS042F30B00000000004 /* StashyPlusManager.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		MAC000000000000000000081 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				MAC000000000000000000001 /* AetherSceneEngine.swift in Sources */,
+				MAC000000000000000000002 /* Scene+AetherPlayback.swift in Sources */,
+				MAC000000000000000000003 /* AetherSceneSurface.swift in Sources */,
+				MAC000000000000000000004 /* SceneScrubSprites.swift in Sources */,
+				MAC000000000000000000005 /* AetherTimeBar.swift in Sources */,
+				MAC000000000000000000006 /* PlayerMenuButton.swift in Sources */,
+				MAC000000000000000000007 /* LocalDownloadStore.swift in Sources */,
+				MAC000000000000000000008 /* AetherVideoSurface.swift in Sources */,
+				MAC000000000000000000009 /* AetherPreviewPlayer.swift in Sources */,
+				MAC00000000000000000000A /* AcknowledgementsView.swift in Sources */,
+				MAC00000000000000000000B /* SceneGalleriesCard.swift in Sources */,
+				MAC00000000000000000000C /* SceneVideoPlayerCard.swift in Sources */,
+				MAC00000000000000000000D /* ScenePlayerExtras.swift in Sources */,
+				MAC00000000000000000000E /* SceneStudioCard.swift in Sources */,
+				MAC00000000000000000000F /* ScenePerformersCard.swift in Sources */,
+				MAC000000000000000000010 /* DirectorDetailView.swift in Sources */,
+				MAC000000000000000000011 /* SceneTagsCard.swift in Sources */,
+				MAC000000000000000000012 /* SceneGroupsCard.swift in Sources */,
+				MAC000000000000000000013 /* SettingsView.swift in Sources */,
+				MAC000000000000000000014 /* ServerListSection.swift in Sources */,
+				MAC000000000000000000015 /* SceneHeatmapCard.swift in Sources */,
+				MAC000000000000000000016 /* ServerDetailView.swift in Sources */,
+				MAC000000000000000000017 /* PlaybackSettingsSection.swift in Sources */,
+				MAC000000000000000000018 /* ContentSettingsSection.swift in Sources */,
+				MAC000000000000000000019 /* DashboardSettingsView.swift in Sources */,
+				MAC00000000000000000001A /* ReelsModeSettingsView.swift in Sources */,
+				MAC00000000000000000001B /* VideoAnalysisManager.swift in Sources */,
+				MAC00000000000000000001C /* StashyPlusManager.swift in Sources */,
+				MAC00000000000000000001D /* AppIconManager.swift in Sources */,
+				MAC00000000000000000001E /* SubtitleController.swift in Sources */,
+				MAC00000000000000000001F /* OCountHeatmapLoader.swift in Sources */,
+				MAC000000000000000000020 /* SceneTranscriptionSupport.swift in Sources */,
+				MAC000000000000000000021 /* SceneLiveTranscriptionController.swift in Sources */,
+				MAC000000000000000000022 /* SceneTranscodeAudioPrefetcher.swift in Sources */,
+				MAC000000000000000000023 /* SceneCaptionTranslator.swift in Sources */,
+				MAC000000000000000000024 /* DefaultFilterView.swift in Sources */,
+				MAC000000000000000000025 /* ServerStatisticsView.swift in Sources */,
+				MAC000000000000000000026 /* OCountHeatmapCard.swift in Sources */,
+				MAC000000000000000000027 /* ScenesView.swift in Sources */,
+				MAC000000000000000000028 /* SceneDetailView.swift in Sources */,
+				MAC000000000000000000029 /* GalleryRepository.swift in Sources */,
+				MAC00000000000000000002A /* StudioRepository.swift in Sources */,
+				MAC00000000000000000002B /* TagRepository.swift in Sources */,
+				MAC00000000000000000002C /* SceneRepository.swift in Sources */,
+				MAC00000000000000000002D /* PerformerRepository.swift in Sources */,
+				MAC00000000000000000002E /* PerformerDetailView.swift in Sources */,
+				MAC00000000000000000002F /* LoginAuthHelper.swift in Sources */,
+				MAC000000000000000000030 /* StudioDetailView.swift in Sources */,
+				MAC000000000000000000031 /* SceneDelegate.swift in Sources */,
+				MAC000000000000000000032 /* App.swift in Sources */,
+				MAC000000000000000000033 /* MainTabView.swift in Sources */,
+				MAC000000000000000000034 /* AppearanceManager.swift in Sources */,
+				MAC000000000000000000035 /* HomeRowView.swift in Sources */,
+				MAC000000000000000000036 /* HomeStatisticsRowView.swift in Sources */,
+				MAC000000000000000000037 /* HomeChannelsRowView.swift in Sources */,
+				MAC000000000000000000038 /* HomeSceneCardView.swift in Sources */,
+				MAC000000000000000000039 /* ServerConfig.swift in Sources */,
+				MAC00000000000000000003A /* NavigationCoordinator.swift in Sources */,
+				MAC00000000000000000003B /* ImageCacheManager.swift in Sources */,
+				MAC00000000000000000003C /* StashDBViewModel.swift in Sources */,
+				MAC00000000000000000003D /* MarkersView.swift in Sources */,
+				MAC00000000000000000003E /* UniversalSearchView.swift in Sources */,
+				MAC00000000000000000003F /* PerformersView.swift in Sources */,
+				MAC000000000000000000040 /* ListCatalogFilterSortModels.swift in Sources */,
+				MAC000000000000000000041 /* ListCatalogFilterSortSheets.swift in Sources */,
+				MAC000000000000000000042 /* DetailLinkedCatalogControllers.swift in Sources */,
+				MAC000000000000000000043 /* CatalogsView.swift in Sources */,
+				MAC000000000000000000044 /* TagsView.swift in Sources */,
+				MAC000000000000000000045 /* TagMergeToolsView.swift in Sources */,
+				MAC000000000000000000046 /* MergeTools.swift in Sources */,
+				MAC000000000000000000047 /* StudioLogo.swift in Sources */,
+				MAC000000000000000000048 /* StudioLogoStore.swift in Sources */,
+				MAC000000000000000000049 /* StarRatingView.swift in Sources */,
+				MAC00000000000000000004A /* DownloadsView.swift in Sources */,
+				MAC00000000000000000004B /* DownloadSyncJobs.swift in Sources */,
+				MAC00000000000000000004C /* ImagesView.swift in Sources */,
+				MAC00000000000000000004D /* StashImageDateSort.swift in Sources */,
+				MAC00000000000000000004E /* GalleriesView.swift in Sources */,
+				MAC00000000000000000004F /* ReelsView.swift in Sources */,
+				MAC000000000000000000050 /* SharedUtilities.swift in Sources */,
+				MAC000000000000000000051 /* SceneCardView.swift in Sources */,
+				MAC000000000000000000052 /* HomeView.swift in Sources */,
+				MAC000000000000000000053 /* FloatingCatalogBar.swift in Sources */,
+				MAC000000000000000000054 /* StashyTopNavStrip.swift in Sources */,
+				MAC000000000000000000055 /* SharedChromeComponents.swift in Sources */,
+				MAC000000000000000000056 /* LinkedImagesCatalogGrid.swift in Sources */,
+				MAC000000000000000000057 /* HotOrNotToolsView.swift in Sources */,
+				MAC000000000000000000058 /* RateMeToolsView.swift in Sources */,
+				MAC000000000000000000059 /* FilterCriterionTypes.swift in Sources */,
+				MAC00000000000000000005A /* FilterFieldCatalog.swift in Sources */,
+				MAC00000000000000000005B /* FilterCriteriaDocument.swift in Sources */,
+				MAC00000000000000000005C /* NativeChromeSupport.swift in Sources */,
+				MAC00000000000000000005D /* CatalogChrome.swift in Sources */,
+				MAC00000000000000000005E /* StashyDetailToolbar.swift in Sources */,
+				MAC00000000000000000005F /* FilterPickerOptionsStore.swift in Sources */,
+				MAC000000000000000000060 /* FilterCriteriaEditorView.swift in Sources */,
+				MAC000000000000000000061 /* FiltersToolsView.swift in Sources */,
+				MAC000000000000000000062 /* TopListsToolsView.swift in Sources */,
+				MAC000000000000000000063 /* SessionTimelineToolsView.swift in Sources */,
+				MAC000000000000000000064 /* SessionTimelineLoader.swift in Sources */,
+				MAC000000000000000000065 /* TabManager.swift in Sources */,
+				MAC000000000000000000066 /* StudiosView.swift in Sources */,
+				MAC000000000000000000067 /* AppearanceSettingsView.swift in Sources */,
+				MAC000000000000000000068 /* EditModeSettingsView.swift in Sources */,
+				MAC000000000000000000069 /* ServerSetupWizardView.swift in Sources */,
+				MAC00000000000000000006A /* GraphQLClient.swift in Sources */,
+				MAC00000000000000000006B /* GraphQLQueries.swift in Sources */,
+				MAC00000000000000000006C /* KeychainManager.swift in Sources */,
+				MAC00000000000000000006D /* ServerFormViewNew.swift in Sources */,
+				MAC00000000000000000006E /* StashSyncManager.swift in Sources */,
+				MAC00000000000000000006F /* DesignTokens.swift in Sources */,
+				MAC000000000000000000070 /* HapticManager.swift in Sources */,
+				MAC000000000000000000071 /* ToastManager.swift in Sources */,
+				MAC000000000000000000072 /* SecurityManager.swift in Sources */,
+				MAC000000000000000000073 /* PasscodeEntryView.swift in Sources */,
+				MAC000000000000000000074 /* AITagSuggestionManager.swift in Sources */,
+				MAC000000000000000000075 /* SimilarScenesFinder.swift in Sources */,
+				MAC000000000000000000076 /* SceneSimilarScenesCard.swift in Sources */,
+				MAC000000000000000000077 /* AITagSuggestionBar.swift in Sources */,
+				MAC000000000000000000078 /* SwipeActionCard.swift in Sources */,
+				MAC000000000000000000079 /* SceneBulkDownloadControl.swift in Sources */,
+				MAC00000000000000000007A /* AddTagsSheet.swift in Sources */,
+				MAC00000000000000000007B /* AITagsSettingsView.swift in Sources */,
+				MAC00000000000000000007C /* SecuritySettingsView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -1253,6 +1562,67 @@
 			};
 			name = Release;
 		};
+		MAC00000000000000000007F /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = MacAppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = stashyMac.entitlements;
+				CODE_SIGN_IDENTITY = "Apple Development";
+				CODE_SIGN_STYLE = Automatic;
+				COMBINE_HIDPI_IMAGES = YES;
+				CURRENT_PROJECT_VERSION = 341;
+				DEVELOPMENT_TEAM = 699G2QY959;
+				ENABLE_HARDENED_RUNTIME = YES;
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = "stashyMac-Info.plist";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				MACOSX_DEPLOYMENT_TARGET = 26.0;
+				MARKETING_VERSION = 3.3.6;
+				PRODUCT_BUNDLE_IDENTIFIER = de.letzgo.stashy;
+				PRODUCT_NAME = stashy;
+				PROVISIONING_PROFILE_SPECIFIER = "";
+				SDKROOT = macosx;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG $(inherited)";
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+			};
+			name = Debug;
+		};
+		MAC000000000000000000080 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = MacAppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = stashyMac.entitlements;
+				CODE_SIGN_IDENTITY = "Apple Development";
+				CODE_SIGN_STYLE = Automatic;
+				COMBINE_HIDPI_IMAGES = YES;
+				CURRENT_PROJECT_VERSION = 341;
+				DEVELOPMENT_TEAM = 699G2QY959;
+				ENABLE_HARDENED_RUNTIME = YES;
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = "stashyMac-Info.plist";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				MACOSX_DEPLOYMENT_TARGET = 26.0;
+				MARKETING_VERSION = 3.3.6;
+				PRODUCT_BUNDLE_IDENTIFIER = de.letzgo.stashy;
+				PRODUCT_NAME = stashy;
+				PROVISIONING_PROFILE_SPECIFIER = "";
+				SDKROOT = macosx;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -1279,6 +1649,15 @@
 			buildConfigurations = (
 				37D3E2562F3932C500AB8FAD /* Debug */,
 				37D3E2572F3932C500AB8FAD /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		MAC00000000000000000007E /* Build configuration list for PBXNativeTarget "stashyMac" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				MAC00000000000000000007F /* Debug */,
+				MAC000000000000000000080 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
@@ -1339,6 +1718,21 @@
 			productName = RevenueCat;
 		};
 		EC0000000000000000000012 /* RevenueCat */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = EC0000000000000000000001 /* XCRemoteSwiftPackageReference "purchases-ios-spm" */;
+			productName = RevenueCat;
+		};
+		MAC000000000000000000086 /* AetherEngine */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = AE7E00000000000000000001 /* XCRemoteSwiftPackageReference "AetherEngine" */;
+			productName = AetherEngine;
+		};
+		MAC000000000000000000087 /* SwiftDraw */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 0F1E2D3C4B5A69788796A5B4 /* XCRemoteSwiftPackageReference "SwiftDraw" */;
+			productName = SwiftDraw;
+		};
+		MAC000000000000000000088 /* RevenueCat */ = {
 			isa = XCSwiftPackageProductDependency;
 			package = EC0000000000000000000001 /* XCRemoteSwiftPackageReference "purchases-ios-spm" */;
 			productName = RevenueCat;

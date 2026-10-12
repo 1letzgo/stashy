@@ -347,7 +347,7 @@ private struct DownloadSyncJobSheet: View {
     let savedFilters: [String: StashDBViewModel.SavedFilter]
     let onSave: (DownloadSyncJob) -> Void
 
-    @Environment(\.dismiss) private var dismiss
+    @Environment(\.stashyDismiss) private var dismiss
     @ObservedObject private var appearance = AppearanceManager.shared
     @State private var selectedFilterId: String?
     @State private var amount: Int = 5
@@ -612,7 +612,7 @@ struct DownloadDetailView: View {
     @State private var isFullScreen = false
     @State private var isHeaderExpanded = false
     @State private var isMuted = ScenePlayerMute.initialValue()
-    @Environment(\.dismiss) var dismiss
+    @Environment(\.stashyDismiss) var dismiss
 
     private var chromePillHeight: CGFloat { StashyExpandingDock.activeHeight }
 
@@ -1034,6 +1034,11 @@ struct DownloadDetailView: View {
     }
 
     private func shareVideo(url: URL) {
+        #if os(macOS)
+        guard let view = NSApp.keyWindow?.contentView else { return }
+        NSSharingServicePicker(items: [url])
+            .show(relativeTo: CGRect(x: view.bounds.midX, y: view.bounds.midY, width: 1, height: 1), of: view, preferredEdge: .minY)
+        #else
         let activityVC = UIActivityViewController(activityItems: [url], applicationActivities: nil)
         
         // For iPad support
@@ -1045,6 +1050,7 @@ struct DownloadDetailView: View {
             
             rootVC.present(activityVC, animated: true)
         }
+        #endif
     }
     
     private func formatDuration(_ seconds: Double) -> String {
@@ -1272,7 +1278,7 @@ struct DownloadedGalleryDetailView: View {
     }
 
     @State private var gridWidth: CGFloat = 0
-    @Environment(\.dismiss) private var dismiss
+    @Environment(\.stashyDismiss) private var dismiss
 
     private var isSyncing: Bool { downloadManager.activeDownloads[entryId] != nil }
 
@@ -1493,7 +1499,7 @@ struct DownloadedGalleryFullScreenView: View {
     let images: [DownloadedGalleryImage]
     let startIndex: Int
 
-    @Environment(\.dismiss) private var dismiss
+    @Environment(\.stashyDismiss) private var dismiss
     @State private var navigationBackTrigger: UUID?
     @ObservedObject private var downloadManager = DownloadManager.shared
     @ObservedObject private var appearance = AppearanceManager.shared

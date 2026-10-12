@@ -1618,7 +1618,7 @@ struct SceneLiveFilterSheet: View {
     var onMarkerSortChange: (StashDBViewModel.SceneMarkerSortOption) -> Void
 
     @ObservedObject private var appearance = AppearanceManager.shared
-    @Environment(\.dismiss) private var dismiss
+    @Environment(\.stashyDismiss) private var dismiss
 
     private var hasSelectedPreset: Bool { !selectedPresetId.isEmpty }
     private var selectedPresetName: String? {

@@ -16,7 +16,7 @@ struct StudioDetailView: View {
     @ObservedObject private var tabManager = TabManager.shared
     @StateObject private var viewModel = StashDBViewModel()
     @EnvironmentObject var coordinator: NavigationCoordinator
-    @Environment(\.dismiss) private var dismiss
+    @Environment(\.stashyDismiss) private var dismiss
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @State private var studioLiveFilterSheetPresented = false
     @State private var showingSceneDownloadOptions = false
@@ -1149,7 +1149,7 @@ struct EditStudioSheet: View {
     var onDeleted: (() -> Void)? = nil
     var onComplete: (Studio) -> Void
 
-    @Environment(\.dismiss) private var dismiss
+    @Environment(\.stashyDismiss) private var dismiss
     @ObservedObject private var appearanceManager = AppearanceManager.shared
 
     @State private var name: String = ""

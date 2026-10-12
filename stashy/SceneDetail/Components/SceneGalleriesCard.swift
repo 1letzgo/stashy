@@ -193,7 +193,7 @@ struct AddGalleryToSceneSheet: View {
     @ObservedObject var viewModel: StashDBViewModel
     var onComplete: ([Gallery]) -> Void
 
-    @Environment(\.dismiss) var dismiss
+    @Environment(\.stashyDismiss) var dismiss
     @ObservedObject var appearanceManager = AppearanceManager.shared
     @State private var performerGalleries: [Gallery] = []
     @State private var allGalleries: [Gallery] = []

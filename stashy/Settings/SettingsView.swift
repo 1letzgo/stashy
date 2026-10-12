@@ -9,7 +9,11 @@
 import SwiftUI
 import StoreKit
 import RevenueCat
+#if canImport(UIKit)
 import UIKit
+#else
+import AppKit
+#endif
 
 private enum StashyLegalLinks {
     /// Apple Standard EULA — required in App Store metadata for auto-renewable subscriptions.
@@ -899,6 +903,12 @@ class StoreManager: ObservableObject {
     }
 
     func manageSubscriptions() async {
+        #if os(macOS)
+        // No in-app sheet on macOS; the App Store app manages subscriptions.
+        if let url = URL(string: "macappstore://apps.apple.com/account/subscriptions") {
+            NSWorkspace.shared.open(url)
+        }
+        #else
         guard let scene = UIApplication.shared.connectedScenes
             .compactMap({ $0 as? UIWindowScene })
             .first(where: { $0.activationState == .foregroundActive })
@@ -909,6 +919,7 @@ class StoreManager: ObservableObject {
         } catch {
             AppLog.debug("Manage subscriptions failed: \(error)")
         }
+        #endif
     }
 
     /// Paid-app buyers (original version before 3.0) get Lifetime.

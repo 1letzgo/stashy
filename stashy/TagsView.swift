@@ -716,7 +716,7 @@ struct TagDetailView: View {
     @ObservedObject var tabManager = TabManager.shared
     @StateObject private var viewModel = StashDBViewModel()
     @EnvironmentObject var coordinator: NavigationCoordinator
-    @Environment(\.dismiss) private var dismiss
+    @Environment(\.stashyDismiss) private var dismiss
     @Environment(\.verticalSizeClass) var verticalSizeClass
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @State private var tagLiveFilterSheetPresented = false
@@ -1714,7 +1714,7 @@ struct EditTagSheet: View {
     var onDeleted: (() -> Void)? = nil
     var onComplete: (Tag) -> Void
 
-    @Environment(\.dismiss) private var dismiss
+    @Environment(\.stashyDismiss) private var dismiss
     @ObservedObject private var appearanceManager = AppearanceManager.shared
 
     @State private var name: String = ""

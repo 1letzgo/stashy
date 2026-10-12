@@ -2,7 +2,11 @@
 
 #if !os(tvOS)
 import SwiftUI
+#if canImport(UIKit)
 import UIKit
+#else
+import AppKit
+#endif
 #if canImport(AetherEngine)
 import AetherEngine
 #endif
@@ -74,8 +78,10 @@ struct SceneVideoPlayerCard: View {
                             )
                         }
                     }
-                    .aspectRatio(16/9, contentMode: .fit)
+                    // Width first, then the ratio — same order as the thumbnail. The other way
+                    // round the surface's own ideal size wins, which on macOS is a small box.
                     .frame(maxWidth: .infinity)
+                    .aspectRatio(16/9, contentMode: .fit)
                     .clipShape(
                         UnevenRoundedRectangle(
                             topLeadingRadius: 12,
@@ -620,7 +626,7 @@ struct SetTagImageFromFrameSheet: View {
     let sceneTags: [Tag]
     @ObservedObject var viewModel: StashDBViewModel
 
-    @Environment(\.dismiss) private var dismiss
+    @Environment(\.stashyDismiss) private var dismiss
     @ObservedObject private var appearanceManager = AppearanceManager.shared
 
     @State private var searchText = ""
@@ -852,7 +858,7 @@ struct EditSceneTitleSheet: View {
     @ObservedObject var viewModel: StashDBViewModel
     var onComplete: (String?, String?) -> Void
 
-    @Environment(\.dismiss) var dismiss
+    @Environment(\.stashyDismiss) var dismiss
     @ObservedObject var appearanceManager = AppearanceManager.shared
     @State private var title: String = ""
     @State private var details: String = ""

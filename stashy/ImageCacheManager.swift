@@ -217,7 +217,11 @@ class ImageCache {
     /// bitmap is ready before SwiftUI draws it. Call off the main thread.
     nonisolated static func decodedForDisplay(_ data: Data) -> UIImage? {
         guard let image = UIImage(data: data) else { return nil }
+        #if os(macOS)
+        return image
+        #else
         return image.preparingForDisplay() ?? image
+        #endif
     }
 
     func loadData(forKey key: NSURL) async -> Data? {

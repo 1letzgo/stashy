@@ -12181,7 +12181,7 @@ extension DownloadManager: URLSessionDownloadDelegate {
     }
     
     nonisolated func urlSessionDidFinishEvents(forBackgroundURLSession session: URLSession) {
-        #if !os(tvOS)
+        #if os(iOS)
         Task { @MainActor in
             if let appDelegate = UIApplication.shared.delegate as? AppDelegate,
                let completionHandler = appDelegate.backgroundSessionCompletionHandler {
@@ -13007,7 +13007,7 @@ class ButtplugManager: ObservableObject {
             lastCommandSentAt = 0
             
             syncTimer?.invalidate()
-            syncTimer = CADisplayLink(target: self, selector: #selector(updateSync))
+            syncTimer = makeDisplayLink(target: self, selector: #selector(updateSync))
             syncTimer?.add(to: .main, forMode: .common)
         }
     }
@@ -13356,7 +13356,7 @@ class LoveSpouseManager: NSObject, ObservableObject {
             lastCommandSentAt = 0
             
             syncTimer?.invalidate()
-            syncTimer = CADisplayLink(target: self, selector: #selector(updateSync))
+            syncTimer = makeDisplayLink(target: self, selector: #selector(updateSync))
             syncTimer?.add(to: .main, forMode: .common)
         }
     }

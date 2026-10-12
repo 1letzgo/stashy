@@ -650,7 +650,7 @@ struct GroupDetailView: View {
     @ObservedObject var configManager = ServerConfigManager.shared
     @StateObject private var viewModel = StashDBViewModel()
     @EnvironmentObject var coordinator: NavigationCoordinator
-    @Environment(\.dismiss) private var dismiss
+    @Environment(\.stashyDismiss) private var dismiss
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @State private var groupLiveFilterSheetPresented = false
     @State private var showingSceneDownloadOptions = false
@@ -1616,7 +1616,7 @@ struct EditGroupSheet: View {
     var onDeleted: (() -> Void)? = nil
     var onComplete: (StashGroup) -> Void
 
-    @Environment(\.dismiss) private var dismiss
+    @Environment(\.stashyDismiss) private var dismiss
     @ObservedObject private var appearanceManager = AppearanceManager.shared
 
     @State private var name: String = ""

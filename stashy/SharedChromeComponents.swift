@@ -1,6 +1,10 @@
 #if !os(tvOS)
 import SwiftUI
+#if canImport(UIKit)
 import UIKit
+#else
+import AppKit
+#endif
 import ObjectiveC
 
 /// Line height of a tag chip's label. A symbol-only pill (the "+" in the tag rows)
@@ -72,6 +76,7 @@ extension View {
 
 // MARK: - Swipe-back with hidden system navigation bar
 
+#if os(iOS)
 /// Long-lived pop-gesture delegate on the `UINavigationController` itself.
 /// Avoids dangling delegates when a detail's representable is deallocated mid-gesture,
 /// and rejects root-level swipes that otherwise freeze NavigationStack.
@@ -300,6 +305,36 @@ private struct NavigationPopToRootOnChange: UIViewControllerRepresentable {
     }
 }
 
+#else
+// macOS: NavigationStack has no UINavigationController to patch. Back goes through the
+// fallback (SwiftUI `dismiss`); the nav-bar / swipe-back helpers have nothing to do.
+private struct SwipeBackGestureEnabler: View {
+    var body: some View { Color.clear.frame(width: 0, height: 0) }
+}
+
+struct StashyNavigationBackTrigger: View {
+    @Binding var trigger: UUID?
+    var dismissFallback: () -> Void
+
+    var body: some View {
+        Color.clear
+            .frame(width: 0, height: 0)
+            .onChange(of: trigger) { _, token in
+                guard token != nil else { return }
+                DispatchQueue.main.async {
+                    trigger = nil
+                    dismissFallback()
+                }
+            }
+    }
+}
+
+private struct NavigationPopToRootOnChange: View {
+    let trigger: String
+    var body: some View { Color.clear.frame(width: 0, height: 0) }
+}
+#endif
+
 /// Custom chrome sits under the status bar on every idiom.
 ///
 /// Bis iPadOS 17 saß die Tab-Bar unten, deshalb lag die Chrome auf iPad darüber.
@@ -376,7 +411,7 @@ struct CatalogSettingsSheetChromeBar: View {
     var onRequestRename: () -> Void
     var onRequestDelete: () -> Void
 
-    @Environment(\.dismiss) private var dismiss
+    @Environment(\.stashyDismiss) private var dismiss
     @State private var showSaveChoice = false
 
     var body: some View {
@@ -498,7 +533,7 @@ struct StashyDetailChromeBar<Trailing: View>: View {
     /// Prefer for modal sheets: `safeAreaInset` + `NavigationView` can make env `dismiss` a no-op.
     var onBack: (() -> Void)? = nil
     @ViewBuilder var trailing: () -> Trailing
-    @Environment(\.dismiss) private var dismiss
+    @Environment(\.stashyDismiss) private var dismiss
 
     init(
         title: String,
@@ -562,8 +597,12 @@ extension View {
             .navigationTitle("")
             .navigationBarTitleDisplayMode(.inline)
             .navigationBarBackButtonHidden(true)
+            #if os(iOS)
             .toolbar(.hidden, for: .navigationBar)
             .toolbarBackground(.hidden, for: .navigationBar)
+            #elseif os(macOS)
+            .modifier(MacHideSheetToolbar())
+            #endif
     }
 
     /// Custom chrome inset: top on iPhone, bottom on iPad.
@@ -1015,6 +1054,14 @@ private struct OCounterRemovalMenu: ViewModifier {
 /// starts editing (SwiftUI `TextField`, `SecureField`, `TextEditor` are backed by these).
 /// Search fields are left alone — they have their own Search key and native look.
 /// Installed once at launch from `AppDelegate`.
+#if os(macOS)
+/// No on-screen keyboard on macOS — nothing to decorate.
+@MainActor
+final class KeyboardDoneAccessory: NSObject {
+    static let shared = KeyboardDoneAccessory()
+    func install() {}
+}
+#else
 @MainActor
 final class KeyboardDoneAccessory: NSObject {
     static let shared = KeyboardDoneAccessory()
@@ -1067,5 +1114,7 @@ final class KeyboardDoneAccessory: NSObject {
         UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
     }
 }
+
+#endif
 
 #endif

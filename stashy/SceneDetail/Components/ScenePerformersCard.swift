@@ -180,7 +180,7 @@ struct AddPerformerToSceneSheet: View {
     @ObservedObject var viewModel: StashDBViewModel
     var onComplete: ([ScenePerformer]) -> Void
 
-    @Environment(\.dismiss) var dismiss
+    @Environment(\.stashyDismiss) var dismiss
     @ObservedObject var appearanceManager = AppearanceManager.shared
     @State private var performers: [Performer] = []
     @State private var isLoading = false

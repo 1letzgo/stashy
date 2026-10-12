@@ -44,7 +44,7 @@ struct SceneDetailView: View {
     @State private var isDeleting = false
     @State private var isDownloading = false
     @State private var isIdentifying = false
-    @Environment(\.dismiss) var dismiss
+    @Environment(\.stashyDismiss) var dismiss
     @EnvironmentObject var coordinator: NavigationCoordinator
 
     @State private var isHeaderExpanded = false
@@ -300,7 +300,14 @@ struct SceneDetailView: View {
     /// content: there the picture already takes most of the height, and a pinned card would
     /// leave a sliver for everything else.
     private var isPlayerPinned: Bool {
+        #if os(macOS)
+        // A Mac window is landscape: pinned, the 16:9 card had to share the height with the
+        // scroll view and shrank to a small box. In the scroll content it stays full width,
+        // exactly like the cover.
+        return false
+        #else
         isPlaybackStarted && aetherEngine != nil && verticalSizeClass != .compact
+        #endif
     }
 
     /// One instance, used pinned above the scroll area or inside it.
@@ -1282,7 +1289,7 @@ struct AddMarkerSheet: View {
     let aetherEngine: AetherSceneEngine?
     @ObservedObject var viewModel: StashDBViewModel
     var onComplete: () -> Void
-    @Environment(\.dismiss) var dismiss
+    @Environment(\.stashyDismiss) var dismiss
     @ObservedObject var appearanceManager = AppearanceManager.shared
     
     @State private var primaryTagId: String = ""
@@ -1664,7 +1671,7 @@ private struct SceneDetailLifecycleModifier: ViewModifier {
             }
             // Without a mute button here the route is the only control the user has: plugging
             // headphones in mid-playback must turn the sound on, unplugging must mute again.
-            .onReceive(NotificationCenter.default.publisher(for: AVAudioSession.routeChangeNotification)
+            .onReceive(NotificationCenter.default.publisher(for: audioRouteChangeNotification)
                 .receive(on: DispatchQueue.main)) { _ in
                 let muted = ScenePlayerMute.initialValue()
                 if muted != isMuted { isMuted = muted }

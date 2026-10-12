@@ -114,7 +114,7 @@ struct AddTagToSceneSheet: View {
     @ObservedObject var viewModel: StashDBViewModel
     var onComplete: ([Tag]) -> Void
 
-    @Environment(\.dismiss) var dismiss
+    @Environment(\.stashyDismiss) var dismiss
     @ObservedObject var appearanceManager = AppearanceManager.shared
     @State private var allTags: [Tag] = []
     @State private var isLoading = false

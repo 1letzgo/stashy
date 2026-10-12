@@ -27,6 +27,7 @@ enum ReelsTabBarLayout {
     private static var cacheTimestamp: CFAbsoluteTime = 0
     private static let cacheTTL: CFAbsoluteTime = 0.5
 
+    #if os(iOS)
     private static func keyWindow() -> UIWindow? {
         let scenes = UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }
         let scene = scenes.first(where: { $0.activationState == .foregroundActive }) ?? scenes.first
@@ -35,16 +36,26 @@ enum ReelsTabBarLayout {
             ?? scene?.windows.first
     }
 
+    #endif
+
     static func invalidateCache() {
         cachedOverlap = nil
         cacheTimestamp = 0
     }
 
     static func topInset() -> CGFloat {
+        #if os(macOS)
+        return 0
+        #else
         keyWindow()?.safeAreaInsets.top ?? 0
+        #endif
     }
 
     static func overlapFromBottom() -> CGFloat {
+        #if os(macOS)
+        // The sidebar sits beside the content on macOS; nothing overlaps from below.
+        return 0
+        #else
         let now = CFAbsoluteTimeGetCurrent()
         if let cachedOverlap, now - cacheTimestamp < cacheTTL {
             return cachedOverlap
@@ -76,6 +87,7 @@ enum ReelsTabBarLayout {
         cachedOverlap = value
         cacheTimestamp = now
         return value
+        #endif
     }
 }
 
@@ -3380,11 +3392,13 @@ struct ReelsViewBody: View {
         reelsPausePlaybackForLocalTeardown()
         ReelsPlayerRegistry.suspendPlayback()
         UIApplication.shared.isIdleTimerDisabled = false
+        #if os(iOS)
         do {
             try AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
         } catch {
             AppLog.debug("🎬 Reels: Audio deactivation error: \(error)")
         }
+        #endif
     }
 
     /// Scenes / Markers / Clips / Previews take the playback session. Pics must not —
@@ -4272,6 +4286,29 @@ struct ReelsViewBody: View {
         refillFeedAfterDrops()
     }
 
+    #if os(macOS)
+    /// ↑ / ↓ on macOS: one item back / forward, animated like a swipe.
+    private func stepFeed(by delta: Int) {
+        let items = currentReelItems
+        guard !items.isEmpty else { return }
+        let index = items.firstIndex(where: { $0.id == currentVisibleSceneId }) ?? 0
+        let target = min(max(index + delta, 0), items.count - 1)
+        guard target != index else { return }
+        withAnimation(.easeInOut(duration: 0.25)) {
+            currentVisibleSceneId = items[target].id
+        }
+    }
+
+    /// ← / → on macOS: seek the active row through the scrubber, like dragging it.
+    private func seekFeed(by delta: Double) {
+        let duration = scrubberState.duration
+        guard duration > 1 else { return }
+        let target = min(max(0, scrubberState.time + delta), duration)
+        scrubberState.time = target
+        scrubberState.seekTarget = target
+    }
+    #endif
+
     private func advanceToNextItem(from item: ReelItemData) {
         let items = currentReelItems
         guard let currentIndex = items.firstIndex(where: { $0.id == item.id }) else { return }
@@ -4383,8 +4420,21 @@ struct ReelsViewBody: View {
                 }
                 .scrollTargetLayout()
             }
+            #if os(macOS)
+            .modifier(MacFeedsKeyboard(
+                isEnabled: !isMenuOpen,
+                onStep: { stepFeed(by: $0) },
+                onSeek: { seekFeed(by: $0) },
+                onTogglePlay: { currentItemIsPlaying.toggle() },
+                onToggleMute: {
+                    isMuted.toggle()
+                    ScenePlayerMute.persist(isMuted)
+                }
+            ))
+            #else
             .focusable(false)
             .focusEffectDisabled()
+            #endif
             .scrollTargetBehavior(.paging)
             .scrollDisabled(isMenuOpen)
             .scrollPosition(id: scrollPositionBinding)
@@ -6803,6 +6853,41 @@ struct IsolatedScrubberBar: View {
         .opacity(isUIVisible ? 1 : 0)
         .allowsHitTesting(isUIVisible)
         .animation(.easeInOut(duration: 0.2), value: isUIVisible)
+    }
+}
+#endif
+
+#if os(macOS)
+/// Feeds keys on macOS: ↑ / ↓ previous / next item, ← / → 10 s, space play / pause, M mute.
+/// The feed takes keyboard focus when it appears and whenever it is clicked.
+private struct MacFeedsKeyboard: ViewModifier {
+    var isEnabled: Bool
+    var onStep: (Int) -> Void
+    var onSeek: (Double) -> Void
+    var onTogglePlay: () -> Void
+    var onToggleMute: () -> Void
+
+    @FocusState private var isFocused: Bool
+
+    func body(content: Content) -> some View {
+        content
+            .focusable()
+            .focusEffectDisabled()
+            .focused($isFocused)
+            .onAppear { isFocused = true }
+            .simultaneousGesture(TapGesture().onEnded { isFocused = true })
+            .onKeyPress(.downArrow) { handle { onStep(1) } }
+            .onKeyPress(.upArrow) { handle { onStep(-1) } }
+            .onKeyPress(.rightArrow) { handle { onSeek(10) } }
+            .onKeyPress(.leftArrow) { handle { onSeek(-10) } }
+            .onKeyPress(.space) { handle { onTogglePlay() } }
+            .onKeyPress("m") { handle { onToggleMute() } }
+    }
+
+    private func handle(_ action: () -> Void) -> KeyPress.Result {
+        guard isEnabled else { return .ignored }
+        action()
+        return .handled
     }
 }
 #endif

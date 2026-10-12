@@ -1321,7 +1321,7 @@ struct FullScreenImageView: View {
     @ObservedObject var appearanceManager = AppearanceManager.shared
     @ObservedObject private var downloadManager = DownloadManager.shared
     @StateObject private var viewModel = StashDBViewModel()
-    @Environment(\.dismiss) var dismiss
+    @Environment(\.stashyDismiss) var dismiss
     @State private var isMediaZoomed = false
     @State private var showingDeleteConfirmation = false
     @State private var isMuted: Bool = ScenePlayerMute.initialValue()
@@ -2075,6 +2075,25 @@ struct FullScreenImageView: View {
     }
 }
 
+#if os(macOS)
+/// macOS: shows the system share picker anchored to the sheet's own view, then closes the sheet.
+struct ShareSheet: NSViewRepresentable {
+    let items: [Any]
+    @Environment(\.stashyDismiss) private var dismiss
+
+    func makeNSView(context: Context) -> NSView {
+        let view = NSView(frame: CGRect(x: 0, y: 0, width: 1, height: 1))
+        let items = items
+        let dismiss = dismiss
+        DispatchQueue.main.async {
+            NSSharingServicePicker(items: items).show(relativeTo: view.bounds, of: view, preferredEdge: .minY)
+            dismiss()
+        }
+        return view
+    }
+    func updateNSView(_ nsView: NSView, context: Context) {}
+}
+#else
 struct ShareSheet: UIViewControllerRepresentable {
     let items: [Any]
     func makeUIViewController(context: Context) -> UIActivityViewController {
@@ -2082,4 +2101,5 @@ struct ShareSheet: UIViewControllerRepresentable {
     }
     func updateUIViewController(_ uiViewController: UIActivityViewController, context: Context) {}
 }
+#endif
 #endif

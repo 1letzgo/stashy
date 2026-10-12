@@ -31,7 +31,7 @@ extension StashDBViewModel.SavedFilter {
 struct DirectorDetailView: View {
     let director: String
 
-    @Environment(\.dismiss) private var dismiss
+    @Environment(\.stashyDismiss) private var dismiss
     @ObservedObject private var appearanceManager = AppearanceManager.shared
     @StateObject private var viewModel = StashDBViewModel()
 

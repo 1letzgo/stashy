@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Stashy is a native iOS/tvOS SwiftUI app for browsing and managing a Stash media server (GraphQL API). Multi-server support, custom filtering, video playback, device sync, and feed-style browsing (StashTok/Feeds). Premium features are gated behind `stashy+` (StoreKit).
+Stashy is a native iOS/tvOS/macOS SwiftUI app for browsing and managing a Stash media server (GraphQL API). Multi-server support, custom filtering, video playback, device sync, and feed-style browsing (StashTok/Feeds). Premium features are gated behind `stashy+` (StoreKit).
 
 ## Build Commands
 
@@ -18,8 +18,13 @@ xcodebuild -project stashy.xcodeproj -scheme stashy -destination 'generic/platfo
 xcodebuild -project stashy.xcodeproj -scheme stashyTV -destination 'generic/platform=tvOS' build
 ```
 
+### macOS Target
+```bash
+xcodebuild -project stashy.xcodeproj -scheme stashyMac -destination 'platform=macOS' build
+```
+
 ### Tests
-No test target is wired into the Xcode project. `stashyTests/` holds Swift Testing files (`InfrastructureTests.swift`: StashTrustDelegate, GraphQL retry, PaginatedLoader generation, AppLog redaction) ready to attach to a future target. Verification = the two builds above + manual testing on device/simulator.
+No test target is wired into the Xcode project. `stashyTests/` holds Swift Testing files (`InfrastructureTests.swift`: StashTrustDelegate, GraphQL retry, PaginatedLoader generation, AppLog redaction) ready to attach to a future target. Verification = the three builds above + manual testing on device/simulator.
 
 ## Architecture Overview
 
@@ -75,7 +80,13 @@ No test target is wired into the Xcode project. `stashyTests/` holds Swift Testi
 
 Shared code with `#if !os(tvOS)` guards. Many iOS-only files guard their *entire* contents, so a new iOS-only file still compiles into the tvOS target harmlessly — but tvOS UI is a separate hand-written surface in `stashyTV/` (`TV*` views, focus-based navigation, remote input, simplified layouts). tvOS lacks Keychain, haptics, UIKit scene delegates, and gesture-heavy components.
 
-`SwiftDraw` (SPM) is linked to **both** targets. Every studio image (PNG/JPG/SVG) goes through `StudioLogoStore` (`stashy/StudioLogoStore.swift`: fetch → SwiftDraw raster → alpha trim → memory + disk cache). Never render an SVG live in a `WKWebView` or per-card.
+**macOS** (`stashyMac`, macOS 26, same bundle ID `de.letzgo.stashy` for universal purchase) compiles the *same* sources as the iOS target plus `stashyMac/` (filesystem-synchronized: `StashyMacApp.swift` entry point + menu commands, `MacCompat.swift`, `MacAppIcon`). Mac Catalyst is not an option: AetherEngine's FFmpeg/Dovi xcframeworks ship no Catalyst slice.
+- `MacCompat.swift` aliases `UIImage`/`UIColor`/`UIFont`/`UIResponder` to AppKit and shims the UIKit surface the shared code touches (`UIApplication`, `UIScreen`, `UIDevice`, `UIGraphicsImageRenderer`, iOS-only SwiftUI modifiers like `navigationBarTitleDisplayMode`, `keyboardType`, `.navigationBar`/`.tabBar` placements, `editMode`). Extend it rather than sprinkling `#if` when a new shared file uses such an API.
+- Real behavioural differences go behind `#if os(iOS)` / `#if os(macOS)` at the call site (AVAudioSession, orientation, UIKit nav-controller hacks, `PlayerMenuButton` = `NSMenu`, `ZoomableScrollView`, `AnimatedWebView`, paging TabViews → paging `ScrollView`/plain switch). Note `#if !os(tvOS)` now also means macOS.
+- Sandbox entitlements (`stashyMac.entitlements`) the app depends on: `network.server` — AetherEngine serves the original file to AVPlayer through a loopback HTTP server (`HLSLocalServer`); without it every original falls back to the server transcode / "No playable source". `keychain-access-groups` — the data-protection keychain (`KeychainManager`) silently fails without it.
+- New shared iOS files must be added to the `stashyMac` Sources phase too (same 4 pbxproj sections, plus the Mac target's Sources list).
+
+`SwiftDraw` (SPM) is linked to **all three** targets. Every studio image (PNG/JPG/SVG) goes through `StudioLogoStore` (`stashy/StudioLogoStore.swift`: fetch → SwiftDraw raster → alpha trim → memory + disk cache). Never render an SVG live in a `WKWebView` or per-card.
 
 ## Key Components
 

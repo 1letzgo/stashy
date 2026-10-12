@@ -18,7 +18,7 @@ struct AddTagsSheet: View {
 
     private var currentTags: [Tag] { target.tags }
 
-    @Environment(\.dismiss) var dismiss
+    @Environment(\.stashyDismiss) var dismiss
     @ObservedObject var appearanceManager = AppearanceManager.shared
 
     @State private var allTags: [Tag] = []

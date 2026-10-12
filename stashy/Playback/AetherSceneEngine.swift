@@ -14,7 +14,11 @@ import Foundation
 import Combine
 import AVFoundation
 import CoreGraphics
+#if canImport(UIKit)
 import UIKit
+#else
+import AppKit
+#endif
 import AetherEngine
 
 /// How a playback surface wants the shared audio session configured when it loads.
@@ -142,6 +146,7 @@ final class AetherSceneEngine: ObservableObject {
 
     /// Whether the engine owns the system Now-Playing session for the native video path.
     /// Must be set before the first `load` — the native host is built with this value.
+    #if os(iOS) || os(tvOS)
     var ownsNowPlaying: Bool {
         get { engine.ownsVideoNowPlayingSession }
         set { engine.ownsVideoNowPlayingSession = newValue }
@@ -151,6 +156,15 @@ final class AetherSceneEngine: ObservableObject {
     func setNowPlayingInfo(_ info: [String: Any]) {
         engine.setVideoNowPlayingInfo(info)
     }
+    #else
+    // The engine has no MPNowPlayingSession on macOS.
+    var ownsNowPlaying: Bool {
+        get { false }
+        set {}
+    }
+
+    func setNowPlayingInfo(_ info: [String: Any]) {}
+    #endif
 
     /// Presentation size of the current source, in pixels, or nil while unknown.
     /// The software route reports the settled picture size directly; the AVPlayer-backed routes

@@ -107,8 +107,11 @@ extension View {
 // MARK: - Section chrome actions (Home)
 
 /// The slots a Home sub-tab root hands up to the Home chrome. Equality only looks at what is
-/// drawn, so a re-render with fresh closures does not churn the preference.
+/// drawn, so a re-render with fresh closures does not churn the preference — plus the owner:
+/// Studios and Performers draw identical buttons, and without it switching between them kept
+/// the previous tab's closures, so its Settings button did nothing.
 struct SectionChromeActions: Equatable {
+    var owner: String = ""
     var slots: CatalogSlotSet
     var selection: CatalogSelectionChrome?
 
@@ -117,7 +120,7 @@ struct SectionChromeActions: Equatable {
             slot.map { "\($0.systemImage)|\($0.isActive)|\($0.accessibilityLabel)" } ?? "-"
         }
         let sel = selection.map { "\($0.isActive)|\($0.count)" } ?? "-"
-        return drawn.joined(separator: ";") + ";" + sel
+        return owner + ";" + drawn.joined(separator: ";") + ";" + sel
     }
 
     static func == (lhs: SectionChromeActions, rhs: SectionChromeActions) -> Bool {
@@ -353,7 +356,7 @@ struct CatalogChromeModifier: ViewModifier {
     private var sectionActions: SectionChromeActions? {
         guard config.hostsInSectionChrome,
               config.visibility.floatingBarVisible(isPresented: config.isPresented) else { return nil }
-        return SectionChromeActions(slots: config.slotSet, selection: config.selection)
+        return SectionChromeActions(owner: config.title, slots: config.slotSet, selection: config.selection)
     }
 
     @ViewBuilder

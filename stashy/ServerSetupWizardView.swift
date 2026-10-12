@@ -9,7 +9,7 @@
 import SwiftUI
 
 struct ServerSetupWizardView: View {
-    @Environment(\.dismiss) private var dismiss
+    @Environment(\.stashyDismiss) private var dismiss
     @ObservedObject var appearanceManager = AppearanceManager.shared
     
     // Wizard State
@@ -54,12 +54,25 @@ struct ServerSetupWizardView: View {
                     .padding(.top, 16)
                 
                 // Step Content
+                #if os(macOS)
+                // No paging TabView on macOS; the buttons below drive the steps anyway.
+                Group {
+                    if currentStep == 1 {
+                        step1ServerDetails
+                    } else {
+                        step2Test
+                    }
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .animation(.easeInOut, value: currentStep)
+                #else
                 TabView(selection: $currentStep) {
                     step1ServerDetails.tag(1)
                     step2Test.tag(2)
                 }
                 .tabViewStyle(.page(indexDisplayMode: .never))
                 .animation(.easeInOut, value: currentStep)
+                #endif
                 
                 // Navigation Buttons
                 navigationButtons

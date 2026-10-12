@@ -118,7 +118,9 @@ struct MainTabView: View {
                 // Suspend before audio teardown so deferred Reel `play()` races cannot restart audio.
                 ReelsPlayerRegistry.suspendPlayback()
                 NotificationCenter.default.post(name: Notification.Name("ReelsPauseAllPlayers"), object: nil)
+                #if os(iOS)
                 try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
+                #endif
             }
             .onChange(of: stashyPlus.isUnlocked) { _, _ in
                 ensureSelectedTabIsVisible()
@@ -242,7 +244,13 @@ extension MainTabView {
                 CatalogsView()
                     .applyAppBackground()
             }
+            #if os(macOS)
+            // macOS has no UINavigationController to pop: deep links into the catalogue
+            // (`cataloguePopToken`) remount the stack instead, so no detail stays on top.
+            .id("\(coordinator.catalogueTabID)|\(coordinator.cataloguePopToken)")
+            #else
             .id(coordinator.catalogueTabID)
+            #endif
 
         case .downloads:
             NavigationStack {
@@ -1036,11 +1044,16 @@ private struct ToolsStatisticsView: View {
 private struct TabBarNeverMinimizes: ViewModifier {
     @ViewBuilder
     func body(content: Content) -> some View {
+        #if os(iOS)
         if #available(iOS 26.0, *) {
             content.tabBarMinimizeBehavior(.never)
         } else {
             content
         }
+        #else
+        // macOS: tab bar across the top of the window, like iPad — no sidebar.
+        content.tabViewStyle(.tabBarOnly)
+        #endif
     }
 }
 #endif
