@@ -5,6 +5,7 @@ import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.spring
 import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -323,14 +324,13 @@ private fun FeedsInfoOverlayContent(
     Column(Modifier.fillMaxWidth()) {
         Row(Modifier.fillMaxWidth().padding(horizontal = FeedsDock.edgePadding), verticalAlignment = Alignment.Bottom) {
             Row(Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                item.performers.firstOrNull()?.let { p -> PerformerThumbnail(p) { onPerformerOpen(p) } }
-                Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                    item.performers.firstOrNull()?.let { p ->
-                        Text(
-                            p.name, color = Color.White, fontSize = 15.sp, fontWeight = FontWeight.Bold, maxLines = 1,
-                            overflow = TextOverflow.Ellipsis, modifier = Modifier.noIndicationClick { onPerformerFilter(p) },
-                        )
-                    }
+                // All performers, like the Pics header (`ImageCatalogFeedHeader`): overlapping
+                // avatars (tap → performer detail) and the names joined by "&" (tap → filter).
+                // Both rows scroll horizontally when they overflow and start over per item.
+                val performers = item.performers
+                if (performers.isNotEmpty()) PerformerAvatarStack(item.id, performers, onPerformerOpen)
+                Column(Modifier.weight(1f, fill = false), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                    if (performers.isNotEmpty()) PerformerNamesRow(item.id, performers, onPerformerFilter)
                     item.title?.takeIf { it.isNotEmpty() }?.let { title ->
                         Text(
                             title, color = Color.White.copy(alpha = 0.85f), fontSize = 15.sp, fontWeight = FontWeight.Medium, maxLines = 1,
@@ -370,6 +370,41 @@ private fun FeedsInfoOverlayContent(
                     AITagSuggestionBar(item.aiTagTarget) { }
                 }
             }
+        }
+    }
+}
+
+/** Max avatars visible side by side before the stack scrolls (keeps room for the names). */
+private const val VisibleAvatarCount = 3
+private val AvatarOverlap = 10.dp
+
+@Composable
+private fun PerformerAvatarStack(itemId: String, performers: List<FeedPerformer>, onOpen: (FeedPerformer) -> Unit) {
+    val scroll = remember(itemId) { ScrollState(0) }
+    val step = FeedsDock.circleSize - AvatarOverlap
+    val maxWidth = FeedsDock.circleSize + step * (VisibleAvatarCount - 1)
+    Row(
+        Modifier.widthIn(max = maxWidth).horizontalScroll(scroll),
+        horizontalArrangement = Arrangement.spacedBy(-AvatarOverlap),
+    ) {
+        performers.forEach { p -> PerformerThumbnail(p) { onOpen(p) } }
+    }
+}
+
+@Composable
+private fun PerformerNamesRow(itemId: String, performers: List<FeedPerformer>, onFilter: (FeedPerformer) -> Unit) {
+    val scroll = remember(itemId) { ScrollState(0) }
+    Row(
+        Modifier.horizontalScroll(scroll),
+        horizontalArrangement = Arrangement.spacedBy(4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        performers.forEachIndexed { i, p ->
+            Text(
+                p.name, color = Color.White, fontSize = 15.sp, fontWeight = FontWeight.Bold, maxLines = 1,
+                modifier = Modifier.noIndicationClick { onFilter(p) },
+            )
+            if (i < performers.size - 1) Text("&", color = Color.White.copy(alpha = 0.75f), fontSize = 15.sp, maxLines = 1)
         }
     }
 }
