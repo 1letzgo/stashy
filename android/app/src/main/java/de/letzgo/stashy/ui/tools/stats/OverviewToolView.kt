@@ -1,5 +1,6 @@
 package de.letzgo.stashy.ui.tools.stats
 
+import de.letzgo.stashy.ui.bottomBarContentPadding
 import de.letzgo.stashy.ui.scaledMaxLines
 import de.letzgo.stashy.ui.scaledIconSize
 import androidx.compose.foundation.background
@@ -55,7 +56,6 @@ import de.letzgo.stashy.ui.NativeType
 import de.letzgo.stashy.ui.Tokens
 import de.letzgo.stashy.ui.oCounterIcon
 import de.letzgo.stashy.ui.tools.NoServerPlaceholder
-import de.letzgo.stashy.ui.tools.ToolsBottomPadding
 import de.letzgo.stashy.ui.tools.ToolsTokens
 import de.letzgo.stashy.ui.tools.toolsTopPadding
 import kotlinx.coroutines.launch
@@ -101,7 +101,7 @@ private fun ServerStatisticsContent(serverID: String) {
                     .fillMaxSize()
                     .verticalScroll(rememberScrollState())
                     .padding(horizontal = ToolsTokens.contentPadding)
-                    .padding(top = toolsTopPadding() + ToolsTokens.menuTopPadding, bottom = ToolsBottomPadding),
+                    .padding(top = toolsTopPadding() + ToolsTokens.menuTopPadding, bottom = bottomBarContentPadding()),
                 verticalArrangement = Arrangement.spacedBy(20.dp),
             ) {
                 HeroCard(stats)

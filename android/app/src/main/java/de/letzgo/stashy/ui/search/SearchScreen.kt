@@ -1,5 +1,7 @@
 package de.letzgo.stashy.ui.search
 
+import de.letzgo.stashy.ui.tabBarHeight
+import de.letzgo.stashy.ui.bottomBarContentPadding
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -68,7 +70,6 @@ import de.letzgo.stashy.ui.MainTab
 import de.letzgo.stashy.ui.Nav
 import de.letzgo.stashy.ui.SF
 import de.letzgo.stashy.ui.SFS
-import de.letzgo.stashy.ui.TabBarClearance
 import de.letzgo.stashy.ui.NativeSearchField
 import de.letzgo.stashy.ui.Theme
 import de.letzgo.stashy.ui.Tokens
@@ -158,7 +159,7 @@ fun SearchScreen() {
 @Composable
 private fun Placeholder(icon: ImageVector, title: String, message: String?, onRetry: (() -> Unit)? = null) {
     val p = Theme.palette
-    Column(Modifier.fillMaxSize().padding(bottom = TabBarClearance), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(24.dp, Alignment.CenterVertically)) {
+    Column(Modifier.fillMaxSize().padding(bottom = tabBarHeight()), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(24.dp, Alignment.CenterVertically)) {
         Icon(icon, null, tint = p.secondaryText.copy(alpha = 0.5f), modifier = Modifier.size(60.dp))
         Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Text(title, style = IosTypography.title2.copy(fontWeight = FontWeight.Bold), color = p.text)
@@ -181,7 +182,7 @@ private fun Results(query: String, searching: Boolean) {
     val sections = TabManager.tabs.filter { it.id in order && it.isVisible }.sortedBy { it.sortOrder }.map { it.id }.let { s ->
         if (AppTab.Scenes in s) s.flatMap { if (it == AppTab.Scenes) listOf(it, AppTab.Images) else listOf(it) } else s + AppTab.Images
     }
-    LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(top = 16.dp, bottom = TabBarClearance + 16.dp), verticalArrangement = Arrangement.spacedBy(24.dp)) {
+    LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(top = 16.dp, bottom = bottomBarContentPadding()), verticalArrangement = Arrangement.spacedBy(24.dp)) {
         if (searching) {
             item { Row(Modifier.fillMaxWidth().padding(24.dp), horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically) {
                 CircularProgressIndicator(Modifier.size(22.dp), color = p.secondaryText, strokeWidth = 2.dp)

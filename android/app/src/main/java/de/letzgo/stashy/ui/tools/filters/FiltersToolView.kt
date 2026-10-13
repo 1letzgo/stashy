@@ -1,5 +1,6 @@
 package de.letzgo.stashy.ui.tools.filters
 
+import de.letzgo.stashy.ui.bottomBarContentPadding
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -65,7 +66,6 @@ import de.letzgo.stashy.ui.Theme
 import de.letzgo.stashy.ui.Tokens
 import de.letzgo.stashy.ui.tools.NoServerPlaceholder
 import de.letzgo.stashy.ui.tools.StashyAlert
-import de.letzgo.stashy.ui.tools.ToolsBottomPadding
 import de.letzgo.stashy.ui.tools.ToolsTokens
 import de.letzgo.stashy.ui.tools.showToast
 import de.letzgo.stashy.ui.tools.toolsTopPadding
@@ -133,7 +133,7 @@ fun FiltersToolView() {
                         Modifier.fillMaxSize(),
                         contentPadding = PaddingValues(
                             start = ToolsTokens.contentPadding, end = ToolsTokens.contentPadding,
-                            top = Tokens.Spacing.sm, bottom = ToolsBottomPadding,
+                            top = Tokens.Spacing.sm, bottom = bottomBarContentPadding(),
                         ),
                     ) {
                         grouped.forEachIndexed { sectionIndex, section ->

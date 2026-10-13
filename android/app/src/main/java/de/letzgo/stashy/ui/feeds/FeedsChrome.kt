@@ -194,7 +194,7 @@ private fun CriterionChip(label: String, onClick: () -> Unit) {
     )
 }
 
-/** iOS: `ChromePillIconButton` (48 pt glass circle). */
+/** iOS: `ChromePillIconButton` (48 pt glass circle). Also used by the image fullscreen viewers. */
 @Composable
 fun ChromePillIconButton(icon: ImageVector, description: String, enabled: Boolean = true, onClick: () -> Unit) {
     Box(
@@ -251,15 +251,19 @@ fun FeedsRateChrome(item: FeedItem, onOCounter: (FeedsRepository.OMutation) -> U
     }
 }
 
+/**
+ * Round count button of the trailing control stack (O-Counter · Rating): icon over the count.
+ * Shared with the image fullscreen viewers so both stacks always look identical.
+ */
 @Composable
-private fun StackedPill(icon: ImageVector, value: String, active: Boolean, modifier: Modifier = Modifier) {
+fun StackedPill(icon: ImageVector, value: String, active: Boolean, modifier: Modifier = Modifier, contentDescription: String? = null) {
     Column(
         // Min 48 dp circle; grows (to a rounded capsule) if the capped font scale needs more room.
         Modifier.sizeIn(minWidth = FeedsDock.stackedButtonSize, minHeight = FeedsDock.stackedButtonSize).stashyGlass(RoundedCornerShape(50)).then(modifier).padding(4.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,
     ) {
-        Icon(icon, null, tint = Color.White.copy(alpha = if (active) 1f else FeedsDock.inactiveIconOpacity), modifier = Modifier.size(FeedsDock.iconSize))
+        Icon(icon, contentDescription, tint = Color.White.copy(alpha = if (active) 1f else FeedsDock.inactiveIconOpacity), modifier = Modifier.size(FeedsDock.iconSize))
         Text(value, style = IosTypography.caption2.copy(fontWeight = FontWeight.SemiBold), color = Color.White.copy(alpha = FeedsDock.inactiveIconOpacity))
     }
 }

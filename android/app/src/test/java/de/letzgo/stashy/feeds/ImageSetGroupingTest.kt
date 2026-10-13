@@ -9,7 +9,9 @@ import de.letzgo.stashy.data.StashImage
 import de.letzgo.stashy.data.VisualFile
 import de.letzgo.stashy.ui.catalog.ImageFeedAutoplay
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /** iOS: `StashImageSetGrouping` (set grouping of Feeds › Pics / Images 1/row), mirrored in stashyTests. */
@@ -143,6 +145,18 @@ class ImageSetGroupingTest {
         assertEquals(listOf("set|i0", "set|i30", "set|i60"), posts.map { it.id })
     }
 
+    @Test fun setsRespectAConfiguredMaxSize() {
+        val images = (0 until 25).map { img("i$it", null, galleries = listOf("g")) }
+        val ten = ImageSetGrouping.buildPosts(images, "dateDesc", ImageGroupMode.GallerySession, 10, maxSetSize = 10)
+        assertEquals(listOf(10, 10, 5), ten.map { it.images.size })
+        assertEquals(listOf("set|i0", "set|i10", "set|i20"), ten.map { it.id })
+        assertEquals(listOf(25), ImageSetGrouping.buildPosts(images, "dateDesc", ImageGroupMode.GallerySession, 10, maxSetSize = 100).map { it.images.size })
+        // canJoin itself: a post of 20 is full at 20, not at 50.
+        val post = images.take(20)
+        assertFalse(ImageSetGrouping.canJoin(post, images[20], ImageGroupMode.Gallery, 10, maxSetSize = 20))
+        assertTrue(ImageSetGrouping.canJoin(post, images[20], ImageGroupMode.Gallery, 10, maxSetSize = 50))
+    }
+
     @Test fun clipAndPhotoNeverShareASet() {
         val a = img("a", "2026-01-01T10:00:00Z", galleries = listOf("g"))
         val v = img("v", "2026-01-01T10:00:01Z", galleries = listOf("g"), video = true)
@@ -190,6 +204,12 @@ class ImageSetGroupingTest {
         assertEquals(60, ImageSetGrouping.normalizedGap(60))
         assertEquals(10, ImageSetGrouping.normalizedGap(5))
         assertEquals(10, ImageSetGrouping.normalizedGap(null))
+        assertEquals("stashline_group_max_size", ImageSetGrouping.MAX_SIZE_KEY)
+        assertEquals(listOf(10, 20, 30, 50, 100), ImageSetGrouping.maxSizeOptions)
+        assertEquals(10, ImageSetGrouping.normalizedMaxSize(10))
+        assertEquals(100, ImageSetGrouping.normalizedMaxSize(100))
+        assertEquals(30, ImageSetGrouping.normalizedMaxSize(40))
+        assertEquals(30, ImageSetGrouping.normalizedMaxSize(null))
     }
 
     @Test fun autoplayPicksMostCenteredVisibleVideo() {

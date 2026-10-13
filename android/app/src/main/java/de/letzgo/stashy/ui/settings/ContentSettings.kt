@@ -31,6 +31,8 @@ import de.letzgo.stashy.data.FeedsConfig
 import de.letzgo.stashy.data.ReelsModeConfig
 import de.letzgo.stashy.data.ReelsModeType
 import de.letzgo.stashy.data.SavedFiltersStore
+import de.letzgo.stashy.data.StashyPlus
+import de.letzgo.stashy.data.HomeRowType
 import de.letzgo.stashy.data.TabConfig
 import de.letzgo.stashy.data.TabManager
 import de.letzgo.stashy.ui.Appearance
@@ -153,21 +155,28 @@ class DashboardSettingsScreen : Screen {
                 item(key = "rows") {
                     Column(Modifier.padding(bottom = 24.dp)) {
                         SectionHeaderText("Visible Dashboard Rows")
+                        // Channels are stashy+: the row is hidden while locked; moves map back onto the full list.
+                        val allRows = TabManager.homeRows
+                        val rows = if (StashyPlus.isUnlocked) allRows else allRows.filter { it.type != HomeRowType.Channels }
                         SettingsGroup {
-                            ReorderableColumn(TabManager.homeRows, { it.id }, { from, to -> TabManager.moveHomeRow(from, to) }) { row, i, handle ->
+                            ReorderableColumn(rows, { it.id }, { from, to ->
+                                val fullFrom = allRows.indexOfFirst { it.id == rows[from].id }
+                                val fullTo = allRows.indexOfFirst { it.id == rows[to].id }
+                                if (fullFrom >= 0 && fullTo >= 0) TabManager.moveHomeRow(fullFrom, fullTo)
+                            }) { row, i, handle ->
                                 Column {
                                     SettingsRow(verticalPadding = 6.dp) {
                                         Text(row.title, style = NativeType.bodyLarge, color = Theme.palette.text, modifier = Modifier.weight(1f))
                                         SettingsSwitch(row.isEnabled) { TabManager.toggleHomeRow(row.id) }
                                         DragHandle(handle)
                                     }
-                                    if (i < TabManager.homeRows.lastIndex) SettingsDivider()
+                                    if (i < rows.lastIndex) SettingsDivider()
                                 }
                             }
                         }
                     }
                 }
-                item(key = "channels") {
+                if (StashyPlus.isUnlocked) item(key = "channels") {
                     Column(Modifier.padding(bottom = 24.dp)) {
                         SectionHeaderText("Channels")
                         val items = TabManager.homeChannelItems.sortedBy { it.sortOrder }
@@ -300,6 +309,11 @@ private fun FeedsModeCard(mode: ReelsModeConfig, handle: Modifier) {
             if (TabManager.stashlineGroupMode == ImageGroupMode.GallerySession) CardSettingRow("Session gap") {
                 MenuValue(ImageSetGrouping.gapOptions.map { it.toString() to "$it min" }, TabManager.stashlineGroupGapMinutes.toString()) {
                     TabManager.stashlineGroupGapMinutes = it.toInt()
+                }
+            }
+            if (TabManager.stashlineGroupMode != ImageGroupMode.Off) CardSettingRow("Max set size") {
+                MenuValue(ImageSetGrouping.maxSizeOptions.map { it.toString() to "$it images" }, TabManager.stashlineGroupMaxSize.toString()) {
+                    TabManager.stashlineGroupMaxSize = it.toInt()
                 }
             }
         }

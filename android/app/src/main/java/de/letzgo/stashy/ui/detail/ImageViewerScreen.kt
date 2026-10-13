@@ -84,7 +84,6 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.positionChanged
 import androidx.compose.ui.layout.ContentScale
@@ -118,9 +117,11 @@ import de.letzgo.stashy.ui.Nav
 import de.letzgo.stashy.ui.SF
 import de.letzgo.stashy.ui.Screen
 import de.letzgo.stashy.ui.StashyColors
-import de.letzgo.stashy.ui.floatingShadow
 import de.letzgo.stashy.ui.oCounterIcon
-import de.letzgo.stashy.ui.stashyGlass
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import de.letzgo.stashy.ui.feeds.ChromePillIconButton
+import de.letzgo.stashy.ui.feeds.StackedPill
+import de.letzgo.stashy.ui.feeds.noIndicationClick
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -441,11 +442,12 @@ class ImageViewerScreen(
                 Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     OCounterButton(image)
                     RatingButton(image)
-                    StackedButton(if (isMuted) SF.speakerSlashFill else SF.speakerWave2Fill, if (isMuted) "Unmute" else "Mute", enabled = isVideo) {
-                        if (isVideo) { isMuted = !isMuted; Prefs.setBool("stashy_scene_player_muted", isMuted) }
+                    // Same buttons as the Feeds control stack ([FeedsInfoOverlay]).
+                    ChromePillIconButton(if (isMuted) SF.speakerSlashFill else SF.speakerWave2Fill, if (isMuted) "Unmute" else "Mute", enabled = isVideo) {
+                        isMuted = !isMuted; Prefs.setBool("stashy_scene_player_muted", isMuted)
                     }
-                    StackedButton(if (isPlaying) SF.pauseFill else SF.playFill, if (isPlaying) "Pause" else "Play", enabled = isVideo || continuousPlay) {
-                        if (isVideo || continuousPlay) isPlaying = !isPlaying
+                    ChromePillIconButton(if (isPlaying) SF.pauseFill else SF.playFill, if (isPlaying) "Pause" else "Play", enabled = isVideo || continuousPlay) {
+                        isPlaying = !isPlaying
                     }
                 }
             }
@@ -470,24 +472,6 @@ class ImageViewerScreen(
         }
     }
 
-    /** iOS `StashyChromePillStyle(height: stackedButtonSize, width: stackedButtonSize)`. */
-    @Composable
-    private fun StackedButton(icon: ImageVector, label: String, enabled: Boolean = true, count: String? = null, highlighted: Boolean = false, modifier: Modifier = Modifier, onClick: () -> Unit) {
-        Column(
-            modifier.size(Dock.stackedButtonSize).floatingShadow().stashyGlass(CircleShape)
-                .let { if (enabled) it.clickable(onClick = onClick) else it },
-            horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center,
-        ) {
-            val alpha = when {
-                !enabled -> 0.35f
-                highlighted || count == null -> 1f
-                else -> Dock.inactiveIconOpacity
-            }
-            Icon(icon, label, tint = Color.White.copy(alpha = alpha), modifier = Modifier.size(Dock.iconSize))
-            if (count != null) Text(count, fontSize = 11.sp, fontWeight = FontWeight.SemiBold, color = Color.White.copy(alpha = Dock.inactiveIconOpacity))
-        }
-    }
-
     /** O-counter pill; long press = iOS `oCounterRemovalMenu`. */
     @OptIn(ExperimentalFoundationApi::class)
     @Composable
@@ -497,14 +481,18 @@ class ImageViewerScreen(
         var menu by remember { mutableStateOf(false) }
         var confirmReset by remember { mutableStateOf(false) }
         Box {
-            Column(
-                Modifier.size(Dock.stackedButtonSize).floatingShadow().stashyGlass(CircleShape)
-                    .combinedClickable(onClick = { scope.launch { changeOCounter(image.id, OCounterMutation.Increment) } }, onLongClick = { menu = true }),
-                horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center,
-            ) {
-                Icon(oCounterIcon(Appearance.oCounterIcon, filled = count > 0), "O-Counter", tint = Color.White.copy(alpha = if (count > 0) 1f else Dock.inactiveIconOpacity), modifier = Modifier.size(Dock.iconSize))
-                Text("$count", fontSize = 11.sp, fontWeight = FontWeight.SemiBold, color = Color.White.copy(alpha = Dock.inactiveIconOpacity))
-            }
+            // The Feeds O-Counter pill ([FeedsRateChrome]): same icon, count and active state.
+            StackedPill(
+                icon = oCounterIcon(Appearance.oCounterIcon, filled = count > 0),
+                value = "$count",
+                active = count > 0,
+                contentDescription = "O-Counter",
+                modifier = Modifier.combinedClickable(
+                    interactionSource = remember { MutableInteractionSource() }, indication = null,
+                    onClick = { scope.launch { changeOCounter(image.id, OCounterMutation.Increment) } },
+                    onLongClick = { menu = true },
+                ),
+            )
             DropdownMenu(menu, { menu = false }) {
                 if (count > 0) {
                     DropdownMenuItem({ Text("Remove one O") }, leadingIcon = { Icon(SF.minusCircle, null) }, onClick = {
@@ -536,7 +524,7 @@ class ImageViewerScreen(
         val scope = rememberCoroutineScope()
         var menu by remember { mutableStateOf(false) }
         Box {
-            StackedButton(SF.starFill, "Rating", count = "$stars", highlighted = stars > 0) { menu = true }
+            StackedPill(SF.starFill, "$stars", stars > 0, Modifier.noIndicationClick { menu = true }, contentDescription = "Rating")
             DropdownMenu(menu, { menu = false }) {
                 DropdownMenuItem({ Text("Clear Rating") }, trailingIcon = { if (stars == 0) Icon(SF.checkmark, null) }, onClick = {
                     menu = false; scope.launch { setRating(image.id, 0) }

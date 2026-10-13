@@ -1,5 +1,6 @@
 package de.letzgo.stashy.ui.catalog
 
+import de.letzgo.stashy.ui.bottomBarContentPadding
 import de.letzgo.stashy.ui.uniqueItemsIndexed
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -71,7 +72,6 @@ import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
 import androidx.compose.ui.input.nestedscroll.NestedScrollSource
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import de.letzgo.stashy.ui.SF
-import de.letzgo.stashy.ui.TabBarClearance
 import de.letzgo.stashy.ui.Theme
 import de.letzgo.stashy.ui.floatingShadow
 import de.letzgo.stashy.ui.stashyGlass
@@ -250,7 +250,7 @@ fun <T> CatalogScaffold(
                     androidx.compose.runtime.key(gridKey) {
                         LazyVerticalGrid(
                             columns = GridCells.Fixed(count),
-                            contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = topPadding, bottom = TabBarClearance + 16.dp),
+                            contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = topPadding, bottom = bottomBarContentPadding()),
                             verticalArrangement = Arrangement.spacedBy(CatalogGridGutter),
                             horizontalArrangement = Arrangement.spacedBy(CatalogGridGutter),
                             modifier = Modifier.fillMaxSize(),

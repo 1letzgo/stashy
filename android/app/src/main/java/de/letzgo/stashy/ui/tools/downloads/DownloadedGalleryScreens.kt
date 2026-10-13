@@ -1,5 +1,6 @@
 package de.letzgo.stashy.ui.tools.downloads
 
+import de.letzgo.stashy.ui.bottomBarContentPadding
 import androidx.compose.foundation.layout.heightIn
 import de.letzgo.stashy.ui.uniqueItemsIndexed
 import android.net.Uri
@@ -24,7 +25,6 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -44,9 +44,7 @@ import androidx.compose.material.icons.filled.Sync
 import androidx.compose.material.icons.filled.VerticalAlignBottom
 import androidx.compose.material.icons.outlined.PhotoLibrary
 import androidx.compose.material.icons.outlined.StopCircle
-import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -96,6 +94,7 @@ import de.letzgo.stashy.ui.TopBarOverflowMenu
 import de.letzgo.stashy.ui.nativeTopBarPadding
 import de.letzgo.stashy.ui.tools.StashyAlert
 import de.letzgo.stashy.ui.tools.ToolsTokens
+import de.letzgo.stashy.ui.feeds.ChromePillIconButton
 import java.io.File
 
 private fun fileUrl(file: File) = "file://${file.absolutePath}"
@@ -115,7 +114,6 @@ class DownloadedGalleryScreen(val entryId: String) : Screen {
         val isSyncing = Downloads.activeDownloads[entryId] != null
         var confirmDelete by remember { mutableStateOf(false) }
         val topInset = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
-        val bottomInset = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
         LaunchedEffect(Unit) { Downloads.backfillMissingImageTitles() }
 
         Box(Modifier.fillMaxSize().background(p.background)) {
@@ -126,7 +124,7 @@ class DownloadedGalleryScreen(val entryId: String) : Screen {
                     modifier = Modifier.fillMaxSize(),
                     contentPadding = PaddingValues(
                         start = ToolsTokens.contentPadding, end = ToolsTokens.contentPadding,
-                        top = nativeTopBarPadding() + 16.dp, bottom = bottomInset + 24.dp,
+                        top = nativeTopBarPadding() + 16.dp, bottom = bottomBarContentPadding(),
                     ),
                     verticalArrangement = Arrangement.spacedBy(12.dp),
                     horizontalArrangement = Arrangement.spacedBy(12.dp),
@@ -316,17 +314,9 @@ private fun ViewerInfoOverlay(
             }
             Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 val enabled = image.isVideo
-                // Material tonal icon buttons on a dark scrim (they sit on the picture / video).
-                val colors = IconButtonDefaults.filledTonalIconButtonColors(
-                    containerColor = Color.Black.copy(alpha = 0.45f), contentColor = Color.White,
-                    disabledContainerColor = Color.Black.copy(alpha = 0.45f), disabledContentColor = Color.White.copy(alpha = 0.35f),
-                )
-                FilledTonalIconButton(onToggleMute, Modifier.size(DownloadsCircleSize), enabled = enabled, colors = colors) {
-                    Icon(if (isMuted) SF.speakerSlash else SF.speaker, if (isMuted) "Unmute" else "Mute", Modifier.size(18.dp))
-                }
-                FilledTonalIconButton(onTogglePlay, Modifier.size(DownloadsCircleSize), enabled = enabled, colors = colors) {
-                    Icon(if (isPlaying) SF.pauseFill else SF.playFill, if (isPlaying) "Pause" else "Play", Modifier.size(18.dp))
-                }
+                // Same buttons as the Feeds control stack ([FeedsInfoOverlay]).
+                ChromePillIconButton(if (isMuted) SF.speakerSlashFill else SF.speakerWave2Fill, if (isMuted) "Unmute" else "Mute", enabled = enabled, onClick = onToggleMute)
+                ChromePillIconButton(if (isPlaying) SF.pauseFill else SF.playFill, if (isPlaying) "Pause" else "Play", enabled = enabled, onClick = onTogglePlay)
             }
         }
         if (tags.isNotEmpty()) {

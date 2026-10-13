@@ -14,6 +14,7 @@ struct ReelsModeSettingsView: View {
     /// Feeds → Pics / Images 1-Spalten-Feed: Bilder einer Session bzw. gleicher Metadaten als Set.
     @AppStorage(StashImageGroupingPrefs.modeKey) private var groupModeRaw: String = StashImageGroupingPrefs.resolvedModeRaw()
     @AppStorage(StashImageGroupingPrefs.gapKey) private var groupGapMinutes: Int = StashImageGroupingPrefs.defaultGapMinutes
+    @AppStorage(StashImageGroupingPrefs.maxSizeKey) private var groupMaxSize: Int = StashImageGroupingPrefs.defaultMaxSetSize
     @StateObject private var viewModel = StashDBViewModel()
 
     @ViewBuilder
@@ -125,6 +126,23 @@ struct ReelsModeSettingsView: View {
                                             }
                                         } label: {
                                             pickerLabelText("\(currentGap) min")
+                                        }
+                                    }
+                                    .padding(.top, 4)
+                                }
+
+                                if groupMode != .off {
+                                    // Max. Bilder pro Set (`stashline_group_max_size`).
+                                    reelsSettingRow(title: "Max set size") {
+                                        let currentMax = StashImageGroupingPrefs.normalizedMaxSize(groupMaxSize)
+                                        Menu {
+                                            ForEach(StashImageGroupingPrefs.maxSizeOptions, id: \.self) { size in
+                                                Button(action: { groupMaxSize = size }) {
+                                                    HStack { Text("\(size) images"); if size == currentMax { Image(systemName: "checkmark") } }
+                                                }
+                                            }
+                                        } label: {
+                                            pickerLabelText("\(currentMax) images")
                                         }
                                     }
                                     .padding(.top, 4)

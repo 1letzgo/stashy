@@ -121,6 +121,7 @@ private struct ImagesViewBody: View {
     /// Same grouping prefs as Feeds → Pics.
     @AppStorage(StashImageGroupingPrefs.modeKey) private var groupModeRaw: String = StashImageGroupingPrefs.resolvedModeRaw()
     @AppStorage(StashImageGroupingPrefs.gapKey) private var groupGapMinutes: Int = StashImageGroupingPrefs.defaultGapMinutes
+    @AppStorage(StashImageGroupingPrefs.maxSizeKey) private var groupMaxSize: Int = StashImageGroupingPrefs.defaultMaxSetSize
 
     private func recomputeAutoplayTarget() {
         guard feedAutoplayGateOpen else {
@@ -179,7 +180,8 @@ private struct ImagesViewBody: View {
             from: displayedImages,
             sort: imageListFilters.selectedSortOption,
             mode: StashImageGroupingPrefs.mode(fromRaw: groupModeRaw),
-            gapMinutes: StashImageGroupingPrefs.normalizedGap(groupGapMinutes)
+            gapMinutes: StashImageGroupingPrefs.normalizedGap(groupGapMinutes),
+            maxSetSize: StashImageGroupingPrefs.normalizedMaxSize(groupMaxSize)
         )
     }
 

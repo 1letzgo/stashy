@@ -1,5 +1,6 @@
 package de.letzgo.stashy.ui.tools.stats
 
+import de.letzgo.stashy.ui.bottomBarContentPadding
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -67,7 +68,6 @@ import de.letzgo.stashy.ui.Tokens
 import de.letzgo.stashy.ui.cardShadow
 import de.letzgo.stashy.ui.oCounterIcon
 import de.letzgo.stashy.ui.scene.SceneDetailScreen
-import de.letzgo.stashy.ui.tools.ToolsBottomPadding
 import de.letzgo.stashy.ui.tools.ToolsTokens
 import de.letzgo.stashy.ui.tools.toolsTopPadding
 import kotlinx.coroutines.launch
@@ -132,7 +132,7 @@ private fun TimelineList(enabledKinds: Set<TimelineKind>, top: androidx.compose.
         Modifier.fillMaxSize(),
         contentPadding = PaddingValues(
             start = ToolsTokens.contentPadding, end = ToolsTokens.contentPadding,
-            top = top, bottom = ToolsBottomPadding,
+            top = top, bottom = bottomBarContentPadding(),
         ),
     ) {
         item(key = "chips") {

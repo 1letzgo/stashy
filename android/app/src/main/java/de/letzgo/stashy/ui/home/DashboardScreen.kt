@@ -1,5 +1,6 @@
 package de.letzgo.stashy.ui.home
 
+import de.letzgo.stashy.ui.bottomBarContentPadding
 import de.letzgo.stashy.ui.cappedFontScale
 import de.letzgo.stashy.ui.scaledIconSize
 import androidx.compose.ui.text.style.TextOverflow
@@ -83,7 +84,6 @@ import de.letzgo.stashy.ui.Nav
 import de.letzgo.stashy.ui.SF
 import de.letzgo.stashy.ui.SFS
 import de.letzgo.stashy.ui.StashyColors
-import de.letzgo.stashy.ui.TabBarClearance
 import de.letzgo.stashy.ui.Theme
 import de.letzgo.stashy.ui.Tokens
 import de.letzgo.stashy.ui.catalog.catalogTopPadding
@@ -184,7 +184,7 @@ private fun DashboardContent() {
     PullToRefreshBox(refreshing, onRefresh = { refreshing = true; DashboardStore.refreshAll() }, Modifier.fillMaxSize()) {
         LazyColumn(
             Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(top = catalogTopPadding() - 16.dp, bottom = TabBarClearance + 16.dp),
+            contentPadding = PaddingValues(top = catalogTopPadding() - 16.dp, bottom = bottomBarContentPadding()),
             verticalArrangement = Arrangement.spacedBy(20.dp),
         ) {
             items(activeRows, key = { it.id }) { row ->

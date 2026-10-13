@@ -77,7 +77,6 @@ import de.letzgo.stashy.ui.TopBarOverflowMenu
 import de.letzgo.stashy.ui.nativeTopBarPadding
 import de.letzgo.stashy.ui.SF
 import de.letzgo.stashy.ui.StashyColors
-import de.letzgo.stashy.ui.TabBarClearance
 import de.letzgo.stashy.ui.NativeTextField
 import de.letzgo.stashy.ui.Theme
 import de.letzgo.stashy.ui.Tokens

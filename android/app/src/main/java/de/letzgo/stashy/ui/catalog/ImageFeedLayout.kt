@@ -138,7 +138,8 @@ object ImageFeedAutoplay {
  * iOS: the 1/row layout of `ImagesViewBody` (`oneColumnFeedPosts` + `ImageGroupCatalogCell`), shared
  * by Feeds › Pics and the Images catalog: one post per row, images of one import set grouped
  * into a swipeable post with a thumb strip (Settings › Content › "Group into sets" /
- * "Session gap", keys `stashline_group_mode` / `stashline_group_gap_minutes`), muted
+ * "Session gap" / "Max set size", keys `stashline_group_mode` / `stashline_group_gap_minutes` /
+ * `stashline_group_max_size`), muted
  * autoplay of the most centred video while the list is idle (`images_feed_video_autoplay`),
  * rating + O-counter on every post, tap opens [ImageViewerScreen] over the posts' flattened
  * order. [onImageUpdated] writes optimistic edits back to the caller's list.
@@ -160,8 +161,9 @@ fun ImageFeedList(
 ) {
     val mode = TabManager.stashlineGroupMode
     val gap = TabManager.stashlineGroupGapMinutes
+    val maxSize = TabManager.stashlineGroupMaxSize
     val snapshot = images.toList()
-    val posts = remember(snapshot, sortRaw, mode, gap) { buildFeedPosts(snapshot, sortRaw, mode, gap) }
+    val posts = remember(snapshot, sortRaw, mode, gap, maxSize) { buildFeedPosts(snapshot, sortRaw, mode, gap, maxSize) }
     val flattened = remember(posts) { posts.flatMap { it.images } }
 
     // Visible image per post (iOS `visibleImageId` of each cell, hoisted for the autoplay pick).
@@ -215,8 +217,9 @@ private fun buildFeedPosts(
     sortRaw: String?,
     mode: ImageGroupMode,
     gapMinutes: Int,
+    maxSetSize: Int,
 ): List<ImageFeedPost> {
-    val built = ImageSetGrouping.buildPosts(images, sortRaw, mode, gapMinutes)
+    val built = ImageSetGrouping.buildPosts(images, sortRaw, mode, gapMinutes, maxSetSize)
     val seen = HashSet<String>()
     return built.map { p -> if (seen.add(p.id)) p else p.copy(id = "${p.id}#${p.images.first().id}") }
 }
@@ -249,11 +252,12 @@ class ImageFeedGridModel {
     fun update(images: List<StashImage>, sortRaw: String?) {
         val mode = TabManager.stashlineGroupMode
         val gap = TabManager.stashlineGroupGapMinutes
+        val maxSize = TabManager.stashlineGroupMaxSize
         val snapshot = images.toList()
-        val key = listOf(snapshot, sortRaw, mode, gap)
+        val key = listOf(snapshot, sortRaw, mode, gap, maxSize)
         if (key == memoKey) return
         memoKey = key
-        posts = buildFeedPosts(snapshot, sortRaw, mode, gap)
+        posts = buildFeedPosts(snapshot, sortRaw, mode, gap, maxSize)
         postsById = posts.associateBy { it.id }
         flattened = posts.flatMap { it.images }
     }

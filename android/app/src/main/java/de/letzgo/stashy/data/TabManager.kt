@@ -204,6 +204,13 @@ object TabManager {
     var stashlineGroupGapMinutes: Int
         get() = _stashlineGroupGapMinutes.value
         set(v) { val g = ImageSetGrouping.normalizedGap(v); _stashlineGroupGapMinutes.value = g; Prefs.setInt(ImageSetGrouping.GAP_KEY, g) }
+    /** Max images per set (10 / 20 / 30 / 50 / 100, `stashline_group_max_size`). */
+    private val _stashlineGroupMaxSize = mutableStateOf(
+        ImageSetGrouping.normalizedMaxSize(if (Prefs.has(ImageSetGrouping.MAX_SIZE_KEY)) Prefs.int(ImageSetGrouping.MAX_SIZE_KEY) else null)
+    )
+    var stashlineGroupMaxSize: Int
+        get() = _stashlineGroupMaxSize.value
+        set(v) { val m = ImageSetGrouping.normalizedMaxSize(v); _stashlineGroupMaxSize.value = m; Prefs.setInt(ImageSetGrouping.MAX_SIZE_KEY, m) }
 
     // MARK: loading
 

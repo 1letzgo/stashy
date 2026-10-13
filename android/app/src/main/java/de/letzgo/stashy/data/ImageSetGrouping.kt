@@ -28,12 +28,15 @@ data class ImageFeedPost(val id: String, val images: List<StashImage>)
  * page can therefore only extend the last post; everything above stays as it was.
  */
 object ImageSetGrouping {
-    const val MAX_SET_SIZE = 30
     const val MODE_KEY = "stashline_group_mode"
     const val GAP_KEY = "stashline_group_gap_minutes"
+    /** Max images per set. */
+    const val MAX_SIZE_KEY = "stashline_group_max_size"
     const val LEGACY_SETS_KEY = "stashline_group_sets"
     val gapOptions = listOf(2, 10, 60)
     const val DEFAULT_GAP_MINUTES = 10
+    val maxSizeOptions = listOf(10, 20, 30, 50, 100)
+    const val DEFAULT_MAX_SET_SIZE = 30
 
     private val stashSession = Regex("""(?<=_-_).+(?=_\d+$)""")
     private val importerSession = Regex("""\d{4}-\d{2}-\d{2}_\d{2}-\d{2}-\d{2}(?=_\d+$)""")
@@ -47,6 +50,9 @@ object ImageSetGrouping {
 
     /** Only 2 / 10 / 60 are offered; anything else falls back to 10. */
     fun normalizedGap(minutes: Int?): Int = minutes?.takeIf { it in gapOptions } ?: DEFAULT_GAP_MINUTES
+
+    /** Only 10 / 20 / 30 / 50 / 100 are offered; anything else falls back to 30. */
+    fun normalizedMaxSize(size: Int?): Int = size?.takeIf { it in maxSizeOptions } ?: DEFAULT_MAX_SET_SIZE
 
     // MARK: filename timestamps
 
@@ -171,18 +177,24 @@ object ImageSetGrouping {
 
     /**
      * Whether [image] may join [post] (non-empty, API order):
-     * - at most [MAX_SET_SIZE] images; a clip and a photo never share a set;
+     * - at most [maxSetSize] images (`stashline_group_max_size`, default 30); a clip and a photo never share a set;
      * - galleries first, against the post's last image: both have galleries → join when they
      *   share one; exactly one has galleries → no join;
      * - [ImageGroupMode.GallerySession], both without galleries: performers equal to the post's
      *   first image and non-empty, or same non-empty studio with equal performers — and the
      *   `created_at` gap to the post's last image ≤ [gapMinutes]. Untagged loose images never join.
      */
-    fun canJoin(post: List<StashImage>, image: StashImage, mode: ImageGroupMode, gapMinutes: Int): Boolean {
+    fun canJoin(
+        post: List<StashImage>,
+        image: StashImage,
+        mode: ImageGroupMode,
+        gapMinutes: Int,
+        maxSetSize: Int = DEFAULT_MAX_SET_SIZE,
+    ): Boolean {
         if (mode == ImageGroupMode.Off) return false
         val first = post.firstOrNull() ?: return false
         val last = post.last()
-        if (post.size >= MAX_SET_SIZE) return false
+        if (post.size >= maxSetSize) return false
         if (first.isVideo != image.isVideo) return false
 
         val lastGalleries = galleryIds(last)
@@ -212,6 +224,7 @@ object ImageSetGrouping {
         sortRaw: String?,
         mode: ImageGroupMode = ImageGroupMode.GallerySession,
         gapMinutes: Int = DEFAULT_GAP_MINUTES,
+        maxSetSize: Int = DEFAULT_MAX_SET_SIZE,
     ): List<ImageFeedPost> {
         if (mode == ImageGroupMode.Off || !supportsGrouping(sortRaw)) {
             return images.map { ImageFeedPost("single|${it.id}", listOf(it)) }
@@ -219,7 +232,7 @@ object ImageSetGrouping {
         val groups = ArrayList<MutableList<StashImage>>()
         for (image in images) {
             val current = groups.lastOrNull()
-            if (current != null && canJoin(current, image, mode, gapMinutes)) current.add(image)
+            if (current != null && canJoin(current, image, mode, gapMinutes, maxSetSize)) current.add(image)
             else groups.add(mutableListOf(image))
         }
         return groups.map { g ->

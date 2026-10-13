@@ -1,5 +1,6 @@
 package de.letzgo.stashy.ui.feeds
 
+import de.letzgo.stashy.ui.tabBarHeight
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
@@ -164,8 +165,8 @@ fun FeedsScreen() {
     val mode = model.mode
     val list = model.list(mode)
     val navBottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
-    // Height the floating tab bar covers (AppShell: 64 pt bar + 2×8 pt margins above the nav bar).
-    val tabBarOverlap = if (isUIVisible) navBottom + 80.dp else navBottom
+    // Height the tab bar covers (bar + system nav inset, measured in AppShell) while the chrome shows.
+    val tabBarOverlap = if (isUIVisible) tabBarHeight() else navBottom
 
     // Height of the top chrome (bar + criterion chips): Pics content starts below it (iOS safeAreaInset).
     val density = LocalDensity.current

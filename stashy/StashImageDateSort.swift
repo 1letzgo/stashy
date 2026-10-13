@@ -29,8 +29,12 @@ enum StashImageGroupingPrefs {
     static let gapKey = "stashline_group_gap_minutes"
     /// Old on/off switch; still written (true unless off) so older readers behave.
     static let legacySetsKey = "stashline_group_sets"
+    /// Max images per set (`stashline_group_max_size`).
+    static let maxSizeKey = "stashline_group_max_size"
     static let gapOptions = [2, 10, 60]
     static let defaultGapMinutes = 10
+    static let maxSizeOptions = [10, 20, 30, 50, 100]
+    static let defaultMaxSetSize = 30
 
     /// First read of `stashline_group_mode`: the old switch decides (missing = on).
     static func migratedMode(legacyGroupSets: Bool?) -> StashImageGroupMode {
@@ -41,6 +45,12 @@ enum StashImageGroupingPrefs {
     static func normalizedGap(_ minutes: Int?) -> Int {
         guard let minutes, gapOptions.contains(minutes) else { return defaultGapMinutes }
         return minutes
+    }
+
+    /// Only 10 / 20 / 30 / 50 / 100 are offered; anything else falls back to 30.
+    static func normalizedMaxSize(_ size: Int?) -> Int {
+        guard let size, maxSizeOptions.contains(size) else { return defaultMaxSetSize }
+        return size
     }
 
     /// Stored mode raw value; migrates (and persists) it from the old switch on first read.
@@ -120,8 +130,6 @@ enum StashImageFilenameKeys {
 /// joins the current (last) post when `canJoin` allows it, otherwise it starts a new post. A new
 /// page can therefore only extend the last post; everything above stays as it was.
 enum StashImageSetGrouping {
-    static let maxSetSize = 30
-
     // MARK: Timestamps (epoch seconds, hand-parsed so Swift and Kotlin agree exactly)
 
     /// `created_at` → epoch seconds. Accepts `2026-06-24T07:42:44Z`, `…+02:00`, `…+0200`,
@@ -226,13 +234,19 @@ enum StashImageSetGrouping {
     private static func studioID(_ image: StashImage) -> String { image.studio?.id ?? "" }
 
     /// Whether `image` may join `post` (non-empty, API order):
-    /// - at most `maxSetSize` images; a clip and a photo never share a set;
+    /// - at most `maxSetSize` images (`stashline_group_max_size`, default 30); a clip and a photo never share a set;
     /// - galleries first, against the post's last image: both have galleries → join when they
     ///   share one; exactly one has galleries → no join;
     /// - `.gallerySession`, both without galleries: performers equal to the post's first image
     ///   and non-empty, or same non-empty studio with equal performers — and the `created_at` gap
     ///   to the post's last image ≤ `gapMinutes`. Untagged loose images never join.
-    static func canJoin(_ post: [StashImage], _ image: StashImage, mode: StashImageGroupMode, gapMinutes: Int) -> Bool {
+    static func canJoin(
+        _ post: [StashImage],
+        _ image: StashImage,
+        mode: StashImageGroupMode,
+        gapMinutes: Int,
+        maxSetSize: Int = StashImageGroupingPrefs.defaultMaxSetSize
+    ) -> Bool {
         guard mode != .off, let first = post.first, let last = post.last else { return false }
         guard post.count < maxSetSize else { return false }
         guard first.isVideo == image.isVideo else { return false }
@@ -259,14 +273,15 @@ enum StashImageSetGrouping {
         from images: [StashImage],
         sort: StashDBViewModel.ImageSortOption,
         mode: StashImageGroupMode = .gallerySession,
-        gapMinutes: Int = StashImageGroupingPrefs.defaultGapMinutes
+        gapMinutes: Int = StashImageGroupingPrefs.defaultGapMinutes,
+        maxSetSize: Int = StashImageGroupingPrefs.defaultMaxSetSize
     ) -> [(id: String, images: [StashImage])] {
         guard mode != .off, supportsGrouping(for: sort) else {
             return images.map { (id: "single|\($0.id)", images: [$0]) }
         }
         var groups: [[StashImage]] = []
         for image in images {
-            if let current = groups.last, canJoin(current, image, mode: mode, gapMinutes: gapMinutes) {
+            if let current = groups.last, canJoin(current, image, mode: mode, gapMinutes: gapMinutes, maxSetSize: maxSetSize) {
                 groups[groups.count - 1].append(image)
             } else {
                 groups.append([image])

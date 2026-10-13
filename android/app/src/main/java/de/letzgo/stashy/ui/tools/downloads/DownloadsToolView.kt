@@ -1,5 +1,6 @@
 package de.letzgo.stashy.ui.tools.downloads
 
+import de.letzgo.stashy.ui.bottomBarContentPadding
 import de.letzgo.stashy.ui.scaledIconSize
 import androidx.compose.foundation.layout.heightIn
 import android.Manifest
@@ -115,7 +116,6 @@ import de.letzgo.stashy.ui.stashyGlass
 import de.letzgo.stashy.ui.tools.GroupedCard
 import de.letzgo.stashy.ui.tools.RowDivider
 import de.letzgo.stashy.ui.tools.StashyAlert
-import de.letzgo.stashy.ui.tools.ToolsBottomPadding
 import de.letzgo.stashy.ui.tools.ToolsTokens
 import de.letzgo.stashy.ui.tools.showToast
 import de.letzgo.stashy.ui.tools.toolsTopPadding
@@ -183,7 +183,7 @@ fun DownloadsToolView() {
 
         if (downloads.isEmpty() && galleries.isEmpty() && active.isEmpty()) {
             Column(
-                Modifier.fillMaxSize().padding(bottom = ToolsBottomPadding),
+                Modifier.fillMaxSize().padding(bottom = bottomBarContentPadding()),
                 verticalArrangement = Arrangement.spacedBy(20.dp, Alignment.CenterVertically),
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
@@ -209,7 +209,7 @@ fun DownloadsToolView() {
 
             LazyColumn(
                 Modifier.fillMaxSize(),
-                contentPadding = androidx.compose.foundation.layout.PaddingValues(top = ToolsTokens.menuTopPadding, bottom = ToolsBottomPadding),
+                contentPadding = androidx.compose.foundation.layout.PaddingValues(top = ToolsTokens.menuTopPadding, bottom = bottomBarContentPadding()),
             ) {
                 if (running.isNotEmpty()) {
                     sectionHeading("Active Downloads")

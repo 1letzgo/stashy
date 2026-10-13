@@ -1,5 +1,6 @@
 package de.letzgo.stashy.ui.scene
 
+import de.letzgo.stashy.ui.bottomBarContentPadding
 import androidx.compose.material.icons.outlined.History
 import android.content.res.Configuration
 import androidx.activity.compose.BackHandler
@@ -53,7 +54,6 @@ import de.letzgo.stashy.ui.IosTypography
 import de.letzgo.stashy.ui.Nav
 import de.letzgo.stashy.ui.Screen
 import de.letzgo.stashy.ui.StashyColors
-import de.letzgo.stashy.ui.TabBarClearance
 import de.letzgo.stashy.ui.Theme
 import de.letzgo.stashy.ui.Tokens
 import de.letzgo.stashy.ui.cardShadow
@@ -188,7 +188,7 @@ private fun SceneDetailContent(model: SceneDetailModel) {
             if (pinned) Box(Modifier.padding(start = 16.dp, end = 16.dp, top = 16.dp)) { playerCard() }
             Column(
                 Modifier.fillMaxSize().verticalScroll(rememberScrollState())
-                    .padding(start = 16.dp, end = 16.dp, top = if (pinned) 12.dp else 16.dp, bottom = 16.dp + TabBarClearance),
+                    .padding(start = 16.dp, end = 16.dp, top = if (pinned) 12.dp else 16.dp, bottom = bottomBarContentPadding()),
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
                 if (!pinned) playerCard()
