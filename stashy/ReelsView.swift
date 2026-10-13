@@ -4623,18 +4623,73 @@ struct ReelsViewBody: View {
     /// bei längeren Namen fast immer abgeschnitten.
     private func reelsNameTitleLine(item: ReelItemData) -> some View {
         VStack(alignment: .leading, spacing: 2) {
-            if let performer = item.performers.first {
-                Button(action: { applyPerformerFilter(performer) }) {
-                    Text(performer.name)
-                        .font(.system(size: 15, weight: .bold))
-                        .foregroundColor(.white)
-                        .lineLimit(1)
+            let performers = item.performers
+            if performers.count == 1, let performer = performers.first {
+                reelsPerformerNameButton(performer)
+            } else if performers.count > 1 {
+                // Alle Performer wie in Pics ("A & B"); bei vielen scrollt die Zeile,
+                // `.id` setzt den Scroll-Offset pro Item zurück.
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 4) {
+                        ForEach(Array(performers.enumerated()), id: \.element.id) { idx, performer in
+                            reelsPerformerNameButton(performer)
+                            if idx < performers.count - 1 {
+                                Text("&")
+                                    .font(.system(size: 15, weight: .medium))
+                                    .foregroundColor(.white.opacity(0.75))
+                            }
+                        }
+                    }
                 }
-                .buttonStyle(.plain)
-                .accessibilityLabel("Filter by \(performer.name)")
+                .id(item.id)
             }
             reelsTitleText(item: item)
         }
+    }
+
+    private func reelsPerformerNameButton(_ performer: ScenePerformer) -> some View {
+        Button(action: { applyPerformerFilter(performer) }) {
+            Text(performer.name)
+                .font(.system(size: 15, weight: .bold))
+                .foregroundColor(.white)
+                .lineLimit(1)
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("Filter by \(performer.name)")
+    }
+
+    /// Overlapping avatars for every performer (same stacking as the Pics header).
+    /// Up to three fit; with more the stack scrolls horizontally, reset per item.
+    @ViewBuilder
+    private func reelsPerformerAvatarStack(item: ReelItemData) -> some View {
+        let performers = item.performers
+        let size = StashyExpandingDock.circleSize
+        let overlap: CGFloat = 10
+        let visibleCount = min(performers.count, 3)
+        // +4 leaves room for the 2pt ring the ScrollView would otherwise clip.
+        let stackWidth = size + CGFloat(visibleCount - 1) * (size - overlap) + 4
+        // Clips (and Pics) are image feeds — open the Images tab, not Galleries/Scenes.
+        let initialTab: PerformerDetailView.DetailTab? = (reelsMode == .clips || reelsMode == .pics) ? .images : nil
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: -overlap) {
+                ForEach(performers) { performer in
+                    NavigationLink(
+                        destination: PerformerDetailView(
+                            performer: performer.toPerformer(),
+                            initialTab: initialTab
+                        )
+                    ) {
+                        performerThumbnail(performer)
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel(performer.name)
+                }
+            }
+            .padding(2)
+        }
+        .scrollDisabled(performers.count <= visibleCount)
+        .frame(width: stackWidth, height: size + 4)
+        .id(item.id)
     }
 
     @ViewBuilder
@@ -4771,18 +4826,8 @@ struct ReelsViewBody: View {
                 // Avatar · (name - title / tags) on the leading side, the control stack trailing.
                 HStack(alignment: .bottom, spacing: 8) {
                     HStack(alignment: .center, spacing: 10) {
-                        if let performer = item.performers.first {
-                            NavigationLink(
-                                destination: PerformerDetailView(
-                                    performer: performer.toPerformer(),
-                                    // Clips (and Pics) are image feeds — open the Images tab, not Galleries/Scenes.
-                                    initialTab: (reelsMode == .clips || reelsMode == .pics) ? .images : nil
-                                )
-                            ) {
-                                performerThumbnail(performer)
-                            }
-                            .buttonStyle(.plain)
-                            .accessibilityLabel(performer.name)
+                        if !item.performers.isEmpty {
+                            reelsPerformerAvatarStack(item: item)
                         }
 
                         VStack(alignment: .leading, spacing: 4) {
