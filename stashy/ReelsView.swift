@@ -5388,6 +5388,11 @@ struct ReelItemView: View {
             playButtonOverlay
             bottomBarOverlay
         }
+        // A row that cannot play must not leave the chrome hidden (immersive mode / a tap):
+        // the error then covered a black screen with no way to the modes, filter or next item.
+        .onChange(of: engineErrorMessage) { _, message in
+            if message != nil, !isUIVisible { isUIVisible = true }
+        }
     }
 }
 
@@ -6043,7 +6048,10 @@ extension ReelItemView {
             // A dead engine never recovers on its own — rebuild it once. If the rebuilt
             // engine fails again, the error stands and the row reports it.
             if let message = self.aetherErrorMessage {
-                guard !self.didRebuildAfterEngineError else {
+                // A preview the server never generated is a missing file, not a flaky engine:
+                // a rebuild only kept the error on screen for another round.
+                let isPreview: Bool = { if case .preview = self.item { return true }; return false }()
+                guard !self.didRebuildAfterEngineError, !isPreview else {
                     AppLog.error("🎬 Reel watchdog: playback engine failed again (\(message))")
                     self.engineErrorMessage = message
                     self.onPlaybackUnavailable()
