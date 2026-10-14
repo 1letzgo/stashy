@@ -87,4 +87,14 @@ class FeedsTabBarPolicyTest {
         // Chrome hidden: only the system inset, whatever the bar does.
         assertEquals(20f, FeedsTabBarPolicy.overlayInset(false, 1f, 100f, 20f), 0.001f)
     }
+
+    @Test fun topChromeFollowsBarInPagerModes() {
+        assertEquals(0f, FeedsTabBarPolicy.topChromeShownFraction(isPics = false, barShownFraction = 0f), 0.001f)
+        assertEquals(0.5f, FeedsTabBarPolicy.topChromeShownFraction(isPics = false, barShownFraction = 0.5f), 0.001f)
+        assertEquals(1f, FeedsTabBarPolicy.topChromeShownFraction(isPics = false, barShownFraction = 1f), 0.001f)
+    }
+
+    @Test fun topChromeStaysInPics() {
+        assertEquals(1f, FeedsTabBarPolicy.topChromeShownFraction(isPics = true, barShownFraction = 0f), 0.001f)
+    }
 }

@@ -20,7 +20,8 @@ import de.letzgo.stashy.data.Prefs
  * Feeds › Pics is a plain list and uses [connection] like every other list. The pager modes
  * (Scenes, Markers, Clips, Previews) suspend the scroll tracking and drive the bar themselves
  * through [FeedsTabBarPolicy] (hide on a swipe to a later row, show on the first row and when
- * the tap-to-toggle chrome comes back).
+ * the tap-to-toggle chrome comes back). The Feeds top chrome slides out and back with the bar
+ * in those modes ([FeedsTabBarPolicy.topChromeShownFraction]).
  */
 object TabBarAutoHide {
     const val PREF_KEY = "tabBarAutoHide"
@@ -129,6 +130,15 @@ object FeedsTabBarPolicy {
         to > from -> true
         else -> null
     }
+
+    /**
+     * How much of the Feeds top chrome (mode dock + Filter & Sort + criterion chips) shows,
+     * 1 = fully, 0 = slid out above the screen. In the pager modes it follows the auto-hidden
+     * tab bar ([barShownFraction], same animation); Feeds › Pics is a list whose content sits
+     * below the chrome, so there it always stays.
+     */
+    fun topChromeShownFraction(isPics: Boolean, barShownFraction: Float): Float =
+        if (isPics) 1f else barShownFraction.coerceIn(0f, 1f)
 
     /** The tap-to-toggle chrome changed: coming back brings the bar with it. */
     fun onChromeVisibilityChanged(visible: Boolean): Boolean? = if (visible) false else null

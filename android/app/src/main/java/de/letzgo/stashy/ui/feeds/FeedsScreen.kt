@@ -40,6 +40,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
@@ -219,9 +220,14 @@ fun FeedsScreen() {
         }
 
         // Top chrome: mode dock + Filter & Sort, criterion chips below (iOS `reelsNavBar`).
-        val chromeAlpha by animateFloatAsState(if (isUIVisible) 1f else 0f, tween(200), label = "chrome")
+        // Auto-hide (pager modes only): slides up and fades out together with the tab bar, on
+        // the same trigger and animation; rows are full-screen, so the video just gains room.
+        val tapAlpha by animateFloatAsState(if (isUIVisible) 1f else 0f, tween(200), label = "chrome")
+        val topShown = FeedsTabBarPolicy.topChromeShownFraction(mode == ReelsModeType.Pics, barShown)
+        val chromeAlpha = tapAlpha * topShown
         Column(
-            Modifier.fillMaxWidth().alpha(chromeAlpha).align(Alignment.TopCenter)
+            Modifier.fillMaxWidth().align(Alignment.TopCenter)
+                .graphicsLayer { alpha = chromeAlpha; translationY = -(1f - topShown) * size.height }
                 .onSizeChanged { with(density) { if (chromeAlpha > 0.99f) measuredChrome = it.height.toDp() } },
         ) {
             if (chromeAlpha > 0.01f) {
