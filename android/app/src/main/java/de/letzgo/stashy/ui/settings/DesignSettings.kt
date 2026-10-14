@@ -67,7 +67,7 @@ class AppearanceSettingsScreen : Screen {
             }
             settingsSection(
                 header = "Tab Bar", key = "tabbar",
-                footer = "Slides the tab bar away while you scroll down a list and brings it back when you scroll up. Feeds keeps its own behaviour.",
+                footer = "Slides the tab bar away while you scroll down a list and brings it back when you scroll up. In Feeds (except Pics) the top bar hides with it.",
             ) {
                 SettingsToggleRow("Auto-hide tab bar", de.letzgo.stashy.ui.TabBarAutoHide.enabled, androidx.compose.material.icons.Icons.Outlined.VerticalAlignBottom) {
                     de.letzgo.stashy.ui.TabBarAutoHide.enabled = it
