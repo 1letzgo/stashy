@@ -65,7 +65,8 @@ struct TVMainTabView: View {
         TVContentTab(id: .tags, appTab: .tags, title: "Tags", systemImage: "tag.fill"),
         TVContentTab(id: .groups, appTab: .groups, title: "Groups", systemImage: "rectangle.stack.fill"),
         TVContentTab(id: .galleries, appTab: .galleries, title: "Galleries", systemImage: "photo.stack.fill"),
-        TVContentTab(id: .images, appTab: .images, title: "Images", systemImage: "photo.fill")
+        TVContentTab(id: .images, appTab: .images, title: "Images", systemImage: "photo.fill"),
+        TVContentTab(id: .markers, appTab: .markers, title: "Markers", systemImage: "bookmark.fill")
     ]
 
     private func isVisible(_ tab: AppTab) -> Bool {
@@ -173,6 +174,8 @@ struct TVMainTabView: View {
             TVTabStack(tab: .galleries) { TVGalleriesView() }
         case .images:
             TVTabStack(tab: .images) { TVImagesView() }
+        case .markers:
+            TVTabStack(tab: .markers) { TVMarkersView() }
         case .home, .search, .settings:
             // Diese drei werden oben direkt deklariert.
             EmptyView()
