@@ -674,6 +674,9 @@ class TabManager: ObservableObject {
     private let homeChannelItemsKey = "HomeChannelItemsConfig"
     private let homeChannelSourcesKey = "HomeChannelSourcesConfig"
     private let lastPlayedOnTopMigrationKey = "HomeRowsLastPlayedOnTop_v1"
+    #if os(tvOS)
+    private let tvHomeRowsDefaultsKey = "HomeRowsTVDefaults_v1"
+    #endif
     private let reelsModesKey = "ReelsModesConfig"
     private let toolsKey = "ToolsConfig"
     private let reelsFillHeightKey = "ReelsFillHeight"
@@ -1100,7 +1103,41 @@ class TabManager: ObservableObject {
             ]
             saveHomeRows()
         }
+        #if os(tvOS)
+        applyTVHomeRowDefaultsIfNeeded()
+        #endif
     }
+
+    #if os(tvOS)
+    /// One-shot per server: the Apple TV Home gets its own starting set. Until rows became
+    /// configurable on tvOS the stored list was the untouched iOS default (the TV never read
+    /// it), so replacing it loses no user choice. Order follows the old fixed TV dashboard
+    /// (Continue Watching, Channels, New, Recently Added, Top Rated, Random) plus top
+    /// performers and studios for discovery; everything else starts off.
+    private func applyTVHomeRowDefaultsIfNeeded() {
+        let key = "\(tvHomeRowsDefaultsKey)\(currentServerSuffix)"
+        guard !UserDefaults.standard.bool(forKey: key) else { return }
+        UserDefaults.standard.set(true, forKey: key)
+
+        let enabled: [HomeRowType] = [
+            .lastPlayed, .channels, .newest3Min, .lastAdded3Min,
+            .performersHighestSceneCount, .topRating3Min, .studiosHighestSceneCount, .random
+        ]
+        let disabled: [HomeRowType] = [
+            .mostViewed3Min, .topCounter3Min, .newPerformers, .performersHighestRating,
+            .performersHighestOCount, .newStudios, .newGalleries, .recentlyUpdatedGalleries,
+            .galleriesHighestImageCount, .statistics
+        ]
+        var rows: [HomeRowConfig] = []
+        for (type, isEnabled) in enabled.map({ ($0, true) }) + disabled.map({ ($0, false) }) {
+            let existingId = homeRows.first(where: { $0.type == type })?.id ?? UUID()
+            rows.append(HomeRowConfig(id: existingId, title: type.defaultTitle, isEnabled: isEnabled,
+                                      sortOrder: rows.count, type: type))
+        }
+        homeRows = rows
+        saveHomeRows()
+    }
+    #endif
     
     func saveHomeRows() {
         if let encoded = try? JSONEncoder().encode(homeRows) {
