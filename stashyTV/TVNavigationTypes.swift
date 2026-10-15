@@ -87,6 +87,7 @@ extension EnvironmentValues {
 /// und `TVTabStack` den Typ als Schlüssel brauchen.
 enum TVRootTab: String, Hashable, CaseIterable {
     case home, scenes, performers, studios, tags, groups, galleries, images, search, settings
+    case feeds
 }
 
 /// Hält die `NavigationPath`s **außerhalb** des View-Baums.
