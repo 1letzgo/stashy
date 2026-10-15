@@ -17,6 +17,8 @@ struct TVPerformerDetailView: View {
     // Nur beim ersten Erscheinen laden — ein Pop zurück darf die nachgeladenen
     // Seiten (und damit Scroll-Position/Fokus) nicht auf Seite 1 zurücksetzen.
     @State private var didLoad = false
+    /// Match rank "rank/total" in the Match pool (same line as iOS), nil when not ranked.
+    @State private var battleLine: String?
 
     var body: some View {
         TVGenericDetailView(
@@ -67,10 +69,18 @@ struct TVPerformerDetailView: View {
                         Text("Favorite").font(.title3).foregroundStyle(.secondary)
                         Image(systemName: "heart.fill").foregroundColor(.red).font(.title3)
                     }
+
+                    if let battleLine {
+                        Text("Battle").font(.title3).foregroundStyle(.secondary)
+                        Text(battleLine).font(.title3).foregroundColor(.white)
+                    }
                 }
             },
             additionalContent: { EmptyView() }
         )
+        .task(id: performerId) {
+            battleLine = await HotOrNotBattleDisplay.fetchRankSlashTotal(performerId: performerId)
+        }
         .onAppear {
             guard !didLoad else { return }
             didLoad = true
