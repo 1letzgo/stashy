@@ -90,6 +90,7 @@ enum TVRootTab: String, Hashable, CaseIterable {
     case markers
     /// Match + RateMe (iOS: Tools → Discover).
     case discover
+    case feeds
 }
 
 /// Hält die `NavigationPath`s **außerhalb** des View-Baums.

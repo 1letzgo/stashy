@@ -125,6 +125,13 @@ struct TVMainTabView: View {
                 TVTabStack(tab: .home) { TVDashboardView() }
             }
 
+            // Feeds (iOS: own tab) — directly under Home, hideable like the iOS tab.
+            if isVisible(.reels) {
+                Tab("Feeds", systemImage: AppTab.reels.icon, value: TVRootTab.feeds) {
+                    TVTabStack(tab: .feeds) { TVFeedsView() }
+                }
+            }
+
             // Ohne die Prüfung entstünde bei komplett ausgeblendeter Library
             // eine Sektion mit Überschrift und ohne Zeilen.
             if !visibleLibraryTabs.isEmpty {
@@ -157,6 +164,7 @@ struct TVMainTabView: View {
             // Inhaltsbereich sonst nichts mehr an.
             var live: Set<TVRootTab> = [.home, .search, .settings, .discover]
             live.formUnion(visibleLibraryTabs.map(\.id))
+            if isVisible(.reels) { live.insert(.feeds) }
             if !live.contains(selectedTab) {
                 selectedTab = .home
             }
@@ -182,7 +190,7 @@ struct TVMainTabView: View {
             TVTabStack(tab: .images) { TVImagesView() }
         case .markers:
             TVTabStack(tab: .markers) { TVMarkersView() }
-        case .home, .search, .settings, .discover:
+        case .home, .search, .settings, .discover, .feeds:
             // Diese werden oben direkt deklariert.
             EmptyView()
         }
