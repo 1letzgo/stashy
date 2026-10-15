@@ -22,6 +22,7 @@ import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import de.letzgo.stashy.data.Net
 import de.letzgo.stashy.ui.player.AudioFocusCoordinator
+import de.letzgo.stashy.ui.player.ScreenAwakeCoordinator
 
 /** What one feed row wants played (iOS: `ReelItemData.videoURL` + engine options). */
 data class FeedMediaRequest(
@@ -61,6 +62,8 @@ class FeedPlayerPool(context: Context, val size: Int = 3) {
     private inner class Slot(val player: ExoPlayer) : Player.Listener {
         /** Lazy focus: only the audible, playing active row ever holds it (never muted rows). */
         val audioFocus = AudioFocusCoordinator(player, allowed = false)
+        /** Screen stays on while this row plays (muted too); paused / torn down rows let it dim. */
+        val screenAwake = ScreenAwakeCoordinator(player)
         var request: FeedMediaRequest? = null
         var sourceIndex = 0
         var lastUsed = 0L
@@ -273,7 +276,7 @@ class FeedPlayerPool(context: Context, val size: Int = 3) {
     fun release() {
         released = true
         teardown()
-        slots.forEach { it.audioFocus.release(); it.player.release() }
+        slots.forEach { it.audioFocus.release(); it.screenAwake.release(); it.player.release() }
         slots.clear()
     }
 }

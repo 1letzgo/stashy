@@ -29,6 +29,8 @@ class MainActivity : FragmentActivity() {
         // iOS covers the window with a blur when the app resigns active, so the app switcher never
         // shows library content. Android 13+: no recents thumbnail at all.
         if (android.os.Build.VERSION.SDK_INT >= 33) setRecentsScreenshotEnabled(false)
+        // Screen stays on while a video plays (ui/player/ScreenAwake.kt).
+        de.letzgo.stashy.ui.player.ScreenAwake.bind(this)
         setContent { StashyTheme { de.letzgo.stashy.ui.settings.AppLockGate { AppShell() } } }
     }
 
