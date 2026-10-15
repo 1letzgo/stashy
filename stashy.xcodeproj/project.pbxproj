@@ -44,6 +44,7 @@
 		4641A386019F4F5F81B587A8 /* StashDBViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 08FB77A2FE84155DC02AAC07 /* StashDBViewModel.swift */; };
 		4FA2DDB674AB41BC92ACAB15 /* FilterCriteriaDocument.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2195D672B4B04628BD280AA1 /* FilterCriteriaDocument.swift */; };
 		5115C0010000000000000001 /* SimilarScenesFinder.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5115C0020000000000000002 /* SimilarScenesFinder.swift */; };
+		5115C0030000000000000003 /* SimilarScenesFinder.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5115C0020000000000000002 /* SimilarScenesFinder.swift */; };
 		5115C0050000000000000005 /* SceneSimilarScenesCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5115C0060000000000000006 /* SceneSimilarScenesCard.swift */; };
 		51487CAA64DF4CC3B986B68C /* SceneStudioCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = DF675E752F2A6392004CA019 /* SceneStudioCard.swift */; };
 		5B0100661A854DEDA5E55778 /* CatalogsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DF22BB142F167223007C2090 /* CatalogsView.swift */; };
@@ -968,6 +969,7 @@
 				C047CE6380F048858A91E6C9 /* GraphQLClient.swift in Sources */,
 				E909C6E8F4744C4D939F78BD /* GraphQLQueries.swift in Sources */,
 				A1PLUS042F30B00000000004 /* StashyPlusManager.swift in Sources */,
+				5115C0030000000000000003 /* SimilarScenesFinder.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
