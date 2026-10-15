@@ -87,6 +87,8 @@ extension EnvironmentValues {
 /// und `TVTabStack` den Typ als Schlüssel brauchen.
 enum TVRootTab: String, Hashable, CaseIterable {
     case home, scenes, performers, studios, tags, groups, galleries, images, search, settings
+    /// Match + RateMe (iOS: Tools → Discover).
+    case discover
 }
 
 /// Hält die `NavigationPath`s **außerhalb** des View-Baums.

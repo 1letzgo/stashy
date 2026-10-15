@@ -136,6 +136,12 @@ struct TVMainTabView: View {
                 }
             }
 
+            // Match + RateMe (stashy+). Bleibt auch gesperrt sichtbar: die Kacheln
+            // tragen dann ein Schloss und führen zur stashy+-Seite.
+            Tab("Discover", systemImage: "sparkles", value: TVRootTab.discover) {
+                TVTabStack(tab: .discover) { TVDiscoverView() }
+            }
+
             // Settings zuletzt. Einen Footer-Slot gibt es auf tvOS nicht
             // (`tabViewSidebarFooter` ist dort nicht verfügbar), die
             // Deklarationsreihenfolge ist der einzige Hebel.
@@ -148,7 +154,7 @@ struct TVMainTabView: View {
         .onChange(of: tabManager.tabs) { _, _ in
             // Blendet der Nutzer den gerade aktiven Bereich aus, zeigt der
             // Inhaltsbereich sonst nichts mehr an.
-            var live: Set<TVRootTab> = [.home, .search, .settings]
+            var live: Set<TVRootTab> = [.home, .search, .settings, .discover]
             live.formUnion(visibleLibraryTabs.map(\.id))
             if !live.contains(selectedTab) {
                 selectedTab = .home
@@ -173,8 +179,8 @@ struct TVMainTabView: View {
             TVTabStack(tab: .galleries) { TVGalleriesView() }
         case .images:
             TVTabStack(tab: .images) { TVImagesView() }
-        case .home, .search, .settings:
-            // Diese drei werden oben direkt deklariert.
+        case .home, .search, .settings, .discover:
+            // Diese werden oben direkt deklariert.
             EmptyView()
         }
     }
