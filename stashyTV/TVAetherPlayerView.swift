@@ -169,8 +169,13 @@ private struct TVAetherPlayerContent<Panel: View>: View {
     /// Which Up/Down click is down right now (fed by `TVRemoteHoldRecognizer`). Clicks are
     /// handled on release by the recognizer; swipes still arrive only as move commands.
     @State private var remotePresses = TVRemotePressTracker()
+    /// Mirror of `engine.rate`: the engine does not publish its speed, so the speed row
+    /// and the transport badge would not redraw after a pick without it.
+    @State private var playbackRate: Float = 1
 
     private static var autoHideDelay: Double { 4 }
+    /// Same choices as the phone player's speed menu.
+    private static var speedOptions: [Float] { [0.5, 0.75, 1, 1.25, 1.5, 2] }
 
     var body: some View {
         ZStack {
@@ -230,9 +235,13 @@ private struct TVAetherPlayerContent<Panel: View>: View {
             scheduleAutoHide()
             // Diese Oberfläche zeichnet die Cues, also darf sie auch automatisch eine Spur wählen.
             engine.autoSelectsPreferredSubtitleTrack = true
+            playbackRate = engine.rate
         }
         .onChange(of: engine.hasFirstFrame) { _, ready in
             if ready && !isPanelOpen { isPlayerFocused = true }
+            // A channel hand-over resets the speed to 1× in the model (like a new scene on
+            // iOS); the mirror follows once the new item is up.
+            if ready { playbackRate = engine.rate }
         }
         .onChange(of: panelFocus) { _, new in
             guard new == .closer, isPanelOpen else { return }
@@ -285,7 +294,8 @@ private struct TVAetherPlayerContent<Panel: View>: View {
         if canGoPrevious || canGoNext { return .nav }
         if !engine.audioTracks.isEmpty { return .audio }
         if !engine.subtitleTracks.isEmpty { return .subtitles }
-        return nil
+        // Speed is always there, so the panel never opens without a focus target.
+        return .speed
     }
 
     /// Erst nach der Einblend-Animation: vorher existieren die Buttons noch nicht und
@@ -423,6 +433,14 @@ private struct TVAetherPlayerContent<Panel: View>: View {
                             .padding(.vertical, 6)
                             .background(Color.white.opacity(0.15), in: Capsule())
                     }
+                    if abs(playbackRate - 1) > 0.001 {
+                        Text(Self.speedLabel(playbackRate))
+                            .font(.system(size: 20, weight: .semibold))
+                            .foregroundStyle(.white.opacity(0.8))
+                            .padding(.horizontal, 14)
+                            .padding(.vertical, 6)
+                            .background(Color.white.opacity(0.15), in: Capsule())
+                    }
                     Image(systemName: engine.isPlaying ? "play.fill" : "pause.fill")
                         .font(.system(size: 24))
                         .foregroundStyle(.white.opacity(0.8))
@@ -484,7 +502,7 @@ private struct TVAetherPlayerContent<Panel: View>: View {
         return h > 0 ? String(format: "%d:%02d:%02d", h, m, s) : String(format: "%d:%02d", m, s)
     }
 
-    // MARK: - Panel (audio / subtitles / up next)
+    // MARK: - Panel (audio / subtitles / speed / up next)
 
     @ViewBuilder
     private var panelOverlay: some View {
@@ -546,6 +564,8 @@ private struct TVAetherPlayerContent<Panel: View>: View {
                     }
                 }
 
+                speedRow
+
                 panelExtra()
                     .focusSection()
                     // Gibt es weder Prev/Next noch Spuren, ist der Extra-Inhalt die
@@ -568,7 +588,7 @@ private struct TVAetherPlayerContent<Panel: View>: View {
     /// Fokus-Anker des Panels. `nil` als `equals`-Wert gibt es bei `@FocusState` nicht,
     /// also wird der Modifier nur auf dem Einstiegs-Button gesetzt.
     fileprivate enum PanelFocusTarget: Hashable {
-        case nav, audio, subtitles
+        case nav, audio, subtitles, speed
         /// Unsichtbare Zeile über der obersten Reihe: landet der Fokus dort, hat der
         /// Nutzer „nach oben" aus dem Panel gedrückt — das Panel geht zu.
         case closer
@@ -629,6 +649,41 @@ private struct TVAetherPlayerContent<Panel: View>: View {
             }
         }
         .focusSection()
+    }
+
+    /// 0.5×–2× like the phone player's speed menu, capped at what the route plays natively.
+    private var speedRow: some View {
+        let cap = engine.maxNativeRate
+        let options = Self.speedOptions.filter { $0 <= cap + 0.001 }
+        return VStack(alignment: .leading, spacing: 12) {
+            Text("Speed")
+                .font(.system(size: 22, weight: .bold))
+                .foregroundStyle(.white.opacity(0.6))
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 18) {
+                    ForEach(options, id: \.self) { option in
+                        let isActive = abs(playbackRate - option) < 0.001
+                        // Entry on the active speed, so Down → Select does not change it by accident.
+                        panelButton(title: isActive ? "✓ \(Self.speedLabel(option))" : Self.speedLabel(option),
+                                    icon: "speedometer",
+                                    focusTarget: (firstPanelTarget == .speed && isActive) ? .speed : nil) {
+                            engine.rate = option
+                            playbackRate = engine.rate
+                        }
+                    }
+                }
+                .padding(.vertical, 6)
+            }
+        }
+        .focusSection()
+    }
+
+    private static func speedLabel(_ rate: Float) -> String {
+        let rounded = (rate * 100).rounded() / 100
+        let text = rounded == rounded.rounded()
+            ? String(format: "%.0f", rounded)
+            : String(format: "%g", rounded)
+        return "\(text)×"
     }
 
     private func label(for track: TrackInfo, isActive: Bool) -> String {

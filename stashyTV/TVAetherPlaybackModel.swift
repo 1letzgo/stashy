@@ -120,6 +120,8 @@ final class TVAetherPlaybackModel: ObservableObject {
 
         engine.fallbackSources = fallbackSources
         engine.fallbackDeclaredDuration = fallbackDeclaredDuration
+        // Every scene starts at 1×, as on iOS (a fresh player per scene there).
+        engine.rate = 1
 
         let start = max(0, startAt)
         Task {
@@ -161,6 +163,9 @@ final class TVAetherPlaybackModel: ObservableObject {
         engine.fallbackSources = fallbackSources
         engine.fallbackDeclaredDuration = fallbackDeclaredDuration
 
+        // The engine outlives the item here, so the speed pick would carry over; a new
+        // scene starts at 1× like on iOS.
+        engine.rate = 1
         isAwaitingNewItem = true
         engine.prepareForItemReplacement()
         Task {
