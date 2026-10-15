@@ -1,5 +1,13 @@
 import SwiftUI
 
+/// A button in the detail header next to "Play as Channel" (favorite, rating, …).
+struct TVDetailHeaderAction: Identifiable {
+    let id: String
+    let icon: String
+    let title: String
+    let perform: () -> Void
+}
+
 struct TVGenericDetailView<Item: TVDetailItem, Info: View, Content: View>: View {
     let item: Item?
     let isLoading: Bool
@@ -8,6 +16,8 @@ struct TVGenericDetailView<Item: TVDetailItem, Info: View, Content: View>: View 
     let heroImageOverride: AnyView?
     /// When set, the header offers continuous playback of everything in this scope.
     let channel: TVChannel?
+    /// Extra header buttons (performer/studio: favorite and rating).
+    let headerActions: [TVDetailHeaderAction]
 
     @State private var playingChannel: TVChannel?
     @ObservedObject private var stashyPlus = StashyPlusManager.shared
@@ -47,6 +57,7 @@ struct TVGenericDetailView<Item: TVDetailItem, Info: View, Content: View>: View 
         placeholderSystemImage: String,
         heroImageOverride: AnyView? = nil,
         channel: TVChannel? = nil,
+        headerActions: [TVDetailHeaderAction] = [],
         scenes: [Scene],
         isLoadingScenes: Bool,
         totalScenes: Int,
@@ -61,6 +72,7 @@ struct TVGenericDetailView<Item: TVDetailItem, Info: View, Content: View>: View 
         self.placeholderSystemImage = placeholderSystemImage
         self.heroImageOverride = heroImageOverride
         self.channel = channel
+        self.headerActions = headerActions
         self.scenes = scenes
         self.isLoadingScenes = isLoadingScenes
         self.totalScenes = totalScenes
@@ -85,7 +97,28 @@ struct TVGenericDetailView<Item: TVDetailItem, Info: View, Content: View>: View 
                             .fontWeight(.bold)
                             .foregroundColor(.white)
 
-                        if let channel, stashyPlus.isUnlocked {
+                        if !headerActions.isEmpty {
+                            HStack(spacing: 24) {
+                                if let channel, stashyPlus.isUnlocked {
+                                    Button {
+                                        playingChannel = channel
+                                    } label: {
+                                        Label("Play as Channel", systemImage: "play.tv.fill")
+                                    }
+                                    .focused($headerFocus)
+                                }
+                                ForEach(Array(headerActions.enumerated()), id: \.element.id) { index, action in
+                                    // Without the channel button the first action is the header's
+                                    // focus anchor, so the page opens on something visible.
+                                    if index == 0 && !showsChannelButton {
+                                        headerActionButton(action)
+                                            .focused($headerAnchorFocus)
+                                    } else {
+                                        headerActionButton(action)
+                                    }
+                                }
+                            }
+                        } else if let channel, stashyPlus.isUnlocked {
                             Button {
                                 playingChannel = channel
                             } label: {
@@ -244,6 +277,12 @@ struct TVGenericDetailView<Item: TVDetailItem, Info: View, Content: View>: View 
             playingChannel = nil
         }) { channel in
             TVChannelPlayerView(channel: channel)
+        }
+    }
+
+    private func headerActionButton(_ action: TVDetailHeaderAction) -> some View {
+        Button(action: action.perform) {
+            Label(action.title, systemImage: action.icon)
         }
     }
 
