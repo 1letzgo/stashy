@@ -191,6 +191,7 @@ struct TVStashyPlusSettingsView: View {
                             || store.isPurchasing
                             || store.isRestoringPurchases
                     )
+                featureRow(icon: "sparkles.rectangle.stack", text: "Similar Scenes & Up Next")
             } footer: {
                 Text("stashy+ unlocks premium features across stashy for iPhone and Apple TV with one purchase.")
             }
