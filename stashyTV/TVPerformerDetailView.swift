@@ -19,6 +19,8 @@ struct TVPerformerDetailView: View {
     @State private var didLoad = false
     @State private var isUpdatingFavorite = false
     @State private var showingRatingPicker = false
+    /// Match rank "rank/total" in the Match pool (same line as iOS), nil when not ranked.
+    @State private var battleLine: String?
 
     var body: some View {
         TVGenericDetailView(
@@ -80,12 +82,20 @@ struct TVPerformerDetailView: View {
                         Text("Favorite").font(.title3).foregroundStyle(.secondary)
                         Image(systemName: "heart.fill").foregroundColor(.red).font(.title3)
                     }
+
+                    if let battleLine {
+                        Text("Battle").font(.title3).foregroundStyle(.secondary)
+                        Text(battleLine).font(.title3).foregroundColor(.white)
+                    }
                 }
             },
             additionalContent: { EmptyView() }
         )
         .tvRatingDialog(isPresented: $showingRatingPicker, current: performer?.rating100) { value in
             setRating(value)
+        }
+        .task(id: performerId) {
+            battleLine = await HotOrNotBattleDisplay.fetchRankSlashTotal(performerId: performerId)
         }
         .onAppear {
             guard !didLoad else { return }

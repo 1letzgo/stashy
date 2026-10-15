@@ -88,6 +88,8 @@ extension EnvironmentValues {
 enum TVRootTab: String, Hashable, CaseIterable {
     case home, scenes, performers, studios, tags, groups, galleries, images, search, settings
     case markers
+    /// Match + RateMe (iOS: Tools → Discover).
+    case discover
 }
 
 /// Hält die `NavigationPath`s **außerhalb** des View-Baums.

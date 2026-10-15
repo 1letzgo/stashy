@@ -6,8 +6,9 @@
 //  Performers / Tags / Studios catalog "Filter & Sort" sheets.
 //
 
-#if !os(tvOS)
 import Foundation
+
+#if !os(tvOS)
 
 // MARK: - O Count live chip (`o_counter` / `IntCriterionInput`)
 
@@ -25,7 +26,9 @@ func sceneLiveOCounterCriterion(from tag: String) -> [String: Any]? {
     return ["value": v, "modifier": parts[0]]
 }
 
-// MARK: - Image list media type (live `image_filter.path` regex)
+#endif
+
+// MARK: - Image list media type (live `image_filter.path` regex) — also compiled into tvOS (RateMe)
 
 /// Live chip for Stash `findImages` via `path` / `MATCHES_REGEX`.
 enum ImageListMediaKind: String, CaseIterable, Identifiable, Equatable {
@@ -60,6 +63,8 @@ enum ImageListMediaKind: String, CaseIterable, Identifiable, Equatable {
         return nil
     }
 }
+
+#if !os(tvOS)
 
 // MARK: - Preset picker row ids (`""` | `server:<stashId>` | `local:<uuid>`)
 

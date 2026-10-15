@@ -181,6 +181,8 @@ struct TVStashyPlusSettingsView: View {
                     }
                 }
 
+                featureRow(icon: ToolsItem.hotOrNot.icon, text: ToolsItem.hotOrNot.plusFeatureTitle)
+                featureRow(icon: ToolsItem.rateMe.icon, text: ToolsItem.rateMe.plusFeatureTitle)
                 featureRow(icon: "sparkles.tv.fill", text: "Channels")
                     // Wer stashy+ bereits besitzt, bekommt weder Kauf- noch
                     // Restore-Button; während eines Kaufs oder Restores sind sie
