@@ -45,7 +45,6 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.compose.LocalLifecycleOwner
-import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
@@ -136,11 +135,10 @@ fun FeedsScreen() {
         }
     }
 
-    // iOS: `isIdleTimerDisabled = true` while Feeds is up; background pauses, foreground resumes.
-    val view = LocalView.current
+    // Background pauses, foreground resumes. The screen stays on only while a row actually plays
+    // (FeedPlayerPool → ScreenAwakeCoordinator), not merely while Feeds is up.
     val lifecycle = LocalLifecycleOwner.current.lifecycle
     DisposableEffect(lifecycle) {
-        view.keepScreenOn = true
         val observer = LifecycleEventObserver { _, event ->
             when (event) {
                 Lifecycle.Event.ON_PAUSE -> { lifecycleActive = false; pool.pauseAll() }
@@ -151,7 +149,6 @@ fun FeedsScreen() {
         lifecycle.addObserver(observer)
         onDispose {
             lifecycle.removeObserver(observer)
-            view.keepScreenOn = false
             Nav.rootHidesTabBar = false
             pool.release()
         }

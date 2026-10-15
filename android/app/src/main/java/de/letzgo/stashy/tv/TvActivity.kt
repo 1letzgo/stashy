@@ -21,6 +21,8 @@ class TvActivity : FragmentActivity() {
         super.onCreate(savedInstanceState)
         current = this
         TvSecurity.ensureLoaded()
+        // Screen saver / Ambient mode stays off while a video plays (ui/player/ScreenAwake.kt).
+        de.letzgo.stashy.ui.player.ScreenAwake.bind(this)
         setContent { TvTheme { TvApp() } }
     }
 

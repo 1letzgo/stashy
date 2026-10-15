@@ -82,6 +82,9 @@ class StashPlayer(context: Context, val role: Role = Role.Main) {
     /** Lazy audio focus: muted / paused / preview playback never pauses other apps' audio. */
     private val audioFocus = AudioFocusCoordinator(exo, allowed = role == Role.Main)
 
+    /** Screen stays on while a Main player plays; muted card previews never hold it. */
+    private val screenAwake = if (role == Role.Main) ScreenAwakeCoordinator(exo) else null
+
     // MARK: Published state
 
     var currentTime by mutableDoubleStateOf(0.0); private set
@@ -328,6 +331,7 @@ class StashPlayer(context: Context, val role: Role = Role.Main) {
         session = null
         exo.removeListener(listener)
         audioFocus.release()
+        screenAwake?.release()
         exo.release()
         textureView = null
     }

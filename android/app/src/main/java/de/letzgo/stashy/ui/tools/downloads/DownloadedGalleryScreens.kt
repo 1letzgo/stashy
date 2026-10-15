@@ -358,7 +358,8 @@ private fun OfflineLoopingVideo(file: File, active: Boolean, muted: Boolean) {
     DisposableEffect(player) {
         // Lazy audio focus: taken only while the clip plays unmuted.
         val audioFocus = de.letzgo.stashy.ui.player.AudioFocusCoordinator(player)
-        onDispose { audioFocus.release(); player.release() }
+        val screenAwake = de.letzgo.stashy.ui.player.ScreenAwakeCoordinator(player)
+        onDispose { audioFocus.release(); screenAwake.release(); player.release() }
     }
     LaunchedEffect(active) { player.playWhenReady = active }
     LaunchedEffect(muted) { player.volume = if (muted) 0f else 1f }
