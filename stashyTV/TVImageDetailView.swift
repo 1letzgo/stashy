@@ -27,6 +27,7 @@ struct TVImageDetailView: View {
     @State private var hasLoaded: Bool = false
     @State private var loadFailed: Bool = false
     @State private var isLoading: Bool = true
+    @State private var slideshow: TVSlideshowStart?
 
     var body: some View {
         ZStack {
@@ -82,6 +83,25 @@ struct TVImageDetailView: View {
                 break
             }
         }
+        // Play/Pause starts a slideshow from the image on screen.
+        .onPlayPauseCommand {
+            guard images.indices.contains(currentIndex) else { return }
+            slideshow = TVSlideshowStart(index: currentIndex)
+        }
+        .fullScreenCover(item: $slideshow) { start in
+            TVImageSlideshowView(
+                images: images,
+                startIndex: start.index,
+                onLoadMore: { requestMoreImages() },
+                hasMore: canLoadMore,
+                onFinish: { imageId in
+                    // Back in the viewer on the image the slideshow stopped at.
+                    if let index = images.firstIndex(where: { $0.id == imageId }) {
+                        currentIndex = index
+                    }
+                }
+            )
+        }
         .onAppear {
             loadImages()
         }
@@ -135,10 +155,14 @@ struct TVImageDetailView: View {
 
                 Spacer()
                 if images.count > 1 {
-                    Text("\(currentIndex + 1) / \(images.count)")
-                        .font(.title3)
-                        .foregroundStyle(.secondary)
-                        .padding(.bottom, 40)
+                    HStack(spacing: 24) {
+                        Text("\(currentIndex + 1) / \(images.count)")
+                        Label("Slideshow", systemImage: "playpause.fill")
+                            .foregroundStyle(.tertiary)
+                    }
+                    .font(.title3)
+                    .foregroundStyle(.secondary)
+                    .padding(.bottom, 40)
                 }
             }
         }
@@ -205,6 +229,24 @@ struct TVImageDetailView: View {
         currentIndex = images.firstIndex(where: { $0.id == anchorId })
             ?? images.firstIndex(where: { $0.id == imageId })
             ?? 0
+    }
+
+    /// Whether the slideshow can ask for another page of the list it is showing.
+    private var canLoadMore: Bool {
+        if onLoadMore != nil { return hasMore }
+        return galleryId != nil ? viewModel.hasMoreGalleryImages : viewModel.hasMoreImages
+    }
+
+    private func requestMoreImages() {
+        if let onLoadMore {
+            if hasMore { onLoadMore() }
+        } else if let galleryId {
+            if viewModel.hasMoreGalleryImages {
+                viewModel.fetchGalleryImages(galleryId: galleryId, isInitialLoad: false)
+            }
+        } else if viewModel.hasMoreImages {
+            viewModel.loadMoreImages()
+        }
     }
 
     private func maybeLoadMoreIfNeeded() {

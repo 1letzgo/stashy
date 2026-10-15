@@ -17,6 +17,7 @@ struct TVImagesView: View {
     // nach jedem Pop/Tab-Wechsel zurück, obwohl "No Filter" gewählt war.
     @State private var didApplyDefaultFilter = false
     @State private var presentedImage: TVImageLink?
+    @State private var slideshow: TVSlideshowStart?
     @State private var focusResetToken = 0
     @FocusState private var focusedImageID: String?
 
@@ -67,6 +68,9 @@ struct TVImagesView: View {
                     },
                     filterMenu: {
                         TVFilterPickerButton(filters: savedFilters, selection: $selectedFilter)
+                        if !displayImages.isEmpty {
+                            TVSlideshowButton { slideshow = TVSlideshowStart(index: 0) }
+                        }
                     }
                 )
             },
@@ -86,7 +90,18 @@ struct TVImagesView: View {
                 }
             }
         )
-        .dismissOnAppLock { presentedImage = nil }
+        .dismissOnAppLock {
+            presentedImage = nil
+            slideshow = nil
+        }
+        .fullScreenCover(item: $slideshow) { start in
+            TVImageSlideshowView(
+                images: displayImages,
+                startIndex: start.index,
+                onLoadMore: { viewModel.loadMoreImages() },
+                hasMore: viewModel.hasMoreImages
+            )
+        }
         .fullScreenCover(item: $presentedImage) { link in
             TVImageDetailView(
                 imageId: link.id,
