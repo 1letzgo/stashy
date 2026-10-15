@@ -349,16 +349,12 @@ class StashDBViewModel: ObservableObject {
 
     private var performerImageUpdatedObserver: NSObjectProtocol?
     private var imageRatingUpdatedObserver: NSObjectProtocol?
-    #if !os(tvOS)
     private var imageOCounterUpdatedObserver: NSObjectProtocol?
-    #endif
     private var imageTagsUpdatedObserver: NSObjectProtocol?
     private var sceneTagsUpdatedObserver: NSObjectProtocol?
     private var markerTagsUpdatedObserver: NSObjectProtocol?
     private var bulkTagsAppliedObserver: NSObjectProtocol?
-    #if !os(tvOS)
     private var sceneOCounterUpdatedObserver: NSObjectProtocol?
-    #endif
     private var sceneUpdatedObserver: NSObjectProtocol?
     private var tagImageUpdatedObserver: NSObjectProtocol?
     private var sceneCoverUpdatedObserver: NSObjectProtocol?
@@ -421,7 +417,6 @@ class StashDBViewModel: ObservableObject {
             }
         }
 
-        #if !os(tvOS)
         imageOCounterUpdatedObserver = NotificationCenter.default.addObserver(
             forName: NSNotification.Name("ImageOCounterUpdated"),
             object: nil,
@@ -447,7 +442,6 @@ class StashDBViewModel: ObservableObject {
                 viewModel?.patchSceneOCounterInLists(sceneId: sceneId, oCounter: oCounter)
             }
         }
-        #endif
 
         sceneTagsUpdatedObserver = NotificationCenter.default.addObserver(
             forName: NSNotification.Name("SceneTagsUpdated"),
@@ -544,14 +538,12 @@ class StashDBViewModel: ObservableObject {
         if let imageRatingUpdatedObserver {
             NotificationCenter.default.removeObserver(imageRatingUpdatedObserver)
         }
-        #if !os(tvOS)
         if let imageOCounterUpdatedObserver {
             NotificationCenter.default.removeObserver(imageOCounterUpdatedObserver)
         }
         if let sceneOCounterUpdatedObserver {
             NotificationCenter.default.removeObserver(sceneOCounterUpdatedObserver)
         }
-        #endif
         if let sceneUpdatedObserver {
             NotificationCenter.default.removeObserver(sceneUpdatedObserver)
         }
@@ -707,13 +699,9 @@ class StashDBViewModel: ObservableObject {
     @Published var statistics: Statistics?
     @Published var performerGenderCounts: [String: Int] = [:]
     @Published var isLoadingPerformerGenderCounts: Bool = false
-    #if !os(tvOS)
     @Published var performerAggregates: PerformerAggregates?
-    #endif
     @Published var isLoadingPerformerAggregates: Bool = false
-    #if !os(tvOS)
     @Published var sceneAggregates: SceneAggregates?
-    #endif
     @Published var isLoadingSceneAggregates: Bool = false
     @Published var scenes: [Scene] = []
     // Detailed Content for DetailViews (Tag, Performer, Studio)
@@ -1270,12 +1258,8 @@ class StashDBViewModel: ObservableObject {
         case updatedAtAsc
         case createdAtDesc
         case createdAtAsc
-        #if !os(tvOS)
         case oCountDesc
-        #endif
-        #if !os(tvOS)
         case oCountAsc
-        #endif
         case ratingDesc
         case ratingAsc
 
@@ -1295,12 +1279,8 @@ class StashDBViewModel: ObservableObject {
             case .updatedAtAsc: return "Updated (Oldest First)"
             case .createdAtDesc: return "Created (Newest First)"
             case .createdAtAsc: return "Created (Oldest First)"
-            #if !os(tvOS)
             case .oCountDesc: return "O Count (High-Low)"
-            #endif
-            #if !os(tvOS)
             case .oCountAsc: return "O Count (Low-High)"
-            #endif
             case .ratingDesc: return "Rating (High-Low)"
             case .ratingAsc: return "Rating (Low-High)"
             case .random: return "Random"
@@ -1309,16 +1289,8 @@ class StashDBViewModel: ObservableObject {
 
         var direction: String {
             switch self {
-            #if !os(tvOS)
             case .nameAsc, .sceneCountAsc, .imageCountAsc, .galleryCountAsc, .birthdateAsc, .updatedAtAsc, .createdAtAsc, .oCountAsc, .ratingAsc: return "ASC"
-            #else
-            case .nameAsc, .sceneCountAsc, .imageCountAsc, .galleryCountAsc, .birthdateAsc, .updatedAtAsc, .createdAtAsc, .ratingAsc: return "ASC"
-            #endif
-            #if !os(tvOS)
             case .nameDesc, .sceneCountDesc, .imageCountDesc, .galleryCountDesc, .birthdateDesc, .updatedAtDesc, .createdAtDesc, .oCountDesc, .ratingDesc, .random: return "DESC"
-            #else
-            case .nameDesc, .sceneCountDesc, .imageCountDesc, .galleryCountDesc, .birthdateDesc, .updatedAtDesc, .createdAtDesc, .ratingDesc, .random: return "DESC"
-            #endif
             }
         }
 
@@ -1331,9 +1303,7 @@ class StashDBViewModel: ObservableObject {
             case .birthdateAsc, .birthdateDesc: return "birthdate"
             case .updatedAtAsc, .updatedAtDesc: return "updated_at"
             case .createdAtAsc, .createdAtDesc: return "created_at"
-            #if !os(tvOS)
             case .oCountAsc, .oCountDesc: return "o_counter"
-            #endif
             case .ratingAsc, .ratingDesc: return "rating"
             case .random: return "random"
             }
@@ -1422,12 +1392,8 @@ class StashDBViewModel: ObservableObject {
         case playCountAsc
         case playDurationDesc
         case playDurationAsc
-        #if !os(tvOS)
         case oCounterDesc
-        #endif
-        #if !os(tvOS)
         case oCounterAsc
-        #endif
         case ratingDesc
         case ratingAsc
 
@@ -1447,12 +1413,8 @@ class StashDBViewModel: ObservableObject {
             case .playCountAsc: return "Least Viewed"
             case .playDurationDesc: return "Watch Time (High-Low)"
             case .playDurationAsc: return "Watch Time (Low-High)"
-            #if !os(tvOS)
             case .oCounterDesc: return "Counter (High-Low)"
-            #endif
-            #if !os(tvOS)
             case .oCounterAsc: return "Counter (Low-High)"
-            #endif
             case .ratingDesc: return "Rating (High-Low)"
             case .ratingAsc: return "Rating (Low-High)"
             case .random: return "Random"
@@ -1461,16 +1423,8 @@ class StashDBViewModel: ObservableObject {
 
         var direction: String {
             switch self {
-            #if !os(tvOS)
             case .dateDesc, .createdAtDesc, .durationDesc, .lastPlayedAtDesc, .playCountDesc, .playDurationDesc, .oCounterDesc, .ratingDesc, .random: return "DESC"
-            #else
-            case .dateDesc, .createdAtDesc, .durationDesc, .lastPlayedAtDesc, .playCountDesc, .playDurationDesc, .ratingDesc, .random: return "DESC"
-            #endif
-            #if !os(tvOS)
             case .dateAsc, .createdAtAsc, .titleAsc, .durationAsc, .lastPlayedAtAsc, .playCountAsc, .playDurationAsc, .oCounterAsc, .ratingAsc: return "ASC"
-            #else
-            case .dateAsc, .createdAtAsc, .titleAsc, .durationAsc, .lastPlayedAtAsc, .playCountAsc, .playDurationAsc, .ratingAsc: return "ASC"
-            #endif
             case .titleDesc: return "DESC"
             }
         }
@@ -1484,9 +1438,7 @@ class StashDBViewModel: ObservableObject {
             case .lastPlayedAtDesc, .lastPlayedAtAsc: return "last_played_at"
             case .playCountDesc, .playCountAsc: return "play_count"
             case .playDurationDesc, .playDurationAsc: return "play_duration"
-            #if !os(tvOS)
             case .oCounterDesc, .oCounterAsc: return "o_counter"
-            #endif
             case .ratingDesc, .ratingAsc: return "rating"
             case .random: return "random"
             }
@@ -1507,9 +1459,7 @@ class StashDBViewModel: ObservableObject {
             case "last_played_at": self = isAsc ? .lastPlayedAtAsc : .lastPlayedAtDesc
             case "play_count": self = isAsc ? .playCountAsc : .playCountDesc
             case "play_duration": self = isAsc ? .playDurationAsc : .playDurationDesc
-            #if !os(tvOS)
             case "o_counter": self = isAsc ? .oCounterAsc : .oCounterDesc
-            #endif
             case "rating", "rating100": self = isAsc ? .ratingAsc : .ratingDesc
             default: return nil
             }
@@ -2102,7 +2052,6 @@ class StashDBViewModel: ObservableObject {
         _ = patch(&clips)
     }
 
-    #if !os(tvOS)
     /// Live-listener: patch `o_counter` across in-memory image lists (FullScreen / feed sync).
     func patchImageOCounterInLists(imageId: String, oCounter: Int) {
         func patch(_ list: inout [StashImage]) -> Bool {
@@ -2116,7 +2065,6 @@ class StashDBViewModel: ObservableObject {
         _ = patch(&detailImages)
         _ = patch(&clips)
     }
-    #endif
 
     /// Live-listener: patch `o_counter` across in-memory scene lists.
     /// A bulk tag action touched many items at once; add the tag to every one of them
@@ -2176,7 +2124,6 @@ class StashDBViewModel: ObservableObject {
         patch(&detailImages)
     }
 
-    #if !os(tvOS)
     func patchSceneOCounterInLists(sceneId: String, oCounter: Int) {
         func patch(_ list: inout [Scene]) {
             guard let idx = list.firstIndex(where: { $0.id == sceneId }) else { return }
@@ -2194,7 +2141,6 @@ class StashDBViewModel: ObservableObject {
             homeRowScenes[rowType] = copy
         }
     }
-    #endif
 
     /// Live-listener: merge title / details / studio / performers / tags / groups / rating
     /// from Scene Detail onto list stubs without replacing files, paths, or play stats.
@@ -2409,17 +2355,10 @@ class StashDBViewModel: ObservableObject {
     /// Hoists scene-only keys mistakenly stored at the root of a marker filter (e.g. older stashy saves)
     /// into `scene_filter` before `findSceneMarkers`.
     private func normalizeSceneMarkerFilterForQuery(_ markerFilter: [String: Any]) -> [String: Any] {
-        #if !os(tvOS)
         let hoistFromRoot: Set<String> = [
             "rating100", "organized", "interactive", "orientation", "performer_count",
             "resolution", "performer_favorite", "o_counter", "studios", "groups", "movies"
         ]
-        #else
-        let hoistFromRoot: Set<String> = [
-            "rating100", "organized", "interactive", "orientation", "performer_count",
-            "resolution", "performer_favorite", "studios", "groups", "movies"
-        ]
-        #endif
         var out = markerFilter
         var sceneNested = (out["scene_filter"] as? [String: Any]) ?? [:]
         for key in hoistFromRoot {
@@ -2981,7 +2920,6 @@ class StashDBViewModel: ObservableObject {
         loadNextPage()
     }
 
-    #if !os(tvOS)
     func fetchPerformerAggregates() {
         guard ServerConfigManager.shared.activeConfig != nil else {
             DispatchQueue.main.async {
@@ -3074,9 +3012,7 @@ class StashDBViewModel: ObservableObject {
 
         loadNextPage()
     }
-    #endif
 
-    #if !os(tvOS)
     func fetchSceneAggregates() {
         guard ServerConfigManager.shared.activeConfig != nil else {
             DispatchQueue.main.async {
@@ -3197,7 +3133,6 @@ class StashDBViewModel: ObservableObject {
 
         loadNextPage()
     }
-    #endif
 
     private var cachedMarkerCountKey: String {
         let serverID = ServerConfigManager.shared.activeConfig?.id.uuidString ?? "default"
@@ -3813,11 +3748,7 @@ class StashDBViewModel: ObservableObject {
     /// Convenience: dispatch to the correct fetch method based on row content type.
     func refreshHomeRow(config: HomeRowConfig, limit: Int = 10) {
         switch config.type {
-        #if !os(tvOS)
-        case .performersHighestOCount:
-            fetchPerformersForHomeRow(config: config, limit: limit, forceRefresh: true) { _ in }
-        #endif
-        case .newPerformers, .performersHighestSceneCount, .performersHighestRating:
+        case .newPerformers, .performersHighestSceneCount, .performersHighestOCount, .performersHighestRating:
             fetchPerformersForHomeRow(config: config, limit: limit, forceRefresh: true) { _ in }
         case .newStudios, .studiosHighestSceneCount:
             fetchStudiosForHomeRow(config: config, limit: limit, forceRefresh: true) { _ in }
@@ -3881,21 +3812,13 @@ class StashDBViewModel: ObservableObject {
             setSort(.dateDesc)
         case .mostViewed3Min:
             setSort(.playCountDesc)
-        #if !os(tvOS)
         case .topCounter3Min:
             setSort(.oCounterDesc)
-            #endif
         case .topRating3Min:
             setSort(.ratingDesc)
         case .random:
             setSort(.random)
-        #if !os(tvOS)
-        case .performersHighestOCount:
-            homeRowLoadingState[rowType] = false
-            completion([])
-            return
-        #endif
-        case .statistics, .channels, .newPerformers, .performersHighestSceneCount, .performersHighestRating, .newStudios, .studiosHighestSceneCount, .newGalleries, .recentlyUpdatedGalleries, .galleriesHighestImageCount:
+        case .statistics, .channels, .newPerformers, .performersHighestSceneCount, .performersHighestOCount, .performersHighestRating, .newStudios, .studiosHighestSceneCount, .newGalleries, .recentlyUpdatedGalleries, .galleriesHighestImageCount:
             homeRowLoadingState[rowType] = false
             completion([])
             return
@@ -3977,10 +3900,8 @@ class StashDBViewModel: ObservableObject {
             setSort(.createdAtDesc)
         case .performersHighestSceneCount:
             setSort(.sceneCountDesc)
-        #if !os(tvOS)
         case .performersHighestOCount:
             setSort(.oCountDesc)
-            #endif
         case .performersHighestRating:
             setSort(.ratingDesc)
         default:
@@ -6706,7 +6627,6 @@ class StashDBViewModel: ObservableObject {
         }
     }
     
-    #if !os(tvOS)
     func incrementOCounter(sceneId: String, completion: ((Int?) -> Void)? = nil) {
         let mutation = """
         {
@@ -6737,9 +6657,7 @@ class StashDBViewModel: ObservableObject {
             }
         }
     }
-    #endif
     
-    #if !os(tvOS)
     /// What a tap / the long-press menu on an O-Counter pill asks for.
     enum OCounterMutation {
         case increment
@@ -6748,9 +6666,7 @@ class StashDBViewModel: ObservableObject {
         /// Removes every O entry.
         case reset
     }
-    #endif
 
-    #if !os(tvOS)
     /// Single entry point for all O-Counter changes on a scene. `.increment` keeps the existing path.
     func mutateSceneOCounter(sceneId: String, _ mutation: OCounterMutation, completion: ((Int?) -> Void)? = nil) {
         let field: String
@@ -6773,9 +6689,7 @@ class StashDBViewModel: ObservableObject {
             completion?(count)
         }
     }
-    #endif
 
-    #if !os(tvOS)
     /// Image counterpart of `mutateSceneOCounter`.
     func mutateImageOCounter(imageId: String, _ mutation: OCounterMutation, completion: ((Int?) -> Void)? = nil) {
         let field: String
@@ -6798,9 +6712,7 @@ class StashDBViewModel: ObservableObject {
             completion?(count)
         }
     }
-    #endif
 
-    #if !os(tvOS)
     /// `sceneDecrementO` / `sceneResetO` / `imageDecrementO` / `imageResetO` all take an `id`
     /// and return the new count. Completion runs on main.
     private func performOCounterMutation(field: String, id: String, completion: @escaping (Int?) -> Void) {
@@ -6817,7 +6729,6 @@ class StashDBViewModel: ObservableObject {
             DispatchQueue.main.async { completion(count) }
         }
     }
-    #endif
 
     /// Syncs playback activity to Stash. `playDuration` is **added** to the scene's total watch time.
     /// Pass `resumeTime: nil` to update only play duration (e.g. marker streams).
@@ -7525,7 +7436,6 @@ struct GenerateData: Codable {
         }
     }
 
-    #if !os(tvOS)
     func incrementImageOCounter(imageId: String, completion: ((Int?) -> Void)? = nil) {
         let mutation = """
         {
@@ -7557,9 +7467,7 @@ struct GenerateData: Codable {
             }
         }
     }
-    #endif
     
-    #if !os(tvOS)
     func updateImageOCounter(imageId: String, oCounter: Int?, completion: @escaping (Bool) -> Void) {
         let mutation = GraphQLQueries.imageUpdateOCounterMutation
         
@@ -7594,7 +7502,6 @@ struct GenerateData: Codable {
             }
         }
     }
-    #endif
     
     func toggleSceneOrganized(sceneId: String, organized: Bool, completion: @escaping (Bool) -> Void) {
         let mutation = GraphQLQueries.sceneUpdateOrganizedMutation
@@ -8309,7 +8216,6 @@ struct GenerateData: Codable {
         }
     }
 
-    #if !os(tvOS)
     /// Updates performer metadata shown on the detail screen (edit mode).
     func updatePerformerDetails(
         performerId: String,
@@ -8362,7 +8268,6 @@ struct GenerateData: Codable {
             completion(response?.data?.performerUpdate != nil)
         }
     }
-    #endif
 
     func toggleStudioFavorite(studioId: String, favorite: Bool, completion: @escaping (Bool) -> Void) {
         let mutation = GraphQLQueries.studioUpdateFavoriteMutation
@@ -8916,11 +8821,7 @@ struct GroupCreateData: Codable {
 struct ImageRatingUpdateItem: Codable {
     let id: String
     let rating100: Int?
-    #if !os(tvOS)
     let o_counter: Int?
-    #else
-    var o_counter: Int? { nil }
-    #endif
 }
 
 struct PerformerUpdateResponse: Codable {
@@ -8983,11 +8884,7 @@ struct Statistics: Codable {
     let groupCount: Int
     let movieCount: Int
     let tagCount: Int
-    #if !os(tvOS)
     let totalOCount: Int
-    #else
-    var totalOCount: Int { 0 }
-    #endif
     let totalPlayDuration: Double
     let totalPlayCount: Int
     let scenesPlayed: Int
@@ -9005,9 +8902,7 @@ struct Statistics: Codable {
         case groupCount = "group_count"
         case movieCount = "movie_count"
         case tagCount = "tag_count"
-        #if !os(tvOS)
         case totalOCount = "total_o_count"
-        #endif
         case totalPlayDuration = "total_play_duration"
         case totalPlayCount = "total_play_count"
         case scenesPlayed = "scenes_played"
@@ -9109,11 +9004,7 @@ struct Scene: Codable, Identifiable, Equatable {
     let playCount: Int?
     let playDuration: Double?
     let lastPlayedAt: String?
-    #if !os(tvOS)
     let oCounter: Int?
-    #else
-    var oCounter: Int? { nil }
-    #endif
     let rating100: Int?
     let createdAt: String?
     let updatedAt: String?
@@ -9198,9 +9089,7 @@ struct Scene: Codable, Identifiable, Equatable {
         case playCount = "play_count"
         case playDuration = "play_duration"
         case lastPlayedAt = "last_played_at"
-        #if !os(tvOS)
         case oCounter = "o_counter"
-        #endif
         case createdAt = "created_at"
         case updatedAt = "updated_at"
         case sceneMarkers = "scene_markers"
@@ -9227,9 +9116,7 @@ struct Scene: Codable, Identifiable, Equatable {
         self.playCount = playCount
         self.playDuration = playDuration
         self.lastPlayedAt = lastPlayedAt
-        #if !os(tvOS)
         self.oCounter = oCounter
-        #endif
         self.rating100 = rating100
         self.createdAt = createdAt
         self.updatedAt = updatedAt
@@ -9263,9 +9150,7 @@ struct Scene: Codable, Identifiable, Equatable {
         playCount = try container.decodeIfPresent(Int.self, forKey: .playCount)
         playDuration = try container.decodeIfPresent(Double.self, forKey: .playDuration)
         lastPlayedAt = try container.decodeIfPresent(String.self, forKey: .lastPlayedAt)
-        #if !os(tvOS)
         oCounter = try container.decodeIfPresent(Int.self, forKey: .oCounter)
-        #endif
         rating100 = try container.decodeIfPresent(Int.self, forKey: .rating100)
         createdAt = try container.decodeIfPresent(String.self, forKey: .createdAt)
         updatedAt = try container.decodeIfPresent(String.self, forKey: .updatedAt)
@@ -9701,7 +9586,7 @@ extension ScenePaths {
 extension MarkerScene {
     /// Same labels as the iOS memberwise init; `interactive` does not exist on tvOS.
     init(id: String, title: String?, date: String?, files: [SceneFile]?, performers: [ScenePerformer]?, rating100: Int?, playCount: Int?, oCounter: Int?, interactive: Bool?, paths: ScenePaths?) {
-        self.init(id: id, title: title, date: date, files: files, performers: performers, rating100: rating100, playCount: playCount, paths: paths)
+        self.init(id: id, title: title, date: date, files: files, performers: performers, rating100: rating100, playCount: playCount, oCounter: oCounter, paths: paths)
     }
 }
 #endif
@@ -9714,11 +9599,7 @@ struct MarkerScene: Codable, Identifiable, Equatable {
     let performers: [ScenePerformer]?
     let rating100: Int?
     let playCount: Int?
-    #if !os(tvOS)
     let oCounter: Int?
-    #else
-    var oCounter: Int? { nil }
-    #endif
     #if !os(tvOS)
     let interactive: Bool?
     #else
@@ -9732,9 +9613,7 @@ struct MarkerScene: Codable, Identifiable, Equatable {
         case interactive
         #endif
         case playCount = "play_count"
-        #if !os(tvOS)
         case oCounter = "o_counter"
-        #endif
     }
 
     func withRating(_ rating: Int?) -> MarkerScene {
@@ -9940,20 +9819,14 @@ struct ScenePerformer: Codable, Identifiable, Equatable {
     let birthdate: String?
     let sceneCount: Int?
     let galleryCount: Int?
-    #if !os(tvOS)
     let oCounter: Int?
-    #else
-    var oCounter: Int? { nil }
-    #endif
     let updatedAt: String?
 
     enum CodingKeys: String, CodingKey {
         case id, name, birthdate
         case sceneCount = "scene_count"
         case galleryCount = "gallery_count"
-        #if !os(tvOS)
         case oCounter = "o_counter"
-        #endif
         case updatedAt = "updated_at"
     }
 
@@ -10050,7 +9923,6 @@ struct PerformerGenderCountsPerformer: Codable {
 }
 
 // MARK: - Performer Aggregates (lightweight decode)
-#if !os(tvOS)
 struct PerformerAggregatesResponse: Codable {
     let data: PerformerAggregatesData?
 }
@@ -10063,27 +9935,17 @@ struct PerformerAggregatesResult: Codable {
     let count: Int
     let performers: [PerformerAggregatesPerformer]
 }
-#endif
 
-#if !os(tvOS)
 struct PerformerAggregatesPerformer: Codable {
     let rating100: Int?
-    #if !os(tvOS)
     let oCounter: Int?
-    #else
-    var oCounter: Int? { nil }
-    #endif
 
     enum CodingKeys: String, CodingKey {
         case rating100
-        #if !os(tvOS)
         case oCounter = "o_counter"
-        #endif
     }
 }
-#endif
 
-#if !os(tvOS)
 struct PerformerAggregates: Equatable {
     let totalCount: Int
     let ratedCount: Int
@@ -10094,10 +9956,8 @@ struct PerformerAggregates: Equatable {
     let averageOCounter: Double?
     let maxOCounter: Int
 }
-#endif
 
 // MARK: - Scene Aggregates (lightweight decode)
-#if !os(tvOS)
 struct SceneAggregatesResponse: Codable {
     let data: SceneAggregatesData?
 }
@@ -10110,31 +9970,21 @@ struct SceneAggregatesResult: Codable {
     let count: Int
     let scenes: [SceneAggregatesScene]
 }
-#endif
 
-#if !os(tvOS)
 struct SceneAggregatesScene: Codable {
     let rating100: Int?
-    #if !os(tvOS)
     let oCounter: Int?
-    #else
-    var oCounter: Int? { nil }
-    #endif
     let playCount: Int?
     let duration: Double?
 
     enum CodingKeys: String, CodingKey {
         case rating100
-        #if !os(tvOS)
         case oCounter = "o_counter"
-        #endif
         case playCount = "play_count"
         case duration
     }
 }
-#endif
 
-#if !os(tvOS)
 struct SceneAggregates: Equatable {
     let totalCount: Int
     let ratedCount: Int
@@ -10151,7 +10001,6 @@ struct SceneAggregates: Equatable {
     let averageDurationSeconds: Double?
     let maxDurationSeconds: Double
 }
-#endif
 
 struct FindPerformersByIdsResult: Codable {
     let performers: [Performer]
@@ -10181,21 +10030,9 @@ struct Performer: Codable, Identifiable, Equatable {
     var ethnicity: String?
     var height: Int? // height_cm
     var weight: Int?
-    #if !os(tvOS)
     var measurements: String?
-    #else
-    var measurements: String? { nil }
-    #endif
-    #if !os(tvOS)
     var fakeTits: String?
-    #else
-    var fakeTits: String? { nil }
-    #endif
-    #if !os(tvOS)
     var penis_length: Double?
-    #else
-    var penis_length: Double? { nil }
-    #endif
     var careerLength: String?
     var tattoos: String?
     var piercings: String?
@@ -10204,31 +10041,18 @@ struct Performer: Codable, Identifiable, Equatable {
     var rating100: Int?
     let createdAt: String?
     let updatedAt: String?
-    #if !os(tvOS)
     let oCounter: Int?
-    #else
-    var oCounter: Int? { nil }
-    #endif
     
     enum CodingKeys: String, CodingKey {
-        case id, name, disambiguation, birthdate, country, gender, ethnicity, weight, tattoos, piercings, favorite, rating100
-        #if !os(tvOS)
-        case measurements
-        #endif
-        #if !os(tvOS)
+        case id, name, disambiguation, birthdate, country, gender, ethnicity, weight, measurements, tattoos, piercings, favorite, rating100
         case oCounter = "o_counter"
-        #endif
         case imagePath = "image_path"
         case sceneCount = "scene_count"
         case imageCount = "image_count"
         case galleryCount = "gallery_count"
         case height = "height_cm"
-        #if !os(tvOS)
         case fakeTits = "fake_tits"
-        #endif
-        #if !os(tvOS)
         case penis_length
-        #endif
         case careerLength = "career_length"
         case aliasList = "alias_list"
         case createdAt = "created_at"
@@ -10707,11 +10531,7 @@ struct StashImage: Codable, Identifiable, Equatable {
     let id: String
     let title: String?
     let rating100: Int?
-    #if !os(tvOS)
     let o_counter: Int?
-    #else
-    var o_counter: Int? { nil }
-    #endif
     let organized: Bool?
     let date: String?
     let createdAt: String?
@@ -10725,10 +10545,7 @@ struct StashImage: Codable, Identifiable, Equatable {
     let tags: [Tag]?
     
     enum CodingKeys: String, CodingKey {
-        case id, title, rating100, organized, date, paths, performers, studio, galleries, visual_files, tags
-        #if !os(tvOS)
-        case o_counter
-        #endif
+        case id, title, rating100, o_counter, organized, date, paths, performers, studio, galleries, visual_files, tags
         case createdAt = "created_at"
         case updatedAt = "updated_at"
     }
@@ -13813,42 +13630,3 @@ final class HomeRowStore: ObservableObject {
         scenes.isEmpty && performers.isEmpty && studios.isEmpty && galleries.isEmpty
     }
 }
-
-#if os(tvOS)
-// tvOS ships without O-Count and adult performer attributes (App Review 2.3.1).
-extension Statistics {
-    /// Same labels as the iOS memberwise init; adult-specific fields do not exist on tvOS.
-    init(sceneCount: Int, scenesSize: Double, scenesDuration: Double, imageCount: Int, imagesSize: Double, galleryCount: Int, performerCount: Int, studioCount: Int, groupCount: Int, movieCount: Int, tagCount: Int, totalOCount: Int, totalPlayDuration: Double, totalPlayCount: Int, scenesPlayed: Int, sceneMarkerCount: Int?) {
-        self.init(sceneCount: sceneCount, scenesSize: scenesSize, scenesDuration: scenesDuration, imageCount: imageCount, imagesSize: imagesSize, galleryCount: galleryCount, performerCount: performerCount, studioCount: studioCount, groupCount: groupCount, movieCount: movieCount, tagCount: tagCount, totalPlayDuration: totalPlayDuration, totalPlayCount: totalPlayCount, scenesPlayed: scenesPlayed, sceneMarkerCount: sceneMarkerCount)
-    }
-}
-
-extension Performer {
-    /// Same labels as the iOS memberwise init; adult-specific fields do not exist on tvOS.
-    init(id: String, name: String, disambiguation: String? = nil, birthdate: String? = nil, country: String? = nil, imagePath: String? = nil, sceneCount: Int, imageCount: Int? = nil, galleryCount: Int?, gender: String? = nil, ethnicity: String? = nil, height: Int? = nil, weight: Int? = nil, measurements: String?, fakeTits: String?, penis_length: Double?, careerLength: String? = nil, tattoos: String? = nil, piercings: String? = nil, aliasList: [String]? = nil, favorite: Bool?, rating100: Int? = nil, createdAt: String?, updatedAt: String?, oCounter: Int?) {
-        self.init(id: id, name: name, disambiguation: disambiguation, birthdate: birthdate, country: country, imagePath: imagePath, sceneCount: sceneCount, imageCount: imageCount, galleryCount: galleryCount, gender: gender, ethnicity: ethnicity, height: height, weight: weight, careerLength: careerLength, tattoos: tattoos, piercings: piercings, aliasList: aliasList, favorite: favorite, rating100: rating100, createdAt: createdAt, updatedAt: updatedAt)
-    }
-}
-
-extension ScenePerformer {
-    /// Same labels as the iOS memberwise init; adult-specific fields do not exist on tvOS.
-    init(id: String, name: String, birthdate: String?, sceneCount: Int?, galleryCount: Int?, oCounter: Int?, updatedAt: String?) {
-        self.init(id: id, name: name, birthdate: birthdate, sceneCount: sceneCount, galleryCount: galleryCount, updatedAt: updatedAt)
-    }
-}
-
-extension StashImage {
-    /// Same labels as the iOS memberwise init; adult-specific fields do not exist on tvOS.
-    init(id: String, title: String?, rating100: Int?, o_counter: Int?, organized: Bool?, date: String?, createdAt: String?, updatedAt: String?, paths: ImagePaths?, visual_files: [ImageFile]?, performers: [GalleryPerformer]? = nil, studio: GalleryStudio?, galleries: [ImageGallery]?, tags: [Tag]?) {
-        self.init(id: id, title: title, rating100: rating100, organized: organized, date: date, createdAt: createdAt, updatedAt: updatedAt, paths: paths, visual_files: visual_files, performers: performers, studio: studio, galleries: galleries, tags: tags)
-    }
-}
-
-extension ImageRatingUpdateItem {
-    /// Same labels as the iOS memberwise init; adult-specific fields do not exist on tvOS.
-    init(id: String, rating100: Int?, o_counter: Int?) {
-        self.init(id: id, rating100: rating100)
-    }
-}
-
-#endif
