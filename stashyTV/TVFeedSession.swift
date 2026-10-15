@@ -332,7 +332,6 @@ final class TVFeedSession: ObservableObject {
     /// The feed cover appeared: fetch (if needed) and play.
     func activate(mode requested: ReelsModeType? = nil) {
         isActive = true
-        UIApplication.shared.isIdleTimerDisabled = true
         if let requested, requested != mode {
             rememberPosition()
             mode = requested
@@ -346,7 +345,6 @@ final class TVFeedSession: ObservableObject {
     func deactivate() {
         rememberPosition()
         isActive = false
-        UIApplication.shared.isIdleTimerDisabled = false
         releaseEngine()
     }
 

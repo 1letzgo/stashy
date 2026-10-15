@@ -3369,7 +3369,6 @@ struct ReelsViewBody: View {
     private func reelsStopPlaybackAndAccessories() {
         reelsPausePlaybackForLocalTeardown()
         ReelsPlayerRegistry.suspendPlayback()
-        UIApplication.shared.isIdleTimerDisabled = false
         AudioSessionCoordinator.shared.releaseSoon()
     }
 
@@ -3387,7 +3386,6 @@ struct ReelsViewBody: View {
         isMediaZoomed = false
         currentItemShowRatingOverlay = false
 
-        UIApplication.shared.isIdleTimerDisabled = true
 
         // Pics uses ImagesView muted autoplay and must not resume reel players / steal audio.
         if reelsMode == .pics { return }
@@ -3657,7 +3655,6 @@ struct ReelsViewBody: View {
     }
 
     private func handleOnAppear() {
-        UIApplication.shared.isIdleTimerDisabled = true
         ReelsPlayerRegistry.resumePlayback()
         reelsClipImageFilters.externalRefetchClips = { vm in
             refetchReelsClipsFromModel(vm)

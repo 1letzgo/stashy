@@ -7,6 +7,9 @@
 
 import Foundation
 import AVFoundation
+#if canImport(UIKit)
+import UIKit
+#endif
 
 /// Protocol for types that provide a user-facing display name (used by tvOS sort picker)
 protocol DisplayNameProvider {
@@ -802,6 +805,61 @@ final class AudioSessionCoordinator: @unchecked Sendable {
         if !liveOwners.isEmpty {
             try? session.setActive(true)
         }
+        #endif
+    }
+}
+
+// MARK: - Idle timer (screen dimming / auto-lock / tvOS screensaver)
+
+/// Single owner of `UIApplication.isIdleTimerDisabled`. Keeps the screen on (iOS: no dimming,
+/// no auto-lock; tvOS: no screensaver) while at least one owner is active — a full playback
+/// surface that is actually playing (muted Feeds included), or a running tvOS slideshow.
+/// Muted card previews never register, paused/stopped/closed players and Picture-in-Picture
+/// don't count, and the flag is dropped while the app is in the background.
+///
+/// Owners are reference-counted by key; nobody else writes `isIdleTimerDisabled` directly,
+/// so one surface closing can never switch the flag off under another one still playing.
+@MainActor
+final class IdleTimerCoordinator {
+    static let shared = IdleTimerCoordinator()
+
+    private var activeOwners = Set<AnyHashable>()
+    private var isInBackground = false
+    private var observers: [NSObjectProtocol] = []
+
+    private init() {
+        #if canImport(UIKit)
+        let center = NotificationCenter.default
+        observers.append(center.addObserver(forName: UIApplication.didEnterBackgroundNotification,
+                                            object: nil, queue: .main) { _ in
+            MainActor.assumeIsolated {
+                IdleTimerCoordinator.shared.isInBackground = true
+                IdleTimerCoordinator.shared.apply()
+            }
+        })
+        observers.append(center.addObserver(forName: UIApplication.willEnterForegroundNotification,
+                                            object: nil, queue: .main) { _ in
+            MainActor.assumeIsolated {
+                IdleTimerCoordinator.shared.isInBackground = false
+                IdleTimerCoordinator.shared.apply()
+            }
+        })
+        #endif
+    }
+
+    /// Reports whether `owner` currently needs the screen to stay on. Idempotent.
+    func setActive(_ active: Bool, for owner: AnyHashable) {
+        let changed = active ? activeOwners.insert(owner).inserted : (activeOwners.remove(owner) != nil)
+        guard changed else { return }
+        apply()
+    }
+
+    private func apply() {
+        #if canImport(UIKit)
+        let disable = !activeOwners.isEmpty && !isInBackground
+        guard UIApplication.shared.isIdleTimerDisabled != disable else { return }
+        UIApplication.shared.isIdleTimerDisabled = disable
+        AppLog.debug("💡 IdleTimer: \(disable ? "disabled (screen stays on)" : "enabled") — active owners: \(activeOwners.count)")
         #endif
     }
 }

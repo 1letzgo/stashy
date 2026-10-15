@@ -62,6 +62,8 @@ struct TVImageSlideshowView: View {
 
     @State private var index = 0
     @State private var isPaused = false
+    /// Key under which a running slideshow keeps the screensaver off (`IdleTimerCoordinator`).
+    private static let idleTimerOwner = "tv.imageSlideshow"
     @State private var showHUD = true
     @State private var hudWork: DispatchWorkItem?
     @State private var advanceTask: Task<Void, Never>?
@@ -132,7 +134,7 @@ struct TVImageSlideshowView: View {
             imagesChanged()
         }
         .onChange(of: isPaused) { _, paused in
-            UIApplication.shared.isIdleTimerDisabled = !paused
+            IdleTimerCoordinator.shared.setActive(!paused, for: Self.idleTimerOwner)
         }
     }
 
@@ -196,7 +198,7 @@ struct TVImageSlideshowView: View {
             interval = TVSlideshowSettings.defaultInterval
         }
         index = images.isEmpty ? 0 : min(max(startIndex, 0), images.count - 1)
-        UIApplication.shared.isIdleTimerDisabled = true
+        IdleTimerCoordinator.shared.setActive(true, for: Self.idleTimerOwner)
         refreshLoaders()
         revealHUD()
         scheduleAdvance()
@@ -206,7 +208,7 @@ struct TVImageSlideshowView: View {
         advanceTask?.cancel()
         advanceTask = nil
         hudWork?.cancel()
-        UIApplication.shared.isIdleTimerDisabled = false
+        IdleTimerCoordinator.shared.setActive(false, for: Self.idleTimerOwner)
     }
 
     private func close() {

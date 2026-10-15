@@ -250,6 +250,7 @@ final class AetherSceneEngine: ObservableObject {
     /// Audible = playing (or holding a PiP window) with sound on a surface allowed to claim
     /// the session. Only then does the app interrupt other audio.
     private func updateAudioSessionClaim(grace: TimeInterval = AudioSessionCoordinator.pauseGrace) {
+        updateIdleTimerClaim()
         let hasSound = !_isMuted && engine.volume > 0
         let audible = audioSessionPolicy == .playback
             && hasSound
@@ -262,6 +263,24 @@ final class AetherSceneEngine: ObservableObject {
                                               audible: audible,
                                               live: live,
                                               grace: grace)
+    }
+
+    // MARK: - Idle timer claim
+
+    /// Last state handed to `IdleTimerCoordinator`.
+    private var lastIdleTimerClaim = false
+
+    /// Keeps the screen on while this engine actually plays on screen. Muted card previews
+    /// (`.ambient`) never claim it; a Picture-in-Picture window doesn't need it. Runs on every
+    /// phase / PiP / policy change and on `stop()` (all funnel through `updateAudioSessionClaim`).
+    private func updateIdleTimerClaim() {
+        let claim = audioSessionPolicy != .ambient
+            && currentURL != nil
+            && isPlaying
+            && !engine.pictureInPictureActive
+        guard claim != lastIdleTimerClaim else { return }
+        lastIdleTimerClaim = claim
+        IdleTimerCoordinator.shared.setActive(claim, for: ObjectIdentifier(self))
     }
 
     // MARK: - Internals
@@ -320,6 +339,10 @@ final class AetherSceneEngine: ObservableObject {
                                               audible: false,
                                               live: false,
                                               grace: AudioSessionCoordinator.stopGrace)
+        if lastIdleTimerClaim {
+            let owner = ObjectIdentifier(self)
+            Task { @MainActor in IdleTimerCoordinator.shared.setActive(false, for: owner) }
+        }
     }
 
     private func bind() {
