@@ -1799,59 +1799,48 @@ struct ReelsViewBody: View {
         }
     }
 
-    /// Feeds "+" behind the performer names: adds the picked performers on the server.
-    /// Scenes / Previews / Markers write their scene (`sceneUpdate`, a marker's parent
-    /// scene), Clips their image (`imageUpdate`); only `id` + `performer_ids` are sent,
-    /// as existing ∪ picked. The overlay updates optimistically and rolls back on failure.
-    private func addPerformers(_ picked: [Performer], to item: ReelItemData) {
-        // A list fetched without performers must never be written back — that would drop
-        // everyone already on the item.
-        let knownExisting: [ScenePerformer]?
+    /// Performers the item was fetched with, or `nil` when its list didn't load them. A list
+    /// fetched without performers must never be written back — that would drop everyone
+    /// already on the item.
+    private func knownPerformers(of item: ReelItemData) -> [ScenePerformer]? {
         switch item {
-        case .scene(let s), .preview(let s): knownExisting = s.performers
-        case .marker(let m): knownExisting = m.scene?.performers
-        case .clip(let c): knownExisting = c.performers?.map { $0.toScenePerformer() }
+        case .scene(let s), .preview(let s): return s.performers
+        case .marker(let m): return m.scene?.performers
+        case .clip(let c): return c.performers?.map { $0.toScenePerformer() }
         }
-        guard let existing = knownExisting else {
-            ToastManager.shared.show("Could not add performers", icon: "exclamationmark.triangle.fill", style: .error)
+    }
+
+    /// Feeds "+" behind the performer names opens the scene-detail performer editor.
+    private func openPerformerEditor(for item: ReelItemData) {
+        let isClip: Bool = { if case .clip = item { return true }; return false }()
+        guard knownPerformers(of: item) != nil, isClip || item.sceneID != nil else {
+            HapticManager.error()
+            ToastManager.shared.show("Could not load performers", icon: "exclamationmark.triangle.fill", style: .error)
             return
         }
-        let existingIds = Set(existing.map(\.id))
-        let newOnes = picked.filter { !existingIds.contains($0.id) }
-        guard !newOnes.isEmpty else { return }
-        let performerIds = existing.map(\.id) + newOnes.map(\.id)
-        let added = newOnes.map {
-            ScenePerformer(id: $0.id, name: $0.name, birthdate: $0.birthdate, sceneCount: $0.sceneCount,
-                           galleryCount: $0.galleryCount, oCounter: nil, updatedAt: $0.updatedAt)
-        }
-        let label = newOnes.count == 1 ? newOnes[0].name : "\(newOnes.count) performers"
-        let finish: (Bool, @escaping () -> Void) -> Void = { success, revert in
-            DispatchQueue.main.async {
-                if success {
-                    HapticManager.success()
-                    ToastManager.shared.show("Added \(label)")
-                } else {
-                    revert()
-                    HapticManager.error()
-                    ToastManager.shared.show("Could not add performers", icon: "exclamationmark.triangle.fill", style: .error)
-                }
-            }
-        }
+        performerPickerItem = item
+    }
 
+    /// The editor already wrote the server (scene / a marker's parent scene via
+    /// `sceneUpdate`, a clip via `imageUpdate`); this mirrors it into every feed copy.
+    private func applyEditedPerformers(_ performers: [ScenePerformer], to item: ReelItemData) {
         if case .clip(let image) = item {
-            let imageId = image.id
-            let original = image.performers ?? []
-            patchClipPerformers(imageId: imageId, performers: original + added.map { $0.toGalleryPerformer() })
-            viewModel.updateImagePerformers(imageId: imageId, performerIds: performerIds) { success in
-                finish(success) { patchClipPerformers(imageId: imageId, performers: original) }
-            }
-            return
+            let galleryPerformers = performers.map { $0.toGalleryPerformer() }
+            patchClipPerformers(imageId: image.id, performers: galleryPerformers)
+            StashImage.postPerformersUpdated(imageId: image.id, performers: galleryPerformers)
+        } else if let sceneId = item.sceneID {
+            patchScenePerformers(sceneId: sceneId, performers: performers)
         }
+        HapticManager.success()
+        ToastManager.shared.show("Performers updated")
+    }
 
-        guard let sceneId = item.sceneID else { return }
-        patchScenePerformers(sceneId: sceneId, performers: existing + added)
-        viewModel.updateScenePerformers(sceneId: sceneId, performerIds: performerIds) { success in
-            finish(success) { patchScenePerformers(sceneId: sceneId, performers: existing) }
+    /// Clips are images: their editor writes `imageUpdate` instead of the scene mutation.
+    private func clipPerformerSaver(for item: ReelItemData) -> (([String], @escaping (Bool) -> Void) -> Void)? {
+        guard case .clip(let image) = item else { return nil }
+        let viewModel = viewModel
+        return { ids, done in
+            viewModel.updateImagePerformers(imageId: image.id, performerIds: ids, completion: done)
         }
     }
 
@@ -3215,11 +3204,13 @@ struct ReelsViewBody: View {
                 }
             }
             .sheet(item: $performerPickerItem) { item in
-                AddPerformersPickerSheet(
-                    existingPerformerIds: Set(item.performers.map(\.id)),
-                    viewModel: viewModel
-                ) { picked in
-                    addPerformers(picked, to: item)
+                AddPerformerToSceneSheet(
+                    sceneId: item.sceneID ?? "",
+                    currentPerformers: knownPerformers(of: item) ?? [],
+                    viewModel: viewModel,
+                    savePerformerIds: clipPerformerSaver(for: item)
+                ) { updated in
+                    applyEditedPerformers(updated, to: item)
                 }
             }
             .onChange(of: performerPickerItem?.id) { _, newValue in
@@ -4773,39 +4764,19 @@ struct ReelsViewBody: View {
                             }
                         }
                         if showsAddPerformer {
-                            reelsAddPerformerButton(item: item)
+                            AddPerformerPlusButton { openPerformerEditor(for: item) }
                                 .padding(.leading, performers.isEmpty ? 0 : 4)
                         }
                     }
                     // Room for the 44 pt hit area; the negative padding below gives the
                     // layout height back so the title doesn't move.
-                    .padding(.vertical, Self.addPerformerHitInset)
+                    .padding(.vertical, AddPerformerPlusButton.hitInset)
                 }
-                .padding(.vertical, -Self.addPerformerHitInset)
+                .padding(.vertical, -AddPerformerPlusButton.hitInset)
                 .id(item.id)
             }
             reelsTitleText(item: item)
         }
-    }
-
-    private static let addPerformerGlyphSize: CGFloat = 20
-    private static let addPerformerHitInset: CGFloat = 12
-
-    /// Small glass "+" behind the names (alone when the item has none). Visually as tall
-    /// as a name; the content shape grows the hit area to 44 pt without moving anything.
-    private func reelsAddPerformerButton(item: ReelItemData) -> some View {
-        Button {
-            performerPickerItem = item
-        } label: {
-            Image(systemName: "plus")
-                .font(.system(size: 11, weight: .bold))
-                .foregroundColor(.white.opacity(0.85))
-                .frame(width: Self.addPerformerGlyphSize, height: Self.addPerformerGlyphSize)
-                .stashyGlass(shape: Circle())
-                .contentShape(Rectangle().inset(by: -Self.addPerformerHitInset))
-        }
-        .buttonStyle(.plain)
-        .accessibilityLabel("Add performers")
     }
 
     private func reelsPerformerNameButton(_ performer: ScenePerformer) -> some View {

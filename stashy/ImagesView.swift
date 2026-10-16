@@ -1204,6 +1204,7 @@ struct ImageGroupCatalogCell: View {
 
     @State private var visibleImageId: String
     @State private var tagEditorImage: StashImage?
+    @State private var performerEditorImage: StashImage?
     @ObservedObject private var appearanceManager = AppearanceManager.shared
 
     init(
@@ -1263,7 +1264,11 @@ struct ImageGroupCatalogCell: View {
                     heroButton(for: visibleImage)
                 }
 
-                ImageCatalogFeedHeader(image: visibleImage, currentGalleryId: currentGalleryId)
+                ImageCatalogFeedHeader(
+                    image: visibleImage,
+                    currentGalleryId: currentGalleryId,
+                    onEditPerformers: viewModel == nil ? nil : { openPerformerEditor(for: visibleImage) }
+                )
 
                 HStack(alignment: .bottom, spacing: 8) {
                     if images.count > 1 {
@@ -1332,10 +1337,41 @@ struct ImageGroupCatalogCell: View {
                 }
             }
         }
+        .sheet(item: $performerEditorImage) { image in
+            if let viewModel {
+                AddPerformerToSceneSheet(
+                    sceneId: "",
+                    currentPerformers: (image.performers ?? []).map { $0.toScenePerformer() },
+                    viewModel: viewModel,
+                    savePerformerIds: { ids, done in
+                        viewModel.updateImagePerformers(imageId: image.id, performerIds: ids, completion: done)
+                    }
+                ) { updated in
+                    let performers = updated.map { $0.toGalleryPerformer() }
+                    var patched = images.first(where: { $0.id == image.id }) ?? image
+                    patched.performers = performers
+                    onImageUpdated?(patched)
+                    StashImage.postPerformersUpdated(imageId: image.id, performers: performers)
+                    HapticManager.success()
+                    ToastManager.shared.show("Performers updated")
+                }
+            }
+        }
     }
 }
 
 extension ImageGroupCatalogCell {
+    /// Refuses images whose list was fetched without performers — saving from there
+    /// would drop everyone already on the image.
+    fileprivate func openPerformerEditor(for image: StashImage) {
+        guard image.performers != nil else {
+            HapticManager.error()
+            ToastManager.shared.show("Could not load performers", icon: "exclamationmark.triangle.fill", style: .error)
+            return
+        }
+        performerEditorImage = image
+    }
+
     // MARK: Tags (same row as Feeds: pinned "+", scrolling chips)
 
     @ViewBuilder
@@ -1551,6 +1587,8 @@ extension ImageGroupCatalogCell {
 struct ImageCatalogFeedHeader: View {
     let image: StashImage
     var currentGalleryId: String? = nil
+    /// Edit mode "+" behind the names; `nil` hides it (no view model to save with).
+    var onEditPerformers: (() -> Void)? = nil
     @ObservedObject private var appearanceManager = AppearanceManager.shared
 
     private var performers: [GalleryPerformer] {
@@ -1620,38 +1658,10 @@ struct ImageCatalogFeedHeader: View {
             .padding(.trailing, performers.count > 1 ? CGFloat(performers.count - 1) * -10 : 0)
 
             VStack(alignment: .leading, spacing: 1) {
-                if performers.isEmpty {
-                    Text(image.title ?? "Unknown")
-                        .font(.subheadline).fontWeight(.semibold)
-                        .foregroundColor(.white)
-                        .lineLimit(1)
-                        .shadow(color: .black.opacity(0.35), radius: 1, y: 1)
-                } else if performers.count == 1 {
-                    NavigationLink(destination: PerformerDetailView(performer: performers[0].toPerformer(), initialTab: .images)) {
-                        Text(performers[0].name)
-                            .font(.subheadline).fontWeight(.semibold)
-                            .foregroundColor(.white)
-                            .lineLimit(1)
-                            .shadow(color: .black.opacity(0.35), radius: 1, y: 1)
-                    }
-                    .buttonStyle(.plain)
-                } else {
-                    HStack(spacing: 4) {
-                        ForEach(Array(performers.enumerated()), id: \.element.id) { idx, performer in
-                            NavigationLink(destination: PerformerDetailView(performer: performer.toPerformer(), initialTab: .images)) {
-                                Text(performer.name)
-                                    .font(.subheadline).fontWeight(.semibold)
-                                    .foregroundColor(.white)
-                                    .lineLimit(1)
-                                    .shadow(color: .black.opacity(0.35), radius: 1, y: 1)
-                            }
-                            .buttonStyle(.plain)
-                            if idx < performers.count - 1 {
-                                Text("&")
-                                    .font(.subheadline)
-                                    .foregroundColor(.white.opacity(0.75))
-                            }
-                        }
+                HStack(spacing: 8) {
+                    nameLine
+                    if let onEditPerformers, appearanceManager.isEditModeEnabled {
+                        AddPerformerPlusButton(action: onEditPerformers)
                     }
                 }
 
@@ -1687,6 +1697,44 @@ struct ImageCatalogFeedHeader: View {
                 endPoint: .bottom
             )
         )
+    }
+
+    @ViewBuilder
+    private var nameLine: some View {
+        if performers.isEmpty {
+            Text(image.title ?? "Unknown")
+                .font(.subheadline).fontWeight(.semibold)
+                .foregroundColor(.white)
+                .lineLimit(1)
+                .shadow(color: .black.opacity(0.35), radius: 1, y: 1)
+        } else if performers.count == 1 {
+            NavigationLink(destination: PerformerDetailView(performer: performers[0].toPerformer(), initialTab: .images)) {
+                Text(performers[0].name)
+                    .font(.subheadline).fontWeight(.semibold)
+                    .foregroundColor(.white)
+                    .lineLimit(1)
+                    .shadow(color: .black.opacity(0.35), radius: 1, y: 1)
+            }
+            .buttonStyle(.plain)
+        } else {
+            HStack(spacing: 4) {
+                ForEach(Array(performers.enumerated()), id: \.element.id) { idx, performer in
+                    NavigationLink(destination: PerformerDetailView(performer: performer.toPerformer(), initialTab: .images)) {
+                        Text(performer.name)
+                            .font(.subheadline).fontWeight(.semibold)
+                            .foregroundColor(.white)
+                            .lineLimit(1)
+                            .shadow(color: .black.opacity(0.35), radius: 1, y: 1)
+                    }
+                    .buttonStyle(.plain)
+                    if idx < performers.count - 1 {
+                        Text("&")
+                            .font(.subheadline)
+                            .foregroundColor(.white.opacity(0.75))
+                    }
+                }
+            }
+        }
     }
 
     private var emptyPerformerAvatar: some View {

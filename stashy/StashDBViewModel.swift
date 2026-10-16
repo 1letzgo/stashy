@@ -351,6 +351,7 @@ class StashDBViewModel: ObservableObject {
     private var imageRatingUpdatedObserver: NSObjectProtocol?
     private var imageOCounterUpdatedObserver: NSObjectProtocol?
     private var imageTagsUpdatedObserver: NSObjectProtocol?
+    private var imagePerformersUpdatedObserver: NSObjectProtocol?
     private var sceneTagsUpdatedObserver: NSObjectProtocol?
     private var markerTagsUpdatedObserver: NSObjectProtocol?
     private var bulkTagsAppliedObserver: NSObjectProtocol?
@@ -483,6 +484,19 @@ class StashDBViewModel: ObservableObject {
             }
         }
 
+        imagePerformersUpdatedObserver = NotificationCenter.default.addObserver(
+            forName: StashImage.performersUpdatedNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] notification in
+            guard let imageId = notification.userInfo?["imageId"] as? String,
+                  let performers = notification.userInfo?["performers"] as? [GalleryPerformer] else { return }
+            let viewModel = self
+            Task { @MainActor in
+                viewModel?.patchImagePerformersInLists(imageId: imageId, performers: performers)
+            }
+        }
+
         imageTagsUpdatedObserver = NotificationCenter.default.addObserver(
             forName: NSNotification.Name("ImageTagsUpdated"),
             object: nil,
@@ -549,6 +563,9 @@ class StashDBViewModel: ObservableObject {
         }
         if let imageTagsUpdatedObserver {
             NotificationCenter.default.removeObserver(imageTagsUpdatedObserver)
+        }
+        if let imagePerformersUpdatedObserver {
+            NotificationCenter.default.removeObserver(imagePerformersUpdatedObserver)
         }
         if let sceneTagsUpdatedObserver {
             NotificationCenter.default.removeObserver(sceneTagsUpdatedObserver)
@@ -2122,6 +2139,19 @@ class StashDBViewModel: ObservableObject {
         patch(&clips)
         patch(&allImages)
         patch(&detailImages)
+    }
+
+    /// Keeps every image list in sync after the performer editor saved an image.
+    func patchImagePerformersInLists(imageId: String, performers: [GalleryPerformer]) {
+        func patch(_ list: inout [StashImage]) {
+            guard let index = list.firstIndex(where: { $0.id == imageId }),
+                  list[index].performers != performers else { return }
+            list[index].performers = performers
+        }
+        patch(&clips)
+        patch(&allImages)
+        patch(&detailImages)
+        patch(&galleryImages)
     }
 
     func patchSceneOCounterInLists(sceneId: String, oCounter: Int) {
@@ -10507,6 +10537,20 @@ struct FindImagesResult: Codable {
     let images: [StashImage]
 }
 
+extension StashImage {
+    /// Posted after the performer editor saved an image; every `StashDBViewModel` patches
+    /// its image lists (`patchImagePerformersInLists`).
+    static let performersUpdatedNotification = Notification.Name("ImagePerformersUpdated")
+
+    static func postPerformersUpdated(imageId: String, performers: [GalleryPerformer]) {
+        NotificationCenter.default.post(
+            name: performersUpdatedNotification,
+            object: nil,
+            userInfo: ["imageId": imageId, "performers": performers]
+        )
+    }
+}
+
 struct StashImage: Codable, Identifiable, Equatable {
     let id: String
     let title: String?
@@ -12214,7 +12258,7 @@ extension DownloadManager: URLSessionDownloadDelegate {
 
 extension StashDBViewModel {
     
-    func searchPerformersAsync(query: String, limit: Int = 5, sort: String = "name", direction: String = "ASC") async -> [Performer] {
+    func searchPerformersAsync(query: String, limit: Int = 5) async -> [Performer] {
         await withCheckedContinuation { continuation in
             let graphqlQuery = GraphQLQueries.queryWithFragments("findPerformers")
             
@@ -12225,8 +12269,8 @@ extension StashDBViewModel {
                         "q": query,
                         "per_page": limit,
                         "page": 1,
-                        "sort": sort,
-                        "direction": direction
+                        "sort": "name",
+                        "direction": "ASC"
                     ]
                 ]
             ]
