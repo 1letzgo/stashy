@@ -249,19 +249,77 @@ private fun count(n: Int?, unit: String) = n?.let { "$it $unit" }
 
 @Composable
 fun EditPerformersSheet(scene: Scene, onDismiss: () -> Unit, onSaved: (List<Performer>) -> Unit) =
-    EditPerformersSheet(scene.performers.map { it.id }.toSet(), { SceneEditing.updatePerformers(scene.id, it) }, onDismiss, onSaved)
+    PerformersPickerSheet(
+        itemKey = "scene-${scene.id}",
+        current = scene.performers.map { PickerEntry(it.id, it.name, it.disambiguation?.takeIf { d -> d.isNotBlank() } ?: it.sceneCount?.let { n -> "$n scenes" }, it.imageURL) },
+        known = scene.performers,
+        save = { ids, _ -> SceneEditing.updatePerformers(scene.id, ids) },
+        onDismiss = onDismiss, onSaved = onSaved,
+    )
 
 /** Performer picker for any owner (scene, gallery): `save` writes the chosen ids. */
 @Composable
-fun EditPerformersSheet(initialIds: Set<String>, save: suspend (List<String>) -> Unit, onDismiss: () -> Unit, onSaved: (List<Performer>) -> Unit) {
-    val byId = remember { mutableMapOf<String, Performer>() }
+fun EditPerformersSheet(initialIds: Set<String>, save: suspend (List<String>) -> Unit, onDismiss: () -> Unit, onSaved: (List<Performer>) -> Unit) =
+    PerformersPickerSheet(
+        itemKey = initialIds.sorted().joinToString(","),
+        current = emptyList(), initialIds = initialIds,
+        save = { ids, _ -> save(ids) },
+        onDismiss = onDismiss, onSaved = onSaved,
+    )
+
+/**
+ * The one performer picker (scene detail "Edit Performers", gallery detail, and the add-only
+ * "+" after the performer names in Feeds, the fullscreen image viewer and the image feed
+ * header): the shared [EntityPickerSheet] with avatars (profile pictures), the most used
+ * performers first, server-side search (`findPerformers(q:)`) and "Create" for a missing name.
+ *
+ * [current] are the owner's performers (listed first with their pictures, so they show even
+ * outside the first loaded page); [known] seeds the full [Performer]s handed to [onSaved].
+ * Edit mode: the selection is free, Save hands the full id list to [save]. [addOnly]:
+ * [current] stay ticked, greyed and marked "Added" (locked), the action reads "Done" and stays
+ * disabled until a new performer is picked; [save] still gets the full selection plus the newly
+ * picked performers (callers write existing ∪ picked). A failed [save] (throw) keeps the sheet
+ * open with the error; the ✕ cancels without writing.
+ */
+@Composable
+fun PerformersPickerSheet(
+    itemKey: String,
+    current: List<PickerEntry>,
+    save: suspend (ids: List<String>, added: List<Performer>) -> Unit,
+    onDismiss: () -> Unit,
+    onSaved: (List<Performer>) -> Unit = {},
+    addOnly: Boolean = false,
+    initialIds: Set<String> = current.map { it.id }.toSet(),
+    known: List<Performer> = emptyList(),
+) {
+    val byId = remember(itemKey) { known.associateBy { it.id }.toMutableMap() }
+    val own = remember(itemKey) { current }
+    val startIds = remember(itemKey) { initialIds }
+    fun entry(p: Performer): PickerEntry {
+        byId[p.id] = p
+        val sub = p.disambiguation?.takeIf { it.isNotBlank() } ?: count(p.sceneCount ?: 0, "scenes")
+        return PickerEntry(p.id, p.name, sub, p.imageURL)
+    }
     EntityPickerSheet(
-        "Edit Performers", "Search Performers", initialIds, multiple = true,
-        load = { SceneEditing.allPerformers().onEach { byId[it.id] = it }.map { PickerEntry(it.id, it.name, count(it.sceneCount ?: 0, "scenes")) } },
-        create = { name -> SceneEditing.createPerformer(name).also { byId[it.id] = it }.let { PickerEntry(it.id, it.name, count(it.sceneCount ?: 0, "scenes")) } },
+        title = if (addOnly) "Add Performers" else "Edit Performers",
+        searchHeader = "Search Performers",
+        initialSelection = startIds,
+        multiple = true,
+        load = {
+            val head = own.map { if (addOnly) it.copy(subtitle = "Added") else it }
+            head + (if (addOnly) SceneEditing.findPerformers(null, 60) else SceneEditing.allPerformers()).map(::entry)
+        },
+        create = { name -> entry(SceneEditing.createPerformer(name)) },
         createFailedText = "Failed to create performer",
-        save = save, saveFailedText = "Failed to update performers",
-        onSaved = { picked -> onSaved(picked.mapNotNull { byId[it.id] }) }, onDismiss = onDismiss,
+        save = { ids -> save(ids, ids.filter { it !in startIds }.mapNotNull { byId[it] }) },
+        saveFailedText = if (addOnly) "Could not add performers" else "Failed to update performers",
+        onSaved = { picked -> onSaved(picked.map { byId[it.id] ?: Performer(id = it.id, name = it.name) }) },
+        onDismiss = onDismiss,
+        serverSearch = { q -> SceneEditing.findPerformers(q, 40).map(::entry) },
+        avatars = true,
+        lockedIds = if (addOnly) startIds else emptySet(),
+        actionTitle = if (addOnly) "Done" else "Save",
+        requireNewSelection = addOnly,
     )
 }
 

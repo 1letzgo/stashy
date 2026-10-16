@@ -427,7 +427,7 @@ private fun PerformerNamesRow(itemId: String, performers: List<FeedPerformer>, o
  * title below; the target then overhangs to the left instead.
  */
 @Composable
-private fun AddPerformerButton(leading: Boolean, onClick: () -> Unit) {
+fun AddPerformerButton(leading: Boolean, onClick: () -> Unit) {
     val visual = 26.dp
     val target = 48.dp
     Box(

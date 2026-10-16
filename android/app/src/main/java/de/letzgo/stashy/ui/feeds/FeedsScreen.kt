@@ -291,10 +291,17 @@ fun FeedsScreen() {
     }
 
     performerTarget?.let { item ->
-        AddPerformersSheet(item, onDismiss = {
-            performerTarget = null
-            if (wasPlayingBeforeTagEditor) { wasPlayingBeforeTagEditor = false; model.isPlaying = true }
-        }) { picked -> model.addPerformers(item, picked) }
+        // The scene detail's performer picker, add-only (existing ∪ picked via FeedsModel.addPerformers).
+        de.letzgo.stashy.ui.scene.PerformersPickerSheet(
+            itemKey = item.id,
+            current = item.performers.map { de.letzgo.stashy.ui.scene.PickerEntry(it.id, it.name, null, it.thumbnailURL) },
+            addOnly = true,
+            save = { _, picked -> check(model.addPerformers(item, picked)) },
+            onDismiss = {
+                performerTarget = null
+                if (wasPlayingBeforeTagEditor) { wasPlayingBeforeTagEditor = false; model.isPlaying = true }
+            },
+        )
     }
 
     deleteTarget?.let { item ->
