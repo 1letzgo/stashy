@@ -124,13 +124,20 @@ fun EditSceneTitleSheet(scene: Scene, onDismiss: () -> Unit, onSaved: (String?, 
     }
 }
 
-/** A row of a picker list (iOS sheets: name, "N scenes", checkmark). */
-data class PickerEntry(val id: String, val name: String, val subtitle: String?)
+/** A row of a picker list (iOS sheets: name, "N scenes", checkmark; optional avatar). */
+data class PickerEntry(val id: String, val name: String, val subtitle: String?, val imageURL: String? = null)
 
 /**
  * iOS: `AddPerformerToSceneSheet` / `AddStudioToSceneSheet` / `AddTagToSceneSheet` /
  * `AddGroupToSceneSheet` — search field, first 30 matches, tap to toggle, "Create "<text>""
  * when nothing matches, Save writes the selection.
+ *
+ * Optional extras: [serverSearch] runs a server-side name search (debounced) whose hits are merged
+ * into the list (so entries outside the first loaded page are reachable); [avatars] shows a
+ * round image per row ([PickerEntry.imageURL]); [lockedIds] stay selected and cannot be
+ * toggled and read greyed (add-only pickers); [actionTitle] replaces "Save";
+ * [requireNewSelection] keeps the action disabled until something beyond [initialSelection]
+ * is picked.
  */
 @Composable
 fun EntityPickerSheet(
@@ -145,51 +152,84 @@ fun EntityPickerSheet(
     saveFailedText: String,
     onSaved: (List<PickerEntry>) -> Unit,
     onDismiss: () -> Unit,
+    serverSearch: (suspend (String) -> List<PickerEntry>)? = null,
+    avatars: Boolean = false,
+    lockedIds: Set<String> = emptySet(),
+    actionTitle: String = "Save",
+    requireNewSelection: Boolean = false,
 ) {
     val p = Theme.palette
     val scope = rememberCoroutineScope()
     val entries = remember { mutableStateListOf<PickerEntry>() }
-    val selected = remember { mutableStateListOf<String>().apply { addAll(initialSelection) } }
+    val selected = remember { mutableStateListOf<String>().apply { addAll(initialSelection + lockedIds) } }
     var loading by remember { mutableStateOf(true) }
     var search by remember { mutableStateOf("") }
     var saving by remember { mutableStateOf(false) }
     var creating by remember { mutableStateOf(false) }
-    LaunchedEffect(Unit) { entries.addAll(runCatching { load() }.getOrDefault(emptyList())); loading = false }
+    var saveError by remember { mutableStateOf<String?>(null) }
+    /** Ids the server search returned for the current term (alias matches have no name hit). */
+    var hitIds by remember { mutableStateOf<Set<String>>(emptySet()) }
+    var searching by remember { mutableStateOf(false) }
+    fun merge(list: List<PickerEntry>) {
+        val known = entries.map { it.id }.toMutableSet()
+        list.forEach { if (known.add(it.id)) entries.add(it) }
+    }
+    LaunchedEffect(Unit) { merge(runCatching { load() }.getOrDefault(emptyList())); loading = false }
+    if (serverSearch != null) LaunchedEffect(search) {
+        val term = search.trim()
+        hitIds = emptySet()
+        if (term.isEmpty()) { searching = false; return@LaunchedEffect }
+        searching = true
+        kotlinx.coroutines.delay(300)
+        runCatching { serverSearch(term) }.onSuccess { hits -> merge(hits); hitIds = hits.map { it.id }.toSet() }
+        searching = false
+    }
     // Chosen entries always lead the list, whatever the search says; the search narrows only the
     // unchosen rest, so a chosen entry never vanishes.
     val pinned = entries.filter { it.id in selected }
-    val filtered = entries.filter { it.id !in selected && (search.isEmpty() || it.name.contains(search, ignoreCase = true)) }
+    val filtered = entries.filter { it.id !in selected && (search.isEmpty() || it.name.contains(search, ignoreCase = true) || it.id in hitIds) }
     val anyMatch = filtered.isNotEmpty() || pinned.any { it.name.contains(search, ignoreCase = true) }
 
-    SceneModalSheet(title, onDismiss, actionTitle = "Save", actionEnabled = !saving, actionBusy = saving, onAction = {
+    val hasNewSelection = selected.any { it !in initialSelection && it !in lockedIds }
+    SceneModalSheet(title, onDismiss, actionTitle = actionTitle, actionEnabled = !saving && (!requireNewSelection || hasNewSelection), actionBusy = saving, onAction = {
         saving = true
+        saveError = null
         val ids = selected.toList()
         scope.launch {
             if (runCatching { save(ids) }.isSuccess) { onSaved(entries.filter { it.id in ids }); onDismiss() }
-            else { saving = false; SceneToast.show(saveFailedText, PlayerIcons.close, SceneToast.Style.Error) }
+            else { saving = false; saveError = saveFailedText; SceneToast.show(saveFailedText, PlayerIcons.close, SceneToast.Style.Error) }
         }
     }) {
         Column(Modifier.verticalScroll(rememberScrollState())) {
-            NativeSearchField(search, { search = it }, searchHeader, Modifier.padding(top = 8.dp))
+            NativeSearchField(search, { search = it }, searchHeader, Modifier.padding(top = 8.dp), loading = searching)
+            saveError?.let { Text(it, Modifier.padding(horizontal = 16.dp, vertical = 8.dp), style = NativeType.bodyMedium, color = androidx.compose.material3.MaterialTheme.colorScheme.error) }
             FormSection(null) {
                 if (loading) LoadingRow()
                 else {
                     (pinned + filtered.take(30)).forEachIndexed { index, e ->
                         if (index > 0) NativeDivider()
-                        FormRow({ if (e.id in selected) selected.remove(e.id) else { if (!multiple) selected.clear(); selected.add(e.id) } }) {
-                            Text(e.name, Modifier.weight(1f), color = p.text)
+                        val locked = e.id in lockedIds
+                        FormRow(if (locked) null else ({ if (e.id in selected) selected.remove(e.id) else { if (!multiple) selected.clear(); selected.add(e.id) } })) {
+                            if (avatars) {
+                                Box(Modifier.size(40.dp).clip(androidx.compose.foundation.shape.CircleShape).background(Appearance.tint.copy(alpha = 0.12f)), contentAlignment = Alignment.Center) {
+                                    Icon(de.letzgo.stashy.ui.SF.personFill, null, tint = Appearance.tint.copy(alpha = 0.5f), modifier = Modifier.size(20.dp))
+                                    e.imageURL?.let { AsyncImage(it, null, Modifier.size(40.dp), contentScale = ContentScale.Crop, alignment = Alignment.TopCenter) }
+                                }
+                                Spacer(Modifier.width(16.dp))
+                            }
+                            Text(e.name, Modifier.weight(1f), color = if (locked) p.secondaryText else p.text)
                             e.subtitle?.let { Text(it, style = NativeType.bodyMedium, color = p.secondaryText) }
-                            if (e.id in selected) { Spacer(Modifier.width(8.dp)); Icon(PlayerIcons.check, null, tint = nativeAccent(), modifier = Modifier.size(24.dp)) }
+                            if (e.id in selected) { Spacer(Modifier.width(8.dp)); Icon(PlayerIcons.check, null, tint = if (locked) p.secondaryText else nativeAccent(), modifier = Modifier.size(24.dp)) }
                         }
                     }
                     if (filtered.size > 30) Text("Type more to refine...", Modifier.padding(16.dp), style = NativeType.bodyMedium, color = p.secondaryText)
-                    if (search.isNotEmpty() && !anyMatch) {
+                    if (search.isNotEmpty() && !anyMatch && !searching) {
                         FormRow(if (creating) null else ({
                             creating = true
                             val name = search
                             scope.launch {
                                 runCatching { create(name) }.onSuccess { e ->
-                                    entries.add(e); if (!multiple) selected.clear(); selected.add(e.id); search = ""
+                                    merge(listOf(e)); if (!multiple) selected.clear(); selected.add(e.id); search = ""
                                 }.onFailure { SceneToast.show(createFailedText, PlayerIcons.close, SceneToast.Style.Error) }
                                 creating = false
                             }

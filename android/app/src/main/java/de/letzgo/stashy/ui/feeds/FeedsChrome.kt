@@ -13,6 +13,10 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.ui.composed
+import androidx.compose.ui.layout.layout
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
@@ -292,12 +296,13 @@ fun FeedsInfoOverlay(
     onToggleMute: () -> Unit,
     onTogglePlay: () -> Unit,
     pausesAdvance: Boolean,
+    onAddPerformers: (() -> Unit)? = null,
 ) {
     // Over video: text follows the system font scale up to OverlayMaxFontScale (1.3×) so the
     // overlay never covers most of the clip; containers below wrap their content.
     de.letzgo.stashy.ui.CappedFontScale { FeedsInfoOverlayContent(
         item, mode, isMuted, isPlaying, showsDelete, onPerformerFilter, onPerformerOpen, onTitle, onTag, onAddTags,
-        onRemoveTag, onOCounter, onRating, onDelete, onToggleMute, onTogglePlay, pausesAdvance,
+        onRemoveTag, onOCounter, onRating, onDelete, onToggleMute, onTogglePlay, pausesAdvance, onAddPerformers,
     ) }
 }
 
@@ -320,6 +325,7 @@ private fun FeedsInfoOverlayContent(
     onToggleMute: () -> Unit,
     onTogglePlay: () -> Unit,
     pausesAdvance: Boolean,
+    onAddPerformers: (() -> Unit)?,
 ) {
     Column(Modifier.fillMaxWidth()) {
         Row(Modifier.fillMaxWidth().padding(horizontal = FeedsDock.edgePadding), verticalAlignment = Alignment.Bottom) {
@@ -330,7 +336,12 @@ private fun FeedsInfoOverlayContent(
                 val performers = item.performers
                 if (performers.isNotEmpty()) PerformerAvatarStack(item.id, performers, onPerformerOpen)
                 Column(Modifier.weight(1f, fill = false), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                    if (performers.isNotEmpty()) PerformerNamesRow(item.id, performers, onPerformerFilter)
+                    // "+" right after the names (also for a row without performers): adds
+                    // performers to the scene / parent scene / image (`AddPerformersSheet`).
+                    if (performers.isNotEmpty() || onAddPerformers != null) Row(verticalAlignment = Alignment.CenterVertically) {
+                        if (performers.isNotEmpty()) PerformerNamesRow(item.id, performers, onPerformerFilter, Modifier.weight(1f, fill = false))
+                        onAddPerformers?.let { AddPerformerButton(leading = performers.isEmpty(), onClick = it) }
+                    }
                     item.title?.takeIf { it.isNotEmpty() }?.let { title ->
                         Text(
                             title, color = Color.White.copy(alpha = 0.85f), fontSize = 15.sp, fontWeight = FontWeight.Medium, maxLines = 1,
@@ -392,10 +403,10 @@ private fun PerformerAvatarStack(itemId: String, performers: List<FeedPerformer>
 }
 
 @Composable
-private fun PerformerNamesRow(itemId: String, performers: List<FeedPerformer>, onFilter: (FeedPerformer) -> Unit) {
+private fun PerformerNamesRow(itemId: String, performers: List<FeedPerformer>, onFilter: (FeedPerformer) -> Unit, modifier: Modifier = Modifier) {
     val scroll = remember(itemId) { ScrollState(0) }
     Row(
-        Modifier.horizontalScroll(scroll),
+        modifier.horizontalScroll(scroll),
         horizontalArrangement = Arrangement.spacedBy(4.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -405,6 +416,34 @@ private fun PerformerNamesRow(itemId: String, performers: List<FeedPerformer>, o
                 modifier = Modifier.noIndicationClick { onFilter(p) },
             )
             if (i < performers.size - 1) Text("&", color = Color.White.copy(alpha = 0.75f), fontSize = 15.sp, maxLines = 1)
+        }
+    }
+}
+
+/**
+ * Small glass "+" (26 dp) after the performer names. The 48 dp touch target is laid out only
+ * horizontally; vertically it overhangs the 26 dp the row reports, so the names / title stack
+ * keeps its height. As the row's first element ([leading]) the glass circle sits flush with the
+ * title below; the target then overhangs to the left instead.
+ */
+@Composable
+private fun AddPerformerButton(leading: Boolean, onClick: () -> Unit) {
+    val visual = 26.dp
+    val target = 48.dp
+    Box(
+        Modifier
+            .layout { measurable, constraints ->
+                val t = target.roundToPx(); val v = visual.roundToPx()
+                val placeable = measurable.measure(constraints.copy(minWidth = t, maxWidth = t, minHeight = t, maxHeight = t))
+                val inset = if (leading) (t - v) / 2 else 0
+                layout(t - inset, v) { placeable.place(-inset, (v - t) / 2) }
+            }
+            .semantics { role = Role.Button }
+            .noIndicationClick(onClick),
+        contentAlignment = Alignment.Center,
+    ) {
+        Box(Modifier.size(visual).stashyGlass(CircleShape), contentAlignment = Alignment.Center) {
+            Icon(SF.plus, "Add performer", tint = Color.White, modifier = Modifier.size(16.dp))
         }
     }
 }
