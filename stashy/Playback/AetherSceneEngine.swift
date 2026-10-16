@@ -832,8 +832,11 @@ final class AetherSceneEngine: ObservableObject {
 
     /// True when a loaded session lost its pipeline (background teardown) and only a reload can
     /// bring it back: the route drops to `.none` on teardown while `currentURL` still names the item.
+    /// `needsForegroundVideoRestore` is the engine's own word for the same state (it may keep the
+    /// native host, and with it the route, while the video item is gone).
     private var isSessionTornDown: Bool {
-        currentURL != nil && !didEnd && !isLoading && engine.videoRoute == .none
+        guard currentURL != nil, !didEnd, !isLoading else { return false }
+        return engine.needsForegroundVideoRestore || engine.videoRoute == .none
     }
 
     /// `reloadAtCurrentPosition` replays the mount's autoplay flag on a torn-down session, so a
