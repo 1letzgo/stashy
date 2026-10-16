@@ -348,6 +348,9 @@ struct ReelsViewBody: View {
     @State private var tagEditorTarget: AITagTarget?
     /// Play state to hand back when the tag editor closes.
     @State private var wasPlayingBeforeTagEditor = false
+    /// Item the "+" behind the performer names opens the add-performer picker for.
+    @State private var performerPickerItem: ReelItemData?
+    @State private var wasPlayingBeforePerformerPicker = false
     @State private var selectedPreviewFilter: StashDBViewModel.SavedFilter?
     @State private var showReelsSceneFilterSheet = false
     /// While the scene-style filter sheet hydrates UI (migration / saved-filter list), ignore preset `onChange` so we do not refetch the Reels timeline.
@@ -1796,6 +1799,84 @@ struct ReelsViewBody: View {
         }
     }
 
+    /// Feeds "+" behind the performer names: adds the picked performers on the server.
+    /// Scenes / Previews / Markers write their scene (`sceneUpdate`, a marker's parent
+    /// scene), Clips their image (`imageUpdate`); only `id` + `performer_ids` are sent,
+    /// as existing ∪ picked. The overlay updates optimistically and rolls back on failure.
+    private func addPerformers(_ picked: [Performer], to item: ReelItemData) {
+        // A list fetched without performers must never be written back — that would drop
+        // everyone already on the item.
+        let knownExisting: [ScenePerformer]?
+        switch item {
+        case .scene(let s), .preview(let s): knownExisting = s.performers
+        case .marker(let m): knownExisting = m.scene?.performers
+        case .clip(let c): knownExisting = c.performers?.map { $0.toScenePerformer() }
+        }
+        guard let existing = knownExisting else {
+            ToastManager.shared.show("Could not add performers", icon: "exclamationmark.triangle.fill", style: .error)
+            return
+        }
+        let existingIds = Set(existing.map(\.id))
+        let newOnes = picked.filter { !existingIds.contains($0.id) }
+        guard !newOnes.isEmpty else { return }
+        let performerIds = existing.map(\.id) + newOnes.map(\.id)
+        let added = newOnes.map {
+            ScenePerformer(id: $0.id, name: $0.name, birthdate: $0.birthdate, sceneCount: $0.sceneCount,
+                           galleryCount: $0.galleryCount, oCounter: nil, updatedAt: $0.updatedAt)
+        }
+        let label = newOnes.count == 1 ? newOnes[0].name : "\(newOnes.count) performers"
+        let finish: (Bool, @escaping () -> Void) -> Void = { success, revert in
+            DispatchQueue.main.async {
+                if success {
+                    HapticManager.success()
+                    ToastManager.shared.show("Added \(label)")
+                } else {
+                    revert()
+                    HapticManager.error()
+                    ToastManager.shared.show("Could not add performers", icon: "exclamationmark.triangle.fill", style: .error)
+                }
+            }
+        }
+
+        if case .clip(let image) = item {
+            let imageId = image.id
+            let original = image.performers ?? []
+            patchClipPerformers(imageId: imageId, performers: original + added.map { $0.toGalleryPerformer() })
+            viewModel.updateImagePerformers(imageId: imageId, performerIds: performerIds) { success in
+                finish(success) { patchClipPerformers(imageId: imageId, performers: original) }
+            }
+            return
+        }
+
+        guard let sceneId = item.sceneID else { return }
+        patchScenePerformers(sceneId: sceneId, performers: existing + added)
+        viewModel.updateScenePerformers(sceneId: sceneId, performerIds: performerIds) { success in
+            finish(success) { patchScenePerformers(sceneId: sceneId, performers: existing) }
+        }
+    }
+
+    /// Every feed copy of the scene (Scenes, Previews, markers on it) gets the new list.
+    private func patchScenePerformers(sceneId: String, performers: [ScenePerformer]) {
+        if let idx = viewModel.scenes.firstIndex(where: { $0.id == sceneId }) {
+            viewModel.scenes[idx] = viewModel.scenes[idx].withPerformers(performers)
+        }
+        if let idx = viewModel.previews.firstIndex(where: { $0.id == sceneId }) {
+            viewModel.previews[idx] = viewModel.previews[idx].withPerformers(performers)
+        }
+        for idx in viewModel.sceneMarkers.indices {
+            if let markerScene = viewModel.sceneMarkers[idx].scene, markerScene.id == sceneId {
+                viewModel.sceneMarkers[idx] = viewModel.sceneMarkers[idx].withScene(markerScene.withPerformers(performers))
+            }
+        }
+    }
+
+    private func patchClipPerformers(imageId: String, performers: [GalleryPerformer]) {
+        guard let idx = viewModel.clips.firstIndex(where: { $0.id == imageId }) else { return }
+        var image = viewModel.clips[idx]
+        image.performers = performers
+        viewModel.clips[idx] = image
+    }
+
     private func applyTagsChange(_ newTags: [Tag]) {
         switch reelsMode {
         case .scenes:
@@ -3128,6 +3209,28 @@ struct ReelsViewBody: View {
                     NotificationCenter.default.post(name: .reelsPauseAllPlayers, object: nil)
                 } else if wasPlayingBeforeTagEditor {
                     wasPlayingBeforeTagEditor = false
+                    currentItemIsPlaying = true
+                    ReelsPlayerRegistry.resumePlayback()
+                    playTrigger += 1
+                }
+            }
+            .sheet(item: $performerPickerItem) { item in
+                AddPerformersPickerSheet(
+                    existingPerformerIds: Set(item.performers.map(\.id)),
+                    viewModel: viewModel
+                ) { picked in
+                    addPerformers(picked, to: item)
+                }
+            }
+            .onChange(of: performerPickerItem?.id) { _, newValue in
+                // Same pause/resume as the tag picker.
+                if newValue != nil {
+                    wasPlayingBeforePerformerPicker = currentItemIsPlaying
+                    currentItemIsPlaying = false
+                    ReelsPlayerRegistry.pauseAll()
+                    NotificationCenter.default.post(name: .reelsPauseAllPlayers, object: nil)
+                } else if wasPlayingBeforePerformerPicker {
+                    wasPlayingBeforePerformerPicker = false
                     currentItemIsPlaying = true
                     ReelsPlayerRegistry.resumePlayback()
                     playTrigger += 1
@@ -4653,11 +4756,12 @@ struct ReelsViewBody: View {
     private func reelsNameTitleLine(item: ReelItemData) -> some View {
         VStack(alignment: .leading, spacing: 2) {
             let performers = item.performers
-            if performers.count == 1, let performer = performers.first {
+            let showsAddPerformer = appearanceManager.isEditModeEnabled
+            if performers.count == 1, !showsAddPerformer, let performer = performers.first {
                 reelsPerformerNameButton(performer)
-            } else if performers.count > 1 {
+            } else if performers.count > 1 || showsAddPerformer {
                 // Alle Performer wie in Pics ("A & B"); bei vielen scrollt die Zeile,
-                // `.id` setzt den Scroll-Offset pro Item zurück.
+                // `.id` setzt den Scroll-Offset pro Item zurück. Das "+" hängt am Ende.
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 4) {
                         ForEach(Array(performers.enumerated()), id: \.element.id) { idx, performer in
@@ -4668,12 +4772,40 @@ struct ReelsViewBody: View {
                                     .foregroundColor(.white.opacity(0.75))
                             }
                         }
+                        if showsAddPerformer {
+                            reelsAddPerformerButton(item: item)
+                                .padding(.leading, performers.isEmpty ? 0 : 4)
+                        }
                     }
+                    // Room for the 44 pt hit area; the negative padding below gives the
+                    // layout height back so the title doesn't move.
+                    .padding(.vertical, Self.addPerformerHitInset)
                 }
+                .padding(.vertical, -Self.addPerformerHitInset)
                 .id(item.id)
             }
             reelsTitleText(item: item)
         }
+    }
+
+    private static let addPerformerGlyphSize: CGFloat = 20
+    private static let addPerformerHitInset: CGFloat = 12
+
+    /// Small glass "+" behind the names (alone when the item has none). Visually as tall
+    /// as a name; the content shape grows the hit area to 44 pt without moving anything.
+    private func reelsAddPerformerButton(item: ReelItemData) -> some View {
+        Button {
+            performerPickerItem = item
+        } label: {
+            Image(systemName: "plus")
+                .font(.system(size: 11, weight: .bold))
+                .foregroundColor(.white.opacity(0.85))
+                .frame(width: Self.addPerformerGlyphSize, height: Self.addPerformerGlyphSize)
+                .stashyGlass(shape: Circle())
+                .contentShape(Rectangle().inset(by: -Self.addPerformerHitInset))
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("Add performers")
     }
 
     private func reelsPerformerNameButton(_ performer: ScenePerformer) -> some View {

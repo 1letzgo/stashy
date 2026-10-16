@@ -8352,6 +8352,19 @@ struct GenerateData: Codable {
         }
     }
 
+    /// Sends only `id` + `performer_ids`; every other image field stays untouched.
+    func updateImagePerformers(imageId: String, performerIds: [String], completion: @escaping (Bool) -> Void) {
+        let mutation = GraphQLQueries.imageUpdatePerformersMutation
+        let variables: [String: Any] = ["input": ["id": imageId, "performer_ids": performerIds]]
+        guard let bodyData = try? JSONSerialization.data(withJSONObject: ["query": mutation, "variables": variables]),
+              let bodyString = String(data: bodyData, encoding: .utf8) else {
+            completion(false); return
+        }
+        performGraphQLQuery(query: bodyString) { (response: ImageUpdateResponse?) in
+            completion(response?.data?.imageUpdate != nil)
+        }
+    }
+
     func updateGalleryPerformers(galleryId: String, performerIds: [String], completion: @escaping (Bool) -> Void) {
         let mutation = GraphQLQueries.galleryUpdatePerformersMutation
         let variables: [String: Any] = ["input": ["id": galleryId, "performer_ids": performerIds]]
@@ -9334,6 +9347,19 @@ struct Scene: Codable, Identifiable, Equatable {
             studio: studio, performers: performers, files: files, tags: tags,
             galleries: galleries, groups: groups, organized: organized,
             resumeTime: newResumeTime, playCount: playCount, oCounter: oCounter,
+            rating100: rating100, createdAt: createdAt, updatedAt: updatedAt,
+            paths: paths, sceneMarkers: sceneMarkers, interactive: interactive, stashIds: stashIds, captions: captions, customFields: customFields,
+            playDuration: playDuration, lastPlayedAt: lastPlayedAt
+        )
+    }
+
+    /// Creates a copy with a new performer list
+    func withPerformers(_ newPerformers: [ScenePerformer]) -> Scene {
+        return Scene(
+            id: id, title: title, details: details, director: director, date: date, duration: duration,
+            studio: studio, performers: newPerformers, files: files, tags: tags,
+            galleries: galleries, groups: groups, organized: organized,
+            resumeTime: resumeTime, playCount: playCount, oCounter: oCounter,
             rating100: rating100, createdAt: createdAt, updatedAt: updatedAt,
             paths: paths, sceneMarkers: sceneMarkers, interactive: interactive, stashIds: stashIds, captions: captions, customFields: customFields,
             playDuration: playDuration, lastPlayedAt: lastPlayedAt
@@ -12188,7 +12214,7 @@ extension DownloadManager: URLSessionDownloadDelegate {
 
 extension StashDBViewModel {
     
-    func searchPerformersAsync(query: String, limit: Int = 5) async -> [Performer] {
+    func searchPerformersAsync(query: String, limit: Int = 5, sort: String = "name", direction: String = "ASC") async -> [Performer] {
         await withCheckedContinuation { continuation in
             let graphqlQuery = GraphQLQueries.queryWithFragments("findPerformers")
             
@@ -12199,8 +12225,8 @@ extension StashDBViewModel {
                         "q": query,
                         "per_page": limit,
                         "page": 1,
-                        "sort": "name",
-                        "direction": "ASC"
+                        "sort": sort,
+                        "direction": direction
                     ]
                 ]
             ]

@@ -422,6 +422,12 @@ class GraphQLQueries {
         }
         """
 
+    static let imageUpdatePerformersMutation = """
+        mutation ImageUpdate($input: ImageUpdateInput!) {
+            imageUpdate(input: $input) { id performers { id name } }
+        }
+        """
+
     static let imageUpdateTagsMutation = """
         mutation ImageUpdate($input: ImageUpdateInput!) {
             imageUpdate(input: $input) { id tags { id name } }

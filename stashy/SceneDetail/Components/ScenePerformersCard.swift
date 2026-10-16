@@ -432,4 +432,123 @@ struct AddPerformerToSceneSheet: View {
         }
     }
 }
+
+/// Add-only performer picker (Feeds "+" next to the performer names). Unlike
+/// `AddPerformerToSceneSheet` it never removes anyone and searches on the server
+/// (`findPerformers` with `q`), so it scales to large libraries. Performers already
+/// on the item are shown as added and can't be toggled. The caller writes the result.
+struct AddPerformersPickerSheet: View {
+    let existingPerformerIds: Set<String>
+    @ObservedObject var viewModel: StashDBViewModel
+    var onDone: ([Performer]) -> Void
+
+    @Environment(\.dismiss) private var dismiss
+    @ObservedObject private var appearanceManager = AppearanceManager.shared
+    @State private var searchText = ""
+    @State private var results: [Performer] = []
+    @State private var picked: [Performer] = []
+    @State private var isLoading = false
+
+    private static let pageSize = 40
+
+    private var pickedIds: Set<String> { Set(picked.map(\.id)) }
+
+    /// Picks lead the list whatever the search says; the rest follows in server order.
+    private var rows: [Performer] {
+        picked + results.filter { !pickedIds.contains($0.id) }
+    }
+
+    var body: some View {
+        NavigationView {
+            List {
+                Section {
+                    TextField("Search performers…", text: $searchText)
+                        .textInputAutocapitalization(.never)
+                        .autocorrectionDisabled()
+                        .submitLabel(.search)
+                }
+                .listRowBackground(Color.secondaryAppBackground)
+
+                Section {
+                    if isLoading && results.isEmpty {
+                        HStack { Spacer(); ProgressView(); Spacer() }
+                    } else if rows.isEmpty {
+                        Text(searchText.isEmpty ? "No performers" : "No matches")
+                            .foregroundColor(.secondary)
+                    } else {
+                        ForEach(rows) { performer in
+                            row(performer)
+                        }
+                    }
+                }
+                .listRowBackground(Color.secondaryAppBackground)
+            }
+            .applyAppBackground()
+            .scrollContentBackground(.hidden)
+            .stashyModalSheetChrome("Add Performers", onBack: { dismiss() }) {
+                StashyChromeTrailingTextButton(title: "Done", enabled: !picked.isEmpty) {
+                    let chosen = picked
+                    dismiss()
+                    onDone(chosen)
+                }
+            }
+            // Debounced server search; `task(id:)` cancels the previous run per keystroke.
+            .task(id: searchText) {
+                let term = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
+                if !term.isEmpty {
+                    try? await Task.sleep(nanoseconds: 300_000_000)
+                    if Task.isCancelled { return }
+                }
+                isLoading = true
+                let found = await viewModel.searchPerformersAsync(
+                    query: term,
+                    limit: Self.pageSize,
+                    sort: term.isEmpty ? "scenes_count" : "name",
+                    direction: term.isEmpty ? "DESC" : "ASC"
+                )
+                if Task.isCancelled { return }
+                results = found
+                isLoading = false
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func row(_ performer: Performer) -> some View {
+        let alreadyAdded = existingPerformerIds.contains(performer.id)
+        let isPicked = pickedIds.contains(performer.id)
+        Button {
+            guard !alreadyAdded else { return }
+            if isPicked {
+                picked.removeAll { $0.id == performer.id }
+            } else {
+                picked.append(performer)
+            }
+        } label: {
+            HStack(spacing: 12) {
+                PerformerCirclePortrait(url: performer.thumbnailURL, size: 40)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(performer.name)
+                        .foregroundColor(.primary)
+                        .lineLimit(1)
+                    if let d = performer.disambiguation, !d.isEmpty {
+                        Text(d).font(.caption).foregroundColor(.secondary).lineLimit(1)
+                    }
+                }
+                Spacer()
+                if alreadyAdded {
+                    Text("Added").font(.caption).foregroundColor(.secondary)
+                } else {
+                    Text("\(performer.sceneCount) scenes").font(.caption).foregroundColor(.secondary)
+                }
+                Image(systemName: (alreadyAdded || isPicked) ? "checkmark.circle.fill" : "circle")
+                    .foregroundColor(isPicked ? appearanceManager.tintColor : .secondary)
+            }
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .disabled(alreadyAdded)
+        .opacity(alreadyAdded ? 0.6 : 1)
+    }
+}
 #endif
