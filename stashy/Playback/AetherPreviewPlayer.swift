@@ -108,6 +108,9 @@ final class AetherPreviewPlayer: ObservableObject {
                 // shallow read-ahead: it is a few seconds of decoration.
                 options.suppressDisplayCriteria = true
                 options.forwardBufferSegments = 4
+                // A preview runs beside the real player: as `.secondary` it never takes Now
+                // Playing or writes display criteria, and its start skips the criteria grace.
+                options.sharedOutputRole = .secondary
             }
         }
     }

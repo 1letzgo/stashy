@@ -1292,7 +1292,7 @@
 			repositoryURL = "https://github.com/superuser404notfound/AetherEngine";
 			requirement = {
 				kind = upToNextMinorVersion;
-				minimumVersion = 7.8.1;
+				minimumVersion = 7.35.0;
 			};
 		};
 		EC0000000000000000000001 /* XCRemoteSwiftPackageReference "purchases-ios-spm" */ = {
