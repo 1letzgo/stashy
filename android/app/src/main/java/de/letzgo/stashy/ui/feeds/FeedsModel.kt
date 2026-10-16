@@ -926,6 +926,35 @@ object FeedsModel {
         }
     }
 
+    /**
+     * The overlay's "+" after the performer names: writes existing ∪ [picked] to the row's
+     * scene (markers: the parent scene) or image, sending only `id` + `performer_ids`. On
+     * success every row showing that scene / image is patched in place and a toast confirms;
+     * on failure nothing changes and false goes back to the picker (which shows the error).
+     */
+    suspend fun addPerformers(item: FeedItem, picked: List<de.letzgo.stashy.data.Performer>): Boolean {
+        val existing = item.performers.map { it.id }.toSet()
+        val added = picked.filter { it.id !in existing }.distinctBy { it.id }
+        if (added.isEmpty()) return true
+        val plan = FeedPerformerAdd.forItem(item, added.map { it.id }) ?: return false
+        val ok = runCatching {
+            when (plan.target) {
+                FeedPerformerAdd.Target.Scene -> de.letzgo.stashy.data.SceneEditing.updatePerformers(plan.id, plan.performerIds)
+                FeedPerformerAdd.Target.Image -> { FeedsRepository.updateImagePerformers(plan.id, plan.performerIds) }
+            }
+        }.isSuccess
+        if (!ok) return false
+        when (plan.target) {
+            FeedPerformerAdd.Target.Scene -> patchScene(plan.id) { it.copy(performers = FeedPerformerAdd.appending(it.performers, added)) }
+            FeedPerformerAdd.Target.Image -> {
+                patchImage(plan.id) { it.copy(performers = FeedPerformerAdd.appendingNames(it.performers.orEmpty(), added)) }
+                pics.list.patch { img -> if (img.id == plan.id) img.copy(performers = FeedPerformerAdd.appendingNames(img.performers.orEmpty(), added)) else img }
+            }
+        }
+        message = if (added.size == 1) "Added ${added[0].name}" else "Added ${added.size} performers"
+        return true
+    }
+
     fun setRating(item: FeedItem, rating100: Int?) {
         val sceneId = item.sceneID
         if (sceneId != null) {

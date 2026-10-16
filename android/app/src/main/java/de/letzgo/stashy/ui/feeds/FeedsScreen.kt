@@ -111,6 +111,8 @@ fun FeedsScreen() {
     var deleteTarget by remember { mutableStateOf<FeedItem?>(null) }
     /** iOS `tagEditorTarget` — the row whose `AddTagsSheet` is open. */
     var tagEditorTarget by remember { mutableStateOf<AITagTarget?>(null) }
+    /** The row whose "Add Performers" picker is open (overlay "+" after the names). */
+    var performerTarget by remember { mutableStateOf<FeedItem?>(null) }
     /** iOS `wasPlayingBeforeTagEditor`. */
     var wasPlayingBeforeTagEditor by remember { mutableStateOf(false) }
     var lifecycleActive by remember { mutableStateOf(true) }
@@ -177,7 +179,7 @@ fun FeedsScreen() {
     )
     val tabBarOverlap = FeedsTabBarPolicy.overlayInset(isUIVisible, barShown, tabBarHeight().value, navBottom.value).dp
     // Sheets and dialogs keep the bar where it is.
-    val overlayOpen = showSheet || tagEditorTarget != null || deleteTarget != null || model.pics.isSheetPresented
+    val overlayOpen = showSheet || tagEditorTarget != null || performerTarget != null || deleteTarget != null || model.pics.isSheetPresented
 
     // Height of the top chrome (bar + criterion chips): Pics content starts below it (iOS safeAreaInset).
     val density = LocalDensity.current
@@ -211,6 +213,11 @@ fun FeedsScreen() {
                         wasPlayingBeforeTagEditor = model.isPlaying
                         model.isPlaying = false
                         tagEditorTarget = target
+                    },
+                    onAddPerformers = { item ->
+                        wasPlayingBeforeTagEditor = model.isPlaying
+                        model.isPlaying = false
+                        performerTarget = item
                     },
                 )
             }
@@ -283,6 +290,13 @@ fun FeedsScreen() {
         }) { }
     }
 
+    performerTarget?.let { item ->
+        AddPerformersSheet(item, onDismiss = {
+            performerTarget = null
+            if (wasPlayingBeforeTagEditor) { wasPlayingBeforeTagEditor = false; model.isPlaying = true }
+        }) { picked -> model.addPerformers(item, picked) }
+    }
+
     deleteTarget?.let { item ->
         val isImage = item is FeedItem.ClipItem
         AlertDialog(
@@ -310,6 +324,7 @@ private fun FeedPager(
     onZoom: (Boolean) -> Unit,
     onDelete: (FeedItem) -> Unit,
     onAddTags: (AITagTarget) -> Unit,
+    onAddPerformers: (FeedItem) -> Unit,
 ) {
     val scope = rememberCoroutineScope()
     val list = model.list(mode)
@@ -499,6 +514,8 @@ private fun FeedPager(
                     },
                     onTogglePlay = { model.isPlaying = !model.isPlaying },
                     pausesAdvance = activeItem.isAnimated && continuous,
+                    // Edit Mode gate like the tag row's "Add tag" (iOS parity).
+                    onAddPerformers = if (de.letzgo.stashy.ui.Appearance.isEditModeEnabled && activeItem.canAddPerformers) ({ onAddPerformers(activeItem) }) else null,
                 )
                 if (!activeItem.isAnimated) {
                     // iOS `ReelsView` scrub preview: the scene's sprite sheet + VTT index, like the

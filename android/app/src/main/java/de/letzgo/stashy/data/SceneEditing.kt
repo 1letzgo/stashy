@@ -290,6 +290,16 @@ object SceneEditing {
     suspend fun allPerformers(): List<Performer> =
         findPage("findPerformers", "findPerformers", "performers", Performer.serializer(), FindFilter(1, 1000, sort = "scenes_count"), "performer_filter", JsonObject(emptyMap())).items
 
+    /**
+     * One page of performers for an add picker: the most used ones without [query], else the
+     * server's `findPerformers(q:)` hits (name, alias, disambiguation).
+     */
+    suspend fun findPerformers(query: String?, limit: Int = 40): List<Performer> {
+        val term = query?.trim()?.takeIf { it.isNotEmpty() }
+        val filter = if (term == null) FindFilter(1, limit, sort = "scenes_count") else FindFilter(1, limit, sort = null, q = term)
+        return findPage("findPerformers", "findPerformers", "performers", Performer.serializer(), filter, "performer_filter", JsonObject(emptyMap())).items
+    }
+
     /** iOS: `fetchAllStudios`. */
     suspend fun allStudios(): List<Studio> =
         findPage("findStudios", "findStudios", "studios", Studio.serializer(), FindFilter(1, 1000, sort = "scenes_count"), "studio_filter", JsonObject(emptyMap())).items

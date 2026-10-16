@@ -55,6 +55,19 @@ object FeedsRepository {
         )["imageUpdate"] is JsonObject
     }.getOrDefault(false)
 
+    /**
+     * `imageUpdate(id, performer_ids)` — replaces the image's performers with [performerIds].
+     * Throws on failure; returns the performers the server now lists.
+     */
+    suspend fun updateImagePerformers(id: String, performerIds: List<String>): List<IdName> {
+        val data = GraphQL.data(
+            "mutation ImageUpdate(\$input: ImageUpdateInput!) { imageUpdate(input: \$input) { id performers { id name } } }",
+            vars("input" to mapOf("id" to id, "performer_ids" to performerIds)),
+        )
+        val obj = data["imageUpdate"] as? JsonObject ?: throw GraphQLError.Query("imageUpdate failed")
+        return GraphQL.decode(ListSerializer(IdName.serializer()), obj["performers"] ?: JsonArray(emptyList()))
+    }
+
     /** iOS: `OCounterMutation`. */
     enum class OMutation { Increment, Decrement, Reset }
 
