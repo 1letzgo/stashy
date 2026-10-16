@@ -172,7 +172,7 @@ struct SceneCardView: View {
                         
                         Rectangle()
                             .fill(appearanceManager.tintColor)
-                            .frame(width: geo.size.width * CGFloat(min(resumeTime, duration) / duration), height: 5)
+                            .frame(width: geo.size.width * PlaybackFraction.cgFloat(resumeTime, in: duration), height: 5)
                     }
                 }
                 .frame(height: 5)

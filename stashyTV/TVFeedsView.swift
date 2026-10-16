@@ -88,7 +88,13 @@ struct TVFeedsView: View {
     /// Navigation from the overlay waits for the cover to be gone, then pushes onto this tab.
     private func handleFeedDismissed() {
         session.deactivate()
-        guard let destination = pendingDestination else { return }
+        guard let destination = pendingDestination else {
+            // Back on the mode card that opened the feed. Without this the focus engine picks
+            // its own landing spot after the cover, and a click meant for the cards could flip a
+            // Feed Settings toggle (Continuous Play sits right below them).
+            focusedMode = launchMode
+            return
+        }
         pendingDestination = nil
         switch destination {
         case .scene(let id):

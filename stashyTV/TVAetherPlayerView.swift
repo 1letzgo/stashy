@@ -447,8 +447,8 @@ private struct TVAetherPlayerContent<Panel: View>: View {
                 }
 
                 GeometryReader { geo in
-                    let duration = max(engine.duration, 0.001)
-                    let progress = min(max(displayedTime / duration, 0), 1)
+                    // NaN-safe: `max(.nan, 0.001)` is NaN, and a NaN width crashes Core Animation.
+                    let progress = PlaybackFraction.cgFloat(displayedTime, in: engine.duration)
                     ZStack(alignment: .leading) {
                         Capsule().fill(Color.white.opacity(0.25))
                         Capsule()

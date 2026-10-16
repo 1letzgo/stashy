@@ -346,7 +346,10 @@ final class AetherSceneEngine: ObservableObject {
     }
 
     private func bind() {
-        #if os(iOS)
+        // tvOS too: the engine tears the video pipeline down on every background there (no
+        // grace window, PiP aside), and nothing rebuilt it on the way back — the surface stayed
+        // black with the transport showing paused, and Play/Select hit a session with no host.
+        #if os(iOS) || os(tvOS)
         NotificationCenter.default.publisher(for: UIApplication.didEnterBackgroundNotification)
             .receive(on: RunLoop.main)
             .sink { [weak self] _ in self?.pauseForBackgroundUnlessPictureInPicture() }
@@ -361,7 +364,10 @@ final class AetherSceneEngine: ObservableObject {
             .receive(on: RunLoop.main)
             .sink { [weak self] time in
                 guard let self else { return }
-                let adjusted = time + self.sourceTimeOffset
+                // Never publish NaN / inf: every progress bar and scrubber multiplies this into a
+                // frame width, and a NaN geometry throws in Core Animation.
+                let raw = time + self.sourceTimeOffset
+                let adjusted = raw.isFinite ? raw : 0
                 self.currentTime = adjusted
                 let dur = self.duration
                 self.onTime?(adjusted, dur)
@@ -371,7 +377,7 @@ final class AetherSceneEngine: ObservableObject {
 
         engine.$duration
             .receive(on: RunLoop.main)
-            .sink { [weak self] value in self?.duration = value }
+            .sink { [weak self] value in self?.duration = value.isFinite ? max(0, value) : 0 }
             .store(in: &cancellables)
 
         engine.$playbackPhase
@@ -874,10 +880,22 @@ final class AetherSceneEngine: ObservableObject {
     }
 
     func pause() {
+        // Already paused: nothing to do, and a repeat is not free — on the software route every
+        // pause re-sets the synchronizer rate, a synchronous main-thread call into CoreAudio.
+        // Feeds pauses every mounted row on each swipe, so the repeats add up. That path is
+        // exactly where the main thread got stuck behind a wedged audio device (AudioQueue
+        // SetProperty waiting on the mix engine's device lock).
+        if engine.state == .paused { return }
         engine.pause()
     }
 
     func togglePlayPause() {
+        // A torn-down session (background teardown) has no transport for the engine's toggle
+        // to act on; `play()` rebuilds it first.
+        if isSessionTornDown {
+            play()
+            return
+        }
         engine.togglePlayPause()
     }
 

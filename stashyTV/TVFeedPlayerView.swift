@@ -490,11 +490,9 @@ private struct TVFeedVideoLayer: View {
     private var currentProgress: CGFloat {
         let time = engine.currentTime
         if let segment = segment?.clamped(toFileDuration: engine.duration) {
-            return CGFloat(min(max(segment.relativeTime(forFile: time) / segment.length, 0), 1))
+            return PlaybackFraction.cgFloat(segment.relativeTime(forFile: time), in: segment.length)
         }
-        let duration = engine.duration
-        guard duration.isFinite, duration > 0 else { return 0 }
-        return CGFloat(min(max(time / duration, 0), 1))
+        return PlaybackFraction.cgFloat(time, in: engine.duration)
     }
 }
 

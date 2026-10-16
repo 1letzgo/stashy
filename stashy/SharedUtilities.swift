@@ -2733,3 +2733,20 @@ struct LazyView<Content: View>: View {
         build()
     }
 }
+
+/// `value / total` for progress bars, scrubbers and marker dots, clamped to 0…1. Any NaN or
+/// infinite input (an engine reporting `duration = .nan` before its probe, an infinite live
+/// duration) yields 0, never a NaN: a NaN that reaches `frame(width:)` / `offset` / `position`
+/// throws in Core Animation (`CALayer setPosition`) and takes the app down.
+enum PlaybackFraction {
+    static func of(_ value: Double, in total: Double) -> Double {
+        guard value.isFinite, total.isFinite, total > 0 else { return 0 }
+        let fraction = value / total
+        guard fraction.isFinite else { return 0 }
+        return min(max(fraction, 0), 1)
+    }
+
+    static func cgFloat(_ value: Double, in total: Double) -> CGFloat {
+        CGFloat(of(value, in: total))
+    }
+}

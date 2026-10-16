@@ -108,6 +108,37 @@ enum ReelsPlayerRegistry {
         return _isSuspended
     }
 
+    /// Feeds instances currently on screen, and those that left the screen while Feeds stayed
+    /// the selected tab (a pushed detail / image viewer covers them). Tracked per instance
+    /// because a remount shows the new instance before the old one disappears.
+    private static var visibleFeedInstances = Set<UUID>()
+    private static var coveredFeedInstances = Set<UUID>()
+
+    static func noteFeedAppeared(_ id: UUID) {
+        lock.lock()
+        visibleFeedInstances.insert(id)
+        coveredFeedInstances.remove(id)
+        lock.unlock()
+    }
+
+    /// `covered`: the instance left the screen while Feeds is still the selected tab.
+    static func noteFeedDisappeared(_ id: UUID, covered: Bool) {
+        lock.lock()
+        visibleFeedInstances.remove(id)
+        if covered { coveredFeedInstances.insert(id) } else { coveredFeedInstances.remove(id) }
+        lock.unlock()
+    }
+
+    /// True while every Feeds instance is hidden behind something pushed on top of it. The
+    /// deferred kicks, the row watchdog and the background return would otherwise start an
+    /// engine nobody sees — and every such play is a main-thread call into the audio stack.
+    /// Fails open: with no bookkeeping at all (never appeared) playback stays allowed.
+    static var isFeedCovered: Bool {
+        lock.lock()
+        defer { lock.unlock() }
+        return visibleFeedInstances.isEmpty && !coveredFeedInstances.isEmpty
+    }
+
     /// Snapshot of the live registrations (the table is weak, entries can vanish).
     private static func registered() -> [ReelsPausable] {
         lock.lock()
@@ -161,8 +192,9 @@ enum ReelsPlayerRegistry {
         guard let engine else { return }
         lock.lock()
         let suspended = _isSuspended
+        let covered = visibleFeedInstances.isEmpty && !coveredFeedInstances.isEmpty
         lock.unlock()
-        guard !suspended else { return }
+        guard !suspended, !covered else { return }
         engine.reelsPlay()
     }
 }
@@ -375,6 +407,8 @@ struct ReelsViewBody: View {
     /// reset arrays/players mid-mount (black first cell).
     @State private var isBootstrapping = false
     @State private var playTrigger = 0  // Incremented when first item should autoplay
+    /// Identity of this Feeds instance for `ReelsPlayerRegistry`'s on-screen bookkeeping.
+    @State private var feedPresenceID = UUID()
     /// Coalesces `activateFeed` delayed play kicks so mode switches don't stack timers.
     @State private var feedActivationGeneration = 0
     /// `reelsListView` is in the hierarchy (not the loading overlay).
@@ -2630,6 +2664,9 @@ struct ReelsViewBody: View {
     private var premiumContent: some View {
         premiumContentBase
             .onAppear {
+                // Before `handleOnAppear`: its resume path bumps `playTrigger`, and the rows'
+                // play must already see this instance on screen.
+                ReelsPlayerRegistry.noteFeedAppeared(feedPresenceID)
                 handleOnAppear()
             }
             .onChange(of: coordinator.selectedTab) { oldTab, newTab in
@@ -2680,6 +2717,11 @@ struct ReelsViewBody: View {
                 }
             }
             .onDisappear {
+                // A push on Feeds' own stack covers this instance; a tab switch or a remount
+                // does not (the tab switch suspends, the remount's new instance is visible).
+                ReelsPlayerRegistry.noteFeedDisappeared(
+                    feedPresenceID,
+                    covered: coordinator.selectedTab == .reels && !isBeingReplaced)
                 // Still on Feeds (push/pop or tab remount): pause only — never `suspendPlayback()`.
                 // Remount destroys this view *after* the new instance's `onAppear`; suspending here
                 // would leave `playIfAllowed` as a permanent no-op for Clips.
@@ -6132,7 +6174,7 @@ extension ReelItemView {
         aetherEngine = aether
         ReelsPlayerRegistry.register(aether)
 
-        let autoplay = !isRotating && isActive && (forcePlay || isPlaying)
+        let autoplay = !isRotating && isActive && (forcePlay || isPlaying) && !ReelsPlayerRegistry.isFeedCovered
         // Marker rows open the original right at the marker, scene rows at their Feeds start
         // position — part of the load itself, so no seek races the first frame / autoplay.
         let start = rowStartTime
@@ -6297,6 +6339,10 @@ extension ReelItemView {
     }
 
     func aetherPlayIfAllowed() {
+        // Only the current item ever plays. Several deferred kicks (activation retries, the
+        // `playTrigger` follow-up, the watchdog) re-check `isActive` themselves, but not all of
+        // them — and a play on a row that is not the current one starts audio nobody sees.
+        guard isActive else { return }
         ReelsPlayerRegistry.playIfAllowed(aetherEngine)
     }
 

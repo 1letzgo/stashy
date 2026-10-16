@@ -342,7 +342,7 @@ struct TVSceneDetailView: View {
                 if let resumeTime = scene.resumeTime, resumeTime > 0,
                    let duration = scene.sceneDuration, duration > 0,
                    duration.isFinite, resumeTime.isFinite {
-                    let progress = max(0.0, min(1.0, resumeTime / duration))
+                    let progress = PlaybackFraction.of(resumeTime, in: duration)
                     HStack(spacing: 12) {
                         Image(systemName: "play.fill")
                             .font(.caption)

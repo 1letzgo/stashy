@@ -95,7 +95,7 @@ struct TVSceneCardView: View {
             if let resumeTime = scene.resumeTime, resumeTime > 0,
                let duration = scene.sceneDuration ?? scene.duration, duration > 0,
                duration.isFinite, resumeTime.isFinite {
-                let progress = max(0.0, min(1.0, resumeTime / duration))
+                let progress = PlaybackFraction.of(resumeTime, in: duration)
                 VStack {
                     Spacer()
                     GeometryReader { geo in
