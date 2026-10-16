@@ -120,6 +120,7 @@ import de.letzgo.stashy.ui.Screen
 import de.letzgo.stashy.ui.StashyColors
 import de.letzgo.stashy.ui.oCounterIcon
 import androidx.compose.foundation.interaction.MutableInteractionSource
+import de.letzgo.stashy.ui.feeds.AddPerformerButton
 import de.letzgo.stashy.ui.feeds.ChromePillIconButton
 import de.letzgo.stashy.ui.feeds.StackedPill
 import de.letzgo.stashy.ui.feeds.noIndicationClick
@@ -166,6 +167,8 @@ class ImageViewerScreen(
     private var tagEditorImage by mutableStateOf<StashImage?>(null)
     /** iOS `wasPlayingBeforeTagEditor`. */
     private var wasPlayingBeforeTagEditor = false
+    /** The picture whose add-only performer picker ("+" after the performer name) is open. */
+    private var performerEditorImage by mutableStateOf<StashImage?>(null)
 
     /** iOS `@AppStorage` keys of the fullscreen viewer. */
     private val continuousPlay get() = Prefs.bool("images_fullscreen_continuous", false)
@@ -254,6 +257,9 @@ class ImageViewerScreen(
             AddTagsSheet(AITagTarget.image(image), onDismiss = { closeTagEditor() }) { updated ->
                 replace(image.id) { it.copy(tags = updated.map { t -> IdName(t.id, t.name) }) }
             }
+        }
+        performerEditorImage?.let { image ->
+            AddImagePerformersSheet(image, onDismiss = { closePerformerEditor() }) { updated -> replace(image.id) { updated } }
         }
         if (confirmDelete) {
             AlertDialog(
@@ -472,11 +478,18 @@ class ImageViewerScreen(
                         PerformerAvatar(performer) { openPerformer(performer) }
                     }
                     Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                        image.performers?.firstOrNull()?.let { performer ->
-                            Text(
-                                performer.name ?: "", fontSize = 15.sp, fontWeight = FontWeight.Bold, color = Color.White, maxLines = 1,
-                                modifier = Modifier.clickable { openPerformer(performer) },
-                            )
+                        val first = image.performers?.firstOrNull()
+                        // "+" right after the name (alone without performers), like the Feeds overlay.
+                        val canAdd = ImagePerformerAdd.canAdd(image)
+                        if (first != null || canAdd) Row(verticalAlignment = Alignment.CenterVertically) {
+                            first?.let { performer ->
+                                Text(
+                                    performer.name ?: "", fontSize = 15.sp, fontWeight = FontWeight.Bold, color = Color.White, maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                    modifier = Modifier.weight(1f, fill = false).clickable { openPerformer(performer) },
+                                )
+                            }
+                            if (canAdd) AddPerformerButton(leading = first == null) { openPerformerEditor(image) }
                         }
                         val title = image.title?.takeIf { it.isNotEmpty() }
                         val gallery = image.galleries?.firstOrNull()
@@ -646,6 +659,19 @@ class ImageViewerScreen(
 
     private fun closeTagEditor() {
         tagEditorImage = null
+        if (wasPlayingBeforeTagEditor) { wasPlayingBeforeTagEditor = false; isPlaying = true }
+    }
+
+    /** Like the tag editor: slideshow / clip pause while the picker is open, resume on close. */
+    private fun openPerformerEditor(image: StashImage) {
+        if (image.performers == null) return
+        wasPlayingBeforeTagEditor = isPlaying
+        isPlaying = false
+        performerEditorImage = image
+    }
+
+    private fun closePerformerEditor() {
+        performerEditorImage = null
         if (wasPlayingBeforeTagEditor) { wasPlayingBeforeTagEditor = false; isPlaying = true }
     }
 
