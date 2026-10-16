@@ -1374,6 +1374,9 @@ struct FullScreenImageView: View {
     @State private var tagEditorImage: StashImage?
     /// Play state to hand back when the tag editor closes.
     @State private var wasPlayingBeforeTagEditor = false
+    /// Image the "+" behind the performer names opens the performer editor for.
+    @State private var performerEditorImage: StashImage?
+    @State private var wasPlayingBeforePerformerEditor = false
     @State private var performerImageTargetPerformers: [GalleryPerformer] = []
     @State private var currentItemIsPlaying = true
     /// Same setting the item views read; here it decides whether pause applies to stills.
@@ -1529,6 +1532,28 @@ struct FullScreenImageView: View {
                     currentItemIsPlaying = true
                 }
             }
+            .sheet(item: $performerEditorImage) { image in
+                AddPerformerToSceneSheet(
+                    sceneId: "",
+                    currentPerformers: (image.performers ?? []).map { $0.toScenePerformer() },
+                    viewModel: viewModel,
+                    savePerformerIds: { ids, done in
+                        viewModel.updateImagePerformers(imageId: image.id, performerIds: ids, completion: done)
+                    }
+                ) { updated in
+                    applyEditedPerformers(updated.map { $0.toGalleryPerformer() }, toImageId: image.id)
+                }
+            }
+            .onChange(of: performerEditorImage?.id) { _, newValue in
+                // Same pause/resume as the tag editor; pausing also stops the auto-advance.
+                if newValue != nil {
+                    wasPlayingBeforePerformerEditor = currentItemIsPlaying
+                    currentItemIsPlaying = false
+                } else if wasPlayingBeforePerformerEditor {
+                    wasPlayingBeforePerformerEditor = false
+                    currentItemIsPlaying = true
+                }
+            }
             .alert("Set as Performer Image?", isPresented: $showingSetPerformerImagePicker) {
                 ForEach(performerImageTargetPerformers) { performer in
                     Button("Okay") {
@@ -1555,17 +1580,69 @@ struct FullScreenImageView: View {
     /// Performer und Titel untereinander — wie in Feeds.
     private func fullScreenNameTitleLine(image: StashImage) -> some View {
         VStack(alignment: .leading, spacing: 2) {
-            if let performer = image.performers?.first {
-                NavigationLink(destination: PerformerDetailView(performer: performer.toPerformer())) {
-                    Text(performer.name)
-                        .font(.system(size: 15, weight: .bold))
-                        .foregroundColor(.white)
-                        .lineLimit(1)
+            let performers = image.performers ?? []
+            let showsAddPerformer = appearanceManager.isEditModeEnabled
+            if performers.count == 1, !showsAddPerformer, let performer = performers.first {
+                fullScreenPerformerName(performer)
+            } else if performers.count > 1 || showsAddPerformer {
+                // Like Feeds: all names ("A & B"), scrolling when long; the "+" sits at the end.
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 4) {
+                        ForEach(Array(performers.enumerated()), id: \.element.id) { idx, performer in
+                            fullScreenPerformerName(performer)
+                            if idx < performers.count - 1 {
+                                Text("&")
+                                    .font(.system(size: 15, weight: .medium))
+                                    .foregroundColor(.white.opacity(0.75))
+                            }
+                        }
+                        if showsAddPerformer {
+                            AddPerformerPlusButton { openPerformerEditor(for: image) }
+                                .padding(.leading, performers.isEmpty ? 0 : 4)
+                        }
+                    }
+                    // Room for the 44 pt hit area without moving the title.
+                    .padding(.vertical, AddPerformerPlusButton.hitInset)
                 }
-                .buttonStyle(.plain)
+                .padding(.vertical, -AddPerformerPlusButton.hitInset)
+                .id(image.id)
             }
             fullScreenTitleText(image: image)
         }
+    }
+
+    private func fullScreenPerformerName(_ performer: GalleryPerformer) -> some View {
+        NavigationLink(destination: PerformerDetailView(performer: performer.toPerformer())) {
+            Text(performer.name)
+                .font(.system(size: 15, weight: .bold))
+                .foregroundColor(.white)
+                .lineLimit(1)
+        }
+        .buttonStyle(.plain)
+    }
+
+    /// Refuses images whose list was fetched without performers — saving from there
+    /// would drop everyone already on the image.
+    private func openPerformerEditor(for image: StashImage) {
+        guard image.performers != nil else {
+            HapticManager.error()
+            ToastManager.shared.show("Could not load performers", icon: "exclamationmark.triangle.fill", style: .error)
+            return
+        }
+        performerEditorImage = image
+    }
+
+    /// The editor already saved (`imageUpdate`); the binding carries it back to the source list,
+    /// the notification to every other list holding the image.
+    private func applyEditedPerformers(_ performers: [GalleryPerformer], toImageId imageId: String) {
+        if let position = images.firstIndex(where: { $0.id == imageId }) {
+            var image = images[position]
+            image.performers = performers
+            images[position] = image
+        }
+        StashImage.postPerformersUpdated(imageId: imageId, performers: performers)
+        HapticManager.success()
+        ToastManager.shared.show("Performers updated")
     }
 
     @ViewBuilder
