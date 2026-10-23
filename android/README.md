@@ -183,5 +183,7 @@ commit is higher. The self-update needs only the APK on the server: a HEAD reque
 decides whether it is offered for installation. Checked on resume (every 6 h at most) and via
 Settings → App → Check for Updates.
 
-**Releases go through Google Play only.** Do not publish APKs as GitHub releases — the old
-GitHub release channel (`scripts/release-sideload.sh`) is retired and the releases were removed.
+**Releases:** Google Play (`play` flavor, `scripts/release-play.sh`) and GitHub Releases
+(`sideload` flavor, `scripts/release-sideload.sh` → `stashy.apk`, which the in-app updater
+downloads). In the sideload build stashy+ is unlocked with an offline license key made by
+`tools/stashy-keygen.py` (private key in `~/.stashy-license/`, never in the repo).
