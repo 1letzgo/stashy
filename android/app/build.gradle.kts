@@ -16,11 +16,6 @@ val localProps = Properties().apply {
 }
 fun localString(key: String) = "\"" + (localProps.getProperty(key) ?: "").replace("\"", "\\\"") + "\""
 
-/** Commit time (epoch seconds) — stable per commit, so BuildConfig doesn't change on every build. */
-fun gitCommitTime(): Long = runCatching {
-    providers.exec { commandLine("git", "log", "-1", "--format=%ct") }.standardOutput.asText.get().trim().toLong()
-}.getOrDefault(0L)
-
 fun gitCommitCount(): Int = runCatching {
     providers.exec { commandLine("git", "rev-list", "--count", "HEAD") }.standardOutput.asText.get().trim().toInt()
 }.getOrDefault(1)
@@ -39,17 +34,15 @@ android {
         buildConfigField("String", "DEBUG_SERVER", "\"\"")
         buildConfigField("String", "DEBUG_API_KEY", "\"\"")
     }
-    // Distribution: `sideload` = our own APK (stashy+ included, self-update from buntes.am),
+    // Distribution: `sideload` = our own APK from GitHub Releases (stashy+ via an offline license
+    // key from tools/stashy-keygen.py, self-update from the latest release),
     // `play` = Google Play (Play Billing, no self-update — Play forbids both other ways).
     flavorDimensions += "distribution"
     productFlavors {
         create("sideload") {
             dimension = "distribution"
-            // Beta builds expire N days after their commit (-PstashyBetaDays=…, 0 = never, negative = already expired for testing).
-            val betaDays = (project.findProperty("stashyBetaDays") as String?)?.toLongOrNull() ?: 30L
-            val expires = if (betaDays != 0L) (gitCommitTime() + betaDays * 86_400L) * 1000L else 0L
-            buildConfigField("long", "EXPIRES_AT", "${expires}L")
-            buildConfigField("boolean", "PLUS_INCLUDED", "true")
+            // stashy+ is unlocked by a signed offline license key (data/LicenseKey.kt), not by Play.
+            buildConfigField("boolean", "LICENSE_KEYS", "true")
             buildConfigField("String", "UPDATE_URL", "\"https://github.com/1letzgo/stashy/releases/latest/download/stashy.apk\"")
             // Latest release metadata: the tag (android-v<name>-<versionCode>) tells the version
             // before anything is downloaded.
@@ -57,8 +50,7 @@ android {
         }
         create("play") {
             dimension = "distribution"
-            buildConfigField("long", "EXPIRES_AT", "0L")
-            buildConfigField("boolean", "PLUS_INCLUDED", "false")
+            buildConfigField("boolean", "LICENSE_KEYS", "false")
             buildConfigField("String", "UPDATE_URL", "\"\"")
             buildConfigField("String", "UPDATE_API", "\"\"")
         }

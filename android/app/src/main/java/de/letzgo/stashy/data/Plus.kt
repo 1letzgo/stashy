@@ -51,13 +51,13 @@ object StashyPlusProduct {
 /** iOS: `StashyPlusSource` (raw values identical; no pre-3.0 paid-app grant on Play). */
 enum class StashyPlusSource(val raw: String) {
     None("none"), Subscription("subscription"), Lifetime("lifetime"), LocalDevelopment("localDevelopment"),
-    /** Our own sideloaded builds (`BuildConfig.PLUS_INCLUDED`): stashy+ is part of the build. */
-    Included("included");
+    /** Sideload builds (`BuildConfig.LICENSE_KEYS`): a valid offline license key ([LicenseKey]). */
+    License("license");
 
     val statusTitle: String get() = when (this) {
         None -> "Not unlocked"
         LocalDevelopment -> "stashy+ (Local Build)"
-        Included -> "stashy+ included"
+        License -> "stashy+ licensed"
         Subscription -> "stashy+ active"
         Lifetime -> "stashy+ Lifetime"
     }
@@ -65,7 +65,7 @@ enum class StashyPlusSource(val raw: String) {
     val statusDetail: String get() = when (this) {
         None -> "Subscribe or buy Lifetime to unlock premium features."
         LocalDevelopment -> "Unlocked automatically because this is a debug build. Not active in any distributed build."
-        Included -> "All stashy+ features are included in this version of the app."
+        License -> "Unlocked with a license key."
         Subscription -> "Thanks for supporting stashy."
         Lifetime -> "Unlocked forever on this Google account."
     }
@@ -101,10 +101,17 @@ object StashyPlus {
     /** Debug helper like iOS: keep the paywall locked even in debug builds. */
     const val DEBUG_FORCE_LOCKED_KEY = "stashy_plus_debug_force_locked"
 
-    private val localUnlockActive: Boolean get() = (BuildConfig.DEBUG || BuildConfig.PLUS_INCLUDED) && !Prefs.bool(DEBUG_FORCE_LOCKED_KEY)
-    /** Source used while no store purchase exists but the build unlocks stashy+. */
-    private val buildSource: StashyPlusSource get() = if (BuildConfig.PLUS_INCLUDED) StashyPlusSource.Included else StashyPlusSource.LocalDevelopment
+    /** The accepted license key (sideload flavor; global, not per server). */
+    private const val LICENSE_KEY = "stashy_plus_license_key"
 
+    /**
+     * Debug builds unlock automatically — except in the license-key flavor, where the debug build
+     * must behave like the shipped APK so the key flow can be tested.
+     */
+    private val localUnlockActive: Boolean get() = BuildConfig.DEBUG && !BuildConfig.LICENSE_KEYS && !Prefs.bool(DEBUG_FORCE_LOCKED_KEY)
+
+    /** Valid stored license (re-verified on every start and resume; invalid/expired → null). */
+    var license by mutableStateOf(storedLicense()); private set
     var source by mutableStateOf(initialSource()); private set
     var isUnlocked by mutableStateOf(source != StashyPlusSource.None); private set
     var activeProductID by mutableStateOf(Prefs.string(ACTIVE_PRODUCT_KEY)); private set
@@ -121,16 +128,67 @@ object StashyPlus {
     val hasLifetime: Boolean get() = source == StashyPlusSource.Lifetime
     /** iOS: `shouldOfferPurchases` — subscribers can still buy Lifetime. */
     val shouldOfferPurchases: Boolean get() =
-        source != StashyPlusSource.Included && (Prefs.bool(DEBUG_FORCE_LOCKED_KEY) || source == StashyPlusSource.LocalDevelopment || !isUnlocked || source == StashyPlusSource.Subscription)
+        !BuildConfig.LICENSE_KEYS && (Prefs.bool(DEBUG_FORCE_LOCKED_KEY) || source == StashyPlusSource.LocalDevelopment || !isUnlocked || source == StashyPlusSource.Subscription)
     val tipsCount: Int get() = Prefs.int(TIPS_COUNT_KEY)
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
 
     private fun initialSource(): StashyPlusSource {
-        if (localUnlockActive) return buildSource
+        if (localUnlockActive) return StashyPlusSource.LocalDevelopment
         if (Prefs.bool(DEBUG_FORCE_LOCKED_KEY)) return StashyPlusSource.None
-        return StashyPlusSource.from(Prefs.string(SOURCE_KEY))
+        if (license != null) return StashyPlusSource.License
+        return StashyPlusSource.from(Prefs.string(SOURCE_KEY)).takeIf { it != StashyPlusSource.License } ?: StashyPlusSource.None
     }
+
+    private fun storedLicense(): License? {
+        if (!BuildConfig.LICENSE_KEYS) return null
+        val key = Prefs.string(LICENSE_KEY) ?: return null
+        return (LicenseKey.verify(key, System.currentTimeMillis()) as? LicenseKey.Result.Valid)?.license
+    }
+
+    /** Whether this build unlocks stashy+ with license keys instead of Play (sideload flavor). */
+    val usesLicenseKeys: Boolean get() = BuildConfig.LICENSE_KEYS
+
+    /** The stored key once it no longer verifies (expired) — for the status text. */
+    val expiredLicense: License? get() {
+        if (!BuildConfig.LICENSE_KEYS || license != null) return null
+        val key = Prefs.string(LICENSE_KEY) ?: return null
+        return (LicenseKey.verify(key, System.currentTimeMillis()) as? LicenseKey.Result.Expired)?.license
+    }
+
+    /**
+     * Verifies and stores a pasted license key. Returns null on success, otherwise the error text
+     * for the input field (the previous license, if any, stays active).
+     */
+    fun activateLicense(input: String): String? {
+        if (!BuildConfig.LICENSE_KEYS) return "License keys are not used in this version of stashy."
+        return when (val result = LicenseKey.verify(input, System.currentTimeMillis())) {
+            is LicenseKey.Result.Valid -> {
+                Prefs.commitString(LICENSE_KEY, input.trim())
+                license = result.license
+                recompute()
+                message = "stashy+ unlocked. Thank you!"
+                null
+            }
+            is LicenseKey.Result.Expired -> "This license key expired on ${result.license.expiresText}."
+            is LicenseKey.Result.Invalid -> result.reason
+        }
+    }
+
+    fun removeLicense() {
+        Prefs.commitString(LICENSE_KEY, null)
+        license = null
+        recompute()
+    }
+
+    /** Re-checks the stored key (an expiry date may have passed while the app was running). */
+    private fun revalidateLicense() {
+        if (!BuildConfig.LICENSE_KEYS) return
+        val now = storedLicense()
+        if (now != license) { license = now; recompute() }
+    }
+
+    private fun recompute() = apply(StashyPlusSource.from(Prefs.string(SOURCE_KEY)), activeProductID)
 
     /** Configures RevenueCat and syncs entitlements. Call at app start (Application.onCreate). */
     fun start(context: Context) {
@@ -144,6 +202,7 @@ object StashyPlus {
 
     /** Re-check on foreground (iOS: `willEnterForeground` → `syncUnlockFromStore`). */
     fun refresh() {
+        revalidateLicense()
         if (Purchases.isConfigured) scope.launch { syncUnlockFromStore() }
     }
 
@@ -195,7 +254,8 @@ object StashyPlus {
         activeProductID = productID
         source = when {
             Prefs.bool(DEBUG_FORCE_LOCKED_KEY) -> StashyPlusSource.None
-            storeSource == StashyPlusSource.None && localUnlockActive -> buildSource
+            storeSource == StashyPlusSource.None && license != null -> StashyPlusSource.License
+            storeSource == StashyPlusSource.None && localUnlockActive -> StashyPlusSource.LocalDevelopment
             else -> storeSource
         }
         isUnlocked = source != StashyPlusSource.None
@@ -252,7 +312,7 @@ object StashyPlus {
     /** Debug toggle (Settings → stashy+ in debug builds), iOS `debugForceLockedKey`. */
     fun setDebugForceLocked(locked: Boolean) {
         Prefs.setBool(DEBUG_FORCE_LOCKED_KEY, locked)
-        apply(StashyPlusSource.from(Prefs.string(SOURCE_KEY)), activeProductID)
+        recompute()
     }
 
     /** Price line for a product (subscriptions: the base plan's recurring price). */

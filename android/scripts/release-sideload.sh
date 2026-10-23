@@ -17,7 +17,7 @@ TMP=$(mktemp -d); cp "$APK" "$TMP/stashy.apk"
 TAG="android-v$NAME-$CODE"
 gh release create "$TAG" "$TMP/stashy.apk" -R 1letzgo/stashy --target "$(git -C .. rev-parse HEAD)" --latest \
   --title "stashy for Android $NAME ($CODE)" \
-  --notes "Android beta build $NAME ($CODE). Install stashy.apk on Android phones and Android TV; the app updates itself from the latest release. Beta builds expire 30 days after their build."
+  --notes "stashy for Android $NAME ($CODE). Install stashy.apk on Android phones and Android TV; the app updates itself from the latest release. stashy+ is unlocked with a license key (Settings → stashy+)."
 echo "released $TAG"
 if [ "$NAS" = "1" ]; then
   mount | grep -q " on /Volumes/appdata " || osascript -e 'mount volume "smb://Tower._smb._tcp.local/appdata"' >/dev/null

@@ -21,6 +21,20 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.material.icons.outlined.ContentPaste
+import androidx.compose.material.icons.outlined.Delete
+import androidx.compose.material.icons.outlined.Key
+import androidx.compose.material3.IconButton
+import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -200,6 +214,12 @@ private fun PurchaseSection() {
         Spacer(Modifier.size(8.dp))
     }
 
+    // Sideload flavor: stashy+ comes from an offline license key instead of Google Play.
+    if (StashyPlus.usesLicenseKeys) {
+        LicenseKeySection()
+        return
+    }
+
     if (StashyPlus.shouldOfferPurchases) {
         if (StashyPlus.products.isEmpty()) {
             GroupedCard {
@@ -280,7 +300,64 @@ private fun statusDetailText(): String {
     if (StashyPlus.source == StashyPlusSource.Subscription && id != null) {
         StashyPlusProduct.displayNames[id]?.let { return "$it plan" }
     }
+    if (StashyPlus.source == StashyPlusSource.License) StashyPlus.license?.let { return licenseText(it) }
     return StashyPlus.source.statusDetail
+}
+
+private fun licenseText(license: de.letzgo.stashy.data.License): String =
+    "Licensed to ${license.name}" + (license.expiresText?.let { " · valid until $it" } ?: "")
+
+/**
+ * Sideload flavor: enter / remove the offline license key ([StashyPlus.activateLicense]).
+ * Locked: key field (paste button, error text) + Activate. Licensed: Remove License.
+ */
+@Composable
+private fun LicenseKeySection() {
+    val license = StashyPlus.license
+    if (license != null) {
+        var confirmRemove by remember { mutableStateOf(false) }
+        GroupedCard(Modifier.padding(vertical = 4.dp)) {
+            SecondaryButton("Remove License", Icons.Outlined.Delete, showsProgress = false) { confirmRemove = true }
+        }
+        SettingsSectionFooter("License ${license.id} · issued ${de.letzgo.stashy.data.License.formatDay(license.issuedDay)}. The key is stored on this device only.")
+        if (confirmRemove) {
+            de.letzgo.stashy.ui.NativeConfirmDialog(
+                "Remove License?", "stashy+ will be locked on this device until you enter the key again.",
+                onDismiss = { confirmRemove = false }, confirmLabel = "Remove", destructive = true,
+            ) { confirmRemove = false; StashyPlus.removeLicense() }
+        }
+        return
+    }
+    var input by rememberSaveable { mutableStateOf("") }
+    var error by rememberSaveable { mutableStateOf<String?>(StashyPlus.expiredLicense?.let { "Your license key expired on ${it.expiresText}." }) }
+    val clipboard = LocalClipboardManager.current
+    val focus = LocalFocusManager.current
+    fun activate() {
+        error = StashyPlus.activateLicense(input)
+        if (error == null) { input = ""; focus.clearFocus() }
+    }
+    GroupedCard {
+        Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            de.letzgo.stashy.ui.NativeTextField(
+                input, { input = it.replace("\n", " "); error = null }, "License key",
+                placeholder = "STASHY-XXXXX-XXXXX-…",
+                monospaced = true, singleLine = false, minLines = 2,
+                isError = error != null, supportingText = error,
+                leadingIcon = Icons.Outlined.Key,
+                capitalization = KeyboardCapitalization.Characters,
+                imeAction = ImeAction.Done,
+                keyboardActions = KeyboardActions(onDone = { if (input.isNotBlank()) activate() }),
+                trailing = {
+                    IconButton({ clipboard.getText()?.text?.let { input = it.trim(); error = null } }) {
+                        Icon(Icons.Outlined.ContentPaste, "Paste")
+                    }
+                },
+            )
+            NativeTonalButton("Activate", Modifier.fillMaxWidth(), enabled = input.isNotBlank(), leading = SF.checkmarkSealFill) { activate() }
+        }
+    }
+    SettingsSectionFooter("This version of stashy unlocks stashy+ with a license key. Paste the key you received — it works offline and stays on this device.")
+
 }
 
 /** iOS: `iconFor(productID:)`. */

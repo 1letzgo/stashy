@@ -411,15 +411,32 @@ private fun StashyPlusPage() {
     LaunchedEffect(Unit) { if (StashyPlus.products.isEmpty()) StashyPlus.fetchProducts() }
     val source = StashyPlus.source
     val busy = StashyPlus.purchasingProductID != null || StashyPlus.isRestoringPurchases
+    var licenseInput by remember { mutableStateOf("") }
+    var licenseError by remember { mutableStateOf(StashyPlus.expiredLicense?.let { "Your license key expired on ${it.expiresText}." }) }
     TvSettingsPage("stashy+", null, firstFocus = first) {
+        val license = StashyPlus.license
         item {
             TvListRow(
-                source.statusTitle, {}, Modifier.focusRequester(first), subtitle = source.statusDetail,
+                source.statusTitle, {}, Modifier.focusRequester(first),
+                subtitle = license?.let { l -> "Licensed to ${l.name}" + (l.expiresText?.let { " · valid until $it" } ?: "") } ?: source.statusDetail,
                 leading = if (StashyPlus.isUnlocked) TvIcons.checkSeal else TvIcons.lock, leadingTint = if (StashyPlus.isUnlocked) TvColors.green else TvColors.tint,
             )
         }
         item { TvListRow("Channels", {}, leading = TvIcons.sparklesTv, leadingTint = TvColors.tint) }
-        item { TvSectionFooter("stashy+ unlocks premium features across stashy for phone, tablet and Android TV with one purchase.") }
+        if (StashyPlus.usesLicenseKeys) {
+            // Sideload flavor: offline license key instead of Google Play.
+            item { TvSectionHeader("License") }
+            if (license != null) {
+                item { TvListRow("Remove License", { StashyPlus.removeLicense() }, destructive = true) }
+                item { TvSectionFooter("License ${license.id}. The key is stored on this device only.") }
+            } else {
+                item { TvTextField("License key (STASHY-…)", licenseInput, { licenseInput = it; licenseError = null }, onSubmit = { licenseError = StashyPlus.activateLicense(licenseInput) }) }
+                item { TvListRow("Activate", { licenseError = StashyPlus.activateLicense(licenseInput) }, enabled = licenseInput.isNotBlank()) }
+                item { TvSectionFooter(licenseError ?: "This version of stashy unlocks stashy+ with a license key. It works offline and stays on this device.") }
+            }
+        } else {
+            item { TvSectionFooter("stashy+ unlocks premium features across stashy for phone, tablet and Android TV with one purchase.") }
+        }
         if (StashyPlus.shouldOfferPurchases) {
             item { TvSectionHeader("Unlock") }
             if (StashyPlus.isLoadingProducts && StashyPlus.products.isEmpty()) {

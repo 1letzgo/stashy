@@ -110,11 +110,6 @@ val LocalTabBarVisible = compositionLocalOf { true }
 @Composable
 fun AppShell() {
     val p = Theme.palette
-    if (de.letzgo.stashy.data.BetaExpiry.expired) {
-        BetaExpiredScreen()
-        AppUpdateDialog()
-        return
-    }
     if (ServerConfigManager.activeConfig == null) {
         Box(Modifier.fillMaxSize().background(p.background)) { ServerSetupScreen(onDone = {}) }
         AppUpdateDialog()

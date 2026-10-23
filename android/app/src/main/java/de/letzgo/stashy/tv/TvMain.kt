@@ -135,7 +135,6 @@ fun TvApp() {
     Box(Modifier.fillMaxSize().background(TvColors.background).onFocusChanged { TvNav.appHasFocus = it.hasFocus }) {
         TvNav.shellShown = !TvSecurity.isAppLocked && config?.hasValidConfig == true
         when {
-            de.letzgo.stashy.data.BetaExpiry.expired -> de.letzgo.stashy.ui.BetaExpiredScreen()
             TvSecurity.isAppLocked -> TvPasscodeEntry()
             config?.hasValidConfig != true -> TvServerSetup()
             else -> TvMainShell()
