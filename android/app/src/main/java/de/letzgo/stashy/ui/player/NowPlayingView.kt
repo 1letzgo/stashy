@@ -140,19 +140,6 @@ private fun NowPlayingContent(initial: Scene, onOpen: (de.letzgo.stashy.ui.Scree
                 de.letzgo.stashy.ui.scene.ScenePlayerModule(model)
             }
             LazyColumn(Modifier.fillMaxSize()) {
-                item(key = "card") {
-                    de.letzgo.stashy.ui.scene.SceneCardContainer(Modifier.fillMaxWidth().padding(start = NowPlayingMargin, end = NowPlayingMargin, top = 12.dp)) {
-                        de.letzgo.stashy.ui.scene.SceneMetadataCardContent(
-                            scene = scene,
-                            isExpanded = model.isHeaderExpanded,
-                            onToggleExpanded = { model.isHeaderExpanded = !model.isHeaderExpanded },
-                            onEditTitle = null,
-                            onIncrementO = model::incrementO,
-                            onRemoveO = model::removeO,
-                            onSetRating = model::setRating,
-                        )
-                    }
-                }
                 item(key = "info") { InfoRow(scene, onOpen) }
                 item(key = "header") {
                     // Plain list header on the sheet background: "Watchlist" + Sort / Done + red Reset.
