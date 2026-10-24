@@ -133,6 +133,53 @@ object MiniPlayerStore {
     /** The bar's tap: [AppShell] presents the mini player's own full view ([NowPlayingSheet]). */
     var showsNowPlaying by mutableStateOf(false)
 
+    /**
+     * Scene of the Now Playing view. While it is open the scene page's player module owns the
+     * player, so [session] is empty; this keys the view (set by expand, a watchlist tap, next).
+     */
+    var nowPlayingScene by mutableStateOf<Scene?>(null)
+
+    /**
+     * Set by [resetWatchlistAndPlayback] for a moment: the Now Playing module that is closing
+     * stops its player instead of handing it back to the bar ([consumeDiscardHandOff]).
+     */
+    private var discardNextHandOffUntil = 0L
+
+    /** Whether a closing Now Playing module should stop its player (once). */
+    fun consumeDiscardHandOff(): Boolean {
+        val discard = android.os.SystemClock.elapsedRealtime() < discardNextHandOffUntil
+        discardNextHandOffUntil = 0L
+        return discard
+    }
+
+    /**
+     * iOS `resetWatchlistAndPlayback()` — the watchlist's Reset: empties the list, forgets the
+     * saved last session, closes Now Playing (its module stops the player) and closes the bar.
+     */
+    fun resetWatchlistAndPlayback() {
+        WatchlistStore.clear()
+        val serverId = session?.serverId ?: de.letzgo.stashy.data.ServerConfigManager.activeConfig?.id
+        MiniPlayerLastSession.forget(serverId)
+        if (showsNowPlaying) {
+            discardNextHandOffUntil = android.os.SystemClock.elapsedRealtime() + 2_000
+            showsNowPlaying = false
+            nowPlayingScene = null
+        }
+        close()
+    }
+
+    /** Now Playing: the scene after [currentId] in the watchlist. */
+    fun nextAfter(currentId: String): Scene? = WatchlistStore.next(currentId)
+
+    /** Now Playing: switch to [scene] (the view rebuilds its player module for it). */
+    fun showInNowPlaying(scene: Scene) { nowPlayingScene = scene }
+
+    /** Now Playing reached the end of [currentId]: on to the next watchlist entry, if any. */
+    fun advanceNowPlaying(currentId: String) {
+        if (!showsNowPlaying) return
+        nextAfter(currentId)?.let { nowPlayingScene = it }
+    }
+
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private val tracker = PlaybackActivityTracker(scope)
     /** "Count as played" by watched seconds, like the scene page (iOS `PlayCountWatchClock`). */
@@ -238,7 +285,7 @@ object MiniPlayerStore {
         tracker.noteSeek(seconds)
     }
 
-    fun expand() { if (session != null) showsNowPlaying = true }
+    fun expand() { session?.let { nowPlayingScene = it.scene; showsNowPlaying = true } }
 
     /** Resume tracking plus the play count, which the page would otherwise have counted. */
     private fun handleTime(seconds: Double, duration: Double) {
@@ -267,13 +314,13 @@ object MiniPlayerStore {
         current.player.onPlayingChanged = null
         current.player.onReachedEnd = null
         session = null
-        showsNowPlaying = false
         return current.copy(playRegistered = playCredit.isCredited, watchedSeconds = playCredit.watchedSeconds)
     }
 
     /** Ends the mini session if it plays a different scene than the one about to start. */
     fun yield(sceneId: String) {
-        if (session?.let { it.scene.id != sceneId } == true) close()
+        // Keeps Now Playing open: it is switching its own scene here.
+        if (session?.let { it.scene.id != sceneId } == true) close(dismissNowPlaying = false)
     }
 
     fun showsScene(sceneId: String): Boolean = session?.scene?.id == sceneId
@@ -293,7 +340,7 @@ object MiniPlayerStore {
     }
 
     /** Saves the position and releases the player; [forget] drops the saved last session (✕ / swipe). */
-    fun close(forget: Boolean = true) {
+    fun close(forget: Boolean = true, dismissNowPlaying: Boolean = true) {
         val current = session ?: return
         val p = current.player
         tracker.setPosition(p.currentTime, if (p.duration > 0) p.duration else current.scene.sceneDuration ?: 0.0)
@@ -307,7 +354,7 @@ object MiniPlayerStore {
         else MiniPlayerLastSession.save(current.serverId, current.scene, p.currentTime)
         lastSavedPosition = null
         session = null
-        showsNowPlaying = false
+        if (dismissNowPlaying) showsNowPlaying = false
     }
 
     /** Same save path as the scene page (`SceneDetailModel.configureTracker`). */

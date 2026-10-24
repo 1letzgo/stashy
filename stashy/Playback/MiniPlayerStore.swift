@@ -31,6 +31,9 @@ final class MiniPlayerStore: ObservableObject {
     @Published var expandedScene: Scene?
     /// The bar's tap: `MainTabView` presents the mini player's own full view (`NowPlayingView`).
     @Published var showsNowPlaying = false
+    /// The scene the full view shows. Its scene-page player takes the engine while open, so the
+    /// view keys on this rather than on `session`.
+    @Published var nowPlayingScene: Scene?
 
     /// Resume time and play duration keep syncing while only the bar shows the video.
     private let tracker = ScenePlaybackActivityTracker()
@@ -66,6 +69,12 @@ final class MiniPlayerStore: ObservableObject {
 
     /// Takes over `engine` from a scene page that is going away. Any other mini session ends.
     func adopt(scene: Scene, engine: AetherSceneEngine, playRegistered: Bool) {
+        if discardNextHandOff {
+            discardNextHandOff = false
+            engine.stop()
+            forgetLastSession()
+            return
+        }
         if let current = session, current.engine !== engine {
             close()
         }
@@ -181,14 +190,48 @@ final class MiniPlayerStore: ObservableObject {
     }
 
     func expand() {
-        guard session != nil else { return }
+        guard let scene = session?.scene else { return }
+        nowPlayingScene = scene
         showsNowPlaying = true
+    }
+
+    /// Set by Reset while the full view's player owns the engine: the hand-back on close
+    /// stops it instead of showing the bar again.
+    private var discardNextHandOff = false
+
+    /// Reset: empty watchlist, playback stopped, bar and full view gone.
+    func resetWatchlistAndPlayback() {
+        WatchlistStore.shared.clear()
+        forgetLastSession()
+        if showsNowPlaying {
+            discardNextHandOff = true
+            showsNowPlaying = false
+            nowPlayingScene = nil
+            // Only the close that follows right now; never a later, unrelated hand-off.
+            DispatchQueue.main.asyncAfter(deadline: .now() + 2) { [weak self] in
+                self?.discardNextHandOff = false
+            }
+        }
+        close()
+    }
+
+    /// Switches the full view to `scene` (watchlist tap, next, end of a scene).
+    func showNowPlaying(_ scene: Scene) {
+        WatchlistStore.shared.ensureListed(scene)
+        nowPlayingScene = scene
+    }
+
+    /// The full view's player reached the end: on to the next watchlist entry.
+    func advanceNowPlaying() {
+        guard showsNowPlaying, let current = nowPlayingScene,
+              let next = WatchlistStore.shared.next(after: current.id) else { return }
+        showNowPlaying(next)
     }
 
     /// From the full view to the scene page (metadata, markers, editing). The page takes the
     /// engine; leaving it hands the video back to the bar.
     func openSceneDetails() {
-        guard let scene = session?.scene else { return }
+        guard let scene = nowPlayingScene ?? session?.scene else { return }
         showsNowPlaying = false
         // Let the sheet finish dismissing before the cover presents.
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) { [weak self] in
@@ -418,6 +461,60 @@ extension View {
     }
 }
 
+/// The scene page's marker row: thumbnail, timestamp and title; a tap seeks there.
+struct SceneMarkerStrip: View {
+    let markers: [SceneMarker]
+    var onSeek: (Double) -> Void
+
+    var body: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 12) {
+                ForEach(markers.sorted { $0.seconds < $1.seconds }) { marker in
+                    Button {
+                        HapticManager.light()
+                        onSeek(marker.seconds)
+                    } label: {
+                        VStack(alignment: .leading, spacing: 8) {
+                            ZStack(alignment: .bottomTrailing) {
+                                CustomAsyncImage(url: marker.thumbnailURL) { loader in
+                                    if let image = loader.image {
+                                        image.resizable().scaledToFill()
+                                    } else {
+                                        Rectangle().fill(Color.gray.opacity(0.2))
+                                            .overlay(Image(systemName: "bookmark").foregroundColor(.secondary))
+                                    }
+                                }
+                                .frame(width: 80, height: 45)
+                                .clipped()
+                                Text(Self.time(marker.seconds))
+                                    .font(.system(size: 8, weight: .bold))
+                                    .padding(.horizontal, 4)
+                                    .padding(.vertical, 1)
+                                    .background(Color.black.opacity(0.6))
+                                    .foregroundColor(.white)
+                                    .clipShape(Capsule())
+                                    .padding(2)
+                            }
+                            .clipShape(RoundedRectangle(cornerRadius: 4))
+                            Text(marker.title ?? "Marker at \(Self.time(marker.seconds))")
+                                .font(.system(size: 10, weight: .medium))
+                                .lineLimit(1)
+                                .frame(width: 80, alignment: .leading)
+                        }
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+            .padding(.horizontal, 8)
+        }
+    }
+
+    private static func time(_ seconds: Double) -> String {
+        let h = Int(seconds) / 3600, m = (Int(seconds) % 3600) / 60, s = Int(seconds) % 60
+        return h > 0 ? String(format: "%d:%02d:%02d", h, m, s) : String(format: "%d:%02d", m, s)
+    }
+}
+
 /// Tools → Watchlist: the list when nothing plays. A row opens and plays its scene; leaving
 /// the page hands it to the mini player, which plays on through the list.
 struct WatchlistToolsView: View {
@@ -427,6 +524,8 @@ struct WatchlistToolsView: View {
     @State private var confirmReset = false
     @State private var openedScene: Scene?
     @State private var showsScene = false
+    /// Sorting shows the drag handles; outside it, swipe left removes a row.
+    @State private var sortMode: EditMode = .inactive
 
     var body: some View {
         Group {
@@ -462,6 +561,17 @@ struct WatchlistToolsView: View {
                                     .background(Capsule(style: .continuous).fill(Color.secondaryAppBackground))
                             }
                             .buttonStyle(.plain)
+                            Button {
+                                withAnimation { sortMode = sortMode.isEditing ? .inactive : .active }
+                            } label: {
+                                Text(sortMode.isEditing ? "Done" : "Sort")
+                                    .font(.subheadline.weight(.semibold))
+                                    .foregroundStyle(sortMode.isEditing ? Color.white : Color.primary.opacity(0.85))
+                                    .padding(.horizontal, 18)
+                                    .frame(height: StashyExpandingDock.activeHeight)
+                                    .background(Capsule(style: .continuous).fill(sortMode.isEditing ? appearance.tintColor : Color.secondaryAppBackground))
+                            }
+                            .buttonStyle(.plain)
                         }
                         .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 12, trailing: 16))
                         .listRowBackground(Color.clear)
@@ -480,7 +590,14 @@ struct WatchlistToolsView: View {
                             .listRowInsets(EdgeInsets(top: 6, leading: 16, bottom: 6, trailing: 16))
                             .listRowBackground(Color.clear)
                             .listRowSeparatorTint(Color.primary.opacity(0.08))
-                            .deleteDisabled(true)
+                            .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+                                    Button(role: .destructive) {
+                                        HapticManager.light()
+                                        watchlist.remove(scene.id)
+                                    } label: {
+                                        Label("Remove", systemImage: "trash")
+                                    }
+                                }
                             .contextMenu {
                                 if watchlist.scenes.first?.id != scene.id {
                                     Button { watchlist.shift(scene.id, by: -1) } label: {
@@ -501,7 +618,7 @@ struct WatchlistToolsView: View {
                     }
                 }
                 .listStyle(.plain)
-                .environment(\.editMode, .constant(.active))
+                .environment(\.editMode, $sortMode)
                 .scrollContentBackground(.hidden)
             }
         }
@@ -512,10 +629,10 @@ struct WatchlistToolsView: View {
             }
         }
         .alert("Reset watchlist?", isPresented: $confirmReset) {
-            Button("Reset", role: .destructive) { watchlist.clear() }
+            Button("Reset", role: .destructive) { MiniPlayerStore.shared.resetWatchlistAndPlayback() }
             Button("Cancel", role: .cancel) {}
         } message: {
-            Text("All scenes are removed from the watchlist.")
+            Text("All scenes are removed from the watchlist and playback stops.")
         }
     }
 }
@@ -559,8 +676,9 @@ struct WatchlistSceneRow: View {
                         .lineLimit(1)
                 }
             }
-            Spacer(minLength: 0)
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
         .contentShape(Rectangle())
     }
 }
@@ -609,7 +727,7 @@ private struct MiniPlayerBarContent: View {
                         }
                     }
                 } else {
-                    AetherVideoSurface(engine: engine, videoGravity: .resizeAspectFill)
+                    AetherVideoSurface(engine: engine, videoGravity: .resizeAspectFill, showsTranscodeTag: false)
                         .overlay {
                             // Restored on launch (paused, no frame decoded yet): show the cover.
                             if !engine.hasPresentedFrame {
@@ -720,15 +838,17 @@ private struct MiniPlayerBarContent: View {
         .accessibilityHint("Opens the scene")
     }
 }
-/// The mini player's own full view: video, transport and the watchlist. Deliberately not the
-/// scene page — that one stays reachable through "Details".
+/// The mini player's own full view: the scene page's player module 1:1 (fullscreen, volume
+/// keys, markers, subtitles, PiP, menus), the metadata card, credits and the watchlist.
 struct NowPlayingView: View {
     @ObservedObject private var player = MiniPlayerStore.shared
 
     var body: some View {
         Group {
-            if let session = player.session {
-                NowPlayingContent(session: session, engine: session.engine)
+            if let scene = player.nowPlayingScene {
+                // Keyed by scene: switching scenes rebuilds the scene-page player for it.
+                NowPlayingContent(scene: scene)
+                    .id(scene.id)
             } else {
                 Color.appBackground.ignoresSafeArea()
                     .onAppear { player.showsNowPlaying = false }
@@ -741,18 +861,18 @@ struct NowPlayingView: View {
 }
 
 private struct NowPlayingContent: View {
-    let session: MiniPlayerStore.Session
-    @ObservedObject var engine: AetherSceneEngine
+    let scene: Scene
 
-    init(session: MiniPlayerStore.Session, engine: AetherSceneEngine) {
-        self.session = session
-        self.engine = engine
-        _displayedScene = State(initialValue: session.scene)
+    init(scene: Scene) {
+        self.scene = scene
+        _displayedScene = State(initialValue: scene)
     }
     @ObservedObject private var player = MiniPlayerStore.shared
     @ObservedObject private var watchlist = WatchlistStore.shared
     @ObservedObject private var appearance = AppearanceManager.shared
     @State private var confirmReset = false
+    /// Sorting shows the drag handles; outside it, swipe left removes a row.
+    @State private var sortMode: EditMode = .inactive
     /// Local copy for the metadata card: rating / O-count edits show at once.
     @State private var displayedScene: Scene
     @State private var isHeaderExpanded = false
@@ -760,33 +880,21 @@ private struct NowPlayingContent: View {
     @EnvironmentObject private var coordinator: NavigationCoordinator
     @Environment(\.dismiss) private var dismiss
 
-    private var subtitle: String {
-        let performers = session.scene.performers.prefix(3).map(\.name).joined(separator: ", ")
-        let studio = session.scene.studio?.name ?? ""
-        return [performers, studio].filter { !$0.isEmpty }.joined(separator: " · ")
-    }
-
     var body: some View {
         // Toolbar (minimize · Details), then the player with a slim side margin; it stays put
         // while the watchlist scrolls.
         NavigationStack {
+        // Pinned to the sheet's width, like the scene page: a long title or description must
+        // wrap, never widen the content (the whole sheet then slid off to the side).
+        GeometryReader { proxy in
         VStack(spacing: 0) {
-            AetherSceneSurface(
-                engine: engine,
-                posterURL: session.scene.thumbnailURL,
-                isMuted: Binding(
-                    get: { engine.isMuted },
-                    set: { engine.isMuted = $0 }
-                ),
-                onSeek: { time in Task { await engine.seek(to: time) } },
-                markers: session.scene.timeBarMarkers
-            )
-            .frame(maxWidth: .infinity)
-            .aspectRatio(16 / 9, contentMode: .fit)
-            .background(Color.black)
-            .clipShape(RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.card))
-            .padding(.horizontal, 8)
-            .padding(.top, 4)
+            // The scene page itself in player-only mode: it takes the engine from the mini
+            // player and hands it back when the view closes.
+            SceneDetailView(scene: scene, autoPlay: true)
+                .environment(\.stashyScenePlayerOnly, true)
+                .frame(maxWidth: .infinity)
+                .padding(.horizontal, 16)
+                .padding(.top, 4)
 
             List {
                 Section {
@@ -794,22 +902,22 @@ private struct NowPlayingContent: View {
                     // duration / plays / O-count / rating chips (O and rating are tappable).
                     SceneDetailMetadataCard(
                         activeScene: $displayedScene,
-                        aetherEngine: engine,
+                        aetherEngine: nil,
                         isHeaderExpanded: $isHeaderExpanded,
                         showingAddMarkerSheet: .constant(false),
                         capturedMarkerTime: .constant(0),
-                        playbackSpeed: .constant(Double(engine.rate)),
+                        playbackSpeed: .constant(1),
                         viewModel: viewModel,
-                        onSeek: { time in Task { await engine.seek(to: time) } }
+                        onSeek: { _ in }
                     )
                     .background(Color.secondaryAppBackground)
                     .clipShape(RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.card))
-                    .listRowInsets(EdgeInsets(top: 12, leading: 8, bottom: 8, trailing: 8))
+                    .listRowInsets(EdgeInsets(top: 12, leading: 16, bottom: 8, trailing: 16))
                     .listRowBackground(Color.clear)
                     .listRowSeparator(.hidden)
 
                     infoRow
-                        .listRowInsets(EdgeInsets(top: 4, leading: 8, bottom: 12, trailing: 8))
+                        .listRowInsets(EdgeInsets(top: 4, leading: 16, bottom: 12, trailing: 16))
                         .listRowBackground(Color.clear)
                         .listRowSeparator(.hidden)
                 }
@@ -818,42 +926,49 @@ private struct NowPlayingContent: View {
                         Text("Add scenes with the watchlist button on a scene. They play here one after another.")
                             .font(.footnote)
                             .foregroundColor(.secondary)
-                            .listRowInsets(EdgeInsets(top: 8, leading: 8, bottom: 8, trailing: 8))
+                            .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16))
                             .listRowBackground(Color.clear)
                             .listRowSeparator(.hidden)
                     } else {
                         // A plain list, not cards. Always in edit mode so every row carries the
                         // system reorder handle; removing is in the row's context menu.
-                        ForEach(watchlist.scenes) { scene in
-                            watchlistRow(scene)
-                                .listRowInsets(EdgeInsets(top: 6, leading: 8, bottom: 6, trailing: 8))
+                        ForEach(watchlist.scenes) { entry in
+                            watchlistRow(entry)
+                                .listRowInsets(EdgeInsets(top: 6, leading: 16, bottom: 6, trailing: 16))
                                 .listRowBackground(Color.clear)
                                 .listRowSeparatorTint(Color.primary.opacity(0.08))
-                                .deleteDisabled(true)
+                                .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+                                    Button(role: .destructive) {
+                                        HapticManager.light()
+                                        watchlist.remove(entry.id)
+                                    } label: {
+                                        Label("Remove", systemImage: "trash")
+                                    }
+                                }
                                 .contextMenu {
-                                    if scene.id != session.scene.id {
+                                    if entry.id != scene.id {
                                         Button {
-                                            watchlist.moveAfter(scene.id, currentId: session.scene.id)
+                                            watchlist.moveAfter(entry.id, currentId: scene.id)
                                         } label: {
                                             Label("Play next", systemImage: "text.line.first.and.arrowtriangle.forward")
                                         }
                                     }
-                                    if watchlist.scenes.first?.id != scene.id {
+                                    if watchlist.scenes.first?.id != entry.id {
                                         Button {
-                                            watchlist.shift(scene.id, by: -1)
+                                            watchlist.shift(entry.id, by: -1)
                                         } label: {
                                             Label("Move up", systemImage: "arrow.up")
                                         }
                                     }
-                                    if watchlist.scenes.last?.id != scene.id {
+                                    if watchlist.scenes.last?.id != entry.id {
                                         Button {
-                                            watchlist.shift(scene.id, by: 1)
+                                            watchlist.shift(entry.id, by: 1)
                                         } label: {
                                             Label("Move down", systemImage: "arrow.down")
                                         }
                                     }
                                     Button(role: .destructive) {
-                                        watchlist.remove(scene.id)
+                                        watchlist.remove(entry.id)
                                     } label: {
                                         Label("Remove from watchlist", systemImage: "trash")
                                     }
@@ -871,19 +986,25 @@ private struct NowPlayingContent: View {
                             Button("Reset", role: .destructive) { confirmReset = true }
                                 .font(.subheadline.weight(.semibold))
                                 .foregroundColor(.red)
+                                .padding(.trailing, 14)
+                            sortToggle
                         }
                     }
                     .textCase(nil)
-                    .padding(.horizontal, 8)
+                    .padding(.horizontal, 16)
                     .padding(.vertical, 6)
                     .listRowInsets(EdgeInsets())
                     .background(Color.appBackground)
                 }
             }
             .listStyle(.plain)
-            .environment(\.editMode, .constant(.active))
+            .environment(\.editMode, $sortMode)
             .scrollContentBackground(.hidden)
             .contentMargins(.top, 0, for: .scrollContent)
+            // Full sheet width always: a long title must wrap, not widen the list.
+            .frame(maxWidth: .infinity)
+        }
+        .frame(width: proxy.size.width)
         }
         .background(Color.appBackground.ignoresSafeArea())
         .navigationBarTitleDisplayMode(.inline)
@@ -900,14 +1021,24 @@ private struct NowPlayingContent: View {
         }
         }
         .alert("Reset watchlist?", isPresented: $confirmReset) {
-            Button("Reset", role: .destructive) { watchlist.clear() }
+            Button("Reset", role: .destructive) { MiniPlayerStore.shared.resetWatchlistAndPlayback() }
             Button("Cancel", role: .cancel) {}
         } message: {
-            Text("All scenes are removed from the watchlist. The playing scene keeps playing.")
+            Text("All scenes are removed from the watchlist and playback stops.")
         }
-        .onChange(of: session.scene.id) { _, _ in
-            displayedScene = session.scene
-            isHeaderExpanded = false
+        .onAppear { loadDetailsIfNeeded() }
+    }
+
+    /// List and watchlist snapshots often lack markers / captions: fetch the full scene once.
+    private func loadDetailsIfNeeded() {
+        let scene = displayedScene
+        guard scene.sceneMarkers == nil || scene.tags == nil else { return }
+        viewModel.fetchSceneDetails(sceneId: scene.id) { updated in
+            guard let updated else { return }
+            DispatchQueue.main.async {
+                guard displayedScene.id == updated.id else { return }
+                displayedScene = updated
+            }
         }
     }
 
@@ -916,8 +1047,8 @@ private struct NowPlayingContent: View {
         HStack(alignment: .center, spacing: 6) {
             creditLinks
             Spacer(minLength: 4)
-            if player.hasNext {
-                iconButton("forward.end.fill", label: "Next in watchlist") { player.playNext() }
+            if let next = watchlist.next(after: scene.id) {
+                iconButton("forward.end.fill", label: "Next in watchlist") { player.showNowPlaying(next) }
             }
         }
     }
@@ -925,8 +1056,8 @@ private struct NowPlayingContent: View {
     /// Performers and studio as links: the sheet closes and the page opens on Home.
     @ViewBuilder
     private var creditLinks: some View {
-        let performers = Array(session.scene.performers.prefix(4))
-        let studio = session.scene.studio
+        let performers = Array(scene.performers.prefix(4))
+        let studio = scene.studio
         if !performers.isEmpty || studio != nil {
             FlowLayout(spacing: 6) {
                 ForEach(performers, id: \.id) { performer in
@@ -970,6 +1101,14 @@ private struct NowPlayingContent: View {
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.35, execute: navigate)
     }
 
+    private var sortToggle: some View {
+        Button(sortMode.isEditing ? "Done" : "Sort") {
+            withAnimation { sortMode = sortMode.isEditing ? .inactive : .active }
+        }
+        .font(.subheadline.weight(.semibold))
+        .foregroundColor(appearance.tintColor)
+    }
+
     private func iconButton(_ systemImage: String, label: String, action: @escaping () -> Void) -> some View {
         Button {
             HapticManager.light()
@@ -986,11 +1125,12 @@ private struct NowPlayingContent: View {
         .accessibilityLabel(label)
     }
 
-    private func watchlistRow(_ scene: Scene) -> some View {
-        let isCurrent = session.scene.id == scene.id
+    private func watchlistRow(_ entry: Scene) -> some View {
+        let isCurrent = entry.id == scene.id
+        let scene = entry
         return Button {
             HapticManager.light()
-            player.play(scene)
+            player.showNowPlaying(entry)
         } label: {
             HStack(spacing: 12) {
                 CustomAsyncImage(url: scene.thumbnailURL) { loader in
@@ -1024,8 +1164,9 @@ private struct NowPlayingContent: View {
                             .lineLimit(1)
                     }
                 }
-                Spacer(minLength: 0)
+                .frame(maxWidth: .infinity, alignment: .leading)
             }
+            .frame(maxWidth: .infinity, alignment: .leading)
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)

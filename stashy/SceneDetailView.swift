@@ -48,6 +48,9 @@ struct SceneDetailView: View {
     @State private var isIdentifying = false
     @Environment(\.stashyDismiss) var dismiss
     @Environment(\.stashyPresentedFromMiniPlayer) private var presentedFromMiniPlayer
+    @Environment(\.stashyScenePlayerOnly) private var playerOnly
+    /// Taken back from a paused mini player: keep it paused instead of autoplaying.
+    @State private var adoptedPaused = false
     @EnvironmentObject var coordinator: NavigationCoordinator
 
     @State private var isHeaderExpanded = false
@@ -404,12 +407,21 @@ struct SceneDetailView: View {
 
 
 
+    @ViewBuilder
+    private var chromedContent: some View {
+        if playerOnly {
+            playerCardView
+        } else {
+            mainContentView
+                .applyAppBackground()
+                .stashyDetailChrome(sceneDetailChromeConfig) {
+                    sceneDetailNavBar
+                }
+        }
+    }
+
     var body: some View {
-        mainContentView
-            .applyAppBackground()
-            .stashyDetailChrome(sceneDetailChromeConfig) {
-                sceneDetailNavBar
-            }
+        chromedContent
             .modifier(SceneDetailAlertModifier(
                 showDeleteConfirmation: $showDeleteWithFilesConfirmation,
                 showingAddMarkerSheet: $showingAddMarkerSheet,
@@ -737,7 +749,7 @@ struct SceneDetailView: View {
         // A playing scene moves to the mini player instead of stopping.
         let handOffEngine: AetherSceneEngine? = {
             #if os(iOS)
-            guard let aether = aetherEngine, isPlaybackStarted, aether.isPlaying,
+            guard let aether = aetherEngine, isPlaybackStarted, aether.isPlaying || playerOnly,
                   MiniPlayerStore.shared.isEnabled else { return nil }
             return aether
             #else
@@ -1031,15 +1043,27 @@ struct SceneDetailView: View {
             Task { await engine.seek(to: resumeTarget) }
         }
 
-        withAnimation {
-            isPlaybackStarted = true
+        // The mini player's full view shows the running video straight away: no cover fade.
+        if playerOnly {
+            var transaction = Transaction()
+            transaction.disablesAnimations = true
+            withTransaction(transaction) { isPlaybackStarted = true }
+        } else {
+            withAnimation {
+                isPlaybackStarted = true
+            }
         }
         // Live captions (AI Subs) share the caption channel with server VTT; the controller is
         // driven by the engine clock.
         if let engine = aetherEngine {
             subtitleController.attach(aether: engine)
         }
-        aetherEngine?.play()
+        // A paused mini player stays paused when its full view takes the engine back.
+        if adoptedPaused {
+            adoptedPaused = false
+        } else {
+            aetherEngine?.play()
+        }
 
         let position = aetherEngine?.currentTime ?? resumeTarget ?? 0
         if handyManager.isSyncing {
@@ -1084,6 +1108,7 @@ struct SceneDetailView: View {
         if let handedBack = MiniPlayerStore.shared.take(sceneId: activeScene.id) {
             let engine = handedBack.engine
             if handedBack.playRegistered { hasAddedPlay = true }
+            adoptedPaused = !engine.isPlaying
             wireEngineCallbacks(engine)
             aetherEngine = engine
             // The bar may have been toggled meanwhile; the page's mute button follows the engine.
@@ -1120,6 +1145,8 @@ struct SceneDetailView: View {
                                   isPlaying: engine?.isPlaying == true && !isScrubbing)
             creditPlayIfWatchedEnough()
         }
+        // In the mini player's full view the watchlist plays on.
+        engine.onReachedEnd = playerOnly ? { MiniPlayerStore.shared.advanceNowPlaying() } : nil
         engine.onPlayingChanged = { [weak engine] playing in
             guard let engine else { return }
             handleAetherPlayingChange(engine, playing: playing)

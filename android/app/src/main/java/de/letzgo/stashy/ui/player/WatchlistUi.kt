@@ -22,6 +22,10 @@ import androidx.compose.material.icons.filled.ArrowUpward
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.DragHandle
 import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.SwipeToDismissBox
+import androidx.compose.material3.SwipeToDismissBoxValue
+import androidx.compose.material3.rememberSwipeToDismissBoxState
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -63,22 +67,44 @@ class WatchlistDragState {
 
 /**
  * iOS: the watchlist `ForEach` of `NowPlayingContent` / `WatchlistToolsView` — a plain list on the
- * background with thin separators, a drag handle per row (reorder any time) and a long-press
- * menu: Play next (not for the playing scene), Move up, Move down, Remove from watchlist.
+ * background with thin separators. Swipe left removes a row; drag handles show only in the
+ * Sort mode ([sorting]); a long-press menu offers Play next (not for the playing scene),
+ * Move up, Move down and Remove from watchlist.
  */
 fun LazyListScope.watchlistRows(
     scenes: List<Scene>,
     currentId: String?,
     drag: WatchlistDragState,
     margin: Dp,
+    sorting: Boolean,
     onOpen: (Scene) -> Unit,
 ) {
     itemsIndexed(scenes, key = { _, s -> "w-${s.id}" }) { index, scene ->
         Column {
-            WatchlistSceneRow(scene, index, scenes.size, isCurrent = scene.id == currentId, currentId, drag, margin, onOpen)
+            SwipeToRemove(scene.id) {
+                WatchlistSceneRow(scene, index, scenes.size, isCurrent = scene.id == currentId, currentId, drag, margin, sorting, onOpen)
+            }
             if (index < scenes.lastIndex) HorizontalDivider(Modifier.padding(start = margin), color = Theme.palette.text.copy(alpha = 0.08f))
         }
     }
+}
+
+/** iOS `.swipeActions(edge: .trailing, allowsFullSwipe: true)` — swipe left removes the entry. */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun SwipeToRemove(sceneId: String, content: @Composable () -> Unit) {
+    val state = rememberSwipeToDismissBoxState(confirmValueChange = { value ->
+        if (value == SwipeToDismissBoxValue.EndToStart) { WatchlistStore.remove(sceneId); true } else false
+    })
+    SwipeToDismissBox(
+        state = state,
+        enableDismissFromStartToEnd = false,
+        backgroundContent = {
+            Box(Modifier.fillMaxSize().background(StashyColors.systemRed).padding(end = 20.dp), contentAlignment = Alignment.CenterEnd) {
+                Icon(Icons.Filled.Delete, "Remove from watchlist", tint = Color.White)
+            }
+        },
+    ) { content() }
 }
 
 @OptIn(ExperimentalFoundationApi::class)
@@ -91,6 +117,7 @@ private fun WatchlistSceneRow(
     currentId: String?,
     drag: WatchlistDragState,
     margin: Dp,
+    sorting: Boolean,
     onOpen: (Scene) -> Unit,
 ) {
     val p = Theme.palette
@@ -99,7 +126,7 @@ private fun WatchlistSceneRow(
     val dragging = drag.draggingId == scene.id
     val performers = scene.performers.take(2).joinToString(", ") { it.name }
     Box(
-        Modifier.zIndex(if (dragging) 1f else 0f)
+        Modifier.fillMaxWidth().zIndex(if (dragging) 1f else 0f)
             .graphicsLayer { translationY = if (dragging) drag.offset else 0f }
             .onSizeChanged { rowHeight = maxOf(1, it.height) },
     ) {
@@ -120,8 +147,8 @@ private fun WatchlistSceneRow(
                 Text(scene.displayTitle, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = if (isCurrent) Appearance.tint else p.text, maxLines = 2, overflow = TextOverflow.Ellipsis)
                 if (performers.isNotEmpty()) Text(performers, fontSize = 12.sp, color = p.secondaryText, maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
-            // Drag handle: swaps with a neighbour each time the row passes half its height.
-            Box(
+            // Drag handle (Sort mode): swaps with a neighbour each time the row passes half its height.
+            if (sorting) Box(
                 Modifier.size(40.dp).pointerInput(scene.id) {
                     detectDragGestures(
                         onDragStart = { drag.draggingId = scene.id; drag.offset = 0f },

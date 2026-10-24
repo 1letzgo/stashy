@@ -58,6 +58,8 @@ import de.letzgo.stashy.ui.SF
 import de.letzgo.stashy.ui.Theme
 import de.letzgo.stashy.ui.catalog.CatalogController
 import de.letzgo.stashy.ui.tools.ToolsTokens
+import de.letzgo.stashy.ui.feeds.FeedsDock
+import de.letzgo.stashy.ui.stashyGlass
 import androidx.compose.ui.draw.shadow
 import de.letzgo.stashy.ui.settings.Segmented
 import kotlinx.serialization.json.JsonObject
@@ -112,11 +114,9 @@ fun CatalogListQuickBar(controller: CatalogController<*>, modifier: Modifier = M
                 isActive = presetName != null || keys.isNotEmpty(),
                 modifier = Modifier.padding(start = ToolsTokens.contentPadding),
             ) { controller.isSheetPresented = true }
-            // The 10 dp gap to the button lives inside the scroll content, so the selected pill's
-            // glow has room on the leading edge instead of being cut at the viewport's hard edge
-            // (the scroll clip already leaves room above and below for shadows).
+            // The 16 dp gap to the button lives inside the scroll content (hard edge, no fade).
             Row(
-                Modifier.weight(1f).horizontalScroll(rememberScrollState()).padding(start = QuickPillSpacing, end = ToolsTokens.contentPadding),
+                Modifier.weight(1f).horizontalScroll(rememberScrollState()).padding(start = 16.dp, end = ToolsTokens.contentPadding),
                 horizontalArrangement = Arrangement.spacedBy(QuickPillSpacing),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
@@ -152,44 +152,40 @@ fun CatalogListQuickBar(controller: CatalogController<*>, modifier: Modifier = M
     }
 }
 
-/** iOS `ToolsPillMenuRow`: 10 between pills, 40 high (Charts' `DockItemSpacing` / `DockActiveHeight`). */
-private val QuickPillSpacing = 10.dp
-private val QuickPillHeight = 40.dp
+/** iOS `StashyExpandingDockChip` metrics — the same as the chrome / Feeds dock ([FeedsDock]). */
+private val QuickPillSpacing = FeedsDock.itemSpacing
+private val QuickPillHeight = FeedsDock.activeHeight
 
 /**
- * iOS: the quick bar's pinned settings button — 40×40 circle on the secondary background with
- * the slider icon (primary 85 %), 9 dp tint dot top-right while a preset or criterion is active.
+ * iOS: the quick bar's pinned settings button — the chrome's glass circle (40 dp) with the
+ * slider icon (18 dp, white 72 %), tint dot top-right while a preset or criterion is active.
  */
 @Composable
 private fun FiltersButton(isActive: Boolean, modifier: Modifier = Modifier, onClick: () -> Unit) {
-    val p = Theme.palette
-    Box(modifier.size(QuickPillHeight).semantics(mergeDescendants = true) { contentDescription = "Filter and sort settings" }) {
+    Box(modifier.size(FeedsDock.circleSize).semantics(mergeDescendants = true) { contentDescription = "Filter and sort settings" }) {
         Box(
-            Modifier.matchParentSize().clip(CircleShape).background(p.secondaryBackground).clickable(onClick = onClick),
+            Modifier.matchParentSize().stashyGlass(CircleShape).clickable(onClick = onClick),
             contentAlignment = Alignment.Center,
         ) {
-            Icon(SF.sliderHorizontal3, null, tint = p.text.copy(alpha = 0.85f), modifier = Modifier.size(20.dp))
+            Icon(SF.sliderHorizontal3, null, tint = Color.White.copy(alpha = FeedsDock.inactiveIconOpacity), modifier = Modifier.size(FeedsDock.iconSize))
         }
         if (isActive) Box(Modifier.align(Alignment.TopEnd).size(9.dp).clip(CircleShape).background(Appearance.tint))
     }
 }
 
 /**
- * iOS `ToolsPillMenuRow` pill (Android: Charts' `CapsuleChip`): 40 high, subheadline semibold,
- * 16 horizontal padding, secondary background; selected = tint fill + 35 % tint shadow (6 dp),
- * white text, unselected text primary 85 %.
+ * iOS `StashyExpandingDockChip` (chrome palette), like the Feeds mode chips: glass capsule 40 dp
+ * high, 14 dp horizontal padding; selected = tinted glass with white text, inactive = plain
+ * glass with white text at 72 %. No shadow.
  */
 @Composable
 private fun SortChip(label: String, active: Boolean, icon: ImageVector?, onClick: () -> Unit) {
-    val p = Theme.palette
-    val tint = Appearance.tint
     val shape = RoundedCornerShape(50)
-    val fg = if (active) Color.White else p.text.copy(alpha = 0.85f)
+    val fg = if (active) Color.White else Color.White.copy(alpha = FeedsDock.inactiveIconOpacity)
     Row(
         Modifier.height(QuickPillHeight)
-            .let { if (active) it.shadow(6.dp, shape, ambientColor = tint.copy(alpha = 0.35f), spotColor = tint.copy(alpha = 0.35f)) else it }
-            .clip(shape).background(if (active) tint else p.secondaryBackground)
-            .clickable(onClick = onClick).padding(horizontal = 16.dp)
+            .let { if (active) it.stashyGlass(shape, Appearance.tint) else it.stashyGlass(shape) }
+            .clickable(onClick = onClick).padding(horizontal = FeedsDock.activeHorizontalPadding)
             .semantics { contentDescription = "Sort by $label" },
         horizontalArrangement = Arrangement.spacedBy(4.dp),
         verticalAlignment = Alignment.CenterVertically,

@@ -95,8 +95,17 @@ class SceneDetailScreen(
 
 private enum class EditSheet { Title, Performers, Studio, Groups, Tags, Galleries }
 
+/**
+ * iOS: `SceneDetailView` in `stashyScenePlayerOnly` mode — the scene page's player module 1:1
+ * (player card with its marker strip, fullscreen, menus, subtitles / AI captions, add marker,
+ * frame tools, PiP) without the rest of the page; hosted by the mini player's Now Playing view.
+ * [model] must be created with `playerOnly = true`.
+ */
 @Composable
-private fun SceneDetailContent(model: SceneDetailModel, openedFromMiniPlayer: Boolean) {
+fun ScenePlayerModule(model: SceneDetailModel) = SceneDetailContent(model, openedFromMiniPlayer = false, playerOnly = true)
+
+@Composable
+private fun SceneDetailContent(model: SceneDetailModel, openedFromMiniPlayer: Boolean, playerOnly: Boolean = false) {
     val p = Theme.palette
     val scene = model.scene
     val lifecycle = LocalLifecycleOwner.current.lifecycle
@@ -121,7 +130,7 @@ private fun SceneDetailContent(model: SceneDetailModel, openedFromMiniPlayer: Bo
     }
     // iOS: `.task(id: SimilarScenesFinder.signature(for: activeScene))` — runs again once the full
     // scene replaces the list version. Results live in the page model, not in the finder.
-    LaunchedEffect(SimilarScenes.signature(scene), SimilarScenes.isActive) { model.loadSimilarScenes() }
+    LaunchedEffect(SimilarScenes.signature(scene), SimilarScenes.isActive) { if (!playerOnly) model.loadSimilarScenes() }
     // Tag Suggestion writes elsewhere (Reels, bulk "Set on all of performer") patch this scene's tags,
     // like `StashDBViewModel` patches its lists on `SceneTagsUpdated` / `BulkTagsApplied`.
     LaunchedEffect(model) {
@@ -151,7 +160,7 @@ private fun SceneDetailContent(model: SceneDetailModel, openedFromMiniPlayer: Bo
             PlayerWindow.releaseOrientation()
         }
     }
-    BackHandler(enabled = model.isFullscreen) { model.isFullscreen = false }
+    BackHandler(enabled = model.isFullscreen && !playerOnly) { model.isFullscreen = false }
 
     val extraMenuItems: () -> List<PlayerMenuItem> = {
         buildList {
@@ -185,7 +194,45 @@ private fun SceneDetailContent(model: SceneDetailModel, openedFromMiniPlayer: Bo
         return
     }
 
-    Box(Modifier.fillMaxSize().background(p.background)) {
+    // iOS: `fullScreenCover` — the same player, full bleed.
+    val fullscreenPlayer: @Composable () -> Unit = {
+        if (player != null) Box(Modifier.fillMaxSize().background(Color.Black)) {
+            ScenePlayerSurface(
+                player = player,
+                posterURL = scene.thumbnailURL,
+                isMuted = model.isMuted,
+                onMutedChange = model::updateMuted,
+                onSeek = model::seekTo,
+                modifier = Modifier.fillMaxSize(),
+                onToggleFullscreen = { model.isFullscreen = false },
+                isFullscreen = true,
+                markers = scene.timeBarMarkers,
+                onAddMarker = model::beginAddMarker,
+                extraMenuItems = extraMenuItems,
+                subtitleMenuExtras = model.aiSubtitles::menuItems,
+                onHostSubtitleOff = model.aiSubtitles::turnOffAISubtitles,
+                onOptionsMenuClosed = model.aiSubtitles::optionsMenuClosed,
+                scrubSprites = model.scrubSprites,
+                onRotate = { PlayerWindow.toggleOrientation() },
+                onPictureInPicture = { PlayerWindow.enterPictureInPicture(player.videoSize) },
+            )
+        }
+    }
+
+    if (playerOnly) {
+        // Only the player card (with its marker strip); the host lays out the rest.
+        Box(Modifier.fillMaxWidth()) {
+            Column(Modifier.fillMaxWidth().cardShadow().clip(RoundedCornerShape(Tokens.Radius.card)).background(p.secondaryBackground)) {
+                SceneVideoPlayerCard(model, extraMenuItems)
+            }
+            SceneToastHost(Modifier.align(Alignment.TopCenter))
+        }
+        // The host is a sheet: fullscreen gets its own full-window dialog.
+        if (model.isFullscreen && player != null) androidx.compose.ui.window.Dialog(
+            onDismissRequest = { model.isFullscreen = false },
+            properties = androidx.compose.ui.window.DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false),
+        ) { fullscreenPlayer() }
+    } else Box(Modifier.fillMaxSize().background(p.background)) {
         val landscape = LocalConfiguration.current.orientation == Configuration.ORIENTATION_LANDSCAPE
         val pinned = model.isPlaybackStarted && player != null && !landscape
         Column(Modifier.fillMaxSize()) {
@@ -233,30 +280,7 @@ private fun SceneDetailContent(model: SceneDetailModel, openedFromMiniPlayer: Bo
             }
         }
 
-        // iOS: `fullScreenCover` — the same player, full bleed.
-        if (model.isFullscreen && player != null) {
-            Box(Modifier.fillMaxSize().background(Color.Black)) {
-                ScenePlayerSurface(
-                    player = player,
-                    posterURL = scene.thumbnailURL,
-                    isMuted = model.isMuted,
-                    onMutedChange = model::updateMuted,
-                    onSeek = model::seekTo,
-                    modifier = Modifier.fillMaxSize(),
-                    onToggleFullscreen = { model.isFullscreen = false },
-                    isFullscreen = true,
-                    markers = scene.timeBarMarkers,
-                    onAddMarker = model::beginAddMarker,
-                    extraMenuItems = extraMenuItems,
-                    subtitleMenuExtras = model.aiSubtitles::menuItems,
-                    onHostSubtitleOff = model.aiSubtitles::turnOffAISubtitles,
-                    onOptionsMenuClosed = model.aiSubtitles::optionsMenuClosed,
-                    scrubSprites = model.scrubSprites,
-                    onRotate = { PlayerWindow.toggleOrientation() },
-                    onPictureInPicture = { PlayerWindow.enterPictureInPicture(player.videoSize) },
-                )
-            }
-        }
+        if (model.isFullscreen && player != null) fullscreenPlayer()
 
         SceneToastHost(Modifier.align(Alignment.TopCenter))
     }

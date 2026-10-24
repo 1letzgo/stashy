@@ -8,6 +8,8 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
@@ -73,164 +75,116 @@ import de.letzgo.stashy.ui.Tokens
 import de.letzgo.stashy.ui.scene.timeBarMarkers
 
 /**
- * iOS: `NowPlayingView` — the mini player's own full view: 16:9 video (tap toggles play), title,
- * performers · studio, scrubber, transport (−10, play/pause, +10, next in watchlist), the
- * watchlist toggle and the watchlist itself (tap plays in place, Edit reorders / removes).
- * Deliberately not the scene page — that one stays reachable through [onOpenDetails].
+ * iOS: `NowPlayingView` — the mini player's own full view. On top the scene page's player module
+ * 1:1 ([ScenePlayerModule] in player-only mode: fullscreen, markers + strip, add marker,
+ * subtitles / AI captions, frame tools, PiP), then the scene page's metadata card, the
+ * performer / studio pills with "next", and the watchlist. While open, the module owns the
+ * player and [MiniPlayerStore.session] is empty; the view is keyed on
+ * [MiniPlayerStore.nowPlayingScene], so switching scenes rebuilds the module.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun NowPlayingSheet(onOpen: (de.letzgo.stashy.ui.Screen) -> Unit) {
     if (!MiniPlayerStore.showsNowPlaying) return
-    val session = MiniPlayerStore.session
-    LaunchedEffect(session == null) { if (session == null) MiniPlayerStore.showsNowPlaying = false }
-    if (session == null) return
+    val scene = MiniPlayerStore.nowPlayingScene
+    LaunchedEffect(scene == null) { if (scene == null) MiniPlayerStore.showsNowPlaying = false }
+    if (scene == null) return
     val p = Theme.palette
     ModalBottomSheet(
         onDismissRequest = { MiniPlayerStore.showsNowPlaying = false },
         sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
         containerColor = p.background,
     ) {
-        NowPlayingContent(session, onOpen)
+        androidx.compose.runtime.key(scene.id) { NowPlayingContent(scene, onOpen) }
     }
 }
 
 @Composable
-private fun NowPlayingContent(session: MiniPlayerStore.Session, onOpen: (de.letzgo.stashy.ui.Screen) -> Unit) {
+private fun NowPlayingContent(initial: Scene, onOpen: (de.letzgo.stashy.ui.Screen) -> Unit) {
     val p = Theme.palette
-    val player = session.player
-    val scene = session.scene
+    // The scene page's model in player-only mode: takes the bar's player (no reload), hands it
+    // back on leaving even when paused; a scene the bar does not run starts with autoplay.
+    val model = remember { de.letzgo.stashy.ui.scene.SceneDetailModel(initial, autoPlay = true, playerOnly = true) }
+    val scene = model.scene
     val watchlist = WatchlistStore.all
     val drag = remember { WatchlistDragState() }
+    var sorting by remember { mutableStateOf(false) }
     var confirmReset by remember { mutableStateOf(false) }
     if (confirmReset) AlertDialog(
         onDismissRequest = { confirmReset = false },
         title = { Text("Reset watchlist?") },
-        text = { Text("All scenes are removed from the watchlist. The playing scene keeps playing.") },
+        text = { Text("All scenes are removed from the watchlist and playback stops.") },
         confirmButton = {
-            TextButton({ confirmReset = false; WatchlistStore.clear() }) {
+            TextButton({ confirmReset = false; sorting = false; MiniPlayerStore.resetWatchlistAndPlayback() }) {
                 Text("Reset", color = StashyColors.systemRed)
             }
         },
         dismissButton = { TextButton({ confirmReset = false }) { Text("Cancel") } },
         containerColor = p.secondaryBackground, titleContentColor = p.text, textContentColor = p.secondaryText,
     )
-    Column(Modifier.fillMaxSize().navigationBarsPadding()) {
-        // Toolbar: minimize · Details.
-        Row(Modifier.fillMaxWidth().padding(horizontal = 4.dp), verticalAlignment = Alignment.CenterVertically) {
-            IconButton(onClick = { MiniPlayerStore.showsNowPlaying = false }) {
-                Icon(SF.chevronDown, "Minimize", tint = p.text)
+    // Pinned to the sheet's width: nothing (a long title or description) may widen the content.
+    androidx.compose.foundation.layout.BoxWithConstraints(Modifier.fillMaxSize()) {
+        Column(Modifier.width(maxWidth).fillMaxHeight().navigationBarsPadding()) {
+            // Toolbar: minimize · Details.
+            Row(Modifier.fillMaxWidth().padding(horizontal = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+                IconButton(onClick = { MiniPlayerStore.showsNowPlaying = false }) {
+                    Icon(SF.chevronDown, "Minimize", tint = p.text)
+                }
+                Box(Modifier.weight(1f))
+                TextButton(onClick = { onOpen(de.letzgo.stashy.ui.scene.SceneDetailScreen(scene.id, scene, openedFromMiniPlayer = true)) }) {
+                    Text("Details", color = Appearance.tint, fontWeight = FontWeight.SemiBold)
+                }
             }
-            Box(Modifier.weight(1f))
-            TextButton(onClick = { onOpen(de.letzgo.stashy.ui.scene.SceneDetailScreen(scene.id, scene, openedFromMiniPlayer = true)) }) {
-                Text("Details", color = Appearance.tint, fontWeight = FontWeight.SemiBold)
+            // The scene page's player module, 8 dp side margin, fixed above the scrolling list.
+            Box(Modifier.fillMaxWidth().padding(start = NowPlayingMargin, end = NowPlayingMargin, top = 4.dp)) {
+                de.letzgo.stashy.ui.scene.ScenePlayerModule(model)
             }
-        }
-        // The scene page's player, 8 dp side margin, fixed above the scrolling list.
-        PlayerSurfaceBlock(session, Modifier.padding(start = NowPlayingMargin, end = NowPlayingMargin, top = 4.dp))
-        LazyColumn(Modifier.fillMaxSize()) {
-            item(key = "card") { MetadataCard(session) }
-            item(key = "info") { InfoRow(session, onOpen) }
-            item(key = "header") {
-                // Plain list header on the sheet background: "Watchlist" + red Reset.
-                Row(Modifier.fillMaxWidth().padding(start = NowPlayingMargin, top = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Text("Watchlist", Modifier.weight(1f), style = IosTypography.headline, color = p.text)
-                    if (watchlist.isNotEmpty()) TextButton(onClick = { confirmReset = true }) {
-                        Text("Reset", color = StashyColors.systemRed, fontWeight = FontWeight.SemiBold)
+            LazyColumn(Modifier.fillMaxSize()) {
+                item(key = "card") {
+                    de.letzgo.stashy.ui.scene.SceneCardContainer(Modifier.fillMaxWidth().padding(start = NowPlayingMargin, end = NowPlayingMargin, top = 12.dp)) {
+                        de.letzgo.stashy.ui.scene.SceneMetadataCardContent(
+                            scene = scene,
+                            isExpanded = model.isHeaderExpanded,
+                            onToggleExpanded = { model.isHeaderExpanded = !model.isHeaderExpanded },
+                            onEditTitle = null,
+                            onIncrementO = model::incrementO,
+                            onRemoveO = model::removeO,
+                            onSetRating = model::setRating,
+                        )
                     }
                 }
+                item(key = "info") { InfoRow(scene, onOpen) }
+                item(key = "header") {
+                    // Plain list header on the sheet background: "Watchlist" + Sort / Done + red Reset.
+                    Row(Modifier.fillMaxWidth().padding(start = NowPlayingMargin, top = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Text("Watchlist", Modifier.weight(1f), style = IosTypography.headline, color = p.text)
+                        if (watchlist.isNotEmpty()) TextButton(onClick = { sorting = !sorting }) {
+                            Text(if (sorting) "Done" else "Sort", color = Appearance.tint, fontWeight = FontWeight.SemiBold)
+                        }
+                        if (watchlist.isNotEmpty()) TextButton(onClick = { confirmReset = true }) {
+                            Text("Reset", color = StashyColors.systemRed, fontWeight = FontWeight.SemiBold)
+                        }
+                    }
+                }
+                if (watchlist.isEmpty()) item(key = "empty") {
+                    Text(
+                        "Add scenes with the watchlist button on a scene. They play here one after another.",
+                        Modifier.padding(horizontal = NowPlayingMargin, vertical = 8.dp), fontSize = 13.sp, color = p.secondaryText,
+                    )
+                } else watchlistRows(watchlist.toList(), scene.id, drag, NowPlayingMargin, sorting) { MiniPlayerStore.showInNowPlaying(it) }
+                item(key = "bottom") { Box(Modifier.height(24.dp)) }
             }
-            if (watchlist.isEmpty()) item(key = "empty") {
-                Text(
-                    "Add scenes with the watchlist button on a scene. They play here one after another.",
-                    Modifier.padding(horizontal = NowPlayingMargin, vertical = 8.dp), fontSize = 13.sp, color = p.secondaryText,
-                )
-            } else watchlistRows(watchlist.toList(), scene.id, drag, NowPlayingMargin) { MiniPlayerStore.play(it) }
-            item(key = "bottom") { Box(Modifier.height(24.dp)) }
         }
     }
 }
 
-/** Side margin of Now Playing: player, title and watchlist rows line up on it. */
-private val NowPlayingMargin = 8.dp
-
-/** The scene page's own player surface (poster, mute, scrubber, markers, transport) as a rounded card. */
-@Composable
-private fun PlayerSurfaceBlock(session: MiniPlayerStore.Session, modifier: Modifier = Modifier) {
-    val player = session.player
-    val scene = session.scene
-    val sprites = remember(scene.id) { SceneScrubSprites.create(scene.paths?.vtt, scene.paths?.sprite) }
-    Box(modifier.fillMaxWidth().aspectRatio(16f / 9f).clip(RoundedCornerShape(Tokens.Radius.card)).background(Color.Black)) {
-        ScenePlayerSurface(
-            player = player,
-            posterURL = scene.thumbnailURL,
-            isMuted = player.mutedState,
-            onMutedChange = { player.isMuted = it },
-            onSeek = { MiniPlayerStore.seekTo(it) },
-            modifier = Modifier.fillMaxSize(),
-            markers = scene.timeBarMarkers,
-            scrubSprites = sprites,
-        )
-    }
-}
-
-/** Title + performers · studio, and the round "next" button when the watchlist has a next entry. */
-/**
- * iOS: the scene page's `SceneDetailMetadataCard` in Now Playing — the same card (title,
- * details, date · duration · plays · O · rating) on the same rounded secondary background.
- * Rating and O edits go to the server and into a local copy of the scene, which shows them at
- * once and starts over when the bar switches scenes.
- */
-@Composable
-private fun MetadataCard(session: MiniPlayerStore.Session) {
-    val scope = rememberCoroutineScope()
-    var scene by remember(session.scene.id) { mutableStateOf(session.scene) }
-    var expanded by remember(session.scene.id) { mutableStateOf(false) }
-    de.letzgo.stashy.ui.scene.SceneCardContainer(Modifier.fillMaxWidth().padding(start = NowPlayingMargin, end = NowPlayingMargin, top = 12.dp)) {
-        de.letzgo.stashy.ui.scene.SceneMetadataCardContent(
-            scene = scene,
-            isExpanded = expanded,
-            onToggleExpanded = { expanded = !expanded },
-            onEditTitle = null,
-            onIncrementO = {
-                val id = scene.id
-                scope.launch {
-                    val count = runCatching { SceneEditing.mutateOCounter(id, OCounterMutation.Increment) }.getOrNull() ?: return@launch
-                    if (scene.id == id) scene = scene.copy(oCounter = count)
-                    SceneEvents.post(SceneEvent.OCounterUpdated(id, count))
-                }
-            },
-            onRemoveO = { mutation ->
-                val original = scene.oCounter ?: 0
-                val id = scene.id
-                scene = scene.copy(oCounter = if (mutation == OCounterMutation.Reset) 0 else maxOf(0, original - 1))
-                scope.launch {
-                    val count = runCatching { SceneEditing.mutateOCounter(id, mutation) }.getOrNull()
-                    if (scene.id != id) return@launch
-                    if (count != null) {
-                        scene = scene.copy(oCounter = count)
-                        SceneEvents.post(SceneEvent.OCounterUpdated(id, count))
-                    } else scene = scene.copy(oCounter = original)
-                }
-            },
-            onSetRating = { rating ->
-                val original = scene
-                val rated = scene.copy(rating100 = rating)
-                scene = rated
-                scope.launch {
-                    if (runCatching { SceneEditing.updateRating(rated.id, rating) }.isSuccess) SceneEvents.post(SceneEvent.Updated(rated))
-                    else if (scene.id == rated.id) scene = original
-                }
-            },
-        )
-    }
-}
+/** Side margin of Now Playing, like the scene page: player, cards and watchlist rows line up on it. */
+private val NowPlayingMargin = 16.dp
 
 @OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
 @Composable
-private fun InfoRow(session: MiniPlayerStore.Session, onOpen: (de.letzgo.stashy.ui.Screen) -> Unit) {
+private fun InfoRow(scene: Scene, onOpen: (de.letzgo.stashy.ui.Screen) -> Unit) {
     val p = Theme.palette
-    val scene = session.scene
     val performers = scene.performers.filter { it.name.isNotBlank() }.take(4)
     val studio = scene.studio?.takeIf { it.name.isNotBlank() }
     Row(
@@ -252,7 +206,9 @@ private fun InfoRow(session: MiniPlayerStore.Session, onOpen: (de.letzgo.stashy.
                 }
             }
         }
-        if (MiniPlayerStore.hasNext) CircleAction(Icons.Filled.SkipNext, "Next in watchlist") { MiniPlayerStore.playNext() }
+        MiniPlayerStore.nextAfter(scene.id)?.let { next ->
+            CircleAction(Icons.Filled.SkipNext, "Next in watchlist") { MiniPlayerStore.showInNowPlaying(next) }
+        }
     }
 }
 

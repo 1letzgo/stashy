@@ -42,6 +42,9 @@ struct AetherVideoSurface: View {
     /// Fires once per session, the first time the engine reports a displayable frame.
     var onFirstFrame: (() -> Void)?
 
+    /// The "Transcode" tag; off for thumbnail-sized surfaces (mini player bar).
+    var showsTranscodeTag: Bool = true
+
     private var alignment: Alignment {
         topAlignAspectFill ? .top : .center
     }
@@ -68,7 +71,7 @@ struct AetherVideoSurface: View {
                 if ready { onFirstFrame?() }
             }
             .overlay(alignment: .bottomTrailing) {
-                if engine.isUsingTranscodeFallback {
+                if showsTranscodeTag, engine.isUsingTranscodeFallback {
                     Text("Transcode")
                         .font(.system(size: 11, weight: .semibold))
                         .foregroundStyle(.white)

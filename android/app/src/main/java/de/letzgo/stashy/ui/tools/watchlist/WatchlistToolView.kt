@@ -57,11 +57,12 @@ fun WatchlistToolView() {
     val scenes = WatchlistStore.all
     val drag = remember { WatchlistDragState() }
     var confirmReset by remember { mutableStateOf(false) }
+    var sorting by remember { mutableStateOf(false) }
     if (confirmReset) AlertDialog(
         onDismissRequest = { confirmReset = false },
         title = { Text("Reset watchlist?") },
-        text = { Text("All scenes are removed from the watchlist.") },
-        confirmButton = { TextButton({ confirmReset = false; WatchlistStore.clear() }) { Text("Reset", color = StashyColors.systemRed) } },
+        text = { Text("All scenes are removed from the watchlist and playback stops.") },
+        confirmButton = { TextButton({ confirmReset = false; MiniPlayerStore.resetWatchlistAndPlayback() }) { Text("Reset", color = StashyColors.systemRed) } },
         dismissButton = { TextButton({ confirmReset = false }) { Text("Cancel") } },
         containerColor = p.secondaryBackground, titleContentColor = p.text, textContentColor = p.secondaryText,
     )
@@ -103,6 +104,13 @@ fun WatchlistToolView() {
                 }
                 Box(
                     Modifier.height(40.dp).clip(RoundedCornerShape(50)).background(p.secondaryBackground)
+                        .clickable { sorting = !sorting }.padding(horizontal = 18.dp),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text(if (sorting) "Done" else "Sort", style = IosTypography.subheadline.copy(fontWeight = FontWeight.SemiBold), color = Appearance.tint)
+                }
+                Box(
+                    Modifier.height(40.dp).clip(RoundedCornerShape(50)).background(p.secondaryBackground)
                         .clickable { confirmReset = true }.padding(horizontal = 18.dp),
                     contentAlignment = Alignment.Center,
                 ) {
@@ -110,7 +118,7 @@ fun WatchlistToolView() {
                 }
             }
         }
-        watchlistRows(scenes.toList(), MiniPlayerStore.session?.scene?.id, drag, ToolsTokens.contentPadding) { open(it) }
+        watchlistRows(scenes.toList(), MiniPlayerStore.session?.scene?.id, drag, ToolsTokens.contentPadding, sorting) { open(it) }
     }
 }
 

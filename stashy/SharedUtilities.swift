@@ -535,6 +535,19 @@ struct StashyDismissAction {
     func callAsFunction() { action() }
 }
 
+private struct StashyScenePlayerOnlyKey: EnvironmentKey {
+    static let defaultValue = false
+}
+
+extension EnvironmentValues {
+    /// The scene page reduced to its player module (the mini player's full view): no chrome,
+    /// no cards, and it hands the engine back to the mini player even when paused.
+    var stashyScenePlayerOnly: Bool {
+        get { self[StashyScenePlayerOnlyKey.self] }
+        set { self[StashyScenePlayerOnlyKey.self] = newValue }
+    }
+}
+
 private struct StashyPresentedFromMiniPlayerKey: EnvironmentKey {
     static let defaultValue = false
 }

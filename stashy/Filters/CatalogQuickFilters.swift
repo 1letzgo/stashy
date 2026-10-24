@@ -323,7 +323,8 @@ struct CatalogListQuickBar<Option: CatalogQuickSortable>: View {
                     // The selected pill's glow (radius 6, y 3) must fit inside the clipped
                     // scroll area on every side, or it shows as a hard-edged box.
                     .padding(.vertical, Self.shadowRoom)
-                    .padding(.leading, onOpenFilters == nil ? 0 : StashyExpandingDock.itemSpacing)
+                    // A bit more air after the pinned settings button than between the pills.
+                    .padding(.leading, onOpenFilters == nil ? 0 : 16)
                     .padding(.trailing, DesignTokens.Tools.contentPadding)
                 }
                 .padding(.vertical, -Self.shadowRoom)
@@ -358,11 +359,12 @@ struct CatalogListQuickBar<Option: CatalogQuickSortable>: View {
     private func settingsButton(action: @escaping () -> Void) -> some View {
         let filtered = presetName != nil || !document.isEmpty
         return Button(action: action) {
+            // Same glass circle as the chrome's nav buttons (`StashyExpandingDockChip`).
             Image(systemName: "slider.horizontal.3")
-                .font(.subheadline.weight(.semibold))
-                .foregroundStyle(Color.primary.opacity(0.85))
-                .frame(width: StashyExpandingDock.circleSize, height: StashyExpandingDock.activeHeight)
-                .background(Circle().fill(Color.secondaryAppBackground))
+                .font(.system(size: StashyExpandingDock.iconSize, weight: .semibold))
+                .foregroundStyle(Color.white.opacity(StashyExpandingDock.inactiveIconOpacity))
+                .frame(width: StashyExpandingDock.circleSize, height: StashyExpandingDock.circleSize)
+                .stashyChromeFill(shape: Circle(), activeColor: nil)
                 .contentShape(Circle())
                 .overlay(alignment: .topTrailing) {
                     if filtered {
@@ -400,13 +402,13 @@ struct CatalogListQuickBar<Option: CatalogQuickSortable>: View {
                 }
             }
             .font(.subheadline.weight(.semibold))
-            .foregroundStyle(isActive ? Color.white : Color.primary.opacity(0.85))
-            .padding(.horizontal, 16)
+            // Chrome nav chip look: tinted glass when active, plain glass otherwise, no glow.
+            .foregroundStyle(isActive ? Color.white : Color.white.opacity(StashyExpandingDock.inactiveIconOpacity))
+            .padding(.horizontal, StashyExpandingDock.activeHorizontalPadding)
             .frame(height: StashyExpandingDock.activeHeight)
-            .background(
-                Capsule(style: .continuous)
-                    .fill(isActive ? appearance.tintColor : Color.secondaryAppBackground)
-                    .shadow(color: isActive ? appearance.tintColor.opacity(0.35) : .clear, radius: 6, x: 0, y: 3)
+            .stashyChromeFill(
+                shape: Capsule(style: .continuous),
+                activeColor: isActive ? appearance.tintColor : nil
             )
             .contentShape(Capsule(style: .continuous))
         }
