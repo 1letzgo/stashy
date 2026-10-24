@@ -309,7 +309,9 @@ struct CatalogListQuickBar<Option: CatalogQuickSortable>: View {
     var body: some View {
         // Same pills, sizes and spacing as the Tools section rows (`ToolsPillMenuRow`).
         VStack(alignment: .leading, spacing: DesignTokens.Tools.menuBottomPadding) {
-            HStack(spacing: 0) {
+            // Like Merge Scenes' template row: the gap sits outside the scroll area, so pills
+            // scrolled under it are cut off with air to the pinned button, not right at it.
+            HStack(spacing: DesignTokens.Spacing.sm) {
                 // Pinned: only the sort pills scroll, the settings button stays put.
                 if let onOpenFilters {
                     settingsButton(action: onOpenFilters)
@@ -323,8 +325,6 @@ struct CatalogListQuickBar<Option: CatalogQuickSortable>: View {
                     // The selected pill's glow (radius 6, y 3) must fit inside the clipped
                     // scroll area on every side, or it shows as a hard-edged box.
                     .padding(.vertical, Self.shadowRoom)
-                    // A bit more air after the pinned settings button than between the pills.
-                    .padding(.leading, onOpenFilters == nil ? 0 : 16)
                     .padding(.trailing, DesignTokens.Tools.contentPadding)
                 }
                 .padding(.vertical, -Self.shadowRoom)
