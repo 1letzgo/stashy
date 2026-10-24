@@ -63,6 +63,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import de.letzgo.stashy.data.ServerConfigManager
+import kotlinx.coroutines.launch
 import de.letzgo.stashy.ui.catalog.CatalogsScreen
 import de.letzgo.stashy.ui.feeds.FeedsScreen
 import de.letzgo.stashy.ui.search.SearchScreen
@@ -120,7 +121,10 @@ fun AppShell() {
     val p = Theme.palette
     // iOS `ServerConfigChanged`: a switch (or removing the server) ends the mini player.
     val activeServerId = ServerConfigManager.activeConfig?.id
-    LaunchedEffect(activeServerId) { de.letzgo.stashy.ui.player.MiniPlayerStore.onServerChanged(activeServerId) }
+    LaunchedEffect(activeServerId) {
+        de.letzgo.stashy.ui.player.MiniPlayerStore.onServerChanged(activeServerId)
+        de.letzgo.stashy.data.WatchlistStore.onServerChanged(activeServerId)
+    }
     if (de.letzgo.stashy.data.BetaExpiry.expired) {
         BetaExpiredScreen()
         AppUpdateDialog()
@@ -190,7 +194,7 @@ fun AppShell() {
 /**
  * iOS: `MiniPlayerHost` — the mini player above the tab bar (follows its auto-hide), hidden on
  * Feeds (which also pauses it, iOS `stashyPauseBackgroundPlayers`) and under full-screen pages.
- * A tap reopens the scene as a pushed page that takes the player back.
+ * A tap opens the Now Playing view; its "Details" opens the scene page, which takes the player back.
  */
 @Composable
 private fun MiniPlayerHost(tabBarShown: Boolean, tabBarHideFraction: Float, modifier: Modifier = Modifier) {
@@ -201,8 +205,15 @@ private fun MiniPlayerHost(tabBarShown: Boolean, tabBarHideFraction: Float, modi
     de.letzgo.stashy.ui.player.MiniPlayerBar(
         visible = tabBarShown && !onFeeds,
         modifier = modifier.padding(start = 12.dp, end = 12.dp, bottom = nav + barHeight + MiniPlayerBarGap),
-    ) { scene ->
-        Nav.push(de.letzgo.stashy.ui.scene.SceneDetailScreen(scene.id, scene, openedFromMiniPlayer = true))
+    )
+    // The bar's own full view; "Details" closes it and opens the scene page, which takes the player.
+    val scope = androidx.compose.runtime.rememberCoroutineScope()
+    de.letzgo.stashy.ui.player.NowPlayingSheet { scene ->
+        de.letzgo.stashy.ui.player.MiniPlayerStore.showsNowPlaying = false
+        scope.launch {
+            kotlinx.coroutines.delay(300)
+            Nav.push(de.letzgo.stashy.ui.scene.SceneDetailScreen(scene.id, scene, openedFromMiniPlayer = true))
+        }
     }
 }
 

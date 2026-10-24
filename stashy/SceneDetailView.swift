@@ -122,6 +122,9 @@ struct SceneDetailView: View {
                 if !activeScene.hasStashID {
                     sceneIdentifyNavButton
                 }
+                #if os(iOS)
+                SceneWatchlistNavButton(scene: activeScene)
+                #endif
                 sceneDownloadNavButton
                 // Rarely used, so it lives up here instead of as a big card under the scene.
                 ChromeCircleButton(systemImage: "trash", accessibilityLabel: "Delete Scene") {
@@ -1768,4 +1771,34 @@ private struct SceneDetailLifecycleModifier: ViewModifier {
     }
 }
 
+#endif
+
+#if os(iOS)
+/// Adds the scene to the mini player's watchlist (filled while it is on the list).
+private struct SceneWatchlistNavButton: View {
+    let scene: Scene
+    @ObservedObject private var watchlist = WatchlistStore.shared
+    @ObservedObject private var appearance = AppearanceManager.shared
+
+    var body: some View {
+        let listed = watchlist.contains(scene.id)
+        Button {
+            HapticManager.light()
+            watchlist.toggle(scene)
+            ToastManager.shared.show(
+                listed ? "Removed from watchlist" : "Added to watchlist",
+                icon: listed ? "text.badge.minus" : "text.badge.checkmark",
+                style: .success
+            )
+        } label: {
+            Image(systemName: listed ? "text.badge.checkmark" : "text.badge.plus")
+                .font(.system(size: StashyExpandingDock.iconSize, weight: .semibold))
+                .foregroundColor(listed ? appearance.tintColor : .white.opacity(StashyExpandingDock.inactiveIconOpacity))
+                .frame(width: StashyExpandingDock.circleSize, height: StashyExpandingDock.circleSize)
+                .stashyGlass(shape: Circle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(listed ? "Remove from watchlist" : "Add to watchlist")
+    }
+}
 #endif

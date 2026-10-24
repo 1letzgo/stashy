@@ -6,6 +6,11 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.background
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.PlaylistAdd
+import androidx.compose.material.icons.automirrored.filled.PlaylistAddCheck
+import androidx.compose.material.icons.automirrored.filled.PlaylistPlay
+import androidx.compose.material.icons.filled.PlaylistRemove
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.layout.Arrangement
@@ -44,6 +49,9 @@ import de.letzgo.stashy.data.SceneEditing
 import de.letzgo.stashy.data.SceneEvent
 import de.letzgo.stashy.data.SceneEvents
 import de.letzgo.stashy.data.TabManager
+import de.letzgo.stashy.data.WatchlistStore
+import de.letzgo.stashy.ui.scene.originalVideoURL
+import de.letzgo.stashy.ui.scene.transcodeFallbackURLs
 import de.letzgo.stashy.ui.Appearance
 import de.letzgo.stashy.ui.SF
 import de.letzgo.stashy.ui.Theme
@@ -85,6 +93,17 @@ object MiniPlayerRules {
     fun progress(currentTime: Double, duration: Double): Float =
         if (duration > 0 && currentTime.isFinite()) (currentTime / duration).coerceIn(0.0, 1.0).toFloat() else 0f
 
+    /** Where a scene switched to in the bar starts: its resume point, unless it was watched to ≥ 95 %. */
+    fun resumeStart(resumeTime: Double?, duration: Double?): Double? {
+        val time = resumeTime?.takeIf { it > 0 } ?: return null
+        if (duration != null && duration > 0 && time >= duration * 0.95) return null
+        return time
+    }
+
+    /** Whether the bar should count the play now ([threshold] = "Count as played — Player"). */
+    fun countsPlay(alreadyRegistered: Boolean, seconds: Double, threshold: Double): Boolean =
+        !alreadyRegistered && seconds >= maxOf(0.0, threshold)
+
     /** First two performers, else the studio, else nothing. */
     fun subtitle(performerNames: List<String>, studioName: String?): String {
         val names = performerNames.map { it.trim() }.filter { it.isNotEmpty() }.take(2).joinToString(", ")
@@ -111,6 +130,9 @@ object MiniPlayerStore {
     var session by mutableStateOf<Session?>(null)
         private set
 
+    /** The bar's tap: [AppShell] presents the mini player's own full view ([NowPlayingSheet]). */
+    var showsNowPlaying by mutableStateOf(false)
+
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private val tracker = PlaybackActivityTracker(scope)
 
@@ -120,20 +142,75 @@ object MiniPlayerStore {
     /** Takes over [player] from a scene page that is going away. Any other mini session ends. */
     fun adopt(scene: Scene, player: StashPlayer, playRegistered: Boolean, serverId: String?) {
         session?.let { if (it.player !== player) close() }
-        player.onTime = { seconds, duration ->
-            if (seconds >= 0) tracker.setPosition(seconds, if (duration > 0) duration else scene.sceneDuration ?: 0.0)
-        }
+        player.onTime = { seconds, duration -> handleTime(seconds, duration) }
         player.onPlayingChanged = { playing -> if (playing) tracker.start() else tracker.stop() }
+        // The watchlist plays on in the bar: the next entry starts when one ends.
+        player.onReachedEnd = { playNext() }
         // Captions and transcode toasts belong to the page; the bar only plays.
         player.onTranscodeFallback = null
         player.onFirstFrame = null
-        player.onReachedEnd = null
 
         tracker.reset()
         configureTracker(scene.id)
         tracker.setPosition(player.currentTime, if (player.duration > 0) player.duration else scene.sceneDuration ?: 0.0)
         if (player.isPlaying) tracker.start()
         session = Session(scene, player, playRegistered, serverId)
+    }
+
+    /** iOS `play(_:)` — switches the bar to [scene] on the same player (watchlist tap, next entry). */
+    fun play(scene: Scene) {
+        val current = session ?: return
+        val p = current.player
+        if (current.scene.id == scene.id) { p.play(); return }
+        val url = scene.originalVideoURL ?: return
+        // Save the one being left before the tracker moves on.
+        tracker.setPosition(p.currentTime, if (p.duration > 0) p.duration else current.scene.sceneDuration ?: 0.0)
+        tracker.stop()
+        tracker.reset()
+        configureTracker(scene.id)
+        p.fallbackSources = scene.transcodeFallbackURLs
+        p.fallbackDeclaredDuration = scene.sceneDuration
+        p.nowPlaying = SceneNowPlaying.of(scene)
+        session = current.copy(scene = scene, playRegistered = false)
+        p.load(url, MiniPlayerRules.resumeStart(scene.resumeTime, scene.sceneDuration), autoplay = true)
+    }
+
+    val hasNext: Boolean get() = session?.let { WatchlistStore.next(it.scene.id) } != null
+
+    fun playNext() {
+        val current = session ?: return
+        WatchlistStore.next(current.scene.id)?.let { play(it) }
+    }
+
+    fun seekBy(delta: Double) {
+        val p = session?.player ?: return
+        val target = (p.currentTime + delta).coerceIn(0.0, maxOf(p.duration - 1, 0.0))
+        p.seek(target)
+        tracker.noteSeek(target)
+    }
+
+    fun seekTo(seconds: Double) {
+        val p = session?.player ?: return
+        p.seek(seconds)
+        tracker.noteSeek(seconds)
+    }
+
+    fun expand() { if (session != null) showsNowPlaying = true }
+
+    /** Resume tracking plus the play count, which the page would otherwise have counted. */
+    private fun handleTime(seconds: Double, duration: Double) {
+        val current = session ?: return
+        if (seconds < 0) return
+        tracker.setPosition(seconds, if (duration > 0) duration else current.scene.sceneDuration ?: 0.0)
+        if (MiniPlayerRules.countsPlay(current.playRegistered, seconds, PlayerSettings.playCountPlayerSeconds)) {
+            session = current.copy(playRegistered = true)
+            val id = current.scene.id
+            if (!TabManager.tracksActivity(id)) return
+            scope.launch {
+                runCatching { SceneEditing.addPlay(id) }
+                SceneEvents.post(SceneEvent.PlayAdded(id))
+            }
+        }
     }
 
     /** Hands the player back to a page showing [sceneId], or null when the bar plays something else. */
@@ -143,7 +220,9 @@ object MiniPlayerStore {
         tracker.stop()
         current.player.onTime = null
         current.player.onPlayingChanged = null
+        current.player.onReachedEnd = null
         session = null
+        showsNowPlaying = false
         return current
     }
 
@@ -172,9 +251,11 @@ object MiniPlayerStore {
         tracker.stop()
         p.onTime = null
         p.onPlayingChanged = null
+        p.onReachedEnd = null
         p.pause()
         p.release()
         session = null
+        showsNowPlaying = false
     }
 
     /** Same save path as the scene page (`SceneDetailModel.configureTracker`). */
@@ -191,10 +272,11 @@ object MiniPlayerStore {
 
 /**
  * iOS: `MiniPlayerBar` — live picture, title, performers / studio, play/pause, close and a tint
- * progress line. Tap reopens the scene ([onExpand]); a swipe down or sideways closes it.
+ * progress line, plus the watchlist button. Tap opens the Now Playing view; a swipe down or
+ * sideways closes it.
  */
 @Composable
-fun MiniPlayerBar(visible: Boolean, modifier: Modifier = Modifier, onExpand: (Scene) -> Unit) {
+fun MiniPlayerBar(visible: Boolean, modifier: Modifier = Modifier) {
     val session = MiniPlayerStore.session
     AnimatedVisibility(
         visible && session != null, modifier,
@@ -204,12 +286,12 @@ fun MiniPlayerBar(visible: Boolean, modifier: Modifier = Modifier, onExpand: (Sc
         // Keeps drawing the last session while the exit animation runs.
         val shown = remember { mutableStateOf(session) }
         if (session != null) shown.value = session
-        shown.value?.let { MiniPlayerBarContent(it, onExpand) }
+        shown.value?.let { MiniPlayerBarContent(it) }
     }
 }
 
 @Composable
-private fun MiniPlayerBarContent(session: MiniPlayerStore.Session, onExpand: (Scene) -> Unit) {
+private fun MiniPlayerBarContent(session: MiniPlayerStore.Session) {
     val p = Theme.palette
     val player = session.player
     val scene = session.scene
@@ -242,19 +324,24 @@ private fun MiniPlayerBarContent(session: MiniPlayerStore.Session, onExpand: (Sc
                     },
                 ) { change, amount -> change.consume(); dragX += amount.x; dragY += amount.y }
             }
-            .clickable { onExpand(scene) }
-            .semantics { contentDescription = "Mini player: ${scene.displayTitle}. Opens the scene" },
+            .clickable { MiniPlayerStore.expand() }
+            .semantics { contentDescription = "Mini player: ${scene.displayTitle}. Opens the player" },
     ) {
         Row(
             Modifier.fillMaxWidth().fillMaxHeight().padding(start = 8.dp, end = 6.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(10.dp),
         ) {
-            VideoSurface(player, Modifier.size(width = 64.dp, height = 36.dp).clip(RoundedCornerShape(6.dp)), fill = true)
+            val thumbModifier = Modifier.size(width = 64.dp, height = 36.dp).clip(RoundedCornerShape(6.dp))
+            // The full view draws the picture now; a player shows in one place only.
+            if (MiniPlayerStore.showsNowPlaying) {
+                coil3.compose.AsyncImage(scene.thumbnailURL, null, thumbModifier.background(androidx.compose.ui.graphics.Color.Black), contentScale = androidx.compose.ui.layout.ContentScale.Crop)
+            } else VideoSurface(player, thumbModifier, fill = true)
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(1.dp)) {
                 Text(scene.displayTitle, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = p.text, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 if (subtitle.isNotEmpty()) Text(subtitle, fontSize = 12.sp, color = p.secondaryText, maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
+            WatchlistButton()
             IconButton(onClick = { MiniPlayerStore.togglePlayPause() }, modifier = Modifier.size(40.dp)) {
                 Icon(if (playing) SF.pauseFill else SF.playFill, if (playing) "Pause" else "Play", tint = p.text)
             }
@@ -266,4 +353,29 @@ private fun MiniPlayerBarContent(session: MiniPlayerStore.Session, onExpand: (Sc
             Box(Modifier.fillMaxWidth(progress).height(2.dp).clip(RoundedCornerShape(1.dp)).background(Appearance.tint))
         }
     }
+}
+
+/** The bar's list button: opens Now Playing, badge = watchlist size. */
+@Composable
+private fun WatchlistButton() {
+    val count = WatchlistStore.all.size
+    Box {
+        IconButton(onClick = { MiniPlayerStore.expand() }, modifier = Modifier.size(36.dp)) {
+            Icon(WatchlistIcons.list, "Watchlist", tint = Theme.palette.text, modifier = Modifier.size(22.dp))
+        }
+        if (count > 0) Text(
+            "$count",
+            Modifier.align(Alignment.TopEnd).padding(top = 2.dp, end = 2.dp)
+                .clip(RoundedCornerShape(50)).background(Appearance.tint).padding(horizontal = 4.dp),
+            fontSize = 9.sp, fontWeight = FontWeight.Bold, color = androidx.compose.ui.graphics.Color.White,
+        )
+    }
+}
+
+/** iOS `list.bullet`, `text.badge.plus` / `text.badge.checkmark`. */
+object WatchlistIcons {
+    val list = Icons.AutoMirrored.Filled.PlaylistPlay
+    val add = Icons.AutoMirrored.Filled.PlaylistAdd
+    val listed = Icons.AutoMirrored.Filled.PlaylistAddCheck
+    val removed = Icons.Filled.PlaylistRemove
 }

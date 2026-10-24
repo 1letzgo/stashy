@@ -42,4 +42,19 @@ class MiniPlayerRulesTest {
         assertEquals("Studio", MiniPlayerRules.subtitle(emptyList(), "Studio"))
         assertEquals("", MiniPlayerRules.subtitle(emptyList(), null))
     }
+
+    @Test fun resumeStartSkipsFinishedScenes() {
+        assertEquals(120.0, MiniPlayerRules.resumeStart(120.0, 600.0)!!, 0.0)
+        org.junit.Assert.assertNull(MiniPlayerRules.resumeStart(580.0, 600.0))
+        org.junit.Assert.assertNull(MiniPlayerRules.resumeStart(0.0, 600.0))
+        org.junit.Assert.assertNull(MiniPlayerRules.resumeStart(null, 600.0))
+        assertEquals(30.0, MiniPlayerRules.resumeStart(30.0, null)!!, 0.0)
+    }
+
+    @Test fun playCountsOnceAtThreshold() {
+        assertTrue(MiniPlayerRules.countsPlay(alreadyRegistered = false, seconds = 30.0, threshold = 30.0))
+        assertFalse(MiniPlayerRules.countsPlay(alreadyRegistered = false, seconds = 29.0, threshold = 30.0))
+        assertFalse(MiniPlayerRules.countsPlay(alreadyRegistered = true, seconds = 300.0, threshold = 30.0))
+        assertTrue(MiniPlayerRules.countsPlay(alreadyRegistered = false, seconds = 0.0, threshold = -1.0))
+    }
 }

@@ -1074,6 +1074,9 @@ private struct MiniPlayerHost: ViewModifier {
                 isEnabled: store.session != nil && !hidden,
                 floats: store.tabBarHiddenByPage
             ))
+            .sheet(isPresented: $store.showsNowPlaying) {
+                NowPlayingView()
+            }
             .fullScreenCover(item: $store.expandedScene) { scene in
                 // The page shows Close instead of Back here; leaving hands the video back to the bar.
                 NavigationStack {
