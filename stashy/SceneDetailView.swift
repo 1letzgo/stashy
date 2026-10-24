@@ -45,6 +45,7 @@ struct SceneDetailView: View {
     @State private var isDownloading = false
     @State private var isIdentifying = false
     @Environment(\.stashyDismiss) var dismiss
+    @Environment(\.stashyPresentedFromMiniPlayer) private var presentedFromMiniPlayer
     @EnvironmentObject var coordinator: NavigationCoordinator
 
     @State private var isHeaderExpanded = false
@@ -104,16 +105,17 @@ struct SceneDetailView: View {
                     dismiss()
                 } label: {
                     HStack(spacing: StashyExpandingDock.iconLabelSpacing) {
-                        Image(systemName: "chevron.left")
+                        // Opened from the mini player there is no page below to go back to.
+                        Image(systemName: presentedFromMiniPlayer ? "xmark" : "chevron.left")
                             .font(.system(size: StashyExpandingDock.iconSize, weight: .semibold))
-                        Text("Back")
+                        Text(presentedFromMiniPlayer ? "Close" : "Back")
                             .font(.subheadline.weight(.semibold))
                     }
                     .foregroundColor(.white)
                     .modifier(StashyChromePillStyle(height: chromePillHeight, accent: true))
                 }
                 .buttonStyle(.plain)
-                .accessibilityLabel("Back")
+                .accessibilityLabel(presentedFromMiniPlayer ? "Close" : "Back")
 
                 Spacer(minLength: 8)
 
@@ -805,6 +807,14 @@ struct SceneDetailView: View {
             configureSubtitles()
         }
         
+        // The mini player runs this scene (left it earlier, or reopened from the bar): play on
+        // in the page with the same engine, no cover and no reload.
+        if !isPlaybackStarted, miniPlayerShowsThisScene {
+            resumeOnReturn = nil
+            startPlayback(resume: false)
+            return
+        }
+
         // Back from another tab or a pushed page: the video played when it was left, so it plays
         // on from the same spot instead of waiting on the cover.
         if let pending = resumeOnReturn {
@@ -868,7 +878,17 @@ struct SceneDetailView: View {
         if let aether = aetherEngine, isPlaybackStarted {
             resumeOnReturn = (aether.isPlaying, aether.currentTime)
         }
-        aetherEngine?.pause()
+        // A playing scene moves to the mini player instead of stopping.
+        let handOffEngine: AetherSceneEngine? = {
+            #if os(iOS)
+            guard let aether = aetherEngine, isPlaybackStarted, aether.isPlaying,
+                  MiniPlayerStore.shared.isEnabled else { return nil }
+            return aether
+            #else
+            return nil
+            #endif
+        }()
+        if handOffEngine == nil { aetherEngine?.pause() }
         StashSyncManager.shared.stop()
         if handyManager.isSyncing || handyManager.isStashSyncMode { handyManager.pause() }
         if buttplugManager.isConnected { buttplugManager.stop() }
@@ -879,8 +899,16 @@ struct SceneDetailView: View {
         // AI Motion teardown below can close it for good.
         Task { await transcriptionController.disable() }
         AetherMotionAnalysis.teardown(engine: aetherEngine)
+        #if os(iOS)
+        if let handOffEngine {
+            MiniPlayerStore.shared.adopt(scene: activeScene, engine: handOffEngine, playRegistered: hasAddedPlay)
+        } else {
+            aetherEngine?.stop()
+        }
+        #else
         // `@State` release is not deterministic, so the engine is torn down explicitly.
         aetherEngine?.stop()
+        #endif
         aetherEngine = nil
         // The player surface has no engine behind it any more; show the cover until return.
         isPlaybackStarted = false
@@ -948,8 +976,10 @@ struct SceneDetailView: View {
     private func startPlayback(resume: Bool) {
         guard let url = activeScene.aetherVideoURL else { return }
 
+        // The mini player still runs this scene: take its engine back instead of reloading.
+        let adoptedFromMiniPlayer = takeEngineFromMiniPlayer()
         let resumeTarget: Double? = {
-            guard resume, let time = activeScene.resumeTime, time > 0 else { return nil }
+            guard resume, !adoptedFromMiniPlayer, let time = activeScene.resumeTime, time > 0 else { return nil }
             return time
         }()
 
@@ -974,41 +1004,7 @@ struct SceneDetailView: View {
             engine.isMuted = isMuted
             engine.rate = Float(playbackSpeed)
 
-            engine.onTime = { [weak engine] seconds, duration in
-                if seconds >= 0 {
-                    currentPlaybackTime = seconds
-                    let total = duration > 0 ? duration : (activeScene.sceneDuration ?? 0)
-                    playbackActivityTracker.setPosition(currentTime: seconds, duration: total)
-                    if engine?.isPlaying == true {
-                        ensurePlaybackActivityConfigured()
-                        playbackActivityTracker.start()
-                    }
-                }
-                if !hasAddedPlay, seconds >= playCountThreshold {
-                    registerScenePlay()
-                }
-            }
-            engine.onPlayingChanged = { [weak engine] playing in
-                guard let engine else { return }
-                handleAetherPlayingChange(engine, playing: playing)
-            }
-            // A (re)load swaps the analysis item in place — re-attach AI Motion to the new one.
-            engine.onAnalysisItemChanged = { _ in
-                ensureAetherVideoAnalysis()
-            }
-
-            // Server transcodes the engine falls back to when the original will not play.
-            engine.fallbackSources = activeScene.transcodeFallbackURLs
-            engine.fallbackDeclaredDuration = activeScene.sceneDuration
-            engine.onTranscodeFallback = { _ in
-                guard !didAnnounceTranscodeFallback else { return }
-                didAnnounceTranscodeFallback = true
-                ToastManager.shared.show(
-                    "Original could not be played — using the server transcode",
-                    icon: "arrow.triangle.2.circlepath",
-                    style: .error
-                )
-            }
+            wireEngineCallbacks(engine)
 
             aetherEngine = engine
             let scene = activeScene
@@ -1059,6 +1055,73 @@ struct SceneDetailView: View {
     /// Stash's server captions as selectable external subtitle tracks on the engine. Registering
     /// them republishes `subtitleTracks`, so "Show subtitles automatically" (Settings → Playback)
     /// can pick one; otherwise the user picks from the Audio & Subtitles menu.
+    /// Takes the engine back from the mini player when it plays this scene; any other scene
+    /// the mini player runs is closed, since this page is about to start its own.
+    private func takeEngineFromMiniPlayer() -> Bool {
+        #if os(iOS)
+        guard aetherEngine == nil else { return false }
+        if let handedBack = MiniPlayerStore.shared.take(sceneId: activeScene.id) {
+            let engine = handedBack.engine
+            if handedBack.playRegistered { hasAddedPlay = true }
+            wireEngineCallbacks(engine)
+            aetherEngine = engine
+            // The bar may have been toggled meanwhile; the page's mute button follows the engine.
+            isMuted = engine.isMuted
+            return true
+        }
+        MiniPlayerStore.shared.yield(to: activeScene.id)
+        #endif
+        return false
+    }
+
+    private var miniPlayerShowsThisScene: Bool {
+        #if os(iOS)
+        MiniPlayerStore.shared.session?.scene.id == activeScene.id
+        #else
+        false
+        #endif
+    }
+
+    /// Page-side engine callbacks. Set on a fresh engine and again on one the mini player
+    /// hands back, since the mini player replaces them while it owns the engine.
+    private func wireEngineCallbacks(_ engine: AetherSceneEngine) {
+        engine.onTime = { [weak engine] seconds, duration in
+            if seconds >= 0 {
+                currentPlaybackTime = seconds
+                let total = duration > 0 ? duration : (activeScene.sceneDuration ?? 0)
+                playbackActivityTracker.setPosition(currentTime: seconds, duration: total)
+                if engine?.isPlaying == true {
+                    ensurePlaybackActivityConfigured()
+                    playbackActivityTracker.start()
+                }
+            }
+            if !hasAddedPlay, seconds >= playCountThreshold {
+                registerScenePlay()
+            }
+        }
+        engine.onPlayingChanged = { [weak engine] playing in
+            guard let engine else { return }
+            handleAetherPlayingChange(engine, playing: playing)
+        }
+        // A (re)load swaps the analysis item in place — re-attach AI Motion to the new one.
+        engine.onAnalysisItemChanged = { _ in
+            ensureAetherVideoAnalysis()
+        }
+
+        // Server transcodes the engine falls back to when the original will not play.
+        engine.fallbackSources = activeScene.transcodeFallbackURLs
+        engine.fallbackDeclaredDuration = activeScene.sceneDuration
+        engine.onTranscodeFallback = { _ in
+            guard !didAnnounceTranscodeFallback else { return }
+            didAnnounceTranscodeFallback = true
+            ToastManager.shared.show(
+                "Original could not be played — using the server transcode",
+                icon: "arrow.triangle.2.circlepath",
+                style: .error
+            )
+        }
+    }
+
     private func registerAetherCaptions(on engine: AetherSceneEngine, scene: Scene) {
         guard let captions = scene.captions, !captions.isEmpty else { return }
         for caption in captions {

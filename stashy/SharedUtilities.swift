@@ -532,6 +532,19 @@ struct StashyDismissAction {
     func callAsFunction() { action() }
 }
 
+private struct StashyPresentedFromMiniPlayerKey: EnvironmentKey {
+    static let defaultValue = false
+}
+
+extension EnvironmentValues {
+    /// The scene page was reopened from the mini player (a cover, not a pushed page):
+    /// its top chrome shows Close instead of Back.
+    var stashyPresentedFromMiniPlayer: Bool {
+        get { self[StashyPresentedFromMiniPlayerKey.self] }
+        set { self[StashyPresentedFromMiniPlayerKey.self] = newValue }
+    }
+}
+
 private struct StashyDismissOverrideKey: EnvironmentKey {
     static let defaultValue: StashyDismissAction? = nil
 }

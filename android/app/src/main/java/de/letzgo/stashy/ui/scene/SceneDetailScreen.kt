@@ -76,18 +76,25 @@ import kotlinx.coroutines.delay
  * The page model lives with the screen object, so a pushed page or another tab can come back
  * to it and resume playback where it left off.
  */
-class SceneDetailScreen(val sceneId: String, val preview: Scene? = null, autoPlay: Boolean = false) : Screen {
-    override val key = "scene-$sceneId"
+class SceneDetailScreen(
+    val sceneId: String,
+    val preview: Scene? = null,
+    autoPlay: Boolean = false,
+    /** Reopened from the mini player (iOS full-screen cover with a minimize chevron). */
+    private val openedFromMiniPlayer: Boolean = false,
+) : Screen {
+    // Own key when reopened from the bar: the same scene's page may already sit lower in the stack.
+    override val key = if (openedFromMiniPlayer) "scene-$sceneId-mini-${System.nanoTime()}" else "scene-$sceneId"
     private val model = SceneDetailModel(preview ?: Scene(id = sceneId), autoPlay)
     override val hidesTabBar: Boolean get() = model.isFullscreen || PlayerWindow.isInPictureInPicture
 
-    @Composable override fun Content() = SceneDetailContent(model)
+    @Composable override fun Content() = SceneDetailContent(model, openedFromMiniPlayer)
 }
 
 private enum class EditSheet { Title, Performers, Studio, Groups, Tags, Galleries }
 
 @Composable
-private fun SceneDetailContent(model: SceneDetailModel) {
+private fun SceneDetailContent(model: SceneDetailModel, openedFromMiniPlayer: Boolean) {
     val p = Theme.palette
     val scene = model.scene
     val lifecycle = LocalLifecycleOwner.current.lifecycle
@@ -179,7 +186,7 @@ private fun SceneDetailContent(model: SceneDetailModel) {
         val landscape = LocalConfiguration.current.orientation == Configuration.ORIENTATION_LANDSCAPE
         val pinned = model.isPlaybackStarted && player != null && !landscape
         Column(Modifier.fillMaxSize()) {
-            SceneDetailNavBar(model) { sheet = EditSheet.Title }
+            SceneDetailNavBar(model, openedFromMiniPlayer) { sheet = EditSheet.Title }
             val playerCard: @Composable () -> Unit = {
                 Column(Modifier.fillMaxWidth().cardShadow().clip(RoundedCornerShape(Tokens.Radius.card)).background(p.secondaryBackground)) {
                     SceneVideoPlayerCard(model, extraMenuItems)
@@ -286,8 +293,10 @@ private fun SceneDetailContent(model: SceneDetailModel) {
  * with the page's rarer actions (edit title & details, delete — same handlers as the cards).
  */
 @Composable
-private fun SceneDetailNavBar(model: SceneDetailModel, onEditTitle: () -> Unit) {
+private fun SceneDetailNavBar(model: SceneDetailModel, openedFromMiniPlayer: Boolean, onEditTitle: () -> Unit) {
     NativeTopBar(model.scene.displayTitle) {
+        // iOS: the cover's "chevron.down" — leaving hands a playing video back to the mini player.
+        if (openedFromMiniPlayer) TopBarAction(de.letzgo.stashy.ui.SF.chevronDown, "Minimize") { Nav.pop() }
         if (!model.scene.hasStashID) {
             TopBarAction(PlayerIcons.identify, "Identify scene", busy = model.isIdentifying) { model.identify() }
         }

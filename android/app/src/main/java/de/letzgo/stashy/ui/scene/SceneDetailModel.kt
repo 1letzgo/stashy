@@ -18,6 +18,8 @@ import de.letzgo.stashy.data.SceneStamps
 import de.letzgo.stashy.data.ScenesRepository
 import de.letzgo.stashy.data.ServerConfigManager
 import de.letzgo.stashy.data.VideoCaption
+import de.letzgo.stashy.ui.player.MiniPlayerRules
+import de.letzgo.stashy.ui.player.MiniPlayerStore
 import de.letzgo.stashy.ui.player.PlaybackActivityTracker
 import de.letzgo.stashy.ui.player.PlayerIcons
 import de.letzgo.stashy.ui.player.PlayerMute
@@ -161,6 +163,13 @@ class SceneDetailModel(initial: Scene, private val autoPlay: Boolean) {
             refreshDetails()
         }
         hasAppeared = true
+        // The mini player runs this scene (left it earlier, or reopened from the bar): play on
+        // in the page with the same player — no cover, no reload, no seek.
+        if (!isPlaybackStarted && MiniPlayerStore.showsScene(s.id)) {
+            resumeOnReturn = null
+            startPlayback(false)
+            return
+        }
         resumeOnReturn?.let { (wasPlaying, position) ->
             resumeOnReturn = null
             if (position > 1) scene = scene.copy(resumeTime = position)
@@ -177,9 +186,23 @@ class SceneDetailModel(initial: Scene, private val autoPlay: Boolean) {
         if (isDeleting) { p?.pause(); return }
         persistPlaybackActivity(stopTracking = true)
         SceneEvents.post(SceneEvent.Updated(scene))
-        if (p != null && isPlaybackStarted) resumeOnReturn = p.playWhenReady to p.currentTime
-        p?.pause()
-        p?.release()
+        // A playing scene moves to the mini player instead of stopping (Settings › Playback).
+        val handOff = p != null && MiniPlayerRules.handsOff(
+            MiniPlayerStore.isEnabled, isPlaybackStarted, p.playWhenReady && !p.didEnd, isDeleting, PlayerWindow.isInPictureInPicture,
+        )
+        if (p != null && isPlaybackStarted) {
+            // Handed off: back on the page the mini player normally still runs it ([onAppear]);
+            // if it was closed meanwhile, the page waits on the cover at the last position.
+            resumeOnReturn = (p.playWhenReady && !handOff) to p.currentTime
+        }
+        if (handOff && p != null) {
+            // Live captions belong to the page; the bar only plays.
+            aiSubtitles.stopLiveCaptionsIfNeeded()
+            MiniPlayerStore.adopt(scene, p, hasAddedPlay, ServerConfigManager.activeConfig?.id)
+        } else {
+            p?.pause()
+            p?.release()
+        }
         player = null
         isPlaybackStarted = false
         if (isFullscreen) { isFullscreen = false; PlayerWindow.setImmersive(false); PlayerWindow.releaseOrientation() }
@@ -211,30 +234,18 @@ class SceneDetailModel(initial: Scene, private val autoPlay: Boolean) {
     /** iOS: `startPlayback(resume:)`. */
     fun startPlayback(resume: Boolean) {
         val url = scene.originalVideoURL ?: return
-        val resumeTarget = scene.resumeTime?.takeIf { resume && it > 0 }
+        // The mini player still runs this scene: take its player back instead of reloading.
+        val adopted = takeFromMiniPlayer()
+        val resumeTarget = scene.resumeTime?.takeIf { resume && !adopted && it > 0 }
         val existing = player
         if (existing == null) {
             val p = StashPlayer(Prefs.appContext, StashPlayer.Role.Main)
             // Re-read here: the route only now reports connected headphones (iOS `initialValueForPlayback`).
             isMuted = PlayerMute.initialValue(Prefs.appContext)
             p.isMuted = isMuted
-            p.onTime = { seconds, duration ->
-                if (seconds >= 0) {
-                    currentPlaybackTime = seconds
-                    tracker.setPosition(seconds, if (duration > 0) duration else scene.sceneDuration ?: 0.0)
-                    if (p.isPlaying) { configureTracker(); tracker.start() }
-                }
-                if (!hasAddedPlay && seconds >= playCountThreshold) registerPlay()
-            }
-            p.onPlayingChanged = { playing -> handlePlayingChange(p, playing) }
+            wirePlayerCallbacks(p)
             p.fallbackSources = scene.transcodeFallbackURLs
             p.fallbackDeclaredDuration = scene.sceneDuration
-            p.onTranscodeFallback = {
-                if (!didAnnounceTranscodeFallback) {
-                    didAnnounceTranscodeFallback = true
-                    SceneToast.show("Original could not be played — using the server transcode", PlayerIcons.reset, SceneToast.Style.Error)
-                }
-            }
             p.nowPlaying = SceneNowPlaying.of(scene)
             p.enableMediaSession()
             player = p
@@ -248,6 +259,52 @@ class SceneDetailModel(initial: Scene, private val autoPlay: Boolean) {
         configureTracker()
         tracker.start()
         if (!hasAddedPlay && playCountThreshold <= 0) registerPlay()
+    }
+
+    /**
+     * iOS: `takeEngineFromMiniPlayer` — takes the player back when the mini player runs this
+     * scene; any other scene it runs is closed, since this page is about to start its own.
+     */
+    private fun takeFromMiniPlayer(): Boolean {
+        when (MiniPlayerRules.onPageStart(MiniPlayerStore.session?.scene?.id, scene.id, player != null)) {
+            MiniPlayerRules.StartDecision.TakeBack -> {
+                val handed = MiniPlayerStore.take(scene.id) ?: return false
+                val p = handed.player
+                if (handed.playRegistered) hasAddedPlay = true
+                wirePlayerCallbacks(p)
+                player = p
+                // The page's mute button follows the player.
+                isMuted = p.isMuted
+                currentPlaybackTime = p.currentTime
+                tracker.setPosition(p.currentTime, if (p.duration > 0) p.duration else scene.sceneDuration ?: 0.0)
+                return true
+            }
+            MiniPlayerRules.StartDecision.CloseOther -> MiniPlayerStore.yield(scene.id)
+            MiniPlayerRules.StartDecision.Nothing -> {}
+        }
+        return false
+    }
+
+    /**
+     * iOS: `wireEngineCallbacks` — page-side callbacks, set on a fresh player and again on one
+     * the mini player hands back (it replaces them while it owns the player).
+     */
+    private fun wirePlayerCallbacks(p: StashPlayer) {
+        p.onTime = { seconds, duration ->
+            if (seconds >= 0) {
+                currentPlaybackTime = seconds
+                tracker.setPosition(seconds, if (duration > 0) duration else scene.sceneDuration ?: 0.0)
+                if (p.isPlaying) { configureTracker(); tracker.start() }
+            }
+            if (!hasAddedPlay && seconds >= playCountThreshold) registerPlay()
+        }
+        p.onPlayingChanged = { playing -> handlePlayingChange(p, playing) }
+        p.onTranscodeFallback = {
+            if (!didAnnounceTranscodeFallback) {
+                didAnnounceTranscodeFallback = true
+                SceneToast.show("Original could not be played — using the server transcode", PlayerIcons.reset, SceneToast.Style.Error)
+            }
+        }
     }
 
     /** Settings › Playback › "Count as played — Player". */

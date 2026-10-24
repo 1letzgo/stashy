@@ -109,6 +109,9 @@ object TabManager {
     var reelsContinuousPlay: Boolean get() = _reelsContinuousPlay.value; set(v) { _reelsContinuousPlay.value = v; Prefs.setBool("ReelsContinuousPlay", v) }
     private val _isPiPEnabled = bool("isPiPEnabled", true)
     var isPiPEnabled: Boolean get() = _isPiPEnabled.value; set(v) { _isPiPEnabled.value = v; Prefs.setBool("isPiPEnabled", v) }
+    /** iOS `isMiniPlayerEnabled` — a scene left while playing keeps running in the mini bar (default on). */
+    private val _isMiniPlayerEnabled = bool("isMiniPlayerEnabled", true)
+    var isMiniPlayerEnabled: Boolean get() = _isMiniPlayerEnabled.value; set(v) { _isMiniPlayerEnabled.value = v; Prefs.setBool("isMiniPlayerEnabled", v) }
     private val _playerSkipSeconds = dbl("playerSkipSeconds", 10.0, playerSkipOptions)
     var playerSkipSeconds: Double get() = _playerSkipSeconds.value; set(v) { _playerSkipSeconds.value = v; Prefs.setFloat("playerSkipSeconds", v.toFloat()) }
     private val _showsPlayerSkipButtons = bool("showsPlayerSkipButtons", true)

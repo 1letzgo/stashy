@@ -95,7 +95,15 @@ fun tabBarHeight(): Dp {
  * while the bar auto-hides ([TabBarAutoHide]) — content is never covered, it just gains room.
  */
 @Composable
-fun bottomBarContentPadding(extra: Dp = BottomBarContentGap): Dp = tabBarHeight() + extra
+fun bottomBarContentPadding(extra: Dp = BottomBarContentGap): Dp = tabBarHeight() + extra + miniPlayerInset()
+
+/** Room for the mini player bar while it shows above the tab bar (not on Feeds, where it hides). */
+@Composable
+fun miniPlayerInset(): Dp =
+    if (de.letzgo.stashy.ui.player.MiniPlayerStore.session != null && Nav.tab != MainTab.Feeds) MiniPlayerBarHeight + MiniPlayerBarGap else 0.dp
+
+internal val MiniPlayerBarHeight: Dp = 56.dp
+internal val MiniPlayerBarGap: Dp = 8.dp
 
 /** Default gap between the last item of a list and the top edge of the tab bar. */
 val BottomBarContentGap: Dp = 24.dp
@@ -110,6 +118,9 @@ val LocalTabBarVisible = compositionLocalOf { true }
 @Composable
 fun AppShell() {
     val p = Theme.palette
+    // iOS `ServerConfigChanged`: a switch (or removing the server) ends the mini player.
+    val activeServerId = ServerConfigManager.activeConfig?.id
+    LaunchedEffect(activeServerId) { de.letzgo.stashy.ui.player.MiniPlayerStore.onServerChanged(activeServerId) }
     if (de.letzgo.stashy.data.BetaExpiry.expired) {
         BetaExpiredScreen()
         AppUpdateDialog()
@@ -171,8 +182,28 @@ fun AppShell() {
             // Slides down by its own height (system inset included) when auto-hidden.
             FloatingTabBar(Modifier.graphicsLayer { translationY = barOffset * size.height })
         }
+        MiniPlayerHost(showBar, barOffset, Modifier.align(Alignment.BottomCenter))
     }
     AppUpdateDialog()
+}
+
+/**
+ * iOS: `MiniPlayerHost` — the mini player above the tab bar (follows its auto-hide), hidden on
+ * Feeds (which also pauses it, iOS `stashyPauseBackgroundPlayers`) and under full-screen pages.
+ * A tap reopens the scene as a pushed page that takes the player back.
+ */
+@Composable
+private fun MiniPlayerHost(tabBarShown: Boolean, tabBarHideFraction: Float, modifier: Modifier = Modifier) {
+    val onFeeds = Nav.tab == MainTab.Feeds
+    LaunchedEffect(onFeeds) { if (onFeeds) de.letzgo.stashy.ui.player.MiniPlayerStore.pause() }
+    val nav = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
+    val barHeight = if (tabBarShown) maxOf(TabBarMetrics.containerHeight, TabBarMetrics.fallbackContainerHeight) * (1f - tabBarHideFraction) else 0.dp
+    de.letzgo.stashy.ui.player.MiniPlayerBar(
+        visible = tabBarShown && !onFeeds,
+        modifier = modifier.padding(start = 12.dp, end = 12.dp, bottom = nav + barHeight + MiniPlayerBarGap),
+    ) { scene ->
+        Nav.push(de.letzgo.stashy.ui.scene.SceneDetailScreen(scene.id, scene, openedFromMiniPlayer = true))
+    }
 }
 
 @Composable

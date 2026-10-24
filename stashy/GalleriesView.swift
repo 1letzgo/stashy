@@ -1460,7 +1460,7 @@ struct FullScreenImageView: View {
                     dismiss()
                 }
             }
-            .toolbar(showUI ? .automatic : .hidden, for: .tabBar)
+            .miniPlayerAwareTabBar(hidden: !showUI)
             .safeAreaInset(edge: .top, spacing: 0) {
                 if showUI, !StashyChromePlacement.prefersBottom {
                     fullScreenImageNavBar

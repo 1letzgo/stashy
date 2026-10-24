@@ -96,6 +96,9 @@ struct MainTabView: View {
             .tint(appearanceManager.tintColor)
             .withToasts()
             .modifier(TabBarNeverMinimizes())
+            #if os(iOS)
+            .modifier(MiniPlayerHost(hidden: coordinator.selectedTab == .reels))
+            #endif
             .onAppear {
                 ServerConfigManager.shared.scrubPlaintextAPIKeysFromDisk()
                 checkConfiguration()
@@ -1057,3 +1060,64 @@ private struct TabBarNeverMinimizes: ViewModifier {
     }
 }
 #endif
+
+#if os(iOS)
+/// Puts the mini player above the tab bar and reopens its scene full screen on tap.
+private struct MiniPlayerHost: ViewModifier {
+    /// Feeds own the whole screen; the bar steps aside there (the engine is paused anyway).
+    var hidden: Bool
+    @ObservedObject private var store = MiniPlayerStore.shared
+
+    func body(content: Content) -> some View {
+        content
+            .modifier(MiniPlayerAccessory(
+                isEnabled: store.session != nil && !hidden,
+                floats: store.tabBarHiddenByPage
+            ))
+            .fullScreenCover(item: $store.expandedScene) { scene in
+                // The page shows Close instead of Back here; leaving hands the video back to the bar.
+                NavigationStack {
+                    SceneDetailView(scene: scene, autoPlay: true)
+                        .environment(\.stashyPresentedFromMiniPlayer, true)
+                }
+            }
+    }
+}
+
+/// iOS 26's tab bar accessory slot (the Music-style bar). Older systems, and pages that hide
+/// the tab bar (and with it the accessory), get a floating bar instead.
+private struct MiniPlayerAccessory: ViewModifier {
+    var isEnabled: Bool
+    /// The tab bar is hidden by the current page: float at the bottom edge.
+    var floats: Bool
+
+    func body(content: Content) -> some View {
+        if #available(iOS 26.1, *) {
+            content
+                .tabViewBottomAccessory(isEnabled: isEnabled && !floats) {
+                    MiniPlayerBar()
+                }
+                .overlay(alignment: .bottom) {
+                    floatingBar(visible: isEnabled && floats, bottomPadding: 8)
+                }
+        } else {
+            content.overlay(alignment: .bottom) {
+                floatingBar(visible: isEnabled, bottomPadding: floats ? 8 : 64)
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func floatingBar(visible: Bool, bottomPadding: CGFloat) -> some View {
+        if visible {
+            MiniPlayerBar()
+                .frame(height: 56)
+                .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 16))
+                .padding(.horizontal, 12)
+                .padding(.bottom, bottomPadding)
+                .transition(.move(edge: .bottom).combined(with: .opacity))
+        }
+    }
+}
+#endif
+

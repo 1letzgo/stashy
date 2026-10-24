@@ -1,0 +1,269 @@
+package de.letzgo.stashy.ui.player
+
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import de.letzgo.stashy.data.Scene
+import de.letzgo.stashy.data.SceneEditing
+import de.letzgo.stashy.data.SceneEvent
+import de.letzgo.stashy.data.SceneEvents
+import de.letzgo.stashy.data.TabManager
+import de.letzgo.stashy.ui.Appearance
+import de.letzgo.stashy.ui.SF
+import de.letzgo.stashy.ui.Theme
+import de.letzgo.stashy.ui.floatingShadow
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
+import kotlin.math.abs
+
+/**
+ * Pure rules of the mini player hand-off (iOS: the guards in `SceneDetailView.finishDisappearTeardown`,
+ * `takeEngineFromMiniPlayer` and `MiniPlayerBarContent`'s drag), kept apart for the unit tests.
+ */
+object MiniPlayerRules {
+    /** What a scene page does with the mini player when it starts playback or appears. */
+    enum class StartDecision {
+        /** The bar plays this scene: take its player back (no reload, no seek, no cover). */
+        TakeBack,
+        /** The bar plays another scene: close it (saves its position) before this one starts. */
+        CloseOther,
+        Nothing,
+    }
+
+    /** A page being left hands its player over instead of releasing it. */
+    fun handsOff(enabled: Boolean, playbackStarted: Boolean, isPlaying: Boolean, isDeleting: Boolean, inPictureInPicture: Boolean): Boolean =
+        enabled && playbackStarted && isPlaying && !isDeleting && !inPictureInPicture
+
+    /** [pageHasPlayer]: the page already runs its own player — nothing to take or close. */
+    fun onPageStart(miniSceneId: String?, pageSceneId: String, pageHasPlayer: Boolean): StartDecision = when {
+        pageHasPlayer || miniSceneId == null -> StartDecision.Nothing
+        miniSceneId == pageSceneId -> StartDecision.TakeBack
+        else -> StartDecision.CloseOther
+    }
+
+    /** iOS: swipe down more than 40 pt or sideways more than 120 pt closes the bar (values in dp). */
+    fun closesOnDrag(dx: Float, dy: Float): Boolean = dy > 40f || abs(dx) > 120f
+
+    fun progress(currentTime: Double, duration: Double): Float =
+        if (duration > 0 && currentTime.isFinite()) (currentTime / duration).coerceIn(0.0, 1.0).toFloat() else 0f
+
+    /** First two performers, else the studio, else nothing. */
+    fun subtitle(performerNames: List<String>, studioName: String?): String {
+        val names = performerNames.map { it.trim() }.filter { it.isNotEmpty() }.take(2).joinToString(", ")
+        return names.ifEmpty { studioName?.trim().orEmpty() }
+    }
+}
+
+/**
+ * iOS: `MiniPlayerStore` — keeps a scene playing after its detail page is left. The page hands
+ * its running [StashPlayer] over instead of releasing it; [MiniPlayerBar] above the tab bar draws
+ * it, and reopening the scene (from the bar, or by returning to the page) takes the same player
+ * back, so the video never reloads. Resume time and play duration keep syncing meanwhile.
+ */
+object MiniPlayerStore {
+    data class Session(
+        val scene: Scene,
+        val player: StashPlayer,
+        /** The page already counted this viewing as a play; the page taking it back must not again. */
+        val playRegistered: Boolean,
+        /** Server the scene belongs to — a switch closes the session. */
+        val serverId: String?,
+    )
+
+    var session by mutableStateOf<Session?>(null)
+        private set
+
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
+    private val tracker = PlaybackActivityTracker(scope)
+
+    /** Settings › Playback › "Mini player when leaving a scene". */
+    val isEnabled: Boolean get() = TabManager.isMiniPlayerEnabled
+
+    /** Takes over [player] from a scene page that is going away. Any other mini session ends. */
+    fun adopt(scene: Scene, player: StashPlayer, playRegistered: Boolean, serverId: String?) {
+        session?.let { if (it.player !== player) close() }
+        player.onTime = { seconds, duration ->
+            if (seconds >= 0) tracker.setPosition(seconds, if (duration > 0) duration else scene.sceneDuration ?: 0.0)
+        }
+        player.onPlayingChanged = { playing -> if (playing) tracker.start() else tracker.stop() }
+        // Captions and transcode toasts belong to the page; the bar only plays.
+        player.onTranscodeFallback = null
+        player.onFirstFrame = null
+        player.onReachedEnd = null
+
+        tracker.reset()
+        configureTracker(scene.id)
+        tracker.setPosition(player.currentTime, if (player.duration > 0) player.duration else scene.sceneDuration ?: 0.0)
+        if (player.isPlaying) tracker.start()
+        session = Session(scene, player, playRegistered, serverId)
+    }
+
+    /** Hands the player back to a page showing [sceneId], or null when the bar plays something else. */
+    fun take(sceneId: String): Session? {
+        val current = session?.takeIf { it.scene.id == sceneId } ?: return null
+        tracker.setPosition(current.player.currentTime, if (current.player.duration > 0) current.player.duration else current.scene.sceneDuration ?: 0.0)
+        tracker.stop()
+        current.player.onTime = null
+        current.player.onPlayingChanged = null
+        session = null
+        return current
+    }
+
+    /** Ends the mini session if it plays a different scene than the one about to start. */
+    fun yield(sceneId: String) {
+        if (session?.let { it.scene.id != sceneId } == true) close()
+    }
+
+    fun showsScene(sceneId: String): Boolean = session?.scene?.id == sceneId
+
+    fun togglePlayPause() { session?.player?.togglePlayPause() }
+
+    /** iOS `stashyPauseBackgroundPlayers` (Feeds took over the screen). */
+    fun pause() { session?.player?.pause() }
+
+    /** Closes a session that belongs to another server than [serverId] (iOS `ServerConfigChanged`). */
+    fun onServerChanged(serverId: String?) {
+        if (session?.let { it.serverId != serverId } == true) close()
+    }
+
+    /** Saves the position and releases the player. */
+    fun close() {
+        val current = session ?: return
+        val p = current.player
+        tracker.setPosition(p.currentTime, if (p.duration > 0) p.duration else current.scene.sceneDuration ?: 0.0)
+        tracker.stop()
+        p.onTime = null
+        p.onPlayingChanged = null
+        p.pause()
+        p.release()
+        session = null
+    }
+
+    /** Same save path as the scene page (`SceneDetailModel.configureTracker`). */
+    private fun configureTracker(sceneId: String) {
+        tracker.updatesResumeTime = true
+        tracker.onSave = { resume, played ->
+            scope.launch {
+                val ok = runCatching { SceneEditing.saveActivity(sceneId, resume, played) }.isSuccess
+                if (ok && resume != null) SceneEvents.post(SceneEvent.ResumeTimeUpdated(sceneId, resume))
+            }
+        }
+    }
+}
+
+/**
+ * iOS: `MiniPlayerBar` — live picture, title, performers / studio, play/pause, close and a tint
+ * progress line. Tap reopens the scene ([onExpand]); a swipe down or sideways closes it.
+ */
+@Composable
+fun MiniPlayerBar(visible: Boolean, modifier: Modifier = Modifier, onExpand: (Scene) -> Unit) {
+    val session = MiniPlayerStore.session
+    AnimatedVisibility(
+        visible && session != null, modifier,
+        enter = fadeIn() + slideInVertically { it / 2 },
+        exit = fadeOut() + slideOutVertically { it / 2 },
+    ) {
+        // Keeps drawing the last session while the exit animation runs.
+        val shown = remember { mutableStateOf(session) }
+        if (session != null) shown.value = session
+        shown.value?.let { MiniPlayerBarContent(it, onExpand) }
+    }
+}
+
+@Composable
+private fun MiniPlayerBarContent(session: MiniPlayerStore.Session, onExpand: (Scene) -> Unit) {
+    val p = Theme.palette
+    val player = session.player
+    val scene = session.scene
+    val density = LocalDensity.current
+    var dragX by remember { mutableFloatStateOf(0f) }
+    var dragY by remember { mutableFloatStateOf(0f) }
+    val subtitle = MiniPlayerRules.subtitle(scene.performers.map { it.name }, scene.studio?.name)
+    val playing = player.isPlaying || player.playWhenReady
+    val progress = MiniPlayerRules.progress(player.currentTime, player.duration)
+
+    Box(
+        Modifier.fillMaxWidth().height(56.dp)
+            .graphicsLayer {
+                translationY = maxOf(dragY, 0f)
+                val dy = with(density) { maxOf(dragY, 0f).toDp().value }
+                alpha = 1f - (dy / 80f).coerceIn(0f, 0.6f)
+            }
+            .floatingShadow(RoundedCornerShape(16.dp))
+            .clip(RoundedCornerShape(16.dp))
+            .background(p.secondaryBackground)
+            .pointerInput(session.scene.id) {
+                detectDragGestures(
+                    onDragStart = { dragX = 0f; dragY = 0f },
+                    onDragCancel = { dragX = 0f; dragY = 0f },
+                    onDragEnd = {
+                        val dx = with(density) { dragX.toDp().value }
+                        val dy = with(density) { dragY.toDp().value }
+                        dragX = 0f; dragY = 0f
+                        if (MiniPlayerRules.closesOnDrag(dx, dy)) MiniPlayerStore.close()
+                    },
+                ) { change, amount -> change.consume(); dragX += amount.x; dragY += amount.y }
+            }
+            .clickable { onExpand(scene) }
+            .semantics { contentDescription = "Mini player: ${scene.displayTitle}. Opens the scene" },
+    ) {
+        Row(
+            Modifier.fillMaxWidth().fillMaxHeight().padding(start = 8.dp, end = 6.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            VideoSurface(player, Modifier.size(width = 64.dp, height = 36.dp).clip(RoundedCornerShape(6.dp)), fill = true)
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(1.dp)) {
+                Text(scene.displayTitle, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = p.text, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                if (subtitle.isNotEmpty()) Text(subtitle, fontSize = 12.sp, color = p.secondaryText, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            }
+            IconButton(onClick = { MiniPlayerStore.togglePlayPause() }, modifier = Modifier.size(40.dp)) {
+                Icon(if (playing) SF.pauseFill else SF.playFill, if (playing) "Pause" else "Play", tint = p.text)
+            }
+            IconButton(onClick = { MiniPlayerStore.close() }, modifier = Modifier.size(36.dp)) {
+                Icon(SF.xmark, "Close mini player", tint = p.text, modifier = Modifier.size(20.dp))
+            }
+        }
+        Box(Modifier.align(Alignment.BottomStart).padding(horizontal = 12.dp).fillMaxWidth().height(2.dp)) {
+            Box(Modifier.fillMaxWidth(progress).height(2.dp).clip(RoundedCornerShape(1.dp)).background(Appearance.tint))
+        }
+    }
+}

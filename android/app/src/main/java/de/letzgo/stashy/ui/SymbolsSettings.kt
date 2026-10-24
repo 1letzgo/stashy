@@ -23,6 +23,8 @@ object SFS {
     val serverRack = Icons.Outlined.Dns
     val uiwindowSplit = Icons.Outlined.ViewAgenda
     val pip = Icons.Outlined.PictureInPictureAlt
+    /** iOS `rectangle.bottomhalf.inset.filled` (mini player). */
+    val miniPlayer = Icons.Outlined.CallToAction
     val goforward = Icons.Outlined.Refresh
     val goforward10 = Icons.Filled.Forward10
     val arrowUpLeftDownRight = Icons.Filled.OpenInFull

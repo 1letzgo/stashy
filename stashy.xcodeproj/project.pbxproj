@@ -96,6 +96,7 @@
 		AE7E0000000000000000B052 /* LocalDownloadStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE7E0000000000000000B051 /* LocalDownloadStore.swift */; };
 		AE7E0000000000000000B053 /* LocalDownloadStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE7E0000000000000000B051 /* LocalDownloadStore.swift */; };
 		AE7E0000000000000000B062 /* AetherVideoSurface.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE7E0000000000000000B061 /* AetherVideoSurface.swift */; };
+		C0A7F1200000000000000002 /* MiniPlayerStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0A7F1200000000000000001 /* MiniPlayerStore.swift */; };
 		AE7E0000000000000000B063 /* AetherVideoSurface.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE7E0000000000000000B061 /* AetherVideoSurface.swift */; };
 		AE7E0000000000000000B072 /* AetherPreviewPlayer.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE7E0000000000000000B071 /* AetherPreviewPlayer.swift */; };
 		AE7E0000000000000000B073 /* AetherPreviewPlayer.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE7E0000000000000000B071 /* AetherPreviewPlayer.swift */; };
@@ -216,6 +217,7 @@
 		MAC000000000000000000006 /* PlayerMenuButton.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE7E0000000000000000B0C1 /* PlayerMenuButton.swift */; };
 		MAC000000000000000000007 /* LocalDownloadStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE7E0000000000000000B051 /* LocalDownloadStore.swift */; };
 		MAC000000000000000000008 /* AetherVideoSurface.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE7E0000000000000000B061 /* AetherVideoSurface.swift */; };
+		C0A7F1200000000000000003 /* MiniPlayerStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0A7F1200000000000000001 /* MiniPlayerStore.swift */; };
 		MAC000000000000000000009 /* AetherPreviewPlayer.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE7E0000000000000000B071 /* AetherPreviewPlayer.swift */; };
 		MAC00000000000000000000A /* AcknowledgementsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE7E0000000000000000B031 /* AcknowledgementsView.swift */; };
 		MAC00000000000000000000B /* SceneGalleriesCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = DF675E732F2A6392004CA019 /* SceneGalleriesCard.swift */; };
@@ -407,6 +409,7 @@
 		AE7E0000000000000000B041 /* AetherSceneSurface.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AetherSceneSurface.swift; sourceTree = "<group>"; };
 		AE7E0000000000000000B051 /* LocalDownloadStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalDownloadStore.swift; sourceTree = "<group>"; };
 		AE7E0000000000000000B061 /* AetherVideoSurface.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AetherVideoSurface.swift; sourceTree = "<group>"; };
+		C0A7F1200000000000000001 /* MiniPlayerStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MiniPlayerStore.swift; sourceTree = "<group>"; };
 		AE7E0000000000000000B071 /* AetherPreviewPlayer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AetherPreviewPlayer.swift; sourceTree = "<group>"; };
 		AE7E0000000000000000B0B1 /* AetherTimeBar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AetherTimeBar.swift; sourceTree = "<group>"; };
 		AE7E0000000000000000B0C1 /* PlayerMenuButton.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlayerMenuButton.swift; sourceTree = "<group>"; };
@@ -677,6 +680,7 @@
 				AE7E0000000000000000B0C1 /* PlayerMenuButton.swift */,
 				AE7E0000000000000000B051 /* LocalDownloadStore.swift */,
 				AE7E0000000000000000B061 /* AetherVideoSurface.swift */,
+				C0A7F1200000000000000001 /* MiniPlayerStore.swift */,
 				AE7E0000000000000000B071 /* AetherPreviewPlayer.swift */,
 			);
 			path = Playback;
@@ -975,6 +979,7 @@
 				AE7E0000000000000000B0C2 /* PlayerMenuButton.swift in Sources */,
 				AE7E0000000000000000B052 /* LocalDownloadStore.swift in Sources */,
 				AE7E0000000000000000B062 /* AetherVideoSurface.swift in Sources */,
+				C0A7F1200000000000000002 /* MiniPlayerStore.swift in Sources */,
 				AE7E0000000000000000B072 /* AetherPreviewPlayer.swift in Sources */,
 				AE7E0000000000000000B032 /* AcknowledgementsView.swift in Sources */,
 				DF675E7A2F2A6392004CA019 /* SceneGalleriesCard.swift in Sources */,
@@ -1181,6 +1186,7 @@
 				MAC000000000000000000006 /* PlayerMenuButton.swift in Sources */,
 				MAC000000000000000000007 /* LocalDownloadStore.swift in Sources */,
 				MAC000000000000000000008 /* AetherVideoSurface.swift in Sources */,
+				C0A7F1200000000000000003 /* MiniPlayerStore.swift in Sources */,
 				MAC000000000000000000009 /* AetherPreviewPlayer.swift in Sources */,
 				MAC00000000000000000000A /* AcknowledgementsView.swift in Sources */,
 				MAC00000000000000000000B /* SceneGalleriesCard.swift in Sources */,

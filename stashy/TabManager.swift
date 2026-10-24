@@ -611,6 +611,12 @@ class TabManager: ObservableObject {
             UserDefaults.standard.set(isPiPEnabled, forKey: isPiPEnabledKey)
         }
     }
+    /// Leaving a playing scene keeps it running in the mini bar above the tab bar.
+    @Published var isMiniPlayerEnabled: Bool = true {
+        didSet {
+            UserDefaults.standard.set(isMiniPlayerEnabled, forKey: isMiniPlayerEnabledKey)
+        }
+    }
     /// Feeds overlay: optional delete button between Rating and Mute.
     @Published var reelsShowsDeleteButton: Bool = false {
         didSet {
@@ -661,6 +667,7 @@ class TabManager: ObservableObject {
     private let reelsFillHeightKey = "ReelsFillHeight"
     private let reelsContinuousPlayKey = "ReelsContinuousPlay"
     private let isPiPEnabledKey = "isPiPEnabled"
+    private let isMiniPlayerEnabledKey = "isMiniPlayerEnabled"
     private let playerSkipSecondsKey = "playerSkipSeconds"
     private let showsPlayerSkipButtonsKey = "showsPlayerSkipButtons"
     private let playerAutoZoomKey = "playerAutoZoom"
@@ -719,6 +726,7 @@ class TabManager: ObservableObject {
         self.reelsFillHeight = UserDefaults.standard.object(forKey: reelsFillHeightKey) as? Bool ?? true
         self.reelsContinuousPlay = UserDefaults.standard.bool(forKey: reelsContinuousPlayKey)
         self.isPiPEnabled = UserDefaults.standard.object(forKey: isPiPEnabledKey) as? Bool ?? true
+        self.isMiniPlayerEnabled = UserDefaults.standard.object(forKey: isMiniPlayerEnabledKey) as? Bool ?? true
         let storedSkip = UserDefaults.standard.object(forKey: playerSkipSecondsKey) as? Double ?? 10
         self.playerSkipSeconds = Self.playerSkipOptions.contains(storedSkip) ? storedSkip : 10
         self.showsPlayerSkipButtons = UserDefaults.standard.object(forKey: showsPlayerSkipButtonsKey) as? Bool ?? true
