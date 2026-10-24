@@ -6,14 +6,17 @@
 //  Ascension plugin (`ascension.js` calculateMatchOutcome / getProgressiveKFactor).
 //  (hotornot_stats, rating100, performer_record).
 //
+//  Model, math and `HotOrNotViewModel` are shared with tvOS (`stashyTV/TVMatchView.swift`);
+//  only the SwiftUI screens below are iOS-only.
+//
 
-#if !os(tvOS)
+import Combine
 import Foundation
 import SwiftUI
 
 // MARK: - Plugin-compatible stats
 
-private struct HotOrNotStats: Codable, Equatable {
+struct HotOrNotStats: Codable, Equatable {
     var total_matches: Int
     var wins: Int
     var losses: Int
@@ -77,7 +80,7 @@ private struct HotOrNotStats: Codable, Equatable {
     }
 }
 
-private struct HotOrNotMatchRecord: Codable, Equatable {
+struct HotOrNotMatchRecord: Codable, Equatable {
     let date: String
     let opponent: String
     let won: Bool?
@@ -86,7 +89,7 @@ private struct HotOrNotMatchRecord: Codable, Equatable {
 
 // MARK: - Math (matches plugin math-utils.js)
 
-private enum HotOrNotSwissMath {
+enum HotOrNotSwissMath {
 
     /// Stash `custom_fields` may encode `hotornot_stats` as a JSON **string** (plugin) or as a structured **object** (GraphQL).
     private static func intFromStashJSON(_ v: StashJSONValue?) -> Int {
@@ -400,7 +403,7 @@ private enum HotOrNotSwissMath {
 
 // MARK: - GraphQL response types
 
-private struct HotOrNotPerformerData: Codable {
+struct HotOrNotPerformerData: Codable {
     let id: String
     let name: String
     let disambiguation: String?
@@ -493,7 +496,7 @@ private struct HotOrNotPerformerData: Codable {
 }
 
 /// Fixed 3×2 grid for battle cards: same fields always; empty → "—".
-private func hotOrNotBattleFixedInfoRows(_ p: HotOrNotPerformerData) -> [(label: String, value: String)] {
+func hotOrNotBattleFixedInfoRows(_ p: HotOrNotPerformerData) -> [(label: String, value: String)] {
     let dash = "—"
     let rating = "\(p.rating100 ?? 50)"
     let genderVal: String = {
@@ -529,6 +532,8 @@ private func hotOrNotBattleFixedInfoRows(_ p: HotOrNotPerformerData) -> [(label:
         ("TITS", titsVal)
     ]
 }
+
+#if !os(tvOS)
 
 /// Clips the performer photo: only the **top** corners match the card radius; the **bottom** edge stays square (no rounding).
 private struct HotOrNotPhotoTopClipShape: Shape {
@@ -851,23 +856,25 @@ private struct HotOrNotGauntletStarterPickCard: View {
     }
 }
 
-private struct HotOrNotFindResult: Codable {
+#endif
+
+struct HotOrNotFindResult: Codable {
     let count: Int
     let performers: [HotOrNotPerformerData]
 }
 
-private struct HotOrNotFindData: Codable {
+struct HotOrNotFindData: Codable {
     let findPerformers: HotOrNotFindResult
 }
 
-private struct HotOrNotFindResponse: Codable {
+struct HotOrNotFindResponse: Codable {
     let data: HotOrNotFindData?
 }
 
 // MARK: - Battle rank (Performer detail header; same pool as Charts)
 
 /// Paginates `findPerformers` for Hot or Not leaderboards. Not isolated to `@MainActor` so `HotOrNotBattleDisplay` can use the same value in Swift 6.
-private enum HotOrNotLeaderboardPaging {
+enum HotOrNotLeaderboardPaging {
     static let perPage = 50
 }
 
@@ -934,20 +941,20 @@ enum HotOrNotBattleDisplay {
     }
 }
 
-private struct HotOrNotMutationData: Codable {
+struct HotOrNotMutationData: Codable {
     let performerUpdate: HotOrNotUpdated?
 }
 
-private struct HotOrNotUpdated: Codable {
+struct HotOrNotUpdated: Codable {
     let id: String
 }
 
-private struct HotOrNotMutationResponse: Codable {
+struct HotOrNotMutationResponse: Codable {
     let data: HotOrNotMutationData?
 }
 
 /// Per-side duel outcome: `delta100` is the change in Stash `rating100` (Ascension-style math / server update); `rating100After` is the clamped new value.
-private struct HotOrNotDuelVoteFeedback: Equatable {
+struct HotOrNotDuelVoteFeedback: Equatable {
     struct Side: Equatable {
         let delta100: Int
         let rating100After: Int
@@ -960,7 +967,7 @@ private struct HotOrNotDuelVoteFeedback: Equatable {
 // MARK: - ViewModel
 
 @MainActor
-private final class HotOrNotViewModel: ObservableObject {
+final class HotOrNotViewModel: ObservableObject {
     enum Section: String, CaseIterable {
         case battle = "Game"
         case leaderboard = "Charts"
@@ -1490,7 +1497,9 @@ private final class HotOrNotViewModel: ObservableObject {
             pendingRating100ByPerformerId[winner.id] = newW
             pendingRating100ByPerformerId[loser.id] = newL
             applyClimbAfterVote(winner: winner, loser: loser, newWinnerRating: newW, newLoserRating: newL)
+            #if !os(tvOS)
             HapticManager.light()
+            #endif
             withAnimation(.easeOut(duration: 0.18)) {
                 duelFeedback = feedback
             }
@@ -1552,7 +1561,9 @@ private final class HotOrNotViewModel: ObservableObject {
             try await pushPerformerUpdate(performer: r, newRating: newR, won: nil, opponentId: l.id, opponentName: l.name)
             pendingRating100ByPerformerId[l.id] = newL
             pendingRating100ByPerformerId[r.id] = newR
+            #if !os(tvOS)
             HapticManager.light()
+            #endif
             withAnimation(.easeOut(duration: 0.18)) {
                 duelFeedback = feedback
             }
@@ -1615,7 +1626,9 @@ private final class HotOrNotViewModel: ObservableObject {
     }
 }
 
-// MARK: - UI
+#if !os(tvOS)
+
+// MARK: - UI (iOS)
 
 struct HotOrNotToolsView: View {
     @StateObject private var model = HotOrNotViewModel()

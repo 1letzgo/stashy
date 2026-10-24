@@ -38,7 +38,6 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -55,6 +54,12 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Shadow
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
@@ -72,7 +77,6 @@ import de.letzgo.stashy.ui.NativeTabStrip
 import de.letzgo.stashy.ui.NativeTopBar
 import de.letzgo.stashy.ui.OverflowItem
 import de.letzgo.stashy.ui.TopBarAction
-import de.letzgo.stashy.ui.TopBarMenuAction
 import de.letzgo.stashy.ui.TopBarOverflowMenu
 import de.letzgo.stashy.ui.nativeTopBarPadding
 import de.letzgo.stashy.ui.SF
@@ -102,11 +106,13 @@ internal object Dock {
 /** Section icons in the detail chrome bar (iOS `PerformerDetailView.DetailTab` & co.). */
 enum class DetailTab(val title: String) {
     Scenes("Scenes"), Galleries("Galleries"), Studios("Studios"), Performers("Performers"),
-    Tags("Tags"), Groups("Groups"), Images("Images");
+    Tags("Tags"), Groups("Groups"), Images("Images"),
+    /** Performer detail only: performers who share scenes with this one ([de.letzgo.stashy.data.CoPerformersRepository]). */
+    AppearsWith("Appears with");
 
     val icon: ImageVector get() = when (this) {
         Scenes -> SF.film; Galleries -> SF.photoStack; Studios -> SF.building2; Performers -> SF.personFill
-        Tags -> SF.tag; Groups -> SF.rectangleStackFill; Images -> SF.photo
+        Tags -> SF.tag; Groups -> SF.rectangleStackFill; Images -> SF.photo; AppearsWith -> SF.person2
     }
 }
 
@@ -149,7 +155,7 @@ internal fun DockIconButton(
 /**
  * iOS: the detail chrome bar (`StashySectionChromeBar`: Back · section icons · Favorite · Edit)
  * plus the floating list slots (`CatalogSlotBar`), as one native Material top app bar:
- * back arrow · [title] · slot icons (download state …) · sort `DropdownMenu` or the catalog
+ * back arrow · [title] · slot icons (download state …) · the catalog
  * "Settings" action ([settings], opens the filter & sort sheet) · favorite ·
  * "⋮" overflow (slots marked [ChromeSlot.inOverflow] such as card columns, and Edit). The
  * sections become a [NativeTabStrip] under the bar, shown only when more than one has content.
@@ -161,7 +167,6 @@ internal fun DetailTopBar(
     selected: DetailTab?,
     onSelect: (DetailTab) -> Unit,
     slots: List<ChromeSlot> = emptyList(),
-    sortMenu: (@Composable (dismiss: () -> Unit) -> Unit)? = null,
     settings: de.letzgo.stashy.ui.catalog.CatalogChromeSlot? = null,
     isFavorite: Boolean? = null,
     favoriteBusy: Boolean = false,
@@ -173,9 +178,6 @@ internal fun DetailTopBar(
         NativeTopBar(title) {
             slots.filter { !it.inOverflow }.forEach { s ->
                 TopBarAction(s.icon, s.label, tint = if (s.isActive) Appearance.tint else null, onClick = s.onClick)
-            }
-            if (sortMenu != null) {
-                TopBarMenuAction(androidx.compose.material.icons.Icons.AutoMirrored.Filled.Sort, "Sort") { dismiss -> sortMenu(dismiss) }
             }
             settings?.let { de.letzgo.stashy.ui.catalog.FilterSortAction(it) }
             if (isFavorite != null) {
@@ -223,33 +225,76 @@ object DetailFeedsLink {
     }
 }
 
-/** iOS: Feeds pill in the header (`AppTab.reels.icon` + "Feeds") — Material `AssistChip`. */
+/**
+ * iOS `DetailHeroFeedsButton`: compact 24dp capsule, tint-washed fill, pill-accent icon + "Feeds".
+ * [contentColor] overrides the accent (over a picture).
+ */
 @Composable
-internal fun FeedsPill(onClick: () -> Unit) {
-    de.letzgo.stashy.ui.components.ActionChip("Feeds", onClick, icon = SF.playRectangleOnRectangle)
+internal fun FeedsPill(contentColor: Color? = null, onClick: () -> Unit) {
+    HeroPill("Open in Feeds", onClick, contentColor) { color ->
+        Icon(SF.playRectangleOnRectangle, null, tint = color, modifier = Modifier.size(13.dp))
+        Text("Feeds", fontSize = 12.sp, lineHeight = 14.sp, fontWeight = FontWeight.Bold, color = color, maxLines = 1)
+    }
 }
 
-/** 2-column label/value grid of the detail headers (8pt uppercase label, 11pt medium value). */
+/** Expand/collapse chevron pill, same chrome and height as [FeedsPill] (iOS `detailHeroPill`). */
 @Composable
-internal fun DetailItemsGrid(items: List<DetailItem>) {
-    val p = Theme.palette
-    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-        items.chunked(2).forEach { row ->
-            Row(Modifier.fillMaxWidth()) {
+internal fun ExpandPill(expanded: Boolean, onToggle: () -> Unit) {
+    HeroPill(if (expanded) "Show less" else "Show more", onToggle) { color ->
+        Icon(if (expanded) SF.chevronUp else SF.chevronDown, null, tint = color, modifier = Modifier.size(13.dp))
+    }
+}
+
+/** iOS `DetailHeroPillModifier`: 24pt capsule, 10pt horizontal padding, tint 0.15 fill. */
+@Composable
+private fun HeroPill(label: String, onClick: () -> Unit, contentColor: Color? = null, content: @Composable RowScope.(Color) -> Unit) {
+    val color = contentColor ?: Theme.palette.pillAccent
+    Row(
+        Modifier.heightIn(min = 24.dp).clip(CircleShape)
+            .background(if (contentColor != null) Color.Black.copy(alpha = 0.45f) else Appearance.tint.copy(alpha = 0.15f))
+            .clickable(onClickLabel = label, role = Role.Button, onClick = onClick)
+            .semantics { contentDescription = label }
+            .padding(horizontal = 10.dp, vertical = 4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(4.dp),
+    ) { content(color) }
+}
+
+/** Columns of the legacy [DetailHeaderCard] grid; collapsed headers show whole rows of it. */
+internal const val DetailGridColumns = 2
+
+/** iOS `DetailHeroCard.infoGrid`: `min(max(count, 2), 4)` flexible columns. */
+internal fun heroGridColumns(count: Int): Int = count.coerceIn(2, 4)
+
+/**
+ * Label/value grid of the detail headers (8pt uppercase label, 11pt medium value, one line each).
+ * [shadow] adds the iOS text shadow used on a picture.
+ */
+@Composable
+internal fun DetailItemsGrid(
+    items: List<DetailItem>,
+    labelColor: Color = Theme.palette.secondaryText,
+    valueColor: Color = Theme.palette.text,
+    columns: Int = DetailGridColumns,
+    shadow: Boolean = false,
+) {
+    val textShadow = if (shadow) Shadow(Color.Black.copy(alpha = 0.4f), Offset(0f, 2f), 4f) else null
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        items.chunked(columns).forEach { row ->
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 row.forEach { d ->
-                    Column(Modifier.weight(1f)) {
-                        Text(d.label.uppercase(), fontSize = 8.sp, lineHeight = 10.sp, color = p.secondaryText)
-                        // 2 lines: half-width column, so a large font scale wraps instead of cutting the value.
-                        Text(d.value, fontSize = 11.sp, lineHeight = 13.sp, fontWeight = FontWeight.Medium, color = p.text, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(1.dp)) {
+                        Text(d.label.uppercase(), fontSize = 8.sp, lineHeight = 10.sp, color = labelColor, maxLines = 1, overflow = TextOverflow.Ellipsis, style = TextStyle(shadow = textShadow))
+                        Text(d.value, fontSize = 11.sp, lineHeight = 13.sp, fontWeight = FontWeight.Medium, color = valueColor, maxLines = 1, overflow = TextOverflow.Ellipsis, style = TextStyle(shadow = textShadow))
                     }
                 }
-                if (row.size == 1) Spacer(Modifier.weight(1f))
+                repeat(columns - row.size) { Spacer(Modifier.weight(1f)) }
             }
         }
     }
 }
 
-/** Round expand/collapse chevron at the header's bottom-right. */
+/** Round expand/collapse chevron at the header's bottom-right ([DetailHeaderCard]). */
 @Composable
 internal fun BoxScope.HeaderExpandButton(expanded: Boolean, onToggle: () -> Unit) {
     Box(
@@ -293,11 +338,10 @@ internal fun DetailHeaderCard(
     expandedContent: (@Composable ColumnScope.() -> Unit)? = null,
 ) {
     val p = Theme.palette
-    val collapsedHeight = 115.dp
     HeaderCardFrame {
         // The text column sets the height; the strip matches it (no intrinsics: Coil's
         // SubcomposeAsyncImage cannot answer intrinsic measurements).
-        Box(Modifier.fillMaxWidth().heightIn(min = collapsedHeight)) {
+        Box(Modifier.fillMaxWidth().heightIn(min = 115.dp)) {
             Box(Modifier.matchParentSize()) {
             Box(
                 Modifier.width(72.dp).fillMaxHeight()
@@ -314,7 +358,7 @@ internal fun DetailHeaderCard(
             }
             }
             Column(
-                Modifier.fillMaxWidth().heightIn(min = collapsedHeight).padding(start = 72.dp + 12.dp, end = 12.dp, top = 10.dp, bottom = 10.dp),
+                Modifier.fillMaxWidth().heightIn(min = 115.dp).padding(start = 72.dp + 12.dp, end = 12.dp, top = 10.dp, bottom = 10.dp),
                 verticalArrangement = Arrangement.spacedBy(4.dp),
             ) {
                 Row(verticalAlignment = Alignment.Top, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -322,7 +366,7 @@ internal fun DetailHeaderCard(
                         title, Modifier.weight(1f), style = IosTypography.title2.copy(fontWeight = FontWeight.Bold), color = p.text,
                         maxLines = if (expanded) Int.MAX_VALUE else titleMaxLines, overflow = TextOverflow.Ellipsis,
                     )
-                    if (onFeeds != null) FeedsPill(onFeeds)
+                    if (onFeeds != null) FeedsPill(onClick = onFeeds)
                 }
                 val visible = if (expanded) items else items.take(4)
                 if (visible.isNotEmpty()) DetailItemsGrid(visible)
@@ -365,18 +409,6 @@ internal class ChromeSlot(
     val inOverflow: Boolean = false,
     val onClick: () -> Unit,
 )
-
-/** Sort entries with a checkmark on the current one (iOS sort `Picker` in the filter sheet). */
-@Composable
-internal fun <S : SortChoice> SortMenuItems(options: List<S>, current: S, dismiss: () -> Unit, onPick: (S) -> Unit) {
-    options.forEach { o ->
-        DropdownMenuItem(
-            text = { Text(o.label) },
-            trailingIcon = { if (o == current) Icon(SF.checkmark, null) },
-            onClick = { dismiss(); onPick(o) },
-        )
-    }
-}
 
 // MARK: - Edit sheets
 

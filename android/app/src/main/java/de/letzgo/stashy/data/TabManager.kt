@@ -116,6 +116,9 @@ object TabManager {
     var playerSkipSeconds: Double get() = _playerSkipSeconds.value; set(v) { _playerSkipSeconds.value = v; Prefs.setFloat("playerSkipSeconds", v.toFloat()) }
     private val _showsPlayerSkipButtons = bool("showsPlayerSkipButtons", true)
     var showsPlayerSkipButtons: Boolean get() = _showsPlayerSkipButtons.value; set(v) { _showsPlayerSkipButtons.value = v; Prefs.setBool("showsPlayerSkipButtons", v) }
+    /** Settings › Playback › Player › "Start muted without headphones" (read by `PlayerMute`). */
+    private val _playbackMuteWithoutHeadphones = bool("playbackMuteWithoutHeadphones", true)
+    var playbackMuteWithoutHeadphones: Boolean get() = _playbackMuteWithoutHeadphones.value; set(v) { _playbackMuteWithoutHeadphones.value = v; Prefs.setBool("playbackMuteWithoutHeadphones", v) }
     private val _playerAutoZoom = bool("playerAutoZoom", false)
     var playerAutoZoom: Boolean get() = _playerAutoZoom.value; set(v) { _playerAutoZoom.value = v; Prefs.setBool("playerAutoZoom", v) }
     /** iOS: Settings › Playback › "Playback activity" (Stash web `trackActivity`). Off: no play count,
@@ -126,8 +129,6 @@ object TabManager {
     val activityPausedSceneIds: MutableSet<String> = java.util.concurrent.ConcurrentHashMap.newKeySet()
     /** The global switch and the per-scene pause from the player menu. */
     fun tracksActivity(sceneId: String): Boolean = tracksPlaybackActivity && sceneId !in activityPausedSceneIds
-    private val _playerDolbyVision = bool("player_dolby_vision_enabled", true)
-    var playerDolbyVisionEnabled: Boolean get() = _playerDolbyVision.value; set(v) { _playerDolbyVision.value = v; Prefs.setBool("player_dolby_vision_enabled", v) }
     private val _playCountPlayerSeconds = dbl("play_count_player_seconds", 1.0, playCountThresholdOptions)
     var playCountPlayerSeconds: Double get() = _playCountPlayerSeconds.value; set(v) { _playCountPlayerSeconds.value = v; Prefs.setFloat("play_count_player_seconds", v.toFloat()) }
     private val _playCountFeedsSeconds = dbl("play_count_feeds_seconds", 30.0, playCountThresholdOptions)

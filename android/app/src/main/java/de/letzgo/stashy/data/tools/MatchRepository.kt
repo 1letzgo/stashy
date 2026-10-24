@@ -138,9 +138,10 @@ object MatchRepository {
     /** iOS: `thumbnailURL(for:)` — absolute `image_path`, else `<base>/performer/<id>/image`, signed. */
     fun thumbnailURL(p: Performer): String? {
         val path = p.imagePath
-        if (path != null && (path.startsWith("http://") || path.startsWith("https://"))) return Net.signed(path)
+        val bust = { url: String -> Net.signed(de.letzgo.stashy.data.ImageBusters.apply(url, de.letzgo.stashy.data.ImageBusters.Kind.Performer, p.id)) }
+        if (path != null && (path.startsWith("http://") || path.startsWith("https://"))) return bust(path)
         val config = ServerConfigManager.activeConfig?.takeIf { it.hasValidConfig } ?: return null
-        return Net.signed("${config.baseURL}/performer/${p.id}/image")
+        return bust("${config.baseURL}/performer/${p.id}/image")
     }
 
     // MARK: Mutation

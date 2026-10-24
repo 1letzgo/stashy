@@ -38,7 +38,8 @@ struct FilterCriteriaEditorView: View {
     private var addableFields: [FilterFieldDescriptor] {
         FilterFieldCatalog.addableFields(
             for: document.mode,
-            excludingKeys: Set(levelKeys)
+            // Present keys too: a hidden one (the search field's name/title regex) must not be re-added.
+            excludingKeys: Set(levelKeys).union(document.node(at: path).keys)
         )
     }
 

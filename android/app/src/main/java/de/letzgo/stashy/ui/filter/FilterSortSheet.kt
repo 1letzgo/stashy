@@ -15,7 +15,22 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardCapitalization
+import androidx.compose.ui.text.input.KeyboardType
+import de.letzgo.stashy.ui.NativeGroupShape
+import de.letzgo.stashy.ui.SF
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
@@ -68,6 +83,8 @@ fun CatalogFilterSortSheet(
     controller: CatalogController<*>,
     /** Resets chip state the controller does not own (images "Type") before the criteria reset. */
     onReset: () -> Unit = {},
+    /** List-specific sorts offered first in the sort menu (performer "Appears with": Shared scenes). */
+    extraSorts: List<SortOption> = emptyList(),
     extraCards: @Composable () -> Unit = {},
 ) {
     if (!controller.isSheetPresented) return
@@ -93,13 +110,15 @@ fun CatalogFilterSortSheet(
             // card, 32 bottom padding. Cards and quick sections share the 16 dp left edge.
             Column(Modifier.verticalScroll(rememberScrollState()).padding(top = 8.dp, bottom = 32.dp)) {
                 Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                    if (controller.supportsNameRegex) NameRegexSearchField(controller.nameRegex) { controller.commitNameRegex(it) }
                     Column {
                         // Header text lines up with the group's row text (Material settings look).
                         NativeSectionHeader("Filter & sort", Modifier.padding(horizontal = 16.dp))
                         ControlGroup {
                             FilterPickerCard(controller)
                             NativeDivider()
-                            SortCard(controller.mode, controller.sort) { controller.changeSort(it) }
+                            // Groups use the generic card too (their field kinds live in `SortCatalog`).
+                            SortCard(controller.mode, controller.sort, extraSorts) { controller.changeSort(it) }
                         }
                     }
                     extraCards()
@@ -140,6 +159,59 @@ fun CatalogFilterSortSheet(
 
 private enum class NameDialog { SaveAs, Rename }
 
+/**
+ * Mini search field at the top of the catalog sheet: "Name or regex" → a live chip on the
+ * entity's name / title ([de.letzgo.stashy.data.NameRegexFilter]). Commits only on IME
+ * Search / Done and on clear — never per keystroke; [onCommit] returns false for an invalid
+ * pattern, which stays in the field with "Invalid regex" and is not applied.
+ */
+@Composable
+fun NameRegexSearchField(committed: String, onCommit: (String) -> Boolean) {
+    val p = Theme.palette
+    // Re-seeded whenever the committed value changes elsewhere (Reset, preset load).
+    var draft by remember(committed) { mutableStateOf(committed) }
+    var invalid by remember(committed) { mutableStateOf(false) }
+    val focusManager = LocalFocusManager.current
+    val commit = {
+        if (onCommit(draft)) { invalid = false; focusManager.clearFocus() } else invalid = true
+    }
+    Column(Modifier.padding(horizontal = 16.dp)) {
+        Row(
+            Modifier.fillMaxWidth().height(44.dp).clip(NativeGroupShape).background(p.secondaryBackground)
+                .padding(start = 12.dp, end = 4.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Icon(SF.magnifyingglass, null, Modifier.size(20.dp), tint = p.secondaryText)
+            Spacer(Modifier.width(8.dp))
+            Box(Modifier.weight(1f), contentAlignment = Alignment.CenterStart) {
+                if (draft.isEmpty()) Text("Name or regex", style = NativeType.bodyLarge, color = p.secondaryText, maxLines = 1)
+                BasicTextField(
+                    value = draft,
+                    onValueChange = { draft = it; invalid = false },
+                    singleLine = true,
+                    textStyle = NativeType.bodyLarge.copy(color = if (invalid) StashyColors.systemRed else p.text),
+                    cursorBrush = SolidColor(Appearance.tint),
+                    keyboardOptions = KeyboardOptions(
+                        capitalization = KeyboardCapitalization.None, autoCorrectEnabled = false,
+                        keyboardType = KeyboardType.Text, imeAction = ImeAction.Search,
+                    ),
+                    keyboardActions = KeyboardActions(onSearch = { commit() }, onDone = { commit() }),
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
+            if (draft.isNotEmpty() || committed.isNotEmpty()) {
+                IconButton({ draft = ""; invalid = false; onCommit(""); focusManager.clearFocus() }, Modifier.size(40.dp)) {
+                    Icon(SF.xmarkCircleFill, "Clear", Modifier.size(18.dp), tint = p.secondaryText)
+                }
+            }
+        }
+        if (invalid) Text(
+            "Invalid regex", Modifier.padding(start = 12.dp, top = 4.dp),
+            style = NativeType.bodySmall, color = StashyColors.systemRed,
+        )
+    }
+}
+
 /** iOS: `CatalogSettingsSheetChromeBar` (Reset · "Settings" · Save · Done) → Material sheet top bar. */
 @Composable
 internal fun SheetChromeBar(onReset: () -> Unit, onSave: (() -> Unit)?, onDone: () -> Unit, title: String = "Settings") {
@@ -172,18 +244,18 @@ fun FilterPickerCard(controller: CatalogController<*>) {
  * unmapped server sort) and the sort field menu ("Other (field)" for unknown fields).
  */
 @Composable
-fun SortCard(mode: FilterMode, sort: SortOption, onChange: (SortOption) -> Unit) {
-    val kinds = SortCatalog.fieldKinds(mode)
+fun SortCard(mode: FilterMode, sort: SortOption, extraSorts: List<SortOption> = emptyList(), onChange: (SortOption) -> Unit) {
+    val kinds = SortCatalog.fieldKinds(mode, extraSorts)
     val known = kinds.firstOrNull { it.field == sort.field }
     val orderDisabled = sort.isRandom || known == null
     ControlCard {
         ControlLabel("Sort")
         Row(Modifier.alpha(if (orderDisabled) 0.4f else 1f), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
             CatalogFilterChip("Asc", sort.isAscending && !orderDisabled) {
-                if (!orderDisabled) SortCatalog.optionFor(mode, sort.field, true)?.let(onChange)
+                if (!orderDisabled) SortCatalog.optionFor(mode, sort.field, true, extraSorts)?.let(onChange)
             }
             CatalogFilterChip("Desc", !sort.isAscending && !orderDisabled) {
-                if (!orderDisabled) SortCatalog.optionFor(mode, sort.field, false)?.let(onChange)
+                if (!orderDisabled) SortCatalog.optionFor(mode, sort.field, false, extraSorts)?.let(onChange)
             }
         }
         Spacer(Modifier.weight(1f))
@@ -192,14 +264,14 @@ fun SortCard(mode: FilterMode, sort: SortOption, onChange: (SortOption) -> Unit)
             kinds.forEach { add(MenuEntry(it.field, it.menuLabel)) }
         }
         MenuPicker(sort.field, entries) { field ->
-            if (kinds.any { it.field == field }) SortCatalog.optionAfterPickingField(mode, sort, field)?.let(onChange)
+            if (kinds.any { it.field == field }) SortCatalog.optionAfterPickingField(mode, sort, field, extraSorts)?.let(onChange)
         }
     }
 }
 
 /** iOS: `CatalogSettingsSheetChromeBar` save alert. */
 @Composable
-private fun SaveChoiceDialog(
+internal fun SaveChoiceDialog(
     presetName: String?,
     hasPreset: Boolean,
     onUpdate: () -> Unit,
@@ -235,7 +307,7 @@ private fun DialogOption(label: String, color: Color, action: () -> Unit) = Text
 )
 
 @Composable
-private fun NameInputDialog(title: String, message: String, initial: String, onSave: (String) -> Unit, onCancel: () -> Unit) {
+internal fun NameInputDialog(title: String, message: String, initial: String, onSave: (String) -> Unit, onCancel: () -> Unit) {
     val p = Theme.palette
     var text by remember { mutableStateOf(initial) }
     AlertDialog(
@@ -272,13 +344,19 @@ fun ImageMediaTypeCard(kind: ImageListMediaKind, onChange: (ImageListMediaKind) 
  * gallery); state lives in [CatalogPrefs], so the list recomposes on change.
  */
 @Composable
-fun CardColumnsCard(scope: CatalogCardColumnScope) {
-    val current = CatalogPrefs.cardColumns(scope)
+fun CardColumnsCard(
+    scope: CatalogCardColumnScope,
+    /** iOS `forcedCardColumns` — shown instead of the stored value while a screen forces it. */
+    forced: CatalogCardColumns? = null,
+    /** iOS `onCardColumnsChange`. */
+    onChange: () -> Unit = {},
+) {
+    val current = forced ?: CatalogPrefs.cardColumns(scope)
     ControlCard {
         ControlLabel("Per row")
         Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-            CatalogFilterChip("1", current == CatalogCardColumns.One) { CatalogPrefs.setCardColumns(scope, CatalogCardColumns.One) }
-            CatalogFilterChip("2", current == CatalogCardColumns.Two) { CatalogPrefs.setCardColumns(scope, CatalogCardColumns.Two) }
+            CatalogFilterChip("1", current == CatalogCardColumns.One) { CatalogPrefs.setCardColumns(scope, CatalogCardColumns.One); onChange() }
+            CatalogFilterChip("2", current == CatalogCardColumns.Two) { CatalogPrefs.setCardColumns(scope, CatalogCardColumns.Two); onChange() }
         }
         Spacer(Modifier.weight(1f))
     }

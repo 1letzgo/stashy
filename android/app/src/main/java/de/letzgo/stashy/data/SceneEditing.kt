@@ -1,5 +1,6 @@
 package de.letzgo.stashy.data
 
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.delay
 import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.json.JsonArray
@@ -173,6 +174,24 @@ object SceneEditing {
         return GraphQL.named("metadataGenerate", vars("input" to input))["metadataGenerate"].stringOrNull
     }
 
+    /** Outlives the screen that asked: the Add Marker sheet is gone before these jobs finish. */
+    private val backgroundScope = kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.SupervisorJob() + kotlinx.coroutines.Dispatchers.IO)
+
+    /**
+     * iOS: the Add Marker completion — video + animated preview for the new marker (no overwrite,
+     * so only it is rendered), then the screenshot at its start time (Stash has no marker image
+     * upload; scoped by scene so Stash writes `generated/markers/<hash>/`). [onScreenshotReady]
+     * runs on the main thread once the screenshot job finished.
+     */
+    fun generateForNewMarker(sceneId: String, onScreenshotReady: () -> Unit) {
+        backgroundScope.launch { runCatching { generateMarkerPreviews(sceneId) } }
+        backgroundScope.launch {
+            val jobId = runCatching { generateMarkerScreenshots(sceneId) }.getOrNull()
+            val done = if (jobId.isNullOrEmpty()) { kotlinx.coroutines.delay(3_000); true } else waitForJob(jobId, 120).first
+            if (done) kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) { onScreenshotReady() }
+        }
+    }
+
     suspend fun generateMarkerScreenshots(sceneId: String) = generate(mapOf("markerScreenshots" to true, "overwrite" to true), listOf(sceneId))
     suspend fun generateMarkerPreviews(sceneId: String) = generate(mapOf("markers" to true, "markerImagePreviews" to true), listOf(sceneId))
 
@@ -270,6 +289,16 @@ object SceneEditing {
     /** iOS: `fetchAllPerformers`. */
     suspend fun allPerformers(): List<Performer> =
         findPage("findPerformers", "findPerformers", "performers", Performer.serializer(), FindFilter(1, 1000, sort = "scenes_count"), "performer_filter", JsonObject(emptyMap())).items
+
+    /**
+     * One page of performers for an add picker: the most used ones without [query], else the
+     * server's `findPerformers(q:)` hits (name, alias, disambiguation).
+     */
+    suspend fun findPerformers(query: String?, limit: Int = 40): List<Performer> {
+        val term = query?.trim()?.takeIf { it.isNotEmpty() }
+        val filter = if (term == null) FindFilter(1, limit, sort = "scenes_count") else FindFilter(1, limit, sort = null, q = term)
+        return findPage("findPerformers", "findPerformers", "performers", Performer.serializer(), filter, "performer_filter", JsonObject(emptyMap())).items
+    }
 
     /** iOS: `fetchAllStudios`. */
     suspend fun allStudios(): List<Studio> =

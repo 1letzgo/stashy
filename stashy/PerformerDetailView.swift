@@ -34,9 +34,21 @@ struct PerformerDetailView: View {
     @StateObject private var linkedStudios: DetailLinkedStudiosFilterModel
     @StateObject private var linkedTags: DetailLinkedTagsFilterModel
     @StateObject private var linkedGalleries: DetailLinkedGalleriesFilterModel
+    /// Scenes tab filter / sort, kept here so it survives the tab remounting `ScenesView`.
+    @StateObject private var scenesFilterMemory = ScenesListFilterMemory()
     @StateObject private var linkedImages: DetailLinkedImagesFilterModel
+    /// "Appears with" filter / sort — own scope, not shared with the other tabs or the catalog.
+    @StateObject private var linkedCoPerformers: DetailLinkedPerformersFilterModel
     /// Images 1/row autoplay: parent ScrollView drag/decelerate.
     @State private var imagesFeedScrolling = false
+    /// "Appears with": co-performers sorted by shared scenes; `nil` until loaded (session cache in `CoPerformerCache`).
+    @State private var coPerformers: [CoPerformer]?
+    @State private var isLoadingCoPerformers = false
+    @State private var coPerformersError: String?
+    /// Filter + sort key `coPerformers` was loaded for; a different key means reload.
+    @State private var coPerformersLoadedKey: String?
+    /// Latest load request; older in-flight loads drop their result.
+    @State private var coPerformersLoadToken = UUID()
 
     private var showsFeedsNavButton: Bool {
         tabManager.tabs.first(where: { $0.id == .reels })?.isVisible ?? true
@@ -49,6 +61,7 @@ struct PerformerDetailView: View {
         case tags = "Tags"
         case groups = "Groups"
         case images = "Images"
+        case appearsWith = "Appears with"
 
         var icon: String {
             switch self {
@@ -58,6 +71,7 @@ struct PerformerDetailView: View {
             case .tags: return "tag"
             case .groups: return "rectangle.stack.fill"
             case .images: return "photo"
+            case .appearsWith: return "person.2"
             }
         }
     }
@@ -78,6 +92,7 @@ struct PerformerDetailView: View {
         _linkedTags = StateObject(wrappedValue: DetailLinkedTagsFilterModel(scope: .performer(performer.id)))
         _linkedGalleries = StateObject(wrappedValue: DetailLinkedGalleriesFilterModel(scope: .performer(performer.id)))
         _linkedImages = StateObject(wrappedValue: DetailLinkedImagesFilterModel(scope: .performer(performer.id)))
+        _linkedCoPerformers = StateObject(wrappedValue: DetailLinkedPerformersFilterModel(scope: .coPerformers(performer.id), initialSort: .nameAsc))
     }
 
     @State private var galleryGridWidth: CGFloat = 0
@@ -96,7 +111,9 @@ struct PerformerDetailView: View {
     }
     
     private var effectiveScenes: Int {
-        if viewModel.performerDetailScenesInitialFetchCompleted {
+        // A filter / search narrowing the list (even to 0) must not hide the Scenes tab — the
+        // user could no longer reach its filter sheet to undo it — nor "Appears with".
+        if viewModel.performerDetailScenesInitialFetchCompleted && !viewModel.isPerformerDetailSceneListConstrained {
             return viewModel.totalPerformerScenes
         }
         return max(viewModel.totalPerformerScenes, displayPerformer.sceneCount)
@@ -114,6 +131,7 @@ struct PerformerDetailView: View {
         if viewModel.totalDetailTags > 0 { tabs.append(.tags) }
         if viewModel.totalDetailGroups > 0 { tabs.append(.groups) }
         if viewModel.totalDetailImages > 0 { tabs.append(.images) }
+        if effectiveScenes > 0 { tabs.append(.appearsWith) }
         return tabs
     }
 
@@ -130,6 +148,7 @@ struct PerformerDetailView: View {
             case .tags: return viewModel.detailTags.isEmpty
             case .groups: return viewModel.detailGroups.isEmpty
             case .images: return viewModel.detailImages.isEmpty
+            case .appearsWith: return coPerformers?.isEmpty ?? true
             }
         }()
         return CatalogFloatingChromeState(
@@ -160,7 +179,8 @@ struct PerformerDetailView: View {
             scrollHeader: AnyView(
                 headerView(displayPerformer: displayPerformer, battleLine: hotOrNotBattleLine)
                     .padding(.horizontal, 16)
-            )
+            ),
+            filterMemory: scenesFilterMemory
         )
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
     }
@@ -190,6 +210,8 @@ struct PerformerDetailView: View {
                     groupGrid
                 } else if selectedDetailTab == .images {
                     imageGrid
+                } else if selectedDetailTab == .appearsWith {
+                    appearsWithContent
                 } else if selectedDetailTab == .scenes {
                     InlineEmptyStateView(icon: "film", title: "No scenes found")
                 }
@@ -204,10 +226,50 @@ struct PerformerDetailView: View {
             }
             imagesFeedScrolling = newPhase != .idle
         }
+        .modifier(OptionalRefreshable(action: appearsWithRefreshAction))
+        .onChange(of: selectedDetailTab, initial: true) { _, tab in
+            // Unstructured on purpose: switching tabs mid-load must not cancel the fetch.
+            guard tab == .appearsWith else { return }
+            Task { await loadCoPerformers(force: false) }
+        }
     }
 
     var body: some View {
+        performerDetailWithCoPerformersSheets
+    }
+
+    private var performerDetailWithCoPerformersSheets: some View {
         performerDetailWithLinkedGalleriesAndImagesSheets
+            .sheet(isPresented: $linkedCoPerformers.showFilterSortSheet) {
+                performerDetailCoPerformersFilterSheet
+            }
+            .onChange(of: linkedCoPerformers.catalogPresetRowSelection) { _, newId in
+                linkedCoPerformers.handlePresetSelection(newId, viewModel: viewModel)
+            }
+            .onChange(of: linkedCoPerformers.refetchGeneration) { _, _ in
+                // Unstructured on purpose: closing the sheet must not cancel the fetch.
+                Task { await loadCoPerformers(force: false) }
+            }
+            .alert("Save as new", isPresented: $linkedCoPerformers.showSaveAsCatalogPresetAlert) {
+                TextField("Name", text: $linkedCoPerformers.catalogPresetNameInput)
+                Button("Save") { linkedCoPerformers.savePresetAs(name: linkedCoPerformers.catalogPresetNameInput, viewModel: viewModel) }
+                Button("Cancel", role: .cancel) {}
+            } message: {
+                Text("Save the current sort, filter, and live criteria as a new Stash saved filter.")
+            }
+            .alert("Rename", isPresented: $linkedCoPerformers.showRenameCatalogPresetAlert) {
+                TextField("Name", text: $linkedCoPerformers.renameCatalogPresetInput)
+                Button("Save") { linkedCoPerformers.renamePreset(to: linkedCoPerformers.renameCatalogPresetInput, viewModel: viewModel) }
+                Button("Cancel", role: .cancel) {}
+            } message: {
+                Text("Rename this preset or saved filter.")
+            }
+            .alert("Delete filter?", isPresented: $linkedCoPerformers.showDeleteCatalogPresetAlert) {
+                Button("Delete", role: .destructive) { linkedCoPerformers.deletePreset(viewModel: viewModel) }
+                Button("Cancel", role: .cancel) {}
+            } message: {
+                Text(linkedCoPerformers.deletePresetConfirmationText(viewModel: viewModel))
+            }
     }
 
     private var performerDetailWithLinkedStudiosSheets: some View {
@@ -596,13 +658,69 @@ struct PerformerDetailView: View {
                 linkedImages.showFilterSortSheet = true
             }
         case .groups:
-            break
+            // No groups filter model yet — hide the bar instead of showing an empty one.
+            slots.isPresented = false
+        case .appearsWith:
+            slots.filterSort = CatalogChromeSlot(
+                systemImage: "slider.horizontal.3",
+                isActive: linkedCoPerformers.catalogFilterSortFABActive,
+                accessibilityLabel: "Filter and sort"
+            ) {
+                HapticManager.light()
+                linkedCoPerformers.showFilterSortSheet = true
+            }
         }
         return slots
     }
 
     private var performerDetailChromeConfig: StashyDetailChromeConfig {
         StashyDetailChromeConfig(listSlots: performerDetailListSlots, insetSpacing: 0)
+    }
+
+    @ViewBuilder
+    private var performerDetailCoPerformersFilterSheet: some View {
+        PerformersCatalogFilterSortSheet(
+            serverFilters: linkedCoPerformers.sortedServerPerformerFilters(viewModel: viewModel),
+            localPresets: linkedCoPerformers.localCatalogPresets,
+            selectedPresetRowId: $linkedCoPerformers.catalogPresetRowSelection,
+            criteriaDocument: linkedCoPerformers.criteriaDocument,
+            sortOption: linkedCoPerformers.selectedSortOption,
+            onSortChange: { linkedCoPerformers.changeSortOption(to: $0, viewModel: viewModel) },
+            onApply: { linkedCoPerformers.applyLiveFilter(viewModel: viewModel) },
+            onReset: {
+                linkedCoPerformers.catalogPresetRowSelection = ""
+                linkedCoPerformers.selectedFilter = nil
+                linkedCoPerformers.clearLiveChipsOnly()
+                linkedCoPerformers.criteriaDocument.clear()
+                linkedCoPerformers.applyLiveFilter(viewModel: viewModel)
+            },
+            onRequestSave: { linkedCoPerformers.savePresetOverwrite(viewModel: viewModel) },
+            onRequestSaveAs: {
+                linkedCoPerformers.catalogPresetNameInput = ""
+                linkedCoPerformers.showSaveAsCatalogPresetAlert = true
+            },
+            onRequestRename: {
+                if let sid = ListLivePresetTag.parseServerId(linkedCoPerformers.catalogPresetRowSelection),
+                   let n = viewModel.savedFilters[sid]?.name {
+                    linkedCoPerformers.renameCatalogPresetInput = n
+                } else if let ls = ListLivePresetTag.parseLocalUUIDString(linkedCoPerformers.catalogPresetRowSelection),
+                          let uuid = UUID(uuidString: ls),
+                          let p = linkedCoPerformers.localCatalogPresets.first(where: { $0.id == uuid }) {
+                    linkedCoPerformers.renameCatalogPresetInput = p.name
+                }
+                linkedCoPerformers.showRenameCatalogPresetAlert = true
+            },
+            onRequestDelete: { linkedCoPerformers.showDeleteCatalogPresetAlert = true },
+            sharedScenesSortSelected: linkedCoPerformers.sortsBySharedScenes,
+            onSelectSharedScenesSort: { linkedCoPerformers.selectSharedScenesSort(viewModel: viewModel) }
+        )
+        .presentationDragIndicator(.visible)
+        .presentationBackground(Color.appBackground)
+        .onAppear {
+            ListLivePresetTag.migrateLegacySelection(&linkedCoPerformers.catalogPresetRowSelection)
+            linkedCoPerformers.refreshLocalPresets()
+            linkedCoPerformers.applyCatalogPresetSelectionFromSheetIfNeeded(viewModel: viewModel)
+        }
     }
 
     @ViewBuilder
@@ -884,6 +1002,105 @@ struct PerformerDetailView: View {
         .measuresGridWidth($galleryGridWidth)
     }
     
+    /// Pull-to-refresh only on "Appears with"; other tabs keep their existing (no refresh) behavior.
+    private var appearsWithRefreshAction: (() async -> Void)? {
+        guard selectedDetailTab == .appearsWith else { return nil }
+        return { await loadCoPerformers(force: true) }
+    }
+
+    @ViewBuilder
+    private var appearsWithContent: some View {
+        if let coPerformers, !coPerformers.isEmpty {
+            appearsWithGrid(coPerformers)
+        } else if isLoadingCoPerformers || coPerformers == nil && coPerformersError == nil {
+            VStack {
+                InlineSpinner()
+                Text("Loading performers...").font(.caption).foregroundColor(.secondary)
+            }.padding(.top, 40)
+        } else if let coPerformersError {
+            InlineEmptyStateView(icon: "exclamationmark.triangle", title: coPerformersError)
+        } else {
+            InlineEmptyStateView(
+                icon: "person.2",
+                title: linkedCoPerformers.catalogFilterSortFABActive ? "No performers match this filter" : "No shared scenes"
+            )
+        }
+    }
+
+    /// Same cards / columns as the Performers catalog; the badge shows the shared-scene count.
+    /// Tap → scenes with both performers; context menu → the co-performer's detail.
+    private func appearsWithGrid(_ coPerformers: [CoPerformer]) -> some View {
+        LazyVGrid(columns: galleryColumns, spacing: 12) {
+            ForEach(coPerformers) { co in
+                NavigationLink(destination: LazyView {
+                    SharedScenesView(first: displayPerformer, second: co.performer)
+                }) {
+                    PerformerCardView(performer: co.performer, sharedSceneCount: co.sharedSceneCount)
+                }
+                .buttonStyle(.plain)
+                .contextMenu {
+                    NavigationLink(destination: LazyView { PerformerDetailView(performer: co.performer) }) {
+                        Label("Open Performer", systemImage: "person.crop.circle")
+                    }
+                }
+                .accessibilityLabel(co.performer.name)
+                .accessibilityValue("\(co.sharedSceneCount) shared \(co.sharedSceneCount == 1 ? "scene" : "scenes")")
+            }
+        }
+        .measuresGridWidth($galleryGridWidth)
+    }
+
+    /// Loads "Appears with" for the current filter + sort. Session cache per performer + filter +
+    /// sort (`CoPerformerCache`); `force` (pull-to-refresh) drops it and recounts shared scenes.
+    private func loadCoPerformers(force: Bool) async {
+        let performerId = performer.id
+        let model = linkedCoPerformers
+        let queryKey = model.coPerformersQueryKey(viewModel: viewModel)
+        if !force, coPerformers != nil, coPerformersLoadedKey == queryKey { return }
+        if force {
+            CoPerformerCache.shared.invalidate(performerId)
+        } else if let cached = CoPerformerCache.shared.get(performerId, queryKey: queryKey) {
+            coPerformersLoadToken = UUID()
+            coPerformers = cached
+            coPerformersLoadedKey = queryKey
+            coPerformersError = nil
+            isLoadingCoPerformers = false
+            return
+        }
+        let token = UUID()
+        coPerformersLoadToken = token
+        isLoadingCoPerformers = true
+        coPerformersError = nil
+        let performerFilter = model.coPerformersPerformerFilter(viewModel: viewModel)
+        let sort = model.coPerformersServerSort(viewModel: viewModel)
+        do {
+            let repository = PerformerRepository()
+            let counts: [String: Int]
+            if let cachedCounts = CoPerformerCache.shared.counts(performerId) {
+                counts = cachedCounts
+            } else {
+                counts = try await repository.fetchCoPerformerSceneCounts(performerId: performerId)
+                CoPerformerCache.shared.setCounts(performerId, counts)
+            }
+            let result = try await repository.fetchCoPerformers(
+                performerId: performerId,
+                counts: counts,
+                performerFilter: performerFilter,
+                sort: sort
+            )
+            CoPerformerCache.shared.set(performerId, queryKey: queryKey, result)
+            guard coPerformersLoadToken == token else { return }
+            coPerformers = result
+            coPerformersLoadedKey = queryKey
+            isLoadingCoPerformers = false
+        } catch {
+            AppLog.error("Appears with: \(error.localizedDescription)")
+            guard coPerformersLoadToken == token else { return }
+            isLoadingCoPerformers = false
+            if coPerformers == nil { coPerformersError = "Couldn't load performers" }
+        }
+    }
+
     private var imageGrid: some View {
         LinkedImagesCatalogGrid(
             images: $viewModel.detailImages,
@@ -897,132 +1114,69 @@ struct PerformerDetailView: View {
         )
     }
     
+    /// Header card (`DetailHeroCard`): the performer image blurred as the compact
+    /// band backdrop, the portrait top-cropped in the circle straddling the band edge (keeps the
+    /// face visible), name, Feeds pill and stats in the solid section. Two full rows of stats (8 at
+    /// the grid's 4 columns) show collapsed, the rest behind the chevron pill. Favorite / Edit / image change stay in the nav bar.
     private func headerView(displayPerformer: Performer, battleLine: String?) -> some View {
-        let collapsedHeight: CGFloat = 115
-        let imageWidth: CGFloat = 72
-        
-        return HStack(alignment: .top, spacing: 0) {
-            // Thumbnail: 9:16 portrait, flush to edges, cropped from top
-            ZStack(alignment: .top) {
-                if let thumbnailURL = displayPerformer.thumbnailURL {
-                    CustomAsyncImage(url: thumbnailURL) { loader in
-                        if loader.isLoading {
-                            Rectangle().fill(Color.gray.opacity(DesignTokens.Opacity.placeholder))
-                                .overlay(InlineSpinner(scale: .compact))
-                        } else if let image = loader.image {
-                            image.resizable()
-                                .scaledToFill()
-                                .frame(width: imageWidth)
-                                .clipped()
-                        } else {
-                            defaultThumbnailContent(width: imageWidth)
-                        }
+        let imageURL = displayPerformer.thumbnailURL
+        return DetailHeroCard(
+            title: displayPerformer.name,
+            items: getPerformerDetails(displayPerformer, battleLine: battleLine)
+                .map { DetailHeroItem(label: $0.label, value: $0.value) },
+            description: nil,
+            showsHero: imageURL != nil,
+            heroAccessibilityLabel: "Performer image",
+            onHeroTap: nil,
+            isExpanded: $isHeaderExpanded,
+            collapsedItemLimit: 8,
+            placeholderSystemImage: "person.fill",
+            backdrop: { performerHeroImage(imageURL, alignment: .center) },
+            avatar: { performerHeroImage(imageURL, alignment: .top) },
+            accessory: { onImage in
+                if showsFeedsNavButton {
+                    DetailHeroFeedsButton(onImage: onImage) {
+                        let sp = ScenePerformer(
+                            id: displayPerformer.id,
+                            name: displayPerformer.name,
+                            birthdate: displayPerformer.birthdate,
+                            sceneCount: displayPerformer.sceneCount,
+                            galleryCount: displayPerformer.galleryCount,
+                            oCounter: displayPerformer.oCounter,
+                            updatedAt: nil
+                        )
+                        coordinator.navigateToReels(performer: sp, mode: nil)
                     }
-                } else {
-                    defaultThumbnailContent(width: imageWidth)
-                }
-            }
-            .frame(width: imageWidth, alignment: .top)
-            .frame(minHeight: collapsedHeight)
-            // Wenn ausgeklappt: Zeilenhöhe = Detailbereich, kein Füllen des übergeordneten VStack (siehe fixedSize am Header)
-            .frame(maxHeight: isHeaderExpanded ? nil : collapsedHeight, alignment: .top)
-            .background(Color.gray.opacity(DesignTokens.Opacity.placeholder))
-            
-            // Details Section
-            VStack(alignment: .leading, spacing: 4) {
-                // Header: Name and Feeds
-                HStack(alignment: .top, spacing: 8) {
-                    Text(displayPerformer.name)
-                        .font(.title2)
-                        .fontWeight(.bold)
-                        .foregroundColor(.primary)
-                        .lineLimit(isHeaderExpanded ? nil : 1)
-
-                    Spacer()
-
-                    if showsFeedsNavButton {
-                        Button(action: {
-                            let sp = ScenePerformer(
-                                id: displayPerformer.id,
-                                name: displayPerformer.name,
-                                birthdate: displayPerformer.birthdate,
-                                sceneCount: displayPerformer.sceneCount,
-                                galleryCount: displayPerformer.galleryCount,
-                                oCounter: displayPerformer.oCounter,
-                                updatedAt: nil
-                            )
-                            coordinator.navigateToReels(performer: sp, mode: nil)
-                        }) {
-                            HStack(spacing: 4) {
-                                Image(systemName: AppTab.reels.icon)
-                                    .font(.system(size: 12, weight: .bold))
-                                Text("Feeds")
-                                    .font(.system(size: 11, weight: .bold))
-                            }
-                            .foregroundColor(Color.pillAccent)
-                            .padding(.horizontal, 10)
-                            .padding(.vertical, 5)
-                            .background(appearanceManager.tintColor.opacity(0.15))
-                            .clipShape(Capsule())
-                        }
-                    }
-                }
-                
-                // Grid for Performer Info
-                let allDetails = getPerformerDetails(displayPerformer, battleLine: battleLine)
-                let visibleDetails = isHeaderExpanded ? allDetails : Array(allDetails.prefix(4))
-                
-                if !visibleDetails.isEmpty {
-                    LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], alignment: .leading, spacing: 6) {
-                        ForEach(visibleDetails, id: \.label) { detail in
-                            VStack(alignment: .leading, spacing: 0) {
-                                Text(detail.label)
-                                    .font(.system(size: 8))
-                                    .foregroundColor(.secondary)
-                                    .textCase(.uppercase)
-                                Text(detail.value)
-                                    .font(.system(size: 11, weight: .medium))
-                                    .foregroundColor(.primary)
-                                    .lineLimit(1)
-                            }
-                        }
-                    }
-                }
-            }
-            .padding(.vertical, 10)
-            .padding(.horizontal, 12)
-            .frame(maxWidth: .infinity, minHeight: collapsedHeight, alignment: .topLeading)
-        }
-        .background(Color.secondaryAppBackground)
-        .clipShape(RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.card))
-        .overlay(
-            RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.card)
-                .stroke(Color.primary.opacity(0.1), lineWidth: 0.5)
-        )
-        .cardShadow()
-        // Nur so hoch wie Inhalt (Name/Details), nicht so hoch wie die komplette übergeordnete Fläche
-        .fixedSize(horizontal: false, vertical: true)
-        .overlay(
-            Group {
-                let allDetails = getPerformerDetails(displayPerformer, battleLine: battleLine)
-                if allDetails.count > 4 {
-                    Button(action: {
-                        withAnimation(.spring()) {
-                            isHeaderExpanded.toggle()
-                        }
-                    }) {
-                        Image(systemName: isHeaderExpanded ? "chevron.up" : "chevron.down")
-                            .font(.system(size: 10, weight: .bold))
-                            .foregroundColor(Color.pillAccent)
-                            .padding(6)
-                            .background(appearanceManager.tintColor.opacity(0.15))
-                            .clipShape(Circle())
-                    }
-                    .padding(8)
                 }
             },
-            alignment: .bottomTrailing
+            footer: { EmptyView() }
         )
+    }
+
+    /// Performer image filling its frame; `alignment` picks the crop (top for the circle so
+    /// the face of a portrait stays visible).
+    @ViewBuilder
+    private func performerHeroImage(_ url: URL?, alignment: Alignment) -> some View {
+        if let url {
+            CustomAsyncImage(url: url) { loader in
+                if let image = loader.image {
+                    image.resizable()
+                        .scaledToFill()
+                        .frame(minWidth: 0, maxWidth: .infinity, minHeight: 0, maxHeight: .infinity, alignment: alignment)
+                        .clipped()
+                } else if loader.isLoading {
+                    Rectangle().fill(Color.gray.opacity(DesignTokens.Opacity.placeholder))
+                        .overlay(InlineSpinner(scale: .compact))
+                } else {
+                    Rectangle().fill(Color.gray.opacity(DesignTokens.Opacity.placeholder))
+                        .overlay(
+                            Image(systemName: "person.fill")
+                                .font(.system(size: 28))
+                                .foregroundColor(.appAccent.opacity(0.5))
+                        )
+                }
+            }
+        }
     }
 
     private func cardBadge(icon: String, text: String) -> some View {
@@ -1035,13 +1189,6 @@ struct PerformerDetailView: View {
         .padding(.vertical, 3)
         .background(appearanceManager.tintColor.opacity(0.15))
         .clipShape(Capsule())
-    }
-
-    private func defaultThumbnailContent(width: CGFloat) -> some View {
-        Rectangle().fill(Color.gray.opacity(DesignTokens.Opacity.placeholder))
-            .frame(width: width)
-            .frame(maxHeight: .infinity, alignment: .top)
-            .overlay(Image(systemName: "person.fill").font(.system(size: 32)).foregroundColor(.appAccent.opacity(0.5)))
     }
 
     private func thumbnailBadge(icon: String, text: String) -> some View {
@@ -1115,6 +1262,19 @@ struct PerformerDetailView: View {
         performer = updated
         if fullPerformer != nil {
             fullPerformer = updated
+        }
+    }
+}
+
+/// `.refreshable` only when an action is provided, so tabs without pull-to-refresh keep their behavior.
+private struct OptionalRefreshable: ViewModifier {
+    let action: (() async -> Void)?
+
+    func body(content: Content) -> some View {
+        if let action {
+            content.refreshable { await action() }
+        } else {
+            content
         }
     }
 }
@@ -1333,6 +1493,144 @@ struct EditPerformerSheet: View {
                 }
             }
         }
+    }
+}
+
+// MARK: - Shared scenes ("Appears with" → card)
+
+/// Scenes with both performers, pushed from an "Appears with" card. Fixed scope like
+/// `DirectorDetailView`: the filter is injected, so sort changes stay local to this list.
+struct SharedScenesView: View {
+    let first: Performer
+    let second: Performer
+
+    @Environment(\.dismiss) private var dismiss
+    @ObservedObject private var appearanceManager = AppearanceManager.shared
+    @StateObject private var viewModel = StashDBViewModel()
+    @State private var isHeaderExpanded = false
+    /// UIKit pop when `dismiss()` is a no-op under custom chrome.
+    @State private var navigationBackTrigger: UUID?
+
+    var body: some View {
+        ScenesView(
+            filter: .scenesShared(by: first, and: second),
+            hideTitle: true,
+            scope: .catalog,
+            sharedViewModel: viewModel,
+            showsFloatingFilterButton: true,
+            scrollHeader: AnyView(
+                heroHeader
+                    .padding(.horizontal, 16)
+            )
+        )
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+        .background {
+            StashyNavigationBackTrigger(trigger: $navigationBackTrigger) {
+                dismiss()
+            }
+        }
+        .stashyDetailChrome(StashyDetailChromeConfig(insetSpacing: 0)) { navBar }
+    }
+
+    /// Same `DetailHeroCard` as the other detail screens: blurred band from the first performer,
+    /// both avatars side by side (slightly overlapping) on the band edge, each opening that
+    /// performer's detail.
+    private var heroHeader: some View {
+        let backdropURL = first.thumbnailURL ?? second.thumbnailURL
+        return DetailHeroCard(
+            title: "\(first.name) & \(second.name)",
+            items: [DetailHeroItem(label: "SHARED SCENES", value: sharedScenesValue)],
+            description: nil,
+            showsHero: backdropURL != nil,
+            onHeroTap: nil,
+            isExpanded: $isHeaderExpanded,
+            placeholderSystemImage: "person.2.fill",
+            leadingAvatars: AnyView(avatarPair),
+            backdrop: { heroImage(backdropURL, alignment: .center) },
+            avatar: { EmptyView() },
+            accessory: { _ in EmptyView() },
+            footer: { EmptyView() }
+        )
+    }
+
+    private var sharedScenesValue: String {
+        if viewModel.totalScenes == 0 && (viewModel.isLoading || viewModel.isLoadingScenes) { return "—" }
+        return "\(viewModel.totalScenes)"
+    }
+
+    private var avatarPair: some View {
+        HStack(spacing: -18) {
+            performerAvatarLink(first)
+            performerAvatarLink(second)
+        }
+    }
+
+    private func performerAvatarLink(_ performer: Performer) -> some View {
+        NavigationLink(destination: LazyView { PerformerDetailView(performer: performer) }) {
+            DetailHeroAvatarCircle(showsImage: performer.thumbnailURL != nil, placeholderSystemImage: "person.fill") {
+                heroImage(performer.thumbnailURL, alignment: .top)
+            }
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("Open \(performer.name)")
+    }
+
+    /// Image filling its frame; `alignment` picks the crop (top for the circles so faces stay visible).
+    @ViewBuilder
+    private func heroImage(_ url: URL?, alignment: Alignment) -> some View {
+        if let url {
+            CustomAsyncImage(url: url) { loader in
+                if let image = loader.image {
+                    image.resizable()
+                        .scaledToFill()
+                        .frame(minWidth: 0, maxWidth: .infinity, minHeight: 0, maxHeight: .infinity, alignment: alignment)
+                        .clipped()
+                } else if loader.isLoading {
+                    Rectangle().fill(Color.gray.opacity(DesignTokens.Opacity.placeholder))
+                        .overlay(InlineSpinner(scale: .compact))
+                } else {
+                    Rectangle().fill(Color.gray.opacity(DesignTokens.Opacity.placeholder))
+                        .overlay(
+                            Image(systemName: "person.fill")
+                                .font(.system(size: 28))
+                                .foregroundColor(.appAccent.opacity(0.5))
+                        )
+                }
+            }
+        }
+    }
+
+    /// Same top chrome as the performer / studio detail screens: Back pill only.
+    @ViewBuilder
+    private var navBar: some View {
+        StashySectionChromeBar {
+            HStack(spacing: 8) {
+                StashyChromeBackButton { navigationBackTrigger = UUID() }
+                Spacer(minLength: 8)
+            }
+            .frame(minHeight: StashyExpandingDock.activeHeight)
+            .padding(.horizontal, StashyExpandingDock.edgePadding)
+            .padding(.vertical, 8)
+        }
+    }
+}
+
+extension StashDBViewModel.SavedFilter {
+    /// Scenes featuring both performers (`INCLUDES_ALL`), used by the "Appears with" cards.
+    static func scenesShared(by first: Performer, and second: Performer) -> StashDBViewModel.SavedFilter {
+        StashDBViewModel.SavedFilter(
+            id: "stashy_shared_\(first.id)_\(second.id)",
+            name: "\(first.name) & \(second.name)",
+            mode: .scenes,
+            filter: nil,
+            object_filter: .object([
+                "performers": .object([
+                    "value": .array([.string(first.id), .string(second.id)]),
+                    "modifier": .string("INCLUDES_ALL")
+                ])
+            ]),
+            ui_options: nil
+        )
     }
 }
 

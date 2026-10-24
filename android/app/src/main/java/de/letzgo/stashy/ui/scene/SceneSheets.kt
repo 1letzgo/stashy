@@ -124,13 +124,20 @@ fun EditSceneTitleSheet(scene: Scene, onDismiss: () -> Unit, onSaved: (String?, 
     }
 }
 
-/** A row of a picker list (iOS sheets: name, "N scenes", checkmark). */
-data class PickerEntry(val id: String, val name: String, val subtitle: String?)
+/** A row of a picker list (iOS sheets: name, "N scenes", checkmark; optional avatar). */
+data class PickerEntry(val id: String, val name: String, val subtitle: String?, val imageURL: String? = null)
 
 /**
  * iOS: `AddPerformerToSceneSheet` / `AddStudioToSceneSheet` / `AddTagToSceneSheet` /
  * `AddGroupToSceneSheet` — search field, first 30 matches, tap to toggle, "Create "<text>""
  * when nothing matches, Save writes the selection.
+ *
+ * Optional extras: [serverSearch] runs a server-side name search (debounced) whose hits are merged
+ * into the list (so entries outside the first loaded page are reachable); [avatars] shows a
+ * round image per row ([PickerEntry.imageURL]); [lockedIds] stay selected and cannot be
+ * toggled and read greyed (add-only pickers); [actionTitle] replaces "Save";
+ * [requireNewSelection] keeps the action disabled until something beyond [initialSelection]
+ * is picked.
  */
 @Composable
 fun EntityPickerSheet(
@@ -145,51 +152,84 @@ fun EntityPickerSheet(
     saveFailedText: String,
     onSaved: (List<PickerEntry>) -> Unit,
     onDismiss: () -> Unit,
+    serverSearch: (suspend (String) -> List<PickerEntry>)? = null,
+    avatars: Boolean = false,
+    lockedIds: Set<String> = emptySet(),
+    actionTitle: String = "Save",
+    requireNewSelection: Boolean = false,
 ) {
     val p = Theme.palette
     val scope = rememberCoroutineScope()
     val entries = remember { mutableStateListOf<PickerEntry>() }
-    val selected = remember { mutableStateListOf<String>().apply { addAll(initialSelection) } }
+    val selected = remember { mutableStateListOf<String>().apply { addAll(initialSelection + lockedIds) } }
     var loading by remember { mutableStateOf(true) }
     var search by remember { mutableStateOf("") }
     var saving by remember { mutableStateOf(false) }
     var creating by remember { mutableStateOf(false) }
-    LaunchedEffect(Unit) { entries.addAll(runCatching { load() }.getOrDefault(emptyList())); loading = false }
+    var saveError by remember { mutableStateOf<String?>(null) }
+    /** Ids the server search returned for the current term (alias matches have no name hit). */
+    var hitIds by remember { mutableStateOf<Set<String>>(emptySet()) }
+    var searching by remember { mutableStateOf(false) }
+    fun merge(list: List<PickerEntry>) {
+        val known = entries.map { it.id }.toMutableSet()
+        list.forEach { if (known.add(it.id)) entries.add(it) }
+    }
+    LaunchedEffect(Unit) { merge(runCatching { load() }.getOrDefault(emptyList())); loading = false }
+    if (serverSearch != null) LaunchedEffect(search) {
+        val term = search.trim()
+        hitIds = emptySet()
+        if (term.isEmpty()) { searching = false; return@LaunchedEffect }
+        searching = true
+        kotlinx.coroutines.delay(300)
+        runCatching { serverSearch(term) }.onSuccess { hits -> merge(hits); hitIds = hits.map { it.id }.toSet() }
+        searching = false
+    }
     // Chosen entries always lead the list, whatever the search says; the search narrows only the
     // unchosen rest, so a chosen entry never vanishes.
     val pinned = entries.filter { it.id in selected }
-    val filtered = entries.filter { it.id !in selected && (search.isEmpty() || it.name.contains(search, ignoreCase = true)) }
+    val filtered = entries.filter { it.id !in selected && (search.isEmpty() || it.name.contains(search, ignoreCase = true) || it.id in hitIds) }
     val anyMatch = filtered.isNotEmpty() || pinned.any { it.name.contains(search, ignoreCase = true) }
 
-    SceneModalSheet(title, onDismiss, actionTitle = "Save", actionEnabled = !saving, actionBusy = saving, onAction = {
+    val hasNewSelection = selected.any { it !in initialSelection && it !in lockedIds }
+    SceneModalSheet(title, onDismiss, actionTitle = actionTitle, actionEnabled = !saving && (!requireNewSelection || hasNewSelection), actionBusy = saving, onAction = {
         saving = true
+        saveError = null
         val ids = selected.toList()
         scope.launch {
             if (runCatching { save(ids) }.isSuccess) { onSaved(entries.filter { it.id in ids }); onDismiss() }
-            else { saving = false; SceneToast.show(saveFailedText, PlayerIcons.close, SceneToast.Style.Error) }
+            else { saving = false; saveError = saveFailedText; SceneToast.show(saveFailedText, PlayerIcons.close, SceneToast.Style.Error) }
         }
     }) {
         Column(Modifier.verticalScroll(rememberScrollState())) {
-            NativeSearchField(search, { search = it }, searchHeader, Modifier.padding(top = 8.dp))
+            NativeSearchField(search, { search = it }, searchHeader, Modifier.padding(top = 8.dp), loading = searching)
+            saveError?.let { Text(it, Modifier.padding(horizontal = 16.dp, vertical = 8.dp), style = NativeType.bodyMedium, color = androidx.compose.material3.MaterialTheme.colorScheme.error) }
             FormSection(null) {
                 if (loading) LoadingRow()
                 else {
                     (pinned + filtered.take(30)).forEachIndexed { index, e ->
                         if (index > 0) NativeDivider()
-                        FormRow({ if (e.id in selected) selected.remove(e.id) else { if (!multiple) selected.clear(); selected.add(e.id) } }) {
-                            Text(e.name, Modifier.weight(1f), color = p.text)
+                        val locked = e.id in lockedIds
+                        FormRow(if (locked) null else ({ if (e.id in selected) selected.remove(e.id) else { if (!multiple) selected.clear(); selected.add(e.id) } })) {
+                            if (avatars) {
+                                Box(Modifier.size(40.dp).clip(androidx.compose.foundation.shape.CircleShape).background(Appearance.tint.copy(alpha = 0.12f)), contentAlignment = Alignment.Center) {
+                                    Icon(de.letzgo.stashy.ui.SF.personFill, null, tint = Appearance.tint.copy(alpha = 0.5f), modifier = Modifier.size(20.dp))
+                                    e.imageURL?.let { AsyncImage(it, null, Modifier.size(40.dp), contentScale = ContentScale.Crop, alignment = Alignment.TopCenter) }
+                                }
+                                Spacer(Modifier.width(16.dp))
+                            }
+                            Text(e.name, Modifier.weight(1f), color = if (locked) p.secondaryText else p.text)
                             e.subtitle?.let { Text(it, style = NativeType.bodyMedium, color = p.secondaryText) }
-                            if (e.id in selected) { Spacer(Modifier.width(8.dp)); Icon(PlayerIcons.check, null, tint = nativeAccent(), modifier = Modifier.size(24.dp)) }
+                            if (e.id in selected) { Spacer(Modifier.width(8.dp)); Icon(PlayerIcons.check, null, tint = if (locked) p.secondaryText else nativeAccent(), modifier = Modifier.size(24.dp)) }
                         }
                     }
                     if (filtered.size > 30) Text("Type more to refine...", Modifier.padding(16.dp), style = NativeType.bodyMedium, color = p.secondaryText)
-                    if (search.isNotEmpty() && !anyMatch) {
+                    if (search.isNotEmpty() && !anyMatch && !searching) {
                         FormRow(if (creating) null else ({
                             creating = true
                             val name = search
                             scope.launch {
                                 runCatching { create(name) }.onSuccess { e ->
-                                    entries.add(e); if (!multiple) selected.clear(); selected.add(e.id); search = ""
+                                    merge(listOf(e)); if (!multiple) selected.clear(); selected.add(e.id); search = ""
                                 }.onFailure { SceneToast.show(createFailedText, PlayerIcons.close, SceneToast.Style.Error) }
                                 creating = false
                             }
@@ -208,27 +248,95 @@ fun EntityPickerSheet(
 private fun count(n: Int?, unit: String) = n?.let { "$it $unit" }
 
 @Composable
-fun EditPerformersSheet(scene: Scene, onDismiss: () -> Unit, onSaved: (List<Performer>) -> Unit) {
-    val byId = remember { mutableMapOf<String, Performer>() }
+fun EditPerformersSheet(scene: Scene, onDismiss: () -> Unit, onSaved: (List<Performer>) -> Unit) =
+    PerformersPickerSheet(
+        itemKey = "scene-${scene.id}",
+        current = scene.performers.map { PickerEntry(it.id, it.name, it.disambiguation?.takeIf { d -> d.isNotBlank() } ?: it.sceneCount?.let { n -> "$n scenes" }, it.imageURL) },
+        known = scene.performers,
+        save = { ids, _ -> SceneEditing.updatePerformers(scene.id, ids) },
+        onDismiss = onDismiss, onSaved = onSaved,
+    )
+
+/** Performer picker for any owner (scene, gallery): `save` writes the chosen ids. */
+@Composable
+fun EditPerformersSheet(initialIds: Set<String>, save: suspend (List<String>) -> Unit, onDismiss: () -> Unit, onSaved: (List<Performer>) -> Unit) =
+    PerformersPickerSheet(
+        itemKey = initialIds.sorted().joinToString(","),
+        current = emptyList(), initialIds = initialIds,
+        save = { ids, _ -> save(ids) },
+        onDismiss = onDismiss, onSaved = onSaved,
+    )
+
+/**
+ * The one performer picker (scene detail "Edit Performers", gallery detail, and the add-only
+ * "+" after the performer names in Feeds, the fullscreen image viewer and the image feed
+ * header): the shared [EntityPickerSheet] with avatars (profile pictures), the most used
+ * performers first, server-side search (`findPerformers(q:)`) and "Create" for a missing name.
+ *
+ * [current] are the owner's performers (listed first with their pictures, so they show even
+ * outside the first loaded page); [known] seeds the full [Performer]s handed to [onSaved].
+ * Edit mode: the selection is free, Save hands the full id list to [save]. [addOnly]:
+ * [current] stay ticked, greyed and marked "Added" (locked), the action reads "Done" and stays
+ * disabled until a new performer is picked; [save] still gets the full selection plus the newly
+ * picked performers (callers write existing ∪ picked). A failed [save] (throw) keeps the sheet
+ * open with the error; the ✕ cancels without writing.
+ */
+@Composable
+fun PerformersPickerSheet(
+    itemKey: String,
+    current: List<PickerEntry>,
+    save: suspend (ids: List<String>, added: List<Performer>) -> Unit,
+    onDismiss: () -> Unit,
+    onSaved: (List<Performer>) -> Unit = {},
+    addOnly: Boolean = false,
+    initialIds: Set<String> = current.map { it.id }.toSet(),
+    known: List<Performer> = emptyList(),
+) {
+    val byId = remember(itemKey) { known.associateBy { it.id }.toMutableMap() }
+    val own = remember(itemKey) { current }
+    val startIds = remember(itemKey) { initialIds }
+    fun entry(p: Performer): PickerEntry {
+        byId[p.id] = p
+        val sub = p.disambiguation?.takeIf { it.isNotBlank() } ?: count(p.sceneCount ?: 0, "scenes")
+        return PickerEntry(p.id, p.name, sub, p.imageURL)
+    }
     EntityPickerSheet(
-        "Edit Performers", "Search Performers", scene.performers.map { it.id }.toSet(), multiple = true,
-        load = { SceneEditing.allPerformers().onEach { byId[it.id] = it }.map { PickerEntry(it.id, it.name, count(it.sceneCount ?: 0, "scenes")) } },
-        create = { name -> SceneEditing.createPerformer(name).also { byId[it.id] = it }.let { PickerEntry(it.id, it.name, count(it.sceneCount ?: 0, "scenes")) } },
+        title = if (addOnly) "Add Performers" else "Edit Performers",
+        searchHeader = "Search Performers",
+        initialSelection = startIds,
+        multiple = true,
+        load = {
+            val head = own.map { if (addOnly) it.copy(subtitle = "Added") else it }
+            head + (if (addOnly) SceneEditing.findPerformers(null, 60) else SceneEditing.allPerformers()).map(::entry)
+        },
+        create = { name -> entry(SceneEditing.createPerformer(name)) },
         createFailedText = "Failed to create performer",
-        save = { SceneEditing.updatePerformers(scene.id, it) }, saveFailedText = "Failed to update performers",
-        onSaved = { picked -> onSaved(picked.mapNotNull { byId[it.id] }) }, onDismiss = onDismiss,
+        save = { ids -> save(ids, ids.filter { it !in startIds }.mapNotNull { byId[it] }) },
+        saveFailedText = if (addOnly) "Could not add performers" else "Failed to update performers",
+        onSaved = { picked -> onSaved(picked.map { byId[it.id] ?: Performer(id = it.id, name = it.name) }) },
+        onDismiss = onDismiss,
+        serverSearch = { q -> SceneEditing.findPerformers(q, 40).map(::entry) },
+        avatars = true,
+        lockedIds = if (addOnly) startIds else emptySet(),
+        actionTitle = if (addOnly) "Done" else "Save",
+        requireNewSelection = addOnly,
     )
 }
 
 @Composable
-fun EditStudioSheet(scene: Scene, onDismiss: () -> Unit, onSaved: (Studio?) -> Unit) {
+fun EditStudioSheet(scene: Scene, onDismiss: () -> Unit, onSaved: (Studio?) -> Unit) =
+    EditStudioSheet(scene.studio?.id, { SceneEditing.updateStudio(scene.id, it) }, onDismiss, onSaved)
+
+/** Studio picker for any owner (scene, gallery): `save` writes the chosen id (null clears it). */
+@Composable
+fun EditStudioSheet(initialId: String?, save: suspend (String?) -> Unit, onDismiss: () -> Unit, onSaved: (Studio?) -> Unit) {
     val byId = remember { mutableMapOf<String, Studio>() }
     EntityPickerSheet(
-        "Set Studio", "Search Studio", setOfNotNull(scene.studio?.id), multiple = false,
+        "Set Studio", "Search Studio", setOfNotNull(initialId), multiple = false,
         load = { SceneEditing.allStudios().onEach { byId[it.id] = it }.map { PickerEntry(it.id, it.name, count(it.sceneCount ?: 0, "scenes")) } },
         create = { name -> SceneEditing.createStudio(name).also { byId[it.id] = it }.let { PickerEntry(it.id, it.name, count(it.sceneCount ?: 0, "scenes")) } },
         createFailedText = "Failed to create studio",
-        save = { SceneEditing.updateStudio(scene.id, it.firstOrNull()) }, saveFailedText = "Failed to update studio",
+        save = { save(it.firstOrNull()) }, saveFailedText = "Failed to update studio",
         onSaved = { picked -> onSaved(picked.firstOrNull()?.let { byId[it.id] }) }, onDismiss = onDismiss,
     )
 }
@@ -357,7 +465,7 @@ fun EditGalleriesSheet(scene: Scene, onDismiss: () -> Unit, onSaved: (List<Scene
  * After creating: refresh, then generate marker previews and screenshots (refresh again when done).
  */
 @Composable
-fun AddMarkerSheet(scene: Scene, seconds: Double, onDismiss: () -> Unit, onComplete: () -> Unit) {
+fun AddMarkerSheet(scene: Scene, seconds: Double, frame: android.graphics.Bitmap?, onDismiss: () -> Unit, onComplete: () -> Unit) {
     val p = Theme.palette
     val scope = rememberCoroutineScope()
     val sceneTagIds = scene.tags.orEmpty().map { it.id }.toSet()
@@ -380,13 +488,17 @@ fun AddMarkerSheet(scene: Scene, seconds: Double, onDismiss: () -> Unit, onCompl
         scope.launch {
             val created = runCatching { SceneEditing.createMarker(scene.id, title, seconds, end, primaryTagId) }
             creating = false
-            if (created.isFailure) return@launch
+            val marker = created.getOrNull() ?: return@launch
+            // iOS `seedMarkerThumbnailCache`: the captured frame stands in until Stash rendered the still.
+            de.letzgo.stashy.data.ImageRefresh.markerCreated(marker, frame)
             onDismiss()
             onComplete()
-            // Video + animated preview, then the still at start time (Stash has no marker image upload).
-            launch { runCatching { SceneEditing.generateMarkerPreviews(scene.id) } }
-            val jobId = runCatching { SceneEditing.generateMarkerScreenshots(scene.id) }.getOrNull()
-            if (jobId != null) { if (SceneEditing.waitForJob(jobId, 120).first) onComplete() }
+            // Not in this sheet's scope: dismissing cancelled it, so the jobs never reached Stash.
+            // The screenshot URL is stable: drop the seed / any cached miss and reload (iOS `invalidateMarkerScreenshot`).
+            SceneEditing.generateForNewMarker(scene.id) {
+                de.letzgo.stashy.data.ImageRefresh.markerScreenshotReady(marker, scene.id)
+                onComplete()
+            }
         }
     }) {
         Column(Modifier.verticalScroll(rememberScrollState())) {

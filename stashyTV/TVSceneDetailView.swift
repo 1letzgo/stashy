@@ -14,6 +14,8 @@ struct TVSceneDetailView: View {
     @ObservedObject private var configManager = ServerConfigManager.shared
     @StateObject private var viewModel = StashDBViewModel()
     @StateObject private var playerModel = TVAetherPlaybackModel()
+    /// stashy+ Similar Scenes: the row below and the Up Next offer at the end of playback.
+    @StateObject private var similar = TVSimilarScenesModel()
     @State private var sceneDetail: Scene?
     @State private var isLoadingDetail = true
     @State private var showingRatingPicker = false
@@ -90,6 +92,9 @@ struct TVSceneDetailView: View {
                             studioSection(studio: studio)
                                 .focusSection()
                         }
+
+                        // Similar Scenes (stashy+, hides itself when locked or empty)
+                        TVSimilarScenesSection(scene: scene, model: similar)
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(.horizontal, 60)
@@ -121,14 +126,17 @@ struct TVSceneDetailView: View {
         .defaultFocus($focusedHeroAction, .play)
         .dismissOnAppLock { playerModel.isShowingPlayer = false }
         .fullScreenCover(isPresented: $playerModel.isShowingPlayer, onDismiss: {
+            similar.endSession()
             playerModel.clear()
             loadData()
         }) {
+            // After Up Next the player shows a similar scene, not the page's own.
+            let playing = similar.nowPlaying ?? sceneDetail
             TVAetherPlayerView(
                 model: playerModel,
-                title: sceneDetail?.displayTitle ?? "Untitled Scene",
-                subtitle: sceneDetail?.studio?.name ?? "",
-                posterURL: sceneDetail?.thumbnailURL,
+                title: playing?.displayTitle ?? "Untitled Scene",
+                subtitle: playing?.studio?.name ?? "",
+                posterURL: playing?.thumbnailURL,
                 onDisappear: {
                     // Failsafe — save progress falls fullScreenCover ohne `onDismiss` weggeht.
                     playerModel.saveProgress()
@@ -137,7 +145,7 @@ struct TVSceneDetailView: View {
                     // Statt „Up Next“ (Channel) zeigt die Einzelszene ihre Marker.
                     // `currentTime` wird bei jedem Rebuild des Panels frisch gelesen —
                     // die Engine ist dort das beobachtete Objekt.
-                    let markers = sceneDetail?.sceneMarkers ?? []
+                    let markers = playing?.sceneMarkers ?? []
                     if !markers.isEmpty {
                         TVMarkerRailView(
                             markers: markers,
@@ -153,6 +161,10 @@ struct TVSceneDetailView: View {
                     }
                 }
             )
+            // The overlay owns focus while it is up; the ended player stays visible behind it.
+            .disabled(similar.upNext != nil)
+            .overlay { TVUpNextOverlay(model: similar) }
+            .animation(.easeInOut(duration: 0.3), value: similar.upNext?.id)
         }
     }
 
@@ -330,7 +342,7 @@ struct TVSceneDetailView: View {
                 if let resumeTime = scene.resumeTime, resumeTime > 0,
                    let duration = scene.sceneDuration, duration > 0,
                    duration.isFinite, resumeTime.isFinite {
-                    let progress = max(0.0, min(1.0, resumeTime / duration))
+                    let progress = PlaybackFraction.of(resumeTime, in: duration)
                     HStack(spacing: 12) {
                         Image(systemName: "play.fill")
                             .font(.caption)
@@ -509,6 +521,7 @@ struct TVSceneDetailView: View {
                           fallbackSources: scene.transcodeFallbackURLs,
                           fallbackDeclaredDuration: scene.sceneDuration,
                           scene: scene)
+        similar.beginPlayback(of: scene, player: playerModel, viewModel: viewModel)
     }
 
     // MARK: - Markers Section

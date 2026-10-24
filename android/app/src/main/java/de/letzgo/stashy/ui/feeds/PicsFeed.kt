@@ -36,8 +36,8 @@ import de.letzgo.stashy.ui.filter.ImagesFeedAutoplaySettingsCard
  * background, pull to refresh like iOS `.refreshable`.
  *
  * Differences to iOS: the 1/2-column toggle and multi-select of `ImagesView` are not offered
- * here (iOS hides them in Feeds too); tag editing on posts ("+", remove, AI suggestions) is not
- * ported; an avatar opens the gallery's regular detail (iOS forces it into the 1/row feed).
+ * here (iOS hides them in Feeds too). Tag editing on posts ("+", long-press remove, AI
+ * suggestions) comes from the shared feed list; an avatar opens the gallery in the 1/row feed.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable

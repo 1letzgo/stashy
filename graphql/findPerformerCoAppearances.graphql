@@ -1,0 +1,11 @@
+query FindPerformerCoAppearances($scene_filter: SceneFilterType, $filter: FindFilterType) {
+  findScenes(scene_filter: $scene_filter, filter: $filter) {
+    count
+    scenes {
+      id
+      performers {
+        id
+      }
+    }
+  }
+}

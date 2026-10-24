@@ -85,7 +85,6 @@ enum class TvSettingsEntry(val title: String, val summary: String) {
     DefaultFilters("Default Filters", "A saved server filter to apply automatically when a section opens."),
     VisibleTabs("Visible Tabs", "Hide sections you do not use. They disappear from the sidebar."),
     Subtitles("Subtitles", "Turn subtitles on automatically, choose the language a scene should start with, and set how the cues look."),
-    DolbyVision("Dolby Vision", "Turn off if a Dolby Vision scene shows green or purple colors. It then plays as HDR10, which your TV still shows in HDR."),
     PlayCount("Count As Played", "How long a scene has to play before it counts as played and its position is saved."),
     Maintenance("Maintenance", "Clear the cached artwork for the active server. Images are re-downloaded as they are shown again."),
     About("About", "Version, build number and updates.");
@@ -99,7 +98,6 @@ enum class TvSettingsEntry(val title: String, val summary: String) {
         DefaultFilters -> TvIcons.filter
         VisibleTabs -> TvIcons.gridGroup
         Subtitles -> TvIcons.captions
-        DolbyVision -> TvIcons.tv
         PlayCount -> TvIcons.playCircle
         Maintenance -> TvIcons.drive
         About -> TvIcons.info
@@ -131,10 +129,6 @@ fun TvSettings(model: TvSettingsModel) {
             item { EntryRow(model, TvSettingsEntry.VisibleTabs) }
             item { TvSectionHeader("Playback") }
             item { EntryRow(model, TvSettingsEntry.Subtitles) }
-            item {
-                TvToggleRow("Dolby Vision", TabManager.playerDolbyVisionEnabled, { TabManager.playerDolbyVisionEnabled = it },
-                    Modifier.tvFocusMemory(model.focus, TvSettingsEntry.DolbyVision.name), onFocus = { model.detailEntry = TvSettingsEntry.DolbyVision })
-            }
             item { EntryRow(model, TvSettingsEntry.PlayCount, TabConfigLogic.playCountThresholdLabel(TabManager.playCountPlayerSeconds)) }
             item { Spacer(Modifier.height(pt(28))) }
             item { EntryRow(model, TvSettingsEntry.Maintenance) }
@@ -194,7 +188,6 @@ class TvSettingsPageRoute(private val entry: TvSettingsEntry) : TvRoute {
             TvSettingsEntry.PlayCount -> PlayCountPage()
             TvSettingsEntry.Maintenance -> MaintenancePage()
             TvSettingsEntry.About -> AboutPage()
-            TvSettingsEntry.DolbyVision -> {}
         }
     }
 }
@@ -418,15 +411,32 @@ private fun StashyPlusPage() {
     LaunchedEffect(Unit) { if (StashyPlus.products.isEmpty()) StashyPlus.fetchProducts() }
     val source = StashyPlus.source
     val busy = StashyPlus.purchasingProductID != null || StashyPlus.isRestoringPurchases
+    var licenseInput by remember { mutableStateOf("") }
+    var licenseError by remember { mutableStateOf(StashyPlus.expiredLicense?.let { "Your license key expired on ${it.expiresText}." }) }
     TvSettingsPage("stashy+", null, firstFocus = first) {
+        val license = StashyPlus.license
         item {
             TvListRow(
-                source.statusTitle, {}, Modifier.focusRequester(first), subtitle = source.statusDetail,
+                source.statusTitle, {}, Modifier.focusRequester(first),
+                subtitle = license?.let { l -> "Licensed to ${l.name}" + (l.expiresText?.let { " · valid until $it" } ?: "") } ?: source.statusDetail,
                 leading = if (StashyPlus.isUnlocked) TvIcons.checkSeal else TvIcons.lock, leadingTint = if (StashyPlus.isUnlocked) TvColors.green else TvColors.tint,
             )
         }
         item { TvListRow("Channels", {}, leading = TvIcons.sparklesTv, leadingTint = TvColors.tint) }
-        item { TvSectionFooter("stashy+ unlocks premium features across stashy for phone, tablet and Android TV with one purchase.") }
+        if (StashyPlus.usesLicenseKeys) {
+            // Sideload flavor: offline license key instead of Google Play.
+            item { TvSectionHeader("License") }
+            if (license != null) {
+                item { TvListRow("Remove License", { StashyPlus.removeLicense() }, destructive = true) }
+                item { TvSectionFooter("License ${license.id}. The key is stored on this device only.") }
+            } else {
+                item { TvTextField("License key (STASHY-…)", licenseInput, { licenseInput = it; licenseError = null }, onSubmit = { licenseError = StashyPlus.activateLicense(licenseInput) }) }
+                item { TvListRow("Activate", { licenseError = StashyPlus.activateLicense(licenseInput) }, enabled = licenseInput.isNotBlank()) }
+                item { TvSectionFooter(licenseError ?: "This version of stashy unlocks stashy+ with a license key. It works offline and stays on this device.") }
+            }
+        } else {
+            item { TvSectionFooter("stashy+ unlocks premium features across stashy for phone, tablet and Android TV with one purchase.") }
+        }
         if (StashyPlus.shouldOfferPurchases) {
             item { TvSectionHeader("Unlock") }
             if (StashyPlus.isLoadingProducts && StashyPlus.products.isEmpty()) {
@@ -611,14 +621,14 @@ private fun PlayCountPage() {
 private fun MaintenancePage() {
     val first = remember { FocusRequester() }
     val context = LocalContext.current
+    val scope = androidx.compose.runtime.rememberCoroutineScope()
     var cleared by remember { mutableStateOf(false) }
     TvSettingsPage("Maintenance", "Removes the cached artwork for the active server. Images are downloaded again as they appear.", firstFocus = first) {
         item {
-            // Never disabled: it is the page's only button.
+            // Never disabled: it is the page's only button. iOS `clearCurrentServerCache()`.
             TvListRow("Clear Image Cache", {
                 if (ServerConfigManager.activeConfig == null) return@TvListRow
-                coil3.SingletonImageLoader.get(context).let { it.memoryCache?.clear(); it.diskCache?.clear() }
-                cleared = true
+                scope.launch { cleared = de.letzgo.stashy.data.ServerImageCache.clearActiveServer(context) }
             }, Modifier.focusRequester(first), value = if (cleared) "Cleared" else null)
         }
     }

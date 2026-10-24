@@ -4,9 +4,7 @@ import de.letzgo.stashy.ui.tools.downloads.GalleryDownloadOptionsDialog
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.grid.LazyGridState
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -16,8 +14,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import de.letzgo.stashy.data.CatalogCardColumnScope
+import de.letzgo.stashy.data.CatalogCardColumns
 import de.letzgo.stashy.data.CatalogPrefs
 import de.letzgo.stashy.data.DetailRepository
 import de.letzgo.stashy.data.FilterMode
@@ -28,7 +26,14 @@ import de.letzgo.stashy.ui.Nav
 import de.letzgo.stashy.ui.SF
 import de.letzgo.stashy.ui.catalog.CatalogChromeSlot
 import de.letzgo.stashy.ui.catalog.CatalogController
+import de.letzgo.stashy.ui.catalog.ImageDeleteConfirmation
 import de.letzgo.stashy.ui.catalog.ImageFeedGridModel
+import de.letzgo.stashy.ui.catalog.ImageSelectionController
+import de.letzgo.stashy.ui.catalog.SelectableImageCell
+import de.letzgo.stashy.ui.PagedList
+import androidx.compose.foundation.lazy.grid.LazyGridScope
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.SelectAll
 import de.letzgo.stashy.ui.catalog.ImageMediaKindHolder
 import de.letzgo.stashy.ui.filter.CardColumnsCard
 import de.letzgo.stashy.ui.filter.CatalogFilterSortSheet
@@ -37,29 +42,54 @@ import de.letzgo.stashy.ui.filter.ImageMediaTypeCard
 import de.letzgo.stashy.ui.filter.ImagesFeedAutoplaySettingsCard
 import de.letzgo.stashy.ui.Screen
 import de.letzgo.stashy.ui.Theme
+import de.letzgo.stashy.ui.scene.EditPerformersSheet
+import de.letzgo.stashy.ui.scene.EditStudioSheet
+import de.letzgo.stashy.ui.scene.ScenePerformersStudioCard
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.size
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.Icon
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
+import coil3.compose.SubcomposeAsyncImage
+import de.letzgo.stashy.ui.StashyColors
 import kotlinx.coroutines.launch
 import kotlinx.serialization.json.JsonObject
 
 /**
- * iOS: `ImagesView(gallery:)` for an opened gallery — chrome bar Back · Edit, the gallery
- * header (cover strip, IMAGES / DATE / STUDIO / PERFORMERS / ORGANIZED, details when
- * expanded), then the image grid (2/row) or the grouped feed (1/row). The top bar's "Settings"
+ * iOS: `ImagesView(gallery:)` for an opened gallery — chrome bar Back · Edit, one header card
+ * with the cover as a hero and the gallery title + IMAGES / DATE / ORGANIZED overlaid on it
+ * (plain card without a picture; description below, expandable), the scene-detail Performers & Studio card (only when set), then the image grid (2/row) or the grouped feed (1/row). The top bar's "Settings"
  * opens the images filter & sort sheet (iOS `ImagesCatalogFilterSortSheet` with
  * `DetailLinkedImagesFilterModel(scope: .gallery(id))`): filter, sort, Type, Per row
  * (`openedGallery` scope), autoplay toggles and the criteria editor. The `galleries` INCLUDES
  * scope is layered last, so no saved filter or criterion can widen the list beyond this gallery.
  * Tapping an image opens [ImageViewerScreen].
  */
-class GalleryDetailScreen(val galleryId: String, val preview: Gallery? = null) : Screen {
+class GalleryDetailScreen(
+    val galleryId: String,
+    val preview: Gallery? = null,
+    /** iOS `forceOneColumnFeed` (opened from an image-feed avatar): 1/row until the sheet's "Per row" is used. */
+    val forceOneColumnFeed: Boolean = false,
+) : Screen {
     override val key = "gallery-$galleryId"
 
     private val scope = screenScope()
     private var gallery by mutableStateOf(preview)
     private var expanded by mutableStateOf(false)
     private var editing by mutableStateOf(false)
+    /** Performers / Studio card pencils (`galleryUpdate` performer_ids / studio_id). */
+    private var editingPerformers by mutableStateOf(false)
+    private var editingStudio by mutableStateOf(false)
     /** iOS `showingGalleryDownloadOptions` (`GalleryDownloadOptionsAlert`). */
     private var showDownloadOptions by mutableStateOf(false)
     private var started = false
+    /** iOS `ignoreForcedOneColumnFeed`. */
+    private var ignoreForcedColumns by mutableStateOf(false)
+    private val forcedColumns: CatalogCardColumns? get() = if (forceOneColumnFeed && !ignoreForcedColumns) CatalogCardColumns.One else null
     private val gridState = LazyGridState()
 
     /** iOS `liveFilterMediaKind` ("Type": Any / Image / Video). */
@@ -74,6 +104,8 @@ class GalleryDetailScreen(val galleryId: String, val preview: Gallery? = null) :
     )
     /** Grouped 1/row feed (iOS `ImagesView(gallery:)` one-column layout). */
     private val imageFeed = ImageFeedGridModel()
+    /** iOS `isSelectionMode` / `selectedImageIds` (multi-select + bulk delete). */
+    private val selection = ImageSelectionController()
 
     private fun load() {
         images.onAppear()
@@ -84,49 +116,134 @@ class GalleryDetailScreen(val galleryId: String, val preview: Gallery? = null) :
     @Composable
     override fun Content() {
         LaunchedEffect(Unit) { if (!started) { started = true; load() } }
+        androidx.activity.compose.BackHandler(enabled = selection.isActive) { selection.end() }
         Box(Modifier.fillMaxSize().background(Theme.palette.background)) {
-            val columns = CatalogPrefs.cardColumns(CatalogCardColumnScope.OpenedGallery).raw
-            DetailGrid(gridState, { w -> columnsFor(DetailTab.Images, w, columns) }, header = { gallery?.let { Header(it) } }) {
-                imageSection(
+            val columns = (forcedColumns ?: CatalogPrefs.cardColumns(CatalogCardColumnScope.OpenedGallery)).raw
+            DetailGrid(gridState, { w -> columnsFor(DetailTab.Images, w, columns) }, header = { gallery?.let { HeaderWithCards(it) } }) {
+                // iOS: while selecting, 1/row drops the grouped feed for per-image cards.
+                if (selection.isActive) selectableImageSection(images.list, selection)
+                else imageSection(
                     images.list, useFeed = columns == 1, feedModel = imageFeed, sortRaw = images.sort.raw,
                     gridState = gridState, currentGalleryId = galleryId,
                 )
             }
-            // iOS `galleryDownloadSlot` (secondary contextual, before filter & sort).
-            val download = gallery?.let { imageSetDownloadSlot(it.id, "Download gallery") { showDownloadOptions = true } }
-            DetailTopBar(
-                gallery?.displayTitle ?: "", emptyList(), null, {}, listOfNotNull(download),
-                settings = CatalogChromeSlot(SF.sliderHorizontal3, images.isFilterActive || kind.kind != ImageListMediaKind.All, "Settings") {
-                    images.isSheetPresented = true
-                },
-                onEdit = { editing = true }, editLabel = "Edit gallery",
-            )
+            if (selection.isActive) {
+                // iOS `CatalogSelectionChrome`: Select all · Delete · Done.
+                DetailTopBar(
+                    "${selection.state.count} Selected", emptyList(), null, {},
+                    listOf(
+                        ChromeSlot(Icons.Filled.SelectAll, "Select all") { selection.selectAll(images.list.items) },
+                        ChromeSlot(SF.trash, "Delete") { selection.requestDelete() },
+                        ChromeSlot(SF.checkmark, "Done", isActive = true) { selection.end() },
+                    ),
+                )
+            } else {
+                // iOS `galleryDownloadSlot` (secondary contextual, before filter & sort).
+                val download = gallery?.let { imageSetDownloadSlot(it.id, "Download gallery") { showDownloadOptions = true } }
+                val select = ChromeSlot(SF.checkmarkCircle, "Select images") { selection.begin() }
+                DetailTopBar(
+                    gallery?.displayTitle ?: "", emptyList(), null, {}, listOfNotNull(select, download),
+                    settings = CatalogChromeSlot(SF.sliderHorizontal3, images.isFilterActive || kind.kind != ImageListMediaKind.All, "Settings") {
+                        images.isSheetPresented = true
+                    },
+                    onEdit = { editing = true }, editLabel = "Edit gallery",
+                )
+            }
         }
+        ImageDeleteConfirmation(selection, images.list)
         CatalogFilterSortSheet(images, onReset = { kind.kind = ImageListMediaKind.All }) {
             ImageMediaTypeCard(kind.kind) { kind.kind = it; images.applyLive() }
-            CardColumnsCard(CatalogCardColumnScope.OpenedGallery)
+            CardColumnsCard(CatalogCardColumnScope.OpenedGallery, forced = forcedColumns) { ignoreForcedColumns = true }
             ImagesFeedAutoplaySettingsCard()
         }
         val g = gallery
         if (editing && g != null) EditGallerySheet(g, { editing = false }) { gallery = it }
+        if (editingPerformers && g != null) EditPerformersSheet(
+            g.performers.orEmpty().map { it.id }.toSet(), { DetailRepository.updateGalleryPerformers(g.id, it) },
+            { editingPerformers = false },
+        ) { picked -> gallery = gallery?.copy(performers = picked) }
+        if (editingStudio && g != null) EditStudioSheet(
+            g.studio?.id, { DetailRepository.updateGalleryStudio(g.id, it) },
+            { editingStudio = false },
+        ) { picked -> gallery = gallery?.copy(studio = picked) }
         if (showDownloadOptions && g != null) GalleryDownloadOptionsDialog(g) { showDownloadOptions = false }
     }
 
-    /** iOS `openedGalleryHeader`. */
+    /**
+     * Hero header, then the scene detail's Performers & Studio card (full width). The card only
+     * shows when the gallery has a studio or performers — or in edit mode, empty, so they can be
+     * assigned via its pencil menu.
+     */
     @Composable
-    private fun Header(g: Gallery) {
-        val items = DetailFormatting.gallery(g, images.list.totalCount)
-        val details = g.details?.takeIf { it.isNotEmpty() }
-        DetailHeaderCard(
+    private fun HeaderWithCards(g: Gallery) {
+        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            HeroHeader(g)
+            ScenePerformersStudioCard(
+                g.date, g.studio, g.performers.orEmpty(), director = null,
+                onEditStudio = { editingStudio = true }, onEditPerformers = { editingPerformers = true },
+            )
+        }
+    }
+
+    /** The gallery cover, else the first loaded image (with its list index and whether it is the cover); null without any picture. */
+    private fun heroImage(g: Gallery): Triple<StashImage, Int, Boolean>? {
+        val items = images.list.items
+        val cover = g.cover?.takeIf { it.paths != null && it.id != null }
+        val coverIndex = cover?.id?.let { id -> items.indexOfFirst { it.id == id } } ?: -1
+        val image = when {
+            coverIndex >= 0 -> items[coverIndex]
+            cover != null -> StashImage(id = cover.id!!, paths = cover.paths)
+            else -> items.firstOrNull()
+        } ?: return null
+        return Triple(image, coverIndex, cover != null)
+    }
+
+    /**
+     * iOS `openedGalleryHeader` merged with the cover hero ([DetailHeroCard]): the cover (thumbnail)
+     * blurred as the band backdrop (with the details on it) and center-cropped in the circle on the
+     * band edge; tapping band or circle opens the fullscreen viewer. Title and description (three
+     * lines, expandable) below. Without a picture, a tinted band and the gallery icon in the circle.
+     */
+    @Composable
+    private fun HeroHeader(g: Gallery) {
+        val hero = heroImage(g)
+        // A video clip as cover fails to decode as a picture, so it uses the thumbnail.
+        val url = hero?.first?.let { img -> (if (img.isVideo) null else img.imageURL) ?: img.thumbnailURL }
+        DetailHeroCard(
             title = g.displayTitle,
-            imageUrl = g.coverURL,
-            placeholderIcon = photoOnRectangleIcon(),
-            items = items,
-            expandable = items.size > 4 || details != null,
+            items = DetailFormatting.gallery(g, images.list.totalCount),
+            description = g.details?.takeIf { it.isNotEmpty() },
             expanded = expanded,
             onToggle = { expanded = !expanded },
-            expandedContent = details?.let { d -> { Text(d, fontSize = 11.sp, color = Theme.palette.secondaryText, modifier = Modifier.padding(top = 4.dp)) } },
+            hero = if (hero != null && url != null) {
+                val (image, coverIndex, isCover) = hero
+                val thumb = image.thumbnailURL
+                DetailHero(DetailHero.Style.Cover, thumb ?: url, Color.Black, "Open image", { openHero(image, coverIndex, isCover) }) {
+                    // 76dp circle: the thumbnail is plenty; full picture only when there is none.
+                    SubcomposeAsyncImage(
+                        thumb ?: url, g.displayTitle, Modifier.fillMaxSize(), contentScale = ContentScale.Crop, alignment = Alignment.Center,
+                        loading = { Box(Modifier.fillMaxSize(), Alignment.Center) { CircularProgressIndicator(Modifier.size(20.dp), color = Color.White.copy(alpha = 0.7f), strokeWidth = 2.dp) } },
+                        error = {
+                            Box(Modifier.fillMaxSize().background(Color.Gray.copy(alpha = 0.1f)), Alignment.Center) {
+                                Icon(photoOnRectangleIcon(), null, tint = StashyColors.appAccent.copy(alpha = 0.5f), modifier = Modifier.size(28.dp))
+                            }
+                        },
+                    )
+                }
+            } else DetailHero(DetailHero.Style.Cover, null, Color.Black, "Open image", null) { HeroPlaceholder(photoOnRectangleIcon()) },
         )
+    }
+
+    /** Viewer on the hero picture: inside the loaded list when it is there, else just that picture. */
+    private fun openHero(image: StashImage, coverIndex: Int, isCover: Boolean) {
+        val list = images.list
+        val index = when {
+            coverIndex >= 0 -> coverIndex
+            !isCover && list.items.isNotEmpty() -> 0
+            else -> -1
+        }
+        if (index >= 0) Nav.push(ImageViewerScreen(list.items, index, onLoadMore = { list.loadMore() }))
+        else Nav.push(ImageViewerScreen(listOf(image), 0))
     }
 
     /** iOS: `EditGallerySheet`. */
@@ -161,6 +278,15 @@ class GalleryDetailScreen(val galleryId: String, val preview: Gallery? = null) :
                 Nav.pop()
             },
         )
+    }
+}
+
+/** [imageSection] in selection mode: per-image cards with the selection overlay (iOS `imageCell`). */
+private fun LazyGridScope.selectableImageSection(list: PagedList<StashImage>, selection: ImageSelectionController) {
+    pagedSection(list, { it.id }, "Loading images...", SF.cameraFill, "No images found") { _, image ->
+        SelectableImageCell(selection.state.isSelected(image.id), { selection.toggle(image.id) }) {
+            DetailImageCard(image)
+        }
     }
 }
 

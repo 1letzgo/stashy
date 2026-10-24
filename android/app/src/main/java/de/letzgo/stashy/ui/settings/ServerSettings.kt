@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -105,6 +106,7 @@ fun androidx.compose.foundation.lazy.LazyListScope.serverListSection() {
     }
 }
 
+@OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 @Composable
 private fun ServerListRow(server: ServerConfig) {
     val p = Theme.palette
@@ -114,16 +116,42 @@ private fun ServerListRow(server: ServerConfig) {
         ActiveServerStatus.isConnected == true -> Color(0xFF30D158)
         else -> Color(0xFFFFD60A)
     }
-    // Material list item like the Wi-Fi list: tap connects, the gear opens the server details.
-    NativeListItem(
-        server.name, supporting = server.baseURL,
-        onClick = { if (!active) connectServer(server) },
-        leading = { Box(Modifier.size(24.dp), contentAlignment = Alignment.Center) { Box(Modifier.size(10.dp).background(dot, CircleShape)) } },
-        trailing = {
-            IconButton({ Nav.push(ServerDetailScreen(server.id)) }) {
-                Icon(androidx.compose.material.icons.Icons.Outlined.Settings, "Server details", tint = p.secondaryText)
+    var confirmDelete by remember { mutableStateOf(false) }
+    // iOS `.onDelete` on the server list: swipe left deletes. The row snaps back and the same
+    // "Delete Server" confirmation as the detail screen decides (also for the active server).
+    val swipe = androidx.compose.material3.rememberSwipeToDismissBoxState(confirmValueChange = { value ->
+        if (value == androidx.compose.material3.SwipeToDismissBoxValue.EndToStart) confirmDelete = true
+        false
+    })
+    androidx.compose.material3.SwipeToDismissBox(
+        state = swipe,
+        enableDismissFromStartToEnd = false,
+        backgroundContent = {
+            Box(Modifier.fillMaxSize().background(StashyColors.systemRed).padding(end = 20.dp), contentAlignment = Alignment.CenterEnd) {
+                Icon(SF.trash, "Delete Server", tint = Color.White)
             }
         },
+    ) {
+        // Material list item like the Wi-Fi list: tap connects, the gear opens the server details.
+        Box(Modifier.background(p.secondaryBackground)) {
+            NativeListItem(
+                server.name, supporting = server.baseURL,
+                onClick = { if (!active) connectServer(server) },
+                leading = { Box(Modifier.size(24.dp), contentAlignment = Alignment.Center) { Box(Modifier.size(10.dp).background(dot, CircleShape)) } },
+                trailing = {
+                    IconButton({ Nav.push(ServerDetailScreen(server.id)) }) {
+                        Icon(androidx.compose.material.icons.Icons.Outlined.Settings, "Server details", tint = p.secondaryText)
+                    }
+                },
+            )
+        }
+    }
+    if (confirmDelete) ConfirmAlert(
+        "Delete Server",
+        "Are you sure you want to delete this server configuration? This action cannot be undone.",
+        "Delete",
+        onConfirm = { if (active) { ServerConfigManager.delete(server); ActiveServerStatus.reset(); MainTab.entries.forEach { Nav.popToRoot(it) } } else ServerConfigManager.delete(server) },
+        onDismiss = { confirmDelete = false },
     )
 }
 

@@ -127,7 +127,11 @@ object GraphQL {
             if (errors.any { it.lowercase().contains("database is locked") }) throw DatabaseLocked()
             when (r.code) {
                 in 200..299 -> {}
-                401 -> throw GraphQLError.Unauthorized
+                401 -> {
+                    // iOS posts "AuthError401"; the shell shows "Authentication Required" once.
+                    AuthEvents.reportUnauthorized(config.id)
+                    throw GraphQLError.Unauthorized
+                }
                 else -> throw GraphQLError.Server(r.code, text)
             }
             val data = root?.get("data") as? JsonObject

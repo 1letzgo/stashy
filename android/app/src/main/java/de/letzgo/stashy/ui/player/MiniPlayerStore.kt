@@ -100,9 +100,6 @@ object MiniPlayerRules {
         return time
     }
 
-    /** Whether the bar should count the play now ([threshold] = "Count as played — Player"). */
-    fun countsPlay(alreadyRegistered: Boolean, seconds: Double, threshold: Double): Boolean =
-        !alreadyRegistered && seconds >= maxOf(0.0, threshold)
 
     /** First two performers, else the studio, else nothing. */
     fun subtitle(performerNames: List<String>, studioName: String?): String {
@@ -121,8 +118,10 @@ object MiniPlayerStore {
     data class Session(
         val scene: Scene,
         val player: StashPlayer,
-        /** The page already counted this viewing as a play; the page taking it back must not again. */
+        /** This viewing was already counted as a play; whoever takes it next must not count it again. */
         val playRegistered: Boolean,
+        /** Seconds actually watched in this viewing ([PlayCountCredit]), handed on with the player. */
+        val watchedSeconds: Double = 0.0,
         /** Server the scene belongs to — a switch closes the session. */
         val serverId: String?,
     )
@@ -135,12 +134,14 @@ object MiniPlayerStore {
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private val tracker = PlaybackActivityTracker(scope)
+    /** "Count as played" by watched seconds, like the scene page (iOS `PlayCountWatchClock`). */
+    private val playCredit = PlayCountCredit(0.0)
 
     /** Settings › Playback › "Mini player when leaving a scene". */
     val isEnabled: Boolean get() = TabManager.isMiniPlayerEnabled
 
     /** Takes over [player] from a scene page that is going away. Any other mini session ends. */
-    fun adopt(scene: Scene, player: StashPlayer, playRegistered: Boolean, serverId: String?) {
+    fun adopt(scene: Scene, player: StashPlayer, watchedSeconds: Double, playRegistered: Boolean, serverId: String?) {
         session?.let { if (it.player !== player) close() }
         player.onTime = { seconds, duration -> handleTime(seconds, duration) }
         player.onPlayingChanged = { playing -> if (playing) tracker.start() else tracker.stop() }
@@ -154,7 +155,8 @@ object MiniPlayerStore {
         configureTracker(scene.id)
         tracker.setPosition(player.currentTime, if (player.duration > 0) player.duration else scene.sceneDuration ?: 0.0)
         if (player.isPlaying) tracker.start()
-        session = Session(scene, player, playRegistered, serverId)
+        playCredit.restore(watchedSeconds, playRegistered)
+        session = Session(scene, player, playRegistered, watchedSeconds, serverId)
     }
 
     /** iOS `play(_:)` — switches the bar to [scene] on the same player (watchlist tap, next entry). */
@@ -171,6 +173,7 @@ object MiniPlayerStore {
         p.fallbackSources = scene.transcodeFallbackURLs
         p.fallbackDeclaredDuration = scene.sceneDuration
         p.nowPlaying = SceneNowPlaying.of(scene)
+        playCredit.reset()
         session = current.copy(scene = scene, playRegistered = false)
         p.load(url, MiniPlayerRules.resumeStart(scene.resumeTime, scene.sceneDuration), autoplay = true)
     }
@@ -202,7 +205,8 @@ object MiniPlayerStore {
         val current = session ?: return
         if (seconds < 0) return
         tracker.setPosition(seconds, if (duration > 0) duration else current.scene.sceneDuration ?: 0.0)
-        if (MiniPlayerRules.countsPlay(current.playRegistered, seconds, PlayerSettings.playCountPlayerSeconds)) {
+        playCredit.thresholdSeconds = maxOf(0.0, PlayerSettings.playCountPlayerSeconds)
+        if (playCredit.onTime(seconds, current.player.isPlaying, android.os.SystemClock.elapsedRealtime() / 1000.0)) {
             session = current.copy(playRegistered = true)
             val id = current.scene.id
             if (!TabManager.tracksActivity(id)) return
@@ -223,7 +227,7 @@ object MiniPlayerStore {
         current.player.onReachedEnd = null
         session = null
         showsNowPlaying = false
-        return current
+        return current.copy(playRegistered = playCredit.isCredited, watchedSeconds = playCredit.watchedSeconds)
     }
 
     /** Ends the mini session if it plays a different scene than the one about to start. */

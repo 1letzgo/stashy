@@ -85,6 +85,8 @@ fun ActionChip(
     modifier: Modifier = Modifier,
     icon: ImageVector? = null,
     enabled: Boolean = true,
+    /** Label/icon/border colour over a picture (e.g. white on a hero gradient); null = theme colours. */
+    contentColor: Color? = null,
 ) {
     val p = Theme.palette
     AssistChip(
@@ -95,10 +97,32 @@ fun ActionChip(
         leadingIcon = icon?.let { { Icon(it, null, Modifier.size(scaledIconSize(AssistChipDefaults.IconSize))) } },
         colors = AssistChipDefaults.assistChipColors(
             containerColor = Color.Transparent,
-            labelColor = p.text,
-            leadingIconContentColor = nativeAccent(),
+            labelColor = contentColor ?: p.text,
+            leadingIconContentColor = contentColor ?: nativeAccent(),
         ),
-        border = AssistChipDefaults.assistChipBorder(enabled = enabled, borderColor = p.separator),
+        border = AssistChipDefaults.assistChipBorder(enabled = enabled, borderColor = contentColor?.copy(alpha = 0.5f) ?: p.separator),
+    )
+}
+
+/**
+ * Icon-only [ActionChip]: the same `AssistChip` (height, shape, border, colours) with just the
+ * accent icon as its content, for a compact action next to labelled chips (header expand chevron).
+ */
+@Composable
+fun IconActionChip(
+    icon: ImageVector,
+    contentDescription: String,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    contentColor: Color? = null,
+) {
+    val p = Theme.palette
+    AssistChip(
+        onClick = onClick,
+        modifier = modifier,
+        label = { Icon(icon, contentDescription, Modifier.size(scaledIconSize(AssistChipDefaults.IconSize)), tint = contentColor ?: nativeAccent()) },
+        colors = AssistChipDefaults.assistChipColors(containerColor = Color.Transparent, labelColor = contentColor ?: p.text),
+        border = AssistChipDefaults.assistChipBorder(enabled = true, borderColor = contentColor?.copy(alpha = 0.5f) ?: p.separator),
     )
 }
 

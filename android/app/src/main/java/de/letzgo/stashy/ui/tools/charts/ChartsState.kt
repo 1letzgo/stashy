@@ -23,6 +23,8 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.launch
+import de.letzgo.stashy.data.applying
 
 /**
  * One ranked category of the Charts tool: one list + paging cursor per metric, the selected
@@ -150,6 +152,16 @@ class TopListsViewModel {
         TopListsTagMetric.entries, TopListsTagMetric.Scenes, Tag::id,
     ) { m, page -> TopListsRepository.tags(m, page) }
 
+    init {
+        // iOS `SceneCoverUpdated` / `PerformerImageUpdated` observers of `TopListsToolsView`.
+        scope.launch {
+            de.letzgo.stashy.data.SceneEvents.events.collect { event ->
+                if (event is de.letzgo.stashy.data.SceneEvent.CoverUpdated) patchSceneCover(event.sceneId, event.updatedAt)
+            }
+        }
+        scope.launch { de.letzgo.stashy.data.PerformerEvents.events.collect { patchPerformer(it) } }
+    }
+
     /** iOS: `reset()`. */
     fun reset() {
         scenes.reset(); performers.reset(); studios.reset(); tags.reset()
@@ -187,6 +199,11 @@ class TopListsViewModel {
     fun patchSceneMetadata(scene: Scene) {
         TopListsSceneMetric.entries.forEach { m -> scenes.update(m) { TopListsLogic.mergeScene(it, scene) } }
         scenes.update(TopListsSceneMetric.Rating) { TopListsLogic.sortScenesByRating(it) }
+    }
+
+    /** iOS: `patchPerformerImageInLists` for the performer rankings. */
+    fun patchPerformer(event: de.letzgo.stashy.data.PerformerEvent) {
+        TopListsPerformerMetric.entries.forEach { m -> performers.update(m) { list -> list.applying(event) ?: list } }
     }
 
     /** iOS: `patchSceneCover(sceneId:updatedAt:)`. */

@@ -6,9 +6,7 @@ import de.letzgo.stashy.ui.tools.downloads.SceneBulkDownloadDialog
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.grid.LazyGridState
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -16,8 +14,8 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
 import de.letzgo.stashy.data.DetailRepository
 import de.letzgo.stashy.data.Tag
 import de.letzgo.stashy.ui.Nav
@@ -102,7 +100,6 @@ class TagDetailScreen(val tagId: String, val preview: Tag? = null) : Screen {
             DetailGrid(gridState, { w -> columnsFor(tab, w, catalog.imageColumns) }, hasTabs = catalog.available.size > 1, header = { tag?.let { Header(it) } }) {
                 linkedSection(catalog, tab, gridState)
             }
-            val (slots, menu) = catalog.slots(tab)
             // iOS: the scenes tab adds `SceneBulkDownloadChrome.slot` (contextual, before filter & sort).
             val extra = when (tab) {
                 DetailTab.Scenes -> listOf(sceneBulkDownloadSlot { showSceneDownloadOptions = true })
@@ -111,13 +108,13 @@ class TagDetailScreen(val tagId: String, val preview: Tag? = null) : Screen {
                 else -> emptyList()
             }
             DetailTopBar(
-                tag?.name ?: "", catalog.available, tab, { tab = it }, slots + extra, menu,
-                settings = catalog.imagesSettingsSlot(tab),
+                tag?.name ?: "", catalog.available, tab, { tab = it }, extra,
+                settings = catalog.settingsSlot(tab),
                 isFavorite = isFavorite, favoriteBusy = favoriteBusy, onFavorite = ::toggleFavorite,
                 onEdit = { editing = true }, editLabel = "Edit tag",
             )
         }
-        LinkedImagesSettingsSheet(catalog)
+        LinkedSettingsSheets(catalog)
         val t = tag
         if (editing && t != null) EditTagSheet(t, { editing = false }) { tag = it }
         if (showSceneDownloadOptions) {
@@ -128,22 +125,28 @@ class TagDetailScreen(val tagId: String, val preview: Tag? = null) : Screen {
         }
     }
 
-    /** iOS `tagHeaderView`. */
+    /**
+     * iOS `tagHeaderView` as a [DetailHeroCard]: the tag image blurred as the band backdrop (with
+     * the details on it) and center-cropped in the circle on the band edge (tap → fullscreen); name
+     * + Feeds pill and description below. Without an image (or Stash's `default=true`
+     * placeholder), a tinted band and the tag icon in the circle.
+     */
     @Composable
     private fun Header(t: Tag) {
-        val items = DetailFormatting.tag(t, catalog.effectiveScenes, catalog.effectiveGalleries)
-        val desc = t.description?.takeIf { it.isNotEmpty() }
-        DetailHeaderCard(
+        val url = t.imageURL?.takeIf { t.hasImage }
+        DetailHeroCard(
             title = t.name,
-            imageUrl = null,
-            placeholderIcon = SF.number,
-            items = items,
-            expandable = items.size > 4 || desc != null,
+            items = DetailFormatting.tag(t, catalog.effectiveScenes, catalog.effectiveGalleries),
+            description = t.description?.takeIf { it.isNotEmpty() },
             expanded = expanded,
             onToggle = { expanded = !expanded },
-            imageContent = { TagImage(t, Modifier.fillMaxSize()) },
-            onFeeds = { DetailFeedsLink.navigate(DetailFeedsLink.Target.Tag(t.id, t.name)) },
-            expandedContent = desc?.let { d -> { Text(d, fontSize = 11.sp, color = Theme.palette.secondaryText, modifier = Modifier.padding(top = 4.dp)) } },
+            hero = url?.let {
+                DetailHero(DetailHero.Style.Cover, it, Color.Black, "Open image", { Nav.push(HeroPictureViewerScreen(it, t.name)) }) {
+                    HeroPicture(it, t.name, ContentScale.Crop, SF.number)
+                }
+            } ?: DetailHero(DetailHero.Style.Cover, null, Color.Black, "Open image", null) { HeroPlaceholder(SF.number) },
+            collapsedItemCount = 4,
+            titleAccessory = { color -> FeedsPill(color) { DetailFeedsLink.navigate(DetailFeedsLink.Target.Tag(t.id, t.name)) } },
         )
     }
 

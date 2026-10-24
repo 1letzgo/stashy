@@ -23,6 +23,9 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
         // The statistics manager listens for the server-ready notification to refresh
         // stale tag statistics; a lazy singleton nobody touches before that misses it.
         _ = AITagSuggestionManager.shared
+        // Mixable idle audio category, never activated here: opening the app must not stop
+        // Music / podcasts. The session is taken only once a player makes sound.
+        AudioSessionCoordinator.shared.prepareIdleSession()
         #if !os(tvOS) && canImport(AetherEngine)
         AetherPlaybackBootstrap.installOnce()
         #endif
@@ -37,6 +40,15 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
 
     func application(_ application: UIApplication, configurationForConnecting connectingSceneSession: UISceneSession, options: UIScene.ConnectionOptions) -> UISceneConfiguration {
         return UISceneConfiguration(name: "Default Configuration", sessionRole: connectingSceneSession.role)
+    }
+
+    /// Orientations the app allows right now. `.all` normally; the fullscreen player narrows it
+    /// to landscape for a moment so a programmatic rotation takes, then restores it (keeping it
+    /// narrowed crashed UIKit with a sheet + keyboard in landscape).
+    static var orientationLock: UIInterfaceOrientationMask = .all
+
+    func application(_ application: UIApplication, supportedInterfaceOrientationsFor window: UIWindow?) -> UIInterfaceOrientationMask {
+        AppDelegate.orientationLock
     }
 
     func application(_ application: UIApplication, didDiscardSceneSessions sceneSessions: Set<UISceneSession>) {

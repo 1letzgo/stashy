@@ -25,6 +25,8 @@ struct SceneDetailView: View {
     @ObservedObject private var stashSyncManager = StashSyncManager.shared
     
     @ObservedObject private var downloadManager = DownloadManager.shared
+    /// Card order / visibility from Settings › Scene View — observed so changes apply live.
+    @ObservedObject private var sceneDetailLayout = SceneDetailLayoutManager.shared
     @StateObject private var subtitleController = SubtitleController()
     @StateObject private var transcriptionController = SceneLiveTranscriptionController()
     @StateObject private var captionTranslator = SceneCaptionTranslator()
@@ -55,6 +57,9 @@ struct SceneDetailView: View {
     @State private var tagsTotalHeight: CGFloat = 0
     @State private var isMuted = ScenePlayerMute.initialValue()
     @State private var hasAddedPlay = false
+    /// Seconds actually watched on this page — what "Count as played" measures. Resume
+    /// position and seeks add nothing.
+    @State private var playCountClock = PlayCountWatchClock()
     /// Set when the page is left while the video plays (another tab, a pushed page). The engine
     /// is torn down then, so coming back starts it again at the position it had.
     @State private var resumeOnReturn: (wasPlaying: Bool, position: Double)?
@@ -361,175 +366,26 @@ struct SceneDetailView: View {
                 if !isPlayerPinned {
                     playerCardView
                 }
-                VStack(spacing: 0) {
-                    SceneDetailMetadataCard(
-                        activeScene: $activeScene,
-                        aetherEngine: aetherEngine,
-                        isHeaderExpanded: $isHeaderExpanded,
-                        showingAddMarkerSheet: $showingAddMarkerSheet,
-                        capturedMarkerTime: $capturedMarkerTime,
-                        playbackSpeed: $playbackSpeed,
-                        viewModel: viewModel,
-                        onSeek: { seconds in seekTo(seconds) },
-                        onTitleUpdated: { newTitle, newDetails in
-                            applyLocalSceneEdit(Scene(id: activeScene.id, title: newTitle, details: newDetails, director: activeScene.director, date: activeScene.date, duration: activeScene.duration, studio: activeScene.studio, performers: activeScene.performers, files: activeScene.files, tags: activeScene.tags, galleries: activeScene.galleries, groups: activeScene.groups, organized: activeScene.organized, resumeTime: activeScene.resumeTime, playCount: activeScene.playCount, oCounter: activeScene.oCounter, rating100: activeScene.rating100, createdAt: activeScene.createdAt, updatedAt: activeScene.updatedAt, paths: activeScene.paths, sceneMarkers: activeScene.sceneMarkers, interactive: activeScene.interactive, stashIds: activeScene.stashIds, captions: activeScene.captions, customFields: activeScene.customFields))
-                        }
-                    )
-                }
-                .background(Color.secondaryAppBackground)
-                .clipShape(RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.card))
-                .cardShadow()
-
-                
-                let isStashSyncActive = handyManager.isStashSyncMode || buttplugManager.isStashSyncMode || loveSpouseManager.isStashSyncMode
-                
-                if activeScene.interactive == true && activeScene.funscriptURL != nil && !isStashSyncActive {
-                    SceneHeatmapCard(
-                        heatmapURL: activeScene.heatmapURL,
-                        funscriptURL: activeScene.funscriptURL,
-                        durationSeconds: activeScene.sceneDuration ?? 0,
-                        currentTimeSeconds: currentPlaybackTime,
-                        onSeek: { seconds in seekTo(seconds) },
-                        onSeekCommit: { seconds in commitScrub(to: seconds) },
-                        onScrubStateChange: { active in
-                            isScrubbing = active
-                            if active {
-                                playbackActivityTracker.stop()
-                            }
-                        }
-                    )
-                }
-
-                if stashSyncManager.isSyncing {
-                    StashSyncCard()
-                }
-                
                 if verticalSizeClass == .compact {
-                    // Landscape Mode: Grid Layout for Metadata
-                    LazyVGrid(columns: [GridItem(.flexible(), alignment: .top), GridItem(.flexible(), alignment: .top)], spacing: 12) {
-
-                        // stashy+ — hides itself when Suggestions is off or nothing is similar.
-                        SceneSimilarScenesCard(scenes: similarScenes, isLoading: isLoadingSimilarScenes)
-                            .gridCellColumns(2)
-
-                        // Item 1: Performers (+ Director, full scroll row, spans both columns)
-                        ScenePerformersCard(
-                            sceneId: activeScene.id,
-                            sceneDate: activeScene.date,
-                            performers: activeScene.performers,
-                            director: activeScene.normalizedDirector,
-                            onPerformersUpdated: { updated in
-                                applyLocalSceneEdit(Scene(id: activeScene.id, title: activeScene.title, details: activeScene.details, director: activeScene.director, date: activeScene.date, duration: activeScene.duration, studio: activeScene.studio, performers: updated, files: activeScene.files, tags: activeScene.tags, galleries: activeScene.galleries, groups: activeScene.groups, organized: activeScene.organized, resumeTime: activeScene.resumeTime, playCount: activeScene.playCount, oCounter: activeScene.oCounter, rating100: activeScene.rating100, createdAt: activeScene.createdAt, updatedAt: activeScene.updatedAt, paths: activeScene.paths, sceneMarkers: activeScene.sceneMarkers, interactive: activeScene.interactive, stashIds: activeScene.stashIds, captions: activeScene.captions, customFields: activeScene.customFields))
-                            },
-                            viewModel: viewModel
-                        )
-                        .gridCellColumns(2)
-
-                        // Item 2: Studio
-                        SceneStudioCard(
-                            sceneId: activeScene.id,
-                            studio: activeScene.studio,
-                            onStudioUpdated: { updated in
-                                applyLocalSceneEdit(Scene(id: activeScene.id, title: activeScene.title, details: activeScene.details, director: activeScene.director, date: activeScene.date, duration: activeScene.duration, studio: updated, performers: activeScene.performers, files: activeScene.files, tags: activeScene.tags, galleries: activeScene.galleries, groups: activeScene.groups, organized: activeScene.organized, resumeTime: activeScene.resumeTime, playCount: activeScene.playCount, oCounter: activeScene.oCounter, rating100: activeScene.rating100, createdAt: activeScene.createdAt, updatedAt: activeScene.updatedAt, paths: activeScene.paths, sceneMarkers: activeScene.sceneMarkers, interactive: activeScene.interactive, stashIds: activeScene.stashIds, captions: activeScene.captions, customFields: activeScene.customFields))
-                            },
-                            viewModel: viewModel
-                        )
-
-                        // Item 3: Groups
-                        SceneGroupsCard(
-                            sceneId: activeScene.id,
-                            groups: activeScene.groups ?? [],
-                            onGroupsUpdated: { updated in
-                                applyLocalSceneEdit(Scene(id: activeScene.id, title: activeScene.title, details: activeScene.details, director: activeScene.director, date: activeScene.date, duration: activeScene.duration, studio: activeScene.studio, performers: activeScene.performers, files: activeScene.files, tags: activeScene.tags, galleries: activeScene.galleries, groups: updated, organized: activeScene.organized, resumeTime: activeScene.resumeTime, playCount: activeScene.playCount, oCounter: activeScene.oCounter, rating100: activeScene.rating100, createdAt: activeScene.createdAt, updatedAt: activeScene.updatedAt, paths: activeScene.paths, sceneMarkers: activeScene.sceneMarkers, interactive: activeScene.interactive, stashIds: activeScene.stashIds, captions: activeScene.captions, customFields: activeScene.customFields))
-                            },
-                            viewModel: viewModel
-                        )
-
-                        // Item 4: Tags — always visible
-                        SceneTagsCard(
-                            sceneId: activeScene.id,
-                            tags: activeScene.tags,
-                            onTagsUpdated: { updated in
-                                applyLocalSceneEdit(Scene(id: activeScene.id, title: activeScene.title, details: activeScene.details, director: activeScene.director, date: activeScene.date, duration: activeScene.duration, studio: activeScene.studio, performers: activeScene.performers, files: activeScene.files, tags: updated, galleries: activeScene.galleries, groups: activeScene.groups, organized: activeScene.organized, resumeTime: activeScene.resumeTime, playCount: activeScene.playCount, oCounter: activeScene.oCounter, rating100: activeScene.rating100, createdAt: activeScene.createdAt, updatedAt: activeScene.updatedAt, paths: activeScene.paths, sceneMarkers: activeScene.sceneMarkers, interactive: activeScene.interactive, stashIds: activeScene.stashIds, captions: activeScene.captions, customFields: activeScene.customFields))
-                            },
-                            viewModel: viewModel,
-                            isTagsExpanded: $isTagsExpanded,
-                            tagsTotalHeight: $tagsTotalHeight
-                        )
-
-                        // Item 5: Galleries — always visible (full width)
-                        SceneGalleriesCard(
-                            sceneId: activeScene.id,
-                            galleries: activeScene.galleries,
-                            performers: activeScene.performers,
-                            onGalleriesUpdated: { updated in
-                                applyLocalSceneEdit(Scene(id: activeScene.id, title: activeScene.title, details: activeScene.details, director: activeScene.director, date: activeScene.date, duration: activeScene.duration, studio: activeScene.studio, performers: activeScene.performers, files: activeScene.files, tags: activeScene.tags, galleries: updated, groups: activeScene.groups, organized: activeScene.organized, resumeTime: activeScene.resumeTime, playCount: activeScene.playCount, oCounter: activeScene.oCounter, rating100: activeScene.rating100, createdAt: activeScene.createdAt, updatedAt: activeScene.updatedAt, paths: activeScene.paths, sceneMarkers: activeScene.sceneMarkers, interactive: activeScene.interactive, stashIds: activeScene.stashIds, captions: activeScene.captions, customFields: activeScene.customFields))
-                            },
-                            viewModel: viewModel
-                        )
-                        .gridCellColumns(2)
-
+                    // Landscape: full-width cards span the row; adjacent half-width cards
+                    // (Groups, Tags) pair up side by side in the user's order.
+                    ForEach(landscapeCardRows, id: \.self) { row in
+                        if row.count == 2 {
+                            HStack(alignment: .top, spacing: 12) {
+                                sceneCard(row[0])
+                                    .frame(maxWidth: .infinity, alignment: .top)
+                                sceneCard(row[1])
+                                    .frame(maxWidth: .infinity, alignment: .top)
+                            }
+                        } else if let card = row.first {
+                            sceneCard(card)
+                        }
                     }
                 } else {
-                    // Portrait Mode: Vertical Stack
-                    // stashy+ — hides itself when Suggestions is off or nothing is similar.
-                    SceneSimilarScenesCard(scenes: similarScenes, isLoading: isLoadingSimilarScenes)
-
-                    // Row 1: Performers (+ Director, full width, horizontal scroll)
-                    ScenePerformersCard(
-                        sceneId: activeScene.id,
-                        sceneDate: activeScene.date,
-                        performers: activeScene.performers,
-                        director: activeScene.normalizedDirector,
-                        onPerformersUpdated: { updated in
-                            applyLocalSceneEdit(Scene(id: activeScene.id, title: activeScene.title, details: activeScene.details, director: activeScene.director, date: activeScene.date, duration: activeScene.duration, studio: activeScene.studio, performers: updated, files: activeScene.files, tags: activeScene.tags, galleries: activeScene.galleries, groups: activeScene.groups, organized: activeScene.organized, resumeTime: activeScene.resumeTime, playCount: activeScene.playCount, oCounter: activeScene.oCounter, rating100: activeScene.rating100, createdAt: activeScene.createdAt, updatedAt: activeScene.updatedAt, paths: activeScene.paths, sceneMarkers: activeScene.sceneMarkers, interactive: activeScene.interactive, stashIds: activeScene.stashIds, captions: activeScene.captions, customFields: activeScene.customFields))
-                        },
-                        viewModel: viewModel
-                    )
-
-                    // Row 2: Studio + Groups side by side
-                    HStack(alignment: .top, spacing: 12) {
-                        SceneStudioCard(
-                            sceneId: activeScene.id,
-                            studio: activeScene.studio,
-                            onStudioUpdated: { updated in
-                                applyLocalSceneEdit(Scene(id: activeScene.id, title: activeScene.title, details: activeScene.details, director: activeScene.director, date: activeScene.date, duration: activeScene.duration, studio: updated, performers: activeScene.performers, files: activeScene.files, tags: activeScene.tags, galleries: activeScene.galleries, groups: activeScene.groups, organized: activeScene.organized, resumeTime: activeScene.resumeTime, playCount: activeScene.playCount, oCounter: activeScene.oCounter, rating100: activeScene.rating100, createdAt: activeScene.createdAt, updatedAt: activeScene.updatedAt, paths: activeScene.paths, sceneMarkers: activeScene.sceneMarkers, interactive: activeScene.interactive, stashIds: activeScene.stashIds, captions: activeScene.captions, customFields: activeScene.customFields))
-                            },
-                            viewModel: viewModel
-                        )
-                        SceneGroupsCard(
-                            sceneId: activeScene.id,
-                            groups: activeScene.groups ?? [],
-                            onGroupsUpdated: { updated in
-                                applyLocalSceneEdit(Scene(id: activeScene.id, title: activeScene.title, details: activeScene.details, director: activeScene.director, date: activeScene.date, duration: activeScene.duration, studio: activeScene.studio, performers: activeScene.performers, files: activeScene.files, tags: activeScene.tags, galleries: activeScene.galleries, groups: updated, organized: activeScene.organized, resumeTime: activeScene.resumeTime, playCount: activeScene.playCount, oCounter: activeScene.oCounter, rating100: activeScene.rating100, createdAt: activeScene.createdAt, updatedAt: activeScene.updatedAt, paths: activeScene.paths, sceneMarkers: activeScene.sceneMarkers, interactive: activeScene.interactive, stashIds: activeScene.stashIds, captions: activeScene.captions, customFields: activeScene.customFields))
-                            },
-                            viewModel: viewModel
-                        )
+                    // Portrait: single column in the user's order.
+                    ForEach(renderedCards) { card in
+                        sceneCard(card)
                     }
-
-                    // Row 3: Tags — always visible
-                    SceneTagsCard(
-                        sceneId: activeScene.id,
-                        tags: activeScene.tags,
-                        onTagsUpdated: { updated in
-                            applyLocalSceneEdit(Scene(id: activeScene.id, title: activeScene.title, details: activeScene.details, director: activeScene.director, date: activeScene.date, duration: activeScene.duration, studio: activeScene.studio, performers: activeScene.performers, files: activeScene.files, tags: updated, galleries: activeScene.galleries, groups: activeScene.groups, organized: activeScene.organized, resumeTime: activeScene.resumeTime, playCount: activeScene.playCount, oCounter: activeScene.oCounter, rating100: activeScene.rating100, createdAt: activeScene.createdAt, updatedAt: activeScene.updatedAt, paths: activeScene.paths, sceneMarkers: activeScene.sceneMarkers, interactive: activeScene.interactive, stashIds: activeScene.stashIds, captions: activeScene.captions, customFields: activeScene.customFields))
-                        },
-                        viewModel: viewModel,
-                        isTagsExpanded: $isTagsExpanded,
-                        tagsTotalHeight: $tagsTotalHeight
-                    )
-
-                    // Row 4: Galleries — always visible
-                    SceneGalleriesCard(
-                        sceneId: activeScene.id,
-                        galleries: activeScene.galleries,
-                        performers: activeScene.performers,
-                        onGalleriesUpdated: { updated in
-                            applyLocalSceneEdit(Scene(id: activeScene.id, title: activeScene.title, details: activeScene.details, director: activeScene.director, date: activeScene.date, duration: activeScene.duration, studio: activeScene.studio, performers: activeScene.performers, files: activeScene.files, tags: activeScene.tags, galleries: updated, groups: activeScene.groups, organized: activeScene.organized, resumeTime: activeScene.resumeTime, playCount: activeScene.playCount, oCounter: activeScene.oCounter, rating100: activeScene.rating100, createdAt: activeScene.createdAt, updatedAt: activeScene.updatedAt, paths: activeScene.paths, sceneMarkers: activeScene.sceneMarkers, interactive: activeScene.interactive, stashIds: activeScene.stashIds, captions: activeScene.captions, customFields: activeScene.customFields))
-                        },
-                        viewModel: viewModel
-                    )
-
                 }
             }
             .padding(.horizontal, 16)
@@ -942,9 +798,7 @@ struct SceneDetailView: View {
             playbackActivityTracker.setPosition(currentTime: currentTime, duration: duration)
             ensurePlaybackActivityConfigured()
             playbackActivityTracker.start()
-            if !hasAddedPlay, currentTime >= playCountThreshold {
-                registerScenePlay()
-            }
+            creditPlayIfWatchedEnough()
         }
     }
 
@@ -968,6 +822,165 @@ struct SceneDetailView: View {
                 }
             }
         }
+    }
+
+    // MARK: - Card layout (Settings › Scene View)
+
+    /// Whether a card has anything to show for this scene, independent of the user's layout.
+    /// Similar Scenes hides itself, so it always counts as present here.
+    private func hasContent(_ card: SceneDetailCard) -> Bool {
+        switch card {
+        case .heatmap:
+            let isStashSyncActive = handyManager.isStashSyncMode || buttplugManager.isStashSyncMode || loveSpouseManager.isStashSyncMode
+            return activeScene.interactive == true && activeScene.funscriptURL != nil && !isStashSyncActive
+        case .aiMotion:
+            return stashSyncManager.isSyncing
+        case .performersStudio:
+            return showsPerformersStudioCard
+        case .details, .similarScenes, .groups, .tags, .galleries:
+            return true
+        }
+    }
+
+    /// The user's order minus hidden cards and cards with nothing to show.
+    private var renderedCards: [SceneDetailCard] {
+        sceneDetailLayout.visibleCards.filter(hasContent)
+    }
+
+    /// Landscape rows: adjacent half-width cards pair up, everything else takes a full row.
+    private var landscapeCardRows: [[SceneDetailCard]] {
+        var rows: [[SceneDetailCard]] = []
+        var pending: SceneDetailCard?
+        for card in renderedCards {
+            if card.isHalfWidthInLandscape {
+                if let first = pending {
+                    rows.append([first, card])
+                    pending = nil
+                } else {
+                    pending = card
+                }
+            } else {
+                if let first = pending {
+                    rows.append([first])
+                    pending = nil
+                }
+                rows.append([card])
+            }
+        }
+        if let first = pending { rows.append([first]) }
+        return rows
+    }
+
+    @ViewBuilder
+    private func sceneCard(_ card: SceneDetailCard) -> some View {
+        switch card {
+        case .details:
+            VStack(spacing: 0) {
+                SceneDetailMetadataCard(
+                    activeScene: $activeScene,
+                    aetherEngine: aetherEngine,
+                    isHeaderExpanded: $isHeaderExpanded,
+                    showingAddMarkerSheet: $showingAddMarkerSheet,
+                    capturedMarkerTime: $capturedMarkerTime,
+                    playbackSpeed: $playbackSpeed,
+                    viewModel: viewModel,
+                    onSeek: { seconds in seekTo(seconds) },
+                    onTitleUpdated: { newTitle, newDetails in
+                        applyLocalSceneEdit(Scene(id: activeScene.id, title: newTitle, details: newDetails, director: activeScene.director, date: activeScene.date, duration: activeScene.duration, studio: activeScene.studio, performers: activeScene.performers, files: activeScene.files, tags: activeScene.tags, galleries: activeScene.galleries, groups: activeScene.groups, organized: activeScene.organized, resumeTime: activeScene.resumeTime, playCount: activeScene.playCount, oCounter: activeScene.oCounter, rating100: activeScene.rating100, createdAt: activeScene.createdAt, updatedAt: activeScene.updatedAt, paths: activeScene.paths, sceneMarkers: activeScene.sceneMarkers, interactive: activeScene.interactive, stashIds: activeScene.stashIds, captions: activeScene.captions, customFields: activeScene.customFields))
+                    }
+                )
+            }
+            .background(Color.secondaryAppBackground)
+            .clipShape(RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.card))
+            .cardShadow()
+
+        case .heatmap:
+            SceneHeatmapCard(
+                heatmapURL: activeScene.heatmapURL,
+                funscriptURL: activeScene.funscriptURL,
+                durationSeconds: activeScene.sceneDuration ?? 0,
+                currentTimeSeconds: currentPlaybackTime,
+                onSeek: { seconds in seekTo(seconds) },
+                onSeekCommit: { seconds in commitScrub(to: seconds) },
+                onScrubStateChange: { active in
+                    isScrubbing = active
+                    if active {
+                        playbackActivityTracker.stop()
+                    }
+                }
+            )
+
+        case .aiMotion:
+            StashSyncCard()
+
+        case .similarScenes:
+            // stashy+ — hides itself when Suggestions is off or nothing is similar.
+            SceneSimilarScenesCard(scenes: similarScenes, isLoading: isLoadingSimilarScenes)
+
+        case .performersStudio:
+            // Studio first, then performers (+ director), horizontal scroll.
+            performersStudioCard
+
+        case .groups:
+            SceneGroupsCard(
+                sceneId: activeScene.id,
+                groups: activeScene.groups ?? [],
+                onGroupsUpdated: { updated in
+                    applyLocalSceneEdit(Scene(id: activeScene.id, title: activeScene.title, details: activeScene.details, director: activeScene.director, date: activeScene.date, duration: activeScene.duration, studio: activeScene.studio, performers: activeScene.performers, files: activeScene.files, tags: activeScene.tags, galleries: activeScene.galleries, groups: updated, organized: activeScene.organized, resumeTime: activeScene.resumeTime, playCount: activeScene.playCount, oCounter: activeScene.oCounter, rating100: activeScene.rating100, createdAt: activeScene.createdAt, updatedAt: activeScene.updatedAt, paths: activeScene.paths, sceneMarkers: activeScene.sceneMarkers, interactive: activeScene.interactive, stashIds: activeScene.stashIds, captions: activeScene.captions, customFields: activeScene.customFields))
+                },
+                viewModel: viewModel
+            )
+
+        case .tags:
+            SceneTagsCard(
+                sceneId: activeScene.id,
+                tags: activeScene.tags,
+                onTagsUpdated: { updated in
+                    applyLocalSceneEdit(Scene(id: activeScene.id, title: activeScene.title, details: activeScene.details, director: activeScene.director, date: activeScene.date, duration: activeScene.duration, studio: activeScene.studio, performers: activeScene.performers, files: activeScene.files, tags: updated, galleries: activeScene.galleries, groups: activeScene.groups, organized: activeScene.organized, resumeTime: activeScene.resumeTime, playCount: activeScene.playCount, oCounter: activeScene.oCounter, rating100: activeScene.rating100, createdAt: activeScene.createdAt, updatedAt: activeScene.updatedAt, paths: activeScene.paths, sceneMarkers: activeScene.sceneMarkers, interactive: activeScene.interactive, stashIds: activeScene.stashIds, captions: activeScene.captions, customFields: activeScene.customFields))
+                },
+                viewModel: viewModel,
+                isTagsExpanded: $isTagsExpanded,
+                tagsTotalHeight: $tagsTotalHeight
+            )
+
+        case .galleries:
+            SceneGalleriesCard(
+                sceneId: activeScene.id,
+                galleries: activeScene.galleries,
+                performers: activeScene.performers,
+                onGalleriesUpdated: { updated in
+                    applyLocalSceneEdit(Scene(id: activeScene.id, title: activeScene.title, details: activeScene.details, director: activeScene.director, date: activeScene.date, duration: activeScene.duration, studio: activeScene.studio, performers: activeScene.performers, files: activeScene.files, tags: activeScene.tags, galleries: updated, groups: activeScene.groups, organized: activeScene.organized, resumeTime: activeScene.resumeTime, playCount: activeScene.playCount, oCounter: activeScene.oCounter, rating100: activeScene.rating100, createdAt: activeScene.createdAt, updatedAt: activeScene.updatedAt, paths: activeScene.paths, sceneMarkers: activeScene.sceneMarkers, interactive: activeScene.interactive, stashIds: activeScene.stashIds, captions: activeScene.captions, customFields: activeScene.customFields))
+                },
+                viewModel: viewModel
+            )
+        }
+    }
+
+    private var showsPerformersStudioCard: Bool {
+        ScenePerformersStudioCard.isVisible(
+            performers: activeScene.performers,
+            studio: activeScene.studio,
+            director: activeScene.normalizedDirector,
+            editing: appearanceManager.isEditModeEnabled
+        )
+    }
+
+    /// Studio first, then performers (+ director) — writes through `sceneUpdate`.
+    private var performersStudioCard: some View {
+        ScenePerformersStudioCard(
+            sceneId: activeScene.id,
+            sceneDate: activeScene.date,
+            performers: activeScene.performers,
+            studio: activeScene.studio,
+            director: activeScene.normalizedDirector,
+            onPerformersUpdated: { updated in
+                applyLocalSceneEdit(Scene(id: activeScene.id, title: activeScene.title, details: activeScene.details, director: activeScene.director, date: activeScene.date, duration: activeScene.duration, studio: activeScene.studio, performers: updated, files: activeScene.files, tags: activeScene.tags, galleries: activeScene.galleries, groups: activeScene.groups, organized: activeScene.organized, resumeTime: activeScene.resumeTime, playCount: activeScene.playCount, oCounter: activeScene.oCounter, rating100: activeScene.rating100, createdAt: activeScene.createdAt, updatedAt: activeScene.updatedAt, paths: activeScene.paths, sceneMarkers: activeScene.sceneMarkers, interactive: activeScene.interactive, stashIds: activeScene.stashIds, captions: activeScene.captions, customFields: activeScene.customFields))
+            },
+            onStudioUpdated: { updated in
+                applyLocalSceneEdit(Scene(id: activeScene.id, title: activeScene.title, details: activeScene.details, director: activeScene.director, date: activeScene.date, duration: activeScene.duration, studio: updated, performers: activeScene.performers, files: activeScene.files, tags: activeScene.tags, galleries: activeScene.galleries, groups: activeScene.groups, organized: activeScene.organized, resumeTime: activeScene.resumeTime, playCount: activeScene.playCount, oCounter: activeScene.oCounter, rating100: activeScene.rating100, createdAt: activeScene.createdAt, updatedAt: activeScene.updatedAt, paths: activeScene.paths, sceneMarkers: activeScene.sceneMarkers, interactive: activeScene.interactive, stashIds: activeScene.stashIds, captions: activeScene.captions, customFields: activeScene.customFields))
+            },
+            viewModel: viewModel
+        )
     }
 
     /// Updates local Scene Detail state and notifies catalog lists (title, studio, tags, …).
@@ -1049,10 +1062,16 @@ struct SceneDetailView: View {
     }
 
     /// Settings › Playback › "Count as played — Player": seconds of playback before the scene
-    /// gets its play count. The threshold is measured on the playhead, so a resumed scene needs
-    /// that many seconds of new playback too.
+    /// gets its play count. Measured as time actually watched on this page (`playCountClock`),
+    /// never on the playhead: a resumed scene, or one skipped ahead, needs that many seconds of
+    /// real playback too.
     private var playCountThreshold: Double {
         max(0, TabManager.shared.playCountPlayerSeconds)
+    }
+
+    private func creditPlayIfWatchedEnough() {
+        guard !hasAddedPlay, playCountClock.watchedSeconds >= playCountThreshold else { return }
+        registerScenePlay()
     }
 
     /// Stash's server captions as selectable external subtitle tracks on the engine. Registering
@@ -1098,9 +1117,9 @@ struct SceneDetailView: View {
                     playbackActivityTracker.start()
                 }
             }
-            if !hasAddedPlay, seconds >= playCountThreshold {
-                registerScenePlay()
-            }
+            playCountClock.sample(playhead: seconds,
+                                  isPlaying: engine?.isPlaying == true && !isScrubbing)
+            creditPlayIfWatchedEnough()
         }
         engine.onPlayingChanged = { [weak engine] playing in
             guard let engine else { return }
@@ -1170,6 +1189,8 @@ struct SceneDetailView: View {
 
     /// One in-flight engine seek at a time; the latest scrub target wins.
     private func enqueueAetherSeek(_ aether: AetherSceneEngine, to seconds: Double) {
+        // A seek is not watch time: restart the "Count as played" interval at the new spot.
+        playCountClock.breakInterval()
         pendingAetherSeek = seconds
         guard !aetherSeekInFlight else { return }
         aetherSeekInFlight = true
@@ -1739,6 +1760,9 @@ private struct SceneDetailLifecycleModifier: ViewModifier {
             // headphones in mid-playback must turn the sound on, unplugging must mute again.
             .onReceive(NotificationCenter.default.publisher(for: audioRouteChangeNotification)
                 .receive(on: DispatchQueue.main)) { _ in
+                // "Start muted without headphones" off: the route never decides the mute state,
+                // so unplugging does not force-mute (playback pause on unplug is the system's).
+                guard TabManager.mutesWithoutHeadphones else { return }
                 let muted = ScenePlayerMute.initialValue()
                 if muted != isMuted { isMuted = muted }
             }

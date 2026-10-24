@@ -3,44 +3,28 @@ package de.letzgo.stashy.ui.detail
 import de.letzgo.stashy.data.Downloads
 import de.letzgo.stashy.ui.tools.downloads.SceneBulkDownloadDialog
 import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.heightIn
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.grid.LazyGridState
-import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.layout.ContentScale
+import de.letzgo.stashy.ui.SF
 import androidx.compose.ui.text.input.KeyboardType
-import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.dp
 import de.letzgo.stashy.data.DetailRepository
 import de.letzgo.stashy.data.Studio
-import de.letzgo.stashy.ui.IosTypography
 import de.letzgo.stashy.ui.Nav
 import de.letzgo.stashy.ui.Screen
 import de.letzgo.stashy.ui.Theme
 import kotlinx.coroutines.launch
 
 /**
- * iOS: `StudioDetailView` — logo header (140pt logo column, PNG/JPG/SVG via Coil like
- * `StudioLogoStore`), sections Scenes · Galleries · Studios (sub-studios) · Performers · Tags ·
+ * iOS: `StudioDetailView` — logo hero header (PNG/JPG/SVG via Coil like `StudioLogoStore`), sections Scenes · Galleries · Studios (sub-studios) · Performers · Tags ·
  * Groups · Images, favorite and `EditStudioSheet`.
  */
 class StudioDetailScreen(val studioId: String, val preview: Studio? = null) : Screen {
@@ -116,20 +100,19 @@ class StudioDetailScreen(val studioId: String, val preview: Studio? = null) : Sc
             DetailGrid(gridState, { w -> columnsFor(tab, w, if (catalog.usesImageFeed) catalog.imageColumns else 2) }, hasTabs = catalog.available.size > 1, header = { studio?.let { Header(it) } }) {
                 linkedSection(catalog, tab, gridState)
             }
-            val (slots, menu) = catalog.slots(tab)
             // iOS: the scenes tab adds `SceneBulkDownloadChrome.slot` (contextual, before filter & sort).
             val extra = when (tab) {
                 DetailTab.Scenes -> listOf(sceneBulkDownloadSlot { showSceneDownloadOptions = true })
                 else -> emptyList()
             }
             DetailTopBar(
-                studio?.name ?: "", catalog.available, tab, { tab = it }, slots + extra, menu,
-                settings = catalog.imagesSettingsSlot(tab),
+                studio?.name ?: "", catalog.available, tab, { tab = it }, extra,
+                settings = catalog.settingsSlot(tab),
                 isFavorite = isFavorite, favoriteBusy = favoriteBusy, onFavorite = ::toggleFavorite,
                 onEdit = { editing = true }, editLabel = "Edit studio",
             )
         }
-        LinkedImagesSettingsSheet(catalog)
+        LinkedSettingsSheets(catalog)
         val s = studio
         if (editing && s != null) EditStudioSheet(s, { editing = false }) { studio = it }
         if (showSceneDownloadOptions) {
@@ -137,43 +120,31 @@ class StudioDetailScreen(val studioId: String, val preview: Studio? = null) : Sc
         }
     }
 
-    /** iOS `headerCard`. */
+    /**
+     * iOS `headerCard` as a [DetailHeroCard]: the logo blurred as the band backdrop (with the
+     * details on it) and, never cropped (fit, inset on the dark studio backdrop), in the circle on
+     * the band edge (tap → fullscreen); name + Feeds pill, URL and description below. Without a
+     * logo, a tinted band and the studio icon in the circle.
+     */
     @Composable
     private fun Header(s: Studio) {
         val p = Theme.palette
-        val details = DetailFormatting.studio(s, catalog.effectiveScenes.coerceAtLeast(s.sceneCount ?: 0), catalog.effectiveGalleries)
-        val hasURL = !s.url.isNullOrEmpty()
-        val expandable = details.size > 4 || (hasURL && details.size > 2)
-        HeaderCardFrame {
-            // iOS: details padded by 140 + 12, logo overlaid at the leading edge.
-            Box(Modifier.fillMaxWidth().heightIn(min = 115.dp)) {
-                Box(Modifier.matchParentSize()) {
-                    Box(Modifier.width(140.dp).fillMaxHeight().background(p.studioHeader).padding(8.dp)) {
-                        StudioLogo(s, Modifier.fillMaxSize())
-                    }
+        val url = s.imageURL?.takeIf { s.hasImage }
+        DetailHeroCard(
+            title = s.name,
+            items = DetailFormatting.studio(s, catalog.effectiveScenes.coerceAtLeast(s.sceneCount ?: 0), catalog.effectiveGalleries),
+            description = s.details?.takeIf { it.isNotEmpty() },
+            expanded = expanded,
+            onToggle = { expanded = !expanded },
+            hero = url?.let {
+                DetailHero(DetailHero.Style.Logo, it, p.studioHeader, "Open logo", { Nav.push(HeroPictureViewerScreen(it, s.name, p.studioHeader, inset = true)) }) {
+                    HeroPicture(it, s.name, ContentScale.Fit, SF.building2)
                 }
-                Column(Modifier.fillMaxWidth().heightIn(min = 115.dp).padding(start = 152.dp, end = 12.dp, top = 10.dp, bottom = 10.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Row(verticalAlignment = Alignment.Top, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Text(
-                            s.name, Modifier.weight(1f), style = IosTypography.title2.copy(fontWeight = FontWeight.Bold), color = p.text,
-                            maxLines = if (expanded) Int.MAX_VALUE else 2, overflow = TextOverflow.Ellipsis,
-                        )
-                        FeedsPill { DetailFeedsLink.navigate(DetailFeedsLink.Target.Studio(s.id, s.name)) }
-                    }
-                    val visible = if (expanded) details else details.take(4)
-                    if (visible.isNotEmpty()) DetailItemsGrid(visible)
-                    if (hasURL && (expanded || details.size <= 2)) HeaderLink(s.url!!)
-                    s.details?.takeIf { it.isNotEmpty() }?.let { desc ->
-                        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                            HorizontalDivider(color = p.separator)
-                            Text(desc, style = IosTypography.caption, color = p.secondaryText, modifier = Modifier.padding(vertical = 4.dp))
-                        }
-                    }
-                    if (expandable) Spacer(Modifier.height(18.dp))
-                }
-            }
-            if (expandable) HeaderExpandButton(expanded) { expanded = !expanded }
-        }
+            } ?: DetailHero(DetailHero.Style.Cover, null, p.studioHeader, "Open logo", null) { HeroPlaceholder(SF.building2) },
+            collapsedItemCount = 4,
+            titleAccessory = { color -> FeedsPill(color) { DetailFeedsLink.navigate(DetailFeedsLink.Target.Studio(s.id, s.name)) } },
+            footer = s.url?.takeIf { it.isNotEmpty() }?.let { link -> { HeaderLink(link) } },
+        )
     }
 
     /** iOS: `EditStudioSheet`. */

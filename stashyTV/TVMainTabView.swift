@@ -65,7 +65,8 @@ struct TVMainTabView: View {
         TVContentTab(id: .tags, appTab: .tags, title: "Tags", systemImage: "tag.fill"),
         TVContentTab(id: .groups, appTab: .groups, title: "Groups", systemImage: "rectangle.stack.fill"),
         TVContentTab(id: .galleries, appTab: .galleries, title: "Galleries", systemImage: "photo.stack.fill"),
-        TVContentTab(id: .images, appTab: .images, title: "Images", systemImage: "photo.fill")
+        TVContentTab(id: .images, appTab: .images, title: "Images", systemImage: "photo.fill"),
+        TVContentTab(id: .markers, appTab: .markers, title: "Markers", systemImage: "bookmark.fill")
     ]
 
     private func isVisible(_ tab: AppTab) -> Bool {
@@ -124,6 +125,13 @@ struct TVMainTabView: View {
                 TVTabStack(tab: .home) { TVDashboardView() }
             }
 
+            // Feeds (iOS: own tab) — directly under Home, hideable like the iOS tab.
+            if isVisible(.reels) {
+                Tab("Feeds", systemImage: AppTab.reels.icon, value: TVRootTab.feeds) {
+                    TVTabStack(tab: .feeds) { TVFeedsView() }
+                }
+            }
+
             // Ohne die Prüfung entstünde bei komplett ausgeblendeter Library
             // eine Sektion mit Überschrift und ohne Zeilen.
             if !visibleLibraryTabs.isEmpty {
@@ -134,6 +142,12 @@ struct TVMainTabView: View {
                         }
                     }
                 }
+            }
+
+            // Match + RateMe (stashy+). Bleibt auch gesperrt sichtbar: die Kacheln
+            // tragen dann ein Schloss und führen zur stashy+-Seite.
+            Tab("Discover", systemImage: "sparkles", value: TVRootTab.discover) {
+                TVTabStack(tab: .discover) { TVDiscoverView() }
             }
 
             // Settings zuletzt. Einen Footer-Slot gibt es auf tvOS nicht
@@ -148,8 +162,9 @@ struct TVMainTabView: View {
         .onChange(of: tabManager.tabs) { _, _ in
             // Blendet der Nutzer den gerade aktiven Bereich aus, zeigt der
             // Inhaltsbereich sonst nichts mehr an.
-            var live: Set<TVRootTab> = [.home, .search, .settings]
+            var live: Set<TVRootTab> = [.home, .search, .settings, .discover]
             live.formUnion(visibleLibraryTabs.map(\.id))
+            if isVisible(.reels) { live.insert(.feeds) }
             if !live.contains(selectedTab) {
                 selectedTab = .home
             }
@@ -173,8 +188,10 @@ struct TVMainTabView: View {
             TVTabStack(tab: .galleries) { TVGalleriesView() }
         case .images:
             TVTabStack(tab: .images) { TVImagesView() }
-        case .home, .search, .settings:
-            // Diese drei werden oben direkt deklariert.
+        case .markers:
+            TVTabStack(tab: .markers) { TVMarkersView() }
+        case .home, .search, .settings, .discover, .feeds:
+            // Diese werden oben direkt deklariert.
             EmptyView()
         }
     }

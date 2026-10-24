@@ -149,6 +149,7 @@ struct TVGalleryDetailView: View {
     @State private var gallery: Gallery?
     @State private var isLoadingGallery: Bool = false
     @State private var presentedImage: TVImageLink?
+    @State private var slideshow: TVSlideshowStart?
     @FocusState private var emptyFocus: Bool
     @Environment(\.tvContentWidth) private var contentWidth
 
@@ -232,13 +233,24 @@ struct TVGalleryDetailView: View {
             .padding(.bottom, 80)
         }
         .background(Color.appBackground)
-        .dismissOnAppLock { presentedImage = nil }
+        .dismissOnAppLock {
+            presentedImage = nil
+            slideshow = nil
+        }
         .fullScreenCover(item: $presentedImage) { link in
             TVImageDetailView(
                 imageId: link.id,
                 imageTitle: link.title,
                 galleryId: link.galleryId,
                 initialImages: displayImages,
+                onLoadMore: { viewModel.fetchGalleryImages(galleryId: galleryId, isInitialLoad: false) },
+                hasMore: viewModel.hasMoreGalleryImages
+            )
+        }
+        .fullScreenCover(item: $slideshow) { start in
+            TVImageSlideshowView(
+                images: displayImages,
+                startIndex: start.index,
                 onLoadMore: { viewModel.fetchGalleryImages(galleryId: galleryId, isInitialLoad: false) },
                 hasMore: viewModel.hasMoreGalleryImages
             )
@@ -320,6 +332,11 @@ struct TVGalleryDetailView: View {
                             }
                         }
                     }
+                }
+
+                if !displayImages.isEmpty {
+                    TVSlideshowButton { slideshow = TVSlideshowStart(index: 0) }
+                        .padding(.top, 8)
                 }
             }
             .frame(maxWidth: .infinity, alignment: .leading)

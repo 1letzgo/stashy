@@ -34,6 +34,8 @@ final class MiniPlayerStore: ObservableObject {
 
     /// Resume time and play duration keep syncing while only the bar shows the video.
     private let tracker = ScenePlaybackActivityTracker()
+    /// Time actually watched in the bar, same rule as the scene page's play count.
+    private var playCountClock = PlayCountWatchClock()
     private lazy var viewModel = StashDBViewModel()
 
     private init() {
@@ -78,6 +80,7 @@ final class MiniPlayerStore: ObservableObject {
         engine.onTranscodeFallback = nil
 
         tracker.reset()
+        playCountClock = PlayCountWatchClock()
         configureTracker(sceneId: scene.id)
         let duration = engine.duration > 0 ? engine.duration : (scene.sceneDuration ?? 0)
         tracker.setPosition(currentTime: engine.currentTime, duration: duration)
@@ -102,6 +105,7 @@ final class MiniPlayerStore: ObservableObject {
         tracker.setPosition(currentTime: engine.currentTime, duration: oldDuration)
         tracker.stop()
         tracker.reset()
+        playCountClock = PlayCountWatchClock()
         configureTracker(sceneId: scene.id)
 
         engine.fallbackSources = scene.transcodeFallbackURLs
@@ -126,7 +130,8 @@ final class MiniPlayerStore: ObservableObject {
     private func handleTime(_ seconds: Double, duration: Double) {
         guard let current = session, seconds >= 0 else { return }
         tracker.setPosition(currentTime: seconds, duration: duration > 0 ? duration : (current.scene.sceneDuration ?? 0))
-        if !current.playRegistered, seconds >= max(0, TabManager.shared.playCountPlayerSeconds) {
+        playCountClock.sample(playhead: seconds, isPlaying: current.engine.isPlaying)
+        if !current.playRegistered, playCountClock.watchedSeconds >= max(0, TabManager.shared.playCountPlayerSeconds) {
             session?.playRegistered = true
             let sceneId = current.scene.id
             viewModel.addScenePlay(sceneId: sceneId)

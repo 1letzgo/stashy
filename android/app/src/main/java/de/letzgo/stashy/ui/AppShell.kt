@@ -125,11 +125,6 @@ fun AppShell() {
         de.letzgo.stashy.ui.player.MiniPlayerStore.onServerChanged(activeServerId)
         de.letzgo.stashy.data.WatchlistStore.onServerChanged(activeServerId)
     }
-    if (de.letzgo.stashy.data.BetaExpiry.expired) {
-        BetaExpiredScreen()
-        AppUpdateDialog()
-        return
-    }
     if (ServerConfigManager.activeConfig == null) {
         Box(Modifier.fillMaxSize().background(p.background)) { ServerSetupScreen(onDone = {}) }
         AppUpdateDialog()
@@ -153,15 +148,17 @@ fun AppShell() {
         }
     }
 
-    // Auto-hide (Settings › Appearance): Feeds owns its chrome (tap toggles it), so the bar
-    // stays put there; any tab or screen change brings a hidden bar back.
-    val autoHideSuspended = top == null && Nav.tab == MainTab.Feeds
+    // Auto-hide (Settings › Appearance): the Feeds pager drives the bar itself (page changes,
+    // chrome toggle — see FeedsTabBarPolicy), so scroll tracking is off there; Feeds › Pics is a
+    // plain list and tracks like the others. Any tab, screen or Feeds mode change shows the bar.
+    val autoHideSuspended = top == null && Nav.tab == MainTab.Feeds &&
+        de.letzgo.stashy.ui.feeds.FeedsModel.mode != de.letzgo.stashy.data.ReelsModeType.Pics
     SideEffect { TabBarAutoHide.suspended = autoHideSuspended }
     LaunchedEffect(Nav.tab, top?.key, autoHideSuspended) { TabBarAutoHide.show() }
     val density = androidx.compose.ui.platform.LocalDensity.current
     SideEffect { TabBarAutoHide.thresholdPx = with(density) { 24.dp.toPx() } }
-    val barHidden = TabBarAutoHide.enabled && TabBarAutoHide.hidden && !autoHideSuspended
-    val barOffset by animateFloatAsState(if (barHidden) 1f else 0f, tween(220), label = "tabBarAutoHide")
+    val barHidden = TabBarAutoHide.enabled && TabBarAutoHide.hidden
+    val barOffset by animateFloatAsState(if (barHidden) 1f else 0f, tween(TabBarAutoHide.ANIMATION_MS), label = "tabBarAutoHide")
 
     Box(Modifier.fillMaxSize().background(p.background).nestedScroll(TabBarAutoHide.connection)) {
         AnimatedContent(
@@ -188,6 +185,7 @@ fun AppShell() {
         }
         MiniPlayerHost(showBar, barOffset, Modifier.align(Alignment.BottomCenter))
     }
+    ShellAlerts()
     AppUpdateDialog()
 }
 
@@ -214,6 +212,53 @@ private fun MiniPlayerHost(tabBarShown: Boolean, tabBarHideFraction: Float, modi
             kotlinx.coroutines.delay(300)
             Nav.push(de.letzgo.stashy.ui.scene.SceneDetailScreen(scene.id, scene, openedFromMiniPlayer = true))
         }
+    }
+}
+
+/** Which of the iOS `MainTabView` configuration alerts is showing. */
+private enum class ShellAlert { IncompleteSetup, AuthExpired }
+
+/**
+ * iOS `MainTabView` alerts: "Incomplete Setup" when the active server config lacks details
+ * (`checkConfiguration()` on appear) and "Authentication Required" on a 401 ("AuthError401").
+ * Both open the active server's configuration in Settings.
+ */
+@Composable
+private fun ShellAlerts() {
+    val config = ServerConfigManager.activeConfig
+    var incompleteFor by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf<String?>(null) }
+    var incompleteDismissed by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf<String?>(null) }
+    LaunchedEffect(config?.id, config?.hasValidConfig) {
+        incompleteFor = config?.takeIf { !it.hasValidConfig && incompleteDismissed != it.id }?.id
+    }
+    val authFor = de.letzgo.stashy.data.AuthEvents.pendingServerId
+    val alert = when {
+        incompleteFor != null && incompleteFor == config?.id -> ShellAlert.IncompleteSetup
+        authFor != null && authFor == config?.id -> ShellAlert.AuthExpired
+        else -> null
+    } ?: return
+    fun dismiss() {
+        when (alert) {
+            ShellAlert.IncompleteSetup -> { incompleteDismissed = incompleteFor; incompleteFor = null }
+            ShellAlert.AuthExpired -> de.letzgo.stashy.data.AuthEvents.consume()
+        }
+    }
+    fun openServerSettings() {
+        dismiss()
+        val id = ServerConfigManager.activeConfig?.id
+        Nav.tab = MainTab.Settings
+        Nav.popToRoot(MainTab.Settings)
+        if (id != null) Nav.push(de.letzgo.stashy.ui.settings.ServerFormScreen(id))
+    }
+    when (alert) {
+        ShellAlert.IncompleteSetup -> NativeConfirmDialog(
+            "Incomplete Setup", "Your server configuration is missing some details.",
+            onDismiss = ::dismiss, confirmLabel = "Check Settings", dismissLabel = null, onConfirm = ::openServerSettings,
+        )
+        ShellAlert.AuthExpired -> NativeConfirmDialog(
+            "Authentication Required", "Your API key is invalid or expired. Please check your server configuration.",
+            onDismiss = ::dismiss, confirmLabel = "Update API Key", dismissLabel = null, onConfirm = ::openServerSettings,
+        )
     }
 }
 

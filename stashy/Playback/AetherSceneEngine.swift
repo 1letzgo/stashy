@@ -21,9 +21,9 @@ import AppKit
 #endif
 import AetherEngine
 
-/// How a playback surface wants the shared audio session configured when it loads.
-/// Muted previews must not take the session away from a running scene, so they ask for
-/// `.ambient`; a surface that manages the session itself asks for `.none`.
+/// Whether a playback surface may claim the shared audio session. `.playback` claims it through
+/// `AudioSessionCoordinator` only while it actually plays with sound; muted card previews ask
+/// for `.ambient` and never claim it; a surface that manages the session itself asks for `.none`.
 enum AetherAudioSessionPolicy {
     case playback
     case ambient
@@ -128,9 +128,11 @@ final class AetherSceneEngine: ObservableObject {
     /// Fires once per switch, with the rung the ladder moved to. Hosts use it for a toast.
     var onTranscodeFallback: ((SourceKind) -> Void)?
 
-    /// Which audio session `load` installs. Previews use `.ambient` so they never steal the
-    /// session from a playing scene.
-    var audioSessionPolicy: AetherAudioSessionPolicy = .playback
+    /// Whether this engine may claim the audio session while audible. Previews use `.ambient`
+    /// so they never steal the session from a playing scene or another app.
+    var audioSessionPolicy: AetherAudioSessionPolicy = .playback {
+        didSet { updateAudioSessionClaim() }
+    }
 
     /// Surfaces that actually draw subtitles switch this on, so "Show subtitles automatically"
     /// (Settings → Playback) picks the preferred track once a load's tracks are known. Muted
@@ -220,6 +222,7 @@ final class AetherSceneEngine: ObservableObject {
             }
             _isMuted = newValue
             applyVolumeState()
+            updateAudioSessionClaim(grace: AudioSessionCoordinator.stopGrace)
         }
     }
 
@@ -234,11 +237,13 @@ final class AetherSceneEngine: ObservableObject {
                 // Zero is a level, not a mute: `unmutedVolume` keeps the remembered value so a
                 // later unmute does not resurrect silence.
                 engine.volume = 0
+                updateAudioSessionClaim(grace: AudioSessionCoordinator.stopGrace)
                 return
             }
             unmutedVolume = clamped
             _isMuted = false
             applyVolumeState()
+            updateAudioSessionClaim()
         }
     }
 
@@ -246,6 +251,50 @@ final class AetherSceneEngine: ObservableObject {
     /// every point where the audio output may have been (re)created.
     private func applyVolumeState() {
         engine.volume = _isMuted ? 0 : (unmutedVolume > 0 ? unmutedVolume : 1.0)
+    }
+
+    // MARK: - Audio session claim
+
+    /// Last state handed to the coordinator, so phase ticks do not flood its queue.
+    private var lastAudioClaim: (audible: Bool, live: Bool)?
+    /// The engine's init declares a non-mixable category off-main; the first load waits until
+    /// the coordinator has turned it back into the mixable idle one (iOS).
+    private var engineCategoryAbsorption: Task<Void, Never>?
+
+    /// Audible = playing (or holding a PiP window) with sound on a surface allowed to claim
+    /// the session. Only then does the app interrupt other audio.
+    private func updateAudioSessionClaim(grace: TimeInterval = AudioSessionCoordinator.pauseGrace) {
+        updateIdleTimerClaim()
+        let hasSound = !_isMuted && engine.volume > 0
+        let audible = audioSessionPolicy == .playback
+            && hasSound
+            && currentURL != nil
+            && (isPlaying || engine.pictureInPictureActive)
+        let live = currentURL != nil
+        if let last = lastAudioClaim, last.audible == audible, last.live == live { return }
+        lastAudioClaim = (audible, live)
+        AudioSessionCoordinator.shared.update(owner: ObjectIdentifier(self),
+                                              audible: audible,
+                                              live: live,
+                                              grace: grace)
+    }
+
+    // MARK: - Idle timer claim
+
+    /// Last state handed to `IdleTimerCoordinator`.
+    private var lastIdleTimerClaim = false
+
+    /// Keeps the screen on while this engine actually plays on screen. Muted card previews
+    /// (`.ambient`) never claim it; a Picture-in-Picture window doesn't need it. Runs on every
+    /// phase / PiP / policy change and on `stop()` (all funnel through `updateAudioSessionClaim`).
+    private func updateIdleTimerClaim() {
+        let claim = audioSessionPolicy != .ambient
+            && currentURL != nil
+            && isPlaying
+            && !engine.pictureInPictureActive
+        guard claim != lastIdleTimerClaim else { return }
+        lastIdleTimerClaim = claim
+        IdleTimerCoordinator.shared.setActive(claim, for: ObjectIdentifier(self))
     }
 
     // MARK: - Internals
@@ -293,12 +342,28 @@ final class AetherSceneEngine: ObservableObject {
         engine.deactivatesAudioSessionOnStop = false
         #if os(iOS)
         engine.backgroundPlaybackEnabled = TabManager.shared.isPiPEnabled
+        engineCategoryAbsorption = Task { await AudioSessionCoordinator.shared.absorbEngineCategoryDeclaration() }
         #endif
         bind()
     }
 
+    deinit {
+        // `stop()` is the contract; this only keeps a forgotten wrapper from pinning the session.
+        AudioSessionCoordinator.shared.update(owner: ObjectIdentifier(self),
+                                              audible: false,
+                                              live: false,
+                                              grace: AudioSessionCoordinator.stopGrace)
+        if lastIdleTimerClaim {
+            let owner = ObjectIdentifier(self)
+            Task { @MainActor in IdleTimerCoordinator.shared.setActive(false, for: owner) }
+        }
+    }
+
     private func bind() {
-        #if os(iOS)
+        // tvOS too: the engine tears the video pipeline down on every background there (no
+        // grace window, PiP aside), and nothing rebuilt it on the way back — the surface stayed
+        // black with the transport showing paused, and Play/Select hit a session with no host.
+        #if os(iOS) || os(tvOS)
         NotificationCenter.default.publisher(for: UIApplication.didEnterBackgroundNotification)
             .receive(on: RunLoop.main)
             .sink { [weak self] _ in self?.pauseForBackgroundUnlessPictureInPicture() }
@@ -313,7 +378,10 @@ final class AetherSceneEngine: ObservableObject {
             .receive(on: RunLoop.main)
             .sink { [weak self] time in
                 guard let self else { return }
-                let adjusted = time + self.sourceTimeOffset
+                // Never publish NaN / inf: every progress bar and scrubber multiplies this into a
+                // frame width, and a NaN geometry throws in Core Animation.
+                let raw = time + self.sourceTimeOffset
+                let adjusted = raw.isFinite ? raw : 0
                 self.currentTime = adjusted
                 let dur = self.duration
                 self.onTime?(adjusted, dur)
@@ -323,7 +391,7 @@ final class AetherSceneEngine: ObservableObject {
 
         engine.$duration
             .receive(on: RunLoop.main)
-            .sink { [weak self] value in self?.duration = value }
+            .sink { [weak self] value in self?.duration = value.isFinite ? max(0, value) : 0 }
             .store(in: &cancellables)
 
         engine.$playbackPhase
@@ -498,6 +566,7 @@ final class AetherSceneEngine: ObservableObject {
             isPlaying = playing
             onPlayingChanged?(playing)
         }
+        defer { updateAudioSessionClaim() }
 
         switch phase {
         case .loading:
@@ -589,11 +658,8 @@ final class AetherSceneEngine: ObservableObject {
         loadGeneration &+= 1
         let generation = loadGeneration
 
-        switch audioSessionPolicy {
-        case .playback: applyPlaybackAudioSession()
-        case .ambient: applyAmbientMixingAudioSession()
-        case .none: break
-        }
+        // No session work here: loading (and muted playback) must not interrupt other audio.
+        // The claim follows `isPlaying` + mute (`updateAudioSessionClaim`).
 
         cancelFirstFrameWatchdog()
 
@@ -661,6 +727,12 @@ final class AetherSceneEngine: ObservableObject {
             options.declaredDurationSeconds = fallbackDeclaredDuration
         }
         hostCustomizeOptions?(&options)
+
+        if let absorption = engineCategoryAbsorption {
+            await absorption.value
+            engineCategoryAbsorption = nil
+            guard generation == loadGeneration else { return }
+        }
 
         do {
             _ = try await engine.load(url: signedURL(requestURL) ?? requestURL,
@@ -774,8 +846,11 @@ final class AetherSceneEngine: ObservableObject {
 
     /// True when a loaded session lost its pipeline (background teardown) and only a reload can
     /// bring it back: the route drops to `.none` on teardown while `currentURL` still names the item.
+    /// `needsForegroundVideoRestore` is the engine's own word for the same state (it may keep the
+    /// native host, and with it the route, while the video item is gone).
     private var isSessionTornDown: Bool {
-        currentURL != nil && !didEnd && !isLoading && engine.videoRoute == .none
+        guard currentURL != nil, !didEnd, !isLoading else { return false }
+        return engine.needsForegroundVideoRestore || engine.videoRoute == .none
     }
 
     /// `reloadAtCurrentPosition` replays the mount's autoplay flag on a torn-down session, so a
@@ -822,10 +897,22 @@ final class AetherSceneEngine: ObservableObject {
     }
 
     func pause() {
+        // Already paused: nothing to do, and a repeat is not free — on the software route every
+        // pause re-sets the synchronizer rate, a synchronous main-thread call into CoreAudio.
+        // Feeds pauses every mounted row on each swipe, so the repeats add up. That path is
+        // exactly where the main thread got stuck behind a wedged audio device (AudioQueue
+        // SetProperty waiting on the mix engine's device lock).
+        if engine.state == .paused { return }
         engine.pause()
     }
 
     func togglePlayPause() {
+        // A torn-down session (background teardown) has no transport for the engine's toggle
+        // to act on; `play()` rebuilds it first.
+        if isSessionTornDown {
+            play()
+            return
+        }
         engine.togglePlayPause()
     }
 
@@ -1036,6 +1123,7 @@ final class AetherSceneEngine: ObservableObject {
 
     func setPictureInPictureActive(_ active: Bool) {
         engine.pictureInPictureActive = active
+        updateAudioSessionClaim()
     }
 
     /// Callers must invoke this before releasing the wrapper: `@State` release is not deterministic.
@@ -1056,6 +1144,7 @@ final class AetherSceneEngine: ObservableObject {
         hasPresentedFrame = false
         currentSubtitleText = nil
         currentSubtitleImage = nil
+        updateAudioSessionClaim(grace: AudioSessionCoordinator.stopGrace)
     }
 }
 

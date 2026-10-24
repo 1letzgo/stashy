@@ -165,7 +165,8 @@ fun ServerTasksContent(topPadding: Dp) {
         }
         settingsSection(header = "Cache", key = "cache") {
             TaskRow("Clear Image Cache", SFS.internaldrive, "cache_clear") {
-                coil3.SingletonImageLoader.get(context).let { it.memoryCache?.clear(); it.diskCache?.clear() }
+                // iOS `ImageCache.shared.clearCurrentServerCache()`: the active server only.
+                de.letzgo.stashy.data.ServerImageCache.clearActiveServer(context)
                 "Cache Cleared" to "Images will be reloaded from the server."
             }
         }

@@ -51,7 +51,7 @@ private struct DetailSlotBar: ViewModifier {
     @ViewBuilder
     func body(content: Content) -> some View {
         if let slots {
-            content.floatingActionBar(isPresented: slots.isPresented, catalogChrome: slots.visibility) {
+            content.floatingActionBar(isPresented: slots.isPresented && slots.hasAnySlot, catalogChrome: slots.visibility) {
                 CatalogSlotBar(slots: slots)
             }
         } else {

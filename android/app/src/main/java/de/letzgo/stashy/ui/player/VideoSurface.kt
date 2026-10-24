@@ -24,7 +24,14 @@ import kotlin.math.min
  * Only one surface should show a player at a time (the last one attached wins).
  */
 @Composable
-fun VideoSurface(player: StashPlayer, modifier: Modifier = Modifier, fill: Boolean = false, topAligned: Boolean = false) {
+fun VideoSurface(
+    player: StashPlayer,
+    modifier: Modifier = Modifier,
+    fill: Boolean = false,
+    topAligned: Boolean = false,
+    /** Draw picture-based subtitles (PGS / VobSub / DVB) in the picture rect (scene players). */
+    showsBitmapSubtitles: Boolean = false,
+) {
     val density = LocalDensity.current
     BoxWithConstraints(modifier.background(Color.Black).clipToBounds(), contentAlignment = if (topAligned) Alignment.TopCenter else Alignment.Center) {
         val size = player.videoSize
@@ -57,6 +64,7 @@ fun VideoSurface(player: StashPlayer, modifier: Modifier = Modifier, fill: Boole
                 },
                 modifier = Modifier.fillMaxSize(),
             )
+            if (showsBitmapSubtitles) BitmapSubtitleLayer(player.displayedBitmapCues, Modifier.fillMaxSize())
         }
     }
 }

@@ -365,11 +365,44 @@ private struct GalleriesViewContent: View {
         }
     }
     
-    init(viewModel: StashDBViewModel, initialSort: StashDBViewModel.GallerySortOption? = nil, hideTitle: Bool = false) {
+    init(
+        viewModel: StashDBViewModel,
+        initialSort: StashDBViewModel.GallerySortOption? = nil,
+        hideTitle: Bool = false,
+        filterMemory: CatalogListFilterMemory<CatalogListFilterSnapshot<StashDBViewModel.GallerySortOption>>? = nil
+    ) {
         self.viewModel = viewModel
         self.hideTitle = hideTitle
+        self.filterMemory = filterMemory
         let savedSort = StashDBViewModel.GallerySortOption(rawValue: TabManager.shared.getSortOption(for: .galleries) ?? "")
         _selectedSortOption = State(initialValue: initialSort ?? savedSort ?? .dateDesc)
+        if let filterMemory {
+            _criteriaDocument = StateObject(wrappedValue: filterMemory.criteriaDocument)
+            // Remount (Home sub-tab switch): restore what the list was fetched with.
+            if let snap = filterMemory.snapshot {
+                _selectedSortOption = State(initialValue: snap.sortOption)
+                _selectedFilter = State(initialValue: snap.selectedFilter)
+                _catalogPresetRowSelection = State(initialValue: snap.presetSelection)
+                _searchText = State(initialValue: snap.searchText)
+                _isSearchVisible = State(initialValue: snap.isSearchVisible)
+                _didApplyDefaultFilter = State(initialValue: snap.didApplyDefaultFilter)
+            }
+        }
+    }
+
+    /// Host-owned filter state (Home sub-tab, see `CatalogRootFilterMemories`); `nil` = the
+    /// state lives and dies with this view.
+    private let filterMemory: CatalogListFilterMemory<CatalogListFilterSnapshot<StashDBViewModel.GallerySortOption>>?
+
+    private var filterMemorySnapshot: CatalogListFilterSnapshot<StashDBViewModel.GallerySortOption> {
+        CatalogListFilterSnapshot(
+            sortOption: selectedSortOption,
+            selectedFilter: selectedFilter,
+            presetSelection: catalogPresetRowSelection,
+            searchText: searchText,
+            isSearchVisible: isSearchVisible,
+            didApplyDefaultFilter: didApplyDefaultFilter
+        )
     }
     
     @ObservedObject private var tabManager = TabManager.shared
@@ -583,10 +616,14 @@ private struct GalleriesViewContent: View {
             .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("DefaultSortChanged"))) { notification in
                 handleGalleriesDefaultSortChanged(notification)
             }
+            .onDisappear {
+                filterMemory?.snapshot = filterMemorySnapshot
+            }
             .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("ServerConfigChanged"))) { _ in
                 selectedFilter = nil
                 didApplyDefaultFilter = false
                 catalogPresetRowSelection = ""
+                criteriaDocument.clear()
                 clearGalleryLiveChipsOnly()
                 refreshGalleryLocalPresets()
                 performSearch()
@@ -752,18 +789,26 @@ struct GalleriesView: View {
     let catalogBrowserViewModel: StashDBViewModel?
     let initialSort: StashDBViewModel.GallerySortOption?
     var hideTitle: Bool = false
+    let filterMemory: CatalogListFilterMemory<CatalogListFilterSnapshot<StashDBViewModel.GallerySortOption>>?
 
-    init(initialSort: StashDBViewModel.GallerySortOption? = nil, hideTitle: Bool = false, catalogBrowserViewModel: StashDBViewModel? = nil) {
+    init(
+        initialSort: StashDBViewModel.GallerySortOption? = nil,
+        hideTitle: Bool = false,
+        catalogBrowserViewModel: StashDBViewModel? = nil,
+        filterMemory: CatalogListFilterMemory<CatalogListFilterSnapshot<StashDBViewModel.GallerySortOption>>? = nil
+    ) {
         self.catalogBrowserViewModel = catalogBrowserViewModel
         self.initialSort = initialSort
         self.hideTitle = hideTitle
+        self.filterMemory = filterMemory
     }
 
     var body: some View {
         var content = GalleriesViewContent(
                 viewModel: catalogBrowserViewModel ?? ownedViewModel,
                 initialSort: initialSort,
-                hideTitle: hideTitle
+                hideTitle: hideTitle,
+                filterMemory: filterMemory
             )
         content.hostsInSectionChrome = catalogBrowserViewModel != nil
         return content
@@ -1119,12 +1164,8 @@ struct GalleryItemView: View {
         .onChange(of: isMuted) { _, newValue in
             // Persisting happens in the mute button, not here — this also fires for programmatic
             // writes, which is how the stored choice reaches the engine.
+            // The engine claims / releases the audio session itself (AudioSessionCoordinator).
             engine?.isMuted = newValue
-            if newValue {
-                applyAmbientMixingAudioSession()
-            } else {
-                applyPlaybackAudioSession()
-            }
         }
         .onChange(of: currentVisibleId) { _, _ in
             applyActivePlaybackState()
@@ -1365,6 +1406,9 @@ struct FullScreenImageView: View {
     @State private var tagEditorImage: StashImage?
     /// Play state to hand back when the tag editor closes.
     @State private var wasPlayingBeforeTagEditor = false
+    /// Image the "+" behind the performer names opens the performer editor for.
+    @State private var performerEditorImage: StashImage?
+    @State private var wasPlayingBeforePerformerEditor = false
     @State private var performerImageTargetPerformers: [GalleryPerformer] = []
     @State private var currentItemIsPlaying = true
     /// Same setting the item views read; here it decides whether pause applies to stills.
@@ -1491,14 +1535,8 @@ struct FullScreenImageView: View {
                 scrubberState.seeking = false
                 scrubberState.seekTarget = nil
             }
-            .onAppear {
-                if !isMuted {
-                    applyPlaybackAudioSession()
-                }
-            }
             .onDisappear {
                 showUI = true
-                applyAmbientMixingAudioSession()
             }
             .task(id: selectedImageId) {
                 currentVisibleId = selectedImageId
@@ -1523,6 +1561,28 @@ struct FullScreenImageView: View {
                     currentItemIsPlaying = false
                 } else if wasPlayingBeforeTagEditor {
                     wasPlayingBeforeTagEditor = false
+                    currentItemIsPlaying = true
+                }
+            }
+            .sheet(item: $performerEditorImage) { image in
+                AddPerformerToSceneSheet(
+                    sceneId: "",
+                    currentPerformers: (image.performers ?? []).map { $0.toScenePerformer() },
+                    viewModel: viewModel,
+                    savePerformerIds: { ids, done in
+                        viewModel.updateImagePerformers(imageId: image.id, performerIds: ids, completion: done)
+                    }
+                ) { updated in
+                    applyEditedPerformers(updated.map { $0.toGalleryPerformer() }, toImageId: image.id)
+                }
+            }
+            .onChange(of: performerEditorImage?.id) { _, newValue in
+                // Same pause/resume as the tag editor; pausing also stops the auto-advance.
+                if newValue != nil {
+                    wasPlayingBeforePerformerEditor = currentItemIsPlaying
+                    currentItemIsPlaying = false
+                } else if wasPlayingBeforePerformerEditor {
+                    wasPlayingBeforePerformerEditor = false
                     currentItemIsPlaying = true
                 }
             }
@@ -1552,17 +1612,69 @@ struct FullScreenImageView: View {
     /// Performer und Titel untereinander — wie in Feeds.
     private func fullScreenNameTitleLine(image: StashImage) -> some View {
         VStack(alignment: .leading, spacing: 2) {
-            if let performer = image.performers?.first {
-                NavigationLink(destination: PerformerDetailView(performer: performer.toPerformer())) {
-                    Text(performer.name)
-                        .font(.system(size: 15, weight: .bold))
-                        .foregroundColor(.white)
-                        .lineLimit(1)
+            let performers = image.performers ?? []
+            let showsAddPerformer = appearanceManager.isEditModeEnabled
+            if performers.count == 1, !showsAddPerformer, let performer = performers.first {
+                fullScreenPerformerName(performer)
+            } else if performers.count > 1 || showsAddPerformer {
+                // Like Feeds: all names ("A & B"), scrolling when long; the "+" sits at the end.
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 4) {
+                        ForEach(Array(performers.enumerated()), id: \.element.id) { idx, performer in
+                            fullScreenPerformerName(performer)
+                            if idx < performers.count - 1 {
+                                Text("&")
+                                    .font(.system(size: 15, weight: .medium))
+                                    .foregroundColor(.white.opacity(0.75))
+                            }
+                        }
+                        if showsAddPerformer {
+                            AddPerformerPlusButton { openPerformerEditor(for: image) }
+                                .padding(.leading, performers.isEmpty ? 0 : 4)
+                        }
+                    }
+                    // Room for the 44 pt hit area without moving the title.
+                    .padding(.vertical, AddPerformerPlusButton.hitInset)
                 }
-                .buttonStyle(.plain)
+                .padding(.vertical, -AddPerformerPlusButton.hitInset)
+                .id(image.id)
             }
             fullScreenTitleText(image: image)
         }
+    }
+
+    private func fullScreenPerformerName(_ performer: GalleryPerformer) -> some View {
+        NavigationLink(destination: PerformerDetailView(performer: performer.toPerformer())) {
+            Text(performer.name)
+                .font(.system(size: 15, weight: .bold))
+                .foregroundColor(.white)
+                .lineLimit(1)
+        }
+        .buttonStyle(.plain)
+    }
+
+    /// Refuses images whose list was fetched without performers — saving from there
+    /// would drop everyone already on the image.
+    private func openPerformerEditor(for image: StashImage) {
+        guard image.performers != nil else {
+            HapticManager.error()
+            ToastManager.shared.show("Could not load performers", icon: "exclamationmark.triangle.fill", style: .error)
+            return
+        }
+        performerEditorImage = image
+    }
+
+    /// The editor already saved (`imageUpdate`); the binding carries it back to the source list,
+    /// the notification to every other list holding the image.
+    private func applyEditedPerformers(_ performers: [GalleryPerformer], toImageId imageId: String) {
+        if let position = images.firstIndex(where: { $0.id == imageId }) {
+            var image = images[position]
+            image.performers = performers
+            images[position] = image
+        }
+        StashImage.postPerformersUpdated(imageId: imageId, performers: performers)
+        HapticManager.success()
+        ToastManager.shared.show("Performers updated")
     }
 
     @ViewBuilder

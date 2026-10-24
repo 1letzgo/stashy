@@ -673,7 +673,11 @@ struct DownloadDetailView: View {
                             posterURL: nil,
                             isMuted: $isMuted,
                             onSeek: { seconds in seekTo(seconds) },
-                            onToggleFullscreen: { isFullScreen = true },
+                            onToggleFullscreen: {
+                                var transaction = Transaction()
+                                transaction.disablesAnimations = true
+                                withTransaction(transaction) { isFullScreen = true }
+                            },
                             isFullscreen: false
                         )
                         .aspectRatio(16/9, contentMode: .fit) // Keep 16:9 for consistency or use nil for 9:16

@@ -16,6 +16,8 @@ import de.letzgo.stashy.data.SavedFilter
 import de.letzgo.stashy.data.SavedFiltersStore
 import de.letzgo.stashy.data.Scene
 import de.letzgo.stashy.data.SceneEvents
+import de.letzgo.stashy.data.PerformerEvents
+import de.letzgo.stashy.data.applyingPerformerEvent
 import de.letzgo.stashy.data.applying
 import de.letzgo.stashy.data.ServerConfigManager
 import de.letzgo.stashy.data.StashStatistics
@@ -62,6 +64,18 @@ object DashboardStore {
             SceneEvents.events.collect { event ->
                 for ((type, state) in rows.toMap()) {
                     state.scenes.applying(event)?.let { rows[type] = state.copy(scenes = it) }
+                }
+            }
+        }
+        // iOS `patchPerformerImageInLists` (`homeRowPerformers`) and the scene rows' performers.
+        scope.launch {
+            PerformerEvents.events.collect { event ->
+                for ((type, state) in rows.toMap()) {
+                    val performers = state.performers.applying(event)
+                    val scenes = state.scenes.applyingPerformerEvent(event)
+                    if (performers != null || scenes != null) {
+                        rows[type] = state.copy(performers = performers ?: state.performers, scenes = scenes ?: state.scenes)
+                    }
                 }
             }
         }

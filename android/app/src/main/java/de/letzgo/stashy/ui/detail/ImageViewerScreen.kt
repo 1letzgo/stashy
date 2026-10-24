@@ -115,10 +115,12 @@ import de.letzgo.stashy.data.await
 import de.letzgo.stashy.ui.Appearance
 import de.letzgo.stashy.ui.Nav
 import de.letzgo.stashy.ui.SF
+import de.letzgo.stashy.ui.stashyGlass
 import de.letzgo.stashy.ui.Screen
 import de.letzgo.stashy.ui.StashyColors
 import de.letzgo.stashy.ui.oCounterIcon
 import androidx.compose.foundation.interaction.MutableInteractionSource
+import de.letzgo.stashy.ui.feeds.AddPerformerButton
 import de.letzgo.stashy.ui.feeds.ChromePillIconButton
 import de.letzgo.stashy.ui.feeds.StackedPill
 import de.letzgo.stashy.ui.feeds.noIndicationClick
@@ -165,6 +167,8 @@ class ImageViewerScreen(
     private var tagEditorImage by mutableStateOf<StashImage?>(null)
     /** iOS `wasPlayingBeforeTagEditor`. */
     private var wasPlayingBeforeTagEditor = false
+    /** The picture whose add-only performer picker ("+" after the performer name) is open. */
+    private var performerEditorImage by mutableStateOf<StashImage?>(null)
 
     /** iOS `@AppStorage` keys of the fullscreen viewer. */
     private val continuousPlay get() = Prefs.bool("images_fullscreen_continuous", false)
@@ -214,7 +218,10 @@ class ImageViewerScreen(
             if (!continuousPlay || !isPlaying) return@LaunchedEffect
             if (image.isVideo && !DetailFormatting.isAnimated(image)) return@LaunchedEffect
             delay(continuousSeconds * 1000L)
-            advance(pager)
+            // Own scope: the page switch happens halfway through the scroll animation and
+            // restarts this effect (`currentIndex` changes) — run in the effect, the animation
+            // was cancelled and the pager stuck between two images.
+            scope.launch { advance(pager) }
         }
 
         Box(Modifier.fillMaxSize().background(Color.Black)) {
@@ -234,6 +241,12 @@ class ImageViewerScreen(
             }
 
             AnimatedVisibility(showUI, Modifier.align(Alignment.TopCenter), enter = fadeIn(), exit = fadeOut()) { TopBar(context) }
+            // iOS `fastForwardOverlay` (top 130, glass capsule with `chevron.right.2`).
+            AnimatedVisibility(fastForwarding, Modifier.align(Alignment.TopCenter).padding(top = 130.dp), enter = fadeIn(), exit = fadeOut()) {
+                Box(Modifier.stashyGlass(RoundedCornerShape(50)).padding(horizontal = 22.dp, vertical = 14.dp)) {
+                    Icon(SF.chevronRight2, "2×", tint = Color.White, modifier = Modifier.size(32.dp))
+                }
+            }
             AnimatedVisibility(showUI, Modifier.align(Alignment.BottomCenter), enter = fadeIn(), exit = fadeOut()) {
                 // Over the media: font scale capped at OverlayMaxFontScale (like Feeds).
                 current?.let { de.letzgo.stashy.ui.CappedFontScale { BottomOverlay(it) } }
@@ -244,6 +257,9 @@ class ImageViewerScreen(
             AddTagsSheet(AITagTarget.image(image), onDismiss = { closeTagEditor() }) { updated ->
                 replace(image.id) { it.copy(tags = updated.map { t -> IdName(t.id, t.name) }) }
             }
+        }
+        performerEditorImage?.let { image ->
+            AddImagePerformersSheet(image, onDismiss = { closePerformerEditor() }) { updated -> replace(image.id) { updated } }
         }
         if (confirmDelete) {
             AlertDialog(
@@ -290,10 +306,13 @@ class ImageViewerScreen(
         val portraitImage = image.visualFiles?.firstOrNull()?.let { (it.height ?: 0) > (it.width ?: 0) } ?: false
         // iOS `shouldFill`: immersive on and content orientation matches the device.
         val fill = immersiveScaling && (portraitDevice == portraitImage)
+        val isClip = image.isVideo && !animated
         ZoomableBox(
             onTap = { showUI = !showUI },
             onZoomChange = { zoomed = it },
-            zoomEnabled = !(image.isVideo && !animated),
+            zoomEnabled = !isClip,
+            onHold = if (isClip) ({ holdFastForward(it) }) else null,
+            onDoubleTapAt = if (isClip) ({ x, w -> skipOnDoubleTap(x, w) }) else null,
         ) {
             if (image.isVideo && !animated) {
                 VideoPage(image, active, fill, onEnded)
@@ -311,6 +330,41 @@ class ImageViewerScreen(
                 )
             }
         }
+    }
+
+    /** iOS `isFastForwarding` (press-and-hold 2× on a playing clip). */
+    private var fastForwarding by mutableStateOf(false)
+    private var rateBeforeFastForward = 1f
+
+    /** iOS `setFastForwarding`: 2× while held, previous rate restored on release. */
+    private fun holdFastForward(active: Boolean) {
+        val exo = player ?: return
+        if (active == fastForwarding) return
+        if (active) {
+            if (!isPlaying) return
+            rateBeforeFastForward = exo.playbackParameters.speed
+            exo.setPlaybackSpeed(2f)
+        } else {
+            exo.setPlaybackSpeed(rateBeforeFastForward)
+        }
+        fastForwarding = active
+    }
+
+    /** iOS `handleDoubleTapSkip`: outer thirds skip ±`playerSkipSeconds`, the middle does nothing. */
+    private fun skipOnDoubleTap(x: Float, width: Float): Boolean {
+        val exo = player ?: return false
+        val third = width / 3f
+        val deltaMs = (de.letzgo.stashy.ui.player.PlayerSettings.skipSeconds * 1000).toLong()
+        val delta = when {
+            x < third -> -deltaMs
+            x > width - third -> deltaMs
+            else -> return false
+        }
+        val dur = exo.duration.takeIf { it > 0 }
+        val target = (exo.currentPosition + delta).coerceAtLeast(0).let { t -> dur?.let { minOf(t, it) } ?: t }
+        exo.seekTo(target)
+        position = target
+        return true
     }
 
     @Composable
@@ -337,10 +391,15 @@ class ImageViewerScreen(
                     }
                 }
                 exo.addListener(listener)
+                // Lazy audio focus: a muted / paused clip leaves other apps' audio alone.
+                val audioFocus = de.letzgo.stashy.ui.player.AudioFocusCoordinator(exo)
+                val screenAwake = de.letzgo.stashy.ui.player.ScreenAwakeCoordinator(exo)
                 player = exo
                 onDispose {
+                    audioFocus.release()
+                    screenAwake.release()
                     exo.removeListener(listener)
-                    if (player === exo) player = null
+                    if (player === exo) { player = null; fastForwarding = false }
                     exo.release()
                 }
             }
@@ -419,11 +478,18 @@ class ImageViewerScreen(
                         PerformerAvatar(performer) { openPerformer(performer) }
                     }
                     Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                        image.performers?.firstOrNull()?.let { performer ->
-                            Text(
-                                performer.name ?: "", fontSize = 15.sp, fontWeight = FontWeight.Bold, color = Color.White, maxLines = 1,
-                                modifier = Modifier.clickable { openPerformer(performer) },
-                            )
+                        val first = image.performers?.firstOrNull()
+                        // "+" right after the name (alone without performers), like the Feeds overlay.
+                        val canAdd = ImagePerformerAdd.canAdd(image)
+                        if (first != null || canAdd) Row(verticalAlignment = Alignment.CenterVertically) {
+                            first?.let { performer ->
+                                Text(
+                                    performer.name ?: "", fontSize = 15.sp, fontWeight = FontWeight.Bold, color = Color.White, maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                    modifier = Modifier.weight(1f, fill = false).clickable { openPerformer(performer) },
+                                )
+                            }
+                            if (canAdd) AddPerformerButton(leading = first == null) { openPerformerEditor(image) }
                         }
                         val title = image.title?.takeIf { it.isNotEmpty() }
                         val gallery = image.galleries?.firstOrNull()
@@ -596,6 +662,19 @@ class ImageViewerScreen(
         if (wasPlayingBeforeTagEditor) { wasPlayingBeforeTagEditor = false; isPlaying = true }
     }
 
+    /** Like the tag editor: slideshow / clip pause while the picker is open, resume on close. */
+    private fun openPerformerEditor(image: StashImage) {
+        if (image.performers == null) return
+        wasPlayingBeforeTagEditor = isPlaying
+        isPlaying = false
+        performerEditorImage = image
+    }
+
+    private fun closePerformerEditor() {
+        performerEditorImage = null
+        if (wasPlayingBeforeTagEditor) { wasPlayingBeforeTagEditor = false; isPlaying = true }
+    }
+
     private fun replace(id: String, transform: (StashImage) -> StashImage) {
         val i = items.indexOfFirst { it.id == id }
         if (i >= 0) items[i] = transform(items[i])
@@ -650,8 +729,13 @@ class ImageViewerScreen(
         val ext = DetailFormatting.fileExtension(image)
         val url = if (ext in listOf("JPG", "JPEG", "PNG", "WEBP")) image.imageURL else image.thumbnailURL
         if (url == null) return
-        if (DetailRepository.setPerformerImage(performer.id, url)) detailToast("Performer image updated")
-        else detailToast("Failed to update performer image")
+        val updated = DetailRepository.setPerformerImage(performer.id, url)
+        if (updated != null) {
+            // iOS: `invalidatePerformerProfileImage` + `PerformerImageUpdated` — every list,
+            // header and card showing this performer reloads its image.
+            de.letzgo.stashy.data.ImageRefresh.performerImageChanged(performer.id, updated.imagePath)
+            detailToast("Performer image updated")
+        } else detailToast("Failed to update performer image")
     }
 
     /** iOS `shareCurrentImage` — downloads the original and hands it to the share sheet. */
@@ -680,7 +764,7 @@ class ImageViewerScreen(
     }
 
     private companion object {
-        /** iOS `ScenePlayerMute.initialValue` — always muted without headphones. */
+        /** iOS `ScenePlayerMute.initialValue` — muted without headphones (unless the setting is off). */
         fun initialMute(context: Context): Boolean {
             val am = context.getSystemService(Context.AUDIO_SERVICE) as AudioManager
             val headphones = am.getDevices(AudioManager.GET_DEVICES_OUTPUTS).any {
@@ -689,8 +773,8 @@ class ImageViewerScreen(
                     AudioDeviceInfo.TYPE_BLUETOOTH_A2DP, AudioDeviceInfo.TYPE_USB_HEADSET, 26 /* TYPE_BLE_HEADSET */,
                 )
             }
-            if (!headphones) return true
-            return if (Prefs.has("stashy_scene_player_muted")) Prefs.bool("stashy_scene_player_muted") else false
+            val mute = de.letzgo.stashy.ui.player.PlayerMute
+            return mute.decide(headphones, mute.muteWithoutHeadphones, mute.storedMuted)
         }
     }
 }
@@ -707,7 +791,16 @@ internal fun formatClock(ms: Long): String {
  * through to the pager while not zoomed; [onTap] toggles the chrome.
  */
 @Composable
-internal fun ZoomableBox(onTap: () -> Unit, onZoomChange: (Boolean) -> Unit, zoomEnabled: Boolean = true, content: @Composable () -> Unit) {
+internal fun ZoomableBox(
+    onTap: () -> Unit,
+    onZoomChange: (Boolean) -> Unit,
+    zoomEnabled: Boolean = true,
+    /** iOS `onLongPress(pressing)`: true on hold, false on release (video 2×). */
+    onHold: ((Boolean) -> Unit)? = null,
+    /** iOS `onDoubleTap(location)` → skip; returns whether it handled the tap (outer thirds of a video). */
+    onDoubleTapAt: ((x: Float, width: Float) -> Boolean)? = null,
+    content: @Composable () -> Unit,
+) {
     var scale by remember { mutableFloatStateOf(1f) }
     var offset by remember { mutableStateOf(Offset.Zero) }
     BoxWithConstraints(Modifier.fillMaxSize()) {
@@ -720,10 +813,17 @@ internal fun ZoomableBox(onTap: () -> Unit, onZoomChange: (Boolean) -> Unit, zoo
         }
         Box(
             Modifier.fillMaxSize()
-                .pointerInput(zoomEnabled) {
+                .pointerInput(zoomEnabled, onHold != null, onDoubleTapAt != null) {
+                    var holding = false
                     detectTapGestures(
                         onTap = { onTap() },
+                        onLongPress = if (onHold == null) null else { _ -> holding = true; onHold(true) },
+                        onPress = {
+                            tryAwaitRelease()
+                            if (holding) { holding = false; onHold?.invoke(false) }
+                        },
                         onDoubleTap = { tap ->
+                            if (onDoubleTapAt?.invoke(tap.x, w) == true) return@detectTapGestures
                             if (!zoomEnabled) return@detectTapGestures
                             if (scale > 1f) { scale = 1f; offset = Offset.Zero; onZoomChange(false) }
                             else {

@@ -201,11 +201,20 @@ fun ScenePlayerSurface(
     LaunchedEffect(Unit) { player.autoSelectsPreferredSubtitleTrack = true; scheduleHide() }
 
     // Hardware volume buttons move the slider (and unmute, iOS `unmutesOnHardwareVolume`).
+    // `Settings.System` fires for every system-settings write (rotation, brightness, …), not just
+    // volume, so react only when the media stream's index really moved — comparing against the
+    // slider's float level (rounded by `setSystemVolume`) unmuted the player and filled the
+    // volume bar on an orientation change.
     DisposableEffect(Unit) {
+        var lastIndex = systemVolumeIndex(context)
         val observer = object : ContentObserver(Handler(Looper.getMainLooper())) {
             override fun onChange(selfChange: Boolean) {
+                val index = systemVolumeIndex(context)
+                if (index == lastIndex) return
+                lastIndex = index
                 val level = systemVolume(context)
-                if (abs(level - volumeLevel) > 0.001f) { volumeLevel = level; if (level > 0 && mutedNow) mutedChange(false) }
+                volumeLevel = level
+                if (level > 0 && mutedNow) mutedChange(false)
             }
         }
         context.contentResolver.registerContentObserver(Settings.System.CONTENT_URI, true, observer)
@@ -246,7 +255,7 @@ fun ScenePlayerSurface(
             min(inset, maxOf(0f, (surfaceW.value - 520f) / 2)).dp
         } else 0.dp
 
-        VideoSurface(player, Modifier.fillMaxSize(), fill = fillsScreen)
+        VideoSurface(player, Modifier.fillMaxSize(), fill = fillsScreen, showsBitmapSubtitles = true)
 
         if (!player.hasPresentedFrame) {
             Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -484,6 +493,7 @@ fun SubtitleOverlay(text: String?, scale: Float, modifier: Modifier = Modifier) 
     val box = PlayerSettings.subtitleBoxColor
     val style = TextStyle(
         fontSize = (PlayerSettings.subtitleFontSize * scale).sp, fontWeight = FontWeight.SemiBold, textAlign = TextAlign.Center,
+        fontFamily = PlayerSettings.subtitleFontFamily,
         shadow = if (box == null) Shadow(Color.Black.copy(alpha = 0.9f), blurRadius = 3f * scale) else null,
     )
     Box(modifier.padding(start = 16.dp, end = 16.dp, bottom = 14.dp)) {
@@ -556,6 +566,9 @@ private fun systemVolume(context: Context): Float {
     val max = am.getStreamMaxVolume(AudioManager.STREAM_MUSIC).coerceAtLeast(1)
     return am.getStreamVolume(AudioManager.STREAM_MUSIC).toFloat() / max
 }
+
+private fun systemVolumeIndex(context: Context): Int =
+    (context.getSystemService(Context.AUDIO_SERVICE) as AudioManager).getStreamVolume(AudioManager.STREAM_MUSIC)
 
 private fun setSystemVolume(context: Context, level: Float) {
     val am = context.getSystemService(Context.AUDIO_SERVICE) as AudioManager

@@ -21,13 +21,14 @@ class TvActivity : FragmentActivity() {
         super.onCreate(savedInstanceState)
         current = this
         TvSecurity.ensureLoaded()
+        // Screen saver / Ambient mode stays off while a video plays (ui/player/ScreenAwake.kt).
+        de.letzgo.stashy.ui.player.ScreenAwake.bind(this)
         setContent { TvTheme { TvApp() } }
     }
 
     override fun onResume() {
         super.onResume()
         StashyPlus.refresh()
-        de.letzgo.stashy.data.BetaExpiry.refresh()
         // Sideload builds: look for a newer APK (same check as the phone app, data/AppUpdate.kt).
         lifecycleScope.launch { AppUpdate.autoCheck(this@TvActivity) }
     }

@@ -15,7 +15,6 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.Request
 import java.io.File
-import java.text.SimpleDateFormat
 import java.util.Locale
 
 /**
@@ -185,8 +184,4 @@ object AppUpdate {
         val info = context.packageManager.getPackageInfo(context.packageName, 0)
         if (Build.VERSION.SDK_INT >= 28) info.longVersionCode else @Suppress("DEPRECATION") info.versionCode.toLong()
     }.getOrDefault(BuildConfig.VERSION_CODE.toLong())
-
-    internal fun parseHttpDate(value: String?): Long? = value?.let {
-        runCatching { SimpleDateFormat("EEE, dd MMM yyyy HH:mm:ss zzz", Locale.US).parse(it)?.time }.getOrNull()
-    }
 }

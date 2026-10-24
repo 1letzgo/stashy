@@ -6,6 +6,7 @@ import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.intOrNull
 import kotlinx.serialization.json.jsonPrimitive
 
@@ -27,23 +28,50 @@ object DetailRepository {
     /**
      * Older Stash servers reject some iOS scopes (`tag_filter.performers`, `studio_filter.groups` …).
      * Then the same criterion is retried through the entity's `scenes_filter`, which every
-     * supported server knows; a second failure yields an empty page (tab stays hidden like on iOS).
+     * supported server knows. Only Performers / Studios / Tags / Groups tabs retry, and never the
+     * child-studio scope (`parents` is a real `StudioFilterType` key). The scope stays the last
+     * layer of the retried query, so the fallback can't widen the list either.
      */
-    private suspend fun <T> scoped(
-        document: String, field: String, listField: String,
-        item: kotlinx.serialization.KSerializer<T>,
-        filter: FindFilter, filterVar: String, scope: JsonObject, sceneFallback: Boolean,
-    ): Page<T> = try {
-        findPage(document, field, listField, item, filter, filterVar, scope)
+    fun sceneFilterFallback(query: CatalogQuery): CatalogQuery? {
+        val scope = query.scope?.takeIf { it.isNotEmpty() } ?: return null
+        if (query.mode !in SCENE_FALLBACK_MODES || scope.containsKey("parents")) return null
+        return query.copy(scope = buildJsonObject { put("scenes_filter", scope) })
+    }
+
+    private val SCENE_FALLBACK_MODES = setOf(FilterMode.Performers, FilterMode.Studios, FilterMode.Tags, FilterMode.Groups)
+
+    /** One page of a detail tab's scoped catalog query, with the [sceneFilterFallback] retry. */
+    suspend fun <T> findScoped(query: CatalogQuery, page: Int, perPage: Int): Page<T> = try {
+        CatalogRepository.find(query, page, perPage)
     } catch (e: GraphQLError) {
-        if (!sceneFallback || scope.isEmpty()) throw e
-        findPage(document, field, listField, item, filter, filterVar, buildJsonObject { put("scenes_filter", scope) })
+        val fallback = sceneFilterFallback(query) ?: throw e
+        CatalogRepository.find(fallback, page, perPage)
     }
 
     // MARK: Entities
 
     suspend fun performer(id: String): Performer? =
         findPage("findPerformers", "findPerformers", "performers", Performer.serializer(), FindFilter(1, 1), extra = mapOf("ids" to listOf(id))).items.firstOrNull()
+
+    /**
+     * Header extras the shared `PerformerFields` fragment leaves out (it also feeds the lists):
+     * `details` and `urls`. `urls` only exists on Stash v0.25+, so an older server falls back to
+     * the singular `url`. Null when neither query succeeds.
+     */
+    suspend fun performerProfile(id: String): PerformerProfile? {
+        suspend fun load(fields: String): JsonObject? = runCatching {
+            GraphQL.data("query(\$id: ID!) { findPerformer(id: \$id) { $fields } }", vars("id" to id))["findPerformer"] as? JsonObject
+        }.getOrNull()
+        load("details urls")?.let { o ->
+            val urls = (o["urls"] as? JsonArray).orEmpty()
+                .mapNotNull { (it as? JsonPrimitive)?.contentOrNull?.takeIf(String::isNotBlank) }
+            return PerformerProfile(o.string("details"), urls)
+        }
+        return load("details url")?.let { o -> PerformerProfile(o.string("details"), listOfNotNull(o.string("url"))) }
+    }
+
+    private fun JsonObject.string(key: String): String? =
+        (this[key] as? JsonPrimitive)?.contentOrNull?.takeIf { it.isNotBlank() }
 
     suspend fun studio(id: String): Studio? {
         val data = GraphQL.named("findStudio", vars("id" to id))
@@ -61,28 +89,6 @@ object DetailRepository {
 
     suspend fun gallery(id: String): Gallery? =
         findPage("findGalleries", "findGalleries", "galleries", Gallery.serializer(), FindFilter(1, 1), extra = mapOf("ids" to listOf(id))).items.firstOrNull()
-
-    // MARK: Linked lists
-
-    suspend fun scenes(filter: FindFilter, sceneFilter: JsonObject): Page<Scene> = ScenesRepository.find(filter, sceneFilter)
-
-    suspend fun galleries(filter: FindFilter, scope: JsonObject): Page<Gallery> =
-        findPage("findGalleries", "findGalleries", "galleries", Gallery.serializer(), filter, "gallery_filter", scope)
-
-    suspend fun images(filter: FindFilter, scope: JsonObject): Page<StashImage> =
-        findPage("findImages", "findImages", "images", StashImage.serializer(), filter, "image_filter", scope)
-
-    suspend fun performers(filter: FindFilter, scope: JsonObject): Page<Performer> =
-        scoped("findPerformers", "findPerformers", "performers", Performer.serializer(), filter, "performer_filter", scope, true)
-
-    suspend fun studios(filter: FindFilter, scope: JsonObject): Page<Studio> =
-        scoped("findStudios", "findStudios", "studios", Studio.serializer(), filter, "studio_filter", scope, !scope.containsKey("parents"))
-
-    suspend fun tags(filter: FindFilter, scope: JsonObject): Page<Tag> =
-        scoped("findTags", "findTags", "tags", Tag.serializer(), filter, "tag_filter", scope, true)
-
-    suspend fun groups(filter: FindFilter, scope: JsonObject): Page<StashGroup> =
-        scoped("findGroups", "findGroups", "groups", StashGroup.serializer(), filter, "group_filter", scope, true)
 
     // MARK: Favorites
 
@@ -134,6 +140,22 @@ object DetailRepository {
         "mutation GalleryUpdate(\$input: GalleryUpdateInput!) { galleryUpdate(input: \$input) { id title date details } }",
         "galleryUpdate", mapOf("id" to id, "title" to title, "date" to date, "details" to details),
     )
+
+    /** `galleryUpdate(performer_ids:)` — the opened gallery's Performers card. Throws on failure (picker shows the error). */
+    suspend fun updateGalleryPerformers(id: String, performerIds: List<String>) {
+        GraphQL.data(
+            "mutation GalleryUpdate(\$input: GalleryUpdateInput!) { galleryUpdate(input: \$input) { id } }",
+            vars("input" to mapOf("id" to id, "performer_ids" to performerIds)),
+        )
+    }
+
+    /** `galleryUpdate(studio_id:)` — null clears the studio. Throws on failure. */
+    suspend fun updateGalleryStudio(id: String, studioId: String?) {
+        GraphQL.data(
+            "mutation GalleryUpdate(\$input: GalleryUpdateInput!) { galleryUpdate(input: \$input) { id } }",
+            vars("input" to mapOf("id" to id, "studio_id" to studioId)),
+        )
+    }
 
     // MARK: Create (iOS `create*` — used by the scene detail pickers)
 
@@ -210,11 +232,25 @@ object DetailRepository {
         return true
     }
 
-    /** iOS `setPerformerImage` (`performerUpdate(image:)` with a URL Stash downloads itself). */
-    suspend fun setPerformerImage(performerId: String, imageURL: String): Boolean = input(
-        "mutation PerformerUpdate(\$input: PerformerUpdateInput!) { performerUpdate(input: \$input) { id image_path } }",
-        "performerUpdate", mapOf("id" to performerId, "image" to imageURL),
-    )
+    /** Outcome of [setPerformerImage]: the new `image_path` (null when Stash returned none). */
+    data class PerformerImageUpdate(val imagePath: String?)
+
+    /**
+     * iOS `setPerformerImage` (`performerUpdate(image:)` with a URL Stash downloads itself).
+     * Returns null on failure, else the new `image_path` (carries the new `?t=`) — refetched
+     * when the mutation response lacks it.
+     */
+    suspend fun setPerformerImage(performerId: String, imageURL: String): PerformerImageUpdate? {
+        val result = runCatching {
+            mutate(
+                "mutation PerformerUpdate(\$input: PerformerUpdateInput!) { performerUpdate(input: \$input) { id image_path } }",
+                vars("input" to mapOf("id" to performerId, "image" to imageURL)), "performerUpdate",
+            )
+        }.getOrNull() ?: return null
+        val path = (result["image_path"] as? kotlinx.serialization.json.JsonPrimitive)?.takeIf { it.isString }?.content?.takeIf { it.isNotBlank() }
+            ?: runCatching { performer(performerId)?.imagePath }.getOrNull()
+        return PerformerImageUpdate(path)
+    }
 
     /** iOS `AITagSuggestionManager.write(tags:to: .image)` — replaces the image's tag ids. */
     suspend fun setImageTags(imageId: String, tagIds: List<String>): Boolean = input(
@@ -242,3 +278,6 @@ data class PerformerEdit(
     val aliasList: List<String>?,
     val rating100: Int?,
 )
+
+/** Performer `details` + `urls` for the detail header ([DetailRepository.performerProfile]). */
+data class PerformerProfile(val details: String?, val urls: List<String>)

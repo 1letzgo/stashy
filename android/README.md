@@ -167,8 +167,15 @@ Sizes are tvOS points halved (`pt()`: 1920 pt ≙ 960 dp). Pure logic lives in `
 
 | Flavor | stashy+ | Updates | Build |
 |---|---|---|---|
-| `sideload` | included (`PLUS_INCLUDED`) | self-update from GitHub Releases (`https://github.com/1letzgo/stashy/releases/latest/download/stashy.apk`) (`data/AppUpdate.kt`) | `./gradlew assembleSideloadRelease` |
+| `sideload` | offline license key (`LICENSE_KEYS`, `data/LicenseKey.kt`) | self-update from GitHub Releases (`https://github.com/1letzgo/stashy/releases/latest/download/stashy.apk`) (`data/AppUpdate.kt`) | `./gradlew assembleSideloadRelease` |
 | `play` | Google Play Billing | Play Store (no install permission, no self-update — Play policy) | `./gradlew bundlePlayRelease` |
+
+**stashy+ license keys (sideload).** The sideload APK unlocks stashy+ only with a signed offline
+key (ECDSA P-256), entered in Settings › stashy+ (phone) or Settings › stashy+ (TV). Keys are
+issued with `tools/stashy-keygen.py` (`init` once, then `issue --name "…" [--expires YYYY-MM-DD]`);
+the private key lives in `~/.stashy-license/` and never in the repo, the app embeds only the
+public key (`LicenseKey.PUBLIC_KEY`). Sideload debug builds do not auto-unlock, so the key flow
+can be tested as shipped. There is no beta expiry any more.
 
 `versionCode` = number of git commits (`git rev-list --count HEAD`), so every build from a newer
 commit is higher. The self-update needs only the APK on the server: a HEAD request compares
@@ -176,5 +183,7 @@ commit is higher. The self-update needs only the APK on the server: a HEAD reque
 decides whether it is offered for installation. Checked on resume (every 6 h at most) and via
 Settings → App → Check for Updates.
 
-**Releases go through Google Play only.** Do not publish APKs as GitHub releases — the old
-GitHub release channel (`scripts/release-sideload.sh`) is retired and the releases were removed.
+**Releases:** Google Play (`play` flavor, `scripts/release-play.sh`) and GitHub Releases
+(`sideload` flavor, `scripts/release-sideload.sh` → `stashy.apk`, which the in-app updater
+downloads). In the sideload build stashy+ is unlocked with an offline license key made by
+`tools/stashy-keygen.py` (private key in `~/.stashy-license/`, never in the repo).

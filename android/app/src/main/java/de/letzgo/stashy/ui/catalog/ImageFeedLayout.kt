@@ -91,7 +91,10 @@ import de.letzgo.stashy.ui.SF
 import de.letzgo.stashy.ui.Theme
 import de.letzgo.stashy.ui.Tokens
 import de.letzgo.stashy.ui.cardShadow
+import de.letzgo.stashy.ui.detail.AddImagePerformersSheet
 import de.letzgo.stashy.ui.detail.GalleryDetailScreen
+import de.letzgo.stashy.ui.detail.ImagePerformerAdd
+import de.letzgo.stashy.ui.feeds.AddPerformerButton
 import de.letzgo.stashy.ui.detail.ImageViewerScreen
 import de.letzgo.stashy.ui.detail.PerformerDetailScreen
 import de.letzgo.stashy.ui.noRippleClickable
@@ -341,6 +344,9 @@ fun ImageFeedPostCard(
     // A set keeps one frame — its tallest image — so the height never jumps while swiping;
     // wider images are letterboxed in it instead of cropped.
     val ratio = if (images.size > 1) images.minOf { it.oneColumnFeedAspectRatio } else visible.oneColumnFeedAspectRatio
+    /** The add-only performer picker of the visible image ("+" in the header); previews pause while it is open. */
+    var performerEditor by remember { mutableStateOf<StashImage?>(null) }
+    val previewsAllowed = performerEditor == null
 
     Column(Modifier.fillMaxWidth().cardShadow(cardShape).clip(cardShape).background(p.secondaryBackground)) {
         Box(Modifier.fillMaxWidth().aspectRatio(ratio)) {
@@ -350,12 +356,12 @@ fun ImageFeedPostCard(
                 LaunchedEffect(visibleIndex) { if (pager.currentPage != visibleIndex && !pager.isScrollInProgress) pager.animateScrollToPage(visibleIndex) }
                 HorizontalPager(pager, Modifier.fillMaxSize(), key = { images.getOrNull(it)?.id ?: it }) { page ->
                     val img = images[page]
-                    FeedHero(img, autoplay = img.id == visible.id && autoplayImageId == img.id, fit = img.oneColumnFeedAspectRatio > ratio + 0.01f) { onOpen(img) }
+                    FeedHero(img, autoplay = previewsAllowed && img.id == visible.id && autoplayImageId == img.id, fit = img.oneColumnFeedAspectRatio > ratio + 0.01f) { onOpen(img) }
                 }
             } else {
-                FeedHero(visible, autoplay = autoplayImageId == visible.id) { onOpen(visible) }
+                FeedHero(visible, autoplay = previewsAllowed && autoplayImageId == visible.id) { onOpen(visible) }
             }
-            FeedHeader(visible, currentGalleryId)
+            FeedHeader(visible, currentGalleryId, onAddPerformers = if (ImagePerformerAdd.canAdd(visible)) ({ performerEditor = visible }) else null)
             Row(
                 Modifier.align(Alignment.BottomCenter).fillMaxWidth().padding(8.dp),
                 verticalAlignment = Alignment.Bottom,
@@ -370,6 +376,9 @@ fun ImageFeedPostCard(
         }
 
         TagRow(visible, bottomPadding = if (images.size > 1) 0.dp else 8.dp, onImageUpdated = onImageUpdated)
+        performerEditor?.let { image ->
+            AddImagePerformersSheet(image, onDismiss = { performerEditor = null }, onUpdated = onImageUpdated)
+        }
 
         if (images.size > 1) {
             val strip = rememberLazyListState()
@@ -425,11 +434,12 @@ private fun FeedHero(image: StashImage, autoplay: Boolean, fit: Boolean = false,
 
 /** iOS: `ImageCatalogFeedHeader` — avatars · performer names / studio · date over a top gradient. */
 @Composable
-private fun FeedHeader(image: StashImage, currentGalleryId: String?) {
+private fun FeedHeader(image: StashImage, currentGalleryId: String?, onAddPerformers: (() -> Unit)? = null) {
     val performers = image.performers.orEmpty()
     val gallery = image.galleries?.let { gs -> if (currentGalleryId != null) gs.firstOrNull { it.id != currentGalleryId } else gs.firstOrNull() }
-    val openGallery: (() -> Unit)? = gallery?.let { g -> { Nav.push(GalleryDetailScreen(g.id, Gallery(id = g.id, title = g.title ?: g.name ?: "Gallery"))) } }
-    fun openPerformer(p: IdName) = Nav.push(PerformerDetailScreen(p.id, Performer(id = p.id, name = p.name.orEmpty())))
+    val openGallery: (() -> Unit)? = gallery?.let { g -> { Nav.push(GalleryDetailScreen(g.id, Gallery(id = g.id, title = g.title ?: g.name ?: "Gallery"), forceOneColumnFeed = true)) } }
+    // iOS: `PerformerDetailView(performer:initialTab: .images)`.
+    fun openPerformer(p: IdName) = Nav.push(PerformerDetailScreen(p.id, Performer(id = p.id, name = p.name.orEmpty()), initialTab = de.letzgo.stashy.ui.detail.DetailTab.Images))
     val nameStyle = IosTypography.subheadline.copy(fontWeight = FontWeight.SemiBold, shadow = textShadow)
     val smallStyle = IosTypography.caption2.copy(shadow = textShadow)
 
@@ -446,17 +456,21 @@ private fun FeedHeader(image: StashImage, currentGalleryId: String?) {
             else performers.forEach { pf -> Avatar(pf, performerImageURL(pf.id), onClick = openGallery ?: { openPerformer(pf) }) }
         }
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(1.dp)) {
-            when {
-                performers.isEmpty() -> Text(image.title ?: "Unknown", style = nameStyle, color = Color.White, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                else -> Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                    performers.forEachIndexed { i, pf ->
-                        Text(
-                            pf.name.orEmpty(), style = nameStyle, color = Color.White, maxLines = 1, overflow = TextOverflow.Ellipsis,
-                            modifier = Modifier.weight(1f, fill = false).noRippleClickable { openPerformer(pf) },
-                        )
-                        if (i < performers.size - 1) Text("&", style = IosTypography.subheadline, color = Color.White.copy(alpha = 0.75f))
+            // "+" right after the names (after the title without performers), like the Feeds overlay.
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                when {
+                    performers.isEmpty() -> Text(image.title ?: "Unknown", style = nameStyle, color = Color.White, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false))
+                    else -> Row(Modifier.weight(1f, fill = false), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                        performers.forEachIndexed { i, pf ->
+                            Text(
+                                pf.name.orEmpty(), style = nameStyle, color = Color.White, maxLines = 1, overflow = TextOverflow.Ellipsis,
+                                modifier = Modifier.weight(1f, fill = false).noRippleClickable { openPerformer(pf) },
+                            )
+                            if (i < performers.size - 1) Text("&", style = IosTypography.subheadline, color = Color.White.copy(alpha = 0.75f))
+                        }
                     }
                 }
+                onAddPerformers?.let { AddPerformerButton(leading = false, onClick = it) }
             }
             image.studio?.name?.let { Text(it, style = smallStyle, color = Color.White.copy(alpha = 0.85f), maxLines = 1, overflow = TextOverflow.Ellipsis) }
         }
@@ -465,7 +479,9 @@ private fun FeedHeader(image: StashImage, currentGalleryId: String?) {
 }
 
 /** Performer portrait (`/performer/<id>/image`, like the Feeds overlay). */
-private fun performerImageURL(id: String): String? = ServerConfigManager.activeConfig?.baseURL?.let { Net.signed("$it/performer/$id/image") }
+private fun performerImageURL(id: String): String? = ServerConfigManager.activeConfig?.baseURL?.let {
+    Net.signed(de.letzgo.stashy.data.ImageBusters.apply("$it/performer/$id/image", de.letzgo.stashy.data.ImageBusters.Kind.Performer, id))
+}
 
 @Composable
 private fun Avatar(performer: IdName?, url: String?, onClick: (() -> Unit)?) {

@@ -4,10 +4,13 @@
 //
 //  stashy+ — scenes that resemble the one on screen, found in the user's own library.
 //
+//  Shared with tvOS. The tag-statistics bonus (`AITagSuggestionManager`) is iOS-only;
+//  on Apple TV the ranking runs on plain weighted overlap.
+//
 
-#if !os(tvOS)
 import Foundation
 import SwiftUI
+import Combine
 
 /// Finds scenes similar to a given one: same performers, same studio, overlapping tags.
 ///
@@ -30,8 +33,10 @@ final class SimilarScenesFinder: ObservableObject {
     @Published var isEnabled: Bool {
         didSet {
             UserDefaults.standard.set(isEnabled, forKey: Self.enabledKey)
+            #if !os(tvOS)
             // Shares the tag statistics — switching on builds them if missing.
             AITagSuggestionManager.shared.statisticsConsumerChanged()
+            #endif
         }
     }
 
@@ -69,7 +74,12 @@ final class SimilarScenesFinder: ObservableObject {
     }
 
     private init() {
+        #if os(tvOS)
+        // Apple TV has no Suggestions settings — stashy+ alone switches the row on.
+        isEnabled = (UserDefaults.standard.object(forKey: Self.enabledKey) as? Bool) ?? true
+        #else
         isEnabled = UserDefaults.standard.bool(forKey: Self.enabledKey)
+        #endif
         let stored = UserDefaults.standard.integer(forKey: Self.maxCountKey)
         maxCount = (4...8).contains(stored) ? stored : 8
         NotificationCenter.default.addObserver(
@@ -143,9 +153,11 @@ final class SimilarScenesFinder: ObservableObject {
             return []
         }
 
+        #if !os(tvOS)
         // The ranking bonus reads the shared statistics; make sure they are in memory even
         // when tag suggestions are switched off.
         await AITagSuggestionManager.shared.loadIfNeeded()
+        #endif
 
         let candidates = await fetchCandidates(
             performerIds: performerIds,
@@ -243,7 +255,11 @@ final class SimilarScenesFinder: ObservableObject {
         excluding sceneId: String
     ) -> [Scene] {
         let tagIds = Set(sourceTags.map(\.id))
+        #if os(tvOS)
+        let related: [String: Double] = [:]
+        #else
         let related = AITagSuggestionManager.shared.relatedTagWeights(for: Array(tagIds))
+        #endif
         // Rarity per source tag — a shared niche tag is worth far more than a shared common one.
         let rarityById: [String: Double] = Dictionary(
             uniqueKeysWithValues: sourceTags.map { ($0.id, rarity(of: $0, totalScenes: totalScenes)) }
@@ -280,4 +296,3 @@ final class SimilarScenesFinder: ObservableObject {
             .map(\.scene)
     }
 }
-#endif

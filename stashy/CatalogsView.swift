@@ -6,6 +6,7 @@
 //
 
 #if !os(tvOS)
+import Combine
 import SwiftUI
 
 struct CatalogsView: View {
@@ -13,9 +14,9 @@ struct CatalogsView: View {
     @EnvironmentObject var coordinator: NavigationCoordinator
     /// Ein ViewModel für alle Katalog-Listen-Tabs (Scenes, Images, …): Daten bleiben beim Unter-Tab-Wechsel warm, ein Verbindungstest.
     @StateObject private var catalogBrowserViewModel = StashDBViewModel()
-    /// Images filter/sort session — lives on CatalogsView so it survives ImagesView remounts
-    /// when pushing FullScreenImageView (especially 1/row video).
-    @StateObject private var catalogImagesFilters = DetailLinkedImagesFilterModel(scope: .catalogRoot)
+    /// Filter / sort state of every catalog sub-tab list — lives here so it survives the sub-tab
+    /// switch remounting the list (and, for Images, pushing FullScreenImageView).
+    @StateObject private var rootFilters = CatalogRootFilterMemories()
     /// Settings / select actions of the active sub-tab, shown pinned right in the Home chrome.
     @State private var sectionActions: SectionChromeActions?
     
@@ -114,25 +115,28 @@ struct CatalogsView: View {
         case .dashboard:
             HomeView(catalogBrowserViewModel: catalogBrowserViewModel)
         case .scenes:
-            ScenesView.catalogTab(viewModel: catalogBrowserViewModel)
+            ScenesView.catalogTab(viewModel: catalogBrowserViewModel, filterMemory: rootFilters.scenes)
         case .images:
             ImagesView(
                 catalogBrowserViewModel: catalogBrowserViewModel,
-                sharedImageListFilters: catalogImagesFilters,
-                initialSearch: coordinator.activeSearchText
+                sharedImageListFilters: rootFilters.images,
+                // A remount keeps the list's search: the shared view model still fetches with it.
+                initialSearch: coordinator.activeSearchText.isEmpty
+                    ? catalogBrowserViewModel.currentImageSearchQuery
+                    : coordinator.activeSearchText
             )
         case .galleries:
-            GalleriesView(catalogBrowserViewModel: catalogBrowserViewModel)
+            GalleriesView(catalogBrowserViewModel: catalogBrowserViewModel, filterMemory: rootFilters.galleries)
         case .performers:
-            PerformersView(catalogBrowserViewModel: catalogBrowserViewModel)
+            PerformersView(catalogBrowserViewModel: catalogBrowserViewModel, filterMemory: rootFilters.performers)
         case .studios:
-            StudiosView(hideTitle: false, catalogBrowserViewModel: catalogBrowserViewModel)
+            StudiosView(hideTitle: false, catalogBrowserViewModel: catalogBrowserViewModel, filterMemory: rootFilters.studios)
         case .tags:
-            TagsView(hideTitle: false, catalogBrowserViewModel: catalogBrowserViewModel)
+            TagsView(hideTitle: false, catalogBrowserViewModel: catalogBrowserViewModel, filterMemory: rootFilters.tags)
         case .groups:
-            GroupsView(hideTitle: false, catalogBrowserViewModel: catalogBrowserViewModel)
+            GroupsView(hideTitle: false, catalogBrowserViewModel: catalogBrowserViewModel, filterMemory: rootFilters.groups)
         case .markers:
-            MarkersView(hideTitle: false, catalogBrowserViewModel: catalogBrowserViewModel)
+            MarkersView(hideTitle: false, catalogBrowserViewModel: catalogBrowserViewModel, filterMemory: rootFilters.markers)
         }
     }
     
@@ -166,6 +170,79 @@ struct CatalogsView: View {
         }
     }
 }
+
+// MARK: - Catalog root filter memory
+
+/// Sheet / chrome state of a catalog list that is not kept in the shared view model.
+struct CatalogListFilterSnapshot<Sort> {
+    var sortOption: Sort
+    var selectedFilter: StashDBViewModel.SavedFilter?
+    var presetSelection: String
+    var searchText: String
+    var isSearchVisible: Bool
+    var didApplyDefaultFilter: Bool
+}
+
+/// Filter / sort state of one catalog list, owned above the view so a remount (Home sub-tab
+/// switch) restores what the list was fetched with. The criteria document is shared live; the
+/// remaining `@State` is captured on disappear and restored in the list's `init`.
+@MainActor
+final class CatalogListFilterMemory<Snapshot> {
+    let criteriaDocument: FilterCriteriaDocument
+    var snapshot: Snapshot?
+
+    init(mode: StashDBViewModel.FilterMode) {
+        criteriaDocument = FilterCriteriaDocument(mode: mode, pinsDefaults: true)
+    }
+
+    func reset() {
+        snapshot = nil
+        criteriaDocument.clear()
+    }
+}
+
+/// Markers also keep live scene chips (they feed the fetch).
+struct MarkersListFilterSnapshot {
+    var base: CatalogListFilterSnapshot<StashDBViewModel.SceneMarkerSortOption>
+    var chips: SceneLiveChipRowState
+}
+
+/// One filter memory per `CatalogsView` sub-tab list. Cleared on `"ServerConfigChanged"`: saved
+/// filters, presets and criteria ids belong to the previous server.
+@MainActor
+final class CatalogRootFilterMemories: ObservableObject {
+    let scenes = ScenesListFilterMemory()
+    let performers = CatalogListFilterMemory<CatalogListFilterSnapshot<StashDBViewModel.PerformerSortOption>>(mode: .performers)
+    let studios = CatalogListFilterMemory<CatalogListFilterSnapshot<StashDBViewModel.StudioSortOption>>(mode: .studios)
+    let tags = CatalogListFilterMemory<CatalogListFilterSnapshot<StashDBViewModel.TagSortOption>>(mode: .tags)
+    let galleries = CatalogListFilterMemory<CatalogListFilterSnapshot<StashDBViewModel.GallerySortOption>>(mode: .galleries)
+    let groups = CatalogListFilterMemory<CatalogListFilterSnapshot<StashDBViewModel.GroupSortOption>>(mode: .groups)
+    let markers = CatalogListFilterMemory<MarkersListFilterSnapshot>(mode: .sceneMarkers)
+    /// Images keep their whole session in the filter model (also survives FullScreenImageView).
+    let images = DetailLinkedImagesFilterModel(scope: .catalogRoot)
+
+    private var serverChangeObserver: AnyCancellable?
+
+    init() {
+        serverChangeObserver = NotificationCenter.default
+            .publisher(for: NSNotification.Name("ServerConfigChanged"))
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] _ in
+                MainActor.assumeIsolated { self?.resetAll() }
+            }
+    }
+
+    private func resetAll() {
+        scenes.reset()
+        performers.reset()
+        studios.reset()
+        tags.reset()
+        galleries.reset()
+        groups.reset()
+        markers.reset()
+        images.resetForServerChange()
+    }
+}
 #endif
 
 // MARK: - Groups Support Views
@@ -175,14 +252,16 @@ struct GroupsView: View {
     @StateObject private var ownedViewModel = StashDBViewModel()
     let catalogBrowserViewModel: StashDBViewModel?
     var hideTitle: Bool = false
+    let filterMemory: CatalogListFilterMemory<CatalogListFilterSnapshot<StashDBViewModel.GroupSortOption>>?
 
-    init(hideTitle: Bool = false, catalogBrowserViewModel: StashDBViewModel? = nil) {
+    init(hideTitle: Bool = false, catalogBrowserViewModel: StashDBViewModel? = nil, filterMemory: CatalogListFilterMemory<CatalogListFilterSnapshot<StashDBViewModel.GroupSortOption>>? = nil) {
         self.hideTitle = hideTitle
         self.catalogBrowserViewModel = catalogBrowserViewModel
+        self.filterMemory = filterMemory
     }
 
     var body: some View {
-        var content = GroupsViewContent(viewModel: catalogBrowserViewModel ?? ownedViewModel, hideTitle: hideTitle)
+        var content = GroupsViewContent(viewModel: catalogBrowserViewModel ?? ownedViewModel, hideTitle: hideTitle, filterMemory: filterMemory)
         content.hostsInSectionChrome = catalogBrowserViewModel != nil
         return content
     }
@@ -209,11 +288,38 @@ private struct GroupsViewContent: View {
     @State private var lastOpenedGroupId: String?
     @Environment(\.horizontalSizeClass) var horizontalSizeClass
     var hideTitle: Bool = false
+    /// Host-owned filter state (Home sub-tab, see `CatalogRootFilterMemories`); `nil` = the
+    /// state lives and dies with this view.
+    private let filterMemory: CatalogListFilterMemory<CatalogListFilterSnapshot<StashDBViewModel.GroupSortOption>>?
 
-    init(viewModel: StashDBViewModel, hideTitle: Bool = false) {
+    init(viewModel: StashDBViewModel, hideTitle: Bool = false, filterMemory: CatalogListFilterMemory<CatalogListFilterSnapshot<StashDBViewModel.GroupSortOption>>? = nil) {
         self.viewModel = viewModel
         self.hideTitle = hideTitle
+        self.filterMemory = filterMemory
+        if let filterMemory {
+            _groupsCriteriaDocument = StateObject(wrappedValue: filterMemory.criteriaDocument)
+            // Remount (Home sub-tab switch): restore what the list was fetched with.
+            if let snap = filterMemory.snapshot {
+                _selectedSortOption = State(initialValue: snap.sortOption)
+                _selectedFilter = State(initialValue: snap.selectedFilter)
+                _groupsPresetRowSelection = State(initialValue: snap.presetSelection)
+                _searchText = State(initialValue: snap.searchText)
+                _isSearchVisible = State(initialValue: snap.isSearchVisible)
+            }
+        }
     }
+
+    private var filterMemorySnapshot: CatalogListFilterSnapshot<StashDBViewModel.GroupSortOption> {
+        CatalogListFilterSnapshot(
+            sortOption: selectedSortOption,
+            selectedFilter: selectedFilter,
+            presetSelection: groupsPresetRowSelection,
+            searchText: searchText,
+            isSearchVisible: isSearchVisible,
+            didApplyDefaultFilter: false
+        )
+    }
+
     
 
     /// Advanced criteria are sent as `liveFilter`, so edits apply without saving to the server first.
@@ -441,6 +547,16 @@ private struct GroupsViewContent: View {
                     performSearch()
                 }
             }
+        }
+        .onDisappear {
+            filterMemory?.snapshot = filterMemorySnapshot
+        }
+        .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("ServerConfigChanged"))) { _ in
+            // Saved filter / criteria ids belong to the previous server.
+            selectedFilter = nil
+            groupsPresetRowSelection = ""
+            groupsCriteriaDocument.clear()
+            performSearch()
         }
         .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("DefaultSortChanged"))) { notification in
             if let tabId = notification.userInfo?["tab"] as? String, tabId == AppTab.groups.rawValue {
@@ -689,6 +805,8 @@ struct GroupDetailView: View {
     @StateObject private var linkedTags: DetailLinkedTagsFilterModel
     @StateObject private var linkedStudios: DetailLinkedStudiosFilterModel
     @StateObject private var linkedGalleries: DetailLinkedGalleriesFilterModel
+    /// Scenes tab filter / sort, kept here so it survives the tab remounting `ScenesView`.
+    @StateObject private var scenesFilterMemory = ScenesListFilterMemory()
     @StateObject private var linkedImages: DetailLinkedImagesFilterModel
 
     private var chromePillHeight: CGFloat { StashyExpandingDock.activeHeight }
@@ -790,7 +908,8 @@ struct GroupDetailView: View {
             externalLiveFilterSheetBinding: $groupLiveFilterSheetPresented,
             externalLiveFilterActiveBinding: $groupSceneFilterActive,
             showsFloatingFilterButton: false,
-            scrollHeader: AnyView(headerView)
+            scrollHeader: AnyView(headerView),
+            filterMemory: scenesFilterMemory
         )
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
     }
@@ -1495,119 +1614,51 @@ struct GroupDetailView: View {
         .padding(.bottom, 32)
     }
 
+    /// Header card (`DetailHeroCard`): the front cover blurred as the compact band backdrop,
+    /// the cover (a poster) top-cropped in the circle straddling the band edge, name, stats
+    /// and synopsis in the solid section. Editing stays on the nav-bar pencil.
     private var headerView: some View {
-        let collapsedHeight: CGFloat = 115
-        let imageWidth: CGFloat = 72
-        
-        return HStack(alignment: .top, spacing: 0) {
-            // Thumbnail: 9:16 portrait
-            ZStack(alignment: .bottom) {
-                if let url = selectedGroup.thumbnailURL {
-                    CustomAsyncImage(url: url) { loader in
-                        if loader.isLoading {
-                            Rectangle().fill(Color.gray.opacity(DesignTokens.Opacity.placeholder))
-                                .overlay(InlineSpinner(scale: .compact))
-                        } else if let image = loader.image {
-                            image.resizable()
-                                .scaledToFill()
-                                .frame(width: imageWidth)
-                                .frame(maxWidth: .infinity, maxHeight: .infinity)
-                                .clipped()
-                        } else {
-                            defaultThumbnailContent(width: imageWidth)
-                        }
-                    }
-                } else {
-                    defaultThumbnailContent(width: imageWidth)
-                }
-            }
-            .frame(width: imageWidth)
-            .frame(minHeight: collapsedHeight)
-            .frame(maxHeight: isHeaderExpanded ? .infinity : collapsedHeight)
-            .background(Color.gray.opacity(DesignTokens.Opacity.placeholder))
-            
-            // Details Section
-            VStack(alignment: .leading, spacing: 4) {
-                // Header: Name
-                Text(selectedGroup.name)
-                    .font(.title2)
-                    .fontWeight(.bold)
-                    .foregroundColor(.primary)
-                    .lineLimit(isHeaderExpanded ? nil : 2)
-                
-                // Grid for Group Info
-                let allDetails = getGroupDetails()
-                let visibleDetails = isHeaderExpanded ? allDetails : Array(allDetails.prefix(4))
-                
-                if !visibleDetails.isEmpty {
-                    LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], alignment: .leading, spacing: 6) {
-                        ForEach(visibleDetails, id: \.label) { detail in
-                            VStack(alignment: .leading, spacing: 0) {
-                                Text(detail.label)
-                                    .font(.system(size: 8))
-                                    .foregroundColor(.secondary)
-                                    .textCase(.uppercase)
-                                Text(detail.value)
-                                    .font(.system(size: 11, weight: .medium))
-                                    .foregroundColor(.primary)
-                                    .lineLimit(1)
-                            }
-                        }
-                    }
-                }
-                
-                if isHeaderExpanded && !(selectedGroup.synopsis ?? "").isEmpty {
-                    Text("Synopsis")
-                        .font(.system(size: 8))
-                        .foregroundColor(.secondary)
-                        .textCase(.uppercase)
-                        .padding(.top, 4)
-                    Text(selectedGroup.synopsis ?? "")
-                        .font(.system(size: 11))
-                        .foregroundColor(.primary)
-                }
-            }
-            .padding(.vertical, 10)
-            .padding(.horizontal, 12)
-            .frame(maxWidth: .infinity, minHeight: collapsedHeight, alignment: .topLeading)
-        }
-        .background(Color.secondaryAppBackground)
-        .clipShape(RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.card))
-        .overlay(
-            RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.card)
-                .stroke(Color.primary.opacity(0.1), lineWidth: 0.5)
+        let coverURL = selectedGroup.thumbnailURL
+        return DetailHeroCard(
+            title: selectedGroup.name,
+            items: getGroupDetails().map { DetailHeroItem(label: $0.label, value: $0.value) },
+            description: selectedGroup.synopsis,
+            showsHero: coverURL != nil,
+            heroAccessibilityLabel: "Group cover",
+            onHeroTap: nil,
+            isExpanded: $isHeaderExpanded,
+            placeholderSystemImage: "rectangle.stack",
+            backdrop: { groupHeroImage(coverURL, alignment: .center) },
+            avatar: { groupHeroImage(coverURL, alignment: .top) },
+            accessory: { _ in EmptyView() },
+            footer: { EmptyView() }
         )
-        .cardShadow()
         .padding(.horizontal, 16)
-        .overlay(
-            Group {
-                let allDetails = getGroupDetails()
-                if allDetails.count > 4 || !(selectedGroup.synopsis ?? "").isEmpty {
-                    Button(action: {
-                        withAnimation(.spring()) {
-                            isHeaderExpanded.toggle()
-                        }
-                    }) {
-                        Image(systemName: isHeaderExpanded ? "chevron.up" : "chevron.down")
-                            .font(.system(size: 10, weight: .bold))
-                            .foregroundColor(appearanceManager.tintColor)
-                            .padding(6)
-                            .background(appearanceManager.tintColor.opacity(0.1))
-                            .clipShape(Circle())
-                    }
-                    .padding(.trailing, 24)
-                    .padding(.bottom, 8)
-                }
-            },
-            alignment: .bottomTrailing
-        )
     }
 
-    private func defaultThumbnailContent(width: CGFloat) -> some View {
-        Rectangle().fill(Color.gray.opacity(DesignTokens.Opacity.placeholder))
-            .frame(width: width)
-            .frame(maxHeight: .infinity)
-            .overlay(Image(systemName: "rectangle.stack").font(.system(size: 24)).foregroundColor(.appAccent.opacity(0.5)))
+    /// Front cover filling its frame; `alignment` picks the crop (top for the circle).
+    @ViewBuilder
+    private func groupHeroImage(_ url: URL?, alignment: Alignment) -> some View {
+        if let url {
+            CustomAsyncImage(url: url) { loader in
+                if let image = loader.image {
+                    image.resizable()
+                        .scaledToFill()
+                        .frame(minWidth: 0, maxWidth: .infinity, minHeight: 0, maxHeight: .infinity, alignment: alignment)
+                        .clipped()
+                } else if loader.isLoading {
+                    Rectangle().fill(Color.gray.opacity(DesignTokens.Opacity.placeholder))
+                        .overlay(InlineSpinner(scale: .compact))
+                } else {
+                    Rectangle().fill(Color.gray.opacity(DesignTokens.Opacity.placeholder))
+                        .overlay(
+                            Image(systemName: "rectangle.stack")
+                                .font(.system(size: 24))
+                                .foregroundColor(.appAccent.opacity(0.5))
+                        )
+                }
+            }
+        }
     }
 
     private func getGroupDetails() -> [(label: String, value: String)] {

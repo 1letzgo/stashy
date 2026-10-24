@@ -120,6 +120,37 @@ enum ReelsPlayerRegistry {
         return _isSuspended
     }
 
+    /// Feeds instances currently on screen, and those that left the screen while Feeds stayed
+    /// the selected tab (a pushed detail / image viewer covers them). Tracked per instance
+    /// because a remount shows the new instance before the old one disappears.
+    private static var visibleFeedInstances = Set<UUID>()
+    private static var coveredFeedInstances = Set<UUID>()
+
+    static func noteFeedAppeared(_ id: UUID) {
+        lock.lock()
+        visibleFeedInstances.insert(id)
+        coveredFeedInstances.remove(id)
+        lock.unlock()
+    }
+
+    /// `covered`: the instance left the screen while Feeds is still the selected tab.
+    static func noteFeedDisappeared(_ id: UUID, covered: Bool) {
+        lock.lock()
+        visibleFeedInstances.remove(id)
+        if covered { coveredFeedInstances.insert(id) } else { coveredFeedInstances.remove(id) }
+        lock.unlock()
+    }
+
+    /// True while every Feeds instance is hidden behind something pushed on top of it. The
+    /// deferred kicks, the row watchdog and the background return would otherwise start an
+    /// engine nobody sees — and every such play is a main-thread call into the audio stack.
+    /// Fails open: with no bookkeeping at all (never appeared) playback stays allowed.
+    static var isFeedCovered: Bool {
+        lock.lock()
+        defer { lock.unlock() }
+        return visibleFeedInstances.isEmpty && !coveredFeedInstances.isEmpty
+    }
+
     /// Snapshot of the live registrations (the table is weak, entries can vanish).
     private static func registered() -> [ReelsPausable] {
         lock.lock()
@@ -173,8 +204,9 @@ enum ReelsPlayerRegistry {
         guard let engine else { return }
         lock.lock()
         let suspended = _isSuspended
+        let covered = visibleFeedInstances.isEmpty && !coveredFeedInstances.isEmpty
         lock.unlock()
-        guard !suspended else { return }
+        guard !suspended, !covered else { return }
         engine.reelsPlay()
     }
 }
@@ -328,6 +360,9 @@ struct ReelsViewBody: View {
     @State private var tagEditorTarget: AITagTarget?
     /// Play state to hand back when the tag editor closes.
     @State private var wasPlayingBeforeTagEditor = false
+    /// Item the "+" behind the performer names opens the add-performer picker for.
+    @State private var performerPickerItem: ReelItemData?
+    @State private var wasPlayingBeforePerformerPicker = false
     @State private var selectedPreviewFilter: StashDBViewModel.SavedFilter?
     @State private var showReelsSceneFilterSheet = false
     /// While the scene-style filter sheet hydrates UI (migration / saved-filter list), ignore preset `onChange` so we do not refetch the Reels timeline.
@@ -387,6 +422,8 @@ struct ReelsViewBody: View {
     /// reset arrays/players mid-mount (black first cell).
     @State private var isBootstrapping = false
     @State private var playTrigger = 0  // Incremented when first item should autoplay
+    /// Identity of this Feeds instance for `ReelsPlayerRegistry`'s on-screen bookkeeping.
+    @State private var feedPresenceID = UUID()
     /// Coalesces `activateFeed` delayed play kicks so mode switches don't stack timers.
     @State private var feedActivationGeneration = 0
     /// `reelsListView` is in the hierarchy (not the loading overlay).
@@ -1596,17 +1633,7 @@ struct ReelsViewBody: View {
         /// when that is known.
         var playbackSegment: ReelPlaybackSegment? {
             guard case .marker(let m) = self else { return nil }
-            let start = max(0, m.seconds)
-            var end: Double
-            if let explicitEnd = m.endSeconds, explicitEnd > start + 0.1 {
-                end = explicitEnd
-            } else {
-                end = start + TabManager.storedFeedsMarkerDefaultSeconds
-            }
-            if let fileDuration = m.scene?.files?.first?.duration, fileDuration > start + 0.5 {
-                end = min(end, fileDuration)
-            }
-            return ReelPlaybackSegment(start: start, end: end)
+            return ReelPlaybackSegment.marker(m)
         }
 
         /// Poster for the scrub preview when no sprite tile is at hand (markers only).
@@ -1782,6 +1809,73 @@ struct ReelsViewBody: View {
                 ToastManager.shared.show("Could not remove tag", icon: "exclamationmark.triangle.fill", style: .error)
             }
         }
+    }
+
+    /// Performers the item was fetched with, or `nil` when its list didn't load them. A list
+    /// fetched without performers must never be written back — that would drop everyone
+    /// already on the item.
+    private func knownPerformers(of item: ReelItemData) -> [ScenePerformer]? {
+        switch item {
+        case .scene(let s), .preview(let s): return s.performers
+        case .marker(let m): return m.scene?.performers
+        case .clip(let c): return c.performers?.map { $0.toScenePerformer() }
+        }
+    }
+
+    /// Feeds "+" behind the performer names opens the scene-detail performer editor.
+    private func openPerformerEditor(for item: ReelItemData) {
+        let isClip: Bool = { if case .clip = item { return true }; return false }()
+        guard knownPerformers(of: item) != nil, isClip || item.sceneID != nil else {
+            HapticManager.error()
+            ToastManager.shared.show("Could not load performers", icon: "exclamationmark.triangle.fill", style: .error)
+            return
+        }
+        performerPickerItem = item
+    }
+
+    /// The editor already wrote the server (scene / a marker's parent scene via
+    /// `sceneUpdate`, a clip via `imageUpdate`); this mirrors it into every feed copy.
+    private func applyEditedPerformers(_ performers: [ScenePerformer], to item: ReelItemData) {
+        if case .clip(let image) = item {
+            let galleryPerformers = performers.map { $0.toGalleryPerformer() }
+            patchClipPerformers(imageId: image.id, performers: galleryPerformers)
+            StashImage.postPerformersUpdated(imageId: image.id, performers: galleryPerformers)
+        } else if let sceneId = item.sceneID {
+            patchScenePerformers(sceneId: sceneId, performers: performers)
+        }
+        HapticManager.success()
+        ToastManager.shared.show("Performers updated")
+    }
+
+    /// Clips are images: their editor writes `imageUpdate` instead of the scene mutation.
+    private func clipPerformerSaver(for item: ReelItemData) -> (([String], @escaping (Bool) -> Void) -> Void)? {
+        guard case .clip(let image) = item else { return nil }
+        let viewModel = viewModel
+        return { ids, done in
+            viewModel.updateImagePerformers(imageId: image.id, performerIds: ids, completion: done)
+        }
+    }
+
+    /// Every feed copy of the scene (Scenes, Previews, markers on it) gets the new list.
+    private func patchScenePerformers(sceneId: String, performers: [ScenePerformer]) {
+        if let idx = viewModel.scenes.firstIndex(where: { $0.id == sceneId }) {
+            viewModel.scenes[idx] = viewModel.scenes[idx].withPerformers(performers)
+        }
+        if let idx = viewModel.previews.firstIndex(where: { $0.id == sceneId }) {
+            viewModel.previews[idx] = viewModel.previews[idx].withPerformers(performers)
+        }
+        for idx in viewModel.sceneMarkers.indices {
+            if let markerScene = viewModel.sceneMarkers[idx].scene, markerScene.id == sceneId {
+                viewModel.sceneMarkers[idx] = viewModel.sceneMarkers[idx].withScene(markerScene.withPerformers(performers))
+            }
+        }
+    }
+
+    private func patchClipPerformers(imageId: String, performers: [GalleryPerformer]) {
+        guard let idx = viewModel.clips.firstIndex(where: { $0.id == imageId }) else { return }
+        var image = viewModel.clips[idx]
+        image.performers = performers
+        viewModel.clips[idx] = image
     }
 
     private func applyTagsChange(_ newTags: [Tag]) {
@@ -2652,6 +2746,9 @@ struct ReelsViewBody: View {
     private var premiumContent: some View {
         premiumContentBase
             .onAppear {
+                // Before `handleOnAppear`: its resume path bumps `playTrigger`, and the rows'
+                // play must already see this instance on screen.
+                ReelsPlayerRegistry.noteFeedAppeared(feedPresenceID)
                 handleOnAppear()
             }
             .onChange(of: coordinator.selectedTab) { oldTab, newTab in
@@ -2702,6 +2799,11 @@ struct ReelsViewBody: View {
                 }
             }
             .onDisappear {
+                // A push on Feeds' own stack covers this instance; a tab switch or a remount
+                // does not (the tab switch suspends, the remount's new instance is visible).
+                ReelsPlayerRegistry.noteFeedDisappeared(
+                    feedPresenceID,
+                    covered: coordinator.selectedTab == .reels && !isBeingReplaced)
                 // Still on Feeds (push/pop or tab remount): pause only — never `suspendPlayback()`.
                 // Remount destroys this view *after* the new instance's `onAppear`; suspending here
                 // would leave `playIfAllowed` as a permanent no-op for Clips.
@@ -3113,6 +3215,30 @@ struct ReelsViewBody: View {
                     playTrigger += 1
                 }
             }
+            .sheet(item: $performerPickerItem) { item in
+                AddPerformerToSceneSheet(
+                    sceneId: item.sceneID ?? "",
+                    currentPerformers: knownPerformers(of: item) ?? [],
+                    viewModel: viewModel,
+                    savePerformerIds: clipPerformerSaver(for: item)
+                ) { updated in
+                    applyEditedPerformers(updated, to: item)
+                }
+            }
+            .onChange(of: performerPickerItem?.id) { _, newValue in
+                // Same pause/resume as the tag picker.
+                if newValue != nil {
+                    wasPlayingBeforePerformerPicker = currentItemIsPlaying
+                    currentItemIsPlaying = false
+                    ReelsPlayerRegistry.pauseAll()
+                    NotificationCenter.default.post(name: .reelsPauseAllPlayers, object: nil)
+                } else if wasPlayingBeforePerformerPicker {
+                    wasPlayingBeforePerformerPicker = false
+                    currentItemIsPlaying = true
+                    ReelsPlayerRegistry.resumePlayback()
+                    playTrigger += 1
+                }
+            }
     }
 
     private var reelsClipFilterSortSheet: some View {
@@ -3391,24 +3517,7 @@ struct ReelsViewBody: View {
     private func reelsStopPlaybackAndAccessories() {
         reelsPausePlaybackForLocalTeardown()
         ReelsPlayerRegistry.suspendPlayback()
-        UIApplication.shared.isIdleTimerDisabled = false
-        #if os(iOS)
-        do {
-            try AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
-        } catch {
-            AppLog.debug("🎬 Reels: Audio deactivation error: \(error)")
-        }
-        #endif
-    }
-
-    /// Scenes / Markers / Clips / Previews take the playback session. Pics must not —
-    /// muted 1-row autoplay mixes with other audio instead of ducking it.
-    private func applyReelsAudioSession(for mode: ReelsMode) {
-        if mode == .pics {
-            applyAmbientMixingAudioSession()
-        } else {
-            applyPlaybackAudioSession()
-        }
+        AudioSessionCoordinator.shared.releaseSoon()
     }
 
     /// Resume scroll item + mid-clip time and continue autoplay after returning to Feeds — from
@@ -3425,8 +3534,6 @@ struct ReelsViewBody: View {
         isMediaZoomed = false
         currentItemShowRatingOverlay = false
 
-        UIApplication.shared.isIdleTimerDisabled = true
-        applyReelsAudioSession(for: reelsMode)
 
         // Pics uses ImagesView muted autoplay and must not resume reel players / steal audio.
         if reelsMode == .pics { return }
@@ -3696,15 +3803,12 @@ struct ReelsViewBody: View {
     }
 
     private func handleOnAppear() {
-        UIApplication.shared.isIdleTimerDisabled = true
         ReelsPlayerRegistry.resumePlayback()
         reelsClipImageFilters.externalRefetchClips = { vm in
             refetchReelsClipsFromModel(vm)
         }
 
         ReelsSessionRAM.clearLegacyUserDefaultsIfNeeded()
-        
-        applyReelsAudioSession(for: reelsMode)
         if let kind = reelsFeedKind(for: reelsMode) {
             viewModel.setActiveReelsFeed(kind)
         }
@@ -3997,7 +4101,6 @@ struct ReelsViewBody: View {
 
         if skipNextReelsModeSessionRestore {
             skipNextReelsModeSessionRestore = false
-            applyReelsAudioSession(for: newValue)
             if newValue == .pics {
                 NotificationCenter.default.post(name: .reelsTeardownAllPlayers, object: nil)
                 currentVisibleSceneId = nil
@@ -4009,8 +4112,6 @@ struct ReelsViewBody: View {
 
         // Persist old mode position before clearing the active id (Pics teardown).
         saveCurrentPositionIfPossible(for: oldValue)
-
-        applyReelsAudioSession(for: newValue)
 
         if newValue == .pics {
             // Active row's `onDisappear` skips `cleanupPlayer` while still "active", so force
@@ -4693,18 +4794,82 @@ struct ReelsViewBody: View {
     /// bei längeren Namen fast immer abgeschnitten.
     private func reelsNameTitleLine(item: ReelItemData) -> some View {
         VStack(alignment: .leading, spacing: 2) {
-            if let performer = item.performers.first {
-                Button(action: { applyPerformerFilter(performer) }) {
-                    Text(performer.name)
-                        .font(.system(size: 15, weight: .bold))
-                        .foregroundColor(.white)
-                        .lineLimit(1)
+            let performers = item.performers
+            let showsAddPerformer = appearanceManager.isEditModeEnabled
+            if performers.count == 1, !showsAddPerformer, let performer = performers.first {
+                reelsPerformerNameButton(performer)
+            } else if performers.count > 1 || showsAddPerformer {
+                // Alle Performer wie in Pics ("A & B"); bei vielen scrollt die Zeile,
+                // `.id` setzt den Scroll-Offset pro Item zurück. Das "+" hängt am Ende.
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 4) {
+                        ForEach(Array(performers.enumerated()), id: \.element.id) { idx, performer in
+                            reelsPerformerNameButton(performer)
+                            if idx < performers.count - 1 {
+                                Text("&")
+                                    .font(.system(size: 15, weight: .medium))
+                                    .foregroundColor(.white.opacity(0.75))
+                            }
+                        }
+                        if showsAddPerformer {
+                            AddPerformerPlusButton { openPerformerEditor(for: item) }
+                                .padding(.leading, performers.isEmpty ? 0 : 4)
+                        }
+                    }
+                    // Room for the 44 pt hit area; the negative padding below gives the
+                    // layout height back so the title doesn't move.
+                    .padding(.vertical, AddPerformerPlusButton.hitInset)
                 }
-                .buttonStyle(.plain)
-                .accessibilityLabel("Filter by \(performer.name)")
+                .padding(.vertical, -AddPerformerPlusButton.hitInset)
+                .id(item.id)
             }
             reelsTitleText(item: item)
         }
+    }
+
+    private func reelsPerformerNameButton(_ performer: ScenePerformer) -> some View {
+        Button(action: { applyPerformerFilter(performer) }) {
+            Text(performer.name)
+                .font(.system(size: 15, weight: .bold))
+                .foregroundColor(.white)
+                .lineLimit(1)
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("Filter by \(performer.name)")
+    }
+
+    /// Overlapping avatars for every performer (same stacking as the Pics header).
+    /// Up to three fit; with more the stack scrolls horizontally, reset per item.
+    @ViewBuilder
+    private func reelsPerformerAvatarStack(item: ReelItemData) -> some View {
+        let performers = item.performers
+        let size = StashyExpandingDock.circleSize
+        let overlap: CGFloat = 10
+        let visibleCount = min(performers.count, 3)
+        // +4 leaves room for the 2pt ring the ScrollView would otherwise clip.
+        let stackWidth = size + CGFloat(visibleCount - 1) * (size - overlap) + 4
+        // Clips (and Pics) are image feeds — open the Images tab, not Galleries/Scenes.
+        let initialTab: PerformerDetailView.DetailTab? = (reelsMode == .clips || reelsMode == .pics) ? .images : nil
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: -overlap) {
+                ForEach(performers) { performer in
+                    NavigationLink(
+                        destination: PerformerDetailView(
+                            performer: performer.toPerformer(),
+                            initialTab: initialTab
+                        )
+                    ) {
+                        performerThumbnail(performer)
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel(performer.name)
+                }
+            }
+            .padding(2)
+        }
+        .scrollDisabled(performers.count <= visibleCount)
+        .frame(width: stackWidth, height: size + 4)
+        .id(item.id)
     }
 
     @ViewBuilder
@@ -4841,18 +5006,8 @@ struct ReelsViewBody: View {
                 // Avatar · (name - title / tags) on the leading side, the control stack trailing.
                 HStack(alignment: .bottom, spacing: 8) {
                     HStack(alignment: .center, spacing: 10) {
-                        if let performer = item.performers.first {
-                            NavigationLink(
-                                destination: PerformerDetailView(
-                                    performer: performer.toPerformer(),
-                                    // Clips (and Pics) are image feeds — open the Images tab, not Galleries/Scenes.
-                                    initialTab: (reelsMode == .clips || reelsMode == .pics) ? .images : nil
-                                )
-                            ) {
-                                performerThumbnail(performer)
-                            }
-                            .buttonStyle(.plain)
-                            .accessibilityLabel(performer.name)
+                        if !item.performers.isEmpty {
+                            reelsPerformerAvatarStack(item: item)
                         }
 
                         VStack(alignment: .leading, spacing: 4) {
@@ -5307,7 +5462,9 @@ struct ReelItemView: View {
     @State private var playbackActivityTracker = ScenePlaybackActivityTracker()
     /// Skipped Reels must not hit `sceneAddPlay` / `sceneSaveActivity` (those set last_played).
     @State private var didCreditReelsWatch = false
-    @State private var reelsWatchedSeconds: Double = 0
+    /// Seconds actually watched on this row — what "Count as played — Feeds" measures. The
+    /// row's start position (resume / Feeds start / marker) and seeks add nothing.
+    @State private var reelsWatchClock = PlayCountWatchClock()
     @State private var heldReelsPlayDuration: Double = 0
     /// Marker rows: the segment end has been acted on (loop seek / advance) and must not fire
     /// again until the playhead is back inside the segment.
@@ -6176,7 +6333,7 @@ extension ReelItemView {
         aetherEngine = aether
         ReelsPlayerRegistry.register(aether)
 
-        let autoplay = !isRotating && isActive && (forcePlay || isPlaying)
+        let autoplay = !isRotating && isActive && (forcePlay || isPlaying) && !ReelsPlayerRegistry.isFeedCovered
         // Marker rows open the original right at the marker, scene rows at their Feeds start
         // position — part of the load itself, so no seek races the first frame / autoplay.
         let start = rowStartTime
@@ -6203,16 +6360,22 @@ extension ReelItemView {
         }
     }
 
-    /// Count real playback only. Skipping away before 30s must not call `sceneAddPlay`.
-    private func noteReelsWatchProgress(delta: Double = 0.1) {
+    /// Count real playback only: time that elapsed while the row played and its playhead moved
+    /// with it. Skipping away before the threshold must not call `sceneAddPlay`, and neither
+    /// the start position nor a seek counts as watched.
+    private func noteReelsWatchProgress(playhead: Double) {
         switch item {
         case .scene, .marker: break
         case .preview, .clip: return
         }
-        guard isPlaying, isPlaybackActive, !isRotating else { return }
-        guard !ReelsPlayerRegistry.isPlaybackSuspended else { return }
-        reelsWatchedSeconds += delta
-        guard !didCreditReelsWatch, reelsWatchedSeconds >= reelsMinWatchSecondsBeforePlayCredit else { return }
+        let watching = isPlaying && isPlaybackActive && !isRotating
+            && !ReelsPlayerRegistry.isPlaybackSuspended
+            && !scrubberState.seeking
+            && aetherEngine?.isPlaying == true
+        reelsWatchClock.sample(playhead: playhead, isPlaying: watching)
+        guard watching else { return }
+        guard !didCreditReelsWatch,
+              reelsWatchClock.watchedSeconds >= reelsMinWatchSecondsBeforePlayCredit else { return }
         didCreditReelsWatch = true
         incrementPlayCount()
         playbackActivityTracker.flush()
@@ -6273,7 +6436,7 @@ extension ReelItemView {
         syncPlaybackActivityPosition()
         playbackActivityTracker.stop()
         didCreditReelsWatch = false
-        reelsWatchedSeconds = 0
+        reelsWatchClock.reset()
         heldReelsPlayDuration = 0
         cleanupAetherEngine()
         videoSurfaceReadiness.reset()
@@ -6282,6 +6445,7 @@ extension ReelItemView {
 
     func seek(to time: Double) {
         guard let aether = aetherEngine else { return }
+        reelsWatchClock.breakInterval()
         Task {
             await aether.seek(to: time)
             if self.isPlaying && self.isPlaybackActive && !self.isRotating {
@@ -6334,6 +6498,10 @@ extension ReelItemView {
     }
 
     func aetherPlayIfAllowed() {
+        // Only the current item ever plays. Several deferred kicks (activation retries, the
+        // `playTrigger` follow-up, the watchdog) re-check `isActive` themselves, but not all of
+        // them — and a play on a row that is not the current one starts audio nobody sees.
+        guard isActive else { return }
         ReelsPlayerRegistry.playIfAllowed(aetherEngine)
     }
 
@@ -6479,7 +6647,7 @@ extension ReelItemView {
 
             self.syncPlaybackPresentationSize(aether)
             self.syncPlaybackActivityPosition()
-            self.noteReelsWatchProgress()
+            self.noteReelsWatchProgress(playhead: time)
             if self.isPlaying && self.isPlaybackActive && !self.isRotating {
                 self.startPlaybackActivityTrackingIfNeeded()
             }
@@ -6648,82 +6816,6 @@ class ScrubberState: ObservableObject {
     /// Shown in the preview box while no still is there (marker rows: the marker's screenshot,
     /// for scenes without scrubber sprites).
     @Published var previewPlaceholderURL: URL? = nil
-}
-
-/// Settings › Playback › "Feeds start position": where a Feeds › Scenes row starts (and loops
-/// back to), so the feed does not open on studio intros. Worked out once per scene and feed
-/// session and then kept, so a Random start stays put while the row stays and for its loop,
-/// and an engine rebuild by the watchdog lands on the same spot.
-@MainActor
-enum ReelsSceneStartPositions {
-    private static var cache: [String: Double] = [:]
-
-    /// Videos shorter than this always start at 0.
-    private static let minimumDuration: Double = 120
-    /// A start this close to the end starts at 0 instead.
-    private static let endMargin: Double = 5
-    private static let skipSeconds: Double = 30
-
-    static func reset() { cache.removeAll() }
-
-    static func start(for scene: Scene) -> Double {
-        let setting = TabManager.shared.feedsSceneStartPosition
-        let key = "\(setting.rawValue)|\(scene.id)"
-        if let cached = cache[key] { return cached }
-        let value = compute(for: scene, setting: setting)
-        cache[key] = value
-        return value
-    }
-
-    private static func compute(for scene: Scene, setting: TabManager.FeedsSceneStartPosition) -> Double {
-        guard let duration = scene.sceneDuration, duration.isFinite, duration >= minimumDuration else { return 0 }
-        // Square and vertical videos are mostly short-form content that starts right away.
-        if let file = scene.files?.first, let width = file.width, let height = file.height,
-           width > 0, height > 0, width <= height {
-            return 0
-        }
-        let start: Double
-        switch setting {
-        case .beginning:
-            return 0
-        case .firstMarker:
-            let detailMarkers = scene.sceneMarkers?.map(\.seconds).filter { $0.isFinite && $0 >= 0 }.min()
-            start = [scene.earliestMarkerSeconds, detailMarkers].compactMap { $0 }.min() ?? skipSeconds
-        case .skip30:
-            start = skipSeconds
-        case .random:
-            start = Double.random(in: 0..<(duration * 0.5))
-        }
-        guard start > 0, start < duration - endMargin else { return 0 }
-        return start
-    }
-}
-
-/// The stretch of a source file a Feeds row plays (marker rows: their part of the scene).
-/// The scrubber shows it as 0…`length`; the engine keeps working in file time.
-struct ReelPlaybackSegment: Equatable {
-    // Markers without an end in Stash play Settings › Playback › "Marker length" (30 s default).
-
-    let start: Double
-    let end: Double
-
-    var length: Double { max(0.1, end - start) }
-
-    /// Segment-relative time (the scrubber's) → file time, kept inside the segment.
-    func fileTime(forRelative relative: Double) -> Double {
-        min(max(start, start + relative), max(start, end - 0.1))
-    }
-
-    /// File time → segment-relative time for the scrubber.
-    func relativeTime(forFile time: Double) -> Double {
-        min(max(0, time - start), length)
-    }
-
-    /// The same segment with its end pulled in to a file length learnt at runtime.
-    func clamped(toFileDuration duration: Double?) -> ReelPlaybackSegment {
-        guard let duration, duration.isFinite, duration > start + 0.5, duration < end else { return self }
-        return ReelPlaybackSegment(start: start, end: duration)
-    }
 }
 
 /// Scrub preview stills for the Feeds scrubber.

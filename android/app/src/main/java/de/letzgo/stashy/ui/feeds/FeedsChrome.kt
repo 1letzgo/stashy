@@ -5,6 +5,7 @@ import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.spring
 import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -12,6 +13,10 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.ui.composed
+import androidx.compose.ui.layout.layout
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
@@ -291,12 +296,13 @@ fun FeedsInfoOverlay(
     onToggleMute: () -> Unit,
     onTogglePlay: () -> Unit,
     pausesAdvance: Boolean,
+    onAddPerformers: (() -> Unit)? = null,
 ) {
     // Over video: text follows the system font scale up to OverlayMaxFontScale (1.3×) so the
     // overlay never covers most of the clip; containers below wrap their content.
     de.letzgo.stashy.ui.CappedFontScale { FeedsInfoOverlayContent(
         item, mode, isMuted, isPlaying, showsDelete, onPerformerFilter, onPerformerOpen, onTitle, onTag, onAddTags,
-        onRemoveTag, onOCounter, onRating, onDelete, onToggleMute, onTogglePlay, pausesAdvance,
+        onRemoveTag, onOCounter, onRating, onDelete, onToggleMute, onTogglePlay, pausesAdvance, onAddPerformers,
     ) }
 }
 
@@ -319,17 +325,22 @@ private fun FeedsInfoOverlayContent(
     onToggleMute: () -> Unit,
     onTogglePlay: () -> Unit,
     pausesAdvance: Boolean,
+    onAddPerformers: (() -> Unit)?,
 ) {
     Column(Modifier.fillMaxWidth()) {
         Row(Modifier.fillMaxWidth().padding(horizontal = FeedsDock.edgePadding), verticalAlignment = Alignment.Bottom) {
             Row(Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                item.performers.firstOrNull()?.let { p -> PerformerThumbnail(p) { onPerformerOpen(p) } }
-                Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                    item.performers.firstOrNull()?.let { p ->
-                        Text(
-                            p.name, color = Color.White, fontSize = 15.sp, fontWeight = FontWeight.Bold, maxLines = 1,
-                            overflow = TextOverflow.Ellipsis, modifier = Modifier.noIndicationClick { onPerformerFilter(p) },
-                        )
+                // All performers, like the Pics header (`ImageCatalogFeedHeader`): overlapping
+                // avatars (tap → performer detail) and the names joined by "&" (tap → filter).
+                // Both rows scroll horizontally when they overflow and start over per item.
+                val performers = item.performers
+                if (performers.isNotEmpty()) PerformerAvatarStack(item.id, performers, onPerformerOpen)
+                Column(Modifier.weight(1f, fill = false), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                    // "+" right after the names (also for a row without performers): adds
+                    // performers to the scene / parent scene / image (`AddPerformersSheet`).
+                    if (performers.isNotEmpty() || onAddPerformers != null) Row(verticalAlignment = Alignment.CenterVertically) {
+                        if (performers.isNotEmpty()) PerformerNamesRow(item.id, performers, onPerformerFilter, Modifier.weight(1f, fill = false))
+                        onAddPerformers?.let { AddPerformerButton(leading = performers.isEmpty(), onClick = it) }
                     }
                     item.title?.takeIf { it.isNotEmpty() }?.let { title ->
                         Text(
@@ -374,6 +385,69 @@ private fun FeedsInfoOverlayContent(
     }
 }
 
+/** Max avatars visible side by side before the stack scrolls (keeps room for the names). */
+private const val VisibleAvatarCount = 3
+private val AvatarOverlap = 10.dp
+
+@Composable
+private fun PerformerAvatarStack(itemId: String, performers: List<FeedPerformer>, onOpen: (FeedPerformer) -> Unit) {
+    val scroll = remember(itemId) { ScrollState(0) }
+    val step = FeedsDock.circleSize - AvatarOverlap
+    val maxWidth = FeedsDock.circleSize + step * (VisibleAvatarCount - 1)
+    Row(
+        Modifier.widthIn(max = maxWidth).horizontalScroll(scroll),
+        horizontalArrangement = Arrangement.spacedBy(-AvatarOverlap),
+    ) {
+        performers.forEach { p -> PerformerThumbnail(p) { onOpen(p) } }
+    }
+}
+
+@Composable
+private fun PerformerNamesRow(itemId: String, performers: List<FeedPerformer>, onFilter: (FeedPerformer) -> Unit, modifier: Modifier = Modifier) {
+    val scroll = remember(itemId) { ScrollState(0) }
+    Row(
+        modifier.horizontalScroll(scroll),
+        horizontalArrangement = Arrangement.spacedBy(4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        performers.forEachIndexed { i, p ->
+            Text(
+                p.name, color = Color.White, fontSize = 15.sp, fontWeight = FontWeight.Bold, maxLines = 1,
+                modifier = Modifier.noIndicationClick { onFilter(p) },
+            )
+            if (i < performers.size - 1) Text("&", color = Color.White.copy(alpha = 0.75f), fontSize = 15.sp, maxLines = 1)
+        }
+    }
+}
+
+/**
+ * Small glass "+" (26 dp) after the performer names. The 48 dp touch target is laid out only
+ * horizontally; vertically it overhangs the 26 dp the row reports, so the names / title stack
+ * keeps its height. As the row's first element ([leading]) the glass circle sits flush with the
+ * title below; the target then overhangs to the left instead.
+ */
+@Composable
+fun AddPerformerButton(leading: Boolean, onClick: () -> Unit) {
+    val visual = 26.dp
+    val target = 48.dp
+    Box(
+        Modifier
+            .layout { measurable, constraints ->
+                val t = target.roundToPx(); val v = visual.roundToPx()
+                val placeable = measurable.measure(constraints.copy(minWidth = t, maxWidth = t, minHeight = t, maxHeight = t))
+                val inset = if (leading) (t - v) / 2 else 0
+                layout(t - inset, v) { placeable.place(-inset, (v - t) / 2) }
+            }
+            .semantics { role = Role.Button }
+            .noIndicationClick(onClick),
+        contentAlignment = Alignment.Center,
+    ) {
+        Box(Modifier.size(visual).stashyGlass(CircleShape), contentAlignment = Alignment.Center) {
+            Icon(SF.plus, "Add performer", tint = Color.White, modifier = Modifier.size(16.dp))
+        }
+    }
+}
+
 @Composable
 private fun PerformerThumbnail(p: FeedPerformer, onClick: () -> Unit) {
     val size = FeedsDock.circleSize
@@ -393,8 +467,8 @@ private fun PerformerThumbnail(p: FeedPerformer, onClick: () -> Unit) {
 /**
  * iOS: `IsolatedScrubberBar` — the shared `AetherTimeBar` (44 pt glass capsule: elapsed · track ·
  * remaining) with 16 pt sides and 8 pt above / below. The scrub preview shows
- * [previewImageAt] (Markers: the scene's sprite tile) when it has one for the scrubbed time,
- * else the row's poster ([placeholderURL]) — Android decodes no frames here.
+ * [previewImageAt] (Scenes / Markers: the scene's sprite tile, iOS `ReelsView` scrub stills)
+ * when it has one for the scrubbed time, else the row's poster ([placeholderURL]).
  */
 @Composable
 fun FeedsScrubber(
@@ -420,6 +494,7 @@ fun FeedsScrubber(
         modifier = Modifier.padding(horizontal = 16.dp).padding(top = 8.dp, bottom = 8.dp),
         onScrubChanged = { s ->
             scrubbing = true
+            // A missing tile (sheet still loading, gap in the VTT) keeps the last still.
             previewImageAt?.invoke(s)?.let { previewImage = it }
             onScrub(s)
         },

@@ -205,8 +205,7 @@ struct SceneHeatmapCard: View {
 
     private var progress: CGFloat {
         if isDragging { return draftProgress }
-        guard durationSeconds > 0 else { return 0 }
-        return CGFloat(min(max(currentTimeSeconds, 0), durationSeconds) / durationSeconds)
+        return PlaybackFraction.cgFloat(currentTimeSeconds, in: durationSeconds)
     }
 
     @ViewBuilder

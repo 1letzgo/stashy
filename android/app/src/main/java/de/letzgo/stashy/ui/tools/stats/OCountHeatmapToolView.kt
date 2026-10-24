@@ -38,6 +38,9 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
@@ -268,9 +271,11 @@ private fun MonthTitleRow(
                 title,
                 style = IosTypography.title3.copy(fontWeight = FontWeight.SemiBold),
                 color = p.text, maxLines = 1, overflow = TextOverflow.Ellipsis,
+                // iOS: button labelled with the title + hint "Shows the current month.", else a header.
                 modifier = if (showsJumpToCurrent) Modifier.clickable(
-                    interactionSource = remember { MutableInteractionSource() }, indication = null, onClick = onJumpToCurrent,
-                ) else Modifier,
+                    interactionSource = remember { MutableInteractionSource() }, indication = null,
+                    onClickLabel = "Shows the current month.", role = Role.Button, onClick = onJumpToCurrent,
+                ) else Modifier.semantics { heading() },
             )
         }
         ChevronButton(Icons.AutoMirrored.Filled.KeyboardArrowRight, "Next month", canGoForward, onForward)
@@ -366,7 +371,10 @@ private fun DayCell(cell: OCountMonthHeatmap.Cell?, blockSize: Dp, isSelected: B
             .border(0.5.dp, heatOutline(level), CircleShape)
             .let { if (isSelected) it.border(2.dp, accent, CircleShape) else it }
             .let { m -> if (inMonth && cell != null) m.clickable { onSelect(cell.id) } else m }
-            .semantics { contentDescription = cell?.accessibilityLabel ?: "No data" },
+            .semantics {
+                contentDescription = cell?.accessibilityLabel ?: "No data"
+                if (inMonth && cell != null) selected = isSelected
+            },
         contentAlignment = Alignment.Center,
     ) {
         // Day number sized from the cell (calendar grid of fixed circles): follows the font scale
@@ -415,8 +423,11 @@ private fun SummaryCard(heatmap: OCountMonthHeatmap, selectedDayKey: String?) {
     } else {
         "O-Count" to countLabel(heatmap.totalInMonth)
     }
+    // iOS `summaryContent(heatmap:).accessibility`.
+    val accessibility = if (selectedCell != null) "$title, $value"
+    else "${heatmap.monthTitle}, ${heatmap.daysWithOCount} days, ${countLabel(heatmap.totalInMonth)}"
     Column(
-        Modifier.fillMaxWidth().insightsCard().padding(16.dp),
+        Modifier.fillMaxWidth().insightsCard().semantics(mergeDescendants = true) { contentDescription = accessibility }.padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(4.dp),
     ) {
         Text(title, style = NativeType.bodyMedium, color = p.secondaryText, maxLines = 2)
@@ -463,7 +474,11 @@ private fun DayItemRow(item: OCountHeatmapItem, onClick: () -> Unit) {
     val thumbHeight = 56.dp
     val thumbWidth = if (item.kind == OCountHeatmapItem.Kind.Scene) thumbHeight * 16f / 9f else thumbHeight
     Row(
-        Modifier.fillMaxWidth().heightIn(min = 72.dp).clickable(onClick = onClick).padding(horizontal = 16.dp, vertical = 8.dp),
+        Modifier.fillMaxWidth().heightIn(min = 72.dp)
+            // iOS `OCountDayItemRow` accessibility label + hint "Opens this scene/image."
+            .semantics { contentDescription = item.accessibilityLabel }
+            .clickable(onClickLabel = "Opens this ${item.kindTitle.lowercase()}.", onClick = onClick)
+            .padding(horizontal = 16.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(16.dp),
     ) {
@@ -529,3 +544,12 @@ class OCountImageDestinationScreen(private val item: OCountHeatmapItem) : Screen
 
     private fun isPlayable(image: StashImage) = image.visualFiles != null || image.paths?.image != null || image.isVideo
 }
+
+/** iOS `OCountDayItemRow` `.accessibilityLabel`: kind, title, subtitle, performers, count. */
+private val OCountHeatmapItem.accessibilityLabel: String
+    get() = buildString {
+        append(kindTitle).append(", ").append(displayTitle)
+        if (rowSubtitle != kindTitle) append(", ").append(rowSubtitle)
+        if (performerNamesLine.isNotEmpty()) append(", ").append(performerNamesLine)
+        append(", ").append(countOnDay)
+    }

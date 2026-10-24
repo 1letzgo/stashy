@@ -1,6 +1,7 @@
 package de.letzgo.stashy.tv
 
 import de.letzgo.stashy.ui.uniqueItemsIndexed
+import android.os.SystemClock
 import android.view.KeyEvent as AndroidKeyEvent
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
@@ -66,6 +67,7 @@ import de.letzgo.stashy.data.SceneEvent
 import de.letzgo.stashy.data.SceneEvents
 import de.letzgo.stashy.data.SceneMarker
 import de.letzgo.stashy.data.TabManager
+import de.letzgo.stashy.ui.player.PlayCountCredit
 import de.letzgo.stashy.ui.player.PlaybackActivityTracker
 import de.letzgo.stashy.ui.player.PlayerSettings
 import de.letzgo.stashy.ui.player.SceneNowPlaying
@@ -92,6 +94,7 @@ import java.util.Locale
 class TvPlaybackModel {
     companion object {
         private val live = java.util.Collections.newSetFromMap(java.util.WeakHashMap<TvPlaybackModel, Boolean>())
+        private const val NO_STREAM = "The server has no playable file for this scene (no stream path)."
 
         /** Pauses every TV player (app left via Home / another app in front). */
         fun pauseAll() = live.toList().forEach { it.player?.pause() }
@@ -102,13 +105,25 @@ class TvPlaybackModel {
     val hasPlayer: Boolean get() = player != null
     var scene by mutableStateOf<Scene?>(null); private set
     var sprites by mutableStateOf<SceneScrubSprites?>(null); private set
+    /** iOS `model.error` — why no player could be started (shown by [TvPlayerError]). */
+    var error by mutableStateOf<String?>(null); private set
     /** Called when the current item finishes (channel continuous play). */
     var onPlaybackEnded: (() -> Unit)? = null
 
     private val tracker = PlaybackActivityTracker(scope)
     private val credited = HashSet<String>()
+    /** Count-as-played: real watch time of the current item, not its playhead (resume ≠ watched). */
+    private val playCredit = PlayCountCredit(0.0)
 
-    private fun ensurePlayer(): StashPlayer = player ?: StashPlayer(Prefs.appContext, StashPlayer.Role.Main).also { p ->
+    private fun ensurePlayer(): StashPlayer? = player ?: try {
+        createPlayer()
+    } catch (e: Exception) {
+        android.util.Log.e("TvPlayer", "player init failed", e)
+        error = "The video player could not be started: ${e.localizedMessage ?: e.javaClass.simpleName}"
+        null
+    }
+
+    private fun createPlayer(): StashPlayer = StashPlayer(Prefs.appContext, StashPlayer.Role.Main).also { p ->
         p.autoSelectsPreferredSubtitleTrack = true
         p.onTime = { t, d -> onTime(p, t, d) }
         p.onPlayingChanged = { playing ->
@@ -128,8 +143,10 @@ class TvPlaybackModel {
 
     /** First load of a session. */
     fun setup(scene: Scene, startAt: Double, subtitle: String? = scene.studio?.name) {
-        val url = scene.streamURL ?: return
-        val p = ensurePlayer()
+        this.scene = scene
+        val url = scene.streamURL ?: run { error = NO_STREAM; return }
+        val p = ensurePlayer() ?: return
+        error = null
         configure(p, scene)
         p.load(url, startAt.takeIf { it > 0.25 }, autoplay = true)
         registerCaptions(p, scene)
@@ -139,8 +156,10 @@ class TvPlaybackModel {
     fun playNext(scene: Scene, subtitle: String? = scene.studio?.name) {
         val p = player ?: return setup(scene, 0.0, subtitle)
         tracker.reset()
+        val url = scene.streamURL ?: run { this.scene = scene; p.stop(); error = NO_STREAM; return }
+        error = null
         configure(p, scene)
-        p.load(scene.streamURL ?: return, null, autoplay = true)
+        p.load(url, null, autoplay = true)
         registerCaptions(p, scene)
     }
 
@@ -158,7 +177,9 @@ class TvPlaybackModel {
         p.fallbackDeclaredDuration = scene.sceneDuration
         p.nowPlaying = SceneNowPlaying.of(scene)
         sprites = SceneScrubSprites.create(scene.paths?.vtt, scene.paths?.sprite)?.also { it.prepare(scope) }
-        if (playThreshold <= 0) credit(sceneId)
+        playCredit.reset()
+        playCredit.thresholdSeconds = playThreshold
+        if (playCredit.onStart()) credit(sceneId)
     }
 
     private val playThreshold: Double get() = maxOf(0.0, TabManager.playCountPlayerSeconds)
@@ -169,10 +190,11 @@ class TvPlaybackModel {
         tracker.setPosition(t, if (d > 0) d else scene?.sceneDuration ?: 0.0)
         if (p.isPlaying) tracker.start()
         val id = scene?.id ?: return
-        if (t >= playThreshold) credit(id)
+        playCredit.thresholdSeconds = playThreshold
+        if (playCredit.onTime(t, p.isPlaying, SystemClock.elapsedRealtime() / 1000.0)) credit(id)
     }
 
-    /** Credits the play once the playhead passed the threshold (seeking ahead counts too). */
+    /** Credits the play once per scene, after [playThreshold] seconds actually watched ([PlayCountCredit]). */
     private fun credit(sceneId: String) {
         if (!credited.add(sceneId)) return
         if (!de.letzgo.stashy.data.TabManager.tracksActivity(sceneId)) return
@@ -195,6 +217,7 @@ class TvPlaybackModel {
         val p = player ?: return
         p.seek(seconds)
         tracker.noteSeek(seconds)
+        playCredit.noteSeek()
     }
 
     /** Back on the player: save and pause, keep the player until the page is gone. */
@@ -206,9 +229,11 @@ class TvPlaybackModel {
     fun clear() {
         tracker.stop()
         credited.clear()
+        playCredit.reset()
         player?.release()
         player = null
         sprites = null
+        error = null
     }
 }
 
@@ -240,8 +265,12 @@ fun TvPlayerScreen(
 ) {
     val player = model.player
     Box(Modifier.fillMaxSize().background(Color.Black)) {
-        if (player == null) {
-            TvPlayerError(null, onExit)
+        // iOS `TVPlayerErrorView(error: model.error)`: the reason, not just "unable to play".
+        // A player whose every source failed before showing a frame lands here too (the
+        // transcode ladder is exhausted by then), with Media3's reason.
+        val fatal = model.error ?: player?.errorMessage?.takeIf { !player.hasPresentedFrame }
+        if (player == null || fatal != null) {
+            TvPlayerError(fatal, onExit)
         } else {
             TvPlayerContent(model, player, title, subtitle, posterURL, onExit, canGoPrevious, canGoNext, onPrevious, onNext, panelExtra)
         }
@@ -400,7 +429,7 @@ private fun TvPlayerContent(
             }
         },
     ) {
-        VideoSurface(player, Modifier.fillMaxSize())
+        VideoSurface(player, Modifier.fillMaxSize(), showsBitmapSubtitles = true)
 
         if (!player.hasPresentedFrame) {
             Box(Modifier.fillMaxSize().background(Color.Black), contentAlignment = Alignment.Center) {
@@ -655,7 +684,7 @@ fun TvMarkerRail(markers: List<SceneMarker>, currentTime: Double, entry: FocusRe
 }
 
 /** Marker screenshot URL (signed). */
-fun markerThumbnail(marker: SceneMarker): String? = de.letzgo.stashy.data.Net.signed(marker.screenshot)
+fun markerThumbnail(marker: SceneMarker): String? = marker.screenshotURL
 
 // MARK: - Routes
 
@@ -710,7 +739,7 @@ class TvChannelPlayerRoute(channel: TvChannel) : TvRoute {
                     }
                     TvRequestFocus(focus, "player.close")
                 }
-                session.player.hasPlayer -> {
+                session.player.hasPlayer || session.player.error != null -> {
                     val scene = session.currentScene
                     val label = session.indexLabel
                     TvPlayerScreen(

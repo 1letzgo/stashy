@@ -53,6 +53,8 @@ struct AetherSceneSurface: View {
     @State private var systemVolume = AetherSystemVolumeControl()
 
     @State private var areControlsVisible = true
+    /// Fullscreen auto-rotate to landscape ran for this surface.
+    @State private var didAutoRotate = false
     /// Fullscreen only: crop to fill the whole screen instead of letterboxing.
     @State private var fillsScreen = false
     @State private var controlsHideToken = UUID()
@@ -218,9 +220,16 @@ struct AetherSceneSurface: View {
         // settled — Autozoom needs both that and the surface geometry.
         .onChange(of: engine.hasFirstFrame) { _, ready in
             if ready { applyAutoZoomIfNeeded() }
+            // The video size is only known now when fullscreen opened before the first frame.
+            if ready, isFullscreen { rotateToLandscapeForWideVideo() }
         }
-        .onChange(of: isFullscreen) { _, _ in
+        // The fullscreen surface is created with `isFullscreen: true` (no change to observe).
+        .onAppear {
+            if isFullscreen { rotateToLandscapeForWideVideo() }
+        }
+        .onChange(of: isFullscreen) { _, fullscreen in
             applyFillForGeometry()
+            if fullscreen { rotateToLandscapeForWideVideo() }
         }
         .onChange(of: fillsScreen) { _, fills in
             engine.setVideoGravity(fills ? .resizeAspectFill : .resizeAspect)
@@ -228,7 +237,11 @@ struct AetherSceneSurface: View {
         .onDisappear {
             rewindTimer?.invalidate()
             rewindTimer = nil
-            if isFullscreen { engine.setVideoGravity(.resizeAspect) }
+            if isFullscreen {
+                engine.setVideoGravity(.resizeAspect)
+                // Every fullscreen host (scene detail, downloads) gets the orientation back.
+                Self.releaseOrientationOverride()
+            }
             pip.update(layer: nil)
             endScrubPreview()
         }
@@ -479,6 +492,18 @@ struct AetherSceneSurface: View {
                     topRow(volumeWidth: 130)
                     topRow(volumeWidth: nil)
                 }
+                // Hidden MPVolumeView: the only way to set the system volume from the slider.
+                // Exactly one, outside `ViewThatFits`: it used to sit in every candidate row, so
+                // a rotation in fullscreen (which switches the candidate) built a fresh
+                // MPVolumeView mid-layout whose system slider showed up on screen and stayed
+                // there until the next scene. Still under `autoHiding`, so the system volume HUD
+                // shows / is suppressed exactly as before.
+                .background(alignment: .topLeading) {
+                    AetherSystemVolumeView(control: systemVolume)
+                        .frame(width: 1, height: 1)
+                        .allowsHitTesting(false)
+                        .accessibilityHidden(true)
+                }
                 .padding(.horizontal, 16)
                 .padding(.top, 12)
                 Spacer()
@@ -569,12 +594,6 @@ struct AetherSceneSurface: View {
             .frame(height: chromeButtonSize)
             .stashyGlass(shape: Capsule())
         }
-        // Hidden MPVolumeView: the only way to set the system volume from the slider.
-        AetherSystemVolumeView(control: systemVolume)
-            .frame(width: 1, height: 1)
-            .opacity(0.01)
-            .allowsHitTesting(false)
-            .accessibilityHidden(true)
     }
 
     private func topRow(volumeWidth: CGFloat?) -> some View {
@@ -760,29 +779,92 @@ struct AetherSceneSurface: View {
             .first(where: { $0.activationState == .foregroundActive })
             ?? UIApplication.shared.connectedScenes.compactMap({ $0 as? UIWindowScene }).first
         else { return }
-        let target: UIInterfaceOrientationMask = scene.interfaceOrientation.isLandscape ? .portrait : .landscapeRight
+        let target: UIInterfaceOrientationMask = scene.interfaceOrientation.isLandscape ? .portrait : .landscape
         // Only the geometry request: the app's supported orientations stay `.all`. Narrowing
         // them to one orientation crashed UIKit as soon as a sheet + keyboard came up in
         // landscape ("no common orientation with the application"). With the device's
         // orientation lock on there is no rotation event, so the new orientation holds anyway.
         Self.didRotateInFullscreen = true
-        scene.requestGeometryUpdate(.iOS(interfaceOrientations: target)) { error in
-            AppLog.debug("Rotate request failed: \(error)")
-        }
+        Self.rotate(scene, to: target)
         #endif
     }
 
     private static var didRotateInFullscreen = false
 
+    #if os(iOS)
+    /// A geometry request only takes once the presented controllers re-read their supported
+    /// orientations — without this the fullscreen cover often stayed upright.
+    private static func refreshSupportedOrientations(in scene: UIWindowScene) {
+        var controller = scene.keyWindow?.rootViewController
+        while let current = controller {
+            current.setNeedsUpdateOfSupportedInterfaceOrientations()
+            controller = current.presentedViewController
+        }
+    }
+
+    /// Rotates the interface and keeps it there: the app's allowed orientations are narrowed to
+    /// the target (SwiftUI's fullscreen cover ignores plain geometry requests, and with `.all`
+    /// the device orientation would turn it straight back). Fullscreen holds the lock until it
+    /// closes (`releaseOrientationOverride`), like Android's sensorLandscape.
+    private static func rotate(_ scene: UIWindowScene, to target: UIInterfaceOrientationMask) {
+        AppDelegate.orientationLock = target
+        refreshSupportedOrientations(in: scene)
+        scene.requestGeometryUpdate(.iOS(interfaceOrientations: target)) { error in
+            AppLog.debug("Rotate request failed: \(error)")
+        }
+    }
+    #endif
+
+
+    /// Entering fullscreen with a landscape video while the phone is upright turns the interface
+    /// to landscape (like Android); closing fullscreen turns it back (`releaseOrientationOverride`).
+    /// Once per fullscreen session, so a manual rotate back to portrait sticks.
+    private func rotateToLandscapeForWideVideo(attempt: Int = 0) {
+        #if os(iOS)
+        guard !didAutoRotate, TabManager.isFullscreenAutoRotateOn,
+              UIDevice.current.userInterfaceIdiom == .phone else { return }
+        // The video size can still be unknown when fullscreen opens (and may arrive without a
+        // new first frame): ask again for up to ~3 s.
+        guard let size = engine.sourceSize else {
+            if attempt < 12 {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) {
+                    rotateToLandscapeForWideVideo(attempt: attempt + 1)
+                }
+            }
+            return
+        }
+        guard size.width > size.height else { return }
+        didAutoRotate = true
+        // Next run loop: the cover is presented without animation, so it is already up.
+        DispatchQueue.main.async {
+            guard let scene = UIApplication.shared.connectedScenes
+                .compactMap({ $0 as? UIWindowScene })
+                .first(where: { $0.activationState == .foregroundActive })
+                ?? UIApplication.shared.connectedScenes.compactMap({ $0 as? UIWindowScene }).first,
+                  !scene.interfaceOrientation.isLandscape else { return }
+            Self.didRotateInFullscreen = true
+            Self.rotate(scene, to: .landscape)
+        }
+        #endif
+    }
+
     /// Back to portrait on the phone once fullscreen goes away, if the button rotated it.
     static func releaseOrientationOverride() {
-        guard didRotateInFullscreen else { return }
-        didRotateInFullscreen = false
         #if os(iOS)
-        guard UIDevice.current.userInterfaceIdiom == .phone else { return }
-        UIApplication.shared.connectedScenes
-            .compactMap { $0 as? UIWindowScene }
-            .forEach { $0.requestGeometryUpdate(.iOS(interfaceOrientations: .portrait)) { _ in } }
+        guard didRotateInFullscreen || AppDelegate.orientationLock != .all else { return }
+        didRotateInFullscreen = false
+        let scenes = UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }
+        guard UIDevice.current.userInterfaceIdiom == .phone else {
+            AppDelegate.orientationLock = .all
+            scenes.forEach { refreshSupportedOrientations(in: $0) }
+            return
+        }
+        // Back upright, then free again (after the rotation) so the device decides from here on.
+        scenes.forEach { rotate($0, to: .portrait) }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) {
+            AppDelegate.orientationLock = .all
+            scenes.forEach { refreshSupportedOrientations(in: $0) }
+        }
         #endif
     }
 
@@ -1390,17 +1472,48 @@ final class AetherSystemVolumeControl {
 
 private struct AetherSystemVolumeView: UIViewRepresentable {
     var control: AetherSystemVolumeControl
-    func makeUIView(context: Context) -> MPVolumeView {
-        let view = MPVolumeView(frame: CGRect(x: 0, y: 0, width: 1, height: 1))
-        view.showsVolumeSlider = true
-        view.alpha = 0.01
-        control.slider = view.subviews.compactMap { $0 as? UISlider }.first
+    func makeUIView(context: Context) -> AetherHiddenVolumeContainer {
+        let view = AetherHiddenVolumeContainer()
+        control.slider = view.slider
         return view
     }
-    func updateUIView(_ uiView: MPVolumeView, context: Context) {
-        if control.slider == nil {
-            control.slider = uiView.subviews.compactMap { $0 as? UISlider }.first
+    func updateUIView(_ uiView: AetherHiddenVolumeContainer, context: Context) {
+        if control.slider == nil || control.slider !== uiView.slider {
+            control.slider = uiView.slider
         }
+    }
+}
+
+/// Keeps the MPVolumeView invisible whatever layout pass comes along. SwiftUI owns the alpha
+/// of a representable's root view (its `.opacity` / `autoHiding` write it), and MPVolumeView
+/// lays its slider out at the slider's own width, past a 1 pt frame — so the volume view sits
+/// in a clipping 1 pt container and has its own alpha and frame re-pinned on every layout.
+final class AetherHiddenVolumeContainer: UIView {
+    private let volumeView = MPVolumeView(frame: CGRect(x: 0, y: 0, width: 1, height: 1))
+
+    var slider: UISlider? { volumeView.subviews.compactMap { $0 as? UISlider }.first }
+
+    override init(frame: CGRect) {
+        super.init(frame: frame)
+        clipsToBounds = true
+        isUserInteractionEnabled = false
+        isAccessibilityElement = false
+        accessibilityElementsHidden = true
+        volumeView.showsVolumeSlider = true
+        volumeView.isUserInteractionEnabled = false
+        volumeView.clipsToBounds = true
+        volumeView.alpha = 0.01
+        addSubview(volumeView)
+    }
+
+    required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
+
+    override var intrinsicContentSize: CGSize { CGSize(width: 1, height: 1) }
+
+    override func layoutSubviews() {
+        super.layoutSubviews()
+        volumeView.frame = CGRect(x: 0, y: 0, width: 1, height: 1)
+        if volumeView.alpha != 0.01 { volumeView.alpha = 0.01 }
     }
 }
 

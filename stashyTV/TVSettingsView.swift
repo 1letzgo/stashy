@@ -16,6 +16,7 @@ import UIKit
 private enum TVSettingsEntry: Hashable {
     case servers, appearance, security, stashyPlus
     case defaultSort, defaultFilters, visibleTabs
+    case homeRows
     case subtitles
     case dolbyVision
     case playCount
@@ -31,6 +32,7 @@ private enum TVSettingsEntry: Hashable {
         case .defaultSort: return "Default Sorting"
         case .defaultFilters: return "Default Filters"
         case .visibleTabs: return "Visible Tabs"
+        case .homeRows: return "Home Rows"
         case .subtitles: return "Subtitles"
         case .dolbyVision: return "Dolby Vision"
         case .playCount: return "Count As Played"
@@ -48,6 +50,7 @@ private enum TVSettingsEntry: Hashable {
         case .defaultSort: return "arrow.up.arrow.down"
         case .defaultFilters: return "line.3.horizontal.decrease.circle"
         case .visibleTabs: return "rectangle.3.group.fill"
+        case .homeRows: return "rectangle.grid.1x2.fill"
         case .subtitles: return "captions.bubble.fill"
         case .dolbyVision: return "sparkles.tv"
         case .playCount: return "play.circle"
@@ -72,6 +75,8 @@ private enum TVSettingsEntry: Hashable {
             return "A saved server filter to apply automatically when a section opens."
         case .visibleTabs:
             return "Hide sections you do not use. They disappear from the sidebar."
+        case .homeRows:
+            return "Choose which rows Home shows — scenes, performers, studios, galleries, Channels — and their order."
         case .subtitles:
             return "Turn subtitles on automatically, choose the language a scene should start with, and set how the cues look."
         case .playCount:
@@ -138,6 +143,7 @@ struct TVSettingsView: View {
                 link(.defaultSort)
                 link(.defaultFilters)
                 link(.visibleTabs)
+                link(.homeRows)
             } header: {
                 Text("Content")
             }
@@ -186,6 +192,7 @@ struct TVSettingsView: View {
         case .defaultSort: TVDefaultSortSettingsView()
         case .defaultFilters: TVDefaultFilterSettingsView()
         case .visibleTabs: TVTabVisibilitySettingsView()
+        case .homeRows: TVHomeRowsSettingsView()
         case .subtitles: TVSubtitleSettingsView()
         case .maintenance: TVMaintenanceSettingsView()
         case .about: TVAboutSettingsView()
@@ -685,7 +692,7 @@ private struct TVTabVisibilitySettingsView: View {
     var body: some View {
         List {
             Section {
-                // No Feeds row: tvOS has no Feeds section, so the toggle controlled nothing.
+                tabVisibilityRow(.reels, label: "Feeds", icon: "play.rectangle.on.rectangle")
                 tabVisibilityRow(.scenes, label: "Scenes", icon: "film.fill")
                 tabVisibilityRow(.performers, label: "Performers", icon: "person.3.fill")
                 tabVisibilityRow(.studios, label: "Studios", icon: "building.2.fill")
@@ -693,6 +700,7 @@ private struct TVTabVisibilitySettingsView: View {
                 tabVisibilityRow(.groups, label: "Groups", icon: "rectangle.stack.fill")
                 tabVisibilityRow(.galleries, label: "Galleries", icon: "photo.stack.fill")
                 tabVisibilityRow(.images, label: "Images", icon: "photo.fill")
+                tabVisibilityRow(.markers, label: "Markers", icon: "bookmark.fill")
             }
         }
         .tvSettingsPage("Visible Tabs", description: "Sections you turn off disappear from the sidebar. Home, Search and Settings always stay.")

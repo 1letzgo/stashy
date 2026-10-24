@@ -364,9 +364,7 @@ enum ToolsItem: String, Codable, CaseIterable, Identifiable {
     case timeline
     case topLists
     case filters
-    #if !os(tvOS)
     case hotOrNot
-    #endif
     case rateMe
     
     var id: String { rawValue }
@@ -380,19 +378,17 @@ enum ToolsItem: String, Codable, CaseIterable, Identifiable {
         case .timeline: return "Timeline"
         case .topLists: return "Charts"
         case .filters: return "Filters"
-        #if !os(tvOS)
         case .hotOrNot: return "Match"
-        #endif
         case .rateMe: return "RateMe"
         }
     }
 
     /// Name used in stashy+ settings / paywall lists.
     var plusFeatureTitle: String {
-        #if !os(tvOS)
-        if self == .hotOrNot { return "Performer Match" }
-        #endif
-        return title
+        switch self {
+        case .hotOrNot: return "Performer Match"
+        default: return title
+        }
     }
     
     var icon: String {
@@ -404,9 +400,7 @@ enum ToolsItem: String, Codable, CaseIterable, Identifiable {
         case .timeline: return "calendar.day.timeline.left"
         case .topLists: return "list.number"
         case .filters: return "line.3.horizontal.decrease.circle"
-        #if !os(tvOS)
         case .hotOrNot: return "flame.fill"
-        #endif
         case .rateMe: return "star.fill"
         }
     }
@@ -472,6 +466,30 @@ class TabManager: ObservableObject {
     /// The global switch and the per-scene pause from the player menu.
     static func tracksActivity(for sceneId: String) -> Bool {
         isPlaybackActivityTracked && !activityPausedSceneIds.contains(sceneId)
+    }
+
+    /// Settings › Playback › Player › "Auto-rotate fullscreen": fullscreen turns to landscape
+    /// for landscape videos while the phone is upright.
+    @Published var playerAutoRotateFullscreen: Bool = true {
+        didSet { UserDefaults.standard.set(playerAutoRotateFullscreen, forKey: Self.playerAutoRotateFullscreenKey) }
+    }
+    static let playerAutoRotateFullscreenKey = "playerAutoRotateFullscreen"
+    nonisolated static var isFullscreenAutoRotateOn: Bool {
+        UserDefaults.standard.object(forKey: playerAutoRotateFullscreenKey) as? Bool ?? true
+    }
+
+    /// Settings › Playback › Player › "Start muted without headphones". On (default): a video
+    /// starts muted while the audio route is the built-in speaker. Off: the speaker is treated
+    /// like headphones and the stored mute choice decides (mute button persists it, default
+    /// unmuted). Read at every video start.
+    @Published var playbackMuteWithoutHeadphones: Bool = true {
+        didSet {
+            UserDefaults.standard.set(playbackMuteWithoutHeadphones, forKey: Self.playbackMuteWithoutHeadphonesKey)
+        }
+    }
+    static let playbackMuteWithoutHeadphonesKey = "playbackMuteWithoutHeadphones"
+    nonisolated static var mutesWithoutHeadphones: Bool {
+        UserDefaults.standard.object(forKey: playbackMuteWithoutHeadphonesKey) as? Bool ?? true
     }
 
     /// Share of the picture the fill may cut off before Autozoom leaves it letterboxed.
@@ -662,6 +680,9 @@ class TabManager: ObservableObject {
     private let homeChannelItemsKey = "HomeChannelItemsConfig"
     private let homeChannelSourcesKey = "HomeChannelSourcesConfig"
     private let lastPlayedOnTopMigrationKey = "HomeRowsLastPlayedOnTop_v1"
+    #if os(tvOS)
+    private let tvHomeRowsDefaultsKey = "HomeRowsTVDefaults_v1"
+    #endif
     private let reelsModesKey = "ReelsModesConfig"
     private let toolsKey = "ToolsConfig"
     private let reelsFillHeightKey = "ReelsFillHeight"
@@ -732,6 +753,8 @@ class TabManager: ObservableObject {
         self.showsPlayerSkipButtons = UserDefaults.standard.object(forKey: showsPlayerSkipButtonsKey) as? Bool ?? true
         self.playerAutoZoom = UserDefaults.standard.object(forKey: playerAutoZoomKey) as? Bool ?? false
         self.tracksPlaybackActivity = Self.isPlaybackActivityTracked
+        self.playerAutoRotateFullscreen = Self.isFullscreenAutoRotateOn
+        self.playbackMuteWithoutHeadphones = Self.mutesWithoutHeadphones
         self.playerDolbyVisionEnabled = UserDefaults.standard.object(forKey: playerDolbyVisionEnabledKey) as? Bool ?? true
         let storedBatch = UserDefaults.standard.object(forKey: downloadBatchSizeKey) as? Int ?? 50
         self.downloadBatchSize = Self.downloadBatchSizeOptions.contains(storedBatch) ? storedBatch : 50
@@ -1088,7 +1111,41 @@ class TabManager: ObservableObject {
             ]
             saveHomeRows()
         }
+        #if os(tvOS)
+        applyTVHomeRowDefaultsIfNeeded()
+        #endif
     }
+
+    #if os(tvOS)
+    /// One-shot per server: the Apple TV Home gets its own starting set. Until rows became
+    /// configurable on tvOS the stored list was the untouched iOS default (the TV never read
+    /// it), so replacing it loses no user choice. Order follows the old fixed TV dashboard
+    /// (Continue Watching, Channels, New, Recently Added, Top Rated, Random) plus top
+    /// performers and studios for discovery; everything else starts off.
+    private func applyTVHomeRowDefaultsIfNeeded() {
+        let key = "\(tvHomeRowsDefaultsKey)\(currentServerSuffix)"
+        guard !UserDefaults.standard.bool(forKey: key) else { return }
+        UserDefaults.standard.set(true, forKey: key)
+
+        let enabled: [HomeRowType] = [
+            .lastPlayed, .channels, .newest3Min, .lastAdded3Min,
+            .performersHighestSceneCount, .topRating3Min, .studiosHighestSceneCount, .random
+        ]
+        let disabled: [HomeRowType] = [
+            .mostViewed3Min, .topCounter3Min, .newPerformers, .performersHighestRating,
+            .performersHighestOCount, .newStudios, .newGalleries, .recentlyUpdatedGalleries,
+            .galleriesHighestImageCount, .statistics
+        ]
+        var rows: [HomeRowConfig] = []
+        for (type, isEnabled) in enabled.map({ ($0, true) }) + disabled.map({ ($0, false) }) {
+            let existingId = homeRows.first(where: { $0.type == type })?.id ?? UUID()
+            rows.append(HomeRowConfig(id: existingId, title: type.defaultTitle, isEnabled: isEnabled,
+                                      sortOrder: rows.count, type: type))
+        }
+        homeRows = rows
+        saveHomeRows()
+    }
+    #endif
     
     func saveHomeRows() {
         if let encoded = try? JSONEncoder().encode(homeRows) {
@@ -1464,12 +1521,10 @@ class TabManager: ObservableObject {
                 ToolsItemConfig(id: .oCount, isEnabled: true, sortOrder: 3),
                 ToolsItemConfig(id: .timeline, isEnabled: true, sortOrder: 4),
                 ToolsItemConfig(id: .topLists, isEnabled: true, sortOrder: 5),
-                ToolsItemConfig(id: .filters, isEnabled: true, sortOrder: 6)
+                ToolsItemConfig(id: .filters, isEnabled: true, sortOrder: 6),
+                ToolsItemConfig(id: .hotOrNot, isEnabled: true, sortOrder: 7),
+                ToolsItemConfig(id: .rateMe, isEnabled: true, sortOrder: 8)
             ]
-            #if !os(tvOS)
-            self.tools.append(ToolsItemConfig(id: .hotOrNot, isEnabled: true, sortOrder: 7))
-            #endif
-            self.tools.append(ToolsItemConfig(id: .rateMe, isEnabled: true, sortOrder: 8))
             enforceFixedTools()
             saveTools()
         }
@@ -1511,10 +1566,7 @@ class TabManager: ObservableObject {
 
     /// Tools managed / gated under stashy+.
     static func isStashyPlusTool(_ item: ToolsItem) -> Bool {
-        #if !os(tvOS)
-        if item == .hotOrNot { return true }
-        #endif
-        return item == .downloads || item == .statistics || item == .oCount || item == .timeline || item == .topLists || item == .filters || item == .rateMe
+        item == .downloads || item == .statistics || item == .oCount || item == .timeline || item == .topLists || item == .filters || item == .hotOrNot || item == .rateMe
     }
     
     func toggleTool(_ item: ToolsItem) {
@@ -1886,5 +1938,58 @@ class TabManager: ObservableObject {
             tabs[index].isVisible.toggle()
             saveConfig()
         }
+    }
+}
+
+/// "Count as played" clock: seconds actually watched in this playback session.
+///
+/// Only time that elapsed while the video was playing *and* the playhead moved forward with it
+/// counts. Where playback starts (resume position, Feeds start, marker) is irrelevant, a seek
+/// or skip — a playhead jump the wall clock cannot account for — adds nothing, and neither do
+/// stalls (playhead not moving) or paused time. Feed it every playhead tick.
+struct PlayCountWatchClock {
+    /// Seconds watched so far.
+    private(set) var watchedSeconds: Double = 0
+    private var lastPlayhead: Double?
+    private var lastUptime: TimeInterval?
+
+    /// Highest playback rate a tick may account for (hold-to-speed-up, scrub boosts).
+    private static let maxRate: Double = 4
+    /// Tick jitter / decoder catch-up the playhead may run ahead of the wall clock.
+    private static let jitterTolerance: Double = 0.35
+    /// A gap longer than this between ticks (backgrounding, hitch) only counts this much.
+    private static let maxStep: Double = 1.5
+
+    /// Records one playhead sample. Not playing (or scrubbing) breaks the chain, so the next
+    /// sample starts a fresh interval instead of crediting the gap.
+    mutating func sample(playhead: Double, isPlaying: Bool,
+                         now: TimeInterval = ProcessInfo.processInfo.systemUptime) {
+        guard isPlaying, playhead.isFinite else {
+            lastPlayhead = nil
+            lastUptime = nil
+            return
+        }
+        defer {
+            lastPlayhead = playhead
+            lastUptime = now
+        }
+        guard let previousPlayhead = lastPlayhead, let previousUptime = lastUptime else { return }
+        let wallDelta = now - previousUptime
+        let mediaDelta = playhead - previousPlayhead
+        guard wallDelta > 0, mediaDelta > 0 else { return }
+        // A forward jump beyond what playback could cover in that time is a seek, not watching.
+        guard mediaDelta <= wallDelta * Self.maxRate + Self.jitterTolerance else { return }
+        // Wall time, so slow-motion and 2x both count what the user really spent watching.
+        watchedSeconds += min(wallDelta, Self.maxStep)
+    }
+
+    /// Ends the current interval (pause, seek, scrub) without resetting the total.
+    mutating func breakInterval() {
+        lastPlayhead = nil
+        lastUptime = nil
+    }
+
+    mutating func reset() {
+        self = PlayCountWatchClock()
     }
 }

@@ -64,9 +64,10 @@ class DetailFormattingTest {
             listOf(DetailItem("SCENES", "7"), DetailItem("STUDIO", "Studio"), DetailItem("DATE", "2020-01-01"), DetailItem("RATING", "60%")),
             DetailFormatting.group(group, 7, 0),
         )
-        val gallery = Gallery("1", imageCount = 12, performers = listOf(IdName("1", "A"), IdName("2", "B")), organized = true)
+        // Studio / performers are cards under the gallery header, not header rows.
+        val gallery = Gallery("1", imageCount = 12, studio = Studio("9", "S"), performers = listOf(Performer("1", "A"), Performer("2", "B")), organized = true)
         assertEquals(
-            listOf(DetailItem("IMAGES", "12"), DetailItem("PERFORMERS", "A, B"), DetailItem("ORGANIZED", "Yes")),
+            listOf(DetailItem("IMAGES", "12"), DetailItem("ORGANIZED", "Yes")),
             DetailFormatting.gallery(gallery, 5),
         )
     }
@@ -119,12 +120,7 @@ class DetailFormattingTest {
         assertEquals(DetailSort.Scene.DateDesc, DetailSort.Scene.from("dateDesc"))
         assertEquals("o_counter", DetailSort.Scene.OCounterDesc.field)
         assertEquals("Most Viewed", DetailSort.Scene.PlayCountDesc.label)
-        assertEquals("images_count", DetailSort.Gallery.ImageCountDesc.field)
-        assertEquals("scene_markers_count", DetailSort.Tag.MarkerCountAsc.field)
-        assertEquals("ASC", DetailSort.Tag.MarkerCountAsc.direction)
-        val f = DetailSort.findFilter(2, 40, DetailSort.Image.Random)
-        assertTrue(f.sort!!.startsWith("random_"))
-        assertEquals("DESC", f.direction)
+        assertEquals(DetailSort.Image.DateDesc, DetailSort.Image.from("dateDesc"))
         assertEquals("DetailViewsSortConfig_performer_detail_ABC", DetailViewConfig.key(DetailViewContext.Performer, "ABC"))
         assertEquals("Images Sort", DetailViewContext.Gallery.settingsRowTitle)
     }

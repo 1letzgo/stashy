@@ -45,6 +45,12 @@ object PlayerSettings {
     val subtitleFontSize: Float get() = when (Prefs.string("subtitle_font_size")) {
         "small" -> 14f; "large" -> 22f; "extraLarge" -> 28f; else -> 18f
     }
+    /** iOS: `SubtitleFontFamily.font` (`subtitle_font_family`; Rounded has no Android system face → default). */
+    val subtitleFontFamily: androidx.compose.ui.text.font.FontFamily get() = when (Prefs.string("subtitle_font_family")) {
+        "serif" -> androidx.compose.ui.text.font.FontFamily.Serif
+        "monospaced" -> androidx.compose.ui.text.font.FontFamily.Monospace
+        else -> androidx.compose.ui.text.font.FontFamily.Default
+    }
     /** iOS: `SubtitleTextColorChoice.color`. */
     val subtitleTextColor: Color get() = when (Prefs.string("subtitle_text_color")) {
         "yellow" -> Color(1f, 0.87f, 0.25f); "cyan" -> Color(0.45f, 0.9f, 1f)
@@ -77,17 +83,31 @@ object PlayerSettings {
 
 /**
  * iOS: `ScenePlayerMute` — start-up mute state for every player embed. Without headphones
- * playback always starts muted; with headphones the stored choice (`stashy_scene_player_muted`)
- * applies. [persist] only from an explicit user action (the mute button).
+ * playback starts muted (unless Settings › Playback › "Start muted without headphones" is off);
+ * otherwise the stored choice (`stashy_scene_player_muted`, default unmuted) applies.
+ * [persist] only from an explicit user action (the mute button).
  */
 object PlayerMute {
-    private const val KEY = "stashy_scene_player_muted"
+    const val KEY = "stashy_scene_player_muted"
+    /** Settings › Playback › Player › "Start muted without headphones" (default on). */
+    const val MUTE_WITHOUT_HEADPHONES_KEY = "playbackMuteWithoutHeadphones"
 
-    fun initialValue(context: Context): Boolean {
-        if (!isHeadphonesConnected(context)) return true
-        if (!Prefs.has(KEY)) return false
-        return Prefs.bool(KEY)
+    val muteWithoutHeadphones: Boolean get() = Prefs.bool(MUTE_WITHOUT_HEADPHONES_KEY, true)
+
+    /** The stored manual choice, or null when the user never toggled mute. */
+    val storedMuted: Boolean? get() = if (Prefs.has(KEY)) Prefs.bool(KEY) else null
+
+    /**
+     * Pure start-up decision: without headphones (and the setting on) always muted, otherwise
+     * the user's stored choice, defaulting to sound on.
+     */
+    fun decide(headphonesConnected: Boolean, muteWithoutHeadphones: Boolean, storedMuted: Boolean?): Boolean {
+        if (!headphonesConnected && muteWithoutHeadphones) return true
+        return storedMuted ?: false
     }
+
+    fun initialValue(context: Context): Boolean =
+        decide(isHeadphonesConnected(context), muteWithoutHeadphones, storedMuted)
 
     fun persist(muted: Boolean) = Prefs.setBool(KEY, muted)
 

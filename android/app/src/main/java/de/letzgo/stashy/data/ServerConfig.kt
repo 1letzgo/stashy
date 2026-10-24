@@ -133,6 +133,7 @@ object ServerConfigManager {
 
     fun activate(config: ServerConfig?) {
         activeConfig = config
+        AuthEvents.reset()
         Prefs.commitString(ACTIVE_KEY, config?.let { Json.encodeToString(ServerConfig.serializer(), it) })
         Net.resetConnections()
     }
@@ -142,6 +143,8 @@ object ServerConfigManager {
         persistList(allowEmpty = true)
         Secrets.set("apikey_${config.id}", null)
         Secrets.set("headers_${config.id}", null)
+        // iOS `deleteServer` → `ImageCache.shared.clearCache(forServerID:)`.
+        ServerImageCache.clearServerAsync(Prefs.appContext, config.id)
         if (activeConfig?.id == config.id) activate(savedServers.firstOrNull())
     }
 

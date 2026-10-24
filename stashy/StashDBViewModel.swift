@@ -164,7 +164,7 @@ class StashDBViewModel: ObservableObject {
     }
 
     /// Formats a "random_<seed>" sort field for the given kind.
-    private func randomSort(_ kind: RandomSeedKind) -> String {
+    func randomSort(_ kind: RandomSeedKind) -> String {
         "random_\(seed(for: kind))"
     }
 
@@ -351,6 +351,7 @@ class StashDBViewModel: ObservableObject {
     private var imageRatingUpdatedObserver: NSObjectProtocol?
     private var imageOCounterUpdatedObserver: NSObjectProtocol?
     private var imageTagsUpdatedObserver: NSObjectProtocol?
+    private var imagePerformersUpdatedObserver: NSObjectProtocol?
     private var sceneTagsUpdatedObserver: NSObjectProtocol?
     private var markerTagsUpdatedObserver: NSObjectProtocol?
     private var bulkTagsAppliedObserver: NSObjectProtocol?
@@ -483,6 +484,19 @@ class StashDBViewModel: ObservableObject {
             }
         }
 
+        imagePerformersUpdatedObserver = NotificationCenter.default.addObserver(
+            forName: StashImage.performersUpdatedNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] notification in
+            guard let imageId = notification.userInfo?["imageId"] as? String,
+                  let performers = notification.userInfo?["performers"] as? [GalleryPerformer] else { return }
+            let viewModel = self
+            Task { @MainActor in
+                viewModel?.patchImagePerformersInLists(imageId: imageId, performers: performers)
+            }
+        }
+
         imageTagsUpdatedObserver = NotificationCenter.default.addObserver(
             forName: NSNotification.Name("ImageTagsUpdated"),
             object: nil,
@@ -549,6 +563,9 @@ class StashDBViewModel: ObservableObject {
         }
         if let imageTagsUpdatedObserver {
             NotificationCenter.default.removeObserver(imageTagsUpdatedObserver)
+        }
+        if let imagePerformersUpdatedObserver {
+            NotificationCenter.default.removeObserver(imagePerformersUpdatedObserver)
         }
         if let sceneTagsUpdatedObserver {
             NotificationCenter.default.removeObserver(sceneTagsUpdatedObserver)
@@ -2122,6 +2139,19 @@ class StashDBViewModel: ObservableObject {
         patch(&clips)
         patch(&allImages)
         patch(&detailImages)
+    }
+
+    /// Keeps every image list in sync after the performer editor saved an image.
+    func patchImagePerformersInLists(imageId: String, performers: [GalleryPerformer]) {
+        func patch(_ list: inout [StashImage]) {
+            guard let index = list.firstIndex(where: { $0.id == imageId }),
+                  list[index].performers != performers else { return }
+            list[index].performers = performers
+        }
+        patch(&clips)
+        patch(&allImages)
+        patch(&detailImages)
+        patch(&galleryImages)
     }
 
     func patchSceneOCounterInLists(sceneId: String, oCounter: Int) {
@@ -4457,7 +4487,7 @@ class StashDBViewModel: ObservableObject {
     // MARK: - Detail Content Fetching
     
     /// Merges optional saved filter with `scope` (parent-entity constraint wins on key collision), then applies `live`.
-    private func mergeDetailScopeWithSavedAndLiveFilters(scope: [String: Any], saved: SavedFilter?, live: [String: Any]?) -> [String: Any] {
+    func mergeDetailScopeWithSavedAndLiveFilters(scope: [String: Any], saved: SavedFilter?, live: [String: Any]?) -> [String: Any] {
         var merged: [String: Any] = [:]
         if let saved {
             if let dict = saved.filterDict {
@@ -8352,6 +8382,44 @@ struct GenerateData: Codable {
         }
     }
 
+    /// Sends only `id` + `performer_ids`; every other image field stays untouched.
+    func updateImagePerformers(imageId: String, performerIds: [String], completion: @escaping (Bool) -> Void) {
+        let mutation = GraphQLQueries.imageUpdatePerformersMutation
+        let variables: [String: Any] = ["input": ["id": imageId, "performer_ids": performerIds]]
+        guard let bodyData = try? JSONSerialization.data(withJSONObject: ["query": mutation, "variables": variables]),
+              let bodyString = String(data: bodyData, encoding: .utf8) else {
+            completion(false); return
+        }
+        performGraphQLQuery(query: bodyString) { (response: ImageUpdateResponse?) in
+            completion(response?.data?.imageUpdate != nil)
+        }
+    }
+
+    func updateGalleryPerformers(galleryId: String, performerIds: [String], completion: @escaping (Bool) -> Void) {
+        let mutation = GraphQLQueries.galleryUpdatePerformersMutation
+        let variables: [String: Any] = ["input": ["id": galleryId, "performer_ids": performerIds]]
+        guard let bodyData = try? JSONSerialization.data(withJSONObject: ["query": mutation, "variables": variables]),
+              let bodyString = String(data: bodyData, encoding: .utf8) else {
+            completion(false); return
+        }
+        performGraphQLQuery(query: bodyString) { (response: GalleryUpdateResponse?) in
+            completion(response?.data?.galleryUpdate != nil)
+        }
+    }
+
+    func updateGalleryStudio(galleryId: String, studioId: String?, completion: @escaping (Bool) -> Void) {
+        let mutation = GraphQLQueries.galleryUpdateStudioMutation
+        let input: [String: Any] = ["id": galleryId, "studio_id": studioId ?? NSNull()]
+        let variables: [String: Any] = ["input": input]
+        guard let bodyData = try? JSONSerialization.data(withJSONObject: ["query": mutation, "variables": variables]),
+              let bodyString = String(data: bodyData, encoding: .utf8) else {
+            completion(false); return
+        }
+        performGraphQLQuery(query: bodyString) { (response: GalleryUpdateResponse?) in
+            completion(response?.data?.galleryUpdate != nil)
+        }
+    }
+
     /// Updates gallery metadata shown on the opened-gallery screen (edit mode).
     func updateGalleryDetails(
         galleryId: String,
@@ -8985,12 +9053,7 @@ struct Scene: Codable, Identifiable, Equatable {
     let updatedAt: String?
     let paths: ScenePaths?
     let sceneMarkers: [SceneMarker]?
-    #if !os(tvOS)
     let interactive: Bool?
-    #else
-    /// tvOS has no device sync: the field is never requested or decoded there.
-    var interactive: Bool? { nil }
-    #endif
     let stashIds: [StashID]?
     let captions: [VideoCaption]?
     let customFields: [String: StashJSONValue]?
@@ -9056,10 +9119,7 @@ struct Scene: Codable, Identifiable, Equatable {
     
     
     enum CodingKeys: String, CodingKey {
-        case id, title, details, director, date, duration, studio, performers, files, tags, galleries, groups, organized, rating100, paths, captions
-        #if !os(tvOS)
-        case interactive
-        #endif
+        case id, title, details, director, date, duration, studio, performers, files, tags, galleries, groups, organized, rating100, paths, interactive, captions
         case resumeTime = "resume_time"
         case playCount = "play_count"
         case playDuration = "play_duration"
@@ -9097,9 +9157,7 @@ struct Scene: Codable, Identifiable, Equatable {
         self.updatedAt = updatedAt
         self.paths = paths
         self.sceneMarkers = sceneMarkers
-        #if !os(tvOS)
         self.interactive = interactive
-        #endif
         self.stashIds = stashIds
         self.captions = captions
         self.customFields = customFields
@@ -9131,9 +9189,7 @@ struct Scene: Codable, Identifiable, Equatable {
         updatedAt = try container.decodeIfPresent(String.self, forKey: .updatedAt)
         paths = try container.decodeIfPresent(ScenePaths.self, forKey: .paths)
         sceneMarkers = try container.decodeIfPresent([SceneMarker].self, forKey: .sceneMarkers)
-        #if !os(tvOS)
         interactive = try container.decodeIfPresent(Bool.self, forKey: .interactive)
-        #endif
         stashIds = try container.decodeIfPresent([StashID].self, forKey: .stashIds)
         captions = try container.decodeIfPresent([VideoCaption].self, forKey: .captions)
         customFields = try container.decodeIfPresent([String: StashJSONValue].self, forKey: .customFields)
@@ -9169,12 +9225,10 @@ struct Scene: Codable, Identifiable, Equatable {
         return false
     }
 
-    #if !os(tvOS)
     // Computed property to determine if scene is truly interactive (has funscript)
     var hasInteractive: Bool {
         return paths?.funscript != nil
     }
-    #endif
 
     // Total duration from files if not at top level
     var sceneDuration: Double? {
@@ -9235,7 +9289,6 @@ struct Scene: Codable, Identifiable, Equatable {
         return signed(URL(string: manualPath))
     }
 
-    #if !os(tvOS)
     var heatmapURL: URL? {
         guard let path = paths?.interactive_heatmap, let url = URL(string: path) else { return nil }
         guard let config = ServerConfigManager.shared.activeConfig, let key = config.secureApiKey, !key.isEmpty else { return url }
@@ -9260,7 +9313,6 @@ struct Scene: Codable, Identifiable, Equatable {
         comps?.queryItems = items
         return comps?.url ?? url
     }
-    #endif
 
     /// Download source: always the signed original file (`paths.stream`).
     /// No MP4-transcode preference and no "incompatible format" bail-out — the local player
@@ -9325,6 +9377,19 @@ struct Scene: Codable, Identifiable, Equatable {
             studio: studio, performers: performers, files: files, tags: tags,
             galleries: galleries, groups: groups, organized: organized,
             resumeTime: newResumeTime, playCount: playCount, oCounter: oCounter,
+            rating100: rating100, createdAt: createdAt, updatedAt: updatedAt,
+            paths: paths, sceneMarkers: sceneMarkers, interactive: interactive, stashIds: stashIds, captions: captions, customFields: customFields,
+            playDuration: playDuration, lastPlayedAt: lastPlayedAt
+        )
+    }
+
+    /// Creates a copy with a new performer list
+    func withPerformers(_ newPerformers: [ScenePerformer]) -> Scene {
+        return Scene(
+            id: id, title: title, details: details, director: director, date: date, duration: duration,
+            studio: studio, performers: newPerformers, files: files, tags: tags,
+            galleries: galleries, groups: groups, organized: organized,
+            resumeTime: resumeTime, playCount: playCount, oCounter: oCounter,
             rating100: rating100, createdAt: createdAt, updatedAt: updatedAt,
             paths: paths, sceneMarkers: sceneMarkers, interactive: interactive, stashIds: stashIds, captions: captions, customFields: customFields,
             playDuration: playDuration, lastPlayedAt: lastPlayedAt
@@ -9540,31 +9605,10 @@ struct ScenePaths: Codable, Equatable {
     let webp: String?
     let vtt: String?
     let sprite: String?
-    #if !os(tvOS)
     let funscript: String?
     let interactive_heatmap: String?
-    #endif
     let caption: String?
 }
-
-#if os(tvOS)
-extension ScenePaths {
-    /// tvOS has no device sync: script and heatmap paths are never requested there.
-    /// Same labels as the iOS memberwise init so shared call sites compile unchanged.
-    init(screenshot: String?, preview: String?, stream: String?, webp: String?, vtt: String?, sprite: String?, funscript: String?, interactive_heatmap: String?, caption: String?) {
-        self.init(screenshot: screenshot, preview: preview, stream: stream, webp: webp, vtt: vtt, sprite: sprite, caption: caption)
-    }
-}
-#endif
-
-#if os(tvOS)
-extension MarkerScene {
-    /// Same labels as the iOS memberwise init; `interactive` does not exist on tvOS.
-    init(id: String, title: String?, date: String?, files: [SceneFile]?, performers: [ScenePerformer]?, rating100: Int?, playCount: Int?, oCounter: Int?, interactive: Bool?, paths: ScenePaths?) {
-        self.init(id: id, title: title, date: date, files: files, performers: performers, rating100: rating100, playCount: playCount, oCounter: oCounter, paths: paths)
-    }
-}
-#endif
 
 struct MarkerScene: Codable, Identifiable, Equatable {
     let id: String
@@ -9575,18 +9619,11 @@ struct MarkerScene: Codable, Identifiable, Equatable {
     let rating100: Int?
     let playCount: Int?
     let oCounter: Int?
-    #if !os(tvOS)
     let interactive: Bool?
-    #else
-    var interactive: Bool? { nil }
-    #endif
     let paths: ScenePaths?
 
     enum CodingKeys: String, CodingKey {
-        case id, title, date, files, performers, rating100, paths
-        #if !os(tvOS)
-        case interactive
-        #endif
+        case id, title, date, files, performers, rating100, interactive, paths
         case playCount = "play_count"
         case oCounter = "o_counter"
     }
@@ -9629,12 +9666,10 @@ struct MarkerScene: Codable, Identifiable, Equatable {
         )
     }
 
-    #if !os(tvOS)
     // Computed property to determine if scene is truly interactive (has funscript)
     var hasInteractive: Bool {
         return paths?.funscript != nil
     }
-    #endif
 
     var thumbnailURL: URL? {
         // 0. Check local first — but only for downloaded scenes. A `fileExists`
@@ -9815,7 +9850,7 @@ struct ScenePerformer: Codable, Identifiable, Equatable {
     }
 
     func toGalleryPerformer() -> GalleryPerformer {
-        GalleryPerformer(id: id, name: name, image_path: nil)
+        GalleryPerformer(id: id, name: name, image_path: nil, birthdate: birthdate, updated_at: updatedAt)
     }
 }
 
@@ -10364,7 +10399,7 @@ struct Gallery: Codable, Identifiable, Equatable {
     let organized: Bool?
     let createdAt: String?
     let updatedAt: String?
-    let studio: GalleryStudio?
+    var studio: GalleryStudio?
     var performers: [GalleryPerformer]?
     let cover: GalleryCover?
 
@@ -10414,12 +10449,27 @@ struct Gallery: Codable, Identifiable, Equatable {
 struct GalleryStudio: Codable, Equatable {
     let id: String
     let name: String
+    var image_path: String? = nil
+    var updated_at: String? = nil
+
+    /// Same shape the scene detail Studio card consumes.
+    func toSceneStudio() -> SceneStudio {
+        SceneStudio(id: id, name: name, updatedAt: updated_at, imagePath: image_path)
+    }
 }
 
 struct GalleryPerformer: Codable, Identifiable, Equatable, Hashable {
     let id: String
     let name: String
     var image_path: String?
+    var birthdate: String? = nil
+    var updated_at: String? = nil
+
+    /// Same shape the scene detail Performers card consumes.
+    func toScenePerformer() -> ScenePerformer {
+        ScenePerformer(id: id, name: name, birthdate: birthdate, sceneCount: 0, galleryCount: 0,
+                       oCounter: 0, updatedAt: updated_at)
+    }
 
     func toPerformer() -> Performer {
         Performer(id: id, name: name, disambiguation: nil, birthdate: nil, country: nil,
@@ -10442,10 +10492,6 @@ struct GalleryPerformer: Codable, Identifiable, Equatable, Hashable {
         // Fallback when GraphQL omitted image_path (same endpoint as ScenePerformer).
         guard let config = ServerConfigManager.shared.loadConfig() else { return nil }
         return signedURL(URL(string: "\(config.baseURL)/performer/\(id)/image"))
-    }
-
-    func toScenePerformer() -> ScenePerformer {
-        ScenePerformer(id: id, name: name, birthdate: nil, sceneCount: 0, galleryCount: 0, oCounter: 0, updatedAt: nil)
     }
 }
 
@@ -10489,6 +10535,20 @@ struct GalleryImagesData: Codable {
 struct FindImagesResult: Codable {
     let count: Int
     let images: [StashImage]
+}
+
+extension StashImage {
+    /// Posted after the performer editor saved an image; every `StashDBViewModel` patches
+    /// its image lists (`patchImagePerformersInLists`).
+    static let performersUpdatedNotification = Notification.Name("ImagePerformersUpdated")
+
+    static func postPerformersUpdated(imageId: String, performers: [GalleryPerformer]) {
+        NotificationCenter.default.post(
+            name: performersUpdatedNotification,
+            object: nil,
+            userInfo: ["imageId": imageId, "performers": performers]
+        )
+    }
 }
 
 struct StashImage: Codable, Identifiable, Equatable {

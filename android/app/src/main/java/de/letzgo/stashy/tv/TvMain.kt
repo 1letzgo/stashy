@@ -135,13 +135,35 @@ fun TvApp() {
     Box(Modifier.fillMaxSize().background(TvColors.background).onFocusChanged { TvNav.appHasFocus = it.hasFocus }) {
         TvNav.shellShown = !TvSecurity.isAppLocked && config?.hasValidConfig == true
         when {
-            de.letzgo.stashy.data.BetaExpiry.expired -> de.letzgo.stashy.ui.BetaExpiredScreen()
             TvSecurity.isAppLocked -> TvPasscodeEntry()
             config?.hasValidConfig != true -> TvServerSetup()
             else -> TvMainShell()
         }
     }
+    if (!TvSecurity.isAppLocked && config?.hasValidConfig == true) TvAuthAlert()
     de.letzgo.stashy.ui.AppUpdateDialog()
+}
+
+/**
+ * iOS `MainTabView` "Authentication Required" alert on a 401 (`AuthEvents`, shown once per
+ * server until its key changes). "Update API Key" opens the active server's form in Settings.
+ */
+@Composable
+private fun TvAuthAlert() {
+    val active = ServerConfigManager.activeConfig ?: return
+    if (de.letzgo.stashy.data.AuthEvents.pendingServerId != active.id) return
+    TvOptionDialog(
+        "Authentication Required\nYour API key is invalid or expired. Please check your server configuration.",
+        listOf(TvOption(true, "Update API Key")), null,
+        onSelect = {
+            de.letzgo.stashy.data.AuthEvents.consume()
+            TvNav.dismissFullScreen()
+            if (TvNav.selected != TvRootTab.Settings) TvNav.select(TvRootTab.Settings)
+            while (TvNav.pop()) Unit
+            TvNav.push(TvServerFormRoute(active))
+        },
+        onDismiss = { de.letzgo.stashy.data.AuthEvents.consume() },
+    )
 }
 
 /**

@@ -567,7 +567,7 @@ object Downloads {
             fetchThenEnqueue(id, onEmpty = "Gallery has no images", isError = true, fetch = { DownloadsFetch.galleryImages(id, limit) }) { images, total ->
                 PendingImageDownload(
                     entryId = id, title = title, entryTitle = gallery.title, mode = PendingImageDownload.MODE_NEW,
-                    images = images, studioName = gallery.studio?.name, performerNames = gallery.performers.orEmpty().mapNotNull { it.name },
+                    images = images, studioName = gallery.studio?.name, performerNames = gallery.performers.orEmpty().map { it.name },
                     serverImageCount = total, sourceKind = DownloadedGallery.Kind.Gallery.raw,
                 )
             }

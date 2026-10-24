@@ -1,6 +1,7 @@
 package de.letzgo.stashy.ui.scene
 
 import android.graphics.Bitmap
+import android.os.SystemClock
 import android.util.Base64
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableDoubleStateOf
@@ -13,6 +14,8 @@ import de.letzgo.stashy.data.Prefs
 import de.letzgo.stashy.data.Scene
 import de.letzgo.stashy.data.SceneEditing
 import de.letzgo.stashy.data.SceneEvent
+import de.letzgo.stashy.data.ImageRefresh
+import de.letzgo.stashy.data.PerformerEvent
 import de.letzgo.stashy.data.SceneEvents
 import de.letzgo.stashy.data.SceneStamps
 import de.letzgo.stashy.data.ScenesRepository
@@ -20,6 +23,7 @@ import de.letzgo.stashy.data.ServerConfigManager
 import de.letzgo.stashy.data.VideoCaption
 import de.letzgo.stashy.ui.player.MiniPlayerRules
 import de.letzgo.stashy.ui.player.MiniPlayerStore
+import de.letzgo.stashy.ui.player.PlayCountCredit
 import de.letzgo.stashy.ui.player.PlaybackActivityTracker
 import de.letzgo.stashy.ui.player.PlayerIcons
 import de.letzgo.stashy.ui.player.PlayerMute
@@ -117,6 +121,8 @@ class SceneDetailModel(initial: Scene, private val autoPlay: Boolean) {
     var showDeleteConfirmation by mutableStateOf(false)
     var showAddMarker by mutableStateOf(false)
     var capturedMarkerTime by mutableDoubleStateOf(0.0)
+    /** The frame on screen when "Add Marker" opened (iOS `frameDataURL`): shown until Stash generated the still. */
+    var capturedMarkerFrame: android.graphics.Bitmap? = null
     var showReplaceCoverConfirm by mutableStateOf(false)
     var tagImageDataURL by mutableStateOf<String?>(null)
     var isCapturing by mutableStateOf(false); private set
@@ -124,7 +130,8 @@ class SceneDetailModel(initial: Scene, private val autoPlay: Boolean) {
     var isDeleting by mutableStateOf(false); private set
     var isIdentifying by mutableStateOf(false); private set
 
-    private var hasAddedPlay = false
+    /** Count-as-played: real watch time of this page, not the playhead (a resume is not watching). */
+    private val playCredit = PlayCountCredit(0.0)
     private var didAnnounceTranscodeFallback = false
     private var resumeOnReturn: Pair<Boolean, Double>? = null
     private var hasAppeared = false
@@ -198,7 +205,7 @@ class SceneDetailModel(initial: Scene, private val autoPlay: Boolean) {
         if (handOff && p != null) {
             // Live captions belong to the page; the bar only plays.
             aiSubtitles.stopLiveCaptionsIfNeeded()
-            MiniPlayerStore.adopt(scene, p, hasAddedPlay, ServerConfigManager.activeConfig?.id)
+            MiniPlayerStore.adopt(scene, p, playCredit.watchedSeconds, playCredit.isCredited, ServerConfigManager.activeConfig?.id)
         } else {
             p?.pause()
             p?.release()
@@ -223,6 +230,11 @@ class SceneDetailModel(initial: Scene, private val autoPlay: Boolean) {
             player?.nowPlaying = SceneNowPlaying.of(next)
             refreshScrubSprites()
         }
+    }
+
+    /** iOS `PerformerImageUpdated` on the scene page: the performer row shows the new image. */
+    fun applyPerformerEvent(event: PerformerEvent) {
+        event.applyTo(scene)?.let { scene = it }
     }
 
     private fun refreshScrubSprites() {
@@ -253,12 +265,14 @@ class SceneDetailModel(initial: Scene, private val autoPlay: Boolean) {
             registerCaptions(p)
         } else if (resumeTarget != null) {
             existing.seek(resumeTarget)
+            playCredit.noteSeek()
         }
         isPlaybackStarted = true
         player?.play()
         configureTracker()
         tracker.start()
-        if (!hasAddedPlay && playCountThreshold <= 0) registerPlay()
+        playCredit.thresholdSeconds = playCountThreshold
+        if (playCredit.onStart()) registerPlay()
     }
 
     /**
@@ -270,7 +284,8 @@ class SceneDetailModel(initial: Scene, private val autoPlay: Boolean) {
             MiniPlayerRules.StartDecision.TakeBack -> {
                 val handed = MiniPlayerStore.take(scene.id) ?: return false
                 val p = handed.player
-                if (handed.playRegistered) hasAddedPlay = true
+                // Same viewing: the watched seconds carry on, a credited play is not counted twice.
+                playCredit.restore(handed.watchedSeconds, handed.playRegistered)
                 wirePlayerCallbacks(p)
                 player = p
                 // The page's mute button follows the player.
@@ -296,7 +311,7 @@ class SceneDetailModel(initial: Scene, private val autoPlay: Boolean) {
                 tracker.setPosition(seconds, if (duration > 0) duration else scene.sceneDuration ?: 0.0)
                 if (p.isPlaying) { configureTracker(); tracker.start() }
             }
-            if (!hasAddedPlay && seconds >= playCountThreshold) registerPlay()
+            creditIfDue(seconds, p.isPlaying && !isScrubbing)
         }
         p.onPlayingChanged = { playing -> handlePlayingChange(p, playing) }
         p.onTranscodeFallback = {
@@ -309,6 +324,11 @@ class SceneDetailModel(initial: Scene, private val autoPlay: Boolean) {
 
     /** Settings › Playback › "Count as played — Player". */
     private val playCountThreshold: Double get() = maxOf(0.0, PlayerSettings.playCountPlayerSeconds)
+
+    private fun creditIfDue(position: Double, playing: Boolean) {
+        playCredit.thresholdSeconds = playCountThreshold
+        if (playCredit.onTime(position, playing, SystemClock.elapsedRealtime() / 1000.0)) registerPlay()
+    }
 
     /** iOS: `registerAetherCaptions` — server captions as selectable external tracks. */
     private fun registerCaptions(p: StashPlayer) {
@@ -333,6 +353,7 @@ class SceneDetailModel(initial: Scene, private val autoPlay: Boolean) {
         val p = player ?: return
         p.seek(seconds)
         tracker.noteSeek(seconds)
+        playCredit.noteSeek()
         if (!isScrubbing) p.play()
     }
 
@@ -341,6 +362,7 @@ class SceneDetailModel(initial: Scene, private val autoPlay: Boolean) {
         val p = player ?: return
         p.seek(seconds)
         tracker.noteSeek(seconds)
+        playCredit.noteSeek()
         p.play()
     }
 
@@ -362,7 +384,6 @@ class SceneDetailModel(initial: Scene, private val autoPlay: Boolean) {
         tracker.setPosition(p.currentTime, if (p.duration > 0) p.duration else scene.sceneDuration ?: 0.0)
         configureTracker()
         tracker.start()
-        if (!hasAddedPlay && p.currentTime >= playCountThreshold) registerPlay()
     }
 
     private fun persistPlaybackActivity(stopTracking: Boolean) {
@@ -390,7 +411,6 @@ class SceneDetailModel(initial: Scene, private val autoPlay: Boolean) {
 
     /** iOS: `registerScenePlay` — `sceneAddPlay` once per page. */
     private fun registerPlay() {
-        hasAddedPlay = true
         if (!de.letzgo.stashy.data.TabManager.tracksActivity(scene.id)) return
         val id = scene.id
         scope.launch {
@@ -402,6 +422,8 @@ class SceneDetailModel(initial: Scene, private val autoPlay: Boolean) {
 
     fun beginAddMarker() {
         capturedMarkerTime = player?.currentTime ?: 0.0
+        // Thumbnail size is plenty for the marker strip and cards.
+        capturedMarkerFrame = runCatching { player?.captureFrame(640) }.getOrNull()
         showAddMarker = true
     }
 
@@ -474,9 +496,9 @@ class SceneDetailModel(initial: Scene, private val autoPlay: Boolean) {
             val ok = runCatching { SceneEditing.setCoverImage(current.id, dataURL) }.isSuccess
             isCapturing = false
             if (ok) {
-                val bust = System.currentTimeMillis().toString()
+                // Drops the cached cover everywhere, then patches every list (iOS `SceneCoverUpdated`).
+                val bust = ImageRefresh.sceneCoverChanged(current.id, listOf(current.thumbnailURL))
                 scene = scene.copy(updatedAt = bust)
-                SceneEvents.post(SceneEvent.CoverUpdated(current.id, bust))
                 SceneToast.show("Scene cover updated", PlayerIcons.photo, SceneToast.Style.Success)
             } else SceneToast.show("Failed to update scene cover", PlayerIcons.close, SceneToast.Style.Error)
         }
@@ -507,9 +529,8 @@ class SceneDetailModel(initial: Scene, private val autoPlay: Boolean) {
                 scene.resumeTime?.takeIf { it > 0 }?.let { next = next.copy(resumeTime = it) }
                 if (ok) {
                     // Identify usually replaces the cover: bust like "Set as cover".
-                    val bust = System.currentTimeMillis().toString()
+                    val bust = ImageRefresh.sceneCoverChanged(next.id, listOf(scene.thumbnailURL))
                     next = next.copy(updatedAt = bust)
-                    SceneEvents.post(SceneEvent.CoverUpdated(next.id, bust))
                 }
                 scene = next
                 SceneEvents.post(SceneEvent.Updated(next))

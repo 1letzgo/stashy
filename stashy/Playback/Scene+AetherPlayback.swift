@@ -113,3 +113,98 @@ extension Scene {
     }
 }
 #endif
+
+// MARK: - Feeds playback window (shared by the iOS Feeds tab and tvOS Feeds)
+
+/// Settings › Playback › "Feeds start position": where a Feeds › Scenes row starts (and loops
+/// back to), so the feed does not open on studio intros. Worked out once per scene and feed
+/// session and then kept, so a Random start stays put while the row stays and for its loop,
+/// and an engine rebuild by the watchdog lands on the same spot.
+@MainActor
+enum ReelsSceneStartPositions {
+    private static var cache: [String: Double] = [:]
+
+    /// Videos shorter than this always start at 0.
+    private static let minimumDuration: Double = 120
+    /// A start this close to the end starts at 0 instead.
+    private static let endMargin: Double = 5
+    private static let skipSeconds: Double = 30
+
+    static func reset() { cache.removeAll() }
+
+    static func start(for scene: Scene) -> Double {
+        let setting = TabManager.shared.feedsSceneStartPosition
+        let key = "\(setting.rawValue)|\(scene.id)"
+        if let cached = cache[key] { return cached }
+        let value = compute(for: scene, setting: setting)
+        cache[key] = value
+        return value
+    }
+
+    private static func compute(for scene: Scene, setting: TabManager.FeedsSceneStartPosition) -> Double {
+        guard let duration = scene.sceneDuration, duration.isFinite, duration >= minimumDuration else { return 0 }
+        // Square and vertical videos are mostly short-form content that starts right away.
+        if let file = scene.files?.first, let width = file.width, let height = file.height,
+           width > 0, height > 0, width <= height {
+            return 0
+        }
+        let start: Double
+        switch setting {
+        case .beginning:
+            return 0
+        case .firstMarker:
+            let detailMarkers = scene.sceneMarkers?.map(\.seconds).filter { $0.isFinite && $0 >= 0 }.min()
+            start = [scene.earliestMarkerSeconds, detailMarkers].compactMap { $0 }.min() ?? skipSeconds
+        case .skip30:
+            start = skipSeconds
+        case .random:
+            start = Double.random(in: 0..<(duration * 0.5))
+        }
+        guard start > 0, start < duration - endMargin else { return 0 }
+        return start
+    }
+}
+
+/// The stretch of a source file a Feeds row plays (marker rows: their part of the scene).
+/// The scrubber shows it as 0…`length`; the engine keeps working in file time.
+struct ReelPlaybackSegment: Equatable {
+    // Markers without an end in Stash play Settings › Playback › "Marker length" (30 s default).
+
+    let start: Double
+    let end: Double
+
+    var length: Double { max(0.1, end - start) }
+
+    /// Segment-relative time (the scrubber's) → file time, kept inside the segment.
+    func fileTime(forRelative relative: Double) -> Double {
+        min(max(start, start + relative), max(start, end - 0.1))
+    }
+
+    /// File time → segment-relative time for the scrubber.
+    func relativeTime(forFile time: Double) -> Double {
+        min(max(0, time - start), length)
+    }
+
+    /// A marker's stretch of its scene: `seconds` to `end_seconds` when Stash has an end for
+    /// it, otherwise Settings › Playback › "Marker length" from the marker on — clamped to the
+    /// file's length when that is known.
+    static func marker(_ m: SceneMarker) -> ReelPlaybackSegment {
+        let start = max(0, m.seconds)
+        var end: Double
+        if let explicitEnd = m.endSeconds, explicitEnd > start + 0.1 {
+            end = explicitEnd
+        } else {
+            end = start + TabManager.storedFeedsMarkerDefaultSeconds
+        }
+        if let fileDuration = m.scene?.files?.first?.duration, fileDuration > start + 0.5 {
+            end = min(end, fileDuration)
+        }
+        return ReelPlaybackSegment(start: start, end: end)
+    }
+
+    /// The same segment with its end pulled in to a file length learnt at runtime.
+    func clamped(toFileDuration duration: Double?) -> ReelPlaybackSegment {
+        guard let duration, duration.isFinite, duration > start + 0.5, duration < end else { return self }
+        return ReelPlaybackSegment(start: start, end: duration)
+    }
+}

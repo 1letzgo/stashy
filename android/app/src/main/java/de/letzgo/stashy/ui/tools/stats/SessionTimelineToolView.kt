@@ -32,6 +32,9 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.shadow
@@ -199,7 +202,9 @@ private fun TimelineFilterChipRow(enabled: Set<TimelineKind>, onChange: (Set<Tim
                     .let { if (selected) it.shadow(6.dp, shape, ambientColor = tint.copy(alpha = 0.35f), spotColor = tint.copy(alpha = 0.35f)) else it }
                     .clip(shape)
                     .background(if (selected) tint else p.secondaryBackground, shape)
-                    .clickable {
+                    // iOS: "<kind>, selected" + `.isSelected` trait.
+                    .semantics { this.selected = selected }
+                    .clickable(role = Role.Button) {
                         if (selected) {
                             if (enabled.size > 1) onChange(enabled - kind)
                         } else {
@@ -384,7 +389,7 @@ private fun TimelineVisitCard(visit: TimelineVisit, modifier: Modifier = Modifie
         }
         Row(Modifier.align(Alignment.BottomEnd), horizontalArrangement = Arrangement.spacedBy(2.dp), verticalAlignment = Alignment.CenterVertically) {
             when {
-                visit.isMarkerAction -> BadgeIcon(SF.bookmarkFill, tint)
+                visit.isMarkerAction -> BadgeIcon(SF.bookmarkFill, tint, "Marker created")
                 visit.isPlayback -> {
                     if (visit.oCount > 0) OCountBadge(visit.oCount)
                     BadgeIcon(SF.playFill, p.secondaryText)
@@ -396,8 +401,8 @@ private fun TimelineVisitCard(visit: TimelineVisit, modifier: Modifier = Modifie
 }
 
 @Composable
-private fun BadgeIcon(icon: androidx.compose.ui.graphics.vector.ImageVector, color: Color) {
-    Icon(icon, null, tint = color, modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp).size(13.dp))
+private fun BadgeIcon(icon: androidx.compose.ui.graphics.vector.ImageVector, color: Color, description: String? = null) {
+    Icon(icon, description, tint = color, modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp).size(13.dp))
 }
 
 @Composable

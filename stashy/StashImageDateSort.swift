@@ -232,14 +232,24 @@ enum StashImageSetGrouping {
     private static func galleryIDs(_ image: StashImage) -> Set<String> { Set((image.galleries ?? []).map(\.id)) }
     private static func performerIDs(_ image: StashImage) -> Set<String> { Set((image.performers ?? []).map(\.id)) }
     private static func studioID(_ image: StashImage) -> String { image.studio?.id ?? "" }
+    /// The image's own `date` (shoot day) as `yyyy-MM-dd`, or nil when unset / unreadable.
+    static func shootDay(_ image: StashImage) -> String? {
+        guard let raw = image.date?.trimmingCharacters(in: .whitespaces), raw.count >= 10 else { return nil }
+        let day = String(raw.prefix(10))
+        let parts = day.split(separator: "-")
+        guard parts.count == 3, parts[0].count == 4, parts.allSatisfy({ $0.allSatisfy(\.isNumber) }) else { return nil }
+        return day
+    }
 
     /// Whether `image` may join `post` (non-empty, API order):
     /// - at most `maxSetSize` images (`stashline_group_max_size`, default 30); a clip and a photo never share a set;
+    /// - both images carry a `date` and it differs → never (any mode, galleries included);
     /// - galleries first, against the post's last image: both have galleries → join when they
     ///   share one; exactly one has galleries → no join;
     /// - `.gallerySession`, both without galleries: performers equal to the post's first image
-    ///   and non-empty, or same non-empty studio with equal performers — and the `created_at` gap
-    ///   to the post's last image ≤ `gapMinutes`. Untagged loose images never join.
+    ///   and non-empty, or same non-empty studio with equal performers — and then the session:
+    ///   both have a `date` → same day joins, a different day never does; otherwise the
+    ///   `created_at` gap to the post's last image ≤ `gapMinutes`. Untagged loose images never join.
     static func canJoin(
         _ post: [StashImage],
         _ image: StashImage,
@@ -250,6 +260,10 @@ enum StashImageSetGrouping {
         guard mode != .off, let first = post.first, let last = post.last else { return false }
         guard post.count < maxSetSize else { return false }
         guard first.isVideo == image.isVideo else { return false }
+        // A different shoot day never shares a set — not even inside one gallery.
+        let lastDay = shootDay(last)
+        let day = shootDay(image)
+        if let lastDay, let day, lastDay != day { return false }
 
         let lastGalleries = galleryIDs(last)
         let galleries = galleryIDs(image)
@@ -263,6 +277,8 @@ enum StashImageSetGrouping {
         let sameStudio = !firstStudio.isEmpty && firstStudio == studioID(image)
         guard !performers.isEmpty || sameStudio else { return false }
 
+        // Session by shoot day when both carry one; else by import time.
+        if lastDay != nil, day != nil { return true }  // same day (a different one returned above)
         guard let t0 = timestamp(for: last), let t1 = timestamp(for: image) else { return false }
         return abs(t1 - t0) <= gapMinutes * 60
     }

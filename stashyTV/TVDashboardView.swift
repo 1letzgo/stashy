@@ -2,7 +2,8 @@
 //  TVDashboardView.swift
 //  stashyTV
 //
-//  Dashboard for tvOS — Netflix/Prime style rows
+//  Dashboard for tvOS — Netflix/Prime style rows. Which rows and in what order comes
+//  from `TabManager.homeRows` (Settings › Home Rows), the same store iOS uses.
 //
 
 import SwiftUI
@@ -11,18 +12,20 @@ struct TVDashboardView: View {
     @StateObject private var viewModel = StashDBViewModel()
     @ObservedObject private var configManager = ServerConfigManager.shared
     @ObservedObject private var appearanceManager = AppearanceManager.shared
+    @ObservedObject private var tabManager = TabManager.shared
 
-    @State private var recentlyPlayedScenes: [Scene] = []
-    @State private var recentlyReleasedScenes: [Scene] = []
-    @State private var recentlyAddedScenes: [Scene] = []
-    @State private var topRatedScenes: [Scene] = []
-    @State private var randomScenes: [Scene] = []
+    /// Row contents by type. Local state (not the view model's caches) so live updates
+    /// can patch them in place.
+    @State private var sceneRows: [HomeRowType: [Scene]] = [:]
+    @State private var performerRows: [HomeRowType: [Performer]] = [:]
+    @State private var studioRows: [HomeRowType: [Studio]] = [:]
+    @State private var galleryRows: [HomeRowType: [Gallery]] = [:]
+    /// Rows with a fetch in flight. Rows not yet fetched count as loading too
+    /// (`hasLoaded`), so the first frame shows the spinner, not the empty state.
+    @State private var loadingRows: Set<HomeRowType> = []
+    @State private var loadedRows: Set<HomeRowType> = []
 
-    @State private var isLoadingPlayed: Bool = true
-    @State private var isLoadingReleased: Bool = true
-    @State private var isLoadingAdded: Bool = true
-    @State private var isLoadingTopRated: Bool = true
-    @State private var isLoadingRandom: Bool = true
+    private static let rowLimit = 15
 
     @State private var channelPreviews: [String: [Scene]] = [:]
     @State private var isLoadingChannelPreviews = false
@@ -66,6 +69,10 @@ struct TVDashboardView: View {
             TVChannelPlayerView(channel: channel)
         }
         .onAppear { loadData(forceRefresh: true) }
+        // Settings › Home Rows: a newly enabled row needs its content.
+        .onChange(of: tabManager.homeRows) { _, _ in
+            loadMissingRows()
+        }
         // Nicht auf `ServerConfigChanged` laden: `handleServerChange` bricht alle GraphQL-Tasks ab —
         // ein sofortiges `loadData()` würde nur leer/cancelled enden. Stattdessen nach init neu laden.
         .onReceive(NotificationCenter.default.publisher(for: .stashServerInitializationFinished)) { _ in
@@ -81,6 +88,13 @@ struct TVDashboardView: View {
         .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("ServerConfigChanged"))) { _ in
             // Saved filters are server-scoped, so previews must not survive a switch.
             channelPreviews = [:]
+            // Rows belong to the old server as well.
+            sceneRows = [:]
+            performerRows = [:]
+            studioRows = [:]
+            galleryRows = [:]
+            loadingRows = []
+            loadedRows = []
             playingChannel = nil
             isLoadingChannelPreviews = false
         }
@@ -134,13 +148,14 @@ struct TVDashboardView: View {
 
     // MARK: - Live-Updates der Reihen
 
-    /// Wendet eine Änderung auf alle fünf Reihen an.
+    /// Wendet eine Änderung auf alle Szenen-Reihen an.
     private func mutateRows(_ transform: (inout [Scene]) -> Void) {
-        transform(&recentlyPlayedScenes)
-        transform(&recentlyReleasedScenes)
-        transform(&recentlyAddedScenes)
-        transform(&topRatedScenes)
-        transform(&randomScenes)
+        for key in Array(sceneRows.keys) {
+            guard var list = sceneRows[key] else { continue }
+            let before = list
+            transform(&list)
+            if list != before { sceneRows[key] = list }
+        }
     }
 
     /// Ersetzt eine Szene in allen Reihen, in denen sie vorkommt.
@@ -154,95 +169,63 @@ struct TVDashboardView: View {
     }
 
     private func refreshTopRated() {
-        guard hasValidConfig else { return }
-        let topRatedConfig = HomeRowConfig(
-            id: UUID(),
-            title: "Top Rated",
-            isEnabled: true,
-            sortOrder: 3,
-            type: .topRating3Min
-        )
-        viewModel.fetchScenesForHomeRow(config: topRatedConfig, limit: 15, forceRefresh: true) { scenes in
-            topRatedScenes = scenes
+        // „Top Rated" ist nach Bewertung sortiert — die Reihenfolge kann sich
+        // geändert haben, das lässt sich nicht in-place patchen.
+        refreshRowIfEnabled(.topRating3Min)
+    }
+
+    private func refreshContinueWatching() {
+        refreshRowIfEnabled(.lastPlayed)
+    }
+
+    private func refreshRowIfEnabled(_ type: HomeRowType) {
+        guard hasValidConfig, let row = enabledRows.first(where: { $0.type == type }) else { return }
+        fetchRow(row, forceRefresh: true)
+    }
+
+    // MARK: - Content Rows
+
+    /// Enabled rows in the user's order. Statistics has no TV form; Channels drops out
+    /// on its own without stashy+ (`channels` is empty then).
+    private var enabledRows: [HomeRowConfig] {
+        tabManager.homeRows.filter { $0.isEnabled && $0.type.isAvailableOnTV }
+    }
+
+    private var isAnyRowLoading: Bool {
+        enabledRows.contains { row in
+            row.type != .channels && (loadingRows.contains(row.type) || !loadedRows.contains(row.type))
         }
     }
-    
-    // MARK: - Content Rows
-    
+
     private var contentRows: some View {
         VStack(alignment: .leading, spacing: 50) {
-            if isLoadingPlayed || isLoadingReleased || isLoadingAdded || isLoadingTopRated || isLoadingRandom {
-                if recentContentIsEmpty {
-                    HStack {
-                        Spacer()
-                        ProgressView()
-                            .scaleEffect(1.5)
-                        Spacer()
-                    }
-                    .padding(.top, 40)
+            if isAnyRowLoading && recentContentIsEmpty {
+                HStack {
+                    Spacer()
+                    ProgressView()
+                        .scaleEffect(1.5)
+                    Spacer()
                 }
+                .padding(.top, 40)
             }
 
-            if !recentlyPlayedScenes.isEmpty {
-                sceneRow(
-                    title: "Continue Watching",
-                    scenes: recentlyPlayedScenes,
-                    sortBy: .lastPlayedAtDesc,
-                    cardWidth: 560,
-                    cardHeight: 315
-                )
-                .focusSection()
+            ForEach(enabledRows) { row in
+                rowView(for: row)
             }
 
-            if !channels.isEmpty {
-                channelsRow
-                    .focusSection()
-            }
-
-            if !recentlyReleasedScenes.isEmpty {
-                sceneRow(
-                    title: "New Releases",
-                    scenes: recentlyReleasedScenes,
-                    sortBy: .dateDesc
-                )
-                .focusSection()
-            }
-
-            if !recentlyAddedScenes.isEmpty {
-                sceneRow(
-                    title: "Recently Added",
-                    scenes: recentlyAddedScenes,
-                    sortBy: .createdAtDesc
-                )
-                .focusSection()
-            }
-
-            if !topRatedScenes.isEmpty {
-                sceneRow(
-                    title: "Top Rated",
-                    scenes: topRatedScenes,
-                    sortBy: .ratingDesc
-                )
-                .focusSection()
-            }
-
-            if !randomScenes.isEmpty {
-                sceneRow(
-                    title: "Random Picks",
-                    scenes: randomScenes,
-                    sortBy: .random
-                )
-                .focusSection()
-            }
-
-            if !isLoadingPlayed && !isLoadingReleased && !isLoadingAdded && !isLoadingTopRated && !isLoadingRandom && recentContentIsEmpty {
+            if !isAnyRowLoading && recentContentIsEmpty {
                 VStack(spacing: 24) {
                     Image(systemName: "film.stack")
                         .font(.largeTitle)
                         .foregroundStyle(.secondary)
-                    Text("No scenes to show yet")
+                    Text(enabledRows.isEmpty ? "All Home rows are turned off" : "No scenes to show yet")
                         .font(.title2)
                         .foregroundStyle(.secondary)
+                    if enabledRows.isEmpty {
+                        Text("Turn rows on in Settings › Home Rows.")
+                            .font(.title3)
+                            .foregroundStyle(.secondary)
+                    }
                     Button("Reload") { loadData(forceRefresh: true) }
                         .font(.title3)
                 }
@@ -253,12 +236,77 @@ struct TVDashboardView: View {
         .padding(.bottom, 80)
     }
 
+    @ViewBuilder
+    private func rowView(for row: HomeRowConfig) -> some View {
+        let title = row.type.tvTitle
+        switch row.type {
+        case .channels:
+            if !channels.isEmpty {
+                channelsRow
+                    .focusSection()
+            }
+        case .statistics:
+            EmptyView()
+        case .lastPlayed:
+            if let scenes = sceneRows[row.type], !scenes.isEmpty {
+                sceneRow(title: title, scenes: scenes, sortBy: .lastPlayedAtDesc,
+                         cardWidth: 560, cardHeight: 315)
+                    .focusSection()
+            }
+        case .newest3Min, .lastAdded3Min, .mostViewed3Min, .topCounter3Min, .topRating3Min, .random:
+            if let scenes = sceneRows[row.type], !scenes.isEmpty {
+                sceneRow(title: title, scenes: scenes, sortBy: Self.sceneSort(for: row.type))
+                    .focusSection()
+            }
+        case .newPerformers, .performersHighestSceneCount, .performersHighestOCount, .performersHighestRating:
+            if let performers = performerRows[row.type], !performers.isEmpty {
+                cardRow(title: title, items: performers) { performer in
+                    TVNavButton(value: TVPerformerLink(id: performer.id, name: performer.name)) {
+                        TVPerformerCardView(performer: performer)
+                    }
+                }
+                .focusSection()
+            }
+        case .newStudios, .studiosHighestSceneCount:
+            if let studios = studioRows[row.type], !studios.isEmpty {
+                cardRow(title: title, items: studios) { studio in
+                    TVNavButton(value: TVStudioLink(id: studio.id, name: studio.name)) {
+                        TVStudioCardView(studio: studio)
+                    }
+                }
+                .focusSection()
+            }
+        case .newGalleries, .recentlyUpdatedGalleries, .galleriesHighestImageCount:
+            if let galleries = galleryRows[row.type], !galleries.isEmpty {
+                cardRow(title: title, items: galleries) { gallery in
+                    TVNavButton(value: TVGalleryLink(id: gallery.id, title: gallery.displayName)) {
+                        TVGalleryCardView(gallery: gallery)
+                    }
+                }
+                .focusSection()
+            }
+        }
+    }
+
+    /// The "See All" target of a scene row: the Scenes grid in the row's sort.
+    private static func sceneSort(for type: HomeRowType) -> StashDBViewModel.SceneSortOption {
+        switch type {
+        case .lastPlayed: return .lastPlayedAtDesc
+        case .lastAdded3Min: return .createdAtDesc
+        case .mostViewed3Min: return .playCountDesc
+        case .topCounter3Min: return .oCounterDesc
+        case .topRating3Min: return .ratingDesc
+        case .random: return .random
+        default: return .dateDesc
+        }
+    }
+
     private var recentContentIsEmpty: Bool {
-        recentlyPlayedScenes.isEmpty
-            && recentlyReleasedScenes.isEmpty
-            && recentlyAddedScenes.isEmpty
-            && topRatedScenes.isEmpty
-            && randomScenes.isEmpty
+        sceneRows.values.allSatisfy(\.isEmpty)
+            && performerRows.values.allSatisfy(\.isEmpty)
+            && studioRows.values.allSatisfy(\.isEmpty)
+            && galleryRows.values.allSatisfy(\.isEmpty)
+            && (channels.isEmpty || !enabledRows.contains { $0.type == .channels })
     }
 
     private var hasValidConfig: Bool { configManager.activeConfig?.hasValidConfig == true }
@@ -322,86 +370,55 @@ struct TVDashboardView: View {
         }
     }
 
-    private func refreshContinueWatching() {
-        guard hasValidConfig else { return }
-        isLoadingPlayed = true
-        let playedConfig = HomeRowConfig(
-            id: UUID(),
-            title: "Recently Played",
-            isEnabled: true,
-            sortOrder: 0,
-            type: .lastPlayed
-        )
-        viewModel.fetchScenesForHomeRow(config: playedConfig, limit: 15, forceRefresh: true) { scenes in
-            recentlyPlayedScenes = scenes
-            isLoadingPlayed = false
+    private func fetchHomeRows(forceRefresh: Bool) {
+        for row in enabledRows where row.type != .channels {
+            fetchRow(row, forceRefresh: forceRefresh)
         }
     }
 
-    private func fetchHomeRows(forceRefresh: Bool) {
-        isLoadingPlayed = true
-        let playedConfig = HomeRowConfig(
-            id: UUID(),
-            title: "Recently Played",
-            isEnabled: true,
-            sortOrder: 0,
-            type: .lastPlayed
-        )
-        viewModel.fetchScenesForHomeRow(config: playedConfig, limit: 15, forceRefresh: forceRefresh) { scenes in
-            recentlyPlayedScenes = scenes
-            isLoadingPlayed = false
+    /// Rows switched on in Settings while Home was alive.
+    private func loadMissingRows() {
+        guard hasValidConfig else { return }
+        for row in enabledRows where row.type != .channels && !loadedRows.contains(row.type) {
+            fetchRow(row, forceRefresh: false)
         }
-
-        isLoadingReleased = true
-        let releasedConfig = HomeRowConfig(
-            id: UUID(),
-            title: "Recently Released",
-            isEnabled: true,
-            sortOrder: 1,
-            type: .newest3Min
-        )
-        viewModel.fetchScenesForHomeRow(config: releasedConfig, limit: 15, forceRefresh: forceRefresh) { scenes in
-            recentlyReleasedScenes = scenes
-            isLoadingReleased = false
+        if enabledRows.contains(where: { $0.type == .channels }) {
+            fetchChannels()
         }
+    }
 
-        isLoadingAdded = true
-        let addedConfig = HomeRowConfig(
-            id: UUID(),
-            title: "Recently Added",
-            isEnabled: true,
-            sortOrder: 2,
-            type: .lastAdded3Min
-        )
-        viewModel.fetchScenesForHomeRow(config: addedConfig, limit: 15, forceRefresh: forceRefresh) { scenes in
-            recentlyAddedScenes = scenes
-            isLoadingAdded = false
+    /// One row through the same `StashDBViewModel` fetches as the iOS Home.
+    private func fetchRow(_ row: HomeRowConfig, forceRefresh: Bool) {
+        let type = row.type
+        let limit = Self.rowLimit
+        loadingRows.insert(type)
+        let finish = {
+            loadingRows.remove(type)
+            loadedRows.insert(type)
         }
-
-        isLoadingTopRated = true
-        let topRatedConfig = HomeRowConfig(
-            id: UUID(),
-            title: "Top Rated",
-            isEnabled: true,
-            sortOrder: 3,
-            type: .topRating3Min
-        )
-        viewModel.fetchScenesForHomeRow(config: topRatedConfig, limit: 15, forceRefresh: forceRefresh) { scenes in
-            topRatedScenes = scenes
-            isLoadingTopRated = false
-        }
-
-        isLoadingRandom = true
-        let randomConfig = HomeRowConfig(
-            id: UUID(),
-            title: "Random",
-            isEnabled: true,
-            sortOrder: 4,
-            type: .random
-        )
-        viewModel.fetchScenesForHomeRow(config: randomConfig, limit: 15, forceRefresh: forceRefresh) { scenes in
-            randomScenes = scenes
-            isLoadingRandom = false
+        switch type {
+        case .channels, .statistics:
+            loadingRows.remove(type)
+        case .newPerformers, .performersHighestSceneCount, .performersHighestOCount, .performersHighestRating:
+            viewModel.fetchPerformersForHomeRow(config: row, limit: limit, forceRefresh: forceRefresh) { performers in
+                performerRows[type] = performers
+                finish()
+            }
+        case .newStudios, .studiosHighestSceneCount:
+            viewModel.fetchStudiosForHomeRow(config: row, limit: limit, forceRefresh: forceRefresh) { studios in
+                studioRows[type] = studios
+                finish()
+            }
+        case .newGalleries, .recentlyUpdatedGalleries, .galleriesHighestImageCount:
+            viewModel.fetchGalleriesForHomeRow(config: row, limit: limit, forceRefresh: forceRefresh) { galleries in
+                galleryRows[type] = galleries
+                finish()
+            }
+        case .lastPlayed, .lastAdded3Min, .newest3Min, .mostViewed3Min, .topCounter3Min, .topRating3Min, .random:
+            viewModel.fetchScenesForHomeRow(config: row, limit: limit, forceRefresh: forceRefresh) { scenes in
+                sceneRows[type] = scenes
+                finish()
+            }
         }
     }
 
@@ -442,6 +459,34 @@ struct TVDashboardView: View {
                                 .frame(maxWidth: .infinity, alignment: .leading)
                         }
                         .frame(width: cardWidth)
+                    }
+                }
+                .padding(.horizontal, 50)
+                .padding(.vertical, 20)
+            }
+        }
+    }
+
+    // MARK: - Performer / Studio / Gallery Rows
+
+    /// Horizontal row of cards that bring their own size and caption.
+    @ViewBuilder
+    private func cardRow<Item: Identifiable, Card: View>(
+        title: String,
+        items: [Item],
+        @ViewBuilder card: @escaping (Item) -> Card
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 18) {
+            Text(title)
+                .font(.headline)
+                .fontWeight(.semibold)
+                .foregroundColor(.white.opacity(0.6))
+                .padding(.horizontal, 50)
+
+            ScrollView(.horizontal, showsIndicators: false) {
+                LazyHStack(alignment: .top, spacing: 30) {
+                    ForEach(items) { item in
+                        card(item)
                     }
                 }
                 .padding(.horizontal, 50)

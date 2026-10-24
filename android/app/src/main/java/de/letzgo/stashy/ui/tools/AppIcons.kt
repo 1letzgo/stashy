@@ -120,10 +120,11 @@ object AppIcons {
 fun AppIconPicker(modifier: Modifier = Modifier) {
     val haptics = LocalHapticFeedback.current
     val p = Theme.palette
-    // iOS `GridItem(.adaptive(minimum: 72), spacing: 12)`: as many columns as fit, sharing the width.
+    // Always four per row (iOS: four flexible grid columns); the icon shrinks if a cell is narrower.
     androidx.compose.foundation.layout.BoxWithConstraints(modifier.fillMaxWidth().padding(vertical = 8.dp)) {
-    val columns = ((maxWidth + 12.dp) / (72.dp + 12.dp)).toInt().coerceAtLeast(1)
-    val cell = (maxWidth - 12.dp * (columns - 1)) / columns
+    val columns = 4
+    // A hair under the exact share so pixel rounding never pushes the fourth tile to a new row.
+    val cell = (maxWidth - 12.dp * (columns - 1)) / columns - 0.5.dp
     FlowRow(
         Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.spacedBy(12.dp),
@@ -143,11 +144,11 @@ fun AppIconPicker(modifier: Modifier = Modifier) {
             ) {
                 Image(
                     painterResource(icon.preview), icon.label,
-                    Modifier.size(60.dp).clip(shape)
+                    Modifier.size(minOf(60.dp, cell)).clip(shape)
                         .border(if (selected) 3.dp else 1.dp, if (selected) de.letzgo.stashy.ui.nativeAccent() else p.text.copy(alpha = 0.2f), shape),
                     contentScale = ContentScale.Fit,
                 )
-                Text(icon.label, style = de.letzgo.stashy.ui.NativeType.labelMedium, color = if (selected) p.text else p.secondaryText)
+                Text(icon.label, style = de.letzgo.stashy.ui.NativeType.labelMedium, color = if (selected) p.text else p.secondaryText, maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
             }
         }
     }

@@ -166,11 +166,9 @@ class GraphQLQueries {
         case "findPerformers":
             fragments = loadQuery(named: "fragment_PerformerFields")
             
-        #if !os(tvOS)
         case "hotOrNotFindPerformers":
             fragments = loadQuery(named: "fragment_HotOrNotPerformerFields")
-        #endif
-
+            
         case "findStudios", "findStudio":
             fragments = loadQuery(named: "fragment_StudioFields")
             
@@ -424,6 +422,12 @@ class GraphQLQueries {
         }
         """
 
+    static let imageUpdatePerformersMutation = """
+        mutation ImageUpdate($input: ImageUpdateInput!) {
+            imageUpdate(input: $input) { id performers { id name } }
+        }
+        """
+
     static let imageUpdateTagsMutation = """
         mutation ImageUpdate($input: ImageUpdateInput!) {
             imageUpdate(input: $input) { id tags { id name } }
@@ -551,6 +555,18 @@ class GraphQLQueries {
     static let groupUpdateDetailsMutation = """
         mutation GroupUpdate($input: GroupUpdateInput!) {
             groupUpdate(input: $input) { id name date synopsis rating100 }
+        }
+        """
+
+    static let galleryUpdatePerformersMutation = """
+        mutation GalleryUpdatePerformers($input: GalleryUpdateInput!) {
+            galleryUpdate(input: $input) { id }
+        }
+        """
+
+    static let galleryUpdateStudioMutation = """
+        mutation GalleryUpdateStudio($input: GalleryUpdateInput!) {
+            galleryUpdate(input: $input) { id }
         }
         """
 

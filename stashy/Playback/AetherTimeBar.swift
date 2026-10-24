@@ -52,7 +52,7 @@ struct AetherTimeBar: View {
 
             GeometryReader { geo in
                 let width = max(geo.size.width, 1)
-                let progress = duration > 0 ? min(1, max(0, displayedTime / duration)) : 0
+                let progress = PlaybackFraction.of(displayedTime, in: duration)
                 ZStack(alignment: .leading) {
                     Capsule()
                         .fill(Color.white.opacity(0.28))
@@ -108,7 +108,7 @@ struct AetherTimeBar: View {
                     .overlay(Circle().stroke(Color.white, lineWidth: 1))
                     .shadow(color: .black.opacity(0.4), radius: 1, x: 0, y: 0.5)
                     .frame(width: dot, height: dot)
-                    .offset(x: min(max(0, barWidth * CGFloat(seconds / duration) - dot / 2), barWidth - dot))
+                    .offset(x: min(max(0, barWidth * PlaybackFraction.cgFloat(seconds, in: duration) - dot / 2), max(0, barWidth - dot)))
             }
         }
         .allowsHitTesting(false)

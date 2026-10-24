@@ -1,0 +1,2 @@
+# Safety net: license signing keys never belong in the repo.
+*.pem

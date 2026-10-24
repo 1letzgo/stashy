@@ -51,10 +51,18 @@ class MiniPlayerRulesTest {
         assertEquals(30.0, MiniPlayerRules.resumeStart(30.0, null)!!, 0.0)
     }
 
-    @Test fun playCountsOnceAtThreshold() {
-        assertTrue(MiniPlayerRules.countsPlay(alreadyRegistered = false, seconds = 30.0, threshold = 30.0))
-        assertFalse(MiniPlayerRules.countsPlay(alreadyRegistered = false, seconds = 29.0, threshold = 30.0))
-        assertFalse(MiniPlayerRules.countsPlay(alreadyRegistered = true, seconds = 300.0, threshold = 30.0))
-        assertTrue(MiniPlayerRules.countsPlay(alreadyRegistered = false, seconds = 0.0, threshold = -1.0))
+    @Test fun creditCarriesOverBetweenPageAndBar() {
+        // Page watched 20 s of a 30 s threshold, then handed off: the bar credits after 10 s more.
+        val bar = PlayCountCredit(30.0)
+        bar.restore(watchedSeconds = 20.0, credited = false)
+        assertFalse(bar.onTime(100.0, true, 0.0))
+        // Ticks of 1 s: nine more do not reach 30 s, the tenth does.
+        for (i in 1..9) assertFalse(bar.onTime(100.0 + i, true, i.toDouble()))
+        assertTrue(bar.onTime(110.0, true, 10.0))
+        // Handed back already credited: the page never credits it again.
+        val page = PlayCountCredit(30.0)
+        page.restore(watchedSeconds = bar.watchedSeconds, credited = bar.isCredited)
+        assertFalse(page.onStart())
+        assertFalse(page.onTime(111.0, true, 11.0))
     }
 }

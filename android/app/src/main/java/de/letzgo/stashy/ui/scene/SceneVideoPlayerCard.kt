@@ -225,7 +225,7 @@ private fun MarkerStrip(markers: List<SceneMarker>, playing: Boolean, onSeek: (D
         uniqueItems(markers.sortedBy { it.seconds }, { it.id }) { marker ->
             Column(Modifier.width(80.dp).clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) { onSeek(marker.seconds) }, verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Box(Modifier.size(80.dp, 45.dp).clip(RoundedCornerShape(4.dp)).background(Color.Gray.copy(alpha = 0.2f))) {
-                    val url = Net.signed(marker.screenshot)
+                    val url = marker.screenshotURL
                     if (url != null) AsyncImage(url, null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
                     else Icon(PlayerIcons.bookmark, null, tint = p.secondaryText, modifier = Modifier.align(Alignment.Center))
                     Text(

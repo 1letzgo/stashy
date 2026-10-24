@@ -80,12 +80,19 @@ fun performerAge(birthdate: String?): Int? {
 
 /**
  * iOS: `PerformerCardView` — 9:12 portrait (top-anchored crop), age pill top-left, count pill
- * top-right (depends on the sort), bottom gradient with the name.
+ * top-right (depends on the sort), bottom gradient with the name. [badge] (icon + text) replaces
+ * the sort-driven count pill (performer detail "Appears with": shared scene count).
  */
 @Composable
-fun PerformerCard(performer: Performer, modifier: Modifier = Modifier, badgeType: PerformerBadgeType = PerformerBadgeType.SceneCount, onClick: (() -> Unit)? = null) {
+fun PerformerCard(
+    performer: Performer,
+    modifier: Modifier = Modifier,
+    badgeType: PerformerBadgeType = PerformerBadgeType.SceneCount,
+    badge: Pair<ImageVector, String>? = null,
+    onClick: (() -> Unit)? = null,
+) {
     val p = Theme.palette
-    val (icon, text) = when (badgeType) {
+    val (icon, text) = badge ?: when (badgeType) {
         PerformerBadgeType.SceneCount -> SF.film to "${performer.sceneCount ?: 0}"
         PerformerBadgeType.ImageCount -> SF.photo to "${performer.imageCount ?: 0}"
         PerformerBadgeType.GalleryCount -> SF.photoStack to "${performer.galleryCount ?: 0}"
@@ -94,7 +101,7 @@ fun PerformerCard(performer: Performer, modifier: Modifier = Modifier, badgeType
     }
     NativeCard(modifier.fillMaxWidth().aspectRatio(9f / 12f), onClick = onClick) { BoxWithConstraints(Modifier.fillMaxSize()) {
         Box(Modifier.fillMaxSize().background(Color.Gray.copy(alpha = 0.2f)), contentAlignment = Alignment.Center) {
-            var failed by remember(performer.id) { mutableStateOf(performer.imageURL == null) }
+            var failed by remember(performer.id, performer.imageURL) { mutableStateOf(performer.imageURL == null) }
             if (failed) PlaceholderIcon(SF.personFill)
             AsyncImage(performer.imageURL, null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop, alignment = Alignment.TopCenter, onError = { failed = true })
         }
@@ -281,7 +288,7 @@ fun ImageCard(image: StashImage, modifier: Modifier = Modifier, aspectRatio: Flo
 }
 
 /** iOS: `SceneMarker.thumbnailURL` — the marker screenshot. */
-val SceneMarker.thumbnailURL: String? get() = Net.signed(screenshot)
+val SceneMarker.thumbnailURL: String? get() = screenshotURL
 
 /**
  * iOS: `MarkerCardView` — 16:9 screenshot on header grey, marker title pill top-left, scene title
@@ -292,7 +299,7 @@ fun MarkerCard(marker: SceneMarker, modifier: Modifier = Modifier, onClick: (() 
     val p = Theme.palette
     NativeCard(modifier.fillMaxWidth().aspectRatio(16f / 9f), onClick = onClick) {
         Box(Modifier.fillMaxSize().background(p.studioHeader), contentAlignment = Alignment.Center) {
-            var failed by remember(marker.id) { mutableStateOf(marker.thumbnailURL == null) }
+            var failed by remember(marker.id, marker.thumbnailURL) { mutableStateOf(marker.thumbnailURL == null) }
             if (failed) PlaceholderIcon(SF.bookmarkFill, Appearance.tint)
             AsyncImage(marker.thumbnailURL, null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop, onError = { failed = true })
         }

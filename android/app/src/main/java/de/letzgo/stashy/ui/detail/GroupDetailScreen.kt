@@ -5,9 +5,7 @@ import de.letzgo.stashy.ui.tools.downloads.SceneBulkDownloadDialog
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.grid.LazyGridState
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -15,9 +13,9 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.input.KeyboardType
-import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import de.letzgo.stashy.data.DetailRepository
 import de.letzgo.stashy.data.StashGroup
 import de.letzgo.stashy.ui.Nav
@@ -69,16 +67,15 @@ class GroupDetailScreen(val groupId: String, val preview: StashGroup? = null) : 
             DetailGrid(gridState, { w -> columnsFor(tab, w, catalog.imageColumns) }, hasTabs = catalog.available.size > 1, header = { group?.let { Header(it) } }) {
                 linkedSection(catalog, tab, gridState)
             }
-            val (slots, menu) = catalog.slots(tab)
             // iOS: the scenes tab adds `SceneBulkDownloadChrome.slot` (contextual, before filter & sort).
             val extra = when (tab) {
                 DetailTab.Scenes -> listOf(sceneBulkDownloadSlot { showSceneDownloadOptions = true })
                 else -> emptyList()
             }
-            DetailTopBar(group?.name ?: "", catalog.available, tab, { tab = it }, slots + extra, menu,
-                settings = catalog.imagesSettingsSlot(tab), onEdit = { editing = true }, editLabel = "Edit group")
+            DetailTopBar(group?.name ?: "", catalog.available, tab, { tab = it }, extra,
+                settings = catalog.settingsSlot(tab), onEdit = { editing = true }, editLabel = "Edit group")
         }
-        LinkedImagesSettingsSheet(catalog)
+        LinkedSettingsSheets(catalog)
         val g = group
         if (editing && g != null) EditGroupSheet(g, { editing = false }) { group = it }
         if (showSceneDownloadOptions) {
@@ -86,27 +83,39 @@ class GroupDetailScreen(val groupId: String, val preview: StashGroup? = null) : 
         }
     }
 
-    /** iOS `headerView`. */
+    /**
+     * iOS `headerView` as a [DetailHeroCard] (like performer / tag / studio): the front cover
+     * blurred as the band backdrop with the details on it, sharp in the circle on the band edge
+     * (poster -> top-biased crop; tap -> fullscreen cover); name + aliases below, then the
+     * the synopsis. Without a cover (or Stash's `default=true` placeholder), a tinted band and the
+     * group icon in the circle.
+     */
     @Composable
     private fun Header(g: StashGroup) {
         // iOS shows the loaded scene total here (`viewModel.totalGroupScenes`).
-        val items = DetailFormatting.group(g, catalog.scenes?.totalCount ?: 0, catalog.effectiveGalleries)
-        val synopsis = g.synopsis?.takeIf { it.isNotEmpty() }
-        DetailHeaderCard(
+        val items = DetailFormatting.group(g, catalog.scenes?.totalCount ?: 0, catalog.effectiveGalleries).toMutableList()
+        g.director?.takeIf { it.isNotBlank() }?.let { items += DetailItem("DIRECTOR", it) }
+        de.letzgo.stashy.ui.components.formatDuration(g.duration?.toDouble())?.let { items += DetailItem("DURATION", it) }
+        g.subGroupCount?.takeIf { it > 0 }?.let { items += DetailItem("SUB-GROUPS", "$it") }
+        val thumb = groupThumbnailURL(g)?.takeIf { g.frontImagePath?.contains("default=true") != true }
+        val full = g.frontImageURL
+        DetailHeroCard(
             title = g.name,
-            imageUrl = groupThumbnailURL(g),
-            placeholderIcon = rectangleStackIcon(),
+            // iOS shows no aliases in the header (URLs are never shown); they appear only expanded here.
+            subtitle = g.aliases?.takeIf { it.isNotBlank() && expanded },
             items = items,
-            expandable = items.size > 4 || synopsis != null,
+            description = g.synopsis?.takeIf { it.isNotBlank() },
             expanded = expanded,
             onToggle = { expanded = !expanded },
-            titleMaxLines = 2,
-            expandedContent = synopsis?.let { s ->
-                {
-                    Text("SYNOPSIS", fontSize = 8.sp, color = Theme.palette.secondaryText, modifier = Modifier.padding(top = 4.dp))
-                    Text(s, fontSize = 11.sp, color = Theme.palette.text)
-                }
-            },
+            hero = if (thumb != null && full != null) {
+                DetailHero(
+                    DetailHero.Style.Cover, thumb, Color.Black, "Open cover", { Nav.push(HeroPictureViewerScreen(full, g.name)) },
+                    backdropAlignment = HeroPortraitBias,
+                ) { HeroPicture(thumb, g.name, ContentScale.Crop, rectangleStackIcon(), alignment = HeroPortraitBias) }
+            } else DetailHero(DetailHero.Style.Cover, null, Color.Black, "Open cover", null) { HeroPlaceholder(rectangleStackIcon()) },
+            collapsedItemCount = 4,
+            footer = null,
+            footerHasMore = !g.aliases.isNullOrBlank(),
         )
     }
 

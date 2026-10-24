@@ -2,6 +2,7 @@ package de.letzgo.stashy.ui.settings
 
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Headphones
 import androidx.compose.material.icons.outlined.History
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
@@ -49,7 +50,10 @@ fun LazyListScope.playbackSections() {
         SettingsDivider()
         SettingsToggleRow("Autozoom", TabManager.playerAutoZoom, SFS.arrowUpLeftDownRight) { TabManager.playerAutoZoom = it }
         SettingsDivider()
-        SettingsToggleRow("Dolby Vision", TabManager.playerDolbyVisionEnabled, SFS.sparklesTv) { TabManager.playerDolbyVisionEnabled = it }
+        // Scene player, Feeds and image-viewer videos (card previews stay muted regardless).
+        SettingsToggleRow("Start muted without headphones", TabManager.playbackMuteWithoutHeadphones, Icons.Outlined.Headphones) {
+            TabManager.playbackMuteWithoutHeadphones = it
+        }
         SettingsDivider()
         SettingsPickerRow("Hold to speed up", TabManager.holdSpeedOptions, TabManager.holdSpeedPlayer, TabConfigLogic::holdSpeedLabel, SFS.forwardFill) { TabManager.holdSpeedPlayer = it }
         SettingsDivider()

@@ -107,7 +107,7 @@ struct HomeSceneCardView: View {
                     Rectangle().fill(Color.white.opacity(0.2)).frame(height: 5)
                     Rectangle()
                         .fill(appearanceManager.tintColor)
-                        .frame(width: cardWidth * CGFloat(min(resumeTime, duration) / duration), height: 5)
+                        .frame(width: cardWidth * PlaybackFraction.cgFloat(resumeTime, in: duration), height: 5)
                 }
             }
         }

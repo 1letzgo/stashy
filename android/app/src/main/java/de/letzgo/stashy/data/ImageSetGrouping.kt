@@ -175,13 +175,25 @@ object ImageSetGrouping {
     private fun performerIds(image: StashImage): Set<String> = image.performers.orEmpty().map { it.id }.toSet()
     private fun studioId(image: StashImage): String = image.studio?.id.orEmpty()
 
+    /** The image's own `date` (shoot day) as `yyyy-MM-dd`, or null when unset / unreadable. */
+    fun shootDay(image: StashImage): String? {
+        val raw = image.date?.trim() ?: return null
+        if (raw.length < 10) return null
+        val day = raw.substring(0, 10)
+        val parts = day.split('-')
+        if (parts.size != 3 || parts[0].length != 4 || parts.any { p -> p.isEmpty() || !p.all { it in '0'..'9' } }) return null
+        return day
+    }
+
     /**
      * Whether [image] may join [post] (non-empty, API order):
      * - at most [maxSetSize] images (`stashline_group_max_size`, default 30); a clip and a photo never share a set;
+     * - both images carry a `date` and it differs → never (any mode, galleries included);
      * - galleries first, against the post's last image: both have galleries → join when they
      *   share one; exactly one has galleries → no join;
      * - [ImageGroupMode.GallerySession], both without galleries: performers equal to the post's
-     *   first image and non-empty, or same non-empty studio with equal performers — and the
+     *   first image and non-empty, or same non-empty studio with equal performers — and then the
+     *   session: both have a `date` → same day joins, a different day never does; otherwise the
      *   `created_at` gap to the post's last image ≤ [gapMinutes]. Untagged loose images never join.
      */
     fun canJoin(
@@ -196,6 +208,10 @@ object ImageSetGrouping {
         val last = post.last()
         if (post.size >= maxSetSize) return false
         if (first.isVideo != image.isVideo) return false
+        // A different shoot day never shares a set — not even inside one gallery.
+        val lastDay = shootDay(last)
+        val day = shootDay(image)
+        if (lastDay != null && day != null && lastDay != day) return false
 
         val lastGalleries = galleryIds(last)
         val galleries = galleryIds(image)
@@ -210,6 +226,8 @@ object ImageSetGrouping {
         val sameStudio = firstStudio.isNotEmpty() && firstStudio == studioId(image)
         if (performers.isEmpty() && !sameStudio) return false
 
+        // Session by shoot day when both carry one; else by import time.
+        if (lastDay != null && day != null) return true // same day (a different one returned above)
         val t0 = timestamp(last) ?: return false
         val t1 = timestamp(image) ?: return false
         return abs(t1 - t0) <= gapMinutes * 60L

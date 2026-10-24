@@ -10,7 +10,6 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -45,6 +44,9 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import de.letzgo.stashy.data.Scene
+import de.letzgo.stashy.data.SceneDetailCard
+import de.letzgo.stashy.data.SceneDetailLayout
+import de.letzgo.stashy.data.SceneDetailLayoutLogic
 import de.letzgo.stashy.ui.Appearance
 import de.letzgo.stashy.ui.NativeTopBar
 import de.letzgo.stashy.ui.OverflowItem
@@ -109,6 +111,7 @@ private fun SceneDetailContent(model: SceneDetailModel, openedFromMiniPlayer: Bo
     }
     // iOS: `Timer.publish(every: 10)` → periodic activity sync.
     LaunchedEffect(model) { while (true) { delay(10_000); model.periodicSync() } }
+    LaunchedEffect(model) { de.letzgo.stashy.data.PerformerEvents.events.collect { model.applyPerformerEvent(it) } }
     // PiP window closed (not expanded back): stop like iOS ending PiP.
     LaunchedEffect(PlayerWindow.isInPictureInPicture) {
         if (!PlayerWindow.isInPictureInPicture) {
@@ -199,34 +202,33 @@ private fun SceneDetailContent(model: SceneDetailModel, openedFromMiniPlayer: Bo
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
                 if (!pinned) playerCard()
-                SceneCardContainer(Modifier.fillMaxWidth()) { SceneMetadataCard(model) { sheet = EditSheet.Title } }
-                if (scene.interactive == true && scene.hasFunscript) {
-                    SceneHeatmapCard(
-                        scene.heatmapURL, scene.sceneDuration ?: 0.0, model.currentPlaybackTime,
-                        onSeek = model::seekTo, onSeekCommit = model::commitScrub, onScrubStateChange = model::updateScrubbing,
-                    )
+                // Settings › Design › Scene View: card order and visibility (applies live). In
+                // landscape adjacent half-width cards (Groups, Tags) share a row.
+                @Composable
+                fun card(c: SceneDetailCard, modifier: Modifier) {
+                    when (c) {
+                        SceneDetailCard.Details -> SceneCardContainer(modifier.fillMaxWidth()) { SceneMetadataCard(model) { sheet = EditSheet.Title } }
+                        SceneDetailCard.Heatmap -> if (scene.interactive == true && scene.hasFunscript) {
+                            SceneHeatmapCard(
+                                scene.heatmapURL, scene.sceneDuration ?: 0.0, model.currentPlaybackTime,
+                                onSeek = model::seekTo, onSeekCommit = model::commitScrub, onScrubStateChange = model::updateScrubbing,
+                            )
+                        }
+                        // stashy+ — hides itself when Similar Scenes is off or nothing is similar.
+                        SceneDetailCard.SimilarScenes -> SceneSimilarScenesCard(model.similarScenes, model.isLoadingSimilarScenes)
+                        // Hides itself without studio, performers and director (unless edit mode is on).
+                        SceneDetailCard.PerformersStudio -> ScenePerformersStudioCard(
+                            scene.date, scene.studio, scene.performers, scene.normalizedDirector,
+                            onEditStudio = { sheet = EditSheet.Studio }, onEditPerformers = { sheet = EditSheet.Performers },
+                        )
+                        SceneDetailCard.Groups -> SceneGroupsCard(scene.groups.orEmpty(), { sheet = EditSheet.Groups }, modifier)
+                        SceneDetailCard.Tags -> SceneTagsCard(scene.tags, model.isTagsExpanded, { model.isTagsExpanded = !model.isTagsExpanded }, { sheet = EditSheet.Tags }, modifier)
+                        SceneDetailCard.Galleries -> SceneGalleriesCard(scene.galleries, modifier) { sheet = EditSheet.Galleries }
+                    }
                 }
-                // stashy+ — hides itself when Similar Scenes is off or nothing is similar.
-                SceneSimilarScenesCard(model.similarScenes, model.isLoadingSimilarScenes)
-                ScenePerformersCard(scene.date, scene.performers, scene.normalizedDirector) { sheet = EditSheet.Performers }
-                if (landscape) {
-                    // iOS landscape: two-column grid (Studio | Groups, Tags, Galleries full width). Delete lives in the top bar's ⋮ menu.
-                    Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                        SceneStudioCard(scene.studio, { sheet = EditSheet.Studio }, Modifier.weight(1f))
-                        SceneGroupsCard(scene.groups.orEmpty(), { sheet = EditSheet.Groups }, Modifier.weight(1f))
-                    }
-                    Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                        SceneTagsCard(scene.tags, model.isTagsExpanded, { model.isTagsExpanded = !model.isTagsExpanded }, { sheet = EditSheet.Tags }, Modifier.weight(1f))
-                        Spacer(Modifier.weight(1f))
-                    }
-                    SceneGalleriesCard(scene.galleries) { sheet = EditSheet.Galleries }
-                } else {
-                    Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                        SceneStudioCard(scene.studio, { sheet = EditSheet.Studio }, Modifier.weight(1f))
-                        SceneGroupsCard(scene.groups.orEmpty(), { sheet = EditSheet.Groups }, Modifier.weight(1f))
-                    }
-                    SceneTagsCard(scene.tags, model.isTagsExpanded, { model.isTagsExpanded = !model.isTagsExpanded }, { sheet = EditSheet.Tags })
-                    SceneGalleriesCard(scene.galleries) { sheet = EditSheet.Galleries }
+                SceneDetailLayoutLogic.rows(SceneDetailLayout.order, SceneDetailLayout.hidden, landscape).forEach { row ->
+                    if (row.size == 1) card(row[0], Modifier)
+                    else Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) { row.forEach { card(it, Modifier.weight(1f)) } }
                 }
             }
         }
@@ -269,7 +271,7 @@ private fun SceneDetailContent(model: SceneDetailModel, openedFromMiniPlayer: Bo
         EditSheet.Galleries -> EditGalleriesSheet(scene, { sheet = null }) { model.applyEdit(model.scene.copy(galleries = it)) }
         null -> {}
     }
-    if (model.showAddMarker) AddMarkerSheet(scene, model.capturedMarkerTime, { model.showAddMarker = false }) { model.refreshDetails() }
+    if (model.showAddMarker) AddMarkerSheet(scene, model.capturedMarkerTime, model.capturedMarkerFrame, { model.showAddMarker = false; model.capturedMarkerFrame = null }) { model.refreshDetails() }
     model.tagImageDataURL?.let { url -> SetTagImageFromFrameSheet(url, scene.tags.orEmpty()) { model.tagImageDataURL = null } }
     if (model.showReplaceCoverConfirm) AlertDialog(
         onDismissRequest = { model.showReplaceCoverConfirm = false },

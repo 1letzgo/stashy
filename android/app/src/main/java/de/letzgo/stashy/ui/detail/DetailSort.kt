@@ -1,14 +1,13 @@
 package de.letzgo.stashy.ui.detail
 
-import de.letzgo.stashy.data.FindFilter
 import de.letzgo.stashy.data.Prefs
 import kotlin.math.roundToInt
 
 /**
- * Sort options used inside the detail screens (iOS: `StashDBViewModel.SceneSortOption`,
- * `GallerySortOption`, `ImageSortOption`, `PerformerSortOption`, `StudioSortOption`,
- * `TagSortOption`). `raw` is the iOS rawValue (persisted), `label` the iOS `displayName`.
- * Namespaced in [DetailSort] so it can live next to the catalog's own copies until merge.
+ * Detail scene / image sort values (iOS: `StashDBViewModel.SceneSortOption`, `ImageSortOption`)
+ * behind the persisted `DetailViewsSortConfig_<context>` defaults. `raw` is the iOS rawValue
+ * (persisted), `label` the iOS `displayName`. The detail lists themselves sort through
+ * [de.letzgo.stashy.data.SortCatalog] in their filter & sort sheets.
  */
 interface SortChoice {
     val raw: String
@@ -18,14 +17,6 @@ interface SortChoice {
 }
 
 object DetailSort {
-    /** iOS `randomSort(_:)` — `random_<seed>`; the seed is refreshed when Random is picked again. */
-    var randomSeed: Int = (1..1_000_000).random()
-        private set
-    fun refreshRandomSeed() { randomSeed = (1..1_000_000).random() }
-
-    fun findFilter(page: Int, perPage: Int, sort: SortChoice): FindFilter =
-        FindFilter(page, perPage, if (sort.field == "random") "random_$randomSeed" else sort.field, sort.direction)
-
     enum class Scene(override val raw: String, override val label: String, override val field: String, override val direction: String) : SortChoice {
         Random("random", "Random", "random", "DESC"),
         DateDesc("dateDesc", "Date (Newest First)", "date", "DESC"),
@@ -49,23 +40,6 @@ object DetailSort {
         companion object { fun from(raw: String?) = entries.firstOrNull { it.raw == raw } }
     }
 
-    enum class Gallery(override val raw: String, override val label: String, override val field: String, override val direction: String) : SortChoice {
-        TitleAsc("titleAsc", "Name (A-Z)", "title", "ASC"),
-        TitleDesc("titleDesc", "Name (Z-A)", "title", "DESC"),
-        DateDesc("dateDesc", "Date (Newest)", "date", "DESC"),
-        DateAsc("dateAsc", "Date (Oldest)", "date", "ASC"),
-        RatingDesc("ratingDesc", "Rating (High-Low)", "rating", "DESC"),
-        RatingAsc("ratingAsc", "Rating (Low-High)", "rating", "ASC"),
-        CreatedAtDesc("createdAtDesc", "Created (Newest)", "created_at", "DESC"),
-        CreatedAtAsc("createdAtAsc", "Created (Oldest)", "created_at", "ASC"),
-        UpdatedAtDesc("updatedAtDesc", "Updated (Newest)", "updated_at", "DESC"),
-        UpdatedAtAsc("updatedAtAsc", "Updated (Oldest)", "updated_at", "ASC"),
-        ImageCountDesc("imageCountDesc", "Image Count (High-Low)", "images_count", "DESC"),
-        ImageCountAsc("imageCountAsc", "Image Count (Low-High)", "images_count", "ASC"),
-        Random("random", "Random", "random", "DESC");
-        companion object { fun from(raw: String?) = entries.firstOrNull { it.raw == raw } }
-    }
-
     enum class Image(override val raw: String, override val label: String, override val field: String, override val direction: String) : SortChoice {
         TitleAsc("titleAsc", "Title (A-Z)", "title", "ASC"),
         TitleDesc("titleDesc", "Title (Z-A)", "title", "DESC"),
@@ -81,67 +55,6 @@ object DetailSort {
         companion object { fun from(raw: String?) = entries.firstOrNull { it.raw == raw } }
     }
 
-    enum class Performer(override val raw: String, override val label: String, override val field: String, override val direction: String) : SortChoice {
-        Random("random", "Random", "random", "DESC"),
-        NameAsc("nameAsc", "Name (A-Z)", "name", "ASC"),
-        NameDesc("nameDesc", "Name (Z-A)", "name", "DESC"),
-        SceneCountDesc("sceneCountDesc", "Scene Count (High-Low)", "scenes_count", "DESC"),
-        SceneCountAsc("sceneCountAsc", "Scene Count (Low-High)", "scenes_count", "ASC"),
-        ImageCountDesc("imageCountDesc", "Image Count (High-Low)", "images_count", "DESC"),
-        ImageCountAsc("imageCountAsc", "Image Count (Low-High)", "images_count", "ASC"),
-        GalleryCountDesc("galleryCountDesc", "Gallery Count (High-Low)", "galleries_count", "DESC"),
-        GalleryCountAsc("galleryCountAsc", "Gallery Count (Low-High)", "galleries_count", "ASC"),
-        BirthdateDesc("birthdateDesc", "Birthday (Youngest First)", "birthdate", "DESC"),
-        BirthdateAsc("birthdateAsc", "Birthday (Oldest First)", "birthdate", "ASC"),
-        UpdatedAtDesc("updatedAtDesc", "Updated (Newest First)", "updated_at", "DESC"),
-        UpdatedAtAsc("updatedAtAsc", "Updated (Oldest First)", "updated_at", "ASC"),
-        CreatedAtDesc("createdAtDesc", "Created (Newest First)", "created_at", "DESC"),
-        CreatedAtAsc("createdAtAsc", "Created (Oldest First)", "created_at", "ASC"),
-        OCountDesc("oCountDesc", "O Count (High-Low)", "o_counter", "DESC"),
-        OCountAsc("oCountAsc", "O Count (Low-High)", "o_counter", "ASC"),
-        RatingDesc("ratingDesc", "Rating (High-Low)", "rating", "DESC"),
-        RatingAsc("ratingAsc", "Rating (Low-High)", "rating", "ASC");
-    }
-
-    enum class Studio(override val raw: String, override val label: String, override val field: String, override val direction: String) : SortChoice {
-        Random("random", "Random", "random", "DESC"),
-        NameAsc("nameAsc", "Name (A-Z)", "name", "ASC"),
-        NameDesc("nameDesc", "Name (Z-A)", "name", "DESC"),
-        SceneCountDesc("sceneCountDesc", "Scene Count (High-Low)", "scenes_count", "DESC"),
-        SceneCountAsc("sceneCountAsc", "Scene Count (Low-High)", "scenes_count", "ASC"),
-        UpdatedAtDesc("updatedAtDesc", "Updated (Newest First)", "updated_at", "DESC"),
-        UpdatedAtAsc("updatedAtAsc", "Updated (Oldest First)", "updated_at", "ASC"),
-        CreatedAtDesc("createdAtDesc", "Created (Newest First)", "created_at", "DESC"),
-        CreatedAtAsc("createdAtAsc", "Created (Oldest First)", "created_at", "ASC"),
-        RatingDesc("ratingDesc", "Rating (High-Low)", "rating", "DESC"),
-        RatingAsc("ratingAsc", "Rating (Low-High)", "rating", "ASC"),
-        PerformerCountDesc("performerCountDesc", "Performer Count (High-Low)", "performer_count", "DESC"),
-        PerformerCountAsc("performerCountAsc", "Performer Count (Low-High)", "performer_count", "ASC"),
-        GalleryCountDesc("galleryCountDesc", "Gallery Count (High-Low)", "galleries_count", "DESC"),
-        GalleryCountAsc("galleryCountAsc", "Gallery Count (Low-High)", "galleries_count", "ASC"),
-        ImageCountDesc("imageCountDesc", "Image Count (High-Low)", "images_count", "DESC"),
-        ImageCountAsc("imageCountAsc", "Image Count (Low-High)", "images_count", "ASC");
-    }
-
-    enum class Tag(override val raw: String, override val label: String, override val field: String, override val direction: String) : SortChoice {
-        Random("random", "Random", "random", "DESC"),
-        NameAsc("nameAsc", "Name (A-Z)", "name", "ASC"),
-        NameDesc("nameDesc", "Name (Z-A)", "name", "DESC"),
-        SceneCountDesc("sceneCountDesc", "Scene Count (High-Low)", "scenes_count", "DESC"),
-        SceneCountAsc("sceneCountAsc", "Scene Count (Low-High)", "scenes_count", "ASC"),
-        ImageCountDesc("imageCountDesc", "Image Count (High-Low)", "images_count", "DESC"),
-        ImageCountAsc("imageCountAsc", "Image Count (Low-High)", "images_count", "ASC"),
-        GalleryCountDesc("galleryCountDesc", "Gallery Count (High-Low)", "galleries_count", "DESC"),
-        GalleryCountAsc("galleryCountAsc", "Gallery Count (Low-High)", "galleries_count", "ASC"),
-        MarkerCountDesc("markerCountDesc", "Marker Count (High-Low)", "scene_markers_count", "DESC"),
-        MarkerCountAsc("markerCountAsc", "Marker Count (Low-High)", "scene_markers_count", "ASC"),
-        PerformerCountDesc("performerCountDesc", "Performer Count (High-Low)", "performers_count", "DESC"),
-        PerformerCountAsc("performerCountAsc", "Performer Count (Low-High)", "performers_count", "ASC"),
-        UpdatedAtDesc("updatedAtDesc", "Updated (Newest First)", "updated_at", "DESC"),
-        UpdatedAtAsc("updatedAtAsc", "Updated (Oldest First)", "updated_at", "ASC"),
-        CreatedAtDesc("createdAtDesc", "Created (Newest First)", "created_at", "DESC"),
-        CreatedAtAsc("createdAtAsc", "Created (Oldest First)", "created_at", "ASC");
-    }
 }
 
 /** iOS: `DetailViewContext` (rawValues are the persisted keys). */

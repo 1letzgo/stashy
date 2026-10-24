@@ -5,26 +5,38 @@
 //  RateMe: random unrated Scenes / Images with star rating (Match-style UI).
 //  Performers stay in Match.
 //
+//  DTOs and `RateMeViewModel` are shared with tvOS (`stashyTV/TVRateMeView.swift`);
+//  only the SwiftUI screens below are iOS-only.
+//
 
-#if !os(tvOS)
+import Combine
 import SwiftUI
+
+#if os(tvOS)
+/// tvOS does not compile `Filters/FilterCriterionTypes.swift` (it pulls in the whole criteria
+/// editor); RateMe themes only need the id / name pair.
+struct FilterEntityOption: Identifiable, Equatable, Hashable {
+    let id: String
+    let name: String
+}
+#endif
 
 // MARK: - DTOs
 
-private struct RateMeSceneFindResponse: Codable {
+struct RateMeSceneFindResponse: Codable {
     let data: RateMeSceneFindData?
 }
 
-private struct RateMeSceneFindData: Codable {
+struct RateMeSceneFindData: Codable {
     let findScenes: RateMeSceneFindResult
 }
 
-private struct RateMeSceneFindResult: Codable {
+struct RateMeSceneFindResult: Codable {
     let count: Int?
     let scenes: [RateMeSceneDTO]
 }
 
-private struct RateMeSceneDTO: Codable {
+struct RateMeSceneDTO: Codable {
     let id: String
     let title: String?
     let rating100: Int?
@@ -33,30 +45,30 @@ private struct RateMeSceneDTO: Codable {
     let performers: [RateMePerformerDTO]?
 }
 
-private struct RateMeScenePaths: Codable {
+struct RateMeScenePaths: Codable {
     let screenshot: String?
     let preview: String?
 }
 
-private struct RateMePerformerDTO: Codable {
+struct RateMePerformerDTO: Codable {
     let id: String
     let name: String?
 }
 
-private struct RateMeImageFindResponse: Codable {
+struct RateMeImageFindResponse: Codable {
     let data: RateMeImageFindData?
 }
 
-private struct RateMeImageFindData: Codable {
+struct RateMeImageFindData: Codable {
     let findImages: RateMeImageFindResult
 }
 
-private struct RateMeImageFindResult: Codable {
+struct RateMeImageFindResult: Codable {
     let count: Int?
     let images: [RateMeImageDTO]
 }
 
-private struct RateMeImageDTO: Codable {
+struct RateMeImageDTO: Codable {
     let id: String
     let title: String?
     let rating100: Int?
@@ -66,13 +78,13 @@ private struct RateMeImageDTO: Codable {
     let performers: [RateMePerformerDTO]?
 }
 
-private struct RateMeImagePaths: Codable {
+struct RateMeImagePaths: Codable {
     let image: String?
     let preview: String?
     let thumbnail: String?
 }
 
-private struct RateMeImageFile: Codable {
+struct RateMeImageFile: Codable {
     let path: String?
     let basename: String?
     let width: Int?
@@ -80,34 +92,34 @@ private struct RateMeImageFile: Codable {
     let duration: Double?
 }
 
-private struct RateMeMutationResponse: Codable {
+struct RateMeMutationResponse: Codable {
     let data: RateMeMutationData?
 }
 
-private struct RateMeMutationData: Codable {
+struct RateMeMutationData: Codable {
     let sceneUpdate: RateMeUpdated?
     let imageUpdate: RateMeUpdated?
 }
 
-private struct RateMeUpdated: Codable {
+struct RateMeUpdated: Codable {
     let id: String
     let rating100: Int?
 }
 
-private struct RateMeIncrementOResponse: Codable {
+struct RateMeIncrementOResponse: Codable {
     let data: RateMeIncrementOData?
 }
 
-private struct RateMeIncrementOData: Codable {
+struct RateMeIncrementOData: Codable {
     let sceneIncrementO: Int?
     let imageIncrementO: Int?
 }
 
-private struct RateMeDestroyResponse: Codable {
+struct RateMeDestroyResponse: Codable {
     let data: RateMeDestroyData?
 }
 
-private struct RateMeDestroyData: Codable {
+struct RateMeDestroyData: Codable {
     let sceneDestroy: Bool?
     let imageDestroy: Bool?
 }
@@ -115,7 +127,7 @@ private struct RateMeDestroyData: Codable {
 // MARK: - ViewModel
 
 @MainActor
-private final class RateMeViewModel: ObservableObject {
+final class RateMeViewModel: ObservableObject {
     enum Mode: String, CaseIterable, Identifiable {
         case scenes
         case images
@@ -304,7 +316,9 @@ private final class RateMeViewModel: ObservableObject {
                 draftRating100 = nil
                 return
             }
+            #if !os(tvOS)
             HapticManager.success()
+            #endif
             switch current.mode {
             case .scenes:
                 NotificationCenter.default.post(
@@ -362,7 +376,9 @@ private final class RateMeViewModel: ObservableObject {
             let newCount = try await mutateIncrementO(id: current.id, mode: current.mode)
             current.oCounter = newCount ?? (previous + 1)
             item = current
+            #if !os(tvOS)
             HapticManager.success()
+            #endif
             switch current.mode {
             case .scenes:
                 NotificationCenter.default.post(
@@ -395,12 +411,14 @@ private final class RateMeViewModel: ObservableObject {
                 errorMessage = current.mode == .scenes ? "Failed to delete scene." : "Failed to delete image."
                 return
             }
+            #if !os(tvOS)
             HapticManager.success()
             ToastManager.shared.show(
                 current.mode == .scenes ? "Scene deleted" : "Image deleted",
                 icon: "trash",
                 style: .success
             )
+            #endif
             skipIDs.remove(current.id)
             await loadNext()
         } catch {
@@ -690,7 +708,9 @@ private extension String {
     var nilIfEmpty: String? { isEmpty ? nil : self }
 }
 
-// MARK: - Media
+#if !os(tvOS)
+
+// MARK: - Media (iOS)
 
 private struct RateMeMediaView: View {
     let item: RateMeViewModel.Item

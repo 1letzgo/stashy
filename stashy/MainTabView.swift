@@ -121,9 +121,7 @@ struct MainTabView: View {
                 // Suspend before audio teardown so deferred Reel `play()` races cannot restart audio.
                 ReelsPlayerRegistry.suspendPlayback()
                 NotificationCenter.default.post(name: Notification.Name("ReelsPauseAllPlayers"), object: nil)
-                #if os(iOS)
-                try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
-                #endif
+                AudioSessionCoordinator.shared.releaseSoon()
             }
             .onChange(of: stashyPlus.isUnlocked) { _, _ in
                 ensureSelectedTabIsVisible()

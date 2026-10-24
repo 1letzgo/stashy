@@ -373,10 +373,42 @@ private struct PerformersViewContent: View {
         showDeleteCatalogPresetAlert = false
     }
 
-    init(viewModel: StashDBViewModel, initialSort: StashDBViewModel.PerformerSortOption? = nil) {
+    init(
+        viewModel: StashDBViewModel,
+        initialSort: StashDBViewModel.PerformerSortOption? = nil,
+        filterMemory: CatalogListFilterMemory<CatalogListFilterSnapshot<StashDBViewModel.PerformerSortOption>>? = nil
+    ) {
         self.viewModel = viewModel
+        self.filterMemory = filterMemory
         let savedSort = StashDBViewModel.PerformerSortOption(rawValue: TabManager.shared.getSortOption(for: .performers) ?? "")
         _selectedSortOption = State(initialValue: initialSort ?? savedSort ?? .sceneCountDesc)
+        if let filterMemory {
+            _criteriaDocument = StateObject(wrappedValue: filterMemory.criteriaDocument)
+            // Remount (Home sub-tab switch): restore what the list was fetched with.
+            if let snap = filterMemory.snapshot {
+                _selectedSortOption = State(initialValue: snap.sortOption)
+                _selectedFilter = State(initialValue: snap.selectedFilter)
+                _catalogPresetRowSelection = State(initialValue: snap.presetSelection)
+                _searchText = State(initialValue: snap.searchText)
+                _isSearchVisible = State(initialValue: snap.isSearchVisible)
+                _didApplyDefaultFilter = State(initialValue: snap.didApplyDefaultFilter)
+            }
+        }
+    }
+
+    /// Host-owned filter state (Home sub-tab, see `CatalogRootFilterMemories`); `nil` = the
+    /// state lives and dies with this view.
+    private let filterMemory: CatalogListFilterMemory<CatalogListFilterSnapshot<StashDBViewModel.PerformerSortOption>>?
+
+    private var filterMemorySnapshot: CatalogListFilterSnapshot<StashDBViewModel.PerformerSortOption> {
+        CatalogListFilterSnapshot(
+            sortOption: selectedSortOption,
+            selectedFilter: selectedFilter,
+            presetSelection: catalogPresetRowSelection,
+            searchText: searchText,
+            isSearchVisible: isSearchVisible,
+            didApplyDefaultFilter: didApplyDefaultFilter
+        )
     }
     
     @State private var gridWidth: CGFloat = 0
@@ -459,10 +491,14 @@ private struct PerformersViewContent: View {
             .onAppear {
                 performersOnAppear()
             }
+            .onDisappear {
+                filterMemory?.snapshot = filterMemorySnapshot
+            }
             .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("ServerConfigChanged"))) { _ in
                 selectedFilter = nil
                 didApplyDefaultFilter = false
                 catalogPresetRowSelection = ""
+                criteriaDocument.clear()
                 refreshPerformerLocalPresets()
                 performSearch()
             }
@@ -775,6 +811,8 @@ private struct PerformersViewContent: View {
 struct PerformerCardView: View {
     let performer: Performer
     var badgeType: PerformerBadgeType = .sceneCount
+    /// "Appears with": replaces the count badge with the number of scenes shared with the host performer.
+    var sharedSceneCount: Int? = nil
     @ObservedObject var appearanceManager = AppearanceManager.shared
 
     private var ageText: String? {
@@ -790,6 +828,7 @@ struct PerformerCardView: View {
     }
 
     private var countBadgeIcon: String {
+        if sharedSceneCount != nil { return "person.2" }
         switch badgeType {
         case .sceneCount: return "film"
         case .imageCount: return "photo"
@@ -800,6 +839,7 @@ struct PerformerCardView: View {
     }
 
     private var countBadgeText: String {
+        if let sharedSceneCount { return "\(sharedSceneCount)" }
         switch badgeType {
         case .sceneCount: return "\(performer.sceneCount)"
         case .imageCount: return "\(performer.imageCount ?? 0)"
@@ -918,16 +958,23 @@ struct PerformersView: View {
     @StateObject private var ownedViewModel = StashDBViewModel()
     let catalogBrowserViewModel: StashDBViewModel?
     let initialSort: StashDBViewModel.PerformerSortOption?
+    let filterMemory: CatalogListFilterMemory<CatalogListFilterSnapshot<StashDBViewModel.PerformerSortOption>>?
 
-    init(initialSort: StashDBViewModel.PerformerSortOption? = nil, catalogBrowserViewModel: StashDBViewModel? = nil) {
+    init(
+        initialSort: StashDBViewModel.PerformerSortOption? = nil,
+        catalogBrowserViewModel: StashDBViewModel? = nil,
+        filterMemory: CatalogListFilterMemory<CatalogListFilterSnapshot<StashDBViewModel.PerformerSortOption>>? = nil
+    ) {
         self.catalogBrowserViewModel = catalogBrowserViewModel
         self.initialSort = initialSort
+        self.filterMemory = filterMemory
     }
 
     var body: some View {
         var content = PerformersViewContent(
                 viewModel: catalogBrowserViewModel ?? ownedViewModel,
-                initialSort: initialSort
+                initialSort: initialSort,
+                filterMemory: filterMemory
             )
         content.hostsInSectionChrome = catalogBrowserViewModel != nil
         return content

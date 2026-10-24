@@ -79,6 +79,7 @@ private struct ImagesViewBody: View {
     @State private var didApplyDefaultFilter = false
     @State private var showingEditGallerySheet = false
     @State private var isHeaderExpanded = false
+    @Environment(\.verticalSizeClass) private var verticalSizeClass
     /// After the user picks a per-row layout in the sheet, stop locking `forceOneColumnFeed`.
     @State private var ignoreForcedOneColumnFeed = false
     /// True while the Images feed ScrollView is dragging / decelerating.
@@ -113,6 +114,8 @@ private struct ImagesViewBody: View {
         self.imageListFilters = imageListFilters
         let seeded = initialSearch.trimmingCharacters(in: .whitespacesAndNewlines)
         _searchText = State(initialValue: seeded)
+        // A seeded search (deep link, or the catalog list's search kept across a remount) shows its field.
+        _isSearchVisible = State(initialValue: !seeded.isEmpty)
         if !seeded.isEmpty {
             viewModel.currentImageSearchQuery = seeded
         }
@@ -316,7 +319,7 @@ private struct ImagesViewBody: View {
             } else if showsBlockingInitialLoad {
                 VStack(spacing: 0) {
                     if let gallery {
-                        openedGalleryHeader(gallery)
+                        openedGalleryTop(gallery)
                             .padding(16)
                     }
                     if showsQuickBar { quickBar.padding(.top, 8) }
@@ -330,7 +333,7 @@ private struct ImagesViewBody: View {
             } else if displayedImages.isEmpty {
                 VStack(spacing: 0) {
                     if let gallery {
-                        openedGalleryHeader(gallery)
+                        openedGalleryTop(gallery)
                             .padding(16)
                     }
                     if showsQuickBar && (!imageListFilters.criteriaDocument.isEmpty || activeImagePresetName != nil) {
@@ -351,7 +354,7 @@ private struct ImagesViewBody: View {
                         ScrollView {
                             VStack(spacing: 12) {
                                 if let gallery {
-                                    openedGalleryHeader(gallery)
+                                    openedGalleryTop(gallery)
                                 }
                                 if showsQuickBar {
                                     // The bar pads itself; undo the column's inset so chips scroll edge to edge.
@@ -536,6 +539,7 @@ private struct ImagesViewBody: View {
             imageListFilters.catalogPresetRowSelection = ""
             imageListFilters.selectedFilter = nil
             imageListFilters.clearLiveChipsOnly()
+            imageListFilters.criteriaDocument.clear()
             imageListFilters.refreshLocalPresets()
             imageListFilters.hasCompletedInitialBootstrap = false
             imageListFilters.sessionLastOpenedImageId = nil
@@ -670,116 +674,114 @@ private struct ImagesViewBody: View {
         }
     }
 
-    /// Performer/Tag-style detail header for an opened gallery.
+    /// Opened-gallery top block, laid out like scene detail: one header card (cover hero
+    /// with name and details overlaid), then Performers & Studio. The grid follows below.
     @ViewBuilder
-    private func openedGalleryHeader(_ gallery: Gallery) -> some View {
-        let collapsedHeight: CGFloat = 115
-        let imageWidth: CGFloat = 72
-        let allDetails = getGalleryHeaderDetails(gallery)
-        let visibleDetails = isHeaderExpanded ? allDetails : Array(allDetails.prefix(4))
-        let hasExpandableContent = allDetails.count > 4 || !(gallery.details ?? "").isEmpty
-
-        HStack(alignment: .top, spacing: 0) {
-            ZStack(alignment: .top) {
-                if let url = gallery.coverURL {
-                    CustomAsyncImage(url: url) { loader in
-                        if loader.isLoading {
-                            Rectangle().fill(Color.gray.opacity(DesignTokens.Opacity.placeholder))
-                                .overlay(InlineSpinner(scale: .compact))
-                        } else if let image = loader.image {
-                            image.resizable()
-                                .scaledToFill()
-                                .frame(width: imageWidth)
-                                .clipped()
-                        } else {
-                            galleryHeaderPlaceholder(width: imageWidth)
-                        }
-                    }
-                } else {
-                    galleryHeaderPlaceholder(width: imageWidth)
-                }
-            }
-            .frame(width: imageWidth, alignment: .top)
-            .frame(minHeight: collapsedHeight)
-            .frame(maxHeight: isHeaderExpanded ? nil : collapsedHeight, alignment: .top)
-            .background(Color.gray.opacity(DesignTokens.Opacity.placeholder))
-
-            VStack(alignment: .leading, spacing: 4) {
-                Text(gallery.displayName)
-                    .font(.title2)
-                    .fontWeight(.bold)
-                    .foregroundColor(.primary)
-                    .lineLimit(isHeaderExpanded ? nil : 1)
-
-                if !visibleDetails.isEmpty {
-                    LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], alignment: .leading, spacing: 6) {
-                        ForEach(visibleDetails, id: \.label) { detail in
-                            VStack(alignment: .leading, spacing: 0) {
-                                Text(detail.label)
-                                    .font(.system(size: 8))
-                                    .foregroundColor(.secondary)
-                                    .textCase(.uppercase)
-                                Text(detail.value)
-                                    .font(.system(size: 11, weight: .medium))
-                                    .foregroundColor(.primary)
-                                    .lineLimit(1)
-                            }
-                        }
-                    }
-                }
-
-                if isHeaderExpanded, let details = gallery.details, !details.isEmpty {
-                    Text(details)
-                        .font(.system(size: 11))
-                        .foregroundColor(.secondary)
-                        .padding(.top, 4)
-                }
-            }
-            .padding(.vertical, 10)
-            .padding(.horizontal, 12)
-            .frame(maxWidth: .infinity, minHeight: collapsedHeight, alignment: .topLeading)
+    private func openedGalleryTop(_ gallery: Gallery) -> some View {
+        VStack(spacing: 12) {
+            openedGalleryHeaderCard(gallery)
+            openedGalleryLinkedCards(gallery)
         }
-        .background(Color.secondaryAppBackground)
-        .clipShape(RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.card))
-        .overlay(
-            RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.card)
-                .stroke(Color.primary.opacity(0.1), lineWidth: 0.5)
-        )
-        .cardShadow()
-        .fixedSize(horizontal: false, vertical: true)
-        .overlay(alignment: .bottomTrailing) {
-            if hasExpandableContent {
-                Button {
-                    withAnimation(.spring()) {
-                        isHeaderExpanded.toggle()
+    }
+
+    /// Cover first; without one the first loaded image; nothing -> no hero.
+    private func openedGalleryHeroURL(_ gallery: Gallery) -> URL? {
+        if gallery.cover != nil, let url = gallery.coverURL {
+            return url
+        }
+        return displayedImages.first?.thumbnailURL
+    }
+
+    /// Image to open fullscreen from the hero: the cover when it is in the loaded list,
+    /// otherwise the first image.
+    private func openedGalleryHeroImageId(_ gallery: Gallery) -> String? {
+        if let coverId = gallery.cover?.id, displayedImages.contains(where: { $0.id == coverId }) {
+            return coverId
+        }
+        return displayedImages.first?.id
+    }
+
+    /// Single header card for an opened gallery (`DetailHeroCard`): the cover blurred as
+    /// the compact band backdrop, the cover centre-cropped in the circle straddling the band
+    /// edge, name, details and description in the solid section. Without a cover or loaded image
+    /// a tinted band and a gallery placeholder circle. Tap opens the cover (or first image) fullscreen.
+    /// Editing stays on the nav-bar pencil.
+    private func openedGalleryHeaderCard(_ gallery: Gallery) -> some View {
+        let heroURL = openedGalleryHeroURL(gallery)
+        let heroImageId = openedGalleryHeroImageId(gallery)
+        return DetailHeroCard(
+            title: gallery.displayName,
+            items: getGalleryHeaderDetails(gallery).map { DetailHeroItem(label: $0.label, value: $0.value) },
+            description: gallery.details,
+            showsHero: heroURL != nil,
+            heroAccessibilityLabel: "Open cover image",
+            onHeroTap: heroImageId.map { id in { fullscreenImageId = id } },
+            isExpanded: $isHeaderExpanded,
+            placeholderSystemImage: AppTab.galleries.icon
+        ) {
+            if let heroURL {
+                CustomAsyncImage(url: heroURL) { loader in
+                    if let image = loader.image {
+                        image.resizable()
+                            .scaledToFill()
+                            .frame(minWidth: 0, maxWidth: .infinity, minHeight: 0, maxHeight: .infinity, alignment: .center)
+                    } else if loader.isLoading {
+                        Rectangle().fill(Color.gray.opacity(DesignTokens.Opacity.placeholder))
+                            .overlay(InlineSpinner(scale: .compact))
+                    } else {
+                        Rectangle().fill(Color.gray.opacity(DesignTokens.Opacity.placeholder))
+                            .overlay(
+                                Image(systemName: "photo.on.rectangle")
+                                    .font(.system(size: 32))
+                                    .foregroundColor(.appAccent.opacity(0.5))
+                            )
                     }
-                } label: {
-                    Image(systemName: isHeaderExpanded ? "chevron.up" : "chevron.down")
-                        .font(.system(size: 10, weight: .bold))
-                        .foregroundColor(Color.pillAccent)
-                        .padding(6)
-                        .background(appearanceManager.tintColor.opacity(0.15))
-                        .clipShape(Circle())
                 }
-                .padding(8)
             }
         }
     }
 
-    private func galleryHeaderPlaceholder(width: CGFloat) -> some View {
-        Rectangle().fill(Color.gray.opacity(DesignTokens.Opacity.placeholder))
-            .frame(width: width)
-            .frame(maxHeight: .infinity, alignment: .top)
-            .overlay(
-                Image(systemName: "photo.on.rectangle")
-                    .font(.system(size: 24))
-                    .foregroundColor(.appAccent.opacity(0.5))
+    /// Scene-detail "Performers & Studio" card for an opened gallery — only when the
+    /// gallery has a studio or performers, or always in edit mode so one can be
+    /// assigned (like Android). Edits write through `galleryUpdate`.
+    @ViewBuilder
+    private func openedGalleryLinkedCards(_ gallery: Gallery) -> some View {
+        let performers = (gallery.performers ?? []).map { $0.toScenePerformer() }
+        let studio = gallery.studio?.toSceneStudio()
+        if ScenePerformersStudioCard.isVisible(performers: performers, studio: studio, editing: appearanceManager.isEditModeEnabled) {
+            ScenePerformersStudioCard(
+                sceneId: gallery.id,
+                sceneDate: gallery.date,
+                performers: performers,
+                studio: studio,
+                onPerformersUpdated: { updated in
+                    guard var current = self.gallery, current.id == gallery.id else { return }
+                    current.performers = updated.map { $0.toGalleryPerformer() }
+                    self.gallery = current
+                },
+                onStudioUpdated: { updated in
+                    guard var current = self.gallery, current.id == gallery.id else { return }
+                    current.studio = updated.map {
+                        GalleryStudio(id: $0.id, name: $0.name, image_path: $0.imagePath, updated_at: $0.updatedAt)
+                    }
+                    self.gallery = current
+                },
+                savePerformerIds: { ids, done in
+                    viewModel.updateGalleryPerformers(galleryId: gallery.id, performerIds: ids, completion: done)
+                },
+                saveStudioId: { id, done in
+                    viewModel.updateGalleryStudio(galleryId: gallery.id, studioId: id, completion: done)
+                },
+                viewModel: viewModel
             )
+        }
     }
 
     /// Image 1-row avatar navigation passes a stub Gallery (`cover: nil`). Load full metadata for the header.
     private func hydrateOpenedGalleryIfNeeded() async {
-        guard let current = gallery, current.cover == nil else { return }
+        // Stubs (`cover: nil`) and partial galleries from scene/other queries
+        // (`performers` not fetched) both need the full GalleryFields set.
+        guard let current = gallery, current.cover == nil || current.performers == nil else { return }
         let query = GraphQLQueries.queryWithFragments("findGalleries")
         let variables: [String: Any] = [
             "ids": [current.id],
@@ -807,13 +809,10 @@ private struct ImagesViewBody: View {
         if let date = gallery.date, !date.isEmpty {
             list.append((label: "DATE", value: date))
         }
-        if let studio = gallery.studio {
-            list.append((label: "STUDIO", value: studio.name))
+        if let rating = gallery.rating100 {
+            list.append((label: "RATING", value: "\(rating)%"))
         }
-        if let performers = gallery.performers, !performers.isEmpty {
-            let names = performers.map(\.name).joined(separator: ", ")
-            list.append((label: "PERFORMERS", value: names))
-        }
+        // Studio and performers live in their own cards below the header.
         if gallery.organized == true {
             list.append((label: "ORGANIZED", value: "Yes"))
         }
@@ -1243,6 +1242,7 @@ struct ImageGroupCatalogCell: View {
 
     @State private var visibleImageId: String
     @State private var tagEditorImage: StashImage?
+    @State private var performerEditorImage: StashImage?
     @ObservedObject private var appearanceManager = AppearanceManager.shared
 
     init(
@@ -1323,7 +1323,11 @@ struct ImageGroupCatalogCell: View {
                     heroButton(for: visibleImage)
                 }
 
-                ImageCatalogFeedHeader(image: visibleImage, currentGalleryId: currentGalleryId)
+                ImageCatalogFeedHeader(
+                    image: visibleImage,
+                    currentGalleryId: currentGalleryId,
+                    onEditPerformers: viewModel == nil ? nil : { openPerformerEditor(for: visibleImage) }
+                )
 
                 HStack(alignment: .bottom, spacing: 8) {
                     if images.count > 1 {
@@ -1392,10 +1396,41 @@ struct ImageGroupCatalogCell: View {
                 }
             }
         }
+        .sheet(item: $performerEditorImage) { image in
+            if let viewModel {
+                AddPerformerToSceneSheet(
+                    sceneId: "",
+                    currentPerformers: (image.performers ?? []).map { $0.toScenePerformer() },
+                    viewModel: viewModel,
+                    savePerformerIds: { ids, done in
+                        viewModel.updateImagePerformers(imageId: image.id, performerIds: ids, completion: done)
+                    }
+                ) { updated in
+                    let performers = updated.map { $0.toGalleryPerformer() }
+                    var patched = images.first(where: { $0.id == image.id }) ?? image
+                    patched.performers = performers
+                    onImageUpdated?(patched)
+                    StashImage.postPerformersUpdated(imageId: image.id, performers: performers)
+                    HapticManager.success()
+                    ToastManager.shared.show("Performers updated")
+                }
+            }
+        }
     }
 }
 
 extension ImageGroupCatalogCell {
+    /// Refuses images whose list was fetched without performers — saving from there
+    /// would drop everyone already on the image.
+    fileprivate func openPerformerEditor(for image: StashImage) {
+        guard image.performers != nil else {
+            HapticManager.error()
+            ToastManager.shared.show("Could not load performers", icon: "exclamationmark.triangle.fill", style: .error)
+            return
+        }
+        performerEditorImage = image
+    }
+
     // MARK: Tags (same row as Feeds: pinned "+", scrolling chips)
 
     @ViewBuilder
@@ -1611,6 +1646,8 @@ extension ImageGroupCatalogCell {
 struct ImageCatalogFeedHeader: View {
     let image: StashImage
     var currentGalleryId: String? = nil
+    /// Edit mode "+" behind the names; `nil` hides it (no view model to save with).
+    var onEditPerformers: (() -> Void)? = nil
     @ObservedObject private var appearanceManager = AppearanceManager.shared
 
     private var performers: [GalleryPerformer] {
@@ -1680,38 +1717,10 @@ struct ImageCatalogFeedHeader: View {
             .padding(.trailing, performers.count > 1 ? CGFloat(performers.count - 1) * -10 : 0)
 
             VStack(alignment: .leading, spacing: 1) {
-                if performers.isEmpty {
-                    Text(image.title ?? "Unknown")
-                        .font(.subheadline).fontWeight(.semibold)
-                        .foregroundColor(.white)
-                        .lineLimit(1)
-                        .shadow(color: .black.opacity(0.35), radius: 1, y: 1)
-                } else if performers.count == 1 {
-                    NavigationLink(destination: PerformerDetailView(performer: performers[0].toPerformer(), initialTab: .images)) {
-                        Text(performers[0].name)
-                            .font(.subheadline).fontWeight(.semibold)
-                            .foregroundColor(.white)
-                            .lineLimit(1)
-                            .shadow(color: .black.opacity(0.35), radius: 1, y: 1)
-                    }
-                    .buttonStyle(.plain)
-                } else {
-                    HStack(spacing: 4) {
-                        ForEach(Array(performers.enumerated()), id: \.element.id) { idx, performer in
-                            NavigationLink(destination: PerformerDetailView(performer: performer.toPerformer(), initialTab: .images)) {
-                                Text(performer.name)
-                                    .font(.subheadline).fontWeight(.semibold)
-                                    .foregroundColor(.white)
-                                    .lineLimit(1)
-                                    .shadow(color: .black.opacity(0.35), radius: 1, y: 1)
-                            }
-                            .buttonStyle(.plain)
-                            if idx < performers.count - 1 {
-                                Text("&")
-                                    .font(.subheadline)
-                                    .foregroundColor(.white.opacity(0.75))
-                            }
-                        }
+                HStack(spacing: 8) {
+                    nameLine
+                    if let onEditPerformers, appearanceManager.isEditModeEnabled {
+                        AddPerformerPlusButton(action: onEditPerformers)
                     }
                 }
 
@@ -1747,6 +1756,44 @@ struct ImageCatalogFeedHeader: View {
                 endPoint: .bottom
             )
         )
+    }
+
+    @ViewBuilder
+    private var nameLine: some View {
+        if performers.isEmpty {
+            Text(image.title ?? "Unknown")
+                .font(.subheadline).fontWeight(.semibold)
+                .foregroundColor(.white)
+                .lineLimit(1)
+                .shadow(color: .black.opacity(0.35), radius: 1, y: 1)
+        } else if performers.count == 1 {
+            NavigationLink(destination: PerformerDetailView(performer: performers[0].toPerformer(), initialTab: .images)) {
+                Text(performers[0].name)
+                    .font(.subheadline).fontWeight(.semibold)
+                    .foregroundColor(.white)
+                    .lineLimit(1)
+                    .shadow(color: .black.opacity(0.35), radius: 1, y: 1)
+            }
+            .buttonStyle(.plain)
+        } else {
+            HStack(spacing: 4) {
+                ForEach(Array(performers.enumerated()), id: \.element.id) { idx, performer in
+                    NavigationLink(destination: PerformerDetailView(performer: performer.toPerformer(), initialTab: .images)) {
+                        Text(performer.name)
+                            .font(.subheadline).fontWeight(.semibold)
+                            .foregroundColor(.white)
+                            .lineLimit(1)
+                            .shadow(color: .black.opacity(0.35), radius: 1, y: 1)
+                    }
+                    .buttonStyle(.plain)
+                    if idx < performers.count - 1 {
+                        Text("&")
+                            .font(.subheadline)
+                            .foregroundColor(.white.opacity(0.75))
+                    }
+                }
+            }
+        }
     }
 
     private var emptyPerformerAvatar: some View {

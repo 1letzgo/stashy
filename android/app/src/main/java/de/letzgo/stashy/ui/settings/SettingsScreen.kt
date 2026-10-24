@@ -73,6 +73,8 @@ private fun androidx.compose.foundation.lazy.LazyListScope.designSettings() {
         SettingsNavRow("Appearance", SFS.paintbrush) { Nav.push(AppearanceSettingsScreen()) }
         SettingsDivider()
         SettingsNavRow("Editing", SFS.pencilCircle) { Nav.push(EditModeSettingsScreen()) }
+        SettingsDivider()
+        SettingsNavRow("Scene View", SF.rectangleGrid1x2) { Nav.push(SceneViewSettingsScreen()) }
     }
     settingsSection(header = "Security", key = "security") {
         SettingsNavRow("Security", SFS.lockShield) { Nav.push(SecuritySettingsScreen()) }
@@ -106,7 +108,7 @@ private fun androidx.compose.foundation.lazy.LazyListScope.aboutSection() {
     // iOS `tipSection` — the tip products inline (header, Small / Medium / Large, footer).
     // Sideload builds aren't installed by Play, so Play returns no tips there: the section only
     // shows when tips were loaded instead of a permanent "Tips unavailable".
-    if (!BuildConfig.PLUS_INCLUDED || StashyPlus.tipProducts.isNotEmpty()) item(key = "tips") {
+    if (!BuildConfig.LICENSE_KEYS || StashyPlus.tipProducts.isNotEmpty()) item(key = "tips") {
         StashyTipsSection(Modifier.padding(bottom = 24.dp))
     }
     settingsSection(header = "Links", key = "links") {

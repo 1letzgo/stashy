@@ -40,11 +40,11 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.compose.LocalLifecycleOwner
-import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
@@ -65,6 +65,8 @@ import de.letzgo.stashy.ui.IosTypography
 import de.letzgo.stashy.ui.MainTab
 import de.letzgo.stashy.ui.Nav
 import de.letzgo.stashy.ui.SF
+import de.letzgo.stashy.ui.FeedsTabBarPolicy
+import de.letzgo.stashy.ui.TabBarAutoHide
 import de.letzgo.stashy.ui.detail.PerformerDetailScreen
 import de.letzgo.stashy.ui.scene.SceneDetailScreen
 import de.letzgo.stashy.ui.stashyGlass
@@ -77,15 +79,14 @@ import kotlinx.coroutines.launch
  * Edge-to-edge vertical pager (one row per screen) with autoplay of the settled row and
  * preloading of its neighbours ([FeedPlayerPool]); the section chrome (mode dock + Filter &
  * Sort) floats on top, the info overlay and scrubber sit right above the floating tab bar.
- * Tapping the media hides all chrome including the tab bar, like iOS. Pics is the Images
+ * Tapping the media hides all chrome including the tab bar, like iOS. With "Auto-hide tab bar"
+ * on, a swipe to a later row also slides the bar away (the overlay follows it down); the first
+ * row, a tab / mode switch or tapping the chrome back in returns it. Pics is the Images
  * catalog's 1/row feed under the same chrome ([PicsFeed]); loading / empty / error states and
  * Pics sit on the app background like iOS (`StashyThemeFill(.app)`), video rows on black.
  *
  * Known differences to iOS: the AI Motion pill (device control) is not ported (Play policy);
- * the Feeds sheet has no Save / presets (see [FeedsFilterSortSheet]); the performer avatar opens the
- * performer's default detail section (iOS jumps to Images for Clips / Pics); the scrubber shows
- * the row's poster (Markers: the scene's sprite tile) instead of decoded scrub stills; the mode
- * chip's label appears without iOS's delayed fade.
+ * the mode chip's label appears without iOS's delayed fade.
  *
  * Markers play their window of the original scene (`seconds … end_seconds`, else 30 s — see
  * [FeedSegment]) with audio, not Stash's generated marker clip; the scrubber spans that window.
@@ -110,6 +111,8 @@ fun FeedsScreen() {
     var deleteTarget by remember { mutableStateOf<FeedItem?>(null) }
     /** iOS `tagEditorTarget` — the row whose `AddTagsSheet` is open. */
     var tagEditorTarget by remember { mutableStateOf<AITagTarget?>(null) }
+    /** The row whose "Add Performers" picker is open (overlay "+" after the names). */
+    var performerTarget by remember { mutableStateOf<FeedItem?>(null) }
     /** iOS `wasPlayingBeforeTagEditor`. */
     var wasPlayingBeforeTagEditor by remember { mutableStateOf(false) }
     var lifecycleActive by remember { mutableStateOf(true) }
@@ -134,11 +137,10 @@ fun FeedsScreen() {
         }
     }
 
-    // iOS: `isIdleTimerDisabled = true` while Feeds is up; background pauses, foreground resumes.
-    val view = LocalView.current
+    // Background pauses, foreground resumes. The screen stays on only while a row actually plays
+    // (FeedPlayerPool → ScreenAwakeCoordinator), not merely while Feeds is up.
     val lifecycle = LocalLifecycleOwner.current.lifecycle
     DisposableEffect(lifecycle) {
-        view.keepScreenOn = true
         val observer = LifecycleEventObserver { _, event ->
             when (event) {
                 Lifecycle.Event.ON_PAUSE -> { lifecycleActive = false; pool.pauseAll() }
@@ -149,12 +151,15 @@ fun FeedsScreen() {
         lifecycle.addObserver(observer)
         onDispose {
             lifecycle.removeObserver(observer)
-            view.keepScreenOn = false
             Nav.rootHidesTabBar = false
             pool.release()
         }
     }
-    LaunchedEffect(isUIVisible) { Nav.rootHidesTabBar = !isUIVisible }
+    LaunchedEffect(isUIVisible) {
+        Nav.rootHidesTabBar = !isUIVisible
+        // Auto-hide: tapping the chrome back in brings an auto-hidden tab bar with it.
+        TabBarAutoHide.apply(FeedsTabBarPolicy.onChromeVisibilityChanged(isUIVisible))
+    }
 
     // Toast-like messages (iOS `ToastManager`).
     var toast by remember { mutableStateOf<String?>(null) }
@@ -165,8 +170,16 @@ fun FeedsScreen() {
     val mode = model.mode
     val list = model.list(mode)
     val navBottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
-    // Height the tab bar covers (bar + system nav inset, measured in AppShell) while the chrome shows.
-    val tabBarOverlap = if (isUIVisible) tabBarHeight() else navBottom
+    // Height the tab bar covers (bar + system nav inset, measured in AppShell) while the chrome
+    // shows. An auto-hidden bar (Settings › Appearance) slides away; the overlay and scrubber
+    // follow it down to the system inset with the bar's own animation.
+    val barShown by animateFloatAsState(
+        if (TabBarAutoHide.enabled && TabBarAutoHide.hidden) 0f else 1f,
+        tween(TabBarAutoHide.ANIMATION_MS), label = "feedsTabBarInset",
+    )
+    val tabBarOverlap = FeedsTabBarPolicy.overlayInset(isUIVisible, barShown, tabBarHeight().value, navBottom.value).dp
+    // Sheets and dialogs keep the bar where it is.
+    val overlayOpen = showSheet || tagEditorTarget != null || performerTarget != null || deleteTarget != null || model.pics.isSheetPresented
 
     // Height of the top chrome (bar + criterion chips): Pics content starts below it (iOS safeAreaInset).
     val density = LocalDensity.current
@@ -178,7 +191,8 @@ fun FeedsScreen() {
     Box(Modifier.fillMaxSize().background(Theme.palette.background)) {
         val items = model.visibleItems(mode)
         when {
-            mode == ReelsModeType.Pics -> PicsFeed(model, topPadding = chromeHeight, bottomPadding = tabBarOverlap)
+            // Pics keeps the full bar padding while the bar auto-hides, like every other list.
+            mode == ReelsModeType.Pics -> PicsFeed(model, topPadding = chromeHeight, bottomPadding = if (isUIVisible) tabBarHeight() else navBottom)
             ServerConfigManager.activeConfig == null -> StatusPlaceholder(SF.server, "Server not reachable", "Retry Connection", { model.refetch(mode) })
             items.isEmpty() && list.isLoading -> StandardLoading("Loading feeds...")
             items.isEmpty() && list.error != null -> StatusPlaceholder(SF.server, "Server not reachable", "Retry Connection", { model.refetch(mode) })
@@ -189,6 +203,7 @@ fun FeedsScreen() {
                     model = model, mode = mode, items = items, pool = pool,
                     isUIVisible = isUIVisible, isZoomed = isZoomed, lifecycleActive = lifecycleActive,
                     tabBarOverlap = tabBarOverlap,
+                    overlayOpen = overlayOpen,
                     onToggleUI = { isUIVisible = !isUIVisible },
                     onZoom = { isZoomed = it },
                     onDelete = { deleteTarget = it },
@@ -199,14 +214,24 @@ fun FeedsScreen() {
                         model.isPlaying = false
                         tagEditorTarget = target
                     },
+                    onAddPerformers = { item ->
+                        wasPlayingBeforeTagEditor = model.isPlaying
+                        model.isPlaying = false
+                        performerTarget = item
+                    },
                 )
             }
         }
 
         // Top chrome: mode dock + Filter & Sort, criterion chips below (iOS `reelsNavBar`).
-        val chromeAlpha by animateFloatAsState(if (isUIVisible) 1f else 0f, tween(200), label = "chrome")
+        // Auto-hide (pager modes only): slides up and fades out together with the tab bar, on
+        // the same trigger and animation; rows are full-screen, so the video just gains room.
+        val tapAlpha by animateFloatAsState(if (isUIVisible) 1f else 0f, tween(200), label = "chrome")
+        val topShown = FeedsTabBarPolicy.topChromeShownFraction(mode == ReelsModeType.Pics, barShown)
+        val chromeAlpha = tapAlpha * topShown
         Column(
-            Modifier.fillMaxWidth().alpha(chromeAlpha).align(Alignment.TopCenter)
+            Modifier.fillMaxWidth().align(Alignment.TopCenter)
+                .graphicsLayer { alpha = chromeAlpha; translationY = -(1f - topShown) * size.height }
                 .onSizeChanged { with(density) { if (chromeAlpha > 0.99f) measuredChrome = it.height.toDp() } },
         ) {
             if (chromeAlpha > 0.01f) {
@@ -238,10 +263,18 @@ fun FeedsScreen() {
         FeedsFilterSortSheet(
             mode = mode,
             filters = model.filtersFor(mode),
+            localPresets = model.localPresets(mode),
+            presetRow = model.presetRow(mode),
+            presetName = model.presetName(mode),
             selectedFilter = model.filters[mode],
             sort = model.sort(mode),
             sortOptions = model.sortOptions(mode),
-            onFilter = { pool.teardown(); model.setFilter(mode, it) },
+            onPresetRow = { pool.teardown(); model.selectPresetRow(mode, it) },
+            onSaveOverwrite = { model.saveOverwrite(mode) },
+            onSaveAs = { model.saveAs(mode, it) },
+            onRename = { model.rename(mode, it) },
+            onDelete = { model.deletePreset(mode) },
+            deleteConfirmationText = { model.deleteConfirmationText(mode) },
             onSort = { pool.teardown(); model.setSort(mode, it) },
             onCriteriaChanged = { pool.teardown(); model.applyCriteriaDocument(mode) },
             onReset = { pool.teardown(); model.reset(mode) },
@@ -255,6 +288,20 @@ fun FeedsScreen() {
             tagEditorTarget = null
             if (wasPlayingBeforeTagEditor) { wasPlayingBeforeTagEditor = false; model.isPlaying = true }
         }) { }
+    }
+
+    performerTarget?.let { item ->
+        // The scene detail's performer picker, add-only (existing ∪ picked via FeedsModel.addPerformers).
+        de.letzgo.stashy.ui.scene.PerformersPickerSheet(
+            itemKey = item.id,
+            current = item.performers.map { de.letzgo.stashy.ui.scene.PickerEntry(it.id, it.name, null, it.thumbnailURL) },
+            addOnly = true,
+            save = { _, picked -> check(model.addPerformers(item, picked)) },
+            onDismiss = {
+                performerTarget = null
+                if (wasPlayingBeforeTagEditor) { wasPlayingBeforeTagEditor = false; model.isPlaying = true }
+            },
+        )
     }
 
     deleteTarget?.let { item ->
@@ -279,10 +326,12 @@ private fun FeedPager(
     isZoomed: Boolean,
     lifecycleActive: Boolean,
     tabBarOverlap: androidx.compose.ui.unit.Dp,
+    overlayOpen: Boolean,
     onToggleUI: () -> Unit,
     onZoom: (Boolean) -> Unit,
     onDelete: (FeedItem) -> Unit,
     onAddTags: (AITagTarget) -> Unit,
+    onAddPerformers: (FeedItem) -> Unit,
 ) {
     val scope = rememberCoroutineScope()
     val list = model.list(mode)
@@ -294,6 +343,26 @@ private fun FeedPager(
     LaunchedEffect(pagerState) {
         snapshotFlow { pagerState.settledPage }.collect { idx ->
             currentItems.getOrNull(idx)?.let { model.currentIds[mode] = it.id }
+        }
+    }
+    // Auto-hide tab bar (Settings › Appearance): a user swipe on to a later row slides the bar
+    // away, the first row brings it back (FeedsTabBarPolicy). Programmatic moves (continuous
+    // play, restore) only count when they land on the first row.
+    val overlayOpenNow by rememberUpdatedState(overlayOpen)
+    LaunchedEffect(pagerState) {
+        var swiped = false
+        launch {
+            pagerState.interactionSource.interactions.collect {
+                if (it is androidx.compose.foundation.interaction.DragInteraction.Start) swiped = true
+            }
+        }
+        var from = pagerState.settledPage
+        snapshotFlow { pagerState.isScrollInProgress }.collect { inProgress ->
+            if (inProgress) return@collect
+            val to = pagerState.currentPage
+            TabBarAutoHide.apply(FeedsTabBarPolicy.onPageSettled(from, to, swiped, overlayOpenNow))
+            from = to
+            swiped = false
         }
     }
     val activeId = model.currentIds[mode]
@@ -431,7 +500,11 @@ private fun FeedPager(
                     isPlaying = isPlaying,
                     showsDelete = FeedsConfig.showsDeleteButton,
                     onPerformerFilter = { p -> model.filterByPerformer(IdName(p.id, p.name)) },
-                    onPerformerOpen = { p -> Nav.push(PerformerDetailScreen(p.id, Performer(id = p.id, name = p.name))) },
+                    // iOS: Clips (and Pics) are image feeds — open the performer on Images.
+                    onPerformerOpen = { p ->
+                        val images = mode == ReelsModeType.Clips || mode == ReelsModeType.Pics
+                        Nav.push(PerformerDetailScreen(p.id, Performer(id = p.id, name = p.name), initialTab = if (images) de.letzgo.stashy.ui.detail.DetailTab.Images else null))
+                    },
                     onTitle = {
                         activeItem.titleLinkScene?.let { s -> Nav.push(SceneDetailScreen(s.id, s)) }
                     },
@@ -448,16 +521,18 @@ private fun FeedPager(
                     },
                     onTogglePlay = { model.isPlaying = !model.isPlaying },
                     pausesAdvance = activeItem.isAnimated && continuous,
+                    // Edit Mode gate like the tag row's "Add tag" (iOS parity).
+                    onAddPerformers = if (de.letzgo.stashy.ui.Appearance.isEditModeEnabled && activeItem.canAddPerformers) ({ onAddPerformers(activeItem) }) else null,
                 )
                 if (!activeItem.isAnimated) {
-                    // Markers: the bar spans the segment (the player is clipped to it), the
-                    // scrub still comes from the scene's sprite sheet at the matching scene time.
+                    // iOS `ReelsView` scrub preview: the scene's sprite sheet + VTT index, like the
+                    // scene player. Scenes scrub in scene time; Markers' bar spans the segment
+                    // (the player is clipped to it), so the still is read at the matching scene
+                    // time. Previews (a generated clip) and scenes without sprites keep the poster.
                     val segment = activeItem.segment
-                    val sprites = remember(activeItem.id) {
-                        (activeItem as? FeedItem.MarkerItem)?.marker?.scene?.paths?.let {
-                            de.letzgo.stashy.ui.player.SceneScrubSprites.create(it.vtt, it.sprite)
-                        }
-                    }
+                    val sprites = remember(activeItem.id) { feedScrubSprites(activeItem) }
+                    // Fetched as soon as the row is active, so the first scrub already has stills.
+                    LaunchedEffect(sprites) { sprites?.prepare() }
                     val previewAt = remember(sprites, segment) {
                         sprites?.let { sp -> { s: Double -> sp.prepare(); sp.thumbnail(segment?.sceneTime(s) ?: s) } }
                     }
@@ -476,6 +551,16 @@ private fun FeedPager(
             }
         }
     }
+}
+
+/** Sprite sheet of the scene a row scrubs through (Scenes, Markers); null for clips / previews. */
+private fun feedScrubSprites(item: FeedItem): de.letzgo.stashy.ui.player.SceneScrubSprites? {
+    val paths = when (item) {
+        is FeedItem.SceneItem -> item.scene.paths
+        is FeedItem.MarkerItem -> item.marker.scene?.paths
+        else -> null
+    } ?: return null
+    return de.letzgo.stashy.ui.player.SceneScrubSprites.create(paths.vtt, paths.sprite)
 }
 
 private fun emptyIcon(mode: ReelsModeType) = when (mode) {

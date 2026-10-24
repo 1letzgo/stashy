@@ -67,7 +67,13 @@ struct SceneVideoPlayerCard: View {
                                 liveCaptionText: subtitleController.isLiveCaptionsActive
                                     ? subtitleController.currentText
                                     : "",
-                                onToggleFullscreen: { isFullscreen = true },
+                                onToggleFullscreen: {
+                                    // No slide-up: the cover is there at once, so a landscape video
+                                    // can turn right away instead of after the animation.
+                                    var transaction = Transaction()
+                                    transaction.disablesAnimations = true
+                                    withTransaction(transaction) { isFullscreen = true }
+                                },
                                 markers: activeScene.timeBarMarkers,
                                 onAddMarker: onAddMarker,
                                 extraMenuItems: { extrasController.menuItems() },
@@ -180,7 +186,7 @@ struct SceneVideoPlayerCard: View {
             if !isPreviewing,
                let resumeTime = activeScene.resumeTime, resumeTime > 0,
                let duration = activeScene.sceneDuration, duration > 0 {
-                resumeProgressBar(progress: min(1, resumeTime / duration))
+                resumeProgressBar(progress: PlaybackFraction.of(resumeTime, in: duration))
             }
         }
         .frame(maxWidth: .infinity)
