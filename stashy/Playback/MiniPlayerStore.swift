@@ -399,11 +399,19 @@ final class WatchlistStore: ObservableObject {
     func remove(_ sceneId: String) {
         scenes.removeAll { $0.id == sceneId }
         persist()
+        resetIfEmptied()
     }
 
     func remove(atOffsets offsets: IndexSet) {
         scenes.remove(atOffsets: offsets)
         persist()
+        resetIfEmptied()
+    }
+
+    /// Removing the last entry is the same as Reset: playback stops, bar and full view go.
+    private func resetIfEmptied() {
+        guard scenes.isEmpty else { return }
+        MiniPlayerStore.shared.resetWatchlistAndPlayback()
     }
 
     func move(fromOffsets source: IndexSet, toOffset destination: Int) {

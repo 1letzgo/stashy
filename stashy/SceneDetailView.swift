@@ -595,6 +595,7 @@ struct SceneDetailView: View {
             onRefreshMarkers: refreshSceneDetails,
             onInitialSync: initialSync,
             onEnsureAetherAnalysis: ensureAetherVideoAnalysis,
+            onPauseForFeeds: handlePauseForFeeds,
             handyManager: handyManager,
             buttplugManager: buttplugManager,
             loveSpouseManager: loveSpouseManager
@@ -714,6 +715,20 @@ struct SceneDetailView: View {
         // display channel.
         guard let aether = aetherEngine else { return }
         subtitleController.attach(aether: aether)
+    }
+
+    /// Feeds took over the screen. A playing scene goes to the mini player first: paused, the
+    /// later disappear would stop it instead, and the bar stayed gone after leaving Feeds.
+    private func handlePauseForFeeds() {
+        #if !os(tvOS)
+        if let aether = aetherEngine, isPlaybackStarted, aether.isPlaying, !isFullscreen,
+           MiniPlayerStore.shared.isEnabled {
+            finishDisappearTeardown()
+            MiniPlayerStore.shared.session?.engine.pause()
+            return
+        }
+        #endif
+        aetherEngine?.pause()
     }
 
     private func handleOnDisappear() {
@@ -1768,6 +1783,7 @@ private struct SceneDetailLifecycleModifier: ViewModifier {
     let onRefreshMarkers:  () -> Void
     let onInitialSync:     () -> Void
     let onEnsureAetherAnalysis: () -> Void
+    let onPauseForFeeds:   () -> Void
     let handyManager:      HandyManager
     let buttplugManager:   ButtplugManager
     let loveSpouseManager: LoveSpouseManager
@@ -1795,7 +1811,7 @@ private struct SceneDetailLifecycleModifier: ViewModifier {
             // Feeds taking over the screen stops this player; otherwise its audio kept running
             // underneath the feed until the user swiped.
             .onReceive(NotificationCenter.default.publisher(for: .stashyPauseBackgroundPlayers)) { _ in
-                aetherEngine?.pause()
+                onPauseForFeeds()
             }
             .onReceive(Timer.publish(every: 10, on: .main, in: .common).autoconnect()) { _ in onPeriodicSync() }
             .onChange(of: StashSyncManager.shared.isActive) { _, active in if active { onInitialSync() } }
