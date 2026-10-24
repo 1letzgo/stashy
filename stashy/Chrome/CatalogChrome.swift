@@ -68,7 +68,8 @@ struct CatalogChromeConfig {
     var hostsInSectionChrome: Bool = false
     var columns: CatalogChromeSlot? = nil              // slot 1
     var quickFilter: CatalogQuickFilterMenuModel? = nil // slot 2
-    var filterSort: CatalogChromeSlot                   // slot 3
+    /// Optional: catalog lists open the sheet from their quick bar instead (`CatalogListQuickBar`).
+    var filterSort: CatalogChromeSlot? = nil            // slot 3
     var contextual: CatalogChromeSlot? = nil            // slot 4
     /// Optional slot 5 for screens that legitimately carry two contextual actions
     /// (Images: select mode plus the gallery download control).

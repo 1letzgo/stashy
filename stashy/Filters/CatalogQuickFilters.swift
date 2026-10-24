@@ -306,25 +306,32 @@ struct CatalogListQuickBar<Option: CatalogQuickSortable>: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 8) {
-                    if let onOpenFilters {
-                        Button(action: onOpenFilters) {
-                            Image(systemName: "line.3.horizontal.decrease")
-                                .font(.system(size: 13, weight: .semibold))
-                                .frame(width: 32, height: 30)
-                                .background(Color.secondaryAppBackground)
-                                .foregroundColor(.primary)
-                                .clipShape(Capsule())
+            HStack(spacing: 0) {
+                // Pinned: only the sort chips scroll, the settings button stays put.
+                if let onOpenFilters {
+                    settingsButton(action: onOpenFilters)
+                        .padding(.leading, 16)
+                        .padding(.trailing, 8)
+                }
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 8) {
+                        ForEach(sortFields, id: \.self) { field in
+                            sortChip(field)
                         }
-                        .buttonStyle(.plain)
-                        .accessibilityLabel("Filters")
                     }
-                    ForEach(sortFields, id: \.self) { field in
-                        sortChip(field)
+                    .padding(.leading, onOpenFilters == nil ? 16 : 0)
+                    .padding(.trailing, 16)
+                }
+                // Chips fade out under the pinned button instead of being cut off hard.
+                .mask {
+                    HStack(spacing: 0) {
+                        if onOpenFilters != nil {
+                            LinearGradient(colors: [.clear, .black], startPoint: .leading, endPoint: .trailing)
+                                .frame(width: 12)
+                        }
+                        Color.black
                     }
                 }
-                .padding(.horizontal, 16)
             }
             let chips = activeChips
             if !chips.isEmpty || presetName != nil {
@@ -348,6 +355,29 @@ struct CatalogListQuickBar<Option: CatalogQuickSortable>: View {
             }
         }
         .padding(.vertical, 4)
+    }
+
+    /// Replaces the chrome's former "Settings" slot; the dot marks an active filter.
+    private func settingsButton(action: @escaping () -> Void) -> some View {
+        let filtered = presetName != nil || !document.isEmpty
+        return Button(action: action) {
+            Image(systemName: "slider.horizontal.3")
+                .font(.system(size: 14, weight: .semibold))
+                .frame(width: 38, height: 30)
+                .background(Color.secondaryAppBackground)
+                .foregroundColor(.primary)
+                .clipShape(Capsule())
+                .overlay(alignment: .topTrailing) {
+                    if filtered {
+                        Circle()
+                            .fill(appearance.tintColor)
+                            .frame(width: 8, height: 8)
+                            .offset(x: -2, y: 1)
+                    }
+                }
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("Filter and sort settings")
     }
 
     private func sortChip(_ field: CatalogQuickSortCatalog.Field) -> some View {

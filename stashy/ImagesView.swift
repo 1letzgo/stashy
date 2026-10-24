@@ -862,7 +862,7 @@ private struct ImagesViewBody: View {
             ),
             isPresented: !feedsEmbedded,
             hostsInSectionChrome: hostsInSectionChrome && !isOpenedGallery,
-            filterSort: CatalogChromeSlot(
+            filterSort: showsQuickBar ? nil : CatalogChromeSlot(
                 systemImage: "slider.horizontal.3",
                 isActive: catalogFilterSortFABActive,
                 accessibilityLabel: "Settings",

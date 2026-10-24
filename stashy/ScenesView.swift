@@ -1085,12 +1085,6 @@ private struct ScenesViewContent: View {
             ),
             isPresented: showsFloatingFilterButton,
             hostsInSectionChrome: hostsInSectionChrome,
-            filterSort: CatalogChromeSlot(
-                systemImage: "slider.horizontal.3",
-                isActive: liveFilterFABHasSomethingSet,
-                accessibilityLabel: "Settings",
-                action: { liveFilterSheetPresented.wrappedValue = true }
-            ),
             // Embedded in a detail screen the parent owns the nav bar, so no search field here.
             search: hideTitle ? nil : CatalogSearchChrome(
                 text: $searchText,

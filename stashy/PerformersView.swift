@@ -565,12 +565,6 @@ private struct PerformersViewContent: View {
             ),
             isPresented: true,
             hostsInSectionChrome: hostsInSectionChrome,
-            filterSort: CatalogChromeSlot(
-                systemImage: "slider.horizontal.3",
-                isActive: catalogFilterSortFABActive,
-                accessibilityLabel: "Settings",
-                action: { showFilterSortSheet = true }
-            ),
             search: CatalogSearchChrome(
                 text: $searchText,
                 isVisible: $isSearchVisible,

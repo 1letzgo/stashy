@@ -460,12 +460,6 @@ private struct TagsViewContent: View {
             ),
             isPresented: true,
             hostsInSectionChrome: hostsInSectionChrome,
-            filterSort: CatalogChromeSlot(
-                systemImage: "slider.horizontal.3",
-                isActive: catalogFilterSortFABActive,
-                accessibilityLabel: "Settings",
-                action: { showFilterSortSheet = true }
-            ),
             search: CatalogSearchChrome(
                 text: $searchText,
                 isVisible: $isSearchVisible,
@@ -1288,14 +1282,7 @@ struct TagDetailView: View {
         )
         switch selectedDetailTab {
         case .scenes:
-            slots.filterSort = CatalogChromeSlot(
-                systemImage: "slider.horizontal.3",
-                isActive: tagSceneFilterActive,
-                accessibilityLabel: "Filter and sort"
-            ) {
-                HapticManager.light()
-                tagLiveFilterSheetPresented = true
-            }
+            // Filter & sort opens from the scene list's own quick bar.
             slots.contextual = SceneBulkDownloadChrome.slot {
                 showingSceneDownloadOptions = true
             }

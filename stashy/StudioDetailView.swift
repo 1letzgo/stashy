@@ -528,14 +528,7 @@ struct StudioDetailView: View {
         var slots = CatalogSlotSet(visibility: studioDetailCatalogFloatingChromeForFooter)
         switch selectedDetailTab {
         case .scenes:
-            slots.filterSort = CatalogChromeSlot(
-                systemImage: "slider.horizontal.3",
-                isActive: studioSceneFilterActive,
-                accessibilityLabel: "Filter and sort"
-            ) {
-                HapticManager.light()
-                studioLiveFilterSheetPresented = true
-            }
+            // Filter & sort opens from the scene list's own quick bar.
             slots.contextual = SceneBulkDownloadChrome.slot {
                 showingSceneDownloadOptions = true
             }

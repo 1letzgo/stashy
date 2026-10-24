@@ -64,7 +64,7 @@ fun PerformersCatalog() {
 fun PerformersList(c: CatalogController<Performer>, topPadding: androidx.compose.ui.unit.Dp = catalogTopPadding()) {
     CatalogScaffold(
         c, CatalogTexts("Loading performers...", SF.person3, "No performers found", "Load Performers"),
-        CatalogSlots(filterSort = filterSortSlot(c)), posterColumns, { it.id }, topPadding,
+        CatalogSlots(), posterColumns, { it.id }, topPadding,
     ) { _, performer ->
         PerformerCard(performer, badgeType = PerformerBadgeType.forSort(c.sort), onClick = { Nav.push(PerformerDetailScreen(performer.id, performer)) })
     }
@@ -82,7 +82,7 @@ fun StudiosCatalog() {
 fun StudiosList(c: CatalogController<Studio>, topPadding: androidx.compose.ui.unit.Dp = catalogTopPadding()) {
     CatalogScaffold(
         c, CatalogTexts("Loading studios...", SF.building2, "No studios found", "Load Studios"),
-        CatalogSlots(filterSort = filterSortSlot(c)), posterColumns, { it.id }, topPadding,
+        CatalogSlots(), posterColumns, { it.id }, topPadding,
     ) { _, studio ->
         StudioCard(studio, onClick = { Nav.push(StudioDetailScreen(studio.id, studio)) })
     }
@@ -100,7 +100,7 @@ fun TagsCatalog() {
 fun TagsList(c: CatalogController<Tag>, topPadding: androidx.compose.ui.unit.Dp = catalogTopPadding()) {
     CatalogScaffold(
         c, CatalogTexts("Loading tags...", SF.tag, "No tags found", "Load Tags"),
-        CatalogSlots(filterSort = filterSortSlot(c)), posterColumns, { it.id }, topPadding,
+        CatalogSlots(), posterColumns, { it.id }, topPadding,
     ) { _, tag ->
         TagCard(tag, onClick = { Nav.push(TagDetailScreen(tag.id, tag)) })
     }
@@ -113,7 +113,7 @@ fun GroupsCatalog() {
     val c = rememberCatalogController<StashGroup>(FilterMode.Groups)
     CatalogScaffold(
         c, CatalogTexts("Loading groups...", SF.rectangleStackFill, "No groups found", "Load Groups"),
-        CatalogSlots(filterSort = filterSortSlot(c)), posterColumns, { it.id },
+        CatalogSlots(), posterColumns, { it.id },
     ) { _, group ->
         GroupCard(group, onClick = { Nav.push(GroupDetailScreen(group.id, group)) })
     }
@@ -126,7 +126,7 @@ fun MarkersCatalog() {
     val c = rememberCatalogController<SceneMarker>(FilterMode.SceneMarkers)
     CatalogScaffold(
         c, CatalogTexts("Loading markers...", SF.bookmarkFill, "No markers found", "Load Markers"),
-        CatalogSlots(filterSort = filterSortSlot(c)), posterColumns, { it.id },
+        CatalogSlots(), posterColumns, { it.id },
     ) { _, marker ->
         MarkerCard(marker, onClick = {
             marker.scene?.let { scene -> Nav.push(SceneDetailScreen(scene.id, scene.copy(resumeTime = marker.seconds), autoPlay = true)) }
@@ -147,7 +147,7 @@ fun GalleriesList(c: CatalogController<Gallery>, columnScope: CatalogCardColumnS
     val cols = CatalogPrefs.cardColumns(columnScope)
     CatalogScaffold(
         c, CatalogTexts("Loading galleries...", SF.photoStack, "No galleries found", "Reload"),
-        CatalogSlots(filterSort = filterSortSlot(c)),
+        CatalogSlots(),
         columns = { cols.columnCount(it) }, itemKey = { it.id }, topPadding = topPadding, gridKey = cols,
     ) { _, gallery ->
         GalleryCard(gallery, aspectRatio = cols.cardAspectRatio, onClick = { Nav.push(GalleryDetailScreen(gallery.id, gallery)) })
@@ -180,9 +180,8 @@ fun ImagesList(c: CatalogController<StashImage>, holder: ImageMediaKindHolder, c
     val cols = CatalogPrefs.cardColumns(columnScope)
     CatalogScaffold(
         c, CatalogTexts("Loading images...", SF.photo, "No images found", "Reload"),
-        CatalogSlots(
-            filterSort = de.letzgo.stashy.ui.catalog.CatalogChromeSlot(SF.sliderHorizontal3, c.isFilterActive || holder.kind != ImageListMediaKind.All, "Settings") { c.isSheetPresented = true },
-        ),
+        // No Settings button: the quick bar's filters chip opens the sheet (both layouts show it).
+        CatalogSlots(),
         columns = { cols.columnCount(it) }, itemKey = { it.id }, topPadding = topPadding, gridKey = cols,
         // iOS `usesOneColumnFeedLayout`: 1/row is the grouped feed, not a grid of cards.
         listBody = if (cols == CatalogCardColumns.One) { top ->

@@ -555,14 +555,7 @@ struct PerformerDetailView: View {
         var slots = CatalogSlotSet(visibility: performerDetailCatalogFloatingChromeForFooter)
         switch selectedDetailTab {
         case .scenes:
-            slots.filterSort = CatalogChromeSlot(
-                systemImage: "slider.horizontal.3",
-                isActive: performerSceneFilterActive,
-                accessibilityLabel: "Filter and sort"
-            ) {
-                HapticManager.light()
-                performerLiveFilterSheetPresented = true
-            }
+            // Filter & sort opens from the scene list's own quick bar.
             slots.contextual = SceneBulkDownloadChrome.slot {
                 showingSceneDownloadOptions = true
             }

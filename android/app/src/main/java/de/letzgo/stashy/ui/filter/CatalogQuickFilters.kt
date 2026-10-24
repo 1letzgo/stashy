@@ -4,6 +4,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
@@ -15,6 +16,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
@@ -96,12 +98,17 @@ fun CatalogListQuickBar(controller: CatalogController<*>, modifier: Modifier = M
     val names = if (entityKinds.isEmpty()) emptyMap() else FilterPickerOptionsStore.knownLabels()
 
     Column(modifier.fillMaxWidth().padding(vertical = 4.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Row(
-            Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = 16.dp),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            FiltersButton { controller.isSheetPresented = true }
+        // The settings button is pinned at the leading edge; only the sort chips scroll.
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            FiltersButton(
+                isActive = presetName != null || keys.isNotEmpty(),
+                modifier = Modifier.padding(start = 16.dp, end = 8.dp),
+            ) { controller.isSheetPresented = true }
+            Row(
+                Modifier.weight(1f).horizontalScroll(rememberScrollState()).padding(end = 16.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
             CatalogQuickSortCatalog.availableFields(mode).forEach { field ->
                 val active = CatalogQuickSortCatalog.isActive(sort, field.field)
                 val icon = when {
@@ -111,6 +118,7 @@ fun CatalogListQuickBar(controller: CatalogController<*>, modifier: Modifier = M
                     else -> SF.arrowDown
                 }
                 SortChip(field.label, active, icon) { controller.quickSort(field.field) }
+            }
             }
         }
         if (keys.isNotEmpty() || presetName != null) {
@@ -134,14 +142,19 @@ fun CatalogListQuickBar(controller: CatalogController<*>, modifier: Modifier = M
 }
 
 @Composable
-private fun FiltersButton(onClick: () -> Unit) {
-    Row(
-        Modifier.height(30.dp).width(36.dp).clip(RoundedCornerShape(50)).background(Theme.palette.secondaryBackground)
-            .clickable(onClick = onClick).semantics { contentDescription = "Filters" },
-        horizontalArrangement = Arrangement.Center,
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Icon(SF.line3HorizontalDecrease, null, tint = Theme.palette.text, modifier = Modifier.size(16.dp))
+/**
+ * iOS: the quick bar's pinned settings button — slider icon in a 38×30 capsule (the icon the old
+ * chrome "Settings" button used), tint dot at top-trailing while a preset or criterion is active.
+ */
+private fun FiltersButton(isActive: Boolean, modifier: Modifier = Modifier, onClick: () -> Unit) {
+    Box(modifier.size(width = 38.dp, height = 30.dp).semantics(mergeDescendants = true) { contentDescription = "Filter and sort settings" }) {
+        Box(
+            Modifier.matchParentSize().clip(RoundedCornerShape(50)).background(Theme.palette.secondaryBackground).clickable(onClick = onClick),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(SF.sliderHorizontal3, null, tint = Theme.palette.text, modifier = Modifier.size(16.dp))
+        }
+        if (isActive) Box(Modifier.align(Alignment.TopEnd).size(8.dp).clip(CircleShape).background(Appearance.tint))
     }
 }
 

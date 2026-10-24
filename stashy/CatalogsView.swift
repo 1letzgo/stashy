@@ -340,18 +340,6 @@ private struct GroupsViewContent: View {
             ),
             isPresented: true,
             hostsInSectionChrome: hostsInSectionChrome,
-            filterSort: CatalogChromeSlot(
-                systemImage: "slider.horizontal.3",
-                isActive: selectedFilter != nil || !groupsCriteriaDocument.objectFilter.isEmpty || selectedSortOption != .nameAsc,
-                accessibilityLabel: "Settings",
-                action: {
-                    if let f = selectedFilter {
-                        groupsPresetRowSelection = ListLivePresetTag.serverRow(f.id)
-                        groupsCriteriaDocument.load(f.criteriaObjectFilter())
-                    }
-                    showGroupsFilterSheet = true
-                }
-            ),
             search: CatalogSearchChrome(
                 text: $searchText,
                 isVisible: $isSearchVisible,
@@ -523,7 +511,13 @@ private struct GroupsViewContent: View {
             presetName: activePresetName,
             onClearPreset: { resetAllGroupFilters() },
             onFiltersChanged: { performSearch() },
-            onOpenFilters: { showGroupsFilterSheet = true }
+            onOpenFilters: {
+                if let f = selectedFilter {
+                    groupsPresetRowSelection = ListLivePresetTag.serverRow(f.id)
+                    groupsCriteriaDocument.load(f.criteriaObjectFilter())
+                }
+                showGroupsFilterSheet = true
+            }
         )
     }
 
@@ -1078,14 +1072,7 @@ struct GroupDetailView: View {
         var slots = CatalogSlotSet(visibility: groupDetailCatalogFloatingChromeForFooter)
         switch selectedDetailTab {
         case .scenes:
-            slots.filterSort = CatalogChromeSlot(
-                systemImage: "slider.horizontal.3",
-                isActive: groupSceneFilterActive,
-                accessibilityLabel: "Filter and sort"
-            ) {
-                HapticManager.light()
-                groupLiveFilterSheetPresented = true
-            }
+            // Filter & sort opens from the scene list's own quick bar.
             slots.contextual = SceneBulkDownloadChrome.slot {
                 showingSceneDownloadOptions = true
             }

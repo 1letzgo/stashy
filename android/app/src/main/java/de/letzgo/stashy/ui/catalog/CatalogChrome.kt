@@ -302,6 +302,3 @@ private fun LazyGridScope.loadingFooter(isLoading: Boolean) {
     }
 }
 
-/** The filter & sort slot every catalog has (iOS: `slider.horizontal.3`, label "Settings"). */
-fun filterSortSlot(controller: CatalogController<*>) =
-    CatalogChromeSlot(SF.sliderHorizontal3, controller.isFilterActive, "Settings") { controller.isSheetPresented = true }
