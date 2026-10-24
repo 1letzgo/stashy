@@ -748,7 +748,7 @@ struct SceneDetailView: View {
         }
         // A playing scene moves to the mini player instead of stopping.
         let handOffEngine: AetherSceneEngine? = {
-            #if os(iOS)
+            #if !os(tvOS)
             guard let aether = aetherEngine, isPlaybackStarted, aether.isPlaying || playerOnly,
                   MiniPlayerStore.shared.isEnabled else { return nil }
             return aether
@@ -767,7 +767,7 @@ struct SceneDetailView: View {
         // AI Motion teardown below can close it for good.
         Task { await transcriptionController.disable() }
         AetherMotionAnalysis.teardown(engine: aetherEngine)
-        #if os(iOS)
+        #if !os(tvOS)
         if let handOffEngine {
             MiniPlayerStore.shared.adopt(scene: activeScene, engine: handOffEngine, playRegistered: hasAddedPlay)
         } else {
@@ -1103,7 +1103,7 @@ struct SceneDetailView: View {
     /// Takes the engine back from the mini player when it plays this scene; any other scene
     /// the mini player runs is closed, since this page is about to start its own.
     private func takeEngineFromMiniPlayer() -> Bool {
-        #if os(iOS)
+        #if !os(tvOS)
         guard aetherEngine == nil else { return false }
         if let handedBack = MiniPlayerStore.shared.take(sceneId: activeScene.id) {
             let engine = handedBack.engine
@@ -1121,7 +1121,7 @@ struct SceneDetailView: View {
     }
 
     private var miniPlayerShowsThisScene: Bool {
-        #if os(iOS)
+        #if !os(tvOS)
         MiniPlayerStore.shared.session?.scene.id == activeScene.id
         #else
         false

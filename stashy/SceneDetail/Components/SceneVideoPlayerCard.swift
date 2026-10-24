@@ -259,7 +259,7 @@ struct SceneVideoPlayerCard: View {
                     .clipShape(Capsule())
                     .shadow(color: .black.opacity(0.2), radius: 3)
             }
-            #if os(iOS)
+            #if !os(tvOS)
             SceneWatchlistCoverButton(scene: activeScene)
             #endif
         }
@@ -280,7 +280,7 @@ struct SceneVideoPlayerCard: View {
         }
         .contentShape(Rectangle())
         .onTapGesture { onStartPlayback(false) }
-        #if os(iOS)
+        #if !os(tvOS)
         // Same spot as under "Start from beginning", below the play button.
         .overlay(alignment: .bottom) {
             SceneWatchlistCoverButton(scene: activeScene)
@@ -927,7 +927,7 @@ struct EditSceneTitleSheet: View {
 
 #endif
 
-#if os(iOS)
+#if !os(tvOS)
 /// Watchlist toggle on the scene cover, under the play / "Start from beginning" buttons.
 private struct SceneWatchlistCoverButton: View {
     let scene: Scene

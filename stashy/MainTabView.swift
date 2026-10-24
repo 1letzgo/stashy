@@ -96,13 +96,13 @@ struct MainTabView: View {
             .tint(appearanceManager.tintColor)
             .withToasts()
             .modifier(TabBarNeverMinimizes())
-            #if os(iOS)
+            #if !os(tvOS)
             .modifier(MiniPlayerHost(hidden: coordinator.selectedTab == .reels))
             #endif
             .onAppear {
                 ServerConfigManager.shared.scrubPlaintextAPIKeysFromDisk()
                 checkConfiguration()
-                #if os(iOS)
+                #if !os(tvOS)
                 MiniPlayerStore.shared.restoreLastSessionIfNeeded()
                 #endif
             }
@@ -1066,7 +1066,7 @@ private struct TabBarNeverMinimizes: ViewModifier {
 }
 #endif
 
-#if os(iOS)
+#if !os(tvOS)
 /// Puts the mini player above the tab bar and reopens its scene full screen on tap.
 private struct MiniPlayerHost: ViewModifier {
     /// Feeds own the whole screen; the bar steps aside there (the engine is paused anyway).
@@ -1081,7 +1081,20 @@ private struct MiniPlayerHost: ViewModifier {
             ))
             .sheet(isPresented: $store.showsNowPlaying) {
                 NowPlayingView()
+                    #if os(macOS)
+                    .frame(minWidth: 640, minHeight: 720)
+                    #endif
             }
+            #if os(macOS)
+            // macOS has no full-screen cover: a large sheet carries the scene page instead.
+            .sheet(item: $store.expandedScene) { scene in
+                NavigationStack {
+                    SceneDetailView(scene: scene, autoPlay: true)
+                        .environment(\.stashyPresentedFromMiniPlayer, true)
+                }
+                .frame(minWidth: 820, minHeight: 640)
+            }
+            #else
             .fullScreenCover(item: $store.expandedScene) { scene in
                 // The page shows Close instead of Back here; leaving hands the video back to the bar.
                 NavigationStack {
@@ -1089,6 +1102,7 @@ private struct MiniPlayerHost: ViewModifier {
                         .environment(\.stashyPresentedFromMiniPlayer, true)
                 }
             }
+            #endif
     }
 }
 
@@ -1100,6 +1114,13 @@ private struct MiniPlayerAccessory: ViewModifier {
     var floats: Bool
 
     func body(content: Content) -> some View {
+        #if os(macOS)
+        // macOS: the tab bar sits at the top, so the bar floats at the window's bottom edge.
+        content.overlay(alignment: .bottom) {
+            floatingBar(visible: isEnabled, bottomPadding: 12)
+                .frame(maxWidth: 560)
+        }
+        #else
         if #available(iOS 26.1, *) {
             content
                 .tabViewBottomAccessory(isEnabled: isEnabled && !floats) {
@@ -1113,6 +1134,7 @@ private struct MiniPlayerAccessory: ViewModifier {
                 floatingBar(visible: isEnabled, bottomPadding: floats ? 8 : 64)
             }
         }
+        #endif
     }
 
     @ViewBuilder

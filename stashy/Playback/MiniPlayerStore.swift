@@ -682,7 +682,7 @@ struct WatchlistSceneRow: View {
         .contentShape(Rectangle())
     }
 }
-#if os(iOS)
+#if !os(tvOS)
 /// The bar above the tab bar: live picture, title, play/pause, close. Tap reopens the scene,
 /// a swipe down closes it.
 struct MiniPlayerBar: View {
@@ -863,6 +863,14 @@ struct NowPlayingView: View {
 private struct NowPlayingContent: View {
     let scene: Scene
 
+    #if os(macOS)
+    private static let leadingPlacement = ToolbarItemPlacement.cancellationAction
+    private static let trailingPlacement = ToolbarItemPlacement.primaryAction
+    #else
+    private static let leadingPlacement = ToolbarItemPlacement.topBarLeading
+    private static let trailingPlacement = ToolbarItemPlacement.topBarTrailing
+    #endif
+
     init(scene: Scene) {
         self.scene = scene
         _displayedScene = State(initialValue: scene)
@@ -1009,13 +1017,13 @@ private struct NowPlayingContent: View {
         .background(Color.appBackground.ignoresSafeArea())
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
-            ToolbarItem(placement: .topBarLeading) {
+            ToolbarItem(placement: Self.leadingPlacement) {
                 Button { dismiss() } label: {
                     Image(systemName: "chevron.down")
                 }
                 .accessibilityLabel("Minimize")
             }
-            ToolbarItem(placement: .topBarTrailing) {
+            ToolbarItem(placement: Self.trailingPlacement) {
                 Button("Details") { player.openSceneDetails() }
             }
         }
