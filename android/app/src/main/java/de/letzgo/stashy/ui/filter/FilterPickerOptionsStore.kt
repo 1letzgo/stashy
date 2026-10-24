@@ -38,6 +38,9 @@ object FilterPickerOptionsStore {
         return out
     }
 
+    /** The cached "most used" list without search hits (iOS `cached(_:)`). */
+    fun cached(kind: PickerKind): List<FilterEntityOption> = options[kind] ?: emptyList()
+
     fun availableOptions(kind: PickerKind): List<FilterEntityOption> {
         val base = options[kind] ?: emptyList()
         val extra = searchResults[kind] ?: return base

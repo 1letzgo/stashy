@@ -446,24 +446,67 @@ private struct GalleriesViewContent: View {
         if configManager.activeConfig == nil {
             ConnectionErrorView { performSearch() }
         } else if viewModel.isLoadingGalleries && viewModel.galleries.isEmpty {
-            StandardLoadingView(message: "Loading galleries...")
+            // Keep the bar while a sort/filter change refetches, so it does not jump away.
+            VStack(spacing: 0) {
+                quickBar.padding(.top, 8)
+                StandardLoadingView(message: "Loading galleries...")
+            }
         } else if viewModel.galleries.isEmpty && viewModel.errorMessage != nil {
             ConnectionErrorView { performSearch() }
         } else if viewModel.galleries.isEmpty {
-            SharedEmptyStateView(
-                icon: "photo.stack",
-                title: "No galleries found",
-                buttonText: "Reload",
-                onRetry: { performSearch() }
-            )
+            VStack(spacing: 0) {
+                if !criteriaDocument.isEmpty || activePresetName != nil { quickBar.padding(.top, 8) }
+                SharedEmptyStateView(
+                    icon: "photo.stack",
+                    title: "No galleries found",
+                    buttonText: "Reload",
+                    onRetry: { performSearch() }
+                )
+            }
         } else {
             galleriesGridScroll
         }
     }
 
+    /// Sheet "Reset" and the saved-filter chip's ✕: drops the preset and every criterion.
+    private func resetAllCatalogFilters() {
+        catalogPresetRowSelection = ""
+        selectedFilter = nil
+        clearGalleryLiveChipsOnly()
+        criteriaDocument.clear()
+        applyLiveFilter()
+    }
+
+    /// Name of the active saved filter / local preset for the removable chip above the list.
+    private var activePresetName: String? {
+        if let ls = ListLivePresetTag.parseLocalUUIDString(catalogPresetRowSelection), let uuid = UUID(uuidString: ls) {
+            return localCatalogPresets.first { $0.id == uuid }?.name
+        }
+        if let sid = ListLivePresetTag.parseServerId(catalogPresetRowSelection) {
+            return viewModel.savedFilters[sid]?.name ?? selectedFilter?.name
+        }
+        return selectedFilter?.name
+    }
+
+    private var quickBar: some View {
+        CatalogListQuickBar(
+            mode: .galleries,
+            sort: selectedSortOption,
+            onSort: { changeSortOption(to: $0) },
+            document: criteriaDocument,
+            presetName: activePresetName,
+            onClearPreset: { resetAllCatalogFilters() },
+            onFiltersChanged: { applyLiveFilter() },
+            onOpenFilters: { showFilterSortSheet = true }
+        )
+    }
+
     private var galleriesGridScroll: some View {
         let cardColumns = tabManager.catalogCardColumns(for: CatalogCardColumnScope.galleries)
         return ScrollView {
+            VStack(spacing: 0) {
+            quickBar
+                .padding(.top, 8)
             LazyVGrid(columns: columns, spacing: 12) {
                 ForEach(viewModel.galleries) { gallery in
                     NavigationLink(destination: LazyView { ImagesView(gallery: gallery) }) {
@@ -489,6 +532,7 @@ private struct GalleriesViewContent: View {
             .measuresGridWidth($cardGridWidth)
             .id(cardColumns)
             .padding(16)
+            }
         }
         .background(Color.appBackground)
         .refreshable { performSearch() }
@@ -680,13 +724,7 @@ private struct GalleriesViewContent: View {
             sortOption: selectedSortOption,
             onSortChange: { changeSortOption(to: $0) },
             onApply: { applyLiveFilter() },
-            onReset: {
-                catalogPresetRowSelection = ""
-                selectedFilter = nil
-                clearGalleryLiveChipsOnly()
-                criteriaDocument.clear()
-                applyLiveFilter()
-            },
+            onReset: { resetAllCatalogFilters() },
             onRequestSave: { saveGalleryCatalogPresetOverwrite() },
             onRequestSaveAs: {
                 catalogPresetNameInput = ""

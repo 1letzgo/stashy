@@ -319,6 +319,7 @@ private struct ImagesViewBody: View {
                         openedGalleryHeader(gallery)
                             .padding(16)
                     }
+                    if showsQuickBar { quickBar.padding(.top, 8) }
                     StandardLoadingView(message: "Loading images...")
                 }
             } else if imagesListShowsConnectionError {
@@ -331,6 +332,9 @@ private struct ImagesViewBody: View {
                     if let gallery {
                         openedGalleryHeader(gallery)
                             .padding(16)
+                    }
+                    if showsQuickBar && (!imageListFilters.criteriaDocument.isEmpty || activeImagePresetName != nil) {
+                        quickBar.padding(.top, 8)
                     }
                     SharedEmptyStateView(
                         icon: "camera.fill",
@@ -348,6 +352,10 @@ private struct ImagesViewBody: View {
                             VStack(spacing: 12) {
                                 if let gallery {
                                     openedGalleryHeader(gallery)
+                                }
+                                if showsQuickBar {
+                                    // The bar pads itself; undo the column's inset so chips scroll edge to edge.
+                                    quickBar.padding(.horizontal, -16)
                                 }
                                 gridContent
                             }
@@ -903,13 +911,7 @@ private struct ImagesViewBody: View {
             onSortChange: { changeSortOption(to: $0) },
             liveMediaKind: $imageListFilters.liveFilterMediaKind,
             onApply: { imageListFilters.applyLiveFilter(viewModel: viewModel) },
-            onReset: {
-                imageListFilters.catalogPresetRowSelection = ""
-                imageListFilters.selectedFilter = nil
-                imageListFilters.clearLiveChipsOnly()
-                imageListFilters.criteriaDocument.clear()
-                imageListFilters.refetchImages(viewModel: viewModel, initial: true)
-            },
+            onReset: { resetAllImageFilters() },
             onRequestSave: { imageListFilters.savePresetOverwrite(viewModel: viewModel) },
             onRequestSaveAs: {
                 imageListFilters.catalogPresetNameInput = ""
@@ -940,6 +942,42 @@ private struct ImagesViewBody: View {
         }
     }
     
+    /// Sheet "Reset" and the saved-filter chip's ✕: drops the preset and every criterion.
+    private func resetAllImageFilters() {
+        imageListFilters.catalogPresetRowSelection = ""
+        imageListFilters.selectedFilter = nil
+        imageListFilters.clearLiveChipsOnly()
+        imageListFilters.criteriaDocument.clear()
+        imageListFilters.refetchImages(viewModel: viewModel, initial: true)
+    }
+
+    private var activeImagePresetName: String? {
+        let sel = imageListFilters.catalogPresetRowSelection
+        if let ls = ListLivePresetTag.parseLocalUUIDString(sel), let uuid = UUID(uuidString: ls) {
+            return imageListFilters.localCatalogPresets.first { $0.id == uuid }?.name
+        }
+        if let sid = ListLivePresetTag.parseServerId(sel) {
+            return viewModel.savedFilters[sid]?.name ?? imageListFilters.selectedFilter?.name
+        }
+        return imageListFilters.selectedFilter?.name
+    }
+
+    /// Feeds embed this list under their own chrome, so the bar stays out of there.
+    private var showsQuickBar: Bool { !feedsEmbedded }
+
+    private var quickBar: some View {
+        CatalogListQuickBar(
+            mode: .images,
+            sort: imageListFilters.selectedSortOption,
+            onSort: { changeSortOption(to: $0) },
+            document: imageListFilters.criteriaDocument,
+            presetName: activeImagePresetName,
+            onClearPreset: { resetAllImageFilters() },
+            onFiltersChanged: { imageListFilters.applyLiveFilter(viewModel: viewModel) },
+            onOpenFilters: { imageListFilters.showFilterSortSheet = true }
+        )
+    }
+
     private var displayedImages: [StashImage] {
         gallery != nil ? viewModel.galleryImages : viewModel.allImages
     }

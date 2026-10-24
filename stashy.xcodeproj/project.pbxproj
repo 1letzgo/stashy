@@ -69,6 +69,7 @@
 		9AA0A05BF61443C2B087A163 /* SharedUtilities.swift in Sources */ = {isa = PBXBuildFile; fileRef = DF22BB1C2F16743C007C2090 /* SharedUtilities.swift */; };
 		9BA6D13B444E433980610D36 /* SceneGroupsCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA617C2A62174FFFB0912B44 /* SceneGroupsCard.swift */; };
 		A1B2C3D40002400180011002 /* FilterPickerOptionsStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D40001400180011001 /* FilterPickerOptionsStore.swift */; };
+		C0A7F1100000000000000002 /* CatalogQuickFilters.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0A7F1100000000000000001 /* CatalogQuickFilters.swift */; };
 		A1ED4C0012345678901234AB /* EditModeSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1ED4C0112345678901234AB /* EditModeSettingsView.swift */; };
 		A1ED4C0212345678901234AB /* EditModeSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1ED4C0112345678901234AB /* EditModeSettingsView.swift */; };
 		A1ICON012F30B00000000001 /* AppIconManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1ICON022F30B00000000002 /* AppIconManager.swift */; };
@@ -302,6 +303,7 @@
 		MAC00000000000000000005D /* CatalogChrome.swift in Sources */ = {isa = PBXBuildFile; fileRef = C4B0E00100000000000000A2 /* CatalogChrome.swift */; };
 		MAC00000000000000000005E /* StashyDetailToolbar.swift in Sources */ = {isa = PBXBuildFile; fileRef = C4B0E00100000000000000A3 /* StashyDetailToolbar.swift */; };
 		MAC00000000000000000005F /* FilterPickerOptionsStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D40001400180011001 /* FilterPickerOptionsStore.swift */; };
+		C0A7F1100000000000000003 /* CatalogQuickFilters.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0A7F1100000000000000001 /* CatalogQuickFilters.swift */; };
 		MAC000000000000000000060 /* FilterCriteriaEditorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0D91ABA114F544C390FD6F8E /* FilterCriteriaEditorView.swift */; };
 		MAC000000000000000000061 /* FiltersToolsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 130472FFD9E64071BF78EDAE /* FiltersToolsView.swift */; };
 		MAC000000000000000000062 /* TopListsToolsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 971A00062F999006 /* TopListsToolsView.swift */; };
@@ -391,6 +393,7 @@
 		971A00072F999007 /* SessionTimelineToolsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionTimelineToolsView.swift; sourceTree = "<group>"; };
 		971A00092F999009 /* SessionTimelineLoader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionTimelineLoader.swift; sourceTree = "<group>"; };
 		A1B2C3D40001400180011001 /* FilterPickerOptionsStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FilterPickerOptionsStore.swift; sourceTree = "<group>"; };
+		C0A7F1100000000000000001 /* CatalogQuickFilters.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CatalogQuickFilters.swift; sourceTree = "<group>"; };
 		A1ED4C0112345678901234AB /* EditModeSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EditModeSettingsView.swift; sourceTree = "<group>"; };
 		A1ICON022F30B00000000002 /* AppIconManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppIconManager.swift; sourceTree = "<group>"; };
 		A1IMGDS022345678901234AB /* StashImageDateSort.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StashImageDateSort.swift; sourceTree = "<group>"; };
@@ -656,6 +659,7 @@
 				FEA1E8DCB9534BA393BDCA09 /* FilterFieldCatalog.swift */,
 				2195D672B4B04628BD280AA1 /* FilterCriteriaDocument.swift */,
 				A1B2C3D40001400180011001 /* FilterPickerOptionsStore.swift */,
+				C0A7F1100000000000000001 /* CatalogQuickFilters.swift */,
 				0D91ABA114F544C390FD6F8E /* FilterCriteriaEditorView.swift */,
 				130472FFD9E64071BF78EDAE /* FiltersToolsView.swift */,
 			);
@@ -1058,6 +1062,7 @@
 				C4B0E00200000000000000B2 /* CatalogChrome.swift in Sources */,
 				C4B0E00200000000000000B3 /* StashyDetailToolbar.swift in Sources */,
 				A1B2C3D40002400180011002 /* FilterPickerOptionsStore.swift in Sources */,
+				C0A7F1100000000000000002 /* CatalogQuickFilters.swift in Sources */,
 				13B8ED271E86457390593F48 /* FilterCriteriaEditorView.swift in Sources */,
 				B981A60AAA104A77A56B0923 /* FiltersToolsView.swift in Sources */,
 				971A00052F999005 /* TopListsToolsView.swift in Sources */,
@@ -1263,6 +1268,7 @@
 				MAC00000000000000000005D /* CatalogChrome.swift in Sources */,
 				MAC00000000000000000005E /* StashyDetailToolbar.swift in Sources */,
 				MAC00000000000000000005F /* FilterPickerOptionsStore.swift in Sources */,
+				C0A7F1100000000000000003 /* CatalogQuickFilters.swift in Sources */,
 				MAC000000000000000000060 /* FilterCriteriaEditorView.swift in Sources */,
 				MAC000000000000000000061 /* FiltersToolsView.swift in Sources */,
 				MAC000000000000000000062 /* TopListsToolsView.swift in Sources */,

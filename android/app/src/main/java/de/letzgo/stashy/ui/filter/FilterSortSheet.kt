@@ -59,7 +59,8 @@ import de.letzgo.stashy.ui.stashyGlass
  * iOS: the unified catalog "Settings" sheet (`PerformersCatalogFilterSortSheet`,
  * `SceneLiveFilterSheet`, `ImagesCatalogFilterSortSheet`, `GroupsCatalogFilterSortSheet` …):
  * chrome bar (Reset · Settings · Save · Done), Filter picker card (None / Stash saved filters /
- * on-device presets), Sort card, optional [extraCards], then the criteria editor.
+ * on-device presets), Sort card, optional [extraCards], then quick filters and the collapsible
+ * criteria editor ([CatalogFilterCriteriaBody]).
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -88,20 +89,23 @@ fun CatalogFilterSortSheet(
                 onSave = { showSaveChoice = true },
                 onDone = { controller.isSheetPresented = false },
             )
-            Spacer(Modifier.height(8.dp))
-            Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(20.dp)) {
-                Column {
-                    NativeSectionHeader("Filter & sort", Modifier.padding(horizontal = 16.dp))
-                    ControlGroup {
-                        FilterPickerCard(controller)
-                        NativeDivider()
-                        if (controller.mode == FilterMode.Groups) GroupSortCard(controller.sort) { controller.changeSort(it) }
-                        else SortCard(controller.mode, controller.sort) { controller.changeSort(it) }
+            // iOS sheet metrics: 8 top inset, 16 between cards, quick filters 8 below the last
+            // card, 32 bottom padding. Cards and quick sections share the 16 dp left edge.
+            Column(Modifier.verticalScroll(rememberScrollState()).padding(top = 8.dp, bottom = 32.dp)) {
+                Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                    Column {
+                        // Header text lines up with the group's row text (Material settings look).
+                        NativeSectionHeader("Filter & sort", Modifier.padding(horizontal = 16.dp))
+                        ControlGroup {
+                            FilterPickerCard(controller)
+                            NativeDivider()
+                            SortCard(controller.mode, controller.sort) { controller.changeSort(it) }
+                        }
                     }
+                    extraCards()
                 }
-                extraCards()
-                FilterCriteriaEditor(controller.criteria, onChange = { controller.applyLive() })
-                Spacer(Modifier.height(24.dp))
+                Spacer(Modifier.height(8.dp))
+                CatalogFilterCriteriaBody(controller.criteria, onChange = { controller.applyLive() })
             }
         }
     }
@@ -189,18 +193,6 @@ fun SortCard(mode: FilterMode, sort: SortOption, onChange: (SortOption) -> Unit)
         }
         MenuPicker(sort.field, entries) { field ->
             if (kinds.any { it.field == field }) SortCatalog.optionAfterPickingField(mode, sort, field)?.let(onChange)
-        }
-    }
-}
-
-/** iOS: `GroupsCatalogFilterSortSheet` — "Sort" heading and a menu over every `GroupSortOption`. */
-@Composable
-private fun GroupSortCard(sort: SortOption, onChange: (SortOption) -> Unit) {
-    ControlCard {
-        ControlLabel("Sort")
-        Spacer(Modifier.weight(1f))
-        MenuPicker(sort.raw, SortCatalog.groups.map { MenuEntry(it.raw, it.label) }) { raw ->
-            SortCatalog.option(FilterMode.Groups, raw)?.let(onChange)
         }
     }
 }

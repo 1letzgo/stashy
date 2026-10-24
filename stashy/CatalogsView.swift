@@ -366,11 +366,18 @@ private struct GroupsViewContent: View {
             if configManager.activeConfig == nil {
                 ConnectionErrorView { performSearch() }
             } else if viewModel.isLoadingGroups && viewModel.groups.isEmpty {
-                StandardLoadingView(message: "Loading groups...")
+                // Keep the bar while a sort/filter change refetches, so it does not jump away.
+                VStack(spacing: 0) {
+                    quickBar.padding(.top, 8)
+                    StandardLoadingView(message: "Loading groups...")
+                }
             } else if viewModel.groups.isEmpty && viewModel.errorMessage != nil {
                 ConnectionErrorView { performSearch() }
             } else if viewModel.groups.isEmpty {
-                emptyStateView
+                VStack(spacing: 0) {
+                    if !groupsCriteriaDocument.isEmpty || activePresetName != nil { quickBar.padding(.top, 8) }
+                    emptyStateView
+                }
             } else {
                 groupsGrid
             }
@@ -385,12 +392,7 @@ private struct GroupsViewContent: View {
                 sortOption: selectedSortOption,
                 onSortChange: { changeSortOption(to: $0) },
                 onApply: { performSearch() },
-                onReset: {
-                    groupsPresetRowSelection = ""
-                    selectedFilter = nil
-                    groupsCriteriaDocument.clear()
-                    performSearch()
-                },
+                onReset: { resetAllGroupFilters() },
                 onRequestSave: { saveGroupsFilterOverwrite() },
                 onRequestSaveAs: {
                     groupsFilterNameInput = ""
@@ -497,9 +499,40 @@ private struct GroupsViewContent: View {
         )
     }
 
+    /// Sheet "Reset" and the saved-filter chip's ✕: drops the saved filter and every criterion.
+    private func resetAllGroupFilters() {
+        groupsPresetRowSelection = ""
+        selectedFilter = nil
+        groupsCriteriaDocument.clear()
+        performSearch()
+    }
+
+    private var activePresetName: String? {
+        if let sid = ListLivePresetTag.parseServerId(groupsPresetRowSelection) {
+            return viewModel.savedFilters[sid]?.name ?? selectedFilter?.name
+        }
+        return selectedFilter?.name
+    }
+
+    private var quickBar: some View {
+        CatalogListQuickBar(
+            mode: .groups,
+            sort: selectedSortOption,
+            onSort: { changeSortOption(to: $0) },
+            document: groupsCriteriaDocument,
+            presetName: activePresetName,
+            onClearPreset: { resetAllGroupFilters() },
+            onFiltersChanged: { performSearch() },
+            onOpenFilters: { showGroupsFilterSheet = true }
+        )
+    }
+
     private var groupsGrid: some View {
         ScrollViewReader { proxy in
             ScrollView {
+                VStack(spacing: 0) {
+                quickBar
+                    .padding(.top, 8)
                 LazyVGrid(columns: columns, spacing: 12) {
                     ForEach(viewModel.groups) { group in
                         NavigationLink(destination: GroupDetailView(selectedGroup: group)) {
@@ -528,6 +561,7 @@ private struct GroupsViewContent: View {
                 }
                 .measuresGridWidth($gridWidth)
                 .padding(16)
+                }
             }
             .refreshable { performSearch() }
             .onAppear {

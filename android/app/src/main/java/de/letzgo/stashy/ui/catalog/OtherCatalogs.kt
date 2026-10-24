@@ -45,6 +45,7 @@ import de.letzgo.stashy.ui.filter.CatalogFilterSortSheet
 import de.letzgo.stashy.ui.filter.ImageListMediaKind
 import de.letzgo.stashy.ui.filter.ImageMediaTypeCard
 import de.letzgo.stashy.ui.filter.ImagesFeedAutoplaySettingsCard
+import de.letzgo.stashy.ui.filter.bleedHorizontally
 import de.letzgo.stashy.ui.noRippleClickable
 import de.letzgo.stashy.ui.scene.SceneDetailScreen
 import kotlinx.serialization.json.JsonObject
@@ -192,9 +193,12 @@ fun ImagesList(c: CatalogController<StashImage>, holder: ImageMediaKindHolder, c
                 onLoadMore = { c.list.loadMore() },
                 contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = top, bottom = bottomBarContentPadding()),
                 onImageUpdated = { updated -> c.list.patch { if (it.id == updated.id) updated else it } },
-                header = if (c.search.isNotEmpty()) ({
-                    Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) { SearchClearChip(c.search, { c.search = "" }) }
-                }) else null,
+                header = {
+                    androidx.compose.foundation.layout.Column {
+                        de.letzgo.stashy.ui.filter.CatalogListQuickBar(c, Modifier.bleedHorizontally(16.dp))
+                        if (c.search.isNotEmpty()) Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) { SearchClearChip(c.search, { c.search = "" }) }
+                    }
+                },
             )
         } else null,
     ) { index, image ->

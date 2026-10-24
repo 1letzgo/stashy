@@ -985,6 +985,48 @@ private struct ScenesViewContent: View {
         }
     }
 
+    /// Sheet "Reset" and the saved-filter chip's ✕: drops the preset and every criterion.
+    private func resetAllSceneFilters() {
+        criteriaDocument.clear()
+        liveFilterMinRating = 0
+        liveFilterOrganized = nil
+        liveFilterInteractive = nil
+        liveFilterOrientation = nil
+        liveFilterPerformerCount = nil
+        liveFilterResolution = nil
+        liveFilterPerformerFavorite = nil
+        liveFilterOCounterTag = nil
+        liveFilterStudioIds = []
+        liveFilterTagIds = []
+        liveFilterGroupIds = []
+        liveSheetPresetSelection = ""
+        selectedFilter = nil
+        applyLiveFilter()
+    }
+
+    private var activePresetName: String? {
+        if let ls = SceneLivePresetTag.parseLocalUUIDString(liveSheetPresetSelection), let uuid = UUID(uuidString: ls) {
+            return liveFilterPresets.first { $0.id == uuid }?.name
+        }
+        if let sid = SceneLivePresetTag.parseServerId(liveSheetPresetSelection) {
+            return viewModel.savedFilters[sid]?.name ?? selectedFilter?.name
+        }
+        return selectedFilter?.name
+    }
+
+    private var quickBar: some View {
+        CatalogListQuickBar(
+            mode: .scenes,
+            sort: selectedSortOption,
+            onSort: { changeSortOption(to: $0) },
+            document: criteriaDocument,
+            presetName: activePresetName,
+            onClearPreset: { resetAllSceneFilters() },
+            onFiltersChanged: { applyLiveFilter() },
+            onOpenFilters: { liveFilterSheetPresented.wrappedValue = true }
+        )
+    }
+
     private func applyLiveFilter() {
         persistSceneSort(selectedSortOption)
         // Full criteria live in `criteriaDocument` — do not also pass `selectedFilter` or base criteria double-apply.
@@ -1066,7 +1108,11 @@ private struct ScenesViewContent: View {
                 if configManager.activeConfig == nil {
                     ConnectionErrorView { performSearch() }
                 } else if showsBlockingInitialLoad {
-                    StandardLoadingView(message: "Loading scenes...")
+                    // Keep the bar while a sort/filter change refetches, so it does not jump away.
+                    VStack(spacing: 0) {
+                        if scrollHeader == nil { quickBar.padding(.top, 8) }
+                        StandardLoadingView(message: "Loading scenes...")
+                    }
                 } else if primarySceneListIsEmpty && viewModel.errorMessage != nil {
                     ConnectionErrorView(title: viewModel.errorMessage ?? "Server not reachable") { performSearch() }
                 } else if primarySceneListIsEmpty {
@@ -1101,23 +1147,7 @@ private struct ScenesViewContent: View {
                 sortOption: selectedSortOption,
                 onSortChange: { changeSortOption(to: $0) },
                 onApply: { applyLiveFilter() },
-                onReset: {
-                    criteriaDocument.clear()
-                    liveFilterMinRating = 0
-                    liveFilterOrganized = nil
-                    liveFilterInteractive = nil
-                    liveFilterOrientation = nil
-                    liveFilterPerformerCount = nil
-                    liveFilterResolution = nil
-                    liveFilterPerformerFavorite = nil
-                    liveFilterOCounterTag = nil
-                    liveFilterStudioIds = []
-                    liveFilterTagIds = []
-                    liveFilterGroupIds = []
-                    liveSheetPresetSelection = ""
-                    selectedFilter = nil
-                    applyLiveFilter()
-                },
+                onReset: { resetAllSceneFilters() },
                 onRequestSave: { saveLivePresetOverwrite() },
                 onRequestSaveAs: {
                     presetNameInput = ""
@@ -1360,6 +1390,7 @@ private struct ScenesViewContent: View {
             ScrollView {
                 VStack(spacing: 12) {
                     scrollHeader
+                    quickBar
                     emptyStateView
                 }
                 // Match PerformerDetail non-scene tabs (`.padding(16)`).
@@ -1368,7 +1399,10 @@ private struct ScenesViewContent: View {
             .background(Color.appBackground)
             .refreshable { performSearch() }
         } else {
-            emptyStateView
+            VStack(spacing: 0) {
+                if !criteriaDocument.isEmpty || activePresetName != nil { quickBar.padding(.top, 8) }
+                emptyStateView
+            }
         }
     }
 
@@ -1378,6 +1412,8 @@ private struct ScenesViewContent: View {
                     if let scrollHeader {
                         scrollHeader
                     }
+                    quickBar
+                        .padding(.top, scrollHeader == nil ? 8 : 0)
                     LazyVGrid(columns: columns, spacing: 12) {
                     ForEach(primaryScenes) { scene in
                             NavigationLink(destination: LazyView { SceneDetailView(scene: scene) }) {
@@ -1407,7 +1443,6 @@ private struct ScenesViewContent: View {
                     }
                     .measuresGridWidth($cardGridWidth)
                     .padding(.horizontal, 16)
-                    .padding(.top, scrollHeader == nil ? 16 : 0)
                 }
                 // Match PerformerDetail non-scene tabs (`.padding(16)`).
                 .padding(.top, scrollHeader != nil ? 16 : 0)
@@ -1684,7 +1719,7 @@ struct SceneLiveFilterSheet: View {
                     }
 
 
-                    FilterCriteriaEditorView(document: criteriaDocument, onChange: onApply)
+                    CatalogFilterCriteriaBody(document: criteriaDocument, onChange: onApply)
                 }
                 .padding(.top, 8)
             }

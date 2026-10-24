@@ -54,6 +54,8 @@ object SF {
     val arrowUpArrowDown = Icons.Filled.SwapVert
     val line3HorizontalDecrease = Icons.Filled.FilterList
     val shuffle = Icons.Filled.Shuffle
+    val arrowUp = Icons.Filled.ArrowUpward
+    val arrowDown = Icons.Filled.ArrowDownward
     val eye = Icons.Outlined.Visibility
     val server = Icons.Outlined.Dns
     val lock = Icons.Outlined.Lock

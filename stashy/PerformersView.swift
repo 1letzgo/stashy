@@ -526,11 +526,18 @@ private struct PerformersViewContent: View {
             if configManager.activeConfig == nil {
                 ConnectionErrorView { performSearch() }
             } else if viewModel.isLoading && viewModel.performers.isEmpty {
-                StandardLoadingView(message: "Loading performers...")
+                // Keep the bar while a sort/filter change refetches, so it does not jump away.
+                VStack(spacing: 0) {
+                    quickBar.padding(.top, 8)
+                    StandardLoadingView(message: "Loading performers...")
+                }
             } else if viewModel.performers.isEmpty && viewModel.errorMessage != nil {
                 ConnectionErrorView { performSearch() }
             } else if viewModel.performers.isEmpty {
-                emptyStateView
+                VStack(spacing: 0) {
+                    if catalogFilterSortFABActive { quickBar.padding(.top, 8) }
+                    emptyStateView
+                }
             } else {
                 performersGrid
             }
@@ -674,9 +681,41 @@ private struct PerformersViewContent: View {
          )
     }
 
+    /// Name of the active saved filter / local preset for the removable chip above the list.
+    private var activePresetName: String? {
+        if let ls = ListLivePresetTag.parseLocalUUIDString(catalogPresetRowSelection), let uuid = UUID(uuidString: ls) {
+            return localCatalogPresets.first { $0.id == uuid }?.name
+        }
+        if let sid = ListLivePresetTag.parseServerId(catalogPresetRowSelection) {
+            return viewModel.savedFilters[sid]?.name ?? selectedFilter?.name
+        }
+        return selectedFilter?.name
+    }
+
+    private var quickBar: some View {
+        CatalogListQuickBar(
+            mode: .performers,
+            sort: selectedSortOption,
+            onSort: { changeSortOption(to: $0) },
+            document: criteriaDocument,
+            presetName: activePresetName,
+            onClearPreset: {
+                catalogPresetRowSelection = ""
+                selectedFilter = nil
+                criteriaDocument.clear()
+                applyLiveFilter()
+            },
+            onFiltersChanged: { applyLiveFilter() },
+            onOpenFilters: { showFilterSortSheet = true }
+        )
+    }
+
     private var performersGrid: some View {
         ScrollViewReader { proxy in
             ScrollView {
+                VStack(spacing: 0) {
+                quickBar
+                    .padding(.top, 8)
                 LazyVGrid(columns: columns, spacing: 12) {
                     ForEach(viewModel.performers) { performer in
                         NavigationLink(destination: LazyView { PerformerDetailView(performer: performer) }) {
@@ -718,6 +757,7 @@ private struct PerformersViewContent: View {
                 }
                 .measuresGridWidth($gridWidth)
                 .padding(16)
+                }
             }
             .refreshable { performSearch() }
             .onChange(of: viewModel.isLoadingMorePerformers) { oldValue, isLoading in

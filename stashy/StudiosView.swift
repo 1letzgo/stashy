@@ -470,11 +470,18 @@ private struct StudiosViewContent: View {
             if configManager.activeConfig == nil {
                 ConnectionErrorView { performSearch() }
             } else if viewModel.isLoading && viewModel.studios.isEmpty {
-                StandardLoadingView(message: "Loading studios...")
+                // Keep the bar while a sort/filter change refetches, so it does not jump away.
+                VStack(spacing: 0) {
+                    quickBar.padding(.top, 8)
+                    StandardLoadingView(message: "Loading studios...")
+                }
             } else if viewModel.studios.isEmpty && viewModel.errorMessage != nil {
                 ConnectionErrorView { performSearch() }
             } else if viewModel.studios.isEmpty {
-                emptyStateView
+                VStack(spacing: 0) {
+                    if !criteriaDocument.isEmpty || activePresetName != nil { quickBar.padding(.top, 8) }
+                    emptyStateView
+                }
             } else {
                 studiosList
             }
@@ -519,13 +526,7 @@ private struct StudiosViewContent: View {
             sortOption: selectedSortOption,
             onSortChange: { changeSortOption(to: $0) },
             onApply: { applyLiveFilter() },
-            onReset: {
-                catalogPresetRowSelection = ""
-                selectedFilter = nil
-                clearStudioLiveChipsOnly()
-                criteriaDocument.clear()
-                applyLiveFilter()
-            },
+            onReset: { resetAllCatalogFilters() },
             onRequestSave: { saveStudioCatalogPresetOverwrite() },
             onRequestSaveAs: {
                 catalogPresetNameInput = ""
@@ -655,9 +656,45 @@ private struct StudiosViewContent: View {
         )
     }
 
+    /// Sheet "Reset" and the saved-filter chip's ✕: drops the preset and every criterion.
+    private func resetAllCatalogFilters() {
+        catalogPresetRowSelection = ""
+        selectedFilter = nil
+        clearStudioLiveChipsOnly()
+        criteriaDocument.clear()
+        applyLiveFilter()
+    }
+
+    /// Name of the active saved filter / local preset for the removable chip above the list.
+    private var activePresetName: String? {
+        if let ls = ListLivePresetTag.parseLocalUUIDString(catalogPresetRowSelection), let uuid = UUID(uuidString: ls) {
+            return localCatalogPresets.first { $0.id == uuid }?.name
+        }
+        if let sid = ListLivePresetTag.parseServerId(catalogPresetRowSelection) {
+            return viewModel.savedFilters[sid]?.name ?? selectedFilter?.name
+        }
+        return selectedFilter?.name
+    }
+
+    private var quickBar: some View {
+        CatalogListQuickBar(
+            mode: .studios,
+            sort: selectedSortOption,
+            onSort: { changeSortOption(to: $0) },
+            document: criteriaDocument,
+            presetName: activePresetName,
+            onClearPreset: { resetAllCatalogFilters() },
+            onFiltersChanged: { applyLiveFilter() },
+            onOpenFilters: { showFilterSortSheet = true }
+        )
+    }
+
     private var studiosList: some View {
         ScrollViewReader { proxy in
             ScrollView {
+                VStack(spacing: 0) {
+                quickBar
+                    .padding(.top, 8)
                 LazyVGrid(columns: columns, spacing: 12) {
                     ForEach(viewModel.studios) { studio in
                         NavigationLink(destination: StudioDetailView(studio: studio)) {
@@ -686,6 +723,7 @@ private struct StudiosViewContent: View {
                 }
                 .measuresGridWidth($gridWidth)
                 .padding(16)
+                }
             }
             .refreshable { performSearch() }
             .onAppear {

@@ -176,8 +176,12 @@ object SortCatalog {
             SortFieldKind("title", "Title"), SortFieldKind("date", "Date"), SortFieldKind("rating", "Rating"),
             SortFieldKind("created_at", "Created"), SortFieldKind("updated_at", "Updated"), SortFieldKind("random", "Random"),
         )
-        // Groups use a plain option menu (iOS `GroupsCatalogFilterSortSheet`).
-        FilterMode.Groups, FilterMode.Unknown -> emptyList()
+        FilterMode.Groups -> listOf(
+            SortFieldKind("name", "Name"), SortFieldKind("scenes_count", "Scene count"), SortFieldKind("galleries_count", "Gallery count"),
+            SortFieldKind("performer_count", "Performer count"), SortFieldKind("date", "Date"), SortFieldKind("rating", "Rating"),
+            SortFieldKind("updated_at", "Updated"), SortFieldKind("created_at", "Created"), SortFieldKind("random", "Random"),
+        )
+        FilterMode.Unknown -> emptyList()
     }
 
     /** iOS: `<Kind>.performerSortOption(ascending:)` etc. — option for a field kind + direction. */

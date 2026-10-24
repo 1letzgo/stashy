@@ -11,6 +11,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import de.letzgo.stashy.data.CatalogPrefs
+import de.letzgo.stashy.data.CatalogQuickSortCatalog
 import de.letzgo.stashy.data.CatalogQuery
 import de.letzgo.stashy.data.CatalogRepository
 import de.letzgo.stashy.data.CriteriaDocument
@@ -130,6 +131,14 @@ class CatalogController<T>(
         ListLivePresetTag.parseServerId(presetRow)?.let { sid -> return SavedFiltersStore.byId[sid]?.name }
         ListLivePresetTag.parseLocalId(presetRow)?.let { lid -> return localPresets.firstOrNull { it.id == lid }?.name }
         return null
+    }
+
+    /** iOS `activePresetName` — the removable preset chip above the list. */
+    val activePresetName: String? get() = selectedPresetName ?: selectedFilter?.name
+
+    /** iOS `CatalogListQuickBar` sort chip: [CatalogQuickSortCatalog.next], Random re-rolls via [changeSort]. */
+    fun quickSort(field: String) {
+        CatalogQuickSortCatalog.next(mode, sort, field)?.let { changeSort(it) }
     }
 
     fun refresh() = list.refresh()
