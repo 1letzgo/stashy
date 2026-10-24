@@ -76,6 +76,7 @@
 		C0A7F1100000000000000002 /* CatalogQuickFilters.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0A7F1100000000000000001 /* CatalogQuickFilters.swift */; };
 		A1ED4C0012345678901234AB /* EditModeSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1ED4C0112345678901234AB /* EditModeSettingsView.swift */; };
 		5CDL00012F80A00000000001 /* SceneDetailLayoutSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5CDL00022F80A00000000002 /* SceneDetailLayoutSettingsView.swift */; };
+		C0A7F1400000000000000002 /* SettingsTransfer.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0A7F1400000000000000001 /* SettingsTransfer.swift */; };
 		A1ED4C0212345678901234AB /* EditModeSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1ED4C0112345678901234AB /* EditModeSettingsView.swift */; };
 		A1ICON012F30B00000000001 /* AppIconManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1ICON022F30B00000000002 /* AppIconManager.swift */; };
 		A1IMGDS012345678901234AB /* StashImageDateSort.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1IMGDS022345678901234AB /* StashImageDateSort.swift */; };
@@ -312,6 +313,7 @@
 		MAC00000000000000000005E /* StashyDetailToolbar.swift in Sources */ = {isa = PBXBuildFile; fileRef = C4B0E00100000000000000A3 /* StashyDetailToolbar.swift */; };
 		MAC00000000000000000005F /* FilterPickerOptionsStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D40001400180011001 /* FilterPickerOptionsStore.swift */; };
 		C0A7F1300000000000000003 /* SceneDetailLayoutSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5CDL00022F80A00000000002 /* SceneDetailLayoutSettingsView.swift */; };
+		C0A7F1400000000000000003 /* SettingsTransfer.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0A7F1400000000000000001 /* SettingsTransfer.swift */; };
 		C0A7F1100000000000000003 /* CatalogQuickFilters.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0A7F1100000000000000001 /* CatalogQuickFilters.swift */; };
 		MAC000000000000000000060 /* FilterCriteriaEditorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0D91ABA114F544C390FD6F8E /* FilterCriteriaEditorView.swift */; };
 		MAC000000000000000000061 /* FiltersToolsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 130472FFD9E64071BF78EDAE /* FiltersToolsView.swift */; };
@@ -405,6 +407,7 @@
 		C0A7F1100000000000000001 /* CatalogQuickFilters.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CatalogQuickFilters.swift; sourceTree = "<group>"; };
 		A1ED4C0112345678901234AB /* EditModeSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EditModeSettingsView.swift; sourceTree = "<group>"; };
 		5CDL00022F80A00000000002 /* SceneDetailLayoutSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SceneDetailLayoutSettingsView.swift; sourceTree = "<group>"; };
+		C0A7F1400000000000000001 /* SettingsTransfer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsTransfer.swift; sourceTree = "<group>"; };
 		A1ICON022F30B00000000002 /* AppIconManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppIconManager.swift; sourceTree = "<group>"; };
 		A1IMGDS022345678901234AB /* StashImageDateSort.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StashImageDateSort.swift; sourceTree = "<group>"; };
 		A1PLUS022F30B00000000002 /* StashyPlusManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StashyPlusManager.swift; sourceTree = "<group>"; };
@@ -771,6 +774,7 @@
 				DF22BB332F1831C7007C2090 /* AppearanceSettingsView.swift */,
 				A1ED4C0112345678901234AB /* EditModeSettingsView.swift */,
 				5CDL00022F80A00000000002 /* SceneDetailLayoutSettingsView.swift */,
+				C0A7F1400000000000000001 /* SettingsTransfer.swift */,
 				DFSEC0062F2A000100000006 /* SecuritySettingsView.swift */,
 				DFST0000A2F30A000000000A /* ContentSettingsSection.swift */,
 				DFST0000C2F30A000000000C /* DashboardSettingsView.swift */,
@@ -1067,6 +1071,7 @@
 				DF22BB342F1831C7007C2090 /* AppearanceSettingsView.swift in Sources */,
 				A1ED4C0012345678901234AB /* EditModeSettingsView.swift in Sources */,
 				5CDL00012F80A00000000001 /* SceneDetailLayoutSettingsView.swift in Sources */,
+				C0A7F1400000000000000002 /* SettingsTransfer.swift in Sources */,
 				DF90B7642F1ACEA3003ED852 /* ServerSetupWizardView.swift in Sources */,
 				DFGQ000012F28A0000000001 /* GraphQLClient.swift in Sources */,
 				DFGQ000032F28A0000000003 /* GraphQLQueries.swift in Sources */,
@@ -1269,6 +1274,7 @@
 				MAC00000000000000000005E /* StashyDetailToolbar.swift in Sources */,
 				MAC00000000000000000005F /* FilterPickerOptionsStore.swift in Sources */,
 				C0A7F1300000000000000003 /* SceneDetailLayoutSettingsView.swift in Sources */,
+				C0A7F1400000000000000003 /* SettingsTransfer.swift in Sources */,
 				C0A7F1100000000000000003 /* CatalogQuickFilters.swift in Sources */,
 				MAC000000000000000000060 /* FilterCriteriaEditorView.swift in Sources */,
 				MAC000000000000000000061 /* FiltersToolsView.swift in Sources */,
@@ -1434,7 +1440,7 @@
 				ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS = YES;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 409;
+				CURRENT_PROJECT_VERSION = 410;
 				DEVELOPMENT_TEAM = 699G2QY959;
 				ENABLE_PREVIEWS = YES;
 				INFOPLIST_FILE = stashy/Info.plist;
@@ -1445,7 +1451,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 3.3.7;
+				MARKETING_VERSION = 3.4;
 				PRODUCT_BUNDLE_IDENTIFIER = de.letzgo.stashy;
 				PRODUCT_NAME = "$(TARGET_NAME:c99extidentifier)";
 				PROVISIONING_PROFILE_SPECIFIER = "";
@@ -1464,7 +1470,7 @@
 				ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS = YES;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 409;
+				CURRENT_PROJECT_VERSION = 410;
 				DEVELOPMENT_TEAM = 699G2QY959;
 				ENABLE_PREVIEWS = YES;
 				INFOPLIST_FILE = stashy/Info.plist;
@@ -1475,7 +1481,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 3.3.7;
+				MARKETING_VERSION = 3.4;
 				PRODUCT_BUNDLE_IDENTIFIER = de.letzgo.stashy;
 				PRODUCT_NAME = "$(TARGET_NAME:c99extidentifier)";
 				PROVISIONING_PROFILE_SPECIFIER = "";
@@ -1498,7 +1504,7 @@
 				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 346;
+				CURRENT_PROJECT_VERSION = 347;
 				DEVELOPMENT_TEAM = 699G2QY959;
 				ENABLE_PREVIEWS = YES;
 				ENABLE_USER_SCRIPT_SANDBOXING = YES;
@@ -1511,7 +1517,7 @@
 					"@executable_path/Frameworks",
 				);
 				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
-				MARKETING_VERSION = 3.3.8;
+				MARKETING_VERSION = 3.4;
 				PRODUCT_BUNDLE_IDENTIFIER = de.letzgo.stashy;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				PROVISIONING_PROFILE_SPECIFIER = "";
@@ -1540,7 +1546,7 @@
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 346;
+				CURRENT_PROJECT_VERSION = 347;
 				DEVELOPMENT_TEAM = 699G2QY959;
 				ENABLE_PREVIEWS = YES;
 				ENABLE_USER_SCRIPT_SANDBOXING = YES;
@@ -1553,7 +1559,7 @@
 					"@executable_path/Frameworks",
 				);
 				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
-				MARKETING_VERSION = 3.3.8;
+				MARKETING_VERSION = 3.4;
 				PRODUCT_BUNDLE_IDENTIFIER = de.letzgo.stashy;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				PROVISIONING_PROFILE_SPECIFIER = "";
@@ -1578,7 +1584,7 @@
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 341;
+				CURRENT_PROJECT_VERSION = 344;
 				DEVELOPMENT_TEAM = 699G2QY959;
 				ENABLE_HARDENED_RUNTIME = YES;
 				ENABLE_PREVIEWS = YES;
@@ -1589,7 +1595,7 @@
 					"@executable_path/../Frameworks",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 26.0;
-				MARKETING_VERSION = 3.3.6;
+				MARKETING_VERSION = 3.4;
 				PRODUCT_BUNDLE_IDENTIFIER = de.letzgo.stashy;
 				PRODUCT_NAME = stashy;
 				PROVISIONING_PROFILE_SPECIFIER = "";
@@ -1609,7 +1615,7 @@
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 341;
+				CURRENT_PROJECT_VERSION = 344;
 				DEVELOPMENT_TEAM = 699G2QY959;
 				ENABLE_HARDENED_RUNTIME = YES;
 				ENABLE_PREVIEWS = YES;
@@ -1620,7 +1626,7 @@
 					"@executable_path/../Frameworks",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 26.0;
-				MARKETING_VERSION = 3.3.6;
+				MARKETING_VERSION = 3.4;
 				PRODUCT_BUNDLE_IDENTIFIER = de.letzgo.stashy;
 				PRODUCT_NAME = stashy;
 				PROVISIONING_PROFILE_SPECIFIER = "";

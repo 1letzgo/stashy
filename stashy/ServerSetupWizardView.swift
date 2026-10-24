@@ -74,6 +74,15 @@ struct ServerSetupWizardView: View {
                 .animation(.easeInOut, value: currentStep)
                 #endif
                 
+                // Moving from another device: take servers and settings from an export instead.
+                if currentStep == 1 {
+                    SettingsTransferControls(importOnly: true) {
+                        if ServerConfigManager.shared.activeConfig != nil { dismiss() }
+                    }
+                    .buttonStyle(.borderless)
+                    .padding(.bottom, 8)
+                }
+
                 // Navigation Buttons
                 navigationButtons
                     .padding(.horizontal, 24)

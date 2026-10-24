@@ -171,6 +171,12 @@ struct SettingsView: View {
             interactiveDevicesSection
         }
 
+        Section {
+            stashyScrollingSectionHeader("Backup & Transfer")
+            SettingsTransferControls(groupedRows: true)
+            stashyScrollingSectionFooter("Servers, settings, default filters, dashboard and tabs as one JSON file — imports on iPhone, iPad, Mac and Android.")
+        }
+
         aboutSection
     }
 

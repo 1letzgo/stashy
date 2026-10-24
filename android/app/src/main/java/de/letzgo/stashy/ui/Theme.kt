@@ -31,6 +31,15 @@ object Appearance {
     var isEditModeEnabled by mutableStateOf(Prefs.bool("kEditModeEnabled", true))
         private set
 
+    /** Re-reads everything from the preferences (after a settings import). */
+    fun reload() {
+        theme = AppTheme.from(Prefs.string("kPreferredTheme"))
+        tint = loadTint()
+        oCounterIcon = Prefs.string("kOCounterIcon") ?: "heart"
+        glassTransparency = if (Prefs.has("kGlassTransparency")) Prefs.float("kGlassTransparency").coerceIn(0.2f, 1f) else 1f
+        isEditModeEnabled = Prefs.bool("kEditModeEnabled", true)
+    }
+
     fun updateTheme(value: AppTheme) { theme = value; Prefs.setString("kPreferredTheme", value.raw) }
     fun updateTint(color: Color) {
         tint = color
