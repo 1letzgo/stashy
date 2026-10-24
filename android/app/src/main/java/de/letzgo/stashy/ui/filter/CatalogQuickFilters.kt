@@ -107,16 +107,17 @@ fun CatalogListQuickBar(controller: CatalogController<*>, modifier: Modifier = M
         modifier.fillMaxWidth().padding(top = ToolsTokens.menuTopPadding),
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        // The settings button is pinned at the leading edge; only the sort pills scroll, with a
-        // hard edge (no fade) right after the button + spacing.
-        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-            FiltersButton(
-                isActive = presetName != null || keys.isNotEmpty(),
-                modifier = Modifier.padding(start = ToolsTokens.contentPadding),
-            ) { controller.isSheetPresented = true }
-            // The 16 dp gap to the button lives inside the scroll content (hard edge, no fade).
+        // The settings button is pinned at the leading edge; only the sort pills scroll. The 12 dp
+        // gap sits outside the scroll area (like Merge Scenes' template row), so pills scrolled
+        // left are cut off 12 dp from the button instead of sliding up to it.
+        Row(
+            Modifier.fillMaxWidth().padding(start = ToolsTokens.contentPadding),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            FiltersButton(isActive = presetName != null || keys.isNotEmpty()) { controller.isSheetPresented = true }
             Row(
-                Modifier.weight(1f).horizontalScroll(rememberScrollState()).padding(start = 16.dp, end = ToolsTokens.contentPadding),
+                Modifier.weight(1f).horizontalScroll(rememberScrollState()).padding(end = ToolsTokens.contentPadding),
                 horizontalArrangement = Arrangement.spacedBy(QuickPillSpacing),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
