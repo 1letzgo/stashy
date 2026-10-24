@@ -564,14 +564,14 @@ private struct PerformersViewContent: View {
             } else if viewModel.isLoading && viewModel.performers.isEmpty {
                 // Keep the bar while a sort/filter change refetches, so it does not jump away.
                 VStack(spacing: 0) {
-                    quickBar.padding(.top, 8)
+                    quickBar
                     StandardLoadingView(message: "Loading performers...")
                 }
             } else if viewModel.performers.isEmpty && viewModel.errorMessage != nil {
                 ConnectionErrorView { performSearch() }
             } else if viewModel.performers.isEmpty {
                 VStack(spacing: 0) {
-                    if catalogFilterSortFABActive { quickBar.padding(.top, 8) }
+                    if catalogFilterSortFABActive { quickBar }
                     emptyStateView
                 }
             } else {
@@ -745,7 +745,6 @@ private struct PerformersViewContent: View {
             ScrollView {
                 VStack(spacing: 0) {
                 quickBar
-                    .padding(.top, 8)
                 LazyVGrid(columns: columns, spacing: 12) {
                     ForEach(viewModel.performers) { performer in
                         NavigationLink(destination: LazyView { PerformerDetailView(performer: performer) }) {
@@ -786,7 +785,7 @@ private struct PerformersViewContent: View {
                     }
                 }
                 .measuresGridWidth($gridWidth)
-                .padding(16)
+                .padding([.horizontal, .bottom], 16)
                 }
             }
             .refreshable { performSearch() }

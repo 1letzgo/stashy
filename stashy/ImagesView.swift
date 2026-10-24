@@ -322,7 +322,7 @@ private struct ImagesViewBody: View {
                         openedGalleryTop(gallery)
                             .padding(16)
                     }
-                    if showsQuickBar { quickBar.padding(.top, 8) }
+                    if showsQuickBar { quickBar }
                     StandardLoadingView(message: "Loading images...")
                 }
             } else if imagesListShowsConnectionError {
@@ -337,7 +337,7 @@ private struct ImagesViewBody: View {
                             .padding(16)
                     }
                     if showsQuickBar && (!imageListFilters.criteriaDocument.isEmpty || activeImagePresetName != nil) {
-                        quickBar.padding(.top, 8)
+                        quickBar
                     }
                     SharedEmptyStateView(
                         icon: "camera.fill",

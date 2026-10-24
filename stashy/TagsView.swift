@@ -456,14 +456,14 @@ private struct TagsViewContent: View {
             } else if (viewModel.isLoading && viewModel.tags.isEmpty) || (viewModel.isLoadingSavedFilters && viewModel.savedFilters.isEmpty) {
                 // Keep the bar while a sort/filter change refetches, so it does not jump away.
                 VStack(spacing: 0) {
-                    quickBar.padding(.top, 8)
+                    quickBar
                     StandardLoadingView(message: "Loading tags...")
                 }
             } else if viewModel.tags.isEmpty && viewModel.errorMessage != nil {
                 ConnectionErrorView { performSearch() }
             } else if viewModel.tags.isEmpty {
                 VStack(spacing: 0) {
-                    if !criteriaDocument.isEmpty || activePresetName != nil { quickBar.padding(.top, 8) }
+                    if !criteriaDocument.isEmpty || activePresetName != nil { quickBar }
                     emptyStateView
                 }
             } else {
@@ -648,7 +648,6 @@ private struct TagsViewContent: View {
             ScrollView {
                 VStack(spacing: 0) {
                 quickBar
-                    .padding(.top, 8)
                 LazyVGrid(columns: columns, spacing: 12) {
                     ForEach(viewModel.tags) { tag in
                         NavigationLink(destination: TagDetailView(selectedTag: tag)) {
@@ -675,7 +674,7 @@ private struct TagsViewContent: View {
                     }
                 }
                 .measuresGridWidth($gridWidth)
-                .padding(16)
+                .padding([.horizontal, .bottom], 16)
                 }
             }
             .refreshable { performSearch() }

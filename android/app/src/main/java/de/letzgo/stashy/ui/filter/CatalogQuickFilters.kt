@@ -57,6 +57,8 @@ import de.letzgo.stashy.ui.NativeSearchField
 import de.letzgo.stashy.ui.SF
 import de.letzgo.stashy.ui.Theme
 import de.letzgo.stashy.ui.catalog.CatalogController
+import de.letzgo.stashy.ui.tools.ToolsTokens
+import androidx.compose.ui.draw.shadow
 import de.letzgo.stashy.ui.settings.Segmented
 import kotlinx.serialization.json.JsonObject
 
@@ -97,16 +99,25 @@ fun CatalogListQuickBar(controller: CatalogController<*>, modifier: Modifier = M
     LaunchedEffect(entityKinds) { entityKinds.forEach { FilterPickerOptionsStore.load(it) } }
     val names = if (entityKinds.isEmpty()) emptyMap() else FilterPickerOptionsStore.knownLabels()
 
-    Column(modifier.fillMaxWidth().padding(vertical = 4.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        // The settings button is pinned at the leading edge; only the sort chips scroll.
+    // iOS `ToolsPillMenuRow` metrics (Tools pages): Tools content padding, menu top padding; the
+    // list's own 12 dp gutter below is the menu bottom padding. 8 between the two rows.
+    Column(
+        modifier.fillMaxWidth().padding(top = ToolsTokens.menuTopPadding),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        // The settings button is pinned at the leading edge; only the sort pills scroll, with a
+        // hard edge (no fade) right after the button + spacing.
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             FiltersButton(
                 isActive = presetName != null || keys.isNotEmpty(),
-                modifier = Modifier.padding(start = 16.dp, end = 8.dp),
+                modifier = Modifier.padding(start = ToolsTokens.contentPadding),
             ) { controller.isSheetPresented = true }
+            // The 10 dp gap to the button lives inside the scroll content, so the selected pill's
+            // glow has room on the leading edge instead of being cut at the viewport's hard edge
+            // (the scroll clip already leaves room above and below for shadows).
             Row(
-                Modifier.weight(1f).horizontalScroll(rememberScrollState()).padding(end = 16.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                Modifier.weight(1f).horizontalScroll(rememberScrollState()).padding(start = QuickPillSpacing, end = ToolsTokens.contentPadding),
+                horizontalArrangement = Arrangement.spacedBy(QuickPillSpacing),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
             CatalogQuickSortCatalog.availableFields(mode).forEach { field ->
@@ -123,7 +134,7 @@ fun CatalogListQuickBar(controller: CatalogController<*>, modifier: Modifier = M
         }
         if (keys.isNotEmpty() || presetName != null) {
             Row(
-                Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = 16.dp),
+                Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = ToolsTokens.contentPadding),
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
@@ -141,35 +152,49 @@ fun CatalogListQuickBar(controller: CatalogController<*>, modifier: Modifier = M
     }
 }
 
-@Composable
+/** iOS `ToolsPillMenuRow`: 10 between pills, 40 high (Charts' `DockItemSpacing` / `DockActiveHeight`). */
+private val QuickPillSpacing = 10.dp
+private val QuickPillHeight = 40.dp
+
 /**
- * iOS: the quick bar's pinned settings button — slider icon in a 38×30 capsule (the icon the old
- * chrome "Settings" button used), tint dot at top-trailing while a preset or criterion is active.
+ * iOS: the quick bar's pinned settings button — 40×40 circle on the secondary background with
+ * the slider icon (primary 85 %), 9 dp tint dot top-right while a preset or criterion is active.
  */
+@Composable
 private fun FiltersButton(isActive: Boolean, modifier: Modifier = Modifier, onClick: () -> Unit) {
-    Box(modifier.size(width = 38.dp, height = 30.dp).semantics(mergeDescendants = true) { contentDescription = "Filter and sort settings" }) {
+    val p = Theme.palette
+    Box(modifier.size(QuickPillHeight).semantics(mergeDescendants = true) { contentDescription = "Filter and sort settings" }) {
         Box(
-            Modifier.matchParentSize().clip(RoundedCornerShape(50)).background(Theme.palette.secondaryBackground).clickable(onClick = onClick),
+            Modifier.matchParentSize().clip(CircleShape).background(p.secondaryBackground).clickable(onClick = onClick),
             contentAlignment = Alignment.Center,
         ) {
-            Icon(SF.sliderHorizontal3, null, tint = Theme.palette.text, modifier = Modifier.size(16.dp))
+            Icon(SF.sliderHorizontal3, null, tint = p.text.copy(alpha = 0.85f), modifier = Modifier.size(20.dp))
         }
-        if (isActive) Box(Modifier.align(Alignment.TopEnd).size(8.dp).clip(CircleShape).background(Appearance.tint))
+        if (isActive) Box(Modifier.align(Alignment.TopEnd).size(9.dp).clip(CircleShape).background(Appearance.tint))
     }
 }
 
+/**
+ * iOS `ToolsPillMenuRow` pill (Android: Charts' `CapsuleChip`): 40 high, subheadline semibold,
+ * 16 horizontal padding, secondary background; selected = tint fill + 35 % tint shadow (6 dp),
+ * white text, unselected text primary 85 %.
+ */
 @Composable
 private fun SortChip(label: String, active: Boolean, icon: ImageVector?, onClick: () -> Unit) {
     val p = Theme.palette
-    val fg = if (active) Color.White else p.text
+    val tint = Appearance.tint
+    val shape = RoundedCornerShape(50)
+    val fg = if (active) Color.White else p.text.copy(alpha = 0.85f)
     Row(
-        Modifier.height(30.dp).clip(RoundedCornerShape(50)).background(if (active) Appearance.tint else p.secondaryBackground)
-            .clickable(onClick = onClick).padding(horizontal = 12.dp)
+        Modifier.height(QuickPillHeight)
+            .let { if (active) it.shadow(6.dp, shape, ambientColor = tint.copy(alpha = 0.35f), spotColor = tint.copy(alpha = 0.35f)) else it }
+            .clip(shape).background(if (active) tint else p.secondaryBackground)
+            .clickable(onClick = onClick).padding(horizontal = 16.dp)
             .semantics { contentDescription = "Sort by $label" },
         horizontalArrangement = Arrangement.spacedBy(4.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Text(label, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = fg, maxLines = 1)
+        Text(label, style = IosTypography.subheadline.copy(fontWeight = FontWeight.SemiBold), color = fg, maxLines = 1)
         if (icon != null) Icon(icon, null, tint = fg, modifier = Modifier.size(14.dp))
     }
 }

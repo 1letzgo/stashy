@@ -31,4 +31,28 @@ class WatchlistLogicTest {
         assertEquals(listOf("b", "c", "a"), ids(WatchlistLogic.moved(list, 0, 99)))
         assertEquals(listOf("a", "b", "c"), ids(WatchlistLogic.moved(list, 5, 0)))
     }
+
+    @Test fun ensureListedPutsANewSceneFirstAndKeepsListedOnes() {
+        assertEquals(listOf("c", "a", "b"), ids(WatchlistLogic.ensuredListed(listOf(a, b), c)))
+        assertEquals(listOf("a", "b"), ids(WatchlistLogic.ensuredListed(listOf(a, b), Scene(id = "b", title = "snapshot"))))
+        assertEquals(listOf("a"), ids(WatchlistLogic.ensuredListed(emptyList(), a)))
+    }
+
+    @Test fun shiftSwapsWithNeighbour() {
+        val list = listOf(a, b, c)
+        assertEquals(listOf("b", "a", "c"), ids(WatchlistLogic.shifted(list, "a", 1)))
+        assertEquals(listOf("a", "c", "b"), ids(WatchlistLogic.shifted(list, "c", -1)))
+        assertEquals(listOf("a", "b", "c"), ids(WatchlistLogic.shifted(list, "a", -1)))
+        assertEquals(listOf("a", "b", "c"), ids(WatchlistLogic.shifted(list, "x", 1)))
+    }
+
+    @Test fun moveAfterPutsSceneBehindThePlayingOne() {
+        val d = Scene(id = "d")
+        val list = listOf(a, b, c, d)
+        assertEquals(listOf("a", "d", "b", "c"), ids(WatchlistLogic.movedAfter(list, "d", "a")))
+        assertEquals(listOf("b", "c", "a", "d"), ids(WatchlistLogic.movedAfter(list, "a", "c")))
+        // Playing scene not listed: to the front. The playing one itself never moves.
+        assertEquals(listOf("c", "a", "b", "d"), ids(WatchlistLogic.movedAfter(list, "c", "x")))
+        assertEquals(listOf("a", "b", "c", "d"), ids(WatchlistLogic.movedAfter(list, "b", "b")))
+    }
 }

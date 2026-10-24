@@ -50,6 +50,7 @@ import de.letzgo.stashy.data.SceneEvent
 import de.letzgo.stashy.data.SceneEvents
 import de.letzgo.stashy.data.TabManager
 import de.letzgo.stashy.data.WatchlistStore
+import de.letzgo.stashy.data.MiniPlayerLastSession
 import de.letzgo.stashy.ui.scene.originalVideoURL
 import de.letzgo.stashy.ui.scene.transcodeFallbackURLs
 import de.letzgo.stashy.ui.Appearance
@@ -136,9 +137,11 @@ object MiniPlayerStore {
     private val tracker = PlaybackActivityTracker(scope)
     /** "Count as played" by watched seconds, like the scene page (iOS `PlayCountWatchClock`). */
     private val playCredit = PlayCountCredit(0.0)
+    /** Position of the last "last session" save (see [MiniPlayerLastSession]). */
+    private var lastSavedPosition: Double? = null
 
-    /** Settings › Playback › "Mini player when leaving a scene". */
-    val isEnabled: Boolean get() = TabManager.isMiniPlayerEnabled
+    /** stashy+: Settings › stashy+ › "Mini player when leaving a scene", only while stashy+ is unlocked. */
+    val isEnabled: Boolean get() = TabManager.isMiniPlayerEnabled && de.letzgo.stashy.data.StashyPlus.isUnlocked
 
     /** Takes over [player] from a scene page that is going away. Any other mini session ends. */
     fun adopt(scene: Scene, player: StashPlayer, watchedSeconds: Double, playRegistered: Boolean, serverId: String?) {
@@ -156,7 +159,42 @@ object MiniPlayerStore {
         tracker.setPosition(player.currentTime, if (player.duration > 0) player.duration else scene.sceneDuration ?: 0.0)
         if (player.isPlaying) tracker.start()
         playCredit.restore(watchedSeconds, playRegistered)
+        WatchlistStore.ensureListed(scene)
         session = Session(scene, player, playRegistered, watchedSeconds, serverId)
+        saveLastSession(scene, player.currentTime)
+    }
+
+    private fun saveLastSession(scene: Scene, position: Double) {
+        val serverId = session?.serverId ?: return
+        lastSavedPosition = position
+        MiniPlayerLastSession.save(serverId, scene, position)
+    }
+
+    /** A scene page stopped [sceneId] without handing it over: forget it if it is the saved one. */
+    fun forgetLastSession(sceneId: String, serverId: String?) {
+        if (MiniPlayerLastSession.forgetsFor(MiniPlayerLastSession.load(serverId)?.scene?.id, sceneId)) MiniPlayerLastSession.forget(serverId)
+    }
+
+    /**
+     * iOS `restoreLastSessionIfNeeded` — on launch (and after a server switch) the last session of
+     * [serverId] comes back paused at its position. Only with the mini player on and stashy+.
+     */
+    fun restoreLastSessionIfNeeded(serverId: String?) {
+        if (session != null || !isEnabled) return
+        val saved = MiniPlayerLastSession.load(serverId) ?: return
+        val scene = saved.scene
+        val url = scene.originalVideoURL ?: return
+        val context = de.letzgo.stashy.data.Prefs.appContext
+        val p = StashPlayer(context, StashPlayer.Role.Main)
+        p.isMuted = PlayerMute.initialValue(context)
+        p.fallbackSources = scene.transcodeFallbackURLs
+        p.fallbackDeclaredDuration = scene.sceneDuration
+        p.nowPlaying = SceneNowPlaying.of(scene)
+        p.enableMediaSession()
+        // Restoring is not a new viewing: no play is counted for it.
+        adopt(scene, p, watchedSeconds = 0.0, playRegistered = true, serverId = serverId)
+        p.load(url, saved.position.takeIf { it > 0 }, autoplay = false)
+        lastSavedPosition = saved.position
     }
 
     /** iOS `play(_:)` — switches the bar to [scene] on the same player (watchlist tap, next entry). */
@@ -175,6 +213,8 @@ object MiniPlayerStore {
         p.nowPlaying = SceneNowPlaying.of(scene)
         playCredit.reset()
         session = current.copy(scene = scene, playRegistered = false)
+        WatchlistStore.ensureListed(scene)
+        saveLastSession(scene, MiniPlayerRules.resumeStart(scene.resumeTime, scene.sceneDuration) ?: 0.0)
         p.load(url, MiniPlayerRules.resumeStart(scene.resumeTime, scene.sceneDuration), autoplay = true)
     }
 
@@ -205,6 +245,7 @@ object MiniPlayerStore {
         val current = session ?: return
         if (seconds < 0) return
         tracker.setPosition(seconds, if (duration > 0) duration else current.scene.sceneDuration ?: 0.0)
+        if (current.player.isPlaying && MiniPlayerLastSession.isDueForSave(lastSavedPosition, seconds)) saveLastSession(current.scene, seconds)
         playCredit.thresholdSeconds = maxOf(0.0, PlayerSettings.playCountPlayerSeconds)
         if (playCredit.onTime(seconds, current.player.isPlaying, android.os.SystemClock.elapsedRealtime() / 1000.0)) {
             session = current.copy(playRegistered = true)
@@ -242,13 +283,17 @@ object MiniPlayerStore {
     /** iOS `stashyPauseBackgroundPlayers` (Feeds took over the screen). */
     fun pause() { session?.player?.pause() }
 
-    /** Closes a session that belongs to another server than [serverId] (iOS `ServerConfigChanged`). */
+    /**
+     * iOS `ServerConfigChanged` (and the shell's first appearance): a session of another server is
+     * closed but stays saved for that server; then [serverId]'s saved session is restored.
+     */
     fun onServerChanged(serverId: String?) {
-        if (session?.let { it.serverId != serverId } == true) close()
+        if (session?.let { it.serverId != serverId } == true) close(forget = false)
+        restoreLastSessionIfNeeded(serverId)
     }
 
-    /** Saves the position and releases the player. */
-    fun close() {
+    /** Saves the position and releases the player; [forget] drops the saved last session (✕ / swipe). */
+    fun close(forget: Boolean = true) {
         val current = session ?: return
         val p = current.player
         tracker.setPosition(p.currentTime, if (p.duration > 0) p.duration else current.scene.sceneDuration ?: 0.0)
@@ -258,6 +303,9 @@ object MiniPlayerStore {
         p.onReachedEnd = null
         p.pause()
         p.release()
+        if (forget) MiniPlayerLastSession.forget(current.serverId)
+        else MiniPlayerLastSession.save(current.serverId, current.scene, p.currentTime)
+        lastSavedPosition = null
         session = null
         showsNowPlaying = false
     }
@@ -338,7 +386,8 @@ private fun MiniPlayerBarContent(session: MiniPlayerStore.Session) {
         ) {
             val thumbModifier = Modifier.size(width = 64.dp, height = 36.dp).clip(RoundedCornerShape(6.dp))
             // The full view draws the picture now; a player shows in one place only.
-            if (MiniPlayerStore.showsNowPlaying) {
+            // Cover while Now Playing draws the picture, and until a restored (paused) player has a frame.
+            if (MiniPlayerStore.showsNowPlaying || !player.hasPresentedFrame) {
                 coil3.compose.AsyncImage(scene.thumbnailURL, null, thumbModifier.background(androidx.compose.ui.graphics.Color.Black), contentScale = androidx.compose.ui.layout.ContentScale.Crop)
             } else VideoSurface(player, thumbModifier, fill = true)
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(1.dp)) {

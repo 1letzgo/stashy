@@ -42,8 +42,6 @@ fun LazyListScope.playbackSections() {
     settingsSection(header = "Player", key = "player") {
         SettingsToggleRow("Picture-in-Picture", TabManager.isPiPEnabled, SFS.pip) { TabManager.isPiPEnabled = it }
         SettingsDivider()
-        SettingsToggleRow("Mini player when leaving a scene", TabManager.isMiniPlayerEnabled, SFS.miniPlayer) { TabManager.isMiniPlayerEnabled = it }
-        SettingsDivider()
         SettingsPickerRow("Skip interval", TabManager.playerSkipOptions, TabManager.playerSkipSeconds, { "${it.toInt()} s" }, SFS.goforward) { TabManager.playerSkipSeconds = it }
         SettingsDivider()
         SettingsToggleRow("Skip buttons", TabManager.showsPlayerSkipButtons, SFS.goforward10) { TabManager.showsPlayerSkipButtons = it }

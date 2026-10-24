@@ -509,14 +509,14 @@ private struct StudiosViewContent: View {
             } else if viewModel.isLoading && viewModel.studios.isEmpty {
                 // Keep the bar while a sort/filter change refetches, so it does not jump away.
                 VStack(spacing: 0) {
-                    quickBar.padding(.top, 8)
+                    quickBar
                     StandardLoadingView(message: "Loading studios...")
                 }
             } else if viewModel.studios.isEmpty && viewModel.errorMessage != nil {
                 ConnectionErrorView { performSearch() }
             } else if viewModel.studios.isEmpty {
                 VStack(spacing: 0) {
-                    if !criteriaDocument.isEmpty || activePresetName != nil { quickBar.padding(.top, 8) }
+                    if !criteriaDocument.isEmpty || activePresetName != nil { quickBar }
                     emptyStateView
                 }
             } else {
@@ -725,7 +725,6 @@ private struct StudiosViewContent: View {
             ScrollView {
                 VStack(spacing: 0) {
                 quickBar
-                    .padding(.top, 8)
                 LazyVGrid(columns: columns, spacing: 12) {
                     ForEach(viewModel.studios) { studio in
                         NavigationLink(destination: StudioDetailView(studio: studio)) {
@@ -753,7 +752,7 @@ private struct StudiosViewContent: View {
                     }
                 }
                 .measuresGridWidth($gridWidth)
-                .padding(16)
+                .padding([.horizontal, .bottom], 16)
                 }
             }
             .refreshable { performSearch() }

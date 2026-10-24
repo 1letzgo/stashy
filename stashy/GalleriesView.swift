@@ -481,14 +481,14 @@ private struct GalleriesViewContent: View {
         } else if viewModel.isLoadingGalleries && viewModel.galleries.isEmpty {
             // Keep the bar while a sort/filter change refetches, so it does not jump away.
             VStack(spacing: 0) {
-                quickBar.padding(.top, 8)
+                quickBar
                 StandardLoadingView(message: "Loading galleries...")
             }
         } else if viewModel.galleries.isEmpty && viewModel.errorMessage != nil {
             ConnectionErrorView { performSearch() }
         } else if viewModel.galleries.isEmpty {
             VStack(spacing: 0) {
-                if !criteriaDocument.isEmpty || activePresetName != nil { quickBar.padding(.top, 8) }
+                if !criteriaDocument.isEmpty || activePresetName != nil { quickBar }
                 SharedEmptyStateView(
                     icon: "photo.stack",
                     title: "No galleries found",
@@ -539,7 +539,6 @@ private struct GalleriesViewContent: View {
         return ScrollView {
             VStack(spacing: 0) {
             quickBar
-                .padding(.top, 8)
             LazyVGrid(columns: columns, spacing: 12) {
                 ForEach(viewModel.galleries) { gallery in
                     NavigationLink(destination: LazyView { ImagesView(gallery: gallery) }) {
@@ -564,7 +563,7 @@ private struct GalleriesViewContent: View {
             }
             .measuresGridWidth($cardGridWidth)
             .id(cardColumns)
-            .padding(16)
+            .padding([.horizontal, .bottom], 16)
             }
         }
         .background(Color.appBackground)

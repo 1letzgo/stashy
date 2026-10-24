@@ -122,8 +122,10 @@ fun AppShell() {
     // iOS `ServerConfigChanged`: a switch (or removing the server) ends the mini player.
     val activeServerId = ServerConfigManager.activeConfig?.id
     LaunchedEffect(activeServerId) {
-        de.letzgo.stashy.ui.player.MiniPlayerStore.onServerChanged(activeServerId)
+        // Watchlist first: restoring the last mini player session lists its scene.
         de.letzgo.stashy.data.WatchlistStore.onServerChanged(activeServerId)
+        // First appearance and server switch: restore that server's last mini player session (paused).
+        de.letzgo.stashy.ui.player.MiniPlayerStore.onServerChanged(activeServerId)
     }
     if (ServerConfigManager.activeConfig == null) {
         Box(Modifier.fillMaxSize().background(p.background)) { ServerSetupScreen(onDone = {}) }
@@ -206,11 +208,12 @@ private fun MiniPlayerHost(tabBarShown: Boolean, tabBarHideFraction: Float, modi
     )
     // The bar's own full view; "Details" closes it and opens the scene page, which takes the player.
     val scope = androidx.compose.runtime.rememberCoroutineScope()
-    de.letzgo.stashy.ui.player.NowPlayingSheet { scene ->
+    de.letzgo.stashy.ui.player.NowPlayingSheet { screen ->
+        // Details / performer / studio: close the sheet, then open the page.
         de.letzgo.stashy.ui.player.MiniPlayerStore.showsNowPlaying = false
         scope.launch {
             kotlinx.coroutines.delay(300)
-            Nav.push(de.letzgo.stashy.ui.scene.SceneDetailScreen(scene.id, scene, openedFromMiniPlayer = true))
+            Nav.push(screen)
         }
     }
 }

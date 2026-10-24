@@ -321,7 +321,7 @@ fun <T> CatalogScaffold(
 @Composable
 private fun QuickBarAbove(controller: CatalogController<*>, topPadding: Dp, content: @Composable () -> Unit) {
     Column(Modifier.fillMaxSize().padding(top = topPadding)) {
-        CatalogListQuickBar(controller)
+        CatalogListQuickBar(controller, Modifier.padding(bottom = de.letzgo.stashy.ui.tools.ToolsTokens.menuBottomPadding))
         Box(Modifier.fillMaxWidth().weight(1f)) { content() }
     }
 }

@@ -44,7 +44,11 @@ final class MiniPlayerStore: ObservableObject {
             object: nil,
             queue: .main
         ) { [weak self] _ in
-            Task { @MainActor in self?.close() }
+            Task { @MainActor in
+                // The old server's session stays saved for when it is active again.
+                self?.close(forget: false)
+                self?.restoreLastSessionIfNeeded()
+            }
         }
         // Feeds take over the screen: same rule as every other background player.
         NotificationCenter.default.addObserver(
@@ -57,7 +61,8 @@ final class MiniPlayerStore: ObservableObject {
     }
 
     /// Whether a page being left should hand its playing engine over instead of stopping it.
-    var isEnabled: Bool { TabManager.shared.isMiniPlayerEnabled }
+    /// stashy+ feature, like the watchlist behind it.
+    var isEnabled: Bool { TabManager.shared.isMiniPlayerEnabled && StashyPlusManager.isUnlockedNow }
 
     /// Takes over `engine` from a scene page that is going away. Any other mini session ends.
     func adopt(scene: Scene, engine: AetherSceneEngine, playRegistered: Bool) {
@@ -89,6 +94,8 @@ final class MiniPlayerStore: ObservableObject {
         withAnimation(DesignTokens.Animation.quick) {
             session = Session(scene: scene, engine: engine, playRegistered: playRegistered)
         }
+        WatchlistStore.shared.ensureListed(scene)
+        saveSession(position: engine.currentTime)
     }
 
     /// Switches the bar to `scene` on the same engine (watchlist tap, or the next entry).
@@ -111,6 +118,8 @@ final class MiniPlayerStore: ObservableObject {
         engine.fallbackSources = scene.transcodeFallbackURLs
         engine.fallbackDeclaredDuration = scene.sceneDuration
         session = Session(scene: scene, engine: engine, playRegistered: false)
+        WatchlistStore.shared.ensureListed(scene)
+        saveSession(position: scene.resumeTime ?? 0)
         let resume: Double? = {
             guard let time = scene.resumeTime, time > 0 else { return nil }
             // Watched to the end before: start over instead of landing on the credits.
@@ -129,6 +138,7 @@ final class MiniPlayerStore: ObservableObject {
     /// Resume tracking plus the play count, which the page would otherwise have counted.
     private func handleTime(_ seconds: Double, duration: Double) {
         guard let current = session, seconds >= 0 else { return }
+        if abs(seconds - lastSavedPosition) >= 5 { saveSession(position: seconds) }
         tracker.setPosition(currentTime: seconds, duration: duration > 0 ? duration : (current.scene.sceneDuration ?? 0))
         playCountClock.sample(playhead: seconds, isPlaying: current.engine.isPlaying)
         if !current.playRegistered, playCountClock.watchedSeconds >= max(0, TabManager.shared.playCountPlayerSeconds) {
@@ -202,8 +212,9 @@ final class MiniPlayerStore: ObservableObject {
     }
 
     /// Saves the position and stops the engine.
-    func close() {
+    func close(forget: Bool = true) {
         guard let current = session else { return }
+        if forget { forgetLastSession() }
         let duration = current.engine.duration > 0 ? current.engine.duration : (current.scene.sceneDuration ?? 0)
         tracker.setPosition(currentTime: current.engine.currentTime, duration: duration)
         tracker.stop()
@@ -214,6 +225,54 @@ final class MiniPlayerStore: ObservableObject {
         withAnimation(DesignTokens.Animation.quick) {
             session = nil
         }
+    }
+
+    // MARK: - Last session (restored on launch)
+
+    private struct SavedSession: Codable {
+        let scene: Scene
+        let position: Double
+    }
+
+    private var lastSavedPosition: Double = -10
+
+    private var savedSessionKey: String? {
+        ServerConfigManager.shared.activeConfig.map { "mini_player_last_\($0.id.uuidString)" }
+    }
+
+    private func saveSession(position: Double) {
+        guard let current = session, let key = savedSessionKey else { return }
+        lastSavedPosition = position
+        if let data = try? JSONEncoder().encode(SavedSession(scene: current.scene, position: position)) {
+            UserDefaults.standard.set(data, forKey: key)
+        }
+    }
+
+    /// Dropped when the bar is closed, or when a page stops this scene without handing it over.
+    func forgetLastSession(sceneId: String? = nil) {
+        guard let key = savedSessionKey else { return }
+        if let sceneId,
+           let data = UserDefaults.standard.data(forKey: key),
+           let saved = try? JSONDecoder().decode(SavedSession.self, from: data),
+           saved.scene.id != sceneId {
+            return
+        }
+        UserDefaults.standard.removeObject(forKey: key)
+    }
+
+    /// App start: the bar comes back with the last scene, paused at its position.
+    func restoreLastSessionIfNeeded() {
+        guard session == nil, isEnabled, let key = savedSessionKey,
+              let data = UserDefaults.standard.data(forKey: key),
+              let saved = try? JSONDecoder().decode(SavedSession.self, from: data),
+              let url = saved.scene.aetherVideoURL,
+              let engine = try? AetherSceneEngine() else { return }
+        engine.isMuted = ScenePlayerMute.initialValue()
+        engine.fallbackSources = saved.scene.transcodeFallbackURLs
+        engine.fallbackDeclaredDuration = saved.scene.sceneDuration
+        adopt(scene: saved.scene, engine: engine, playRegistered: false)
+        let start = saved.position > 1 ? saved.position : nil
+        Task { await engine.load(url: url, startAt: start, autoplay: false) }
     }
 
     /// Same save path as the scene page (`ensurePlaybackActivityConfigured`).
@@ -314,6 +373,31 @@ final class WatchlistStore: ObservableObject {
         persist()
     }
 
+    /// One step up (`-1`) or down (`+1`); the context-menu fallback for dragging.
+    func shift(_ sceneId: String, by delta: Int) {
+        guard let index = scenes.firstIndex(where: { $0.id == sceneId }) else { return }
+        let target = index + delta
+        guard scenes.indices.contains(target) else { return }
+        scenes.swapAt(index, target)
+        persist()
+    }
+
+    /// Moves `sceneId` right behind the playing scene, so it plays next.
+    func moveAfter(_ sceneId: String, currentId: String?) {
+        guard let index = scenes.firstIndex(where: { $0.id == sceneId }), sceneId != currentId else { return }
+        let scene = scenes.remove(at: index)
+        let anchor = currentId.flatMap { id in scenes.firstIndex(where: { $0.id == id }) }
+        scenes.insert(scene, at: anchor.map { $0 + 1 } ?? 0)
+        persist()
+    }
+
+    /// The playing scene is always on the list: added in front when it is not yet.
+    func ensureListed(_ scene: Scene) {
+        guard !contains(scene.id) else { return }
+        scenes.insert(scene, at: 0)
+        persist()
+    }
+
     /// The entry after `sceneId`; the first one when `sceneId` is not on the list.
     func next(after sceneId: String) -> Scene? {
         guard let index = scenes.firstIndex(where: { $0.id == sceneId }) else { return scenes.first }
@@ -334,6 +418,152 @@ extension View {
     }
 }
 
+/// Tools → Watchlist: the list when nothing plays. A row opens and plays its scene; leaving
+/// the page hands it to the mini player, which plays on through the list.
+struct WatchlistToolsView: View {
+    @ObservedObject private var watchlist = WatchlistStore.shared
+    @ObservedObject private var player = MiniPlayerStore.shared
+    @ObservedObject private var appearance = AppearanceManager.shared
+    @State private var confirmReset = false
+    @State private var openedScene: Scene?
+    @State private var showsScene = false
+
+    var body: some View {
+        Group {
+            if watchlist.scenes.isEmpty {
+                ContentUnavailableView(
+                    "Watchlist is empty",
+                    systemImage: "text.badge.plus",
+                    description: Text("Add scenes with \"Add to watchlist\" on a scene. They play one after another in the mini player.")
+                )
+            } else {
+                List {
+                    Section {
+                        HStack(spacing: StashyExpandingDock.itemSpacing) {
+                            Button {
+                                HapticManager.light()
+                                openedScene = watchlist.scenes.first
+                                showsScene = openedScene != nil
+                            } label: {
+                                Label("Play all", systemImage: "play.fill")
+                                    .font(.subheadline.weight(.semibold))
+                                    .foregroundStyle(Color.white)
+                                    .frame(maxWidth: .infinity)
+                                    .frame(height: StashyExpandingDock.activeHeight)
+                                    .background(Capsule(style: .continuous).fill(appearance.tintColor))
+                            }
+                            .buttonStyle(.plain)
+                            Button(role: .destructive) { confirmReset = true } label: {
+                                Text("Reset")
+                                    .font(.subheadline.weight(.semibold))
+                                    .foregroundStyle(Color.red)
+                                    .padding(.horizontal, 18)
+                                    .frame(height: StashyExpandingDock.activeHeight)
+                                    .background(Capsule(style: .continuous).fill(Color.secondaryAppBackground))
+                            }
+                            .buttonStyle(.plain)
+                        }
+                        .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 12, trailing: 16))
+                        .listRowBackground(Color.clear)
+                        .listRowSeparator(.hidden)
+                    }
+                    Section {
+                        ForEach(watchlist.scenes) { scene in
+                            Button {
+                                HapticManager.light()
+                                openedScene = scene
+                                showsScene = true
+                            } label: {
+                                WatchlistSceneRow(scene: scene, isCurrent: player.session?.scene.id == scene.id)
+                            }
+                            .buttonStyle(.plain)
+                            .listRowInsets(EdgeInsets(top: 6, leading: 16, bottom: 6, trailing: 16))
+                            .listRowBackground(Color.clear)
+                            .listRowSeparatorTint(Color.primary.opacity(0.08))
+                            .deleteDisabled(true)
+                            .contextMenu {
+                                if watchlist.scenes.first?.id != scene.id {
+                                    Button { watchlist.shift(scene.id, by: -1) } label: {
+                                        Label("Move up", systemImage: "arrow.up")
+                                    }
+                                }
+                                if watchlist.scenes.last?.id != scene.id {
+                                    Button { watchlist.shift(scene.id, by: 1) } label: {
+                                        Label("Move down", systemImage: "arrow.down")
+                                    }
+                                }
+                                Button(role: .destructive) { watchlist.remove(scene.id) } label: {
+                                    Label("Remove from watchlist", systemImage: "trash")
+                                }
+                            }
+                        }
+                        .onMove { watchlist.move(fromOffsets: $0, toOffset: $1) }
+                    }
+                }
+                .listStyle(.plain)
+                .environment(\.editMode, .constant(.active))
+                .scrollContentBackground(.hidden)
+            }
+        }
+        .background(Color.appBackground.ignoresSafeArea())
+        .navigationDestination(isPresented: $showsScene) {
+            if let openedScene {
+                SceneDetailView(scene: openedScene, autoPlay: true)
+            }
+        }
+        .alert("Reset watchlist?", isPresented: $confirmReset) {
+            Button("Reset", role: .destructive) { watchlist.clear() }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("All scenes are removed from the watchlist.")
+        }
+    }
+}
+
+/// Thumbnail, title and performers; the playing one tinted with a speaker badge.
+struct WatchlistSceneRow: View {
+    let scene: Scene
+    var isCurrent: Bool = false
+    @ObservedObject private var appearance = AppearanceManager.shared
+
+    var body: some View {
+        HStack(spacing: 12) {
+            CustomAsyncImage(url: scene.thumbnailURL) { loader in
+                if let image = loader.image {
+                    image.resizable().aspectRatio(contentMode: .fill)
+                } else {
+                    Color.black.opacity(0.3)
+                }
+            }
+            .frame(width: 80, height: 45)
+            .clipShape(RoundedRectangle(cornerRadius: 6))
+            .overlay {
+                if isCurrent {
+                    Image(systemName: "speaker.wave.2.fill")
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundColor(.white)
+                        .padding(6)
+                        .background(Color.black.opacity(0.5), in: Circle())
+                }
+            }
+            VStack(alignment: .leading, spacing: 2) {
+                Text(scene.title ?? "Scene")
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundColor(isCurrent ? appearance.tintColor : .primary)
+                    .lineLimit(2)
+                let performers = scene.performers.prefix(2).map(\.name).joined(separator: ", ")
+                if !performers.isEmpty {
+                    Text(performers)
+                        .font(.system(size: 12))
+                        .foregroundColor(.secondary)
+                        .lineLimit(1)
+                }
+            }
+            Spacer(minLength: 0)
+        }
+        .contentShape(Rectangle())
+    }
+}
 #if os(iOS)
 /// The bar above the tab bar: live picture, title, play/pause, close. Tap reopens the scene,
 /// a swipe down closes it.
@@ -380,6 +610,18 @@ private struct MiniPlayerBarContent: View {
                     }
                 } else {
                     AetherVideoSurface(engine: engine, videoGravity: .resizeAspectFill)
+                        .overlay {
+                            // Restored on launch (paused, no frame decoded yet): show the cover.
+                            if !engine.hasPresentedFrame {
+                                CustomAsyncImage(url: session.scene.thumbnailURL) { loader in
+                                    if let image = loader.image {
+                                        image.resizable().aspectRatio(contentMode: .fill)
+                                    } else {
+                                        Color.black
+                                    }
+                                }
+                            }
+                        }
                 }
             }
                 .frame(width: 64, height: 36)
@@ -501,11 +743,21 @@ struct NowPlayingView: View {
 private struct NowPlayingContent: View {
     let session: MiniPlayerStore.Session
     @ObservedObject var engine: AetherSceneEngine
+
+    init(session: MiniPlayerStore.Session, engine: AetherSceneEngine) {
+        self.session = session
+        self.engine = engine
+        _displayedScene = State(initialValue: session.scene)
+    }
     @ObservedObject private var player = MiniPlayerStore.shared
     @ObservedObject private var watchlist = WatchlistStore.shared
     @ObservedObject private var appearance = AppearanceManager.shared
-    @State private var scrubTime: Double?
     @State private var confirmReset = false
+    /// Local copy for the metadata card: rating / O-count edits show at once.
+    @State private var displayedScene: Scene
+    @State private var isHeaderExpanded = false
+    @StateObject private var viewModel = StashDBViewModel()
+    @EnvironmentObject private var coordinator: NavigationCoordinator
     @Environment(\.dismiss) private var dismiss
 
     private var subtitle: String {
@@ -515,11 +767,49 @@ private struct NowPlayingContent: View {
     }
 
     var body: some View {
+        // Toolbar (minimize · Details), then the player with a slim side margin; it stays put
+        // while the watchlist scrolls.
         NavigationStack {
+        VStack(spacing: 0) {
+            AetherSceneSurface(
+                engine: engine,
+                posterURL: session.scene.thumbnailURL,
+                isMuted: Binding(
+                    get: { engine.isMuted },
+                    set: { engine.isMuted = $0 }
+                ),
+                onSeek: { time in Task { await engine.seek(to: time) } },
+                markers: session.scene.timeBarMarkers
+            )
+            .frame(maxWidth: .infinity)
+            .aspectRatio(16 / 9, contentMode: .fit)
+            .background(Color.black)
+            .clipShape(RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.card))
+            .padding(.horizontal, 8)
+            .padding(.top, 4)
+
             List {
                 Section {
-                    playerBlock
-                        .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 16, trailing: 16))
+                    // The scene page's own metadata card: title, expandable details, date /
+                    // duration / plays / O-count / rating chips (O and rating are tappable).
+                    SceneDetailMetadataCard(
+                        activeScene: $displayedScene,
+                        aetherEngine: engine,
+                        isHeaderExpanded: $isHeaderExpanded,
+                        showingAddMarkerSheet: .constant(false),
+                        capturedMarkerTime: .constant(0),
+                        playbackSpeed: .constant(Double(engine.rate)),
+                        viewModel: viewModel,
+                        onSeek: { time in Task { await engine.seek(to: time) } }
+                    )
+                    .background(Color.secondaryAppBackground)
+                    .clipShape(RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.card))
+                    .listRowInsets(EdgeInsets(top: 12, leading: 8, bottom: 8, trailing: 8))
+                    .listRowBackground(Color.clear)
+                    .listRowSeparator(.hidden)
+
+                    infoRow
+                        .listRowInsets(EdgeInsets(top: 4, leading: 8, bottom: 12, trailing: 8))
                         .listRowBackground(Color.clear)
                         .listRowSeparator(.hidden)
                 }
@@ -528,111 +818,169 @@ private struct NowPlayingContent: View {
                         Text("Add scenes with the watchlist button on a scene. They play here one after another.")
                             .font(.footnote)
                             .foregroundColor(.secondary)
-                            .listRowBackground(Color.secondaryAppBackground)
+                            .listRowInsets(EdgeInsets(top: 8, leading: 8, bottom: 8, trailing: 8))
+                            .listRowBackground(Color.clear)
+                            .listRowSeparator(.hidden)
                     } else {
+                        // A plain list, not cards. Always in edit mode so every row carries the
+                        // system reorder handle; removing is in the row's context menu.
                         ForEach(watchlist.scenes) { scene in
                             watchlistRow(scene)
-                                .listRowBackground(Color.secondaryAppBackground)
+                                .listRowInsets(EdgeInsets(top: 6, leading: 8, bottom: 6, trailing: 8))
+                                .listRowBackground(Color.clear)
+                                .listRowSeparatorTint(Color.primary.opacity(0.08))
+                                .deleteDisabled(true)
+                                .contextMenu {
+                                    if scene.id != session.scene.id {
+                                        Button {
+                                            watchlist.moveAfter(scene.id, currentId: session.scene.id)
+                                        } label: {
+                                            Label("Play next", systemImage: "text.line.first.and.arrowtriangle.forward")
+                                        }
+                                    }
+                                    if watchlist.scenes.first?.id != scene.id {
+                                        Button {
+                                            watchlist.shift(scene.id, by: -1)
+                                        } label: {
+                                            Label("Move up", systemImage: "arrow.up")
+                                        }
+                                    }
+                                    if watchlist.scenes.last?.id != scene.id {
+                                        Button {
+                                            watchlist.shift(scene.id, by: 1)
+                                        } label: {
+                                            Label("Move down", systemImage: "arrow.down")
+                                        }
+                                    }
+                                    Button(role: .destructive) {
+                                        watchlist.remove(scene.id)
+                                    } label: {
+                                        Label("Remove from watchlist", systemImage: "trash")
+                                    }
+                                }
                         }
-                        .onDelete { watchlist.remove(atOffsets: $0) }
                         .onMove { watchlist.move(fromOffsets: $0, toOffset: $1) }
                     }
                 } header: {
                     HStack {
                         Text("Watchlist")
+                            .font(.headline)
+                            .foregroundColor(.primary)
                         Spacer()
                         if !watchlist.scenes.isEmpty {
                             Button("Reset", role: .destructive) { confirmReset = true }
                                 .font(.subheadline.weight(.semibold))
                                 .foregroundColor(.red)
-                                .textCase(nil)
-                                .padding(.trailing, 12)
-                            EditButton()
-                                .font(.subheadline.weight(.semibold))
-                                .textCase(nil)
                         }
                     }
+                    .textCase(nil)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 6)
+                    .listRowInsets(EdgeInsets())
+                    .background(Color.appBackground)
                 }
             }
-            .listStyle(.insetGrouped)
+            .listStyle(.plain)
+            .environment(\.editMode, .constant(.active))
             .scrollContentBackground(.hidden)
-            .background(Color.appBackground.ignoresSafeArea())
-            .navigationBarTitleDisplayMode(.inline)
-            .alert("Reset watchlist?", isPresented: $confirmReset) {
-                Button("Reset", role: .destructive) { watchlist.clear() }
-                Button("Cancel", role: .cancel) {}
-            } message: {
-                Text("All scenes are removed from the watchlist. The playing scene keeps playing.")
+            .contentMargins(.top, 0, for: .scrollContent)
+        }
+        .background(Color.appBackground.ignoresSafeArea())
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .topBarLeading) {
+                Button { dismiss() } label: {
+                    Image(systemName: "chevron.down")
+                }
+                .accessibilityLabel("Minimize")
             }
-            .toolbar {
-                ToolbarItem(placement: .topBarLeading) {
-                    Button { dismiss() } label: {
-                        Image(systemName: "chevron.down")
+            ToolbarItem(placement: .topBarTrailing) {
+                Button("Details") { player.openSceneDetails() }
+            }
+        }
+        }
+        .alert("Reset watchlist?", isPresented: $confirmReset) {
+            Button("Reset", role: .destructive) { watchlist.clear() }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("All scenes are removed from the watchlist. The playing scene keeps playing.")
+        }
+        .onChange(of: session.scene.id) { _, _ in
+            displayedScene = session.scene
+            isHeaderExpanded = false
+        }
+    }
+
+    /// Performers · studio as links, and next when the watchlist has one.
+    private var infoRow: some View {
+        HStack(alignment: .center, spacing: 6) {
+            creditLinks
+            Spacer(minLength: 4)
+            if player.hasNext {
+                iconButton("forward.end.fill", label: "Next in watchlist") { player.playNext() }
+            }
+        }
+    }
+
+    /// Performers and studio as links: the sheet closes and the page opens on Home.
+    @ViewBuilder
+    private var creditLinks: some View {
+        let performers = Array(session.scene.performers.prefix(4))
+        let studio = session.scene.studio
+        if !performers.isEmpty || studio != nil {
+            FlowLayout(spacing: 6) {
+                ForEach(performers, id: \.id) { performer in
+                    creditPill(icon: "person.fill", text: performer.name) {
+                        open { coordinator.openPerformer(performer.toPerformer()) }
                     }
-                    .accessibilityLabel("Minimize")
                 }
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button("Details") { player.openSceneDetails() }
+                if let studio {
+                    creditPill(icon: "building.2.fill", text: studio.name) {
+                        open { coordinator.openStudio(studio.toStudio()) }
+                    }
                 }
             }
         }
     }
 
-    private var playerBlock: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            AetherVideoSurface(engine: engine)
-                .aspectRatio(16 / 9, contentMode: .fit)
-                .clipShape(RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.card))
-                .contentShape(Rectangle())
-                .onTapGesture { player.togglePlayPause() }
-
-            VStack(alignment: .leading, spacing: 3) {
-                Text(session.scene.title ?? "Scene")
-                    .font(.title3.weight(.bold))
-                    .lineLimit(2)
-                if !subtitle.isEmpty {
-                    Text(subtitle)
-                        .font(.subheadline)
-                        .foregroundColor(.secondary)
-                        .lineLimit(1)
-                }
+    /// Same look as the scene page's metadata pills (accent tint, 28 pt capsule).
+    private func creditPill(icon: String, text: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            HStack(spacing: 4) {
+                Image(systemName: icon)
+                    .font(.system(size: 10, weight: .bold))
+                Text(text)
+                    .font(.system(size: 12, weight: .bold))
+                    .lineLimit(1)
             }
-
-            AetherTimeBar(
-                currentTime: scrubTime ?? engine.currentTime,
-                duration: engine.duration,
-                isScrubbing: scrubTime != nil,
-                isCompact: true,
-                onScrubChanged: { scrubTime = $0 },
-                onScrubEnded: { time in
-                    scrubTime = nil
-                    Task { await engine.seek(to: time) }
-                }
-            )
-
-            HStack(spacing: 0) {
-                transportButton("gobackward.10", label: "Back 10 seconds") { player.seek(by: -10) }
-                transportButton(engine.isPlaying ? "pause.fill" : "play.fill",
-                                label: engine.isPlaying ? "Pause" : "Play",
-                                size: 34) { player.togglePlayPause() }
-                transportButton("goforward.10", label: "Forward 10 seconds") { player.seek(by: 10) }
-                transportButton("forward.end.fill", label: "Next in watchlist") { player.playNext() }
-                    .disabled(!player.hasNext)
-                    .opacity(player.hasNext ? 1 : 0.35)
-            }
-            WatchlistToggleRow(scene: session.scene)
+            .padding(.horizontal, 10)
+            .frame(height: 28)
+            .background(Color.pillAccent.opacity(0.1))
+            .foregroundColor(Color.pillAccent)
+            .clipShape(Capsule())
         }
+        .buttonStyle(.plain)
+        .accessibilityHint("Opens the page")
     }
 
-    private func transportButton(_ systemImage: String, label: String, size: CGFloat = 22, action: @escaping () -> Void) -> some View {
+    /// Closes the sheet first; navigating under a presented sheet does not show.
+    private func open(_ navigate: @escaping () -> Void) {
+        HapticManager.light()
+        player.showsNowPlaying = false
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.35, execute: navigate)
+    }
+
+    private func iconButton(_ systemImage: String, label: String, action: @escaping () -> Void) -> some View {
         Button {
             HapticManager.light()
             action()
         } label: {
             Image(systemName: systemImage)
-                .font(.system(size: size, weight: .semibold))
-                .frame(maxWidth: .infinity, minHeight: 48)
-                .contentShape(Rectangle())
+                .font(.system(size: 17, weight: .semibold))
+                .foregroundStyle(Color.primary.opacity(0.85))
+                .frame(width: StashyExpandingDock.circleSize, height: StashyExpandingDock.circleSize)
+                .background(Circle().fill(Color.secondaryAppBackground))
+                .contentShape(Circle())
         }
         .buttonStyle(.plain)
         .accessibilityLabel(label)
@@ -684,30 +1032,6 @@ private struct NowPlayingContent: View {
     }
 }
 
-/// "On watchlist" toggle for the scene playing in the full view.
-private struct WatchlistToggleRow: View {
-    let scene: Scene
-    @ObservedObject private var watchlist = WatchlistStore.shared
-    @ObservedObject private var appearance = AppearanceManager.shared
-
-    var body: some View {
-        let listed = watchlist.contains(scene.id)
-        Button {
-            HapticManager.light()
-            watchlist.toggle(scene)
-        } label: {
-            Label(listed ? "On watchlist" : "Add to watchlist",
-                  systemImage: listed ? "text.badge.checkmark" : "text.badge.plus")
-                .font(.subheadline.weight(.semibold))
-                .foregroundColor(listed ? appearance.tintColor : .primary)
-                .padding(.horizontal, 14)
-                .frame(height: 34)
-                .background(Color.secondaryAppBackground, in: Capsule())
-        }
-        .buttonStyle(.plain)
-        .frame(maxWidth: .infinity)
-    }
-}
 #endif
 
 #endif

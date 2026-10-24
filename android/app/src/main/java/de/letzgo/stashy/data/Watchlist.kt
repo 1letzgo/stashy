@@ -17,6 +17,32 @@ object WatchlistLogic {
     fun toggled(scenes: List<Scene>, scene: Scene): List<Scene> =
         if (scenes.any { it.id == scene.id }) scenes.filter { it.id != scene.id } else scenes + scene
 
+    /** [scene] at the front when it is not listed yet; the list unchanged otherwise. */
+    fun ensuredListed(scenes: List<Scene>, scene: Scene): List<Scene> =
+        if (scenes.any { it.id == scene.id }) scenes else listOf(scene) + scenes
+
+    /** Swaps [sceneId] with its neighbour [delta] places away; unchanged when out of range. */
+    fun shifted(scenes: List<Scene>, sceneId: String, delta: Int): List<Scene> {
+        val index = scenes.indexOfFirst { it.id == sceneId }
+        val target = index + delta
+        if (index < 0 || target !in scenes.indices) return scenes
+        val list = scenes.toMutableList()
+        list[index] = scenes[target]
+        list[target] = scenes[index]
+        return list
+    }
+
+    /** Moves [sceneId] right behind [currentId] so it plays next (to the front when the current one is not listed). */
+    fun movedAfter(scenes: List<Scene>, sceneId: String, currentId: String?): List<Scene> {
+        val index = scenes.indexOfFirst { it.id == sceneId }
+        if (index < 0 || sceneId == currentId) return scenes
+        val list = scenes.toMutableList()
+        val scene = list.removeAt(index)
+        val anchor = currentId?.let { id -> list.indexOfFirst { it.id == id } }?.takeIf { it >= 0 }
+        list.add(anchor?.plus(1) ?: 0, scene)
+        return list
+    }
+
     /** Moves the entry at [from] to index [to] of the resulting list (clamped); no-op when out of range. */
     fun moved(scenes: List<Scene>, from: Int, to: Int): List<Scene> {
         if (from !in scenes.indices) return scenes
@@ -74,6 +100,17 @@ object WatchlistStore {
     fun contains(sceneId: String): Boolean { ensureLoaded(); return scenes.any { it.id == sceneId } }
 
     fun toggle(scene: Scene) { ensureLoaded(); replace(WatchlistLogic.toggled(scenes, scene)) }
+
+    /** iOS `ensureListed` — the scene playing in the mini player is always on the list (added at the front). */
+    fun ensureListed(scene: Scene) {
+        ensureLoaded()
+        if (scenes.none { it.id == scene.id }) replace(WatchlistLogic.ensuredListed(scenes, scene))
+    }
+
+    fun shift(sceneId: String, delta: Int) { ensureLoaded(); replace(WatchlistLogic.shifted(scenes, sceneId, delta)) }
+
+    /** iOS `moveAfter` — "Play next". */
+    fun moveAfter(sceneId: String, currentId: String?) { ensureLoaded(); replace(WatchlistLogic.movedAfter(scenes, sceneId, currentId)) }
 
     fun remove(sceneId: String) { ensureLoaded(); replace(scenes.filter { it.id != sceneId }) }
 

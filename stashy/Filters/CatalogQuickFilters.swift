@@ -288,6 +288,8 @@ struct CatalogListQuickBar<Option: CatalogQuickSortable>: View {
     @ObservedObject private var appearance = AppearanceManager.shared
     @ObservedObject private var pickerOptions = FilterPickerOptionsStore.shared
 
+    private static var shadowRoom: CGFloat { 12 }
+
     private var sortFields: [CatalogQuickSortCatalog.Field] {
         let available = Set(Option.allCases.map(\.sortField))
         return CatalogQuickSortCatalog.fields(for: mode).filter { field in
@@ -305,34 +307,28 @@ struct CatalogListQuickBar<Option: CatalogQuickSortable>: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
+        // Same pills, sizes and spacing as the Tools section rows (`ToolsPillMenuRow`).
+        VStack(alignment: .leading, spacing: DesignTokens.Tools.menuBottomPadding) {
             HStack(spacing: 0) {
-                // Pinned: only the sort chips scroll, the settings button stays put.
+                // Pinned: only the sort pills scroll, the settings button stays put.
                 if let onOpenFilters {
                     settingsButton(action: onOpenFilters)
-                        .padding(.leading, 16)
-                        .padding(.trailing, 8)
                 }
                 ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: 8) {
+                    HStack(spacing: StashyExpandingDock.itemSpacing) {
                         ForEach(sortFields, id: \.self) { field in
                             sortChip(field)
                         }
                     }
-                    .padding(.leading, onOpenFilters == nil ? 16 : 0)
-                    .padding(.trailing, 16)
+                    // The selected pill's glow (radius 6, y 3) must fit inside the clipped
+                    // scroll area on every side, or it shows as a hard-edged box.
+                    .padding(.vertical, Self.shadowRoom)
+                    .padding(.leading, onOpenFilters == nil ? 0 : StashyExpandingDock.itemSpacing)
+                    .padding(.trailing, DesignTokens.Tools.contentPadding)
                 }
-                // Chips fade out under the pinned button instead of being cut off hard.
-                .mask {
-                    HStack(spacing: 0) {
-                        if onOpenFilters != nil {
-                            LinearGradient(colors: [.clear, .black], startPoint: .leading, endPoint: .trailing)
-                                .frame(width: 12)
-                        }
-                        Color.black
-                    }
-                }
+                .padding(.vertical, -Self.shadowRoom)
             }
+            .padding(.leading, DesignTokens.Tools.contentPadding)
             let chips = activeChips
             if !chips.isEmpty || presetName != nil {
                 ScrollView(.horizontal, showsIndicators: false) {
@@ -350,11 +346,12 @@ struct CatalogListQuickBar<Option: CatalogQuickSortable>: View {
                             }
                         }
                     }
-                    .padding(.horizontal, 16)
+                    .padding(.horizontal, DesignTokens.Tools.contentPadding)
                 }
             }
         }
-        .padding(.vertical, 4)
+        .padding(.top, DesignTokens.Tools.menuTopPadding)
+        .padding(.bottom, DesignTokens.Tools.menuBottomPadding)
     }
 
     /// Replaces the chrome's former "Settings" slot; the dot marks an active filter.
@@ -362,17 +359,17 @@ struct CatalogListQuickBar<Option: CatalogQuickSortable>: View {
         let filtered = presetName != nil || !document.isEmpty
         return Button(action: action) {
             Image(systemName: "slider.horizontal.3")
-                .font(.system(size: 14, weight: .semibold))
-                .frame(width: 38, height: 30)
-                .background(Color.secondaryAppBackground)
-                .foregroundColor(.primary)
-                .clipShape(Capsule())
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(Color.primary.opacity(0.85))
+                .frame(width: StashyExpandingDock.circleSize, height: StashyExpandingDock.activeHeight)
+                .background(Circle().fill(Color.secondaryAppBackground))
+                .contentShape(Circle())
                 .overlay(alignment: .topTrailing) {
                     if filtered {
                         Circle()
                             .fill(appearance.tintColor)
-                            .frame(width: 8, height: 8)
-                            .offset(x: -2, y: 1)
+                            .frame(width: 9, height: 9)
+                            .offset(x: -1, y: 1)
                     }
                 }
         }
@@ -390,23 +387,28 @@ struct CatalogListQuickBar<Option: CatalogQuickSortable>: View {
             return sort.direction == "ASC" ? "arrow.up" : "arrow.down"
         }()
         return Button {
-            HapticManager.light()
+            HapticManager.selection()
             if let next = CatalogQuickSortCatalog.next(after: sort, tapping: field.field) {
                 onSort(next)
             }
         } label: {
             HStack(spacing: 4) {
                 Text(field.label)
+                    .lineLimit(1)
                 if let icon {
-                    Image(systemName: icon).font(.system(size: 11, weight: .bold))
+                    Image(systemName: icon).font(.caption.weight(.bold))
                 }
             }
-            .font(.system(size: 13, weight: .semibold))
-            .padding(.horizontal, 12)
-            .frame(height: 30)
-            .background(isActive ? appearance.tintColor : Color.secondaryAppBackground)
-            .foregroundColor(isActive ? .white : .primary)
-            .clipShape(Capsule())
+            .font(.subheadline.weight(.semibold))
+            .foregroundStyle(isActive ? Color.white : Color.primary.opacity(0.85))
+            .padding(.horizontal, 16)
+            .frame(height: StashyExpandingDock.activeHeight)
+            .background(
+                Capsule(style: .continuous)
+                    .fill(isActive ? appearance.tintColor : Color.secondaryAppBackground)
+                    .shadow(color: isActive ? appearance.tintColor.opacity(0.35) : .clear, radius: 6, x: 0, y: 3)
+            )
+            .contentShape(Capsule(style: .continuous))
         }
         .buttonStyle(.plain)
         .accessibilityLabel("Sort by \(field.label)")

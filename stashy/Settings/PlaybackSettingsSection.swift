@@ -35,13 +35,7 @@ struct PlaybackSettingsSection: View {
                 Label("Picture-in-Picture", systemImage: "pip")
             }
             .tint(appearanceManager.tintColor)
-            .stashyGroupedBlockRow(index: 0, count: 10)
-
-            Toggle(isOn: $tabManager.isMiniPlayerEnabled) {
-                Label("Mini player when leaving a scene", systemImage: "rectangle.bottomhalf.inset.filled")
-            }
-            .tint(appearanceManager.tintColor)
-            .stashyGroupedBlockRow(index: 1, count: 10)
+            .stashyGroupedBlockRow(index: 0, count: 9)
 
             Picker(selection: $tabManager.playerSkipSeconds) {
                 ForEach(TabManager.playerSkipOptions, id: \.self) { seconds in
@@ -50,33 +44,33 @@ struct PlaybackSettingsSection: View {
             } label: {
                 Label("Skip interval", systemImage: "goforward")
             }
-            .stashyGroupedBlockRow(index: 2, count: 10)
+            .stashyGroupedBlockRow(index: 1, count: 9)
 
             Toggle(isOn: $tabManager.showsPlayerSkipButtons) {
                 Label("Skip buttons", systemImage: "goforward.10")
             }
             .tint(appearanceManager.tintColor)
-            .stashyGroupedBlockRow(index: 3, count: 10)
+            .stashyGroupedBlockRow(index: 2, count: 9)
 
             // Fullscreen turns to landscape for landscape videos.
             Toggle(isOn: $tabManager.playerAutoRotateFullscreen) {
                 Label("Auto-rotate fullscreen", systemImage: "rotate.right")
             }
             .tint(appearanceManager.tintColor)
-            .stashyGroupedBlockRow(index: 4, count: 10)
+            .stashyGroupedBlockRow(index: 3, count: 9)
 
             // Landscape fullscreen fills by itself when little of the picture is lost.
             Toggle(isOn: $tabManager.playerAutoZoom) {
                 Label("Autozoom", systemImage: "arrow.up.left.and.arrow.down.right")
             }
             .tint(appearanceManager.tintColor)
-            .stashyGroupedBlockRow(index: 5, count: 10)
+            .stashyGroupedBlockRow(index: 4, count: 9)
 
             Toggle(isOn: $tabManager.playerDolbyVisionEnabled) {
                 Label("Dolby Vision", systemImage: "sparkles.tv")
             }
             .tint(appearanceManager.tintColor)
-            .stashyGroupedBlockRow(index: 6, count: 10)
+            .stashyGroupedBlockRow(index: 5, count: 9)
 
             Picker(selection: $tabManager.holdSpeedPlayer) {
                 ForEach(TabManager.holdSpeedOptions, id: \.self) { rate in
@@ -85,7 +79,7 @@ struct PlaybackSettingsSection: View {
             } label: {
                 Label("Hold to speed up", systemImage: "forward.fill")
             }
-            .stashyGroupedBlockRow(index: 7, count: 10)
+            .stashyGroupedBlockRow(index: 6, count: 9)
 
             Picker(selection: $tabManager.playCountPlayerSeconds) {
                 ForEach(TabManager.playCountThresholdOptions, id: \.self) { seconds in
@@ -94,14 +88,14 @@ struct PlaybackSettingsSection: View {
             } label: {
                 Label("Count as played", systemImage: "play.circle")
             }
-            .stashyGroupedBlockRow(index: 8, count: 10)
+            .stashyGroupedBlockRow(index: 7, count: 9)
 
             // Applies to the player, Feeds and image-viewer videos; card previews stay muted.
             Toggle(isOn: $tabManager.playbackMuteWithoutHeadphones) {
                 Label("Start muted without headphones", systemImage: "speaker.slash")
             }
             .tint(appearanceManager.tintColor)
-            .stashyGroupedBlockRow(index: 9, count: 10)
+            .stashyGroupedBlockRow(index: 8, count: 9)
         }
     }
 

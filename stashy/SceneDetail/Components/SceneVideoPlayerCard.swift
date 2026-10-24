@@ -259,6 +259,9 @@ struct SceneVideoPlayerCard: View {
                     .clipShape(Capsule())
                     .shadow(color: .black.opacity(0.2), radius: 3)
             }
+            #if os(iOS)
+            SceneWatchlistCoverButton(scene: activeScene)
+            #endif
         }
     }
 
@@ -277,6 +280,14 @@ struct SceneVideoPlayerCard: View {
         }
         .contentShape(Rectangle())
         .onTapGesture { onStartPlayback(false) }
+        #if os(iOS)
+        // Same spot as under "Start from beginning", below the play button.
+        .overlay(alignment: .bottom) {
+            SceneWatchlistCoverButton(scene: activeScene)
+                .fixedSize()
+                .offset(y: 50)
+        }
+        #endif
     }
 
     @ViewBuilder
@@ -914,4 +925,46 @@ struct EditSceneTitleSheet: View {
     }
 }
 
+#endif
+
+#if os(iOS)
+/// Watchlist toggle on the scene cover, under the play / "Start from beginning" buttons.
+private struct SceneWatchlistCoverButton: View {
+    let scene: Scene
+    @ObservedObject private var watchlist = WatchlistStore.shared
+    @ObservedObject private var appearance = AppearanceManager.shared
+
+    @ObservedObject private var stashyPlus = StashyPlusManager.shared
+
+    var body: some View {
+        if stashyPlus.isUnlocked {
+            button
+        }
+    }
+
+    private var button: some View {
+        let listed = watchlist.contains(scene.id)
+        return Button {
+            HapticManager.light()
+            watchlist.toggle(scene)
+            ToastManager.shared.show(
+                listed ? "Removed from watchlist" : "Added to watchlist",
+                icon: listed ? "text.badge.minus" : "text.badge.checkmark",
+                style: .success
+            )
+        } label: {
+            Label(listed ? "On watchlist" : "Add to watchlist",
+                  systemImage: listed ? "text.badge.checkmark" : "text.badge.plus")
+                .font(.caption.weight(.medium))
+                .foregroundColor(.white)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 6)
+                .background(listed ? appearance.tintColor : Color.black.opacity(0.45))
+                .clipShape(Capsule())
+                .shadow(color: .black.opacity(0.2), radius: 3)
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(listed ? "Remove from watchlist" : "Add to watchlist")
+    }
+}
 #endif

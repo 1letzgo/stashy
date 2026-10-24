@@ -1170,7 +1170,7 @@ private struct ScenesViewContent: View {
                 } else if showsBlockingInitialLoad {
                     // Keep the bar while a sort/filter change refetches, so it does not jump away.
                     VStack(spacing: 0) {
-                        if scrollHeader == nil { quickBar.padding(.top, 8) }
+                        if scrollHeader == nil { quickBar }
                         StandardLoadingView(message: "Loading scenes...")
                     }
                 } else if primarySceneListIsEmpty && viewModel.errorMessage != nil {
@@ -1464,7 +1464,7 @@ private struct ScenesViewContent: View {
             .refreshable { performSearch() }
         } else {
             VStack(spacing: 0) {
-                if !criteriaDocument.isEmpty || activePresetName != nil { quickBar.padding(.top, 8) }
+                if !criteriaDocument.isEmpty || activePresetName != nil { quickBar }
                 emptyStateView
             }
         }
@@ -1477,7 +1477,6 @@ private struct ScenesViewContent: View {
                         scrollHeader
                     }
                     quickBar
-                        .padding(.top, scrollHeader == nil ? 8 : 0)
                     LazyVGrid(columns: columns, spacing: 12) {
                     ForEach(primaryScenes) { scene in
                             NavigationLink(destination: LazyView { SceneDetailView(scene: scene) }) {

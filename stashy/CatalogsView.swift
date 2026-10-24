@@ -462,14 +462,14 @@ private struct GroupsViewContent: View {
             } else if viewModel.isLoadingGroups && viewModel.groups.isEmpty {
                 // Keep the bar while a sort/filter change refetches, so it does not jump away.
                 VStack(spacing: 0) {
-                    quickBar.padding(.top, 8)
+                    quickBar
                     StandardLoadingView(message: "Loading groups...")
                 }
             } else if viewModel.groups.isEmpty && viewModel.errorMessage != nil {
                 ConnectionErrorView { performSearch() }
             } else if viewModel.groups.isEmpty {
                 VStack(spacing: 0) {
-                    if !groupsCriteriaDocument.isEmpty || activePresetName != nil { quickBar.padding(.top, 8) }
+                    if !groupsCriteriaDocument.isEmpty || activePresetName != nil { quickBar }
                     emptyStateView
                 }
             } else {
@@ -642,7 +642,6 @@ private struct GroupsViewContent: View {
             ScrollView {
                 VStack(spacing: 0) {
                 quickBar
-                    .padding(.top, 8)
                 LazyVGrid(columns: columns, spacing: 12) {
                     ForEach(viewModel.groups) { group in
                         NavigationLink(destination: GroupDetailView(selectedGroup: group)) {
@@ -670,7 +669,7 @@ private struct GroupsViewContent: View {
                     }
                 }
                 .measuresGridWidth($gridWidth)
-                .padding(16)
+                .padding([.horizontal, .bottom], 16)
                 }
             }
             .refreshable { performSearch() }

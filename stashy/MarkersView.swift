@@ -516,14 +516,14 @@ private struct MarkersViewContent: View {
             } else if (viewModel.isLoadingMarkers && viewModel.sceneMarkers.isEmpty) || (viewModel.isLoadingSavedFilters && viewModel.savedFilters.isEmpty) {
                 // Keep the bar while a sort/filter change refetches, so it does not jump away.
                 VStack(spacing: 0) {
-                    quickBar.padding(.top, 8)
+                    quickBar
                     StandardLoadingView(message: "Loading markers...")
                 }
             } else if viewModel.sceneMarkers.isEmpty && viewModel.errorMessage != nil {
                 ConnectionErrorView { performSearch() }
             } else if viewModel.sceneMarkers.isEmpty {
                 VStack(spacing: 0) {
-                    if !criteriaDocument.isEmpty || activePresetName != nil { quickBar.padding(.top, 8) }
+                    if !criteriaDocument.isEmpty || activePresetName != nil { quickBar }
                     emptyStateView
                 }
             } else {
@@ -713,7 +713,6 @@ private struct MarkersViewContent: View {
         ScrollView {
             VStack(spacing: 0) {
             quickBar
-                .padding(.top, 8)
             LazyVGrid(columns: columns, spacing: 12) {
                 ForEach(viewModel.sceneMarkers) { marker in
                     if let markerScene = marker.scene {
@@ -740,7 +739,7 @@ private struct MarkersViewContent: View {
                 }
             }
             .measuresGridWidth($gridWidth)
-            .padding(16)
+            .padding([.horizontal, .bottom], 16)
             }
         }
         .refreshable { performSearch() }

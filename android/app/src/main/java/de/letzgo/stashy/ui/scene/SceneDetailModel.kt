@@ -207,6 +207,8 @@ class SceneDetailModel(initial: Scene, private val autoPlay: Boolean) {
             aiSubtitles.stopLiveCaptionsIfNeeded()
             MiniPlayerStore.adopt(scene, p, playCredit.watchedSeconds, playCredit.isCredited, ServerConfigManager.activeConfig?.id)
         } else {
+            // Stopped here without a hand-off: a saved mini player session of this scene is stale.
+            if (p != null && isPlaybackStarted) MiniPlayerStore.forgetLastSession(scene.id, ServerConfigManager.activeConfig?.id)
             p?.pause()
             p?.release()
         }

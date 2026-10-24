@@ -27,6 +27,7 @@ import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Replay10
 import androidx.compose.material.icons.filled.SkipNext
+import de.letzgo.stashy.ui.IosTypography
 import androidx.compose.material3.AlertDialog
 import de.letzgo.stashy.ui.StashyColors
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -57,11 +58,19 @@ import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
 import de.letzgo.stashy.data.Scene
 import de.letzgo.stashy.data.WatchlistStore
+import de.letzgo.stashy.data.OCounterMutation
+import de.letzgo.stashy.data.SceneEditing
+import de.letzgo.stashy.data.SceneEvent
+import de.letzgo.stashy.data.SceneEvents
+import androidx.compose.runtime.rememberCoroutineScope
+import kotlinx.coroutines.launch
+import androidx.compose.material.icons.filled.Business
 import de.letzgo.stashy.ui.Appearance
 import de.letzgo.stashy.ui.NativeSectionHeader
 import de.letzgo.stashy.ui.SF
 import de.letzgo.stashy.ui.Theme
 import de.letzgo.stashy.ui.Tokens
+import de.letzgo.stashy.ui.scene.timeBarMarkers
 
 /**
  * iOS: `NowPlayingView` — the mini player's own full view: 16:9 video (tap toggles play), title,
@@ -71,7 +80,7 @@ import de.letzgo.stashy.ui.Tokens
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun NowPlayingSheet(onOpenDetails: (Scene) -> Unit) {
+fun NowPlayingSheet(onOpen: (de.letzgo.stashy.ui.Screen) -> Unit) {
     if (!MiniPlayerStore.showsNowPlaying) return
     val session = MiniPlayerStore.session
     LaunchedEffect(session == null) { if (session == null) MiniPlayerStore.showsNowPlaying = false }
@@ -82,24 +91,24 @@ fun NowPlayingSheet(onOpenDetails: (Scene) -> Unit) {
         sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
         containerColor = p.background,
     ) {
-        NowPlayingContent(session, onOpenDetails)
+        NowPlayingContent(session, onOpen)
     }
 }
 
 @Composable
-private fun NowPlayingContent(session: MiniPlayerStore.Session, onOpenDetails: (Scene) -> Unit) {
+private fun NowPlayingContent(session: MiniPlayerStore.Session, onOpen: (de.letzgo.stashy.ui.Screen) -> Unit) {
     val p = Theme.palette
     val player = session.player
     val scene = session.scene
     val watchlist = WatchlistStore.all
-    var editing by remember { mutableStateOf(false) }
+    val drag = remember { WatchlistDragState() }
     var confirmReset by remember { mutableStateOf(false) }
     if (confirmReset) AlertDialog(
         onDismissRequest = { confirmReset = false },
         title = { Text("Reset watchlist?") },
         text = { Text("All scenes are removed from the watchlist. The playing scene keeps playing.") },
         confirmButton = {
-            TextButton({ confirmReset = false; editing = false; WatchlistStore.clear() }) {
+            TextButton({ confirmReset = false; WatchlistStore.clear() }) {
                 Text("Reset", color = StashyColors.systemRed)
             }
         },
@@ -113,166 +122,160 @@ private fun NowPlayingContent(session: MiniPlayerStore.Session, onOpenDetails: (
                 Icon(SF.chevronDown, "Minimize", tint = p.text)
             }
             Box(Modifier.weight(1f))
-            TextButton(onClick = { onOpenDetails(scene) }) {
+            TextButton(onClick = { onOpen(de.letzgo.stashy.ui.scene.SceneDetailScreen(scene.id, scene, openedFromMiniPlayer = true)) }) {
                 Text("Details", color = Appearance.tint, fontWeight = FontWeight.SemiBold)
             }
         }
+        // The scene page's player, 8 dp side margin, fixed above the scrolling list.
+        PlayerSurfaceBlock(session, Modifier.padding(start = NowPlayingMargin, end = NowPlayingMargin, top = 4.dp))
         LazyColumn(Modifier.fillMaxSize()) {
-            item(key = "player") { PlayerBlock(session) }
+            item(key = "card") { MetadataCard(session) }
+            item(key = "info") { InfoRow(session, onOpen) }
             item(key = "header") {
-                Row(Modifier.fillMaxWidth().padding(end = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-                    NativeSectionHeader("Watchlist", Modifier.weight(1f))
+                // Plain list header on the sheet background: "Watchlist" + red Reset.
+                Row(Modifier.fillMaxWidth().padding(start = NowPlayingMargin, top = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Text("Watchlist", Modifier.weight(1f), style = IosTypography.headline, color = p.text)
                     if (watchlist.isNotEmpty()) TextButton(onClick = { confirmReset = true }) {
                         Text("Reset", color = StashyColors.systemRed, fontWeight = FontWeight.SemiBold)
-                    }
-                    if (watchlist.isNotEmpty()) TextButton(onClick = { editing = !editing }) {
-                        Text(if (editing) "Done" else "Edit", color = Appearance.tint, fontWeight = FontWeight.SemiBold)
                     }
                 }
             }
             if (watchlist.isEmpty()) item(key = "empty") {
                 Text(
                     "Add scenes with the watchlist button on a scene. They play here one after another.",
-                    Modifier.padding(horizontal = 16.dp, vertical = 8.dp), fontSize = 13.sp, color = p.secondaryText,
+                    Modifier.padding(horizontal = NowPlayingMargin, vertical = 8.dp), fontSize = 13.sp, color = p.secondaryText,
                 )
-            } else itemsIndexed(watchlist, key = { _, s -> "w-${s.id}" }) { index, entry ->
-                WatchlistRow(
-                    entry, isCurrent = entry.id == scene.id, editing = editing,
-                    canMoveUp = index > 0, canMoveDown = index < watchlist.lastIndex,
-                    onPlay = { MiniPlayerStore.play(entry) },
-                    onMoveUp = { WatchlistStore.move(index, index - 1) },
-                    onMoveDown = { WatchlistStore.move(index, index + 1) },
-                    onDelete = { WatchlistStore.remove(entry.id) },
-                )
-            }
+            } else watchlistRows(watchlist.toList(), scene.id, drag, NowPlayingMargin) { MiniPlayerStore.play(it) }
             item(key = "bottom") { Box(Modifier.height(24.dp)) }
         }
     }
 }
 
+/** Side margin of Now Playing: player, title and watchlist rows line up on it. */
+private val NowPlayingMargin = 8.dp
+
+/** The scene page's own player surface (poster, mute, scrubber, markers, transport) as a rounded card. */
 @Composable
-private fun PlayerBlock(session: MiniPlayerStore.Session) {
-    val p = Theme.palette
+private fun PlayerSurfaceBlock(session: MiniPlayerStore.Session, modifier: Modifier = Modifier) {
     val player = session.player
     val scene = session.scene
-    var scrubTime by remember { mutableStateOf<Double?>(null) }
-    val playing = player.isPlaying || (player.playWhenReady && !player.didEnd)
-    val hasNext = MiniPlayerStore.hasNext
-    val subtitle = listOf(
-        scene.performers.take(3).joinToString(", ") { it.name },
-        scene.studio?.name.orEmpty(),
-    ).filter { it.isNotBlank() }.joinToString(" · ")
-    Column(Modifier.padding(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 16.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
-        VideoSurface(
-            player,
-            Modifier.fillMaxWidth().aspectRatio(16f / 9f).clip(RoundedCornerShape(Tokens.Radius.card))
-                .clickable { MiniPlayerStore.togglePlayPause() },
+    val sprites = remember(scene.id) { SceneScrubSprites.create(scene.paths?.vtt, scene.paths?.sprite) }
+    Box(modifier.fillMaxWidth().aspectRatio(16f / 9f).clip(RoundedCornerShape(Tokens.Radius.card)).background(Color.Black)) {
+        ScenePlayerSurface(
+            player = player,
+            posterURL = scene.thumbnailURL,
+            isMuted = player.mutedState,
+            onMutedChange = { player.isMuted = it },
+            onSeek = { MiniPlayerStore.seekTo(it) },
+            modifier = Modifier.fillMaxSize(),
+            markers = scene.timeBarMarkers,
+            scrubSprites = sprites,
         )
-        Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
-            Text(scene.displayTitle, fontSize = 20.sp, fontWeight = FontWeight.Bold, color = p.text, maxLines = 2, overflow = TextOverflow.Ellipsis)
-            if (subtitle.isNotEmpty()) Text(subtitle, fontSize = 14.sp, color = p.secondaryText, maxLines = 1, overflow = TextOverflow.Ellipsis)
-        }
-        // Scrubber (the player's own TimeBar is drawn for a dark video backdrop).
-        val duration = maxOf(player.duration, 0.0)
-        val shown = scrubTime ?: player.currentTime
-        Column {
-            Slider(
-                value = if (duration > 0) (shown / duration).coerceIn(0.0, 1.0).toFloat() else 0f,
-                onValueChange = { if (duration > 0) scrubTime = it * duration },
-                onValueChangeFinished = { scrubTime?.let { MiniPlayerStore.seekTo(it) }; scrubTime = null },
-                enabled = duration > 0,
-                colors = SliderDefaults.colors(thumbColor = Appearance.tint, activeTrackColor = Appearance.tint, inactiveTrackColor = p.secondaryText.copy(alpha = 0.3f)),
-            )
-            Row(Modifier.fillMaxWidth()) {
-                Text(PlaybackFormat.time(shown), fontSize = 12.sp, color = p.secondaryText)
-                Box(Modifier.weight(1f))
-                Text("-" + PlaybackFormat.time(maxOf(0.0, duration - shown)), fontSize = 12.sp, color = p.secondaryText)
-            }
-        }
-        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-            TransportButton(Icons.Filled.Replay10, "Back 10 seconds") { MiniPlayerStore.seekBy(-10.0) }
-            TransportButton(if (playing) Icons.Filled.Pause else Icons.Filled.PlayArrow, if (playing) "Pause" else "Play", size = 40) { MiniPlayerStore.togglePlayPause() }
-            TransportButton(Icons.Filled.Forward10, "Forward 10 seconds") { MiniPlayerStore.seekBy(10.0) }
-            TransportButton(Icons.Filled.SkipNext, "Next in watchlist", enabled = hasNext) { MiniPlayerStore.playNext() }
-        }
-        WatchlistToggle(scene)
     }
 }
 
+/** Title + performers · studio, and the round "next" button when the watchlist has a next entry. */
+/**
+ * iOS: the scene page's `SceneDetailMetadataCard` in Now Playing — the same card (title,
+ * details, date · duration · plays · O · rating) on the same rounded secondary background.
+ * Rating and O edits go to the server and into a local copy of the scene, which shows them at
+ * once and starts over when the bar switches scenes.
+ */
 @Composable
-private fun androidx.compose.foundation.layout.RowScope.TransportButton(
-    icon: androidx.compose.ui.graphics.vector.ImageVector,
-    label: String,
-    size: Int = 28,
-    enabled: Boolean = true,
-    onClick: () -> Unit,
-) {
-    Box(
-        Modifier.weight(1f).heightIn(min = 48.dp).clickable(enabled = enabled, onClick = onClick).alpha(if (enabled) 1f else 0.35f),
-        contentAlignment = Alignment.Center,
-    ) {
-        Icon(icon, label, tint = Theme.palette.text, modifier = Modifier.size(size.dp))
+private fun MetadataCard(session: MiniPlayerStore.Session) {
+    val scope = rememberCoroutineScope()
+    var scene by remember(session.scene.id) { mutableStateOf(session.scene) }
+    var expanded by remember(session.scene.id) { mutableStateOf(false) }
+    de.letzgo.stashy.ui.scene.SceneCardContainer(Modifier.fillMaxWidth().padding(start = NowPlayingMargin, end = NowPlayingMargin, top = 12.dp)) {
+        de.letzgo.stashy.ui.scene.SceneMetadataCardContent(
+            scene = scene,
+            isExpanded = expanded,
+            onToggleExpanded = { expanded = !expanded },
+            onEditTitle = null,
+            onIncrementO = {
+                val id = scene.id
+                scope.launch {
+                    val count = runCatching { SceneEditing.mutateOCounter(id, OCounterMutation.Increment) }.getOrNull() ?: return@launch
+                    if (scene.id == id) scene = scene.copy(oCounter = count)
+                    SceneEvents.post(SceneEvent.OCounterUpdated(id, count))
+                }
+            },
+            onRemoveO = { mutation ->
+                val original = scene.oCounter ?: 0
+                val id = scene.id
+                scene = scene.copy(oCounter = if (mutation == OCounterMutation.Reset) 0 else maxOf(0, original - 1))
+                scope.launch {
+                    val count = runCatching { SceneEditing.mutateOCounter(id, mutation) }.getOrNull()
+                    if (scene.id != id) return@launch
+                    if (count != null) {
+                        scene = scene.copy(oCounter = count)
+                        SceneEvents.post(SceneEvent.OCounterUpdated(id, count))
+                    } else scene = scene.copy(oCounter = original)
+                }
+            },
+            onSetRating = { rating ->
+                val original = scene
+                val rated = scene.copy(rating100 = rating)
+                scene = rated
+                scope.launch {
+                    if (runCatching { SceneEditing.updateRating(rated.id, rating) }.isSuccess) SceneEvents.post(SceneEvent.Updated(rated))
+                    else if (scene.id == rated.id) scene = original
+                }
+            },
+        )
     }
 }
 
-/** iOS: `WatchlistToggleRow` — "Add to watchlist" / "On watchlist" pill. */
+@OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
 @Composable
-private fun WatchlistToggle(scene: Scene) {
+private fun InfoRow(session: MiniPlayerStore.Session, onOpen: (de.letzgo.stashy.ui.Screen) -> Unit) {
     val p = Theme.palette
-    val listed = WatchlistStore.contains(scene.id)
-    val color = if (listed) Appearance.tint else p.text
-    Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
-        Row(
-            Modifier.height(34.dp).clip(RoundedCornerShape(50)).background(p.secondaryBackground)
-                .clickable { WatchlistStore.toggle(scene) }.padding(horizontal = 14.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(6.dp),
-        ) {
-            Icon(if (listed) WatchlistIcons.listed else WatchlistIcons.add, null, tint = color, modifier = Modifier.size(18.dp))
-            Text(if (listed) "On watchlist" else "Add to watchlist", fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = color)
-        }
-    }
-}
-
-@Composable
-private fun WatchlistRow(
-    scene: Scene,
-    isCurrent: Boolean,
-    editing: Boolean,
-    canMoveUp: Boolean,
-    canMoveDown: Boolean,
-    onPlay: () -> Unit,
-    onMoveUp: () -> Unit,
-    onMoveDown: () -> Unit,
-    onDelete: () -> Unit,
-) {
-    val p = Theme.palette
-    val performers = scene.performers.take(2).joinToString(", ") { it.name }
+    val scene = session.scene
+    val performers = scene.performers.filter { it.name.isNotBlank() }.take(4)
+    val studio = scene.studio?.takeIf { it.name.isNotBlank() }
     Row(
-        Modifier.fillMaxWidth().clickable(enabled = !editing, onClick = onPlay).padding(horizontal = 16.dp, vertical = 8.dp),
+        Modifier.fillMaxWidth().padding(start = NowPlayingMargin, end = NowPlayingMargin, top = 12.dp, bottom = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        Box(Modifier.size(width = 80.dp, height = 45.dp).clip(RoundedCornerShape(6.dp)).background(Color.Black.copy(alpha = 0.3f)), contentAlignment = Alignment.Center) {
-            AsyncImage(scene.thumbnailURL, null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
-            if (isCurrent) Box(Modifier.clip(CircleShape).background(Color.Black.copy(alpha = 0.5f)).padding(6.dp)) {
-                Icon(SF.speakerWave2Fill, "Now playing", tint = Color.White, modifier = Modifier.size(14.dp))
+        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+            // Performers and studio are links: the sheet closes and their page opens.
+            if (performers.isNotEmpty() || studio != null) androidx.compose.foundation.layout.FlowRow(
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                verticalArrangement = Arrangement.spacedBy(6.dp),
+            ) {
+                performers.forEach { performer ->
+                    LinkPill(SF.personFill, performer.name) { onOpen(de.letzgo.stashy.ui.detail.PerformerDetailScreen(performer.id, performer)) }
+                }
+                if (studio != null) {
+                    LinkPill(Icons.Filled.Business, studio.name) { onOpen(de.letzgo.stashy.ui.detail.StudioDetailScreen(studio.id, studio)) }
+                }
             }
         }
-        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-            Text(scene.displayTitle, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = if (isCurrent) Appearance.tint else p.text, maxLines = 2, overflow = TextOverflow.Ellipsis)
-            if (performers.isNotEmpty()) Text(performers, fontSize = 12.sp, color = p.secondaryText, maxLines = 1, overflow = TextOverflow.Ellipsis)
-        }
-        if (editing) {
-            IconButton(onClick = onMoveUp, enabled = canMoveUp, modifier = Modifier.size(36.dp)) {
-                Icon(Icons.Filled.KeyboardArrowUp, "Move up", tint = if (canMoveUp) p.text else p.secondaryText.copy(alpha = 0.4f))
-            }
-            IconButton(onClick = onMoveDown, enabled = canMoveDown, modifier = Modifier.size(36.dp)) {
-                Icon(Icons.Filled.KeyboardArrowDown, "Move down", tint = if (canMoveDown) p.text else p.secondaryText.copy(alpha = 0.4f))
-            }
-            IconButton(onClick = onDelete, modifier = Modifier.size(36.dp)) {
-                Icon(Icons.Filled.Delete, "Remove from watchlist", tint = de.letzgo.stashy.ui.StashyColors.systemRed)
-            }
-        }
+        if (MiniPlayerStore.hasNext) CircleAction(Icons.Filled.SkipNext, "Next in watchlist") { MiniPlayerStore.playNext() }
+    }
+}
+
+@Composable
+private fun CircleAction(icon: androidx.compose.ui.graphics.vector.ImageVector, label: String, onClick: () -> Unit) {
+    val p = Theme.palette
+    Box(
+        Modifier.size(40.dp).clip(CircleShape).background(p.secondaryBackground).clickable(onClick = onClick),
+        contentAlignment = Alignment.Center,
+    ) { Icon(icon, label, tint = p.text, modifier = Modifier.size(22.dp)) }
+}
+
+/** Performer / studio link styled like the scene page's metadata pills (pill accent at 10 %). */
+@Composable
+private fun LinkPill(icon: androidx.compose.ui.graphics.vector.ImageVector, text: String, onClick: () -> Unit) {
+    val accent = Theme.palette.pillAccent
+    Row(
+        Modifier.height(28.dp).clip(RoundedCornerShape(50)).background(accent.copy(alpha = 0.1f))
+            .clickable(onClick = onClick).padding(horizontal = 10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(4.dp),
+    ) {
+        Icon(icon, null, tint = accent, modifier = Modifier.size(10.dp))
+        Text(text, fontSize = 12.sp, fontWeight = FontWeight.Bold, color = accent, maxLines = 1, overflow = TextOverflow.Ellipsis)
     }
 }
