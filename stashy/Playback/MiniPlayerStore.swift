@@ -891,7 +891,6 @@ private struct NowPlayingContent: View {
     @State private var sortMode: EditMode = .inactive
     /// Local copy for the metadata card: rating / O-count edits show at once.
     @State private var displayedScene: Scene
-    @State private var isHeaderExpanded = false
     @StateObject private var viewModel = StashDBViewModel()
     @EnvironmentObject private var coordinator: NavigationCoordinator
     @Environment(\.dismiss) private var dismiss
@@ -914,26 +913,8 @@ private struct NowPlayingContent: View {
 
             List {
                 Section {
-                    // The scene page's own metadata card: title, expandable details, date /
-                    // duration / plays / O-count / rating chips (O and rating are tappable).
-                    SceneDetailMetadataCard(
-                        activeScene: $displayedScene,
-                        aetherEngine: nil,
-                        isHeaderExpanded: $isHeaderExpanded,
-                        showingAddMarkerSheet: .constant(false),
-                        capturedMarkerTime: .constant(0),
-                        playbackSpeed: .constant(1),
-                        viewModel: viewModel,
-                        onSeek: { _ in }
-                    )
-                    .background(Color.secondaryAppBackground)
-                    .clipShape(RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.card))
-                    .listRowInsets(EdgeInsets(top: 12, leading: 16, bottom: 8, trailing: 16))
-                    .listRowBackground(Color.clear)
-                    .listRowSeparator(.hidden)
-
                     infoRow
-                        .listRowInsets(EdgeInsets(top: 4, leading: 16, bottom: 12, trailing: 16))
+                        .listRowInsets(EdgeInsets(top: 12, leading: 16, bottom: 12, trailing: 16))
                         .listRowBackground(Color.clear)
                         .listRowSeparator(.hidden)
                 }

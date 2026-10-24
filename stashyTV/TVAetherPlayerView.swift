@@ -161,6 +161,7 @@ private struct TVAetherPlayerContent<Panel: View>: View {
     @State private var scrubImage: UIImage?
     @State private var scrubCommitWork: DispatchWorkItem?
     @State private var scrubThumbGeneration = 0
+    @State private var isScrubThumbInFlight = false
     @State private var lastMove = Date.distantPast
     @State private var moveStreak = 0
     /// When a held direction just switched the scene. The release of that same press
@@ -798,14 +799,21 @@ private struct TVAetherPlayerContent<Panel: View>: View {
         }
     }
 
+    /// One still request at a time: each click used to start its own decode, and a burst of
+    /// them kept the engine busy long after the scrub. The running one fetches the newest
+    /// target again when it finishes.
     private func requestScrubThumbnail() {
         scrubThumbGeneration &+= 1
-        let generation = scrubThumbGeneration
-        let target = scrubTarget
+        guard !isScrubThumbInFlight else { return }
+        isScrubThumbInFlight = true
         Task {
-            let image = await engine.scrubThumbnail(at: target, maxWidth: 320)
-            guard generation == scrubThumbGeneration, let image else { return }
-            scrubImage = image
+            var fetched = -1
+            while fetched != scrubThumbGeneration, isScrubbing {
+                fetched = scrubThumbGeneration
+                let image = await engine.scrubThumbnail(at: scrubTarget, maxWidth: 320)
+                if isScrubbing, let image { scrubImage = image }
+            }
+            isScrubThumbInFlight = false
         }
     }
 
