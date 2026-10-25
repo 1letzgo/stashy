@@ -84,7 +84,7 @@ fun CatalogFilterSortSheet(
     /** Resets chip state the controller does not own (images "Type") before the criteria reset. */
     onReset: () -> Unit = {},
     /** List-specific sorts offered first in the sort menu (performer "Appears with": Shared scenes). */
-    extraSorts: List<SortOption> = emptyList(),
+    extraSorts: List<SortOption> = controller.extraSorts,
     extraCards: @Composable () -> Unit = {},
 ) {
     if (!controller.isSheetPresented) return

@@ -941,6 +941,12 @@ private struct ScenesViewContent: View {
     }
 
     // Safe sort change function
+    /// A group's scenes can also sort by their number in the group.
+    private var groupScopeSortFields: [CatalogQuickSortCatalog.Field] {
+        if case .group = scope { return [.init(field: "group_scene_number", label: "Scene No.")] }
+        return []
+    }
+
     private func changeSortOption(to newOption: StashDBViewModel.SceneSortOption) {
         if newOption == .random && selectedSortOption == .random {
             viewModel.refreshRandomSeed()
@@ -1089,7 +1095,8 @@ private struct ScenesViewContent: View {
             presetName: activePresetName,
             onClearPreset: { resetAllSceneFilters() },
             onFiltersChanged: { applyLiveFilter() },
-            onOpenFilters: { liveFilterSheetPresented.wrappedValue = true }
+            onOpenFilters: { liveFilterSheetPresented.wrappedValue = true },
+            leadingSortFields: groupScopeSortFields
         )
     }
 

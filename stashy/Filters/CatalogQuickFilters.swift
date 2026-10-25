@@ -78,7 +78,7 @@ enum CatalogQuickSortCatalog {
 
     /// Names read A→Z first; counts, dates and ratings read highest/newest first.
     static func defaultAscending(_ field: String) -> Bool {
-        field == "name" || field == "title"
+        field == "name" || field == "title" || field == "group_scene_number"
     }
 
     static func option<Option: CatalogQuickSortable>(_ type: Option.Type, field: String, ascending: Bool) -> Option? {
@@ -130,15 +130,17 @@ enum QuickFilterCatalog {
         let all: [QuickFilterSection]
         switch mode {
         case .scenes:
-            all = [.entities(key: "tags", title: "Tags"), rating, sceneDuration, resolution, organized, watched]
+            all = [.entities(key: "tags", title: "Tags"), rating, sceneDuration, resolution, organized, watched, oCount]
         case .performers:
-            all = [gender, favorite(key: "filter_favorites"), rating, age, .entities(key: "tags", title: "Tags")]
+            all = [gender, favorite(key: "filter_favorites"), rating, age, oCount, .entities(key: "tags", title: "Tags")]
         case .studios:
             all = [favorite(key: "favorite"), rating, .entities(key: "tags", title: "Tags")]
         case .tags:
             all = [favorite(key: "favorite"), hasScenes]
-        case .galleries, .images:
+        case .galleries:
             all = [.entities(key: "tags", title: "Tags"), rating, organized]
+        case .images:
+            all = [.entities(key: "tags", title: "Tags"), rating, organized, oCount]
         case .groups:
             all = [.entities(key: "tags", title: "Tags"), rating]
         case .sceneMarkers:
@@ -226,6 +228,20 @@ enum QuickFilterCatalog {
         ]
     )
 
+    private static let oCount = QuickFilterSection.choices(
+        key: "o_counter", title: "O-Count", anyLabel: "Any",
+        choices: [
+            .init(id: "o0", label: "None", activeLabel: "No O",
+                  value: ["modifier": "EQUALS", "value": 0]),
+            .init(id: "o1", label: "1+", activeLabel: "O 1+",
+                  value: ["modifier": "GREATER_THAN", "value": 0]),
+            .init(id: "o5", label: "5+", activeLabel: "O 5+",
+                  value: ["modifier": "GREATER_THAN", "value": 4]),
+            .init(id: "o10", label: "10+", activeLabel: "O 10+",
+                  value: ["modifier": "GREATER_THAN", "value": 9]),
+        ]
+    )
+
     private static let gender = QuickFilterSection.choices(
         key: "gender", title: "Gender", anyLabel: "Any",
         choices: [
@@ -284,6 +300,8 @@ struct CatalogListQuickBar<Option: CatalogQuickSortable>: View {
     /// Called after a chip removed a criterion; the host refetches.
     var onFiltersChanged: () -> Void = {}
     var onOpenFilters: (() -> Void)? = nil
+    /// Fields only this list offers, in front of the mode's own (a group's scene number).
+    var leadingSortFields: [CatalogQuickSortCatalog.Field] = []
 
     @ObservedObject private var appearance = AppearanceManager.shared
     @ObservedObject private var pickerOptions = FilterPickerOptionsStore.shared
@@ -292,7 +310,7 @@ struct CatalogListQuickBar<Option: CatalogQuickSortable>: View {
 
     private var sortFields: [CatalogQuickSortCatalog.Field] {
         let available = Set(Option.allCases.map(\.sortField))
-        return CatalogQuickSortCatalog.fields(for: mode).filter { field in
+        return (leadingSortFields + CatalogQuickSortCatalog.fields(for: mode)).filter { field in
             CatalogQuickSortCatalog.isRandom(field.field)
                 ? available.contains { CatalogQuickSortCatalog.isRandom($0) }
                 : available.contains(field.field)

@@ -292,7 +292,7 @@ struct CatalogDefaultSortMenu: View {
         switch tab {
         case .scenes:
             sortMenu(
-                StashDBViewModel.SceneSortOption.allCases.map { ($0.rawValue, $0.displayName) },
+                StashDBViewModel.SceneSortOption.generalCases.map { ($0.rawValue, $0.displayName) },
                 fallback: StashDBViewModel.SceneSortOption.dateDesc.rawValue
             )
         case .performers:
@@ -430,7 +430,7 @@ struct CatalogDetailSortMenu: View {
             )
         } else {
             sortMenu(
-                StashDBViewModel.SceneSortOption.allCases.map { ($0.rawValue, $0.displayName) },
+                StashDBViewModel.SceneSortOption.generalCases.map { ($0.rawValue, $0.displayName) },
                 fallback: StashDBViewModel.SceneSortOption.dateDesc.rawValue
             )
         }

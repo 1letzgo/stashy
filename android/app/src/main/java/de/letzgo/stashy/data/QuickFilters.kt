@@ -104,11 +104,12 @@ object QuickFilterCatalog {
     fun sections(mode: FilterMode): List<QuickFilterSection> {
         val tags = QuickFilterSection.Entities("tags", "Tags")
         val all: List<QuickFilterSection> = when (mode) {
-            FilterMode.Scenes -> listOf(tags, rating, sceneDuration, resolution, organized, watched)
-            FilterMode.Performers -> listOf(gender, favorite("filter_favorites"), rating, age, tags)
+            FilterMode.Scenes -> listOf(tags, rating, sceneDuration, resolution, organized, watched, oCount)
+            FilterMode.Performers -> listOf(gender, favorite("filter_favorites"), rating, age, oCount, tags)
             FilterMode.Studios -> listOf(favorite("favorite"), rating, tags)
             FilterMode.Tags -> listOf(favorite("favorite"), hasScenes)
-            FilterMode.Galleries, FilterMode.Images -> listOf(tags, rating, organized)
+            FilterMode.Galleries -> listOf(tags, rating, organized)
+            FilterMode.Images -> listOf(tags, rating, organized, oCount)
             FilterMode.Groups -> listOf(tags, rating)
             FilterMode.SceneMarkers -> listOf(tags)
             FilterMode.Unknown -> emptyList()
@@ -207,6 +208,16 @@ object QuickFilterCatalog {
         listOf(
             QuickFilterChoice("unwatched", "Unwatched", "Unwatched", obj("modifier" to "EQUALS", "value" to 0)),
             QuickFilterChoice("watched", "Watched", "Watched", obj("modifier" to "GREATER_THAN", "value" to 0)),
+        ),
+    )
+
+    private val oCount = QuickFilterSection.Choices(
+        "o_counter", "O-Count", "Any",
+        listOf(
+            QuickFilterChoice("o0", "None", "No O", obj("modifier" to "EQUALS", "value" to 0)),
+            QuickFilterChoice("o1", "1+", "O 1+", obj("modifier" to "GREATER_THAN", "value" to 0)),
+            QuickFilterChoice("o5", "5+", "O 5+", obj("modifier" to "GREATER_THAN", "value" to 4)),
+            QuickFilterChoice("o10", "10+", "O 10+", obj("modifier" to "GREATER_THAN", "value" to 9)),
         ),
     )
 

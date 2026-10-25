@@ -1413,6 +1413,13 @@ class StashDBViewModel: ObservableObject {
         case oCounterAsc
         case ratingDesc
         case ratingAsc
+        /// Position inside a group (Stash `group_scene_number`); only offered on a group's scenes.
+        case sceneNumberAsc
+        case sceneNumberDesc
+
+        /// Every option that works on any scene list — not the group-only scene number.
+        static var generalCases: [SceneSortOption] { allCases.filter { !$0.isGroupOnly } }
+        var isGroupOnly: Bool { self == .sceneNumberAsc || self == .sceneNumberDesc }
 
         var displayName: String {
             switch self {
@@ -1435,6 +1442,8 @@ class StashDBViewModel: ObservableObject {
             case .ratingDesc: return "Rating (High-Low)"
             case .ratingAsc: return "Rating (Low-High)"
             case .random: return "Random"
+            case .sceneNumberAsc: return "Scene No. (Ascending)"
+            case .sceneNumberDesc: return "Scene No. (Descending)"
             }
         }
 
@@ -1442,7 +1451,8 @@ class StashDBViewModel: ObservableObject {
             switch self {
             case .dateDesc, .createdAtDesc, .durationDesc, .lastPlayedAtDesc, .playCountDesc, .playDurationDesc, .oCounterDesc, .ratingDesc, .random: return "DESC"
             case .dateAsc, .createdAtAsc, .titleAsc, .durationAsc, .lastPlayedAtAsc, .playCountAsc, .playDurationAsc, .oCounterAsc, .ratingAsc: return "ASC"
-            case .titleDesc: return "DESC"
+            case .titleDesc, .sceneNumberDesc: return "DESC"
+            case .sceneNumberAsc: return "ASC"
             }
         }
 
@@ -1458,6 +1468,7 @@ class StashDBViewModel: ObservableObject {
             case .oCounterDesc, .oCounterAsc: return "o_counter"
             case .ratingDesc, .ratingAsc: return "rating"
             case .random: return "random"
+            case .sceneNumberAsc, .sceneNumberDesc: return "group_scene_number"
             }
         }
 
@@ -1478,6 +1489,7 @@ class StashDBViewModel: ObservableObject {
             case "play_duration": self = isAsc ? .playDurationAsc : .playDurationDesc
             case "o_counter": self = isAsc ? .oCounterAsc : .oCounterDesc
             case "rating", "rating100": self = isAsc ? .ratingAsc : .ratingDesc
+            case "group_scene_number", "movie_scene_number": self = isAsc ? .sceneNumberAsc : .sceneNumberDesc
             default: return nil
             }
         }

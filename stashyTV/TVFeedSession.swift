@@ -227,7 +227,7 @@ extension ReelsModeType {
     var sortChoices: [(raw: String, label: String)] {
         switch self {
         case .scenes, .previews:
-            return StashDBViewModel.SceneSortOption.allCases.map { ($0.rawValue, $0.displayName) }
+            return StashDBViewModel.SceneSortOption.generalCases.map { ($0.rawValue, $0.displayName) }
         case .markers:
             return StashDBViewModel.SceneMarkerSortOption.allCases.map { ($0.rawValue, $0.displayName) }
         case .clips, .pics:

@@ -162,6 +162,11 @@ private struct TVAetherPlayerContent<Panel: View>: View {
     @State private var scrubCommitWork: DispatchWorkItem?
     @State private var scrubThumbGeneration = 0
     @State private var isScrubThumbInFlight = false
+    /// Touch-surface scrub: where the pan started, and when it last moved — the swipe's own
+    /// move command arrives too and must not add a 10 s step on top.
+    @State private var panStartTarget: Double = 0
+    @State private var isPanning = false
+    @State private var lastPanAt = Date.distantPast
     @State private var lastMove = Date.distantPast
     @State private var moveStreak = 0
     /// When a held direction just switched the scene. The release of that same press
@@ -213,6 +218,17 @@ private struct TVAetherPlayerContent<Panel: View>: View {
                 panelOverlay
                     .transition(.move(edge: .bottom).combined(with: .opacity))
             }
+
+            // Free scrubbing on the touch surface (the move commands only give 10 s steps).
+            TVRemoteScrubRecognizer(
+                isEnabled: !isPanelOpen,
+                onBegan: { beginPanScrub() },
+                onChanged: { panScrub(translation: $0) },
+                onEnded: { endPanScrub() }
+            )
+            .frame(width: 0, height: 0)
+            .allowsHitTesting(false)
+            .accessibilityHidden(true)
 
             // Channel shortcut: hold Down for the next scene, hold Up for the previous one.
             // Remotes without dedicated skip buttons otherwise have to open the panel.
@@ -736,10 +752,10 @@ private struct TVAetherPlayerContent<Panel: View>: View {
             // Only swipes (no press) are handled here.
             if (canGoPrevious || canGoNext), remotePresses.isPressing(direction) { return }
             handleVerticalTap(direction)
-        case .left:
-            step(by: -stepSeconds())
-        case .right:
-            step(by: stepSeconds())
+        case .left, .right:
+            // A swipe also arrives here; the pan already scrubbed it freely.
+            guard !isPanning, Date().timeIntervalSince(lastPanAt) > 0.4 else { return }
+            step(by: direction == .left ? -stepSeconds() : stepSeconds())
         @unknown default:
             break
         }
@@ -802,6 +818,43 @@ private struct TVAetherPlayerContent<Panel: View>: View {
     /// One still request at a time: each click used to start its own decode, and a burst of
     /// them kept the engine busy long after the scrub. The running one fetches the newest
     /// target again when it finishes.
+    // MARK: - Touch-surface scrub
+
+    private func beginPanScrub() {
+        guard !isPanelOpen else { return }
+        isPanning = true
+        lastPanAt = Date()
+        scrubCommitWork?.cancel()
+        if !isScrubbing {
+            isScrubbing = true
+            scrubTarget = engine.currentTime
+            scrubImage = nil
+        }
+        panStartTarget = scrubTarget
+        reveal()
+    }
+
+    /// One swipe across the whole surface covers about 40 % of the scene (at least 1 min),
+    /// so long scenes stay quick to cross and short ones fine-grained.
+    private func panScrub(translation: CGFloat) {
+        guard isPanning else { return }
+        lastPanAt = Date()
+        let duration = engine.duration
+        guard duration.isFinite, duration > 0 else { return }
+        let secondsPerPoint = max(60, duration * 0.4) / 1920
+        scrubTarget = min(max(0, panStartTarget + Double(translation) * secondsPerPoint), duration - 0.5)
+        requestScrubThumbnail()
+        reveal()
+    }
+
+    /// Lifting the finger keeps the preview: Select commits at once, otherwise after 1 s idle.
+    private func endPanScrub() {
+        guard isPanning else { return }
+        isPanning = false
+        lastPanAt = Date()
+        scheduleScrubCommit()
+    }
+
     private func requestScrubThumbnail() {
         scrubThumbGeneration &+= 1
         guard !isScrubThumbInFlight else { return }

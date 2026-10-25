@@ -174,7 +174,7 @@ struct ReelsModeSettingsView: View {
         case .scenes:
             let current = StashDBViewModel.SceneSortOption(rawValue: tabManager.getReelsDefaultSort(for: .scenes) ?? "") ?? .random
             Menu {
-                ForEach(StashDBViewModel.SceneSortOption.allCases, id: \.self) { option in
+                ForEach(StashDBViewModel.SceneSortOption.generalCases, id: \.self) { option in
                     Button(action: { tabManager.setReelsDefaultSort(for: .scenes, option: option.rawValue) }) {
                         HStack { Text(option.displayName); if option == current { Image(systemName: "checkmark") } }
                     }
@@ -210,7 +210,7 @@ struct ReelsModeSettingsView: View {
         case .previews:
             let current = StashDBViewModel.SceneSortOption(rawValue: tabManager.getReelsDefaultSort(for: .previews) ?? "") ?? .random
             Menu {
-                ForEach(StashDBViewModel.SceneSortOption.allCases, id: \.self) { option in
+                ForEach(StashDBViewModel.SceneSortOption.generalCases, id: \.self) { option in
                     Button(action: { tabManager.setReelsDefaultSort(for: .previews, option: option.rawValue) }) {
                         HStack { Text(option.displayName); if option == current { Image(systemName: "checkmark") } }
                     }

@@ -80,6 +80,8 @@ class CatalogController<T>(
     perPage: Int = CatalogRepository.pageSize(mode),
     /** Page loader; detail tabs route through `DetailRepository.findScoped` (old-server fallback). */
     private val fetch: (suspend (CatalogQuery, Int, Int) -> Page<T>)? = null,
+    /** List-specific sorts offered first in the quick bar and the sheet (a group's scene number). */
+    val extraSorts: List<SortOption> = emptyList(),
 ) {
     var sort by mutableStateOf(initialSort ?: CatalogPrefs.resolvedSort(mode))
         private set
@@ -187,6 +189,12 @@ class CatalogController<T>(
 
     /** iOS `CatalogListQuickBar` sort chip: [CatalogQuickSortCatalog.next], Random re-rolls via [changeSort]. */
     fun quickSort(field: String) {
+        if (extraSorts.any { it.field == field }) {
+            // Own fields: the active one flips, otherwise ascending first (1, 2, 3 …).
+            val ascending = if (sort.field == field) !sort.isAscending else true
+            SortCatalog.optionFor(mode, field, ascending, extraSorts)?.let { changeSort(it) }
+            return
+        }
         CatalogQuickSortCatalog.next(mode, sort, field)?.let { changeSort(it) }
     }
 

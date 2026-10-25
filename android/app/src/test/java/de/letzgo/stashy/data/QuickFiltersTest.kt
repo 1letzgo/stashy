@@ -51,7 +51,7 @@ class QuickFiltersTest {
 
     @Test fun sectionsSkipKeysTheModeDoesNotKnow() {
         val keys = QuickFilterCatalog.sections(FilterMode.Scenes).map { it.key }
-        assertEquals(listOf("tags", "rating100", "duration", "resolution", "organized", "play_count"), keys)
+        assertEquals(listOf("tags", "rating100", "duration", "resolution", "organized", "play_count", "o_counter"), keys)
         assertTrue(QuickFilterCatalog.sections(FilterMode.Tags).none { it.key == "tags" })
     }
 

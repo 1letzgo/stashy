@@ -48,6 +48,7 @@ class GroupDetailScreen(val groupId: String, val preview: StashGroup? = null) : 
         studioScope = DetailRepository.scope("groups", groupId),
         tagScope = DetailRepository.scope("groups", groupId),
         imageScope = DetailRepository.scope("groups", groupId),
+        sceneExtraSorts = de.letzgo.stashy.data.GroupSceneSort.options,
         sceneContext = DetailViewContext.Group,
         previewScenes = preview?.sceneCount ?: 0,
     )

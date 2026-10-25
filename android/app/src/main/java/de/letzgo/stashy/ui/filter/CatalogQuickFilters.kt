@@ -121,7 +121,9 @@ fun CatalogListQuickBar(controller: CatalogController<*>, modifier: Modifier = M
                 horizontalArrangement = Arrangement.spacedBy(QuickPillSpacing),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-            CatalogQuickSortCatalog.availableFields(mode).forEach { field ->
+            val ownFields = controller.extraSorts.distinctBy { it.field }
+                .map { CatalogQuickSortCatalog.Field(it.field, it.label.substringBefore(" (")) }
+            (ownFields + CatalogQuickSortCatalog.availableFields(mode)).forEach { field ->
                 val active = CatalogQuickSortCatalog.isActive(sort, field.field)
                 val icon = when {
                     !active -> null

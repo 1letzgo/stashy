@@ -16,6 +16,14 @@ data class SortOption(val raw: String, val label: String, val field: String, val
 data class SortFieldKind(val field: String, val menuLabel: String)
 
 /** iOS: `FilterSortCatalog` + the per-entity sort enums and sheet field kinds. */
+/** iOS `SceneSortOption.sceneNumber*`: a scene's number inside a group, only on a group's scenes. */
+object GroupSceneSort {
+    const val FIELD = "group_scene_number"
+    val Asc = SortOption("sceneNumberAsc", "Scene No. (Ascending)", FIELD, "ASC")
+    val Desc = SortOption("sceneNumberDesc", "Scene No. (Descending)", FIELD, "DESC")
+    val options = listOf(Asc, Desc)
+}
+
 object SortCatalog {
     private fun o(raw: String, label: String, field: String, dir: String) = SortOption(raw, label, field, dir)
 
