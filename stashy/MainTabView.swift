@@ -1072,13 +1072,18 @@ private struct MiniPlayerHost: ViewModifier {
     /// Feeds own the whole screen; the bar steps aside there (the engine is paused anyway).
     var hidden: Bool
     @ObservedObject private var store = MiniPlayerStore.shared
+    @ObservedObject private var tabManager = TabManager.shared
 
     func body(content: Content) -> some View {
         content
             .modifier(MiniPlayerAccessory(
-                isEnabled: store.session != nil && !hidden,
+                isEnabled: store.session != nil && !hidden && store.isEnabled,
                 floats: store.tabBarHiddenByPage
             ))
+            // Settings › stashy+ › Miniplayer & Watchlist off: the bar closes (its spot is kept).
+            .onChange(of: tabManager.isMiniPlayerEnabled) { _, enabled in
+                if !enabled { store.close(forget: false) }
+            }
             .sheet(isPresented: $store.showsNowPlaying) {
                 NowPlayingView()
                     #if os(macOS)

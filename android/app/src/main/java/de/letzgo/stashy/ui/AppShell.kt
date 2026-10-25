@@ -200,10 +200,13 @@ fun AppShell() {
 private fun MiniPlayerHost(tabBarShown: Boolean, tabBarHideFraction: Float, modifier: Modifier = Modifier) {
     val onFeeds = Nav.tab == MainTab.Feeds
     LaunchedEffect(onFeeds) { if (onFeeds) de.letzgo.stashy.ui.player.MiniPlayerStore.pause() }
+    // Settings › stashy+ › Miniplayer & Watchlist off (or stashy+ gone): the bar closes.
+    val miniEnabled = de.letzgo.stashy.ui.player.MiniPlayerStore.isEnabled
+    LaunchedEffect(miniEnabled) { if (!miniEnabled) de.letzgo.stashy.ui.player.MiniPlayerStore.close(forget = false) }
     val nav = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
     val barHeight = if (tabBarShown) maxOf(TabBarMetrics.containerHeight, TabBarMetrics.fallbackContainerHeight) * (1f - tabBarHideFraction) else 0.dp
     de.letzgo.stashy.ui.player.MiniPlayerBar(
-        visible = tabBarShown && !onFeeds,
+        visible = tabBarShown && !onFeeds && miniEnabled,
         modifier = modifier.padding(start = 12.dp, end = 12.dp, bottom = nav + barHeight + MiniPlayerBarGap),
     )
     // The bar's own full view; "Details" closes it and opens the scene page, which takes the player.

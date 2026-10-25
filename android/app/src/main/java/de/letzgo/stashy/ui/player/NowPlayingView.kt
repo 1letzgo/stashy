@@ -87,6 +87,9 @@ import de.letzgo.stashy.ui.scene.timeBarMarkers
 @Composable
 fun NowPlayingSheet(onOpen: (de.letzgo.stashy.ui.Screen) -> Unit) {
     if (!MiniPlayerStore.showsNowPlaying) return
+    // The sheet is its own window above the app: while the app lock is up it would cover the
+    // passcode screen with a playing video. It comes back once unlocked.
+    if (de.letzgo.stashy.data.SecurityManager.isAppLocked) return
     val scene = MiniPlayerStore.nowPlayingScene
     LaunchedEffect(scene == null) { if (scene == null) MiniPlayerStore.showsNowPlaying = false }
     if (scene == null) return

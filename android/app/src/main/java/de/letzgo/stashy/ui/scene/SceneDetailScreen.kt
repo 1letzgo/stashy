@@ -231,7 +231,13 @@ private fun SceneDetailContent(model: SceneDetailModel, openedFromMiniPlayer: Bo
         if (model.isFullscreen && player != null) androidx.compose.ui.window.Dialog(
             onDismissRequest = { model.isFullscreen = false },
             properties = androidx.compose.ui.window.DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false),
-        ) { fullscreenPlayer() }
+        ) {
+            val dialogView = androidx.compose.ui.platform.LocalView.current
+            androidx.compose.runtime.SideEffect {
+                (dialogView.parent as? androidx.compose.ui.window.DialogWindowProvider)?.window?.let(PlayerWindow::makeDialogImmersive)
+            }
+            fullscreenPlayer()
+        }
     } else Box(Modifier.fillMaxSize().background(p.background)) {
         val landscape = LocalConfiguration.current.orientation == Configuration.ORIENTATION_LANDSCAPE
         val pinned = model.isPlaybackStarted && player != null && !landscape

@@ -39,6 +39,26 @@ object PlayerWindow {
         } else controller.show(WindowInsetsCompat.Type.systemBars())
     }
 
+    /**
+     * A dialog hosting the fullscreen player (Now Playing is a sheet) has its own window, which
+     * [setImmersive] does not reach: without this it kept the system bars and their insets, so
+     * the picture was inset and the bottom controls were cut off.
+     */
+    fun makeDialogImmersive(window: android.view.Window) {
+        window.setLayout(android.view.ViewGroup.LayoutParams.MATCH_PARENT, android.view.ViewGroup.LayoutParams.MATCH_PARENT)
+        window.setDimAmount(0f)
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.P) {
+            window.attributes = window.attributes.apply {
+                layoutInDisplayCutoutMode = android.view.WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES
+            }
+        }
+        WindowCompat.setDecorFitsSystemWindows(window, false)
+        WindowCompat.getInsetsController(window, window.decorView).apply {
+            systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+            hide(WindowInsetsCompat.Type.systemBars())
+        }
+    }
+
     /** Landscape for landscape videos when fullscreen opens; portrait videos keep the device orientation. */
     fun lockLandscape(landscape: Boolean) {
         val activity = MainActivity.current ?: return
