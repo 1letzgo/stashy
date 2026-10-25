@@ -13,6 +13,12 @@ object WatchlistLogic {
         return scenes.getOrNull(index + 1)
     }
 
+    /** The entry before [sceneId]; null at the top or when it is not on the list. */
+    fun previous(scenes: List<Scene>, sceneId: String): Scene? {
+        val index = scenes.indexOfFirst { it.id == sceneId }
+        return if (index > 0) scenes[index - 1] else null
+    }
+
     /** Removes [scene] when listed, else appends it. */
     fun toggled(scenes: List<Scene>, scene: Scene): List<Scene> =
         if (scenes.any { it.id == scene.id }) scenes.filter { it.id != scene.id } else scenes + scene
@@ -119,4 +125,5 @@ object WatchlistStore {
     fun clear() { ensureLoaded(); replace(emptyList()) }
 
     fun next(after: String): Scene? { ensureLoaded(); return WatchlistLogic.next(scenes, after) }
+    fun previous(before: String): Scene? { ensureLoaded(); return WatchlistLogic.previous(scenes, before) }
 }

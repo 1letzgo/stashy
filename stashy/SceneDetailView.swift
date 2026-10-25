@@ -677,8 +677,9 @@ struct SceneDetailView: View {
         }
         
         // The mini player runs this scene (left it earlier, or reopened from the bar): play on
-        // in the page with the same engine, no cover and no reload.
-        if !isPlaybackStarted, miniPlayerShowsThisScene {
+        // in the page with the same engine, no cover and no reload. Not when scenes play in
+        // Now Playing: the bar keeps it.
+        if !isPlaybackStarted, miniPlayerShowsThisScene, !playsInNowPlaying {
             resumeOnReturn = nil
             startPlayback(resume: false)
             return
@@ -1015,7 +1016,23 @@ struct SceneDetailView: View {
         updated.postListMetadataUpdated()
     }
 
-    private func startPlayback(resume: Bool) {
+    /// Mini player on: Play hands the scene to Now Playing instead of playing on this page.
+    /// The page Now Playing embeds (`playerOnly`) and its Details page play themselves.
+    private var playsInNowPlaying: Bool {
+        #if os(tvOS)
+        false
+        #else
+        !playerOnly && !presentedFromMiniPlayer && MiniPlayerStore.shared.isEnabled
+        #endif
+    }
+
+    private func startPlayback(resume: Bool, startAt: Double? = nil) {
+        #if !os(tvOS)
+        if playsInNowPlaying {
+            MiniPlayerStore.shared.openNowPlaying(activeScene, startAt: startAt ?? (resume ? nil : 0))
+            return
+        }
+        #endif
         guard let url = activeScene.aetherVideoURL else { return }
 
         // The mini player still runs this scene: take its engine back instead of reloading.
@@ -1289,7 +1306,8 @@ struct SceneDetailView: View {
 
     private func seekTo(_ seconds: Double) {
         if !isPlaybackStarted {
-            startPlayback(resume: false)
+            startPlayback(resume: false, startAt: seconds)
+            if playsInNowPlaying { return }
         }
 
         guard let aether = aetherEngine else { return }

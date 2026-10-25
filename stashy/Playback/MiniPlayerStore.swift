@@ -215,6 +215,18 @@ final class MiniPlayerStore: ObservableObject {
         close()
     }
 
+    /// Play on a scene page while the mini player is on: the scene plays in the full view (and
+    /// is listed on the watchlist) instead of on the page. `startAt` nil resumes where it was left.
+    func openNowPlaying(_ scene: Scene, startAt: Double?) {
+        WatchlistStore.shared.ensureListed(scene)
+        // The bar already runs it: the full view takes that engine as is, so jump it here.
+        if let startAt, let current = session, current.scene.id == scene.id {
+            Task { await current.engine.seek(to: startAt) }
+        }
+        nowPlayingScene = startAt.map { scene.withResumeTime($0) } ?? scene
+        showsNowPlaying = true
+    }
+
     /// Switches the full view to `scene` (watchlist tap, next, end of a scene).
     func showNowPlaying(_ scene: Scene) {
         WatchlistStore.shared.ensureListed(scene)
@@ -454,6 +466,12 @@ final class WatchlistStore: ObservableObject {
         guard let index = scenes.firstIndex(where: { $0.id == sceneId }) else { return scenes.first }
         let nextIndex = scenes.index(after: index)
         return nextIndex < scenes.endIndex ? scenes[nextIndex] : nil
+    }
+
+    /// The entry before `sceneId`; nil at the top or when `sceneId` is not on the list.
+    func previous(before sceneId: String) -> Scene? {
+        guard let index = scenes.firstIndex(where: { $0.id == sceneId }), index > scenes.startIndex else { return nil }
+        return scenes[scenes.index(before: index)]
     }
 }
 
@@ -1039,11 +1057,14 @@ private struct NowPlayingContent: View {
         }
     }
 
-    /// Performers · studio as links, and next when the watchlist has one.
+    /// Performers · studio as links, and previous / next when the watchlist has them.
     private var infoRow: some View {
         HStack(alignment: .center, spacing: 6) {
             creditLinks
             Spacer(minLength: 4)
+            if let previous = watchlist.previous(before: scene.id) {
+                iconButton("backward.end.fill", label: "Previous in watchlist") { player.showNowPlaying(previous) }
+            }
             if let next = watchlist.next(after: scene.id) {
                 iconButton("forward.end.fill", label: "Next in watchlist") { player.showNowPlaying(next) }
             }

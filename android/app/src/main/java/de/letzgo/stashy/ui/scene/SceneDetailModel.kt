@@ -106,7 +106,15 @@ class SceneDetailModel(
      * when paused, and advances Now Playing to the next watchlist entry at the end.
      */
     val playerOnly: Boolean = false,
+    /** Reopened from the mini player ("Details"): plays here like before. */
+    private val openedFromMiniPlayer: Boolean = false,
 ) {
+    /**
+     * iOS `playsInNowPlaying`: with the mini player on, Play hands the scene to Now Playing
+     * instead of playing on this page.
+     */
+    private val playsInNowPlaying: Boolean get() = !playerOnly && !openedFromMiniPlayer && MiniPlayerStore.isEnabled
+
     /** Outlives the composition: activity saves on leaving must still go out. */
     val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
 
@@ -181,7 +189,7 @@ class SceneDetailModel(
         hasAppeared = true
         // The mini player runs this scene (left it earlier, or reopened from the bar): play on
         // in the page with the same player — no cover, no reload, no seek.
-        if (!isPlaybackStarted && MiniPlayerStore.showsScene(s.id)) {
+        if (!isPlaybackStarted && MiniPlayerStore.showsScene(s.id) && !playsInNowPlaying) {
             resumeOnReturn = null
             startPlayback(false)
             return
@@ -261,7 +269,11 @@ class SceneDetailModel(
     // MARK: Playback
 
     /** iOS: `startPlayback(resume:)`. */
-    fun startPlayback(resume: Boolean) {
+    fun startPlayback(resume: Boolean, startAt: Double? = null) {
+        if (playsInNowPlaying) {
+            MiniPlayerStore.openNowPlaying(scene, startAt ?: if (resume) null else 0.0)
+            return
+        }
         val url = scene.originalVideoURL ?: return
         // The mini player still runs this scene: take its player back instead of reloading.
         val wasPlayingInBar = MiniPlayerStore.session?.takeIf { it.scene.id == scene.id }?.player?.let { it.playWhenReady && !it.didEnd } ?: true
@@ -370,7 +382,10 @@ class SceneDetailModel(
 
     /** iOS: `seekTo` — starts playback first when needed. */
     fun seekTo(seconds: Double) {
-        if (!isPlaybackStarted) startPlayback(false)
+        if (!isPlaybackStarted) {
+            startPlayback(false, startAt = seconds)
+            if (playsInNowPlaying) return
+        }
         val p = player ?: return
         p.seek(seconds)
         tracker.noteSeek(seconds)

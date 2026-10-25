@@ -87,7 +87,7 @@ class SceneDetailScreen(
 ) : Screen {
     // Own key when reopened from the bar: the same scene's page may already sit lower in the stack.
     override val key = if (openedFromMiniPlayer) "scene-$sceneId-mini-${System.nanoTime()}" else "scene-$sceneId"
-    private val model = SceneDetailModel(preview ?: Scene(id = sceneId), autoPlay)
+    private val model = SceneDetailModel(preview ?: Scene(id = sceneId), autoPlay, openedFromMiniPlayer = openedFromMiniPlayer)
     override val hidesTabBar: Boolean get() = model.isFullscreen || PlayerWindow.isInPictureInPicture
 
     @Composable override fun Content() = SceneDetailContent(model, openedFromMiniPlayer)

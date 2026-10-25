@@ -301,7 +301,7 @@ private fun FloatingTabBar(modifier: Modifier = Modifier) {
             val container = with(density) { size.height.toDp() } - navInset
             if (container > 0.dp) TabBarMetrics.containerHeight = container
         },
-        containerColor = p.secondaryBackground,
+        containerColor = chromeBarColor(p.secondaryBackground),
         contentColor = p.text,
         tonalElevation = 0.dp,
     ) {

@@ -170,9 +170,22 @@ object MiniPlayerStore {
 
     /** Now Playing: the scene after [currentId] in the watchlist. */
     fun nextAfter(currentId: String): Scene? = WatchlistStore.next(currentId)
+    fun previousBefore(currentId: String): Scene? = WatchlistStore.previous(currentId)
 
     /** Now Playing: switch to [scene] (the view rebuilds its player module for it). */
     fun showInNowPlaying(scene: Scene) { nowPlayingScene = scene }
+
+    /**
+     * iOS `openNowPlaying`: Play on a scene page while the mini player is on — the scene plays in
+     * the full view (and is listed on the watchlist). [startAt] null resumes where it was left.
+     */
+    fun openNowPlaying(scene: Scene, startAt: Double?) {
+        WatchlistStore.ensureListed(scene)
+        // The bar already runs it: the full view takes that player as is, so jump it here.
+        if (startAt != null) session?.takeIf { it.scene.id == scene.id }?.player?.seek(startAt)
+        nowPlayingScene = if (startAt != null) scene.copy(resumeTime = startAt) else scene
+        showsNowPlaying = true
+    }
 
     /** Now Playing reached the end of [currentId]: on to the next watchlist entry, if any. */
     fun advanceNowPlaying(currentId: String) {
@@ -410,7 +423,7 @@ private fun MiniPlayerBarContent(session: MiniPlayerStore.Session) {
             }
             .floatingShadow(RoundedCornerShape(16.dp))
             .clip(RoundedCornerShape(16.dp))
-            .background(p.secondaryBackground)
+            .background(de.letzgo.stashy.ui.chromeBarColor(p.secondaryBackground))
             .pointerInput(session.scene.id) {
                 detectDragGestures(
                     onDragStart = { dragX = 0f; dragY = 0f },

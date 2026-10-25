@@ -29,6 +29,7 @@ import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Replay10
 import androidx.compose.material.icons.filled.SkipNext
+import androidx.compose.material.icons.filled.SkipPrevious
 import de.letzgo.stashy.ui.IosTypography
 import androidx.compose.material3.AlertDialog
 import de.letzgo.stashy.ui.StashyColors
@@ -192,6 +193,9 @@ private fun InfoRow(scene: Scene, onOpen: (de.letzgo.stashy.ui.Screen) -> Unit) 
                     LinkPill(Icons.Filled.Business, studio.name) { onOpen(de.letzgo.stashy.ui.detail.StudioDetailScreen(studio.id, studio)) }
                 }
             }
+        }
+        MiniPlayerStore.previousBefore(scene.id)?.let { previous ->
+            CircleAction(Icons.Filled.SkipPrevious, "Previous in watchlist") { MiniPlayerStore.showInNowPlaying(previous) }
         }
         MiniPlayerStore.nextAfter(scene.id)?.let { next ->
             CircleAction(Icons.Filled.SkipNext, "Next in watchlist") { MiniPlayerStore.showInNowPlaying(next) }
