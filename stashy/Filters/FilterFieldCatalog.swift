@@ -617,11 +617,26 @@ enum FilterCriterionSummary {
         let value = displayValue(dict["value"])
         let value2 = displayValue(dict["value2"])
         guard !value.isEmpty else { return anyText }
+        if modifier == .matchesRegex || modifier == .notMatchesRegex {
+            return regexText(value, negated: modifier == .notMatchesRegex)
+        }
         let symbol = compactModifier(modifier)
         if let value2 = value2.isEmpty ? nil : value2, modifier?.needsSecondValue == true {
             return "\(symbol) \(value) – \(value2)"
         }
         return symbol.isEmpty ? value : "\(symbol) \(value)"
+    }
+
+    /// A regex in plain words: the name search's case-insensitive `(?i)` prefix is dropped,
+    /// and a pattern that is just text reads as that text in quotes.
+    private static func regexText(_ pattern: String, negated: Bool) -> String {
+        var text = pattern
+        if text.hasPrefix(FilterCriteriaDocument.nameSearchRegexPrefix) {
+            text.removeFirst(FilterCriteriaDocument.nameSearchRegexPrefix.count)
+        }
+        let isPlainText = text.rangeOfCharacter(from: CharacterSet(charactersIn: "\\^$.|?*+()[]{}")) == nil
+        if isPlainText { return negated ? "without “\(text)”" : "“\(text)”" }
+        return negated ? "not matching \(text)" : "matches \(text)"
     }
 
     private static func compactModifier(_ modifier: StashCriterionModifier?) -> String {

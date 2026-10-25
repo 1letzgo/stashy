@@ -583,11 +583,14 @@ struct QuickFiltersCard: View {
             FlowLayout(spacing: 8) {
                 CatalogFilterChip(title: anyLabel, isActive: current == nil) {
                     guard current != nil else { return }
+                    // Same tap feedback as the tag chips above.
+                    HapticManager.light()
                     document.removeCriterion(key: key)
                     onChange()
                 }
                 ForEach(choices) { choice in
                     CatalogFilterChip(title: choice.label, isActive: selected?.id == choice.id) {
+                        HapticManager.light()
                         if selected?.id == choice.id {
                             document.removeCriterion(key: key)
                         } else {

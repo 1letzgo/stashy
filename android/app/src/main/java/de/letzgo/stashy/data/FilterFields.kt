@@ -410,9 +410,26 @@ object FilterCriterionSummary {
         val value = displayValue(dict["value"])
         val value2 = displayValue(dict["value2"])
         if (value.isEmpty()) return ANY
+        if (modifier == CriterionModifier.MatchesRegex || modifier == CriterionModifier.NotMatchesRegex) {
+            return regexText(value, negated = modifier == CriterionModifier.NotMatchesRegex)
+        }
         val symbol = compactModifier(modifier)
         if (value2.isNotEmpty() && modifier?.needsSecondValue == true) return "$symbol $value – $value2".trim()
         return if (symbol.isEmpty()) value else "$symbol $value"
+    }
+
+    /**
+     * iOS `regexText`: a regex in plain words — the name search's case-insensitive `(?i)` prefix
+     * is dropped, and a pattern that is just text reads as that text in quotes.
+     */
+    private fun regexText(pattern: String, negated: Boolean): String {
+        val text = pattern.removePrefix(NameRegexFilter.CASE_INSENSITIVE_PREFIX)
+        val isPlainText = text.none { it in "\\^$.|?*+()[]{}" }
+        return when {
+            isPlainText -> if (negated) "without “$text”" else "“$text”"
+            negated -> "not matching $text"
+            else -> "matches $text"
+        }
     }
 
     private fun compactModifier(m: CriterionModifier?): String = when (m) {
