@@ -163,8 +163,13 @@ fun FeedsScreen() {
 
     // Toast-like messages (iOS `ToastManager`).
     var toast by remember { mutableStateOf<String?>(null) }
+    // Taking the message over resets `model.message`, which restarts an effect keyed on it and
+    // cancelled the hide delay: the toast stayed up. The hide is keyed on the toast instead.
     LaunchedEffect(model.message) {
-        model.message?.let { toast = it; model.message = null; delay(2_000); toast = null }
+        model.message?.let { toast = it; model.message = null }
+    }
+    LaunchedEffect(toast) {
+        if (toast != null) { delay(2_000); toast = null }
     }
 
     val mode = model.mode
