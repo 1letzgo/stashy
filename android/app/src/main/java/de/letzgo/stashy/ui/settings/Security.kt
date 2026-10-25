@@ -89,8 +89,14 @@ fun PasscodeEntryView() {
     val lockedOut = SecurityManager.lockoutRemainingSeconds > 0
     BackHandler { (context as? android.app.Activity)?.moveTaskToBack(true) }
 
+    val lifecycle = LocalLifecycleOwner.current.lifecycle
+
+    // Only in the foreground: the lock goes up in onStop, and a prompt started while the app
+    // is in the background never shows and never calls back — `authenticating` then stayed
+    // true and every later return got the passcode keypad instead of biometrics.
     fun promptBiometrics() {
         val activity = context as? FragmentActivity ?: return
+        if (!lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED)) return
         if (!SecurityManager.isBiometricsEnabled || lockedOut || authenticating || !SecurityManager.isAppLocked) return
         authenticating = true
         SecurityManager.authenticateWithBiometrics(activity) { authenticating = false }
@@ -101,10 +107,16 @@ fun PasscodeEntryView() {
         delay(300)
         promptBiometrics()
     }
-    // iOS: prompt again on every return to the foreground.
-    val lifecycle = LocalLifecycleOwner.current.lifecycle
+    // iOS: prompt again on every return to the foreground. Leaving drops a prompt still marked
+    // as running (the system dismisses it anyway), so the next return can ask again.
     androidx.compose.runtime.DisposableEffect(lifecycle) {
-        val obs = LifecycleEventObserver { _, e -> if (e == Lifecycle.Event.ON_RESUME) promptBiometrics() }
+        val obs = LifecycleEventObserver { _, e ->
+            when (e) {
+                Lifecycle.Event.ON_RESUME -> promptBiometrics()
+                Lifecycle.Event.ON_STOP -> authenticating = false
+                else -> {}
+            }
+        }
         lifecycle.addObserver(obs)
         onDispose { lifecycle.removeObserver(obs) }
     }
