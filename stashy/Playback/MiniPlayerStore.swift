@@ -227,6 +227,17 @@ final class MiniPlayerStore: ObservableObject {
         showsNowPlaying = true
     }
 
+    /// The playing scene was taken off the watchlist: playback moves to the first entry left.
+    /// (An emptied list already reset everything.)
+    func watchlistRemoved(_ sceneId: String) {
+        guard let first = WatchlistStore.shared.scenes.first else { return }
+        if showsNowPlaying, nowPlayingScene?.id == sceneId {
+            showNowPlaying(first)
+        } else if !showsNowPlaying, session?.scene.id == sceneId {
+            play(first)
+        }
+    }
+
     /// Switches the full view to `scene` (watchlist tap, next, end of a scene).
     func showNowPlaying(_ scene: Scene) {
         WatchlistStore.shared.ensureListed(scene)
@@ -408,10 +419,15 @@ final class WatchlistStore: ObservableObject {
         }
     }
 
+    /// The last entry the user removed, for `ensureListed`.
+    private var recentlyRemoved: (id: String, at: Date)?
+
     func remove(_ sceneId: String) {
+        recentlyRemoved = (sceneId, Date())
         scenes.removeAll { $0.id == sceneId }
         persist()
         resetIfEmptied()
+        MiniPlayerStore.shared.watchlistRemoved(sceneId)
     }
 
     func remove(atOffsets offsets: IndexSet) {
@@ -457,6 +473,8 @@ final class WatchlistStore: ObservableObject {
     /// The playing scene is always on the list: added in front when it is not yet.
     func ensureListed(_ scene: Scene) {
         guard !contains(scene.id) else { return }
+        // Just removed by the user: the hand-off of the player leaving it must not list it again.
+        if let removed = recentlyRemoved, removed.id == scene.id, Date().timeIntervalSince(removed.at) < 3 { return }
         scenes.insert(scene, at: 0)
         persist()
     }

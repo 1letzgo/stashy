@@ -110,6 +110,8 @@ object WatchlistStore {
     /** iOS `ensureListed` — the scene playing in the mini player is always on the list (added at the front). */
     fun ensureListed(scene: Scene) {
         ensureLoaded()
+        // Just removed by the user: the hand-off of the player leaving it must not list it again.
+        recentlyRemoved?.let { (id, at) -> if (id == scene.id && android.os.SystemClock.elapsedRealtime() - at < 3_000) return }
         if (scenes.none { it.id == scene.id }) replace(WatchlistLogic.ensuredListed(scenes, scene))
     }
 
@@ -118,7 +120,14 @@ object WatchlistStore {
     /** iOS `moveAfter` — "Play next". */
     fun moveAfter(sceneId: String, currentId: String?) { ensureLoaded(); replace(WatchlistLogic.movedAfter(scenes, sceneId, currentId)) }
 
-    fun remove(sceneId: String) { ensureLoaded(); replace(scenes.filter { it.id != sceneId }) }
+    /** The last entry the user removed (id, elapsed-realtime ms), for [ensureListed]. */
+    private var recentlyRemoved: Pair<String, Long>? = null
+
+    fun remove(sceneId: String) {
+        ensureLoaded()
+        recentlyRemoved = sceneId to android.os.SystemClock.elapsedRealtime()
+        replace(scenes.filter { it.id != sceneId })
+    }
 
     fun move(from: Int, to: Int) { ensureLoaded(); replace(WatchlistLogic.moved(scenes, from, to)) }
 

@@ -168,6 +168,20 @@ object MiniPlayerStore {
         close()
     }
 
+    /**
+     * Removing from the watchlist (swipe, menu). Like iOS: the last entry resets everything, and
+     * removing the playing scene moves playback to the first entry left.
+     */
+    fun removeFromWatchlist(sceneId: String) {
+        WatchlistStore.remove(sceneId)
+        val first = WatchlistStore.scenes.firstOrNull()
+        when {
+            first == null -> resetWatchlistAndPlayback()
+            showsNowPlaying && nowPlayingScene?.id == sceneId -> showInNowPlaying(first)
+            !showsNowPlaying && session?.scene?.id == sceneId -> play(first)
+        }
+    }
+
     /** Now Playing: the scene after [currentId] in the watchlist. */
     fun nextAfter(currentId: String): Scene? = WatchlistStore.next(currentId)
     fun previousBefore(currentId: String): Scene? = WatchlistStore.previous(currentId)

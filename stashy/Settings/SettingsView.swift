@@ -227,9 +227,9 @@ struct SettingsView: View {
             }
 
             Section {
-                stashyScrollingSectionHeader("Mini Player & Watchlist")
+                stashyScrollingSectionHeader("Miniplayer & Watchlist")
                 Toggle(isOn: $tabManager.isMiniPlayerEnabled) {
-                    Label("Mini player when leaving a scene", systemImage: "rectangle.bottomhalf.inset.filled")
+                    Label("Miniplayer & Watchlist", systemImage: "rectangle.bottomhalf.inset.filled")
                 }
                 .tint(appearanceManager.tintColor)
                 .stashyGroupedSettingsRow()
@@ -264,7 +264,7 @@ struct SettingsView: View {
                 Label("Download Scenes", systemImage: "lock.fill")
                     .foregroundColor(.secondary)
                     .stashyGroupedBlockRow(index: 1, count: 12)
-                Label("Mini Player & Watchlist", systemImage: "lock.fill")
+                Label("Miniplayer & Watchlist", systemImage: "lock.fill")
                     .foregroundColor(.secondary)
                     .stashyGroupedBlockRow(index: 2, count: 12)
                 lockedPlusFeature("AI Subtitles and translation", systemImage: "lock.fill", isBeta: true)

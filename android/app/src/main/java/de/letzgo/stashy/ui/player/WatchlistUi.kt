@@ -94,7 +94,7 @@ fun LazyListScope.watchlistRows(
 @Composable
 private fun SwipeToRemove(sceneId: String, content: @Composable () -> Unit) {
     val state = rememberSwipeToDismissBoxState(confirmValueChange = { value ->
-        if (value == SwipeToDismissBoxValue.EndToStart) { WatchlistStore.remove(sceneId); true } else false
+        if (value == SwipeToDismissBoxValue.EndToStart) { MiniPlayerStore.removeFromWatchlist(sceneId); true } else false
     })
     SwipeToDismissBox(
         state = state,
@@ -189,7 +189,7 @@ private fun WatchlistSceneRow(
             DropdownMenuItem(
                 text = { Text("Remove from watchlist", color = StashyColors.systemRed) },
                 leadingIcon = { Icon(Icons.Filled.Delete, null, tint = StashyColors.systemRed) },
-                onClick = { menu = false; WatchlistStore.remove(scene.id) },
+                onClick = { menu = false; MiniPlayerStore.removeFromWatchlist(scene.id) },
             )
         }
     }
