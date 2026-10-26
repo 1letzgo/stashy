@@ -206,11 +206,9 @@ fun ImagesList(c: CatalogController<StashImage>, holder: ImageMediaKindHolder, c
                 onLoadMore = { c.list.loadMore() },
                 contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = top, bottom = bottomBarContentPadding()),
                 onImageUpdated = { updated -> c.list.patch { if (it.id == updated.id) updated else it } },
+                // The quick bar is pinned above the list by CatalogScaffold.
                 header = {
-                    androidx.compose.foundation.layout.Column {
-                        de.letzgo.stashy.ui.filter.CatalogListQuickBar(c, Modifier.bleedHorizontally(16.dp))
-                        if (c.search.isNotEmpty()) Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) { SearchClearChip(c.search, { c.search = "" }) }
-                    }
+                    if (c.search.isNotEmpty()) Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) { SearchClearChip(c.search, { c.search = "" }) }
                 },
             )
         } else null,

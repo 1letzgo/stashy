@@ -573,7 +573,11 @@ private struct PerformersViewContent: View {
                     emptyStateView
                 }
             } else {
-                performersGrid
+                // Pinned above the list so it always shows, also after coming back from a detail page.
+                VStack(spacing: 0) {
+                    quickBar
+                    performersGrid
+                }
             }
         }
         .applyAppBackground()
@@ -741,7 +745,6 @@ private struct PerformersViewContent: View {
         ScrollViewReader { proxy in
             ScrollView {
                 VStack(spacing: 0) {
-                quickBar
                 LazyVGrid(columns: columns, spacing: 12) {
                     ForEach(viewModel.performers) { performer in
                         NavigationLink(destination: LazyView { PerformerDetailView(performer: performer) }) {

@@ -525,7 +525,11 @@ private struct MarkersViewContent: View {
                     emptyStateView
                 }
             } else {
-                markersList
+                // Pinned above the list so it always shows, also after coming back from a detail page.
+                VStack(spacing: 0) {
+                    quickBar
+                    markersList
+                }
             }
         }
         .applyAppBackground()
@@ -709,7 +713,6 @@ private struct MarkersViewContent: View {
     private var markersList: some View {
         ScrollView {
             VStack(spacing: 0) {
-            quickBar
             LazyVGrid(columns: columns, spacing: 12) {
                 ForEach(viewModel.sceneMarkers) { marker in
                     if let markerScene = marker.scene {

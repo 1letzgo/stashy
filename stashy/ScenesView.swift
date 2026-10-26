@@ -1196,6 +1196,12 @@ private struct ScenesViewContent: View {
                     ConnectionErrorView(title: viewModel.errorMessage ?? "Server not reachable") { performSearch() }
                 } else if primarySceneListIsEmpty {
                     scenesEmptyContent
+                } else if scrollHeader == nil {
+                    // Pinned above the list so it always shows, also after coming back from a detail page.
+                    VStack(spacing: 0) {
+                        quickBar
+                        scenesGrid
+                    }
                 } else {
                     scenesGrid
                 }
@@ -1493,9 +1499,10 @@ private struct ScenesViewContent: View {
             ScrollView {
                 VStack(spacing: 12) {
                     if let scrollHeader {
+                        // Detail pages: the bar scrolls with their header; plain lists pin it above.
                         scrollHeader
+                        quickBar
                     }
-                    quickBar
                     LazyVGrid(columns: columns, spacing: 12) {
                     ForEach(primaryScenes) { scene in
                             NavigationLink(destination: LazyView { SceneDetailView(scene: scene) }) {

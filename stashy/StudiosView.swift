@@ -518,7 +518,11 @@ private struct StudiosViewContent: View {
                     emptyStateView
                 }
             } else {
-                studiosList
+                // Pinned above the list so it always shows, also after coming back from a detail page.
+                VStack(spacing: 0) {
+                    quickBar
+                    studiosList
+                }
             }
         }
         .applyAppBackground()
@@ -721,7 +725,6 @@ private struct StudiosViewContent: View {
         ScrollViewReader { proxy in
             ScrollView {
                 VStack(spacing: 0) {
-                quickBar
                 LazyVGrid(columns: columns, spacing: 12) {
                     ForEach(viewModel.studios) { studio in
                         NavigationLink(destination: StudioDetailView(studio: studio)) {

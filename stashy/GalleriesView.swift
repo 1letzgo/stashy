@@ -495,7 +495,11 @@ private struct GalleriesViewContent: View {
                 )
             }
         } else {
-            galleriesGridScroll
+            // Pinned above the list so it always shows, also after coming back from a detail page.
+            VStack(spacing: 0) {
+                quickBar
+                galleriesGridScroll
+            }
         }
     }
 
@@ -536,7 +540,6 @@ private struct GalleriesViewContent: View {
         let cardColumns = tabManager.catalogCardColumns(for: CatalogCardColumnScope.galleries)
         return ScrollView {
             VStack(spacing: 0) {
-            quickBar
             LazyVGrid(columns: columns, spacing: 12) {
                 ForEach(viewModel.galleries) { gallery in
                     NavigationLink(destination: LazyView { ImagesView(gallery: gallery) }) {

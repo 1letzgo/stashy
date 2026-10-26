@@ -467,7 +467,11 @@ private struct GroupsViewContent: View {
                     emptyStateView
                 }
             } else {
-                groupsGrid
+                // Pinned above the list so it always shows, also after coming back from a detail page.
+                VStack(spacing: 0) {
+                    quickBar
+                    groupsGrid
+                }
             }
         }
         .applyAppBackground()
@@ -635,7 +639,6 @@ private struct GroupsViewContent: View {
         ScrollViewReader { proxy in
             ScrollView {
                 VStack(spacing: 0) {
-                quickBar
                 LazyVGrid(columns: columns, spacing: 12) {
                     ForEach(viewModel.groups) { group in
                         NavigationLink(destination: GroupDetailView(selectedGroup: group)) {

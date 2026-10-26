@@ -465,7 +465,11 @@ private struct TagsViewContent: View {
                     emptyStateView
                 }
             } else {
-                tagsList
+                // Pinned above the list so it always shows, also after coming back from a detail page.
+                VStack(spacing: 0) {
+                    quickBar
+                    tagsList
+                }
             }
         }
         .onChange(of: searchText) { oldValue, newValue in
@@ -644,7 +648,6 @@ private struct TagsViewContent: View {
         ScrollViewReader { proxy in
             ScrollView {
                 VStack(spacing: 0) {
-                quickBar
                 LazyVGrid(columns: columns, spacing: 12) {
                     ForEach(viewModel.tags) { tag in
                         NavigationLink(destination: TagDetailView(selectedTag: tag)) {

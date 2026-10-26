@@ -347,6 +347,13 @@ private struct ImagesViewBody: View {
                     )
                 }
             } else {
+                // Plain lists pin the bar above the grid so it always shows, also after coming back
+                // from an image (the return scroll used to push it under the chrome). An opened
+                // gallery keeps it in the scroll content below its header.
+                VStack(spacing: 0) {
+                if showsQuickBar && gallery == nil {
+                    quickBar
+                }
                 GeometryReader { viewport in
                     ScrollViewReader { proxy in
                         ScrollView {
@@ -354,15 +361,16 @@ private struct ImagesViewBody: View {
                                 if let gallery {
                                     openedGalleryTop(gallery)
                                 }
-                                if showsQuickBar {
+                                if showsQuickBar && gallery != nil {
                                     // The bar pads itself; undo the column's inset so chips scroll edge to edge.
                                     quickBar.padding(.horizontal, -16)
                                 }
                                 gridContent
                             }
                             .padding(.horizontal, 16)
-                            // Same top inset as SceneDetail under custom chrome (no phantom nav gap).
-                            .padding(.top, 16)
+                            // Same top inset as SceneDetail under custom chrome (no phantom nav gap);
+                            // under the pinned bar its own bottom padding is the gap, like the other lists.
+                            .padding(.top, showsQuickBar && gallery == nil ? 0 : 16)
                             .padding(.bottom, 16 + (isSelectionMode ? 80 : 0))
                         }
                         .onScrollPhaseChange { _, newPhase in
@@ -407,6 +415,7 @@ private struct ImagesViewBody: View {
                 }
                 .refreshable {
                     imageListFilters.refetchImages(viewModel: viewModel, initial: true)
+                }
                 }
             }
         }

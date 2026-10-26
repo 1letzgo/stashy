@@ -257,7 +257,7 @@ fun <T> CatalogScaffold(
     topPadding: Dp = catalogTopPadding(),
     showsFloatingBar: Boolean = true,
     gridKey: Any? = null,
-    /** iOS `CatalogListQuickBar` as the grid's first, scrolling row (a [listBody] hosts its own). */
+    /** iOS `CatalogListQuickBar`, pinned above the grid (or [listBody]) so it always shows. */
     showsQuickBar: Boolean = true,
     /** Replaces the grid when set (Images 1/row feed); gets the content top padding. */
     listBody: (@Composable (topPadding: Dp) -> Unit)? = null,
@@ -285,20 +285,20 @@ fun <T> CatalogScaffold(
                 if (showsQuickBar && controller.isFilterActive) QuickBarAbove(controller, topPadding) {
                     StatusPlaceholder(texts.emptyIcon, texts.emptyTitle, texts.emptyButton, { controller.refresh() })
                 } else StatusPlaceholder(texts.emptyIcon, texts.emptyTitle, texts.emptyButton, { controller.refresh() })
-            else -> PullToRefreshBox(isRefreshing = false, onRefresh = { controller.refresh() }, modifier = Modifier.fillMaxSize()) {
-                if (listBody != null) listBody(topPadding) else BoxWithConstraints(Modifier.fillMaxSize()) {
+            // The bar sits above the list, not in it: like iOS it stays put while the list scrolls
+            // and after coming back from a detail page.
+            else -> QuickBarAbove(controller, topPadding, shown = showsQuickBar) { gridTop ->
+            PullToRefreshBox(isRefreshing = false, onRefresh = { controller.refresh() }, modifier = Modifier.fillMaxSize()) {
+                if (listBody != null) listBody(gridTop) else BoxWithConstraints(Modifier.fillMaxSize()) {
                     val count = columns((maxWidth - 32.dp).value)
                     androidx.compose.runtime.key(gridKey) {
                         LazyVerticalGrid(
                             columns = GridCells.Fixed(count),
-                            contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = topPadding, bottom = bottomBarContentPadding()),
+                            contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = gridTop, bottom = bottomBarContentPadding()),
                             verticalArrangement = Arrangement.spacedBy(CatalogGridGutter),
                             horizontalArrangement = Arrangement.spacedBy(CatalogGridGutter),
                             modifier = Modifier.fillMaxSize(),
                         ) {
-                            if (showsQuickBar) item(key = "quick-bar", span = { GridItemSpan(maxLineSpan) }) {
-                                CatalogListQuickBar(controller, Modifier.bleedHorizontally(16.dp))
-                            }
                             if (controller.search.isNotEmpty()) item(span = { GridItemSpan(maxLineSpan) }) {
                                 Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
                                     SearchClearChip(controller.search, { controller.search = "" })
@@ -313,16 +313,23 @@ fun <T> CatalogScaffold(
                     }
                 }
             }
+            }
         }
     }
 }
 
-/** Quick bar over a non-list state (loading / empty), below the floating chrome. */
+/** Quick bar pinned below the floating chrome, above a list or a loading / empty state. */
 @Composable
-private fun QuickBarAbove(controller: CatalogController<*>, topPadding: Dp, content: @Composable () -> Unit) {
+private fun QuickBarAbove(controller: CatalogController<*>, topPadding: Dp, content: @Composable () -> Unit) =
+    QuickBarAbove(controller, topPadding, shown = true) { content() }
+
+/** [content] gets the top padding it still needs: none under the bar, the chrome's without it. */
+@Composable
+private fun QuickBarAbove(controller: CatalogController<*>, topPadding: Dp, shown: Boolean, content: @Composable (topPadding: Dp) -> Unit) {
+    if (!shown) return content(topPadding)
     Column(Modifier.fillMaxSize().padding(top = topPadding)) {
         CatalogListQuickBar(controller, Modifier.padding(bottom = de.letzgo.stashy.ui.tools.ToolsTokens.menuBottomPadding))
-        Box(Modifier.fillMaxWidth().weight(1f)) { content() }
+        Box(Modifier.fillMaxWidth().weight(1f)) { content(0.dp) }
     }
 }
 
