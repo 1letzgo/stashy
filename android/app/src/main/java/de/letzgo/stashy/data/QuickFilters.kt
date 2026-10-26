@@ -104,7 +104,7 @@ object QuickFilterCatalog {
     fun sections(mode: FilterMode): List<QuickFilterSection> {
         val tags = QuickFilterSection.Entities("tags", "Tags")
         val all: List<QuickFilterSection> = when (mode) {
-            FilterMode.Scenes -> listOf(tags, rating, sceneDuration, resolution, organized, watched, oCount)
+            FilterMode.Scenes -> listOf(tags, rating, sceneDuration, resolution, orientation, organized, watched, oCount)
             FilterMode.Performers -> listOf(gender, favorite("filter_favorites"), rating, age, oCount, tags)
             FilterMode.Studios -> listOf(favorite("favorite"), rating, tags)
             FilterMode.Tags -> listOf(favorite("favorite"), hasScenes)
@@ -209,6 +209,15 @@ object QuickFilterCatalog {
             QuickFilterChoice("unwatched", "Unwatched", "Unwatched", obj("modifier" to "EQUALS", "value" to 0)),
             QuickFilterChoice("watched", "Watched", "Watched", obj("modifier" to "GREATER_THAN", "value" to 0)),
         ),
+    )
+
+    private val orientation = QuickFilterSection.Choices(
+        "orientation", "Orientation", "Any",
+        OrientationOption.entries.map { o ->
+            QuickFilterChoice(o.raw, o.label, o.label, kotlinx.serialization.json.buildJsonObject {
+                put("value", JsonArray(listOf(JsonPrimitive(o.raw))))
+            })
+        },
     )
 
     private val oCount = QuickFilterSection.Choices(

@@ -130,7 +130,7 @@ enum QuickFilterCatalog {
         let all: [QuickFilterSection]
         switch mode {
         case .scenes:
-            all = [.entities(key: "tags", title: "Tags"), rating, sceneDuration, resolution, organized, watched, oCount]
+            all = [.entities(key: "tags", title: "Tags"), rating, sceneDuration, resolution, orientation, organized, watched, oCount]
         case .performers:
             all = [gender, favorite(key: "filter_favorites"), rating, age, oCount, .entities(key: "tags", title: "Tags")]
         case .studios:
@@ -208,6 +208,14 @@ enum QuickFilterCatalog {
             .init(id: "4k", label: "4K+", activeLabel: "4K+",
                   value: ["modifier": "GREATER_THAN", "value": StashResolutionOption.quadHD.rawValue]),
         ]
+    )
+
+    private static let orientation = QuickFilterSection.choices(
+        key: "orientation", title: "Orientation", anyLabel: "Any",
+        choices: StashOrientationOption.allCases.map { option in
+            QuickFilterChoice(id: option.rawValue, label: option.label, activeLabel: option.label,
+                              value: ["value": [option.rawValue]])
+        }
     )
 
     private static let organized = QuickFilterSection.choices(
@@ -580,7 +588,7 @@ struct QuickFiltersCard: View {
         let selected = choices.first { QuickFilterCatalog.canonical($0.value) == current }
         return VStack(alignment: .leading, spacing: 10) {
             QuickFilterSectionTitle(title)
-            FlowLayout(spacing: 8) {
+            QuickChipRow {
                 CatalogFilterChip(title: anyLabel, isActive: current == nil) {
                     guard current != nil else { return }
                     // Same tap feedback as the tag chips above.
@@ -601,6 +609,20 @@ struct QuickFiltersCard: View {
                 }
             }
         }
+    }
+}
+
+/// One horizontally scrolling row of chips (never wrapping onto more lines). It runs edge to
+/// edge of the sheet, past the body's 16 pt side padding, and starts aligned with the titles.
+private struct QuickChipRow<Content: View>: View {
+    @ViewBuilder var content: Content
+
+    var body: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 8) { content }
+                .padding(.horizontal, 16)
+        }
+        .padding(.horizontal, -16)
     }
 }
 
@@ -694,7 +716,7 @@ private struct QuickEntityFilterSection: View {
             .frame(height: 40)
             .background(Color.secondaryAppBackground)
             .clipShape(RoundedRectangle(cornerRadius: 10))
-            FlowLayout(spacing: 8) {
+            QuickChipRow {
                 ForEach(visibleOptions, id: \.id) { option in
                     CatalogFilterChip(
                         title: (key == "tags" ? "#" : "") + option.name,

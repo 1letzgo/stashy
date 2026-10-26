@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -288,7 +289,7 @@ private fun ChoiceSection(document: CriteriaDocument, section: QuickFilterSectio
     val selected = QuickFilterCatalog.matchingChoice(section.key, current, document.mode)
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
         SectionTitle(section.title)
-        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        QuickChipRow {
             CatalogFilterChip(section.anyLabel, current == null) {
                 if (current != null) { document.removeCriterion(section.key); onChange() }
             }
@@ -361,7 +362,7 @@ private fun QuickEntityFilterSection(document: CriteriaDocument, key: String, ti
             query, { query = it; FilterPickerOptionsStore.search(kind, it) }, "Search ${title.lowercase()}",
             loading = FilterPickerOptionsStore.isSearching(kind),
         )
-        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        QuickChipRow {
             visible.forEach { option ->
                 CatalogFilterChip(prefix + option.name, option.id in selectedIds) { toggle(option.id) }
             }
@@ -378,3 +379,21 @@ private fun QuickEntityFilterSection(document: CriteriaDocument, key: String, ti
 }
 
 private const val VISIBLE_ENTITY_COUNT = 12
+
+/**
+ * iOS `QuickChipRow`: one horizontally scrolling row of chips, never wrapping. It reaches past
+ * the sheet body's 16 dp side padding so chips scroll edge to edge, starting aligned with the titles.
+ */
+@Composable
+private fun QuickChipRow(content: @Composable RowScope.() -> Unit) {
+    Row(
+        Modifier.layout { measurable, constraints ->
+            val bleed = 16.dp.roundToPx()
+            val placeable = measurable.measure(constraints.copy(maxWidth = constraints.maxWidth + bleed * 2, minWidth = 0))
+            layout(constraints.maxWidth, placeable.height) { placeable.place(-bleed, 0) }
+        }.horizontalScroll(rememberScrollState()).padding(horizontal = 16.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        content = content,
+    )
+}
