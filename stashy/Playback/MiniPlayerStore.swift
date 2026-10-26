@@ -610,7 +610,7 @@ struct WatchlistToolsView: View {
                                     .foregroundStyle(Color.white)
                                     .frame(maxWidth: .infinity)
                                     .frame(height: StashyExpandingDock.activeHeight)
-                                    .background(Capsule(style: .continuous).fill(appearance.tintColor))
+                                    .stashyChromeFill(shape: Capsule(style: .continuous), activeColor: appearance.tintColor)
                             }
                             .buttonStyle(.plain)
                             Button(role: .destructive) { confirmReset = true } label: {
@@ -619,7 +619,7 @@ struct WatchlistToolsView: View {
                                     .foregroundStyle(Color.red)
                                     .padding(.horizontal, 18)
                                     .frame(height: StashyExpandingDock.activeHeight)
-                                    .background(Capsule(style: .continuous).fill(Color.secondaryAppBackground))
+                                    .stashyChromeFill(shape: Capsule(style: .continuous), activeColor: nil)
                             }
                             .buttonStyle(.plain)
                             Button {
@@ -630,7 +630,10 @@ struct WatchlistToolsView: View {
                                     .foregroundStyle(sortMode.isEditing ? Color.white : Color.primary.opacity(0.85))
                                     .padding(.horizontal, 18)
                                     .frame(height: StashyExpandingDock.activeHeight)
-                                    .background(Capsule(style: .continuous).fill(sortMode.isEditing ? appearance.tintColor : Color.secondaryAppBackground))
+                                    .stashyChromeFill(
+                                        shape: Capsule(style: .continuous),
+                                        activeColor: sortMode.isEditing ? appearance.tintColor : nil
+                                    )
                             }
                             .buttonStyle(.plain)
                         }
@@ -924,13 +927,6 @@ struct NowPlayingView: View {
 private struct NowPlayingContent: View {
     let scene: Scene
 
-    #if os(macOS)
-    private static let leadingPlacement = ToolbarItemPlacement.cancellationAction
-    private static let trailingPlacement = ToolbarItemPlacement.primaryAction
-    #else
-    private static let leadingPlacement = ToolbarItemPlacement.topBarLeading
-    private static let trailingPlacement = ToolbarItemPlacement.topBarTrailing
-    #endif
 
     init(scene: Scene) {
         self.scene = scene
@@ -1057,17 +1053,13 @@ private struct NowPlayingContent: View {
         .frame(width: proxy.size.width)
         }
         .background(Color.appBackground.ignoresSafeArea())
-        .navigationBarTitleDisplayMode(.inline)
-        .toolbar {
-            ToolbarItem(placement: Self.leadingPlacement) {
-                Button { dismiss() } label: {
-                    Image(systemName: "chevron.down")
-                }
-                .accessibilityLabel("Minimize")
-            }
-            ToolbarItem(placement: Self.trailingPlacement) {
-                Button("Details") { player.openSceneDetails() }
-            }
+        // Standard chrome: Minimize on top like Back, Details in the floating bar.
+        .hideSystemNavigationBarForCustomChrome()
+        .stashyCustomChromeInset(spacing: 0) {
+            StashyDetailTopBar(backTitle: "Minimize", backIcon: "chevron.down", onBack: { dismiss() })
+        }
+        .floatingActionBar {
+            CatalogSlotBar(slots: nowPlayingSlots)
         }
         }
         .alert("Reset watchlist?", isPresented: $confirmReset) {
@@ -1077,6 +1069,16 @@ private struct NowPlayingContent: View {
             Text("All scenes are removed from the watchlist and playback stops.")
         }
         .onAppear { loadDetailsIfNeeded() }
+    }
+
+    private var nowPlayingSlots: CatalogSlotSet {
+        var slots = CatalogSlotSet(visibility: CatalogFloatingChromeState(
+            hasActiveServerConfig: true, primaryListIsEmpty: false, errorMessage: nil, imageFindListError: nil
+        ))
+        slots.entityActions = [CatalogChromeSlot(systemImage: "info.circle", accessibilityLabel: "Details") {
+            player.openSceneDetails()
+        }]
+        return slots
     }
 
     /// List and watchlist snapshots often lack markers / captions: fetch the full scene once.

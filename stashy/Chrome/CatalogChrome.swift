@@ -73,9 +73,6 @@ struct CatalogChromeConfig {
     var ownsNavigationBar: Bool = true
     var visibility: CatalogFloatingChromeState
     var isPresented: Bool = true
-    /// Home sub-tab root: no floating bar; the slots go up into the Home chrome as a pill
-    /// pinned at the right (`SectionChromeActionsKey`).
-    var hostsInSectionChrome: Bool = false
     var columns: CatalogChromeSlot? = nil              // slot 1
     var quickFilter: CatalogQuickFilterMenuModel? = nil // slot 2
     /// Optional: catalog lists open the sheet from their quick bar instead (`CatalogListQuickBar`).
@@ -84,6 +81,8 @@ struct CatalogChromeConfig {
     /// Optional slot 5 for screens that legitimately carry two contextual actions
     /// (Images: select mode plus the gallery download control).
     var secondaryContextual: CatalogChromeSlot? = nil
+    /// The page's own actions (an opened gallery's Edit), drawn first in the floating bar.
+    var entityActions: [CatalogChromeSlot] = []
     var selection: CatalogSelectionChrome? = nil
     var search: CatalogSearchChrome? = nil
 
@@ -96,7 +95,8 @@ struct CatalogChromeConfig {
             quickFilter: quickFilter,
             filterSort: filterSort,
             contextual: contextual,
-            secondaryContextual: secondaryContextual
+            secondaryContextual: secondaryContextual,
+            entityActions: entityActions
         )
     }
 }
@@ -112,83 +112,6 @@ extension View {
         @ViewBuilder _ overlay: @escaping () -> V
     ) -> some View {
         self.overlay(alignment: alignment) { overlay() }
-    }
-}
-
-// MARK: - Section chrome actions (Home)
-
-/// The slots a Home sub-tab root hands up to the Home chrome. Equality only looks at what is
-/// drawn plus which view instance sent it, so a re-render with fresh closures does not churn the
-/// preference, but a remounted list (sub-tab switch) never keeps the previous list's closures.
-struct SectionChromeActions: Equatable {
-    var slots: CatalogSlotSet
-    var selection: CatalogSelectionChrome?
-    /// Identity of the sending view instance: equal drawings from different lists still differ.
-    var owner = UUID()
-
-    private var signature: String {
-        let drawn = [slots.contextual, slots.secondaryContextual, slots.filterSort].map { slot in
-            slot.map { "\($0.systemImage)|\($0.isActive)|\($0.accessibilityLabel)" } ?? "-"
-        }
-        let sel = selection.map { "\($0.isActive)|\($0.count)" } ?? "-"
-        return owner.uuidString + ";" + drawn.joined(separator: ";") + ";" + sel
-    }
-
-    static func == (lhs: SectionChromeActions, rhs: SectionChromeActions) -> Bool {
-        lhs.signature == rhs.signature
-    }
-}
-
-struct SectionChromeActionsKey: PreferenceKey {
-    static var defaultValue: SectionChromeActions? { nil }
-    static func reduce(value: inout SectionChromeActions?, nextValue: () -> SectionChromeActions?) {
-        if let next = nextValue() { value = next }
-    }
-}
-
-/// The view's actions pinned at the right of the Home chrome: one round glass button each,
-/// same as the Feeds settings button (`StashyChromePillStyle(iconOnly:)`).
-struct SectionChromeActionsPill: View {
-    let actions: SectionChromeActions
-
-    var body: some View {
-        HStack(spacing: StashyExpandingDock.itemSpacing) {
-            if let selection = actions.selection, selection.isActive {
-                circleButton("checkmark.circle.fill", label: "Done selecting", action: selection.onDone)
-            } else {
-                if let contextual = actions.slots.contextual {
-                    circleButton(contextual)
-                }
-                if let secondary = actions.slots.secondaryContextual {
-                    circleButton(secondary)
-                }
-                if let filterSort = actions.slots.filterSort {
-                    circleButton(filterSort)
-                }
-            }
-        }
-    }
-
-    private func circleButton(_ slot: CatalogChromeSlot) -> some View {
-        circleButton(slot.systemImage, isActive: slot.isActive, label: slot.accessibilityLabel,
-                     hint: slot.accessibilityHint, action: slot.action)
-    }
-
-    private func circleButton(
-        _ systemImage: String,
-        isActive: Bool = false,
-        label: String,
-        hint: String? = nil,
-        action: @escaping () -> Void
-    ) -> some View {
-        Button(action: action) {
-            SectionChromeCircleGlyph(systemImage: systemImage, isActive: isActive)
-                .frame(width: StashyExpandingDock.iconSize, height: StashyExpandingDock.iconSize)
-                .modifier(StashyChromePillStyle(iconOnly: true))
-        }
-        .buttonStyle(.plain)
-        .accessibilityLabel(label)
-        .accessibilityHint(hint ?? "")
     }
 }
 
@@ -356,25 +279,18 @@ struct CatalogSlotBar: View {
 /// action bar with the slots in fixed order.
 struct CatalogChromeModifier: ViewModifier {
     let config: CatalogChromeConfig
-    /// Stable for this view's lifetime, new on remount (see `SectionChromeActions.owner`).
-    @State private var sectionActionsOwner = UUID()
 
     func body(content: Content) -> some View {
         // Same structure either way (see `floatingActionBar`): only the flags differ.
         titledContent(content)
             .floatingActionBar(
-                isPresented: config.isPresented && !config.hostsInSectionChrome,
+                // Never an empty capsule: a list without slots (or selection) has no bar.
+                isPresented: config.isPresented
+                    && (config.slotSet.hasAnySlot || config.selection?.isActive == true),
                 catalogChrome: config.visibility
             ) {
                 CatalogSlotBar(slots: config.slotSet, selection: config.selection)
             }
-            .preference(key: SectionChromeActionsKey.self, value: sectionActions)
-    }
-
-    private var sectionActions: SectionChromeActions? {
-        guard config.hostsInSectionChrome,
-              config.visibility.floatingBarVisible(isPresented: config.isPresented) else { return nil }
-        return SectionChromeActions(slots: config.slotSet, selection: config.selection, owner: sectionActionsOwner)
     }
 
     @ViewBuilder

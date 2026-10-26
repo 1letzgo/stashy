@@ -9,8 +9,6 @@
 import SwiftUI
 
 private struct TagsViewContent: View {
-    /// Home sub-tab root: actions go into the Home chrome instead of a floating bar.
-    var hostsInSectionChrome = false
     @ObservedObject var viewModel: StashDBViewModel
     @ObservedObject var appearanceManager = AppearanceManager.shared
     @ObservedObject var configManager = ServerConfigManager.shared
@@ -491,7 +489,6 @@ private struct TagsViewContent: View {
                 errorMessage: viewModel.errorMessage
             ),
             isPresented: true,
-            hostsInSectionChrome: hostsInSectionChrome,
             search: CatalogSearchChrome(
                 text: $searchText,
                 isVisible: $isSearchVisible,
@@ -703,7 +700,6 @@ struct TagsView: View {
 
     var body: some View {
         var content = TagsViewContent(viewModel: catalogBrowserViewModel ?? ownedViewModel, hideTitle: hideTitle, filterMemory: filterMemory)
-        content.hostsInSectionChrome = catalogBrowserViewModel != nil
         return content
     }
 }
@@ -802,8 +798,6 @@ struct TagDetailView: View {
     /// Images 1/row autoplay: parent ScrollView drag/decelerate.
     @State private var imagesFeedScrolling = false
 
-    private var chromePillHeight: CGFloat { StashyExpandingDock.activeHeight }
-    private var navActionGroupSpacing: CGFloat { 7 }
     private var showsFeedsNavButton: Bool {
         tabManager.tabs.first(where: { $0.id == .reels })?.isVisible ?? true
     }
@@ -906,10 +900,6 @@ struct TagDetailView: View {
         return tabs
     }
 
-    private var showTabSwitcher: Bool {
-        availableTabs.count > 1
-    }
-
     private var catalogFloatingChromeForFooter: CatalogFloatingChromeState {
         let primaryEmpty: Bool = {
             switch selectedDetailTab {
@@ -977,66 +967,14 @@ struct TagDetailView: View {
     /// Custom top chrome (Performer/Studio template): Back · section icons · Favorite · Edit.
     @ViewBuilder
     private var tagDetailNavBar: some View {
-        StashySectionChromeBar {
-            HStack(spacing: 8) {
-                Button {
-                    dismiss()
-                } label: {
-                    HStack(spacing: StashyExpandingDock.iconLabelSpacing) {
-                        Image(systemName: "chevron.left")
-                            .font(.system(size: StashyExpandingDock.iconSize, weight: .semibold))
-                        Text("Back")
-                            .font(.subheadline.weight(.semibold))
-                    }
-                    .foregroundColor(.white)
-                    .modifier(StashyChromePillStyle(height: chromePillHeight, accent: true))
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel("Back")
-
-                Spacer(minLength: 8)
-
-                if showTabSwitcher {
-                    HStack(spacing: 6) {
-                        ForEach(availableTabs, id: \.self) { tab in
-                            let isSelected = selectedDetailTab == tab
-                            Button {
-                                guard !isSelected else { return }
-                                HapticManager.light()
-                                withAnimation(StashyExpandingDock.selectionAnimation) {
-                                    selectedDetailTab = tab
-                                }
-                            } label: {
-                                Image(systemName: tab.icon)
-                                    .font(.system(size: StashyExpandingDock.iconSize, weight: .semibold))
-                                    .foregroundColor(
-                                        isSelected
-                                            ? .white
-                                            : .white.opacity(StashyExpandingDock.inactiveIconOpacity)
-                                    )
-                                    .frame(
-                                        width: StashyExpandingDock.circleSize,
-                                        height: StashyExpandingDock.circleSize
-                                    )
-                                    .stashyChromeFill(
-                                        shape: Capsule(style: .continuous),
-                                        activeColor: isSelected ? appearanceManager.tintColor : nil
-                                    )
-                                    .contentShape(Capsule(style: .continuous))
-                            }
-                            .buttonStyle(.plain)
-                            .accessibilityLabel(tab.rawValue)
-                            .accessibilityAddTraits(isSelected ? .isSelected : [])
-                        }
-                    }
-                }
-
-            }
-            .frame(minHeight: chromePillHeight)
-            .padding(.horizontal, StashyExpandingDock.edgePadding)
-            .padding(.vertical, 8)
-
-        }
+        StashyDetailTopBar(
+            onBack: { dismiss() },
+            tabs: availableTabs,
+            selection: selectedDetailTab,
+            icon: { $0.icon },
+            label: { $0.rawValue },
+            onSelect: { selectedDetailTab = $0 }
+        )
     }
 
     private func toggleFavorite() {
@@ -1305,7 +1243,15 @@ struct TagDetailView: View {
         slots.entityActions = entityActionSlots
         switch selectedDetailTab {
         case .scenes:
-            // Filter & sort opens from the scene list's own quick bar.
+            // Filter & sort also in the bar (far right), like every other tab.
+            slots.filterSort = CatalogChromeSlot(
+                systemImage: "slider.horizontal.3",
+                isActive: tagSceneFilterActive,
+                accessibilityLabel: "Filter and sort"
+            ) {
+                HapticManager.light()
+                tagLiveFilterSheetPresented = true
+            }
             slots.contextual = SceneBulkDownloadChrome.slot {
                 showingSceneDownloadOptions = true
             }
@@ -1380,7 +1326,7 @@ struct TagDetailView: View {
     }
 
     private var tagDetailChromeConfig: StashyDetailChromeConfig {
-        StashyDetailChromeConfig(listSlots: tagDetailListSlots, insetSpacing: DesignTokens.Chrome.contentTopGap)
+        StashyDetailChromeConfig(listSlots: tagDetailListSlots, insetSpacing: 0)
     }
 
     @ViewBuilder

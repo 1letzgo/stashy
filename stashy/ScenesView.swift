@@ -351,8 +351,6 @@ final class ScenesListFilterMemory: ObservableObject {
 }
 
 private struct ScenesViewContent: View {
-    /// Home sub-tab root: actions go into the Home chrome instead of a floating bar.
-    var hostsInSectionChrome = false
     @ObservedObject var appearanceManager = AppearanceManager.shared
     @ObservedObject var configManager = ServerConfigManager.shared
     @EnvironmentObject var coordinator: NavigationCoordinator
@@ -1172,7 +1170,6 @@ private struct ScenesViewContent: View {
                 errorMessage: viewModel.errorMessage
             ),
             isPresented: showsFloatingFilterButton,
-            hostsInSectionChrome: hostsInSectionChrome,
             // Embedded in a detail screen the parent owns the nav bar, so no search field here.
             search: hideTitle ? nil : CatalogSearchChrome(
                 text: $searchText,
@@ -1606,7 +1603,6 @@ struct ScenesView: View {
             showsFloatingFilterButton: true,
             filterMemory: filterMemory
         )
-        content.hostsInSectionChrome = true
         return content
     }
 }

@@ -9,8 +9,6 @@
 import SwiftUI
 
 private struct GalleriesViewContent: View {
-    /// Home sub-tab root: actions go into the Home chrome instead of a floating bar.
-    var hostsInSectionChrome = false
     @ObservedObject var viewModel: StashDBViewModel
     @ObservedObject var configManager = ServerConfigManager.shared
     @EnvironmentObject var coordinator: NavigationCoordinator
@@ -585,7 +583,6 @@ private struct GalleriesViewContent: View {
             ownsNavigationBar: !hideTitle,
             visibility: galleriesFloatingBarChrome,
             isPresented: true,
-            hostsInSectionChrome: hostsInSectionChrome,
             // Embedded in a detail screen the parent owns the nav bar, so no search field here.
             search: hideTitle ? nil : CatalogSearchChrome(
                 text: $searchText,
@@ -809,7 +806,6 @@ struct GalleriesView: View {
                 hideTitle: hideTitle,
                 filterMemory: filterMemory
             )
-        content.hostsInSectionChrome = catalogBrowserViewModel != nil
         return content
     }
 }

@@ -18,7 +18,6 @@ struct CatalogsView: View {
     /// switch remounting the list (and, for Images, pushing FullScreenImageView).
     @StateObject private var rootFilters = CatalogRootFilterMemories()
     /// Settings / select actions of the active sub-tab, shown pinned right in the Home chrome.
-    @State private var sectionActions: SectionChromeActions?
     
     enum CatalogsTab: String, CaseIterable {
         case dashboard = "Dashboard"
@@ -164,9 +163,8 @@ struct CatalogsView: View {
         .animation(nil, value: coordinator.catalogueSubTab)
         // Swipe-back can desync UIKit/SwiftUI stacks; menu switches must always clear details.
         .popNavigationToRootOnChange("\(coordinator.catalogueSubTab)|\(coordinator.cataloguePopToken.uuidString)")
-        .onPreferenceChange(SectionChromeActionsKey.self) { sectionActions = $0 }
-        .stashySectionChrome(showsSwitcher: showTabSwitcher || sectionActions != nil) {
-            CatalogCategoryRow(tabs: sortedVisibleTabs, selection: selectedTabBinding, actions: sectionActions)
+        .stashySectionChrome(showsSwitcher: showTabSwitcher) {
+            CatalogCategoryRow(tabs: sortedVisibleTabs, selection: selectedTabBinding)
         }
     }
 }
@@ -262,14 +260,11 @@ struct GroupsView: View {
 
     var body: some View {
         var content = GroupsViewContent(viewModel: catalogBrowserViewModel ?? ownedViewModel, hideTitle: hideTitle, filterMemory: filterMemory)
-        content.hostsInSectionChrome = catalogBrowserViewModel != nil
         return content
     }
 }
 
 private struct GroupsViewContent: View {
-    /// Home sub-tab root: actions go into the Home chrome instead of a floating bar.
-    var hostsInSectionChrome = false
     @ObservedObject var viewModel: StashDBViewModel
     @ObservedObject var appearanceManager = AppearanceManager.shared
     @ObservedObject var configManager = ServerConfigManager.shared
@@ -445,7 +440,6 @@ private struct GroupsViewContent: View {
                 errorMessage: viewModel.errorMessage
             ),
             isPresented: true,
-            hostsInSectionChrome: hostsInSectionChrome,
             search: CatalogSearchChrome(
                 text: $searchText,
                 isVisible: $isSearchVisible,
@@ -808,8 +802,6 @@ struct GroupDetailView: View {
     @StateObject private var scenesFilterMemory = ScenesListFilterMemory()
     @StateObject private var linkedImages: DetailLinkedImagesFilterModel
 
-    private var chromePillHeight: CGFloat { StashyExpandingDock.activeHeight }
-    private var navActionGroupSpacing: CGFloat { 7 }
     
     enum DetailTab: String, CaseIterable {
         case scenes = "Scenes"
@@ -917,89 +909,14 @@ struct GroupDetailView: View {
     /// Groups have no favorite field in the Stash API.
     @ViewBuilder
     private var groupDetailNavBar: some View {
-        StashySectionChromeBar {
-            HStack(spacing: 8) {
-                Button {
-                    dismiss()
-                } label: {
-                    HStack(spacing: StashyExpandingDock.iconLabelSpacing) {
-                        Image(systemName: "chevron.left")
-                            .font(.system(size: StashyExpandingDock.iconSize, weight: .semibold))
-                        Text("Back")
-                            .font(.subheadline.weight(.semibold))
-                    }
-                    .foregroundColor(.white)
-                    .modifier(StashyChromePillStyle(height: chromePillHeight, accent: true))
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel("Back")
-
-                Spacer(minLength: 8)
-
-                if showTabSwitcher {
-                    HStack(spacing: 6) {
-                        ForEach(availableTabs, id: \.self) { tab in
-                            let isSelected = selectedDetailTab == tab
-                            Button {
-                                guard !isSelected else { return }
-                                HapticManager.light()
-                                withAnimation(StashyExpandingDock.selectionAnimation) {
-                                    selectedDetailTab = tab
-                                }
-                            } label: {
-                                Image(systemName: tab.icon)
-                                    .font(.system(size: StashyExpandingDock.iconSize, weight: .semibold))
-                                    .foregroundColor(
-                                        isSelected
-                                            ? .white
-                                            : .white.opacity(StashyExpandingDock.inactiveIconOpacity)
-                                    )
-                                    .frame(
-                                        width: StashyExpandingDock.circleSize,
-                                        height: StashyExpandingDock.circleSize
-                                    )
-                                    .stashyChromeFill(
-                                        shape: Capsule(style: .continuous),
-                                        activeColor: isSelected ? appearanceManager.tintColor : nil
-                                    )
-                                    .contentShape(Capsule(style: .continuous))
-                            }
-                            .buttonStyle(.plain)
-                            .accessibilityLabel(tab.rawValue)
-                            .accessibilityAddTraits(isSelected ? .isSelected : [])
-                        }
-                    }
-                }
-
-                if appearanceManager.isEditModeEnabled {
-                    if showTabSwitcher {
-                        Spacer()
-                            .frame(width: navActionGroupSpacing)
-                    }
-
-                    Button {
-                        HapticManager.light()
-                        showingEditGroupSheet = true
-                    } label: {
-                        Image(systemName: "pencil")
-                            .font(.system(size: StashyExpandingDock.iconSize, weight: .semibold))
-                            .foregroundColor(.white.opacity(StashyExpandingDock.inactiveIconOpacity))
-                            .frame(
-                                width: StashyExpandingDock.circleSize,
-                                height: StashyExpandingDock.circleSize
-                            )
-                            .stashyGlass(shape: Capsule(style: .continuous))
-                            .contentShape(Capsule(style: .continuous))
-                    }
-                    .buttonStyle(.plain)
-                    .accessibilityLabel("Edit group")
-                }
-            }
-            .frame(minHeight: chromePillHeight)
-            .padding(.horizontal, StashyExpandingDock.edgePadding)
-            .padding(.vertical, 8)
-
-        }
+        StashyDetailTopBar(
+            onBack: { dismiss() },
+            tabs: availableTabs,
+            selection: selectedDetailTab,
+            icon: { $0.icon },
+            label: { $0.rawValue },
+            onSelect: { selectedDetailTab = $0 }
+        )
     }
 
     @ViewBuilder
@@ -1188,9 +1105,24 @@ struct GroupDetailView: View {
     /// Per-tab slots for the embedded list, mirroring the previous floating action bar content.
     private var groupDetailListSlots: CatalogSlotSet {
         var slots = CatalogSlotSet(visibility: groupDetailCatalogFloatingChromeForFooter)
+        // Edit sits in the floating bar like on performer / studio / tag pages.
+        if appearanceManager.isEditModeEnabled {
+            slots.entityActions = [CatalogChromeSlot(systemImage: "pencil", accessibilityLabel: "Edit group") {
+                HapticManager.light()
+                showingEditGroupSheet = true
+            }]
+        }
         switch selectedDetailTab {
         case .scenes:
-            // Filter & sort opens from the scene list's own quick bar.
+            // Filter & sort also in the bar (far right), like every other tab.
+            slots.filterSort = CatalogChromeSlot(
+                systemImage: "slider.horizontal.3",
+                isActive: groupSceneFilterActive,
+                accessibilityLabel: "Filter and sort"
+            ) {
+                HapticManager.light()
+                groupLiveFilterSheetPresented = true
+            }
             slots.contextual = SceneBulkDownloadChrome.slot {
                 showingSceneDownloadOptions = true
             }
@@ -1246,7 +1178,7 @@ struct GroupDetailView: View {
     private var groupDetailChromeConfig: StashyDetailChromeConfig {
         StashyDetailChromeConfig(
             listSlots: groupDetailListSlots,
-            insetSpacing: DesignTokens.Chrome.contentTopGap
+            insetSpacing: 0
         )
     }
 

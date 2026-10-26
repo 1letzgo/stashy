@@ -55,8 +55,6 @@ enum StashyExpandingDock {
     /// Same inset before icon and after label when expanded.
     static let activeHorizontalPadding: CGFloat = 14
     static let iconLabelSpacing: CGFloat = 8
-    /// Center the strip when item count is below this (Settings has 4 sections).
-    static let centerWhenFewThreshold = 5
     static let selectionAnimation = Animation.spring(response: 0.32, dampingFraction: 0.72)
     static var inactiveIconSideInset: CGFloat { (circleSize - iconSize) / 2 }
     static let inactiveBackground = Color.white.opacity(0.14)
@@ -210,7 +208,6 @@ struct StashyExpandingDockBrowseStrip: View {
                         .id(item.id)
                     }
                 }
-                .frame(maxWidth: scrollingItems.count < StashyExpandingDock.centerWhenFewThreshold ? .infinity : nil)
                 .animation(reduceMotion ? nil : StashyExpandingDock.selectionAnimation, value: selectionID)
             }
             .scrollContentBackground(.hidden)
@@ -360,17 +357,11 @@ struct ToolsPillMenuRow: View {
                         .minimumScaleFactor(0.65)
                         .frame(maxWidth: .infinity)
                         .frame(height: StashyExpandingDock.activeHeight)
-                        .background(
-                            Capsule(style: .continuous)
-                                .fill(selected ? appearance.tintColor : Color.secondaryAppBackground)
-                                .shadow(
-                                    color: selected ? appearance.tintColor.opacity(0.35) : .clear,
-                                    radius: 6,
-                                    x: 0,
-                                    y: 3
-                                )
+                        // Same fill as the chrome pills (detail tabs, dock).
+                        .stashyChromeFill(
+                            shape: Capsule(style: .continuous),
+                            activeColor: selected ? appearance.tintColor : nil
                         )
-                        .clipShape(Capsule(style: .continuous))
                         .contentShape(Capsule(style: .continuous))
                 }
                 .buttonStyle(.plain)

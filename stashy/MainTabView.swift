@@ -1147,7 +1147,9 @@ private struct MiniPlayerAccessory: ViewModifier {
         if visible {
             MiniPlayerBar()
                 .frame(height: 56)
-                .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 16))
+                // Same glass as the floating action bar and the chrome pills.
+                .stashyGlass(shape: RoundedRectangle(cornerRadius: 16, style: .continuous))
+                .floatingShadow()
                 .padding(.horizontal, 12)
                 .padding(.bottom, bottomPadding)
                 .transition(.move(edge: .bottom).combined(with: .opacity))

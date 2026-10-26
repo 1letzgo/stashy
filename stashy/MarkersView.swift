@@ -7,8 +7,6 @@
 import SwiftUI
 
 private struct MarkersViewContent: View {
-    /// Home sub-tab root: actions go into the Home chrome instead of a floating bar.
-    var hostsInSectionChrome = false
     @ObservedObject var viewModel: StashDBViewModel
     @ObservedObject var appearanceManager = AppearanceManager.shared
     @ObservedObject var configManager = ServerConfigManager.shared
@@ -552,7 +550,6 @@ private struct MarkersViewContent: View {
                 errorMessage: viewModel.errorMessage
             ),
             isPresented: true,
-            hostsInSectionChrome: hostsInSectionChrome,
             search: CatalogSearchChrome(
                 text: $searchText,
                 isVisible: $isSearchVisible,
@@ -760,7 +757,6 @@ struct MarkersView: View {
 
     var body: some View {
         var content = MarkersViewContent(viewModel: catalogBrowserViewModel ?? ownedViewModel, hideTitle: hideTitle, filterMemory: filterMemory)
-        content.hostsInSectionChrome = catalogBrowserViewModel != nil
         return content
     }
 }

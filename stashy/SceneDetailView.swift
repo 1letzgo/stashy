@@ -44,7 +44,6 @@ struct SceneDetailView: View {
     @State private var aetherEngine: AetherSceneEngine?
     @State private var showDeleteWithFilesConfirmation = false
     @State private var isDeleting = false
-    @State private var isDownloading = false
     @State private var isIdentifying = false
     @Environment(\.stashyDismiss) var dismiss
     @Environment(\.stashyPresentedFromMiniPlayer) private var presentedFromMiniPlayer
@@ -95,88 +94,56 @@ struct SceneDetailView: View {
     @State private var isPressing = false
     @State private var hasInitializedDevices = false
 
-    private var chromePillHeight: CGFloat { StashyExpandingDock.activeHeight }
 
     @Environment(\.verticalSizeClass) var verticalSizeClass
 
-    /// Shared detail chrome: `sceneDetailNavBar` renders the actual bar content.
+    /// Shared detail chrome: Back on top; Identify, Download and Delete in the floating bar.
     private var sceneDetailChromeConfig: StashyDetailChromeConfig {
-        StashyDetailChromeConfig(insetSpacing: 0)
+        var slots = CatalogSlotSet(visibility: CatalogFloatingChromeState(
+            hasActiveServerConfig: true, primaryListIsEmpty: false, errorMessage: nil, imageFindListError: nil
+        ))
+        slots.entityActions = sceneActionSlots
+        return StashyDetailChromeConfig(listSlots: playerOnly ? nil : slots, insetSpacing: 0)
     }
 
-    /// Custom top chrome: Back · Identify (if no Stash-ID) · Download · Delete.
-    @ViewBuilder
-    private var sceneDetailNavBar: some View {
-        StashySectionChromeBar {
-            HStack(spacing: 8) {
-                Button {
-                    dismiss()
-                } label: {
-                    HStack(spacing: StashyExpandingDock.iconLabelSpacing) {
-                        // Opened from the mini player there is no page below to go back to.
-                        Image(systemName: presentedFromMiniPlayer ? "xmark" : "chevron.left")
-                            .font(.system(size: StashyExpandingDock.iconSize, weight: .semibold))
-                        Text(presentedFromMiniPlayer ? "Close" : "Back")
-                            .font(.subheadline.weight(.semibold))
-                    }
-                    .foregroundColor(.white)
-                    .modifier(StashyChromePillStyle(height: chromePillHeight, accent: true))
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel(presentedFromMiniPlayer ? "Close" : "Back")
-
-                Spacer(minLength: 8)
-
-                if !activeScene.hasStashID {
-                    sceneIdentifyNavButton
-                }
-                sceneDownloadNavButton
-                // Rarely used, so it lives up here instead of as a big card under the scene.
-                ChromeCircleButton(systemImage: "trash", accessibilityLabel: "Delete Scene") {
-                    showDeleteWithFilesConfirmation = true
-                }
-            }
-            .frame(minHeight: chromePillHeight)
-            .padding(.horizontal, StashyExpandingDock.edgePadding)
-            .padding(.vertical, 8)
-        }
-    }
-
-    @ViewBuilder
-    private var sceneIdentifyNavButton: some View {
-        if isIdentifying {
-            ZStack {
-                Circle()
-                    .stroke(Color.white.opacity(0.25), lineWidth: 2.5)
-                Circle()
-                    .trim(from: 0, to: 0.25)
-                    .stroke(appearanceManager.tintColor, style: StrokeStyle(lineWidth: 2.5, lineCap: .round))
-                    .rotationEffect(.degrees(isIdentifying ? 360 : 0))
-                    .animation(.linear(duration: 1).repeatForever(autoreverses: false), value: isIdentifying)
-            }
-            .frame(
-                width: StashyExpandingDock.circleSize,
-                height: StashyExpandingDock.circleSize
-            )
-            .accessibilityLabel("Identifying")
-        } else {
-            Button {
+    private var sceneActionSlots: [CatalogChromeSlot] {
+        var actions: [CatalogChromeSlot] = []
+        if !activeScene.hasStashID {
+            actions.append(CatalogChromeSlot(
+                systemImage: isIdentifying ? "hourglass" : "person.crop.square.filled.and.at.rectangle",
+                isActive: isIdentifying,
+                accessibilityLabel: isIdentifying ? "Identifying" : "Identify scene"
+            ) {
+                guard !isIdentifying else { return }
                 startSceneIdentify()
-            } label: {
-                Image(systemName: "person.crop.square.filled.and.at.rectangle")
-                    .font(.system(size: StashyExpandingDock.iconSize, weight: .semibold))
-                    .foregroundColor(.white.opacity(StashyExpandingDock.inactiveIconOpacity))
-                    .frame(
-                        width: StashyExpandingDock.circleSize,
-                        height: StashyExpandingDock.circleSize
-                    )
-                    .stashyGlass(shape: Capsule(style: .continuous))
-                    .contentShape(Capsule(style: .continuous))
-            }
-            .buttonStyle(.plain)
-            .accessibilityLabel("Identify scene")
+            })
         }
+        if downloadManager.isDownloaded(id: activeScene.id) {
+            actions.append(CatalogChromeSlot(systemImage: "checkmark.circle.fill", accessibilityLabel: "Downloaded", tint: .green) {})
+        } else if downloadManager.activeDownloads[activeScene.id] != nil {
+            actions.append(CatalogChromeSlot(systemImage: "arrow.down.circle.dotted", isActive: true, accessibilityLabel: "Downloading") {})
+        } else {
+            actions.append(CatalogChromeSlot(systemImage: "arrow.down.doc", accessibilityLabel: "Download scene") {
+                HapticManager.light()
+                downloadManager.downloadScene(activeScene)
+            })
+        }
+        // Rarely used, so it lives in the bar instead of as a big card under the scene.
+        actions.append(CatalogChromeSlot(systemImage: "trash", accessibilityLabel: "Delete Scene") {
+            showDeleteWithFilesConfirmation = true
+        })
+        return actions
     }
+
+    /// Back on top (Close when opened from the mini player); actions live in the floating bar.
+    private var sceneDetailNavBar: some View {
+        StashyDetailTopBar(
+            backTitle: presentedFromMiniPlayer ? "Close" : "Back",
+            backIcon: presentedFromMiniPlayer ? "xmark" : "chevron.left",
+            onBack: { dismiss() }
+        )
+    }
+
 
     private func startSceneIdentify() {
         HapticManager.light()
@@ -249,61 +216,6 @@ struct SceneDetailView: View {
         }
     }
 
-    @ViewBuilder
-    private var sceneDownloadNavButton: some View {
-        if downloadManager.isDownloaded(id: activeScene.id) {
-            Image(systemName: "checkmark.circle.fill")
-                .font(.system(size: StashyExpandingDock.iconSize, weight: .semibold))
-                .foregroundColor(.green)
-                .frame(
-                    width: StashyExpandingDock.circleSize,
-                    height: StashyExpandingDock.circleSize
-                )
-                .accessibilityLabel("Downloaded")
-        } else if let activeDownload = downloadManager.activeDownloads[activeScene.id] {
-            ZStack {
-                Circle()
-                    .stroke(Color.white.opacity(0.25), lineWidth: 2.5)
-
-                if activeDownload.totalSize > 0 {
-                    Circle()
-                        .trim(from: 0, to: activeDownload.progress)
-                        .stroke(appearanceManager.tintColor, style: StrokeStyle(lineWidth: 2.5, lineCap: .round))
-                        .rotationEffect(.degrees(-90))
-                        .animation(.linear, value: activeDownload.progress)
-                } else {
-                    Circle()
-                        .trim(from: 0, to: 0.25)
-                        .stroke(appearanceManager.tintColor, style: StrokeStyle(lineWidth: 2.5, lineCap: .round))
-                        .rotationEffect(.degrees(isDownloading ? 360 : 0))
-                        .animation(.linear(duration: 1).repeatForever(autoreverses: false), value: isDownloading)
-                        .onAppear { isDownloading = true }
-                }
-            }
-            .frame(
-                width: StashyExpandingDock.circleSize,
-                height: StashyExpandingDock.circleSize
-            )
-            .accessibilityLabel("Downloading")
-        } else {
-            Button {
-                HapticManager.light()
-                downloadManager.downloadScene(activeScene)
-            } label: {
-                Image(systemName: "arrow.down.doc")
-                    .font(.system(size: StashyExpandingDock.iconSize, weight: .semibold))
-                    .foregroundColor(.white.opacity(StashyExpandingDock.inactiveIconOpacity))
-                    .frame(
-                        width: StashyExpandingDock.circleSize,
-                        height: StashyExpandingDock.circleSize
-                    )
-                    .stashyGlass(shape: Capsule(style: .continuous))
-                    .contentShape(Capsule(style: .continuous))
-            }
-            .buttonStyle(.plain)
-            .accessibilityLabel("Save scene")
-        }
-    }
 
     // Extracted main content to use modular components
     /// Pinned while a started player sits in portrait. Landscape keeps it in the scroll

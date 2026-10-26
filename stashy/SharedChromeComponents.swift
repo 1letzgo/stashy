@@ -378,15 +378,93 @@ struct StashySectionChromeBar<Content: View>: View {
     }
 }
 
+/// The standard top chrome of a detail page: Back on the left, the section pills right-aligned
+/// (scrolling when they don't fit). Entity and list actions live in the floating bar, never here.
+struct StashyDetailTopBar<Tab: Hashable>: View {
+    var backTitle: String = "Back"
+    var backIcon: String = "chevron.left"
+    var onBack: () -> Void
+    /// Right-aligned label for pages without tabs (a download's name, "3 / 20").
+    var title: String? = nil
+    var tabs: [Tab] = []
+    var selection: Tab? = nil
+    var icon: (Tab) -> String = { _ in "circle" }
+    var label: (Tab) -> String = { _ in "" }
+    var onSelect: (Tab) -> Void = { _ in }
+
+    @ObservedObject private var appearance = AppearanceManager.shared
+
+    var body: some View {
+        StashySectionChromeBar {
+            HStack(spacing: StashyExpandingDock.itemSpacing) {
+                StashyChromeBackButton(title: backTitle, systemImage: backIcon, action: onBack)
+                Spacer(minLength: StashyExpandingDock.itemSpacing)
+                if let title, tabs.count <= 1 {
+                    Text(title)
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundColor(.white.opacity(StashyExpandingDock.inactiveIconOpacity))
+                        .lineLimit(1)
+                        .truncationMode(.middle)
+                }
+                if tabs.count > 1 {
+                    ViewThatFits(in: .horizontal) {
+                        pills
+                        ScrollView(.horizontal, showsIndicators: false) { pills }
+                            .scrollBounceBehavior(.basedOnSize, axes: .horizontal)
+                    }
+                    .layoutPriority(-1)
+                }
+            }
+            .frame(minHeight: StashyExpandingDock.activeHeight)
+            .padding(.horizontal, StashyExpandingDock.edgePadding)
+            .padding(.vertical, 8)
+        }
+    }
+
+    private var pills: some View {
+        HStack(spacing: StashyExpandingDock.itemSpacing) {
+            ForEach(tabs, id: \.self) { tab in
+                let isSelected = selection == tab
+                Button {
+                    guard !isSelected else { return }
+                    HapticManager.light()
+                    withAnimation(StashyExpandingDock.selectionAnimation) { onSelect(tab) }
+                } label: {
+                    Image(systemName: icon(tab))
+                        .font(.system(size: StashyExpandingDock.iconSize, weight: .semibold))
+                        .foregroundColor(isSelected ? .white : .white.opacity(StashyExpandingDock.inactiveIconOpacity))
+                        .frame(width: StashyExpandingDock.circleSize, height: StashyExpandingDock.circleSize)
+                        .stashyChromeFill(
+                            shape: Capsule(style: .continuous),
+                            activeColor: isSelected ? appearance.tintColor : nil
+                        )
+                        .contentShape(Capsule(style: .continuous))
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel(label(tab))
+                .accessibilityAddTraits(isSelected ? .isSelected : [])
+            }
+        }
+    }
+}
+
+extension StashyDetailTopBar where Tab == Never {
+    /// A detail page without section tabs: Back only.
+    init(backTitle: String = "Back", backIcon: String = "chevron.left", title: String? = nil, onBack: @escaping () -> Void) {
+        self.init(backTitle: backTitle, backIcon: backIcon, onBack: onBack, title: title, tabs: [])
+    }
+}
+
 /// Shared Back pill used by detail / settings chrome bars.
 struct StashyChromeBackButton: View {
     var title: String = "Back"
+    var systemImage: String = "chevron.left"
     var action: () -> Void
 
     var body: some View {
         Button(action: action) {
             HStack(spacing: StashyExpandingDock.iconLabelSpacing) {
-                Image(systemName: "chevron.left")
+                Image(systemName: systemImage)
                     .font(.system(size: StashyExpandingDock.iconSize, weight: .semibold))
                 Text(title)
                     .font(.subheadline.weight(.semibold))
@@ -547,7 +625,8 @@ struct StashyDetailChromeBar<Trailing: View>: View {
 
     var body: some View {
         StashySectionChromeBar {
-            HStack(spacing: 8) {
+            // Same layout as `StashyDetailTopBar`: Back left, the page's name right-aligned.
+            HStack(spacing: StashyExpandingDock.itemSpacing) {
                 StashyChromeBackButton {
                     if let onBack {
                         onBack()
@@ -558,9 +637,10 @@ struct StashyDetailChromeBar<Trailing: View>: View {
 
                 Text(title)
                     .font(.subheadline.weight(.semibold))
-                    .foregroundColor(.white)
+                    .foregroundColor(.white.opacity(StashyExpandingDock.inactiveIconOpacity))
                     .lineLimit(1)
-                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .truncationMode(.middle)
+                    .frame(maxWidth: .infinity, alignment: .trailing)
 
                 trailing()
             }

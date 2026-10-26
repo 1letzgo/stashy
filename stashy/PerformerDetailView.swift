@@ -79,7 +79,6 @@ struct PerformerDetailView: View {
     /// When set (e.g. Feeds Pics/Clips → `.images`), keep that tab and skip scenes/galleries auto-switch.
     private let preferredInitialTab: DetailTab?
 
-    private var chromePillHeight: CGFloat { StashyExpandingDock.activeHeight }
 
     init(performer: Performer, initialTab: DetailTab? = nil) {
         _performer = State(initialValue: performer)
@@ -139,10 +138,6 @@ struct PerformerDetailView: View {
         if effectiveImages > 0 { tabs.append(.images) }
         if effectiveScenes > 0 { tabs.append(.appearsWith) }
         return tabs
-    }
-
-    private var showTabSwitcher: Bool {
-        availableTabs.count > 1
     }
 
     private var performerDetailCatalogFloatingChromeForFooter: CatalogFloatingChromeState {
@@ -399,8 +394,6 @@ struct PerformerDetailView: View {
         selectedDetailTab == .scenes && (effectiveScenes > 0 || viewModel.isLoadingPerformerScenes)
     }
 
-    /// Extra gap between section icons ↔ favorite/edit actions.
-    private var navActionGroupSpacing: CGFloat { 7 }
 
     private func goBack() {
         navigationBackTrigger = UUID()
@@ -409,72 +402,14 @@ struct PerformerDetailView: View {
     /// Custom top chrome: Back · section icons · Favorite · Edit (edit mode). Feeds lives in the header.
     @ViewBuilder
     private var performerDetailNavBar: some View {
-        StashySectionChromeBar {
-            HStack(spacing: 8) {
-                Button {
-                    goBack()
-                } label: {
-                    HStack(spacing: StashyExpandingDock.iconLabelSpacing) {
-                        Image(systemName: "chevron.left")
-                            .font(.system(size: StashyExpandingDock.iconSize, weight: .semibold))
-                        Text("Back")
-                            .font(.subheadline.weight(.semibold))
-                    }
-                    .foregroundColor(.white)
-                    .modifier(StashyChromePillStyle(height: chromePillHeight, accent: true))
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel("Back")
-
-                Spacer(minLength: 8)
-
-                if showTabSwitcher {
-                    // Scrolls when the tabs don't fit: up to seven of them (Appears with) next to
-                    // Back, Favorite and Edit widened the whole page past the screen.
-                    ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: 6) {
-                        ForEach(availableTabs, id: \.self) { tab in
-                            let isSelected = selectedDetailTab == tab
-                            Button {
-                                guard !isSelected else { return }
-                                HapticManager.light()
-                                withAnimation(StashyExpandingDock.selectionAnimation) {
-                                    selectedDetailTab = tab
-                                }
-                            } label: {
-                                Image(systemName: tab.icon)
-                                    .font(.system(size: StashyExpandingDock.iconSize, weight: .semibold))
-                                    .foregroundColor(
-                                        isSelected
-                                            ? .white
-                                            : .white.opacity(StashyExpandingDock.inactiveIconOpacity)
-                                    )
-                                    .frame(
-                                        width: StashyExpandingDock.circleSize,
-                                        height: StashyExpandingDock.circleSize
-                                    )
-                                    .stashyChromeFill(
-                                        shape: Capsule(style: .continuous),
-                                        activeColor: isSelected ? appearanceManager.tintColor : nil
-                                    )
-                                    .contentShape(Capsule(style: .continuous))
-                            }
-                            .buttonStyle(.plain)
-                            .accessibilityLabel(tab.rawValue)
-                            .accessibilityAddTraits(isSelected ? .isSelected : [])
-                        }
-                    }
-                    }
-                    .scrollBounceBehavior(.basedOnSize, axes: .horizontal)
-                    .layoutPriority(-1)
-                }
-
-            }
-            .frame(minHeight: chromePillHeight)
-            .padding(.horizontal, StashyExpandingDock.edgePadding)
-            .padding(.vertical, 8)
-
-        }
+        StashyDetailTopBar(
+            onBack: { goBack() },
+            tabs: availableTabs,
+            selection: selectedDetailTab,
+            icon: { $0.icon },
+            label: { $0.rawValue },
+            onSelect: { selectedDetailTab = $0 }
+        )
     }
 
     private func toggleFavorite() {
@@ -616,7 +551,15 @@ struct PerformerDetailView: View {
         slots.entityActions = entityActionSlots
         switch selectedDetailTab {
         case .scenes:
-            // Filter & sort opens from the scene list's own quick bar.
+            // Filter & sort also in the bar (far right), like every other tab.
+            slots.filterSort = CatalogChromeSlot(
+                systemImage: "slider.horizontal.3",
+                isActive: performerSceneFilterActive,
+                accessibilityLabel: "Filter and sort"
+            ) {
+                HapticManager.light()
+                performerLiveFilterSheetPresented = true
+            }
             slots.contextual = SceneBulkDownloadChrome.slot {
                 showingSceneDownloadOptions = true
             }
@@ -1600,17 +1543,8 @@ struct SharedScenesView: View {
     }
 
     /// Same top chrome as the performer / studio detail screens: Back pill only.
-    @ViewBuilder
     private var navBar: some View {
-        StashySectionChromeBar {
-            HStack(spacing: 8) {
-                StashyChromeBackButton { navigationBackTrigger = UUID() }
-                Spacer(minLength: 8)
-            }
-            .frame(minHeight: StashyExpandingDock.activeHeight)
-            .padding(.horizontal, StashyExpandingDock.edgePadding)
-            .padding(.vertical, 8)
-        }
+        StashyDetailTopBar(onBack: { navigationBackTrigger = UUID() })
     }
 }
 

@@ -123,16 +123,8 @@ struct DirectorDetailView: View {
         .fixedSize(horizontal: false, vertical: true)
     }
 
-    @ViewBuilder
     private var navBar: some View {
-        StashySectionChromeBar {
-            HStack(spacing: 8) {
-                StashyChromeBackButton { dismiss() }
-                Spacer(minLength: 8)
-            }
-            .padding(.horizontal, 12)
-            .padding(.vertical, 6)
-        }
+        StashyDetailTopBar(onBack: { dismiss() })
     }
 }
 #endif

@@ -51,15 +51,12 @@ struct ImagesView: View {
             imageListFilters: sharedImageListFilters ?? ownedImageListFilters,
             initialSearch: initialSearch
         )
-        content.hostsInSectionChrome = catalogBrowserViewModel != nil && initialGallery == nil && !feedsEmbedded
         return content
     }
 }
 
 private struct ImagesViewBody: View {
     @State private var gallery: Gallery?
-    /// Home sub-tab root: actions go into the Home chrome instead of a floating bar.
-    var hostsInSectionChrome = false
     var forceOneColumnFeed: Bool = false
     var feedsEmbedded: Bool = false
     @ObservedObject var viewModel: StashDBViewModel
@@ -90,7 +87,6 @@ private struct ImagesViewBody: View {
     /// Only this image id may autoplay (most centered video in the viewport).
     @State private var autoplayVideoImageId: String?
 
-    private var chromePillHeight: CGFloat { StashyExpandingDock.activeHeight }
     /// User preference from Filter & Sort (1/row muted autoplay).
     @AppStorage("images_feed_video_autoplay") private var imagesFeedVideoAutoplay = true
     /// 1/row + setting on + feed idle — individual cards still need matching `autoplayVideoImageId`.
@@ -624,54 +620,12 @@ private struct ImagesViewBody: View {
     /// Shared detail chrome for an opened gallery. The list slots stay with
     /// `stashyCatalogChrome`, so this config carries no `listSlots`.
     private var openedGalleryChromeConfig: StashyDetailChromeConfig {
-        StashyDetailChromeConfig(listSlots: nil, insetSpacing: DesignTokens.Chrome.contentTopGap)
+        StashyDetailChromeConfig(listSlots: nil, insetSpacing: 0)
     }
 
-    /// Custom top chrome for opened galleries: Back · Edit (title lives in the header card).
-    @ViewBuilder
+    /// Opened gallery: Back only; Edit sits in the floating bar (`imagesChromeConfig`).
     private var openedGalleryNavBar: some View {
-        StashySectionChromeBar {
-            HStack(spacing: 8) {
-                Button {
-                    dismiss()
-                } label: {
-                    HStack(spacing: StashyExpandingDock.iconLabelSpacing) {
-                        Image(systemName: "chevron.left")
-                            .font(.system(size: StashyExpandingDock.iconSize, weight: .semibold))
-                        Text("Back")
-                            .font(.subheadline.weight(.semibold))
-                    }
-                    .foregroundColor(.white)
-                    .modifier(StashyChromePillStyle(height: chromePillHeight, accent: true))
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel("Back")
-
-                Spacer(minLength: 8)
-
-                if appearanceManager.isEditModeEnabled {
-                    Button {
-                        HapticManager.light()
-                        showingEditGallerySheet = true
-                    } label: {
-                        Image(systemName: "pencil")
-                            .font(.system(size: StashyExpandingDock.iconSize, weight: .semibold))
-                            .foregroundColor(.white.opacity(StashyExpandingDock.inactiveIconOpacity))
-                            .frame(
-                                width: StashyExpandingDock.circleSize,
-                                height: StashyExpandingDock.circleSize
-                            )
-                            .stashyGlass(shape: Capsule(style: .continuous))
-                            .contentShape(Capsule(style: .continuous))
-                    }
-                    .buttonStyle(.plain)
-                    .accessibilityLabel("Edit gallery")
-                }
-            }
-            .frame(minHeight: chromePillHeight)
-            .padding(.horizontal, StashyExpandingDock.edgePadding)
-            .padding(.vertical, 8)
-        }
+        StashyDetailTopBar(onBack: { dismiss() })
     }
 
     /// Opened-gallery top block, laid out like scene detail: one header card (cover hero
@@ -860,7 +814,6 @@ private struct ImagesViewBody: View {
                 imageFindListError: viewModel.imageFindListError
             ),
             isPresented: !feedsEmbedded,
-            hostsInSectionChrome: hostsInSectionChrome && !isOpenedGallery,
             filterSort: showsQuickBar ? nil : CatalogChromeSlot(
                 systemImage: "slider.horizontal.3",
                 isActive: catalogFilterSortFABActive,
@@ -875,6 +828,12 @@ private struct ImagesViewBody: View {
                 }
             ),
             secondaryContextual: gallery.map { galleryDownloadSlot($0) },
+            entityActions: isOpenedGallery && appearanceManager.isEditModeEnabled
+                ? [CatalogChromeSlot(systemImage: "pencil", accessibilityLabel: "Edit gallery") {
+                    HapticManager.light()
+                    showingEditGallerySheet = true
+                }]
+                : [],
             selection: CatalogSelectionChrome(
                 isActive: isSelectionMode,
                 count: selectedImageIds.count,
