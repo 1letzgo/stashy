@@ -71,6 +71,7 @@ import de.letzgo.stashy.ui.detail.PerformerDetailScreen
 import de.letzgo.stashy.ui.scene.SceneDetailScreen
 import de.letzgo.stashy.ui.stashyGlass
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 
 /**
@@ -106,6 +107,8 @@ fun FeedsScreen() {
     LaunchedEffect(muted) { pool.updateMuted(muted) }
 
     var isUIVisible by remember { mutableStateOf(true) }
+    /** Section chrome faded out while flicking through rows ([FeedsChromeAutoHide]); on top of [isUIVisible]. */
+    var chromeScrollHidden by remember { mutableStateOf(false) }
     var showSheet by remember { mutableStateOf(false) }
     var isZoomed by remember { mutableStateOf(false) }
     var deleteTarget by remember { mutableStateOf<FeedItem?>(null) }
@@ -185,6 +188,12 @@ fun FeedsScreen() {
     val tabBarOverlap = FeedsTabBarPolicy.overlayInset(isUIVisible, barShown, tabBarHeight().value, navBottom.value).dp
     // Sheets and dialogs keep the bar where it is.
     val overlayOpen = showSheet || tagEditorTarget != null || performerTarget != null || deleteTarget != null || model.pics.isSheetPresented
+    // A sheet / dialog or a mode switch always brings swipe-hidden chrome back.
+    LaunchedEffect(overlayOpen, mode) { chromeScrollHidden = false }
+    // Reduce Motion (animator duration scale 0): fade only, no slide.
+    val reduceMotion = remember {
+        android.provider.Settings.Global.getFloat(context.contentResolver, android.provider.Settings.Global.ANIMATOR_DURATION_SCALE, 1f) == 0f
+    }
 
     // Height of the top chrome (bar + criterion chips): Pics content starts below it (iOS safeAreaInset).
     val density = LocalDensity.current
@@ -209,7 +218,14 @@ fun FeedsScreen() {
                     isUIVisible = isUIVisible, isZoomed = isZoomed, lifecycleActive = lifecycleActive,
                     tabBarOverlap = tabBarOverlap,
                     overlayOpen = overlayOpen,
-                    onToggleUI = { isUIVisible = !isUIVisible },
+                    onToggleUI = {
+                        if (FeedsChromeAutoHide.tapReveals(chromeScrollHidden)) chromeScrollHidden = false
+                        else isUIVisible = !isUIVisible
+                    },
+                    onDragStarted = {
+                        if (FeedsChromeAutoHide.hidesOnDrag(mode, overlayOpen, isZoomed)) chromeScrollHidden = true
+                    },
+                    onSettled = { chromeScrollHidden = false },
                     onZoom = { isZoomed = it },
                     onDelete = { deleteTarget = it },
                     onAddTags = { target ->
@@ -232,11 +248,17 @@ fun FeedsScreen() {
         // Auto-hide (pager modes only): slides up and fades out together with the tab bar, on
         // the same trigger and animation; rows are full-screen, so the video just gains room.
         val tapAlpha by animateFloatAsState(if (isUIVisible) 1f else 0f, tween(200), label = "chrome")
+        // Swipe auto-hide (FeedsChromeAutoHide): a short slide up with the fade, fade only with Reduce Motion.
+        val scrollShown by animateFloatAsState(if (chromeScrollHidden) 0f else 1f, tween(if (reduceMotion) 150 else 250), label = "chromeScroll")
         val topShown = FeedsTabBarPolicy.topChromeShownFraction(mode == ReelsModeType.Pics, barShown)
-        val chromeAlpha = tapAlpha * topShown
+        val chromeAlpha = tapAlpha * topShown * scrollShown
+        val scrollSlidePx = with(density) { 16.dp.toPx() }
         Column(
             Modifier.fillMaxWidth().align(Alignment.TopCenter)
-                .graphicsLayer { alpha = chromeAlpha; translationY = -(1f - topShown) * size.height }
+                .graphicsLayer {
+                    alpha = chromeAlpha
+                    translationY = -(1f - topShown) * size.height - (if (reduceMotion) 0f else (1f - scrollShown) * scrollSlidePx)
+                }
                 .onSizeChanged { with(density) { if (chromeAlpha > 0.99f) measuredChrome = it.height.toDp() } },
         ) {
             if (chromeAlpha > 0.01f) {
@@ -333,6 +355,8 @@ private fun FeedPager(
     tabBarOverlap: androidx.compose.ui.unit.Dp,
     overlayOpen: Boolean,
     onToggleUI: () -> Unit,
+    onDragStarted: () -> Unit,
+    onSettled: () -> Unit,
     onZoom: (Boolean) -> Unit,
     onDelete: (FeedItem) -> Unit,
     onAddTags: (AITagTarget) -> Unit,
@@ -354,11 +378,31 @@ private fun FeedPager(
     // away, the first row brings it back (FeedsTabBarPolicy). Programmatic moves (continuous
     // play, restore) only count when they land on the first row.
     val overlayOpenNow by rememberUpdatedState(overlayOpen)
+    val onDragStartedNow by rememberUpdatedState(onDragStarted)
+    val onSettledNow by rememberUpdatedState(onSettled)
     LaunchedEffect(pagerState) {
         var swiped = false
+        // A drag too short to scroll never flips `isScrollInProgress`; the reveal waits for both.
+        var dragging by mutableStateOf(false)
         launch {
             pagerState.interactionSource.interactions.collect {
-                if (it is androidx.compose.foundation.interaction.DragInteraction.Start) swiped = true
+                when (it) {
+                    is androidx.compose.foundation.interaction.DragInteraction.Start -> {
+                        swiped = true
+                        dragging = true
+                        onDragStartedNow()
+                    }
+                    is androidx.compose.foundation.interaction.DragInteraction.Stop,
+                    is androidx.compose.foundation.interaction.DragInteraction.Cancel -> dragging = false
+                }
+            }
+        }
+        // Swipe-hidden chrome returns after the feed rests on a row; a new flick restarts the wait.
+        launch {
+            snapshotFlow { pagerState.isScrollInProgress || dragging }.collectLatest { inProgress ->
+                if (inProgress) return@collectLatest
+                delay(FeedsChromeAutoHide.REVEAL_DELAY_MS)
+                onSettledNow()
             }
         }
         var from = pagerState.settledPage

@@ -227,6 +227,25 @@ extension AetherSceneEngine: ReelsPausable {
     }
 }
 
+/// Delayed reveal of the Feeds chrome after paging settles. Deliberately not observable:
+/// rescheduling on every flick must not invalidate `ReelsViewBody`.
+@MainActor
+final class ReelsChromeRevealTimer {
+    private var work: DispatchWorkItem?
+
+    func schedule(after delay: TimeInterval, _ action: @escaping @MainActor () -> Void) {
+        work?.cancel()
+        let item = DispatchWorkItem { MainActor.assumeIsolated { action() } }
+        work = item
+        DispatchQueue.main.asyncAfter(deadline: .now() + delay, execute: item)
+    }
+
+    func cancel() {
+        work?.cancel()
+        work = nil
+    }
+}
+
 /// Route of the active Feeds row, published for the chrome only. Changes once per row / route,
 /// never on a per-frame path.
 @MainActor
@@ -323,6 +342,7 @@ struct ReelsViewBody: View {
     /// Captured at remount time from ``NavigationCoordinator/reelsDeepLink``.
     private let deepLink: ReelsDeepLink
     @EnvironmentObject var coordinator: NavigationCoordinator
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     init(viewModel: StashDBViewModel, deepLink: ReelsDeepLink = .empty) {
         self.viewModel = viewModel
@@ -403,6 +423,11 @@ struct ReelsViewBody: View {
     @State private var isMediaZoomed = false
     @State private var isRotating = false
     @State private var isUIVisible = true
+    /// Section chrome faded out while the user flicks through the feed (on top of `isUIVisible`,
+    /// which stays the tap toggle). Flips only at gesture start / reveal, never per frame.
+    @State private var isChromeScrollHidden = false
+    /// Pending reveal after the feed settles. Plain reference so rescheduling never invalidates the body.
+    @State private var chromeRevealTimer = ReelsChromeRevealTimer()
     @State private var isUserScrollingReels = false
     /// Snapshot of autoplay when a scroll gesture leaves `.idle` (restore after settle, don't force-play if user had paused).
     @State private var reelsWasPlayingBeforeScrollGesture = true
@@ -1479,6 +1504,56 @@ struct ReelsViewBody: View {
         @unknown default:
             return true
         }
+    }
+
+    /// Idle time on an item before the faded chrome comes back.
+    private static let chromeRevealDelay: TimeInterval = 1.2
+
+    /// Anything that needs the chrome on screen: a menu / overlay in the row, a sheet or an alert.
+    private var reelsChromeAutoHideBlocked: Bool {
+        isMenuOpen
+            || showStashSyncSheet
+            || showReelsSceneFilterSheet
+            || reelsClipImageFilters.showFilterSortSheet
+            || tagEditorTarget != nil
+            || performerPickerItem != nil
+            || showDeleteConfirmation
+            || showReelsSceneSaveAsAlert
+            || showReelsSceneRenameAlert
+            || showReelsSceneDeleteAlert
+            || reelsClipImageFilters.showSaveAsCatalogPresetAlert
+            || reelsClipImageFilters.showRenameCatalogPresetAlert
+            || reelsClipImageFilters.showDeleteCatalogPresetAlert
+    }
+
+    /// Short-video style: the section chrome fades out when a finger starts paging and comes back
+    /// once the feed rests on an item. Only a user drag (`.interacting`) hides it — auto-advance and
+    /// the Mac arrow keys animate the scroll too, and must not blink the chrome. Pics never hides.
+    /// The tab bar is left alone: toggling it mid-page resizes the feed and drifts `scrollPosition`.
+    private func reelsUpdateChromeAutoHide(for phase: ScrollPhase) {
+        switch phase {
+        case .interacting:
+            chromeRevealTimer.cancel()
+            guard reelsMode != .pics, !reelsChromeAutoHideBlocked, !isChromeScrollHidden else { return }
+            isChromeScrollHidden = true
+        case .idle:
+            guard isChromeScrollHidden else { return }
+            chromeRevealTimer.schedule(after: Self.chromeRevealDelay) {
+                _ = reelsRevealChromeAfterScroll()
+            }
+        default:
+            // Tracking / decelerating / animating: keep the current state, a new flick restarts the wait.
+            chromeRevealTimer.cancel()
+        }
+    }
+
+    /// Shows the chrome again; returns whether it had been hidden by scrolling.
+    @discardableResult
+    private func reelsRevealChromeAfterScroll() -> Bool {
+        chromeRevealTimer.cancel()
+        guard isChromeScrollHidden else { return false }
+        isChromeScrollHidden = false
+        return true
     }
 
     enum ReelsMode: String, CaseIterable {
@@ -3116,7 +3191,12 @@ struct ReelsViewBody: View {
                 reelsClipImageFilters.handlePresetSelection(newId, viewModel: viewModel)
             }
             .onChange(of: reelsMode) { oldValue, newValue in
+                _ = reelsRevealChromeAfterScroll()
                 handleModeChange(from: oldValue, to: newValue)
+            }
+            // A menu, sheet or alert always gets the chrome back (and keeps it, see `reelsChromeAutoHideBlocked`).
+            .onChange(of: reelsChromeAutoHideBlocked) { _, blocked in
+                if blocked { _ = reelsRevealChromeAfterScroll() }
             }
             .onChange(of: reelsPicsFilters.selectedSortOption) { _, _ in
                 guard reelsMode == .pics else { return }
@@ -3356,7 +3436,7 @@ struct ReelsViewBody: View {
         .safeAreaInset(edge: .top, spacing: 0) {
             if !StashyChromePlacement.prefersBottom {
                 reelsNavBar(currentItem: currentVisibleReelItem)
-                    .allowsHitTesting(isUIVisible)
+                    .allowsHitTesting(isUIVisible && !isChromeScrollHidden)
             }
         }
         .safeAreaInset(edge: .bottom, spacing: 0) {
@@ -3364,7 +3444,7 @@ struct ReelsViewBody: View {
             VStack(spacing: 0) {
                 if StashyChromePlacement.prefersBottom {
                     reelsNavBar(currentItem: currentItem)
-                        .allowsHitTesting(isUIVisible)
+                        .allowsHitTesting(isUIVisible && !isChromeScrollHidden)
                 }
                 if !reelsBottomChromeSuppressed {
                     reelsInfoOverlay(currentItem: currentItem)
@@ -3551,6 +3631,7 @@ struct ReelsViewBody: View {
         ReelsPlayerRegistry.resumePlayback()
 
         // Tab leave mid-gesture / overlays can leave these stuck and block Feeds interaction.
+        _ = reelsRevealChromeAfterScroll()
         isUserScrollingReels = false
         isRotating = false
         isMenuOpen = false
@@ -4486,6 +4567,7 @@ struct ReelsViewBody: View {
             isMenuOpen: $isMenuOpen,
             isZoomed: $isMediaZoomed,
             isRotating: $isRotating,
+            revealScrollHiddenChrome: { reelsRevealChromeAfterScroll() },
             onInteraction: { }
         )
         .scrollDisabled(isMediaZoomed)
@@ -4572,6 +4654,7 @@ struct ReelsViewBody: View {
                 if !wasDriftSuppressed && driftSuppressed {
                     reelsWasPlayingBeforeScrollGesture = currentItemIsPlaying
                 }
+                reelsUpdateChromeAutoHide(for: newPhase)
                 if driftSuppressed {
                     isUserScrollingReels = true
                     currentItemIsPlaying = false
@@ -4709,8 +4792,11 @@ struct ReelsViewBody: View {
                 )
             }
         }
-        .opacity(isUIVisible ? 1 : 0)
+        .opacity(isUIVisible && !isChromeScrollHidden ? 1 : 0)
+        // Slide towards the screen edge it sits on; Reduce Motion keeps the plain fade.
+        .offset(y: isChromeScrollHidden && !reduceMotion ? (prefersBottom ? 16 : -16) : 0)
         .animation(.easeInOut(duration: 0.2), value: isUIVisible)
+        .animation(reduceMotion ? .easeInOut(duration: 0.15) : .easeOut(duration: 0.25), value: isChromeScrollHidden)
     }
 
     @ViewBuilder
@@ -5539,6 +5625,8 @@ struct ReelItemView: View {
     /// Steps the playhead forward while held when the Feeds hold speed exceeds the engine's
     /// native cap (2× for video).
     @State private var fastForwardBoostTimer: Timer?
+    /// Brings back chrome that faded out while swiping; true when it was hidden (the tap is then spent on that).
+    var revealScrollHiddenChrome: () -> Bool = { false }
     var onInteraction: () -> Void
     @StateObject private var videoSurfaceReadiness = ReelItemVideoSurfaceReadiness()
     /// Live decoded size (accounts for clip rotation / preferredTransform).
@@ -5986,6 +6074,10 @@ extension ReelItemView {
         if location.y > 0 && location.y > screenHeight - 160 { return }
         
         guard !isMenuOpen else { return }
+        if revealScrollHiddenChrome() {
+            onInteraction()
+            return
+        }
         withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
             isUIVisible.toggle()
         }
