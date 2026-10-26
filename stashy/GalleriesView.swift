@@ -1586,14 +1586,21 @@ struct FullScreenImageView: View {
                 }
             }
             .alert("Set as Performer Image?", isPresented: $showingSetPerformerImagePicker) {
-                ForEach(performerImageTargetPerformers) { performer in
-                    Button("Okay") {
-                        setPerformerImage(performer: performer)
+                // One performer: a plain confirm. Several: one button per name to pick from.
+                if performerImageTargetPerformers.count == 1, let performer = performerImageTargetPerformers.first {
+                    Button("Okay") { setPerformerImage(performer: performer) }
+                } else {
+                    ForEach(performerImageTargetPerformers) { performer in
+                        Button(performer.name) { setPerformerImage(performer: performer) }
                     }
                 }
                 Button("Cancel", role: .cancel) { }
             } message: {
-                Text("Update the profile picture for the selected performer.")
+                if performerImageTargetPerformers.count == 1, let performer = performerImageTargetPerformers.first {
+                    Text("Use this image as the profile picture of \(performer.name).")
+                } else {
+                    Text("Choose whose profile picture this image becomes.")
+                }
             }
             .alert("Really delete image?", isPresented: $showingDeleteConfirmation) {
                 Button("Cancel", role: .cancel) { }
