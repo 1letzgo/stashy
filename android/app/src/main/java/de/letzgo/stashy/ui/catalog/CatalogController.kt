@@ -11,6 +11,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import de.letzgo.stashy.data.CatalogPrefs
+import de.letzgo.stashy.data.CatalogQuickSortCatalog
 import de.letzgo.stashy.data.CatalogQuery
 import de.letzgo.stashy.data.CatalogRepository
 import de.letzgo.stashy.data.CriteriaDocument
@@ -79,6 +80,8 @@ class CatalogController<T>(
     perPage: Int = CatalogRepository.pageSize(mode),
     /** Page loader; detail tabs route through `DetailRepository.findScoped` (old-server fallback). */
     private val fetch: (suspend (CatalogQuery, Int, Int) -> Page<T>)? = null,
+    /** List-specific sorts offered first in the quick bar and the sheet (a group's scene number). */
+    val extraSorts: List<SortOption> = emptyList(),
 ) {
     var sort by mutableStateOf(initialSort ?: CatalogPrefs.resolvedSort(mode))
         private set
@@ -179,6 +182,20 @@ class CatalogController<T>(
         ListLivePresetTag.parseServerId(presetRow)?.let { sid -> return SavedFiltersStore.byId[sid]?.name }
         ListLivePresetTag.parseLocalId(presetRow)?.let { lid -> return localPresets.firstOrNull { it.id == lid }?.name }
         return null
+    }
+
+    /** iOS `activePresetName` — the removable preset chip above the list. */
+    val activePresetName: String? get() = selectedPresetName ?: selectedFilter?.name
+
+    /** iOS `CatalogListQuickBar` sort chip: [CatalogQuickSortCatalog.next], Random re-rolls via [changeSort]. */
+    fun quickSort(field: String) {
+        if (extraSorts.any { it.field == field }) {
+            // Own fields: the active one flips, otherwise ascending first (1, 2, 3 …).
+            val ascending = if (sort.field == field) !sort.isAscending else true
+            SortCatalog.optionFor(mode, field, ascending, extraSorts)?.let { changeSort(it) }
+            return
+        }
+        CatalogQuickSortCatalog.next(mode, sort, field)?.let { changeSort(it) }
     }
 
     fun refresh() = list.refresh()

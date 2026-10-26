@@ -2,10 +2,10 @@
 #if !os(tvOS)
 import SwiftUI
 
-/// "Performers & Studio" — one horizontal row that always starts with the studio,
-/// followed by the performers (and the director, if any). Shared by the scene detail
-/// page and the opened gallery; the save closures redirect edits away from the
-/// scene mutation (e.g. to `galleryUpdate`).
+/// "Metadata" — one horizontal row that always starts with the studio, then the linked
+/// galleries (scene page) or linked scenes (opened gallery), labelled "Gallery" / "Scene",
+/// then the performers (and the director, if any). Shared by both pages so they read the same; the save
+/// closures redirect edits away from the scene mutation (e.g. to `galleryUpdate`).
 struct ScenePerformersStudioCard: View {
     let sceneId: String
     let sceneDate: String?
@@ -19,12 +19,18 @@ struct ScenePerformersStudioCard: View {
     var savePerformerIds: (([String], @escaping (Bool) -> Void) -> Void)? = nil
     /// Writes the chosen studio somewhere other than the scene. `nil` keeps the scene mutation.
     var saveStudioId: ((String?, @escaping (Bool) -> Void) -> Void)? = nil
+    /// Galleries linked to the scene. `nil` = the host has no galleries to show or edit
+    /// (opened gallery); non-nil also offers "Edit Galleries".
+    var galleries: [Gallery]? = nil
+    var onGalleriesUpdated: (([Gallery]) -> Void)? = nil
+    /// Scenes linked to an opened gallery (read-only).
+    var scenes: [Scene] = []
     @ObservedObject var viewModel: StashDBViewModel
     @ObservedObject var appearanceManager = AppearanceManager.shared
     @State private var activeEditor: Editor?
 
     private enum Editor: String, Identifiable {
-        case studio, performers
+        case studio, performers, galleries
         var id: String { rawValue }
     }
 
@@ -32,12 +38,14 @@ struct ScenePerformersStudioCard: View {
     fileprivate static let tileSize: CGFloat = 80
 
     /// The card has something to show, or edit mode wants it visible for assigning.
-    static func isVisible(performers: [ScenePerformer], studio: SceneStudio?, director: String? = nil, editing: Bool) -> Bool {
+    static func isVisible(performers: [ScenePerformer], studio: SceneStudio?, director: String? = nil,
+                          galleries: [Gallery]? = nil, scenes: [Scene] = [], editing: Bool) -> Bool {
         editing || studio != nil || !performers.isEmpty || director != nil
+            || !(galleries ?? []).isEmpty || !scenes.isEmpty
     }
 
     private var isEmpty: Bool {
-        studio == nil && performers.isEmpty && director == nil
+        studio == nil && performers.isEmpty && director == nil && (galleries ?? []).isEmpty && scenes.isEmpty
     }
 
     private func age(for performer: ScenePerformer) -> Int? {
@@ -53,7 +61,7 @@ struct ScenePerformersStudioCard: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack {
-                Text("Performers & Studio")
+                Text("Metadata")
                     .font(.title3)
                     .fontWeight(.semibold)
                 Spacer()
@@ -69,6 +77,13 @@ struct ScenePerformersStudioCard: View {
                         } label: {
                             Label("Edit Performers", systemImage: "person.2")
                         }
+                        if galleries != nil {
+                            Button {
+                                activeEditor = .galleries
+                            } label: {
+                                Label("Edit Galleries", systemImage: "photo.on.rectangle")
+                            }
+                        }
                     } label: {
                         Image(systemName: "pencil.circle.fill")
                             .font(.system(size: 20))
@@ -80,7 +95,7 @@ struct ScenePerformersStudioCard: View {
             .padding(.top, 8)
 
             if isEmpty {
-                Text("No performers or studio assigned")
+                Text("No metadata assigned")
                     .font(.subheadline)
                     .foregroundColor(.secondary)
                     .padding(.horizontal, 12)
@@ -93,6 +108,24 @@ struct ScenePerformersStudioCard: View {
                                 tile(name: studio.name) {
                                     StudioLogoTile(studio: studio)
                                         .frame(width: Self.tileSize, height: Self.tileSize)
+                                }
+                            }
+                            .buttonStyle(.plain)
+                        }
+
+                        ForEach(galleries ?? []) { gallery in
+                            NavigationLink(destination: ImagesView(gallery: gallery)) {
+                                tile(name: "Gallery") {
+                                    CircleThumbnail(url: gallery.thumbnailURL, placeholder: "photo.on.rectangle", size: Self.tileSize)
+                                }
+                            }
+                            .buttonStyle(.plain)
+                        }
+
+                        ForEach(scenes) { scene in
+                            NavigationLink(destination: SceneDetailView(scene: scene)) {
+                                tile(name: "Scene") {
+                                    CircleThumbnail(url: scene.thumbnailURL, placeholder: "film", size: Self.tileSize)
                                 }
                             }
                             .buttonStyle(.plain)
@@ -152,6 +185,15 @@ struct ScenePerformersStudioCard: View {
                 ) { updated in
                     onStudioUpdated?(updated)
                 }
+            case .galleries:
+                AddGalleryToSceneSheet(
+                    sceneId: sceneId,
+                    currentGalleries: galleries ?? [],
+                    performerIds: performers.map(\.id),
+                    viewModel: viewModel
+                ) { updated in
+                    onGalleriesUpdated?(updated)
+                }
             }
         }
     }
@@ -166,7 +208,7 @@ struct ScenePerformersStudioCard: View {
     }
 }
 
-/// Shared shape language for every "Performers & Studio" item: tinted ring around a circle,
+/// Shared shape language for every "Metadata" item: tinted ring around a circle,
 /// optional badge top-right, name pill overlapping the bottom edge. Also used by
 /// Performer detail › "Appears with".
 struct CircleNameTile<Content: View>: View {
@@ -252,6 +294,40 @@ struct PerformerCirclePortrait: View {
     }
 }
 
+/// Gallery cover / scene screenshot filling a `CircleNameTile` circle; a glyph when
+/// there is no image.
+private struct CircleThumbnail: View {
+    let url: URL?
+    let placeholder: String
+    var size: CGFloat = 80
+    @ObservedObject private var appearanceManager = AppearanceManager.shared
+
+    var body: some View {
+        ZStack {
+            Circle()
+                .fill(Color.secondaryAppBackground)
+            if let url {
+                CustomAsyncImage(url: url) { loader in
+                    if let image = loader.image {
+                        image
+                            .resizable()
+                            .scaledToFill()
+                    } else {
+                        Color.gray.opacity(DesignTokens.Opacity.placeholder)
+                            .skeleton()
+                    }
+                }
+            } else {
+                Image(systemName: placeholder)
+                    .font(.system(size: 28, weight: .medium))
+                    .foregroundColor(Color.pillAccent)
+            }
+        }
+        .frame(width: size, height: size)
+        .clipShape(Circle())
+    }
+}
+
 /// Studio logo inside a performer-sized circle on a neutral background. The logo
 /// comes from `StudioLogoStore` at the same raster size as `StudioImageView`, so
 /// both share one cache entry; studios without their own image show a glyph.
@@ -308,7 +384,7 @@ struct AddPerformerToSceneSheet: View {
     var savePerformerIds: (([String], @escaping (Bool) -> Void) -> Void)? = nil
     var onComplete: ([ScenePerformer]) -> Void
 
-    @Environment(\.dismiss) var dismiss
+    @Environment(\.stashyDismiss) var dismiss
     @ObservedObject var appearanceManager = AppearanceManager.shared
     @State private var performers: [Performer] = []
     @State private var isLoading = false

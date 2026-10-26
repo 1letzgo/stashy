@@ -65,6 +65,7 @@ fun SettingsScreen() {
 private fun androidx.compose.foundation.lazy.LazyListScope.mainSettings() {
     serverListSection()
     if (ServerConfigManager.activeConfig != null) playbackSections()
+    settingsTransferSection()
     aboutSection()
 }
 

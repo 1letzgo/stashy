@@ -102,13 +102,14 @@ class PerformerDetailScreen(val performerId: String, val preview: Performer? = n
 
     private val catalog = LinkedCatalog(
         scope,
-        order = listOf(DetailTab.Scenes, DetailTab.Galleries, DetailTab.Studios, DetailTab.Tags, DetailTab.Groups, DetailTab.Images, DetailTab.AppearsWith),
+        order = listOf(DetailTab.Scenes, DetailTab.Galleries, DetailTab.Images, DetailTab.Studios, DetailTab.Tags, DetailTab.Groups, DetailTab.AppearsWith),
         sceneScope = DetailRepository.scope("performers", performerId),
         galleryScope = DetailRepository.scope("performers", performerId),
         studioScope = DetailRepository.scope("performers", performerId),
         tagScope = DetailRepository.scope("performers", performerId),
         groupScope = DetailRepository.scope("performers", performerId),
         imageScope = DetailRepository.scope("performers", performerId),
+        opensFilteredOnPerformerId = performerId,
         sceneContext = DetailViewContext.Performer,
         previewScenes = preview?.sceneCount ?: 0,
         previewGalleries = preview?.galleryCount ?: 0,

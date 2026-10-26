@@ -65,6 +65,9 @@ data class TabConfig(
     val defaultClipFilterName: String? = null,
     val defaultPreviewFilterId: String? = null,
     val defaultPreviewFilterName: String? = null,
+    /** Feeds › Verticals (stashy+): its own default scene filter; portrait is always added. */
+    val defaultVerticalFilterId: String? = null,
+    val defaultVerticalFilterName: String? = null,
 )
 
 /** iOS: `HomeRowType` (raw values and default titles identical). */
@@ -131,7 +134,14 @@ enum class ReelsModeType(val defaultTitle: String) {
     @SerialName("markers") Markers("Markers"),
     @SerialName("clips") Clips("Clips"),
     @SerialName("previews") Previews("Previews"),
-    @SerialName("pics") Pics("Pics");
+    @SerialName("pics") Pics("Pics"),
+    /** stashy+: the Scenes feed with its filter preset to portrait videos (iOS `.verticals`). */
+    @SerialName("verticals") Verticals("Verticals");
+
+    /** Feed modes behind stashy+. */
+    val requiresStashyPlus: Boolean get() = this == Verticals
+    /** Loads scenes like the Scenes feed (Verticals only differs by its preset filter). */
+    val isSceneFeed: Boolean get() = this == Scenes || this == Verticals
 
     val title: String get() = defaultTitle
     /** iOS: `ReelsMode.rawValue` ("Scenes", "Markers" …) — the deep-link / session spelling. */

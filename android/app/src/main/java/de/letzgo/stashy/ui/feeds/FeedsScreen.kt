@@ -163,8 +163,13 @@ fun FeedsScreen() {
 
     // Toast-like messages (iOS `ToastManager`).
     var toast by remember { mutableStateOf<String?>(null) }
+    // Taking the message over resets `model.message`, which restarts an effect keyed on it and
+    // cancelled the hide delay: the toast stayed up. The hide is keyed on the toast instead.
     LaunchedEffect(model.message) {
-        model.message?.let { toast = it; model.message = null; delay(2_000); toast = null }
+        model.message?.let { toast = it; model.message = null }
+    }
+    LaunchedEffect(toast) {
+        if (toast != null) { delay(2_000); toast = null }
     }
 
     val mode = model.mode
@@ -440,7 +445,7 @@ private fun FeedPager(
                 if (player.isPlaying) {
                     watched += 0.1
                     // iOS `noteReelsWatchProgress`: credit once after "Count as played — Feeds".
-                    if (!credited && activeItem?.countsPlays == true && watched >= FeedsConfig.playCountFeedsSeconds) {
+                    if (!credited && activeItem?.countsPlays == true && watched >= (if (model.mode == de.letzgo.stashy.data.ReelsModeType.Verticals) de.letzgo.stashy.data.TabManager.playCountVerticalsSeconds.toFloat() else FeedsConfig.playCountFeedsSeconds)) {
                         credited = true
                         activeItem.let { model.creditPlay(it) }
                     }
@@ -564,7 +569,7 @@ private fun feedScrubSprites(item: FeedItem): de.letzgo.stashy.ui.player.SceneSc
 }
 
 private fun emptyIcon(mode: ReelsModeType) = when (mode) {
-    ReelsModeType.Scenes -> SF.film
+    ReelsModeType.Scenes, ReelsModeType.Verticals -> SF.film
     ReelsModeType.Markers -> SF.bookmarkFill
     ReelsModeType.Clips -> SF.photoOnRectangleAngled
     ReelsModeType.Previews -> SF.playRectangle
@@ -572,7 +577,7 @@ private fun emptyIcon(mode: ReelsModeType) = when (mode) {
 }
 
 private fun emptyTitle(mode: ReelsModeType) = when (mode) {
-    ReelsModeType.Scenes -> "No scenes found"
+    ReelsModeType.Scenes, ReelsModeType.Verticals -> "No scenes found"
     ReelsModeType.Markers -> "No markers found"
     ReelsModeType.Clips -> "No clips found"
     ReelsModeType.Previews -> "No previews found"

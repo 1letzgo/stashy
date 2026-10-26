@@ -14,7 +14,11 @@
 #if !os(tvOS)
 
 import SwiftUI
+#if canImport(UIKit)
 import UIKit
+#else
+import AppKit
+#endif
 
 // MARK: - Model
 
@@ -107,6 +111,7 @@ extension Array where Element == PlayerMenuItem {
     var menuSignature: String { map(\.signature).joined(separator: ";") }
 }
 
+#if os(iOS)
 // MARK: - UIMenu building
 
 enum PlayerMenuBuilder {
@@ -348,5 +353,89 @@ struct PlayerMenuButton: UIViewRepresentable {
         }
     }
 }
+
+#else
+
+// MARK: - macOS (NSMenu)
+
+/// macOS: the same data-driven rows as a native `NSMenu`. `popUp` blocks until the menu
+/// closes, which gives the host exact will-present / did-dismiss hooks for its auto-hide timer.
+struct PlayerMenuButton: NSViewRepresentable {
+    var items: [PlayerMenuItem]
+    var onWillPresent: () -> Void
+    var onDidDismiss: () -> Void
+    var accessibilityTitle: String = "More options"
+
+    func makeNSView(context: Context) -> MenuHostView {
+        let view = MenuHostView()
+        view.parent = self
+        view.setAccessibilityLabel(accessibilityTitle)
+        view.setAccessibilityRole(.button)
+        return view
+    }
+
+    func updateNSView(_ view: MenuHostView, context: Context) {
+        view.parent = self
+        view.setAccessibilityLabel(accessibilityTitle)
+    }
+
+    final class MenuHostView: NSView {
+        var parent: PlayerMenuButton?
+
+        override func mouseDown(with event: NSEvent) {
+            guard let parent else { return }
+            parent.onWillPresent()
+            let menu = PlayerMenuBuilder.menu(from: parent.items)
+            menu.popUp(positioning: nil, at: NSPoint(x: 0, y: bounds.height), in: self)
+            parent.onDidDismiss()
+        }
+    }
+}
+
+enum PlayerMenuBuilder {
+    static func menu(from items: [PlayerMenuItem]) -> NSMenu {
+        let menu = NSMenu()
+        menu.autoenablesItems = false
+        var first = true
+        for item in items {
+            if item.isSectionBreak {
+                if !first { menu.addItem(.separator()) }
+                if !item.title.isEmpty { menu.addItem(.sectionHeader(title: item.title)) }
+                continue
+            }
+            first = false
+            menu.addItem(element(for: item))
+        }
+        return menu
+    }
+
+    private static func element(for item: PlayerMenuItem) -> NSMenuItem {
+        let menuItem = NSMenuItem(title: item.title, action: nil, keyEquivalent: "")
+        menuItem.image = item.systemImage.flatMap { NSImage(systemSymbolName: $0, accessibilityDescription: nil) }
+        menuItem.state = item.isChecked ? .on : .off
+        menuItem.isEnabled = !item.isDisabled
+        switch item.kind {
+        case .submenu(let nested):
+            menuItem.submenu = menu(from: nested)
+        case .action(let handler):
+            let target = ClosureTarget(handler)
+            menuItem.target = target
+            menuItem.action = #selector(ClosureTarget.fire)
+            menuItem.representedObject = target  // NSMenuItem.target is weak
+        case .info:
+            menuItem.isEnabled = false
+        case .sectionBreak:
+            break
+        }
+        return menuItem
+    }
+
+    private final class ClosureTarget: NSObject {
+        let handler: () -> Void
+        init(_ handler: @escaping () -> Void) { self.handler = handler }
+        @objc func fire() { handler() }
+    }
+}
+#endif
 
 #endif

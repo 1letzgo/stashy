@@ -1,5 +1,9 @@
 #if !os(tvOS)
+#if canImport(UIKit)
 import UIKit
+#else
+import AppKit
+#endif
 import SwiftUI
 import Combine
 
@@ -124,6 +128,7 @@ final class AppIconManager: ObservableObject {
     }
 
     private static func prepareKeyWindowForSystemAlert() {
+        #if os(iOS)
         let scene = UIApplication.shared.connectedScenes
             .compactMap { $0 as? UIWindowScene }
             .first { $0.activationState == .foregroundActive }
@@ -132,6 +137,7 @@ final class AppIconManager: ObservableObject {
         window.endEditing(true)
         window.makeKeyAndVisible()
         window.rootViewController?.view.becomeFirstResponder()
+        #endif
     }
 }
 

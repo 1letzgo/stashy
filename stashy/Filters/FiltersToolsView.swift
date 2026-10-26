@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// Tools → Filters: list / create / edit / rename / delete all server saved filters.
+/// Settings › Server › stashy+ → Filters: list / create / edit / rename / delete all server saved filters.
 struct FiltersToolsView: View {
     @StateObject private var viewModel = StashDBViewModel()
     @ObservedObject private var appearance = AppearanceManager.shared

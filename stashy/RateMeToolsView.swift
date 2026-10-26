@@ -1359,7 +1359,7 @@ private struct RateMeThemePickerSheet: View {
     let onPick: (FilterEntityOption) -> Void
 
     @ObservedObject private var store = FilterPickerOptionsStore.shared
-    @Environment(\.dismiss) private var dismiss
+    @Environment(\.stashyDismiss) private var dismiss
     @State private var query = ""
 
     private var storeKind: FilterPickerOptionsStore.Kind {

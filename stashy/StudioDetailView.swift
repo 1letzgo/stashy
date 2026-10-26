@@ -16,7 +16,7 @@ struct StudioDetailView: View {
     @ObservedObject private var tabManager = TabManager.shared
     @StateObject private var viewModel = StashDBViewModel()
     @EnvironmentObject var coordinator: NavigationCoordinator
-    @Environment(\.dismiss) private var dismiss
+    @Environment(\.stashyDismiss) private var dismiss
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @State private var studioLiveFilterSheetPresented = false
     @State private var showingSceneDownloadOptions = false
@@ -26,15 +26,13 @@ struct StudioDetailView: View {
     @StateObject private var linkedChildStudios: DetailLinkedStudiosFilterModel
     @StateObject private var linkedGalleries: DetailLinkedGalleriesFilterModel
     /// Scenes tab filter / sort, kept here so it survives the tab remounting `ScenesView`.
-    @StateObject private var scenesFilterMemory = ScenesListFilterMemory()
+    @StateObject private var scenesFilterMemory: ScenesListFilterMemory
     @StateObject private var linkedImages: DetailLinkedImagesFilterModel
     @State private var isFavorite: Bool = false
     @State private var isUpdatingFavorite: Bool = false
     @State private var isHeaderExpanded = false
     @State private var showingEditStudioSheet = false
 
-    private var chromePillHeight: CGFloat { StashyExpandingDock.activeHeight }
-    private var navActionGroupSpacing: CGFloat { 7 }
     private var showsFeedsNavButton: Bool {
         tabManager.tabs.first(where: { $0.id == .reels })?.isVisible ?? true
     }
@@ -62,7 +60,9 @@ struct StudioDetailView: View {
     }
     @State private var selectedDetailTab: DetailTab
 
-    init(studio: Studio) {
+    /// `filterPerformerId`: opened from that performer's page — its scenes, galleries and images
+    /// start filtered on the performer.
+    init(studio: Studio, filterPerformerId: String? = nil) {
         _studio = State(initialValue: studio)
         let sc = studio.sceneCount
         let gal = studio.galleryCount ?? 0
@@ -70,8 +70,15 @@ struct StudioDetailView: View {
         _linkedPerformers = StateObject(wrappedValue: DetailLinkedPerformersFilterModel(scope: .studio(studio.id), initialSort: .nameAsc))
         _linkedTags = StateObject(wrappedValue: DetailLinkedTagsFilterModel(scope: .studio(studio.id)))
         _linkedChildStudios = StateObject(wrappedValue: DetailLinkedStudiosFilterModel(scope: .parentStudio(studio.id)))
-        _linkedGalleries = StateObject(wrappedValue: DetailLinkedGalleriesFilterModel(scope: .studio(studio.id)))
-        _linkedImages = StateObject(wrappedValue: DetailLinkedImagesFilterModel(scope: .studio(studio.id)))
+        let galleries = DetailLinkedGalleriesFilterModel(scope: .studio(studio.id))
+        let images = DetailLinkedImagesFilterModel(scope: .studio(studio.id))
+        if let filterPerformerId {
+            galleries.criteriaDocument.load(PerformerScopedDetail.criteria(performerId: filterPerformerId))
+            images.criteriaDocument.load(PerformerScopedDetail.criteria(performerId: filterPerformerId))
+        }
+        _linkedGalleries = StateObject(wrappedValue: galleries)
+        _linkedImages = StateObject(wrappedValue: images)
+        _scenesFilterMemory = StateObject(wrappedValue: PerformerScopedDetail.scenesMemory(performerId: filterPerformerId))
     }
 
     // Computed properties for counts
@@ -93,10 +100,6 @@ struct StudioDetailView: View {
         if viewModel.totalDetailGroups > 0 { tabs.append(.groups) }
         if viewModel.totalDetailImages > 0 { tabs.append(.images) }
         return tabs
-    }
-
-    private var showTabSwitcher: Bool {
-        availableTabs.count > 1
     }
 
     private var studioDetailCatalogFloatingChromeForFooter: CatalogFloatingChromeState {
@@ -151,112 +154,14 @@ struct StudioDetailView: View {
     /// Custom top chrome (PerformerDetail template): Back · section icons · Favorite · Edit.
     @ViewBuilder
     private var studioDetailNavBar: some View {
-        StashySectionChromeBar {
-            HStack(spacing: 8) {
-                Button {
-                    dismiss()
-                } label: {
-                    HStack(spacing: StashyExpandingDock.iconLabelSpacing) {
-                        Image(systemName: "chevron.left")
-                            .font(.system(size: StashyExpandingDock.iconSize, weight: .semibold))
-                        Text("Back")
-                            .font(.subheadline.weight(.semibold))
-                    }
-                    .foregroundColor(.white)
-                    .modifier(StashyChromePillStyle(height: chromePillHeight, accent: true))
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel("Back")
-
-                Spacer(minLength: 8)
-
-                if showTabSwitcher {
-                    HStack(spacing: 6) {
-                        ForEach(availableTabs, id: \.self) { tab in
-                            let isSelected = selectedDetailTab == tab
-                            Button {
-                                guard !isSelected else { return }
-                                HapticManager.light()
-                                withAnimation(StashyExpandingDock.selectionAnimation) {
-                                    selectedDetailTab = tab
-                                }
-                            } label: {
-                                Image(systemName: tab.icon)
-                                    .font(.system(size: StashyExpandingDock.iconSize, weight: .semibold))
-                                    .foregroundColor(
-                                        isSelected
-                                            ? .white
-                                            : .white.opacity(StashyExpandingDock.inactiveIconOpacity)
-                                    )
-                                    .frame(
-                                        width: StashyExpandingDock.circleSize,
-                                        height: StashyExpandingDock.circleSize
-                                    )
-                                    .stashyChromeFill(
-                                        shape: Capsule(style: .continuous),
-                                        activeColor: isSelected ? appearanceManager.tintColor : nil
-                                    )
-                                    .contentShape(Capsule(style: .continuous))
-                            }
-                            .buttonStyle(.plain)
-                            .accessibilityLabel(tab.rawValue)
-                            .accessibilityAddTraits(isSelected ? .isSelected : [])
-                        }
-                    }
-                }
-
-                if showTabSwitcher {
-                    Spacer()
-                        .frame(width: navActionGroupSpacing)
-                }
-
-                HStack(spacing: 6) {
-                    Button {
-                        toggleFavorite()
-                    } label: {
-                        Image(systemName: isFavorite ? "heart.fill" : "heart")
-                            .font(.system(size: StashyExpandingDock.iconSize, weight: .semibold))
-                            .foregroundColor(
-                                isFavorite
-                                    ? .red
-                                    : .white.opacity(StashyExpandingDock.inactiveIconOpacity)
-                            )
-                            .frame(
-                                width: StashyExpandingDock.circleSize,
-                                height: StashyExpandingDock.circleSize
-                            )
-                            .stashyGlass(shape: Capsule(style: .continuous))
-                            .contentShape(Capsule(style: .continuous))
-                    }
-                    .buttonStyle(.plain)
-                    .disabled(isUpdatingFavorite)
-                    .accessibilityLabel(isFavorite ? "Remove favorite" : "Add favorite")
-
-                    if appearanceManager.isEditModeEnabled {
-                        Button {
-                            HapticManager.light()
-                            showingEditStudioSheet = true
-                        } label: {
-                            Image(systemName: "pencil")
-                                .font(.system(size: StashyExpandingDock.iconSize, weight: .semibold))
-                                .foregroundColor(.white.opacity(StashyExpandingDock.inactiveIconOpacity))
-                                .frame(
-                                    width: StashyExpandingDock.circleSize,
-                                    height: StashyExpandingDock.circleSize
-                                )
-                                .stashyGlass(shape: Capsule(style: .continuous))
-                                .contentShape(Capsule(style: .continuous))
-                        }
-                        .buttonStyle(.plain)
-                        .accessibilityLabel("Edit studio")
-                    }
-                }
-            }
-            .frame(minHeight: chromePillHeight)
-            .padding(.horizontal, StashyExpandingDock.edgePadding)
-            .padding(.vertical, 8)
-
-        }
+        StashyDetailTopBar(
+            onBack: { dismiss() },
+            tabs: availableTabs,
+            selection: selectedDetailTab,
+            icon: { $0.icon },
+            label: { $0.rawValue },
+            onSelect: { selectedDetailTab = $0 }
+        )
     }
 
     private func toggleFavorite() {
@@ -526,11 +431,32 @@ struct StudioDetailView: View {
 
     // MARK: - Shared detail chrome
 
+    /// Favorite and Edit sit in the floating bar with the list's actions, not in the top chrome.
+    private var entityActionSlots: [CatalogChromeSlot] {
+        var actions = [CatalogChromeSlot(
+            systemImage: isFavorite ? "heart.fill" : "heart",
+            accessibilityLabel: isFavorite ? "Remove favorite" : "Add favorite",
+            tint: isFavorite ? .red : nil
+        ) {
+            guard !isUpdatingFavorite else { return }
+            toggleFavorite()
+        }]
+        if appearanceManager.isEditModeEnabled {
+            actions.append(CatalogChromeSlot(systemImage: "pencil", accessibilityLabel: "Edit studio") {
+                HapticManager.light()
+                showingEditStudioSheet = true
+            })
+        }
+        return actions
+    }
+
     /// Per-tab slots for the embedded list, mirroring the previous floating action bar content.
     private var studioDetailListSlots: CatalogSlotSet {
         var slots = CatalogSlotSet(visibility: studioDetailCatalogFloatingChromeForFooter)
+        slots.entityActions = entityActionSlots
         switch selectedDetailTab {
         case .scenes:
+            // Filter & sort also in the bar (far right), like every other tab.
             slots.filterSort = CatalogChromeSlot(
                 systemImage: "slider.horizontal.3",
                 isActive: studioSceneFilterActive,
@@ -588,8 +514,8 @@ struct StudioDetailView: View {
                 linkedImages.showFilterSortSheet = true
             }
         case .groups:
-            // No groups filter model yet — hide the bar instead of showing an empty one.
-            slots.isPresented = false
+            // No groups filter model yet; the bar still carries Favorite / Edit.
+            break
         }
         return slots
     }
@@ -1085,7 +1011,7 @@ struct EditStudioSheet: View {
     var onDeleted: (() -> Void)? = nil
     var onComplete: (Studio) -> Void
 
-    @Environment(\.dismiss) private var dismiss
+    @Environment(\.stashyDismiss) private var dismiss
     @ObservedObject private var appearanceManager = AppearanceManager.shared
 
     @State private var name: String = ""

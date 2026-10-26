@@ -7,8 +7,6 @@
 import SwiftUI
 
 private struct MarkersViewContent: View {
-    /// Home sub-tab root: actions go into the Home chrome instead of a floating bar.
-    var hostsInSectionChrome = false
     @ObservedObject var viewModel: StashDBViewModel
     @ObservedObject var appearanceManager = AppearanceManager.shared
     @ObservedObject var configManager = ServerConfigManager.shared
@@ -448,13 +446,7 @@ private struct MarkersViewContent: View {
             sortOption: .dateDesc,
             onSortChange: { _ in },
             onApply: { applyLiveFilterFromSheet() },
-            onReset: {
-                liveSheetPresetSelection = ""
-                selectedFilter = nil
-                criteriaDocument.clear()
-                clearMarkerLiveChipsOnly()
-                applyLiveFilterFromSheet()
-            },
+            onReset: { resetAllCatalogFilters() },
             onRequestSave: { saveMarkerPresetOverwrite() },
             onRequestSaveAs: {
                 presetNameInput = ""
@@ -520,11 +512,18 @@ private struct MarkersViewContent: View {
             if configManager.activeConfig == nil {
                 ConnectionErrorView { performSearch() }
             } else if (viewModel.isLoadingMarkers && viewModel.sceneMarkers.isEmpty) || (viewModel.isLoadingSavedFilters && viewModel.savedFilters.isEmpty) {
-                StandardLoadingView(message: "Loading markers...")
+                // Keep the bar while a sort/filter change refetches, so it does not jump away.
+                VStack(spacing: 0) {
+                    quickBar
+                    StandardLoadingView(message: "Loading markers...")
+                }
             } else if viewModel.sceneMarkers.isEmpty && viewModel.errorMessage != nil {
                 ConnectionErrorView { performSearch() }
             } else if viewModel.sceneMarkers.isEmpty {
-                emptyStateView
+                VStack(spacing: 0) {
+                    if !criteriaDocument.isEmpty || activePresetName != nil { quickBar }
+                    emptyStateView
+                }
             } else {
                 markersList
             }
@@ -551,13 +550,6 @@ private struct MarkersViewContent: View {
                 errorMessage: viewModel.errorMessage
             ),
             isPresented: true,
-            hostsInSectionChrome: hostsInSectionChrome,
-            filterSort: CatalogChromeSlot(
-                systemImage: "slider.horizontal.3",
-                isActive: catalogFilterSortFABActive,
-                accessibilityLabel: "Settings",
-                action: { showFilterSortSheet = true }
-            ),
             search: CatalogSearchChrome(
                 text: $searchText,
                 isVisible: $isSearchVisible,
@@ -681,8 +673,43 @@ private struct MarkersViewContent: View {
         )
     }
 
+    /// Sheet "Reset" and the saved-filter chip's ✕: drops the preset and every criterion.
+    private func resetAllCatalogFilters() {
+        liveSheetPresetSelection = ""
+        selectedFilter = nil
+        criteriaDocument.clear()
+        clearMarkerLiveChipsOnly()
+        applyLiveFilterFromSheet()
+    }
+
+    /// Name of the active saved filter / local preset for the removable chip above the list.
+    private var activePresetName: String? {
+        if let ls = SceneLivePresetTag.parseLocalUUIDString(liveSheetPresetSelection), let uuid = UUID(uuidString: ls) {
+            return markerLocalPresets.first { $0.id == uuid }?.name
+        }
+        if let sid = SceneLivePresetTag.parseServerId(liveSheetPresetSelection) {
+            return viewModel.savedFilters[sid]?.name ?? selectedFilter?.name
+        }
+        return selectedFilter?.name
+    }
+
+    private var quickBar: some View {
+        CatalogListQuickBar(
+            mode: .sceneMarkers,
+            sort: selectedSortOption,
+            onSort: { changeSortOption(to: $0) },
+            document: criteriaDocument,
+            presetName: activePresetName,
+            onClearPreset: { resetAllCatalogFilters() },
+            onFiltersChanged: { applyLiveFilterFromSheet() },
+            onOpenFilters: { showFilterSortSheet = true }
+        )
+    }
+
     private var markersList: some View {
         ScrollView {
+            VStack(spacing: 0) {
+            quickBar
             LazyVGrid(columns: columns, spacing: 12) {
                 ForEach(viewModel.sceneMarkers) { marker in
                     if let markerScene = marker.scene {
@@ -709,7 +736,8 @@ private struct MarkersViewContent: View {
                 }
             }
             .measuresGridWidth($gridWidth)
-            .padding(16)
+            .padding([.horizontal, .bottom], 16)
+            }
         }
         .refreshable { performSearch() }
     }
@@ -729,7 +757,6 @@ struct MarkersView: View {
 
     var body: some View {
         var content = MarkersViewContent(viewModel: catalogBrowserViewModel ?? ownedViewModel, hideTitle: hideTitle, filterMemory: filterMemory)
-        content.hostsInSectionChrome = catalogBrowserViewModel != nil
         return content
     }
 }

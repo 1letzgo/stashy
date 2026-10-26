@@ -28,8 +28,8 @@ import kotlinx.coroutines.launch
  * iOS: `TagDetailView` (TagsView.swift) — sections Scenes · Galleries · Studios · Groups ·
  * Images, favorite, `EditTagSheet`.
  */
-class TagDetailScreen(val tagId: String, val preview: Tag? = null) : Screen {
-    override val key = "tag-$tagId"
+class TagDetailScreen(val tagId: String, val preview: Tag? = null, private val filterPerformerId: String? = null) : Screen {
+    override val key = "tag-$tagId" + (filterPerformerId?.let { "-p$it" } ?: "")
 
     private val scope = screenScope()
     private var tag by mutableStateOf(preview)
@@ -57,6 +57,8 @@ class TagDetailScreen(val tagId: String, val preview: Tag? = null) : Screen {
         previewGalleries = preview?.galleryCount ?: 0,
         previewImages = preview?.imageCount ?: 0,
     )
+
+    init { catalog.startFilteredOnPerformer(filterPerformerId) }
 
     private var tab by mutableStateOf(
         when {

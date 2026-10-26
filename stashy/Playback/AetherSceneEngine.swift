@@ -14,7 +14,11 @@ import Foundation
 import Combine
 import AVFoundation
 import CoreGraphics
+#if canImport(UIKit)
 import UIKit
+#else
+import AppKit
+#endif
 import AetherEngine
 
 /// Whether a playback surface may claim the shared audio session. `.playback` claims it through
@@ -144,6 +148,7 @@ final class AetherSceneEngine: ObservableObject {
 
     /// Whether the engine owns the system Now-Playing session for the native video path.
     /// Must be set before the first `load` — the native host is built with this value.
+    #if os(iOS) || os(tvOS)
     var ownsNowPlaying: Bool {
         get { engine.ownsVideoNowPlayingSession }
         set { engine.ownsVideoNowPlayingSession = newValue }
@@ -153,6 +158,15 @@ final class AetherSceneEngine: ObservableObject {
     func setNowPlayingInfo(_ info: [String: Any]) {
         engine.setVideoNowPlayingInfo(info)
     }
+    #else
+    // The engine has no MPNowPlayingSession on macOS.
+    var ownsNowPlaying: Bool {
+        get { false }
+        set {}
+    }
+
+    func setNowPlayingInfo(_ info: [String: Any]) {}
+    #endif
 
     /// Presentation size of the current source, in pixels, or nil while unknown.
     /// The software route reports the settled picture size directly; the AVPlayer-backed routes
@@ -293,6 +307,9 @@ final class AetherSceneEngine: ObservableObject {
     /// manual pick (including "Off") is never overridden within the same playback.
     private var subtitleDecisionGeneration: Int?
     private var pendingSeek: Double?
+    /// `seek(to:)` coalescing: the newest target waiting behind the running seek.
+    private var queuedSeekTarget: Double?
+    private var isSeekRunning = false
     private var loopSeekInFlight = false
     private var isLoading = false
     /// Fallback still extractor for the software route (no SegmentCache, so no cache-backed
@@ -686,6 +703,7 @@ final class AetherSceneEngine: ObservableObject {
         currentSubtitleText = nil
         currentSubtitleImage = nil
         pendingSeek = nil
+        queuedSeekTarget = nil
         loopSeekInFlight = false
         isLoading = true
 
@@ -902,9 +920,24 @@ final class AetherSceneEngine: ObservableObject {
         engine.togglePlayPause()
     }
 
-    /// Seeks. `.ended` is terminal on the engine, so that case reloads instead.
+    /// Seeks. Calls are coalesced: one runs at a time and only the newest waiting target
+    /// follows it. tvOS fired one seek per remote click, and overlapping seeks (or transcode
+    /// reloads) left the player glitching with the remote no longer getting through.
     func seek(to seconds: Double) async {
-        let target = max(0, seconds)
+        queuedSeekTarget = max(0, seconds)
+        // Shown at once; the running seek picks the newest target up when it finishes.
+        currentTime = queuedSeekTarget ?? currentTime
+        guard !isSeekRunning else { return }
+        isSeekRunning = true
+        defer { isSeekRunning = false }
+        while let target = queuedSeekTarget {
+            queuedSeekTarget = nil
+            await performSeek(to: target)
+        }
+    }
+
+    /// `.ended` is terminal on the engine, so that case reloads instead.
+    private func performSeek(to target: Double) async {
         if didEnd {
             await reloadCurrentSource(startAt: target, autoplay: true)
             return
@@ -1117,6 +1150,7 @@ final class AetherSceneEngine: ObservableObject {
         cancellables.removeAll()
         loadGeneration &+= 1
         pendingSeek = nil
+        queuedSeekTarget = nil
         resetSourceLadder()
         primarySourceURL = nil
         hostCustomizeOptions = nil

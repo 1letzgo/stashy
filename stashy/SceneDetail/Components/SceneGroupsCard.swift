@@ -124,7 +124,7 @@ struct AddGroupToSceneSheet: View {
     @ObservedObject var viewModel: StashDBViewModel
     var onComplete: ([SceneGroupEntry]) -> Void
 
-    @Environment(\.dismiss) var dismiss
+    @Environment(\.stashyDismiss) var dismiss
     @ObservedObject var appearanceManager = AppearanceManager.shared
     @State private var allGroups: [StashGroup] = []
     @State private var isLoading = false

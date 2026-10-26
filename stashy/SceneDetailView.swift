@@ -44,9 +44,12 @@ struct SceneDetailView: View {
     @State private var aetherEngine: AetherSceneEngine?
     @State private var showDeleteWithFilesConfirmation = false
     @State private var isDeleting = false
-    @State private var isDownloading = false
     @State private var isIdentifying = false
-    @Environment(\.dismiss) var dismiss
+    @Environment(\.stashyDismiss) var dismiss
+    @Environment(\.stashyPresentedFromMiniPlayer) private var presentedFromMiniPlayer
+    @Environment(\.stashyScenePlayerOnly) private var playerOnly
+    /// Taken back from a paused mini player: keep it paused instead of autoplaying.
+    @State private var adoptedPaused = false
     @EnvironmentObject var coordinator: NavigationCoordinator
 
     @State private var isHeaderExpanded = false
@@ -91,87 +94,56 @@ struct SceneDetailView: View {
     @State private var isPressing = false
     @State private var hasInitializedDevices = false
 
-    private var chromePillHeight: CGFloat { StashyExpandingDock.activeHeight }
 
     @Environment(\.verticalSizeClass) var verticalSizeClass
 
-    /// Shared detail chrome: `sceneDetailNavBar` renders the actual bar content.
+    /// Shared detail chrome: Back on top; Identify, Download and Delete in the floating bar.
     private var sceneDetailChromeConfig: StashyDetailChromeConfig {
-        StashyDetailChromeConfig(insetSpacing: 0)
+        var slots = CatalogSlotSet(visibility: CatalogFloatingChromeState(
+            hasActiveServerConfig: true, primaryListIsEmpty: false, errorMessage: nil, imageFindListError: nil
+        ))
+        slots.entityActions = sceneActionSlots
+        return StashyDetailChromeConfig(listSlots: playerOnly ? nil : slots, insetSpacing: 0)
     }
 
-    /// Custom top chrome: Back · Identify (if no Stash-ID) · Download · Delete.
-    @ViewBuilder
-    private var sceneDetailNavBar: some View {
-        StashySectionChromeBar {
-            HStack(spacing: 8) {
-                Button {
-                    dismiss()
-                } label: {
-                    HStack(spacing: StashyExpandingDock.iconLabelSpacing) {
-                        Image(systemName: "chevron.left")
-                            .font(.system(size: StashyExpandingDock.iconSize, weight: .semibold))
-                        Text("Back")
-                            .font(.subheadline.weight(.semibold))
-                    }
-                    .foregroundColor(.white)
-                    .modifier(StashyChromePillStyle(height: chromePillHeight, accent: true))
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel("Back")
-
-                Spacer(minLength: 8)
-
-                if !activeScene.hasStashID {
-                    sceneIdentifyNavButton
-                }
-                sceneDownloadNavButton
-                // Rarely used, so it lives up here instead of as a big card under the scene.
-                ChromeCircleButton(systemImage: "trash", accessibilityLabel: "Delete Scene") {
-                    showDeleteWithFilesConfirmation = true
-                }
-            }
-            .frame(minHeight: chromePillHeight)
-            .padding(.horizontal, StashyExpandingDock.edgePadding)
-            .padding(.vertical, 8)
-        }
-    }
-
-    @ViewBuilder
-    private var sceneIdentifyNavButton: some View {
-        if isIdentifying {
-            ZStack {
-                Circle()
-                    .stroke(Color.white.opacity(0.25), lineWidth: 2.5)
-                Circle()
-                    .trim(from: 0, to: 0.25)
-                    .stroke(appearanceManager.tintColor, style: StrokeStyle(lineWidth: 2.5, lineCap: .round))
-                    .rotationEffect(.degrees(isIdentifying ? 360 : 0))
-                    .animation(.linear(duration: 1).repeatForever(autoreverses: false), value: isIdentifying)
-            }
-            .frame(
-                width: StashyExpandingDock.circleSize,
-                height: StashyExpandingDock.circleSize
-            )
-            .accessibilityLabel("Identifying")
-        } else {
-            Button {
+    private var sceneActionSlots: [CatalogChromeSlot] {
+        var actions: [CatalogChromeSlot] = []
+        if !activeScene.hasStashID {
+            actions.append(CatalogChromeSlot(
+                systemImage: isIdentifying ? "hourglass" : "person.crop.square.filled.and.at.rectangle",
+                isActive: isIdentifying,
+                accessibilityLabel: isIdentifying ? "Identifying" : "Identify scene"
+            ) {
+                guard !isIdentifying else { return }
                 startSceneIdentify()
-            } label: {
-                Image(systemName: "person.crop.square.filled.and.at.rectangle")
-                    .font(.system(size: StashyExpandingDock.iconSize, weight: .semibold))
-                    .foregroundColor(.white.opacity(StashyExpandingDock.inactiveIconOpacity))
-                    .frame(
-                        width: StashyExpandingDock.circleSize,
-                        height: StashyExpandingDock.circleSize
-                    )
-                    .stashyGlass(shape: Capsule(style: .continuous))
-                    .contentShape(Capsule(style: .continuous))
-            }
-            .buttonStyle(.plain)
-            .accessibilityLabel("Identify scene")
+            })
         }
+        if downloadManager.isDownloaded(id: activeScene.id) {
+            actions.append(CatalogChromeSlot(systemImage: "checkmark.circle.fill", accessibilityLabel: "Downloaded", tint: .green) {})
+        } else if downloadManager.activeDownloads[activeScene.id] != nil {
+            actions.append(CatalogChromeSlot(systemImage: "arrow.down.circle.dotted", isActive: true, accessibilityLabel: "Downloading") {})
+        } else {
+            actions.append(CatalogChromeSlot(systemImage: "arrow.down.doc", accessibilityLabel: "Download scene") {
+                HapticManager.light()
+                downloadManager.downloadScene(activeScene)
+            })
+        }
+        // Rarely used, so it lives in the bar instead of as a big card under the scene.
+        actions.append(CatalogChromeSlot(systemImage: "trash", accessibilityLabel: "Delete Scene") {
+            showDeleteWithFilesConfirmation = true
+        })
+        return actions
     }
+
+    /// Back on top (Close when opened from the mini player); actions live in the floating bar.
+    private var sceneDetailNavBar: some View {
+        StashyDetailTopBar(
+            backTitle: presentedFromMiniPlayer ? "Close" : "Back",
+            backIcon: presentedFromMiniPlayer ? "xmark" : "chevron.left",
+            onBack: { dismiss() }
+        )
+    }
+
 
     private func startSceneIdentify() {
         HapticManager.light()
@@ -244,68 +216,20 @@ struct SceneDetailView: View {
         }
     }
 
-    @ViewBuilder
-    private var sceneDownloadNavButton: some View {
-        if downloadManager.isDownloaded(id: activeScene.id) {
-            Image(systemName: "checkmark.circle.fill")
-                .font(.system(size: StashyExpandingDock.iconSize, weight: .semibold))
-                .foregroundColor(.green)
-                .frame(
-                    width: StashyExpandingDock.circleSize,
-                    height: StashyExpandingDock.circleSize
-                )
-                .accessibilityLabel("Downloaded")
-        } else if let activeDownload = downloadManager.activeDownloads[activeScene.id] {
-            ZStack {
-                Circle()
-                    .stroke(Color.white.opacity(0.25), lineWidth: 2.5)
-
-                if activeDownload.totalSize > 0 {
-                    Circle()
-                        .trim(from: 0, to: activeDownload.progress)
-                        .stroke(appearanceManager.tintColor, style: StrokeStyle(lineWidth: 2.5, lineCap: .round))
-                        .rotationEffect(.degrees(-90))
-                        .animation(.linear, value: activeDownload.progress)
-                } else {
-                    Circle()
-                        .trim(from: 0, to: 0.25)
-                        .stroke(appearanceManager.tintColor, style: StrokeStyle(lineWidth: 2.5, lineCap: .round))
-                        .rotationEffect(.degrees(isDownloading ? 360 : 0))
-                        .animation(.linear(duration: 1).repeatForever(autoreverses: false), value: isDownloading)
-                        .onAppear { isDownloading = true }
-                }
-            }
-            .frame(
-                width: StashyExpandingDock.circleSize,
-                height: StashyExpandingDock.circleSize
-            )
-            .accessibilityLabel("Downloading")
-        } else {
-            Button {
-                HapticManager.light()
-                downloadManager.downloadScene(activeScene)
-            } label: {
-                Image(systemName: "arrow.down.doc")
-                    .font(.system(size: StashyExpandingDock.iconSize, weight: .semibold))
-                    .foregroundColor(.white.opacity(StashyExpandingDock.inactiveIconOpacity))
-                    .frame(
-                        width: StashyExpandingDock.circleSize,
-                        height: StashyExpandingDock.circleSize
-                    )
-                    .stashyGlass(shape: Capsule(style: .continuous))
-                    .contentShape(Capsule(style: .continuous))
-            }
-            .buttonStyle(.plain)
-            .accessibilityLabel("Save scene")
-        }
-    }
 
     // Extracted main content to use modular components
     /// Pinned while a started player sits in portrait. Landscape keeps it in the scroll
     /// content: there the picture already takes most of the height, and a pinned card would
     /// leave a sliver for everything else.
     private var isPlayerPinned: Bool {
+        #if os(macOS)
+        // A Mac window is landscape: pinned, the 16:9 card had to share the height with the
+        // scroll view and shrank to a small box. In the scroll content it stays full width,
+        // exactly like the cover.
+        return false
+        #else
         isPlaybackStarted && aetherEngine != nil && verticalSizeClass != .compact
+        #endif
     }
 
     /// One instance, used pinned above the scroll area or inside it.
@@ -395,12 +319,21 @@ struct SceneDetailView: View {
 
 
 
+    @ViewBuilder
+    private var chromedContent: some View {
+        if playerOnly {
+            playerCardView
+        } else {
+            mainContentView
+                .applyAppBackground()
+                .stashyDetailChrome(sceneDetailChromeConfig) {
+                    sceneDetailNavBar
+                }
+        }
+    }
+
     var body: some View {
-        mainContentView
-            .applyAppBackground()
-            .stashyDetailChrome(sceneDetailChromeConfig) {
-                sceneDetailNavBar
-            }
+        chromedContent
             .modifier(SceneDetailAlertModifier(
                 showDeleteConfirmation: $showDeleteWithFilesConfirmation,
                 showingAddMarkerSheet: $showingAddMarkerSheet,
@@ -416,6 +349,16 @@ struct SceneDetailView: View {
             ))
             .modifier(lifecycleModifier)
             .dismissOnAppLock { isFullscreen = false }
+            // Deleted elsewhere (from its page opened out of Now Playing, Feeds, …): this copy of
+            // the page has nothing left to show. The page that deleted it closes itself.
+            .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("SceneDeleted"))) { note in
+                guard !isDeleting, !playerOnly,
+                      let sceneId = note.userInfo?["sceneId"] as? String, sceneId == activeScene.id else { return }
+                isDeleting = true
+                aetherEngine?.stop()
+                aetherEngine = nil
+                dismiss()
+            }
             .fullScreenCover(isPresented: $isFullscreen) {
                 fullscreenPlayer
             }
@@ -574,6 +517,7 @@ struct SceneDetailView: View {
             onRefreshMarkers: refreshSceneDetails,
             onInitialSync: initialSync,
             onEnsureAetherAnalysis: ensureAetherVideoAnalysis,
+            onPauseForFeeds: handlePauseForFeeds,
             handyManager: handyManager,
             buttplugManager: buttplugManager,
             loveSpouseManager: loveSpouseManager
@@ -654,6 +598,15 @@ struct SceneDetailView: View {
             configureSubtitles()
         }
         
+        // The mini player runs this scene (left it earlier, or reopened from the bar): play on
+        // in the page with the same engine, no cover and no reload. Not when scenes play in
+        // Now Playing: the bar keeps it.
+        if !isPlaybackStarted, miniPlayerShowsThisScene, !playsInNowPlaying {
+            resumeOnReturn = nil
+            startPlayback(resume: false)
+            return
+        }
+
         // Back from another tab or a pushed page: the video played when it was left, so it plays
         // on from the same spot instead of waiting on the cover.
         if let pending = resumeOnReturn {
@@ -687,9 +640,25 @@ struct SceneDetailView: View {
         subtitleController.attach(aether: aether)
     }
 
+    /// Feeds took over the screen. A playing scene goes to the mini player first: paused, the
+    /// later disappear would stop it instead, and the bar stayed gone after leaving Feeds.
+    private func handlePauseForFeeds() {
+        #if !os(tvOS)
+        if let aether = aetherEngine, isPlaybackStarted, aether.isPlaying, !isFullscreen,
+           MiniPlayerStore.shared.isEnabled {
+            finishDisappearTeardown()
+            MiniPlayerStore.shared.session?.engine.pause()
+            return
+        }
+        #endif
+        aetherEngine?.pause()
+    }
+
     private func handleOnDisappear() {
         if isDeleting {
-            aetherEngine?.pause()
+            // The scene is gone: nothing to resume or hand to the mini player.
+            aetherEngine?.stop()
+            aetherEngine = nil
             stopPreview()
             return
         }
@@ -717,7 +686,17 @@ struct SceneDetailView: View {
         if let aether = aetherEngine, isPlaybackStarted {
             resumeOnReturn = (aether.isPlaying, aether.currentTime)
         }
-        aetherEngine?.pause()
+        // A playing scene moves to the mini player instead of stopping.
+        let handOffEngine: AetherSceneEngine? = {
+            #if !os(tvOS)
+            guard let aether = aetherEngine, isPlaybackStarted, aether.isPlaying || playerOnly,
+                  MiniPlayerStore.shared.isEnabled else { return nil }
+            return aether
+            #else
+            return nil
+            #endif
+        }()
+        if handOffEngine == nil { aetherEngine?.pause() }
         StashSyncManager.shared.stop()
         if handyManager.isSyncing || handyManager.isStashSyncMode { handyManager.pause() }
         if buttplugManager.isConnected { buttplugManager.stop() }
@@ -728,8 +707,18 @@ struct SceneDetailView: View {
         // AI Motion teardown below can close it for good.
         Task { await transcriptionController.disable() }
         AetherMotionAnalysis.teardown(engine: aetherEngine)
+        #if !os(tvOS)
+        if let handOffEngine {
+            MiniPlayerStore.shared.adopt(scene: activeScene, engine: handOffEngine, playRegistered: hasAddedPlay)
+        } else {
+            // Stopped here, not handed over: nothing to bring back on the next launch.
+            if isPlaybackStarted { MiniPlayerStore.shared.forgetLastSession(sceneId: activeScene.id) }
+            aetherEngine?.stop()
+        }
+        #else
         // `@State` release is not deterministic, so the engine is torn down explicitly.
         aetherEngine?.stop()
+        #endif
         aetherEngine = nil
         // The player surface has no engine behind it any more; show the cover until return.
         isPlaybackStarted = false
@@ -799,7 +788,7 @@ struct SceneDetailView: View {
             return stashSyncManager.isSyncing
         case .performersStudio:
             return showsPerformersStudioCard
-        case .details, .similarScenes, .groups, .tags, .galleries:
+        case .details, .similarScenes, .groups, .tags:
             return true
         }
     }
@@ -880,7 +869,7 @@ struct SceneDetailView: View {
             SceneSimilarScenesCard(scenes: similarScenes, isLoading: isLoadingSimilarScenes)
 
         case .performersStudio:
-            // Studio first, then performers (+ director), horizontal scroll.
+            // Metadata: studio, performers (+ director), galleries — horizontal scroll.
             performersStudioCard
 
         case .groups:
@@ -905,16 +894,6 @@ struct SceneDetailView: View {
                 tagsTotalHeight: $tagsTotalHeight
             )
 
-        case .galleries:
-            SceneGalleriesCard(
-                sceneId: activeScene.id,
-                galleries: activeScene.galleries,
-                performers: activeScene.performers,
-                onGalleriesUpdated: { updated in
-                    applyLocalSceneEdit(Scene(id: activeScene.id, title: activeScene.title, details: activeScene.details, director: activeScene.director, date: activeScene.date, duration: activeScene.duration, studio: activeScene.studio, performers: activeScene.performers, files: activeScene.files, tags: activeScene.tags, galleries: updated, groups: activeScene.groups, organized: activeScene.organized, resumeTime: activeScene.resumeTime, playCount: activeScene.playCount, oCounter: activeScene.oCounter, rating100: activeScene.rating100, createdAt: activeScene.createdAt, updatedAt: activeScene.updatedAt, paths: activeScene.paths, sceneMarkers: activeScene.sceneMarkers, interactive: activeScene.interactive, stashIds: activeScene.stashIds, captions: activeScene.captions, customFields: activeScene.customFields))
-                },
-                viewModel: viewModel
-            )
         }
     }
 
@@ -923,11 +902,12 @@ struct SceneDetailView: View {
             performers: activeScene.performers,
             studio: activeScene.studio,
             director: activeScene.normalizedDirector,
+            galleries: activeScene.galleries,
             editing: appearanceManager.isEditModeEnabled
         )
     }
 
-    /// Studio first, then performers (+ director) — writes through `sceneUpdate`.
+    /// Metadata: studio, performers (+ director), galleries — writes through `sceneUpdate`.
     private var performersStudioCard: some View {
         ScenePerformersStudioCard(
             sceneId: activeScene.id,
@@ -941,6 +921,10 @@ struct SceneDetailView: View {
             onStudioUpdated: { updated in
                 applyLocalSceneEdit(Scene(id: activeScene.id, title: activeScene.title, details: activeScene.details, director: activeScene.director, date: activeScene.date, duration: activeScene.duration, studio: updated, performers: activeScene.performers, files: activeScene.files, tags: activeScene.tags, galleries: activeScene.galleries, groups: activeScene.groups, organized: activeScene.organized, resumeTime: activeScene.resumeTime, playCount: activeScene.playCount, oCounter: activeScene.oCounter, rating100: activeScene.rating100, createdAt: activeScene.createdAt, updatedAt: activeScene.updatedAt, paths: activeScene.paths, sceneMarkers: activeScene.sceneMarkers, interactive: activeScene.interactive, stashIds: activeScene.stashIds, captions: activeScene.captions, customFields: activeScene.customFields))
             },
+            galleries: activeScene.galleries ?? [],
+            onGalleriesUpdated: { updated in
+                applyLocalSceneEdit(Scene(id: activeScene.id, title: activeScene.title, details: activeScene.details, director: activeScene.director, date: activeScene.date, duration: activeScene.duration, studio: activeScene.studio, performers: activeScene.performers, files: activeScene.files, tags: activeScene.tags, galleries: updated, groups: activeScene.groups, organized: activeScene.organized, resumeTime: activeScene.resumeTime, playCount: activeScene.playCount, oCounter: activeScene.oCounter, rating100: activeScene.rating100, createdAt: activeScene.createdAt, updatedAt: activeScene.updatedAt, paths: activeScene.paths, sceneMarkers: activeScene.sceneMarkers, interactive: activeScene.interactive, stashIds: activeScene.stashIds, captions: activeScene.captions, customFields: activeScene.customFields))
+            },
             viewModel: viewModel
         )
     }
@@ -951,11 +935,29 @@ struct SceneDetailView: View {
         updated.postListMetadataUpdated()
     }
 
-    private func startPlayback(resume: Bool) {
+    /// Mini player on: Play hands the scene to Now Playing instead of playing on this page.
+    /// The page Now Playing embeds (`playerOnly`) and its Details page play themselves.
+    private var playsInNowPlaying: Bool {
+        #if os(tvOS)
+        false
+        #else
+        !playerOnly && !presentedFromMiniPlayer && MiniPlayerStore.shared.isEnabled
+        #endif
+    }
+
+    private func startPlayback(resume: Bool, startAt: Double? = nil) {
+        #if !os(tvOS)
+        if playsInNowPlaying {
+            MiniPlayerStore.shared.openNowPlaying(activeScene, startAt: startAt ?? (resume ? nil : 0))
+            return
+        }
+        #endif
         guard let url = activeScene.aetherVideoURL else { return }
 
+        // The mini player still runs this scene: take its engine back instead of reloading.
+        let adoptedFromMiniPlayer = takeEngineFromMiniPlayer()
         let resumeTarget: Double? = {
-            guard resume, let time = activeScene.resumeTime, time > 0 else { return nil }
+            guard resume, !adoptedFromMiniPlayer, let time = activeScene.resumeTime, time > 0 else { return nil }
             return time
         }()
 
@@ -980,41 +982,7 @@ struct SceneDetailView: View {
             engine.isMuted = isMuted
             engine.rate = Float(playbackSpeed)
 
-            engine.onTime = { [weak engine] seconds, duration in
-                if seconds >= 0 {
-                    currentPlaybackTime = seconds
-                    let total = duration > 0 ? duration : (activeScene.sceneDuration ?? 0)
-                    playbackActivityTracker.setPosition(currentTime: seconds, duration: total)
-                    if engine?.isPlaying == true {
-                        ensurePlaybackActivityConfigured()
-                        playbackActivityTracker.start()
-                    }
-                }
-                playCountClock.sample(playhead: seconds,
-                                      isPlaying: engine?.isPlaying == true && !isScrubbing)
-                creditPlayIfWatchedEnough()
-            }
-            engine.onPlayingChanged = { [weak engine] playing in
-                guard let engine else { return }
-                handleAetherPlayingChange(engine, playing: playing)
-            }
-            // A (re)load swaps the analysis item in place — re-attach AI Motion to the new one.
-            engine.onAnalysisItemChanged = { _ in
-                ensureAetherVideoAnalysis()
-            }
-
-            // Server transcodes the engine falls back to when the original will not play.
-            engine.fallbackSources = activeScene.transcodeFallbackURLs
-            engine.fallbackDeclaredDuration = activeScene.sceneDuration
-            engine.onTranscodeFallback = { _ in
-                guard !didAnnounceTranscodeFallback else { return }
-                didAnnounceTranscodeFallback = true
-                ToastManager.shared.show(
-                    "Original could not be played — using the server transcode",
-                    icon: "arrow.triangle.2.circlepath",
-                    style: .error
-                )
-            }
+            wireEngineCallbacks(engine)
 
             aetherEngine = engine
             let scene = activeScene
@@ -1026,15 +994,27 @@ struct SceneDetailView: View {
             Task { await engine.seek(to: resumeTarget) }
         }
 
-        withAnimation {
-            isPlaybackStarted = true
+        // The mini player's full view shows the running video straight away: no cover fade.
+        if playerOnly {
+            var transaction = Transaction()
+            transaction.disablesAnimations = true
+            withTransaction(transaction) { isPlaybackStarted = true }
+        } else {
+            withAnimation {
+                isPlaybackStarted = true
+            }
         }
         // Live captions (AI Subs) share the caption channel with server VTT; the controller is
         // driven by the engine clock.
         if let engine = aetherEngine {
             subtitleController.attach(aether: engine)
         }
-        aetherEngine?.play()
+        // A paused mini player stays paused when its full view takes the engine back.
+        if adoptedPaused {
+            adoptedPaused = false
+        } else {
+            aetherEngine?.play()
+        }
 
         let position = aetherEngine?.currentTime ?? resumeTarget ?? 0
         if handyManager.isSyncing {
@@ -1071,6 +1051,76 @@ struct SceneDetailView: View {
     /// Stash's server captions as selectable external subtitle tracks on the engine. Registering
     /// them republishes `subtitleTracks`, so "Show subtitles automatically" (Settings → Playback)
     /// can pick one; otherwise the user picks from the Audio & Subtitles menu.
+    /// Takes the engine back from the mini player when it plays this scene; any other scene
+    /// the mini player runs is closed, since this page is about to start its own.
+    private func takeEngineFromMiniPlayer() -> Bool {
+        #if !os(tvOS)
+        guard aetherEngine == nil else { return false }
+        if let handedBack = MiniPlayerStore.shared.take(sceneId: activeScene.id) {
+            let engine = handedBack.engine
+            if handedBack.playRegistered { hasAddedPlay = true }
+            adoptedPaused = !engine.isPlaying
+            wireEngineCallbacks(engine)
+            aetherEngine = engine
+            // The bar may have been toggled meanwhile; the page's mute button follows the engine.
+            isMuted = engine.isMuted
+            return true
+        }
+        MiniPlayerStore.shared.yield(to: activeScene.id)
+        #endif
+        return false
+    }
+
+    private var miniPlayerShowsThisScene: Bool {
+        #if !os(tvOS)
+        MiniPlayerStore.shared.session?.scene.id == activeScene.id
+        #else
+        false
+        #endif
+    }
+
+    /// Page-side engine callbacks. Set on a fresh engine and again on one the mini player
+    /// hands back, since the mini player replaces them while it owns the engine.
+    private func wireEngineCallbacks(_ engine: AetherSceneEngine) {
+        engine.onTime = { [weak engine] seconds, duration in
+            if seconds >= 0 {
+                currentPlaybackTime = seconds
+                let total = duration > 0 ? duration : (activeScene.sceneDuration ?? 0)
+                playbackActivityTracker.setPosition(currentTime: seconds, duration: total)
+                if engine?.isPlaying == true {
+                    ensurePlaybackActivityConfigured()
+                    playbackActivityTracker.start()
+                }
+            }
+            playCountClock.sample(playhead: seconds,
+                                  isPlaying: engine?.isPlaying == true && !isScrubbing)
+            creditPlayIfWatchedEnough()
+        }
+        // In the mini player's full view the watchlist plays on.
+        engine.onReachedEnd = playerOnly ? { MiniPlayerStore.shared.advanceNowPlaying() } : nil
+        engine.onPlayingChanged = { [weak engine] playing in
+            guard let engine else { return }
+            handleAetherPlayingChange(engine, playing: playing)
+        }
+        // A (re)load swaps the analysis item in place — re-attach AI Motion to the new one.
+        engine.onAnalysisItemChanged = { _ in
+            ensureAetherVideoAnalysis()
+        }
+
+        // Server transcodes the engine falls back to when the original will not play.
+        engine.fallbackSources = activeScene.transcodeFallbackURLs
+        engine.fallbackDeclaredDuration = activeScene.sceneDuration
+        engine.onTranscodeFallback = { _ in
+            guard !didAnnounceTranscodeFallback else { return }
+            didAnnounceTranscodeFallback = true
+            ToastManager.shared.show(
+                "Original could not be played — using the server transcode",
+                icon: "arrow.triangle.2.circlepath",
+                style: .error
+            )
+        }
+    }
+
     private func registerAetherCaptions(on engine: AetherSceneEngine, scene: Scene) {
         guard let captions = scene.captions, !captions.isEmpty else { return }
         for caption in captions {
@@ -1175,7 +1225,8 @@ struct SceneDetailView: View {
 
     private func seekTo(_ seconds: Double) {
         if !isPlaybackStarted {
-            startPlayback(resume: false)
+            startPlayback(resume: false, startAt: seconds)
+            if playsInNowPlaying { return }
         }
 
         guard let aether = aetherEngine else { return }
@@ -1303,7 +1354,7 @@ struct AddMarkerSheet: View {
     let aetherEngine: AetherSceneEngine?
     @ObservedObject var viewModel: StashDBViewModel
     var onComplete: () -> Void
-    @Environment(\.dismiss) var dismiss
+    @Environment(\.stashyDismiss) var dismiss
     @ObservedObject var appearanceManager = AppearanceManager.shared
     
     @State private var primaryTagId: String = ""
@@ -1669,6 +1720,7 @@ private struct SceneDetailLifecycleModifier: ViewModifier {
     let onRefreshMarkers:  () -> Void
     let onInitialSync:     () -> Void
     let onEnsureAetherAnalysis: () -> Void
+    let onPauseForFeeds:   () -> Void
     let handyManager:      HandyManager
     let buttplugManager:   ButtplugManager
     let loveSpouseManager: LoveSpouseManager
@@ -1685,7 +1737,7 @@ private struct SceneDetailLifecycleModifier: ViewModifier {
             }
             // Without a mute button here the route is the only control the user has: plugging
             // headphones in mid-playback must turn the sound on, unplugging must mute again.
-            .onReceive(NotificationCenter.default.publisher(for: AVAudioSession.routeChangeNotification)
+            .onReceive(NotificationCenter.default.publisher(for: audioRouteChangeNotification)
                 .receive(on: DispatchQueue.main)) { _ in
                 // "Start muted without headphones" off: the route never decides the mute state,
                 // so unplugging does not force-mute (playback pause on unplug is the system's).
@@ -1696,7 +1748,7 @@ private struct SceneDetailLifecycleModifier: ViewModifier {
             // Feeds taking over the screen stops this player; otherwise its audio kept running
             // underneath the feed until the user swiped.
             .onReceive(NotificationCenter.default.publisher(for: .stashyPauseBackgroundPlayers)) { _ in
-                aetherEngine?.pause()
+                onPauseForFeeds()
             }
             .onReceive(Timer.publish(every: 10, on: .main, in: .common).autoconnect()) { _ in onPeriodicSync() }
             .onChange(of: StashSyncManager.shared.isActive) { _, active in if active { onInitialSync() } }

@@ -311,6 +311,21 @@ extension ScenesListScope {
 /// `CatalogsView` for the Home sub-tab) so it survives the list being remounted (tab switches).
 /// The scene list itself already lives in the shared view model; without this the sheet
 /// reopened blank over a filtered list.
+/// A tag or studio opened from a performer's page lists only that performer's content: the
+/// performer starts as a removable criterion in the scenes, galleries and images filters.
+@MainActor
+enum PerformerScopedDetail {
+    static func criteria(performerId: String) -> [String: Any] {
+        ["performers": ["value": [performerId], "modifier": StashCriterionModifier.includes.rawValue]]
+    }
+
+    static func scenesMemory(performerId: String?) -> ScenesListFilterMemory {
+        let memory = ScenesListFilterMemory()
+        if let performerId { memory.criteriaDocument.load(criteria(performerId: performerId)) }
+        return memory
+    }
+}
+
 @MainActor
 final class ScenesListFilterMemory: ObservableObject {
     struct Snapshot {
@@ -336,8 +351,6 @@ final class ScenesListFilterMemory: ObservableObject {
 }
 
 private struct ScenesViewContent: View {
-    /// Home sub-tab root: actions go into the Home chrome instead of a floating bar.
-    var hostsInSectionChrome = false
     @ObservedObject var appearanceManager = AppearanceManager.shared
     @ObservedObject var configManager = ServerConfigManager.shared
     @EnvironmentObject var coordinator: NavigationCoordinator
@@ -941,6 +954,12 @@ private struct ScenesViewContent: View {
     }
 
     // Safe sort change function
+    /// A group's scenes can also sort by their number in the group.
+    private var groupScopeSortFields: [CatalogQuickSortCatalog.Field] {
+        if case .group = scope { return [.init(field: "group_scene_number", label: "Scene No.")] }
+        return []
+    }
+
     private func changeSortOption(to newOption: StashDBViewModel.SceneSortOption) {
         if newOption == .random && selectedSortOption == .random {
             viewModel.refreshRandomSeed()
@@ -1051,6 +1070,49 @@ private struct ScenesViewContent: View {
         }
     }
 
+    /// Sheet "Reset" and the saved-filter chip's ✕: drops the preset and every criterion.
+    private func resetAllSceneFilters() {
+        criteriaDocument.clear()
+        liveFilterMinRating = 0
+        liveFilterOrganized = nil
+        liveFilterInteractive = nil
+        liveFilterOrientation = nil
+        liveFilterPerformerCount = nil
+        liveFilterResolution = nil
+        liveFilterPerformerFavorite = nil
+        liveFilterOCounterTag = nil
+        liveFilterStudioIds = []
+        liveFilterTagIds = []
+        liveFilterGroupIds = []
+        liveSheetPresetSelection = ""
+        selectedFilter = nil
+        applyLiveFilter()
+    }
+
+    private var activePresetName: String? {
+        if let ls = SceneLivePresetTag.parseLocalUUIDString(liveSheetPresetSelection), let uuid = UUID(uuidString: ls) {
+            return liveFilterPresets.first { $0.id == uuid }?.name
+        }
+        if let sid = SceneLivePresetTag.parseServerId(liveSheetPresetSelection) {
+            return viewModel.savedFilters[sid]?.name ?? selectedFilter?.name
+        }
+        return selectedFilter?.name
+    }
+
+    private var quickBar: some View {
+        CatalogListQuickBar(
+            mode: .scenes,
+            sort: selectedSortOption,
+            onSort: { changeSortOption(to: $0) },
+            document: criteriaDocument,
+            presetName: activePresetName,
+            onClearPreset: { resetAllSceneFilters() },
+            onFiltersChanged: { applyLiveFilter() },
+            onOpenFilters: { liveFilterSheetPresented.wrappedValue = true },
+            leadingSortFields: groupScopeSortFields
+        )
+    }
+
     private func applyLiveFilter() {
         persistSceneSort(selectedSortOption)
         // Full criteria live in `criteriaDocument` — do not also pass `selectedFilter` or base criteria double-apply.
@@ -1108,13 +1170,6 @@ private struct ScenesViewContent: View {
                 errorMessage: viewModel.errorMessage
             ),
             isPresented: showsFloatingFilterButton,
-            hostsInSectionChrome: hostsInSectionChrome,
-            filterSort: CatalogChromeSlot(
-                systemImage: "slider.horizontal.3",
-                isActive: liveFilterFABHasSomethingSet,
-                accessibilityLabel: "Settings",
-                action: { liveFilterSheetPresented.wrappedValue = true }
-            ),
             // Embedded in a detail screen the parent owns the nav bar, so no search field here.
             search: hideTitle ? nil : CatalogSearchChrome(
                 text: $searchText,
@@ -1132,7 +1187,11 @@ private struct ScenesViewContent: View {
                 if configManager.activeConfig == nil {
                     ConnectionErrorView { performSearch() }
                 } else if showsBlockingInitialLoad {
-                    StandardLoadingView(message: "Loading scenes...")
+                    // Keep the bar while a sort/filter change refetches, so it does not jump away.
+                    VStack(spacing: 0) {
+                        if scrollHeader == nil { quickBar }
+                        StandardLoadingView(message: "Loading scenes...")
+                    }
                 } else if primarySceneListIsEmpty && viewModel.errorMessage != nil {
                     ConnectionErrorView(title: viewModel.errorMessage ?? "Server not reachable") { performSearch() }
                 } else if primarySceneListIsEmpty {
@@ -1167,23 +1226,7 @@ private struct ScenesViewContent: View {
                 sortOption: selectedSortOption,
                 onSortChange: { changeSortOption(to: $0) },
                 onApply: { applyLiveFilter() },
-                onReset: {
-                    criteriaDocument.clear()
-                    liveFilterMinRating = 0
-                    liveFilterOrganized = nil
-                    liveFilterInteractive = nil
-                    liveFilterOrientation = nil
-                    liveFilterPerformerCount = nil
-                    liveFilterResolution = nil
-                    liveFilterPerformerFavorite = nil
-                    liveFilterOCounterTag = nil
-                    liveFilterStudioIds = []
-                    liveFilterTagIds = []
-                    liveFilterGroupIds = []
-                    liveSheetPresetSelection = ""
-                    selectedFilter = nil
-                    applyLiveFilter()
-                },
+                onReset: { resetAllSceneFilters() },
                 onRequestSave: { saveLivePresetOverwrite() },
                 onRequestSaveAs: {
                     presetNameInput = ""
@@ -1430,6 +1473,7 @@ private struct ScenesViewContent: View {
             ScrollView {
                 VStack(spacing: 12) {
                     scrollHeader
+                    quickBar
                     emptyStateView
                 }
                 // Match PerformerDetail non-scene tabs (`.padding(16)`).
@@ -1438,7 +1482,10 @@ private struct ScenesViewContent: View {
             .background(Color.appBackground)
             .refreshable { performSearch() }
         } else {
-            emptyStateView
+            VStack(spacing: 0) {
+                if !criteriaDocument.isEmpty || activePresetName != nil { quickBar }
+                emptyStateView
+            }
         }
     }
 
@@ -1448,6 +1495,7 @@ private struct ScenesViewContent: View {
                     if let scrollHeader {
                         scrollHeader
                     }
+                    quickBar
                     LazyVGrid(columns: columns, spacing: 12) {
                     ForEach(primaryScenes) { scene in
                             NavigationLink(destination: LazyView { SceneDetailView(scene: scene) }) {
@@ -1477,7 +1525,6 @@ private struct ScenesViewContent: View {
                     }
                     .measuresGridWidth($cardGridWidth)
                     .padding(.horizontal, 16)
-                    .padding(.top, scrollHeader == nil ? 16 : 0)
                 }
                 // Match PerformerDetail non-scene tabs (`.padding(16)`).
                 .padding(.top, scrollHeader != nil ? 16 : 0)
@@ -1556,7 +1603,6 @@ struct ScenesView: View {
             showsFloatingFilterButton: true,
             filterMemory: filterMemory
         )
-        content.hostsInSectionChrome = true
         return content
     }
 }
@@ -1693,7 +1739,7 @@ struct SceneLiveFilterSheet: View {
     var onMarkerSortChange: (StashDBViewModel.SceneMarkerSortOption) -> Void
 
     @ObservedObject private var appearance = AppearanceManager.shared
-    @Environment(\.dismiss) private var dismiss
+    @Environment(\.stashyDismiss) private var dismiss
 
     private var hasSelectedPreset: Bool { !selectedPresetId.isEmpty }
     private var selectedPresetName: String? {
@@ -1760,7 +1806,7 @@ struct SceneLiveFilterSheet: View {
                     }
 
 
-                    FilterCriteriaEditorView(document: criteriaDocument, onChange: onApply)
+                    CatalogFilterCriteriaBody(document: criteriaDocument, onChange: onApply)
                 }
                 .padding(.top, 8)
             }

@@ -96,9 +96,15 @@ struct MainTabView: View {
             .tint(appearanceManager.tintColor)
             .withToasts()
             .modifier(TabBarNeverMinimizes())
+            #if !os(tvOS)
+            .modifier(MiniPlayerHost(hidden: coordinator.selectedTab == .reels))
+            #endif
             .onAppear {
                 ServerConfigManager.shared.scrubPlaintextAPIKeysFromDisk()
                 checkConfiguration()
+                #if !os(tvOS)
+                MiniPlayerStore.shared.restoreLastSessionIfNeeded()
+                #endif
             }
             .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("AuthError401"))) { _ in
                 coordinator.selectedTab = .catalogue
@@ -242,7 +248,13 @@ extension MainTabView {
                 CatalogsView()
                     .applyAppBackground()
             }
+            #if os(macOS)
+            // macOS has no UINavigationController to pop: deep links into the catalogue
+            // (`cataloguePopToken`) remount the stack instead, so no detail stays on top.
+            .id("\(coordinator.catalogueTabID)|\(coordinator.cataloguePopToken)")
+            #else
             .id(coordinator.catalogueTabID)
+            #endif
 
         case .downloads:
             NavigationStack {
@@ -296,26 +308,22 @@ struct ToolsView: View {
 
     enum ToolsTab: String, CaseIterable {
         case downloads = "Downloads"
+        case watchlist = "Watchlist"
         case overview = "Overview"
         case oCount = "O-Count"
         case timeline = "Timeline"
         case topLists = "Charts"
-        case filters = "Filters"
-        case mergeTags = "Merge Tags"
-        case mergeStudios = "Merge Studios"
         case hotOrNot = "Match"
         case rateMe = "RateMe"
         
         var icon: String {
             switch self {
             case .downloads: return "square.and.arrow.down"
+            case .watchlist: return "text.badge.checkmark"
             case .overview: return "chart.bar.fill"
             case .oCount: return "calendar"
             case .timeline: return "calendar.day.timeline.left"
             case .topLists: return "list.number"
-            case .filters: return "line.3.horizontal.decrease.circle"
-            case .mergeTags: return "arrow.triangle.merge"
-            case .mergeStudios: return "building.2"
             case .hotOrNot: return "flame.fill"
             case .rateMe: return "star.fill"
             }
@@ -326,7 +334,7 @@ struct ToolsView: View {
     /// hand-sorted flat list stopped being a good way in once Tools grew — the grid needs stable
     /// categories, so the order is part of the design now rather than a setting.
     static let toolGroups: [(title: String, tools: [ToolsTab])] = [
-        ("Library", [.downloads, .filters, .mergeTags, .mergeStudios]),
+        ("Library", [.downloads, .watchlist]),
         ("Insights", [.overview, .topLists, .oCount, .timeline]),
         ("Discover", [.hotOrNot, .rateMe])
     ]
@@ -365,6 +373,8 @@ struct ToolsView: View {
             switch effectiveTab {
             case .downloads:
                 DownloadsView()
+            case .watchlist:
+                WatchlistToolsView()
             case .overview:
                 ToolsStatisticsView(viewModel: statisticsViewModel)
             case .oCount:
@@ -373,12 +383,6 @@ struct ToolsView: View {
                 SessionTimelineToolsView()
             case .topLists:
                 TopListsToolsContainerView(viewModel: topListsViewModel)
-            case .filters:
-                FiltersToolsView()
-            case .mergeTags:
-                TagMergeToolsView()
-            case .mergeStudios:
-                StudioMergeToolsView()
             case .hotOrNot:
                 HotOrNotToolsView()
             case .rateMe:
@@ -531,6 +535,7 @@ struct ToolsServerView: View {
 
     @ObservedObject private var configManager = ServerConfigManager.shared
     @ObservedObject private var appearanceManager = AppearanceManager.shared
+    @ObservedObject private var stashyPlus = StashyPlusManager.shared
     @StateObject private var viewModel = StashDBViewModel()
     
     @State private var alertTitle = ""
@@ -672,6 +677,25 @@ struct ToolsServerView: View {
                         }
                         taskRow(label: "Remove Unused Studios", icon: "building.2.crop.circle", taskId: "studios_unused", index: 2, count: 3) {
                             findUnused(.studios)
+                        }
+                    }
+
+                    // Admin-Werkzeuge (früher unter Tools), nur mit stashy+.
+                    if stashyPlus.isUnlocked {
+                        Section {
+                            stashyScrollingSectionHeader("stashy+")
+                            NavigationLink(destination: FiltersToolsView().stashySettingsDetailChrome("Filters")) {
+                                Label("Filters", systemImage: "line.3.horizontal.decrease.circle")
+                            }
+                            .stashyGroupedBlockRow(index: 0, count: 3)
+                            NavigationLink(destination: TagMergeToolsView().stashySettingsDetailChrome("Merge Tags")) {
+                                Label("Merge Tags", systemImage: "arrow.triangle.merge")
+                            }
+                            .stashyGroupedBlockRow(index: 1, count: 3)
+                            NavigationLink(destination: StudioMergeToolsView().stashySettingsDetailChrome("Merge Studios")) {
+                                Label("Merge Studios", systemImage: "building.2")
+                            }
+                            .stashyGroupedBlockRow(index: 2, count: 3)
                         }
                     }
 
@@ -1036,11 +1060,109 @@ private struct ToolsStatisticsView: View {
 private struct TabBarNeverMinimizes: ViewModifier {
     @ViewBuilder
     func body(content: Content) -> some View {
+        #if os(iOS)
         if #available(iOS 26.0, *) {
             content.tabBarMinimizeBehavior(.never)
         } else {
             content
         }
+        #else
+        // macOS: tab bar across the top of the window, like iPad — no sidebar.
+        content.tabViewStyle(.tabBarOnly)
+        #endif
     }
 }
 #endif
+
+#if !os(tvOS)
+/// Puts the mini player above the tab bar and reopens its scene full screen on tap.
+private struct MiniPlayerHost: ViewModifier {
+    /// Feeds own the whole screen; the bar steps aside there (the engine is paused anyway).
+    var hidden: Bool
+    @ObservedObject private var store = MiniPlayerStore.shared
+    @ObservedObject private var tabManager = TabManager.shared
+
+    func body(content: Content) -> some View {
+        content
+            .modifier(MiniPlayerAccessory(
+                isEnabled: store.session != nil && !hidden && store.isEnabled,
+                floats: store.tabBarHiddenByPage
+            ))
+            // Settings › stashy+ › Miniplayer & Watchlist off: the bar closes (its spot is kept).
+            .onChange(of: tabManager.isMiniPlayerEnabled) { _, enabled in
+                if !enabled { store.close(forget: false) }
+            }
+            .sheet(isPresented: $store.showsNowPlaying) {
+                NowPlayingView()
+                    #if os(macOS)
+                    .frame(minWidth: 640, minHeight: 720)
+                    #endif
+            }
+            #if os(macOS)
+            // macOS has no full-screen cover: a large sheet carries the scene page instead.
+            .sheet(item: $store.expandedScene) { scene in
+                NavigationStack {
+                    SceneDetailView(scene: scene, autoPlay: true)
+                        .environment(\.stashyPresentedFromMiniPlayer, true)
+                }
+                .frame(minWidth: 820, minHeight: 640)
+            }
+            #else
+            .fullScreenCover(item: $store.expandedScene) { scene in
+                // The page shows Close instead of Back here; leaving hands the video back to the bar.
+                NavigationStack {
+                    SceneDetailView(scene: scene, autoPlay: true)
+                        .environment(\.stashyPresentedFromMiniPlayer, true)
+                }
+            }
+            #endif
+    }
+}
+
+/// iOS 26's tab bar accessory slot (the Music-style bar). Older systems, and pages that hide
+/// the tab bar (and with it the accessory), get a floating bar instead.
+private struct MiniPlayerAccessory: ViewModifier {
+    var isEnabled: Bool
+    /// The tab bar is hidden by the current page: float at the bottom edge.
+    var floats: Bool
+
+    func body(content: Content) -> some View {
+        #if os(macOS)
+        // macOS: the tab bar sits at the top, so the bar floats at the window's bottom edge.
+        content.overlay(alignment: .bottom) {
+            floatingBar(visible: isEnabled, bottomPadding: 12)
+                .frame(maxWidth: 560)
+        }
+        #else
+        if #available(iOS 26.1, *) {
+            content
+                .tabViewBottomAccessory(isEnabled: isEnabled && !floats) {
+                    MiniPlayerBar()
+                }
+                .overlay(alignment: .bottom) {
+                    floatingBar(visible: isEnabled && floats, bottomPadding: 8)
+                }
+        } else {
+            content.overlay(alignment: .bottom) {
+                floatingBar(visible: isEnabled, bottomPadding: floats ? 8 : 64)
+            }
+        }
+        #endif
+    }
+
+    @ViewBuilder
+    private func floatingBar(visible: Bool, bottomPadding: CGFloat) -> some View {
+        if visible {
+            MiniPlayerBar()
+                .frame(height: 56)
+                // Same glass as the floating action bar and the chrome pills.
+                .stashyGlass(shape: RoundedRectangle(cornerRadius: 16, style: .continuous))
+                .floatingShadow()
+                .padding(.horizontal, 12)
+                .padding(.bottom, bottomPadding)
+                .transition(.move(edge: .bottom).combined(with: .opacity))
+        }
+    }
+}
+#endif
+

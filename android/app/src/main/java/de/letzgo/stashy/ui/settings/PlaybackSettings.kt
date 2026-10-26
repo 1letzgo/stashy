@@ -67,7 +67,12 @@ fun LazyListScope.playbackSections() {
         SettingsDivider()
         SettingsPickerRow("Hold to speed up", TabManager.holdSpeedOptions, TabManager.holdSpeedFeeds, TabConfigLogic::holdSpeedLabel, SFS.forwardFrameFill) { TabManager.holdSpeedFeeds = it }
         SettingsDivider()
-        SettingsPickerRow("Count as played", TabManager.playCountThresholdOptions, TabManager.playCountFeedsSeconds, TabConfigLogic::playCountThresholdLabel, SFS.rectangleStackBadgePlay) { TabManager.playCountFeedsSeconds = it }
+        val verticals = de.letzgo.stashy.data.ReelsModeType.Verticals in TabManager.enabledReelsModes
+        SettingsPickerRow(if (verticals) "Count as played · Scenes" else "Count as played", TabManager.playCountThresholdOptions, TabManager.playCountFeedsSeconds, TabConfigLogic::playCountThresholdLabel, SFS.rectangleStackBadgePlay) { TabManager.playCountFeedsSeconds = it }
+        if (verticals) {
+            SettingsDivider()
+            SettingsPickerRow("Count as played · Verticals", TabManager.playCountThresholdOptions, TabManager.playCountVerticalsSeconds, TabConfigLogic::playCountThresholdLabel, SFS.rectangleStackBadgePlay) { TabManager.playCountVerticalsSeconds = it }
+        }
     }
     // Stash web "Track activity": play count, history, resume point, watch time.
     settingsSection(

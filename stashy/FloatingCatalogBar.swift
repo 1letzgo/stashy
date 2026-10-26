@@ -70,8 +70,6 @@ extension View {
 struct CatalogCategoryRow: View {
     let tabs: [CatalogsView.CatalogsTab]
     @Binding var selection: CatalogsView.CatalogsTab
-    /// The active sub-tab's actions (settings, select, …), pinned at the right.
-    var actions: SectionChromeActions? = nil
 
     var body: some View {
         HStack(spacing: StashyExpandingDock.itemSpacing) {
@@ -79,10 +77,6 @@ struct CatalogCategoryRow: View {
                 strip
             } else {
                 Spacer(minLength: 0)
-            }
-            if let actions {
-                SectionChromeActionsPill(actions: actions)
-                    .padding(StashyChromePlacement.prefersBottom ? .top : .bottom, 4)
             }
         }
     }

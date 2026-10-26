@@ -17,8 +17,8 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.serialization.json.JsonObject
 
 /**
- * iOS: `ScenesView` (catalog tab) — fixed one card per row (16:9), filter & sort as the only
- * slot, Settings default sort/filter, saved filters and on-device presets in the sheet.
+ * iOS: `ScenesView` (catalog tab) — fixed one card per row (16:9), the quick bar's filters chip
+ * opens filter & sort (no chrome slot), Settings default sort/filter, saved filters and on-device presets in the sheet.
  */
 @Composable
 fun ScenesCatalog() {
@@ -35,7 +35,7 @@ fun ScenesList(controller: CatalogController<Scene>, topPadding: androidx.compos
     CatalogScaffold(
         controller,
         CatalogTexts("Loading scenes...", SF.film, "No scenes found", "Load Scenes"),
-        CatalogSlots(filterSort = filterSortSlot(controller)),
+        CatalogSlots(),
         columns = { CatalogCardColumns.One.columnCount(it) },
         itemKey = { it.id },
         topPadding = topPadding,

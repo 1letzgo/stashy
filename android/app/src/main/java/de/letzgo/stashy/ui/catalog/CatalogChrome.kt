@@ -75,6 +75,8 @@ import de.letzgo.stashy.ui.SF
 import de.letzgo.stashy.ui.Theme
 import de.letzgo.stashy.ui.floatingShadow
 import de.letzgo.stashy.ui.stashyGlass
+import de.letzgo.stashy.ui.filter.CatalogListQuickBar
+import de.letzgo.stashy.ui.filter.bleedHorizontally
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.SelectAll
 
@@ -255,6 +257,8 @@ fun <T> CatalogScaffold(
     topPadding: Dp = catalogTopPadding(),
     showsFloatingBar: Boolean = true,
     gridKey: Any? = null,
+    /** iOS `CatalogListQuickBar` as the grid's first, scrolling row (a [listBody] hosts its own). */
+    showsQuickBar: Boolean = true,
     /** Replaces the grid when set (Images 1/row feed); gets the content top padding. */
     listBody: (@Composable (topPadding: Dp) -> Unit)? = null,
     item: @Composable (index: Int, item: T) -> Unit,
@@ -271,9 +275,16 @@ fun <T> CatalogScaffold(
     Box(Modifier.fillMaxSize().background(p.background)) {
         when {
             !hasServer -> StatusPlaceholder(SF.server, "Server not reachable", "Retry Connection", { controller.refresh() })
-            list.items.isEmpty() && (list.isLoading || !list.loadedOnce) -> StandardLoading(texts.loading)
+            // iOS: the quick bar stays above the loading state (a sort / filter change refetches)
+            // and above the empty state while filters are active, so it never jumps away.
+            list.items.isEmpty() && (list.isLoading || !list.loadedOnce) ->
+                if (showsQuickBar) QuickBarAbove(controller, topPadding) { StandardLoading(texts.loading) }
+                else StandardLoading(texts.loading)
             list.items.isEmpty() && list.error != null -> StatusPlaceholder(SF.server, "Server not reachable", "Retry Connection", { controller.refresh() })
-            list.items.isEmpty() -> StatusPlaceholder(texts.emptyIcon, texts.emptyTitle, texts.emptyButton, { controller.refresh() })
+            list.items.isEmpty() ->
+                if (showsQuickBar && controller.isFilterActive) QuickBarAbove(controller, topPadding) {
+                    StatusPlaceholder(texts.emptyIcon, texts.emptyTitle, texts.emptyButton, { controller.refresh() })
+                } else StatusPlaceholder(texts.emptyIcon, texts.emptyTitle, texts.emptyButton, { controller.refresh() })
             else -> PullToRefreshBox(isRefreshing = false, onRefresh = { controller.refresh() }, modifier = Modifier.fillMaxSize()) {
                 if (listBody != null) listBody(topPadding) else BoxWithConstraints(Modifier.fillMaxSize()) {
                     val count = columns((maxWidth - 32.dp).value)
@@ -285,6 +296,9 @@ fun <T> CatalogScaffold(
                             horizontalArrangement = Arrangement.spacedBy(CatalogGridGutter),
                             modifier = Modifier.fillMaxSize(),
                         ) {
+                            if (showsQuickBar) item(key = "quick-bar", span = { GridItemSpan(maxLineSpan) }) {
+                                CatalogListQuickBar(controller, Modifier.bleedHorizontally(16.dp))
+                            }
                             if (controller.search.isNotEmpty()) item(span = { GridItemSpan(maxLineSpan) }) {
                                 Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
                                     SearchClearChip(controller.search, { controller.search = "" })
@@ -303,12 +317,25 @@ fun <T> CatalogScaffold(
     }
 }
 
+/** Quick bar over a non-list state (loading / empty), below the floating chrome. */
+@Composable
+private fun QuickBarAbove(controller: CatalogController<*>, topPadding: Dp, content: @Composable () -> Unit) {
+    Column(Modifier.fillMaxSize().padding(top = topPadding)) {
+        CatalogListQuickBar(controller, Modifier.padding(bottom = de.letzgo.stashy.ui.tools.ToolsTokens.menuBottomPadding))
+        Box(Modifier.fillMaxWidth().weight(1f)) { content() }
+    }
+}
+
 private fun LazyGridScope.loadingFooter(isLoading: Boolean) {
     if (isLoading) item(span = { GridItemSpan(maxLineSpan) }) {
         Box(Modifier.fillMaxWidth().padding(16.dp), Alignment.Center) { CircularProgressIndicator(color = Theme.palette.secondaryText) }
     }
 }
 
-/** The filter & sort slot every catalog has (iOS: `slider.horizontal.3`, label "Settings"). */
+/**
+ * The filter & sort button of lists without the quick bar (director / shared scenes / "Appears
+ * with" detail lists — iOS: `slider.horizontal.3`, label "Settings"). Catalog roots open the
+ * sheet from the quick bar's pinned settings button instead.
+ */
 fun filterSortSlot(controller: CatalogController<*>) =
     CatalogChromeSlot(SF.sliderHorizontal3, controller.isFilterActive, "Settings") { controller.isSheetPresented = true }

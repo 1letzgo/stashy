@@ -142,6 +142,15 @@ fun LazyListScope.stashyPlusSettingsItems() {
         }
     }
     if (StashyPlus.isUnlocked) {
+        item(key = "plus-mini-player") {
+            SettingsSectionHeader("Miniplayer & Watchlist")
+            GroupedCard {
+                de.letzgo.stashy.ui.settings.SettingsToggleRow(
+                    "Miniplayer & Watchlist", de.letzgo.stashy.data.TabManager.isMiniPlayerEnabled, de.letzgo.stashy.ui.SFS.miniPlayer,
+                ) { de.letzgo.stashy.data.TabManager.isMiniPlayerEnabled = it }
+            }
+            SectionSpacer()
+        }
         item(key = "plus-app-icons") {
             SettingsSectionHeader("Custom App Icons")
             GroupedCard { Box(Modifier.padding(horizontal = 16.dp)) { AppIconPicker() } }
@@ -169,6 +178,7 @@ fun LazyListScope.stashyPlusSettingsItems() {
             val features = listOf(
                 "Custom App Icons" to false,
                 "Download Scenes" to false,
+                "Miniplayer & Watchlist" to false,
                 "AI Subtitles and translation" to true,
                 ToolsItem.Statistics.plusFeatureTitle to false,
                 ToolsItem.OCount.plusFeatureTitle to false,

@@ -51,15 +51,12 @@ struct ImagesView: View {
             imageListFilters: sharedImageListFilters ?? ownedImageListFilters,
             initialSearch: initialSearch
         )
-        content.hostsInSectionChrome = catalogBrowserViewModel != nil && initialGallery == nil && !feedsEmbedded
         return content
     }
 }
 
 private struct ImagesViewBody: View {
     @State private var gallery: Gallery?
-    /// Home sub-tab root: actions go into the Home chrome instead of a floating bar.
-    var hostsInSectionChrome = false
     var forceOneColumnFeed: Bool = false
     var feedsEmbedded: Bool = false
     @ObservedObject var viewModel: StashDBViewModel
@@ -67,10 +64,12 @@ private struct ImagesViewBody: View {
     @ObservedObject var appearanceManager = AppearanceManager.shared
     @ObservedObject var configManager = ServerConfigManager.shared
     @EnvironmentObject private var coordinator: NavigationCoordinator
-    @Environment(\.dismiss) private var dismiss
+    @Environment(\.stashyDismiss) private var dismiss
     @ObservedObject private var tabManager = TabManager.shared
     @ObservedObject private var downloadManager = DownloadManager.shared
     @State private var showingGalleryDownloadOptions = false
+    /// Scenes linked to the opened gallery, shown in its Metadata card.
+    @State private var galleryScenes: [Scene] = []
 
     @State private var lastOpenedImageId: String?
     @State private var searchText: String
@@ -90,7 +89,6 @@ private struct ImagesViewBody: View {
     /// Only this image id may autoplay (most centered video in the viewport).
     @State private var autoplayVideoImageId: String?
 
-    private var chromePillHeight: CGFloat { StashyExpandingDock.activeHeight }
     /// User preference from Filter & Sort (1/row muted autoplay).
     @AppStorage("images_feed_video_autoplay") private var imagesFeedVideoAutoplay = true
     /// 1/row + setting on + feed idle — individual cards still need matching `autoplayVideoImageId`.
@@ -322,6 +320,7 @@ private struct ImagesViewBody: View {
                         openedGalleryTop(gallery)
                             .padding(16)
                     }
+                    if showsQuickBar { quickBar }
                     StandardLoadingView(message: "Loading images...")
                 }
             } else if imagesListShowsConnectionError {
@@ -334,6 +333,9 @@ private struct ImagesViewBody: View {
                     if let gallery {
                         openedGalleryTop(gallery)
                             .padding(16)
+                    }
+                    if showsQuickBar && (!imageListFilters.criteriaDocument.isEmpty || activeImagePresetName != nil) {
+                        quickBar
                     }
                     SharedEmptyStateView(
                         icon: "camera.fill",
@@ -351,6 +353,10 @@ private struct ImagesViewBody: View {
                             VStack(spacing: 12) {
                                 if let gallery {
                                     openedGalleryTop(gallery)
+                                }
+                                if showsQuickBar {
+                                    // The bar pads itself; undo the column's inset so chips scroll edge to edge.
+                                    quickBar.padding(.horizontal, -16)
                                 }
                                 gridContent
                             }
@@ -511,6 +517,11 @@ private struct ImagesViewBody: View {
         .task(id: gallery?.id) {
             await hydrateOpenedGalleryIfNeeded()
         }
+        .task(id: gallery?.id) {
+            galleryScenes = []
+            guard let id = gallery?.id else { return }
+            galleryScenes = (try? await SceneRepository().fetchGalleryScenes(galleryId: id)) ?? []
+        }
         .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("DefaultFilterChanged"))) { notification in
             guard gallery == nil, !feedsEmbedded else { return }
             if let tabId = notification.userInfo?["tab"] as? String, tabId == AppTab.images.rawValue {
@@ -616,58 +627,16 @@ private struct ImagesViewBody: View {
     /// Shared detail chrome for an opened gallery. The list slots stay with
     /// `stashyCatalogChrome`, so this config carries no `listSlots`.
     private var openedGalleryChromeConfig: StashyDetailChromeConfig {
-        StashyDetailChromeConfig(listSlots: nil, insetSpacing: DesignTokens.Chrome.contentTopGap)
+        StashyDetailChromeConfig(listSlots: nil, insetSpacing: 0)
     }
 
-    /// Custom top chrome for opened galleries: Back · Edit (title lives in the header card).
-    @ViewBuilder
+    /// Opened gallery: Back only; Edit sits in the floating bar (`imagesChromeConfig`).
     private var openedGalleryNavBar: some View {
-        StashySectionChromeBar {
-            HStack(spacing: 8) {
-                Button {
-                    dismiss()
-                } label: {
-                    HStack(spacing: StashyExpandingDock.iconLabelSpacing) {
-                        Image(systemName: "chevron.left")
-                            .font(.system(size: StashyExpandingDock.iconSize, weight: .semibold))
-                        Text("Back")
-                            .font(.subheadline.weight(.semibold))
-                    }
-                    .foregroundColor(.white)
-                    .modifier(StashyChromePillStyle(height: chromePillHeight, accent: true))
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel("Back")
-
-                Spacer(minLength: 8)
-
-                if appearanceManager.isEditModeEnabled {
-                    Button {
-                        HapticManager.light()
-                        showingEditGallerySheet = true
-                    } label: {
-                        Image(systemName: "pencil")
-                            .font(.system(size: StashyExpandingDock.iconSize, weight: .semibold))
-                            .foregroundColor(.white.opacity(StashyExpandingDock.inactiveIconOpacity))
-                            .frame(
-                                width: StashyExpandingDock.circleSize,
-                                height: StashyExpandingDock.circleSize
-                            )
-                            .stashyGlass(shape: Capsule(style: .continuous))
-                            .contentShape(Capsule(style: .continuous))
-                    }
-                    .buttonStyle(.plain)
-                    .accessibilityLabel("Edit gallery")
-                }
-            }
-            .frame(minHeight: chromePillHeight)
-            .padding(.horizontal, StashyExpandingDock.edgePadding)
-            .padding(.vertical, 8)
-        }
+        StashyDetailTopBar(onBack: { dismiss() })
     }
 
     /// Opened-gallery top block, laid out like scene detail: one header card (cover hero
-    /// with name and details overlaid), then Performers & Studio. The grid follows below.
+    /// with name and details overlaid), then Metadata. The grid follows below.
     @ViewBuilder
     private func openedGalleryTop(_ gallery: Gallery) -> some View {
         VStack(spacing: 12) {
@@ -733,14 +702,14 @@ private struct ImagesViewBody: View {
         }
     }
 
-    /// Scene-detail "Performers & Studio" card for an opened gallery — only when the
-    /// gallery has a studio or performers, or always in edit mode so one can be
-    /// assigned (like Android). Edits write through `galleryUpdate`.
+    /// Scene-detail "Metadata" card for an opened gallery — only when the gallery has a
+    /// studio, performers or linked scenes, or always in edit mode so one can be assigned
+    /// (like Android). Edits write through `galleryUpdate`.
     @ViewBuilder
     private func openedGalleryLinkedCards(_ gallery: Gallery) -> some View {
         let performers = (gallery.performers ?? []).map { $0.toScenePerformer() }
         let studio = gallery.studio?.toSceneStudio()
-        if ScenePerformersStudioCard.isVisible(performers: performers, studio: studio, editing: appearanceManager.isEditModeEnabled) {
+        if ScenePerformersStudioCard.isVisible(performers: performers, studio: studio, scenes: galleryScenes, editing: appearanceManager.isEditModeEnabled) {
             ScenePerformersStudioCard(
                 sceneId: gallery.id,
                 sceneDate: gallery.date,
@@ -764,6 +733,7 @@ private struct ImagesViewBody: View {
                 saveStudioId: { id, done in
                     viewModel.updateGalleryStudio(galleryId: gallery.id, studioId: id, completion: done)
                 },
+                scenes: galleryScenes,
                 viewModel: viewModel
             )
         }
@@ -852,8 +822,7 @@ private struct ImagesViewBody: View {
                 imageFindListError: viewModel.imageFindListError
             ),
             isPresented: !feedsEmbedded,
-            hostsInSectionChrome: hostsInSectionChrome && !isOpenedGallery,
-            filterSort: CatalogChromeSlot(
+            filterSort: showsQuickBar ? nil : CatalogChromeSlot(
                 systemImage: "slider.horizontal.3",
                 isActive: catalogFilterSortFABActive,
                 accessibilityLabel: "Settings",
@@ -867,6 +836,12 @@ private struct ImagesViewBody: View {
                 }
             ),
             secondaryContextual: gallery.map { galleryDownloadSlot($0) },
+            entityActions: isOpenedGallery && appearanceManager.isEditModeEnabled
+                ? [CatalogChromeSlot(systemImage: "pencil", accessibilityLabel: "Edit gallery") {
+                    HapticManager.light()
+                    showingEditGallerySheet = true
+                }]
+                : [],
             selection: CatalogSelectionChrome(
                 isActive: isSelectionMode,
                 count: selectedImageIds.count,
@@ -902,13 +877,7 @@ private struct ImagesViewBody: View {
             onSortChange: { changeSortOption(to: $0) },
             liveMediaKind: $imageListFilters.liveFilterMediaKind,
             onApply: { imageListFilters.applyLiveFilter(viewModel: viewModel) },
-            onReset: {
-                imageListFilters.catalogPresetRowSelection = ""
-                imageListFilters.selectedFilter = nil
-                imageListFilters.clearLiveChipsOnly()
-                imageListFilters.criteriaDocument.clear()
-                imageListFilters.refetchImages(viewModel: viewModel, initial: true)
-            },
+            onReset: { resetAllImageFilters() },
             onRequestSave: { imageListFilters.savePresetOverwrite(viewModel: viewModel) },
             onRequestSaveAs: {
                 imageListFilters.catalogPresetNameInput = ""
@@ -939,6 +908,42 @@ private struct ImagesViewBody: View {
         }
     }
     
+    /// Sheet "Reset" and the saved-filter chip's ✕: drops the preset and every criterion.
+    private func resetAllImageFilters() {
+        imageListFilters.catalogPresetRowSelection = ""
+        imageListFilters.selectedFilter = nil
+        imageListFilters.clearLiveChipsOnly()
+        imageListFilters.criteriaDocument.clear()
+        imageListFilters.refetchImages(viewModel: viewModel, initial: true)
+    }
+
+    private var activeImagePresetName: String? {
+        let sel = imageListFilters.catalogPresetRowSelection
+        if let ls = ListLivePresetTag.parseLocalUUIDString(sel), let uuid = UUID(uuidString: ls) {
+            return imageListFilters.localCatalogPresets.first { $0.id == uuid }?.name
+        }
+        if let sid = ListLivePresetTag.parseServerId(sel) {
+            return viewModel.savedFilters[sid]?.name ?? imageListFilters.selectedFilter?.name
+        }
+        return imageListFilters.selectedFilter?.name
+    }
+
+    /// Feeds embed this list under their own chrome, so the bar stays out of there.
+    private var showsQuickBar: Bool { !feedsEmbedded }
+
+    private var quickBar: some View {
+        CatalogListQuickBar(
+            mode: .images,
+            sort: imageListFilters.selectedSortOption,
+            onSort: { changeSortOption(to: $0) },
+            document: imageListFilters.criteriaDocument,
+            presetName: activeImagePresetName,
+            onClearPreset: { resetAllImageFilters() },
+            onFiltersChanged: { imageListFilters.applyLiveFilter(viewModel: viewModel) },
+            onOpenFilters: { imageListFilters.showFilterSortSheet = true }
+        )
+    }
+
     private var displayedImages: [StashImage] {
         gallery != nil ? viewModel.galleryImages : viewModel.allImages
     }
@@ -1253,6 +1258,26 @@ struct ImageGroupCatalogCell: View {
                 // fullscreen would pop the viewer.
                 if images.count > 1 {
                     // Grouped set: swipe through the images; the thumb strip below follows.
+                    #if os(macOS)
+                    // macOS has no paging TabView: a paging scroll view, trackpad-swipeable.
+                    ScrollView(.horizontal) {
+                        LazyHStack(spacing: 0) {
+                            ForEach(images) { img in
+                                heroButton(for: img)
+                                    .containerRelativeFrame(.horizontal)
+                                    .id(img.id)
+                            }
+                        }
+                        .scrollTargetLayout()
+                    }
+                    .scrollTargetBehavior(.paging)
+                    .scrollIndicators(.never)
+                    .scrollPosition(id: Binding(
+                        get: { Optional(visibleImageId) },
+                        set: { if let id = $0 { visibleImageId = id } }
+                    ))
+                    .aspectRatio(setAspectRatio, contentMode: .fit)
+                    #else
                     TabView(selection: $visibleImageId) {
                         ForEach(images) { img in
                             heroButton(for: img).tag(img.id)
@@ -1260,6 +1285,7 @@ struct ImageGroupCatalogCell: View {
                     }
                     .tabViewStyle(.page(indexDisplayMode: .never))
                     .aspectRatio(setAspectRatio, contentMode: .fit)
+                    #endif
                 } else {
                     heroButton(for: visibleImage)
                 }
@@ -2136,7 +2162,7 @@ struct EditGallerySheet: View {
     var onDeleted: (() -> Void)? = nil
     var onComplete: (Gallery) -> Void
 
-    @Environment(\.dismiss) private var dismiss
+    @Environment(\.stashyDismiss) private var dismiss
     @ObservedObject private var appearanceManager = AppearanceManager.shared
 
     @State private var title: String = ""

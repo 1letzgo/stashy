@@ -699,7 +699,10 @@ private struct HotOrNotBattleColumn: View {
                 if loader.isLoading {
                     InlineSpinner(scale: .medium)
                 } else if let image = loader.image {
-                    image.resizable().scaledToFill()
+                    Color.clear
+                            // Faces sit at the top of performer photos: crop from the top, not the middle.
+                            .overlay(alignment: .top) { image.resizable().scaledToFill() }
+                            .clipped()
                 } else {
                     placeholderIcon
                 }
@@ -814,7 +817,10 @@ private struct HotOrNotGauntletStarterPickCard: View {
                 if loader.isLoading {
                     InlineSpinner(scale: .medium)
                 } else if let image = loader.image {
-                    image.resizable().scaledToFill()
+                    Color.clear
+                            // Faces sit at the top of performer photos: crop from the top, not the middle.
+                            .overlay(alignment: .top) { image.resizable().scaledToFill() }
+                            .clipped()
                 } else {
                     placeholderIcon
                 }
@@ -977,6 +983,7 @@ final class HotOrNotViewModel: ObservableObject {
     /// Persisted `rawValue`: `headToHead` | `placement` | `champion` (legacy `swiss` / `gauntlet` migrated on load).
     enum DuelMode: String, CaseIterable, Identifiable {
         case headToHead
+        case bracket
         case placement
         case champion
 
@@ -987,6 +994,7 @@ final class HotOrNotViewModel: ObservableObject {
             case .headToHead: return "1 vs. 1"
             case .placement: return "Rise"
             case .champion: return "Legend"
+            case .bracket: return "32:1"
             }
         }
 
@@ -996,6 +1004,7 @@ final class HotOrNotViewModel: ObservableObject {
             case .headToHead: return "swiss"
             case .placement: return "gauntlet"
             case .champion: return "champion"
+            case .bracket: return "bracket"
             }
         }
     }
@@ -1036,6 +1045,13 @@ final class HotOrNotViewModel: ObservableObject {
     @Published var placementStarters: [HotOrNotPerformerData] = []
     @Published var isLoadingPlacementStarters = false
 
+    // 32:1 bracket (`HotOrNotBracket.swift`): no rating writes until the results are applied.
+    @Published var bracket: HotOrNotBracketState?
+    @Published var bracketProposals: [HotOrNotBracketMath.Proposal] = []
+    @Published var isLoadingBracketResults = false
+    @Published var isApplyingBracket = false
+    @Published var bracketAppliedCount = 0
+
     /// Inline Rise starter grid (no sheet): need picks before the first duel.
     var needsPlacementStarterSelection: Bool {
         duelMode == .placement && climbChampion == nil && !climbFalling && climbVictory == nil
@@ -1064,6 +1080,7 @@ final class HotOrNotViewModel: ObservableObject {
         case "swiss", "headToHead": return .headToHead
         case "gauntlet", "placement": return .placement
         case "champion": return .champion
+        case "bracket": return .bracket
         default:
             return DuelMode(rawValue: raw) ?? .headToHead
         }
@@ -1136,6 +1153,8 @@ final class HotOrNotViewModel: ObservableObject {
             await loadClimbPair(isPlacement: true)
         case .champion:
             await loadClimbPair(isPlacement: false)
+        case .bracket:
+            await loadBracketPair()
         }
     }
 
@@ -1342,7 +1361,7 @@ final class HotOrNotViewModel: ObservableObject {
 
     private func applyClimbAfterVote(winner: HotOrNotPerformerData, loser: HotOrNotPerformerData, newWinnerRating: Int, newLoserRating: Int) {
         switch duelMode {
-        case .headToHead:
+        case .headToHead, .bracket:
             break
         case .champion:
             if climbChampion?.id == winner.id {
@@ -1423,8 +1442,188 @@ final class HotOrNotViewModel: ObservableObject {
         }
     }
 
+    // MARK: 32:1 bracket
+
+    private func fetchRatingSortedPool() async throws -> (list: [HotOrNotPerformerData], count: Int) {
+        let query = GraphQLQueries.queryWithFragments("hotOrNotFindPerformers")
+        let variables: [String: Any] = [
+            "performer_filter": performerFilter,
+            "filter": ["per_page": -1, "sort": "rating", "direction": "DESC"] as [String: Any]
+        ]
+        let res: HotOrNotFindResponse = try await client.execute(query: query, variables: variables)
+        let list = ladderSortedPool(res.data?.findPerformers.performers ?? [])
+        return (list, res.data?.findPerformers.count ?? list.count)
+    }
+
+    /// Restores the saved bracket (or draws a new one) and shows its next match.
+    private func loadBracketPair() async {
+        errorMessage = nil
+        rankLeft = nil
+        rankRight = nil
+        if bracket == nil {
+            bracket = HotOrNotBracketStore.load()
+        }
+        // A finished and saved tournament is only shown right after the final; coming back
+        // to 32:1 starts the next one. (Unsaved results stay so the save can finish.)
+        if let state = bracket, state.isFinished, state.appliedIds.count >= state.entrants.count {
+            bracket = nil
+            bracketProposals = []
+            bracketAppliedCount = 0
+            HotOrNotBracketStore.save(nil)
+        }
+        if bracket == nil {
+            isLoadingPair = true
+            defer { isLoadingPair = false }
+            do {
+                let pool = try await fetchRatingSortedPool()
+                poolCount = pool.count
+                guard let state = HotOrNotBracketMath.newBracket(
+                    pool: pool.list,
+                    recentIds: HotOrNotBracketStore.recentIds()
+                ) else {
+                    errorMessage = "Need at least \(HotOrNotBracketMath.size) performers with images for the selected genders."
+                    left = nil
+                    right = nil
+                    return
+                }
+                bracket = state
+                HotOrNotBracketStore.save(state)
+                HotOrNotBracketStore.rememberEntrants(state.entrants.map(\.id))
+            } catch {
+                errorMessage = error.localizedDescription
+                return
+            }
+        }
+        showCurrentBracketMatch()
+        if bracket?.isFinished == true && bracketProposals.isEmpty {
+            await loadBracketResults()
+        }
+    }
+
+    private func showCurrentBracketMatch() {
+        guard let state = bracket, let m = state.currentMatch else {
+            left = nil
+            right = nil
+            return
+        }
+        left = state.entrant(m.leftId)
+        right = state.entrant(m.rightId)
+    }
+
+    private func pickBracketWinner(_ winner: HotOrNotPerformerData) {
+        guard var state = bracket, state.currentMatch != nil else { return }
+        state.picks.append(winner.id)
+        bracket = state
+        HotOrNotBracketStore.save(state)
+        #if !os(tvOS)
+        HapticManager.light()
+        #endif
+        showCurrentBracketMatch()
+        if state.isFinished {
+            Task { await loadBracketResults() }
+        }
+    }
+
+    func undoBracketPick() {
+        guard var state = bracket, !state.picks.isEmpty, state.appliedIds.isEmpty else { return }
+        state.picks.removeLast()
+        bracket = state
+        bracketProposals = []
+        HotOrNotBracketStore.save(state)
+        showCurrentBracketMatch()
+    }
+
+    /// Discards the current bracket (also after Apply) and draws a new one.
+    func newBracket() {
+        bracket = nil
+        bracketProposals = []
+        bracketAppliedCount = 0
+        HotOrNotBracketStore.save(nil)
+        Task { await loadDuelPair() }
+    }
+
+    /// Rating proposals from the finishing places, against fresh ratings / stats of the pool.
+    func loadBracketResults() async {
+        guard let state = bracket, state.isFinished else { return }
+        isLoadingBracketResults = true
+        defer { isLoadingBracketResults = false }
+        do {
+            let pool = try await fetchRatingSortedPool()
+            let current = Dictionary(pool.list.map { ($0.id, $0) }, uniquingKeysWith: { a, _ in a })
+            bracketProposals = HotOrNotBracketMath.proposals(
+                for: state,
+                current: current,
+                poolRatingsDesc: pool.list.map { $0.rating100 ?? 50 }
+            )
+            bracketAppliedCount = state.appliedIds.count
+        } catch {
+            errorMessage = error.localizedDescription
+            return
+        }
+        // Results are written right after the final; a failed save leaves a Retry on the card.
+        if !bracketIsApplied {
+            await applyBracket()
+        }
+    }
+
+    /// Writes every proposal (rating + stats + match records). Already written performers are
+    /// skipped, so a failed run can simply be retried.
+    func applyBracket() async {
+        guard var state = bracket, state.isFinished, !bracketProposals.isEmpty else { return }
+        isApplyingBracket = true
+        errorMessage = nil
+        defer { isApplyingBracket = false }
+        // Fresh custom_fields so the run appends to the latest stats / records.
+        let current: [String: HotOrNotPerformerData]
+        do {
+            let pool = try await fetchRatingSortedPool()
+            current = Dictionary(pool.list.map { ($0.id, $0) }, uniquingKeysWith: { a, _ in a })
+        } catch {
+            errorMessage = error.localizedDescription
+            return
+        }
+        for proposal in bracketProposals where !state.appliedIds.contains(proposal.id) {
+            guard let performer = current[proposal.id] ?? state.entrant(proposal.id) else { continue }
+            let matches = state.results(for: proposal.id).map { r in
+                (opponentId: r.opponentId,
+                 opponentName: state.entrant(r.opponentId)?.name ?? "",
+                 won: Optional(r.won))
+            }
+            do {
+                try await pushPerformerUpdate(performer: performer, newRating: proposal.newRating, matches: matches)
+                state.appliedIds.append(proposal.id)
+                bracket = state
+                bracketAppliedCount = state.appliedIds.count
+                HotOrNotBracketStore.save(state)
+            } catch {
+                errorMessage = error.localizedDescription
+                return
+            }
+        }
+        #if !os(tvOS)
+        HapticManager.success()
+        #endif
+        if section == .leaderboard { await refreshLeaderboard() }
+    }
+
+    var bracketIsApplied: Bool {
+        guard let state = bracket else { return false }
+        return !bracketProposals.isEmpty && state.appliedIds.count >= bracketProposals.count
+    }
+
+    /// "Round of 32 · Match 3/16"
+    var bracketStatusLine: String? {
+        guard let state = bracket, let m = state.currentMatch else { return nil }
+        let roundSize = state.rounds[m.round].count
+        return "\(HotOrNotBracketMath.roundTitle(round: m.round, roundCount: state.roundCount)) · Match \(m.index + 1)/\(roundSize)"
+    }
+
     func choose(leftWins: Bool) async {
         guard let l = left, let r = right else { return }
+        if duelMode == .bracket {
+            pickBracketWinner(leftWins ? l : r)
+            return
+        }
         isSubmitting = true
         errorMessage = nil
         defer { isSubmitting = false }
@@ -1519,7 +1718,7 @@ final class HotOrNotViewModel: ObservableObject {
     }
 
     func skipDraw() async {
-        guard duelMode != .champion else { return }
+        guard duelMode != .champion, duelMode != .bracket else { return }
         guard let l = left, let r = right else { return }
         isSubmitting = true
         errorMessage = nil
@@ -1589,16 +1788,32 @@ final class HotOrNotViewModel: ObservableObject {
         opponentId: String,
         opponentName: String
     ) async throws {
-        let stats = HotOrNotSwissMath.updateStats(performer.stats, won: won)
-        let statsJson = try HotOrNotSwissMath.encodeStats(stats)
+        try await pushPerformerUpdate(
+            performer: performer,
+            newRating: newRating,
+            matches: [(opponentId, opponentName, won)]
+        )
+    }
+
+    /// One `performerUpdate` for several played matches (32:1 writes a whole bracket run at once).
+    private func pushPerformerUpdate(
+        performer: HotOrNotPerformerData,
+        newRating: Int,
+        matches: [(opponentId: String, opponentName: String, won: Bool?)]
+    ) async throws {
+        var stats = performer.stats
         var records = HotOrNotSwissMath.parseMatchRecords(from: performer.custom_fields)
-        let opponentField = "\(opponentId):\(opponentName)"
-        records.append(HotOrNotMatchRecord(
-            date: ISO8601DateFormatter().string(from: Date()),
-            opponent: opponentField,
-            won: won,
-            ratingAfter: newRating
-        ))
+        let now = ISO8601DateFormatter().string(from: Date())
+        for m in matches {
+            stats = HotOrNotSwissMath.updateStats(stats, won: m.won)
+            records.append(HotOrNotMatchRecord(
+                date: now,
+                opponent: "\(m.opponentId):\(m.opponentName)",
+                won: m.won,
+                ratingAfter: newRating
+            ))
+        }
+        let statsJson = try HotOrNotSwissMath.encodeStats(stats)
         if records.count > 30 { records = Array(records.suffix(30)) }
         let recordJson = try HotOrNotSwissMath.encodeMatchRecords(records)
 
@@ -1636,6 +1851,7 @@ struct HotOrNotToolsView: View {
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     /// Avoids re-running `loadDuelPair` when returning from `NavigationLink` (e.g. Profile): `.task` restarts after disappear/reappear.
     @State private var didRunInitialHotOrNotLoad = false
+    @State private var showBracketTree = false
 
     private var isRegular: Bool { horizontalSizeClass == .regular }
 
@@ -1685,7 +1901,11 @@ struct HotOrNotToolsView: View {
             }
         }
         .onAppear {
-            guard !didRunInitialHotOrNotLoad else { return }
+            guard !didRunInitialHotOrNotLoad else {
+                // Back on Match after a saved final: start the next tournament.
+                if model.duelMode == .bracket, model.bracketIsApplied { model.newBracket() }
+                return
+            }
             didRunInitialHotOrNotLoad = true
             Task {
                 await model.loadDuelPair()
@@ -1707,6 +1927,11 @@ struct HotOrNotToolsView: View {
                 Task { await model.refreshLeaderboard() }
             }
         }
+        .sheet(isPresented: $showBracketTree) {
+            if let state = model.bracket {
+                HotOrNotBracketTreeSheet(state: state)
+            }
+        }
     }
 
     /// Gleiche Logik wie der Zweig in `battleContent` mit Karten + Aktionen (kein Sieger-/Rise-Start-UI).
@@ -1722,7 +1947,27 @@ struct HotOrNotToolsView: View {
     @ViewBuilder
     private var hotOrNotDuelActionsRow: some View {
         HStack(spacing: 10) {
-            if model.duelMode == .champion {
+            if model.duelMode == .bracket {
+                Button {
+                    HapticManager.light()
+                    model.undoBracketPick()
+                } label: {
+                    Label("Undo", systemImage: "arrow.uturn.backward")
+                        .font(.subheadline.weight(.semibold))
+                        .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.bordered)
+                .disabled(model.bracket?.picks.isEmpty ?? true)
+
+                Button {
+                    showBracketTree = true
+                } label: {
+                    Label("32:1", systemImage: "trophy")
+                        .font(.subheadline.weight(.semibold))
+                        .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.bordered)
+            } else if model.duelMode == .champion {
                 Button {
                     HapticManager.light()
                     model.startNewClimbRun()
@@ -1746,7 +1991,9 @@ struct HotOrNotToolsView: View {
                 .disabled(model.isSubmitting)
             }
 
-            if model.duelMode == .placement {
+            if model.duelMode == .bracket {
+                EmptyView()
+            } else if model.duelMode == .placement {
                 Button(action: {}) {
                     Label("New pair", systemImage: "arrow.triangle.2.circlepath")
                         .font(.subheadline.weight(.semibold))
@@ -1787,6 +2034,7 @@ struct HotOrNotToolsView: View {
     private var hotOrNotBottomChrome: some View {
         HStack(spacing: StashyExpandingDock.itemSpacing) {
             hotOrNotDuelModeChip(.headToHead)
+            hotOrNotDuelModeChip(.bracket)
             hotOrNotDuelModeChip(.placement)
             hotOrNotDuelModeChip(.champion)
         }
@@ -1893,10 +2141,21 @@ struct HotOrNotToolsView: View {
                     .cardShadow()
                 } else if model.needsPlacementStarterSelection {
                     placementStarterInline
+                } else if model.duelMode == .bracket, model.bracket?.isFinished == true {
+                    HotOrNotBracketResultsCard(
+                        model: model,
+                        showTree: { showBracketTree = true }
+                    )
                 } else if model.isLoadingPair && model.left == nil {
                     StandardLoadingView(message: "Loading pair...")
                         .frame(minHeight: 320)
                 } else if let l = model.left, let r = model.right {
+                    if model.duelMode == .bracket, let status = model.bracketStatusLine {
+                        Text(status)
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundStyle(.secondary)
+                            .frame(maxWidth: .infinity)
+                    }
                     HStack(alignment: .top, spacing: isRegular ? 20 : 10) {
                         VStack(spacing: 10) {
                             HotOrNotBattleColumn(
@@ -1960,6 +2219,222 @@ struct HotOrNotToolsView: View {
                 }
             }
         }
+    }
+}
+
+// MARK: - 32:1 results / bracket tree
+
+private struct HotOrNotBracketResultsCard: View {
+    @ObservedObject var model: HotOrNotViewModel
+    @ObservedObject private var appearance = AppearanceManager.shared
+    let showTree: () -> Void
+
+    private var champion: HotOrNotPerformerData? {
+        guard let id = model.bracket?.championId else { return nil }
+        return model.bracket?.entrant(id)
+    }
+
+    var body: some View {
+        VStack(spacing: 14) {
+            if let champion {
+                VStack(spacing: 6) {
+                    Image(systemName: "trophy.fill")
+                        .font(.title)
+                        .foregroundStyle(appearance.tintColor)
+                    Text("Champion")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(.secondary)
+                        .textCase(.uppercase)
+                    Text(champion.displayName)
+                        .font(.title2.weight(.bold))
+                        .multilineTextAlignment(.center)
+                }
+            }
+
+            if model.isLoadingBracketResults && model.bracketProposals.isEmpty {
+                StandardLoadingView(message: "Calculating ratings...")
+                    .frame(minHeight: 160)
+            } else {
+                if model.isApplyingBracket {
+                    Text("Saving ratings \(model.bracketAppliedCount)/\(model.bracketProposals.count)")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                VStack(spacing: 0) {
+                    ForEach(model.bracketProposals) { p in
+                        proposalRow(p)
+                        if p.id != model.bracketProposals.last?.id {
+                            Divider()
+                        }
+                    }
+                }
+            }
+
+            HStack(spacing: 10) {
+                Button(action: showTree) {
+                    Label("32:1", systemImage: "trophy")
+                        .font(.subheadline.weight(.semibold))
+                        .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.bordered)
+
+                if model.bracketIsApplied {
+                    Button {
+                        model.newBracket()
+                    } label: {
+                        Text("New tournament")
+                            .font(.subheadline.weight(.semibold))
+                            .frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .tint(appearance.tintColor)
+                } else if !model.isApplyingBracket && !model.isLoadingBracketResults && !model.bracketProposals.isEmpty {
+                    // Only after a failed automatic save.
+                    Button {
+                        Task { await model.applyBracket() }
+                    } label: {
+                        Label("Retry", systemImage: "arrow.clockwise")
+                            .font(.subheadline.weight(.semibold))
+                            .frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .tint(appearance.tintColor)
+                }
+            }
+        }
+        .padding(16)
+        .frame(maxWidth: 720)
+        .frame(maxWidth: .infinity)
+        .background(Color.secondaryAppBackground)
+        .clipShape(RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.card))
+        .overlay(
+            RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.card)
+                .stroke(Color.primary.opacity(0.1), lineWidth: 0.5)
+        )
+        .cardShadow()
+    }
+
+    private func proposalRow(_ p: HotOrNotBracketMath.Proposal) -> some View {
+        let applied = model.bracket?.appliedIds.contains(p.id) ?? false
+        return HStack(spacing: 10) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(p.name)
+                    .font(.subheadline.weight(.semibold))
+                    .lineLimit(1)
+                Text(p.tier.label)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            Spacer(minLength: 8)
+            Text("\(p.oldRating) → \(p.newRating)")
+                .font(.subheadline.monospacedDigit())
+                .foregroundStyle(.secondary)
+            Text(p.delta > 0 ? "+\(p.delta)" : "\(p.delta)")
+                .font(.subheadline.monospacedDigit().weight(.bold))
+                .foregroundStyle(p.delta > 0 ? Color.green : (p.delta < 0 ? Color.red : Color.secondary))
+                .frame(minWidth: 34, alignment: .trailing)
+            Image(systemName: "checkmark.circle.fill")
+                .foregroundStyle(.green)
+                .font(.caption)
+                .opacity(applied ? 1 : 0)
+        }
+        .padding(.vertical, 6)
+    }
+}
+
+/// One round at a time (round picker on top, matches as a plain vertical list) so the sheet
+/// only scrolls vertically.
+private struct HotOrNotBracketTreeSheet: View {
+    let state: HotOrNotBracketState
+    @ObservedObject private var appearance = AppearanceManager.shared
+    @Environment(\.dismiss) private var dismiss
+    @State private var round: Int
+
+    init(state: HotOrNotBracketState) {
+        self.state = state
+        _round = State(initialValue: max(0, state.rounds.count - 1))
+    }
+
+    var body: some View {
+        NavigationStack {
+            VStack(spacing: 0) {
+                Picker("Round", selection: $round) {
+                    ForEach(0..<state.roundCount, id: \.self) { r in
+                        Text(shortTitle(r)).tag(r)
+                    }
+                }
+                .pickerStyle(.segmented)
+                .padding(.horizontal, 16)
+                .padding(.vertical, 10)
+
+                ScrollView(.vertical) {
+                    LazyVStack(spacing: 8) {
+                        if round < state.rounds.count {
+                            ForEach(state.rounds[round], id: \.index) { m in
+                                matchCell(m)
+                            }
+                        } else {
+                            Text("Not reached yet")
+                                .font(.subheadline)
+                                .foregroundStyle(.secondary)
+                                .padding(.top, 40)
+                        }
+                        if round == state.roundCount - 1, let id = state.championId, let champ = state.entrant(id) {
+                            Label(champ.displayName, systemImage: "trophy.fill")
+                                .font(.headline)
+                                .foregroundStyle(appearance.tintColor)
+                                .padding(.top, 12)
+                        }
+                    }
+                    .padding(.horizontal, 16)
+                    .padding(.bottom, 16)
+                }
+            }
+            .background(Color.appBackground)
+            .navigationTitle(HotOrNotBracketMath.roundTitle(round: round, roundCount: state.roundCount))
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Done") { dismiss() }
+                }
+            }
+        }
+        .presentationDetents([.large])
+        .presentationDragIndicator(.visible)
+    }
+
+    private func shortTitle(_ r: Int) -> String {
+        switch state.roundCount - r {
+        case 1: return "F"
+        case 2: return "SF"
+        case 3: return "QF"
+        default: return "\(1 << (state.roundCount - r))"
+        }
+    }
+
+    private func matchCell(_ m: HotOrNotBracketState.Match) -> some View {
+        HStack(spacing: 10) {
+            nameLine(m.leftId, winnerId: m.winnerId, alignment: .leading)
+            Text("vs")
+                .font(.caption2)
+                .foregroundStyle(.tertiary)
+            nameLine(m.rightId, winnerId: m.winnerId, alignment: .trailing)
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 10)
+        .frame(maxWidth: .infinity)
+        .background(Color.secondaryAppBackground)
+        .clipShape(RoundedRectangle(cornerRadius: 10))
+    }
+
+    private func nameLine(_ id: String, winnerId: String?, alignment: Alignment) -> some View {
+        let won = winnerId == id
+        let lost = winnerId != nil && !won
+        return Text(state.entrant(id)?.displayName ?? "—")
+            .font(.subheadline.weight(won ? .bold : .regular))
+            .foregroundStyle(won ? appearance.tintColor : (lost ? Color.secondary : Color.primary))
+            .lineLimit(1)
+            .frame(maxWidth: .infinity, alignment: alignment)
     }
 }
 
@@ -2102,7 +2577,10 @@ private struct HotOrNotLeaderboardCard: View {
                     if loader.isLoading {
                         InlineSpinner(scale: .medium)
                     } else if let image = loader.image {
-                        image.resizable().scaledToFill()
+                        Color.clear
+                            // Faces sit at the top of performer photos: crop from the top, not the middle.
+                            .overlay(alignment: .top) { image.resizable().scaledToFill() }
+                            .clipped()
                     } else {
                         placeholderIcon
                     }

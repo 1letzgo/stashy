@@ -466,11 +466,12 @@ class MatchEloTest {
         assertEquals(MatchDuelMode.Placement, MatchDuelMode.migrating("gauntlet"))
         assertEquals(MatchDuelMode.Placement, MatchDuelMode.migrating("placement"))
         assertEquals(MatchDuelMode.Champion, MatchDuelMode.migrating("champion"))
+        assertEquals(MatchDuelMode.Bracket, MatchDuelMode.migrating("bracket"))
         assertEquals(MatchDuelMode.HeadToHead, MatchDuelMode.migrating(null))
         assertEquals(MatchDuelMode.HeadToHead, MatchDuelMode.migrating("bogus"))
-        assertEquals(listOf("swiss", "gauntlet", "champion"), MatchDuelMode.entries.map { it.ascensionMode })
-        assertEquals(listOf("1 vs. 1", "Rise", "Legend"), MatchDuelMode.entries.map { it.label })
-        assertEquals(listOf("headToHead", "placement", "champion"), MatchDuelMode.entries.map { it.raw })
+        assertEquals(listOf("swiss", "bracket", "gauntlet", "champion"), MatchDuelMode.entries.map { it.ascensionMode })
+        assertEquals(listOf("1 vs. 1", "32:1", "Rise", "Legend"), MatchDuelMode.entries.map { it.label })
+        assertEquals(listOf("headToHead", "bracket", "placement", "champion"), MatchDuelMode.entries.map { it.raw })
     }
 
     @Test

@@ -17,7 +17,11 @@ protocol DisplayNameProvider {
 }
 #if !os(tvOS)
 import WebKit
+#if canImport(UIKit)
 import UIKit
+#else
+import AppKit
+#endif
 #endif
 import StoreKit
 
@@ -522,11 +526,84 @@ func authenticatedStashRequest(for url: URL) -> URLRequest {
     return request
 }
 
+/// `dismiss` for views that close themselves. Identical to SwiftUI's `\.dismiss` on iOS / tvOS.
+/// On macOS a `dismiss()` from the root of a `NavigationStack` inside a sheet does nothing, so
+/// the macOS `NavigationStack` (MacCompat) hands its root the dismiss from outside the stack —
+/// the one that actually closes the sheet.
+struct StashyDismissAction {
+    let action: () -> Void
+    func callAsFunction() { action() }
+}
+
+private struct StashyScenePlayerOnlyKey: EnvironmentKey {
+    static let defaultValue = false
+}
+
+extension EnvironmentValues {
+    /// The scene page reduced to its player module (the mini player's full view): no chrome,
+    /// no cards, and it hands the engine back to the mini player even when paused.
+    var stashyScenePlayerOnly: Bool {
+        get { self[StashyScenePlayerOnlyKey.self] }
+        set { self[StashyScenePlayerOnlyKey.self] = newValue }
+    }
+}
+
+private struct StashyPresentedFromMiniPlayerKey: EnvironmentKey {
+    static let defaultValue = false
+}
+
+extension EnvironmentValues {
+    /// The scene page was reopened from the mini player (a cover, not a pushed page):
+    /// its top chrome shows Close instead of Back.
+    var stashyPresentedFromMiniPlayer: Bool {
+        get { self[StashyPresentedFromMiniPlayerKey.self] }
+        set { self[StashyPresentedFromMiniPlayerKey.self] = newValue }
+    }
+}
+
+private struct StashyDismissOverrideKey: EnvironmentKey {
+    static let defaultValue: StashyDismissAction? = nil
+}
+
+extension EnvironmentValues {
+    var stashyDismiss: StashyDismissAction {
+        get {
+            if let override = self[StashyDismissOverrideKey.self] { return override }
+            let system = dismiss
+            return StashyDismissAction { system() }
+        }
+        set { self[StashyDismissOverrideKey.self] = newValue }
+    }
+}
+
+/// Frame-synced timer. macOS has no `CADisplayLink` initializer; the screen vends one.
+func makeDisplayLink(target: Any, selector: Selector) -> CADisplayLink? {
+    #if os(macOS)
+    return NSScreen.main?.displayLink(target: target, selector: selector)
+    #else
+    return CADisplayLink(target: target, selector: selector)
+    #endif
+}
+
+/// Output route changed (headphones in/out). macOS has no AVAudioSession; nothing posts this there.
+let audioRouteChangeNotification: Notification.Name = {
+    #if os(macOS)
+    Notification.Name("stashy.mac.audioRouteChange")
+    #else
+    AVAudioSession.routeChangeNotification
+    #endif
+}()
+
 func isHeadphonesConnected() -> Bool {
+    #if os(macOS)
+    // Desktop speakers are the normal output on a Mac; never force-mute for lack of headphones.
+    return true
+    #else
     let currentRoute = AVAudioSession.sharedInstance().currentRoute
     return currentRoute.outputs.contains(where: { port in
         [AVAudioSession.Port.headphones, AVAudioSession.Port.bluetoothA2DP, AVAudioSession.Port.bluetoothLE, AVAudioSession.Port.bluetoothHFP].contains(port.portType)
     })
+    #endif
 }
 
 /// Start-up mute state for every player embed.
@@ -748,6 +825,7 @@ final class AudioSessionCoordinator: @unchecked Sendable {
     }
 
     private func acquireExclusive() {
+        #if os(iOS)
         let session = AVAudioSession.sharedInstance()
         do {
             if session.category != .playback || session.mode != .moviePlayback || !session.categoryOptions.isEmpty {
@@ -759,6 +837,7 @@ final class AudioSessionCoordinator: @unchecked Sendable {
         } catch {
             AppLog.error("🔈 AudioSession: acquire failed: \(error)")
         }
+        #endif
     }
 
     private func cancelPendingRelease() {
@@ -1010,6 +1089,8 @@ final class HardwareVolumeMonitor {
     private init() {}
 
     func start() {
+        // macOS has no AVAudioSession volume KVO; hardware volume keys don't reach the app.
+        #if os(iOS)
         guard observation == nil else { return }
         let session = AVAudioSession.sharedInstance()
         lastVolume = session.outputVolume
@@ -1022,6 +1103,7 @@ final class HardwareVolumeMonitor {
                 NotificationCenter.default.post(name: .stashyHardwareVolumeChanged, object: nil)
             }
         }
+        #endif
     }
 }
 
@@ -1217,10 +1299,18 @@ extension View {
     /// Applies the .searchable modifier conditionally.
     /// Search field is only visible when isSearchVisible is true.
     #if !os(tvOS)
+    private static var alwaysVisibleSearchPlacement: SearchFieldPlacement {
+        #if os(macOS)
+        .toolbar
+        #else
+        .navigationBarDrawer(displayMode: .always)
+        #endif
+    }
+
     @ViewBuilder
     func conditionalSearchable(isVisible: Bool, text: Binding<String>, prompt: String = "Search") -> some View {
         if isVisible {
-            self.searchable(text: text, placement: .navigationBarDrawer(displayMode: .always), prompt: Text(prompt))
+            self.searchable(text: text, placement: Self.alwaysVisibleSearchPlacement, prompt: Text(prompt))
         } else {
             self
         }
@@ -1231,6 +1321,17 @@ extension View {
     /// corner radius), Form-matching insets, compact section headers.
     #if !os(tvOS)
     func stashySettingsList() -> some View {
+        #if os(macOS)
+        // AppKit lists ignore `contentMargins` and default to tight rows, so the card layout
+        // is rebuilt with padding and a real minimum row height.
+        self
+            .listStyle(.plain)
+            .alternatingRowBackgrounds(.disabled)
+            .environment(\.defaultMinListRowHeight, 40)
+            .scrollContentBackground(.hidden)
+            .padding(.horizontal, 20)
+            .padding(.top, 8)
+        #else
         self
             .listStyle(.plain)
             .listRowSpacing(0)
@@ -1242,6 +1343,7 @@ extension View {
             .contentMargins(.bottom, 28, for: .scrollContent)
             .environment(\.defaultMinListRowHeight, 0)
             .scrollContentBackground(.hidden)
+        #endif
     }
 
     /// Same list chrome as `stashySettingsList()`; name kept for reorderable card screens.
@@ -1253,15 +1355,28 @@ extension View {
         self
             .listRowSeparator(.hidden)
             .listRowBackground(StashySettingsCardRowBackground())
+            .stashyMacCardRowInsets()
     }
 
     func stashyGroupedSettingsRow() -> some View {
         self
             .listRowBackground(StashyGroupedSettingsRowBackground())
+            .stashyMacCardRowInsets()
     }
 
     func stashyGroupedBlockRow(index: Int, count: Int) -> some View {
         self.listRowBackground(StashyGroupedBlockBackground(index: index, count: count))
+            .stashyMacCardRowInsets()
+    }
+
+    /// iOS rows already sit ~16 pt inside their card; AppKit rows start almost at the edge.
+    @ViewBuilder
+    func stashyMacCardRowInsets() -> some View {
+        #if os(macOS)
+        self.listRowInsets(EdgeInsets(top: 6, leading: 14, bottom: 6, trailing: 14))
+        #else
+        self
+        #endif
     }
 
     /// Form/insetGrouped section header look, as a scrolling row (plain lists otherwise pin headers).
@@ -1276,11 +1391,20 @@ extension View {
             }
             Spacer(minLength: 0)
         }
-        .listRowInsets(EdgeInsets(top: 0, leading: 0, bottom: 8, trailing: 0))
+        // macOS has no `listSectionSpacing`; the header row carries the gap instead.
+        .listRowInsets(EdgeInsets(top: Self.macSectionGap, leading: 0, bottom: 8, trailing: 0))
         .listRowBackground(Color.clear)
         .listRowSeparator(.hidden)
         .moveDisabled(true)
         .deleteDisabled(true)
+    }
+
+    private static var macSectionGap: CGFloat {
+        #if os(macOS)
+        20
+        #else
+        0
+        #endif
     }
 
     /// Form-style section footer, as a scrolling row under grouped settings cards.
@@ -1374,6 +1498,34 @@ struct StandardLoadingView: View {
     }
 }
 
+#if os(macOS)
+/// macOS variant of `AnimatedWebView`: same HTML, AppKit host view.
+struct AnimatedWebView: NSViewRepresentable {
+    let data: Data
+    var fillMode: Bool = false
+    var topInset: CGFloat = 0
+    var bottomInset: CGFloat = 0
+
+    func makeCoordinator() -> Coordinator { Coordinator() }
+
+    final class Coordinator { var lastRenderKey: String? }
+
+    func makeNSView(context: Context) -> WKWebView {
+        let config = WKWebViewConfiguration()
+        config.mediaTypesRequiringUserActionForPlayback = []
+        let webView = WKWebView(frame: .zero, configuration: config)
+        webView.setValue(false, forKey: "drawsBackground")
+        return webView
+    }
+
+    func updateNSView(_ nsView: WKWebView, context: Context) {
+        let renderKey = "\(data.hashValue)|\(fillMode)|\(Int(topInset.rounded()))|\(Int(bottomInset.rounded()))"
+        guard context.coordinator.lastRenderKey != renderKey else { return }
+        context.coordinator.lastRenderKey = renderKey
+        nsView.loadHTMLString(animatedImageHTML(data: data, fillMode: fillMode, top: max(0, topInset), bottom: max(0, bottomInset)), baseURL: nil)
+    }
+}
+#else
 /// A view that plays animated GIFs and WebP images using WKWebView for reliability and simple looping.
 struct AnimatedWebView: UIViewRepresentable {
     let data: Data
@@ -1414,54 +1566,128 @@ struct AnimatedWebView: UIViewRepresentable {
         }
         context.coordinator.lastRenderKey = renderKey
         
-        // Determine MIME type
-        let mimeType = isWebP(data) ? "image/webp" : "image/gif"
-        
-        let base64 = data.base64EncodedString()
-        let objectFit = fillMode ? "cover" : "contain"
-        // Cover crops off the bottom, not both edges — matches the Pics feed.
-        let objectPosition = fillMode ? "center top" : "center center"
-        let verticalInset = top + bottom
-        
-        let html = """
-        <!DOCTYPE html>
-        <html>
-        <head>
-            <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-            <style>
-                * { margin: 0; padding: 0; box-sizing: border-box; }
-                html, body {
-                    width: 100%;
-                    height: 100%;
-                    background-color: black;
-                    display: flex;
-                    justify-content: center;
-                    align-items: flex-start;
-                    overflow: hidden;
-                    padding-top: \(top)px;
-                }
-                img {
-                    width: 100vw;
-                    height: calc(100vh - \(verticalInset)px);
-                    object-fit: \(objectFit);
-                    object-position: \(objectPosition);
-                    display: block;
-                }
-            </style>
-        </head>
-        <body>
-            <img src="data:\(mimeType);base64,\(base64)">
-        </body>
-        </html>
-        """
-        uiView.loadHTMLString(html, baseURL: nil)
+        uiView.loadHTMLString(animatedImageHTML(data: data, fillMode: fillMode, top: top, bottom: bottom), baseURL: nil)
     }
+}
+#endif
+
+private func animatedImageHTML(data: Data, fillMode: Bool, top: CGFloat, bottom: CGFloat) -> String {
+    // Determine MIME type
+    let mimeType = isWebP(data) ? "image/webp" : "image/gif"
+    
+    let base64 = data.base64EncodedString()
+    let objectFit = fillMode ? "cover" : "contain"
+    // Cover crops off the bottom, not both edges — matches the Pics feed.
+    let objectPosition = fillMode ? "center top" : "center center"
+    let verticalInset = top + bottom
+    
+    return """
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+        <style>
+            * { margin: 0; padding: 0; box-sizing: border-box; }
+            html, body {
+                width: 100%;
+                height: 100%;
+                background-color: black;
+                display: flex;
+                justify-content: center;
+                align-items: flex-start;
+                overflow: hidden;
+                padding-top: \(top)px;
+            }
+            img {
+                width: 100vw;
+                height: calc(100vh - \(verticalInset)px);
+                object-fit: \(objectFit);
+                object-position: \(objectPosition);
+                display: block;
+            }
+        </style>
+    </head>
+    <body>
+        <img src="data:\(mimeType);base64,\(base64)">
+    </body>
+    </html>
+    """
 }
 
 
 
 
 
+#if os(macOS)
+/// macOS variant of `ZoomableScrollView`: trackpad pinch zooms, drag pans while zoomed,
+/// click toggles chrome, double click zooms / hands off to `onDoubleTap`.
+struct ZoomableScrollView<Content: View>: View {
+    private var content: Content
+    private var onTap: ((CGPoint) -> Void)?
+    private var onLongPress: ((Bool) -> Void)?
+    private var onDoubleTap: ((CGPoint) -> Bool)?
+    @Binding var isZoomed: Bool
+
+    @State private var scale: CGFloat = 1
+    @State private var baseScale: CGFloat = 1
+    @State private var offset: CGSize = .zero
+    @State private var baseOffset: CGSize = .zero
+
+    init(isZoomed: Binding<Bool> = .constant(false), onTap: ((CGPoint) -> Void)? = nil, onLongPress: ((Bool) -> Void)? = nil, onDoubleTap: ((CGPoint) -> Bool)? = nil, @ViewBuilder content: () -> Content) {
+        self._isZoomed = isZoomed
+        self.onTap = onTap
+        self.onLongPress = onLongPress
+        self.onDoubleTap = onDoubleTap
+        self.content = content()
+    }
+
+    var body: some View {
+        GeometryReader { geo in
+            content
+                .frame(width: geo.size.width, height: geo.size.height)
+                .scaleEffect(scale)
+                .offset(offset)
+                .contentShape(Rectangle())
+                .gesture(
+                    MagnifyGesture()
+                        .onChanged { value in setScale(baseScale * value.magnification) }
+                        .onEnded { _ in baseScale = scale }
+                )
+                .simultaneousGesture(
+                    DragGesture(minimumDistance: 4)
+                        .onChanged { value in
+                            guard scale > 1 else { return }
+                            offset = CGSize(width: baseOffset.width + value.translation.width,
+                                            height: baseOffset.height + value.translation.height)
+                        }
+                        .onEnded { _ in baseOffset = offset }
+                )
+                .onTapGesture(count: 2, coordinateSpace: .global) { location in
+                    if scale <= 1, let onDoubleTap, onDoubleTap(location) { return }
+                    withAnimation(.easeInOut(duration: 0.2)) { setScale(scale > 1 ? 1 : 2.5) }
+                    baseScale = scale
+                }
+                .onTapGesture(count: 1, coordinateSpace: .global) { location in onTap?(location) }
+                .onLongPressGesture(minimumDuration: 0.6) {
+                } onPressingChanged: { pressing in
+                    onLongPress?(pressing)
+                }
+                .clipped()
+        }
+        .onChange(of: isZoomed) { _, zoomed in
+            // Parent clears `isZoomed` on page/mode change — reset like the iOS scroll view.
+            if !zoomed, scale != 1 { setScale(1); baseScale = 1 }
+        }
+    }
+
+    private func setScale(_ value: CGFloat) {
+        scale = min(5, max(1, value))
+        if scale <= 1 { offset = .zero; baseOffset = .zero }
+        let zoomed = scale > 1
+        if isZoomed != zoomed { isZoomed = zoomed }
+    }
+}
+#else
 /// A wrapper around UIScrollView that provides pinch-to-zoom and panning for any SwiftUI view.
 ///
 /// Uses a small `UIScrollView` subclass so vertical paging of the parent Feeds `ScrollView`
@@ -1632,6 +1858,7 @@ final class PassThroughZoomScrollView: UIScrollView {
         return super.gestureRecognizerShouldBegin(gestureRecognizer)
     }
 }
+#endif
 
 func isGIF(_ data: Data) -> Bool {
     return data.count >= 3 && data[0] == 0x47 && data[1] == 0x49 && data[2] == 0x46
@@ -1742,6 +1969,8 @@ struct InfoPill: View {
             ZStack {
                 #if os(tvOS)
                 Color.black
+                #elseif os(macOS)
+                Color(nsColor: .windowBackgroundColor)
                 #else
                 Color(UIColor.systemBackground)
                 #endif
@@ -2555,7 +2784,7 @@ struct StashSyncSheet: View {
     @ObservedObject var handyManager = HandyManager.shared
     @ObservedObject var buttplugManager = ButtplugManager.shared
     @ObservedObject var loveSpouseManager = LoveSpouseManager.shared
-    @Environment(\.dismiss) var dismiss
+    @Environment(\.stashyDismiss) var dismiss
     @State private var isChannelsExpanded = false
     
     var body: some View {

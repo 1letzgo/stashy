@@ -899,6 +899,55 @@ private enum TagCatalogSortPickerValue: Hashable {
     }
 }
 
+// MARK: - Group sort
+
+private enum GroupCatalogSortFieldKind: String, CaseIterable, Identifiable {
+    case name
+    case scenes_count
+    case galleries_count
+    case performer_count
+    case date
+    case rating
+    case updated_at
+    case created_at
+    case random
+
+    var id: String { rawValue }
+
+    var menuLabel: String {
+        switch self {
+        case .name: return "Name"
+        case .scenes_count: return "Scene count"
+        case .galleries_count: return "Gallery count"
+        case .performer_count: return "Performer count"
+        case .date: return "Date"
+        case .rating: return "Rating"
+        case .updated_at: return "Updated"
+        case .created_at: return "Created"
+        case .random: return "Random"
+        }
+    }
+
+    /// Every `GroupSortOption` maps to a kind, so unlike tags there is no "Other" row.
+    static func from(_ option: StashDBViewModel.GroupSortOption) -> GroupCatalogSortFieldKind {
+        GroupCatalogSortFieldKind(rawValue: option.sortField) ?? .name
+    }
+
+    func groupSortOption(ascending: Bool) -> StashDBViewModel.GroupSortOption {
+        switch self {
+        case .name: return ascending ? .nameAsc : .nameDesc
+        case .scenes_count: return ascending ? .sceneCountAsc : .sceneCountDesc
+        case .galleries_count: return ascending ? .galleryCountAsc : .galleryCountDesc
+        case .performer_count: return ascending ? .performerCountAsc : .performerCountDesc
+        case .date: return ascending ? .dateAsc : .dateDesc
+        case .rating: return ascending ? .ratingAsc : .ratingDesc
+        case .updated_at: return ascending ? .updatedAtAsc : .updatedAtDesc
+        case .created_at: return ascending ? .createdAtAsc : .createdAtDesc
+        case .random: return .random
+        }
+    }
+}
+
 // MARK: - Studio sort
 
 private enum StudioCatalogSortFieldKind: String, CaseIterable, Identifiable {
@@ -1022,8 +1071,9 @@ struct PerformersCatalogFilterSortSheet: View {
                     CatalogNameRegexSearchCard(document: criteriaDocument, onApply: onApply)
                     filterPickerCard
                     performerSortCard
-                    FilterCriteriaEditorView(document: criteriaDocument, onChange: onApply)
+                    CatalogFilterCriteriaBody(document: criteriaDocument, onChange: onApply)
                 }
+                .padding(.top, 8)
             }
             .background(Color.appBackground.ignoresSafeArea())
             .catalogSettingsSheetChrome(
@@ -1178,8 +1228,9 @@ struct TagsCatalogFilterSortSheet: View {
                     CatalogNameRegexSearchCard(document: criteriaDocument, onApply: onApply)
                     filterPickerCard
                     tagSortCard
-                    FilterCriteriaEditorView(document: criteriaDocument, onChange: onApply)
+                    CatalogFilterCriteriaBody(document: criteriaDocument, onChange: onApply)
                 }
+                .padding(.top, 8)
             }
             .background(Color.appBackground.ignoresSafeArea())
             .catalogSettingsSheetChrome(
@@ -1319,8 +1370,9 @@ struct StudiosCatalogFilterSortSheet: View {
                     CatalogNameRegexSearchCard(document: criteriaDocument, onApply: onApply)
                     filterPickerCard
                     studioSortCard
-                    FilterCriteriaEditorView(document: criteriaDocument, onChange: onApply)
+                    CatalogFilterCriteriaBody(document: criteriaDocument, onChange: onApply)
                 }
+                .padding(.top, 8)
             }
             .background(Color.appBackground.ignoresSafeArea())
             .catalogSettingsSheetChrome(
@@ -1529,8 +1581,9 @@ struct GalleriesCatalogFilterSortSheet: View {
                     CatalogNameRegexSearchCard(document: criteriaDocument, onApply: onApply)
                     filterPickerCard
                     gallerySortCard
-                    FilterCriteriaEditorView(document: criteriaDocument, onChange: onApply)
+                    CatalogFilterCriteriaBody(document: criteriaDocument, onChange: onApply)
                 }
+                .padding(.top, 8)
             }
             .background(Color.appBackground.ignoresSafeArea())
             .catalogSettingsSheetChrome(
@@ -1780,8 +1833,9 @@ struct ImagesCatalogFilterSortSheet: View {
                     if showsImagesFeedAutoplaySetting {
                         ImagesFeedAutoplaySettingsCard()
                     }
-                    FilterCriteriaEditorView(document: criteriaDocument, onChange: onApply)
+                    CatalogFilterCriteriaBody(document: criteriaDocument, onChange: onApply)
                 }
+                .padding(.top, 8)
             }
             .background(Color.appBackground.ignoresSafeArea())
             .catalogSettingsSheetChrome(
@@ -2194,24 +2248,11 @@ struct GroupsCatalogFilterSortSheet: View {
                     }
                     .catalogFilterSortControlCardChrome()
 
-                    // Sort chips — reuse name/date style via GroupSortOption raw values in host if needed
-                    Text("Sort")
-                        .font(.subheadline.weight(.semibold))
-                        .foregroundColor(.secondary)
-                        .padding(.horizontal, 16)
-                    Picker("Sort", selection: Binding(
-                        get: { sortOption },
-                        set: { onSortChange($0) }
-                    )) {
-                        ForEach(StashDBViewModel.GroupSortOption.allCases, id: \.self) { opt in
-                            Text(opt.displayName).tag(opt)
-                        }
-                    }
-                    .pickerStyle(.menu)
-                    .padding(.horizontal, 16)
+                    groupSortCard
 
-                    FilterCriteriaEditorView(document: criteriaDocument, onChange: onApply)
+                    CatalogFilterCriteriaBody(document: criteriaDocument, onChange: onApply)
                 }
+                .padding(.top, 8)
             }
             .background(Color.appBackground.ignoresSafeArea())
             .catalogSettingsSheetChrome(
@@ -2228,6 +2269,52 @@ struct GroupsCatalogFilterSortSheet: View {
         .presentationDetents([.large])
         .presentationDragIndicator(.visible)
         .presentationBackground(Color.appBackground)
+    }
+
+    private var groupSortCard: some View {
+        let kind = GroupCatalogSortFieldKind.from(sortOption)
+        let ascending = sortOption.direction == "ASC"
+        let orderDisabled = kind == .random
+        return HStack(alignment: .center, spacing: 12) {
+            Text("Sort")
+                .font(.subheadline.weight(.semibold))
+                .foregroundColor(.secondary)
+                .frame(width: CatalogFilterSortSheetLayout.labelColumnWidth, alignment: .leading)
+            HStack(spacing: 6) {
+                CatalogFilterChip(title: "Asc", isActive: ascending && !orderDisabled) {
+                    guard !orderDisabled else { return }
+                    onSortChange(kind.groupSortOption(ascending: true))
+                }
+                CatalogFilterChip(title: "Desc", isActive: !ascending && !orderDisabled) {
+                    guard !orderDisabled else { return }
+                    onSortChange(kind.groupSortOption(ascending: false))
+                }
+            }
+            .fixedSize(horizontal: true, vertical: false)
+            .opacity(orderDisabled ? 0.4 : 1)
+            .allowsHitTesting(!orderDisabled)
+            Spacer(minLength: 8)
+            Picker("Sort type", selection: Binding(
+                get: { GroupCatalogSortFieldKind.from(sortOption) },
+                set: { newKind in
+                    if newKind == .random {
+                        onSortChange(.random)
+                    } else if GroupCatalogSortFieldKind.from(sortOption) == .random {
+                        onSortChange(newKind.groupSortOption(ascending: false))
+                    } else {
+                        onSortChange(newKind.groupSortOption(ascending: sortOption.direction == "ASC"))
+                    }
+                }
+            )) {
+                ForEach(GroupCatalogSortFieldKind.allCases) { k in
+                    Text(k.menuLabel).tag(k)
+                }
+            }
+            .pickerStyle(.menu)
+            .labelsHidden()
+            .tint(appearance.tintColor)
+        }
+        .catalogFilterSortControlCardChrome()
     }
 }
 

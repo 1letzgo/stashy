@@ -213,9 +213,12 @@ struct TabConfig: Codable, Identifiable, Equatable {
     var defaultClipFilterName: String?
     var defaultPreviewFilterId: String?
     var defaultPreviewFilterName: String?
+    /// Feeds › Verticals (stashy+): its own default scene filter; portrait is always added.
+    var defaultVerticalFilterId: String?
+    var defaultVerticalFilterName: String?
 
     enum CodingKeys: String, CodingKey {
-        case id, isVisible, sortOrder, defaultFilterId, defaultFilterName, defaultMarkerFilterId, defaultMarkerFilterName, defaultClipFilterId, defaultClipFilterName, defaultPreviewFilterId, defaultPreviewFilterName
+        case id, isVisible, sortOrder, defaultFilterId, defaultFilterName, defaultMarkerFilterId, defaultMarkerFilterName, defaultClipFilterId, defaultClipFilterName, defaultPreviewFilterId, defaultPreviewFilterName, defaultVerticalFilterId, defaultVerticalFilterName
         case defaultSortOption = "sortOption"
     }
 }
@@ -324,6 +327,11 @@ enum ReelsModeType: String, Codable, CaseIterable {
     case clips
     case previews
     case pics
+    /// stashy+: the Scenes feed with its filter preset to portrait videos.
+    case verticals
+
+    /// Feed modes behind stashy+.
+    var requiresStashyPlus: Bool { self == .verticals }
     
     var defaultTitle: String {
         switch self {
@@ -332,6 +340,7 @@ enum ReelsModeType: String, Codable, CaseIterable {
         case .clips: return "Clips"
         case .previews: return "Previews"
         case .pics: return "Pics"
+        case .verticals: return "Verticals"
         }
     }
     
@@ -342,6 +351,7 @@ enum ReelsModeType: String, Codable, CaseIterable {
         case .clips: return "photo.on.rectangle.angled"
         case .previews: return "play.rectangle.on.rectangle.fill"
         case .pics: return "camera.fill"
+        case .verticals: return "rectangle.portrait.fill"
         }
     }
 }
@@ -511,6 +521,10 @@ class TabManager: ObservableObject {
     @Published var playCountFeedsSeconds: Double = 30 {
         didSet { UserDefaults.standard.set(playCountFeedsSeconds, forKey: playCountFeedsSecondsKey) }
     }
+    /// Feeds › Verticals (stashy+) has its own rule; short portrait clips often count earlier.
+    @Published var playCountVerticalsSeconds: Double = 30 {
+        didSet { UserDefaults.standard.set(playCountVerticalsSeconds, forKey: playCountVerticalsSecondsKey) }
+    }
     static let playCountThresholdOptions: [Double] = [0, 1, 5, 10, 30, 60, 120]
 
     /// Settings › Playback › "Hold to speed up". Rate while a finger rests on the picture —
@@ -629,6 +643,12 @@ class TabManager: ObservableObject {
             UserDefaults.standard.set(isPiPEnabled, forKey: isPiPEnabledKey)
         }
     }
+    /// Leaving a playing scene keeps it running in the mini bar above the tab bar.
+    @Published var isMiniPlayerEnabled: Bool = true {
+        didSet {
+            UserDefaults.standard.set(isMiniPlayerEnabled, forKey: isMiniPlayerEnabledKey)
+        }
+    }
     /// Feeds overlay: optional delete button between Rating and Mute.
     @Published var reelsShowsDeleteButton: Bool = false {
         didSet {
@@ -682,6 +702,7 @@ class TabManager: ObservableObject {
     private let reelsFillHeightKey = "ReelsFillHeight"
     private let reelsContinuousPlayKey = "ReelsContinuousPlay"
     private let isPiPEnabledKey = "isPiPEnabled"
+    private let isMiniPlayerEnabledKey = "isMiniPlayerEnabled"
     private let playerSkipSecondsKey = "playerSkipSeconds"
     private let showsPlayerSkipButtonsKey = "showsPlayerSkipButtons"
     private let playerAutoZoomKey = "playerAutoZoom"
@@ -693,6 +714,7 @@ class TabManager: ObservableObject {
     private let feedsSceneStartPositionKey = "feedsSceneStartPosition"
     private let playCountPlayerSecondsKey = "play_count_player_seconds"
     private let playCountFeedsSecondsKey = "play_count_feeds_seconds"
+    private let playCountVerticalsSecondsKey = "play_count_verticals_seconds"
     private let subtitlesAutoEnabledKey = "subtitle_auto_enabled"
     private let subtitlePreferredLanguageKey = "subtitle_preferred_language"
     private let subtitleFontSizeKey = "subtitle_font_size"
@@ -740,6 +762,7 @@ class TabManager: ObservableObject {
         self.reelsFillHeight = UserDefaults.standard.object(forKey: reelsFillHeightKey) as? Bool ?? true
         self.reelsContinuousPlay = UserDefaults.standard.bool(forKey: reelsContinuousPlayKey)
         self.isPiPEnabled = UserDefaults.standard.object(forKey: isPiPEnabledKey) as? Bool ?? true
+        self.isMiniPlayerEnabled = UserDefaults.standard.object(forKey: isMiniPlayerEnabledKey) as? Bool ?? true
         let storedSkip = UserDefaults.standard.object(forKey: playerSkipSecondsKey) as? Double ?? 10
         self.playerSkipSeconds = Self.playerSkipOptions.contains(storedSkip) ? storedSkip : 10
         self.showsPlayerSkipButtons = UserDefaults.standard.object(forKey: showsPlayerSkipButtonsKey) as? Bool ?? true
@@ -763,6 +786,9 @@ class TabManager: ObservableObject {
         self.playCountPlayerSeconds = Self.playCountThresholdOptions.contains(storedPlayerThreshold) ? storedPlayerThreshold : 1
         let storedFeedsThreshold = UserDefaults.standard.object(forKey: playCountFeedsSecondsKey) as? Double ?? 30
         self.playCountFeedsSeconds = Self.playCountThresholdOptions.contains(storedFeedsThreshold) ? storedFeedsThreshold : 30
+        // Until set, Verticals follows the Scenes rule.
+        let storedVerticalsThreshold = UserDefaults.standard.object(forKey: playCountVerticalsSecondsKey) as? Double ?? self.playCountFeedsSeconds
+        self.playCountVerticalsSeconds = Self.playCountThresholdOptions.contains(storedVerticalsThreshold) ? storedVerticalsThreshold : 30
         loadSubtitleSettings()
         self.reelsShowsDeleteButton = UserDefaults.standard.bool(forKey: reelsShowsDeleteButtonKey)
         self.sceneCardsShowStudioLogo = UserDefaults.standard.object(forKey: sceneCardsShowStudioLogoKey) as? Bool ?? true
@@ -1630,14 +1656,16 @@ class TabManager: ObservableObject {
     
     var enabledReelsModes: [ReelsModeType] {
         reelsModes
-            .filter { $0.isEnabled }
+            .filter { $0.isEnabled && (!$0.type.requiresStashyPlus || StashyPlusManager.isUnlockedNow) }
             .sorted { $0.sortOrder < $1.sortOrder }
             .map { $0.type }
     }
 
     /// Modes shown in Feeds settings.
     var configurableReelsModes: [ReelsModeConfig] {
-        reelsModes.sorted { $0.sortOrder < $1.sortOrder }
+        reelsModes
+            .filter { !$0.type.requiresStashyPlus || StashyPlusManager.isUnlockedNow }
+            .sorted { $0.sortOrder < $1.sortOrder }
     }
     
     func getReelsDefaultSort(for type: ReelsModeType) -> String? {
@@ -1820,6 +1848,18 @@ class TabManager: ObservableObject {
                 userInfo: ["tab": tab.id]
             )
         }
+    }
+
+    func getDefaultVerticalFilterId(for tab: AppTab) -> String? {
+        tabs.first(where: { $0.id == tab })?.defaultVerticalFilterId
+    }
+
+    func setDefaultVerticalFilter(for tab: AppTab, filterId: String?, filterName: String?) {
+        guard let index = tabs.firstIndex(where: { $0.id == tab }) else { return }
+        tabs[index].defaultVerticalFilterId = filterId
+        tabs[index].defaultVerticalFilterName = filterName
+        saveConfig()
+        NotificationCenter.default.post(name: NSNotification.Name("DefaultFilterChanged"), object: nil, userInfo: ["tab": tab.id])
     }
 
     // Helper to get default preview filter for a tab

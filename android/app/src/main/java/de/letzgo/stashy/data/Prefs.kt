@@ -22,16 +22,27 @@ object Prefs {
         Secrets.init(context)
     }
 
-    fun string(key: String): String? = prefs.getString(key, null)
+    // Typed reads tolerate a value of another type (an imported settings file can bring an int
+    // where this app keeps a float, see `SettingsTransfer`): the fast typed getter first, the
+    // conversion only on a mismatch, never an exception.
+    fun string(key: String): String? = try { prefs.getString(key, null) } catch (_: ClassCastException) {
+        prefs.all[key]?.takeIf { it !is Set<*> }?.toString()
+    }
     fun setString(key: String, value: String?) = prefs.edit().apply { if (value == null) remove(key) else putString(key, value) }.apply()
     /** Synchronous write (`commit`) for data that must survive an immediate process kill. */
     fun commitString(key: String, value: String?) =
         prefs.edit().apply { if (value == null) remove(key) else putString(key, value) }.commit()
-    fun bool(key: String, default: Boolean = false) = prefs.getBoolean(key, default)
+    fun bool(key: String, default: Boolean = false): Boolean = try { prefs.getBoolean(key, default) } catch (_: ClassCastException) {
+        when (val v = prefs.all[key]) { is String -> v.toBooleanStrictOrNull() ?: default; is Number -> v.toInt() != 0; else -> default }
+    }
     fun setBool(key: String, value: Boolean) = prefs.edit().putBoolean(key, value).apply()
-    fun int(key: String, default: Int = 0) = prefs.getInt(key, default)
+    fun int(key: String, default: Int = 0): Int = try { prefs.getInt(key, default) } catch (_: ClassCastException) {
+        when (val v = prefs.all[key]) { is Number -> v.toInt(); is String -> v.toIntOrNull() ?: v.toDoubleOrNull()?.toInt() ?: default; else -> default }
+    }
     fun setInt(key: String, value: Int) = prefs.edit().putInt(key, value).apply()
-    fun float(key: String, default: Float = 0f) = prefs.getFloat(key, default)
+    fun float(key: String, default: Float = 0f): Float = try { prefs.getFloat(key, default) } catch (_: ClassCastException) {
+        when (val v = prefs.all[key]) { is Number -> v.toFloat(); is String -> v.toFloatOrNull() ?: default; else -> default }
+    }
     fun setFloat(key: String, value: Float) = prefs.edit().putFloat(key, value).apply()
     fun has(key: String) = prefs.contains(key)
     fun remove(key: String) = prefs.edit().remove(key).apply()

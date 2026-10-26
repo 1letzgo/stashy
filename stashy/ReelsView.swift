@@ -27,6 +27,7 @@ enum ReelsTabBarLayout {
     private static var cacheTimestamp: CFAbsoluteTime = 0
     private static let cacheTTL: CFAbsoluteTime = 0.5
 
+    #if os(iOS)
     private static func keyWindow() -> UIWindow? {
         let scenes = UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }
         let scene = scenes.first(where: { $0.activationState == .foregroundActive }) ?? scenes.first
@@ -35,16 +36,26 @@ enum ReelsTabBarLayout {
             ?? scene?.windows.first
     }
 
+    #endif
+
     static func invalidateCache() {
         cachedOverlap = nil
         cacheTimestamp = 0
     }
 
     static func topInset() -> CGFloat {
+        #if os(macOS)
+        return 0
+        #else
         keyWindow()?.safeAreaInsets.top ?? 0
+        #endif
     }
 
     static func overlapFromBottom() -> CGFloat {
+        #if os(macOS)
+        // The sidebar sits beside the content on macOS; nothing overlaps from below.
+        return 0
+        #else
         let now = CFAbsoluteTimeGetCurrent()
         if let cachedOverlap, now - cacheTimestamp < cacheTTL {
             return cachedOverlap
@@ -76,6 +87,7 @@ enum ReelsTabBarLayout {
         cachedOverlap = value
         cacheTimestamp = now
         return value
+        #endif
     }
 }
 
@@ -373,6 +385,17 @@ struct ReelsViewBody: View {
     @State private var reelsScenePresetNameInput = ""
     @State private var showReelsSceneSaveAsAlert = false
     @StateObject private var reelsCriteriaDocument = FilterCriteriaDocument(mode: .scenes, pinsDefaults: true)
+    /// stashy+ Verticals: the Scenes feed (`reelsMode == .scenes`) with its own criteria, preset to
+    /// portrait. The shared scene document swaps between the two variants; this holds the other one.
+    @State private var reelsVerticals = false
+    @State private var reelsParkedSceneCriteria: [String: Any] = [:]
+    @State private var reelsParkedVerticalCriteria: [String: Any] = [:]
+    @State private var reelsParkedSceneFilter: StashDBViewModel.SavedFilter?
+    @State private var reelsParkedVerticalFilter: StashDBViewModel.SavedFilter?
+    /// Verticals' first visit starts from its own default filter (Settings › Feeds).
+    @State private var reelsVerticalsVisited = false
+    /// Always sent in Verticals, on top of its filter and criteria.
+    private static let verticalsCriteria: [String: Any] = ["orientation": ["value": ["PORTRAIT"]]]
     @StateObject private var reelsMarkerCriteriaDocument = FilterCriteriaDocument(mode: .sceneMarkers, pinsDefaults: true)
     @State private var showReelsSceneRenameAlert = false
     @State private var showReelsSceneDeleteAlert = false
@@ -1492,6 +1515,8 @@ struct ReelsViewBody: View {
             case .clips: self = .clips
             case .previews: self = .previews
             case .pics: self = .pics
+            // Verticals is the Scenes feed with its own (portrait) filter; see `reelsVerticals`.
+            case .verticals: self = .scenes
             }
         }
     }
@@ -1951,6 +1976,14 @@ struct ReelsViewBody: View {
         reelsCriteriaDocument.layered(over: base ?? [:])
     }
 
+    /// The Scenes feed's criteria; in Verticals the portrait criterion is always added on top,
+    /// whatever filter or criteria the user picked there.
+    private func reelsSceneFeedLive(_ base: [String: Any]?) -> [String: Any]? {
+        var live = reelsSceneLive(base) ?? [:]
+        if reelsVerticals { live.merge(Self.verticalsCriteria) { _, forced in forced } }
+        return live.isEmpty ? nil : live
+    }
+
     /// Marker counterpart of ``reelsSceneLive(_:)``. The chips are scene-level criteria and go
     /// under `scene_filter`; the marker criteria editor's entries stay top-level (marker fields).
     private func reelsMarkerLive(_ base: [String: Any]?) -> [String: Any]? {
@@ -1968,7 +2001,7 @@ struct ReelsViewBody: View {
                 sortField: selectedSortOption.sortField,
                 direction: selectedSortOption.direction,
                 filterId: selectedFilter?.id,
-                liveFilter: reelsSceneLive(reelsSceneLiveChips.effectiveLiveFilter(for: selectedFilter)),
+                liveFilter: reelsSceneFeedLive(reelsSceneLiveChips.effectiveLiveFilter(for: selectedFilter)),
                 performerId: selectedPerformer?.id,
                 tagIds: selectedTags.map(\.id),
                 studioId: selectedStudio?.id
@@ -2300,7 +2333,9 @@ struct ReelsViewBody: View {
         let mergedPreviewFilter = hasCriterionOverlay
             ? viewModel.mergeFilterWithCriteria(filter: resolvedPreviewFilter, performer: performer, tags: tags, studio: studio, mode: .scenes)
             : resolvedPreviewFilter
-        let sceneLiveForScenes = stripLiveChips ? nil : reelsSceneLive(reelsSceneLiveChips.effectiveLiveFilter(for: resolvedSceneFilterEarly))
+        let sceneLiveForScenes = stripLiveChips
+            ? (reelsVerticals ? Self.verticalsCriteria : nil)
+            : reelsSceneFeedLive(reelsSceneLiveChips.effectiveLiveFilter(for: resolvedSceneFilterEarly))
         let sceneLiveForMarkers = stripLiveChips ? nil : reelsMarkerLive(reelsMarkerLiveChips.effectiveLiveFilter(for: resolvedMarkerFilterEarly))
         let sceneLiveForPreviews = stripLiveChips ? nil : reelsSceneLive(reelsPreviewLiveChips.effectiveLiveFilter(for: resolvedPreviewFilter))
 
@@ -4375,6 +4410,29 @@ struct ReelsViewBody: View {
         refillFeedAfterDrops()
     }
 
+    #if os(macOS)
+    /// ↑ / ↓ on macOS: one item back / forward, animated like a swipe.
+    private func stepFeed(by delta: Int) {
+        let items = currentReelItems
+        guard !items.isEmpty else { return }
+        let index = items.firstIndex(where: { $0.id == currentVisibleSceneId }) ?? 0
+        let target = min(max(index + delta, 0), items.count - 1)
+        guard target != index else { return }
+        withAnimation(.easeInOut(duration: 0.25)) {
+            currentVisibleSceneId = items[target].id
+        }
+    }
+
+    /// ← / → on macOS: seek the active row through the scrubber, like dragging it.
+    private func seekFeed(by delta: Double) {
+        let duration = scrubberState.duration
+        guard duration > 1 else { return }
+        let target = min(max(0, scrubberState.time + delta), duration)
+        scrubberState.time = target
+        scrubberState.seekTarget = target
+    }
+    #endif
+
     private func advanceToNextItem(from item: ReelItemData) {
         let items = currentReelItems
         guard let currentIndex = items.firstIndex(where: { $0.id == item.id }) else { return }
@@ -4386,6 +4444,7 @@ struct ReelsViewBody: View {
     @ViewBuilder
     private func reelItemRow(index: Int, item: ReelItemData, itemCount: Int) -> some View {
         ReelItemView(
+            isVerticalsFeed: reelsVerticals,
             item: item,
             currentVisibleSceneId: $currentVisibleSceneId,
             isMuted: $isMuted,
@@ -4486,8 +4545,21 @@ struct ReelsViewBody: View {
                 }
                 .scrollTargetLayout()
             }
+            #if os(macOS)
+            .modifier(MacFeedsKeyboard(
+                isEnabled: !isMenuOpen,
+                onStep: { stepFeed(by: $0) },
+                onSeek: { seekFeed(by: $0) },
+                onTogglePlay: { currentItemIsPlaying.toggle() },
+                onToggleMute: {
+                    isMuted.toggle()
+                    ScenePlayerMute.persist(isMuted)
+                }
+            ))
+            #else
             .focusable(false)
             .focusEffectDisabled()
+            #endif
             .scrollTargetBehavior(.paging)
             .scrollDisabled(isMenuOpen)
             .scrollPosition(id: scrollPositionBinding)
@@ -4667,21 +4739,79 @@ struct ReelsViewBody: View {
 
     @ViewBuilder
     private var reelsModeDock: some View {
-        let enabledModes = tabManager.enabledReelsModes.map { ReelsMode(from: $0) }
+        let enabledTypes = tabManager.enabledReelsModes
         StashyExpandingDockBrowseStrip(
-            items: enabledModes.map {
-                StashyNavMenuItem(id: $0.rawValue, title: $0.rawValue, systemImage: $0.icon)
+            items: enabledTypes.map { type in
+                if type == .verticals {
+                    return StashyNavMenuItem(id: Self.verticalsDockID, title: type.defaultTitle, systemImage: type.icon)
+                }
+                let mode = ReelsMode(from: type)
+                return StashyNavMenuItem(id: mode.rawValue, title: mode.rawValue, systemImage: mode.icon)
             },
-            selectionID: reelsMode.rawValue,
+            selectionID: reelsVerticals && reelsMode == .scenes ? Self.verticalsDockID : reelsMode.rawValue,
             accessibilityLabel: "Feed",
             accessibilityHint: "Chooses which feed mode to show"
         ) { id in
-            guard let mode = ReelsMode(rawValue: id), mode != reelsMode else { return }
-            reelsMode = mode
+            selectReelsDockEntry(id)
         }
         // The same air toward the content that `StashyTopNavNameDropdownRow` gives the strip in
         // Home, Tools and Settings. Without it the Feeds chrome sat 4 pt shorter than the rest.
         .padding(StashyChromePlacement.prefersBottom ? .top : .bottom, 4)
+    }
+
+    private static let verticalsDockID = "Verticals"
+
+    /// Dock tap. Verticals and Scenes share `reelsMode == .scenes`; switching between them swaps
+    /// the scene criteria document, so each keeps its own filter (Verticals starts on portrait).
+    private func selectReelsDockEntry(_ id: String) {
+        if id == Self.verticalsDockID {
+            guard !(reelsVerticals && reelsMode == .scenes) else { return }
+            if reelsMode == .scenes {
+                setReelsVerticals(true)
+                reelsApplySceneLiveFromSheet()
+            } else {
+                reelsMode = .scenes
+                // After the mode change has restored the Scenes session.
+                DispatchQueue.main.async {
+                    setReelsVerticals(true)
+                    reelsApplySceneLiveFromSheet()
+                }
+            }
+            return
+        }
+        guard let mode = ReelsMode(rawValue: id) else { return }
+        if reelsVerticals {
+            setReelsVerticals(false)
+            if mode == .scenes, reelsMode == .scenes {
+                reelsApplySceneLiveFromSheet()
+                return
+            }
+        }
+        guard mode != reelsMode else { return }
+        reelsMode = mode
+    }
+
+    private func setReelsVerticals(_ on: Bool) {
+        guard on != reelsVerticals else { return }
+        let current = reelsCriteriaDocument.objectFilter
+        if on {
+            reelsParkedSceneCriteria = current
+            reelsParkedSceneFilter = selectedFilter
+            if !reelsVerticalsVisited {
+                reelsVerticalsVisited = true
+                reelsParkedVerticalFilter = TabManager.shared.getDefaultVerticalFilterId(for: .reels)
+                    .flatMap { viewModel.savedFilters[$0] }
+                reelsParkedVerticalCriteria = reelsParkedVerticalFilter?.filterDict ?? [:]
+            }
+            selectedFilter = reelsParkedVerticalFilter
+            reelsCriteriaDocument.load(reelsParkedVerticalCriteria)
+        } else {
+            reelsParkedVerticalCriteria = current
+            reelsParkedVerticalFilter = selectedFilter
+            selectedFilter = reelsParkedSceneFilter
+            reelsCriteriaDocument.load(reelsParkedSceneCriteria)
+        }
+        reelsVerticals = on
     }
 
     @ViewBuilder
@@ -5350,6 +5480,8 @@ private final class ReelItemVideoSurfaceReadiness: ObservableObject {
 }
 
 struct ReelItemView: View {
+    /// Verticals counts plays by its own rule (Settings › Playback › Feeds).
+    var isVerticalsFeed: Bool = false
     let item: ReelsViewBody.ReelItemData
     @Binding var currentVisibleSceneId: String?
     
@@ -5444,9 +5576,9 @@ struct ReelItemView: View {
         return 0
     }
 
-    /// Settings › Playback › "Count as played — Feeds".
+    /// Settings › Playback › Feeds "Count as played" (Scenes / Verticals each their own rule).
     private var reelsMinWatchSecondsBeforePlayCredit: Double {
-        max(0, TabManager.shared.playCountFeedsSeconds)
+        max(0, isVerticalsFeed ? TabManager.shared.playCountVerticalsSeconds : TabManager.shared.playCountFeedsSeconds)
     }
 
     /// Scenes + markers contribute watch time to the parent scene; previews/clips do not.
@@ -5496,6 +5628,11 @@ struct ReelItemView: View {
             fastForwardOverlay
             playButtonOverlay
             bottomBarOverlay
+        }
+        // A row that cannot play must not leave the chrome hidden (immersive mode / a tap):
+        // the error then covered a black screen with no way to the modes, filter or next item.
+        .onChange(of: engineErrorMessage) { _, message in
+            if message != nil, !isUIVisible { isUIVisible = true }
         }
     }
 }
@@ -6152,7 +6289,10 @@ extension ReelItemView {
             // A dead engine never recovers on its own — rebuild it once. If the rebuilt
             // engine fails again, the error stands and the row reports it.
             if let message = self.aetherErrorMessage {
-                guard !self.didRebuildAfterEngineError else {
+                // A preview the server never generated is a missing file, not a flaky engine:
+                // a rebuild only kept the error on screen for another round.
+                let isPreview: Bool = { if case .preview = self.item { return true }; return false }()
+                guard !self.didRebuildAfterEngineError, !isPreview else {
                     AppLog.error("🎬 Reel watchdog: playback engine failed again (\(message))")
                     self.engineErrorMessage = message
                     self.onPlaybackUnavailable()
@@ -6897,6 +7037,41 @@ struct IsolatedScrubberBar: View {
         .opacity(isUIVisible ? 1 : 0)
         .allowsHitTesting(isUIVisible)
         .animation(.easeInOut(duration: 0.2), value: isUIVisible)
+    }
+}
+#endif
+
+#if os(macOS)
+/// Feeds keys on macOS: ↑ / ↓ previous / next item, ← / → 10 s, space play / pause, M mute.
+/// The feed takes keyboard focus when it appears and whenever it is clicked.
+private struct MacFeedsKeyboard: ViewModifier {
+    var isEnabled: Bool
+    var onStep: (Int) -> Void
+    var onSeek: (Double) -> Void
+    var onTogglePlay: () -> Void
+    var onToggleMute: () -> Void
+
+    @FocusState private var isFocused: Bool
+
+    func body(content: Content) -> some View {
+        content
+            .focusable()
+            .focusEffectDisabled()
+            .focused($isFocused)
+            .onAppear { isFocused = true }
+            .simultaneousGesture(TapGesture().onEnded { isFocused = true })
+            .onKeyPress(.downArrow) { handle { onStep(1) } }
+            .onKeyPress(.upArrow) { handle { onStep(-1) } }
+            .onKeyPress(.rightArrow) { handle { onSeek(10) } }
+            .onKeyPress(.leftArrow) { handle { onSeek(-10) } }
+            .onKeyPress(.space) { handle { onTogglePlay() } }
+            .onKeyPress("m") { handle { onToggleMute() } }
+    }
+
+    private func handle(_ action: () -> Void) -> KeyPress.Result {
+        guard isEnabled else { return .ignored }
+        action()
+        return .handled
     }
 }
 #endif

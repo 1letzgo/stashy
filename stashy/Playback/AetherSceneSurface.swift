@@ -158,8 +158,23 @@ struct AetherSceneSurface: View {
             surfaceSize = size
             applyFillForGeometry()
         }
+        #if os(macOS)
+        .modifier(MacPlayerKeyboard(
+            onTogglePlay: {
+                engine.togglePlayPause()
+                revealControls()
+            },
+            onSkip: { skip(by: $0) },
+            onVolume: { delta in setVolume(min(1, max(0, volumeLevel + delta))) },
+            onToggleMute: {
+                isMuted.toggle()
+                revealControls()
+            },
+            onExitFullscreen: isFullscreen ? onToggleFullscreen : nil
+        ))
+        #endif
         .onReceive(NotificationCenter.default.publisher(for: .stashyHardwareVolumeChanged)) { _ in
-            volumeLevel = AVAudioSession.sharedInstance().outputVolume
+            volumeLevel = Self.systemOutputVolume(engine: engine)
         }
         .onAppear {
             HardwareVolumeMonitor.shared.start()
@@ -169,7 +184,10 @@ struct AetherSceneSurface: View {
             // The slider is the system volume, so it follows the hardware buttons. The
             // engine's own level is left alone: writing it here cleared the host's mute
             // (the volume setter un-mutes), so a muted scene started with sound.
-            volumeLevel = AVAudioSession.sharedInstance().outputVolume
+            volumeLevel = Self.systemOutputVolume(engine: engine)
+            #if os(macOS)
+            systemVolume.engine = engine
+            #endif
             playbackRate = engine.rate
             pip.update(layer: pipLayerIfEnabled)
             pip.onActiveChange = { [weak engine] active in
@@ -522,7 +540,9 @@ struct AetherSceneSurface: View {
             if onToggleFullscreen != nil {
                 dismissOrExpandButton
             }
+            #if os(iOS)
             if isFullscreen { rotateButton }
+            #endif
             routeCapsule
         }
     }
@@ -641,6 +661,16 @@ struct AetherSceneSurface: View {
         .accessibilityLabel("Volume")
     }
 
+    /// iOS: the system output volume (the slider drives it). macOS has no app-settable system
+    /// volume, so the slider is the engine's own level there.
+    private static func systemOutputVolume(engine: AetherSceneEngine) -> Float {
+        #if os(iOS)
+        AVAudioSession.sharedInstance().outputVolume
+        #else
+        engine.volume
+        #endif
+    }
+
     /// Dragging the slider is an unmute: the level is what the user asked for. The level is
     /// pushed to the system volume through the hidden MPVolumeView.
     private func setVolume(_ level: Float) {
@@ -743,6 +773,7 @@ struct AetherSceneSurface: View {
     }
 
     private func toggleInterfaceOrientation() {
+        #if os(iOS)
         guard let scene = UIApplication.shared.connectedScenes
             .compactMap({ $0 as? UIWindowScene })
             .first(where: { $0.activationState == .foregroundActive })
@@ -755,10 +786,12 @@ struct AetherSceneSurface: View {
         // orientation lock on there is no rotation event, so the new orientation holds anyway.
         Self.didRotateInFullscreen = true
         Self.rotate(scene, to: target)
+        #endif
     }
 
     private static var didRotateInFullscreen = false
 
+    #if os(iOS)
     /// A geometry request only takes once the presented controllers re-read their supported
     /// orientations — without this the fullscreen cover often stayed upright.
     private static func refreshSupportedOrientations(in scene: UIWindowScene) {
@@ -780,12 +813,14 @@ struct AetherSceneSurface: View {
             AppLog.debug("Rotate request failed: \(error)")
         }
     }
+    #endif
 
 
     /// Entering fullscreen with a landscape video while the phone is upright turns the interface
     /// to landscape (like Android); closing fullscreen turns it back (`releaseOrientationOverride`).
     /// Once per fullscreen session, so a manual rotate back to portrait sticks.
     private func rotateToLandscapeForWideVideo(attempt: Int = 0) {
+        #if os(iOS)
         guard !didAutoRotate, TabManager.isFullscreenAutoRotateOn,
               UIDevice.current.userInterfaceIdiom == .phone else { return }
         // The video size can still be unknown when fullscreen opens (and may arrive without a
@@ -810,10 +845,12 @@ struct AetherSceneSurface: View {
             Self.didRotateInFullscreen = true
             Self.rotate(scene, to: .landscape)
         }
+        #endif
     }
 
     /// Back to portrait on the phone once fullscreen goes away, if the button rotated it.
     static func releaseOrientationOverride() {
+        #if os(iOS)
         guard didRotateInFullscreen || AppDelegate.orientationLock != .all else { return }
         didRotateInFullscreen = false
         let scenes = UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }
@@ -828,6 +865,7 @@ struct AetherSceneSurface: View {
             AppDelegate.orientationLock = .all
             scenes.forEach { refreshSupportedOrientations(in: $0) }
         }
+        #endif
     }
 
     /// Fullscreen only: the fill toggle. (Options live next to the volume capsule.)
@@ -1525,6 +1563,46 @@ private struct AetherRoutePickerView: UIViewRepresentable {
         }
     }
 }
+#elseif os(macOS)
+/// macOS: no app-settable system volume — the slider drives the engine's own level.
+@MainActor
+final class AetherSystemVolumeControl {
+    weak var engine: AetherSceneEngine?
+    func set(_ level: Float) { engine?.volume = level }
+}
+
+private struct AetherSystemVolumeView: View {
+    var control: AetherSystemVolumeControl
+    var body: some View { Color.clear }
+}
+
+final class AetherAirPlayTrigger {
+    weak var pickerView: AVRoutePickerView?
+
+    func present() {
+        guard let pickerView else { return }
+        DispatchQueue.main.async {
+            if let button = pickerView.subviews.compactMap({ $0 as? NSButton }).first {
+                button.performClick(nil)
+            }
+        }
+    }
+}
+
+private struct AetherRoutePickerView: NSViewRepresentable {
+    var trigger: AetherAirPlayTrigger
+
+    func makeNSView(context: Context) -> AVRoutePickerView {
+        let view = AVRoutePickerView()
+        view.isRoutePickerButtonBordered = false
+        view.setRoutePickerButtonColor(.white, for: .normal)
+        view.setRoutePickerButtonColor(.white, for: .active)
+        trigger.pickerView = view
+        return view
+    }
+
+    func updateNSView(_ nsView: AVRoutePickerView, context: Context) {}
+}
 #endif
 
 // MARK: - Picture in Picture
@@ -1557,7 +1635,9 @@ private final class AetherPictureInPictureCoordinator: NSObject, ObservableObjec
         let created = AVPictureInPictureController(playerLayer: layer)
         created?.delegate = self
         // PiP starts only from the button, never because the app left the foreground.
+        #if os(iOS)
         created?.canStartPictureInPictureAutomaticallyFromInline = false
+        #endif
         controller = created
         isAvailable = created != nil
     }
@@ -1618,5 +1698,39 @@ private struct AetherFillPinchGesture: ViewModifier {
         }
     }
 }
+
+#if os(macOS)
+/// macOS player keys: space play/pause, ←/→ 10 s, ↑/↓ volume, M mute, esc leaves fullscreen.
+/// The surface takes keyboard focus when it appears and whenever it is clicked.
+private struct MacPlayerKeyboard: ViewModifier {
+    var onTogglePlay: () -> Void
+    var onSkip: (Double) -> Void
+    var onVolume: (Float) -> Void
+    var onToggleMute: () -> Void
+    var onExitFullscreen: (() -> Void)?
+
+    @FocusState private var isFocused: Bool
+
+    func body(content: Content) -> some View {
+        content
+            .focusable()
+            .focusEffectDisabled()
+            .focused($isFocused)
+            .onAppear { isFocused = true }
+            .simultaneousGesture(TapGesture().onEnded { isFocused = true })
+            .onKeyPress(.space) { onTogglePlay(); return .handled }
+            .onKeyPress(.leftArrow) { onSkip(-10); return .handled }
+            .onKeyPress(.rightArrow) { onSkip(10); return .handled }
+            .onKeyPress(.upArrow) { onVolume(0.1); return .handled }
+            .onKeyPress(.downArrow) { onVolume(-0.1); return .handled }
+            .onKeyPress("m") { onToggleMute(); return .handled }
+            .onKeyPress(.escape) {
+                guard let onExitFullscreen else { return .ignored }
+                onExitFullscreen()
+                return .handled
+            }
+    }
+}
+#endif
 
 #endif

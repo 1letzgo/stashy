@@ -16,6 +16,14 @@ data class SortOption(val raw: String, val label: String, val field: String, val
 data class SortFieldKind(val field: String, val menuLabel: String)
 
 /** iOS: `FilterSortCatalog` + the per-entity sort enums and sheet field kinds. */
+/** iOS `SceneSortOption.sceneNumber*`: a scene's number inside a group, only on a group's scenes. */
+object GroupSceneSort {
+    const val FIELD = "group_scene_number"
+    val Asc = SortOption("sceneNumberAsc", "Scene No. (Ascending)", FIELD, "ASC")
+    val Desc = SortOption("sceneNumberDesc", "Scene No. (Descending)", FIELD, "DESC")
+    val options = listOf(Asc, Desc)
+}
+
 object SortCatalog {
     private fun o(raw: String, label: String, field: String, dir: String) = SortOption(raw, label, field, dir)
 
@@ -193,8 +201,12 @@ object SortCatalog {
             SortFieldKind("title", "Title"), SortFieldKind("date", "Date"), SortFieldKind("rating", "Rating"),
             SortFieldKind("created_at", "Created"), SortFieldKind("updated_at", "Updated"), SortFieldKind("random", "Random"),
         )
-        // Groups use a plain option menu (iOS `GroupsCatalogFilterSortSheet`).
-        FilterMode.Groups, FilterMode.Unknown -> emptyList()
+        FilterMode.Groups -> listOf(
+            SortFieldKind("name", "Name"), SortFieldKind("scenes_count", "Scene count"), SortFieldKind("galleries_count", "Gallery count"),
+            SortFieldKind("performer_count", "Performer count"), SortFieldKind("date", "Date"), SortFieldKind("rating", "Rating"),
+            SortFieldKind("updated_at", "Updated"), SortFieldKind("created_at", "Created"), SortFieldKind("random", "Random"),
+        )
+        FilterMode.Unknown -> emptyList()
     }
 
     /** iOS: `<Kind>.performerSortOption(ascending:)` etc. — option for a field kind + direction. */

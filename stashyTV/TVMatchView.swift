@@ -60,7 +60,11 @@ struct TVMatchView: View {
         .defaultFocus($focusedCard, true)
         .background(TVThemeFill())
         .onAppear {
-            guard !didRunInitialLoad else { return }
+            guard !didRunInitialLoad else {
+                // Back on Match after a saved final: start the next tournament.
+                if model.duelMode == .bracket, model.bracketIsApplied { model.newBracket() }
+                return
+            }
             didRunInitialLoad = true
             Task {
                 await model.loadDuelPair()
@@ -128,6 +132,10 @@ struct TVMatchView: View {
             return nil
         }
         var parts: [String] = [model.duelMode.label]
+        if model.duelMode == .bracket {
+            if let status = model.bracketStatusLine { parts.append(status) }
+            return parts.joined(separator: " · ")
+        }
         if model.poolCount > 0 { parts.append("\(model.poolCount) in pool") }
         if model.duelMode != .headToHead, model.climbChampion != nil || model.climbFalling {
             parts.append(model.climbFalling ? "falling" : "\(model.climbWins) wins")
@@ -148,6 +156,8 @@ struct TVMatchView: View {
             victoryCard(victor)
         } else if model.needsPlacementStarterSelection {
             placementStarters
+        } else if model.duelMode == .bracket, model.bracket?.isFinished == true {
+            bracketResults
         } else if model.isLoadingPair && model.left == nil {
             loadingBox("Loading pair…")
         } else if let l = model.left, let r = model.right {
@@ -199,10 +209,14 @@ struct TVMatchView: View {
         .frame(width: columnWidth, alignment: .leading)
     }
 
-    /// Draw / New pair / Stop — same set per mode as iOS.
+    /// Draw / New pair / Stop — same set per mode as iOS (32:1: Undo).
     private var duelActions: some View {
         HStack(spacing: 24) {
-            if model.duelMode == .champion {
+            if model.duelMode == .bracket {
+                actionButton("Undo", icon: "arrow.uturn.backward") {
+                    model.undoBracketPick()
+                }
+            } else if model.duelMode == .champion {
                 actionButton("Stop", icon: "stop.circle") {
                     model.startNewClimbRun()
                 }
@@ -212,7 +226,9 @@ struct TVMatchView: View {
                 }
             }
 
-            if model.duelMode == .placement {
+            if model.duelMode == .bracket {
+                EmptyView()
+            } else if model.duelMode == .placement {
                 actionButton("Stop", icon: "stop.circle") {
                     model.startNewClimbRun()
                 }
@@ -260,6 +276,78 @@ struct TVMatchView: View {
             }
         }
         .focusSection()
+    }
+
+    /// 32:1 finished: champion and the rating changes (saved automatically after the final).
+    private var bracketResults: some View {
+        VStack(alignment: .leading, spacing: 28) {
+            if let id = model.bracket?.championId, let champ = model.bracket?.entrant(id) {
+                HStack(alignment: .center, spacing: 40) {
+                    TVMatchPhoto(url: model.thumbnailURL(for: champ), rank: nil)
+                        .frame(width: 240, height: 320)
+                        .clipShape(RoundedRectangle(cornerRadius: 16))
+                    VStack(alignment: .leading, spacing: 12) {
+                        Text("Champion")
+                            .font(.headline)
+                            .foregroundStyle(.secondary)
+                        Text(champ.displayName)
+                            .font(.largeTitle)
+                            .fontWeight(.bold)
+                    }
+                }
+            }
+
+            HStack(spacing: 24) {
+                if model.bracketIsApplied {
+                    actionButton("New tournament", icon: "arrow.triangle.2.circlepath") {
+                        model.newBracket()
+                    }
+                } else if model.isApplyingBracket || model.isLoadingBracketResults {
+                    Text("Saving ratings \(model.bracketAppliedCount)/\(model.bracketProposals.count)")
+                        .font(.headline)
+                        .foregroundStyle(.secondary)
+                } else if !model.bracketProposals.isEmpty {
+                    actionButton("Retry", icon: "arrow.clockwise") {
+                        Task { await model.applyBracket() }
+                    }
+                }
+            }
+            .focusSection()
+
+            if model.isLoadingBracketResults && model.bracketProposals.isEmpty {
+                loadingBox("Calculating ratings…")
+            } else {
+                LazyVGrid(
+                    columns: [GridItem(.adaptive(minimum: 520), spacing: 40)],
+                    alignment: .leading,
+                    spacing: 16
+                ) {
+                    ForEach(model.bracketProposals) { p in
+                        HStack(spacing: 16) {
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(p.name)
+                                    .font(.headline)
+                                    .lineLimit(1)
+                                Text(p.tier.label)
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
+                            Spacer(minLength: 12)
+                            Text("\(p.oldRating) → \(p.newRating)")
+                                .monospacedDigit()
+                                .foregroundStyle(.secondary)
+                            Text(p.delta > 0 ? "+\(p.delta)" : "\(p.delta)")
+                                .monospacedDigit()
+                                .fontWeight(.bold)
+                                .foregroundStyle(p.delta > 0 ? Color.green : (p.delta < 0 ? Color.red : Color.secondary))
+                                .frame(minWidth: 60, alignment: .trailing)
+                        }
+                        .padding(16)
+                        .background(Color.secondaryAppBackground, in: RoundedRectangle(cornerRadius: 12))
+                    }
+                }
+            }
+        }
     }
 
     @ViewBuilder
@@ -497,7 +585,10 @@ private struct TVMatchPhoto: View {
             if let url {
                 CustomAsyncImage(url: url) { loader in
                     if let image = loader.image {
-                        image.resizable().scaledToFill()
+                        Color.clear
+                            // Faces sit at the top of performer photos: crop from the top, not the middle.
+                            .overlay(alignment: .top) { image.resizable().scaledToFill() }
+                            .clipped()
                     } else if loader.isLoading {
                         ProgressView()
                             .frame(maxWidth: .infinity, maxHeight: .infinity)

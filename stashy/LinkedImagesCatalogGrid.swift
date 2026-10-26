@@ -7,7 +7,11 @@
 
 #if !os(tvOS)
 import SwiftUI
+#if canImport(UIKit)
 import UIKit
+#else
+import AppKit
+#endif
 
 /// Images list that respects `CatalogCardColumnScope.images` (1/row with set grouping, or multi-column).
 struct LinkedImagesCatalogGrid: View {
@@ -90,6 +94,9 @@ struct LinkedImagesCatalogGrid: View {
     }
 
     private var viewportFrame: CGRect {
+        #if os(macOS)
+        return NSApp.keyWindow?.contentView?.bounds ?? UIScreen.main.bounds
+        #else
         if let scene = UIApplication.shared.connectedScenes
             .compactMap({ $0 as? UIWindowScene })
             .first(where: { $0.activationState == .foregroundActive }),
@@ -97,6 +104,7 @@ struct LinkedImagesCatalogGrid: View {
             return window.bounds
         }
         return UIScreen.main.bounds
+        #endif
     }
 
     private func recomputeAutoplayTarget(using frames: [String: CGRect]? = nil) {

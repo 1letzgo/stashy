@@ -8,7 +8,11 @@
 
 #if !os(tvOS)
 import SwiftUI
+#if canImport(UIKit)
 import UIKit
+#else
+import AppKit
+#endif
 
 /// Studio-Logo statt Name auf Szenenkarten.
 ///

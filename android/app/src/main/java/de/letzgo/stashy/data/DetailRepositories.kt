@@ -90,6 +90,13 @@ object DetailRepository {
     suspend fun gallery(id: String): Gallery? =
         findPage("findGalleries", "findGalleries", "galleries", Gallery.serializer(), FindFilter(1, 1), extra = mapOf("ids" to listOf(id))).items.firstOrNull()
 
+    /** Scenes linked to a gallery (its Metadata card). */
+    suspend fun galleryScenes(id: String): List<Scene> =
+        findPage(
+            "findScenes", "findScenes", "scenes", Scene.serializer(), FindFilter(1, 40, "date", "DESC"), "scene_filter",
+            JsonObject(mapOf("galleries" to JsonObject(mapOf("value" to JsonArray(listOf(JsonPrimitive(id))), "modifier" to JsonPrimitive("INCLUDES"))))),
+        ).items
+
     // MARK: Favorites
 
     private suspend fun mutate(query: String, variables: JsonObject, field: String): JsonObject? =

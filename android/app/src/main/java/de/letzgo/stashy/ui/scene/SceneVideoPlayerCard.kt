@@ -185,13 +185,19 @@ private fun CoverWithOverlay(model: SceneDetailModel) {
                                 .clickable { model.startPlayback(false) }.padding(horizontal = 12.dp, vertical = 6.dp),
                             color = Color.White, style = IosTypography.caption.copy(fontWeight = FontWeight.Medium),
                         )
+                        // stashy+: the watchlist belongs to the mini player.
+                        if (de.letzgo.stashy.data.StashyPlus.isUnlocked) WatchlistCoverButton(scene)
                     }
                 } else {
-                    Box(
-                        Modifier.size(70.dp).clip(CircleShape).background(Color.Black.copy(alpha = 0.5f))
-                            .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) { model.startPlayback(false) },
-                        contentAlignment = Alignment.Center,
-                    ) { Icon(PlayerIcons.play, "Play", tint = Color.White, modifier = Modifier.size(40.dp).padding(start = 2.dp)) }
+                    Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                        Box(
+                            Modifier.size(70.dp).clip(CircleShape).background(Color.Black.copy(alpha = 0.5f))
+                                .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) { model.startPlayback(false) },
+                            contentAlignment = Alignment.Center,
+                        ) { Icon(PlayerIcons.play, "Play", tint = Color.White, modifier = Modifier.size(40.dp).padding(start = 2.dp)) }
+                        // stashy+: the watchlist belongs to the mini player.
+                        if (de.letzgo.stashy.data.StashyPlus.isUnlocked) WatchlistCoverButton(scene)
+                    }
                 }
             }
             PlaybackFormat.resolutionLabel(scene.files?.firstOrNull()?.height)?.let { label ->
@@ -209,6 +215,35 @@ private fun CoverWithOverlay(model: SceneDetailModel) {
                 Box(Modifier.align(Alignment.BottomStart).fillMaxWidth((resume / duration).toFloat().coerceIn(0f, 1f)).height(4.dp).background(tint))
             }
         } }
+    }
+}
+
+/**
+ * iOS: the cover's watchlist capsule under "Start from beginning" (or under Play) — adds /
+ * removes the scene on the mini player's watchlist, tinted while listed.
+ */
+@Composable
+private fun WatchlistCoverButton(scene: de.letzgo.stashy.data.Scene) {
+    val listed = de.letzgo.stashy.data.WatchlistStore.contains(scene.id)
+    Row(
+        Modifier.clip(RoundedCornerShape(50)).background(if (listed) Appearance.tint else Color.Black.copy(alpha = 0.45f))
+            .clickable {
+                de.letzgo.stashy.data.WatchlistStore.toggle(scene)
+                SceneToast.show(
+                    if (listed) "Removed from watchlist" else "Added to watchlist",
+                    if (listed) de.letzgo.stashy.ui.player.WatchlistIcons.removed else de.letzgo.stashy.ui.player.WatchlistIcons.listed,
+                    SceneToast.Style.Success,
+                )
+            }
+            .padding(horizontal = 12.dp, vertical = 6.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(5.dp),
+    ) {
+        Icon(
+            if (listed) de.letzgo.stashy.ui.player.WatchlistIcons.listed else de.letzgo.stashy.ui.player.WatchlistIcons.add,
+            null, tint = Color.White, modifier = Modifier.size(scaledIconSize(14.dp)),
+        )
+        Text(if (listed) "On watchlist" else "Add to watchlist", color = Color.White, style = IosTypography.caption.copy(fontWeight = FontWeight.Medium))
     }
 }
 
@@ -248,10 +283,33 @@ private fun MarkerStrip(markers: List<SceneMarker>, playing: Boolean, onSeek: (D
  * iOS: `SceneDetailMetadataCard` — title (+ edit pencil), collapsible details, and the pill row:
  * date · duration · play count · O-counter (tap +1, long-press "Remove one O" / reset) · rating.
  */
-@OptIn(ExperimentalFoundationApi::class, ExperimentalLayoutApi::class)
 @Composable
-fun SceneMetadataCard(model: SceneDetailModel, onEditTitle: () -> Unit) {
-    val scene = model.scene
+fun SceneMetadataCard(model: SceneDetailModel, onEditTitle: () -> Unit) = SceneMetadataCardContent(
+    scene = model.scene,
+    isExpanded = model.isHeaderExpanded,
+    onToggleExpanded = { model.isHeaderExpanded = !model.isHeaderExpanded },
+    onEditTitle = onEditTitle,
+    onIncrementO = model::incrementO,
+    onRemoveO = model::removeO,
+    onSetRating = model::setRating,
+)
+
+/**
+ * The metadata card's content without a page model (also embedded in the mini player's Now
+ * Playing view): title, expandable details, date · duration · plays · O-counter (tap +1,
+ * long-press remove / reset) · star rating.
+ */
+@OptIn(ExperimentalLayoutApi::class, ExperimentalFoundationApi::class)
+@Composable
+fun SceneMetadataCardContent(
+    scene: de.letzgo.stashy.data.Scene,
+    isExpanded: Boolean,
+    onToggleExpanded: () -> Unit,
+    onEditTitle: (() -> Unit)?,
+    onIncrementO: () -> Unit,
+    onRemoveO: (OCounterMutation) -> Unit,
+    onSetRating: (Int?) -> Unit,
+) {
     val p = Theme.palette
     val tint = Appearance.tint
     val haptics = LocalHapticFeedback.current
@@ -259,15 +317,15 @@ fun SceneMetadataCard(model: SceneDetailModel, onEditTitle: () -> Unit) {
     Column(Modifier.fillMaxWidth().padding(start = 12.dp, end = 12.dp, bottom = 12.dp, top = if (hasMarkers) 4.dp else 12.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Row(verticalAlignment = Alignment.Top) {
             Text(scene.displayTitle, Modifier.weight(1f), style = IosTypography.title2.copy(fontWeight = FontWeight.Bold), color = p.text, maxLines = 2, overflow = TextOverflow.Ellipsis)
-            if (Appearance.isEditModeEnabled) EditCircleButton(onEditTitle)
+            if (Appearance.isEditModeEnabled && onEditTitle != null) EditCircleButton(onEditTitle)
         }
         scene.details?.takeIf { it.isNotEmpty() }?.let { details ->
             Box(Modifier.fillMaxWidth()) {
                 Text(
                     details, Modifier.fillMaxWidth().padding(bottom = 20.dp), style = IosTypography.body, color = p.text.copy(alpha = 0.8f),
-                    maxLines = if (model.isHeaderExpanded) Int.MAX_VALUE else 3, overflow = TextOverflow.Ellipsis,
+                    maxLines = if (isExpanded) Int.MAX_VALUE else 3, overflow = TextOverflow.Ellipsis,
                 )
-                ExpandChevron(model.isHeaderExpanded, Modifier.align(Alignment.BottomEnd)) { model.isHeaderExpanded = !model.isHeaderExpanded }
+                ExpandChevron(isExpanded, Modifier.align(Alignment.BottomEnd), onToggleExpanded)
             }
         }
         // FlowRow: at large font scales the pills wrap onto a second line instead of squeezing
@@ -290,13 +348,13 @@ fun SceneMetadataCard(model: SceneDetailModel, onEditTitle: () -> Unit) {
                     oCounterIcon(Appearance.oCounterIcon, filled = true), "$count",
                     Modifier.semantics { contentDescription = "O-Counter $count, tap to add one, long-press for options" }.combinedClickable(
                         interactionSource = remember { MutableInteractionSource() }, indication = ripple(),
-                        onClick = { haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove); model.incrementO() },
+                        onClick = { haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove); onIncrementO() },
                         onLongClick = { haptics.performHapticFeedback(HapticFeedbackType.LongPress); menu = true },
                     ),
                 )
                 DropdownMenu(menu, onDismissRequest = { menu = false }) {
                     if (count > 0) {
-                        DropdownMenuItem(text = { Text("Remove one O") }, leadingIcon = { Icon(PlayerIcons.minusCircle, null) }, onClick = { menu = false; model.removeO(OCounterMutation.Decrement) })
+                        DropdownMenuItem(text = { Text("Remove one O") }, leadingIcon = { Icon(PlayerIcons.minusCircle, null) }, onClick = { menu = false; onRemoveO(OCounterMutation.Decrement) })
                         if (count > 1) DropdownMenuItem(
                             text = { Text("Reset O-Counter ($count)", color = StashyColors.systemRed) },
                             leadingIcon = { Icon(PlayerIcons.reset, null, tint = StashyColors.systemRed) },
@@ -309,10 +367,10 @@ fun SceneMetadataCard(model: SceneDetailModel, onEditTitle: () -> Unit) {
                 onDismissRequest = { confirmReset = false },
                 title = { Text("Reset O-Counter?") },
                 text = { Text("All $count recorded O entries and their dates are permanently deleted on the server. This cannot be undone.") },
-                confirmButton = { TextButton({ confirmReset = false; model.removeO(OCounterMutation.Reset) }) { Text("Remove all $count", color = StashyColors.systemRed) } },
+                confirmButton = { TextButton({ confirmReset = false; onRemoveO(OCounterMutation.Reset) }) { Text("Remove all $count", color = StashyColors.systemRed) } },
                 dismissButton = { TextButton({ confirmReset = false }) { Text("Cancel") } },
             )
-            StarRating(scene.rating100, size = 14.dp, spacing = 4.dp, modifier = center, container = p.pillAccent.copy(alpha = 0.1f)) { model.setRating(it) }
+            StarRating(scene.rating100, size = 14.dp, spacing = 4.dp, modifier = center, container = p.pillAccent.copy(alpha = 0.1f), onChange = onSetRating)
         }
     }
 }

@@ -155,4 +155,11 @@ object MatchRepository {
         val data = GraphQL.data(UPDATE_MUTATION.trimIndent(), buildJsonObject { put("input", input) })
         if (data["performerUpdate"] !is JsonObject) throw Exception("Update failed")
     }
+
+    /** 32:1: one update for an entrant's whole bracket run (`MatchBracket.performerUpdate`). */
+    suspend fun pushBracketUpdate(performer: Performer, newRating: Int, matches: List<Triple<String, String, Boolean>>) {
+        val input = MatchBracket.performerUpdate(performer, newRating, matches)
+        val data = GraphQL.data(UPDATE_MUTATION.trimIndent(), buildJsonObject { put("input", input) })
+        if (data["performerUpdate"] !is JsonObject) throw Exception("Update failed")
+    }
 }

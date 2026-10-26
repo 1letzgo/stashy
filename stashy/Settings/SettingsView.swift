@@ -9,7 +9,11 @@
 import SwiftUI
 import StoreKit
 import RevenueCat
+#if canImport(UIKit)
 import UIKit
+#else
+import AppKit
+#endif
 
 private enum StashyLegalLinks {
     /// Apple Standard EULA — required in App Store metadata for auto-renewable subscriptions.
@@ -167,6 +171,12 @@ struct SettingsView: View {
             interactiveDevicesSection
         }
 
+        Section {
+            stashyScrollingSectionHeader("Backup & Transfer")
+            SettingsTransferControls(groupedRows: true)
+            stashyScrollingSectionFooter("Servers, settings, default filters, dashboard and tabs as one JSON file — imports on iPhone, iPad, Mac and Android.")
+        }
+
         aboutSection
     }
 
@@ -217,6 +227,15 @@ struct SettingsView: View {
             }
 
             Section {
+                stashyScrollingSectionHeader("Miniplayer & Watchlist")
+                Toggle(isOn: $tabManager.isMiniPlayerEnabled) {
+                    Label("Miniplayer & Watchlist", systemImage: "rectangle.bottomhalf.inset.filled")
+                }
+                .tint(appearanceManager.tintColor)
+                .stashyGroupedSettingsRow()
+            }
+
+            Section {
                 stashyScrollingSectionHeader("AI Subtitles and translation", isBeta: true)
                 StashyPlusAISubtitlesSettings()
             }
@@ -241,35 +260,38 @@ struct SettingsView: View {
                 stashyScrollingSectionHeader("Included with stashy+")
                 Label("Custom App Icons", systemImage: "lock.fill")
                     .foregroundColor(.secondary)
-                    .stashyGroupedBlockRow(index: 0, count: 11)
+                    .stashyGroupedBlockRow(index: 0, count: 12)
                 Label("Download Scenes", systemImage: "lock.fill")
                     .foregroundColor(.secondary)
-                    .stashyGroupedBlockRow(index: 1, count: 11)
+                    .stashyGroupedBlockRow(index: 1, count: 12)
+                Label("Miniplayer & Watchlist", systemImage: "lock.fill")
+                    .foregroundColor(.secondary)
+                    .stashyGroupedBlockRow(index: 2, count: 12)
                 lockedPlusFeature("AI Subtitles and translation", systemImage: "lock.fill", isBeta: true)
-                    .stashyGroupedBlockRow(index: 2, count: 11)
+                    .stashyGroupedBlockRow(index: 3, count: 12)
                 lockedPlusFeature(AIMotionCopy.name, systemImage: "lock.fill", isBeta: true)
-                    .stashyGroupedBlockRow(index: 3, count: 11)
+                    .stashyGroupedBlockRow(index: 4, count: 12)
                 Label(ToolsItem.statistics.plusFeatureTitle, systemImage: "lock.fill")
                     .foregroundColor(.secondary)
-                    .stashyGroupedBlockRow(index: 4, count: 11)
+                    .stashyGroupedBlockRow(index: 5, count: 12)
                 Label(ToolsItem.oCount.plusFeatureTitle, systemImage: "lock.fill")
                     .foregroundColor(.secondary)
-                    .stashyGroupedBlockRow(index: 5, count: 11)
+                    .stashyGroupedBlockRow(index: 6, count: 12)
                 Label(ToolsItem.timeline.plusFeatureTitle, systemImage: "lock.fill")
                     .foregroundColor(.secondary)
-                    .stashyGroupedBlockRow(index: 6, count: 11)
+                    .stashyGroupedBlockRow(index: 7, count: 12)
                 Label(ToolsItem.topLists.plusFeatureTitle, systemImage: "lock.fill")
                     .foregroundColor(.secondary)
-                    .stashyGroupedBlockRow(index: 7, count: 11)
+                    .stashyGroupedBlockRow(index: 8, count: 12)
                 Label(ToolsItem.filters.plusFeatureTitle, systemImage: "lock.fill")
                     .foregroundColor(.secondary)
-                    .stashyGroupedBlockRow(index: 8, count: 11)
+                    .stashyGroupedBlockRow(index: 9, count: 12)
                 Label(ToolsItem.hotOrNot.plusFeatureTitle, systemImage: "lock.fill")
                     .foregroundColor(.secondary)
-                    .stashyGroupedBlockRow(index: 9, count: 11)
+                    .stashyGroupedBlockRow(index: 10, count: 12)
                 Label(ToolsItem.rateMe.title, systemImage: "lock.fill")
                     .foregroundColor(.secondary)
-                    .stashyGroupedBlockRow(index: 10, count: 11)
+                    .stashyGroupedBlockRow(index: 11, count: 12)
             }
         }
 
@@ -903,6 +925,12 @@ class StoreManager: ObservableObject {
     }
 
     func manageSubscriptions() async {
+        #if os(macOS)
+        // No in-app sheet on macOS; the App Store app manages subscriptions.
+        if let url = URL(string: "macappstore://apps.apple.com/account/subscriptions") {
+            NSWorkspace.shared.open(url)
+        }
+        #else
         guard let scene = UIApplication.shared.connectedScenes
             .compactMap({ $0 as? UIWindowScene })
             .first(where: { $0.activationState == .foregroundActive })
@@ -913,6 +941,7 @@ class StoreManager: ObservableObject {
         } catch {
             AppLog.debug("Manage subscriptions failed: \(error)")
         }
+        #endif
     }
 
     /// Paid-app buyers (original version before 3.0) get Lifetime.

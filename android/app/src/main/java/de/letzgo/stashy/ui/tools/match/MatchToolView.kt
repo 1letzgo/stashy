@@ -47,7 +47,11 @@ import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.outlined.Groups
 import androidx.compose.material.icons.outlined.PersonOff
 import androidx.compose.material.icons.outlined.StopCircle
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.material.icons.automirrored.filled.Undo
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FilledTonalButton
@@ -93,6 +97,8 @@ import de.letzgo.stashy.ui.components.SelectChip
 import coil3.compose.AsyncImagePainter
 import de.letzgo.stashy.data.Performer
 import de.letzgo.stashy.data.ServerConfigManager
+import de.letzgo.stashy.data.tools.MatchBracket
+import de.letzgo.stashy.data.tools.MatchBracketState
 import de.letzgo.stashy.data.tools.MatchDuelMode
 import de.letzgo.stashy.data.tools.MatchElo
 import de.letzgo.stashy.data.tools.MatchRepository
@@ -266,10 +272,14 @@ private fun MatchActionButton(
     }
 }
 
-/** iOS: `hotOrNotDuelActionsRow` — Draw / Stop, New pair, Stop. */
+/** iOS: `hotOrNotDuelActionsRow` — Draw / Stop, New pair, Stop (32:1: Undo, Bracket, New). */
 @Composable
 private fun DuelActionsRow(model: MatchViewModel, hPad: Dp) {
     val view = LocalView.current
+    if (model.duelMode == MatchDuelMode.Bracket) {
+        BracketActionsRow(model, hPad)
+        return
+    }
     Row(Modifier.fillMaxWidth().padding(horizontal = hPad), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
         if (model.duelMode == MatchDuelMode.Champion) {
             MatchActionButton("Stop", Icons.Outlined.StopCircle, prominent = false, enabled = !model.isSubmitting, modifier = Modifier.weight(1f), accessibilityLabel = "End Legend run") {
@@ -345,6 +355,8 @@ private fun PerformerPhoto(performer: Performer, modifier: Modifier = Modifier, 
         if (url != null) {
             AsyncImage(
                 model = url, contentDescription = performer.name, contentScale = ContentScale.Crop,
+                // Faces sit at the top of performer photos: crop from the top, not the middle.
+                alignment = Alignment.TopCenter,
                 modifier = Modifier.fillMaxSize(), onState = { state = it },
             )
         }
@@ -376,8 +388,18 @@ private fun BattleContent(model: MatchViewModel, hPad: Dp, isRegular: Boolean, b
         when {
             victor != null -> VictoryCard(model, victor)
             model.needsPlacementStarterSelection -> PlacementStarterInline(model)
+            model.duelMode == MatchDuelMode.Bracket && model.bracket?.isFinished == true -> BracketResultsCard(model)
             model.isLoadingPair && l == null -> MatchLoadingView("Loading pair...", Modifier.fillMaxWidth().heightIn(min = 320.dp))
-            l != null && r != null -> Row(
+            l != null && r != null -> Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+              if (model.duelMode == MatchDuelMode.Bracket) {
+                model.bracketStatusLine?.let {
+                    Text(
+                        it, style = IosTypography.subheadline.copy(fontWeight = FontWeight.SemiBold),
+                        color = Theme.palette.secondaryText, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth(),
+                    )
+                }
+              }
+              Row(
                 Modifier.fillMaxWidth().let { if (isRegular) it.widthIn(max = 920.dp) else it },
                 horizontalArrangement = Arrangement.spacedBy(if (isRegular) 20.dp else 10.dp),
                 verticalAlignment = Alignment.Top,
@@ -390,10 +412,161 @@ private fun BattleContent(model: MatchViewModel, hPad: Dp, isRegular: Boolean, b
                     BattleColumn(model, r, model.rankRight, model.duelFeedback?.right) { model.chooseAsync(leftWins = false) }
                     ProfileLinkCard(r)
                 }
+              }
             }
         }
         Spacer(Modifier.height(ToolsTokens.menuBottomPadding))
     }
+}
+
+// MARK: - 32:1
+
+/** iOS: 32:1 actions row — Undo, Bracket (tree dialog), New (confirmed). */
+@Composable
+private fun BracketActionsRow(model: MatchViewModel, hPad: Dp) {
+    val view = LocalView.current
+    var showTree by remember { mutableStateOf(false) }
+    Row(Modifier.fillMaxWidth().padding(horizontal = hPad), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+        MatchActionButton("Undo", Icons.AutoMirrored.Filled.Undo, prominent = false, enabled = model.bracket?.picks?.isNotEmpty() == true, modifier = Modifier.weight(1f)) {
+            view.performMatchHaptic(MatchHaptic.Light)
+            model.undoBracketPick()
+        }
+        MatchActionButton("32:1", SF.trophy, prominent = false, enabled = true, modifier = Modifier.weight(1f)) { showTree = true }
+    }
+    if (showTree) model.bracket?.let { BracketTreeDialog(it) { showTree = false } }
+}
+
+/**
+ * iOS: `HotOrNotBracketTreeSheet` — one round at a time (round chips on top, matches as a plain
+ * vertical list), so the dialog only scrolls vertically and keeps a fixed size.
+ */
+@Composable
+private fun BracketTreeDialog(state: MatchBracketState, onDismiss: () -> Unit) {
+    val p = Theme.palette
+    val tint = Appearance.tint
+    var round by remember { mutableIntStateOf(maxOf(0, state.rounds.size - 1)) }
+    val shortTitle = { r: Int ->
+        when (state.roundCount - r) {
+            1 -> "F"
+            2 -> "SF"
+            3 -> "QF"
+            else -> "${1 shl (state.roundCount - r)}"
+        }
+    }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(MatchBracket.roundTitle(round, state.roundCount)) },
+        confirmButton = { TextButton(onDismiss) { Text("Done") } },
+        text = {
+            Column(Modifier.fillMaxWidth().height(440.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    (0 until state.roundCount).forEach { r ->
+                        MatchPill(shortTitle(r), selected = r == round, modifier = Modifier.weight(1f)) { round = r }
+                    }
+                }
+                Column(
+                    Modifier.fillMaxWidth().weight(1f).verticalScroll(rememberScrollState()),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    val matches = state.rounds.getOrNull(round)
+                    if (matches == null) {
+                        Text("Not reached yet", style = IosTypography.subheadline, color = p.secondaryText, modifier = Modifier.padding(top = 24.dp))
+                    }
+                    matches?.forEach { m ->
+                        Row(
+                            Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp)).background(p.secondaryBackground)
+                                .padding(horizontal = 12.dp, vertical = 10.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        ) {
+                            listOf(m.leftId, m.rightId).forEachIndexed { i, id ->
+                                val won = m.winnerId == id
+                                val lost = m.winnerId != null && !won
+                                if (i == 1) Text("vs", style = IosTypography.caption2, color = p.secondaryText)
+                                Text(
+                                    state.entrant(id)?.name ?: "—",
+                                    style = IosTypography.subheadline.copy(fontWeight = if (won) FontWeight.Bold else FontWeight.Normal),
+                                    color = if (won) tint else if (lost) p.secondaryText else p.text,
+                                    maxLines = 1, overflow = TextOverflow.Ellipsis,
+                                    textAlign = if (i == 0) TextAlign.Start else TextAlign.End,
+                                    modifier = Modifier.weight(1f),
+                                )
+                            }
+                        }
+                    }
+                    if (round == state.roundCount - 1) {
+                        state.championId?.let { state.entrant(it) }?.let { champ ->
+                            Row(Modifier.fillMaxWidth().padding(top = 8.dp), horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically) {
+                                Icon(SF.trophy, null, tint = tint, modifier = Modifier.size(20.dp))
+                                Spacer(Modifier.width(6.dp))
+                                Text(champ.name, style = IosTypography.headline, color = tint)
+                            }
+                        }
+                    }
+                }
+            }
+        },
+    )
+}
+
+/** iOS: `HotOrNotBracketResultsCard` — champion and the rating changes (saved automatically after the final). */
+@Composable
+private fun BracketResultsCard(model: MatchViewModel) {
+    val p = Theme.palette
+    val tint = Appearance.tint
+    val view = LocalView.current
+    val state = model.bracket ?: return
+    var showTree by remember { mutableStateOf(false) }
+    Column(
+        Modifier.fillMaxWidth().widthIn(max = 720.dp).matchCard().padding(16.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(14.dp),
+    ) {
+        state.championId?.let { state.entrant(it) }?.let { champ ->
+            Icon(SF.trophy, null, tint = tint, modifier = Modifier.size(34.dp))
+            Text("CHAMPION", style = IosTypography.caption.copy(fontWeight = FontWeight.SemiBold), color = p.secondaryText)
+            Text(champ.name, style = IosTypography.title2.copy(fontWeight = FontWeight.Bold), color = p.text, textAlign = TextAlign.Center)
+        }
+        if (model.isLoadingBracketResults && model.bracketProposals.isEmpty()) {
+            MatchLoadingView("Calculating ratings...", Modifier.fillMaxWidth().heightIn(min = 160.dp))
+        } else {
+            if (model.isApplyingBracket) {
+                Text("Saving ratings ${model.bracketAppliedCount}/${model.bracketProposals.size}", style = IosTypography.caption, color = p.secondaryText)
+            }
+            Column(Modifier.fillMaxWidth()) {
+                model.bracketProposals.forEach { prop ->
+                    Row(Modifier.fillMaxWidth().padding(vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Column(Modifier.weight(1f)) {
+                            Text(prop.name, style = IosTypography.subheadline.copy(fontWeight = FontWeight.SemiBold), color = p.text, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                            Text(prop.tier.label, style = IosTypography.caption, color = p.secondaryText)
+                        }
+                        Text("${prop.oldRating} → ${prop.newRating}", style = IosTypography.subheadline.merge(numberStyle), color = p.secondaryText)
+                        Text(
+                            if (prop.delta > 0) "+${prop.delta}" else "${prop.delta}",
+                            style = IosTypography.subheadline.merge(numberStyle).copy(fontWeight = FontWeight.Bold),
+                            color = when {
+                                prop.delta > 0 -> StashyColors.systemGreen
+                                prop.delta < 0 -> StashyColors.systemRed
+                                else -> p.secondaryText
+                            },
+                            textAlign = TextAlign.End,
+                            modifier = Modifier.widthIn(min = 40.dp),
+                        )
+                    }
+                }
+            }
+        }
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            MatchActionButton("32:1", SF.trophy, prominent = false, enabled = true, modifier = Modifier.weight(1f)) { showTree = true }
+            if (model.bracketIsApplied) {
+                MatchActionButton("New tournament", Icons.Filled.Autorenew, prominent = true, enabled = true, modifier = Modifier.weight(1f)) { model.newBracket() }
+            } else if (!model.isApplyingBracket && !model.isLoadingBracketResults && model.bracketProposals.isNotEmpty()) {
+                // Only after a failed automatic save.
+                MatchActionButton("Retry", Icons.Filled.Autorenew, prominent = true, enabled = true, modifier = Modifier.weight(1f)) { model.applyBracketAsync() }
+            }
+        }
+    }
+    if (showTree) BracketTreeDialog(state) { showTree = false }
 }
 
 /** iOS: Legend / Rise finished — "Legend!" card with New run. */

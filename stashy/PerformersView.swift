@@ -10,8 +10,6 @@ import SwiftUI
 
 
 private struct PerformersViewContent: View {
-    /// Home sub-tab root: actions go into the Home chrome instead of a floating bar.
-    var hostsInSectionChrome = false
     @ObservedObject var viewModel: StashDBViewModel
     @ObservedObject var configManager = ServerConfigManager.shared
     @State private var scrollPosition: String? = nil
@@ -562,11 +560,18 @@ private struct PerformersViewContent: View {
             if configManager.activeConfig == nil {
                 ConnectionErrorView { performSearch() }
             } else if viewModel.isLoading && viewModel.performers.isEmpty {
-                StandardLoadingView(message: "Loading performers...")
+                // Keep the bar while a sort/filter change refetches, so it does not jump away.
+                VStack(spacing: 0) {
+                    quickBar
+                    StandardLoadingView(message: "Loading performers...")
+                }
             } else if viewModel.performers.isEmpty && viewModel.errorMessage != nil {
                 ConnectionErrorView { performSearch() }
             } else if viewModel.performers.isEmpty {
-                emptyStateView
+                VStack(spacing: 0) {
+                    if catalogFilterSortFABActive { quickBar }
+                    emptyStateView
+                }
             } else {
                 performersGrid
             }
@@ -593,13 +598,6 @@ private struct PerformersViewContent: View {
                 errorMessage: viewModel.errorMessage
             ),
             isPresented: true,
-            hostsInSectionChrome: hostsInSectionChrome,
-            filterSort: CatalogChromeSlot(
-                systemImage: "slider.horizontal.3",
-                isActive: catalogFilterSortFABActive,
-                accessibilityLabel: "Settings",
-                action: { showFilterSortSheet = true }
-            ),
             search: CatalogSearchChrome(
                 text: $searchText,
                 isVisible: $isSearchVisible,
@@ -710,9 +708,40 @@ private struct PerformersViewContent: View {
          )
     }
 
+    /// Name of the active saved filter / local preset for the removable chip above the list.
+    private var activePresetName: String? {
+        if let ls = ListLivePresetTag.parseLocalUUIDString(catalogPresetRowSelection), let uuid = UUID(uuidString: ls) {
+            return localCatalogPresets.first { $0.id == uuid }?.name
+        }
+        if let sid = ListLivePresetTag.parseServerId(catalogPresetRowSelection) {
+            return viewModel.savedFilters[sid]?.name ?? selectedFilter?.name
+        }
+        return selectedFilter?.name
+    }
+
+    private var quickBar: some View {
+        CatalogListQuickBar(
+            mode: .performers,
+            sort: selectedSortOption,
+            onSort: { changeSortOption(to: $0) },
+            document: criteriaDocument,
+            presetName: activePresetName,
+            onClearPreset: {
+                catalogPresetRowSelection = ""
+                selectedFilter = nil
+                criteriaDocument.clear()
+                applyLiveFilter()
+            },
+            onFiltersChanged: { applyLiveFilter() },
+            onOpenFilters: { showFilterSortSheet = true }
+        )
+    }
+
     private var performersGrid: some View {
         ScrollViewReader { proxy in
             ScrollView {
+                VStack(spacing: 0) {
+                quickBar
                 LazyVGrid(columns: columns, spacing: 12) {
                     ForEach(viewModel.performers) { performer in
                         NavigationLink(destination: LazyView { PerformerDetailView(performer: performer) }) {
@@ -753,7 +782,8 @@ private struct PerformersViewContent: View {
                     }
                 }
                 .measuresGridWidth($gridWidth)
-                .padding(16)
+                .padding([.horizontal, .bottom], 16)
+                }
             }
             .refreshable { performSearch() }
             .onChange(of: viewModel.isLoadingMorePerformers) { oldValue, isLoading in
@@ -942,7 +972,6 @@ struct PerformersView: View {
                 initialSort: initialSort,
                 filterMemory: filterMemory
             )
-        content.hostsInSectionChrome = catalogBrowserViewModel != nil
         return content
     }
 }

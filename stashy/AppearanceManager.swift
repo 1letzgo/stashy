@@ -115,6 +115,18 @@ class AppearanceManager: ObservableObject {
     
     // MARK: - Persistence
     
+    /// `UIColor.getRed` reports success; AppKit's variant returns nothing and traps on
+    /// non-RGB colors, so convert to sRGB first there.
+    private func rgbaComponents(of color: UIColor, _ r: inout CGFloat, _ g: inout CGFloat, _ b: inout CGFloat, _ a: inout CGFloat) -> Bool {
+        #if os(macOS)
+        guard let rgb = color.usingColorSpace(.sRGB) else { return false }
+        rgb.getRed(&r, green: &g, blue: &b, alpha: &a)
+        return true
+        #else
+        return color.getRed(&r, green: &g, blue: &b, alpha: &a)
+        #endif
+    }
+
     private func saveColor(_ color: Color) {
         let uiColor = UIColor(color)
         var red: CGFloat = 0
@@ -122,7 +134,7 @@ class AppearanceManager: ObservableObject {
         var blue: CGFloat = 0
         var alpha: CGFloat = 0
         
-        if uiColor.getRed(&red, green: &green, blue: &blue, alpha: &alpha) {
+        if rgbaComponents(of: uiColor, &red, &green, &blue, &alpha) {
             let defaults = UserDefaults.standard
             defaults.set(Float(red), forKey: kTintColorRed)
             defaults.set(Float(green), forKey: kTintColorGreen)
@@ -159,8 +171,8 @@ class AppearanceManager: ObservableObject {
         var r1: CGFloat = 0, g1: CGFloat = 0, b1: CGFloat = 0, a1: CGFloat = 0
         var r2: CGFloat = 0, g2: CGFloat = 0, b2: CGFloat = 0, a2: CGFloat = 0
         
-        guard uiColor1.getRed(&r1, green: &g1, blue: &b1, alpha: &a1),
-              uiColor2.getRed(&r2, green: &g2, blue: &b2, alpha: &a2) else {
+        guard rgbaComponents(of: uiColor1, &r1, &g1, &b1, &a1),
+              rgbaComponents(of: uiColor2, &r2, &g2, &b2, &a2) else {
             return false
         }
         

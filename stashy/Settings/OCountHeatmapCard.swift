@@ -7,7 +7,11 @@
 
 #if !os(tvOS)
 import SwiftUI
+#if canImport(UIKit)
 import UIKit
+#else
+import AppKit
+#endif
 
 struct OCountHeatmapToolsView: View {
     @ObservedObject private var configManager = ServerConfigManager.shared

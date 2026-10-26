@@ -10,7 +10,8 @@ import SwiftUI
 import Combine
 
 /// A card on the scene detail screen. The video player is fixed at the top and not part of this list.
-/// Raw values are persisted — never rename them.
+/// Raw values are persisted — never rename them. (`galleries` was folded into Metadata;
+/// `normalizedOrder` drops the stale id.)
 enum SceneDetailCard: String, CaseIterable, Identifiable {
     case details
     case heatmap
@@ -19,7 +20,6 @@ enum SceneDetailCard: String, CaseIterable, Identifiable {
     case performersStudio
     case groups
     case tags
-    case galleries
 
     var id: String { rawValue }
 
@@ -29,10 +29,9 @@ enum SceneDetailCard: String, CaseIterable, Identifiable {
         case .heatmap: return "Funscript Heatmap"
         case .aiMotion: return "AI Motion Status"
         case .similarScenes: return "Similar Scenes"
-        case .performersStudio: return "Performers & Studio"
+        case .performersStudio: return "Metadata"
         case .groups: return "Groups"
         case .tags: return "Tags"
-        case .galleries: return "Galleries"
         }
     }
 
@@ -54,7 +53,6 @@ enum SceneDetailCard: String, CaseIterable, Identifiable {
         case .performersStudio: return "person.2"
         case .groups: return "film.stack"
         case .tags: return "tag"
-        case .galleries: return "photo.on.rectangle"
         }
     }
 

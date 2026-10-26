@@ -51,10 +51,7 @@ import de.letzgo.stashy.ui.cardShadow
 import de.letzgo.stashy.ui.noRippleClickable
 import de.letzgo.stashy.ui.tools.charts.ChartsToolView
 import de.letzgo.stashy.ui.tools.downloads.DownloadsToolView
-import de.letzgo.stashy.ui.tools.filters.FiltersToolView
 import de.letzgo.stashy.ui.tools.match.MatchToolView
-import de.letzgo.stashy.ui.tools.merge.StudioMergeToolView
-import de.letzgo.stashy.ui.tools.merge.TagMergeToolView
 import de.letzgo.stashy.ui.tools.rateme.RateMeToolView
 import de.letzgo.stashy.ui.tools.stats.OCountHeatmapToolView
 import de.letzgo.stashy.ui.tools.stats.OverviewToolView
@@ -63,13 +60,11 @@ import de.letzgo.stashy.ui.tools.stats.SessionTimelineToolView
 /** iOS: `ToolsView.ToolsTab` — raw values are the titles (`coordinator.toolsSubTab`). */
 enum class ToolsTab(val title: String, val icon: ImageVector) {
     Downloads("Downloads", SF.squareAndArrowDown),
+    Watchlist("Watchlist", de.letzgo.stashy.ui.player.WatchlistIcons.listed),
     Overview("Overview", SF.chartBarFill),
     OCount("O-Count", SF.calendar),
     Timeline("Timeline", SF.calendarDayTimelineLeft),
     TopLists("Charts", SF.listNumber),
-    Filters("Filters", SF.line3HorizontalDecreaseCircle),
-    MergeTags("Merge Tags", SF.arrowTriangleMerge),
-    MergeStudios("Merge Studios", SF.building2),
     HotOrNot("Match", SF.flameFill),
     RateMe("RateMe", SF.starFill);
 
@@ -78,7 +73,7 @@ enum class ToolsTab(val title: String, val icon: ImageVector) {
 
         /** iOS: `ToolsView.toolGroups` — fixed grouping and order. */
         val groups: List<Pair<String, List<ToolsTab>>> = listOf(
-            "Library" to listOf(Downloads, Filters, MergeTags, MergeStudios),
+            "Library" to listOf(Downloads, Watchlist),
             "Insights" to listOf(Overview, TopLists, OCount, Timeline),
             "Discover" to listOf(HotOrNot, RateMe),
         )
@@ -125,13 +120,11 @@ private fun ToolsView() {
         when (selected) {
             null -> ToolsLandingView { ToolsNav.subTab = it.title }
             ToolsTab.Downloads -> DownloadsToolView()
+            ToolsTab.Watchlist -> de.letzgo.stashy.ui.tools.watchlist.WatchlistToolView()
             ToolsTab.Overview -> OverviewToolView()
             ToolsTab.OCount -> OCountHeatmapToolView()
             ToolsTab.Timeline -> SessionTimelineToolView()
             ToolsTab.TopLists -> ChartsToolView()
-            ToolsTab.Filters -> FiltersToolView()
-            ToolsTab.MergeTags -> TagMergeToolView()
-            ToolsTab.MergeStudios -> StudioMergeToolView()
             ToolsTab.HotOrNot -> MatchToolView()
             ToolsTab.RateMe -> RateMeToolView()
         }

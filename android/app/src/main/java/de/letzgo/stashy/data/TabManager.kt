@@ -109,6 +109,9 @@ object TabManager {
     var reelsContinuousPlay: Boolean get() = _reelsContinuousPlay.value; set(v) { _reelsContinuousPlay.value = v; Prefs.setBool("ReelsContinuousPlay", v) }
     private val _isPiPEnabled = bool("isPiPEnabled", true)
     var isPiPEnabled: Boolean get() = _isPiPEnabled.value; set(v) { _isPiPEnabled.value = v; Prefs.setBool("isPiPEnabled", v) }
+    /** iOS `isMiniPlayerEnabled` — a scene left while playing keeps running in the mini bar (default on). */
+    private val _isMiniPlayerEnabled = bool("isMiniPlayerEnabled", true)
+    var isMiniPlayerEnabled: Boolean get() = _isMiniPlayerEnabled.value; set(v) { _isMiniPlayerEnabled.value = v; Prefs.setBool("isMiniPlayerEnabled", v) }
     private val _playerSkipSeconds = dbl("playerSkipSeconds", 10.0, playerSkipOptions)
     var playerSkipSeconds: Double get() = _playerSkipSeconds.value; set(v) { _playerSkipSeconds.value = v; Prefs.setFloat("playerSkipSeconds", v.toFloat()) }
     private val _showsPlayerSkipButtons = bool("showsPlayerSkipButtons", true)
@@ -130,6 +133,9 @@ object TabManager {
     var playCountPlayerSeconds: Double get() = _playCountPlayerSeconds.value; set(v) { _playCountPlayerSeconds.value = v; Prefs.setFloat("play_count_player_seconds", v.toFloat()) }
     private val _playCountFeedsSeconds = dbl("play_count_feeds_seconds", 30.0, playCountThresholdOptions)
     var playCountFeedsSeconds: Double get() = _playCountFeedsSeconds.value; set(v) { _playCountFeedsSeconds.value = v; Prefs.setFloat("play_count_feeds_seconds", v.toFloat()) }
+    /** Feeds › Verticals (stashy+): its own rule; until set it follows the Scenes rule. */
+    private val _playCountVerticalsSeconds = dbl("play_count_verticals_seconds", _playCountFeedsSeconds.value, playCountThresholdOptions)
+    var playCountVerticalsSeconds: Double get() = _playCountVerticalsSeconds.value; set(v) { _playCountVerticalsSeconds.value = v; Prefs.setFloat("play_count_verticals_seconds", v.toFloat()) }
     private val _holdSpeedPlayer = dbl("hold_speed_player", 2.0, holdSpeedOptions)
     var holdSpeedPlayer: Double get() = _holdSpeedPlayer.value; set(v) { _holdSpeedPlayer.value = v; Prefs.setFloat("hold_speed_player", v.toFloat()) }
     /** Settings › Playback › "Marker length": how long a Feeds › Markers row plays when the marker has no end time. */
@@ -356,6 +362,7 @@ object TabManager {
     fun getDefaultMarkerFilterId(tab: AppTab) = tab(tab)?.defaultMarkerFilterId
     fun getDefaultClipFilterId(tab: AppTab) = tab(tab)?.defaultClipFilterId
     fun getDefaultPreviewFilterId(tab: AppTab) = tab(tab)?.defaultPreviewFilterId
+    fun getDefaultVerticalFilterId(tab: AppTab) = tab(tab)?.defaultVerticalFilterId
 
     private fun updateTab(tab: AppTab, change: (TabConfig) -> TabConfig) {
         ensureLoaded()
@@ -369,6 +376,7 @@ object TabManager {
     fun setDefaultMarkerFilter(tab: AppTab, id: String?, name: String?) = updateTab(tab) { it.copy(defaultMarkerFilterId = id, defaultMarkerFilterName = name) }
     fun setDefaultClipFilter(tab: AppTab, id: String?, name: String?) = updateTab(tab) { it.copy(defaultClipFilterId = id, defaultClipFilterName = name) }
     fun setDefaultPreviewFilter(tab: AppTab, id: String?, name: String?) = updateTab(tab) { it.copy(defaultPreviewFilterId = id, defaultPreviewFilterName = name) }
+    fun setDefaultVerticalFilter(tab: AppTab, id: String?, name: String?) = updateTab(tab) { it.copy(defaultVerticalFilterId = id, defaultVerticalFilterName = name) }
 
     fun getPersistentDetailSortOption(ctx: DetailViewContext): String? { ensureLoaded(); return detailSorts[ctx] }
     fun setPersistentDetailSortOption(ctx: DetailViewContext, option: String) {
@@ -450,6 +458,7 @@ object TabManager {
 
     val configurableReelsModes: List<ReelsModeConfig> get() { ensureLoaded(); return reelsModes.sortedBy { it.sortOrder } }
     val enabledReelsModes: List<ReelsModeType> get() = configurableReelsModes.filter { it.isEnabled }.map { it.type }
+        .filter { !it.requiresStashyPlus || de.letzgo.stashy.data.StashyPlus.isUnlocked }
 
     /** iOS `toggleReelsMode` — the last enabled mode can't be switched off. */
     fun toggleReelsMode(type: ReelsModeType) {

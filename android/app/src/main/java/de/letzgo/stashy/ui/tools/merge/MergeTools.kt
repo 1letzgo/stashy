@@ -118,7 +118,7 @@ private object MergeToolsLayout {
  * at the sources (`tagsMerge`) and deletes them.
  */
 @Composable
-fun TagMergeToolView() {
+fun TagMergeToolView(topPadding: Dp = toolsTopPadding()) {
     val config = remember {
         MergeToolsConfig<MergeTag>(
             kind = "tags", noun = "tag", nounPlural = "tags",
@@ -126,7 +126,7 @@ fun TagMergeToolView() {
             merge = { sources, destination -> MergeRepository.mergeTags(sources, destination) },
         )
     }
-    MergeToolsView(config)
+    MergeToolsView(config, topPadding)
 }
 
 /**
@@ -134,7 +134,7 @@ fun TagMergeToolView() {
  * scenes, galleries, images, groups and child studios by bulk update and deletes the sources.
  */
 @Composable
-fun StudioMergeToolView() {
+fun StudioMergeToolView(topPadding: Dp = toolsTopPadding()) {
     val config = remember {
         MergeToolsConfig<MergeStudio>(
             kind = "studios", noun = "studio", nounPlural = "studios",
@@ -142,7 +142,7 @@ fun StudioMergeToolView() {
             merge = { sources, destination -> MergeRepository.mergeStudios(sources, destination) },
         )
     }
-    MergeToolsView(config)
+    MergeToolsView(config, topPadding)
 }
 
 /**
@@ -150,21 +150,21 @@ fun StudioMergeToolView() {
  * heading), a card list with the search as first row, and the merge bar at the bottom.
  */
 @Composable
-fun <T : MergeableItem> MergeToolsView(config: MergeToolsConfig<T>) {
+fun <T : MergeableItem> MergeToolsView(config: MergeToolsConfig<T>, topPadding: Dp = toolsTopPadding()) {
     val nounTitle = config.nounPlural.replaceFirstChar { it.uppercase() }
     if (ServerConfigManager.activeConfig == null) {
         NoServerPlaceholder(Icons.Filled.MergeType, "Connect to a Stash server to merge $nounTitle.")
         return
     }
     // Each server has its own list and templates.
-    key(ServerConfigManager.activeConfig?.id) { MergeToolsContent(config, nounTitle) }
+    key(ServerConfigManager.activeConfig?.id) { MergeToolsContent(config, nounTitle, topPadding) }
 }
 
 private data class RunnablePreset<T>(val preset: MergePreset, val destination: T, val sources: List<T>)
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
-private fun <T : MergeableItem> MergeToolsContent(config: MergeToolsConfig<T>, nounTitle: String) {
+private fun <T : MergeableItem> MergeToolsContent(config: MergeToolsConfig<T>, nounTitle: String, topPadding: Dp) {
     val p = Theme.palette
     val tint = Appearance.tint
     val scope = rememberCoroutineScope()
@@ -392,7 +392,7 @@ private fun <T : MergeableItem> MergeToolsContent(config: MergeToolsConfig<T>, n
             Modifier.fillMaxWidth()
                 .background(p.background)
                 .padding(horizontal = ToolsTokens.contentPadding)
-                .padding(top = toolsTopPadding() + ToolsTokens.menuTopPadding),
+                .padding(top = topPadding + ToolsTokens.menuTopPadding),
         ) {
             DestinationField(destination?.name, destination?.mergeUsageSummary) { showingDestinationPicker = true }
 

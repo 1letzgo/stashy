@@ -1,7 +1,11 @@
 #if !os(tvOS)
 import Foundation
 import Combine
+#if canImport(UIKit)
 import UIKit
+#else
+import AppKit
+#endif
 #if canImport(AetherEngine)
 import AetherEngine
 #endif

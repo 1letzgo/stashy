@@ -78,18 +78,34 @@ import kotlinx.coroutines.delay
  * The page model lives with the screen object, so a pushed page or another tab can come back
  * to it and resume playback where it left off.
  */
-class SceneDetailScreen(val sceneId: String, val preview: Scene? = null, autoPlay: Boolean = false) : Screen {
-    override val key = "scene-$sceneId"
-    private val model = SceneDetailModel(preview ?: Scene(id = sceneId), autoPlay)
+class SceneDetailScreen(
+    val sceneId: String,
+    val preview: Scene? = null,
+    autoPlay: Boolean = false,
+    /** Reopened from the mini player (iOS full-screen cover with a minimize chevron). */
+    private val openedFromMiniPlayer: Boolean = false,
+) : Screen {
+    // Own key when reopened from the bar: the same scene's page may already sit lower in the stack.
+    override val key = if (openedFromMiniPlayer) "scene-$sceneId-mini-${System.nanoTime()}" else "scene-$sceneId"
+    private val model = SceneDetailModel(preview ?: Scene(id = sceneId), autoPlay, openedFromMiniPlayer = openedFromMiniPlayer)
     override val hidesTabBar: Boolean get() = model.isFullscreen || PlayerWindow.isInPictureInPicture
 
-    @Composable override fun Content() = SceneDetailContent(model)
+    @Composable override fun Content() = SceneDetailContent(model, openedFromMiniPlayer)
 }
 
 private enum class EditSheet { Title, Performers, Studio, Groups, Tags, Galleries }
 
+/**
+ * iOS: `SceneDetailView` in `stashyScenePlayerOnly` mode — the scene page's player module 1:1
+ * (player card with its marker strip, fullscreen, menus, subtitles / AI captions, add marker,
+ * frame tools, PiP) without the rest of the page; hosted by the mini player's Now Playing view.
+ * [model] must be created with `playerOnly = true`.
+ */
 @Composable
-private fun SceneDetailContent(model: SceneDetailModel) {
+fun ScenePlayerModule(model: SceneDetailModel) = SceneDetailContent(model, openedFromMiniPlayer = false, playerOnly = true)
+
+@Composable
+private fun SceneDetailContent(model: SceneDetailModel, openedFromMiniPlayer: Boolean, playerOnly: Boolean = false) {
     val p = Theme.palette
     val scene = model.scene
     val lifecycle = LocalLifecycleOwner.current.lifecycle
@@ -114,7 +130,7 @@ private fun SceneDetailContent(model: SceneDetailModel) {
     }
     // iOS: `.task(id: SimilarScenesFinder.signature(for: activeScene))` — runs again once the full
     // scene replaces the list version. Results live in the page model, not in the finder.
-    LaunchedEffect(SimilarScenes.signature(scene), SimilarScenes.isActive) { model.loadSimilarScenes() }
+    LaunchedEffect(SimilarScenes.signature(scene), SimilarScenes.isActive) { if (!playerOnly) model.loadSimilarScenes() }
     // Tag Suggestion writes elsewhere (Reels, bulk "Set on all of performer") patch this scene's tags,
     // like `StashDBViewModel` patches its lists on `SceneTagsUpdated` / `BulkTagsApplied`.
     LaunchedEffect(model) {
@@ -144,7 +160,7 @@ private fun SceneDetailContent(model: SceneDetailModel) {
             PlayerWindow.releaseOrientation()
         }
     }
-    BackHandler(enabled = model.isFullscreen) { model.isFullscreen = false }
+    BackHandler(enabled = model.isFullscreen && !playerOnly) { model.isFullscreen = false }
 
     val extraMenuItems: () -> List<PlayerMenuItem> = {
         buildList {
@@ -178,11 +194,55 @@ private fun SceneDetailContent(model: SceneDetailModel) {
         return
     }
 
-    Box(Modifier.fillMaxSize().background(p.background)) {
+    // iOS: `fullScreenCover` — the same player, full bleed.
+    val fullscreenPlayer: @Composable () -> Unit = {
+        if (player != null) Box(Modifier.fillMaxSize().background(Color.Black)) {
+            ScenePlayerSurface(
+                player = player,
+                posterURL = scene.thumbnailURL,
+                isMuted = model.isMuted,
+                onMutedChange = model::updateMuted,
+                onSeek = model::seekTo,
+                modifier = Modifier.fillMaxSize(),
+                onToggleFullscreen = { model.isFullscreen = false },
+                isFullscreen = true,
+                markers = scene.timeBarMarkers,
+                onAddMarker = model::beginAddMarker,
+                extraMenuItems = extraMenuItems,
+                subtitleMenuExtras = model.aiSubtitles::menuItems,
+                onHostSubtitleOff = model.aiSubtitles::turnOffAISubtitles,
+                onOptionsMenuClosed = model.aiSubtitles::optionsMenuClosed,
+                scrubSprites = model.scrubSprites,
+                onRotate = { PlayerWindow.toggleOrientation() },
+                onPictureInPicture = { PlayerWindow.enterPictureInPicture(player.videoSize) },
+            )
+        }
+    }
+
+    if (playerOnly) {
+        // Only the player card (with its marker strip); the host lays out the rest.
+        Box(Modifier.fillMaxWidth()) {
+            Column(Modifier.fillMaxWidth().cardShadow().clip(RoundedCornerShape(Tokens.Radius.card)).background(p.secondaryBackground)) {
+                SceneVideoPlayerCard(model, extraMenuItems)
+            }
+            SceneToastHost(Modifier.align(Alignment.TopCenter))
+        }
+        // The host is a sheet: fullscreen gets its own full-window dialog.
+        if (model.isFullscreen && player != null) androidx.compose.ui.window.Dialog(
+            onDismissRequest = { model.isFullscreen = false },
+            properties = androidx.compose.ui.window.DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false),
+        ) {
+            val dialogView = androidx.compose.ui.platform.LocalView.current
+            androidx.compose.runtime.SideEffect {
+                (dialogView.parent as? androidx.compose.ui.window.DialogWindowProvider)?.window?.let(PlayerWindow::makeDialogImmersive)
+            }
+            fullscreenPlayer()
+        }
+    } else Box(Modifier.fillMaxSize().background(p.background)) {
         val landscape = LocalConfiguration.current.orientation == Configuration.ORIENTATION_LANDSCAPE
         val pinned = model.isPlaybackStarted && player != null && !landscape
         Column(Modifier.fillMaxSize()) {
-            SceneDetailNavBar(model) { sheet = EditSheet.Title }
+            SceneDetailNavBar(model, openedFromMiniPlayer) { sheet = EditSheet.Title }
             val playerCard: @Composable () -> Unit = {
                 Column(Modifier.fillMaxWidth().cardShadow().clip(RoundedCornerShape(Tokens.Radius.card)).background(p.secondaryBackground)) {
                     SceneVideoPlayerCard(model, extraMenuItems)
@@ -209,14 +269,14 @@ private fun SceneDetailContent(model: SceneDetailModel) {
                         }
                         // stashy+ — hides itself when Similar Scenes is off or nothing is similar.
                         SceneDetailCard.SimilarScenes -> SceneSimilarScenesCard(model.similarScenes, model.isLoadingSimilarScenes)
-                        // Hides itself without studio, performers and director (unless edit mode is on).
+                        // Metadata — hides itself without studio, performers, director and galleries (unless edit mode is on).
                         SceneDetailCard.PerformersStudio -> ScenePerformersStudioCard(
                             scene.date, scene.studio, scene.performers, scene.normalizedDirector,
                             onEditStudio = { sheet = EditSheet.Studio }, onEditPerformers = { sheet = EditSheet.Performers },
+                            galleries = scene.galleries.orEmpty(), onEditGalleries = { sheet = EditSheet.Galleries },
                         )
                         SceneDetailCard.Groups -> SceneGroupsCard(scene.groups.orEmpty(), { sheet = EditSheet.Groups }, modifier)
                         SceneDetailCard.Tags -> SceneTagsCard(scene.tags, model.isTagsExpanded, { model.isTagsExpanded = !model.isTagsExpanded }, { sheet = EditSheet.Tags }, modifier)
-                        SceneDetailCard.Galleries -> SceneGalleriesCard(scene.galleries, modifier) { sheet = EditSheet.Galleries }
                     }
                 }
                 SceneDetailLayoutLogic.rows(SceneDetailLayout.order, SceneDetailLayout.hidden, landscape).forEach { row ->
@@ -226,30 +286,7 @@ private fun SceneDetailContent(model: SceneDetailModel) {
             }
         }
 
-        // iOS: `fullScreenCover` — the same player, full bleed.
-        if (model.isFullscreen && player != null) {
-            Box(Modifier.fillMaxSize().background(Color.Black)) {
-                ScenePlayerSurface(
-                    player = player,
-                    posterURL = scene.thumbnailURL,
-                    isMuted = model.isMuted,
-                    onMutedChange = model::updateMuted,
-                    onSeek = model::seekTo,
-                    modifier = Modifier.fillMaxSize(),
-                    onToggleFullscreen = { model.isFullscreen = false },
-                    isFullscreen = true,
-                    markers = scene.timeBarMarkers,
-                    onAddMarker = model::beginAddMarker,
-                    extraMenuItems = extraMenuItems,
-                    subtitleMenuExtras = model.aiSubtitles::menuItems,
-                    onHostSubtitleOff = model.aiSubtitles::turnOffAISubtitles,
-                    onOptionsMenuClosed = model.aiSubtitles::optionsMenuClosed,
-                    scrubSprites = model.scrubSprites,
-                    onRotate = { PlayerWindow.toggleOrientation() },
-                    onPictureInPicture = { PlayerWindow.enterPictureInPicture(player.videoSize) },
-                )
-            }
-        }
+        if (model.isFullscreen && player != null) fullscreenPlayer()
 
         SceneToastHost(Modifier.align(Alignment.TopCenter))
     }
@@ -288,8 +325,10 @@ private fun SceneDetailContent(model: SceneDetailModel) {
  * with the page's rarer actions (edit title & details, delete — same handlers as the cards).
  */
 @Composable
-private fun SceneDetailNavBar(model: SceneDetailModel, onEditTitle: () -> Unit) {
+private fun SceneDetailNavBar(model: SceneDetailModel, openedFromMiniPlayer: Boolean, onEditTitle: () -> Unit) {
     NativeTopBar(model.scene.displayTitle) {
+        // iOS: the cover's "chevron.down" — leaving hands a playing video back to the mini player.
+        if (openedFromMiniPlayer) TopBarAction(de.letzgo.stashy.ui.SF.chevronDown, "Minimize") { Nav.pop() }
         if (!model.scene.hasStashID) {
             TopBarAction(PlayerIcons.identify, "Identify scene", busy = model.isIdentifying) { model.identify() }
         }
@@ -321,4 +360,3 @@ private fun RouteMuteFollower(model: SceneDetailModel) {
         onDispose { am.unregisterAudioDeviceCallback(callback) }
     }
 }
-

@@ -1,0 +1,39 @@
+{
+  "fill" : {
+    "solid" : "srgb:0.11176,0.15881,0.22284,1.00000"
+  },
+  "groups" : [
+    {
+      "layers" : [
+        {
+          "fill" : {
+            "solid" : "srgb:0.85036,0.85723,0.86683,1.00000"
+          },
+          "hidden" : false,
+          "image-name" : "package.png",
+          "name" : "package",
+          "position" : {
+            "scale" : 1.4,
+            "translation-in-points" : [
+              0,
+              0
+            ]
+          }
+        }
+      ],
+      "shadow" : {
+        "kind" : "neutral",
+        "opacity" : 0.5
+      },
+      "translucency" : {
+        "enabled" : true,
+        "value" : 0.5
+      }
+    }
+  ],
+  "supported-platforms" : {
+    "squares" : [
+      "macOS"
+    ]
+  }
+}

@@ -9,8 +9,6 @@
 import SwiftUI
 
 private struct GalleriesViewContent: View {
-    /// Home sub-tab root: actions go into the Home chrome instead of a floating bar.
-    var hostsInSectionChrome = false
     @ObservedObject var viewModel: StashDBViewModel
     @ObservedObject var configManager = ServerConfigManager.shared
     @EnvironmentObject var coordinator: NavigationCoordinator
@@ -479,24 +477,66 @@ private struct GalleriesViewContent: View {
         if configManager.activeConfig == nil {
             ConnectionErrorView { performSearch() }
         } else if viewModel.isLoadingGalleries && viewModel.galleries.isEmpty {
-            StandardLoadingView(message: "Loading galleries...")
+            // Keep the bar while a sort/filter change refetches, so it does not jump away.
+            VStack(spacing: 0) {
+                quickBar
+                StandardLoadingView(message: "Loading galleries...")
+            }
         } else if viewModel.galleries.isEmpty && viewModel.errorMessage != nil {
             ConnectionErrorView { performSearch() }
         } else if viewModel.galleries.isEmpty {
-            SharedEmptyStateView(
-                icon: "photo.stack",
-                title: "No galleries found",
-                buttonText: "Reload",
-                onRetry: { performSearch() }
-            )
+            VStack(spacing: 0) {
+                if !criteriaDocument.isEmpty || activePresetName != nil { quickBar }
+                SharedEmptyStateView(
+                    icon: "photo.stack",
+                    title: "No galleries found",
+                    buttonText: "Reload",
+                    onRetry: { performSearch() }
+                )
+            }
         } else {
             galleriesGridScroll
         }
     }
 
+    /// Sheet "Reset" and the saved-filter chip's ✕: drops the preset and every criterion.
+    private func resetAllCatalogFilters() {
+        catalogPresetRowSelection = ""
+        selectedFilter = nil
+        clearGalleryLiveChipsOnly()
+        criteriaDocument.clear()
+        applyLiveFilter()
+    }
+
+    /// Name of the active saved filter / local preset for the removable chip above the list.
+    private var activePresetName: String? {
+        if let ls = ListLivePresetTag.parseLocalUUIDString(catalogPresetRowSelection), let uuid = UUID(uuidString: ls) {
+            return localCatalogPresets.first { $0.id == uuid }?.name
+        }
+        if let sid = ListLivePresetTag.parseServerId(catalogPresetRowSelection) {
+            return viewModel.savedFilters[sid]?.name ?? selectedFilter?.name
+        }
+        return selectedFilter?.name
+    }
+
+    private var quickBar: some View {
+        CatalogListQuickBar(
+            mode: .galleries,
+            sort: selectedSortOption,
+            onSort: { changeSortOption(to: $0) },
+            document: criteriaDocument,
+            presetName: activePresetName,
+            onClearPreset: { resetAllCatalogFilters() },
+            onFiltersChanged: { applyLiveFilter() },
+            onOpenFilters: { showFilterSortSheet = true }
+        )
+    }
+
     private var galleriesGridScroll: some View {
         let cardColumns = tabManager.catalogCardColumns(for: CatalogCardColumnScope.galleries)
         return ScrollView {
+            VStack(spacing: 0) {
+            quickBar
             LazyVGrid(columns: columns, spacing: 12) {
                 ForEach(viewModel.galleries) { gallery in
                     NavigationLink(destination: LazyView { ImagesView(gallery: gallery) }) {
@@ -521,7 +561,8 @@ private struct GalleriesViewContent: View {
             }
             .measuresGridWidth($cardGridWidth)
             .id(cardColumns)
-            .padding(16)
+            .padding([.horizontal, .bottom], 16)
+            }
         }
         .background(Color.appBackground)
         .refreshable { performSearch() }
@@ -542,13 +583,6 @@ private struct GalleriesViewContent: View {
             ownsNavigationBar: !hideTitle,
             visibility: galleriesFloatingBarChrome,
             isPresented: true,
-            hostsInSectionChrome: hostsInSectionChrome,
-            filterSort: CatalogChromeSlot(
-                systemImage: "slider.horizontal.3",
-                isActive: catalogFilterSortFABActive,
-                accessibilityLabel: "Settings",
-                action: { showFilterSortSheet = true }
-            ),
             // Embedded in a detail screen the parent owns the nav bar, so no search field here.
             search: hideTitle ? nil : CatalogSearchChrome(
                 text: $searchText,
@@ -717,13 +751,7 @@ private struct GalleriesViewContent: View {
             sortOption: selectedSortOption,
             onSortChange: { changeSortOption(to: $0) },
             onApply: { applyLiveFilter() },
-            onReset: {
-                catalogPresetRowSelection = ""
-                selectedFilter = nil
-                clearGalleryLiveChipsOnly()
-                criteriaDocument.clear()
-                applyLiveFilter()
-            },
+            onReset: { resetAllCatalogFilters() },
             onRequestSave: { saveGalleryCatalogPresetOverwrite() },
             onRequestSaveAs: {
                 catalogPresetNameInput = ""
@@ -778,7 +806,6 @@ struct GalleriesView: View {
                 hideTitle: hideTitle,
                 filterMemory: filterMemory
             )
-        content.hostsInSectionChrome = catalogBrowserViewModel != nil
         return content
     }
 }
@@ -1362,7 +1389,7 @@ struct FullScreenImageView: View {
     @ObservedObject var appearanceManager = AppearanceManager.shared
     @ObservedObject private var downloadManager = DownloadManager.shared
     @StateObject private var viewModel = StashDBViewModel()
-    @Environment(\.dismiss) var dismiss
+    @Environment(\.stashyDismiss) var dismiss
     @State private var isMediaZoomed = false
     @State private var showingDeleteConfirmation = false
     @State private var isMuted: Bool = ScenePlayerMute.initialValue()
@@ -1472,7 +1499,7 @@ struct FullScreenImageView: View {
                     dismiss()
                 }
             }
-            .toolbar(showUI ? .automatic : .hidden, for: .tabBar)
+            .miniPlayerAwareTabBar(hidden: !showUI)
             .safeAreaInset(edge: .top, spacing: 0) {
                 if showUI, !StashyChromePlacement.prefersBottom {
                     fullScreenImageNavBar
@@ -1555,14 +1582,21 @@ struct FullScreenImageView: View {
                 }
             }
             .alert("Set as Performer Image?", isPresented: $showingSetPerformerImagePicker) {
-                ForEach(performerImageTargetPerformers) { performer in
-                    Button("Okay") {
-                        setPerformerImage(performer: performer)
+                // One performer: a plain confirm. Several: one button per name to pick from.
+                if performerImageTargetPerformers.count == 1, let performer = performerImageTargetPerformers.first {
+                    Button("Okay") { setPerformerImage(performer: performer) }
+                } else {
+                    ForEach(performerImageTargetPerformers) { performer in
+                        Button(performer.name) { setPerformerImage(performer: performer) }
                     }
                 }
                 Button("Cancel", role: .cancel) { }
             } message: {
-                Text("Update the profile picture for the selected performer.")
+                if performerImageTargetPerformers.count == 1, let performer = performerImageTargetPerformers.first {
+                    Text("Use this image as the profile picture of \(performer.name).")
+                } else {
+                    Text("Choose whose profile picture this image becomes.")
+                }
             }
             .alert("Really delete image?", isPresented: $showingDeleteConfirmation) {
                 Button("Cancel", role: .cancel) { }
@@ -2187,6 +2221,25 @@ struct FullScreenImageView: View {
     }
 }
 
+#if os(macOS)
+/// macOS: shows the system share picker anchored to the sheet's own view, then closes the sheet.
+struct ShareSheet: NSViewRepresentable {
+    let items: [Any]
+    @Environment(\.stashyDismiss) private var dismiss
+
+    func makeNSView(context: Context) -> NSView {
+        let view = NSView(frame: CGRect(x: 0, y: 0, width: 1, height: 1))
+        let items = items
+        let dismiss = dismiss
+        DispatchQueue.main.async {
+            NSSharingServicePicker(items: items).show(relativeTo: view.bounds, of: view, preferredEdge: .minY)
+            dismiss()
+        }
+        return view
+    }
+    func updateNSView(_ nsView: NSView, context: Context) {}
+}
+#else
 struct ShareSheet: UIViewControllerRepresentable {
     let items: [Any]
     func makeUIViewController(context: Context) -> UIActivityViewController {
@@ -2194,4 +2247,5 @@ struct ShareSheet: UIViewControllerRepresentable {
     }
     func updateUIViewController(_ uiViewController: UIActivityViewController, context: Context) {}
 }
+#endif
 #endif

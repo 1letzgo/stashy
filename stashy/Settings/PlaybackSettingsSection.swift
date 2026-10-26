@@ -11,6 +11,9 @@ struct PlaybackSettingsSection: View {
     @ObservedObject var appearanceManager = AppearanceManager.shared
     @ObservedObject var tabManager = TabManager.shared
 
+    /// Verticals is a stashy+ feed mode; its own rule shows only while it can be used.
+    private var verticalsAvailable: Bool { tabManager.enabledReelsModes.contains(.verticals) }
+
     var body: some View {
         Group {
             #if !os(tvOS)
@@ -111,7 +114,7 @@ struct PlaybackSettingsSection: View {
             } label: {
                 Label("Start position", systemImage: "forward.end")
             }
-            .stashyGroupedBlockRow(index: 0, count: 4)
+            .stashyGroupedBlockRow(index: 0, count: verticalsAvailable ? 5 : 4)
 
             // Feeds › Markers: length of a marker without an end time.
             Picker(selection: $tabManager.feedsMarkerDefaultSeconds) {
@@ -121,7 +124,7 @@ struct PlaybackSettingsSection: View {
             } label: {
                 Label("Marker length", systemImage: "bookmark")
             }
-            .stashyGroupedBlockRow(index: 1, count: 4)
+            .stashyGroupedBlockRow(index: 1, count: verticalsAvailable ? 5 : 4)
 
             Picker(selection: $tabManager.holdSpeedFeeds) {
                 ForEach(TabManager.holdSpeedOptions, id: \.self) { rate in
@@ -130,16 +133,27 @@ struct PlaybackSettingsSection: View {
             } label: {
                 Label("Hold to speed up", systemImage: "forward.frame.fill")
             }
-            .stashyGroupedBlockRow(index: 2, count: 4)
+            .stashyGroupedBlockRow(index: 2, count: verticalsAvailable ? 5 : 4)
 
             Picker(selection: $tabManager.playCountFeedsSeconds) {
                 ForEach(TabManager.playCountThresholdOptions, id: \.self) { seconds in
                     Text(TabManager.playCountThresholdLabel(seconds)).tag(seconds)
                 }
             } label: {
-                Label("Count as played", systemImage: "rectangle.stack.badge.play")
+                Label(verticalsAvailable ? "Count as played · Scenes" : "Count as played", systemImage: "rectangle.stack.badge.play")
             }
-            .stashyGroupedBlockRow(index: 3, count: 4)
+            .stashyGroupedBlockRow(index: 3, count: verticalsAvailable ? 5 : 4)
+
+            if verticalsAvailable {
+                Picker(selection: $tabManager.playCountVerticalsSeconds) {
+                    ForEach(TabManager.playCountThresholdOptions, id: \.self) { seconds in
+                        Text(TabManager.playCountThresholdLabel(seconds)).tag(seconds)
+                    }
+                } label: {
+                    Label("Count as played · Verticals", systemImage: "rectangle.portrait")
+                }
+                .stashyGroupedBlockRow(index: 4, count: 5)
+            }
         }
     }
 

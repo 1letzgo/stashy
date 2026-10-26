@@ -227,7 +227,7 @@ class StashVideoSyncManager: ObservableObject {
     }
 
     private func startDisplayLink() {
-        displayLink = CADisplayLink(target: self, selector: #selector(updateDisplayLink))
+        displayLink = makeDisplayLink(target: self, selector: #selector(updateDisplayLink))
         displayLink?.add(to: .main, forMode: .common)
     }
 

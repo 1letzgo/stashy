@@ -347,7 +347,7 @@ private struct DownloadSyncJobSheet: View {
     let savedFilters: [String: StashDBViewModel.SavedFilter]
     let onSave: (DownloadSyncJob) -> Void
 
-    @Environment(\.dismiss) private var dismiss
+    @Environment(\.stashyDismiss) private var dismiss
     @ObservedObject private var appearance = AppearanceManager.shared
     @State private var selectedFilterId: String?
     @State private var amount: Int = 5
@@ -612,54 +612,25 @@ struct DownloadDetailView: View {
     @State private var isFullScreen = false
     @State private var isHeaderExpanded = false
     @State private var isMuted = ScenePlayerMute.initialValue()
-    @Environment(\.dismiss) var dismiss
+    @Environment(\.stashyDismiss) var dismiss
 
-    private var chromePillHeight: CGFloat { StashyExpandingDock.activeHeight }
 
     /// Custom top chrome: Back · Share.
     @ViewBuilder
     private var downloadDetailNavBar: some View {
-        StashySectionChromeBar {
-            HStack(spacing: 8) {
-                Button {
-                    dismiss()
-                } label: {
-                    HStack(spacing: StashyExpandingDock.iconLabelSpacing) {
-                        Image(systemName: "chevron.left")
-                            .font(.system(size: StashyExpandingDock.iconSize, weight: .semibold))
-                        Text("Back")
-                            .font(.subheadline.weight(.semibold))
-                    }
-                    .foregroundColor(.white)
-                    .modifier(StashyChromePillStyle(height: chromePillHeight, accent: true))
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel("Back")
+        StashyDetailTopBar(onBack: { dismiss() })
+    }
 
-                Spacer(minLength: 8)
-
-                Button {
-                    HapticManager.light()
-                    let videoURL = downloadManager.getLocalVideoURL(for: downloaded)
-                    shareVideo(url: videoURL)
-                } label: {
-                    Image(systemName: "square.and.arrow.up")
-                        .font(.system(size: StashyExpandingDock.iconSize, weight: .semibold))
-                        .foregroundColor(.white.opacity(StashyExpandingDock.inactiveIconOpacity))
-                        .frame(
-                            width: StashyExpandingDock.circleSize,
-                            height: StashyExpandingDock.circleSize
-                        )
-                        .stashyGlass(shape: Capsule(style: .continuous))
-                        .contentShape(Capsule(style: .continuous))
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel("Share")
-            }
-            .frame(minHeight: chromePillHeight)
-            .padding(.horizontal, StashyExpandingDock.edgePadding)
-            .padding(.vertical, 8)
-        }
+    /// Share sits in the floating bar like every page action.
+    private var downloadDetailChromeConfig: StashyDetailChromeConfig {
+        var slots = CatalogSlotSet(visibility: CatalogFloatingChromeState(
+            hasActiveServerConfig: true, primaryListIsEmpty: false, errorMessage: nil, imageFindListError: nil
+        ))
+        slots.entityActions = [CatalogChromeSlot(systemImage: "square.and.arrow.up", accessibilityLabel: "Share") {
+            HapticManager.light()
+            shareVideo(url: downloadManager.getLocalVideoURL(for: downloaded))
+        }]
+        return StashyDetailChromeConfig(listSlots: slots, insetSpacing: 0)
     }
     
     var body: some View {
@@ -933,9 +904,7 @@ struct DownloadDetailView: View {
         } message: {
             Text("The video file is removed from this device.")
         }
-        .hideSystemNavigationBarForCustomChrome()
-        .enableSwipeBackWhenNavBarHidden()
-        .stashyCustomChromeInset(spacing: DesignTokens.Chrome.contentTopGap) {
+        .stashyDetailChrome(downloadDetailChromeConfig) {
             downloadDetailNavBar
         }
         .dismissOnAppLock { isFullScreen = false }
@@ -1038,6 +1007,11 @@ struct DownloadDetailView: View {
     }
 
     private func shareVideo(url: URL) {
+        #if os(macOS)
+        guard let view = NSApp.keyWindow?.contentView else { return }
+        NSSharingServicePicker(items: [url])
+            .show(relativeTo: CGRect(x: view.bounds.midX, y: view.bounds.midY, width: 1, height: 1), of: view, preferredEdge: .minY)
+        #else
         let activityVC = UIActivityViewController(activityItems: [url], applicationActivities: nil)
         
         // For iPad support
@@ -1049,6 +1023,7 @@ struct DownloadDetailView: View {
             
             rootVC.present(activityVC, animated: true)
         }
+        #endif
     }
     
     private func formatDuration(_ seconds: Double) -> String {
@@ -1276,7 +1251,7 @@ struct DownloadedGalleryDetailView: View {
     }
 
     @State private var gridWidth: CGFloat = 0
-    @Environment(\.dismiss) private var dismiss
+    @Environment(\.stashyDismiss) private var dismiss
 
     private var isSyncing: Bool { downloadManager.activeDownloads[entryId] != nil }
 
@@ -1320,9 +1295,7 @@ struct DownloadedGalleryDetailView: View {
             }
         }
         .background(Color.appBackground.ignoresSafeArea())
-        .hideSystemNavigationBarForCustomChrome()
-        .enableSwipeBackWhenNavBarHidden()
-        .stashyCustomChromeInset(spacing: DesignTokens.Chrome.contentTopGap) {
+        .stashyDetailChrome(galleryDetailChromeConfig) {
             galleryDetailNavBar
         }
         .onAppear { downloadManager.backfillMissingImageTitles() }
@@ -1331,89 +1304,49 @@ struct DownloadedGalleryDetailView: View {
     /// Custom top chrome: Back · title · Sync newest / Sync newest 50 / Delete.
     @ViewBuilder
     private var galleryDetailNavBar: some View {
-        StashySectionChromeBar {
-            HStack(spacing: 8) {
-                StashyChromeBackButton { dismiss() }
+        StashyDetailTopBar(title: entry?.displayTitle ?? "Download", onBack: { dismiss() })
+    }
 
-                Text(entry?.displayTitle ?? "Download")
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundColor(.white)
-                    .lineLimit(1)
-                    .truncationMode(.middle)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-
-                if isSyncing {
-                    chromeCircleButton(
-                        systemImage: "stop.circle",
-                        label: "Cancel download",
-                        tint: .red
+    /// Sync / Cancel / Delete sit in the floating bar like every page action.
+    private var galleryDetailChromeConfig: StashyDetailChromeConfig {
+        var slots = CatalogSlotSet(visibility: CatalogFloatingChromeState(
+            hasActiveServerConfig: true, primaryListIsEmpty: false, errorMessage: nil, imageFindListError: nil
+        ))
+        var actions: [CatalogChromeSlot] = []
+        if isSyncing {
+            actions.append(CatalogChromeSlot(systemImage: "stop.circle", accessibilityLabel: "Cancel download", tint: .red) {
+                HapticManager.light()
+                downloadManager.cancelGalleryDownload(id: entryId)
+            })
+        } else {
+            if entry?.isSingleImage == false {
+                actions.append(CatalogChromeSlot(systemImage: "arrow.triangle.2.circlepath", accessibilityLabel: "Sync newest") {
+                    HapticManager.light()
+                    sync(limit: nil)
+                })
+                if DownloadManager.showsSyncNewestBatch(
+                    count: entry?.serverImageCount,
+                    batch: DownloadManager.galleryNewestBatchSize
+                ) {
+                    actions.append(CatalogChromeSlot(
+                        systemImage: "arrow.down.to.line",
+                        accessibilityLabel: "Sync newest \(DownloadManager.galleryNewestBatchSize)"
                     ) {
                         HapticManager.light()
-                        downloadManager.cancelGalleryDownload(id: entryId)
-                    }
-                } else {
-                    if entry?.isSingleImage == false {
-                        chromeCircleButton(
-                            systemImage: "arrow.triangle.2.circlepath",
-                            label: "Sync newest"
-                        ) {
-                            HapticManager.light()
-                            sync(limit: nil)
-                        }
-
-                        if DownloadManager.showsSyncNewestBatch(
-                            count: entry?.serverImageCount,
-                            batch: DownloadManager.galleryNewestBatchSize
-                        ) {
-                            chromeCircleButton(
-                                systemImage: "arrow.down.to.line",
-                                label: "Sync newest \(DownloadManager.galleryNewestBatchSize)"
-                            ) {
-                                HapticManager.light()
-                                sync(limit: DownloadManager.galleryNewestBatchSize)
-                            }
-                        }
-                    }
-
-                    chromeCircleButton(
-                        systemImage: "trash",
-                        label: "Delete",
-                        tint: .red
-                    ) {
-                        HapticManager.light()
-                        downloadManager.deleteGalleryDownload(id: entryId)
-                        dismiss()
-                    }
+                        sync(limit: DownloadManager.galleryNewestBatchSize)
+                    })
                 }
             }
-            .frame(minHeight: StashyExpandingDock.activeHeight)
-            .padding(.horizontal, StashyExpandingDock.edgePadding)
-            .padding(.vertical, 8)
+            actions.append(CatalogChromeSlot(systemImage: "trash", accessibilityLabel: "Delete", tint: .red) {
+                HapticManager.light()
+                downloadManager.deleteGalleryDownload(id: entryId)
+                dismiss()
+            })
         }
+        slots.entityActions = actions
+        return StashyDetailChromeConfig(listSlots: slots, insetSpacing: 0)
     }
 
-    /// Circular chrome action button, same metrics as the Share button in `DownloadDetailView`.
-    @ViewBuilder
-    private func chromeCircleButton(
-        systemImage: String,
-        label: String,
-        tint: Color? = nil,
-        action: @escaping () -> Void
-    ) -> some View {
-        Button(action: action) {
-            Image(systemName: systemImage)
-                .font(.system(size: StashyExpandingDock.iconSize, weight: .semibold))
-                .foregroundColor(tint ?? .white.opacity(StashyExpandingDock.inactiveIconOpacity))
-                .frame(
-                    width: StashyExpandingDock.circleSize,
-                    height: StashyExpandingDock.circleSize
-                )
-                .stashyGlass(shape: Capsule(style: .continuous))
-                .contentShape(Capsule(style: .continuous))
-        }
-        .buttonStyle(.plain)
-        .accessibilityLabel(label)
-    }
 
     private func sync(limit: Int?) {
         guard let entry else { return }
@@ -1497,7 +1430,7 @@ struct DownloadedGalleryFullScreenView: View {
     let images: [DownloadedGalleryImage]
     let startIndex: Int
 
-    @Environment(\.dismiss) private var dismiss
+    @Environment(\.stashyDismiss) private var dismiss
     @State private var navigationBackTrigger: UUID?
     @ObservedObject private var downloadManager = DownloadManager.shared
     @ObservedObject private var appearance = AppearanceManager.shared
@@ -1520,7 +1453,6 @@ struct DownloadedGalleryFullScreenView: View {
         images.firstIndex { $0.id == activeId } ?? 0
     }
 
-    private var chromePillHeight: CGFloat { StashyExpandingDock.activeHeight }
 
     var body: some View {
         ScrollViewReader { proxy in
@@ -1593,32 +1525,7 @@ struct DownloadedGalleryFullScreenView: View {
     }
 
     private var navBar: some View {
-        StashySectionChromeBar {
-            HStack(spacing: 8) {
-                Button { navigationBackTrigger = UUID() } label: {
-                    HStack(spacing: StashyExpandingDock.iconLabelSpacing) {
-                        Image(systemName: "chevron.left")
-                            .font(.system(size: StashyExpandingDock.iconSize, weight: .semibold))
-                        Text("Back")
-                            .font(.subheadline.weight(.semibold))
-                    }
-                    .foregroundColor(.white)
-                    .modifier(StashyChromePillStyle(height: chromePillHeight, accent: true))
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel("Back")
-
-                Spacer(minLength: 8)
-
-                Text("\(currentIndex + 1) / \(images.count)")
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundColor(.white.opacity(StashyExpandingDock.inactiveIconOpacity))
-                    .modifier(StashyChromePillStyle(height: chromePillHeight))
-            }
-            .frame(minHeight: chromePillHeight)
-            .padding(.horizontal, StashyExpandingDock.edgePadding)
-            .padding(.vertical, 8)
-        }
+        StashyDetailTopBar(title: "\(currentIndex + 1) / \(images.count)", onBack: { navigationBackTrigger = UUID() })
     }
 
     private static func initials(for name: String) -> String {

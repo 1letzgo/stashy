@@ -106,6 +106,15 @@ fun Modifier.stashyGlass(shape: Shape = CircleShape, tint: Color? = null): Modif
         .border(0.5.dp, Color.White.copy(alpha = 0.22f), shape)
 }
 
+/**
+ * Fill of the tab bar and the mini player, which sit over the content: the glass transparency
+ * (Settings › Design) lets the content show through. 100 % (pure glass) → 70 % cover, 20 % → opaque.
+ */
+fun chromeBarColor(base: Color): Color {
+    val cover = 0.7f + (1f - Appearance.glassTransparency) / 0.8f * 0.3f
+    return base.copy(alpha = cover.coerceIn(0.7f, 1f))
+}
+
 /** iOS: floating shadow (`DesignTokens.Shadow.floating`). */
 fun Modifier.floatingShadow(shape: Shape = CircleShape) = this.shadow(6.dp, shape, ambientColor = Color.Black.copy(0.12f), spotColor = Color.Black.copy(0.12f))
 

@@ -6,17 +6,17 @@ import androidx.compose.runtime.setValue
 
 /**
  * The cards below the (fixed) video player on the phone scene detail page, in their default
- * order. [id] is the stable key stored in prefs; [isHalfWidth] cards pair up side by side with an
+ * order. [id] is the stable key stored in prefs (the old "galleries" id is dropped as unknown —
+ * galleries now sit in Metadata); [isHalfWidth] cards pair up side by side with an
  * adjacent half-width card in landscape.
  */
 enum class SceneDetailCard(val id: String, val title: String, val isHalfWidth: Boolean = false) {
     Details("details", "Details"),
     Heatmap("heatmap", "Heatmap"),
     SimilarScenes("similarScenes", "Similar Scenes"),
-    PerformersStudio("performersStudio", "Performers & Studio"),
+    PerformersStudio("performersStudio", "Metadata"),
     Groups("groups", "Groups", isHalfWidth = true),
-    Tags("tags", "Tags", isHalfWidth = true),
-    Galleries("galleries", "Galleries");
+    Tags("tags", "Tags", isHalfWidth = true);
 
     companion object {
         val defaultOrder: List<SceneDetailCard> get() = entries

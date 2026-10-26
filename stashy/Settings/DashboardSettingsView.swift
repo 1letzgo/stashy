@@ -292,7 +292,7 @@ struct CatalogDefaultSortMenu: View {
         switch tab {
         case .scenes:
             sortMenu(
-                StashDBViewModel.SceneSortOption.allCases.map { ($0.rawValue, $0.displayName) },
+                StashDBViewModel.SceneSortOption.generalCases.map { ($0.rawValue, $0.displayName) },
                 fallback: StashDBViewModel.SceneSortOption.dateDesc.rawValue
             )
         case .performers:
@@ -429,8 +429,12 @@ struct CatalogDetailSortMenu: View {
                 fallback: StashDBViewModel.ImageSortOption.dateDesc.rawValue
             )
         } else {
+            // Groups also sort by scene number (picked on the group page), so offer those too.
+            let cases = context == .group
+                ? StashDBViewModel.SceneSortOption.allCases
+                : StashDBViewModel.SceneSortOption.generalCases
             sortMenu(
-                StashDBViewModel.SceneSortOption.allCases.map { ($0.rawValue, $0.displayName) },
+                cases.map { ($0.rawValue, $0.displayName) },
                 fallback: StashDBViewModel.SceneSortOption.dateDesc.rawValue
             )
         }

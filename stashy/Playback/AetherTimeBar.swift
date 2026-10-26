@@ -13,7 +13,11 @@
 #if !os(tvOS)
 
 import SwiftUI
+#if canImport(UIKit)
 import UIKit
+#else
+import AppKit
+#endif
 
 struct AetherTimeBar: View {
     /// Anzuzeigende Zeit. Während des Scrubbens reicht der Aufrufer die Scrub-Zeit herein.

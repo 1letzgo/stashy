@@ -9,8 +9,6 @@
 import SwiftUI
 
 private struct TagsViewContent: View {
-    /// Home sub-tab root: actions go into the Home chrome instead of a floating bar.
-    var hostsInSectionChrome = false
     @ObservedObject var viewModel: StashDBViewModel
     @ObservedObject var appearanceManager = AppearanceManager.shared
     @ObservedObject var configManager = ServerConfigManager.shared
@@ -454,11 +452,18 @@ private struct TagsViewContent: View {
             if configManager.activeConfig == nil {
                 ConnectionErrorView { performSearch() }
             } else if (viewModel.isLoading && viewModel.tags.isEmpty) || (viewModel.isLoadingSavedFilters && viewModel.savedFilters.isEmpty) {
-                StandardLoadingView(message: "Loading tags...")
+                // Keep the bar while a sort/filter change refetches, so it does not jump away.
+                VStack(spacing: 0) {
+                    quickBar
+                    StandardLoadingView(message: "Loading tags...")
+                }
             } else if viewModel.tags.isEmpty && viewModel.errorMessage != nil {
                 ConnectionErrorView { performSearch() }
             } else if viewModel.tags.isEmpty {
-                emptyStateView
+                VStack(spacing: 0) {
+                    if !criteriaDocument.isEmpty || activePresetName != nil { quickBar }
+                    emptyStateView
+                }
             } else {
                 tagsList
             }
@@ -484,13 +489,6 @@ private struct TagsViewContent: View {
                 errorMessage: viewModel.errorMessage
             ),
             isPresented: true,
-            hostsInSectionChrome: hostsInSectionChrome,
-            filterSort: CatalogChromeSlot(
-                systemImage: "slider.horizontal.3",
-                isActive: catalogFilterSortFABActive,
-                accessibilityLabel: "Settings",
-                action: { showFilterSortSheet = true }
-            ),
             search: CatalogSearchChrome(
                 text: $searchText,
                 isVisible: $isSearchVisible,
@@ -510,13 +508,7 @@ private struct TagsViewContent: View {
             sortOption: selectedSortOption,
             onSortChange: { changeTagSortOption(to: $0) },
             onApply: { applyLiveFilter() },
-            onReset: {
-                catalogPresetRowSelection = ""
-                selectedFilter = nil
-                clearTagLiveChipsOnly()
-                criteriaDocument.clear()
-                applyLiveFilter()
-            },
+            onReset: { resetAllCatalogFilters() },
             onRequestSave: { saveTagCatalogPresetOverwrite() },
             onRequestSaveAs: {
                 catalogPresetNameInput = ""
@@ -615,9 +607,44 @@ private struct TagsViewContent: View {
         )
     }
 
+    /// Sheet "Reset" and the saved-filter chip's ✕: drops the preset and every criterion.
+    private func resetAllCatalogFilters() {
+        catalogPresetRowSelection = ""
+        selectedFilter = nil
+        clearTagLiveChipsOnly()
+        criteriaDocument.clear()
+        applyLiveFilter()
+    }
+
+    /// Name of the active saved filter / local preset for the removable chip above the list.
+    private var activePresetName: String? {
+        if let ls = ListLivePresetTag.parseLocalUUIDString(catalogPresetRowSelection), let uuid = UUID(uuidString: ls) {
+            return localCatalogPresets.first { $0.id == uuid }?.name
+        }
+        if let sid = ListLivePresetTag.parseServerId(catalogPresetRowSelection) {
+            return viewModel.savedFilters[sid]?.name ?? selectedFilter?.name
+        }
+        return selectedFilter?.name
+    }
+
+    private var quickBar: some View {
+        CatalogListQuickBar(
+            mode: .tags,
+            sort: selectedSortOption,
+            onSort: { changeTagSortOption(to: $0) },
+            document: criteriaDocument,
+            presetName: activePresetName,
+            onClearPreset: { resetAllCatalogFilters() },
+            onFiltersChanged: { applyLiveFilter() },
+            onOpenFilters: { showFilterSortSheet = true }
+        )
+    }
+
     private var tagsList: some View {
         ScrollViewReader { proxy in
             ScrollView {
+                VStack(spacing: 0) {
+                quickBar
                 LazyVGrid(columns: columns, spacing: 12) {
                     ForEach(viewModel.tags) { tag in
                         NavigationLink(destination: TagDetailView(selectedTag: tag)) {
@@ -644,7 +671,8 @@ private struct TagsViewContent: View {
                     }
                 }
                 .measuresGridWidth($gridWidth)
-                .padding(16)
+                .padding([.horizontal, .bottom], 16)
+                }
             }
             .refreshable { performSearch() }
             .onAppear {
@@ -672,7 +700,6 @@ struct TagsView: View {
 
     var body: some View {
         var content = TagsViewContent(viewModel: catalogBrowserViewModel ?? ownedViewModel, hideTitle: hideTitle, filterMemory: filterMemory)
-        content.hostsInSectionChrome = catalogBrowserViewModel != nil
         return content
     }
 }
@@ -750,7 +777,7 @@ struct TagDetailView: View {
     @ObservedObject var tabManager = TabManager.shared
     @StateObject private var viewModel = StashDBViewModel()
     @EnvironmentObject var coordinator: NavigationCoordinator
-    @Environment(\.dismiss) private var dismiss
+    @Environment(\.stashyDismiss) private var dismiss
     @Environment(\.verticalSizeClass) var verticalSizeClass
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @State private var tagLiveFilterSheetPresented = false
@@ -763,7 +790,7 @@ struct TagDetailView: View {
     @StateObject private var linkedStudios: DetailLinkedStudiosFilterModel
     @StateObject private var linkedGalleries: DetailLinkedGalleriesFilterModel
     /// Scenes tab filter / sort, kept here so it survives the tab remounting `ScenesView`.
-    @StateObject private var scenesFilterMemory = ScenesListFilterMemory()
+    @StateObject private var scenesFilterMemory: ScenesListFilterMemory
     @StateObject private var linkedImages: DetailLinkedImagesFilterModel
     @ObservedObject private var downloadManager = DownloadManager.shared
     @State private var showingTagDownloadOptions = false
@@ -771,8 +798,6 @@ struct TagDetailView: View {
     /// Images 1/row autoplay: parent ScrollView drag/decelerate.
     @State private var imagesFeedScrolling = false
 
-    private var chromePillHeight: CGFloat { StashyExpandingDock.activeHeight }
-    private var navActionGroupSpacing: CGFloat { 7 }
     private var showsFeedsNavButton: Bool {
         tabManager.tabs.first(where: { $0.id == .reels })?.isVisible ?? true
     }
@@ -797,7 +822,9 @@ struct TagDetailView: View {
     @State private var selectedDetailTab: DetailTab
     private let preferredInitialTab: DetailTab?
 
-    init(selectedTag: Tag, initialTab: DetailTab? = nil) {
+    /// `filterPerformerId`: opened from that performer's page — its scenes, galleries and images
+    /// start filtered on the performer.
+    init(selectedTag: Tag, initialTab: DetailTab? = nil, filterPerformerId: String? = nil) {
         _selectedTag = State(initialValue: selectedTag)
         preferredInitialTab = initialTab
         let sc = selectedTag.sceneCount ?? 0
@@ -817,8 +844,15 @@ struct TagDetailView: View {
         }
         _selectedDetailTab = State(initialValue: resolvedTab)
         _linkedStudios = StateObject(wrappedValue: DetailLinkedStudiosFilterModel(scope: .tag(selectedTag.id)))
-        _linkedGalleries = StateObject(wrappedValue: DetailLinkedGalleriesFilterModel(scope: .tag(selectedTag.id)))
-        _linkedImages = StateObject(wrappedValue: DetailLinkedImagesFilterModel(scope: .tag(selectedTag.id)))
+        let galleries = DetailLinkedGalleriesFilterModel(scope: .tag(selectedTag.id))
+        let images = DetailLinkedImagesFilterModel(scope: .tag(selectedTag.id))
+        if let filterPerformerId {
+            galleries.criteriaDocument.load(PerformerScopedDetail.criteria(performerId: filterPerformerId))
+            images.criteriaDocument.load(PerformerScopedDetail.criteria(performerId: filterPerformerId))
+        }
+        _linkedGalleries = StateObject(wrappedValue: galleries)
+        _linkedImages = StateObject(wrappedValue: images)
+        _scenesFilterMemory = StateObject(wrappedValue: PerformerScopedDetail.scenesMemory(performerId: filterPerformerId))
     }
 
     @State private var gridWidth: CGFloat = 0
@@ -864,10 +898,6 @@ struct TagDetailView: View {
         if viewModel.totalDetailGroups > 0 { tabs.append(.groups) }
         if effectiveImages > 0 { tabs.append(.images) }
         return tabs
-    }
-
-    private var showTabSwitcher: Bool {
-        availableTabs.count > 1
     }
 
     private var catalogFloatingChromeForFooter: CatalogFloatingChromeState {
@@ -937,112 +967,14 @@ struct TagDetailView: View {
     /// Custom top chrome (Performer/Studio template): Back · section icons · Favorite · Edit.
     @ViewBuilder
     private var tagDetailNavBar: some View {
-        StashySectionChromeBar {
-            HStack(spacing: 8) {
-                Button {
-                    dismiss()
-                } label: {
-                    HStack(spacing: StashyExpandingDock.iconLabelSpacing) {
-                        Image(systemName: "chevron.left")
-                            .font(.system(size: StashyExpandingDock.iconSize, weight: .semibold))
-                        Text("Back")
-                            .font(.subheadline.weight(.semibold))
-                    }
-                    .foregroundColor(.white)
-                    .modifier(StashyChromePillStyle(height: chromePillHeight, accent: true))
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel("Back")
-
-                Spacer(minLength: 8)
-
-                if showTabSwitcher {
-                    HStack(spacing: 6) {
-                        ForEach(availableTabs, id: \.self) { tab in
-                            let isSelected = selectedDetailTab == tab
-                            Button {
-                                guard !isSelected else { return }
-                                HapticManager.light()
-                                withAnimation(StashyExpandingDock.selectionAnimation) {
-                                    selectedDetailTab = tab
-                                }
-                            } label: {
-                                Image(systemName: tab.icon)
-                                    .font(.system(size: StashyExpandingDock.iconSize, weight: .semibold))
-                                    .foregroundColor(
-                                        isSelected
-                                            ? .white
-                                            : .white.opacity(StashyExpandingDock.inactiveIconOpacity)
-                                    )
-                                    .frame(
-                                        width: StashyExpandingDock.circleSize,
-                                        height: StashyExpandingDock.circleSize
-                                    )
-                                    .stashyChromeFill(
-                                        shape: Capsule(style: .continuous),
-                                        activeColor: isSelected ? appearanceManager.tintColor : nil
-                                    )
-                                    .contentShape(Capsule(style: .continuous))
-                            }
-                            .buttonStyle(.plain)
-                            .accessibilityLabel(tab.rawValue)
-                            .accessibilityAddTraits(isSelected ? .isSelected : [])
-                        }
-                    }
-                }
-
-                if showTabSwitcher {
-                    Spacer()
-                        .frame(width: navActionGroupSpacing)
-                }
-
-                HStack(spacing: 6) {
-                    Button {
-                        toggleFavorite()
-                    } label: {
-                        Image(systemName: isFavorite ? "heart.fill" : "heart")
-                            .font(.system(size: StashyExpandingDock.iconSize, weight: .semibold))
-                            .foregroundColor(
-                                isFavorite
-                                    ? .red
-                                    : .white.opacity(StashyExpandingDock.inactiveIconOpacity)
-                            )
-                            .frame(
-                                width: StashyExpandingDock.circleSize,
-                                height: StashyExpandingDock.circleSize
-                            )
-                            .stashyGlass(shape: Capsule(style: .continuous))
-                            .contentShape(Capsule(style: .continuous))
-                    }
-                    .buttonStyle(.plain)
-                    .disabled(isUpdatingFavorite)
-                    .accessibilityLabel(isFavorite ? "Remove favorite" : "Add favorite")
-
-                    if appearanceManager.isEditModeEnabled {
-                        Button {
-                            HapticManager.light()
-                            showingEditTagSheet = true
-                        } label: {
-                            Image(systemName: "pencil")
-                                .font(.system(size: StashyExpandingDock.iconSize, weight: .semibold))
-                                .foregroundColor(.white.opacity(StashyExpandingDock.inactiveIconOpacity))
-                                .frame(
-                                    width: StashyExpandingDock.circleSize,
-                                    height: StashyExpandingDock.circleSize
-                                )
-                                .stashyGlass(shape: Capsule(style: .continuous))
-                                .contentShape(Capsule(style: .continuous))
-                        }
-                        .buttonStyle(.plain)
-                        .accessibilityLabel("Edit tag")
-                    }
-                }
-            }
-            .frame(minHeight: chromePillHeight)
-            .padding(.horizontal, StashyExpandingDock.edgePadding)
-            .padding(.vertical, 8)
-
-        }
+        StashyDetailTopBar(
+            onBack: { dismiss() },
+            tabs: availableTabs,
+            selection: selectedDetailTab,
+            icon: { $0.icon },
+            label: { $0.rawValue },
+            onSelect: { selectedDetailTab = $0 }
+        )
     }
 
     private func toggleFavorite() {
@@ -1283,14 +1215,35 @@ struct TagDetailView: View {
 
     // MARK: - Shared detail chrome
 
+    /// Favorite and Edit sit in the floating bar with the list's actions, not in the top chrome.
+    private var entityActionSlots: [CatalogChromeSlot] {
+        var actions = [CatalogChromeSlot(
+            systemImage: isFavorite ? "heart.fill" : "heart",
+            accessibilityLabel: isFavorite ? "Remove favorite" : "Add favorite",
+            tint: isFavorite ? .red : nil
+        ) {
+            guard !isUpdatingFavorite else { return }
+            toggleFavorite()
+        }]
+        if appearanceManager.isEditModeEnabled {
+            actions.append(CatalogChromeSlot(systemImage: "pencil", accessibilityLabel: "Edit tag") {
+                HapticManager.light()
+                showingEditTagSheet = true
+            })
+        }
+        return actions
+    }
+
     /// Per-tab slots for the embedded list, mirroring the previous floating action bar content.
     private var tagDetailListSlots: CatalogSlotSet {
         var slots = CatalogSlotSet(
             visibility: catalogFloatingChromeForFooter,
-            isPresented: selectedDetailTab != .groups
+            isPresented: true
         )
+        slots.entityActions = entityActionSlots
         switch selectedDetailTab {
         case .scenes:
+            // Filter & sort also in the bar (far right), like every other tab.
             slots.filterSort = CatalogChromeSlot(
                 systemImage: "slider.horizontal.3",
                 isActive: tagSceneFilterActive,
@@ -1373,7 +1326,7 @@ struct TagDetailView: View {
     }
 
     private var tagDetailChromeConfig: StashyDetailChromeConfig {
-        StashyDetailChromeConfig(listSlots: tagDetailListSlots, insetSpacing: DesignTokens.Chrome.contentTopGap)
+        StashyDetailChromeConfig(listSlots: tagDetailListSlots, insetSpacing: 0)
     }
 
     @ViewBuilder
@@ -1705,7 +1658,7 @@ struct EditTagSheet: View {
     var onDeleted: (() -> Void)? = nil
     var onComplete: (Tag) -> Void
 
-    @Environment(\.dismiss) private var dismiss
+    @Environment(\.stashyDismiss) private var dismiss
     @ObservedObject private var appearanceManager = AppearanceManager.shared
 
     @State private var name: String = ""

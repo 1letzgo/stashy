@@ -5,7 +5,7 @@
 //  Created by Daniel Goletz on 07.02.26.
 //
 
-#if !os(tvOS)
+#if os(iOS)
 import UIKit
 
 enum HapticManager {
@@ -57,5 +57,16 @@ enum HapticManager {
         let generator = UISelectionFeedbackGenerator()
         generator.selectionChanged()
     }
+}
+#elseif os(macOS)
+/// macOS has no haptic engine on most hardware; keep the call sites, drop the feedback.
+enum HapticManager {
+    static func light() {}
+    static func medium() {}
+    static func heavy() {}
+    static func success() {}
+    static func error() {}
+    static func warning() {}
+    static func selection() {}
 }
 #endif

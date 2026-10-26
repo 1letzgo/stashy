@@ -63,6 +63,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import de.letzgo.stashy.data.ServerConfigManager
+import kotlinx.coroutines.launch
 import de.letzgo.stashy.ui.catalog.CatalogsScreen
 import de.letzgo.stashy.ui.feeds.FeedsScreen
 import de.letzgo.stashy.ui.search.SearchScreen
@@ -95,7 +96,15 @@ fun tabBarHeight(): Dp {
  * while the bar auto-hides ([TabBarAutoHide]) — content is never covered, it just gains room.
  */
 @Composable
-fun bottomBarContentPadding(extra: Dp = BottomBarContentGap): Dp = tabBarHeight() + extra
+fun bottomBarContentPadding(extra: Dp = BottomBarContentGap): Dp = tabBarHeight() + extra + miniPlayerInset()
+
+/** Room for the mini player bar while it shows above the tab bar (not on Feeds, where it hides). */
+@Composable
+fun miniPlayerInset(): Dp =
+    if (de.letzgo.stashy.ui.player.MiniPlayerStore.session != null && Nav.tab != MainTab.Feeds) MiniPlayerBarHeight + MiniPlayerBarGap else 0.dp
+
+internal val MiniPlayerBarHeight: Dp = 56.dp
+internal val MiniPlayerBarGap: Dp = 8.dp
 
 /** Default gap between the last item of a list and the top edge of the tab bar. */
 val BottomBarContentGap: Dp = 24.dp
@@ -110,6 +119,14 @@ val LocalTabBarVisible = compositionLocalOf { true }
 @Composable
 fun AppShell() {
     val p = Theme.palette
+    // iOS `ServerConfigChanged`: a switch (or removing the server) ends the mini player.
+    val activeServerId = ServerConfigManager.activeConfig?.id
+    LaunchedEffect(activeServerId) {
+        // Watchlist first: restoring the last mini player session lists its scene.
+        de.letzgo.stashy.data.WatchlistStore.onServerChanged(activeServerId)
+        // First appearance and server switch: restore that server's last mini player session (paused).
+        de.letzgo.stashy.ui.player.MiniPlayerStore.onServerChanged(activeServerId)
+    }
     if (ServerConfigManager.activeConfig == null) {
         Box(Modifier.fillMaxSize().background(p.background)) { ServerSetupScreen(onDone = {}) }
         AppUpdateDialog()
@@ -168,9 +185,40 @@ fun AppShell() {
             // Slides down by its own height (system inset included) when auto-hidden.
             FloatingTabBar(Modifier.graphicsLayer { translationY = barOffset * size.height })
         }
+        MiniPlayerHost(showBar, barOffset, Modifier.align(Alignment.BottomCenter))
     }
     ShellAlerts()
     AppUpdateDialog()
+}
+
+/**
+ * iOS: `MiniPlayerHost` — the mini player above the tab bar (follows its auto-hide), hidden on
+ * Feeds (which also pauses it, iOS `stashyPauseBackgroundPlayers`) and under full-screen pages.
+ * A tap opens the Now Playing view; its "Details" opens the scene page, which takes the player back.
+ */
+@Composable
+private fun MiniPlayerHost(tabBarShown: Boolean, tabBarHideFraction: Float, modifier: Modifier = Modifier) {
+    val onFeeds = Nav.tab == MainTab.Feeds
+    LaunchedEffect(onFeeds) { if (onFeeds) de.letzgo.stashy.ui.player.MiniPlayerStore.pause() }
+    // Settings › stashy+ › Miniplayer & Watchlist off (or stashy+ gone): the bar closes.
+    val miniEnabled = de.letzgo.stashy.ui.player.MiniPlayerStore.isEnabled
+    LaunchedEffect(miniEnabled) { if (!miniEnabled) de.letzgo.stashy.ui.player.MiniPlayerStore.close(forget = false) }
+    val nav = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
+    val barHeight = if (tabBarShown) maxOf(TabBarMetrics.containerHeight, TabBarMetrics.fallbackContainerHeight) * (1f - tabBarHideFraction) else 0.dp
+    de.letzgo.stashy.ui.player.MiniPlayerBar(
+        visible = tabBarShown && !onFeeds && miniEnabled,
+        modifier = modifier.padding(start = 12.dp, end = 12.dp, bottom = nav + barHeight + MiniPlayerBarGap),
+    )
+    // The bar's own full view; "Details" closes it and opens the scene page, which takes the player.
+    val scope = androidx.compose.runtime.rememberCoroutineScope()
+    de.letzgo.stashy.ui.player.NowPlayingSheet { screen ->
+        // Details / performer / studio: close the sheet, then open the page.
+        de.letzgo.stashy.ui.player.MiniPlayerStore.showsNowPlaying = false
+        scope.launch {
+            kotlinx.coroutines.delay(300)
+            Nav.push(screen)
+        }
+    }
 }
 
 /** Which of the iOS `MainTabView` configuration alerts is showing. */
@@ -256,7 +304,7 @@ private fun FloatingTabBar(modifier: Modifier = Modifier) {
             val container = with(density) { size.height.toDp() } - navInset
             if (container > 0.dp) TabBarMetrics.containerHeight = container
         },
-        containerColor = p.secondaryBackground,
+        containerColor = chromeBarColor(p.secondaryBackground),
         contentColor = p.text,
         tonalElevation = 0.dp,
     ) {

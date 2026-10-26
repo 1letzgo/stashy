@@ -54,6 +54,17 @@ class PlayCountCredit(thresholdSeconds: Double) {
         anchorClock = null
     }
 
+    /**
+     * Carries a viewing over to another owner (scene page ⇄ mini player): the watched seconds
+     * keep adding up and an already credited play is not credited again.
+     */
+    fun restore(watchedSeconds: Double, credited: Boolean) {
+        this.watchedSeconds = maxOf(0.0, watchedSeconds)
+        isCredited = credited
+        anchor = null
+        anchorClock = null
+    }
+
     /** New item / new session. */
     fun reset() {
         watchedSeconds = 0.0

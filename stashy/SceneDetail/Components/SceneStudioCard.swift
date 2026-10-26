@@ -9,7 +9,7 @@ struct AddStudioToSceneSheet: View {
     var saveStudioId: ((String?, @escaping (Bool) -> Void) -> Void)? = nil
     var onComplete: (SceneStudio?) -> Void
 
-    @Environment(\.dismiss) var dismiss
+    @Environment(\.stashyDismiss) var dismiss
     @ObservedObject var appearanceManager = AppearanceManager.shared
     @State private var studios: [Studio] = []
     @State private var isLoading = false

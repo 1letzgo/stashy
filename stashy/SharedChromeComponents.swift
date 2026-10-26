@@ -1,6 +1,10 @@
 #if !os(tvOS)
 import SwiftUI
+#if canImport(UIKit)
 import UIKit
+#else
+import AppKit
+#endif
 import ObjectiveC
 
 /// Line height of a tag chip's label. A symbol-only pill (the "+" in the tag rows)
@@ -72,6 +76,7 @@ extension View {
 
 // MARK: - Swipe-back with hidden system navigation bar
 
+#if os(iOS)
 /// Long-lived pop-gesture delegate on the `UINavigationController` itself.
 /// Avoids dangling delegates when a detail's representable is deallocated mid-gesture,
 /// and rejects root-level swipes that otherwise freeze NavigationStack.
@@ -300,6 +305,36 @@ private struct NavigationPopToRootOnChange: UIViewControllerRepresentable {
     }
 }
 
+#else
+// macOS: NavigationStack has no UINavigationController to patch. Back goes through the
+// fallback (SwiftUI `dismiss`); the nav-bar / swipe-back helpers have nothing to do.
+private struct SwipeBackGestureEnabler: View {
+    var body: some View { Color.clear.frame(width: 0, height: 0) }
+}
+
+struct StashyNavigationBackTrigger: View {
+    @Binding var trigger: UUID?
+    var dismissFallback: () -> Void
+
+    var body: some View {
+        Color.clear
+            .frame(width: 0, height: 0)
+            .onChange(of: trigger) { _, token in
+                guard token != nil else { return }
+                DispatchQueue.main.async {
+                    trigger = nil
+                    dismissFallback()
+                }
+            }
+    }
+}
+
+private struct NavigationPopToRootOnChange: View {
+    let trigger: String
+    var body: some View { Color.clear.frame(width: 0, height: 0) }
+}
+#endif
+
 /// Custom chrome sits under the status bar on every idiom.
 ///
 /// Bis iPadOS 17 saß die Tab-Bar unten, deshalb lag die Chrome auf iPad darüber.
@@ -343,15 +378,104 @@ struct StashySectionChromeBar<Content: View>: View {
     }
 }
 
+/// The standard top chrome of a detail page: Back on the left, the section pills right-aligned
+/// (scrolling when they don't fit). Entity and list actions live in the floating bar, never here.
+struct StashyDetailTopBar<Tab: Hashable>: View {
+    var backTitle: String = "Back"
+    var backIcon: String = "chevron.left"
+    var onBack: () -> Void
+    /// Right-aligned label for pages without tabs (a download's name, "3 / 20").
+    var title: String? = nil
+    /// Round buttons right after Back (Now Playing's Details).
+    var besideBack: [CatalogChromeSlot] = []
+    var tabs: [Tab] = []
+    var selection: Tab? = nil
+    var icon: (Tab) -> String = { _ in "circle" }
+    var label: (Tab) -> String = { _ in "" }
+    var onSelect: (Tab) -> Void = { _ in }
+
+    @ObservedObject private var appearance = AppearanceManager.shared
+
+    var body: some View {
+        StashySectionChromeBar {
+            HStack(spacing: StashyExpandingDock.itemSpacing) {
+                StashyChromeBackButton(title: backTitle, systemImage: backIcon, action: onBack)
+                ForEach(Array(besideBack.enumerated()), id: \.offset) { _, slot in
+                    ChromeCircleButton(systemImage: slot.systemImage, accessibilityLabel: slot.accessibilityLabel, action: slot.action)
+                }
+                Spacer(minLength: StashyExpandingDock.itemSpacing)
+                if let title, tabs.count <= 1 {
+                    Text(title)
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundColor(.white.opacity(StashyExpandingDock.inactiveIconOpacity))
+                        .lineLimit(1)
+                        .truncationMode(.middle)
+                }
+                if tabs.count > 1 {
+                    ViewThatFits(in: .horizontal) {
+                        pills
+                        ScrollView(.horizontal, showsIndicators: false) { pills }
+                            .scrollBounceBehavior(.basedOnSize, axes: .horizontal)
+                    }
+                    .layoutPriority(-1)
+                }
+            }
+            .frame(minHeight: StashyExpandingDock.activeHeight)
+            .padding(.horizontal, StashyExpandingDock.edgePadding)
+            .padding(.vertical, 8)
+        }
+    }
+
+    private var pills: some View {
+        HStack(spacing: StashyExpandingDock.itemSpacing) {
+            ForEach(tabs, id: \.self) { tab in
+                let isSelected = selection == tab
+                Button {
+                    guard !isSelected else { return }
+                    HapticManager.light()
+                    withAnimation(StashyExpandingDock.selectionAnimation) { onSelect(tab) }
+                } label: {
+                    Image(systemName: icon(tab))
+                        .font(.system(size: StashyExpandingDock.iconSize, weight: .semibold))
+                        .foregroundColor(isSelected ? .white : .white.opacity(StashyExpandingDock.inactiveIconOpacity))
+                        .frame(width: StashyExpandingDock.circleSize, height: StashyExpandingDock.circleSize)
+                        .stashyChromeFill(
+                            shape: Capsule(style: .continuous),
+                            activeColor: isSelected ? appearance.tintColor : nil
+                        )
+                        .contentShape(Capsule(style: .continuous))
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel(label(tab))
+                .accessibilityAddTraits(isSelected ? .isSelected : [])
+            }
+        }
+    }
+}
+
+extension StashyDetailTopBar where Tab == Never {
+    /// A detail page without section tabs: Back only.
+    init(
+        backTitle: String = "Back",
+        backIcon: String = "chevron.left",
+        title: String? = nil,
+        besideBack: [CatalogChromeSlot] = [],
+        onBack: @escaping () -> Void
+    ) {
+        self.init(backTitle: backTitle, backIcon: backIcon, onBack: onBack, title: title, besideBack: besideBack, tabs: [])
+    }
+}
+
 /// Shared Back pill used by detail / settings chrome bars.
 struct StashyChromeBackButton: View {
     var title: String = "Back"
+    var systemImage: String = "chevron.left"
     var action: () -> Void
 
     var body: some View {
         Button(action: action) {
             HStack(spacing: StashyExpandingDock.iconLabelSpacing) {
-                Image(systemName: "chevron.left")
+                Image(systemName: systemImage)
                     .font(.system(size: StashyExpandingDock.iconSize, weight: .semibold))
                 Text(title)
                     .font(.subheadline.weight(.semibold))
@@ -376,7 +500,7 @@ struct CatalogSettingsSheetChromeBar: View {
     var onRequestRename: () -> Void
     var onRequestDelete: () -> Void
 
-    @Environment(\.dismiss) private var dismiss
+    @Environment(\.stashyDismiss) private var dismiss
     @State private var showSaveChoice = false
 
     var body: some View {
@@ -498,7 +622,7 @@ struct StashyDetailChromeBar<Trailing: View>: View {
     /// Prefer for modal sheets: `safeAreaInset` + `NavigationView` can make env `dismiss` a no-op.
     var onBack: (() -> Void)? = nil
     @ViewBuilder var trailing: () -> Trailing
-    @Environment(\.dismiss) private var dismiss
+    @Environment(\.stashyDismiss) private var dismiss
 
     init(
         title: String,
@@ -512,7 +636,8 @@ struct StashyDetailChromeBar<Trailing: View>: View {
 
     var body: some View {
         StashySectionChromeBar {
-            HStack(spacing: 8) {
+            // Same layout as `StashyDetailTopBar`: Back left, the page's name right-aligned.
+            HStack(spacing: StashyExpandingDock.itemSpacing) {
                 StashyChromeBackButton {
                     if let onBack {
                         onBack()
@@ -523,9 +648,10 @@ struct StashyDetailChromeBar<Trailing: View>: View {
 
                 Text(title)
                     .font(.subheadline.weight(.semibold))
-                    .foregroundColor(.white)
+                    .foregroundColor(.white.opacity(StashyExpandingDock.inactiveIconOpacity))
                     .lineLimit(1)
-                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .truncationMode(.middle)
+                    .frame(maxWidth: .infinity, alignment: .trailing)
 
                 trailing()
             }
@@ -562,8 +688,12 @@ extension View {
             .navigationTitle("")
             .navigationBarTitleDisplayMode(.inline)
             .navigationBarBackButtonHidden(true)
+            #if os(iOS)
             .toolbar(.hidden, for: .navigationBar)
             .toolbarBackground(.hidden, for: .navigationBar)
+            #elseif os(macOS)
+            .modifier(MacHideSheetToolbar())
+            #endif
     }
 
     /// Custom chrome inset: top on iPhone, bottom on iPad.
@@ -1015,6 +1145,14 @@ private struct OCounterRemovalMenu: ViewModifier {
 /// starts editing (SwiftUI `TextField`, `SecureField`, `TextEditor` are backed by these).
 /// Search fields are left alone — they have their own Search key and native look.
 /// Installed once at launch from `AppDelegate`.
+#if os(macOS)
+/// No on-screen keyboard on macOS — nothing to decorate.
+@MainActor
+final class KeyboardDoneAccessory: NSObject {
+    static let shared = KeyboardDoneAccessory()
+    func install() {}
+}
+#else
 @MainActor
 final class KeyboardDoneAccessory: NSObject {
     static let shared = KeyboardDoneAccessory()
@@ -1067,6 +1205,7 @@ final class KeyboardDoneAccessory: NSObject {
         UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
     }
 }
+#endif
 
 // MARK: - Detail hero card
 

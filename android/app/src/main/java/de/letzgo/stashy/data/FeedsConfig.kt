@@ -28,6 +28,8 @@ object ReelsModesCodec {
         ReelsModeConfig(type = ReelsModeType.Clips, sortOrder = 2),
         ReelsModeConfig(type = ReelsModeType.Previews, sortOrder = 3),
         ReelsModeConfig(type = ReelsModeType.Pics, sortOrder = 4, defaultSortOption = "dateDesc"),
+        // stashy+ only; hidden from the dock and settings while locked (TabManager).
+        ReelsModeConfig(type = ReelsModeType.Verticals, sortOrder = 5),
     )
 
     fun encode(modes: List<ReelsModeConfig>): String = codecJson.encodeToString(serializer, modes)
@@ -138,6 +140,7 @@ object FeedsConfig {
         ReelsModeType.Clips -> TabManager.getDefaultClipFilterId(AppTab.Reels)
         ReelsModeType.Previews -> TabManager.getDefaultPreviewFilterId(AppTab.Reels)
         ReelsModeType.Pics -> TabManager.getDefaultFilterId(AppTab.Images)
+        ReelsModeType.Verticals -> TabManager.getDefaultVerticalFilterId(AppTab.Reels)
     }?.takeIf { it.isNotEmpty() }
 
     fun setDefaultFilter(mode: ReelsModeType, filterId: String?, filterName: String?) = when (mode) {
@@ -146,6 +149,7 @@ object FeedsConfig {
         ReelsModeType.Clips -> TabManager.setDefaultClipFilter(AppTab.Reels, filterId, filterName)
         ReelsModeType.Previews -> TabManager.setDefaultPreviewFilter(AppTab.Reels, filterId, filterName)
         ReelsModeType.Pics -> TabManager.setDefaultFilter(AppTab.Images, filterId, filterName)
+        ReelsModeType.Verticals -> TabManager.setDefaultVerticalFilter(AppTab.Reels, filterId, filterName)
     }
 
     private val kotlinx.serialization.json.JsonElement?.str: String?

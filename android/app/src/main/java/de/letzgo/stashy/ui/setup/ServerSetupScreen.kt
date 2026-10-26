@@ -9,6 +9,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.material.icons.outlined.FileDownload
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -199,6 +200,16 @@ fun ServerSetupScreen(existing: ServerConfig? = null, onDone: () -> Unit) {
                         NativeTonalButton("Add Header", leading = SFS.plusCircleFill) { headers.add(HeaderDraft()) }
                         Text("Sent with every request to this server, e.g. for SSO or a reverse proxy that needs its own token.", style = NativeType.labelSmall, color = p.secondaryText)
                     }
+                }
+                // First setup only: bring servers and settings over from another device. With an
+                // active server after the import, the shell leaves setup by itself.
+                if (existing == null) {
+                    val (transfer, launchers) = de.letzgo.stashy.ui.settings.rememberSettingsTransfer {
+                        if (de.letzgo.stashy.data.ServerConfigManager.activeConfig != null) onDone()
+                    }
+                    NativeTonalButton("Import Settings", Modifier.fillMaxWidth(), leading = androidx.compose.material.icons.Icons.Outlined.FileDownload, onClick = launchers.import)
+                    Text("Servers and settings exported from stashy on another device (iPhone, iPad, Mac or Android).", style = NativeType.labelSmall, color = p.secondaryText)
+                    de.letzgo.stashy.ui.settings.SettingsTransferDialogs(transfer, launchers)
                 }
                 Spacer(Modifier.height(32.dp))
             } else {
