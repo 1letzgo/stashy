@@ -71,7 +71,6 @@ import de.letzgo.stashy.ui.detail.PerformerDetailScreen
 import de.letzgo.stashy.ui.scene.SceneDetailScreen
 import de.letzgo.stashy.ui.stashyGlass
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 
 /**
@@ -225,7 +224,6 @@ fun FeedsScreen() {
                     onDragStarted = {
                         if (FeedsChromeAutoHide.hidesOnDrag(mode, overlayOpen, isZoomed)) chromeScrollHidden = true
                     },
-                    onSettled = { chromeScrollHidden = false },
                     onZoom = { isZoomed = it },
                     onDelete = { deleteTarget = it },
                     onAddTags = { target ->
@@ -356,7 +354,6 @@ private fun FeedPager(
     overlayOpen: Boolean,
     onToggleUI: () -> Unit,
     onDragStarted: () -> Unit,
-    onSettled: () -> Unit,
     onZoom: (Boolean) -> Unit,
     onDelete: (FeedItem) -> Unit,
     onAddTags: (AITagTarget) -> Unit,
@@ -379,30 +376,15 @@ private fun FeedPager(
     // play, restore) only count when they land on the first row.
     val overlayOpenNow by rememberUpdatedState(overlayOpen)
     val onDragStartedNow by rememberUpdatedState(onDragStarted)
-    val onSettledNow by rememberUpdatedState(onSettled)
     LaunchedEffect(pagerState) {
         var swiped = false
-        // A drag too short to scroll never flips `isScrollInProgress`; the reveal waits for both.
-        var dragging by mutableStateOf(false)
         launch {
             pagerState.interactionSource.interactions.collect {
-                when (it) {
-                    is androidx.compose.foundation.interaction.DragInteraction.Start -> {
-                        swiped = true
-                        dragging = true
-                        onDragStartedNow()
-                    }
-                    is androidx.compose.foundation.interaction.DragInteraction.Stop,
-                    is androidx.compose.foundation.interaction.DragInteraction.Cancel -> dragging = false
+                if (it is androidx.compose.foundation.interaction.DragInteraction.Start) {
+                    swiped = true
+                    // Swipe-hidden chrome stays out while watching; a tap brings it back.
+                    onDragStartedNow()
                 }
-            }
-        }
-        // Swipe-hidden chrome returns after the feed rests on a row; a new flick restarts the wait.
-        launch {
-            snapshotFlow { pagerState.isScrollInProgress || dragging }.collectLatest { inProgress ->
-                if (inProgress) return@collectLatest
-                delay(FeedsChromeAutoHide.REVEAL_DELAY_MS)
-                onSettledNow()
             }
         }
         var from = pagerState.settledPage
