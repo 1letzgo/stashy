@@ -951,6 +951,9 @@ struct SceneDetailView: View {
             MiniPlayerStore.shared.openNowPlaying(activeScene, startAt: startAt ?? (resume ? nil : 0))
             return
         }
+        // Plays on this page (Now Playing's Details, its embedded player): listed right away,
+        // not only once the page hands the video to the bar.
+        if MiniPlayerStore.shared.isEnabled { MiniPlayerStore.shared.notePlaying(activeScene) }
         #endif
         guard let url = activeScene.aetherVideoURL else { return }
 

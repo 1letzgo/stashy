@@ -1,0 +1,8 @@
+query FindScenesByIds($ids: [ID!], $filter: FindFilterType) {
+  findScenes(ids: $ids, filter: $filter) {
+    count
+    scenes {
+      ...SceneListFields
+    }
+  }
+}

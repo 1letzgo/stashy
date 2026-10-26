@@ -2,6 +2,11 @@ package de.letzgo.stashy.data
 
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.snapshots.SnapshotStateList
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
 import kotlinx.serialization.builtins.ListSerializer
 
 /** Pure list rules of the watchlist (iOS `WatchlistStore`), kept apart for the unit tests. */
@@ -23,9 +28,9 @@ object WatchlistLogic {
     fun toggled(scenes: List<Scene>, scene: Scene): List<Scene> =
         if (scenes.any { it.id == scene.id }) scenes.filter { it.id != scene.id } else scenes + scene
 
-    /** [scene] at the front when it is not listed yet; the list unchanged otherwise. */
-    fun ensuredListed(scenes: List<Scene>, scene: Scene): List<Scene> =
-        if (scenes.any { it.id == scene.id }) scenes else listOf(scene) + scenes
+    /** [scene] appended when it is not listed yet; the list unchanged otherwise. */
+    fun added(scenes: List<Scene>, scene: Scene): List<Scene> =
+        if (scenes.any { it.id == scene.id }) scenes else scenes + scene
 
     /** Swaps [sceneId] with its neighbour [delta] places away; unchanged when out of range. */
     fun shifted(scenes: List<Scene>, sceneId: String, delta: Int): List<Scene> {
@@ -62,12 +67,17 @@ object WatchlistLogic {
 /**
  * iOS: `WatchlistStore` — scenes queued for the mini player, per server
  * (`scene_watchlist_<serverId>`), kept across launches as full scene snapshots. The bar plays
- * them in order; the scene page and the Now Playing view add and remove entries.
+ * them in order; the scene page and the "Playing" rows of Now Playing add entries. Scenes
+ * started with Play are not listed here (they sit in `MiniPlayerStore.playingQueue`).
  */
 object WatchlistStore {
     val scenes: SnapshotStateList<Scene> = mutableStateListOf()
     private var loadedServerId: String? = null
     private var loaded = false
+    /** Elapsed-realtime ms of the last [checkAgainstServer] run (throttle). */
+    private var lastServerCheck: Long? = null
+    private var serverCheckJob: Job? = null
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
 
     private fun key(serverId: String?) = serverId?.let { "scene_watchlist_$it" }
 
@@ -77,6 +87,9 @@ object WatchlistStore {
 
     /** Server switched (or first use): read that server's list. */
     fun reload(serverId: String?) {
+        serverCheckJob?.cancel()
+        serverCheckJob = null
+        lastServerCheck = null
         loaded = true
         loadedServerId = serverId
         val raw = key(serverId)?.let { Prefs.string(it) }
@@ -85,9 +98,11 @@ object WatchlistStore {
         scenes.addAll(list)
     }
 
-    /** Reloads only when [serverId] differs from the loaded one. */
-    fun onServerChanged(serverId: String?) {
-        if (!loaded || serverId != loadedServerId) reload(serverId)
+    /** Reloads only when [serverId] differs from the loaded one; true when it did. */
+    fun onServerChanged(serverId: String?): Boolean {
+        if (loaded && serverId == loadedServerId) return false
+        reload(serverId)
+        return true
     }
 
     private fun persist() {
@@ -105,14 +120,13 @@ object WatchlistStore {
 
     fun contains(sceneId: String): Boolean { ensureLoaded(); return scenes.any { it.id == sceneId } }
 
-    fun toggle(scene: Scene) { ensureLoaded(); replace(WatchlistLogic.toggled(scenes, scene)) }
+    fun toggle(scene: Scene) { if (contains(scene.id)) remove(scene.id) else add(scene) }
 
-    /** iOS `ensureListed` — the scene playing in the mini player is always on the list (added at the front). */
-    fun ensureListed(scene: Scene) {
+    /** Appends [scene] (no-op when listed). */
+    fun add(scene: Scene) {
         ensureLoaded()
-        // Just removed by the user: the hand-off of the player leaving it must not list it again.
-        recentlyRemoved?.let { (id, at) -> if (id == scene.id && android.os.SystemClock.elapsedRealtime() - at < 3_000) return }
-        if (scenes.none { it.id == scene.id }) replace(WatchlistLogic.ensuredListed(scenes, scene))
+        if (scenes.any { it.id == scene.id }) return
+        replace(WatchlistLogic.added(scenes, scene))
     }
 
     fun shift(sceneId: String, delta: Int) { ensureLoaded(); replace(WatchlistLogic.shifted(scenes, sceneId, delta)) }
@@ -120,19 +134,72 @@ object WatchlistStore {
     /** iOS `moveAfter` — "Play next". */
     fun moveAfter(sceneId: String, currentId: String?) { ensureLoaded(); replace(WatchlistLogic.movedAfter(scenes, sceneId, currentId)) }
 
-    /** The last entry the user removed (id, elapsed-realtime ms), for [ensureListed]. */
-    private var recentlyRemoved: Pair<String, Long>? = null
-
+    /** Removing never stops playback: the scene on screen moves to "Playing". */
     fun remove(sceneId: String) {
         ensureLoaded()
-        recentlyRemoved = sceneId to android.os.SystemClock.elapsedRealtime()
+        val scene = scenes.firstOrNull { it.id == sceneId } ?: return
         replace(scenes.filter { it.id != sceneId })
+        de.letzgo.stashy.ui.player.MiniPlayerStore.watchlistRemoved(scene)
     }
 
     fun move(from: Int, to: Int) { ensureLoaded(); replace(WatchlistLogic.moved(scenes, from, to)) }
 
-    fun clear() { ensureLoaded(); replace(emptyList()) }
+    /** Empties the watchlist; what plays keeps playing (listed under "Playing"). */
+    fun clear() {
+        ensureLoaded()
+        val removed = scenes.toList()
+        replace(emptyList())
+        removed.forEach { de.letzgo.stashy.ui.player.MiniPlayerStore.watchlistRemoved(it) }
+    }
 
     fun next(after: String): Scene? { ensureLoaded(); return WatchlistLogic.next(scenes, after) }
     fun previous(before: String): Scene? { ensureLoaded(); return WatchlistLogic.previous(scenes, before) }
+
+    // MARK: Server check
+
+    /**
+     * iOS `checkAgainstServer(force:)` — looks up every listed scene (watchlist, "Playing", the
+     * bar's, Now Playing's) on the server in one `findScenes(ids:)` request per 100. Missing ones
+     * were deleted elsewhere and leave every surface ([MiniPlayerStore.sceneDeleted]); found ones
+     * refresh their snapshot. Throttled to once a minute unless [force]; a failed request or a
+     * missing result block changes nothing.
+     */
+    fun checkAgainstServer(force: Boolean = false) {
+        ensureLoaded()
+        val player = de.letzgo.stashy.ui.player.MiniPlayerStore
+        val ids = (scenes.map { it.id } + player.playingQueue.map { it.id } +
+            listOfNotNull(player.session?.scene?.id, player.nowPlayingScene?.id)).distinct()
+        if (ids.isEmpty() || serverCheckJob?.isActive == true) return
+        val now = android.os.SystemClock.elapsedRealtime()
+        if (!force) lastServerCheck?.let { if (now - it < 60_000) return }
+        lastServerCheck = now
+        val serverId = loadedServerId
+        serverCheckJob = scope.launch {
+            val found = fetchScenes(ids) ?: return@launch
+            // The active server changed meanwhile: these results belong to the old one.
+            if (loadedServerId != serverId || ServerConfigManager.activeConfig?.id != serverId) return@launch
+            for (id in ids) if (found[id] == null) player.sceneDeleted(id)
+            if (scenes.any { found[it.id] != null }) replace(scenes.map { found[it.id] ?: it })
+            player.refreshPlaying(found)
+        }
+    }
+
+    /** The scenes of [ids] found on the server, or null when any request failed. */
+    private suspend fun fetchScenes(ids: List<String>): Map<String, Scene>? {
+        val found = HashMap<String, Scene>()
+        for (chunk in ids.chunked(100)) {
+            val list = runCatching {
+                val data = GraphQL.named("findScenesByIds", vars("ids" to chunk, "filter" to mapOf("per_page" to -1)))
+                // No result block at all: unknown state, never treat that as "deleted".
+                val result = data["findScenes"] as? kotlinx.serialization.json.JsonObject ?: return null
+                val element = result["scenes"] ?: return null
+                GraphQL.decode(ListSerializer(Scene.serializer()), element)
+            }.getOrElse { e ->
+                if (e is kotlinx.coroutines.CancellationException) throw e
+                return null
+            }
+            list.forEach { found[it.id] = it }
+        }
+        return found
+    }
 }

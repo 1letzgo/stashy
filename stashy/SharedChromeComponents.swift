@@ -386,8 +386,10 @@ struct StashyDetailTopBar<Tab: Hashable>: View {
     var onBack: () -> Void
     /// Right-aligned label for pages without tabs (a download's name, "3 / 20").
     var title: String? = nil
-    /// Round buttons right after Back (Now Playing's Details).
+    /// Round buttons right after Back.
     var besideBack: [CatalogChromeSlot] = []
+    /// A labelled pill at the right edge (Now Playing's Details).
+    var trailingAction: (title: String, systemImage: String, action: () -> Void)? = nil
     var tabs: [Tab] = []
     var selection: Tab? = nil
     var icon: (Tab) -> String = { _ in "circle" }
@@ -418,6 +420,20 @@ struct StashyDetailTopBar<Tab: Hashable>: View {
                             .scrollBounceBehavior(.basedOnSize, axes: .horizontal)
                     }
                     .layoutPriority(-1)
+                }
+                if let trailingAction {
+                    Button(action: trailingAction.action) {
+                        HStack(spacing: StashyExpandingDock.iconLabelSpacing) {
+                            Image(systemName: trailingAction.systemImage)
+                                .font(.system(size: StashyExpandingDock.iconSize, weight: .semibold))
+                            Text(trailingAction.title)
+                                .font(.subheadline.weight(.semibold))
+                        }
+                        .foregroundColor(.white)
+                        .modifier(StashyChromePillStyle(height: StashyExpandingDock.activeHeight, accent: false))
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel(trailingAction.title)
                 }
             }
             .frame(minHeight: StashyExpandingDock.activeHeight)
@@ -460,9 +476,13 @@ extension StashyDetailTopBar where Tab == Never {
         backIcon: String = "chevron.left",
         title: String? = nil,
         besideBack: [CatalogChromeSlot] = [],
+        trailingAction: (title: String, systemImage: String, action: () -> Void)? = nil,
         onBack: @escaping () -> Void
     ) {
-        self.init(backTitle: backTitle, backIcon: backIcon, onBack: onBack, title: title, besideBack: besideBack, tabs: [])
+        self.init(
+            backTitle: backTitle, backIcon: backIcon, onBack: onBack, title: title,
+            besideBack: besideBack, trailingAction: trailingAction, tabs: []
+        )
     }
 }
 

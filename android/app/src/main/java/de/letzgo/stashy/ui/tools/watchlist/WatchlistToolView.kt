@@ -19,6 +19,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -47,7 +48,7 @@ import de.letzgo.stashy.ui.tools.ToolsTokens
 import de.letzgo.stashy.ui.tools.toolsTopPadding
 
 /**
- * iOS: `WatchlistToolsView` (Tools › Library › Watchlist) — "Play all" + "Reset", then the same
+ * iOS: `WatchlistToolsView` (Tools › Library › Watchlist) — "Play all", "Clear" and "Sort", then the same
  * plain, reorderable watchlist as Now Playing. A row opens that scene's page with autoplay;
  * leaving it hands the video to the mini player as usual.
  */
@@ -56,14 +57,16 @@ fun WatchlistToolView() {
     val p = Theme.palette
     val scenes = WatchlistStore.all
     val drag = remember { WatchlistDragState() }
-    var confirmReset by remember { mutableStateOf(false) }
+    var confirmClear by remember { mutableStateOf(false) }
     var sorting by remember { mutableStateOf(false) }
-    if (confirmReset) AlertDialog(
-        onDismissRequest = { confirmReset = false },
-        title = { Text("Reset watchlist?") },
-        text = { Text("All scenes are removed from the watchlist and playback stops.") },
-        confirmButton = { TextButton({ confirmReset = false; MiniPlayerStore.resetWatchlistAndPlayback() }) { Text("Reset", color = StashyColors.systemRed) } },
-        dismissButton = { TextButton({ confirmReset = false }) { Text("Cancel") } },
+    // Scenes deleted elsewhere leave the list (throttled to once a minute).
+    LaunchedEffect(Unit) { WatchlistStore.checkAgainstServer() }
+    if (confirmClear) AlertDialog(
+        onDismissRequest = { confirmClear = false },
+        title = { Text("Clear watchlist?") },
+        text = { Text("All scenes are removed from the watchlist. What plays keeps playing.") },
+        confirmButton = { TextButton({ confirmClear = false; sorting = false; WatchlistStore.clear() }) { Text("Clear", color = StashyColors.systemRed) } },
+        dismissButton = { TextButton({ confirmClear = false }) { Text("Cancel") } },
         containerColor = p.secondaryBackground, titleContentColor = p.text, textContentColor = p.secondaryText,
     )
 
@@ -104,17 +107,17 @@ fun WatchlistToolView() {
                 }
                 Box(
                     Modifier.height(40.dp).clip(RoundedCornerShape(50)).background(p.secondaryBackground)
+                        .clickable { confirmClear = true }.padding(horizontal = 18.dp),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text("Clear", style = IosTypography.subheadline.copy(fontWeight = FontWeight.SemiBold), color = StashyColors.systemRed)
+                }
+                Box(
+                    Modifier.height(40.dp).clip(RoundedCornerShape(50)).background(p.secondaryBackground)
                         .clickable { sorting = !sorting }.padding(horizontal = 18.dp),
                     contentAlignment = Alignment.Center,
                 ) {
                     Text(if (sorting) "Done" else "Sort", style = IosTypography.subheadline.copy(fontWeight = FontWeight.SemiBold), color = Appearance.tint)
-                }
-                Box(
-                    Modifier.height(40.dp).clip(RoundedCornerShape(50)).background(p.secondaryBackground)
-                        .clickable { confirmReset = true }.padding(horizontal = 18.dp),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Text("Reset", style = IosTypography.subheadline.copy(fontWeight = FontWeight.SemiBold), color = StashyColors.systemRed)
                 }
             }
         }

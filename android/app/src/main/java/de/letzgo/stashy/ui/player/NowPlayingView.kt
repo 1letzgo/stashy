@@ -68,6 +68,7 @@ import de.letzgo.stashy.data.SceneEvents
 import androidx.compose.runtime.rememberCoroutineScope
 import kotlinx.coroutines.launch
 import androidx.compose.material.icons.filled.Business
+import androidx.compose.material.icons.outlined.Info
 import de.letzgo.stashy.ui.Appearance
 import de.letzgo.stashy.ui.NativeSectionHeader
 import de.letzgo.stashy.ui.SF
@@ -113,53 +114,63 @@ private fun NowPlayingContent(initial: Scene, onOpen: (de.letzgo.stashy.ui.Scree
     val watchlist = WatchlistStore.all
     val drag = remember { WatchlistDragState() }
     var sorting by remember { mutableStateOf(false) }
-    var confirmReset by remember { mutableStateOf(false) }
-    if (confirmReset) AlertDialog(
-        onDismissRequest = { confirmReset = false },
-        title = { Text("Reset watchlist?") },
-        text = { Text("All scenes are removed from the watchlist and playback stops.") },
+    val playing = MiniPlayerStore.playingQueue
+    var confirmClear by remember { mutableStateOf(false) }
+    // Scenes deleted elsewhere leave the lists (throttled to once a minute).
+    LaunchedEffect(Unit) { WatchlistStore.checkAgainstServer() }
+    if (confirmClear) AlertDialog(
+        onDismissRequest = { confirmClear = false },
+        title = { Text("Clear watchlist?") },
+        text = { Text("All scenes are removed from the watchlist. What plays keeps playing.") },
         confirmButton = {
-            TextButton({ confirmReset = false; sorting = false; MiniPlayerStore.resetWatchlistAndPlayback() }) {
-                Text("Reset", color = StashyColors.systemRed)
+            TextButton({ confirmClear = false; sorting = false; WatchlistStore.clear() }) {
+                Text("Clear", color = StashyColors.systemRed)
             }
         },
-        dismissButton = { TextButton({ confirmReset = false }) { Text("Cancel") } },
+        dismissButton = { TextButton({ confirmClear = false }) { Text("Cancel") } },
         containerColor = p.secondaryBackground, titleContentColor = p.text, textContentColor = p.secondaryText,
     )
     // Pinned to the sheet's width: nothing (a long title or description) may widen the content.
     androidx.compose.foundation.layout.BoxWithConstraints(Modifier.fillMaxSize()) {
         Column(Modifier.width(maxWidth).fillMaxHeight().navigationBarsPadding()) {
-            // Toolbar: minimize · Details.
-            Row(Modifier.fillMaxWidth().padding(horizontal = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+            // Standard chrome: Minimize like Back on the left, Details on the right edge.
+            Row(Modifier.fillMaxWidth().padding(start = 4.dp, end = NowPlayingMargin), verticalAlignment = Alignment.CenterVertically) {
                 IconButton(onClick = { MiniPlayerStore.showsNowPlaying = false }) {
                     Icon(SF.chevronDown, "Minimize", tint = p.text)
                 }
                 Box(Modifier.weight(1f))
-                TextButton(onClick = { onOpen(de.letzgo.stashy.ui.scene.SceneDetailScreen(scene.id, scene, openedFromMiniPlayer = true)) }) {
-                    Text("Details", color = Appearance.tint, fontWeight = FontWeight.SemiBold)
-                }
+                DetailsPill { onOpen(de.letzgo.stashy.ui.scene.SceneDetailScreen(scene.id, scene, openedFromMiniPlayer = true)) }
             }
-            // The scene page's player module, 8 dp side margin, fixed above the scrolling list.
-            Box(Modifier.fillMaxWidth().padding(start = NowPlayingMargin, end = NowPlayingMargin, top = 4.dp)) {
+            // The scene page's player module with the scene page's gap under its chrome
+            // (16 dp top and sides, `SceneDetailScreen`), fixed above the scrolling list.
+            Box(Modifier.fillMaxWidth().padding(start = NowPlayingMargin, end = NowPlayingMargin, top = NowPlayingMargin)) {
                 de.letzgo.stashy.ui.scene.ScenePlayerModule(model)
             }
             LazyColumn(Modifier.fillMaxSize()) {
                 item(key = "info") { InfoRow(scene, onOpen) }
+                if (playing.isNotEmpty()) {
+                    item(key = "playing-header") {
+                        Row(Modifier.fillMaxWidth().height(48.dp).padding(start = NowPlayingMargin, top = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                            Text("Now Playing", Modifier.weight(1f), style = IosTypography.headline, color = p.text)
+                        }
+                    }
+                    playingRows(playing, scene.id, NowPlayingMargin) { MiniPlayerStore.showInNowPlaying(it) }
+                }
                 item(key = "header") {
-                    // Plain list header on the sheet background: "Watchlist" + Sort / Done + red Reset.
-                    Row(Modifier.fillMaxWidth().padding(start = NowPlayingMargin, top = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                    // Plain list header on the sheet background: "Watchlist" + red Clear + Sort / Done.
+                    Row(Modifier.fillMaxWidth().heightIn(min = 48.dp).padding(start = NowPlayingMargin, top = 8.dp), verticalAlignment = Alignment.CenterVertically) {
                         Text("Watchlist", Modifier.weight(1f), style = IosTypography.headline, color = p.text)
+                        if (watchlist.isNotEmpty()) TextButton(onClick = { confirmClear = true }) {
+                            Text("Clear", color = StashyColors.systemRed, fontWeight = FontWeight.SemiBold)
+                        }
                         if (watchlist.isNotEmpty()) TextButton(onClick = { sorting = !sorting }) {
                             Text(if (sorting) "Done" else "Sort", color = Appearance.tint, fontWeight = FontWeight.SemiBold)
-                        }
-                        if (watchlist.isNotEmpty()) TextButton(onClick = { confirmReset = true }) {
-                            Text("Reset", color = StashyColors.systemRed, fontWeight = FontWeight.SemiBold)
                         }
                     }
                 }
                 if (watchlist.isEmpty()) item(key = "empty") {
                     Text(
-                        "Add scenes with the watchlist button on a scene. They play here one after another.",
+                        "Add scenes with + on a playing scene or the watchlist button on a scene page. They play here one after another.",
                         Modifier.padding(horizontal = NowPlayingMargin, vertical = 8.dp), fontSize = 13.sp, color = p.secondaryText,
                     )
                 } else watchlistRows(watchlist.toList(), scene.id, drag, NowPlayingMargin, sorting) { MiniPlayerStore.showInNowPlaying(it) }
@@ -197,12 +208,26 @@ private fun InfoRow(scene: Scene, onOpen: (de.letzgo.stashy.ui.Screen) -> Unit) 
                 }
             }
         }
-        MiniPlayerStore.previousBefore(scene.id)?.let { previous ->
-            CircleAction(Icons.Filled.SkipPrevious, "Previous in watchlist") { MiniPlayerStore.showInNowPlaying(previous) }
+        MiniPlayerStore.previousScene(scene.id)?.let { previous ->
+            CircleAction(Icons.Filled.SkipPrevious, "Previous") { MiniPlayerStore.showInNowPlaying(previous) }
         }
-        MiniPlayerStore.nextAfter(scene.id)?.let { next ->
-            CircleAction(Icons.Filled.SkipNext, "Next in watchlist") { MiniPlayerStore.showInNowPlaying(next) }
+        MiniPlayerStore.nextScene(scene.id)?.let { next ->
+            CircleAction(Icons.Filled.SkipNext, "Next") { MiniPlayerStore.showInNowPlaying(next) }
         }
+    }
+}
+
+/** iOS `StashyDetailTopBar` trailing action: info icon + "Details" in a tint pill. */
+@Composable
+private fun DetailsPill(onClick: () -> Unit) {
+    Row(
+        Modifier.height(32.dp).clip(RoundedCornerShape(50)).background(Appearance.tint.copy(alpha = 0.15f))
+            .clickable(onClickLabel = "Open the scene page", onClick = onClick).padding(horizontal = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(5.dp),
+    ) {
+        Icon(Icons.Outlined.Info, null, tint = Appearance.tint, modifier = Modifier.size(16.dp))
+        Text("Details", fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = Appearance.tint, maxLines = 1)
     }
 }
 

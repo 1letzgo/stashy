@@ -65,4 +65,27 @@ class MiniPlayerRulesTest {
         assertFalse(page.onStart())
         assertFalse(page.onTime(111.0, true, 11.0))
     }
+
+    private fun scene(id: String) = de.letzgo.stashy.data.Scene(id = id)
+    private fun ids(list: List<de.letzgo.stashy.data.Scene>) = list.map { it.id }
+
+    @Test fun nextSceneFollowsTheWatchlistOrStartsItAfterAPlayingScene() {
+        val watchlist = listOf(scene("a"), scene("b"), scene("c"))
+        // On the watchlist: the next entry, nothing after the last.
+        assertEquals("b", MiniPlayerRules.nextScene(watchlist, "a")?.id)
+        assertEquals("c", MiniPlayerRules.nextScene(watchlist, "b")?.id)
+        org.junit.Assert.assertNull(MiniPlayerRules.nextScene(watchlist, "c"))
+        // Started with Play (not listed): the watchlist from the top is "up next".
+        assertEquals("a", MiniPlayerRules.nextScene(watchlist, "x")?.id)
+        org.junit.Assert.assertNull(MiniPlayerRules.nextScene(emptyList(), "x"))
+        // A lone listed scene has nothing after it.
+        org.junit.Assert.assertNull(MiniPlayerRules.nextScene(listOf(scene("x")), "x"))
+    }
+
+    @Test fun notePlayingKeepsOnlyTheLastScene() {
+        val queue = listOf(scene("a"))
+        assertEquals(listOf("c"), ids(MiniPlayerRules.notedPlaying(queue, scene("c"))))
+        assertEquals(listOf("a"), ids(MiniPlayerRules.notedPlaying(queue, scene("a"))))
+        assertEquals(listOf("x"), ids(MiniPlayerRules.notedPlaying(emptyList(), scene("x"))))
+    }
 }

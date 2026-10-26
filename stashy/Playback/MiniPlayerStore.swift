@@ -10,6 +10,7 @@
 
 #if canImport(AetherEngine) && !os(tvOS)
 
+import Combine
 import SwiftUI
 
 @MainActor
@@ -34,6 +35,13 @@ final class MiniPlayerStore: ObservableObject {
     /// The scene the full view shows. Its scene-page player takes the engine while open, so the
     /// view keys on this rather than on `session`.
     @Published var nowPlayingScene: Scene?
+    /// "Now Playing": the scene last started, on the watchlist or not. One entry, never a growing
+    /// history; the + on its row adds it to the watchlist.
+    @Published private(set) var playingQueue: [Scene] = []
+    private static let playingQueueLimit = 1
+    /// Deleted since the last server switch: a page still showing one (Now Playing closing
+    /// over it) must not hand its engine to the bar.
+    private var deletedSceneIds = Set<String>()
 
     /// Resume time and play duration keep syncing while only the bar shows the video.
     private let tracker = ScenePlaybackActivityTracker()
@@ -50,6 +58,8 @@ final class MiniPlayerStore: ObservableObject {
             Task { @MainActor in
                 // The old server's session stays saved for when it is active again.
                 self?.close(forget: false)
+                self?.playingQueue = []
+                self?.deletedSceneIds = []
                 self?.restoreLastSessionIfNeeded()
             }
         }
@@ -79,10 +89,12 @@ final class MiniPlayerStore: ObservableObject {
 
     /// Takes over `engine` from a scene page that is going away. Any other mini session ends.
     func adopt(scene: Scene, engine: AetherSceneEngine, playRegistered: Bool) {
-        if discardNextHandOff {
-            discardNextHandOff = false
+        // Now Playing switched to another scene: the page it replaced hands over late (its
+        // teardown is deferred), after the new page already started its own engine. Taking it
+        // would leave a second, still playing video behind the sheet.
+        if (showsNowPlaying && nowPlayingScene.map({ $0.id != scene.id }) == true)
+            || deletedSceneIds.contains(scene.id) {
             engine.stop()
-            forgetLastSession()
             return
         }
         if let current = session, current.engine !== engine {
@@ -91,13 +103,15 @@ final class MiniPlayerStore: ObservableObject {
         engine.onTime = { [weak self] seconds, duration in
             self?.handleTime(seconds, duration: duration)
         }
-        engine.onPlayingChanged = { [weak self] playing in
+        engine.onPlayingChanged = { [weak self, weak engine] playing in
             guard let self else { return }
             if playing { self.tracker.start() } else { self.tracker.stop() }
+            // Paused: the exact spot is worth one write; while playing it is saved sparingly.
+            if !playing, let engine { self.saveSession(position: engine.currentTime) }
         }
         // The watchlist plays on in the bar: the next entry starts when one ends.
         engine.onReachedEnd = { [weak self] in
-            self?.playNextFromWatchlist()
+            self?.playNext()
         }
         // AI Motion, captions and transcode toasts belong to the page; the bar only plays.
         engine.onAnalysisItemChanged = nil
@@ -113,7 +127,7 @@ final class MiniPlayerStore: ObservableObject {
         withAnimation(DesignTokens.Animation.quick) {
             session = Session(scene: scene, engine: engine, playRegistered: playRegistered)
         }
-        WatchlistStore.shared.ensureListed(scene)
+        notePlaying(scene)
         saveSession(position: engine.currentTime)
     }
 
@@ -137,7 +151,7 @@ final class MiniPlayerStore: ObservableObject {
         engine.fallbackSources = scene.transcodeFallbackURLs
         engine.fallbackDeclaredDuration = scene.sceneDuration
         session = Session(scene: scene, engine: engine, playRegistered: false)
-        WatchlistStore.shared.ensureListed(scene)
+        notePlaying(scene)
         saveSession(position: scene.resumeTime ?? 0)
         let resume: Double? = {
             guard let time = scene.resumeTime, time > 0 else { return nil }
@@ -148,16 +162,62 @@ final class MiniPlayerStore: ObservableObject {
         Task { await engine.load(url: url, startAt: resume, autoplay: true) }
     }
 
-    private func playNextFromWatchlist() {
-        guard let current = session,
-              let next = WatchlistStore.shared.next(after: current.scene.id) else { return }
-        play(next)
+    // MARK: - Queue
+
+    /// A scene started playing: on top of "Now Playing".
+    func notePlaying(_ scene: Scene) {
+        guard playingQueue.first?.id != scene.id else { return }
+        var queue = playingQueue.filter { $0.id != scene.id }
+        queue.insert(scene, at: 0)
+        playingQueue = Array(queue.prefix(Self.playingQueueLimit))
+    }
+
+    /// The scene now on screen: the full view's while it is open, else the bar's.
+    var currentSceneId: String? {
+        showsNowPlaying ? nowPlayingScene?.id : session?.scene.id
+    }
+
+    /// What follows `sceneId`: the next watchlist entry when it is on the watchlist; after a
+    /// scene started with Play, the watchlist from the top (it is the "up next" list).
+    func nextScene(after sceneId: String) -> Scene? {
+        let watchlist = WatchlistStore.shared
+        if watchlist.contains(sceneId) { return watchlist.next(after: sceneId) }
+        return watchlist.scenes.first { $0.id != sceneId }
+    }
+
+    func previousScene(before sceneId: String) -> Scene? {
+        WatchlistStore.shared.previous(before: sceneId)
+    }
+
+    /// The + on a "Now Playing" row: onto the watchlist (at its end).
+    func addToWatchlist(_ scene: Scene) {
+        WatchlistStore.shared.add(scene)
+    }
+
+    /// Swipe on a "Now Playing" row. The scene on screen stays: closing it is the bar's ×.
+    func removeFromPlaying(_ sceneId: String) {
+        guard sceneId != currentSceneId else { return }
+        playingQueue.removeAll { $0.id == sceneId }
+    }
+
+    /// Taken off the watchlist: the scene on screen keeps playing (it stays in "Now Playing").
+    fileprivate func watchlistRemoved(_ scene: Scene) {
+        guard scene.id == currentSceneId, !playingQueue.contains(where: { $0.id == scene.id }) else { return }
+        notePlaying(scene)
+    }
+
+    /// Fresh copies from the server (titles, covers, resume times) for both lists.
+    fileprivate func refreshPlaying(with fresh: [String: Scene]) {
+        guard playingQueue.contains(where: { fresh[$0.id] != nil }) else { return }
+        playingQueue = playingQueue.map { fresh[$0.id] ?? $0 }
     }
 
     /// Resume tracking plus the play count, which the page would otherwise have counted.
     private func handleTime(_ seconds: Double, duration: Double) {
         guard let current = session, seconds >= 0 else { return }
-        if abs(seconds - lastSavedPosition) >= 5 { saveSession(position: seconds) }
+        // Every save rewrites the whole UserDefaults plist (the scene snapshot is in it); every
+        // 5 s that added up to iOS "excessive disk writes" reports. Pausing saves the exact spot.
+        if abs(seconds - lastSavedPosition) >= 30 { saveSession(position: seconds) }
         tracker.setPosition(currentTime: seconds, duration: duration > 0 ? duration : (current.scene.sceneDuration ?? 0))
         playCountClock.sample(playhead: seconds, isPlaying: current.engine.isPlaying)
         if !current.playRegistered, playCountClock.watchedSeconds >= max(0, TabManager.shared.playCountPlayerSeconds) {
@@ -205,30 +265,10 @@ final class MiniPlayerStore: ObservableObject {
         showsNowPlaying = true
     }
 
-    /// Set by Reset while the full view's player owns the engine: the hand-back on close
-    /// stops it instead of showing the bar again.
-    private var discardNextHandOff = false
-
-    /// Reset: empty watchlist, playback stopped, bar and full view gone.
-    func resetWatchlistAndPlayback() {
-        WatchlistStore.shared.clear()
-        forgetLastSession()
-        if showsNowPlaying {
-            discardNextHandOff = true
-            showsNowPlaying = false
-            nowPlayingScene = nil
-            // Only the close that follows right now; never a later, unrelated hand-off.
-            DispatchQueue.main.asyncAfter(deadline: .now() + 2) { [weak self] in
-                self?.discardNextHandOff = false
-            }
-        }
-        close()
-    }
-
     /// Play on a scene page while the mini player is on: the scene plays in the full view (and
     /// is listed on the watchlist) instead of on the page. `startAt` nil resumes where it was left.
     func openNowPlaying(_ scene: Scene, startAt: Double?) {
-        WatchlistStore.shared.ensureListed(scene)
+        notePlaying(scene)
         // The bar already runs it: the full view takes that engine as is, so jump it here.
         if let startAt, let current = session, current.scene.id == scene.id {
             Task { await current.engine.seek(to: startAt) }
@@ -237,34 +277,26 @@ final class MiniPlayerStore: ObservableObject {
         showsNowPlaying = true
     }
 
-    /// The playing scene was taken off the watchlist: playback moves to the first entry left.
-    /// (An emptied list already reset everything.)
-    func watchlistRemoved(_ sceneId: String) {
-        guard let first = WatchlistStore.shared.scenes.first else { return }
-        if showsNowPlaying, nowPlayingScene?.id == sceneId {
-            showNowPlaying(first)
-        } else if !showsNowPlaying, session?.scene.id == sceneId {
-            play(first)
-        }
-    }
-
-    /// Switches the full view to `scene` (watchlist tap, next, end of a scene).
+    /// Switches the full view to `scene` (row tap, previous / next, end of a scene).
     func showNowPlaying(_ scene: Scene) {
-        WatchlistStore.shared.ensureListed(scene)
+        notePlaying(scene)
         nowPlayingScene = scene
     }
 
-    /// The full view's player reached the end: on to the next watchlist entry.
+    /// The full view's player reached the end: on to what comes next.
     func advanceNowPlaying() {
         guard showsNowPlaying, let current = nowPlayingScene,
-              let next = WatchlistStore.shared.next(after: current.id) else { return }
+              let next = nextScene(after: current.id) else { return }
         showNowPlaying(next)
     }
 
-    private func sceneDeleted(_ sceneId: String) {
+    /// Deleted in the app, or found missing on the server: gone from every surface.
+    func sceneDeleted(_ sceneId: String) {
+        deletedSceneIds.insert(sceneId)
         if expandedScene?.id == sceneId { expandedScene = nil }
         if session?.scene.id == sceneId { close() }
         if nowPlayingScene?.id == sceneId { showsNowPlaying = false; nowPlayingScene = nil }
+        playingQueue.removeAll { $0.id == sceneId }
         if WatchlistStore.shared.contains(sceneId) { WatchlistStore.shared.remove(sceneId) }
     }
 
@@ -287,11 +319,13 @@ final class MiniPlayerStore: ObservableObject {
 
     var hasNext: Bool {
         guard let current = session else { return false }
-        return WatchlistStore.shared.next(after: current.scene.id) != nil
+        return nextScene(after: current.scene.id) != nil
     }
 
+    /// The bar's video ended (or Next): on to what comes next.
     func playNext() {
-        playNextFromWatchlist()
+        guard let current = session, let next = nextScene(after: current.scene.id) else { return }
+        play(next)
     }
 
     /// Saves the position and stops the engine.
@@ -384,13 +418,16 @@ final class MiniPlayerStore: ObservableObject {
 // MARK: - Watchlist
 
 /// Scenes queued for the mini player, per server, kept across launches. The bar plays them in
-/// order; the scene page adds and removes entries.
+/// order; the scene page and the "Now Playing" rows add entries. Scenes started with Play are
+/// not added here (they sit in `MiniPlayerStore.playingQueue`).
 @MainActor
 final class WatchlistStore: ObservableObject {
     static let shared = WatchlistStore()
 
     @Published private(set) var scenes: [Scene] = []
     private var loadedServerId: String?
+    private var lastServerCheck: Date?
+    private var serverCheckTask: Task<Void, Never>?
 
     private init() {
         reload()
@@ -399,7 +436,20 @@ final class WatchlistStore: ObservableObject {
             object: nil,
             queue: .main
         ) { [weak self] _ in
-            Task { @MainActor in self?.reload() }
+            Task { @MainActor in
+                self?.reload()
+                self?.checkAgainstServer(force: true)
+            }
+        }
+        // Scenes deleted on the server (web UI, another device) leave the lists the next time
+        // the app comes to the front.
+        #if os(macOS)
+        let becameActive = NSApplication.didBecomeActiveNotification
+        #else
+        let becameActive = UIApplication.didBecomeActiveNotification
+        #endif
+        NotificationCenter.default.addObserver(forName: becameActive, object: nil, queue: .main) { [weak self] _ in
+            Task { @MainActor in self?.checkAgainstServer() }
         }
     }
 
@@ -408,6 +458,8 @@ final class WatchlistStore: ObservableObject {
     }
 
     private func reload() {
+        serverCheckTask?.cancel()
+        lastServerCheck = nil
         loadedServerId = ServerConfigManager.shared.activeConfig?.id.uuidString
         guard let key = storageKey, let data = UserDefaults.standard.data(forKey: key) else {
             scenes = []
@@ -431,32 +483,30 @@ final class WatchlistStore: ObservableObject {
         if contains(scene.id) {
             remove(scene.id)
         } else {
-            scenes.append(scene)
-            persist()
+            add(scene)
         }
     }
 
-    /// The last entry the user removed, for `ensureListed`.
-    private var recentlyRemoved: (id: String, at: Date)?
+    /// Appends `scene` (no-op when listed).
+    func add(_ scene: Scene) {
+        guard !contains(scene.id) else { return }
+        scenes.append(scene)
+        persist()
+    }
 
+    /// Removing never stops playback.
     func remove(_ sceneId: String) {
-        recentlyRemoved = (sceneId, Date())
+        guard let scene = scenes.first(where: { $0.id == sceneId }) else { return }
         scenes.removeAll { $0.id == sceneId }
         persist()
-        resetIfEmptied()
-        MiniPlayerStore.shared.watchlistRemoved(sceneId)
+        MiniPlayerStore.shared.watchlistRemoved(scene)
     }
 
     func remove(atOffsets offsets: IndexSet) {
+        let removed = offsets.compactMap { scenes.indices.contains($0) ? scenes[$0] : nil }
         scenes.remove(atOffsets: offsets)
         persist()
-        resetIfEmptied()
-    }
-
-    /// Removing the last entry is the same as Reset: playback stops, bar and full view go.
-    private func resetIfEmptied() {
-        guard scenes.isEmpty else { return }
-        MiniPlayerStore.shared.resetWatchlistAndPlayback()
+        removed.forEach { MiniPlayerStore.shared.watchlistRemoved($0) }
     }
 
     func move(fromOffsets source: IndexSet, toOffset destination: Int) {
@@ -464,9 +514,12 @@ final class WatchlistStore: ObservableObject {
         persist()
     }
 
+    /// Empties the watchlist; what plays keeps playing.
     func clear() {
+        let removed = scenes
         scenes = []
         persist()
+        removed.forEach { MiniPlayerStore.shared.watchlistRemoved($0) }
     }
 
     /// One step up (`-1`) or down (`+1`); the context-menu fallback for dragging.
@@ -487,15 +540,6 @@ final class WatchlistStore: ObservableObject {
         persist()
     }
 
-    /// The playing scene is always on the list: added in front when it is not yet.
-    func ensureListed(_ scene: Scene) {
-        guard !contains(scene.id) else { return }
-        // Just removed by the user: the hand-off of the player leaving it must not list it again.
-        if let removed = recentlyRemoved, removed.id == scene.id, Date().timeIntervalSince(removed.at) < 3 { return }
-        scenes.insert(scene, at: 0)
-        persist()
-    }
-
     /// The entry after `sceneId`; the first one when `sceneId` is not on the list.
     func next(after sceneId: String) -> Scene? {
         guard let index = scenes.firstIndex(where: { $0.id == sceneId }) else { return scenes.first }
@@ -507,6 +551,62 @@ final class WatchlistStore: ObservableObject {
     func previous(before sceneId: String) -> Scene? {
         guard let index = scenes.firstIndex(where: { $0.id == sceneId }), index > scenes.startIndex else { return nil }
         return scenes[scenes.index(before: index)]
+    }
+
+    // MARK: - Server check
+
+    private struct ScenesByIdsResponse: Decodable {
+        struct Payload: Decodable { let findScenes: FindScenesResult? }
+        let data: Payload?
+    }
+
+    /// Looks up every listed scene (watchlist, "Now Playing", the bar's) on the server. Missing ones
+    /// were deleted elsewhere and leave every surface; found ones refresh their snapshot.
+    /// Throttled to once a minute unless `force`; a failed request changes nothing.
+    func checkAgainstServer(force: Bool = false) {
+        let player = MiniPlayerStore.shared
+        var ids: [String] = []
+        var seen = Set<String>()
+        for id in scenes.map(\.id) + player.playingQueue.map(\.id) + [player.session?.scene.id, player.nowPlayingScene?.id].compactMap({ $0 })
+        where seen.insert(id).inserted {
+            ids.append(id)
+        }
+        guard !ids.isEmpty, serverCheckTask == nil else { return }
+        if !force, let last = lastServerCheck, Date().timeIntervalSince(last) < 60 { return }
+        lastServerCheck = Date()
+        let serverId = loadedServerId
+
+        serverCheckTask = Task { @MainActor [weak self] in
+            defer { self?.serverCheckTask = nil }
+            var found: [String: Scene] = [:]
+            var start = 0
+            while start < ids.count {
+                let chunk = Array(ids[start..<min(start + 100, ids.count)])
+                start += 100
+                do {
+                    let response: ScenesByIdsResponse = try await GraphQLClient.shared.execute(
+                        query: GraphQLQueries.queryWithFragments("findScenesByIds"),
+                        variables: ["ids": chunk, "filter": ["per_page": -1]]
+                    )
+                    // No result block at all: unknown state, never treat that as "deleted".
+                    guard let result = response.data?.findScenes else { return }
+                    for scene in result.scenes { found[scene.id] = scene }
+                } catch {
+                    AppLog.debug("Watchlist server check failed: \(error)")
+                    return
+                }
+            }
+            guard let self, !Task.isCancelled, self.loadedServerId == serverId else { return }
+            for id in ids where found[id] == nil {
+                MiniPlayerStore.shared.sceneDeleted(id)
+            }
+            let refreshed = self.scenes.map { found[$0.id] ?? $0 }
+            if refreshed.contains(where: { found[$0.id] != nil }) {
+                self.scenes = refreshed
+                self.persist()
+            }
+            MiniPlayerStore.shared.refreshPlaying(with: found)
+        }
     }
 }
 
@@ -614,7 +714,7 @@ struct WatchlistToolsView: View {
                             }
                             .buttonStyle(.plain)
                             Button(role: .destructive) { confirmReset = true } label: {
-                                Text("Reset")
+                                Text("Clear")
                                     .font(.subheadline.weight(.semibold))
                                     .foregroundStyle(Color.red)
                                     .padding(.horizontal, 18)
@@ -692,12 +792,13 @@ struct WatchlistToolsView: View {
                 SceneDetailView(scene: openedScene, autoPlay: true)
             }
         }
-        .alert("Reset watchlist?", isPresented: $confirmReset) {
-            Button("Reset", role: .destructive) { MiniPlayerStore.shared.resetWatchlistAndPlayback() }
+        .alert("Clear watchlist?", isPresented: $confirmReset) {
+            Button("Clear", role: .destructive) { watchlist.clear() }
             Button("Cancel", role: .cancel) {}
         } message: {
-            Text("All scenes are removed from the watchlist and playback stops.")
+            Text("All scenes are removed from the watchlist.")
         }
+        .onAppear { watchlist.checkAgainstServer() }
     }
 }
 
@@ -761,16 +862,16 @@ struct MiniPlayerBar: View {
 
 private struct MiniPlayerBarContent: View {
     let session: MiniPlayerStore.Session
-    @ObservedObject var engine: AetherSceneEngine
+    /// Not observed: the engine publishes its clock many times a second, and rebuilding the bar
+    /// (inside the tab bar's Liquid Glass) at that rate crashed SwiftUI's async glass renderer.
+    /// The bar mirrors only what it draws, and the progress line ticks once a second.
+    let engine: AetherSceneEngine
     @ObservedObject private var appearance = AppearanceManager.shared
     @ObservedObject private var watchlist = WatchlistStore.shared
     @ObservedObject private var store = MiniPlayerStore.shared
     @GestureState private var dragOffset: CGFloat = 0
-
-    private var progress: Double {
-        guard engine.duration > 0 else { return 0 }
-        return min(max(engine.currentTime / engine.duration, 0), 1)
-    }
+    @State private var isPlaying = false
+    @State private var hasPresentedFrame = false
 
     private var subtitle: String {
         let performers = session.scene.performers.prefix(2).map(\.name).joined(separator: ", ")
@@ -794,7 +895,7 @@ private struct MiniPlayerBarContent: View {
                     AetherVideoSurface(engine: engine, videoGravity: .resizeAspectFill, showsTranscodeTag: false)
                         .overlay {
                             // Restored on launch (paused, no frame decoded yet): show the cover.
-                            if !engine.hasPresentedFrame {
+                            if !hasPresentedFrame {
                                 CustomAsyncImage(url: session.scene.thumbnailURL) { loader in
                                     if let image = loader.image {
                                         image.resizable().aspectRatio(contentMode: .fill)
@@ -847,13 +948,13 @@ private struct MiniPlayerBarContent: View {
                 HapticManager.light()
                 MiniPlayerStore.shared.togglePlayPause()
             } label: {
-                Image(systemName: engine.isPlaying ? "pause.fill" : "play.fill")
+                Image(systemName: isPlaying ? "pause.fill" : "play.fill")
                     .font(.system(size: 18, weight: .semibold))
                     .frame(width: 36, height: 36)
                     .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
-            .accessibilityLabel(engine.isPlaying ? "Pause" : "Play")
+            .accessibilityLabel(isPlaying ? "Pause" : "Play")
             Button {
                 HapticManager.light()
                 MiniPlayerStore.shared.close()
@@ -870,15 +971,12 @@ private struct MiniPlayerBarContent: View {
         .padding(.trailing, 6)
         .frame(maxHeight: .infinity)
         .overlay(alignment: .bottom) {
-            GeometryReader { geo in
-                Capsule()
-                    .fill(appearance.tintColor)
-                    .frame(width: geo.size.width * progress, height: 2)
-            }
-            .frame(height: 2)
-            .padding(.horizontal, 12)
-            .allowsHitTesting(false)
+            MiniPlayerProgressLine(engine: engine, tint: appearance.tintColor)
+                .padding(.horizontal, 12)
+                .allowsHitTesting(false)
         }
+        .onReceive(engine.$isPlaying.removeDuplicates()) { isPlaying = $0 }
+        .onReceive(engine.$hasPresentedFrame.removeDuplicates()) { hasPresentedFrame = $0 }
         .contentShape(Rectangle())
         .offset(y: max(dragOffset, 0))
         .opacity(1 - min(max(dragOffset, 0) / 80, 0.6))
@@ -902,6 +1000,30 @@ private struct MiniPlayerBarContent: View {
         .accessibilityHint("Opens the scene")
     }
 }
+/// The bar's 2 pt progress line, refreshed once a second from the engine clock.
+private struct MiniPlayerProgressLine: View {
+    let engine: AetherSceneEngine
+    let tint: Color
+    @State private var progress: Double = 0
+
+    var body: some View {
+        GeometryReader { geo in
+            Capsule()
+                .fill(tint)
+                .frame(width: geo.size.width * progress, height: 2)
+        }
+        .frame(height: 2)
+        .onReceive(
+            engine.$currentTime
+                .throttle(for: .seconds(1), scheduler: RunLoop.main, latest: true)
+        ) { time in
+            let duration = engine.duration
+            let value = duration > 0 && time.isFinite ? min(max(time / duration, 0), 1) : 0
+            if abs(value - progress) > 0.001 { progress = value }
+        }
+    }
+}
+
 /// The mini player's own full view: the scene page's player module 1:1 (fullscreen, volume
 /// keys, markers, subtitles, PiP, menus), the metadata card, credits and the watchlist.
 struct NowPlayingView: View {
@@ -957,8 +1079,9 @@ private struct NowPlayingContent: View {
             SceneDetailView(scene: scene, autoPlay: true)
                 .environment(\.stashyScenePlayerOnly, true)
                 .frame(maxWidth: .infinity)
+                // Same gap under the chrome as the scene page (`mainContentView`).
                 .padding(.horizontal, 16)
-                .padding(.top, 4)
+                .padding(.top, 16)
 
             List {
                 Section {
@@ -967,19 +1090,31 @@ private struct NowPlayingContent: View {
                         .listRowBackground(Color.clear)
                         .listRowSeparator(.hidden)
                 }
+                if !player.playingQueue.isEmpty {
+                    Section {
+                        ForEach(player.playingQueue) { entry in
+                            queueRow(entry, onWatchlist: false)
+                                .listRowInsets(EdgeInsets(top: 6, leading: 16, bottom: 6, trailing: 16))
+                                .listRowBackground(Color.clear)
+                                .listRowSeparatorTint(Color.primary.opacity(0.08))
+                                // Sorting is for the watchlist only.
+                                .moveDisabled(true)
+                        }
+                    } header: {
+                        sectionHeader("Now Playing") { EmptyView() }
+                    }
+                }
                 Section {
                     if watchlist.scenes.isEmpty {
-                        Text("Add scenes with the watchlist button on a scene. They play here one after another.")
+                        Text("Add scenes with + on a playing scene or the watchlist button on a scene page. They play here one after another.")
                             .font(.footnote)
                             .foregroundColor(.secondary)
                             .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16))
                             .listRowBackground(Color.clear)
                             .listRowSeparator(.hidden)
                     } else {
-                        // A plain list, not cards. Always in edit mode so every row carries the
-                        // system reorder handle; removing is in the row's context menu.
                         ForEach(watchlist.scenes) { entry in
-                            watchlistRow(entry)
+                            queueRow(entry, onWatchlist: true)
                                 .listRowInsets(EdgeInsets(top: 6, leading: 16, bottom: 6, trailing: 16))
                                 .listRowBackground(Color.clear)
                                 .listRowSeparatorTint(Color.primary.opacity(0.08))
@@ -1023,24 +1158,15 @@ private struct NowPlayingContent: View {
                         .onMove { watchlist.move(fromOffsets: $0, toOffset: $1) }
                     }
                 } header: {
-                    HStack {
-                        Text("Watchlist")
-                            .font(.headline)
-                            .foregroundColor(.primary)
-                        Spacer()
+                    sectionHeader("Watchlist") {
                         if !watchlist.scenes.isEmpty {
-                            Button("Reset", role: .destructive) { confirmReset = true }
+                            Button("Clear", role: .destructive) { confirmReset = true }
                                 .font(.subheadline.weight(.semibold))
                                 .foregroundColor(.red)
                                 .padding(.trailing, 14)
                             sortToggle
                         }
                     }
-                    .textCase(nil)
-                    .padding(.horizontal, 16)
-                    .padding(.vertical, 6)
-                    .listRowInsets(EdgeInsets())
-                    .background(Color.appBackground)
                 }
             }
             .listStyle(.plain)
@@ -1053,26 +1179,42 @@ private struct NowPlayingContent: View {
         .frame(width: proxy.size.width)
         }
         .background(Color.appBackground.ignoresSafeArea())
-        // Standard chrome: Minimize like Back, Details right beside it.
+        // Standard chrome: Minimize like Back on the left, Details on the right.
         .hideSystemNavigationBarForCustomChrome()
         .stashyCustomChromeInset(spacing: 0) {
             StashyDetailTopBar(
                 backTitle: "Minimize",
                 backIcon: "chevron.down",
-                besideBack: [CatalogChromeSlot(systemImage: "info.circle", accessibilityLabel: "Details") {
-                    player.openSceneDetails()
-                }],
+                trailingAction: ("Details", "info.circle", { player.openSceneDetails() }),
                 onBack: { dismiss() }
             )
         }
         }
-        .alert("Reset watchlist?", isPresented: $confirmReset) {
-            Button("Reset", role: .destructive) { MiniPlayerStore.shared.resetWatchlistAndPlayback() }
+        .alert("Clear watchlist?", isPresented: $confirmReset) {
+            Button("Clear", role: .destructive) { watchlist.clear() }
             Button("Cancel", role: .cancel) {}
         } message: {
-            Text("All scenes are removed from the watchlist and playback stops.")
+            Text("All scenes are removed from the watchlist. What plays keeps playing.")
         }
-        .onAppear { loadDetailsIfNeeded() }
+        .onAppear {
+            loadDetailsIfNeeded()
+            watchlist.checkAgainstServer()
+        }
+    }
+
+    private func sectionHeader<Trailing: View>(_ title: String, @ViewBuilder trailing: () -> Trailing) -> some View {
+        HStack {
+            Text(title)
+                .font(.headline)
+                .foregroundColor(.primary)
+            Spacer()
+            trailing()
+        }
+        .textCase(nil)
+        .padding(.horizontal, 16)
+        .padding(.vertical, 6)
+        .listRowInsets(EdgeInsets())
+        .background(Color.appBackground)
     }
 
     /// List and watchlist snapshots often lack markers / captions: fetch the full scene once.
@@ -1093,11 +1235,11 @@ private struct NowPlayingContent: View {
         HStack(alignment: .center, spacing: 6) {
             creditLinks
             Spacer(minLength: 4)
-            if let previous = watchlist.previous(before: scene.id) {
-                iconButton("backward.end.fill", label: "Previous in watchlist") { player.showNowPlaying(previous) }
+            if let previous = player.previousScene(before: scene.id) {
+                iconButton("backward.end.fill", label: "Previous") { player.showNowPlaying(previous) }
             }
-            if let next = watchlist.next(after: scene.id) {
-                iconButton("forward.end.fill", label: "Next in watchlist") { player.showNowPlaying(next) }
+            if let next = player.nextScene(after: scene.id) {
+                iconButton("forward.end.fill", label: "Next") { player.showNowPlaying(next) }
             }
         }
     }
@@ -1174,7 +1316,30 @@ private struct NowPlayingContent: View {
         .accessibilityLabel(label)
     }
 
-    private func watchlistRow(_ entry: Scene) -> some View {
+    /// A "Now Playing" or watchlist row: tap plays it here. "Now Playing" rows carry a + that
+    /// puts the scene on the watchlist (hidden once it is there).
+    private func queueRow(_ entry: Scene, onWatchlist: Bool) -> some View {
+        HStack(spacing: 8) {
+            queueRowButton(entry)
+            // Once on the watchlist the + just goes away; the row stays.
+            if !onWatchlist, !watchlist.contains(entry.id) {
+                Button {
+                    HapticManager.light()
+                    withAnimation(DesignTokens.Animation.quick) { player.addToWatchlist(entry) }
+                } label: {
+                    Image(systemName: "plus.circle.fill")
+                        .font(.system(size: 24))
+                        .foregroundStyle(appearance.tintColor)
+                        .frame(width: 40, height: 40)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.borderless)
+                .accessibilityLabel("Add to watchlist")
+            }
+        }
+    }
+
+    private func queueRowButton(_ entry: Scene) -> some View {
         let isCurrent = entry.id == scene.id
         let scene = entry
         return Button {

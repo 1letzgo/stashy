@@ -2,6 +2,7 @@ package de.letzgo.stashy.ui.player
 
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.layout.Arrangement
@@ -81,7 +82,7 @@ fun LazyListScope.watchlistRows(
 ) {
     itemsIndexed(scenes, key = { _, s -> "w-${s.id}" }) { index, scene ->
         Column {
-            SwipeToRemove(scene.id) {
+            SwipeToRemove("Remove from watchlist", { WatchlistStore.remove(scene.id) }) {
                 WatchlistSceneRow(scene, index, scenes.size, isCurrent = scene.id == currentId, currentId, drag, margin, sorting, onOpen)
             }
             if (index < scenes.lastIndex) HorizontalDivider(Modifier.padding(start = margin), color = Theme.palette.text.copy(alpha = 0.08f))
@@ -89,19 +90,76 @@ fun LazyListScope.watchlistRows(
     }
 }
 
+/**
+ * iOS: the "Now Playing" `ForEach` of `NowPlayingContent` — every scene played this launch. A trailing tinted + adds a row to the watchlist; swipe left removes it, except
+ * for the scene on screen ([currentId]). Not sortable.
+ */
+fun LazyListScope.playingRows(
+    scenes: List<Scene>,
+    currentId: String?,
+    margin: Dp,
+    onOpen: (Scene) -> Unit,
+) {
+    itemsIndexed(scenes, key = { _, s -> "p-${s.id}" }) { index, scene ->
+        Column {
+            val isCurrent = scene.id == currentId
+            PlayingSceneRow(scene, isCurrent, margin, onOpen)
+            if (index < scenes.lastIndex) HorizontalDivider(Modifier.padding(start = margin), color = Theme.palette.text.copy(alpha = 0.08f))
+        }
+    }
+}
+
+@Composable
+private fun PlayingSceneRow(scene: Scene, isCurrent: Boolean, margin: Dp, onOpen: (Scene) -> Unit) {
+    Row(
+        Modifier.fillMaxWidth().background(Theme.palette.background)
+            .clickable { onOpen(scene) }
+            .padding(start = margin, end = (margin - 8.dp).coerceAtLeast(0.dp), top = 6.dp, bottom = 6.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        SceneRowLabel(scene, isCurrent, Modifier.weight(1f))
+        // iOS `plus.circle.fill` in the tint: onto the watchlist (at its end). Once there the +
+        // just goes away; the row stays.
+        if (!WatchlistStore.contains(scene.id)) Box(
+            Modifier.size(40.dp).clip(CircleShape).clickable { MiniPlayerStore.addToWatchlist(scene) },
+            contentAlignment = Alignment.Center,
+        ) { Icon(SF.plusCircleFill, "Add to watchlist", tint = Appearance.tint, modifier = Modifier.size(26.dp)) }
+    }
+}
+
+/** Thumbnail (speaker badge on the scene on screen), title and the first two performers. */
+@Composable
+private fun SceneRowLabel(scene: Scene, isCurrent: Boolean, modifier: Modifier) {
+    val p = Theme.palette
+    val performers = scene.performers.take(2).joinToString(", ") { it.name }
+    Row(modifier, verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+        Box(Modifier.size(width = 80.dp, height = 45.dp).clip(RoundedCornerShape(6.dp)).background(Color.Black.copy(alpha = 0.3f)), contentAlignment = Alignment.Center) {
+            AsyncImage(scene.thumbnailURL, null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
+            if (isCurrent) Box(Modifier.clip(CircleShape).background(Color.Black.copy(alpha = 0.5f)).padding(6.dp)) {
+                Icon(SF.speakerWave2Fill, "Now playing", tint = Color.White, modifier = Modifier.size(14.dp))
+            }
+        }
+        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            Text(scene.displayTitle, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = if (isCurrent) Appearance.tint else p.text, maxLines = 2, overflow = TextOverflow.Ellipsis)
+            if (performers.isNotEmpty()) Text(performers, fontSize = 12.sp, color = p.secondaryText, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        }
+    }
+}
+
 /** iOS `.swipeActions(edge: .trailing, allowsFullSwipe: true)` — swipe left removes the entry. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun SwipeToRemove(sceneId: String, content: @Composable () -> Unit) {
+private fun SwipeToRemove(label: String, onRemove: () -> Unit, content: @Composable () -> Unit) {
     val state = rememberSwipeToDismissBoxState(confirmValueChange = { value ->
-        if (value == SwipeToDismissBoxValue.EndToStart) { MiniPlayerStore.removeFromWatchlist(sceneId); true } else false
+        if (value == SwipeToDismissBoxValue.EndToStart) { onRemove(); true } else false
     })
     SwipeToDismissBox(
         state = state,
         enableDismissFromStartToEnd = false,
         backgroundContent = {
             Box(Modifier.fillMaxSize().background(StashyColors.systemRed).padding(end = 20.dp), contentAlignment = Alignment.CenterEnd) {
-                Icon(Icons.Filled.Delete, "Remove from watchlist", tint = Color.White)
+                Icon(Icons.Filled.Delete, label, tint = Color.White)
             }
         },
     ) { content() }
@@ -124,7 +182,6 @@ private fun WatchlistSceneRow(
     var menu by remember { mutableStateOf(false) }
     var rowHeight by remember { mutableIntStateOf(1) }
     val dragging = drag.draggingId == scene.id
-    val performers = scene.performers.take(2).joinToString(", ") { it.name }
     Box(
         Modifier.fillMaxWidth().zIndex(if (dragging) 1f else 0f)
             .graphicsLayer { translationY = if (dragging) drag.offset else 0f }
@@ -137,16 +194,7 @@ private fun WatchlistSceneRow(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            Box(Modifier.size(width = 80.dp, height = 45.dp).clip(RoundedCornerShape(6.dp)).background(Color.Black.copy(alpha = 0.3f)), contentAlignment = Alignment.Center) {
-                AsyncImage(scene.thumbnailURL, null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
-                if (isCurrent) Box(Modifier.clip(CircleShape).background(Color.Black.copy(alpha = 0.5f)).padding(6.dp)) {
-                    Icon(SF.speakerWave2Fill, "Now playing", tint = Color.White, modifier = Modifier.size(14.dp))
-                }
-            }
-            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                Text(scene.displayTitle, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = if (isCurrent) Appearance.tint else p.text, maxLines = 2, overflow = TextOverflow.Ellipsis)
-                if (performers.isNotEmpty()) Text(performers, fontSize = 12.sp, color = p.secondaryText, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            }
+            SceneRowLabel(scene, isCurrent, Modifier.weight(1f))
             // Drag handle (Sort mode): swaps with a neighbour each time the row passes half its height.
             if (sorting) Box(
                 Modifier.size(40.dp).pointerInput(scene.id) {
@@ -189,7 +237,7 @@ private fun WatchlistSceneRow(
             DropdownMenuItem(
                 text = { Text("Remove from watchlist", color = StashyColors.systemRed) },
                 leadingIcon = { Icon(Icons.Filled.Delete, null, tint = StashyColors.systemRed) },
-                onClick = { menu = false; MiniPlayerStore.removeFromWatchlist(scene.id) },
+                onClick = { menu = false; WatchlistStore.remove(scene.id) },
             )
         }
     }

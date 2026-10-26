@@ -419,6 +419,14 @@ final class RateMeViewModel: ObservableObject {
                 style: .success
             )
             #endif
+            if current.mode == .scenes {
+                // Mini player, Now Playing and the watchlist drop it like every other delete.
+                NotificationCenter.default.post(
+                    name: NSNotification.Name("SceneDeleted"),
+                    object: nil,
+                    userInfo: ["sceneId": current.id]
+                )
+            }
             skipIDs.remove(current.id)
             await loadNext()
         } catch {

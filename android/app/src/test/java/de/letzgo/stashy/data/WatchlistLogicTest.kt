@@ -32,10 +32,10 @@ class WatchlistLogicTest {
         assertEquals(listOf("a", "b", "c"), ids(WatchlistLogic.moved(list, 5, 0)))
     }
 
-    @Test fun ensureListedPutsANewSceneFirstAndKeepsListedOnes() {
-        assertEquals(listOf("c", "a", "b"), ids(WatchlistLogic.ensuredListed(listOf(a, b), c)))
-        assertEquals(listOf("a", "b"), ids(WatchlistLogic.ensuredListed(listOf(a, b), Scene(id = "b", title = "snapshot"))))
-        assertEquals(listOf("a"), ids(WatchlistLogic.ensuredListed(emptyList(), a)))
+    @Test fun addAppendsANewSceneAndKeepsListedOnes() {
+        assertEquals(listOf("a", "b", "c"), ids(WatchlistLogic.added(listOf(a, b), c)))
+        assertEquals(listOf("a", "b"), ids(WatchlistLogic.added(listOf(a, b), Scene(id = "b", title = "snapshot"))))
+        assertEquals(listOf("a"), ids(WatchlistLogic.added(emptyList(), a)))
     }
 
     @Test fun shiftSwapsWithNeighbour() {

@@ -101,6 +101,24 @@ object MiniPlayerRules {
         return time
     }
 
+    /** "Now Playing" holds the scene last started only — never a growing history. */
+    const val PLAYING_QUEUE_LIMIT = 1
+
+    /**
+     * iOS `notePlaying` — [scene] started playing: at the top of "Now Playing" (deduped, newest
+     * first, at most [limit]), on the watchlist or not.
+     */
+    fun notedPlaying(queue: List<Scene>, scene: Scene, limit: Int = PLAYING_QUEUE_LIMIT): List<Scene> =
+        if (queue.firstOrNull()?.id == scene.id) queue
+        else (listOf(scene) + queue.filter { it.id != scene.id }).take(limit)
+
+    /**
+     * iOS `nextScene(after:)` — the next watchlist entry when [sceneId] is on the watchlist;
+     * after a scene started with Play, the watchlist from the top (it is the "up next" list).
+     */
+    fun nextScene(watchlist: List<Scene>, sceneId: String): Scene? =
+        if (watchlist.any { it.id == sceneId }) de.letzgo.stashy.data.WatchlistLogic.next(watchlist, sceneId)
+        else watchlist.firstOrNull { it.id != sceneId }
 
     /** First two performers, else the studio, else nothing. */
     fun subtitle(performerNames: List<String>, studioName: String?): String {
@@ -140,74 +158,92 @@ object MiniPlayerStore {
     var nowPlayingScene by mutableStateOf<Scene?>(null)
 
     /**
-     * Set by [resetWatchlistAndPlayback] for a moment: the Now Playing module that is closing
-     * stops its player instead of handing it back to the bar ([consumeDiscardHandOff]).
+     * "Now Playing": the scene last started, on the watchlist or not — one entry (memory only,
+     * cleared on a server switch); the + on its row adds it to the watchlist.
      */
-    private var discardNextHandOffUntil = 0L
+    var playingQueue by mutableStateOf<List<Scene>>(emptyList())
+        private set
+    /** Server [playingQueue] belongs to. */
+    private var playingQueueServerId: String? = null
+    /** Scenes deleted (in the app or found missing on the server) since the last server switch. */
+    private val deletedSceneIds = mutableSetOf<String>()
 
-    /** Whether a closing Now Playing module should stop its player (once). */
-    fun consumeDiscardHandOff(): Boolean {
-        val discard = android.os.SystemClock.elapsedRealtime() < discardNextHandOffUntil
-        discardNextHandOffUntil = 0L
-        return discard
+    // MARK: Queue
+
+    /** A scene started playing: on top of "Now Playing". */
+    fun notePlaying(scene: Scene) {
+        playingQueue = MiniPlayerRules.notedPlaying(playingQueue, scene)
     }
 
-    /**
-     * iOS `resetWatchlistAndPlayback()` — the watchlist's Reset: empties the list, forgets the
-     * saved last session, closes Now Playing (its module stops the player) and closes the bar.
-     */
-    fun resetWatchlistAndPlayback() {
-        WatchlistStore.clear()
-        val serverId = session?.serverId ?: de.letzgo.stashy.data.ServerConfigManager.activeConfig?.id
-        MiniPlayerLastSession.forget(serverId)
-        if (showsNowPlaying) {
-            discardNextHandOffUntil = android.os.SystemClock.elapsedRealtime() + 2_000
-            showsNowPlaying = false
-            nowPlayingScene = null
-        }
-        close()
+    /** The scene now on screen: the full view's while it is open, else the bar's. */
+    val currentSceneId: String? get() = if (showsNowPlaying) nowPlayingScene?.id else session?.scene?.id
+
+    /** What follows [sceneId]: see [MiniPlayerRules.nextScene]. */
+    fun nextScene(after: String): Scene? = MiniPlayerRules.nextScene(WatchlistStore.all, after)
+
+    fun previousScene(before: String): Scene? = WatchlistStore.previous(before)
+
+    /** The + on a "Now Playing" row: onto the watchlist (at its end). */
+    fun addToWatchlist(scene: Scene) = WatchlistStore.add(scene)
+
+    /** Swipe on a "Now Playing" row. The scene on screen stays: closing it is the bar's ✕. */
+    fun removeFromPlaying(sceneId: String) {
+        if (sceneId == currentSceneId) return
+        playingQueue = playingQueue.filter { it.id != sceneId }
     }
 
-    /**
-     * Removing from the watchlist (swipe, menu). Like iOS: the last entry resets everything, and
-     * removing the playing scene moves playback to the first entry left.
-     */
-    fun removeFromWatchlist(sceneId: String) {
-        WatchlistStore.remove(sceneId)
-        val first = WatchlistStore.scenes.firstOrNull()
-        when {
-            first == null -> resetWatchlistAndPlayback()
-            showsNowPlaying && nowPlayingScene?.id == sceneId -> showInNowPlaying(first)
-            !showsNowPlaying && session?.scene?.id == sceneId -> play(first)
-        }
+    /** Taken off the watchlist: the scene on screen keeps playing (it stays in "Now Playing"). */
+    fun watchlistRemoved(scene: Scene) {
+        if (scene.id == currentSceneId && playingQueue.none { it.id == scene.id }) notePlaying(scene)
     }
 
-    /** Now Playing: the scene after [currentId] in the watchlist. */
-    fun nextAfter(currentId: String): Scene? = WatchlistStore.next(currentId)
-    fun previousBefore(currentId: String): Scene? = WatchlistStore.previous(currentId)
+    /** Fresh copies from the server (titles, covers, resume times). */
+    fun refreshPlaying(fresh: Map<String, Scene>) {
+        if (playingQueue.none { fresh[it.id] != null }) return
+        playingQueue = playingQueue.map { fresh[it.id] ?: it }
+    }
 
-    /** Now Playing: switch to [scene] (the view rebuilds its player module for it). */
-    fun showInNowPlaying(scene: Scene) { nowPlayingScene = scene }
+    /** iOS `sceneDeleted` — deleted in the app, or found missing on the server: gone from every surface. */
+    fun sceneDeleted(sceneId: String) {
+        deletedSceneIds += sceneId
+        if (session?.scene?.id == sceneId) close(dismissNowPlaying = false)
+        if (nowPlayingScene?.id == sceneId) { showsNowPlaying = false; nowPlayingScene = null }
+        if (playingQueue.any { it.id == sceneId }) playingQueue = playingQueue.filter { it.id != sceneId }
+        if (WatchlistStore.contains(sceneId)) WatchlistStore.remove(sceneId)
+    }
+
+    /** Now Playing: switch to [scene] (row tap, previous / next, end of a scene); the view rebuilds its player module for it. */
+    fun showInNowPlaying(scene: Scene) {
+        notePlaying(scene)
+        nowPlayingScene = scene
+    }
 
     /**
      * iOS `openNowPlaying`: Play on a scene page while the mini player is on — the scene plays in
-     * the full view (and is listed on the watchlist). [startAt] null resumes where it was left.
+     * the full view (and is listed under "Playing"). [startAt] null resumes where it was left.
      */
     fun openNowPlaying(scene: Scene, startAt: Double?) {
-        WatchlistStore.ensureListed(scene)
+        notePlaying(scene)
         // The bar already runs it: the full view takes that player as is, so jump it here.
         if (startAt != null) session?.takeIf { it.scene.id == scene.id }?.player?.seek(startAt)
         nowPlayingScene = if (startAt != null) scene.copy(resumeTime = startAt) else scene
         showsNowPlaying = true
     }
 
-    /** Now Playing reached the end of [currentId]: on to the next watchlist entry, if any. */
+    /** Now Playing reached the end of [currentId]: on to what comes next, if anything. */
     fun advanceNowPlaying(currentId: String) {
         if (!showsNowPlaying) return
-        nextAfter(currentId)?.let { nowPlayingScene = it }
+        nextScene(nowPlayingScene?.id ?: currentId)?.let { showInNowPlaying(it) }
     }
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
+
+    init {
+        // A scene deleted in the app leaves every mini player surface (iOS "SceneDeleted").
+        scope.launch {
+            SceneEvents.events.collect { event -> if (event is SceneEvent.Deleted) sceneDeleted(event.sceneId) }
+        }
+    }
     private val tracker = PlaybackActivityTracker(scope)
     /** "Count as played" by watched seconds, like the scene page (iOS `PlayCountWatchClock`). */
     private val playCredit = PlayCountCredit(0.0)
@@ -219,6 +255,18 @@ object MiniPlayerStore {
 
     /** Takes over [player] from a scene page that is going away. Any other mini session ends. */
     fun adopt(scene: Scene, player: StashPlayer, watchedSeconds: Double, playRegistered: Boolean, serverId: String?) {
+        // Now Playing switched to another scene: the page it replaced hands over late, after the
+        // new module may already run its own player. Taking it would leave a second video playing.
+        // A deleted scene (its Now Playing module closing) is not taken either.
+        val shown = nowPlayingScene
+        if ((showsNowPlaying && shown != null && shown.id != scene.id) || scene.id in deletedSceneIds) {
+            player.onTime = null
+            player.onPlayingChanged = null
+            player.onReachedEnd = null
+            player.pause()
+            player.release()
+            return
+        }
         session?.let { if (it.player !== player) close() }
         player.onTime = { seconds, duration -> handleTime(seconds, duration) }
         player.onPlayingChanged = { playing -> if (playing) tracker.start() else tracker.stop() }
@@ -233,8 +281,8 @@ object MiniPlayerStore {
         tracker.setPosition(player.currentTime, if (player.duration > 0) player.duration else scene.sceneDuration ?: 0.0)
         if (player.isPlaying) tracker.start()
         playCredit.restore(watchedSeconds, playRegistered)
-        WatchlistStore.ensureListed(scene)
         session = Session(scene, player, playRegistered, watchedSeconds, serverId)
+        notePlaying(scene)
         saveLastSession(scene, player.currentTime)
     }
 
@@ -287,16 +335,17 @@ object MiniPlayerStore {
         p.nowPlaying = SceneNowPlaying.of(scene)
         playCredit.reset()
         session = current.copy(scene = scene, playRegistered = false)
-        WatchlistStore.ensureListed(scene)
+        notePlaying(scene)
         saveLastSession(scene, MiniPlayerRules.resumeStart(scene.resumeTime, scene.sceneDuration) ?: 0.0)
         p.load(url, MiniPlayerRules.resumeStart(scene.resumeTime, scene.sceneDuration), autoplay = true)
     }
 
-    val hasNext: Boolean get() = session?.let { WatchlistStore.next(it.scene.id) } != null
+    val hasNext: Boolean get() = session?.let { nextScene(it.scene.id) } != null
 
+    /** The bar's video ended (or Next): on to what comes next. */
     fun playNext() {
         val current = session ?: return
-        WatchlistStore.next(current.scene.id)?.let { play(it) }
+        nextScene(current.scene.id)?.let { play(it) }
     }
 
     fun seekBy(delta: Double) {
@@ -363,6 +412,12 @@ object MiniPlayerStore {
      */
     fun onServerChanged(serverId: String?) {
         if (session?.let { it.serverId != serverId } == true) close(forget = false)
+        // "Playing" is per launch and server; the shell re-running this for the same server keeps it.
+        if (playingQueueServerId != serverId) {
+            playingQueueServerId = serverId
+            playingQueue = emptyList()
+            deletedSceneIds.clear()
+        }
         restoreLastSessionIfNeeded(serverId)
     }
 
@@ -426,7 +481,6 @@ private fun MiniPlayerBarContent(session: MiniPlayerStore.Session) {
     var dragY by remember { mutableFloatStateOf(0f) }
     val subtitle = MiniPlayerRules.subtitle(scene.performers.map { it.name }, scene.studio?.name)
     val playing = player.isPlaying || player.playWhenReady
-    val progress = MiniPlayerRules.progress(player.currentTime, player.duration)
 
     Box(
         Modifier.fillMaxWidth().height(56.dp)
@@ -476,9 +530,24 @@ private fun MiniPlayerBarContent(session: MiniPlayerStore.Session) {
                 Icon(SF.xmark, "Close mini player", tint = p.text, modifier = Modifier.size(20.dp))
             }
         }
-        Box(Modifier.align(Alignment.BottomStart).padding(horizontal = 12.dp).fillMaxWidth().height(2.dp)) {
-            Box(Modifier.fillMaxWidth(progress).height(2.dp).clip(RoundedCornerShape(1.dp)).background(Appearance.tint))
+        MiniPlayerProgressLine(player, Modifier.align(Alignment.BottomStart).padding(horizontal = 12.dp).fillMaxWidth().height(2.dp))
+    }
+}
+
+/**
+ * iOS `MiniPlayerProgressLine` — samples the playhead once a second instead of reading the
+ * player's time state, so the bar does not recompose on every time tick.
+ */
+@Composable
+private fun MiniPlayerProgressLine(player: StashPlayer, modifier: Modifier) {
+    val progress by androidx.compose.runtime.produceState(MiniPlayerRules.progress(player.currentTime, player.duration), player) {
+        while (true) {
+            value = MiniPlayerRules.progress(player.currentTime, player.duration)
+            kotlinx.coroutines.delay(1_000)
         }
+    }
+    Box(modifier) {
+        Box(Modifier.fillMaxWidth(progress).height(2.dp).clip(RoundedCornerShape(1.dp)).background(Appearance.tint))
     }
 }
 

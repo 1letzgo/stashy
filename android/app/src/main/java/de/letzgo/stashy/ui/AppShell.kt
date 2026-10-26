@@ -122,10 +122,22 @@ fun AppShell() {
     // iOS `ServerConfigChanged`: a switch (or removing the server) ends the mini player.
     val activeServerId = ServerConfigManager.activeConfig?.id
     LaunchedEffect(activeServerId) {
-        // Watchlist first: restoring the last mini player session lists its scene.
-        de.letzgo.stashy.data.WatchlistStore.onServerChanged(activeServerId)
+        // Watchlist first: the restored mini player session checks it for "Playing".
+        val switched = de.letzgo.stashy.data.WatchlistStore.onServerChanged(activeServerId)
         // First appearance and server switch: restore that server's last mini player session (paused).
         de.letzgo.stashy.ui.player.MiniPlayerStore.onServerChanged(activeServerId)
+        // iOS: forced server check on a switch — scenes deleted there leave every list.
+        if (switched) de.letzgo.stashy.data.WatchlistStore.checkAgainstServer(force = true)
+    }
+    // iOS `didBecomeActive`: back in the foreground, scenes deleted on the server (web UI,
+    // another device) leave the watchlist and "Playing" (throttled to once a minute).
+    val lifecycle = androidx.compose.ui.platform.LocalLifecycleOwner.current.lifecycle
+    androidx.compose.runtime.DisposableEffect(lifecycle) {
+        val observer = androidx.lifecycle.LifecycleEventObserver { _, event ->
+            if (event == androidx.lifecycle.Lifecycle.Event.ON_START) de.letzgo.stashy.data.WatchlistStore.checkAgainstServer()
+        }
+        lifecycle.addObserver(observer)
+        onDispose { lifecycle.removeObserver(observer) }
     }
     if (ServerConfigManager.activeConfig == null) {
         Box(Modifier.fillMaxSize().background(p.background)) { ServerSetupScreen(onDone = {}) }

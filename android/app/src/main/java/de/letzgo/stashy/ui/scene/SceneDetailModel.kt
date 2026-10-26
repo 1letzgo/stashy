@@ -212,9 +212,7 @@ class SceneDetailModel(
         SceneEvents.post(SceneEvent.Updated(scene))
         // A playing scene moves to the mini player instead of stopping (Settings › Playback).
         // Player-only (Now Playing) always gives the player back, paused or not.
-        // Watchlist Reset in Now Playing: stop instead of handing back.
-        val discard = playerOnly && MiniPlayerStore.consumeDiscardHandOff()
-        val handOff = p != null && !discard && (
+        val handOff = p != null && (
             (playerOnly && isPlaybackStarted) || MiniPlayerRules.handsOff(
                 MiniPlayerStore.isEnabled, isPlaybackStarted, p.playWhenReady && !p.didEnd, isDeleting, PlayerWindow.isInPictureInPicture,
             )
@@ -231,7 +229,7 @@ class SceneDetailModel(
             MiniPlayerStore.adopt(scene, p, playCredit.watchedSeconds, playCredit.isCredited, ServerConfigManager.activeConfig?.id)
         } else {
             // Stopped here without a hand-off: a saved mini player session of this scene is stale.
-            if (p != null && isPlaybackStarted && !discard) MiniPlayerStore.forgetLastSession(scene.id, ServerConfigManager.activeConfig?.id)
+            if (p != null && isPlaybackStarted) MiniPlayerStore.forgetLastSession(scene.id, ServerConfigManager.activeConfig?.id)
             p?.pause()
             p?.release()
         }
@@ -274,6 +272,9 @@ class SceneDetailModel(
             MiniPlayerStore.openNowPlaying(scene, startAt ?: if (resume) null else 0.0)
             return
         }
+        // Plays on this page (Now Playing's Details, its embedded player): listed right away,
+        // not only once the page hands the video to the bar.
+        if (MiniPlayerStore.isEnabled) MiniPlayerStore.notePlaying(scene)
         val url = scene.originalVideoURL ?: return
         // The mini player still runs this scene: take its player back instead of reloading.
         val wasPlayingInBar = MiniPlayerStore.session?.takeIf { it.scene.id == scene.id }?.player?.let { it.playWhenReady && !it.didEnd } ?: true
