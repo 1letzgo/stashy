@@ -44,6 +44,9 @@ protocol SceneRepositoryProtocol {
         sortBy: StashDBViewModel.SceneSortOption
     ) async throws -> (scenes: [Scene], total: Int)
     
+    /// Fetches the scenes linked to a gallery
+    func fetchGalleryScenes(galleryId: String) async throws -> [Scene]
+
     /// Fetches a single scene by ID
     func fetchSceneDetails(sceneId: String) async throws -> Scene?
     
@@ -204,6 +207,22 @@ class SceneRepository: SceneRepositoryProtocol {
         return (scenes, total)
     }
     
+    // MARK: - Fetch Gallery Scenes
+
+    func fetchGalleryScenes(galleryId: String) async throws -> [Scene] {
+        let query = GraphQLQueries.queryWithFragments("findScenes")
+
+        let variables: [String: Any] = [
+            "filter": ["page": 1, "per_page": 40, "sort": "date", "direction": "DESC"],
+            "scene_filter": [
+                "galleries": ["value": [galleryId], "modifier": "INCLUDES"]
+            ]
+        ]
+
+        let response: AltScenesResponse = try await graphQLClient.execute(query: query, variables: variables)
+        return response.data?.findScenes?.scenes ?? []
+    }
+
     // MARK: - Fetch Scene Details
     
     func fetchSceneDetails(sceneId: String) async throws -> Scene? {

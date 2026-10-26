@@ -133,6 +133,9 @@ object TabManager {
     var playCountPlayerSeconds: Double get() = _playCountPlayerSeconds.value; set(v) { _playCountPlayerSeconds.value = v; Prefs.setFloat("play_count_player_seconds", v.toFloat()) }
     private val _playCountFeedsSeconds = dbl("play_count_feeds_seconds", 30.0, playCountThresholdOptions)
     var playCountFeedsSeconds: Double get() = _playCountFeedsSeconds.value; set(v) { _playCountFeedsSeconds.value = v; Prefs.setFloat("play_count_feeds_seconds", v.toFloat()) }
+    /** Feeds › Verticals (stashy+): its own rule; until set it follows the Scenes rule. */
+    private val _playCountVerticalsSeconds = dbl("play_count_verticals_seconds", _playCountFeedsSeconds.value, playCountThresholdOptions)
+    var playCountVerticalsSeconds: Double get() = _playCountVerticalsSeconds.value; set(v) { _playCountVerticalsSeconds.value = v; Prefs.setFloat("play_count_verticals_seconds", v.toFloat()) }
     private val _holdSpeedPlayer = dbl("hold_speed_player", 2.0, holdSpeedOptions)
     var holdSpeedPlayer: Double get() = _holdSpeedPlayer.value; set(v) { _holdSpeedPlayer.value = v; Prefs.setFloat("hold_speed_player", v.toFloat()) }
     /** Settings › Playback › "Marker length": how long a Feeds › Markers row plays when the marker has no end time. */

@@ -386,6 +386,8 @@ struct StashyDetailTopBar<Tab: Hashable>: View {
     var onBack: () -> Void
     /// Right-aligned label for pages without tabs (a download's name, "3 / 20").
     var title: String? = nil
+    /// Round buttons right after Back (Now Playing's Details).
+    var besideBack: [CatalogChromeSlot] = []
     var tabs: [Tab] = []
     var selection: Tab? = nil
     var icon: (Tab) -> String = { _ in "circle" }
@@ -398,6 +400,9 @@ struct StashyDetailTopBar<Tab: Hashable>: View {
         StashySectionChromeBar {
             HStack(spacing: StashyExpandingDock.itemSpacing) {
                 StashyChromeBackButton(title: backTitle, systemImage: backIcon, action: onBack)
+                ForEach(Array(besideBack.enumerated()), id: \.offset) { _, slot in
+                    ChromeCircleButton(systemImage: slot.systemImage, accessibilityLabel: slot.accessibilityLabel, action: slot.action)
+                }
                 Spacer(minLength: StashyExpandingDock.itemSpacing)
                 if let title, tabs.count <= 1 {
                     Text(title)
@@ -450,8 +455,14 @@ struct StashyDetailTopBar<Tab: Hashable>: View {
 
 extension StashyDetailTopBar where Tab == Never {
     /// A detail page without section tabs: Back only.
-    init(backTitle: String = "Back", backIcon: String = "chevron.left", title: String? = nil, onBack: @escaping () -> Void) {
-        self.init(backTitle: backTitle, backIcon: backIcon, onBack: onBack, title: title, tabs: [])
+    init(
+        backTitle: String = "Back",
+        backIcon: String = "chevron.left",
+        title: String? = nil,
+        besideBack: [CatalogChromeSlot] = [],
+        onBack: @escaping () -> Void
+    ) {
+        self.init(backTitle: backTitle, backIcon: backIcon, onBack: onBack, title: title, besideBack: besideBack, tabs: [])
     }
 }
 

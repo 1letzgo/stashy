@@ -3,6 +3,7 @@ package de.letzgo.stashy.ui.scene
 import de.letzgo.stashy.data.Gallery
 import de.letzgo.stashy.data.GroupStub
 import de.letzgo.stashy.data.Performer
+import de.letzgo.stashy.data.Scene
 import de.letzgo.stashy.data.SceneGalleryStub
 import de.letzgo.stashy.data.StashGroup
 import de.letzgo.stashy.data.StashImage
@@ -34,6 +35,8 @@ internal object DetailLinks {
     fun group(group: GroupStub) = Nav.push(
         GroupDetailScreen(group.id, StashGroup(id = group.id, name = group.name, frontImagePath = group.frontImagePath, updatedAt = group.updatedAt)),
     )
+    /** iOS: `SceneDetailView(scene:)`. */
+    fun scene(scene: Scene) = Nav.push(SceneDetailScreen(scene.id, scene))
     /** iOS: `ImagesView(gallery:)`. */
     fun gallery(g: SceneGalleryStub) = Nav.push(
         GalleryDetailScreen(g.id, Gallery(id = g.id, title = g.title, date = g.date, imageCount = g.imageCount, updatedAt = g.updatedAt, cover = g.cover)),

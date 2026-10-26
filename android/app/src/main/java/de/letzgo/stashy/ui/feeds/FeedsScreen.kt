@@ -445,7 +445,7 @@ private fun FeedPager(
                 if (player.isPlaying) {
                     watched += 0.1
                     // iOS `noteReelsWatchProgress`: credit once after "Count as played — Feeds".
-                    if (!credited && activeItem?.countsPlays == true && watched >= FeedsConfig.playCountFeedsSeconds) {
+                    if (!credited && activeItem?.countsPlays == true && watched >= (if (model.mode == de.letzgo.stashy.data.ReelsModeType.Verticals) de.letzgo.stashy.data.TabManager.playCountVerticalsSeconds.toFloat() else FeedsConfig.playCountFeedsSeconds)) {
                         credited = true
                         activeItem.let { model.creditPlay(it) }
                     }

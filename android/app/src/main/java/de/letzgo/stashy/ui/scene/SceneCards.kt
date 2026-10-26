@@ -33,7 +33,6 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -57,10 +56,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
 import de.letzgo.stashy.data.Performer
-import de.letzgo.stashy.data.SceneEditing
+import de.letzgo.stashy.data.Scene
 import de.letzgo.stashy.data.SceneGalleryStub
 import de.letzgo.stashy.data.SceneGroupEntry
-import de.letzgo.stashy.data.StashImage
 import de.letzgo.stashy.data.Studio
 import de.letzgo.stashy.data.Tag
 import de.letzgo.stashy.data.Net
@@ -85,11 +83,11 @@ internal fun ageAt(birthdate: String?, sceneDate: String?): Int? {
 }
 
 /**
- * Performers & Studio — one horizontal row that always starts with the studio, then the performers
- * (round portraits with age badge and name pill), then the director. Shared by scene detail and the
- * opened gallery ([de.letzgo.stashy.ui.detail.GalleryDetailScreen]); `date` is then the gallery date.
- * Hidden when there is nothing to show, except in edit mode, where the pencil opens a menu
- * ("Edit Studio" / "Edit Performers") leading to the existing picker sheets.
+ * Metadata — one horizontal row that always starts with the studio, then the linked galleries (scene
+ * detail) or linked scenes (opened gallery, [de.letzgo.stashy.ui.detail.GalleryDetailScreen]; `date`
+ * is then the gallery date), labelled "Gallery" / "Scene", then the performers (round portraits with
+ * age badge and name pill) and the director. Hidden when there is nothing to show, except in edit mode, where the pencil
+ * opens a menu ("Edit Studio" / "Edit Performers" / "Edit Galleries") leading to the picker sheets.
  */
 @Composable
 fun ScenePerformersStudioCard(
@@ -99,19 +97,29 @@ fun ScenePerformersStudioCard(
     director: String?,
     onEditStudio: () -> Unit,
     onEditPerformers: () -> Unit,
+    galleries: List<SceneGalleryStub> = emptyList(),
+    /** Non-null adds "Edit Galleries" to the edit menu (scene detail). */
+    onEditGalleries: (() -> Unit)? = null,
+    scenes: List<Scene> = emptyList(),
 ) {
     val edit = Appearance.isEditModeEnabled
-    val isEmpty = studio == null && performers.isEmpty() && director == null
+    val isEmpty = studio == null && performers.isEmpty() && director == null && galleries.isEmpty() && scenes.isEmpty()
     if (isEmpty && !edit) return
     val tint = Appearance.tint
     val p = Theme.palette
     SceneCardContainer(Modifier.fillMaxWidth()) {
-        SceneCardHeader("Performers & Studio", onEdit = null, trailing = if (edit) { { PerformersStudioEditMenu(onEditStudio, onEditPerformers) } } else null)
+        SceneCardHeader("Metadata", onEdit = null, trailing = if (edit) { { PerformersStudioEditMenu(onEditStudio, onEditPerformers, onEditGalleries) } } else null)
         if (isEmpty) {
-            Box(Modifier.padding(top = 8.dp)) { SceneCardEmpty("No performers or studio assigned") }
+            Box(Modifier.padding(top = 8.dp)) { SceneCardEmpty("No metadata assigned") }
         } else {
             LazyRow(Modifier.padding(top = 8.dp, bottom = 12.dp), contentPadding = PaddingValues(horizontal = 12.dp), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
                 if (studio != null) item("studio-${studio.id}") { StudioItem(studio) }
+                uniqueItems(galleries, { "gallery:${it.id}" }) { gallery ->
+                    CircleThumbTile(Net.signed(gallery.cover?.paths?.thumbnail), "Gallery", PlayerIcons.gallery) { DetailLinks.gallery(gallery) }
+                }
+                uniqueItems(scenes, { "scene:${it.id}" }) { scene ->
+                    CircleThumbTile(scene.thumbnailURL, "Scene", PlayerIcons.film) { DetailLinks.scene(scene) }
+                }
                 uniqueItems(performers.sortedBy { it.name }, { it.id }) { performer ->
                     ScenePerformerTile(performer, ageAt(performer.birthdate, date)?.toString()) { DetailLinks.performer(performer) }
                 }
@@ -174,15 +182,30 @@ private fun StudioItem(studio: Studio) {
     }
 }
 
-/** Edit-mode pencil of [ScenePerformersStudioCard] with its "Edit Studio" / "Edit Performers" menu. */
+/** Gallery cover / scene screenshot in the 88 dp tinted circle of [ScenePerformersStudioCard]; [icon] without a picture. */
 @Composable
-private fun PerformersStudioEditMenu(onEditStudio: () -> Unit, onEditPerformers: () -> Unit) {
+private fun CircleThumbTile(url: String?, name: String, icon: androidx.compose.ui.graphics.vector.ImageVector, onClick: () -> Unit) {
+    val tint = Appearance.tint
+    val p = Theme.palette
+    Box(Modifier.padding(bottom = 8.dp).plainClick(onClick), contentAlignment = Alignment.BottomCenter) {
+        Box(Modifier.size(88.dp).clip(CircleShape).background(tint).padding(4.dp).clip(CircleShape).background(p.secondaryBackground), contentAlignment = Alignment.Center) {
+            if (url != null) AsyncImage(url, name, Modifier.fillMaxSize().background(Color.Gray.copy(alpha = 0.2f)), contentScale = ContentScale.Crop)
+            else Icon(icon, null, tint = p.pillAccent, modifier = Modifier.size(30.dp))
+        }
+        NamePill(name, Modifier.offset(y = 8.dp))
+    }
+}
+
+/** Edit-mode pencil of [ScenePerformersStudioCard] with its "Edit Studio" / "Edit Performers" / "Edit Galleries" menu. */
+@Composable
+private fun PerformersStudioEditMenu(onEditStudio: () -> Unit, onEditPerformers: () -> Unit, onEditGalleries: (() -> Unit)?) {
     var open by remember { mutableStateOf(false) }
     Box {
         EditCircleButton { open = true }
         DropdownMenu(open, onDismissRequest = { open = false }, containerColor = Theme.palette.secondaryBackground) {
             OverflowItem("Edit Studio", SF.building2, { open = false }, onClick = onEditStudio)
             OverflowItem("Edit Performers", PlayerIcons.person, { open = false }, onClick = onEditPerformers)
+            onEditGalleries?.let { OverflowItem("Edit Galleries", PlayerIcons.gallery, { open = false }, onClick = it) }
         }
     }
 }
@@ -240,50 +263,6 @@ fun SceneTagsCard(tags: List<Tag>?, expanded: Boolean, onToggleExpanded: () -> U
                 }
             }
             if (with(density) { totalHeight.toDp() } > collapsed) ExpandChevron(expanded, Modifier.padding(top = 4.dp), onToggleExpanded)
-        }
-    }
-}
-
-/** iOS: `SceneGalleriesCard` — one strip per gallery: link tile with the image count, then its images. */
-@Composable
-fun SceneGalleriesCard(galleries: List<SceneGalleryStub>?, modifier: Modifier = Modifier, onEdit: () -> Unit) {
-    SceneCardContainer(modifier.fillMaxWidth()) {
-        SceneCardHeader("Galleries", onEdit)
-        if (galleries.isNullOrEmpty()) Box(Modifier.padding(top = 8.dp)) { SceneCardEmpty("No galleries assigned") }
-        else Column(Modifier.padding(top = 8.dp, bottom = 12.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            galleries.forEach { GalleryImageStrip(it) }
-        }
-    }
-}
-
-@Composable
-private fun GalleryImageStrip(gallery: SceneGalleryStub) {
-    val tint = Appearance.tint
-    val thumb = 88.dp
-    val shape = RoundedCornerShape(Tokens.Radius.card * 0.75f)
-    var images by remember(gallery.id) { mutableStateOf<List<StashImage>>(emptyList()) }
-    var loading by remember(gallery.id) { mutableStateOf(true) }
-    LaunchedEffect(gallery.id) {
-        images = runCatching { SceneEditing.galleryPreviewImages(gallery.id, 40) }.getOrDefault(emptyList())
-        loading = false
-    }
-    LazyRow(contentPadding = PaddingValues(horizontal = 12.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        item("link") {
-            Column(
-                Modifier.size(thumb).clip(shape).background(tint.copy(alpha = 0.1f)).border(1.dp, tint.copy(alpha = 0.35f), shape).plainClick { DetailLinks.gallery(gallery) },
-                horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(4.dp, Alignment.CenterVertically),
-            ) {
-                Icon(PlayerIcons.gallery, null, tint = tint, modifier = Modifier.size(scaledIconSize(22.dp, maxScale = 1.4f)))
-                Text(gallery.imageCount?.toString() ?: "—", style = IosTypography.caption.copy(fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace), color = tint)
-            }
-        }
-        uniqueItems(images, { it.id }) { image ->
-            Box(Modifier.size(thumb).clip(shape).background(Color.Gray.copy(alpha = 0.2f)).plainClick { DetailLinks.image(images, image.id) }) {
-                AsyncImage(image.thumbnailURL, null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
-            }
-        }
-        if (loading && images.isEmpty()) item("loading") {
-            Box(Modifier.size(thumb), contentAlignment = Alignment.Center) { CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp, color = tint) }
         }
     }
 }

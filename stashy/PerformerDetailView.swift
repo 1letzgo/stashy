@@ -132,10 +132,10 @@ struct PerformerDetailView: View {
         var tabs: [DetailTab] = []
         if effectiveScenes > 0 { tabs.append(.scenes) }
         if effectiveGalleries > 0 { tabs.append(.galleries) }
+        if effectiveImages > 0 { tabs.append(.images) }
         if viewModel.totalDetailStudios > 0 { tabs.append(.studios) }
         if viewModel.totalDetailTags > 0 { tabs.append(.tags) }
         if viewModel.totalDetailGroups > 0 { tabs.append(.groups) }
-        if effectiveImages > 0 { tabs.append(.images) }
         if effectiveScenes > 0 { tabs.append(.appearsWith) }
         return tabs
     }

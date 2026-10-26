@@ -68,6 +68,8 @@ private struct ImagesViewBody: View {
     @ObservedObject private var tabManager = TabManager.shared
     @ObservedObject private var downloadManager = DownloadManager.shared
     @State private var showingGalleryDownloadOptions = false
+    /// Scenes linked to the opened gallery, shown in its Metadata card.
+    @State private var galleryScenes: [Scene] = []
 
     @State private var lastOpenedImageId: String?
     @State private var searchText: String
@@ -515,6 +517,11 @@ private struct ImagesViewBody: View {
         .task(id: gallery?.id) {
             await hydrateOpenedGalleryIfNeeded()
         }
+        .task(id: gallery?.id) {
+            galleryScenes = []
+            guard let id = gallery?.id else { return }
+            galleryScenes = (try? await SceneRepository().fetchGalleryScenes(galleryId: id)) ?? []
+        }
         .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("DefaultFilterChanged"))) { notification in
             guard gallery == nil, !feedsEmbedded else { return }
             if let tabId = notification.userInfo?["tab"] as? String, tabId == AppTab.images.rawValue {
@@ -629,7 +636,7 @@ private struct ImagesViewBody: View {
     }
 
     /// Opened-gallery top block, laid out like scene detail: one header card (cover hero
-    /// with name and details overlaid), then Performers & Studio. The grid follows below.
+    /// with name and details overlaid), then Metadata. The grid follows below.
     @ViewBuilder
     private func openedGalleryTop(_ gallery: Gallery) -> some View {
         VStack(spacing: 12) {
@@ -695,14 +702,14 @@ private struct ImagesViewBody: View {
         }
     }
 
-    /// Scene-detail "Performers & Studio" card for an opened gallery — only when the
-    /// gallery has a studio or performers, or always in edit mode so one can be
-    /// assigned (like Android). Edits write through `galleryUpdate`.
+    /// Scene-detail "Metadata" card for an opened gallery — only when the gallery has a
+    /// studio, performers or linked scenes, or always in edit mode so one can be assigned
+    /// (like Android). Edits write through `galleryUpdate`.
     @ViewBuilder
     private func openedGalleryLinkedCards(_ gallery: Gallery) -> some View {
         let performers = (gallery.performers ?? []).map { $0.toScenePerformer() }
         let studio = gallery.studio?.toSceneStudio()
-        if ScenePerformersStudioCard.isVisible(performers: performers, studio: studio, editing: appearanceManager.isEditModeEnabled) {
+        if ScenePerformersStudioCard.isVisible(performers: performers, studio: studio, scenes: galleryScenes, editing: appearanceManager.isEditModeEnabled) {
             ScenePerformersStudioCard(
                 sceneId: gallery.id,
                 sceneDate: gallery.date,
@@ -726,6 +733,7 @@ private struct ImagesViewBody: View {
                 saveStudioId: { id, done in
                     viewModel.updateGalleryStudio(galleryId: gallery.id, studioId: id, completion: done)
                 },
+                scenes: galleryScenes,
                 viewModel: viewModel
             )
         }

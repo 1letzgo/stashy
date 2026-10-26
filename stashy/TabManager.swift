@@ -521,6 +521,10 @@ class TabManager: ObservableObject {
     @Published var playCountFeedsSeconds: Double = 30 {
         didSet { UserDefaults.standard.set(playCountFeedsSeconds, forKey: playCountFeedsSecondsKey) }
     }
+    /// Feeds › Verticals (stashy+) has its own rule; short portrait clips often count earlier.
+    @Published var playCountVerticalsSeconds: Double = 30 {
+        didSet { UserDefaults.standard.set(playCountVerticalsSeconds, forKey: playCountVerticalsSecondsKey) }
+    }
     static let playCountThresholdOptions: [Double] = [0, 1, 5, 10, 30, 60, 120]
 
     /// Settings › Playback › "Hold to speed up". Rate while a finger rests on the picture —
@@ -710,6 +714,7 @@ class TabManager: ObservableObject {
     private let feedsSceneStartPositionKey = "feedsSceneStartPosition"
     private let playCountPlayerSecondsKey = "play_count_player_seconds"
     private let playCountFeedsSecondsKey = "play_count_feeds_seconds"
+    private let playCountVerticalsSecondsKey = "play_count_verticals_seconds"
     private let subtitlesAutoEnabledKey = "subtitle_auto_enabled"
     private let subtitlePreferredLanguageKey = "subtitle_preferred_language"
     private let subtitleFontSizeKey = "subtitle_font_size"
@@ -781,6 +786,9 @@ class TabManager: ObservableObject {
         self.playCountPlayerSeconds = Self.playCountThresholdOptions.contains(storedPlayerThreshold) ? storedPlayerThreshold : 1
         let storedFeedsThreshold = UserDefaults.standard.object(forKey: playCountFeedsSecondsKey) as? Double ?? 30
         self.playCountFeedsSeconds = Self.playCountThresholdOptions.contains(storedFeedsThreshold) ? storedFeedsThreshold : 30
+        // Until set, Verticals follows the Scenes rule.
+        let storedVerticalsThreshold = UserDefaults.standard.object(forKey: playCountVerticalsSecondsKey) as? Double ?? self.playCountFeedsSeconds
+        self.playCountVerticalsSeconds = Self.playCountThresholdOptions.contains(storedVerticalsThreshold) ? storedVerticalsThreshold : 30
         loadSubtitleSettings()
         self.reelsShowsDeleteButton = UserDefaults.standard.bool(forKey: reelsShowsDeleteButtonKey)
         self.sceneCardsShowStudioLogo = UserDefaults.standard.object(forKey: sceneCardsShowStudioLogoKey) as? Bool ?? true

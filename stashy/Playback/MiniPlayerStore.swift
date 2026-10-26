@@ -1053,13 +1053,17 @@ private struct NowPlayingContent: View {
         .frame(width: proxy.size.width)
         }
         .background(Color.appBackground.ignoresSafeArea())
-        // Standard chrome: Minimize on top like Back, Details in the floating bar.
+        // Standard chrome: Minimize like Back, Details right beside it.
         .hideSystemNavigationBarForCustomChrome()
         .stashyCustomChromeInset(spacing: 0) {
-            StashyDetailTopBar(backTitle: "Minimize", backIcon: "chevron.down", onBack: { dismiss() })
-        }
-        .floatingActionBar {
-            CatalogSlotBar(slots: nowPlayingSlots)
+            StashyDetailTopBar(
+                backTitle: "Minimize",
+                backIcon: "chevron.down",
+                besideBack: [CatalogChromeSlot(systemImage: "info.circle", accessibilityLabel: "Details") {
+                    player.openSceneDetails()
+                }],
+                onBack: { dismiss() }
+            )
         }
         }
         .alert("Reset watchlist?", isPresented: $confirmReset) {
@@ -1069,16 +1073,6 @@ private struct NowPlayingContent: View {
             Text("All scenes are removed from the watchlist and playback stops.")
         }
         .onAppear { loadDetailsIfNeeded() }
-    }
-
-    private var nowPlayingSlots: CatalogSlotSet {
-        var slots = CatalogSlotSet(visibility: CatalogFloatingChromeState(
-            hasActiveServerConfig: true, primaryListIsEmpty: false, errorMessage: nil, imageFindListError: nil
-        ))
-        slots.entityActions = [CatalogChromeSlot(systemImage: "info.circle", accessibilityLabel: "Details") {
-            player.openSceneDetails()
-        }]
-        return slots
     }
 
     /// List and watchlist snapshots often lack markers / captions: fetch the full scene once.

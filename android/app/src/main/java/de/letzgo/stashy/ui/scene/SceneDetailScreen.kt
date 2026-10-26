@@ -269,14 +269,14 @@ private fun SceneDetailContent(model: SceneDetailModel, openedFromMiniPlayer: Bo
                         }
                         // stashy+ — hides itself when Similar Scenes is off or nothing is similar.
                         SceneDetailCard.SimilarScenes -> SceneSimilarScenesCard(model.similarScenes, model.isLoadingSimilarScenes)
-                        // Hides itself without studio, performers and director (unless edit mode is on).
+                        // Metadata — hides itself without studio, performers, director and galleries (unless edit mode is on).
                         SceneDetailCard.PerformersStudio -> ScenePerformersStudioCard(
                             scene.date, scene.studio, scene.performers, scene.normalizedDirector,
                             onEditStudio = { sheet = EditSheet.Studio }, onEditPerformers = { sheet = EditSheet.Performers },
+                            galleries = scene.galleries.orEmpty(), onEditGalleries = { sheet = EditSheet.Galleries },
                         )
                         SceneDetailCard.Groups -> SceneGroupsCard(scene.groups.orEmpty(), { sheet = EditSheet.Groups }, modifier)
                         SceneDetailCard.Tags -> SceneTagsCard(scene.tags, model.isTagsExpanded, { model.isTagsExpanded = !model.isTagsExpanded }, { sheet = EditSheet.Tags }, modifier)
-                        SceneDetailCard.Galleries -> SceneGalleriesCard(scene.galleries, modifier) { sheet = EditSheet.Galleries }
                     }
                 }
                 SceneDetailLayoutLogic.rows(SceneDetailLayout.order, SceneDetailLayout.hidden, landscape).forEach { row ->

@@ -20,6 +20,7 @@ import de.letzgo.stashy.data.CatalogPrefs
 import de.letzgo.stashy.data.DetailRepository
 import de.letzgo.stashy.data.FilterMode
 import de.letzgo.stashy.data.Gallery
+import de.letzgo.stashy.data.Scene
 import de.letzgo.stashy.data.SortCatalog
 import de.letzgo.stashy.data.StashImage
 import de.letzgo.stashy.ui.Nav
@@ -62,7 +63,7 @@ import kotlinx.serialization.json.JsonObject
 /**
  * iOS: `ImagesView(gallery:)` for an opened gallery — chrome bar Back · Edit, one header card
  * with the cover as a hero and the gallery title + IMAGES / DATE / ORGANIZED overlaid on it
- * (plain card without a picture; description below, expandable), the scene-detail Performers & Studio card (only when set), then the image grid (2/row) or the grouped feed (1/row). The top bar's "Settings"
+ * (plain card without a picture; description below, expandable), the scene-detail Metadata card (only when set), then the image grid (2/row) or the grouped feed (1/row). The top bar's "Settings"
  * opens the images filter & sort sheet (iOS `ImagesCatalogFilterSortSheet` with
  * `DetailLinkedImagesFilterModel(scope: .gallery(id))`): filter, sort, Type, Per row
  * (`openedGallery` scope), autoplay toggles and the criteria editor. The `galleries` INCLUDES
@@ -84,6 +85,8 @@ class GalleryDetailScreen(
     /** Performers / Studio card pencils (`galleryUpdate` performer_ids / studio_id). */
     private var editingPerformers by mutableStateOf(false)
     private var editingStudio by mutableStateOf(false)
+    /** Scenes linked to the gallery, shown in its Metadata card. */
+    private var linkedScenes by mutableStateOf<List<Scene>>(emptyList())
     /** iOS `showingGalleryDownloadOptions` (`GalleryDownloadOptionsAlert`). */
     private var showDownloadOptions by mutableStateOf(false)
     private var started = false
@@ -111,6 +114,7 @@ class GalleryDetailScreen(
         images.onAppear()
         // iOS `hydrateOpenedGalleryIfNeeded` — stubs (no cover) get the full row.
         scope.launch { runCatching { DetailRepository.gallery(galleryId) }.getOrNull()?.let { gallery = it } }
+        scope.launch { linkedScenes = runCatching { DetailRepository.galleryScenes(galleryId) }.getOrDefault(emptyList()) }
     }
 
     @Composable
@@ -170,8 +174,8 @@ class GalleryDetailScreen(
     }
 
     /**
-     * Hero header, then the scene detail's Performers & Studio card (full width). The card only
-     * shows when the gallery has a studio or performers — or in edit mode, empty, so they can be
+     * Hero header, then the scene detail's Metadata card (full width). The card only shows when
+     * the gallery has a studio, performers or linked scenes — or in edit mode, empty, so they can be
      * assigned via its pencil menu.
      */
     @Composable
@@ -181,6 +185,7 @@ class GalleryDetailScreen(
             ScenePerformersStudioCard(
                 g.date, g.studio, g.performers.orEmpty(), director = null,
                 onEditStudio = { editingStudio = true }, onEditPerformers = { editingPerformers = true },
+                scenes = linkedScenes,
             )
         }
     }

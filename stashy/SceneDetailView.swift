@@ -788,7 +788,7 @@ struct SceneDetailView: View {
             return stashSyncManager.isSyncing
         case .performersStudio:
             return showsPerformersStudioCard
-        case .details, .similarScenes, .groups, .tags, .galleries:
+        case .details, .similarScenes, .groups, .tags:
             return true
         }
     }
@@ -869,7 +869,7 @@ struct SceneDetailView: View {
             SceneSimilarScenesCard(scenes: similarScenes, isLoading: isLoadingSimilarScenes)
 
         case .performersStudio:
-            // Studio first, then performers (+ director), horizontal scroll.
+            // Metadata: studio, performers (+ director), galleries — horizontal scroll.
             performersStudioCard
 
         case .groups:
@@ -894,16 +894,6 @@ struct SceneDetailView: View {
                 tagsTotalHeight: $tagsTotalHeight
             )
 
-        case .galleries:
-            SceneGalleriesCard(
-                sceneId: activeScene.id,
-                galleries: activeScene.galleries,
-                performers: activeScene.performers,
-                onGalleriesUpdated: { updated in
-                    applyLocalSceneEdit(Scene(id: activeScene.id, title: activeScene.title, details: activeScene.details, director: activeScene.director, date: activeScene.date, duration: activeScene.duration, studio: activeScene.studio, performers: activeScene.performers, files: activeScene.files, tags: activeScene.tags, galleries: updated, groups: activeScene.groups, organized: activeScene.organized, resumeTime: activeScene.resumeTime, playCount: activeScene.playCount, oCounter: activeScene.oCounter, rating100: activeScene.rating100, createdAt: activeScene.createdAt, updatedAt: activeScene.updatedAt, paths: activeScene.paths, sceneMarkers: activeScene.sceneMarkers, interactive: activeScene.interactive, stashIds: activeScene.stashIds, captions: activeScene.captions, customFields: activeScene.customFields))
-                },
-                viewModel: viewModel
-            )
         }
     }
 
@@ -912,11 +902,12 @@ struct SceneDetailView: View {
             performers: activeScene.performers,
             studio: activeScene.studio,
             director: activeScene.normalizedDirector,
+            galleries: activeScene.galleries,
             editing: appearanceManager.isEditModeEnabled
         )
     }
 
-    /// Studio first, then performers (+ director) — writes through `sceneUpdate`.
+    /// Metadata: studio, performers (+ director), galleries — writes through `sceneUpdate`.
     private var performersStudioCard: some View {
         ScenePerformersStudioCard(
             sceneId: activeScene.id,
@@ -929,6 +920,10 @@ struct SceneDetailView: View {
             },
             onStudioUpdated: { updated in
                 applyLocalSceneEdit(Scene(id: activeScene.id, title: activeScene.title, details: activeScene.details, director: activeScene.director, date: activeScene.date, duration: activeScene.duration, studio: updated, performers: activeScene.performers, files: activeScene.files, tags: activeScene.tags, galleries: activeScene.galleries, groups: activeScene.groups, organized: activeScene.organized, resumeTime: activeScene.resumeTime, playCount: activeScene.playCount, oCounter: activeScene.oCounter, rating100: activeScene.rating100, createdAt: activeScene.createdAt, updatedAt: activeScene.updatedAt, paths: activeScene.paths, sceneMarkers: activeScene.sceneMarkers, interactive: activeScene.interactive, stashIds: activeScene.stashIds, captions: activeScene.captions, customFields: activeScene.customFields))
+            },
+            galleries: activeScene.galleries ?? [],
+            onGalleriesUpdated: { updated in
+                applyLocalSceneEdit(Scene(id: activeScene.id, title: activeScene.title, details: activeScene.details, director: activeScene.director, date: activeScene.date, duration: activeScene.duration, studio: activeScene.studio, performers: activeScene.performers, files: activeScene.files, tags: activeScene.tags, galleries: updated, groups: activeScene.groups, organized: activeScene.organized, resumeTime: activeScene.resumeTime, playCount: activeScene.playCount, oCounter: activeScene.oCounter, rating100: activeScene.rating100, createdAt: activeScene.createdAt, updatedAt: activeScene.updatedAt, paths: activeScene.paths, sceneMarkers: activeScene.sceneMarkers, interactive: activeScene.interactive, stashIds: activeScene.stashIds, captions: activeScene.captions, customFields: activeScene.customFields))
             },
             viewModel: viewModel
         )

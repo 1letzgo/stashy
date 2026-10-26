@@ -4444,6 +4444,7 @@ struct ReelsViewBody: View {
     @ViewBuilder
     private func reelItemRow(index: Int, item: ReelItemData, itemCount: Int) -> some View {
         ReelItemView(
+            isVerticalsFeed: reelsVerticals,
             item: item,
             currentVisibleSceneId: $currentVisibleSceneId,
             isMuted: $isMuted,
@@ -5479,6 +5480,8 @@ private final class ReelItemVideoSurfaceReadiness: ObservableObject {
 }
 
 struct ReelItemView: View {
+    /// Verticals counts plays by its own rule (Settings › Playback › Feeds).
+    var isVerticalsFeed: Bool = false
     let item: ReelsViewBody.ReelItemData
     @Binding var currentVisibleSceneId: String?
     
@@ -5573,9 +5576,9 @@ struct ReelItemView: View {
         return 0
     }
 
-    /// Settings › Playback › "Count as played — Feeds".
+    /// Settings › Playback › Feeds "Count as played" (Scenes / Verticals each their own rule).
     private var reelsMinWatchSecondsBeforePlayCredit: Double {
-        max(0, TabManager.shared.playCountFeedsSeconds)
+        max(0, isVerticalsFeed ? TabManager.shared.playCountVerticalsSeconds : TabManager.shared.playCountFeedsSeconds)
     }
 
     /// Scenes + markers contribute watch time to the parent scene; previews/clips do not.
