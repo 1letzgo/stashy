@@ -1463,6 +1463,14 @@ final class HotOrNotViewModel: ObservableObject {
         if bracket == nil {
             bracket = HotOrNotBracketStore.load()
         }
+        // A finished and saved tournament is only shown right after the final; coming back
+        // to 32:1 starts the next one. (Unsaved results stay so the save can finish.)
+        if let state = bracket, state.isFinished, state.appliedIds.count >= state.entrants.count {
+            bracket = nil
+            bracketProposals = []
+            bracketAppliedCount = 0
+            HotOrNotBracketStore.save(nil)
+        }
         if bracket == nil {
             isLoadingPair = true
             defer { isLoadingPair = false }
@@ -1893,7 +1901,11 @@ struct HotOrNotToolsView: View {
             }
         }
         .onAppear {
-            guard !didRunInitialHotOrNotLoad else { return }
+            guard !didRunInitialHotOrNotLoad else {
+                // Back on Match after a saved final: start the next tournament.
+                if model.duelMode == .bracket, model.bracketIsApplied { model.newBracket() }
+                return
+            }
             didRunInitialHotOrNotLoad = true
             Task {
                 await model.loadDuelPair()

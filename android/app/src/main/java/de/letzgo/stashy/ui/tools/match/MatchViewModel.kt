@@ -104,7 +104,11 @@ class MatchViewModel : ViewModel() {
 
     /** iOS `.onAppear` with `didRunInitialHotOrNotLoad`. */
     fun onAppear() {
-        if (didRunInitialLoad) return
+        if (didRunInitialLoad) {
+            // Back on Match after a saved final: start the next tournament.
+            if (duelMode == MatchDuelMode.Bracket && bracketIsApplied) newBracket()
+            return
+        }
         didRunInitialLoad = true
         viewModelScope.launch {
             loadDuelPair()
@@ -410,6 +414,16 @@ class MatchViewModel : ViewModel() {
         rankLeft = null
         rankRight = null
         if (bracket == null) bracket = MatchBracketStore.load()
+        // A finished and saved tournament is only shown right after the final; coming back
+        // to 32:1 starts the next one. (Unsaved results stay so the save can finish.)
+        bracket?.let { b ->
+            if (b.isFinished && b.appliedIds.size >= b.entrants.size) {
+                bracket = null
+                bracketProposals = emptyList()
+                bracketAppliedCount = 0
+                MatchBracketStore.save(null)
+            }
+        }
         if (bracket == null) {
             isLoadingPair = true
             try {

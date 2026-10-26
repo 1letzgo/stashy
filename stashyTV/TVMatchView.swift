@@ -60,7 +60,11 @@ struct TVMatchView: View {
         .defaultFocus($focusedCard, true)
         .background(Color.appBackground)
         .onAppear {
-            guard !didRunInitialLoad else { return }
+            guard !didRunInitialLoad else {
+                // Back on Match after a saved final: start the next tournament.
+                if model.duelMode == .bracket, model.bracketIsApplied { model.newBracket() }
+                return
+            }
             didRunInitialLoad = true
             Task {
                 await model.loadDuelPair()

@@ -25,6 +25,7 @@ import de.letzgo.stashy.data.CatalogCardColumnScope
 import de.letzgo.stashy.data.CatalogCardColumns
 import de.letzgo.stashy.data.DetailViewContext
 import de.letzgo.stashy.data.FilterMode
+import de.letzgo.stashy.data.GroupSceneSort
 import de.letzgo.stashy.data.SortCatalog
 import de.letzgo.stashy.data.TabConfigLogic
 import de.letzgo.stashy.data.FeedsConfig
@@ -229,7 +230,12 @@ private fun CatalogTabCard(tab: TabConfig, handle: Modifier) {
         CardSettingRow("Default Filter") { DefaultFilterMenu(tab.id) }
         DetailViewContext.forTab(tab.id)?.let { ctx ->
             CardSettingRow(ctx.settingsRowTitle) {
-                val options = if (ctx == DetailViewContext.Gallery) sortNames(FilterMode.Images) else sortNames(FilterMode.Scenes)
+                val options = when (ctx) {
+                    DetailViewContext.Gallery -> sortNames(FilterMode.Images)
+                    // Groups also sort by scene number (picked on the group page), so offer those too.
+                    DetailViewContext.Group -> sortNames(FilterMode.Scenes) + GroupSceneSort.options.map { it.raw to it.label }
+                    else -> sortNames(FilterMode.Scenes)
+                }
                 MenuValue(options, TabManager.getPersistentDetailSortOption(ctx) ?: "dateDesc") { TabManager.setPersistentDetailSortOption(ctx, it) }
             }
         }
