@@ -2,7 +2,7 @@
 //  TagMergeToolsView.swift
 //  stashy
 //
-//  Tools → Merge Tags: mehrere Tags auf einen einzigen zusammenführen.
+//  Settings › Server › stashy+ → Merge Tags: mehrere Tags auf einen einzigen zusammenführen.
 //  Die Seite selbst ist `MergeToolsView` (MergeTools.swift), geteilt mit Merge Studios.
 //
 

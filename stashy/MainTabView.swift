@@ -313,9 +313,6 @@ struct ToolsView: View {
         case oCount = "O-Count"
         case timeline = "Timeline"
         case topLists = "Charts"
-        case filters = "Filters"
-        case mergeTags = "Merge Tags"
-        case mergeStudios = "Merge Studios"
         case hotOrNot = "Match"
         case rateMe = "RateMe"
         
@@ -327,9 +324,6 @@ struct ToolsView: View {
             case .oCount: return "calendar"
             case .timeline: return "calendar.day.timeline.left"
             case .topLists: return "list.number"
-            case .filters: return "line.3.horizontal.decrease.circle"
-            case .mergeTags: return "arrow.triangle.merge"
-            case .mergeStudios: return "building.2"
             case .hotOrNot: return "flame.fill"
             case .rateMe: return "star.fill"
             }
@@ -340,7 +334,7 @@ struct ToolsView: View {
     /// hand-sorted flat list stopped being a good way in once Tools grew — the grid needs stable
     /// categories, so the order is part of the design now rather than a setting.
     static let toolGroups: [(title: String, tools: [ToolsTab])] = [
-        ("Library", [.downloads, .watchlist, .filters, .mergeTags, .mergeStudios]),
+        ("Library", [.downloads, .watchlist]),
         ("Insights", [.overview, .topLists, .oCount, .timeline]),
         ("Discover", [.hotOrNot, .rateMe])
     ]
@@ -389,12 +383,6 @@ struct ToolsView: View {
                 SessionTimelineToolsView()
             case .topLists:
                 TopListsToolsContainerView(viewModel: topListsViewModel)
-            case .filters:
-                FiltersToolsView()
-            case .mergeTags:
-                TagMergeToolsView()
-            case .mergeStudios:
-                StudioMergeToolsView()
             case .hotOrNot:
                 HotOrNotToolsView()
             case .rateMe:
@@ -547,6 +535,7 @@ struct ToolsServerView: View {
 
     @ObservedObject private var configManager = ServerConfigManager.shared
     @ObservedObject private var appearanceManager = AppearanceManager.shared
+    @ObservedObject private var stashyPlus = StashyPlusManager.shared
     @StateObject private var viewModel = StashDBViewModel()
     
     @State private var alertTitle = ""
@@ -688,6 +677,25 @@ struct ToolsServerView: View {
                         }
                         taskRow(label: "Remove Unused Studios", icon: "building.2.crop.circle", taskId: "studios_unused", index: 2, count: 3) {
                             findUnused(.studios)
+                        }
+                    }
+
+                    // Admin-Werkzeuge (früher unter Tools), nur mit stashy+.
+                    if stashyPlus.isUnlocked {
+                        Section {
+                            stashyScrollingSectionHeader("stashy+")
+                            NavigationLink(destination: FiltersToolsView().stashySettingsDetailChrome("Filters")) {
+                                Label("Filters", systemImage: "line.3.horizontal.decrease.circle")
+                            }
+                            .stashyGroupedBlockRow(index: 0, count: 3)
+                            NavigationLink(destination: TagMergeToolsView().stashySettingsDetailChrome("Merge Tags")) {
+                                Label("Merge Tags", systemImage: "arrow.triangle.merge")
+                            }
+                            .stashyGroupedBlockRow(index: 1, count: 3)
+                            NavigationLink(destination: StudioMergeToolsView().stashySettingsDetailChrome("Merge Studios")) {
+                                Label("Merge Studios", systemImage: "building.2")
+                            }
+                            .stashyGroupedBlockRow(index: 2, count: 3)
                         }
                     }
 

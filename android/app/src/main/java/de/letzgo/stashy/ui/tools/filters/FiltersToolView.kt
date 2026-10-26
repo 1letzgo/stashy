@@ -47,6 +47,7 @@ import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import de.letzgo.stashy.data.ServerConfigManager
 import de.letzgo.stashy.data.tools.FiltersLogic
@@ -75,14 +76,14 @@ private val AddButtonSize = 48.dp
 private val AddIconSize = 24.dp
 
 /**
- * iOS: `FiltersToolsView` — Tools › Filters: every saved filter of the server grouped by mode,
+ * iOS: `FiltersToolsView` — Settings › Server › stashy+ › Filters: every saved filter of the server grouped by mode,
  * with search, "+" (new filter per mode), edit (tap), rename and delete (long press; iOS also
  * offers them as swipe actions). Create/edit open [FiltersToolEditorSheet]; a newly created
  * filter reopens in the editor right after saving (iOS `pendingEditAfterCreate`).
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun FiltersToolView() {
+fun FiltersToolView(topPadding: Dp = toolsTopPadding()) {
     val p = Theme.palette
     val state = FiltersToolState
     val serverId = ServerConfigManager.activeConfig?.id
@@ -110,7 +111,7 @@ fun FiltersToolView() {
         Row(
             Modifier.fillMaxWidth().padding(
                 start = ToolsTokens.contentPadding, end = ToolsTokens.contentPadding,
-                top = toolsTopPadding() + ToolsTokens.menuTopPadding, bottom = Tokens.Spacing.xs + 2.dp,
+                top = topPadding + ToolsTokens.menuTopPadding, bottom = Tokens.Spacing.xs + 2.dp,
             ),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(Tokens.Spacing.sm),

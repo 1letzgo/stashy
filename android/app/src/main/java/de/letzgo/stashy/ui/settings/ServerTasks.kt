@@ -32,6 +32,12 @@ import de.letzgo.stashy.data.LibraryCleanupCandidate
 import de.letzgo.stashy.data.ServerConfigManager
 import de.letzgo.stashy.data.ServerTasksRepository
 import de.letzgo.stashy.data.StashQueuedJob
+import de.letzgo.stashy.data.StashyPlus
+import de.letzgo.stashy.ui.Nav
+import de.letzgo.stashy.ui.Screen
+import de.letzgo.stashy.ui.tools.filters.FiltersToolView
+import de.letzgo.stashy.ui.tools.merge.StudioMergeToolView
+import de.letzgo.stashy.ui.tools.merge.TagMergeToolView
 import de.letzgo.stashy.ui.Appearance
 import de.letzgo.stashy.ui.NativeType
 import de.letzgo.stashy.ui.SF
@@ -163,6 +169,16 @@ fun ServerTasksContent(topPadding: Dp) {
             SettingsDivider()
             TaskRow("Remove Unused Studios", SFS.building2Circle, "studios_unused") { findUnusedResult(CleanupKind.Studios) { cleanup = it } }
         }
+        // Admin-Werkzeuge (früher unter Tools), nur mit stashy+.
+        if (StashyPlus.isUnlocked) {
+            settingsSection(header = "stashy+", key = "stashyplus") {
+                SettingsNavRow("Filters", SF.line3HorizontalDecreaseCircle) { Nav.push(ServerToolScreen.Filters) }
+                SettingsDivider()
+                SettingsNavRow("Merge Tags", SF.arrowTriangleMerge) { Nav.push(ServerToolScreen.MergeTags) }
+                SettingsDivider()
+                SettingsNavRow("Merge Studios", SF.building2) { Nav.push(ServerToolScreen.MergeStudios) }
+            }
+        }
         settingsSection(header = "Cache", key = "cache") {
             TaskRow("Clear Image Cache", SFS.internaldrive, "cache_clear") {
                 // iOS `ImageCache.shared.clearCurrentServerCache()`: the active server only.
@@ -191,6 +207,21 @@ fun ServerTasksContent(topPadding: Dp) {
             },
             onDismiss = { cleanup = null },
         )
+    }
+}
+
+/** iOS: the stashy+ rows of `ToolsServerView` — Filters, Merge Tags and Merge Studios as pushed pages. */
+private enum class ServerToolScreen(val title: String) : Screen {
+    Filters("Filters"), MergeTags("Merge Tags"), MergeStudios("Merge Studios");
+
+    override val key get() = "settings-server-$name"
+
+    @Composable override fun Content() = SettingsDetailScaffold(title) { top ->
+        when (this) {
+            Filters -> FiltersToolView(top)
+            MergeTags -> TagMergeToolView(top)
+            MergeStudios -> StudioMergeToolView(top)
+        }
     }
 }
 
