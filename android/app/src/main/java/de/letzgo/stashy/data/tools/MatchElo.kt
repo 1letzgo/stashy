@@ -61,6 +61,8 @@ data class MatchRecord(
  */
 enum class MatchDuelMode(val raw: String, val label: String, val ascensionMode: String) {
     HeadToHead("headToHead", "1 vs. 1", "swiss"),
+    /** 32:1 bracket (`MatchBracket`); [ascensionMode] unused — no per-pick Elo. */
+    Bracket("bracket", "32:1", "bracket"),
     Placement("placement", "Rise", "gauntlet"),
     Champion("champion", "Legend", "champion");
 
@@ -70,6 +72,7 @@ enum class MatchDuelMode(val raw: String, val label: String, val ascensionMode: 
             "swiss", "headToHead" -> HeadToHead
             "gauntlet", "placement" -> Placement
             "champion" -> Champion
+            "bracket" -> Bracket
             else -> HeadToHead
         }
     }

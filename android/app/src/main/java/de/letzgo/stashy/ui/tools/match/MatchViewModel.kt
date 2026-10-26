@@ -7,6 +7,9 @@ import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import de.letzgo.stashy.data.Performer
+import de.letzgo.stashy.data.tools.MatchBracket
+import de.letzgo.stashy.data.tools.MatchBracketState
+import de.letzgo.stashy.data.tools.MatchBracketStore
 import de.letzgo.stashy.data.tools.MatchDuelMode
 import de.letzgo.stashy.data.tools.MatchElo
 import de.letzgo.stashy.data.tools.MatchPairing
@@ -56,6 +59,18 @@ class MatchViewModel : ViewModel() {
     var climbVictory by mutableStateOf<Performer?>(null); private set
     var placementStarters by mutableStateOf<List<Performer>>(emptyList()); private set
     var isLoadingPlacementStarters by mutableStateOf(false); private set
+
+    // 32:1 bracket (`MatchBracket`): no rating writes until the results are applied.
+    var bracket by mutableStateOf<MatchBracketState?>(null); private set
+    var bracketProposals by mutableStateOf<List<MatchBracket.Proposal>>(emptyList()); private set
+    var isLoadingBracketResults by mutableStateOf(false); private set
+    var isApplyingBracket by mutableStateOf(false); private set
+    var bracketAppliedCount by mutableIntStateOf(0); private set
+
+    val bracketIsApplied: Boolean
+        get() = bracket != null && bracketProposals.isNotEmpty() && bracket!!.appliedIds.size >= bracketProposals.size
+
+    val bracketStatusLine: String? get() = bracket?.let { MatchBracket.statusLine(it) }
 
     /** Set by the composable (needs a `View`); null while off screen. */
     var haptic: ((MatchHaptic) -> Unit)? = null
@@ -160,6 +175,7 @@ class MatchViewModel : ViewModel() {
                 loadClimbPair(isPlacement = true)
             }
             MatchDuelMode.Champion -> loadClimbPair(isPlacement = false)
+            MatchDuelMode.Bracket -> loadBracketPair()
         }
     }
 
@@ -319,7 +335,7 @@ class MatchViewModel : ViewModel() {
 
     private fun applyClimbAfterVote(winner: Performer, loser: Performer, newWinnerRating: Int, newLoserRating: Int) {
         when (duelMode) {
-            MatchDuelMode.HeadToHead -> Unit
+            MatchDuelMode.HeadToHead, MatchDuelMode.Bracket -> Unit
             MatchDuelMode.Champion -> {
                 if (climbChampion?.id == winner.id) {
                     climbDefeatedIds = climbDefeatedIds + loser.id
@@ -384,12 +400,144 @@ class MatchViewModel : ViewModel() {
         }
     }
 
+    // MARK: 32:1 bracket
+
+    private fun ratingSorted(list: List<Performer>) = MatchPairing.ladderSorted(list, pendingRating100ByPerformerId)
+
+    /** Restores the saved bracket (or draws a new one) and shows its next match. */
+    private suspend fun loadBracketPair() {
+        errorMessage = null
+        rankLeft = null
+        rankRight = null
+        if (bracket == null) bracket = MatchBracketStore.load()
+        if (bracket == null) {
+            isLoadingPair = true
+            try {
+                val res = MatchRepository.pool(selectedGenders)
+                poolCount = res.count
+                val state = MatchBracket.newBracket(ratingSorted(res.items), MatchBracketStore.recentIds())
+                if (state == null) {
+                    errorMessage = "Need at least ${MatchBracket.SIZE} performers with images for the selected genders."
+                    clearPair()
+                    return
+                }
+                bracket = state
+                MatchBracketStore.save(state)
+                MatchBracketStore.rememberEntrants(state.entrants.map { it.id })
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                errorMessage = errorText(e)
+                return
+            } finally {
+                isLoadingPair = false
+            }
+        }
+        showCurrentBracketMatch()
+        if (bracket?.isFinished == true && bracketProposals.isEmpty()) loadBracketResults()
+    }
+
+    private fun showCurrentBracketMatch() {
+        val state = bracket
+        val m = state?.currentMatch
+        left = m?.let { state.entrant(it.leftId) }
+        right = m?.let { state.entrant(it.rightId) }
+    }
+
+    private fun pickBracketWinner(winner: Performer) {
+        val state = bracket ?: return
+        if (state.currentMatch == null) return
+        val next = state.copy(picks = state.picks + winner.id)
+        bracket = next
+        MatchBracketStore.save(next)
+        haptic(MatchHaptic.Light)
+        showCurrentBracketMatch()
+        if (next.isFinished) viewModelScope.launch { loadBracketResults() }
+    }
+
+    fun undoBracketPick() {
+        val state = bracket ?: return
+        if (state.picks.isEmpty() || state.appliedIds.isNotEmpty()) return
+        val next = state.copy(picks = state.picks.dropLast(1))
+        bracket = next
+        bracketProposals = emptyList()
+        MatchBracketStore.save(next)
+        showCurrentBracketMatch()
+    }
+
+    /** Discards the current bracket (also after Apply) and draws a new one. */
+    fun newBracket() {
+        bracket = null
+        bracketProposals = emptyList()
+        bracketAppliedCount = 0
+        MatchBracketStore.save(null)
+        viewModelScope.launch { loadDuelPair() }
+    }
+
+    /** Rating proposals from the finishing places, against fresh ratings / stats of the pool. */
+    suspend fun loadBracketResults() {
+        val state = bracket?.takeIf { it.isFinished } ?: return
+        isLoadingBracketResults = true
+        try {
+            val pool = ratingSorted(MatchRepository.pool(selectedGenders).items)
+            bracketProposals = MatchBracket.proposals(state, pool.associateBy { it.id }, pool.map { MatchElo.rating(it) })
+            bracketAppliedCount = state.appliedIds.size
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            errorMessage = errorText(e)
+            return
+        } finally {
+            isLoadingBracketResults = false
+        }
+        // Results are written right after the final; a failed save leaves a Retry on the card.
+        if (!bracketIsApplied) applyBracket()
+    }
+
+    fun applyBracketAsync() { viewModelScope.launch { applyBracket() } }
+
+    /** Writes every proposal; already written performers are skipped, so a failed run can be retried. */
+    suspend fun applyBracket() {
+        var state = bracket?.takeIf { it.isFinished } ?: return
+        if (bracketProposals.isEmpty() || isApplyingBracket) return
+        isApplyingBracket = true
+        errorMessage = null
+        try {
+            // Fresh custom_fields so the run appends to the latest stats / records.
+            val current = MatchRepository.pool(selectedGenders).items.associateBy { it.id }
+            for (proposal in bracketProposals) {
+                if (proposal.id in state.appliedIds) continue
+                val performer = current[proposal.id] ?: state.entrant(proposal.id) ?: continue
+                val matches = state.results(proposal.id).map { (oppId, won) ->
+                    Triple(oppId, state.entrant(oppId)?.name.orEmpty(), won)
+                }
+                MatchRepository.pushBracketUpdate(performer, proposal.newRating, matches)
+                state = state.copy(appliedIds = state.appliedIds + proposal.id)
+                bracket = state
+                bracketAppliedCount = state.appliedIds.size
+                MatchBracketStore.save(state)
+            }
+            haptic(MatchHaptic.Success)
+            if (section == Section.Leaderboard) refreshLeaderboard()
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            errorMessage = errorText(e)
+        } finally {
+            isApplyingBracket = false
+        }
+    }
+
     // MARK: Votes
 
     suspend fun choose(leftWins: Boolean) {
         val l = left ?: return
         val r = right ?: return
         if (isSubmitting) return
+        if (duelMode == MatchDuelMode.Bracket) {
+            pickBracketWinner(if (leftWins) l else r)
+            return
+        }
         isSubmitting = true
         errorMessage = null
         val winner = if (leftWins) l else r
@@ -425,7 +573,7 @@ class MatchViewModel : ViewModel() {
 
     /** iOS: `skipDraw()` — Draw button (not in Legend). */
     suspend fun skipDraw() {
-        if (duelMode == MatchDuelMode.Champion) return
+        if (duelMode == MatchDuelMode.Champion || duelMode == MatchDuelMode.Bracket) return
         val l = left ?: return
         val r = right ?: return
         if (isSubmitting) return

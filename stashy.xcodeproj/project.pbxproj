@@ -63,6 +63,9 @@
 		8D7ECC24161D4D9EBF4C3A57 /* TagsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DF22BB1D2F16743C007C2090 /* TagsView.swift */; };
 		91CF530080674BF98FF154C4 /* SceneCardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DF06EF252F18EC1100299105 /* SceneCardView.swift */; };
 		971A00012F999001 /* HotOrNotToolsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 971A00022F999002 /* HotOrNotToolsView.swift */; };
+		B8A7C0012F99B001 /* HotOrNotBracket.swift in Sources */ = {isa = PBXBuildFile; fileRef = B8A7C0042F99B004 /* HotOrNotBracket.swift */; };
+		B8A7C0022F99B002 /* HotOrNotBracket.swift in Sources */ = {isa = PBXBuildFile; fileRef = B8A7C0042F99B004 /* HotOrNotBracket.swift */; };
+		B8A7C0032F99B003 /* HotOrNotBracket.swift in Sources */ = {isa = PBXBuildFile; fileRef = B8A7C0042F99B004 /* HotOrNotBracket.swift */; };
 		971A00032F999003 /* RateMeToolsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 971A00042F999004 /* RateMeToolsView.swift */; };
 		7A7C0A112F9B000100000001 /* HotOrNotToolsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 971A00022F999002 /* HotOrNotToolsView.swift */; };
 		7A7C0A112F9B000100000002 /* RateMeToolsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 971A00042F999004 /* RateMeToolsView.swift */; };
@@ -399,6 +402,7 @@
 		5115C0020000000000000002 /* SimilarScenesFinder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SimilarScenesFinder.swift; sourceTree = "<group>"; };
 		5115C0060000000000000006 /* SceneSimilarScenesCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SceneSimilarScenesCard.swift; sourceTree = "<group>"; };
 		971A00022F999002 /* HotOrNotToolsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HotOrNotToolsView.swift; sourceTree = "<group>"; };
+		B8A7C0042F99B004 /* HotOrNotBracket.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HotOrNotBracket.swift; sourceTree = "<group>"; };
 		971A00042F999004 /* RateMeToolsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RateMeToolsView.swift; sourceTree = "<group>"; };
 		971A00062F999006 /* TopListsToolsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TopListsToolsView.swift; sourceTree = "<group>"; };
 		971A00072F999007 /* SessionTimelineToolsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionTimelineToolsView.swift; sourceTree = "<group>"; };
@@ -591,6 +595,7 @@
 				STNV000022345678901234AB /* StashyTopNavStrip.swift */,
 				SCHR000022345678901234AB /* SharedChromeComponents.swift */,
 				971A00022F999002 /* HotOrNotToolsView.swift */,
+				B8A7C0042F99B004 /* HotOrNotBracket.swift */,
 				971A00042F999004 /* RateMeToolsView.swift */,
 				A1F11TER50F11TER50F11TER /* Filters */,
 				C4B0E00300000000000000C1 /* Chrome */,
@@ -1052,6 +1057,7 @@
 				SCHR000012345678901234AB /* SharedChromeComponents.swift in Sources */,
 				LIMG000012345678901234AB /* LinkedImagesCatalogGrid.swift in Sources */,
 				971A00012F999001 /* HotOrNotToolsView.swift in Sources */,
+				B8A7C0012F99B001 /* HotOrNotBracket.swift in Sources */,
 				971A00032F999003 /* RateMeToolsView.swift in Sources */,
 				821D4E34EE344BBC881B7E2E /* FilterCriterionTypes.swift in Sources */,
 				F3FAA876F0564E51BFE25096 /* FilterFieldCatalog.swift in Sources */,
@@ -1154,6 +1160,7 @@
 				DFEA0012F2A6392000000003 /* ScenePlayerExtras.swift in Sources */,
 				5B3249B4152046408B964DDC /* StarRatingView.swift in Sources */,
 				7A7C0A112F9B000100000001 /* HotOrNotToolsView.swift in Sources */,
+				B8A7C0022F99B002 /* HotOrNotBracket.swift in Sources */,
 				7A7C0A112F9B000100000002 /* RateMeToolsView.swift in Sources */,
 				7A7C0A112F9B000100000004 /* ListCatalogFilterSortModels.swift in Sources */,
 				11A2D778BDD54ABE859A5F1D /* ServerSetupWizardView.swift in Sources */,
@@ -1265,6 +1272,7 @@
 				MAC000000000000000000055 /* SharedChromeComponents.swift in Sources */,
 				MAC000000000000000000056 /* LinkedImagesCatalogGrid.swift in Sources */,
 				MAC000000000000000000057 /* HotOrNotToolsView.swift in Sources */,
+				B8A7C0032F99B003 /* HotOrNotBracket.swift in Sources */,
 				MAC000000000000000000058 /* RateMeToolsView.swift in Sources */,
 				MAC000000000000000000059 /* FilterCriterionTypes.swift in Sources */,
 				MAC00000000000000000005A /* FilterFieldCatalog.swift in Sources */,
@@ -1440,7 +1448,7 @@
 				ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS = YES;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 420;
+				CURRENT_PROJECT_VERSION = 421;
 				DEVELOPMENT_TEAM = 699G2QY959;
 				ENABLE_PREVIEWS = YES;
 				INFOPLIST_FILE = stashy/Info.plist;
@@ -1470,7 +1478,7 @@
 				ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS = YES;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 420;
+				CURRENT_PROJECT_VERSION = 421;
 				DEVELOPMENT_TEAM = 699G2QY959;
 				ENABLE_PREVIEWS = YES;
 				INFOPLIST_FILE = stashy/Info.plist;
@@ -1504,7 +1512,7 @@
 				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 358;
+				CURRENT_PROJECT_VERSION = 359;
 				DEVELOPMENT_TEAM = 699G2QY959;
 				ENABLE_PREVIEWS = YES;
 				ENABLE_USER_SCRIPT_SANDBOXING = YES;
@@ -1546,7 +1554,7 @@
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 358;
+				CURRENT_PROJECT_VERSION = 359;
 				DEVELOPMENT_TEAM = 699G2QY959;
 				ENABLE_PREVIEWS = YES;
 				ENABLE_USER_SCRIPT_SANDBOXING = YES;
@@ -1584,7 +1592,7 @@
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 354;
+				CURRENT_PROJECT_VERSION = 355;
 				DEVELOPMENT_TEAM = 699G2QY959;
 				ENABLE_HARDENED_RUNTIME = YES;
 				ENABLE_PREVIEWS = YES;
@@ -1615,7 +1623,7 @@
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 354;
+				CURRENT_PROJECT_VERSION = 355;
 				DEVELOPMENT_TEAM = 699G2QY959;
 				ENABLE_HARDENED_RUNTIME = YES;
 				ENABLE_PREVIEWS = YES;
