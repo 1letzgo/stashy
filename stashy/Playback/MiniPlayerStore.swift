@@ -1090,19 +1090,17 @@ private struct NowPlayingContent: View {
                         .listRowBackground(Color.clear)
                         .listRowSeparator(.hidden)
                 }
-                if !player.playingQueue.isEmpty {
-                    Section {
-                        ForEach(player.playingQueue) { entry in
-                            queueRow(entry, onWatchlist: false)
-                                .listRowInsets(EdgeInsets(top: 6, leading: 16, bottom: 6, trailing: 16))
-                                .listRowBackground(Color.clear)
-                                .listRowSeparatorTint(Color.primary.opacity(0.08))
-                                // Sorting is for the watchlist only.
-                                .moveDisabled(true)
-                        }
-                    } header: {
-                        sectionHeader("Now Playing") { EmptyView() }
-                    }
+                // Always the scene in the player above, whatever started it (Play, a watchlist
+                // row, next, the bar) — never a separately kept list that could drift.
+                Section {
+                    queueRow(scene, onWatchlist: false)
+                        .listRowInsets(EdgeInsets(top: 6, leading: 16, bottom: 6, trailing: 16))
+                        .listRowBackground(Color.clear)
+                        .listRowSeparator(.hidden)
+                        // Sorting is for the watchlist only.
+                        .moveDisabled(true)
+                } header: {
+                    sectionHeader("Now Playing") { EmptyView() }
                 }
                 Section {
                     if watchlist.scenes.isEmpty {

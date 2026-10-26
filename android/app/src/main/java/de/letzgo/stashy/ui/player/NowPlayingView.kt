@@ -114,7 +114,6 @@ private fun NowPlayingContent(initial: Scene, onOpen: (de.letzgo.stashy.ui.Scree
     val watchlist = WatchlistStore.all
     val drag = remember { WatchlistDragState() }
     var sorting by remember { mutableStateOf(false) }
-    val playing = MiniPlayerStore.playingQueue
     var confirmClear by remember { mutableStateOf(false) }
     // Scenes deleted elsewhere leave the lists (throttled to once a minute).
     LaunchedEffect(Unit) { WatchlistStore.checkAgainstServer() }
@@ -148,14 +147,14 @@ private fun NowPlayingContent(initial: Scene, onOpen: (de.letzgo.stashy.ui.Scree
             }
             LazyColumn(Modifier.fillMaxSize()) {
                 item(key = "info") { InfoRow(scene, onOpen) }
-                if (playing.isNotEmpty()) {
-                    item(key = "playing-header") {
-                        Row(Modifier.fillMaxWidth().height(48.dp).padding(start = NowPlayingMargin, top = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-                            Text("Now Playing", Modifier.weight(1f), style = IosTypography.headline, color = p.text)
-                        }
+                // Always the scene in the player above, whatever started it (Play, a watchlist
+                // row, next, the bar) — never a separately kept list that could drift.
+                item(key = "playing-header") {
+                    Row(Modifier.fillMaxWidth().height(48.dp).padding(start = NowPlayingMargin, top = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Text("Now Playing", Modifier.weight(1f), style = IosTypography.headline, color = p.text)
                     }
-                    playingRows(playing, scene.id, NowPlayingMargin) { MiniPlayerStore.showInNowPlaying(it) }
                 }
+                playingRows(listOf(scene), scene.id, NowPlayingMargin) { MiniPlayerStore.showInNowPlaying(it) }
                 item(key = "header") {
                     // Plain list header on the sheet background: "Watchlist" + red Clear + Sort / Done.
                     Row(Modifier.fillMaxWidth().heightIn(min = 48.dp).padding(start = NowPlayingMargin, top = 8.dp), verticalAlignment = Alignment.CenterVertically) {
