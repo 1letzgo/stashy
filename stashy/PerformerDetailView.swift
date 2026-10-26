@@ -123,6 +123,12 @@ struct PerformerDetailView: View {
         max(viewModel.totalPerformerGalleries, displayPerformer.galleryCount ?? 0)
     }
     
+    /// Like galleries: Stash's own count on the performer also opens the tab, so images linked
+    /// later (Clips / Pics) show even when the list fetch reported none.
+    private var effectiveImages: Int {
+        max(viewModel.totalDetailImages, displayPerformer.imageCount ?? 0)
+    }
+
     private var availableTabs: [DetailTab] {
         var tabs: [DetailTab] = []
         if effectiveScenes > 0 { tabs.append(.scenes) }
@@ -130,7 +136,7 @@ struct PerformerDetailView: View {
         if viewModel.totalDetailStudios > 0 { tabs.append(.studios) }
         if viewModel.totalDetailTags > 0 { tabs.append(.tags) }
         if viewModel.totalDetailGroups > 0 { tabs.append(.groups) }
-        if viewModel.totalDetailImages > 0 { tabs.append(.images) }
+        if effectiveImages > 0 { tabs.append(.images) }
         if effectiveScenes > 0 { tabs.append(.appearsWith) }
         return tabs
     }
@@ -574,6 +580,19 @@ struct PerformerDetailView: View {
             if !loading, selectedDetailTab == .scenes, effectiveScenes == 0, let first = availableTabs.first {
                 withAnimation(DesignTokens.Animation.quick) { selectedDetailTab = first }
             }
+        }
+        // The selected tab must exist: with a single tab (e.g. images only, no scenes or
+        // galleries) the switcher is hidden, and the page stayed on an empty "No galleries".
+        .onChange(of: availableTabs) { _, tabs in
+            guard let first = tabs.first, !tabs.contains(selectedDetailTab) else { return }
+            guard !viewModel.isLoadingPerformerScenes, !viewModel.isLoadingPerformerGalleries else { return }
+            withAnimation(DesignTokens.Animation.quick) { selectedDetailTab = first }
+        }
+        .onChange(of: viewModel.isLoadingPerformerGalleries) { _, loading in
+            let tabs = availableTabs
+            guard !loading, let first = tabs.first, !tabs.contains(selectedDetailTab),
+                  !viewModel.isLoadingPerformerScenes else { return }
+            withAnimation(DesignTokens.Animation.quick) { selectedDetailTab = first }
         }
         .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("SceneDeleted"))) { _ in
             AppLog.debug("🔄 SceneDeleted - Refreshing performer metadata")

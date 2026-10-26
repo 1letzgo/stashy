@@ -4544,7 +4544,8 @@ class StashDBViewModel: ObservableObject {
         
         var studioScope: [String: Any] = [:]
         if let pid = performerId {
-            studioScope["performers"] = ["value": [pid], "modifier": "INCLUDES"]
+            // StudioFilterType has no `performers`: the performer's studios are those of their scenes.
+            studioScope["scenes_filter"] = ["performers": ["value": [pid], "modifier": "INCLUDES"]]
         }
         if let tid = tagId {
             studioScope["tags"] = ["value": [tid], "modifier": "INCLUDES"]
@@ -4617,7 +4618,8 @@ class StashDBViewModel: ObservableObject {
         
         var tagScope: [String: Any] = [:]
         if let pid = performerId {
-            tagScope["performers"] = ["value": [pid], "modifier": "INCLUDES"]
+            // TagFilterType has no `performers`: the performer's tags are those of their scenes.
+            tagScope["scenes_filter"] = ["performers": ["value": [pid], "modifier": "INCLUDES"]]
         }
         if let sid = studioId {
             tagScope["studios"] = ["value": [sid], "modifier": "INCLUDES"]
