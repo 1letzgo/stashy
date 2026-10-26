@@ -64,7 +64,7 @@ private enum TVSettingsEntry: Hashable {
         case .servers:
             return "Add Stash servers, switch between them, and edit or remove saved ones."
         case .appearance:
-            return "Pick the accent color used for focus highlights and icons throughout the app."
+            return "Pick the app theme and the accent color used for focus highlights and icons throughout the app."
         case .security:
             return "Require a PIN before the app opens."
         case .stashyPlus:
@@ -117,7 +117,7 @@ struct TVSettingsView: View {
                 .padding(.top, 60)
         }
         .padding(.trailing, 80)
-        .background(Color.appBackground)
+        .background(TVThemeFill())
         .onChange(of: focusedEntry) { _, entry in
             if let entry { detailEntry = entry }
         }
@@ -314,7 +314,7 @@ struct TVSettingsPageChrome: ViewModifier {
         .padding(.leading, 60)
         .padding(.trailing, 80)
         .padding(.top, 60)
-        .background(Color.appBackground)
+        .background(TVThemeFill())
         // tvOS zeichnet `navigationTitle` mittig und ausgegraut über den Inhalt.
         // Neben der linksbündigen Überschrift stünde der Titel doppelt da, also
         // leer setzen — dasselbe macht `TVSceneDetailView`.
@@ -501,6 +501,33 @@ private struct TVAppearanceSettingsView: View {
         List {
             Section {
                 VStack(alignment: .leading, spacing: 16) {
+                    Text("Theme")
+                        .font(.headline)
+
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: 24) {
+                            ForEach(AppTheme.tvOSThemes) { theme in
+                                Button {
+                                    withAnimation(.easeInOut(duration: 0.25)) {
+                                        appearanceManager.preferredTheme = theme
+                                    }
+                                } label: {
+                                    TVThemePreviewCard(
+                                        theme: theme,
+                                        isSelected: appearanceManager.currentTheme == theme,
+                                        tint: appearanceManager.tintColor
+                                    )
+                                }
+                                .buttonStyle(.plain)
+                            }
+                        }
+                        .padding(.vertical, 8)
+                    }
+                }
+            }
+
+            Section {
+                VStack(alignment: .leading, spacing: 16) {
                     Text("Accent Color")
                         .font(.headline)
 
@@ -523,7 +550,7 @@ private struct TVAppearanceSettingsView: View {
                 }
             }
         }
-        .tvSettingsPage("Appearance", description: "Pick the accent color used for focus highlights and icons throughout the app.")
+        .tvSettingsPage("Appearance", description: "Pick the app theme and the accent color used for focus highlights and icons throughout the app.")
     }
 
     private func colorsEqual(_ a: Color, _ b: Color, tolerance: CGFloat = 0.01) -> Bool {
@@ -879,7 +906,7 @@ private struct TVSubtitleLanguagePickerView: View {
             .tvSettingsPage("Preferred Language",
                             description: "The language a scene's subtitles start with. \"Any\" takes the first ordinary track in the file.")
         }
-        .background(Color.appBackground)
+        .background(TVThemeFill())
     }
 
     private func row(_ option: (id: String, label: String)) -> some View {

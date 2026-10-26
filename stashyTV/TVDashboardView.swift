@@ -58,7 +58,7 @@ struct TVDashboardView: View {
                 .safeAreaInset(edge: .bottom) { Color.clear.frame(height: 60).focusable(false) }
             }
         }
-        .background(Color.appBackground)
+        .background(TVThemeFill())
         .dismissOnAppLock { playingChannel = nil }
         .fullScreenCover(item: $playingChannel, onDismiss: {
             playingChannel = nil

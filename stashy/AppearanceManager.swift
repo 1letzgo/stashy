@@ -23,6 +23,10 @@ enum AppTheme: String, CaseIterable, Identifiable {
         case .dark, .darkBlue: return .dark
         }
     }
+
+    /// Themes the tvOS app offers. Light / System are left out: the tvOS UI is drawn
+    /// for a dark ground (white labels and focus rings, dark hero fades, overlays).
+    static let tvOSThemes: [AppTheme] = [.darkBlue, .dark]
 }
 
 class AppearanceManager: ObservableObject {
@@ -64,14 +68,20 @@ class AppearanceManager: ObservableObject {
 
 
     var currentTheme: AppTheme {
+        #if os(tvOS)
+        // tvOS bietet nur die dunklen Themes an (siehe `AppTheme.tvOSThemes`); ein
+        // anderer gespeicherter Wert fällt auf den bisherigen Standard zurück.
+        return AppTheme.tvOSThemes.contains(preferredTheme) ? preferredTheme : .darkBlue
+        #else
         if preferredTheme == .system {
-            #if os(iOS) || os(tvOS)
+            #if os(iOS)
             return UITraitCollection.current.userInterfaceStyle == .light ? .light : .dark
             #else
             return .dark
             #endif
         }
         return preferredTheme
+        #endif
     }
 
     var oCounterIconFilled: String {

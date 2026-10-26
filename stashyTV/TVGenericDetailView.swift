@@ -257,7 +257,7 @@ struct TVGenericDetailView<Item: TVDetailItem, Info: View, Content: View>: View 
                 .padding(.bottom, 80)
             }
         }
-        .background(Color.appBackground)
+        .background(TVThemeFill())
         .defaultFocus($headerFocus, true)
         // `defaultFocus` only applies to the first layout. When the item or its scenes
         // arrive later, tvOS re-picks focus and lands on the first scene card, scrolling

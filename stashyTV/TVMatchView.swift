@@ -58,7 +58,7 @@ struct TVMatchView: View {
         }
         .safeAreaInset(edge: .bottom) { Color.clear.frame(height: 60).focusable(false) }
         .defaultFocus($focusedCard, true)
-        .background(Color.appBackground)
+        .background(TVThemeFill())
         .onAppear {
             guard !didRunInitialLoad else { return }
             didRunInitialLoad = true
@@ -299,7 +299,7 @@ struct TVMatchView: View {
                                 .padding(16)
                                 .frame(width: 240, alignment: .leading)
                             }
-                            .background(Color.secondaryAppBackground)
+                            .background(TVThemeFill(role: .secondary))
                         }
                         .buttonStyle(.card)
                         .accessibilityLabel("Pick \(p.displayName) as Rise starter")
@@ -477,7 +477,7 @@ private struct TVMatchBattleCard: View {
             }
         }
         .frame(width: width, height: Self.height)
-        .background(Color.secondaryAppBackground)
+        .background(TVThemeFill(role: .secondary))
     }
 
     private func tint(for delta100: Int) -> Color {
@@ -572,7 +572,7 @@ private struct TVMatchLeaderboardRow: View {
             .frame(maxWidth: .infinity, alignment: .leading)
         }
         .frame(height: 200)
-        .background(Color.secondaryAppBackground)
+        .background(TVThemeFill(role: .secondary))
     }
 
     private func stat(_ title: String, _ value: String) -> some View {

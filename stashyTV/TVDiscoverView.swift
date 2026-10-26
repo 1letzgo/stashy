@@ -75,7 +75,7 @@ struct TVDiscoverView: View {
             .padding(.top, 24)
             .frame(maxWidth: .infinity, alignment: .leading)
         }
-        .background(Color.appBackground)
+        .background(TVThemeFill())
         .navigationDestination(for: TVDiscoverToolLink.self) { link in
             TVDiscoverToolDestination(tool: link.tool)
                 .tvExitDismissable()
@@ -123,7 +123,7 @@ struct TVDiscoverView: View {
             }
             .padding(36)
             .frame(width: 560, height: 340, alignment: .topLeading)
-            .background(Color.secondaryAppBackground)
+            .background(TVThemeFill(role: .secondary))
             .opacity(locked ? 0.75 : 1)
         }
         .buttonStyle(.card)

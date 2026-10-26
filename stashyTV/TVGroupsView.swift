@@ -247,12 +247,12 @@ struct TVGroupDetailView: View {
                                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                                 .background(Color.black.opacity(0.12))
                         } else {
-                            Color.appBackground
+                            TVThemeFill()
                                 .overlay(ProgressView().scaleEffect(1.2))
                         }
                     }
                 } else {
-                    Color.appBackground
+                    TVThemeFill()
                 }
             }
         } else {

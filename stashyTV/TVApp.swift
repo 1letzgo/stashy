@@ -58,7 +58,7 @@ struct TVApp: App {
                         .zIndex(1)
                 }
             }
-            // Hintergrund ist auf tvOS fest dunkel (`appBackground`) — ohne das würden
+            // Alle tvOS-Themes sind dunkel (`AppTheme.tvOSThemes`) — ohne das würden
             // `.primary`/`.secondary`-Texte beim hellen Apple-TV-Design unlesbar.
             .preferredColorScheme(.dark)
             .onChange(of: scenePhase) { _, newPhase in

@@ -63,7 +63,7 @@ struct TVSearchView: View {
                 .safeAreaInset(edge: .bottom) { Color.clear.frame(height: 60).focusable(false) }
             }
         }
-        .background(Color.appBackground)
+        .background(TVThemeFill())
         .task {
             // Only autofocus on first visit of this tab instance — not when
             // returning from a pushed detail (avoids stealing focus from results).

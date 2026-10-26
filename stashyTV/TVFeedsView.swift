@@ -58,7 +58,7 @@ struct TVFeedsView: View {
             .padding(.horizontal, 80)
             .padding(.vertical, 60)
         }
-        .background(Color.appBackground)
+        .background(TVThemeFill())
         .defaultFocus($focusedMode, modes.first)
         .onAppear {
             if session.catalog.savedFilters.isEmpty {

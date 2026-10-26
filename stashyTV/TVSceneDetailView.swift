@@ -11,6 +11,7 @@ import Combine
 struct TVSceneDetailView: View {
     let sceneId: String
 
+    @ObservedObject private var appearance = AppearanceManager.shared
     @ObservedObject private var configManager = ServerConfigManager.shared
     @StateObject private var viewModel = StashDBViewModel()
     @StateObject private var playerModel = TVAetherPlaybackModel()
@@ -39,7 +40,7 @@ struct TVSceneDetailView: View {
 
     var body: some View {
         ZStack(alignment: .top) {
-            Color.appBackground.ignoresSafeArea()
+            TVThemeFill().ignoresSafeArea()
             
             // Full Screen Hero Background
             if let scene = sceneDetail {
@@ -224,13 +225,18 @@ struct TVSceneDetailView: View {
 
     // MARK: - Hero Sections
 
+    /// Page ground of the active theme; the hero fades blend into it.
+    private var themeBackground: Color {
+        Color.appBackground(for: appearance.currentTheme)
+    }
+
     @ViewBuilder
     private func heroBackground(scene: Scene) -> some View {
         // No GeometryReader: inside the tab container its proposed size can exclude the
         // sidebar / safe-area region on some tvOS versions, which left the artwork offset
         // with bare background showing along the left and bottom edges. A clear, edge-to-edge
         // base with the artwork as an overlay always fills whatever the screen is.
-        Color.appBackground
+        themeBackground
             .overlay {
                 if let thumbnailURL = scene.thumbnailURL {
                     CustomAsyncImage(url: thumbnailURL) { loader in
@@ -239,7 +245,7 @@ struct TVSceneDetailView: View {
                                 .resizable()
                                 .scaledToFill()
                         } else {
-                            Color.appBackground
+                            themeBackground
                         }
                     }
                 }
@@ -252,7 +258,7 @@ struct TVSceneDetailView: View {
             .overlay {
                 // Complex Gradient Overlay to fade into the black background and side
                 LinearGradient(
-                    colors: [Color.appBackground.opacity(0.9), Color.appBackground.opacity(0.5), .clear, .clear],
+                    colors: [themeBackground.opacity(0.9), themeBackground.opacity(0.5), .clear, .clear],
                     startPoint: .leading,
                     endPoint: .trailing
                 )
@@ -260,7 +266,7 @@ struct TVSceneDetailView: View {
             .overlay {
                 // Bottom linear gradient to ground the content
                 LinearGradient(
-                    colors: [Color.appBackground.opacity(0.9), Color.appBackground.opacity(0.4), .clear],
+                    colors: [themeBackground.opacity(0.9), themeBackground.opacity(0.4), .clear],
                     startPoint: .bottom,
                     endPoint: .center
                 )

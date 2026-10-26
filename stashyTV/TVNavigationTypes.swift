@@ -152,7 +152,7 @@ struct TVTabStack<Content: View>: View {
         // less than the full screen (sidebar column, larger safe-area insets), the page
         // background alone would stop at that box and bare screen showed along the left
         // and bottom edges.
-        .background(Color.appBackground.ignoresSafeArea())
+        .background(TVThemeFill().ignoresSafeArea())
     }
 }
 

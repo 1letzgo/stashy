@@ -23,7 +23,12 @@ extension Color {
 
     static func appBackground(for theme: AppTheme) -> Color {
         #if os(tvOS)
-        return Color(hex: "#161E2B")
+        switch theme {
+        case .dark:
+            return Color(hex: "#000000")
+        default:
+            return Color(hex: "#161E2B")
+        }
         #else
         switch theme {
         case .darkBlue:
@@ -40,7 +45,12 @@ extension Color {
 
     static func secondaryAppBackground(for theme: AppTheme) -> Color {
         #if os(tvOS)
-        return Color(UIColor.separator).opacity(0.15)
+        switch theme {
+        case .dark:
+            return Color(hex: "#1C1C1E")
+        default:
+            return Color(UIColor.separator).opacity(0.15)
+        }
         #else
         switch theme {
         case .darkBlue:

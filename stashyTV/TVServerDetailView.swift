@@ -38,7 +38,7 @@ struct TVServerDetailView: View {
             .padding(.horizontal, 60)
             .padding(.top, 40)
         }
-        .background(Color.appBackground)
+        .background(TVThemeFill())
         .navigationTitle(config?.name ?? "Server")
         // `force`: diese Seite hat eine frische VM — ein gedrosselter Check (andere
         // VMs haben schon getestet) liesse Status und Spinner für immer hängen.

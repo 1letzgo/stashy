@@ -194,7 +194,7 @@ struct TVCatalogGrid<Item: Identifiable, Card: View, Header: View>: View where I
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(Color.appBackground)
+        .background(TVThemeFill())
         .onAppear {
             // Pfadtiefe, auf der dieses Grid selbst liegt ("See All" wird gepusht,
             // der Pfad ist dort nie leer).
