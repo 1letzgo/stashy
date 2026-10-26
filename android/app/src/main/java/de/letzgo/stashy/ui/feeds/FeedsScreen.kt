@@ -569,7 +569,7 @@ private fun feedScrubSprites(item: FeedItem): de.letzgo.stashy.ui.player.SceneSc
 }
 
 private fun emptyIcon(mode: ReelsModeType) = when (mode) {
-    ReelsModeType.Scenes -> SF.film
+    ReelsModeType.Scenes, ReelsModeType.Verticals -> SF.film
     ReelsModeType.Markers -> SF.bookmarkFill
     ReelsModeType.Clips -> SF.photoOnRectangleAngled
     ReelsModeType.Previews -> SF.playRectangle
@@ -577,7 +577,7 @@ private fun emptyIcon(mode: ReelsModeType) = when (mode) {
 }
 
 private fun emptyTitle(mode: ReelsModeType) = when (mode) {
-    ReelsModeType.Scenes -> "No scenes found"
+    ReelsModeType.Scenes, ReelsModeType.Verticals -> "No scenes found"
     ReelsModeType.Markers -> "No markers found"
     ReelsModeType.Clips -> "No clips found"
     ReelsModeType.Previews -> "No previews found"

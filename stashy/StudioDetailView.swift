@@ -26,7 +26,7 @@ struct StudioDetailView: View {
     @StateObject private var linkedChildStudios: DetailLinkedStudiosFilterModel
     @StateObject private var linkedGalleries: DetailLinkedGalleriesFilterModel
     /// Scenes tab filter / sort, kept here so it survives the tab remounting `ScenesView`.
-    @StateObject private var scenesFilterMemory = ScenesListFilterMemory()
+    @StateObject private var scenesFilterMemory: ScenesListFilterMemory
     @StateObject private var linkedImages: DetailLinkedImagesFilterModel
     @State private var isFavorite: Bool = false
     @State private var isUpdatingFavorite: Bool = false
@@ -62,7 +62,9 @@ struct StudioDetailView: View {
     }
     @State private var selectedDetailTab: DetailTab
 
-    init(studio: Studio) {
+    /// `filterPerformerId`: opened from that performer's page — its scenes, galleries and images
+    /// start filtered on the performer.
+    init(studio: Studio, filterPerformerId: String? = nil) {
         _studio = State(initialValue: studio)
         let sc = studio.sceneCount
         let gal = studio.galleryCount ?? 0
@@ -70,8 +72,15 @@ struct StudioDetailView: View {
         _linkedPerformers = StateObject(wrappedValue: DetailLinkedPerformersFilterModel(scope: .studio(studio.id), initialSort: .nameAsc))
         _linkedTags = StateObject(wrappedValue: DetailLinkedTagsFilterModel(scope: .studio(studio.id)))
         _linkedChildStudios = StateObject(wrappedValue: DetailLinkedStudiosFilterModel(scope: .parentStudio(studio.id)))
-        _linkedGalleries = StateObject(wrappedValue: DetailLinkedGalleriesFilterModel(scope: .studio(studio.id)))
-        _linkedImages = StateObject(wrappedValue: DetailLinkedImagesFilterModel(scope: .studio(studio.id)))
+        let galleries = DetailLinkedGalleriesFilterModel(scope: .studio(studio.id))
+        let images = DetailLinkedImagesFilterModel(scope: .studio(studio.id))
+        if let filterPerformerId {
+            galleries.criteriaDocument.load(PerformerScopedDetail.criteria(performerId: filterPerformerId))
+            images.criteriaDocument.load(PerformerScopedDetail.criteria(performerId: filterPerformerId))
+        }
+        _linkedGalleries = StateObject(wrappedValue: galleries)
+        _linkedImages = StateObject(wrappedValue: images)
+        _scenesFilterMemory = StateObject(wrappedValue: PerformerScopedDetail.scenesMemory(performerId: filterPerformerId))
     }
 
     // Computed properties for counts
@@ -205,52 +214,6 @@ struct StudioDetailView: View {
                     }
                 }
 
-                if showTabSwitcher {
-                    Spacer()
-                        .frame(width: navActionGroupSpacing)
-                }
-
-                HStack(spacing: 6) {
-                    Button {
-                        toggleFavorite()
-                    } label: {
-                        Image(systemName: isFavorite ? "heart.fill" : "heart")
-                            .font(.system(size: StashyExpandingDock.iconSize, weight: .semibold))
-                            .foregroundColor(
-                                isFavorite
-                                    ? .red
-                                    : .white.opacity(StashyExpandingDock.inactiveIconOpacity)
-                            )
-                            .frame(
-                                width: StashyExpandingDock.circleSize,
-                                height: StashyExpandingDock.circleSize
-                            )
-                            .stashyGlass(shape: Capsule(style: .continuous))
-                            .contentShape(Capsule(style: .continuous))
-                    }
-                    .buttonStyle(.plain)
-                    .disabled(isUpdatingFavorite)
-                    .accessibilityLabel(isFavorite ? "Remove favorite" : "Add favorite")
-
-                    if appearanceManager.isEditModeEnabled {
-                        Button {
-                            HapticManager.light()
-                            showingEditStudioSheet = true
-                        } label: {
-                            Image(systemName: "pencil")
-                                .font(.system(size: StashyExpandingDock.iconSize, weight: .semibold))
-                                .foregroundColor(.white.opacity(StashyExpandingDock.inactiveIconOpacity))
-                                .frame(
-                                    width: StashyExpandingDock.circleSize,
-                                    height: StashyExpandingDock.circleSize
-                                )
-                                .stashyGlass(shape: Capsule(style: .continuous))
-                                .contentShape(Capsule(style: .continuous))
-                        }
-                        .buttonStyle(.plain)
-                        .accessibilityLabel("Edit studio")
-                    }
-                }
             }
             .frame(minHeight: chromePillHeight)
             .padding(.horizontal, StashyExpandingDock.edgePadding)
@@ -526,9 +489,29 @@ struct StudioDetailView: View {
 
     // MARK: - Shared detail chrome
 
+    /// Favorite and Edit sit in the floating bar with the list's actions, not in the top chrome.
+    private var entityActionSlots: [CatalogChromeSlot] {
+        var actions = [CatalogChromeSlot(
+            systemImage: isFavorite ? "heart.fill" : "heart",
+            accessibilityLabel: isFavorite ? "Remove favorite" : "Add favorite",
+            tint: isFavorite ? .red : nil
+        ) {
+            guard !isUpdatingFavorite else { return }
+            toggleFavorite()
+        }]
+        if appearanceManager.isEditModeEnabled {
+            actions.append(CatalogChromeSlot(systemImage: "pencil", accessibilityLabel: "Edit studio") {
+                HapticManager.light()
+                showingEditStudioSheet = true
+            })
+        }
+        return actions
+    }
+
     /// Per-tab slots for the embedded list, mirroring the previous floating action bar content.
     private var studioDetailListSlots: CatalogSlotSet {
         var slots = CatalogSlotSet(visibility: studioDetailCatalogFloatingChromeForFooter)
+        slots.entityActions = entityActionSlots
         switch selectedDetailTab {
         case .scenes:
             // Filter & sort opens from the scene list's own quick bar.
@@ -581,8 +564,8 @@ struct StudioDetailView: View {
                 linkedImages.showFilterSortSheet = true
             }
         case .groups:
-            // No groups filter model yet — hide the bar instead of showing an empty one.
-            slots.isPresented = false
+            // No groups filter model yet; the bar still carries Favorite / Edit.
+            break
         }
         return slots
     }

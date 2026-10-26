@@ -385,6 +385,17 @@ struct ReelsViewBody: View {
     @State private var reelsScenePresetNameInput = ""
     @State private var showReelsSceneSaveAsAlert = false
     @StateObject private var reelsCriteriaDocument = FilterCriteriaDocument(mode: .scenes, pinsDefaults: true)
+    /// stashy+ Verticals: the Scenes feed (`reelsMode == .scenes`) with its own criteria, preset to
+    /// portrait. The shared scene document swaps between the two variants; this holds the other one.
+    @State private var reelsVerticals = false
+    @State private var reelsParkedSceneCriteria: [String: Any] = [:]
+    @State private var reelsParkedVerticalCriteria: [String: Any] = [:]
+    @State private var reelsParkedSceneFilter: StashDBViewModel.SavedFilter?
+    @State private var reelsParkedVerticalFilter: StashDBViewModel.SavedFilter?
+    /// Verticals' first visit starts from its own default filter (Settings › Feeds).
+    @State private var reelsVerticalsVisited = false
+    /// Always sent in Verticals, on top of its filter and criteria.
+    private static let verticalsCriteria: [String: Any] = ["orientation": ["value": ["PORTRAIT"]]]
     @StateObject private var reelsMarkerCriteriaDocument = FilterCriteriaDocument(mode: .sceneMarkers, pinsDefaults: true)
     @State private var showReelsSceneRenameAlert = false
     @State private var showReelsSceneDeleteAlert = false
@@ -1504,6 +1515,8 @@ struct ReelsViewBody: View {
             case .clips: self = .clips
             case .previews: self = .previews
             case .pics: self = .pics
+            // Verticals is the Scenes feed with its own (portrait) filter; see `reelsVerticals`.
+            case .verticals: self = .scenes
             }
         }
     }
@@ -1963,6 +1976,14 @@ struct ReelsViewBody: View {
         reelsCriteriaDocument.layered(over: base ?? [:])
     }
 
+    /// The Scenes feed's criteria; in Verticals the portrait criterion is always added on top,
+    /// whatever filter or criteria the user picked there.
+    private func reelsSceneFeedLive(_ base: [String: Any]?) -> [String: Any]? {
+        var live = reelsSceneLive(base) ?? [:]
+        if reelsVerticals { live.merge(Self.verticalsCriteria) { _, forced in forced } }
+        return live.isEmpty ? nil : live
+    }
+
     /// Marker counterpart of ``reelsSceneLive(_:)``. The chips are scene-level criteria and go
     /// under `scene_filter`; the marker criteria editor's entries stay top-level (marker fields).
     private func reelsMarkerLive(_ base: [String: Any]?) -> [String: Any]? {
@@ -1980,7 +2001,7 @@ struct ReelsViewBody: View {
                 sortField: selectedSortOption.sortField,
                 direction: selectedSortOption.direction,
                 filterId: selectedFilter?.id,
-                liveFilter: reelsSceneLive(reelsSceneLiveChips.effectiveLiveFilter(for: selectedFilter)),
+                liveFilter: reelsSceneFeedLive(reelsSceneLiveChips.effectiveLiveFilter(for: selectedFilter)),
                 performerId: selectedPerformer?.id,
                 tagIds: selectedTags.map(\.id),
                 studioId: selectedStudio?.id
@@ -2312,7 +2333,9 @@ struct ReelsViewBody: View {
         let mergedPreviewFilter = hasCriterionOverlay
             ? viewModel.mergeFilterWithCriteria(filter: resolvedPreviewFilter, performer: performer, tags: tags, studio: studio, mode: .scenes)
             : resolvedPreviewFilter
-        let sceneLiveForScenes = stripLiveChips ? nil : reelsSceneLive(reelsSceneLiveChips.effectiveLiveFilter(for: resolvedSceneFilterEarly))
+        let sceneLiveForScenes = stripLiveChips
+            ? (reelsVerticals ? Self.verticalsCriteria : nil)
+            : reelsSceneFeedLive(reelsSceneLiveChips.effectiveLiveFilter(for: resolvedSceneFilterEarly))
         let sceneLiveForMarkers = stripLiveChips ? nil : reelsMarkerLive(reelsMarkerLiveChips.effectiveLiveFilter(for: resolvedMarkerFilterEarly))
         let sceneLiveForPreviews = stripLiveChips ? nil : reelsSceneLive(reelsPreviewLiveChips.effectiveLiveFilter(for: resolvedPreviewFilter))
 
@@ -4715,21 +4738,79 @@ struct ReelsViewBody: View {
 
     @ViewBuilder
     private var reelsModeDock: some View {
-        let enabledModes = tabManager.enabledReelsModes.map { ReelsMode(from: $0) }
+        let enabledTypes = tabManager.enabledReelsModes
         StashyExpandingDockBrowseStrip(
-            items: enabledModes.map {
-                StashyNavMenuItem(id: $0.rawValue, title: $0.rawValue, systemImage: $0.icon)
+            items: enabledTypes.map { type in
+                if type == .verticals {
+                    return StashyNavMenuItem(id: Self.verticalsDockID, title: type.defaultTitle, systemImage: type.icon)
+                }
+                let mode = ReelsMode(from: type)
+                return StashyNavMenuItem(id: mode.rawValue, title: mode.rawValue, systemImage: mode.icon)
             },
-            selectionID: reelsMode.rawValue,
+            selectionID: reelsVerticals && reelsMode == .scenes ? Self.verticalsDockID : reelsMode.rawValue,
             accessibilityLabel: "Feed",
             accessibilityHint: "Chooses which feed mode to show"
         ) { id in
-            guard let mode = ReelsMode(rawValue: id), mode != reelsMode else { return }
-            reelsMode = mode
+            selectReelsDockEntry(id)
         }
         // The same air toward the content that `StashyTopNavNameDropdownRow` gives the strip in
         // Home, Tools and Settings. Without it the Feeds chrome sat 4 pt shorter than the rest.
         .padding(StashyChromePlacement.prefersBottom ? .top : .bottom, 4)
+    }
+
+    private static let verticalsDockID = "Verticals"
+
+    /// Dock tap. Verticals and Scenes share `reelsMode == .scenes`; switching between them swaps
+    /// the scene criteria document, so each keeps its own filter (Verticals starts on portrait).
+    private func selectReelsDockEntry(_ id: String) {
+        if id == Self.verticalsDockID {
+            guard !(reelsVerticals && reelsMode == .scenes) else { return }
+            if reelsMode == .scenes {
+                setReelsVerticals(true)
+                reelsApplySceneLiveFromSheet()
+            } else {
+                reelsMode = .scenes
+                // After the mode change has restored the Scenes session.
+                DispatchQueue.main.async {
+                    setReelsVerticals(true)
+                    reelsApplySceneLiveFromSheet()
+                }
+            }
+            return
+        }
+        guard let mode = ReelsMode(rawValue: id) else { return }
+        if reelsVerticals {
+            setReelsVerticals(false)
+            if mode == .scenes, reelsMode == .scenes {
+                reelsApplySceneLiveFromSheet()
+                return
+            }
+        }
+        guard mode != reelsMode else { return }
+        reelsMode = mode
+    }
+
+    private func setReelsVerticals(_ on: Bool) {
+        guard on != reelsVerticals else { return }
+        let current = reelsCriteriaDocument.objectFilter
+        if on {
+            reelsParkedSceneCriteria = current
+            reelsParkedSceneFilter = selectedFilter
+            if !reelsVerticalsVisited {
+                reelsVerticalsVisited = true
+                reelsParkedVerticalFilter = TabManager.shared.getDefaultVerticalFilterId(for: .reels)
+                    .flatMap { viewModel.savedFilters[$0] }
+                reelsParkedVerticalCriteria = reelsParkedVerticalFilter?.filterDict ?? [:]
+            }
+            selectedFilter = reelsParkedVerticalFilter
+            reelsCriteriaDocument.load(reelsParkedVerticalCriteria)
+        } else {
+            reelsParkedVerticalCriteria = current
+            reelsParkedVerticalFilter = selectedFilter
+            selectedFilter = reelsParkedSceneFilter
+            reelsCriteriaDocument.load(reelsParkedSceneCriteria)
+        }
+        reelsVerticals = on
     }
 
     @ViewBuilder

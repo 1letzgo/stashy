@@ -437,6 +437,16 @@ struct SceneDetailView: View {
             ))
             .modifier(lifecycleModifier)
             .dismissOnAppLock { isFullscreen = false }
+            // Deleted elsewhere (from its page opened out of Now Playing, Feeds, …): this copy of
+            // the page has nothing left to show. The page that deleted it closes itself.
+            .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("SceneDeleted"))) { note in
+                guard !isDeleting, !playerOnly,
+                      let sceneId = note.userInfo?["sceneId"] as? String, sceneId == activeScene.id else { return }
+                isDeleting = true
+                aetherEngine?.stop()
+                aetherEngine = nil
+                dismiss()
+            }
             .fullScreenCover(isPresented: $isFullscreen) {
                 fullscreenPlayer
             }
@@ -734,7 +744,9 @@ struct SceneDetailView: View {
 
     private func handleOnDisappear() {
         if isDeleting {
-            aetherEngine?.pause()
+            // The scene is gone: nothing to resume or hand to the mini player.
+            aetherEngine?.stop()
+            aetherEngine = nil
             stopPreview()
             return
         }

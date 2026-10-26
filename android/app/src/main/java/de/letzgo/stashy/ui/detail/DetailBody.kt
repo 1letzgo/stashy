@@ -77,6 +77,8 @@ internal class LinkedCatalog(
     groupScope: JsonObject? = null,
     imageScope: JsonObject? = null,
     val sceneContext: DetailViewContext? = null,
+    /** Performer page: studios and tags it lists open filtered on this performer (iOS `filterPerformerId`). */
+    val opensFilteredOnPerformerId: String? = null,
     /** Scene / gallery counts known from the list item, so the first tab is right before loading. */
     var previewScenes: Int = 0,
     var previewGalleries: Int = 0,
@@ -138,6 +140,21 @@ internal class LinkedCatalog(
         FilterMode.Images, imageScope, DetailSort.Image.DateDesc.raw, CatalogRepository.pageSize(FilterMode.Images),
         extraLive = { imageKind.kind.pathCriterion?.let { JsonObject(mapOf("path" to it)) } ?: JsonObject(emptyMap()) },
     )
+
+    /**
+     * iOS `PerformerScopedDetail`: a tag or studio opened from a performer's page starts with the
+     * performer as a removable criterion in its scenes, galleries and images.
+     */
+    fun startFilteredOnPerformer(performerId: String?) {
+        performerId ?: return
+        val crit = kotlinx.serialization.json.buildJsonObject {
+            put("performers", kotlinx.serialization.json.buildJsonObject {
+                put("value", kotlinx.serialization.json.JsonArray(listOf(kotlinx.serialization.json.JsonPrimitive(performerId))))
+                put("modifier", kotlinx.serialization.json.JsonPrimitive("INCLUDES"))
+            })
+        }
+        listOfNotNull(sceneController, galleryController, imageController).forEach { it.criteria.load(crit) }
+    }
 
     val scenes: PagedList<Scene>? get() = sceneController?.list
     val galleries: PagedList<Gallery>? get() = galleryController?.list
@@ -325,13 +342,13 @@ internal fun LazyGridScope.linkedSection(catalog: LinkedCatalog, tab: DetailTab,
             }
         }
         DetailTab.Studios -> catalog.studios?.let { l ->
-            pagedSection(l, { it.id }) { _, s -> DetailStudioCard(s, onClick = { Nav.push(StudioDetailScreen(s.id, s)) }) }
+            pagedSection(l, { it.id }) { _, s -> DetailStudioCard(s, onClick = { Nav.push(StudioDetailScreen(s.id, s, catalog.opensFilteredOnPerformerId)) }) }
         }
         DetailTab.Performers -> catalog.performers?.let { l ->
             pagedSection(l, { it.id }, "Loading performers...") { _, p -> DetailPerformerCard(p, onClick = { Nav.push(PerformerDetailScreen(p.id, p)) }) }
         }
         DetailTab.Tags -> catalog.tags?.let { l ->
-            pagedSection(l, { it.id }) { _, t -> DetailTagCard(t, onClick = { Nav.push(TagDetailScreen(t.id, t)) }) }
+            pagedSection(l, { it.id }) { _, t -> DetailTagCard(t, onClick = { Nav.push(TagDetailScreen(t.id, t, catalog.opensFilteredOnPerformerId)) }) }
         }
         DetailTab.Groups -> catalog.groups?.let { l ->
             pagedSection(l, { it.id }) { _, g -> DetailGroupCard(g, onClick = { Nav.push(GroupDetailScreen(g.id, g)) }) }

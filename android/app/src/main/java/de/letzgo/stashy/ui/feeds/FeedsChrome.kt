@@ -97,6 +97,7 @@ object FeedsDock {
 /** iOS mode icons (`ReelsMode.icon`). */
 val ReelsModeType.icon: ImageVector get() = when (this) {
     ReelsModeType.Scenes -> SF.film
+    ReelsModeType.Verticals -> SF.rectangleGrid1x2
     ReelsModeType.Markers -> SF.bookmarkFill
     ReelsModeType.Clips -> SF.photoOnRectangleAngled
     ReelsModeType.Previews -> SF.playRectangleOnRectangleFill

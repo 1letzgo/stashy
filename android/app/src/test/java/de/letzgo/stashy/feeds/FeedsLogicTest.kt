@@ -32,16 +32,16 @@ import org.junit.Test
 class ReelsModesCodecTest {
     @Test fun defaultsMatchIOS() {
         val d = ReelsModesCodec.defaults()
-        assertEquals(listOf("scenes", "markers", "clips", "previews", "pics"), d.map { it.type.name.lowercase() })
+        assertEquals(listOf("scenes", "markers", "clips", "previews", "pics", "verticals"), d.map { it.type.name.lowercase() })
         assertTrue(d.all { it.isEnabled })
-        assertEquals("dateDesc", d.last().defaultSortOption)
+        assertEquals("dateDesc", d.first { it.type == ReelsModeType.Pics }.defaultSortOption)
         assertNull(d.first().defaultSortOption)
     }
 
     @Test fun garbageFallsBackToDefaults() {
         val (modes, repaired) = ReelsModesCodec.decode("not json")
         assertTrue(repaired)
-        assertEquals(5, modes.size)
+        assertEquals(6, modes.size)
         assertTrue(ReelsModesCodec.decode(null).second)
     }
 
@@ -64,15 +64,15 @@ class ReelsModesCodecTest {
             {"id":"6F9619FF-8B86-D011-B42D-00CF4FC964FC","type":"previews","isEnabled":true,"sortOrder":3}]"""
         val (modes, repaired) = ReelsModesCodec.decode(swift)
         assertTrue(repaired)
-        assertEquals(listOf(ReelsModeType.Scenes, ReelsModeType.Markers, ReelsModeType.Clips, ReelsModeType.Previews, ReelsModeType.Pics), modes.map { it.type })
-        assertEquals(listOf(0, 1, 2, 3, 4), modes.map { it.sortOrder })
-        assertEquals("dateDesc", modes.last().defaultSortOption)
-        assertEquals(listOf(ReelsModeType.Scenes, ReelsModeType.Clips, ReelsModeType.Previews, ReelsModeType.Pics), ReelsModesCodec.enabled(modes))
+        assertEquals(listOf(ReelsModeType.Scenes, ReelsModeType.Markers, ReelsModeType.Clips, ReelsModeType.Previews, ReelsModeType.Pics, ReelsModeType.Verticals), modes.map { it.type })
+        assertEquals(listOf(0, 1, 2, 3, 4, 5), modes.map { it.sortOrder })
+        assertEquals("dateDesc", modes.first { it.type == ReelsModeType.Pics }.defaultSortOption)
+        assertEquals(listOf(ReelsModeType.Scenes, ReelsModeType.Clips, ReelsModeType.Previews, ReelsModeType.Pics, ReelsModeType.Verticals), ReelsModesCodec.enabled(modes))
     }
 
     @Test fun lastEnabledModeCannotBeDisabled() {
         var modes = ReelsModesCodec.defaults()
-        listOf(ReelsModeType.Scenes, ReelsModeType.Markers, ReelsModeType.Clips, ReelsModeType.Previews).forEach { modes = ReelsModesCodec.toggle(modes, it) }
+        listOf(ReelsModeType.Scenes, ReelsModeType.Markers, ReelsModeType.Clips, ReelsModeType.Previews, ReelsModeType.Verticals).forEach { modes = ReelsModesCodec.toggle(modes, it) }
         assertEquals(listOf(ReelsModeType.Pics), ReelsModesCodec.enabled(modes))
         modes = ReelsModesCodec.toggle(modes, ReelsModeType.Pics)
         assertEquals(listOf(ReelsModeType.Pics), ReelsModesCodec.enabled(modes))
@@ -81,7 +81,7 @@ class ReelsModesCodecTest {
     @Test fun moveRenumbers() {
         val moved = ReelsModesCodec.move(ReelsModesCodec.defaults(), 4, 0)
         assertEquals(ReelsModeType.Pics, moved.first().type)
-        assertEquals(listOf(0, 1, 2, 3, 4), moved.map { it.sortOrder })
+        assertEquals(listOf(0, 1, 2, 3, 4, 5), moved.map { it.sortOrder })
     }
 
     @Test fun modeRawMatchesIOSReelsMode() {

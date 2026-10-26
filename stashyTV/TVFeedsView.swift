@@ -147,7 +147,7 @@ struct TVFeedsView: View {
         case .markers: return tabManager.getDefaultMarkerFilterName(for: .reels)
         case .clips: return tabManager.getDefaultClipFilterName(for: .reels)
         case .previews: return tabManager.getDefaultPreviewFilterName(for: .reels)
-        case .pics: return nil
+        case .pics, .verticals: return nil
         }
     }
 

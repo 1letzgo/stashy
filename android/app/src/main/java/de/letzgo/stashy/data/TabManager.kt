@@ -359,6 +359,7 @@ object TabManager {
     fun getDefaultMarkerFilterId(tab: AppTab) = tab(tab)?.defaultMarkerFilterId
     fun getDefaultClipFilterId(tab: AppTab) = tab(tab)?.defaultClipFilterId
     fun getDefaultPreviewFilterId(tab: AppTab) = tab(tab)?.defaultPreviewFilterId
+    fun getDefaultVerticalFilterId(tab: AppTab) = tab(tab)?.defaultVerticalFilterId
 
     private fun updateTab(tab: AppTab, change: (TabConfig) -> TabConfig) {
         ensureLoaded()
@@ -372,6 +373,7 @@ object TabManager {
     fun setDefaultMarkerFilter(tab: AppTab, id: String?, name: String?) = updateTab(tab) { it.copy(defaultMarkerFilterId = id, defaultMarkerFilterName = name) }
     fun setDefaultClipFilter(tab: AppTab, id: String?, name: String?) = updateTab(tab) { it.copy(defaultClipFilterId = id, defaultClipFilterName = name) }
     fun setDefaultPreviewFilter(tab: AppTab, id: String?, name: String?) = updateTab(tab) { it.copy(defaultPreviewFilterId = id, defaultPreviewFilterName = name) }
+    fun setDefaultVerticalFilter(tab: AppTab, id: String?, name: String?) = updateTab(tab) { it.copy(defaultVerticalFilterId = id, defaultVerticalFilterName = name) }
 
     fun getPersistentDetailSortOption(ctx: DetailViewContext): String? { ensureLoaded(); return detailSorts[ctx] }
     fun setPersistentDetailSortOption(ctx: DetailViewContext, option: String) {
@@ -453,6 +455,7 @@ object TabManager {
 
     val configurableReelsModes: List<ReelsModeConfig> get() { ensureLoaded(); return reelsModes.sortedBy { it.sortOrder } }
     val enabledReelsModes: List<ReelsModeType> get() = configurableReelsModes.filter { it.isEnabled }.map { it.type }
+        .filter { !it.requiresStashyPlus || de.letzgo.stashy.data.StashyPlus.isUnlocked }
 
     /** iOS `toggleReelsMode` — the last enabled mode can't be switched off. */
     fun toggleReelsMode(type: ReelsModeType) {

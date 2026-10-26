@@ -244,7 +244,7 @@ data class FeedSegment(val start: Double, val end: Double) {
 
 /** iOS: `expectedPrefix(for:)`. */
 fun ReelsModeType.itemPrefix(): String? = when (this) {
-    ReelsModeType.Scenes -> "scene"
+    ReelsModeType.Scenes, ReelsModeType.Verticals -> "scene"
     ReelsModeType.Markers -> "marker"
     ReelsModeType.Clips -> "clip"
     ReelsModeType.Previews -> "preview"

@@ -27,8 +27,8 @@ import kotlinx.coroutines.launch
  * iOS: `StudioDetailView` — logo hero header (PNG/JPG/SVG via Coil like `StudioLogoStore`), sections Scenes · Galleries · Studios (sub-studios) · Performers · Tags ·
  * Groups · Images, favorite and `EditStudioSheet`.
  */
-class StudioDetailScreen(val studioId: String, val preview: Studio? = null) : Screen {
-    override val key = "studio-$studioId"
+class StudioDetailScreen(val studioId: String, val preview: Studio? = null, private val filterPerformerId: String? = null) : Screen {
+    override val key = "studio-$studioId" + (filterPerformerId?.let { "-p$it" } ?: "")
 
     private val scope = screenScope()
     private var studio by mutableStateOf(preview)
@@ -58,6 +58,8 @@ class StudioDetailScreen(val studioId: String, val preview: Studio? = null) : Sc
         previewScenes = preview?.sceneCount ?: 0,
         previewGalleries = preview?.galleryCount ?: 0,
     )
+
+    init { catalog.startFilteredOnPerformer(filterPerformerId) }
 
     private var tab by mutableStateOf(
         when {

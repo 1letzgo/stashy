@@ -109,6 +109,7 @@ class PerformerDetailScreen(val performerId: String, val preview: Performer? = n
         tagScope = DetailRepository.scope("performers", performerId),
         groupScope = DetailRepository.scope("performers", performerId),
         imageScope = DetailRepository.scope("performers", performerId),
+        opensFilteredOnPerformerId = performerId,
         sceneContext = DetailViewContext.Performer,
         previewScenes = preview?.sceneCount ?: 0,
         previewGalleries = preview?.galleryCount ?: 0,

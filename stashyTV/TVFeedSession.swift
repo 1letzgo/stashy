@@ -175,7 +175,7 @@ extension ReelsModeType {
 
     var feedKind: StashDBViewModel.ReelsFeedKind? {
         switch self {
-        case .scenes: return .scenes
+        case .scenes, .verticals: return .scenes
         case .markers: return .markers
         case .clips: return .clips
         case .previews: return .previews
@@ -186,7 +186,7 @@ extension ReelsModeType {
     /// Saved-filter mode a Feeds default filter of this mode belongs to.
     var savedFilterMode: StashDBViewModel.FilterMode {
         switch self {
-        case .scenes, .previews: return .scenes
+        case .scenes, .verticals, .previews: return .scenes
         case .markers: return .sceneMarkers
         case .clips, .pics: return .images
         }
@@ -197,7 +197,7 @@ extension ReelsModeType {
     var defaultFilterId: String? {
         let tm = TabManager.shared
         switch self {
-        case .scenes: return tm.getDefaultFilterId(for: .reels)
+        case .scenes, .verticals: return tm.getDefaultFilterId(for: .reels)
         case .markers: return tm.getDefaultMarkerFilterId(for: .reels)
         case .clips: return tm.getDefaultClipFilterId(for: .reels)
         case .previews: return tm.getDefaultPreviewFilterId(for: .reels)
@@ -209,7 +209,7 @@ extension ReelsModeType {
     func setDefaultFilter(id: String?, name: String?) {
         let tm = TabManager.shared
         switch self {
-        case .scenes: tm.setDefaultFilter(for: .reels, filterId: id, filterName: name)
+        case .scenes, .verticals: tm.setDefaultFilter(for: .reels, filterId: id, filterName: name)
         case .markers: tm.setDefaultMarkerFilter(for: .reels, filterId: id, filterName: name)
         case .clips: tm.setDefaultClipFilter(for: .reels, filterId: id, filterName: name)
         case .previews: tm.setDefaultPreviewFilter(for: .reels, filterId: id, filterName: name)
@@ -226,7 +226,7 @@ extension ReelsModeType {
     /// Sort choices of this mode as (raw value, label).
     var sortChoices: [(raw: String, label: String)] {
         switch self {
-        case .scenes, .previews:
+        case .scenes, .verticals, .previews:
             return StashDBViewModel.SceneSortOption.generalCases.map { ($0.rawValue, $0.displayName) }
         case .markers:
             return StashDBViewModel.SceneMarkerSortOption.allCases.map { ($0.rawValue, $0.displayName) }
@@ -298,7 +298,7 @@ final class TVFeedSession: ObservableObject {
 
     private var totalCount: Int {
         switch mode {
-        case .scenes: return catalog.totalScenes
+        case .scenes, .verticals: return catalog.totalScenes
         case .previews: return catalog.totalPreviews
         default: return items.count
         }
@@ -447,7 +447,7 @@ final class TVFeedSession: ObservableObject {
         if mode == .scenes { ReelsSceneStartPositions.reset() }
 
         switch mode {
-        case .scenes:
+        case .scenes, .verticals:
             let sort = StashDBViewModel.SceneSortOption(rawValue: sortRaw) ?? .random
             catalog.fetchScenes(sortBy: sort, filter: filter, forFeeds: true)
         case .markers:
@@ -473,7 +473,7 @@ final class TVFeedSession: ObservableObject {
 
     private func seedKind(for mode: ReelsModeType) -> StashDBViewModel.RandomSeedKind? {
         switch mode {
-        case .scenes: return .scenes
+        case .scenes, .verticals: return .scenes
         case .markers: return .markers
         case .clips: return .images
         case .previews: return .previews
@@ -483,7 +483,7 @@ final class TVFeedSession: ObservableObject {
 
     private func isFetching(_ mode: ReelsModeType) -> Bool {
         switch mode {
-        case .scenes: return catalog.isLoadingScenes
+        case .scenes, .verticals: return catalog.isLoadingScenes
         case .markers: return catalog.isLoadingMarkers
         case .clips: return catalog.isLoadingClips
         case .previews: return catalog.isLoadingPreviews
@@ -496,7 +496,7 @@ final class TVFeedSession: ObservableObject {
     private func buildItems() -> [TVFeedItem] {
         let built: [TVFeedItem]
         switch mode {
-        case .scenes:
+        case .scenes, .verticals:
             built = catalog.scenes.map { .scene($0) }
         case .markers:
             built = catalog.sceneMarkers.filter { $0.scene != nil }.map { .marker($0) }
@@ -551,7 +551,7 @@ final class TVFeedSession: ObservableObject {
     private func loadMoreIfNeeded() {
         guard index >= items.count - 4 else { return }
         switch mode {
-        case .scenes: catalog.loadMoreScenes()
+        case .scenes, .verticals: catalog.loadMoreScenes()
         case .markers: catalog.loadMoreMarkers()
         case .clips: catalog.loadMoreClips()
         case .previews: catalog.loadMorePreviews()

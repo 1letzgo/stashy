@@ -72,6 +72,7 @@ private fun ReelsModeType.icon(): ImageVector = when (this) {
     ReelsModeType.Clips -> SFS.photoOnRectangleAngled
     ReelsModeType.Previews -> SFS.playRectOnRectFill
     ReelsModeType.Pics -> SFS.cameraFill
+    ReelsModeType.Verticals -> SF.rectangleGrid1x2
 }
 
 /** Card header (iOS `Label(…).font(.subheadline.weight(.semibold)).foregroundColor(tint)`) — Material titleMedium. */
@@ -94,7 +95,7 @@ fun DefaultFilterMenu(tab: AppTab, kind: FilterKind = FilterKind.Standard) {
     val mode = when (kind) {
         FilterKind.Marker -> "SCENE_MARKERS"
         FilterKind.Clip -> "IMAGES"
-        FilterKind.Preview -> "SCENES"
+        FilterKind.Preview, FilterKind.Vertical -> "SCENES"
         FilterKind.Standard -> (if (tab == AppTab.Reels || tab == AppTab.Dashboard) FilterMode.Scenes.raw else tab.filterMode?.raw) ?: return
     }
     val filters = SavedFiltersStore.ofMode(mode)
@@ -102,6 +103,7 @@ fun DefaultFilterMenu(tab: AppTab, kind: FilterKind = FilterKind.Standard) {
         FilterKind.Marker -> TabManager.getDefaultMarkerFilterId(tab)
         FilterKind.Clip -> TabManager.getDefaultClipFilterId(tab)
         FilterKind.Preview -> TabManager.getDefaultPreviewFilterId(tab)
+        FilterKind.Vertical -> TabManager.getDefaultVerticalFilterId(tab)
         FilterKind.Standard -> if (tab == AppTab.Markers) TabManager.getDefaultMarkerFilterId(tab) else TabManager.getDefaultFilterId(tab)
     }
     if (filters.isEmpty() && !SavedFiltersStore.isLoading) {
@@ -115,13 +117,14 @@ fun DefaultFilterMenu(tab: AppTab, kind: FilterKind = FilterKind.Standard) {
             kind == FilterKind.Marker || (kind == FilterKind.Standard && tab == AppTab.Markers) -> TabManager.setDefaultMarkerFilter(tab, fid, name)
             kind == FilterKind.Clip -> TabManager.setDefaultClipFilter(tab, fid, name)
             kind == FilterKind.Preview -> TabManager.setDefaultPreviewFilter(tab, fid, name)
+            kind == FilterKind.Vertical -> TabManager.setDefaultVerticalFilter(tab, fid, name)
             else -> TabManager.setDefaultFilter(tab, fid, name)
         }
     }
 }
 
 /** Which default-filter slot of a `TabConfig` a menu edits. */
-enum class FilterKind { Standard, Marker, Clip, Preview }
+enum class FilterKind { Standard, Marker, Clip, Preview, Vertical }
 
 /** iOS: `DashboardSettingsView` — dashboard card, Home tabs (order/visibility/defaults), rows, channels. */
 class DashboardSettingsScreen : Screen {
@@ -261,7 +264,7 @@ class FeedsSettingsScreen : Screen {
                 item(key = "modes") {
                     Column(Modifier.padding(bottom = 24.dp)) {
                         SectionHeaderText("Modes")
-                        ReorderableColumn(TabManager.configurableReelsModes, { it.id }, { from, to -> TabManager.moveReelsMode(from, to) }) { mode, _, handle ->
+                        ReorderableColumn(TabManager.configurableReelsModes.filter { !it.type.requiresStashyPlus || de.letzgo.stashy.data.StashyPlus.isUnlocked }, { it.id }, { from, to -> TabManager.moveReelsMode(from, to) }) { mode, _, handle ->
                             FeedsModeCard(mode, handle)
                         }
                     }
@@ -282,7 +285,7 @@ private fun FeedsModeCard(mode: ReelsModeConfig, handle: Modifier) {
         if (!mode.isEnabled) return@SettingsCard
         CardDivider()
         val (options, fallback) = when (mode.type) {
-            ReelsModeType.Scenes, ReelsModeType.Previews -> sortNames(FilterMode.Scenes) to "random"
+            ReelsModeType.Scenes, ReelsModeType.Previews, ReelsModeType.Verticals -> sortNames(FilterMode.Scenes) to "random"
             ReelsModeType.Markers -> sortNames(FilterMode.SceneMarkers) to "random"
             ReelsModeType.Clips -> sortNames(FilterMode.Images) to "random"
             ReelsModeType.Pics -> sortNames(FilterMode.Images) to "dateDesc"
@@ -298,6 +301,8 @@ private fun FeedsModeCard(mode: ReelsModeConfig, handle: Modifier) {
                 ReelsModeType.Clips -> DefaultFilterMenu(AppTab.Reels, FilterKind.Clip)
                 ReelsModeType.Previews -> DefaultFilterMenu(AppTab.Reels, FilterKind.Preview)
                 ReelsModeType.Pics -> DefaultFilterMenu(AppTab.Images)
+                // A scene filter like Scenes; the feed always adds portrait on top.
+                ReelsModeType.Verticals -> DefaultFilterMenu(AppTab.Reels, FilterKind.Vertical)
             }
         }
         if (mode.type == ReelsModeType.Pics) {

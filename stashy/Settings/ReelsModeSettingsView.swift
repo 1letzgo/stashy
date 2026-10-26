@@ -171,11 +171,11 @@ struct ReelsModeSettingsView: View {
     @ViewBuilder
     private func sortPicker(for type: ReelsModeType) -> some View {
         switch type {
-        case .scenes:
-            let current = StashDBViewModel.SceneSortOption(rawValue: tabManager.getReelsDefaultSort(for: .scenes) ?? "") ?? .random
+        case .scenes, .verticals:
+            let current = StashDBViewModel.SceneSortOption(rawValue: tabManager.getReelsDefaultSort(for: type) ?? "") ?? .random
             Menu {
                 ForEach(StashDBViewModel.SceneSortOption.generalCases, id: \.self) { option in
-                    Button(action: { tabManager.setReelsDefaultSort(for: .scenes, option: option.rawValue) }) {
+                    Button(action: { tabManager.setReelsDefaultSort(for: type, option: option.rawValue) }) {
                         HStack { Text(option.displayName); if option == current { Image(systemName: "checkmark") } }
                     }
                 }
@@ -356,6 +356,27 @@ struct ReelsModeSettingsView: View {
                 .labelsHidden()
             }
 
+        case .verticals:
+            // A scene filter like Scenes; the feed always adds portrait on top.
+            if sceneFilters.isEmpty && !viewModel.isLoadingSavedFilters {
+                Text("No filters found")
+                    .foregroundColor(.secondary)
+                    .font(.subheadline)
+            } else {
+                Picker("", selection: Binding(
+                    get: { tabManager.getDefaultVerticalFilterId(for: .reels) ?? "" },
+                    set: { newId in
+                        let filter = sceneFilters.first(where: { $0.id == newId })
+                        tabManager.setDefaultVerticalFilter(for: .reels, filterId: filter?.id, filterName: filter?.name)
+                    }
+                )) {
+                    Text("None").tag("")
+                    ForEach(sceneFilters) { filter in
+                        Text(filter.name).tag(filter.id)
+                    }
+                }
+                .pickerStyle(.menu)
+            }
         case .pics:
             let filters = viewModel.savedFilters.values
                 .filter { $0.mode == .images }

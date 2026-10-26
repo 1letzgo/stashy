@@ -216,7 +216,7 @@ object FeedsModel {
     fun defaultSort(m: ReelsModeType): FeedSort {
         val raw = FeedsConfig.defaultSort(m)
         return when (m) {
-            ReelsModeType.Scenes, ReelsModeType.Previews -> SceneSortOption.from(raw) ?: SceneSortOption.random
+            ReelsModeType.Scenes, ReelsModeType.Verticals, ReelsModeType.Previews -> SceneSortOption.from(raw) ?: SceneSortOption.random
             ReelsModeType.Markers -> SceneMarkerSortOption.from(raw) ?: SceneMarkerSortOption.random
             ReelsModeType.Clips -> ImageSortOption.from(raw) ?: ImageSortOption.random
             ReelsModeType.Pics -> ImageSortOption.from(raw) ?: ImageSortOption.dateDesc
@@ -225,14 +225,14 @@ object FeedsModel {
 
     /** All sort options of a mode, for the sheet. */
     fun sortOptions(m: ReelsModeType): List<FeedSort> = when (m) {
-        ReelsModeType.Scenes, ReelsModeType.Previews -> SceneSortOption.entries
+        ReelsModeType.Scenes, ReelsModeType.Verticals, ReelsModeType.Previews -> SceneSortOption.entries
         ReelsModeType.Markers -> SceneMarkerSortOption.entries
         ReelsModeType.Clips, ReelsModeType.Pics -> ImageSortOption.entries
     }
 
     /** Saved-filter mode string a Feeds mode accepts (iOS: scenes/previews → SCENES …). */
     fun filterModeFor(m: ReelsModeType): String = when (m) {
-        ReelsModeType.Scenes, ReelsModeType.Previews -> "SCENES"
+        ReelsModeType.Scenes, ReelsModeType.Verticals, ReelsModeType.Previews -> "SCENES"
         ReelsModeType.Markers -> "SCENE_MARKERS"
         ReelsModeType.Clips, ReelsModeType.Pics -> "IMAGES"
     }
@@ -241,7 +241,7 @@ object FeedsModel {
         savedFilters.filter { it.mode == filterModeFor(m) }.sortedBy { it.name.lowercase() }
 
     private fun kind(m: ReelsModeType) = when (m) {
-        ReelsModeType.Scenes -> FeedQueryKind.Scenes
+        ReelsModeType.Scenes, ReelsModeType.Verticals -> FeedQueryKind.Scenes
         ReelsModeType.Markers -> FeedQueryKind.Markers
         ReelsModeType.Clips -> FeedQueryKind.Clips
         ReelsModeType.Previews -> FeedQueryKind.Previews
@@ -351,7 +351,7 @@ object FeedsModel {
         l.job?.cancel()
         if (!keepPosition) currentIds.remove(m)
         // A new Scenes timeline is a new feed session: start positions are drawn again.
-        if (m == ReelsModeType.Scenes && !keepPosition) startPositions.clear()
+        if (m.isSceneFeed && !keepPosition) startPositions.clear()
         // A fresh fetch may well bring items whose files exist now.
         if (m == mode) { unplayable.clear(); probed.clear() }
         l.isLoading = true
@@ -411,9 +411,11 @@ object FeedsModel {
         val per = FeedsQuery.PER_PAGE
         // iOS `fetchBaseFilter`: once the editor holds the filter's criteria, only they are sent.
         val base = if (advanced[m] != null) null else filters[m]
-        val vars = FeedsQuery.variables(kind(m), page, per, sort(m), seed(m), base, advanced[m], criteria)
+        // Verticals always sends portrait on top of whatever filter / criteria it has.
+        val adv = if (m == ReelsModeType.Verticals) JsonObject((advanced[m] ?: JsonObject(emptyMap())) + VERTICALS_PRESET) else advanced[m]
+        val vars = FeedsQuery.variables(kind(m), page, per, sort(m), seed(m), base, adv, criteria)
         return when (m) {
-            ReelsModeType.Scenes -> FeedsRepository.feedScenes(vars).let { p -> p.items.map { FeedItem.SceneItem(it) } to (p.items.size == per) }
+            ReelsModeType.Scenes, ReelsModeType.Verticals -> FeedsRepository.feedScenes(vars).let { p -> p.items.map { FeedItem.SceneItem(it) } to (p.items.size == per) }
             ReelsModeType.Previews -> FeedsRepository.scenes(vars).let { p ->
                 // iOS: only scenes the server actually has a preview for.
                 p.items.filter { !it.paths?.preview.isNullOrEmpty() }.map { FeedItem.PreviewItem(it) } to (p.items.size == per)
@@ -537,7 +539,7 @@ object FeedsModel {
 
     /** Sort of a raw value in the mode's enum (`sortRaw` of a preset / stashy filter). */
     private fun feedSort(m: ReelsModeType, raw: String?): FeedSort? = when (m) {
-        ReelsModeType.Scenes, ReelsModeType.Previews -> SceneSortOption.from(raw)
+        ReelsModeType.Scenes, ReelsModeType.Verticals, ReelsModeType.Previews -> SceneSortOption.from(raw)
         ReelsModeType.Markers -> SceneMarkerSortOption.from(raw)
         ReelsModeType.Clips, ReelsModeType.Pics -> ImageSortOption.from(raw)
     }
@@ -1032,3 +1034,6 @@ object FeedsModel {
         }
     }
 }
+
+/** iOS `verticalsDefaultCriteria`: the Verticals feed starts on portrait scenes. */
+private val VERTICALS_PRESET = JsonObject(mapOf("orientation" to JsonObject(mapOf("value" to kotlinx.serialization.json.JsonArray(listOf(kotlinx.serialization.json.JsonPrimitive("PORTRAIT")))))))

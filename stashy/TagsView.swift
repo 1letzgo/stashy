@@ -794,7 +794,7 @@ struct TagDetailView: View {
     @StateObject private var linkedStudios: DetailLinkedStudiosFilterModel
     @StateObject private var linkedGalleries: DetailLinkedGalleriesFilterModel
     /// Scenes tab filter / sort, kept here so it survives the tab remounting `ScenesView`.
-    @StateObject private var scenesFilterMemory = ScenesListFilterMemory()
+    @StateObject private var scenesFilterMemory: ScenesListFilterMemory
     @StateObject private var linkedImages: DetailLinkedImagesFilterModel
     @ObservedObject private var downloadManager = DownloadManager.shared
     @State private var showingTagDownloadOptions = false
@@ -828,7 +828,9 @@ struct TagDetailView: View {
     @State private var selectedDetailTab: DetailTab
     private let preferredInitialTab: DetailTab?
 
-    init(selectedTag: Tag, initialTab: DetailTab? = nil) {
+    /// `filterPerformerId`: opened from that performer's page — its scenes, galleries and images
+    /// start filtered on the performer.
+    init(selectedTag: Tag, initialTab: DetailTab? = nil, filterPerformerId: String? = nil) {
         _selectedTag = State(initialValue: selectedTag)
         preferredInitialTab = initialTab
         let sc = selectedTag.sceneCount ?? 0
@@ -848,8 +850,15 @@ struct TagDetailView: View {
         }
         _selectedDetailTab = State(initialValue: resolvedTab)
         _linkedStudios = StateObject(wrappedValue: DetailLinkedStudiosFilterModel(scope: .tag(selectedTag.id)))
-        _linkedGalleries = StateObject(wrappedValue: DetailLinkedGalleriesFilterModel(scope: .tag(selectedTag.id)))
-        _linkedImages = StateObject(wrappedValue: DetailLinkedImagesFilterModel(scope: .tag(selectedTag.id)))
+        let galleries = DetailLinkedGalleriesFilterModel(scope: .tag(selectedTag.id))
+        let images = DetailLinkedImagesFilterModel(scope: .tag(selectedTag.id))
+        if let filterPerformerId {
+            galleries.criteriaDocument.load(PerformerScopedDetail.criteria(performerId: filterPerformerId))
+            images.criteriaDocument.load(PerformerScopedDetail.criteria(performerId: filterPerformerId))
+        }
+        _linkedGalleries = StateObject(wrappedValue: galleries)
+        _linkedImages = StateObject(wrappedValue: images)
+        _scenesFilterMemory = StateObject(wrappedValue: PerformerScopedDetail.scenesMemory(performerId: filterPerformerId))
     }
 
     @State private var gridWidth: CGFloat = 0
@@ -1022,52 +1031,6 @@ struct TagDetailView: View {
                     }
                 }
 
-                if showTabSwitcher {
-                    Spacer()
-                        .frame(width: navActionGroupSpacing)
-                }
-
-                HStack(spacing: 6) {
-                    Button {
-                        toggleFavorite()
-                    } label: {
-                        Image(systemName: isFavorite ? "heart.fill" : "heart")
-                            .font(.system(size: StashyExpandingDock.iconSize, weight: .semibold))
-                            .foregroundColor(
-                                isFavorite
-                                    ? .red
-                                    : .white.opacity(StashyExpandingDock.inactiveIconOpacity)
-                            )
-                            .frame(
-                                width: StashyExpandingDock.circleSize,
-                                height: StashyExpandingDock.circleSize
-                            )
-                            .stashyGlass(shape: Capsule(style: .continuous))
-                            .contentShape(Capsule(style: .continuous))
-                    }
-                    .buttonStyle(.plain)
-                    .disabled(isUpdatingFavorite)
-                    .accessibilityLabel(isFavorite ? "Remove favorite" : "Add favorite")
-
-                    if appearanceManager.isEditModeEnabled {
-                        Button {
-                            HapticManager.light()
-                            showingEditTagSheet = true
-                        } label: {
-                            Image(systemName: "pencil")
-                                .font(.system(size: StashyExpandingDock.iconSize, weight: .semibold))
-                                .foregroundColor(.white.opacity(StashyExpandingDock.inactiveIconOpacity))
-                                .frame(
-                                    width: StashyExpandingDock.circleSize,
-                                    height: StashyExpandingDock.circleSize
-                                )
-                                .stashyGlass(shape: Capsule(style: .continuous))
-                                .contentShape(Capsule(style: .continuous))
-                        }
-                        .buttonStyle(.plain)
-                        .accessibilityLabel("Edit tag")
-                    }
-                }
             }
             .frame(minHeight: chromePillHeight)
             .padding(.horizontal, StashyExpandingDock.edgePadding)
@@ -1314,12 +1277,32 @@ struct TagDetailView: View {
 
     // MARK: - Shared detail chrome
 
+    /// Favorite and Edit sit in the floating bar with the list's actions, not in the top chrome.
+    private var entityActionSlots: [CatalogChromeSlot] {
+        var actions = [CatalogChromeSlot(
+            systemImage: isFavorite ? "heart.fill" : "heart",
+            accessibilityLabel: isFavorite ? "Remove favorite" : "Add favorite",
+            tint: isFavorite ? .red : nil
+        ) {
+            guard !isUpdatingFavorite else { return }
+            toggleFavorite()
+        }]
+        if appearanceManager.isEditModeEnabled {
+            actions.append(CatalogChromeSlot(systemImage: "pencil", accessibilityLabel: "Edit tag") {
+                HapticManager.light()
+                showingEditTagSheet = true
+            })
+        }
+        return actions
+    }
+
     /// Per-tab slots for the embedded list, mirroring the previous floating action bar content.
     private var tagDetailListSlots: CatalogSlotSet {
         var slots = CatalogSlotSet(
             visibility: catalogFloatingChromeForFooter,
-            isPresented: selectedDetailTab != .groups
+            isPresented: true
         )
+        slots.entityActions = entityActionSlots
         switch selectedDetailTab {
         case .scenes:
             // Filter & sort opens from the scene list's own quick bar.

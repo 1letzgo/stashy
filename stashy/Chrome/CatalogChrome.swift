@@ -17,6 +17,8 @@ struct CatalogChromeSlot {
     var isActive: Bool = false
     var accessibilityLabel: String
     var accessibilityHint: String? = nil
+    /// Glyph color instead of the default (the favorite heart is red).
+    var tint: Color? = nil
     var action: () -> Void
 }
 
@@ -55,10 +57,13 @@ struct CatalogSlotSet {
     var filterSort: CatalogChromeSlot? = nil            // always rendered last (far right)
     var contextual: CatalogChromeSlot? = nil            // slot 3
     var secondaryContextual: CatalogChromeSlot? = nil   // slot 4
+    /// Detail pages: the entity's own actions (favorite, edit), drawn first.
+    var entityActions: [CatalogChromeSlot] = []
 
     /// A bar without a single action would render as an empty pill.
     var hasAnySlot: Bool {
         columns != nil || quickFilter != nil || filterSort != nil || contextual != nil || secondaryContextual != nil
+            || !entityActions.isEmpty
     }
 }
 
@@ -295,6 +300,10 @@ struct CatalogSlotBar: View {
                 )
                 .frame(maxWidth: .infinity)
             } else {
+                ForEach(Array(slots.entityActions.enumerated()), id: \.offset) { _, slot in
+                    slotButton(slot)
+                        .frame(maxWidth: .infinity)
+                }
                 if let columns = slots.columns {
                     slotButton(columns)
                         .frame(maxWidth: .infinity)
@@ -332,6 +341,7 @@ struct CatalogSlotBar: View {
     private func slotButton(_ slot: CatalogChromeSlot) -> some View {
         CatalogFABIconButton(
             systemImage: slot.systemImage,
+            tint: slot.tint ?? .primary,
             isActive: slot.isActive,
             accessibilityLabel: slot.accessibilityLabel,
             accessibilityHint: slot.accessibilityHint,

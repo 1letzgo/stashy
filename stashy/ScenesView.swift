@@ -311,6 +311,21 @@ extension ScenesListScope {
 /// `CatalogsView` for the Home sub-tab) so it survives the list being remounted (tab switches).
 /// The scene list itself already lives in the shared view model; without this the sheet
 /// reopened blank over a filtered list.
+/// A tag or studio opened from a performer's page lists only that performer's content: the
+/// performer starts as a removable criterion in the scenes, galleries and images filters.
+@MainActor
+enum PerformerScopedDetail {
+    static func criteria(performerId: String) -> [String: Any] {
+        ["performers": ["value": [performerId], "modifier": StashCriterionModifier.includes.rawValue]]
+    }
+
+    static func scenesMemory(performerId: String?) -> ScenesListFilterMemory {
+        let memory = ScenesListFilterMemory()
+        if let performerId { memory.criteriaDocument.load(criteria(performerId: performerId)) }
+        return memory
+    }
+}
+
 @MainActor
 final class ScenesListFilterMemory: ObservableObject {
     struct Snapshot {

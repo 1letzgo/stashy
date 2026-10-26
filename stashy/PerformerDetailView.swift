@@ -429,6 +429,9 @@ struct PerformerDetailView: View {
                 Spacer(minLength: 8)
 
                 if showTabSwitcher {
+                    // Scrolls when the tabs don't fit: up to seven of them (Appears with) next to
+                    // Back, Favorite and Edit widened the whole page past the screen.
+                    ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 6) {
                         ForEach(availableTabs, id: \.self) { tab in
                             let isSelected = selectedDetailTab == tab
@@ -461,54 +464,11 @@ struct PerformerDetailView: View {
                             .accessibilityAddTraits(isSelected ? .isSelected : [])
                         }
                     }
-                }
-
-                if showTabSwitcher {
-                    Spacer()
-                        .frame(width: navActionGroupSpacing)
-                }
-
-                HStack(spacing: 6) {
-                    Button {
-                        toggleFavorite()
-                    } label: {
-                        Image(systemName: isFavorite ? "heart.fill" : "heart")
-                            .font(.system(size: StashyExpandingDock.iconSize, weight: .semibold))
-                            .foregroundColor(
-                                isFavorite
-                                    ? .red
-                                    : .white.opacity(StashyExpandingDock.inactiveIconOpacity)
-                            )
-                            .frame(
-                                width: StashyExpandingDock.circleSize,
-                                height: StashyExpandingDock.circleSize
-                            )
-                            .stashyGlass(shape: Capsule(style: .continuous))
-                            .contentShape(Capsule(style: .continuous))
                     }
-                    .buttonStyle(.plain)
-                    .disabled(isUpdatingFavorite)
-                    .accessibilityLabel(isFavorite ? "Remove favorite" : "Add favorite")
-
-                    if appearanceManager.isEditModeEnabled {
-                        Button {
-                            HapticManager.light()
-                            showingEditPerformerSheet = true
-                        } label: {
-                            Image(systemName: "pencil")
-                                .font(.system(size: StashyExpandingDock.iconSize, weight: .semibold))
-                                .foregroundColor(.white.opacity(StashyExpandingDock.inactiveIconOpacity))
-                                .frame(
-                                    width: StashyExpandingDock.circleSize,
-                                    height: StashyExpandingDock.circleSize
-                                )
-                                .stashyGlass(shape: Capsule(style: .continuous))
-                                .contentShape(Capsule(style: .continuous))
-                        }
-                        .buttonStyle(.plain)
-                        .accessibilityLabel("Edit performer")
-                    }
+                    .scrollBounceBehavior(.basedOnSize, axes: .horizontal)
+                    .layoutPriority(-1)
                 }
+
             }
             .frame(minHeight: chromePillHeight)
             .padding(.horizontal, StashyExpandingDock.edgePadding)
@@ -631,9 +591,29 @@ struct PerformerDetailView: View {
 
     // MARK: - Shared detail chrome
 
+    /// Favorite and Edit sit in the floating bar with the list's actions, not in the top chrome.
+    private var entityActionSlots: [CatalogChromeSlot] {
+        var actions = [CatalogChromeSlot(
+            systemImage: isFavorite ? "heart.fill" : "heart",
+            accessibilityLabel: isFavorite ? "Remove favorite" : "Add favorite",
+            tint: isFavorite ? .red : nil
+        ) {
+            guard !isUpdatingFavorite else { return }
+            toggleFavorite()
+        }]
+        if appearanceManager.isEditModeEnabled {
+            actions.append(CatalogChromeSlot(systemImage: "pencil", accessibilityLabel: "Edit performer") {
+                HapticManager.light()
+                showingEditPerformerSheet = true
+            })
+        }
+        return actions
+    }
+
     /// Per-tab slots for the embedded list, mirroring the previous floating action bar content.
     private var performerDetailListSlots: CatalogSlotSet {
         var slots = CatalogSlotSet(visibility: performerDetailCatalogFloatingChromeForFooter)
+        slots.entityActions = entityActionSlots
         switch selectedDetailTab {
         case .scenes:
             // Filter & sort opens from the scene list's own quick bar.
@@ -677,8 +657,8 @@ struct PerformerDetailView: View {
                 linkedImages.showFilterSortSheet = true
             }
         case .groups:
-            // No groups filter model yet — hide the bar instead of showing an empty one.
-            slots.isPresented = false
+            // No groups filter model yet; the bar still carries Favorite / Edit.
+            break
         case .appearsWith:
             slots.filterSort = CatalogChromeSlot(
                 systemImage: "slider.horizontal.3",
@@ -976,7 +956,7 @@ struct PerformerDetailView: View {
     private var studioGrid: some View {
         LazyVGrid(columns: galleryColumns, spacing: 12) {
             ForEach(viewModel.detailStudios) { studio in
-                NavigationLink(destination: StudioDetailView(studio: studio)) {
+                NavigationLink(destination: StudioDetailView(studio: studio, filterPerformerId: performer.id)) {
                     StudioCardView(studio: studio)
                 }
                 .buttonStyle(.plain)
@@ -992,7 +972,7 @@ struct PerformerDetailView: View {
     private var tagGrid: some View {
         LazyVGrid(columns: galleryColumns, spacing: 12) {
             ForEach(viewModel.detailTags) { tag in
-                NavigationLink(destination: TagDetailView(selectedTag: tag)) {
+                NavigationLink(destination: TagDetailView(selectedTag: tag, filterPerformerId: performer.id)) {
                     TagCardView(tag: tag)
                 }
                 .buttonStyle(.plain)

@@ -213,9 +213,12 @@ struct TabConfig: Codable, Identifiable, Equatable {
     var defaultClipFilterName: String?
     var defaultPreviewFilterId: String?
     var defaultPreviewFilterName: String?
+    /// Feeds › Verticals (stashy+): its own default scene filter; portrait is always added.
+    var defaultVerticalFilterId: String?
+    var defaultVerticalFilterName: String?
 
     enum CodingKeys: String, CodingKey {
-        case id, isVisible, sortOrder, defaultFilterId, defaultFilterName, defaultMarkerFilterId, defaultMarkerFilterName, defaultClipFilterId, defaultClipFilterName, defaultPreviewFilterId, defaultPreviewFilterName
+        case id, isVisible, sortOrder, defaultFilterId, defaultFilterName, defaultMarkerFilterId, defaultMarkerFilterName, defaultClipFilterId, defaultClipFilterName, defaultPreviewFilterId, defaultPreviewFilterName, defaultVerticalFilterId, defaultVerticalFilterName
         case defaultSortOption = "sortOption"
     }
 }
@@ -324,6 +327,11 @@ enum ReelsModeType: String, Codable, CaseIterable {
     case clips
     case previews
     case pics
+    /// stashy+: the Scenes feed with its filter preset to portrait videos.
+    case verticals
+
+    /// Feed modes behind stashy+.
+    var requiresStashyPlus: Bool { self == .verticals }
     
     var defaultTitle: String {
         switch self {
@@ -332,6 +340,7 @@ enum ReelsModeType: String, Codable, CaseIterable {
         case .clips: return "Clips"
         case .previews: return "Previews"
         case .pics: return "Pics"
+        case .verticals: return "Verticals"
         }
     }
     
@@ -342,6 +351,7 @@ enum ReelsModeType: String, Codable, CaseIterable {
         case .clips: return "photo.on.rectangle.angled"
         case .previews: return "play.rectangle.on.rectangle.fill"
         case .pics: return "camera.fill"
+        case .verticals: return "rectangle.portrait.fill"
         }
     }
 }
@@ -1638,14 +1648,16 @@ class TabManager: ObservableObject {
     
     var enabledReelsModes: [ReelsModeType] {
         reelsModes
-            .filter { $0.isEnabled }
+            .filter { $0.isEnabled && (!$0.type.requiresStashyPlus || StashyPlusManager.isUnlockedNow) }
             .sorted { $0.sortOrder < $1.sortOrder }
             .map { $0.type }
     }
 
     /// Modes shown in Feeds settings.
     var configurableReelsModes: [ReelsModeConfig] {
-        reelsModes.sorted { $0.sortOrder < $1.sortOrder }
+        reelsModes
+            .filter { !$0.type.requiresStashyPlus || StashyPlusManager.isUnlockedNow }
+            .sorted { $0.sortOrder < $1.sortOrder }
     }
     
     func getReelsDefaultSort(for type: ReelsModeType) -> String? {
@@ -1828,6 +1840,18 @@ class TabManager: ObservableObject {
                 userInfo: ["tab": tab.id]
             )
         }
+    }
+
+    func getDefaultVerticalFilterId(for tab: AppTab) -> String? {
+        tabs.first(where: { $0.id == tab })?.defaultVerticalFilterId
+    }
+
+    func setDefaultVerticalFilter(for tab: AppTab, filterId: String?, filterName: String?) {
+        guard let index = tabs.firstIndex(where: { $0.id == tab }) else { return }
+        tabs[index].defaultVerticalFilterId = filterId
+        tabs[index].defaultVerticalFilterName = filterName
+        saveConfig()
+        NotificationCenter.default.post(name: NSNotification.Name("DefaultFilterChanged"), object: nil, userInfo: ["tab": tab.id])
     }
 
     // Helper to get default preview filter for a tab

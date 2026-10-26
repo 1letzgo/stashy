@@ -53,6 +53,16 @@ final class MiniPlayerStore: ObservableObject {
                 self?.restoreLastSessionIfNeeded()
             }
         }
+        // A deleted scene leaves every mini-player surface: its scene page opened from the bar
+        // (that `dismiss()` cannot close the cover), the bar, Now Playing and the watchlist.
+        NotificationCenter.default.addObserver(
+            forName: NSNotification.Name("SceneDeleted"),
+            object: nil,
+            queue: .main
+        ) { [weak self] note in
+            guard let sceneId = note.userInfo?["sceneId"] as? String else { return }
+            Task { @MainActor in self?.sceneDeleted(sceneId) }
+        }
         // Feeds take over the screen: same rule as every other background player.
         NotificationCenter.default.addObserver(
             forName: .stashyPauseBackgroundPlayers,
@@ -249,6 +259,13 @@ final class MiniPlayerStore: ObservableObject {
         guard showsNowPlaying, let current = nowPlayingScene,
               let next = WatchlistStore.shared.next(after: current.id) else { return }
         showNowPlaying(next)
+    }
+
+    private func sceneDeleted(_ sceneId: String) {
+        if expandedScene?.id == sceneId { expandedScene = nil }
+        if session?.scene.id == sceneId { close() }
+        if nowPlayingScene?.id == sceneId { showsNowPlaying = false; nowPlayingScene = nil }
+        if WatchlistStore.shared.contains(sceneId) { WatchlistStore.shared.remove(sceneId) }
     }
 
     /// From the full view to the scene page (metadata, markers, editing). The page takes the
