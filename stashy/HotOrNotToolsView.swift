@@ -1877,6 +1877,21 @@ struct HotOrNotToolsView: View {
                 }
             }
 
+            // Game modes right under the sections, same pills (only while playing).
+            if model.section == .battle {
+                ToolsPillMenuRow(
+                    items: [HotOrNotViewModel.DuelMode.headToHead, .bracket, .placement, .champion].map {
+                        ToolsPillMenuRow.Item(id: $0.rawValue, title: $0.label)
+                    },
+                    selectionID: model.duelMode.rawValue,
+                    accessibilityLabel: "Match mode"
+                ) { id in
+                    guard !model.isSubmitting, let mode = HotOrNotViewModel.DuelMode(rawValue: id) else { return }
+                    model.duelMode = mode
+                }
+                .padding(.top, -DesignTokens.Tools.menuTopPadding)
+            }
+
             switch model.section {
             case .battle:
                 battleContent
@@ -1893,10 +1908,7 @@ struct HotOrNotToolsView: View {
                 if shouldShowDuelActionsAboveFloatingBar {
                     hotOrNotDuelActionsRow
                         .toolsHorizontalPadding(horizontalSizeClass)
-                }
-                // Mode pills only while playing — not on Charts / Settings.
-                if model.section == .battle {
-                    hotOrNotBottomChrome
+                        .padding(.bottom, DesignTokens.Chrome.fabBottomPadding)
                 }
             }
         }
@@ -2030,53 +2042,6 @@ struct HotOrNotToolsView: View {
         }
     }
 
-    /// Bottom chrome: duel mode pills only.
-    private var hotOrNotBottomChrome: some View {
-        HStack(spacing: StashyExpandingDock.itemSpacing) {
-            hotOrNotDuelModeChip(.headToHead)
-            hotOrNotDuelModeChip(.bracket)
-            hotOrNotDuelModeChip(.placement)
-            hotOrNotDuelModeChip(.champion)
-        }
-        .padding(.horizontal, StashyExpandingDock.edgePadding)
-        .padding(.bottom, DesignTokens.Chrome.fabBottomPadding)
-    }
-
-    private func hotOrNotDuelModeChip(_ mode: HotOrNotViewModel.DuelMode) -> some View {
-        let selected = model.section == .battle && model.duelMode == mode
-        return Button {
-            HapticManager.selection()
-            model.section = .battle
-            if model.duelMode != mode {
-                model.duelMode = mode
-            }
-        } label: {
-            Text(mode.label)
-                .font(.subheadline.weight(.semibold))
-                .foregroundStyle(selected ? Color.white : Color.primary.opacity(0.85))
-                .lineLimit(1)
-                .minimumScaleFactor(0.78)
-                .frame(maxWidth: .infinity)
-                .frame(height: StashyExpandingDock.activeHeight)
-                .background(
-                    Capsule(style: .continuous)
-                        .fill(selected ? appearance.tintColor : Color.secondaryAppBackground)
-                        .shadow(
-                            color: selected ? appearance.tintColor.opacity(0.35) : .clear,
-                            radius: 6,
-                            x: 0,
-                            y: 3
-                        )
-                )
-                .clipShape(Capsule(style: .continuous))
-                .contentShape(Capsule(style: .continuous))
-        }
-        .buttonStyle(.plain)
-        .disabled(model.isSubmitting)
-        .accessibilityLabel("\(mode.label) mode\(selected ? ", selected" : "")")
-        .accessibilityAddTraits(selected ? .isSelected : [])
-    }
-
     @ViewBuilder
     private var placementStarterInline: some View {
         VStack(spacing: 10) {
@@ -2150,12 +2115,6 @@ struct HotOrNotToolsView: View {
                     StandardLoadingView(message: "Loading pair...")
                         .frame(minHeight: 320)
                 } else if let l = model.left, let r = model.right {
-                    if model.duelMode == .bracket, let status = model.bracketStatusLine {
-                        Text(status)
-                            .font(.subheadline.weight(.semibold))
-                            .foregroundStyle(.secondary)
-                            .frame(maxWidth: .infinity)
-                    }
                     HStack(alignment: .top, spacing: isRegular ? 20 : 10) {
                         VStack(spacing: 10) {
                             HotOrNotBattleColumn(
@@ -2183,6 +2142,13 @@ struct HotOrNotToolsView: View {
                     }
                     .frame(maxWidth: isRegular ? 920 : .infinity)
                     .frame(maxWidth: .infinity)
+                    // 32:1: where the bracket stands, under the profile buttons.
+                    if model.duelMode == .bracket, let status = model.bracketStatusLine {
+                        Text(status)
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundStyle(.secondary)
+                            .frame(maxWidth: .infinity)
+                    }
                 }
             }
             .toolsHorizontalPadding(horizontalSizeClass)

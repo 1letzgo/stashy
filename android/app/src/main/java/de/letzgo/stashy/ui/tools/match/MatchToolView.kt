@@ -174,6 +174,16 @@ fun MatchToolView() {
                     model.selectSection(MatchViewModel.Section.entries[idx])
                 },
             )
+            // Game modes right under the sections, same pills (only while playing).
+            if (model.section == MatchViewModel.Section.Battle) {
+                val modes = MatchDuelMode.entries
+                MatchPillMenuRow(
+                    items = modes.map { it.label },
+                    selectedIndex = modes.indexOf(model.duelMode),
+                    onSelect = { idx -> if (!model.isSubmitting) model.selectDuelMode(modes[idx]) },
+                    topPadding = 0.dp,
+                )
+            }
             val bottom = bottomBarContentPadding() + if (model.section == MatchViewModel.Section.Battle) bottomChrome else 0.dp
             when (model.section) {
                 MatchViewModel.Section.Battle -> BattleContent(model, hPad, isRegular, bottom)
@@ -182,7 +192,7 @@ fun MatchToolView() {
             }
         }
 
-        // iOS: `.safeAreaInset(edge: .bottom)` — duel actions + mode pills above the tab bar.
+        // iOS: `.safeAreaInset(edge: .bottom)` — duel actions above the tab bar.
         if (model.section == MatchViewModel.Section.Battle) {
             Column(
                 Modifier
@@ -192,20 +202,7 @@ fun MatchToolView() {
                     .onSizeChanged { bottomChromePx = it.height },
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                if (model.showsDuelActions) DuelActionsRow(model, hPad)
-                Row(
-                    Modifier.fillMaxWidth().padding(horizontal = Tokens.Spacing.md).padding(bottom = 6.dp),
-                    horizontalArrangement = Arrangement.spacedBy(MatchPillSpacing),
-                ) {
-                    MatchDuelMode.entries.forEach { mode ->
-                        MatchPill(
-                            title = mode.label,
-                            selected = model.duelMode == mode,
-                            enabled = !model.isSubmitting,
-                            modifier = Modifier.weight(1f),
-                        ) { model.selectDuelMode(mode) }
-                    }
-                }
+                if (model.showsDuelActions) Box(Modifier.padding(bottom = 6.dp)) { DuelActionsRow(model, hPad) }
             }
         }
     }
@@ -215,12 +212,12 @@ fun MatchToolView() {
 
 /** iOS: `ToolsPillMenuRow` — equal-width capsules, selected = tint with glow. */
 @Composable
-internal fun MatchPillMenuRow(items: List<String>, selectedIndex: Int, onSelect: (Int) -> Unit) {
+internal fun MatchPillMenuRow(items: List<String>, selectedIndex: Int, onSelect: (Int) -> Unit, topPadding: Dp = ToolsTokens.menuTopPadding) {
     Row(
         Modifier
             .fillMaxWidth()
             .padding(horizontal = ToolsTokens.contentPadding)
-            .padding(top = ToolsTokens.menuTopPadding, bottom = ToolsTokens.menuBottomPadding),
+            .padding(top = topPadding, bottom = ToolsTokens.menuBottomPadding),
         horizontalArrangement = Arrangement.spacedBy(MatchPillSpacing),
     ) {
         items.forEachIndexed { i, title ->
@@ -239,7 +236,7 @@ internal fun MatchPill(title: String, selected: Boolean, modifier: Modifier = Mo
 
 /** iOS `.buttonStyle(.bordered)` / `.borderedProminent` with a `Label` — Material filled / tonal button. */
 @Composable
-private fun MatchActionButton(
+internal fun MatchActionButton(
     title: String,
     icon: ImageVector,
     prominent: Boolean,
@@ -337,7 +334,7 @@ internal fun MatchUnavailableView(title: String, icon: ImageVector, description:
 
 /** Card chrome used across Match: secondary fill, 0.5 pt primary stroke at 10 %, card shadow. */
 @Composable
-private fun Modifier.matchCard(shape: RoundedCornerShape = RoundedCornerShape(Tokens.Radius.card)): Modifier {
+internal fun Modifier.matchCard(shape: RoundedCornerShape = RoundedCornerShape(Tokens.Radius.card)): Modifier {
     val p = Theme.palette
     return this
         .cardShadow(shape)
@@ -391,14 +388,6 @@ private fun BattleContent(model: MatchViewModel, hPad: Dp, isRegular: Boolean, b
             model.duelMode == MatchDuelMode.Bracket && model.bracket?.isFinished == true -> BracketResultsCard(model)
             model.isLoadingPair && l == null -> MatchLoadingView("Loading pair...", Modifier.fillMaxWidth().heightIn(min = 320.dp))
             l != null && r != null -> Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
-              if (model.duelMode == MatchDuelMode.Bracket) {
-                model.bracketStatusLine?.let {
-                    Text(
-                        it, style = IosTypography.subheadline.copy(fontWeight = FontWeight.SemiBold),
-                        color = Theme.palette.secondaryText, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth(),
-                    )
-                }
-              }
               Row(
                 Modifier.fillMaxWidth().let { if (isRegular) it.widthIn(max = 920.dp) else it },
                 horizontalArrangement = Arrangement.spacedBy(if (isRegular) 20.dp else 10.dp),
@@ -411,6 +400,15 @@ private fun BattleContent(model: MatchViewModel, hPad: Dp, isRegular: Boolean, b
                 Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     BattleColumn(model, r, model.rankRight, model.duelFeedback?.right) { model.chooseAsync(leftWins = false) }
                     ProfileLinkCard(r)
+                }
+              }
+              // 32:1: where the bracket stands, under the profile buttons.
+              if (model.duelMode == MatchDuelMode.Bracket) {
+                model.bracketStatusLine?.let {
+                    Text(
+                        it, style = IosTypography.subheadline.copy(fontWeight = FontWeight.SemiBold),
+                        color = Theme.palette.secondaryText, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth(),
+                    )
                 }
               }
             }

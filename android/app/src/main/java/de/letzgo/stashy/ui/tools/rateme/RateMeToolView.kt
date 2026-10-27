@@ -1,14 +1,11 @@
 package de.letzgo.stashy.ui.tools.rateme
 
-import de.letzgo.stashy.ui.bottomBarContentPadding
-import de.letzgo.stashy.ui.scaledIconSize
 import android.os.Build
 import android.view.HapticFeedbackConstants
 import android.view.View
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
@@ -31,26 +28,21 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBackIos
-import androidx.compose.material.icons.filled.Business
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.FastForward
-import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.OpenInFull
-import androidx.compose.material.icons.filled.Sell
-import androidx.compose.material.icons.outlined.PlayCircle
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
-import androidx.compose.material3.SegmentedButton
-import androidx.compose.material3.SegmentedButtonDefaults
-import androidx.compose.material3.SingleChoiceSegmentedButtonRow
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
@@ -58,23 +50,20 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.Shadow
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
@@ -98,34 +87,37 @@ import de.letzgo.stashy.data.tools.RateMeThemePickerKind
 import de.letzgo.stashy.ui.Appearance
 import de.letzgo.stashy.ui.IosTypography
 import de.letzgo.stashy.ui.Nav
-import de.letzgo.stashy.ui.NativeSearchField
-import de.letzgo.stashy.ui.SF
-import de.letzgo.stashy.ui.StashyColors
-import de.letzgo.stashy.ui.Theme
 import de.letzgo.stashy.ui.NativeDivider
 import de.letzgo.stashy.ui.NativeGroup
 import de.letzgo.stashy.ui.NativeListItem
 import de.letzgo.stashy.ui.NativeSearchField
 import de.letzgo.stashy.ui.NativeSectionFooter
 import de.letzgo.stashy.ui.NativeSectionHeader
+import de.letzgo.stashy.ui.SF
+import de.letzgo.stashy.ui.StashyColors
+import de.letzgo.stashy.ui.Theme
 import de.letzgo.stashy.ui.Tokens
-import de.letzgo.stashy.ui.cardShadow
-import de.letzgo.stashy.ui.components.SelectChip
-import de.letzgo.stashy.ui.nativeAccent
+import de.letzgo.stashy.ui.bottomBarContentPadding
 import de.letzgo.stashy.ui.detail.ImageViewerScreen
 import de.letzgo.stashy.ui.oCounterIcon
+import de.letzgo.stashy.ui.scaledIconSize
 import de.letzgo.stashy.ui.scene.SceneDetailScreen
+import de.letzgo.stashy.ui.tabBarHeight
 import de.letzgo.stashy.ui.tools.NoServerPlaceholder
 import de.letzgo.stashy.ui.tools.StashyAlert
 import de.letzgo.stashy.ui.tools.ToolsTokens
+import de.letzgo.stashy.ui.tools.match.MatchActionButton
+import de.letzgo.stashy.ui.tools.match.MatchLoadingView
+import de.letzgo.stashy.ui.tools.match.MatchPill
+import de.letzgo.stashy.ui.tools.match.MatchPillMenuRow
+import de.letzgo.stashy.ui.tools.match.MatchPillSpacing
+import de.letzgo.stashy.ui.tools.match.MatchUnavailableView
+import de.letzgo.stashy.ui.tools.match.matchCard
 import de.letzgo.stashy.ui.tools.toolsTopPadding
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
-// iOS: `RateMeToolsView` (`stashy/RateMeToolsView.swift`).
-
-/** iOS: `StashyExpandingDock.activeHeight` / `itemSpacing`. */
-private val PillSpacing: Dp = 10.dp
+// iOS: `RateMeToolsView` (`stashy/RateMeToolsView.swift`). Layout follows the Match tool.
 
 private fun View.performRateMeHaptic(kind: RateMeHaptic) {
     performHapticFeedback(
@@ -138,21 +130,6 @@ private fun View.performRateMeHaptic(kind: RateMeHaptic) {
 }
 
 private val ModeIcons = mapOf(RateMeMode.Scenes to SF.film, RateMeMode.Images to SF.photo)
-
-private fun themeIcon(theme: RateMeTheme): ImageVector = when (theme) {
-    RateMeTheme.Random -> SF.shuffle
-    RateMeTheme.Newest -> SF.sparkles
-    RateMeTheme.MostPlayed -> Icons.Outlined.PlayCircle
-    is RateMeTheme.Performer -> SF.personFill
-    is RateMeTheme.Studio -> Icons.Filled.Business
-    is RateMeTheme.Tag -> Icons.Filled.Sell
-}
-
-private fun pickerIcon(kind: RateMeThemePickerKind): ImageVector = when (kind) {
-    RateMeThemePickerKind.Performer -> SF.personFill
-    RateMeThemePickerKind.Studio -> Icons.Filled.Business
-    RateMeThemePickerKind.Tag -> Icons.Filled.Sell
-}
 
 /**
  * iOS: `RateMeToolsView` — random unrated scenes / images with a star rating, O-counter,
@@ -175,29 +152,48 @@ fun RateMeToolView() {
 
     var showDeleteConfirmation by remember { mutableStateOf(false) }
     var themePicker by remember { mutableStateOf<RateMeThemePickerKind?>(null) }
+    val density = LocalDensity.current
+    var bottomChromePx by remember { mutableIntStateOf(0) }
+    val bottomChrome = with(density) { bottomChromePx.toDp() }
     val isRegular = LocalConfiguration.current.screenWidthDp >= 600
     val hPad = if (isRegular) Tokens.Spacing.xl else ToolsTokens.contentPadding
+    val item = model.item
 
-    Column(Modifier.fillMaxSize().padding(top = toolsTopPadding())) {
-        val err = model.errorMessage
-        if (err != null && model.item == null) {
-            Text(
-                err, style = IosTypography.footnote, color = StashyColors.systemRed, textAlign = TextAlign.Center,
-                modifier = Modifier.fillMaxWidth().padding(horizontal = ToolsTokens.contentPadding),
+    Box(Modifier.fillMaxSize()) {
+        Column(Modifier.fillMaxSize().padding(top = toolsTopPadding())) {
+            model.errorMessage?.let { err ->
+                Text(
+                    err, style = IosTypography.footnote, color = StashyColors.systemRed, textAlign = TextAlign.Center,
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = ToolsTokens.contentPadding),
+                )
+            }
+            MatchPillMenuRow(
+                items = RateMeMode.entries.map { it.label },
+                selectedIndex = model.mode.ordinal,
+                onSelect = { idx ->
+                    if (!model.isSubmitting) {
+                        view.performRateMeHaptic(RateMeHaptic.Selection)
+                        model.selectMode(RateMeMode.entries[idx])
+                    }
+                },
             )
+            ThemeRow(model) { themePicker = it }
+            val bottom = bottomBarContentPadding() + if (item != null) bottomChrome else 0.dp
+            Content(model, hPad, isRegular, bottom) { showDeleteConfirmation = true }
         }
 
-        // One row: the Scenes / Images switch stays put on the left, the themes scroll behind it.
-        Row(
-            Modifier.fillMaxWidth().padding(top = ToolsTokens.menuTopPadding, bottom = ToolsTokens.menuBottomPadding),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(PillSpacing),
-        ) {
-            ModeToggle(model, Modifier.padding(start = ToolsTokens.contentPadding))
-            ThemeChips(model, Modifier.weight(1f)) { themePicker = it }
+        // Match `DuelActionsRow` — Skip / Watch above the tab bar.
+        if (item != null) {
+            Column(
+                Modifier
+                    .align(Alignment.BottomCenter)
+                    .fillMaxWidth()
+                    .padding(bottom = tabBarHeight())
+                    .onSizeChanged { bottomChromePx = it.height },
+            ) {
+                ActionRow(model, item, hPad)
+            }
         }
-
-        Content(model, hPad, isRegular) { showDeleteConfirmation = true }
     }
 
     themePicker?.let { kind ->
@@ -225,50 +221,16 @@ fun RateMeToolView() {
 
 // MARK: - Chrome
 
-/** iOS: `modeToggle` — Scenes / Images as a Material segmented button with icons. */
-@Composable
-private fun ModeToggle(model: RateMeViewModel, modifier: Modifier = Modifier) {
-    val p = Theme.palette
-    val accent = nativeAccent()
-    val view = LocalView.current
-    val modes = RateMeMode.entries
-    SingleChoiceSegmentedButtonRow(modifier) {
-        modes.forEachIndexed { index, mode ->
-            val selected = model.mode == mode
-            SegmentedButton(
-                selected = selected,
-                onClick = {
-                    if (!selected) {
-                        view.performRateMeHaptic(RateMeHaptic.Selection)
-                        model.selectMode(mode)
-                    }
-                },
-                shape = SegmentedButtonDefaults.itemShape(index, modes.size),
-                enabled = !model.isSubmitting,
-                modifier = Modifier.width(56.dp),
-                colors = SegmentedButtonDefaults.colors(
-                    activeContainerColor = accent.copy(alpha = 0.18f), activeContentColor = p.text,
-                    inactiveContainerColor = Color.Transparent, inactiveContentColor = p.text.copy(alpha = 0.7f),
-                    activeBorderColor = p.separator, inactiveBorderColor = p.separator,
-                    disabledActiveContainerColor = accent.copy(alpha = 0.18f), disabledActiveContentColor = p.text.copy(alpha = 0.6f),
-                    disabledActiveBorderColor = p.separator, disabledInactiveBorderColor = p.separator,
-                ),
-                icon = {},
-            ) { Icon(ModeIcons.getValue(mode), mode.label, modifier = Modifier.size(18.dp)) }
-        }
-    }
-}
-
 /** iOS: `themeChips` — media kind menu (images), fixed themes, performer / studio / tag pickers. */
 @Composable
-private fun ThemeChips(model: RateMeViewModel, modifier: Modifier, onPick: (RateMeThemePickerKind) -> Unit) {
+private fun ThemeRow(model: RateMeViewModel, onPick: (RateMeThemePickerKind) -> Unit) {
     val view = LocalView.current
     val state = rememberLazyListState()
     val fixed = model.availableFixedThemes
     val pickers = RateMeThemePickerKind.entries
     val leading = if (model.mode == RateMeMode.Images) 1 else 0
 
-    // A picked performer / studio / tag sits at the far end; bring its chip into view on change.
+    // A picked performer / studio / tag sits at the far end; bring its pill into view on change.
     var lastThemeId by remember { mutableStateOf(model.theme.id) }
     LaunchedEffect(model.theme) {
         if (model.theme.id == lastThemeId) return@LaunchedEffect
@@ -285,22 +247,22 @@ private fun ThemeChips(model: RateMeViewModel, modifier: Modifier, onPick: (Rate
     }
 
     LazyRow(
-        modifier,
+        Modifier.fillMaxWidth().padding(bottom = ToolsTokens.menuBottomPadding),
         state = state,
-        contentPadding = PaddingValues(end = ToolsTokens.contentPadding),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        contentPadding = PaddingValues(horizontal = ToolsTokens.contentPadding),
+        horizontalArrangement = Arrangement.spacedBy(MatchPillSpacing),
         userScrollEnabled = !model.isSubmitting,
     ) {
         if (model.mode == RateMeMode.Images) item(key = "mediaKind") { MediaKindMenu(model) }
         items(fixed, key = { it.id }) { theme ->
-            ThemeChip(theme.label, themeIcon(theme), selected = model.theme == theme, enabled = !model.isSubmitting) {
+            MatchPill(theme.label, selected = model.theme == theme, enabled = !model.isSubmitting) {
                 view.performRateMeHaptic(RateMeHaptic.Selection)
                 model.selectThemeAsync(theme)
             }
         }
         items(pickers, key = { it.raw }) { kind ->
             val picked = kind.picked(model.theme)
-            ThemeChip(picked?.label ?: "${kind.title}…", pickerIcon(kind), selected = picked != null, enabled = !model.isSubmitting) {
+            MatchPill(picked?.label ?: "${kind.title}…", selected = picked != null, enabled = !model.isSubmitting) {
                 view.performRateMeHaptic(RateMeHaptic.Selection)
                 onPick(kind)
             }
@@ -308,23 +270,17 @@ private fun ThemeChips(model: RateMeViewModel, modifier: Modifier, onPick: (Rate
     }
 }
 
-/** iOS: `themeChip` — Material `FilterChip` with icon. */
-@Composable
-private fun ThemeChip(title: String, icon: ImageVector, selected: Boolean, enabled: Boolean, onClick: () -> Unit) {
-    SelectChip(title, selected, onClick, enabled = enabled, icon = icon)
-}
-
-/** iOS: `mediaKindMenu` — Any media / Images / Videos as a compact menu chip (images mode). */
+/** iOS: `mediaKindMenu` — Any media / Images / Videos as a menu pill (images mode). */
 @Composable
 private fun MediaKindMenu(model: RateMeViewModel) {
     val p = Theme.palette
     var expanded by remember { mutableStateOf(false) }
-    val selected = model.imageMediaKind != RateMeImageMediaKind.All
     Box {
-        SelectChip(
-            model.imageMediaKind.title, selected, { expanded = true },
-            enabled = !model.isSubmitting, trailingIcon = Icons.Filled.KeyboardArrowDown,
-        )
+        MatchPill(
+            model.imageMediaKind.title,
+            selected = model.imageMediaKind != RateMeImageMediaKind.All,
+            enabled = !model.isSubmitting,
+        ) { expanded = true }
         DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }, containerColor = p.secondaryBackground) {
             RateMeImageMediaKind.entries.forEach { kind ->
                 DropdownMenuItem(
@@ -345,96 +301,55 @@ private fun MediaKindMenu(model: RateMeViewModel) {
 
 // MARK: - Content
 
-/** Card chrome: secondary fill, 0.5 pt primary stroke at 10 %, card shadow. */
+/**
+ * Match `BattleContent` padding, but no scroll: the media shrinks to the height left above the
+ * action row, so the card (rating included) always ends above the buttons (iOS `content`).
+ */
 @Composable
-private fun Modifier.rateMeCard(): Modifier {
-    val p = Theme.palette
-    val shape = RoundedCornerShape(Tokens.Radius.card)
-    return this
-        .cardShadow(shape)
-        .clip(shape)
-        .background(p.secondaryBackground, shape)
-        .border(0.5.dp, p.text.copy(alpha = 0.1f), shape)
-}
-
-@Composable
-private fun Content(model: RateMeViewModel, hPad: Dp, isRegular: Boolean, onDelete: () -> Unit) {
-    val p = Theme.palette
-    Box(
+private fun Content(model: RateMeViewModel, hPad: Dp, isRegular: Boolean, bottom: Dp, onDelete: () -> Unit) {
+    Column(
         Modifier
             .fillMaxSize()
             .padding(horizontal = hPad)
-            .padding(bottom = bottomBarContentPadding() + ToolsTokens.menuBottomPadding),
-        contentAlignment = Alignment.TopCenter,
+            .padding(bottom = bottom + ToolsTokens.menuBottomPadding),
+        verticalArrangement = Arrangement.spacedBy(16.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         val item = model.item
         when {
-            model.isLoading && item == null -> Column(
-                Modifier.fillMaxSize(),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(12.dp, Alignment.CenterVertically),
-            ) {
-                CircularProgressIndicator(color = p.secondaryText)
-                Text("Loading…", style = IosTypography.subheadline, color = p.secondaryText)
-            }
-            item != null -> Column(
-                Modifier.fillMaxSize().let { if (isRegular) it.widthIn(max = 720.dp) else it },
-                verticalArrangement = Arrangement.spacedBy(12.dp),
-            ) {
-                // Media at the top taking the height it needs (up to what is free); rating and
-                // Skip / Open pinned to the bottom so they never move between items.
-                Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.TopCenter) {
-                    MediaCard(model, item)
-                }
-                RatingRow(model, item, onDelete)
-                ActionRow(model, item)
-            }
-            else -> Column(
-                Modifier.fillMaxSize().padding(24.dp),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterVertically),
-            ) {
-                Icon(ModeIcons.getValue(model.mode), null, tint = p.secondaryText, modifier = Modifier.size(44.dp))
-                Text("Nothing to rate", style = IosTypography.title3.copy(fontWeight = FontWeight.Bold), color = p.text)
-                Text(
-                    model.errorMessage ?: "All ${model.mode.label.lowercase()} already have a rating.",
-                    style = IosTypography.subheadline, color = p.secondaryText, textAlign = TextAlign.Center,
-                )
-            }
+            model.isLoading && item == null -> MatchLoadingView("Loading…", Modifier.fillMaxWidth().heightIn(min = 320.dp))
+            item != null -> ItemCard(
+                model, item,
+                Modifier.fillMaxWidth().weight(1f, fill = false).let { if (isRegular) it.widthIn(max = 720.dp) else it },
+                onDelete,
+            )
+            else -> MatchUnavailableView(
+                "Nothing to rate", ModeIcons.getValue(model.mode),
+                "All ${model.mode.label.lowercase()} already have a rating.",
+                Modifier.fillMaxWidth().heightIn(min = 320.dp),
+            )
         }
     }
 }
 
-/** iOS: `mediaCard` — media with title / performers on a bottom gradient. */
+/** iOS: `mediaCard` + `ratingRow` — media, then title / performers and stars, O-counter, delete. */
 @Composable
-private fun MediaCard(model: RateMeViewModel, item: RateMeItem) {
+private fun ItemCard(model: RateMeViewModel, item: RateMeItem, modifier: Modifier, onDelete: () -> Unit) {
+    val p = Theme.palette
     val aspect = item.aspectRatio ?: if (item.mode == RateMeMode.Scenes) 16f / 9f else 1f
-    val shadow = Shadow(Color.Black.copy(alpha = 0.5f), Offset(0f, 2f), 4f)
-    Box(
-        Modifier
-            .aspectRatio(aspect)
-            .rateMeCard()
-            .alpha(if (model.isSubmitting) 0.85f else 1f),
-    ) {
-        RateMeMediaView(item, Modifier.fillMaxSize())
-        Column(
-            Modifier
-                .align(Alignment.BottomStart)
-                .fillMaxWidth()
-                .background(Brush.verticalGradient(listOf(Color.Transparent, Color.Black.copy(alpha = 0.7f))))
-                .padding(start = 12.dp, end = 12.dp, top = 28.dp, bottom = 10.dp),
-            verticalArrangement = Arrangement.spacedBy(2.dp),
-        ) {
+    Column(modifier.matchCard().alpha(if (model.isSubmitting) 0.85f else 1f)) {
+        Box(Modifier.fillMaxWidth().weight(1f, fill = false), contentAlignment = Alignment.Center) {
+            RateMeMediaView(item, Modifier.aspectRatio(aspect))
+        }
+        Column(Modifier.fillMaxWidth().padding(12.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
             Text(
-                item.title, style = IosTypography.headline.copy(shadow = shadow), color = Color.White,
+                item.title, style = IosTypography.headline.copy(fontWeight = FontWeight.Bold), color = p.text,
                 maxLines = 2, overflow = TextOverflow.Ellipsis,
             )
             item.performerNames?.let {
-                Text(
-                    it, style = IosTypography.subheadline.copy(shadow = shadow), color = Color.White.copy(alpha = 0.8f),
-                    maxLines = 1, overflow = TextOverflow.Ellipsis,
-                )
+                Text(it, style = IosTypography.subheadline, color = p.secondaryText, maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
+            RatingRow(model, item, onDelete)
         }
     }
 }
@@ -521,22 +436,13 @@ private fun StarRating(rating100: Int?, interactive: Boolean, size: Dp, spacing:
     }
 }
 
-/** iOS: `ratingRow` — stars, O-counter, delete. */
+/** iOS: `ratingRow` — stars left; O-counter and delete as plain icon buttons on the right. */
 @Composable
 private fun RatingRow(model: RateMeViewModel, item: RateMeItem, onDelete: () -> Unit) {
     val p = Theme.palette
     val tint = Appearance.tint
     val view = LocalView.current
-    val inner = RoundedCornerShape(Tokens.Radius.card)
-    Row(
-        Modifier
-            .fillMaxWidth()
-            .rateMeCard()
-            .alpha(if (model.isSubmitting) 0.85f else 1f)
-            .padding(12.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(10.dp),
-    ) {
+    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
         Box(Modifier.weight(1f)) {
             StarRating(model.draftRating100, interactive = !model.isSubmitting && !model.isDeleting, size = 24.dp, spacing = 4.dp) {
                 model.submitRatingAsync(it)
@@ -545,9 +451,8 @@ private fun RatingRow(model: RateMeViewModel, item: RateMeItem, onDelete: () -> 
         val oEnabled = !model.isSubmitting && !model.isIncrementingO && !model.isDeleting
         Row(
             Modifier
-                .heightIn(min = 44.dp)
-                .clip(inner)
-                .background(p.background, inner)
+                .heightIn(min = 48.dp)
+                .clip(RoundedCornerShape(50))
                 .clickable(enabled = oEnabled) { model.incrementOCounterAsync() }
                 .padding(horizontal = 10.dp),
             verticalAlignment = Alignment.CenterVertically,
@@ -565,80 +470,42 @@ private fun RatingRow(model: RateMeViewModel, item: RateMeItem, onDelete: () -> 
                 color = p.text, maxLines = 1,
             )
         }
-        Box(
-            Modifier
-                .size(44.dp)
-                .clip(inner)
-                .background(p.background, inner)
-                .clickable(enabled = !model.isSubmitting && !model.isDeleting && !model.isLoading, onClickLabel = "Deletes this item and its files after confirmation") {
-                    view.performRateMeHaptic(RateMeHaptic.Light)
-                    onDelete()
-                },
-            contentAlignment = Alignment.Center,
+        IconButton(
+            onClick = {
+                view.performRateMeHaptic(RateMeHaptic.Light)
+                onDelete()
+            },
+            enabled = !model.isSubmitting && !model.isDeleting && !model.isLoading,
         ) {
-            Icon(Icons.Filled.Delete, "Delete", tint = StashyColors.systemRed, modifier = Modifier.size(20.dp))
+            Icon(Icons.Filled.Delete, "Delete", tint = StashyColors.systemRed, modifier = Modifier.size(22.dp))
         }
     }
 }
 
-/** iOS: `actionRow` — Skip and Watch / Open side by side, same height. */
+/** Match `DuelActionsRow` — Skip and Watch / Open, equal weight. */
 @Composable
-private fun ActionRow(model: RateMeViewModel, item: RateMeItem) {
-    val p = Theme.palette
-    val tint = Appearance.tint
+private fun ActionRow(model: RateMeViewModel, item: RateMeItem, hPad: Dp) {
     val view = LocalView.current
-    val shape = RoundedCornerShape(Tokens.Radius.card)
     val enabled = !model.isSubmitting && !model.isLoading
-    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-        ActionButton("Skip", Icons.Filled.FastForward, p.text, p.secondaryBackground, shape, enabled, Modifier.weight(1f)) {
+    Row(Modifier.fillMaxWidth().padding(horizontal = hPad).padding(bottom = 6.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+        MatchActionButton("Skip", Icons.Filled.FastForward, prominent = false, enabled = enabled, modifier = Modifier.weight(1f)) {
             view.performRateMeHaptic(RateMeHaptic.Light)
             model.skipAsync()
         }
         if (item.mode == RateMeMode.Scenes) {
-            ActionButton("Watch", SF.playFill, Color.White, tint, shape, enabled, Modifier.weight(1f), "Watch Scene", "Opens this scene; Back returns to RateMe") {
+            MatchActionButton("Watch", SF.playFill, prominent = true, enabled = enabled, modifier = Modifier.weight(1f), accessibilityLabel = "Watch Scene") {
                 view.performRateMeHaptic(RateMeHaptic.Light)
                 // Minimal Scene; the detail screen loads the full scene.
                 Nav.push(SceneDetailScreen(item.id, Scene(id = item.id, title = item.title, oCounter = item.oCounter)))
             }
         } else {
             item.openableImage?.let { image ->
-                ActionButton("Open", Icons.Filled.OpenInFull, Color.White, tint, shape, enabled, Modifier.weight(1f), "Open Image", "Opens this image; Back returns to RateMe") {
+                MatchActionButton("Open", Icons.Filled.OpenInFull, prominent = true, enabled = enabled, modifier = Modifier.weight(1f), accessibilityLabel = "Open Image") {
                     view.performRateMeHaptic(RateMeHaptic.Light)
                     Nav.push(ImageViewerScreen(listOf(image), 0))
                 }
             }
         }
-    }
-}
-
-@Composable
-private fun ActionButton(
-    title: String,
-    icon: ImageVector,
-    fg: Color,
-    bg: Color,
-    shape: RoundedCornerShape,
-    enabled: Boolean,
-    modifier: Modifier,
-    accessibilityLabel: String? = null,
-    accessibilityHint: String? = null,
-    onClick: () -> Unit,
-) {
-    Row(
-        modifier
-            .heightIn(min = 46.dp)
-            .clip(shape)
-            .background(bg, shape)
-            .then(if (accessibilityLabel != null) Modifier.semantics { contentDescription = accessibilityLabel } else Modifier)
-            // iOS `accessibilityHint` → TalkBack's action label ("Double tap to …").
-            .clickable(enabled = enabled, onClickLabel = accessibilityHint, onClick = onClick)
-            .alpha(if (enabled) 1f else 0.5f),
-        horizontalArrangement = Arrangement.Center,
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Icon(icon, null, tint = fg, modifier = Modifier.size(scaledIconSize(17.dp, maxScale = 1.5f)))
-        Spacer(Modifier.width(6.dp))
-        Text(title, style = IosTypography.subheadline.copy(fontWeight = FontWeight.SemiBold), color = fg, modifier = Modifier.padding(vertical = 6.dp))
     }
 }
 
