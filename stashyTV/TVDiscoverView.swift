@@ -29,13 +29,6 @@ enum TVDiscoverTool: String, Hashable, CaseIterable, Identifiable {
         case .rateMe: return ToolsItem.rateMe.icon
         }
     }
-
-    var subtitle: String {
-        switch self {
-        case .match: return "Pick the winner of two performers. Ratings follow the Ascension plugin."
-        case .rateMe: return "Rate unrated scenes and images, one after another."
-        }
-    }
 }
 
 /// Pushes a Discover tool onto the Discover stack.
@@ -112,17 +105,13 @@ struct TVDiscoverView: View {
                     }
                 }
                 Spacer(minLength: 0)
+                // Icon and name only: no explanation text on the tiles.
                 Text(tool.title)
                     .font(.title2)
                     .fontWeight(.bold)
-                Text(tool.subtitle)
-                    .font(.callout)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(3)
-                    .fixedSize(horizontal: false, vertical: true)
             }
             .padding(36)
-            .frame(width: 560, height: 340, alignment: .topLeading)
+            .frame(width: 560, height: 240, alignment: .topLeading)
             .background(TVThemeFill(role: .secondary))
             .opacity(locked ? 0.75 : 1)
         }
