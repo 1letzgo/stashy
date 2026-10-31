@@ -59,14 +59,11 @@ struct TVDashboardView: View {
             }
         }
         .background(TVThemeFill())
-        .dismissOnAppLock { playingChannel = nil }
-        .fullScreenCover(item: $playingChannel, onDismiss: {
-            playingChannel = nil
-            // Fortschritte aus dem Kanal-Player nachholen, die während der
-            // Wiedergabe bewusst nicht verarbeitet wurden (s. u.).
+        // A channel opens Feeds (Scenes, the channel's filter and sort), as on iOS.
+        .tvChannelFeedCover($playingChannel) {
+            // Fortschritte aus den Feeds nachholen, die während der Wiedergabe
+            // bewusst nicht verarbeitet wurden (s. u.).
             refreshContinueWatching()
-        }) { channel in
-            TVChannelPlayerView(channel: channel)
         }
         .onAppear { loadData(forceRefresh: true) }
         // Settings › Home Rows: a newly enabled row needs its content.

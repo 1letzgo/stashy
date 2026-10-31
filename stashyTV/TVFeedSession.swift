@@ -246,6 +246,18 @@ enum TVFeedDestination: Hashable {
     case studio(id: String, name: String)
 }
 
+/// A channel opens Feeds as a starting point, like iOS (`navigateToReelsChannel`): Scenes mode
+/// with the channel's filter and sort. Switching modes in the overlay goes back to the
+/// Feeds defaults.
+struct TVFeedChannelStart: Equatable {
+    let id: String
+    let title: String
+    let filter: StashDBViewModel.SavedFilter?
+    let sortRaw: String
+
+    static func == (a: TVFeedChannelStart, b: TVFeedChannelStart) -> Bool { a.id == b.id && a.sortRaw == b.sortRaw }
+}
+
 @MainActor
 final class TVFeedSession: ObservableObject {
 
@@ -261,6 +273,8 @@ final class TVFeedSession: ObservableObject {
     @Published private(set) var isLoading = false
     @Published private(set) var errorMessage: String?
     @Published private(set) var isMuted: Bool
+    /// Set while the feed was started from a channel (Scenes mode only).
+    @Published private(set) var channel: TVFeedChannelStart?
 
     /// Last item per mode, so switching modes back and forth (and reopening the feed) lands
     /// where the user left off — the iOS session position.
@@ -275,6 +289,11 @@ final class TVFeedSession: ObservableObject {
     // Per-item playback state
     private var watchClock = PlayCountWatchClock()
     private var creditedItemId: String?
+    /// Resume position (full scenes) and play duration (scenes and markers), like iOS Feeds
+    /// (`ReelsView.configurePlaybackActivityTracker`). Nothing is written until the item counts
+    /// as played; the time watched before that is held and sent with the first save.
+    private let activityTracker = ScenePlaybackActivityTracker()
+    private var heldPlayDuration: Double = 0
     private var segmentEndHandled = false
     private var loadGeneration = 0
     /// Items without a playable source, skipped from here on.
@@ -329,8 +348,22 @@ final class TVFeedSession: ObservableObject {
 
     // MARK: Lifecycle
 
+    /// A channel's cover appeared: Scenes with the channel's filter and sort, from the top.
+    func activate(channel start: TVFeedChannelStart) {
+        isActive = true
+        rememberPosition()
+        channel = start
+        mode = .scenes
+        positions[.scenes] = nil
+        restoreFromCatalog()
+        fetchIfNeeded()
+        playCurrent()
+    }
+
     /// The feed cover appeared: fetch (if needed) and play.
     func activate(mode requested: ReelsModeType? = nil) {
+        // Opened from Feeds itself: its own defaults, not a channel left from before.
+        channel = nil
         isActive = true
         if let requested, requested != mode {
             rememberPosition()
@@ -359,6 +392,7 @@ final class TVFeedSession: ObservableObject {
     }
 
     private func releaseEngine() {
+        activityTracker.stop()
         loadGeneration &+= 1
         engineCancellables.removeAll()
         if let engine {
@@ -388,6 +422,8 @@ final class TVFeedSession: ObservableObject {
     func switchMode(to newMode: ReelsModeType) {
         guard newMode != mode else { return }
         rememberPosition()
+        // A channel is only the starting point (as on iOS): other modes use the Feeds defaults.
+        channel = nil
         mode = newMode
         restoreFromCatalog()
         fetchIfNeeded()
@@ -418,7 +454,8 @@ final class TVFeedSession: ObservableObject {
     /// Page 1 for the current mode with its Feeds defaults, unless the list already holds it.
     func fetchIfNeeded(force: Bool = false) {
         let mode = self.mode
-        let filterId = mode.defaultFilterId
+        let channel = mode == .scenes ? self.channel : nil
+        let filterId = channel == nil ? mode.defaultFilterId : nil
 
         // The default filter is a saved filter: wait for the server's list once.
         if filterId != nil, catalog.savedFilters.isEmpty, !savedFiltersRequested {
@@ -429,9 +466,9 @@ final class TVFeedSession: ObservableObject {
             }
             return
         }
-        let filter = filterId.flatMap { catalog.savedFilters[$0] }
-        let sortRaw = mode.defaultSortRaw
-        let key = "\(sortRaw)|\(filter?.id ?? "-")"
+        let filter = channel.map { $0.filter } ?? filterId.flatMap { catalog.savedFilters[$0] }
+        let sortRaw = channel?.sortRaw ?? mode.defaultSortRaw
+        let key = channel.map { "channel|\($0.id)|\($0.sortRaw)" } ?? "\(sortRaw)|\(filter?.id ?? "-")"
         if !force, loadedKeys[mode] == key, !buildItems().isEmpty || isFetching(mode) {
             refreshFromCatalog()
             return
@@ -584,16 +621,29 @@ final class TVFeedSession: ObservableObject {
 
     /// ◀ / ▶: ±10 s, like the macOS arrow keys. Markers stay inside their segment.
     func seek(by delta: Double) {
-        guard let engine, let item = currentItem else { return }
+        guard let engine else { return }
+        seek(to: engine.currentTime + delta)
+    }
+
+    /// The range the playhead may move in: the marker's segment, else the whole file.
+    var seekRange: ClosedRange<Double>? {
+        guard let engine, let item = currentItem else { return nil }
         var lower: Double = 0
         var upper = engine.duration.isFinite && engine.duration > 0 ? engine.duration - 0.5 : .greatestFiniteMagnitude
         if let segment = item.segment?.clamped(toFileDuration: engine.duration) {
             lower = segment.start
             upper = segment.end - 0.5
         }
-        let target = min(max(lower, engine.currentTime + delta), max(lower, upper))
+        return lower...max(lower, upper)
+    }
+
+    /// Absolute seek (touch-surface scrub, ◀ / ▶), clamped to `seekRange`.
+    func seek(to time: Double) {
+        guard let engine, let range = seekRange else { return }
+        let target = min(max(range.lowerBound, time), range.upperBound)
         segmentEndHandled = false
         watchClock.breakInterval()
+        activityTracker.noteSeek(to: target)
         Task { await engine.seek(to: target) }
     }
 
@@ -635,6 +685,13 @@ final class TVFeedSession: ObservableObject {
                 }
             }
             .store(in: &engineCancellables)
+        created.$isPlaying
+            .removeDuplicates()
+            .receive(on: RunLoop.main)
+            .sink { [weak self] playing in
+                if !playing { self?.activityTracker.stop() }
+            }
+            .store(in: &engineCancellables)
         engine = created
         return created
     }
@@ -653,6 +710,8 @@ final class TVFeedSession: ObservableObject {
 
         loadGeneration &+= 1
         let generation = loadGeneration
+        // Saves the outgoing item (with its own rules), then tracks this one.
+        configureActivityTracking(for: item)
         watchClock.reset()
         creditedItemId = nil
         segmentEndHandled = false
@@ -678,6 +737,42 @@ final class TVFeedSession: ObservableObject {
         }
     }
 
+    private func configureActivityTracking(for item: TVFeedItem) {
+        activityTracker.reset()
+        heldPlayDuration = 0
+        guard let sceneId = item.playCreditSceneId else {
+            activityTracker.onSave = nil
+            return
+        }
+        let itemId = item.id
+        // Markers only add watch time; the scene's resume point is not theirs to move.
+        if case .scene = item {
+            activityTracker.updatesResumeTime = true
+        } else {
+            activityTracker.updatesResumeTime = false
+        }
+        let catalog = catalog
+        activityTracker.onSave = { [weak self] resumeTime, playDuration in
+            guard let self, playDuration > 0 || resumeTime != nil else { return }
+            guard self.creditedItemId == itemId else {
+                self.heldPlayDuration += max(0, playDuration)
+                return
+            }
+            let total = playDuration + self.heldPlayDuration
+            self.heldPlayDuration = 0
+            catalog.updateSceneResumeTime(sceneId: sceneId, resumeTime: resumeTime, playDuration: total) { success in
+                guard success, let resumeTime else { return }
+                DispatchQueue.main.async {
+                    NotificationCenter.default.post(
+                        name: NSNotification.Name("SceneResumeTimeUpdated"),
+                        object: nil,
+                        userInfo: ["sceneId": sceneId, "resumeTime": resumeTime]
+                    )
+                }
+            }
+        }
+    }
+
     private func skipUnplayable(_ item: TVFeedItem) {
         AppLog.debug("📺 TV Feeds: no playable source for \(item.id) — skipping")
         unplayableIds.insert(item.id)
@@ -698,7 +793,14 @@ final class TVFeedSession: ObservableObject {
                 if TabManager.tracksActivity(for: sceneId) {
                     catalog.addScenePlay(sceneId: sceneId)
                 }
+                // Counts as played now: the held time goes out at once.
+                activityTracker.flush()
             }
+        }
+
+        if item.playCreditSceneId != nil {
+            activityTracker.setPosition(currentTime: time, duration: duration)
+            if engine.isPlaying { activityTracker.start() }
         }
 
         // Marker rows end at their segment end: continuous play moves on, otherwise loop.

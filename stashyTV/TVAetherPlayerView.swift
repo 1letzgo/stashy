@@ -175,6 +175,10 @@ private struct TVAetherPlayerContent<Panel: View>: View {
     /// Which Up/Down click is down right now (fed by `TVRemoteHoldRecognizer`). Clicks are
     /// handled on release by the recognizer; swipes still arrive only as move commands.
     @State private var remotePresses = TVRemotePressTracker()
+    /// ◀ / ▶ clicks (fed by `TVRemoteSeekHoldRecognizer`): a tap steps, a hold scans through
+    /// the scrub preview until released.
+    @State private var sidePresses = TVRemoteSidePressTracker()
+    @State private var holdSeekTask: Task<Void, Never>?
     /// Mirror of `engine.rate`: the engine does not publish its speed, so the speed row
     /// and the transport badge would not redraw after a pick without it.
     @State private var playbackRate: Float = 1
@@ -225,6 +229,21 @@ private struct TVAetherPlayerContent<Panel: View>: View {
                 onBegan: { beginPanScrub() },
                 onChanged: { panScrub(translation: $0) },
                 onEnded: { endPanScrub() }
+            )
+            .frame(width: 0, height: 0)
+            .allowsHitTesting(false)
+            .accessibilityHidden(true)
+
+            // ◀ / ▶: tap steps (10 → 30 → 60 s when repeated), hold scans continuously.
+            TVRemoteSeekHoldRecognizer(
+                isEnabled: !isPanelOpen,
+                tracker: sidePresses,
+                onTap: { direction in
+                    guard !isPanelOpen else { return }
+                    step(by: Double(direction) * stepSeconds())
+                },
+                onHoldBegan: { beginHoldSeek($0) },
+                onHoldEnded: { endHoldSeek() }
             )
             .frame(width: 0, height: 0)
             .allowsHitTesting(false)
@@ -753,7 +772,9 @@ private struct TVAetherPlayerContent<Panel: View>: View {
             if (canGoPrevious || canGoNext), remotePresses.isPressing(direction) { return }
             handleVerticalTap(direction)
         case .left, .right:
-            // A swipe also arrives here; the pan already scrubbed it freely.
+            // A click is the seek-hold recognizer's (tap on release, hold scans); a swipe also
+            // arrives here, and the pan already scrubbed it freely.
+            guard !sidePresses.isPressing(direction), holdSeekTask == nil else { return }
             guard !isPanning, Date().timeIntervalSince(lastPanAt) > 0.4 else { return }
             step(by: direction == .left ? -stepSeconds() : stepSeconds())
         @unknown default:
@@ -818,6 +839,43 @@ private struct TVAetherPlayerContent<Panel: View>: View {
     /// One still request at a time: each click used to start its own decode, and a burst of
     /// them kept the engine busy long after the scrub. The running one fetches the newest
     /// target again when it finishes.
+    // MARK: - ◀ / ▶ hold
+
+    /// Held ◀ / ▶: the scrub preview runs (20 → 60 → 180 s per second); releasing keeps the
+    /// preview, which commits on Select or after 1 s idle like every other scrub.
+    private func beginHoldSeek(_ direction: Int) {
+        guard !isPanelOpen else { return }
+        holdSeekTask?.cancel()
+        scrubCommitWork?.cancel()
+        if !isScrubbing {
+            isScrubbing = true
+            scrubTarget = engine.currentTime
+            scrubImage = nil
+        }
+        reveal()
+        holdSeekTask = Task { @MainActor in
+            var elapsed: Double = 0
+            while !Task.isCancelled {
+                try? await Task.sleep(nanoseconds: UInt64(TVHoldSeekSpeed.tick * 1_000_000_000))
+                guard !Task.isCancelled else { break }
+                elapsed += TVHoldSeekSpeed.tick
+                let duration = engine.duration
+                let upper = duration.isFinite && duration > 0 ? duration - 0.5 : Double.greatestFiniteMagnitude
+                let delta = Double(direction) * TVHoldSeekSpeed.secondsPerSecond(heldFor: elapsed) * TVHoldSeekSpeed.tick
+                scrubTarget = min(max(0, scrubTarget + delta), upper)
+                requestScrubThumbnail()
+                reveal()
+            }
+        }
+    }
+
+    private func endHoldSeek() {
+        guard let task = holdSeekTask else { return }
+        task.cancel()
+        holdSeekTask = nil
+        scheduleScrubCommit()
+    }
+
     // MARK: - Touch-surface scrub
 
     private func beginPanScrub() {
@@ -890,6 +948,8 @@ private struct TVAetherPlayerContent<Panel: View>: View {
     }
 
     private func cancelScrub() {
+        holdSeekTask?.cancel()
+        holdSeekTask = nil
         scrubCommitWork?.cancel()
         scrubCommitWork = nil
         isScrubbing = false

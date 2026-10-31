@@ -32,7 +32,12 @@ final class TVAetherPlaybackModel: ObservableObject {
     var hasEngine: Bool { engine != nil }
 
     private var cancellables = Set<AnyCancellable>()
-    private var progressTimer: AnyCancellable?
+    private var engineCancellables = Set<AnyCancellable>()
+    /// Resume position and play duration, synced like the phone player (`SceneDetailView`):
+    /// `sceneSaveActivity` every 10 s of real watching, on pause and when leaving. Before, tvOS
+    /// sent the resume point only (`playDuration: 0`), so Stash never saw how long a scene was
+    /// watched there.
+    private let activityTracker = ScenePlaybackActivityTracker()
     /// Settings › Playback › "Count as played": the play is credited once the scene has been
     /// watched that long in this session (`playCreditClock`), not when playback starts.
     private var playCreditTimer: AnyCancellable?
@@ -80,6 +85,18 @@ final class TVAetherPlaybackModel: ObservableObject {
             created.onReachedEnd = { [weak self] in
                 self?.onPlaybackEnded?()
             }
+            created.$currentTime
+                .receive(on: RunLoop.main)
+                .sink { [weak self] _ in self?.trackActivityPosition() }
+                .store(in: &engineCancellables)
+            created.$isPlaying
+                .removeDuplicates()
+                .receive(on: RunLoop.main)
+                .sink { [weak self] playing in
+                    // Paused: saved right away (the exact spot, the time watched so far).
+                    if !playing { self?.activityTracker.stop() }
+                }
+                .store(in: &engineCancellables)
             engine = created
             return created
         } catch {
@@ -115,7 +132,7 @@ final class TVAetherPlaybackModel: ObservableObject {
 
         applyNowPlaying(title: title, subtitle: subtitle, artworkURL: artworkURL)
         isShowingPlayer = true
-        startProgressTimer()
+        configureActivityTracking(sceneId: sceneId, viewModel: viewModel)
         startPlayCreditTimer()
 
         engine.fallbackSources = fallbackSources
@@ -150,14 +167,14 @@ final class TVAetherPlaybackModel: ObservableObject {
                   scene: scene)
             return
         }
-        saveProgress()
         self.sceneId = sceneId
         self.viewModel = viewModel
         self.isSuspended = false
         self.error = nil
 
         applyNowPlaying(title: title, subtitle: subtitle, artworkURL: artworkURL)
-        startProgressTimer()
+        // Saves what was watched of the outgoing item, then tracks the new one.
+        configureActivityTracking(sceneId: sceneId, viewModel: viewModel)
         startPlayCreditTimer()
 
         engine.fallbackSources = fallbackSources
@@ -216,10 +233,36 @@ final class TVAetherPlaybackModel: ObservableObject {
 
     // MARK: - Progress
 
-    private func startProgressTimer() {
-        progressTimer = Timer.publish(every: 10, on: .main, in: .common)
-            .autoconnect()
-            .sink { [weak self] _ in self?.saveProgress() }
+    /// Points the tracker at `sceneId`. Resetting flushes the previous item with its own save
+    /// closure first, so a channel hand-over keeps the outgoing scene's time.
+    private func configureActivityTracking(sceneId: String, viewModel: StashDBViewModel) {
+        activityTracker.reset()
+        activityTracker.updatesResumeTime = true
+        activityTracker.onSave = { resumeTime, playDuration in
+            AppLog.debug("💾 TV PLAYBACK: activity \(sceneId) resume=\(resumeTime.map { "\($0)" } ?? "-") +\(playDuration)s")
+            viewModel.updateSceneResumeTime(
+                sceneId: sceneId,
+                resumeTime: resumeTime,
+                playDuration: playDuration
+            ) { success in
+                guard success, let resumeTime else { return }
+                DispatchQueue.main.async {
+                    NotificationCenter.default.post(
+                        name: NSNotification.Name("SceneResumeTimeUpdated"),
+                        object: nil,
+                        userInfo: ["sceneId": sceneId, "resumeTime": resumeTime]
+                    )
+                }
+            }
+        }
+    }
+
+    /// Feeds the playhead to the tracker. Until the new item shows its first frame the engine
+    /// still reports the old one's time, which must not count for the new scene.
+    private func trackActivityPosition() {
+        guard let engine, sceneId != nil, !isSuspended, playheadBelongsToCurrentItem else { return }
+        activityTracker.setPosition(currentTime: engine.currentTime, duration: engine.duration)
+        if engine.isPlaying { activityTracker.start() }
     }
 
     private func startPlayCreditTimer() {
@@ -255,27 +298,10 @@ final class TVAetherPlaybackModel: ObservableObject {
         )
     }
 
+    /// Sends what is pending now (app to the background, player closing). The tracker clears
+    /// the resume point once ≥ 98 % is watched, like Stash's web player.
     func saveProgress() {
-        guard let engine,
-              let sceneId,
-              let viewModel else { return }
-
-        guard playheadBelongsToCurrentItem else { return }
-        let currentTime = engine.currentTime
-        guard currentTime > 0 else { return }
-
-        let duration = engine.duration
-        var resume = currentTime
-        if duration.isFinite, duration > 0, (100.0 / duration) * currentTime >= 98 {
-            resume = 0
-        }
-        AppLog.debug("💾 TV PLAYBACK: saving resume \(resume)s for \(sceneId)")
-        viewModel.updateSceneResumeTime(sceneId: sceneId, resumeTime: resume, playDuration: 0)
-        NotificationCenter.default.post(
-            name: NSNotification.Name("SceneResumeTimeUpdated"),
-            object: nil,
-            userInfo: ["sceneId": sceneId, "resumeTime": resume]
-        )
+        activityTracker.flush()
     }
 
     // MARK: - Teardown
@@ -285,21 +311,23 @@ final class TVAetherPlaybackModel: ObservableObject {
     func suspend() {
         guard !isSuspended else { return }
         isSuspended = true
-        saveProgress()
-        progressTimer = nil
+        activityTracker.stop()
         playCreditTimer = nil
         engine?.pause()
     }
 
     func clear() {
-        if !isSuspended { saveProgress() }
+        if !isSuspended { activityTracker.stop() }
+        // Already saved: drop the closure first so the reset does not send it twice.
+        activityTracker.onSave = nil
+        activityTracker.reset()
         isSuspended = false
-        progressTimer = nil
         playCreditTimer = nil
         creditedSceneIds.removeAll()
         nowPlayingGeneration &+= 1
         nowPlayingInfo = [:]
         let stopping = engine
+        engineCancellables.removeAll()
         engine = nil
         stopping?.onReachedEnd = nil
         stopping?.stop()

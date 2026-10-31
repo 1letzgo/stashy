@@ -3,7 +3,9 @@
 //  stashyTV
 //
 //  The full-screen Feeds pager. The Siri Remote maps like the macOS Feeds keys:
-//  ▲ / ▼ (click or swipe) previous / next item, ◀ / ▶ seek 10 s, Play/Pause toggles.
+//  ▲ / ▼ (click or swipe) previous / next item, ◀ / ▶ seek 10 s, a horizontal pan on the
+//  touch surface scrubs freely (like the scene player), holding ◀ / ▶ seeks continuously
+//  (faster the longer it is held), Play/Pause toggles.
 //  Select opens a small info overlay (title, performers, studio, actions, mode switcher);
 //  Menu closes the overlay first, then the feed.
 //
@@ -31,6 +33,22 @@ struct TVFeedPlayerView: View {
     @State private var seekFeedback: String?
     @State private var seekFeedbackWork: DispatchWorkItem?
     @State private var isClosing = false
+    /// Touch-surface scrub: where it started, and when it last moved — the swipe's own move
+    /// command arrives too and must not add a 10 s step on top.
+    @State private var isPanning = false
+    @State private var panStartTime: Double = 0
+    @State private var lastPanAt = Date.distantPast
+    @State private var lastPanSeekAt = Date.distantPast
+    @State private var panTarget: Double = 0
+    /// ◀ / ▶ clicks: a tap steps 10 s, a hold seeks continuously until released.
+    @State private var sidePresses = TVRemoteSidePressTracker()
+    @State private var holdSeekTask: Task<Void, Never>?
+
+    /// The progress line only while there is something to see it for: the info strip after
+    /// an item change, seeking / scrubbing, the overlay. Watching shows the video alone.
+    private var showsProgress: Bool {
+        (showsInfo && !isOverlayOpen) || isOverlayOpen || isPanning || holdSeekTask != nil || seekFeedback != nil
+    }
 
     private enum OverlayFocus: Hashable {
         case primary
@@ -44,7 +62,8 @@ struct TVFeedPlayerView: View {
                 TVFeedVideoLayer(engine: engine,
                                  posterURL: session.currentItem?.posterURL,
                                  isSwitching: session.isSwitching,
-                                 segment: session.currentItem?.segment)
+                                 segment: session.currentItem?.segment,
+                                 showsProgress: showsProgress)
                     .ignoresSafeArea()
             } else if let poster = session.currentItem?.posterURL {
                 TVFeedPoster(url: poster, showsSpinner: true)
@@ -77,6 +96,28 @@ struct TVFeedPlayerView: View {
             // Wie im Player: der Fernbedienungs-Layer ist ein Geschwister des Overlays und
             // existiert nur bei geschlossenem Overlay — sonst schlucken seine Recognizer
             // Select und die Richtungstasten der Overlay-Buttons.
+            // Free scrubbing on the touch surface; the move commands only give 10 s steps.
+            TVRemoteScrubRecognizer(
+                isEnabled: !isOverlayOpen && session.engine != nil,
+                onBegan: { beginPanScrub() },
+                onChanged: { panScrub(translation: $0) },
+                onEnded: { endPanScrub() }
+            )
+            .frame(width: 0, height: 0)
+            .allowsHitTesting(false)
+            .accessibilityHidden(true)
+
+            TVRemoteSeekHoldRecognizer(
+                isEnabled: !isOverlayOpen && session.engine != nil,
+                tracker: sidePresses,
+                onTap: { stepSeek($0) },
+                onHoldBegan: { beginHoldSeek($0) },
+                onHoldEnded: { endHoldSeek() }
+            )
+            .frame(width: 0, height: 0)
+            .allowsHitTesting(false)
+            .accessibilityHidden(true)
+
             if !isOverlayOpen {
                 remoteInputLayer
             } else if let item = session.currentItem {
@@ -148,12 +189,12 @@ struct TVFeedPlayerView: View {
             session.previous()
         case .down:
             session.next()
-        case .left:
-            session.seek(by: -TVFeedSession.seekStepSeconds)
-            flashSeek("−\(Int(TVFeedSession.seekStepSeconds)) s")
-        case .right:
-            session.seek(by: TVFeedSession.seekStepSeconds)
-            flashSeek("+\(Int(TVFeedSession.seekStepSeconds)) s")
+        case .left, .right:
+            // A click is the seek-hold recognizer's (tap on release, hold seeks on); a swipe
+            // also arrives here, and the pan already scrubbed it freely.
+            guard !sidePresses.isPressing(direction), holdSeekTask == nil else { return }
+            guard !isPanning, Date().timeIntervalSince(lastPanAt) > 0.4 else { return }
+            stepSeek(direction == .left ? -1 : 1)
         @unknown default:
             break
         }
@@ -187,6 +228,88 @@ struct TVFeedPlayerView: View {
         DispatchQueue.main.asyncAfter(deadline: .now() + 4, execute: work)
     }
 
+    // MARK: - ◀ / ▶ step and hold
+
+    private func stepSeek(_ direction: Int) {
+        guard !isOverlayOpen else { return }
+        let step = Double(direction) * TVFeedSession.seekStepSeconds
+        session.seek(by: step)
+        flashSeek(direction < 0 ? "−\(Int(TVFeedSession.seekStepSeconds)) s" : "+\(Int(TVFeedSession.seekStepSeconds)) s")
+    }
+
+    /// Held ◀ / ▶: the playhead runs on (20 → 60 → 180 s per second), the label shows where.
+    private func beginHoldSeek(_ direction: Int) {
+        guard !isOverlayOpen, let engine = session.engine else { return }
+        holdSeekTask?.cancel()
+        panTarget = engine.currentTime
+        holdSeekTask = Task { @MainActor in
+            var elapsed: Double = 0
+            while !Task.isCancelled {
+                try? await Task.sleep(nanoseconds: UInt64(TVHoldSeekSpeed.tick * 1_000_000_000))
+                guard !Task.isCancelled, let engine = session.engine, let range = session.seekRange else { break }
+                elapsed += TVHoldSeekSpeed.tick
+                let delta = Double(direction) * TVHoldSeekSpeed.secondsPerSecond(heldFor: elapsed) * TVHoldSeekSpeed.tick
+                panTarget = min(max(range.lowerBound, panTarget + delta), range.upperBound)
+                seekFeedbackWork?.cancel()
+                seekFeedback = "\(direction < 0 ? "◀◀" : "▶▶")  \(Self.clock(panTarget)) / \(Self.clock(engine.duration))"
+                session.seek(to: panTarget)
+            }
+        }
+    }
+
+    private func endHoldSeek() {
+        guard let task = holdSeekTask else { return }
+        task.cancel()
+        holdSeekTask = nil
+        session.seek(to: panTarget)
+        let work = DispatchWorkItem { seekFeedback = nil }
+        seekFeedbackWork = work
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.8, execute: work)
+    }
+
+    // MARK: - Touch-surface scrub
+
+    private func beginPanScrub() {
+        guard !isOverlayOpen, let engine = session.engine else { return }
+        isPanning = true
+        lastPanAt = Date()
+        panStartTime = engine.currentTime
+        panTarget = panStartTime
+    }
+
+    /// Same rate as the scene player: one swipe across the surface covers about 40 % of the
+    /// file (at least 1 min). Seeks live, at most every 0.15 s; the label shows the target.
+    private func panScrub(translation: CGFloat) {
+        guard isPanning, let engine = session.engine, let range = session.seekRange else { return }
+        lastPanAt = Date()
+        let duration = engine.duration
+        guard duration.isFinite, duration > 0 else { return }
+        let secondsPerPoint = max(60, duration * 0.4) / 1920
+        panTarget = min(max(range.lowerBound, panStartTime + Double(translation) * secondsPerPoint), range.upperBound)
+        seekFeedbackWork?.cancel()
+        seekFeedback = "\(Self.clock(panTarget)) / \(Self.clock(duration))"
+        if Date().timeIntervalSince(lastPanSeekAt) > 0.15 {
+            lastPanSeekAt = Date()
+            session.seek(to: panTarget)
+        }
+    }
+
+    private func endPanScrub() {
+        guard isPanning else { return }
+        isPanning = false
+        lastPanAt = Date()
+        session.seek(to: panTarget)
+        let work = DispatchWorkItem { seekFeedback = nil }
+        seekFeedbackWork = work
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.8, execute: work)
+    }
+
+    private static func clock(_ seconds: Double) -> String {
+        let total = max(0, Int(seconds.rounded()))
+        let h = total / 3600, m = (total % 3600) / 60, s = total % 60
+        return h > 0 ? String(format: "%d:%02d:%02d", h, m, s) : String(format: "%d:%02d", m, s)
+    }
+
     private func flashSeek(_ label: String) {
         seekFeedback = label
         seekFeedbackWork?.cancel()
@@ -200,7 +323,8 @@ struct TVFeedPlayerView: View {
     private func infoStrip(_ item: TVFeedItem) -> some View {
         VStack {
             HStack(spacing: 14) {
-                Label(session.mode.defaultTitle, systemImage: session.mode.icon)
+                Label(session.channel?.title ?? session.mode.defaultTitle,
+                      systemImage: session.channel == nil ? session.mode.icon : "tv")
                     .font(.system(size: 24, weight: .semibold))
                     .foregroundStyle(appearance.tintColor)
                 Spacer()
@@ -224,7 +348,7 @@ struct TVFeedPlayerView: View {
                         .foregroundStyle(.white.opacity(0.8))
                         .lineLimit(1)
                 }
-                Text("▲ ▼ Browse   ◀ ▶ Seek   Click for info")
+                Text("▲ ▼ Browse   ◀ ▶ Seek (hold to scan)   Swipe to scrub   Click for info")
                     .font(.system(size: 20))
                     .foregroundStyle(.white.opacity(0.5))
                     .padding(.top, 6)
@@ -447,6 +571,7 @@ private struct TVFeedVideoLayer: View {
     let posterURL: URL?
     let isSwitching: Bool
     let segment: ReelPlaybackSegment?
+    var showsProgress: Bool
 
     var body: some View {
         ZStack(alignment: .bottom) {
@@ -469,11 +594,14 @@ private struct TVFeedVideoLayer: View {
             }
 
             progressBar
+                .opacity(showsProgress ? 1 : 0)
+                .animation(.easeInOut(duration: 0.25), value: showsProgress)
         }
         .allowsHitTesting(false)
     }
 
-    /// Thin always-on progress line; markers show their segment, not the whole file.
+    /// Thin progress line, shown only on demand (`showsProgress`); markers show their
+    /// segment, not the whole file.
     private var progressBar: some View {
         GeometryReader { geo in
             let progress = currentProgress

@@ -272,12 +272,8 @@ struct TVGenericDetailView<Item: TVDetailItem, Info: View, Content: View>: View 
         .onChange(of: showsChannelButton) { _, _ in claimHeaderFocusIfUntouched() }
         .onChange(of: isLoading) { _, _ in claimHeaderFocusIfUntouched() }
         .onChange(of: scenes.isEmpty) { _, _ in claimHeaderFocusIfUntouched() }
-        .dismissOnAppLock { playingChannel = nil }
-        .fullScreenCover(item: $playingChannel, onDismiss: {
-            playingChannel = nil
-        }) { channel in
-            TVChannelPlayerView(channel: channel)
-        }
+        // A channel opens Feeds (Scenes of this performer / studio / tag / group), as on iOS.
+        .tvChannelFeedCover($playingChannel)
     }
 
     private func headerActionButton(_ action: TVDetailHeaderAction) -> some View {
