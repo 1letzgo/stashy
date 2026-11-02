@@ -1466,7 +1466,7 @@
 				ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS = YES;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 427;
+				CURRENT_PROJECT_VERSION = 428;
 				DEVELOPMENT_TEAM = 699G2QY959;
 				ENABLE_PREVIEWS = YES;
 				INFOPLIST_FILE = stashy/Info.plist;
@@ -1477,7 +1477,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 3.4;
+				MARKETING_VERSION = 3.5;
 				PRODUCT_BUNDLE_IDENTIFIER = de.letzgo.stashy;
 				PRODUCT_NAME = "$(TARGET_NAME:c99extidentifier)";
 				PROVISIONING_PROFILE_SPECIFIER = "";
@@ -1496,7 +1496,7 @@
 				ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS = YES;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 427;
+				CURRENT_PROJECT_VERSION = 428;
 				DEVELOPMENT_TEAM = 699G2QY959;
 				ENABLE_PREVIEWS = YES;
 				INFOPLIST_FILE = stashy/Info.plist;
@@ -1507,7 +1507,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 3.4;
+				MARKETING_VERSION = 3.5;
 				PRODUCT_BUNDLE_IDENTIFIER = de.letzgo.stashy;
 				PRODUCT_NAME = "$(TARGET_NAME:c99extidentifier)";
 				PROVISIONING_PROFILE_SPECIFIER = "";
