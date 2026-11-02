@@ -106,8 +106,9 @@ struct MainTabView: View {
                 MiniPlayerStore.shared.restoreLastSessionIfNeeded()
                 #endif
             }
-            .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("AuthError401"))) { _ in
-                coordinator.selectedTab = .catalogue
+            .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("AuthError401")).receive(on: DispatchQueue.main)) { _ in
+                // Settings is where the key gets fixed; a late 401 must not interrupt that.
+                guard coordinator.selectedTab != .settings else { return }
                 warningType = .authExpired
                 showConfigWarning = true
             }
