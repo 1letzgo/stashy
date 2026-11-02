@@ -3,6 +3,7 @@ package de.letzgo.stashy.ui
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.automirrored.filled.CallMerge
+import androidx.compose.material.icons.automirrored.filled.MenuBook
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material.icons.outlined.*
 import androidx.compose.material.icons.automirrored.filled.VolumeOff
@@ -44,6 +45,8 @@ object SF {
     val squareAndArrowDown = Icons.Outlined.Download
     val ellipsis = Icons.Filled.MoreHoriz
     val xmark = Icons.Filled.Close
+    val magazine = Icons.AutoMirrored.Filled.MenuBook
+    val counterclockwise = Icons.Filled.Replay
     val plus = Icons.Filled.Add
     val trash = Icons.Outlined.Delete
     val pencil = Icons.Outlined.Edit

@@ -61,6 +61,7 @@ import de.letzgo.stashy.ui.tools.stats.SessionTimelineToolView
 enum class ToolsTab(val title: String, val icon: ImageVector) {
     Downloads("Downloads", SF.squareAndArrowDown),
     Watchlist("Watchlist", de.letzgo.stashy.ui.player.WatchlistIcons.listed),
+    Magazine("Magazin", SF.magazine),
     Overview("Overview", SF.chartBarFill),
     OCount("O-Count", SF.calendar),
     Timeline("Timeline", SF.calendarDayTimelineLeft),
@@ -73,7 +74,7 @@ enum class ToolsTab(val title: String, val icon: ImageVector) {
 
         /** iOS: `ToolsView.toolGroups` — fixed grouping and order. */
         val groups: List<Pair<String, List<ToolsTab>>> = listOf(
-            "Library" to listOf(Downloads, Watchlist),
+            "Library" to listOf(Downloads, Watchlist, Magazine),
             "Insights" to listOf(Overview, TopLists, OCount, Timeline),
             "Discover" to listOf(HotOrNot, RateMe),
         )
@@ -121,6 +122,7 @@ private fun ToolsView() {
             null -> ToolsLandingView { ToolsNav.subTab = it.title }
             ToolsTab.Downloads -> DownloadsToolView()
             ToolsTab.Watchlist -> de.letzgo.stashy.ui.tools.watchlist.WatchlistToolView()
+            ToolsTab.Magazine -> de.letzgo.stashy.ui.tools.magazine.MagazineToolView()
             ToolsTab.Overview -> OverviewToolView()
             ToolsTab.OCount -> OCountHeatmapToolView()
             ToolsTab.Timeline -> SessionTimelineToolView()

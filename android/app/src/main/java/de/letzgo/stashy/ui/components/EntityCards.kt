@@ -27,6 +27,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -199,10 +200,16 @@ fun TagCard(tag: Tag, modifier: Modifier = Modifier, onClick: (() -> Unit)? = nu
  * iOS: `GalleryCardView` — cover filling the card ([aspectRatio] 16:9 at 1/row, 1:1 at 2/row),
  * studio pill top-left, image count top-right, gradient (40 %) with the title.
  */
+@OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
 @Composable
-fun GalleryCard(gallery: Gallery, modifier: Modifier = Modifier, aspectRatio: Float = 1f, shape: androidx.compose.ui.graphics.Shape = de.letzgo.stashy.ui.NativeCardShape, onClick: (() -> Unit)? = null) {
+fun GalleryCard(gallery: Gallery, modifier: Modifier = Modifier, aspectRatio: Float = 1f, shape: androidx.compose.ui.graphics.Shape = de.letzgo.stashy.ui.NativeCardShape, /** Reading progress bar, same as the scene cards. */ progress: Float? = null, onLongClick: (() -> Unit)? = null, onClick: (() -> Unit)? = null) {
     val p = Theme.palette
-    NativeCard(modifier.fillMaxWidth().aspectRatio(aspectRatio), shape = shape, onClick = onClick) { BoxWithConstraints(Modifier.fillMaxSize()) {
+    val cardModifier = modifier.fillMaxWidth().aspectRatio(aspectRatio)
+    NativeCard(
+        if (onLongClick != null && onClick != null) cardModifier.clip(shape).combinedClickable(onLongClick = onLongClick, onClick = onClick) else cardModifier,
+        shape = shape,
+        onClick = onClick.takeIf { onLongClick == null },
+    ) { BoxWithConstraints(Modifier.fillMaxSize()) {
         Box(Modifier.fillMaxSize().background(Color.Gray.copy(alpha = 0.2f)), contentAlignment = Alignment.Center) {
             var failed by remember(gallery.id) { mutableStateOf(gallery.coverURL == null) }
             if (failed) PlaceholderIcon(SF.photoOnRectangle, size = 40)
@@ -218,6 +225,11 @@ fun GalleryCard(gallery: Gallery, modifier: Modifier = Modifier, aspectRatio: Fl
             gallery.displayTitle, Modifier.align(Alignment.BottomStart).fillMaxWidth().padding(12.dp),
             style = NativeType.titleMedium, color = Color.White, maxLines = 2, overflow = TextOverflow.Ellipsis,
         )
+        progress?.let { fraction ->
+            Box(Modifier.align(Alignment.BottomStart).fillMaxWidth().height(5.dp).background(Color.White.copy(alpha = 0.2f))) {
+                Box(Modifier.fillMaxWidth(fraction.coerceIn(0f, 1f)).height(5.dp).background(de.letzgo.stashy.ui.Appearance.tint))
+            }
+        }
     } }
 }
 

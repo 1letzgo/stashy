@@ -143,14 +143,22 @@ fun GalleriesCatalog() {
 }
 
 @Composable
-fun GalleriesList(c: CatalogController<Gallery>, columnScope: CatalogCardColumnScope, topPadding: androidx.compose.ui.unit.Dp = catalogTopPadding()) {
+fun GalleriesList(
+    c: CatalogController<Gallery>,
+    columnScope: CatalogCardColumnScope,
+    topPadding: androidx.compose.ui.unit.Dp = catalogTopPadding(),
+    /** Another screen's card on the same list (Magazin); defaults to opening the gallery. */
+    card: @Composable (Gallery, Float) -> Unit = { gallery, aspectRatio ->
+        GalleryCard(gallery, aspectRatio = aspectRatio, onClick = { Nav.push(GalleryDetailScreen(gallery.id, gallery)) })
+    },
+) {
     val cols = CatalogPrefs.cardColumns(columnScope)
     CatalogScaffold(
         c, CatalogTexts("Loading galleries...", SF.photoStack, "No galleries found", "Reload"),
         CatalogSlots(),
         columns = { cols.columnCount(it) }, itemKey = { it.id }, topPadding = topPadding, gridKey = cols,
     ) { _, gallery ->
-        GalleryCard(gallery, aspectRatio = cols.cardAspectRatio, onClick = { Nav.push(GalleryDetailScreen(gallery.id, gallery)) })
+        card(gallery, cols.cardAspectRatio)
     }
     CatalogFilterSortSheet(c)
 }
