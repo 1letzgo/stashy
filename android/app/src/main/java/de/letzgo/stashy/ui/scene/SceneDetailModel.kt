@@ -283,8 +283,7 @@ class SceneDetailModel(
         val existing = player
         if (existing == null) {
             val p = StashPlayer(Prefs.appContext, StashPlayer.Role.Main)
-            // Re-read here: the route only now reports connected headphones (iOS `initialValueForPlayback`).
-            isMuted = PlayerMute.initialValue(Prefs.appContext)
+            isMuted = PlayerMute.initialValue()
             p.isMuted = isMuted
             wirePlayerCallbacks(p)
             p.fallbackSources = scene.transcodeFallbackURLs

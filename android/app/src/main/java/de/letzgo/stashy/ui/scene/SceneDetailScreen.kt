@@ -146,8 +146,6 @@ private fun SceneDetailContent(model: SceneDetailModel, openedFromMiniPlayer: Bo
             }
         }
     }
-    // Plugging headphones in turns the sound on, unplugging mutes again (iOS route change).
-    RouteMuteFollower(model)
 
     // Fullscreen: immersive, landscape for landscape videos.
     LaunchedEffect(model.isFullscreen) {
@@ -338,25 +336,5 @@ private fun SceneDetailNavBar(model: SceneDetailModel, openedFromMiniPlayer: Boo
             if (Appearance.isEditModeEnabled) OverflowItem("Edit title & details", de.letzgo.stashy.ui.SF.pencil, dismiss, onClick = onEditTitle)
             OverflowItem("Delete scene", PlayerIcons.trash, dismiss, color = StashyColors.systemRed) { model.showDeleteConfirmation = true }
         }
-    }
-}
-
-/** iOS: the `AVAudioSession.routeChangeNotification` handler — mute follows the headphones. */
-@Composable
-private fun RouteMuteFollower(model: SceneDetailModel) {
-    val context = androidx.compose.ui.platform.LocalContext.current
-    DisposableEffect(model) {
-        val am = context.getSystemService(android.content.Context.AUDIO_SERVICE) as android.media.AudioManager
-        val callback = object : android.media.AudioDeviceCallback() {
-            override fun onAudioDevicesAdded(added: Array<out android.media.AudioDeviceInfo>?) = sync()
-            override fun onAudioDevicesRemoved(removed: Array<out android.media.AudioDeviceInfo>?) = sync()
-            fun sync() {
-                if (model.player == null) return
-                val muted = de.letzgo.stashy.ui.player.PlayerMute.initialValue(context)
-                if (muted != model.isMuted) model.updateMuted(muted)
-            }
-        }
-        am.registerAudioDeviceCallback(callback, android.os.Handler(android.os.Looper.getMainLooper()))
-        onDispose { am.unregisterAudioDeviceCallback(callback) }
     }
 }

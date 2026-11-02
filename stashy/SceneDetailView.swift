@@ -979,9 +979,7 @@ struct SceneDetailView: View {
             }
 
             AppLog.debug("🎬 Player initializing with URL: \(redactedURLString(url))")
-            // Re-read here, not at `@State` init: only now is the playback audio session active,
-            // so only now does the route report connected headphones.
-            isMuted = ScenePlayerMute.initialValueForPlayback()
+            isMuted = ScenePlayerMute.initialValue()
             engine.isMuted = isMuted
             engine.rate = Float(playbackSpeed)
 
@@ -1734,19 +1732,7 @@ private struct SceneDetailLifecycleModifier: ViewModifier {
             .onDisappear { onDisappear() }
             .unmutesOnHardwareVolume($isMuted)
             .onChange(of: isMuted) { _, v in
-                // No persist: this view has no mute button of its own, so the handler only
-                // ever sees programmatic writes.
                 aetherEngine?.isMuted = v
-            }
-            // Without a mute button here the route is the only control the user has: plugging
-            // headphones in mid-playback must turn the sound on, unplugging must mute again.
-            .onReceive(NotificationCenter.default.publisher(for: audioRouteChangeNotification)
-                .receive(on: DispatchQueue.main)) { _ in
-                // "Start muted without headphones" off: the route never decides the mute state,
-                // so unplugging does not force-mute (playback pause on unplug is the system's).
-                guard TabManager.mutesWithoutHeadphones else { return }
-                let muted = ScenePlayerMute.initialValue()
-                if muted != isMuted { isMuted = muted }
             }
             // Feeds taking over the screen stops this player; otherwise its audio kept running
             // underneath the feed until the user swiped.

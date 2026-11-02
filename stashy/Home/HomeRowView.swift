@@ -110,7 +110,8 @@ private struct HomeDashboardHeroBackdrop: View, Equatable {
                 .clipped()
                 .offset(y: -500)
         }
-        .ignoresSafeArea(edges: .top)
+        // Horizontal too: in landscape the backdrop otherwise ends hard at the safe area.
+        .ignoresSafeArea(edges: [.top, .horizontal])
         .allowsHitTesting(false)
         .accessibilityHidden(true)
     }

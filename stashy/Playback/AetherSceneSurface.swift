@@ -168,6 +168,7 @@ struct AetherSceneSurface: View {
             onVolume: { delta in setVolume(min(1, max(0, volumeLevel + delta))) },
             onToggleMute: {
                 isMuted.toggle()
+                ScenePlayerMute.remember(isMuted)
                 revealControls()
             },
             onExitFullscreen: isFullscreen ? onToggleFullscreen : nil
@@ -675,7 +676,10 @@ struct AetherSceneSurface: View {
     /// pushed to the system volume through the hidden MPVolumeView.
     private func setVolume(_ level: Float) {
         volumeLevel = level
-        if level > 0, isMuted { isMuted = false }
+        if level > 0, isMuted {
+            isMuted = false
+            ScenePlayerMute.remember(false)
+        }
         systemVolume.set(level)
         revealControls()
     }
@@ -1034,10 +1038,8 @@ struct AetherSceneSurface: View {
     private var muteButton: some View {
         Button {
             HapticManager.light()
-            let next = !isMuted
-            isMuted = next
-            // Explicit user action — the only place the shared choice may be written.
-            ScenePlayerMute.persist(next)
+            isMuted.toggle()
+            ScenePlayerMute.remember(isMuted)
             revealControls()
         } label: {
             glyph(isMuted ? "speaker.slash.fill" : "speaker.wave.2.fill")

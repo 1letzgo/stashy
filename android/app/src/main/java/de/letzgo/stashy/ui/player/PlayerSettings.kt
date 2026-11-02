@@ -1,8 +1,5 @@
 package de.letzgo.stashy.ui.player
 
-import android.content.Context
-import android.media.AudioDeviceInfo
-import android.media.AudioManager
 import androidx.compose.ui.graphics.Color
 import de.letzgo.stashy.data.Prefs
 
@@ -82,44 +79,20 @@ object PlayerSettings {
 }
 
 /**
- * iOS: `ScenePlayerMute` — start-up mute state for every player embed. Without headphones
- * playback starts muted (unless Settings › Playback › "Start muted without headphones" is off);
- * otherwise the stored choice (`stashy_scene_player_muted`, default unmuted) applies.
- * [persist] only from an explicit user action (the mute button).
+ * iOS: `ScenePlayerMute` — start-up mute state for every player embed: the user's last toggle in
+ * this app session, else Settings › Playback › "Start mute". The toggle is deliberately not stored.
  */
 object PlayerMute {
-    const val KEY = "stashy_scene_player_muted"
-    /** Settings › Playback › Player › "Start muted without headphones" (default on). */
-    const val MUTE_WITHOUT_HEADPHONES_KEY = "playbackMuteWithoutHeadphones"
+    /** The setting's former name, kept so an existing choice survives. */
+    const val START_MUTED_KEY = "playbackMuteWithoutHeadphones"
 
-    val muteWithoutHeadphones: Boolean get() = Prefs.bool(MUTE_WITHOUT_HEADPHONES_KEY, true)
+    private var sessionChoice: Boolean? = null
 
-    /** The stored manual choice, or null when the user never toggled mute. */
-    val storedMuted: Boolean? get() = if (Prefs.has(KEY)) Prefs.bool(KEY) else null
+    fun initialValue(): Boolean = sessionChoice ?: Prefs.bool(START_MUTED_KEY, true)
 
-    /**
-     * Pure start-up decision: without headphones (and the setting on) always muted, otherwise
-     * the user's stored choice, defaulting to sound on.
-     */
-    fun decide(headphonesConnected: Boolean, muteWithoutHeadphones: Boolean, storedMuted: Boolean?): Boolean {
-        if (!headphonesConnected && muteWithoutHeadphones) return true
-        return storedMuted ?: false
-    }
+    /** Only from an explicit user action. */
+    fun remember(muted: Boolean) { sessionChoice = muted }
 
-    fun initialValue(context: Context): Boolean =
-        decide(isHeadphonesConnected(context), muteWithoutHeadphones, storedMuted)
-
-    fun persist(muted: Boolean) = Prefs.setBool(KEY, muted)
-
-    /** iOS: `isHeadphonesConnected()` — wired, USB or Bluetooth output. */
-    fun isHeadphonesConnected(context: Context): Boolean {
-        val am = context.getSystemService(Context.AUDIO_SERVICE) as AudioManager
-        val types = buildSet {
-            add(AudioDeviceInfo.TYPE_WIRED_HEADPHONES); add(AudioDeviceInfo.TYPE_WIRED_HEADSET)
-            add(AudioDeviceInfo.TYPE_BLUETOOTH_A2DP); add(AudioDeviceInfo.TYPE_BLUETOOTH_SCO)
-            add(AudioDeviceInfo.TYPE_USB_HEADSET)
-            if (android.os.Build.VERSION.SDK_INT >= 31) { add(AudioDeviceInfo.TYPE_BLE_HEADSET); add(AudioDeviceInfo.TYPE_BLE_SPEAKER) }
-        }
-        return am.getDevices(AudioManager.GET_DEVICES_OUTPUTS).any { it.type in types }
-    }
+    /** The setting was changed: it decides again. */
+    fun forgetSessionChoice() { sessionChoice = null }
 }

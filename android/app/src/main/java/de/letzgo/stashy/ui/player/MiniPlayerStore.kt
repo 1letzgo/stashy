@@ -308,7 +308,7 @@ object MiniPlayerStore {
         val url = scene.originalVideoURL ?: return
         val context = de.letzgo.stashy.data.Prefs.appContext
         val p = StashPlayer(context, StashPlayer.Role.Main)
-        p.isMuted = PlayerMute.initialValue(context)
+        p.isMuted = PlayerMute.initialValue()
         p.fallbackSources = scene.transcodeFallbackURLs
         p.fallbackDeclaredDuration = scene.sceneDuration
         p.nowPlaying = SceneNowPlaying.of(scene)

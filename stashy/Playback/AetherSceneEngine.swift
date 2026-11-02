@@ -220,9 +220,10 @@ final class AetherSceneEngine: ObservableObject {
                 let current = engine.volume
                 if current > 0 { unmutedVolume = current }
             }
+            let unmuting = _isMuted && !newValue
             _isMuted = newValue
             applyVolumeState()
-            updateAudioSessionClaim(grace: AudioSessionCoordinator.stopGrace)
+            updateAudioSessionClaim(grace: AudioSessionCoordinator.stopGrace, restartsAudioOutput: unmuting)
         }
     }
 
@@ -241,9 +242,10 @@ final class AetherSceneEngine: ObservableObject {
                 return
             }
             unmutedVolume = clamped
+            let unmuting = _isMuted
             _isMuted = false
             applyVolumeState()
-            updateAudioSessionClaim()
+            updateAudioSessionClaim(restartsAudioOutput: unmuting)
         }
     }
 
@@ -256,14 +258,15 @@ final class AetherSceneEngine: ObservableObject {
     // MARK: - Audio session claim
 
     /// Last state handed to the coordinator, so phase ticks do not flood its queue.
-    private var lastAudioClaim: (audible: Bool, live: Bool)?
+    private var lastAudioClaim: (audible: Bool, live: Bool, playing: Bool)?
     /// The engine's init declares a non-mixable category off-main; the first load waits until
     /// the coordinator has turned it back into the mixable idle one (iOS).
     private var engineCategoryAbsorption: Task<Void, Never>?
 
     /// Audible = playing (or holding a PiP window) with sound on a surface allowed to claim
     /// the session. Only then does the app interrupt other audio.
-    private func updateAudioSessionClaim(grace: TimeInterval = AudioSessionCoordinator.pauseGrace) {
+    private func updateAudioSessionClaim(grace: TimeInterval = AudioSessionCoordinator.pauseGrace,
+                                         restartsAudioOutput: Bool = false) {
         updateIdleTimerClaim()
         let hasSound = !_isMuted && engine.volume > 0
         let audible = audioSessionPolicy == .playback
@@ -271,12 +274,51 @@ final class AetherSceneEngine: ObservableObject {
             && currentURL != nil
             && (isPlaying || engine.pictureInPictureActive)
         let live = currentURL != nil
-        if let last = lastAudioClaim, last.audible == audible, last.live == live { return }
-        lastAudioClaim = (audible, live)
+        let playing = audioSessionPolicy == .playback && currentURL != nil && isPlaying
+        if let last = lastAudioClaim, last.audible == audible, last.live == live, last.playing == playing { return }
+        lastAudioClaim = (audible, live, playing)
+        var onExclusiveAcquired: (@Sendable () -> Void)?
+        if restartsAudioOutput {
+            onExclusiveAcquired = { [weak self] in
+                DispatchQueue.main.async { [weak self] in self?.restartAudioOutput() }
+            }
+        }
         AudioSessionCoordinator.shared.update(owner: ObjectIdentifier(self),
                                               audible: audible,
                                               live: live,
-                                              grace: grace)
+                                              playing: playing,
+                                              grace: grace,
+                                              onExclusiveAcquired: onExclusiveAcquired)
+    }
+
+    // MARK: - Audio output restart
+
+    /// How long the transport rests while the audio output restarts: short enough to pass as a
+    /// hiccup, long enough for the stop to reach the audio pipeline.
+    private static let audioOutputRestartGap: Duration = .milliseconds(100)
+    private var audioOutputRestart: Task<Void, Never>?
+
+    /// A player that kept running while muted does not pick up the session taken for the unmute
+    /// (nor one given up and reactivated under it after an earlier mute): the volume is right,
+    /// the output stays silent until the transport changes. So the unmute changes it, without
+    /// reporting a pause: `handlePhase` ignores it and `isPlaying` holds.
+    private func restartAudioOutput() {
+        guard !_isMuted, isPlaying, audioOutputRestart == nil else { return }
+        engine.pause()
+        audioOutputRestart = Task { [weak self] in
+            try? await Task.sleep(for: Self.audioOutputRestartGap)
+            guard let self, !Task.isCancelled else { return }
+            self.audioOutputRestart = nil
+            self.engine.play()
+        }
+    }
+
+    /// The transport is about to be decided by someone else: the restart must not resume over it.
+    private func cancelAudioOutputRestart() {
+        guard let restart = audioOutputRestart else { return }
+        restart.cancel()
+        audioOutputRestart = nil
+        handlePhase(engine.playbackPhase)
     }
 
     // MARK: - Idle timer claim
@@ -355,6 +397,7 @@ final class AetherSceneEngine: ObservableObject {
         AudioSessionCoordinator.shared.update(owner: ObjectIdentifier(self),
                                               audible: false,
                                               live: false,
+                                              playing: false,
                                               grace: AudioSessionCoordinator.stopGrace)
         if lastIdleTimerClaim {
             let owner = ObjectIdentifier(self)
@@ -560,6 +603,7 @@ final class AetherSceneEngine: ObservableObject {
     }
 
     private func handlePhase(_ phase: PlaybackPhase) {
+        if audioOutputRestart != nil, phase == .paused { return }
         let playing: Bool
         switch phase {
         case .playing: playing = true
@@ -881,6 +925,7 @@ final class AetherSceneEngine: ObservableObject {
     private func pauseForBackgroundUnlessPictureInPicture() {
         guard !engine.pictureInPictureActive else { return }
         resumesAfterBackground = isPlaying
+        cancelAudioOutputRestart()
         engine.pause()
     }
 
@@ -901,6 +946,7 @@ final class AetherSceneEngine: ObservableObject {
     }
 
     func pause() {
+        cancelAudioOutputRestart()
         // Already paused: nothing to do, and a repeat is not free — on the software route every
         // pause re-sets the synchronizer rate, a synchronous main-thread call into CoreAudio.
         // Feeds pauses every mounted row on each swipe, so the repeats add up. That path is
@@ -911,6 +957,11 @@ final class AetherSceneEngine: ObservableObject {
     }
 
     func togglePlayPause() {
+        // Mid-restart the engine reads paused while the user sees it playing: this tap means pause.
+        if audioOutputRestart != nil {
+            pause()
+            return
+        }
         // A torn-down session (background teardown) has no transport for the engine's toggle
         // to act on; `play()` rebuilds it first.
         if isSessionTornDown {
@@ -1147,6 +1198,8 @@ final class AetherSceneEngine: ObservableObject {
 
     /// Callers must invoke this before releasing the wrapper: `@State` release is not deterministic.
     func stop() {
+        audioOutputRestart?.cancel()
+        audioOutputRestart = nil
         cancellables.removeAll()
         loadGeneration &+= 1
         pendingSeek = nil

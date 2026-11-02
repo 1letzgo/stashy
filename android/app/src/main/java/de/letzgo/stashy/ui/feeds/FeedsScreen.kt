@@ -1,5 +1,6 @@
 package de.letzgo.stashy.ui.feeds
 
+import de.letzgo.stashy.ui.player.PlayerMute
 import de.letzgo.stashy.ui.tabBarHeight
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.tween
@@ -99,10 +100,12 @@ fun FeedsScreen() {
     val scope = rememberCoroutineScope()
     val pool = remember { FeedPlayerPool(context) }
 
-    // Mute state follows the audio route (headphones) like iOS `ScenePlayerMute`.
-    remember { if (model.isMuted == null) model.isMuted = FeedAudio.initialMuted(context) }
+    remember { if (model.isMuted == null) model.isMuted = PlayerMute.initialValue() }
     val muted = model.isMuted ?: true
-    HeadphoneMuteEffect(muted) { model.isMuted = it }
+    VolumeUnmuteEffect(muted) {
+        model.isMuted = false
+        PlayerMute.remember(false)
+    }
     LaunchedEffect(muted) { pool.updateMuted(muted) }
 
     var isUIVisible by remember { mutableStateOf(true) }
@@ -548,7 +551,7 @@ private fun FeedPager(
                     onToggleMute = {
                         val new = !pool.muted
                         model.isMuted = new
-                        FeedAudio.persist(new)
+                        PlayerMute.remember(new)
                     },
                     onTogglePlay = { model.isPlaying = !model.isPlaying },
                     pausesAdvance = activeItem.isAnimated && continuous,

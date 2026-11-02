@@ -204,7 +204,7 @@ object FeedsModel {
 
     /** iOS: `currentItemIsPlaying` (play intent of the active row). */
     var isPlaying by mutableStateOf(true)
-    /** iOS: `isMuted` — set from [FeedAudio] on first show. */
+    /** iOS: `isMuted` — set from `PlayerMute` on first show. */
     var isMuted by mutableStateOf<Boolean?>(null)
 
     private fun seed(m: ReelsModeType): Int = seeds.getOrPut(m) { Random.nextInt(1, 1_000_000) }

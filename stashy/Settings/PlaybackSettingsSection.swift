@@ -94,8 +94,8 @@ struct PlaybackSettingsSection: View {
             .stashyGroupedBlockRow(index: 7, count: 9)
 
             // Applies to the player, Feeds and image-viewer videos; card previews stay muted.
-            Toggle(isOn: $tabManager.playbackMuteWithoutHeadphones) {
-                Label("Start muted without headphones", systemImage: "speaker.slash")
+            Toggle(isOn: $tabManager.playbackStartMuted) {
+                Label("Start mute", systemImage: "speaker.slash")
             }
             .tint(appearanceManager.tintColor)
             .stashyGroupedBlockRow(index: 8, count: 9)

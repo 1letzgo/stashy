@@ -81,6 +81,18 @@ final class MiniPlayerStore: ObservableObject {
         ) { [weak self] _ in
             Task { @MainActor in self?.session?.engine.pause() }
         }
+        // The bar has no mute button: a volume press is how it gets its sound.
+        NotificationCenter.default.addObserver(
+            forName: .stashyHardwareVolumeChanged,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            Task { @MainActor in
+                guard let engine = self?.session?.engine, engine.isMuted else { return }
+                engine.isMuted = false
+                ScenePlayerMute.remember(false)
+            }
+        }
     }
 
     /// Whether a page being left should hand its playing engine over instead of stopping it.
@@ -89,6 +101,7 @@ final class MiniPlayerStore: ObservableObject {
 
     /// Takes over `engine` from a scene page that is going away. Any other mini session ends.
     func adopt(scene: Scene, engine: AetherSceneEngine, playRegistered: Bool) {
+        HardwareVolumeMonitor.shared.start()
         // Now Playing switched to another scene: the page it replaced hands over late (its
         // teardown is deferred), after the new page already started its own engine. Taking it
         // would leave a second, still playing video behind the sheet.
@@ -1073,7 +1086,14 @@ private struct NowPlayingContent: View {
         // Pinned to the sheet's width, like the scene page: a long title or description must
         // wrap, never widen the content (the whole sheet then slid off to the side).
         GeometryReader { proxy in
-        VStack(spacing: 0) {
+        // A phone on its side has no height for player and list on top of each other: squeezed,
+        // the 16:9 card shrank to a sliver and its controls piled up. Same views in an `AnyLayout`,
+        // because a remount would hand the engine back to the mini player mid-rotation.
+        let sideBySide = proxy.size.width > proxy.size.height && proxy.size.height < 500
+        let layout = sideBySide
+            ? AnyLayout(HStackLayout(alignment: .top, spacing: 0))
+            : AnyLayout(VStackLayout(spacing: 0))
+        layout {
             // The scene page itself in player-only mode: it takes the engine from the mini
             // player and hands it back when the view closes.
             SceneDetailView(scene: scene, autoPlay: true)
@@ -1082,6 +1102,7 @@ private struct NowPlayingContent: View {
                 // Same gap under the chrome as the scene page (`mainContentView`).
                 .padding(.horizontal, 16)
                 .padding(.top, 16)
+                .frame(width: sideBySide ? proxy.size.width / 2 : nil)
 
             List {
                 Section {

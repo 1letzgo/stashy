@@ -585,56 +585,24 @@ func makeDisplayLink(target: Any, selector: Selector) -> CADisplayLink? {
     #endif
 }
 
-/// Output route changed (headphones in/out). macOS has no AVAudioSession; nothing posts this there.
-let audioRouteChangeNotification: Notification.Name = {
-    #if os(macOS)
-    Notification.Name("stashy.mac.audioRouteChange")
-    #else
-    AVAudioSession.routeChangeNotification
-    #endif
-}()
-
-func isHeadphonesConnected() -> Bool {
-    #if os(macOS)
-    // Desktop speakers are the normal output on a Mac; never force-mute for lack of headphones.
-    return true
-    #else
-    let currentRoute = AVAudioSession.sharedInstance().currentRoute
-    return currentRoute.outputs.contains(where: { port in
-        [AVAudioSession.Port.headphones, AVAudioSession.Port.bluetoothA2DP, AVAudioSession.Port.bluetoothLE, AVAudioSession.Port.bluetoothHFP].contains(port.portType)
-    })
-    #endif
-}
-
-/// Start-up mute state for every player embed.
+/// Start-up mute state for every player embed: the user's last toggle in this app session,
+/// else Settings › Playback › Player › "Start mute". The toggle is deliberately not stored.
 enum ScenePlayerMute {
-    private static let key = "stashy_scene_player_muted"
+    private static var sessionChoice: Bool?
 
-    /// Without headphones playback starts muted — the stored choice only applies while
-    /// headphones are connected. Gating before the lookup also neutralises a `false` that an
-    /// earlier build persisted from a player's own mute reset.
-    /// Settings › Playback › Player › "Start muted without headphones" off drops the gate: the
-    /// speaker is then treated like headphones.
     static func initialValue() -> Bool {
-        if TabManager.mutesWithoutHeadphones, !isHeadphonesConnected() { return true }
-        if UserDefaults.standard.object(forKey: key) == nil {
-            return false
-        }
-        return UserDefaults.standard.bool(forKey: key)
-    }
-
-    /// Same rule, read when a player mounts. The route reflects the declared category, so the
-    /// (mixable) playback category is declared first — without activating, so other apps keep
-    /// playing until this player actually makes sound.
-    static func initialValueForPlayback() -> Bool {
-        AudioSessionCoordinator.shared.prepareForRouteQuery()
-        return initialValue()
+        sessionChoice ?? TabManager.startsMuted
     }
 
     /// Call only from an explicit user action. Never from an `onChange`, which also sees
-    /// programmatic writes — that is how a player's own resets used to leak into the stored choice.
-    static func persist(_ muted: Bool) {
-        UserDefaults.standard.set(muted, forKey: key)
+    /// programmatic writes.
+    static func remember(_ muted: Bool) {
+        sessionChoice = muted
+    }
+
+    /// The setting was changed: it decides again.
+    static func forgetSessionChoice() {
+        sessionChoice = nil
     }
 }
 
@@ -709,7 +677,9 @@ func makeAuthenticatedAsset(for url: URL) -> AVURLAsset {
 ///   activated — background audio, PiP and AirPlay keep working.
 /// - Back to idle after a grace period (pause) or almost at once (stop / mute):
 ///   `setActive(false, .notifyOthersOnDeactivation)` so the interrupted app resumes. Never while
-///   AirPlay is the route and a player is still on screen.
+///   AirPlay is the route and a player is still on screen. A player still loaded with no other
+///   app to hand back to only drops to the mixable category: deactivating stops its running
+///   audio and sends volume presses to the ringer until the session is active again.
 ///
 /// Owners are reference-counted by `ObjectIdentifier`. All state lives on one serial queue, which
 /// also keeps the blocking `setCategory` / `setActive` XPC calls off the main thread.
@@ -733,6 +703,12 @@ final class AudioSessionCoordinator: @unchecked Sendable {
     /// session for them: the software route's audio clock and the hardware-volume KVO need it.
     private var liveOwners = Set<ObjectIdentifier>()
     private var isExclusive = false
+    /// Owners playing on a full surface, muted or not. Volume presses only reach the hardware
+    /// volume KVO on an explicitly active session, and a muted player never asks for one.
+    private var playingOwners = Set<ObjectIdentifier>()
+    private var isMixableActive = false
+    /// Another app was playing when the session was taken, so a release has to hand it back.
+    private var interruptedOtherAudio = false
     private var pendingRelease: DispatchWorkItem?
     private var pendingReleaseDeadline: DispatchTime?
     private var promptReleaseUntil: DispatchTime?
@@ -746,29 +722,28 @@ final class AudioSessionCoordinator: @unchecked Sendable {
         #endif
     }
 
-    /// Before reading `currentRoute` for the "Start muted without headphones" rule: the route
-    /// is the one the declared category would get, so the category has to be the playback one.
-    /// Never activates, never interrupts.
-    func prepareForRouteQuery() {
-        #if os(iOS)
-        queue.async {
-            guard !self.isExclusive else { return }
-            self.applyIdleCategory()
-        }
-        #endif
-    }
-
     /// Reports an owner's state. `audible` = playing with sound (or PiP holding the session);
     /// `live` = it still has an item loaded. `grace` applies when this drops the last audible owner.
-    func update(owner: ObjectIdentifier, audible: Bool, live: Bool, grace: TimeInterval) {
+    /// `playing` = it plays on a full surface, with or without sound. `onExclusiveAcquired` runs
+    /// on the session queue, only if this update took the session.
+    func update(owner: ObjectIdentifier, audible: Bool, live: Bool, playing: Bool, grace: TimeInterval,
+                onExclusiveAcquired: (@Sendable () -> Void)? = nil) {
         queue.async {
+            if playing { self.playingOwners.insert(owner) } else { self.playingOwners.remove(owner) }
             if live { self.liveOwners.insert(owner) } else { self.liveOwners.remove(owner) }
             if audible { self.audibleOwners.insert(owner) } else { self.audibleOwners.remove(owner) }
             if !self.audibleOwners.isEmpty {
                 self.cancelPendingRelease()
-                if !self.isExclusive { self.acquireExclusive() }
+                if !self.isExclusive {
+                    self.acquireExclusive()
+                    if self.isExclusive { onExclusiveAcquired?() }
+                }
             } else if self.isExclusive {
                 self.scheduleRelease(after: grace)
+            } else if !self.playingOwners.isEmpty {
+                self.activateMixable()
+            } else if self.liveOwners.isEmpty {
+                self.deactivateMixable()
             }
         }
     }
@@ -824,15 +799,40 @@ final class AudioSessionCoordinator: @unchecked Sendable {
         #endif
     }
 
+    private func activateMixable() {
+        #if os(iOS)
+        guard !isMixableActive else { return }
+        applyIdleCategory()
+        do {
+            try AVAudioSession.sharedInstance().setActive(true)
+            isMixableActive = true
+            AppLog.debug("🔈 AudioSession: mixable session active for a muted player")
+        } catch {
+            AppLog.error("🔈 AudioSession: mixable activation failed: \(error)")
+        }
+        #endif
+    }
+
+    private func deactivateMixable() {
+        #if os(iOS)
+        guard isMixableActive else { return }
+        isMixableActive = false
+        try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
+        #endif
+    }
+
     private func acquireExclusive() {
         #if os(iOS)
         let session = AVAudioSession.sharedInstance()
+        let otherAudioPlaying = session.isOtherAudioPlaying
         do {
             if session.category != .playback || session.mode != .moviePlayback || !session.categoryOptions.isEmpty {
                 try session.setCategory(.playback, mode: .moviePlayback, options: [])
             }
             try session.setActive(true)
             isExclusive = true
+            isMixableActive = false
+            interruptedOtherAudio = otherAudioPlaying
             AppLog.debug("🔈 AudioSession: exclusive playback acquired")
         } catch {
             AppLog.error("🔈 AudioSession: acquire failed: \(error)")
@@ -873,6 +873,13 @@ final class AudioSessionCoordinator: @unchecked Sendable {
             return
         }
         applyIdleCategory()
+        if !liveOwners.isEmpty, !interruptedOtherAudio {
+            isExclusive = false
+            isMixableActive = true
+            AppLog.debug("🔈 AudioSession: mixable without deactivating (live owners: \(liveOwners.count))")
+            return
+        }
+        interruptedOtherAudio = false
         do {
             try session.setActive(false, options: .notifyOthersOnDeactivation)
         } catch {
@@ -882,7 +889,9 @@ final class AudioSessionCoordinator: @unchecked Sendable {
         isExclusive = false
         AppLog.debug("🔈 AudioSession: released (live owners: \(liveOwners.count))")
         if !liveOwners.isEmpty {
-            try? session.setActive(true)
+            isMixableActive = (try? session.setActive(true)) != nil
+        } else {
+            isMixableActive = false
         }
         #endif
     }
@@ -1108,7 +1117,7 @@ final class HardwareVolumeMonitor {
 }
 
 /// A volume button press while a player is muted is the user asking for sound: clear the mute
-/// and persist it like the on-screen mute button would.
+/// and remember it like the on-screen mute button would.
 struct UnmuteOnHardwareVolume: ViewModifier {
     @Binding var isMuted: Bool
 
@@ -1119,7 +1128,7 @@ struct UnmuteOnHardwareVolume: ViewModifier {
                 .receive(on: DispatchQueue.main)) { _ in
                 guard isMuted else { return }
                 isMuted = false
-                ScenePlayerMute.persist(false)
+                ScenePlayerMute.remember(false)
             }
     }
 }

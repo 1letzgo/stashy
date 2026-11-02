@@ -389,11 +389,11 @@ fun ScenePlayerSurface(
                             setSystemVolume(context, level)
                             reveal()
                         }
-                        MuteGlyph(isMuted, chrome, glyph) { tick(); PlayerMute.persist(!isMuted); onMutedChange(!isMuted); reveal() }
+                        MuteGlyph(isMuted, chrome, glyph) { tick(); PlayerMute.remember(!isMuted); onMutedChange(!isMuted); reveal() }
                     }
                 } else {
                     Box(Modifier.size(chrome).stashyGlass(CircleShape)) {
-                        MuteGlyph(isMuted, chrome, glyph) { tick(); PlayerMute.persist(!isMuted); onMutedChange(!isMuted); reveal() }
+                        MuteGlyph(isMuted, chrome, glyph) { tick(); PlayerMute.remember(!isMuted); onMutedChange(!isMuted); reveal() }
                     }
                 }
             }

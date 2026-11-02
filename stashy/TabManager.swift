@@ -488,18 +488,18 @@ class TabManager: ObservableObject {
         UserDefaults.standard.object(forKey: playerAutoRotateFullscreenKey) as? Bool ?? true
     }
 
-    /// Settings › Playback › Player › "Start muted without headphones". On (default): a video
-    /// starts muted while the audio route is the built-in speaker. Off: the speaker is treated
-    /// like headphones and the stored mute choice decides (mute button persists it, default
-    /// unmuted). Read at every video start.
-    @Published var playbackMuteWithoutHeadphones: Bool = true {
+    /// Settings › Playback › Player › "Start mute". On (default): every video starts muted,
+    /// off: with sound. Read at every video start.
+    @Published var playbackStartMuted: Bool = true {
         didSet {
-            UserDefaults.standard.set(playbackMuteWithoutHeadphones, forKey: Self.playbackMuteWithoutHeadphonesKey)
+            UserDefaults.standard.set(playbackStartMuted, forKey: Self.playbackStartMutedKey)
+            ScenePlayerMute.forgetSessionChoice()
         }
     }
-    static let playbackMuteWithoutHeadphonesKey = "playbackMuteWithoutHeadphones"
-    nonisolated static var mutesWithoutHeadphones: Bool {
-        UserDefaults.standard.object(forKey: playbackMuteWithoutHeadphonesKey) as? Bool ?? true
+    /// The setting's former name, kept so an existing choice survives.
+    static let playbackStartMutedKey = "playbackMuteWithoutHeadphones"
+    nonisolated static var startsMuted: Bool {
+        UserDefaults.standard.object(forKey: playbackStartMutedKey) as? Bool ?? true
     }
 
     /// Share of the picture the fill may cut off before Autozoom leaves it letterboxed.
@@ -769,7 +769,7 @@ class TabManager: ObservableObject {
         self.playerAutoZoom = UserDefaults.standard.object(forKey: playerAutoZoomKey) as? Bool ?? false
         self.tracksPlaybackActivity = Self.isPlaybackActivityTracked
         self.playerAutoRotateFullscreen = Self.isFullscreenAutoRotateOn
-        self.playbackMuteWithoutHeadphones = Self.mutesWithoutHeadphones
+        self.playbackStartMuted = Self.startsMuted
         self.playerDolbyVisionEnabled = UserDefaults.standard.object(forKey: playerDolbyVisionEnabledKey) as? Bool ?? true
         let storedBatch = UserDefaults.standard.object(forKey: downloadBatchSizeKey) as? Int ?? 50
         self.downloadBatchSize = Self.downloadBatchSizeOptions.contains(storedBatch) ? storedBatch : 50

@@ -19,8 +19,6 @@ import de.letzgo.stashy.ui.TopBarAction
 import de.letzgo.stashy.ui.TopBarOverflowMenu
 import android.content.Context
 import android.content.Intent
-import android.media.AudioDeviceInfo
-import android.media.AudioManager
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -182,7 +180,7 @@ class ImageViewerScreen(
     override fun Content() {
         val context = LocalContext.current
         val scope = rememberCoroutineScope()
-        LaunchedEffect(Unit) { isMuted = initialMute(context) }
+        LaunchedEffect(Unit) { isMuted = initialMute() }
         // iOS `ImageTagsUpdated` / `BulkTagsApplied` → `patchImageTagsInLists` / `patchBulkAppliedTag`.
         LaunchedEffect(Unit) {
             AITagSuggestions.events.collect { event ->
@@ -510,7 +508,7 @@ class ImageViewerScreen(
                     RatingButton(image)
                     // Same buttons as the Feeds control stack ([FeedsInfoOverlay]).
                     ChromePillIconButton(if (isMuted) SF.speakerSlashFill else SF.speakerWave2Fill, if (isMuted) "Unmute" else "Mute", enabled = isVideo) {
-                        isMuted = !isMuted; Prefs.setBool("stashy_scene_player_muted", isMuted)
+                        isMuted = !isMuted; de.letzgo.stashy.ui.player.PlayerMute.remember(isMuted)
                     }
                     ChromePillIconButton(if (isPlaying) SF.pauseFill else SF.playFill, if (isPlaying) "Pause" else "Play", enabled = isVideo || continuousPlay) {
                         isPlaying = !isPlaying
@@ -764,18 +762,8 @@ class ImageViewerScreen(
     }
 
     private companion object {
-        /** iOS `ScenePlayerMute.initialValue` — muted without headphones (unless the setting is off). */
-        fun initialMute(context: Context): Boolean {
-            val am = context.getSystemService(Context.AUDIO_SERVICE) as AudioManager
-            val headphones = am.getDevices(AudioManager.GET_DEVICES_OUTPUTS).any {
-                it.type in setOf(
-                    AudioDeviceInfo.TYPE_WIRED_HEADSET, AudioDeviceInfo.TYPE_WIRED_HEADPHONES,
-                    AudioDeviceInfo.TYPE_BLUETOOTH_A2DP, AudioDeviceInfo.TYPE_USB_HEADSET, 26 /* TYPE_BLE_HEADSET */,
-                )
-            }
-            val mute = de.letzgo.stashy.ui.player.PlayerMute
-            return mute.decide(headphones, mute.muteWithoutHeadphones, mute.storedMuted)
-        }
+        /** iOS `ScenePlayerMute.initialValue`. */
+        fun initialMute(): Boolean = de.letzgo.stashy.ui.player.PlayerMute.initialValue()
     }
 }
 

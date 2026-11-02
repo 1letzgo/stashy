@@ -117,8 +117,9 @@ object TabManager {
     private val _showsPlayerSkipButtons = bool("showsPlayerSkipButtons", true)
     var showsPlayerSkipButtons: Boolean get() = _showsPlayerSkipButtons.value; set(v) { _showsPlayerSkipButtons.value = v; Prefs.setBool("showsPlayerSkipButtons", v) }
     /** Settings › Playback › Player › "Start muted without headphones" (read by `PlayerMute`). */
-    private val _playbackMuteWithoutHeadphones = bool("playbackMuteWithoutHeadphones", true)
-    var playbackMuteWithoutHeadphones: Boolean get() = _playbackMuteWithoutHeadphones.value; set(v) { _playbackMuteWithoutHeadphones.value = v; Prefs.setBool("playbackMuteWithoutHeadphones", v) }
+    // The setting's former name, kept so an existing choice survives.
+    private val _playbackStartMuted = bool("playbackMuteWithoutHeadphones", true)
+    var playbackStartMuted: Boolean get() = _playbackStartMuted.value; set(v) { _playbackStartMuted.value = v; Prefs.setBool("playbackMuteWithoutHeadphones", v) }
     private val _playerAutoZoom = bool("playerAutoZoom", false)
     var playerAutoZoom: Boolean get() = _playerAutoZoom.value; set(v) { _playerAutoZoom.value = v; Prefs.setBool("playerAutoZoom", v) }
     /** iOS: Settings › Playback › "Playback activity" (Stash web `trackActivity`). Off: no play count,

@@ -1810,7 +1810,7 @@ struct FullScreenImageView: View {
                         ) {
                             if isVideo {
                                 isMuted.toggle()
-                                ScenePlayerMute.persist(isMuted)
+                                ScenePlayerMute.remember(isMuted)
                             }
                         }
 

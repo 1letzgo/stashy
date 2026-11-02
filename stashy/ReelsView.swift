@@ -340,7 +340,7 @@ struct ReelsViewBody: View {
     @State private var selectedPerformer: ScenePerformer?
     @State private var selectedTags: [Tag] = []
     @State private var selectedStudio: SceneStudio?
-    // Same source as every other embed: headphone gate first, stored choice second.
+    // Same source as every other embed.
     @State private var isMuted = ScenePlayerMute.initialValue()
     @State private var currentVisibleSceneId: String?
     @State private var showDeleteConfirmation = false
@@ -403,6 +403,10 @@ struct ReelsViewBody: View {
     @State private var isMenuOpen = false
     @State private var isMediaZoomed = false
     @State private var isRotating = false
+    #if os(iOS)
+    /// Last layout the device orientation asked for; see the orientation observer on the list.
+    @State private var deviceWantsLandscape = UIScreen.main.bounds.width > UIScreen.main.bounds.height
+    #endif
     @State private var isUIVisible = true
     /// Section chrome faded out once the user swipes through the feed (on top of `isUIVisible`,
     /// which stays the tap toggle). Stays hidden while watching until a tap; flips only at
@@ -4600,7 +4604,7 @@ struct ReelsViewBody: View {
                 onTogglePlay: { currentItemIsPlaying.toggle() },
                 onToggleMute: {
                     isMuted.toggle()
-                    ScenePlayerMute.persist(isMuted)
+                    ScenePlayerMute.remember(isMuted)
                 }
             ))
             #else
@@ -4676,6 +4680,14 @@ struct ReelsViewBody: View {
                 reelsListMounted = false
             }
             .onReceive(NotificationCenter.default.publisher(for: UIDevice.orientationDidChangeNotification)) { _ in
+                #if os(iOS)
+                // Fires for every tilt of the phone (face up / down, upside down), not only when
+                // the interface turns. Only a real portrait <-> landscape change may pause playback.
+                let orientation = UIDevice.current.orientation
+                guard orientation == .portrait || orientation.isLandscape,
+                      orientation.isLandscape != deviceWantsLandscape else { return }
+                deviceWantsLandscape = orientation.isLandscape
+                #endif
                 withAnimation(.easeInOut(duration: 0.3)) { isRotating = true }
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) {
                     withAnimation { isRotating = false }
@@ -5170,7 +5182,7 @@ struct ReelsViewBody: View {
                         ) {
                             if isVideo {
                                 isMuted.toggle()
-                                ScenePlayerMute.persist(isMuted)
+                                ScenePlayerMute.remember(isMuted)
                             }
                         }
 
