@@ -1,6 +1,9 @@
 package de.letzgo.stashy.data.tools
 
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateMapOf
+import androidx.compose.runtime.setValue
 import de.letzgo.stashy.data.GraphQL
 import de.letzgo.stashy.data.Json
 import de.letzgo.stashy.data.Prefs
@@ -117,6 +120,24 @@ object MagazineReadingStore {
             throw e
         } catch (_: Exception) {
         }
+    }
+}
+
+/** iOS: `MagazineDefaultFilter` — Settings › Tools: the saved gallery filter Magazin opens with, per server. */
+object MagazineDefaultFilter {
+    /** Bumped on every change so a menu or an open list reads the new value. */
+    private var version by mutableIntStateOf(0)
+
+    private val key: String get() = "stashy.magazine.defaultFilter_${ServerConfigManager.activeConfig?.id ?: "none"}"
+
+    val id: String? get() {
+        version
+        return Prefs.string(key)
+    }
+
+    fun set(filterId: String?) {
+        Prefs.setString(key, filterId)
+        version++
     }
 }
 

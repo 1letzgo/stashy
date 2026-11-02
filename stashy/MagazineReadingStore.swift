@@ -133,3 +133,23 @@ final class MagazineReadingStore: ObservableObject {
         UserDefaults.standard.set(data, forKey: Self.storageKey)
     }
 }
+
+/// Settings › Tools: the saved gallery filter Magazin opens with, per server.
+enum MagazineDefaultFilter {
+    static let changeKey = "magazine"
+
+    private static var key: String {
+        "stashy.magazine.defaultFilter_\(ServerConfigManager.shared.loadConfig()?.id.uuidString ?? "none")"
+    }
+
+    static var id: String? { UserDefaults.standard.string(forKey: key) }
+
+    static func set(_ filterId: String?) {
+        UserDefaults.standard.set(filterId, forKey: key)
+        NotificationCenter.default.post(
+            name: NSNotification.Name("DefaultFilterChanged"),
+            object: nil,
+            userInfo: ["tab": changeKey]
+        )
+    }
+}

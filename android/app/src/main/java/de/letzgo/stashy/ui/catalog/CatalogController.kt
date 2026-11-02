@@ -82,6 +82,8 @@ class CatalogController<T>(
     private val fetch: (suspend (CatalogQuery, Int, Int) -> Page<T>)? = null,
     /** List-specific sorts offered first in the quick bar and the sheet (a group's scene number). */
     val extraSorts: List<SortOption> = emptyList(),
+    /** Where the Settings default filter comes from (Magazin keeps its own). */
+    private val defaultFilterIdFor: (String) -> String? = CatalogPrefs::defaultFilterId,
 ) {
     var sort by mutableStateOf(initialSort ?: CatalogPrefs.resolvedSort(mode))
         private set
@@ -147,7 +149,7 @@ class CatalogController<T>(
 
     /** Settings defaults this controller has already reacted to (see [syncDefaults]). */
     private var seenPersistentSort: String? = tabId?.let { CatalogPrefs.persistentSortOption(it) }
-    private var seenDefaultFilterId: String? = tabId?.let { CatalogPrefs.defaultFilterId(it) }
+    private var seenDefaultFilterId: String? = tabId?.let(defaultFilterIdFor)
 
     init {
         // iOS `sceneLiveUpdates(using:)`: resume time, play count, O-count, edits, cover, delete.
@@ -215,7 +217,7 @@ class CatalogController<T>(
     fun onAppear() {
         if (!SavedFiltersStore.loadedOnce) SavedFiltersStore.fetch(coroutineScope)
         if (applySettingsDefaultFilterIfNeeded()) { refresh(); return }
-        val defaultId = tabId?.let { CatalogPrefs.defaultFilterId(it) }
+        val defaultId = tabId?.let(defaultFilterIdFor)
         if ((defaultId == null || SavedFiltersStore.loadedOnce) && !list.loadedOnce) refresh()
     }
 
@@ -228,7 +230,7 @@ class CatalogController<T>(
 
     private fun applySettingsDefaultFilterIfNeeded(): Boolean {
         if (didApplyDefaultFilter || selectedFilter != null || scope != null) return false
-        val id = tabId?.let { CatalogPrefs.defaultFilterId(it) } ?: return false
+        val id = tabId?.let(defaultFilterIdFor) ?: return false
         val filter = SavedFiltersStore.byId[id] ?: return false
         selectedFilter = filter
         didApplyDefaultFilter = true
@@ -250,7 +252,7 @@ class CatalogController<T>(
             seenPersistentSort = persistentRaw
             SortCatalog.option(mode, persistentRaw)?.let { if (it != sort || it.isRandom) changeSort(it) }
         }
-        val defId = CatalogPrefs.defaultFilterId(id)
+        val defId = defaultFilterIdFor(id)
         if (defId != seenDefaultFilterId) {
             seenDefaultFilterId = defId
             val filter = defId?.let { SavedFiltersStore.byId[it] }

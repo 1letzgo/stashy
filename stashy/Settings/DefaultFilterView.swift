@@ -8,6 +8,47 @@
 #if !os(tvOS)
 import SwiftUI
 
+/// Settings › Tools: default filter of the Magazin tool.
+struct MagazineDefaultFilterMenu: View {
+    @ObservedObject var viewModel: StashDBViewModel
+    @State private var currentId = MagazineDefaultFilter.id ?? ""
+
+    var body: some View {
+        let filters = viewModel.savedFilters.values
+            .filter { $0.mode == .galleries }
+            .sorted { $0.name < $1.name }
+        if filters.isEmpty && !viewModel.isLoadingSavedFilters {
+            Text("No filters found")
+                .foregroundColor(.secondary)
+                .font(.subheadline)
+        } else {
+            Menu {
+                Button {
+                    MagazineDefaultFilter.set(nil)
+                    currentId = ""
+                } label: {
+                    HStack { Text("None"); if currentId.isEmpty { Image(systemName: "checkmark") } }
+                }
+                if !filters.isEmpty { Divider() }
+                ForEach(filters) { filter in
+                    Button {
+                        MagazineDefaultFilter.set(filter.id)
+                        currentId = filter.id
+                    } label: {
+                        HStack { Text(filter.name); if filter.id == currentId { Image(systemName: "checkmark") } }
+                    }
+                }
+            } label: {
+                Text(filters.first(where: { $0.id == currentId })?.name ?? "None")
+                    .foregroundColor(.secondary)
+                    .font(.subheadline)
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+            }
+        }
+    }
+}
+
 struct CatalogDefaultFilterMenu: View {
     let tab: AppTab
     @ObservedObject var viewModel: StashDBViewModel

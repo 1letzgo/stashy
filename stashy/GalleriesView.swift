@@ -15,6 +15,10 @@ struct GalleryListHost {
     /// Wraps each card, e.g. with a progress bar or context menu.
     var decorateCard: (Gallery, AnyView) -> AnyView
     var onGalleriesChanged: ([Gallery]) -> Void
+    /// The host's own Settings default filter, replacing the Galleries tab's.
+    var defaultFilterId: () -> String?
+    /// `tab` value of the `DefaultFilterChanged` notification that belongs to `defaultFilterId`.
+    var defaultFilterChangeKey: String
 }
 
 private struct GalleriesViewContent: View {
@@ -695,7 +699,7 @@ private struct GalleriesViewContent: View {
     private func applyGalleriesDefaultFilterFromSettingsIfNeeded(force: Bool) -> Bool {
         if !force, didApplyDefaultFilter || selectedFilter != nil { return false }
 
-        if let defaultId = TabManager.shared.getDefaultFilterId(for: .galleries),
+        if let defaultId = host.map({ $0.defaultFilterId() }) ?? TabManager.shared.getDefaultFilterId(for: .galleries),
            let filter = viewModel.savedFilters[defaultId] {
             let already =
                 selectedFilter?.id == filter.id
@@ -751,7 +755,8 @@ private struct GalleriesViewContent: View {
     }
 
     private func handleGalleriesDefaultFilterChanged(_ notification: Notification) {
-        guard let tabId = notification.userInfo?["tab"] as? String, tabId == AppTab.galleries.rawValue else { return }
+        guard let tabId = notification.userInfo?["tab"] as? String,
+              tabId == host?.defaultFilterChangeKey ?? AppTab.galleries.rawValue else { return }
         _ = applyGalleriesDefaultFilterFromSettingsIfNeeded(force: true)
         performSearch()
     }

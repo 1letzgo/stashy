@@ -246,9 +246,13 @@ class EditModeSettingsScreen : Screen {
 class ToolsSettingsScreen : Screen {
     override val key = "settings-tools"
     @Composable override fun Content() = SettingsDetailScaffold("Tools") { top ->
+        androidx.compose.runtime.LaunchedEffect(Unit) { de.letzgo.stashy.data.SavedFiltersStore.load(force = true) }
         SettingsList(top) {
             settingsSection(header = "Tab", footer = "Tools are grouped on the Tools page.", key = "tab") {
                 SettingsToggleRow("Show Tools Tab", TabManager.isVisible(AppTab.Tools), SF.cubeBox) { TabManager.toggle(AppTab.Tools) }
+            }
+            settingsSection(header = "Magazin", key = "magazine") {
+                CardSettingRow("Default Filter") { MagazineDefaultFilterMenu() }
             }
         }
     }

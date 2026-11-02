@@ -11,8 +11,19 @@ struct MagazineToolsView: View {
     /// Filter state survives switching between tools, like the Home sub-tab lists.
     private static let filterMemory = CatalogListFilterMemory<CatalogListFilterSnapshot<StashDBViewModel.GallerySortOption>>(mode: .galleries)
 
+    /// The default filter the remembered list state was built with.
+    private static var seenDefaultFilterId = MagazineDefaultFilter.id
+
     @ObservedObject private var readingStore = MagazineReadingStore.shared
     @State private var openedGallery: Gallery?
+
+    init() {
+        // Changed in Settings while this list was not on screen: start over with the new default.
+        if Self.seenDefaultFilterId != MagazineDefaultFilter.id {
+            Self.seenDefaultFilterId = MagazineDefaultFilter.id
+            Self.filterMemory.reset()
+        }
+    }
 
     var body: some View {
         GalleriesView(
@@ -24,7 +35,9 @@ struct MagazineToolsView: View {
                 onGalleriesChanged: { galleries in
                     let ids = galleries.map(\.id)
                     Task { await readingStore.sync(galleryIds: ids) }
-                }
+                },
+                defaultFilterId: { MagazineDefaultFilter.id },
+                defaultFilterChangeKey: MagazineDefaultFilter.changeKey
             )
         )
         .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("ServerConfigChanged"))) { _ in

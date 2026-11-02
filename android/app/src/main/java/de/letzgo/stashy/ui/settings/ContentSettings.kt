@@ -124,6 +124,19 @@ fun DefaultFilterMenu(tab: AppTab, kind: FilterKind = FilterKind.Standard) {
     }
 }
 
+/** iOS: `MagazineDefaultFilterMenu` — Settings › Tools. */
+@Composable
+fun MagazineDefaultFilterMenu() {
+    val filters = SavedFiltersStore.ofMode(FilterMode.Galleries.raw)
+    if (filters.isEmpty() && !SavedFiltersStore.isLoading) {
+        Text("No filters found", style = NativeType.bodyMedium, color = Theme.palette.secondaryText)
+        return
+    }
+    MenuValue(listOf("" to "None") + filters.map { it.id to it.name }, de.letzgo.stashy.data.tools.MagazineDefaultFilter.id ?: "") { id ->
+        de.letzgo.stashy.data.tools.MagazineDefaultFilter.set(filters.firstOrNull { it.id == id }?.id)
+    }
+}
+
 /** Which default-filter slot of a `TabConfig` a menu edits. */
 enum class FilterKind { Standard, Marker, Clip, Preview, Vertical }
 

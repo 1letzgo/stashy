@@ -12,6 +12,7 @@ import androidx.compose.runtime.snapshotFlow
 import de.letzgo.stashy.data.FilterMode
 import de.letzgo.stashy.data.Gallery
 import de.letzgo.stashy.data.ServerConfigManager
+import de.letzgo.stashy.data.tools.MagazineDefaultFilter
 import de.letzgo.stashy.data.tools.MagazineLogic
 import de.letzgo.stashy.data.tools.MagazineReadingStore
 import de.letzgo.stashy.ui.Nav
@@ -32,7 +33,9 @@ private object MagazineCatalog {
     private val controllers = HashMap<String?, CatalogController<Gallery>>()
 
     fun controller(serverId: String?): CatalogController<Gallery> =
-        controllers.getOrPut(serverId) { CatalogController(FilterMode.Galleries, RetainedCatalogs.scope) }
+        controllers.getOrPut(serverId) {
+            CatalogController(FilterMode.Galleries, RetainedCatalogs.scope, defaultFilterIdFor = { MagazineDefaultFilter.id })
+        }
 }
 
 /** iOS: `MagazineToolsView` — the regular gallery list (filter, sort, presets), opening the reader. */
@@ -42,6 +45,7 @@ fun MagazineToolView() {
     val c = rememberCatalogController<Gallery>(FilterMode.Galleries, key = "magazine", retain = false) {
         MagazineCatalog.controller(serverId)
     }
+    LaunchedEffect(c, MagazineDefaultFilter.id) { c.syncDefaults() }
     LaunchedEffect(c) {
         MagazineReadingStore.ensureLoaded()
         snapshotFlow { c.list.items.map { it.id } }
