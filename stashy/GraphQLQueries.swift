@@ -475,7 +475,7 @@ class GraphQLQueries {
 
     static let tagUpdateDetailsMutation = """
         mutation TagUpdate($input: TagUpdateInput!) {
-            tagUpdate(input: $input) { id name description }
+            tagUpdate(input: $input) { id name description aliases }
         }
         """
 

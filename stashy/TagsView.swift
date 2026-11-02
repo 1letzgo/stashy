@@ -1568,6 +1568,10 @@ struct TagDetailView: View {
         if let val = t.sceneMarkerCount, val > 0 {
             list.append((label: "MARKERS", value: "\(val)"))
         }
+
+        if let aliases = t.aliases, !aliases.isEmpty {
+            list.append((label: "ALIASES", value: aliases.joined(separator: ", ")))
+        }
         
         if let created = t.createdAt, !created.isEmpty {
             let date = created.prefix(10)
@@ -1666,6 +1670,8 @@ struct EditTagSheet: View {
 
     @State private var name: String = ""
     @State private var descriptionText: String = ""
+    @State private var aliases: [String] = []
+    @State private var newAlias: String = ""
     @State private var isSaving = false
     @State private var isDeleting = false
     @State private var showingDeleteConfirmation = false
@@ -1683,6 +1689,35 @@ struct EditTagSheet: View {
                         .frame(minHeight: 120)
                 }
                 .listRowBackground(Color.secondaryAppBackground)
+
+                // Only once the tag came with its aliases: saving an empty list over unloaded
+                // ones would delete them.
+                if tag.aliases != nil {
+                    Section {
+                        ForEach(aliases, id: \.self) { alias in
+                            Text(alias)
+                        }
+                        .onDelete { aliases.remove(atOffsets: $0) }
+                        HStack {
+                            TextField("Add alias", text: $newAlias)
+                                .textInputAutocapitalization(.never)
+                                .autocorrectionDisabled()
+                                .onSubmit(addAlias)
+                            Button(action: addAlias) {
+                                Image(systemName: "plus.circle.fill")
+                                    .foregroundStyle(appearanceManager.tintColor)
+                            }
+                            .buttonStyle(.plain)
+                            .disabled(newAlias.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                            .accessibilityLabel("Add alias")
+                        }
+                    } header: {
+                        Text("Aliases")
+                    } footer: {
+                        Text("Other names for this tag. Swipe left to remove one.")
+                    }
+                    .listRowBackground(Color.secondaryAppBackground)
+                }
 
                 Section {
                     Button(role: .destructive) {
@@ -1716,6 +1751,7 @@ struct EditTagSheet: View {
             .onAppear {
                 name = tag.name
                 descriptionText = tag.description ?? ""
+                aliases = tag.aliases ?? []
             }
             .alert("Delete Tag", isPresented: $showingDeleteConfirmation) {
                 Button("Cancel", role: .cancel) { }
@@ -1745,17 +1781,30 @@ struct EditTagSheet: View {
         }
     }
 
+    private func addAlias() {
+        let alias = newAlias.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !alias.isEmpty else { return }
+        // Stash rejects duplicates and an alias equal to the name.
+        let existing = Set((aliases + [name]).map { $0.lowercased() })
+        if !existing.contains(alias.lowercased()) { aliases.append(alias) }
+        newAlias = ""
+    }
+
     private func save() {
+        // A typed but not yet added alias counts too.
+        if !newAlias.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { addAlias() }
         let trimmedName = name.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmedName.isEmpty else { return }
         let trimmedDescription = descriptionText.trimmingCharacters(in: .whitespacesAndNewlines)
         let descriptionValue: String? = trimmedDescription.isEmpty ? nil : trimmedDescription
 
         isSaving = true
+        let aliasesValue: [String]? = tag.aliases == nil ? nil : aliases
         viewModel.updateTagDetails(
             tagId: tag.id,
             name: trimmedName,
-            description: descriptionValue
+            description: descriptionValue,
+            aliases: aliasesValue
         ) { success in
             DispatchQueue.main.async {
                 isSaving = false
@@ -1763,6 +1812,7 @@ struct EditTagSheet: View {
                     var updated = tag
                     updated.name = trimmedName
                     updated.description = descriptionValue
+                    if let aliasesValue { updated.aliases = aliasesValue }
                     onComplete(updated)
                     ToastManager.shared.show("Tag updated", icon: "checkmark.circle", style: .success)
                     dismiss()

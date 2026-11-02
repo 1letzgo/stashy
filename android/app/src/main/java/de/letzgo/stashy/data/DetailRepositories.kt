@@ -133,9 +133,14 @@ object DetailRepository {
         "studioUpdate", mapOf("id" to id, "name" to name, "url" to url, "details" to details, "rating100" to rating100),
     )
 
-    suspend fun updateTag(id: String, name: String, description: String?) = input(
-        "mutation TagUpdate(\$input: TagUpdateInput!) { tagUpdate(input: \$input) { id name description } }",
-        "tagUpdate", mapOf("id" to id, "name" to name, "description" to description),
+    /** [aliases] only goes into `TagUpdateInput` when non-null (a tag loaded without them keeps them). */
+    suspend fun updateTag(id: String, name: String, description: String?, aliases: List<String>? = null) = input(
+        "mutation TagUpdate(\$input: TagUpdateInput!) { tagUpdate(input: \$input) { id name description aliases } }",
+        "tagUpdate",
+        buildMap {
+            put("id", id); put("name", name); put("description", description)
+            if (aliases != null) put("aliases", aliases)
+        },
     )
 
     suspend fun updateGroup(id: String, name: String, date: String?, synopsis: String?, rating100: Int?) = input(

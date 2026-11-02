@@ -7415,10 +7415,12 @@ struct GenerateData: Codable {
     }
 
     /// Updates tag metadata shown on the detail screen (edit mode).
+    /// `aliases` nil leaves them untouched (a tag loaded without them must not lose its aliases).
     func updateTagDetails(
         tagId: String,
         name: String,
         description: String?,
+        aliases: [String]? = nil,
         completion: @escaping (Bool) -> Void
     ) {
         let mutation = GraphQLQueries.tagUpdateDetailsMutation
@@ -7427,6 +7429,7 @@ struct GenerateData: Codable {
             "name": name
         ]
         input["description"] = description ?? NSNull()
+        if let aliases { input["aliases"] = aliases }
 
         let variables: [String: Any] = ["input": input]
         guard let bodyData = try? JSONSerialization.data(withJSONObject: ["query": mutation, "variables": variables]),

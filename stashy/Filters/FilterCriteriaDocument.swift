@@ -64,8 +64,40 @@ final class FilterCriteriaDocument: ObservableObject {
         pinnedKeys.isEmpty ? nil : Self.nameSearchKey(for: mode)
     }
 
+    /// Tags: Stash's `name` criterion ignores aliases. The field there writes
+    /// `AND: { name: R, OR: { aliases: R } }` instead of a root `name` — inside AND, so it stays
+    /// ANDed with every other criterion (a root `OR` would be "all the rest OR alias").
+    nonisolated static func searchesAliases(_ mode: StashDBViewModel.FilterMode) -> Bool {
+        mode == .tags
+    }
+
+    private func isOwnedRegex(_ value: Any?) -> String? {
+        guard let criterion = Self.stringKeyedDict(value),
+              (criterion["modifier"] as? String) == StashCriterionModifier.matchesRegex.rawValue,
+              let pattern = criterion["value"] as? String,
+              pattern.hasPrefix(Self.nameSearchRegexPrefix) else { return nil }
+        return String(pattern.dropFirst(Self.nameSearchRegexPrefix.count))
+    }
+
+    /// The search field's alias group (see `searchesAliases`) when the root `AND` is exactly that.
+    private var aliasSearchPattern: String? {
+        guard nameSearchKey != nil, Self.searchesAliases(mode) else { return nil }
+        let group = node(at: ["AND"])
+        guard Set(group.keys) == ["name", "OR"],
+              let pattern = isOwnedRegex(group["name"]) else { return nil }
+        let alt = node(at: ["AND", "OR"])
+        guard Set(alt.keys) == ["aliases"], isOwnedRegex(alt["aliases"]) == pattern else { return nil }
+        return pattern
+    }
+
+    /// The root group that belongs to the search field, hidden from the editor like its criterion.
+    var searchOwnedGroupKey: String? {
+        aliasSearchPattern != nil ? "AND" : nil
+    }
+
     /// The search field's pattern (without the `(?i)` prefix) while the root holds one.
     var nameSearchPattern: String? {
+        if let pattern = aliasSearchPattern { return pattern }
         guard let key = nameSearchKey else { return nil }
         let criterion = dictValue(forKey: key)
         guard (criterion["modifier"] as? String) == StashCriterionModifier.matchesRegex.rawValue,
@@ -78,6 +110,22 @@ final class FilterCriteriaDocument: ObservableObject {
     /// editor owns is replaced by a new pattern — the field wins for its key — but never removed.
     func setNameSearchPattern(_ pattern: String) {
         guard let key = nameSearchKey else { return }
+        // Tags: name or alias, as long as the root `AND` is free (or already the field's).
+        if Self.searchesAliases(mode), aliasSearchPattern != nil || node(at: []).keys.contains("AND") == false {
+            if aliasSearchPattern != nil { removeGroup("AND", at: []) }
+            guard !pattern.isEmpty else { return }
+            // A plain `name` regex from before the alias search would AND against it.
+            if isOwnedRegex(value(forKey: key)) != nil { removeCriterion(key: key) }
+            let criterion: [String: Any] = [
+                "value": Self.nameSearchRegexPrefix + pattern,
+                "modifier": StashCriterionModifier.matchesRegex.rawValue
+            ]
+            addGroup("AND", at: [])
+            setCriterion(key: key, value: criterion, at: ["AND"])
+            addGroup("OR", at: ["AND"])
+            setCriterion(key: "aliases", value: criterion, at: ["AND", "OR"])
+            return
+        }
         if pattern.isEmpty {
             guard nameSearchPattern != nil else { return }
             removeCriterion(key: key)

@@ -115,8 +115,11 @@ class CatalogController<T>(
         return true
     }
 
-    /** Live chips (Images "Type", the name regex) layered on top of the criteria. */
-    private fun liveChips(): JsonObject = NameRegexFilter.layered(extraLive(), mode, nameRegex)
+    /**
+     * Live chips (Images "Type", the name regex) layered on top of the criteria. Tags: the regex
+     * becomes the name-or-alias `AND` group unless the criteria hold a root `AND` of their own.
+     */
+    private fun liveChips(): JsonObject = NameRegexFilter.layered(extraLive(), mode, nameRegex, criteria.sanitizedObjectFilter)
 
     /** Loads preset / saved-filter criteria; a chip-shaped name regex goes back into the field. */
     private fun loadCriteria(dict: JsonObject) {

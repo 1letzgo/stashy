@@ -33,7 +33,12 @@ struct FilterCriteriaEditorView: View {
         return keys
     }
 
-    private var groupKeys: [String] { document.groupKeys(at: path) }
+    /// The search field's own group (tags: name or alias) is not an editor row.
+    private var groupKeys: [String] {
+        let keys = document.groupKeys(at: path)
+        guard isRoot, let owned = document.searchOwnedGroupKey else { return keys }
+        return keys.filter { $0 != owned }
+    }
 
     private var addableFields: [FilterFieldDescriptor] {
         FilterFieldCatalog.addableFields(

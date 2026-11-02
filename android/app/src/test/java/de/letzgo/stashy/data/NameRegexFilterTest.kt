@@ -78,4 +78,75 @@ class NameRegexFilterTest {
         val markers = obj("""{"title":{"value":"(?i)x","modifier":"MATCHES_REGEX"}}""")
         assertEquals("" to markers, NameRegexFilter.extract(FilterMode.SceneMarkers, markers))
     }
+
+    // MARK: Tags — name or alias (iOS `searchesAliases`)
+
+    private val aliasGroup = """{"AND":{"name":{"value":"(?i)ann","modifier":"MATCHES_REGEX"},"OR":{"aliases":{"value":"(?i)ann","modifier":"MATCHES_REGEX"}}}}"""
+
+    @Test fun tagsChipSearchesNameOrAliasInsideAnd() {
+        assertTrue(NameRegexFilter.searchesAliases(FilterMode.Tags))
+        assertEquals(obj(aliasGroup), NameRegexFilter.chip(FilterMode.Tags, " ann "))
+        // ANDed with the other criteria once merged onto the document.
+        val doc = CriteriaDocument(FilterMode.Tags, obj("""{"favorite":true}"""))
+        val merged = doc.merged(NameRegexFilter.layered(JsonObject(emptyMap()), FilterMode.Tags, "ann", doc.sanitizedObjectFilter))!!
+        assertEquals(obj("""{"favorite":true}""" ).plusAll(obj(aliasGroup)), merged)
+    }
+
+    @Test fun tagsAliasGroupReadsBack() {
+        assertEquals("ann", NameRegexFilter.aliasSearchPattern(FilterMode.Tags, obj(aliasGroup)))
+        val saved = obj("""{"favorite":true}""").plusAll(obj(aliasGroup))
+        val (text, rest) = NameRegexFilter.extract(FilterMode.Tags, saved)
+        assertEquals("ann", text)
+        assertEquals(obj("""{"favorite":true}"""), rest)
+        // An AND that only resembles the group stays in the criteria.
+        val mismatch = obj("""{"AND":{"name":{"value":"(?i)ann","modifier":"MATCHES_REGEX"},"OR":{"aliases":{"value":"(?i)bob","modifier":"MATCHES_REGEX"}}}}""")
+        assertNull(NameRegexFilter.aliasSearchPattern(FilterMode.Tags, mismatch))
+        assertEquals("" to mismatch, NameRegexFilter.extract(FilterMode.Tags, mismatch))
+        val extraKey = obj("""{"AND":{"name":{"value":"(?i)ann","modifier":"MATCHES_REGEX"},"OR":{"aliases":{"value":"(?i)ann","modifier":"MATCHES_REGEX"}},"favorite":true}}""")
+        assertEquals("" to extraKey, NameRegexFilter.extract(FilterMode.Tags, extraKey))
+    }
+
+    @Test fun tagsClearingRemovesTheGroup() {
+        assertTrue(NameRegexFilter.chip(FilterMode.Tags, "").isEmpty())
+        val base = obj("""{"favorite":true}""")
+        assertEquals(base, NameRegexFilter.layered(base, FilterMode.Tags, "  "))
+        // Saving with the field cleared drops the group the previous save held.
+        val saved = mergedObjectFilterForSave(null, base, previousLive = obj(aliasGroup))
+        assertEquals(base, saved)
+    }
+
+    @Test fun tagsFallBackToNameWhenCriteriaHoldTheirOwnAnd() {
+        val foreign = obj("""{"AND":{"favorite":true}}""")
+        val chip = NameRegexFilter.chip(FilterMode.Tags, "ann", foreign)
+        assertEquals(obj("""{"name":{"value":"(?i)ann","modifier":"MATCHES_REGEX"}}"""), chip)
+        val doc = CriteriaDocument(FilterMode.Tags, foreign)
+        val merged = doc.merged(NameRegexFilter.layered(JsonObject(emptyMap()), FilterMode.Tags, "ann", doc.sanitizedObjectFilter))!!
+        assertEquals(setOf("AND", "name"), merged.keys)
+        assertEquals(foreign["AND"], merged["AND"])
+        // The field's own group may be replaced by a new pattern.
+        assertEquals(
+            obj(aliasGroup.replace("ann", "bob")),
+            NameRegexFilter.chip(FilterMode.Tags, "bob", obj(aliasGroup)),
+        )
+        // A legacy root `name` regex still reads back into the field.
+        val legacy = obj("""{"name":{"value":"(?i)ann","modifier":"MATCHES_REGEX"}}""")
+        assertEquals("ann" to JsonObject(emptyMap()), NameRegexFilter.extract(FilterMode.Tags, legacy))
+    }
+
+    @Test fun nonTagModesKeepTheRootCriterion() {
+        val modes = listOf(FilterMode.Performers, FilterMode.Studios, FilterMode.Groups, FilterMode.Scenes, FilterMode.Galleries, FilterMode.Images)
+        modes.forEach { mode ->
+            assertFalse(NameRegexFilter.searchesAliases(mode))
+            val key = NameRegexFilter.key(mode)!!
+            assertEquals(obj("""{"$key":{"value":"(?i)ann","modifier":"MATCHES_REGEX"}}"""), NameRegexFilter.chip(mode, "ann"))
+            assertEquals(obj("""{"$key":{"value":"(?i)ann","modifier":"MATCHES_REGEX"}}"""), NameRegexFilter.chip(mode, "ann", JsonObject(emptyMap())))
+            val group = obj(aliasGroup.replace("\"name\"", "\"$key\""))
+            assertNull(NameRegexFilter.aliasSearchPattern(mode, group))
+            assertEquals("" to group, NameRegexFilter.extract(mode, group))
+        }
+        assertFalse(NameRegexFilter.searchesAliases(FilterMode.SceneMarkers))
+        assertTrue(NameRegexFilter.chip(FilterMode.SceneMarkers, "ann").isEmpty())
+    }
+
+    private fun JsonObject.plusAll(other: JsonObject): JsonObject = JsonObject(LinkedHashMap(this).apply { putAll(other) })
 }

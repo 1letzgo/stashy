@@ -115,6 +115,8 @@ data class Tag(
     val favorite: Boolean? = null,
     @SerialName("created_at") val createdAt: String? = null,
     @SerialName("updated_at") val updatedAt: String? = null,
+    /** Only `findTag` (detail) requests them; `null` = not loaded, never "no aliases". */
+    val aliases: List<String>? = null,
 ) {
     val hasImage: Boolean get() = imagePath != null && !imagePath.contains("default=true")
     val imageURL: String? get() = imagePath?.let { Net.signed(it) }

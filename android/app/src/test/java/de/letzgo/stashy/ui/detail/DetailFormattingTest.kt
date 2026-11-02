@@ -59,6 +59,11 @@ class DetailFormattingTest {
             listOf(DetailItem("SCENES", "1"), DetailItem("GALLERIES", "2"), DetailItem("MARKERS", "3"), DetailItem("CREATED", "2025-02-03")),
             DetailFormatting.tag(tag, 1, 2),
         )
+        assertEquals(
+            listOf(DetailItem("SCENES", "0"), DetailItem("ALIASES", "One, Two")),
+            DetailFormatting.tag(Tag("2", aliases = listOf("One", "Two")), 0, 0),
+        )
+        assertEquals(listOf(DetailItem("SCENES", "0")), DetailFormatting.tag(Tag("3", aliases = emptyList()), 0, 0))
         val group = StashGroup("1", studio = IdName("9", name = "Studio"), date = "2020-01-01", rating100 = 60)
         assertEquals(
             listOf(DetailItem("SCENES", "7"), DetailItem("STUDIO", "Studio"), DetailItem("DATE", "2020-01-01"), DetailItem("RATING", "60%")),
@@ -102,6 +107,10 @@ class DetailFormattingTest {
         assertNull(EditParsing.rating(""))
         assertEquals(listOf("Jane Doe", "J.D."), EditParsing.aliases(" Jane Doe , ,J.D."))
         assertNull(EditParsing.aliases(" , "))
+        assertEquals(listOf("a", "B"), EditParsing.addingAlias(listOf("a"), "  B ", "Tag"))
+        assertEquals(listOf("a"), EditParsing.addingAlias(listOf("a"), "   ", "Tag"))
+        assertEquals(listOf("a"), EditParsing.addingAlias(listOf("a"), "A", "Tag"))
+        assertEquals(listOf("a"), EditParsing.addingAlias(listOf("a"), "tag", " Tag "))
     }
 
     @Test fun gridAndRatingHelpers() {

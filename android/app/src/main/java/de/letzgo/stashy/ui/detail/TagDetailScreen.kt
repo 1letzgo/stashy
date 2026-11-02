@@ -5,7 +5,29 @@ import de.letzgo.stashy.data.Downloads
 import de.letzgo.stashy.ui.tools.downloads.SceneBulkDownloadDialog
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.SwipeToDismissBox
+import androidx.compose.material3.SwipeToDismissBoxValue
+import androidx.compose.material3.rememberSwipeToDismissBoxState
+import androidx.compose.runtime.key
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.unit.dp
+import de.letzgo.stashy.ui.Appearance
+import de.letzgo.stashy.ui.NativeDivider
+import de.letzgo.stashy.ui.NativeGroup
+import de.letzgo.stashy.ui.NativeListItem
+import de.letzgo.stashy.ui.NativeSectionFooter
+import de.letzgo.stashy.ui.NativeSectionHeader
+import de.letzgo.stashy.ui.NativeTextField
 import androidx.compose.foundation.lazy.grid.LazyGridState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -20,6 +42,7 @@ import de.letzgo.stashy.data.DetailRepository
 import de.letzgo.stashy.data.Tag
 import de.letzgo.stashy.ui.Nav
 import de.letzgo.stashy.ui.SF
+import de.letzgo.stashy.ui.StashyColors
 import de.letzgo.stashy.ui.Screen
 import de.letzgo.stashy.ui.Theme
 import kotlinx.coroutines.launch
@@ -152,7 +175,11 @@ class TagDetailScreen(val tagId: String, val preview: Tag? = null, private val f
         )
     }
 
-    /** iOS: `EditTagSheet`. */
+    /**
+     * iOS: `EditTagSheet`. The Aliases section only appears when the tag came with its aliases
+     * (`findTag`): saving an empty list over unloaded ones would delete them, so `aliases` is only
+     * sent in that case.
+     */
     @Composable
     private fun EditTagSheet(tag: Tag, onDismiss: () -> Unit, onSaved: (Tag) -> Unit) {
         val sections = remember(tag.id) {
@@ -163,14 +190,24 @@ class TagDetailScreen(val tagId: String, val preview: Tag? = null, private val f
         }
         val name = sections[0].fields[0]
         val description = sections[1].fields[0]
+        val loadedAliases = tag.aliases
+        var aliases by remember(tag.id) { mutableStateOf(loadedAliases.orEmpty()) }
+        var newAlias by remember(tag.id) { mutableStateOf("") }
+        fun addAlias() {
+            aliases = EditParsing.addingAlias(aliases, newAlias, name.value)
+            newAlias = ""
+        }
         EditEntitySheet(
             title = "Edit Tag", sections = sections,
             deleteLabel = "Delete Tag", deleteTitle = "Delete Tag", entityName = tag.name,
             onDismiss = onDismiss,
             onSave = {
-                val ok = DetailRepository.updateTag(tag.id, name.trimmed, description.optional)
+                // A typed but not yet added alias counts too.
+                if (newAlias.isNotBlank()) addAlias()
+                val aliasesValue = if (loadedAliases == null) null else aliases
+                val ok = DetailRepository.updateTag(tag.id, name.trimmed, description.optional, aliasesValue)
                 if (ok) {
-                    onSaved(tag.copy(name = name.trimmed, description = description.optional))
+                    onSaved(tag.copy(name = name.trimmed, description = description.optional, aliases = aliasesValue ?: tag.aliases))
                     detailToast("Tag updated")
                 } else detailToast("Failed to update tag")
                 ok
@@ -180,6 +217,54 @@ class TagDetailScreen(val tagId: String, val preview: Tag? = null, private val f
                 detailToast("Tag deleted")
                 Nav.pop()
             },
+            extraSections = {
+                if (loadedAliases != null) {
+                    Spacer(Modifier.height(20.dp))
+                    NativeSectionHeader("Aliases")
+                    NativeGroup {
+                        aliases.forEachIndexed { index, alias ->
+                            key(alias) {
+                                SwipeToRemoveAlias(alias, onRemove = { aliases = aliases - alias }) {
+                                    NativeListItem(alias, Modifier.background(Theme.palette.secondaryBackground))
+                                }
+                            }
+                            if (index < aliases.lastIndex) NativeDivider()
+                        }
+                        if (aliases.isNotEmpty()) NativeDivider()
+                        Column(Modifier.padding(horizontal = 4.dp, vertical = 4.dp)) {
+                            NativeTextField(
+                                newAlias, { newAlias = it }, "Add alias",
+                                imeAction = ImeAction.Done,
+                                keyboardActions = KeyboardActions(onDone = { addAlias() }),
+                                trailing = {
+                                    IconButton(::addAlias, enabled = newAlias.isNotBlank()) {
+                                        Icon(SF.plusCircleFill, "Add alias", tint = if (newAlias.isNotBlank()) Appearance.tint else Theme.palette.secondaryText)
+                                    }
+                                },
+                            )
+                        }
+                    }
+                    NativeSectionFooter("Other names for this tag. Swipe left to remove one.")
+                }
+            },
         )
     }
+}
+
+/** iOS `.onDelete` on the alias rows — swipe left removes the alias. */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun SwipeToRemoveAlias(label: String, onRemove: () -> Unit, content: @Composable () -> Unit) {
+    val state = rememberSwipeToDismissBoxState(confirmValueChange = { value ->
+        if (value == SwipeToDismissBoxValue.EndToStart) { onRemove(); true } else false
+    })
+    SwipeToDismissBox(
+        state = state,
+        enableDismissFromStartToEnd = false,
+        backgroundContent = {
+            Box(Modifier.fillMaxSize().background(StashyColors.systemRed).padding(end = 20.dp), contentAlignment = Alignment.CenterEnd) {
+                Icon(SF.trash, "Remove $label", tint = Color.White)
+            }
+        },
+    ) { content() }
 }

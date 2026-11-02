@@ -445,6 +445,8 @@ internal fun EditEntitySheet(
     onDismiss: () -> Unit,
     onSave: suspend () -> Boolean,
     onDelete: suspend () -> Unit,
+    /** Extra form sections after the text [sections], before the delete row (tag aliases). */
+    extraSections: @Composable ColumnScope.() -> Unit = {},
 ) {
     val p = Theme.palette
     val scope = androidx.compose.runtime.rememberCoroutineScope()
@@ -474,6 +476,7 @@ internal fun EditEntitySheet(
                         }
                     }
                 }
+                extraSections()
                 Spacer(Modifier.height(20.dp))
                 de.letzgo.stashy.ui.NativeGroup {
                     de.letzgo.stashy.ui.NativeListItem(

@@ -60,6 +60,7 @@ object DetailFormatting {
         if (galleries > 0) list += DetailItem("GALLERIES", "$galleries")
         t.performerCount?.takeIf { it > 0 }?.let { list += DetailItem("PERFORMERS", "$it") }
         t.sceneMarkerCount?.takeIf { it > 0 }?.let { list += DetailItem("MARKERS", "$it") }
+        t.aliases?.takeIf { it.isNotEmpty() }?.let { list += DetailItem("ALIASES", it.joinToString(", ")) }
         t.createdAt?.takeIf { it.isNotEmpty() }?.let { list += DetailItem("CREATED", it.take(10)) }
         t.updatedAt?.takeIf { it.isNotEmpty() }?.let { list += DetailItem("UPDATED", it.take(10)) }
         return list
@@ -133,4 +134,15 @@ object EditParsing {
 
     /** iOS: split on ",", trim, drop empties; empty list → nil. */
     fun aliases(text: String): List<String>? = text.split(",").map { it.trim() }.filter { it.isNotEmpty() }.ifEmpty { null }
+
+    /**
+     * iOS `EditTagSheet.addAlias`: [input] trimmed and appended unless blank, a case-insensitive
+     * duplicate or equal to [name] (Stash rejects both).
+     */
+    fun addingAlias(aliases: List<String>, input: String, name: String): List<String> {
+        val alias = input.trim()
+        if (alias.isEmpty()) return aliases
+        val existing = (aliases + name.trim()).map { it.lowercase() }.toSet()
+        return if (alias.lowercase() in existing) aliases else aliases + alias
+    }
 }
