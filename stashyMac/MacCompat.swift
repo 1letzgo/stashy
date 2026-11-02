@@ -144,6 +144,22 @@ extension View {
         modifier(MacFullScreenCoverModifier(isPresented: isPresented, onDismiss: onDismiss, cover: content))
     }
 
+    func fullScreenCover<Item: Identifiable, Content: View>(
+        item: Binding<Item?>,
+        onDismiss: (() -> Void)? = nil,
+        @ViewBuilder content: @escaping (Item) -> Content
+    ) -> some View {
+        fullScreenCover(
+            isPresented: Binding(
+                get: { item.wrappedValue != nil },
+                set: { if !$0 { item.wrappedValue = nil } }
+            ),
+            onDismiss: onDismiss
+        ) {
+            if let value = item.wrappedValue { content(value) }
+        }
+    }
+
     /// Root of the window: draws whichever `fullScreenCover` below it is presented.
     func macFullScreenCoverHost() -> some View {
         modifier(MacFullScreenCoverHost())

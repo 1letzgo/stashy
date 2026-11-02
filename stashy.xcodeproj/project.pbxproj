@@ -69,6 +69,9 @@
 		971A00012F999001 /* HotOrNotToolsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 971A00022F999002 /* HotOrNotToolsView.swift */; };
 		971A00032F999003 /* RateMeToolsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 971A00042F999004 /* RateMeToolsView.swift */; };
 		971A00052F999005 /* TopListsToolsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 971A00062F999006 /* TopListsToolsView.swift */; };
+		971A00A12F9990A1 /* MagazineToolsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 971A00A22F9990A2 /* MagazineToolsView.swift */; };
+		971A00A32F9990A3 /* MagazineReaderView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 971A00A42F9990A4 /* MagazineReaderView.swift */; };
+		971A00A52F9990A5 /* MagazineReadingStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 971A00A62F9990A6 /* MagazineReadingStore.swift */; };
 		971A00082F999008 /* SessionTimelineToolsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 971A00072F999007 /* SessionTimelineToolsView.swift */; };
 		971A000A2F99900A /* SessionTimelineLoader.swift in Sources */ = {isa = PBXBuildFile; fileRef = 971A00092F999009 /* SessionTimelineLoader.swift */; };
 		9AA0A05BF61443C2B087A163 /* SharedUtilities.swift in Sources */ = {isa = PBXBuildFile; fileRef = DF22BB1C2F16743C007C2090 /* SharedUtilities.swift */; };
@@ -313,6 +316,9 @@
 		MAC000000000000000000060 /* FilterCriteriaEditorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0D91ABA114F544C390FD6F8E /* FilterCriteriaEditorView.swift */; };
 		MAC000000000000000000061 /* FiltersToolsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 130472FFD9E64071BF78EDAE /* FiltersToolsView.swift */; };
 		MAC000000000000000000062 /* TopListsToolsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 971A00062F999006 /* TopListsToolsView.swift */; };
+		MACB000000000000000000A1 /* MagazineToolsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 971A00A22F9990A2 /* MagazineToolsView.swift */; };
+		MACB000000000000000000A2 /* MagazineReaderView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 971A00A42F9990A4 /* MagazineReaderView.swift */; };
+		MACB000000000000000000A3 /* MagazineReadingStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 971A00A62F9990A6 /* MagazineReadingStore.swift */; };
 		MAC000000000000000000063 /* SessionTimelineToolsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 971A00072F999007 /* SessionTimelineToolsView.swift */; };
 		MAC000000000000000000064 /* SessionTimelineLoader.swift in Sources */ = {isa = PBXBuildFile; fileRef = 971A00092F999009 /* SessionTimelineLoader.swift */; };
 		MAC000000000000000000065 /* TabManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = DFF7EE402F0D3D2800344A8B /* TabManager.swift */; };
@@ -405,6 +411,9 @@
 		971A00022F999002 /* HotOrNotToolsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HotOrNotToolsView.swift; sourceTree = "<group>"; };
 		971A00042F999004 /* RateMeToolsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RateMeToolsView.swift; sourceTree = "<group>"; };
 		971A00062F999006 /* TopListsToolsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TopListsToolsView.swift; sourceTree = "<group>"; };
+		971A00A22F9990A2 /* MagazineToolsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MagazineToolsView.swift; sourceTree = "<group>"; };
+		971A00A42F9990A4 /* MagazineReaderView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MagazineReaderView.swift; sourceTree = "<group>"; };
+		971A00A62F9990A6 /* MagazineReadingStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MagazineReadingStore.swift; sourceTree = "<group>"; };
 		971A00072F999007 /* SessionTimelineToolsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionTimelineToolsView.swift; sourceTree = "<group>"; };
 		971A00092F999009 /* SessionTimelineLoader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionTimelineLoader.swift; sourceTree = "<group>"; };
 		A1B2C3D40001400180011001 /* FilterPickerOptionsStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FilterPickerOptionsStore.swift; sourceTree = "<group>"; };
@@ -600,6 +609,9 @@
 				A1F11TER50F11TER50F11TER /* Filters */,
 				C4B0E00300000000000000C1 /* Chrome */,
 				971A00062F999006 /* TopListsToolsView.swift */,
+				971A00A22F9990A2 /* MagazineToolsView.swift */,
+				971A00A42F9990A4 /* MagazineReaderView.swift */,
+				971A00A62F9990A6 /* MagazineReadingStore.swift */,
 				971A00072F999007 /* SessionTimelineToolsView.swift */,
 				372E2D692F6339EE00603361 /* LoginAuthHelper.swift */,
 				DF22BB262F167CDC007C2090 /* ImageCacheManager.swift */,
@@ -1070,6 +1082,9 @@
 				13B8ED271E86457390593F48 /* FilterCriteriaEditorView.swift in Sources */,
 				B981A60AAA104A77A56B0923 /* FiltersToolsView.swift in Sources */,
 				971A00052F999005 /* TopListsToolsView.swift in Sources */,
+				971A00A12F9990A1 /* MagazineToolsView.swift in Sources */,
+				971A00A32F9990A3 /* MagazineReaderView.swift in Sources */,
+				971A00A52F9990A5 /* MagazineReadingStore.swift in Sources */,
 				971A00082F999008 /* SessionTimelineToolsView.swift in Sources */,
 				971A000A2F99900A /* SessionTimelineLoader.swift in Sources */,
 				DFF7EE412F0D3D2800344A8B /* TabManager.swift in Sources */,
@@ -1287,6 +1302,9 @@
 				MAC000000000000000000060 /* FilterCriteriaEditorView.swift in Sources */,
 				MAC000000000000000000061 /* FiltersToolsView.swift in Sources */,
 				MAC000000000000000000062 /* TopListsToolsView.swift in Sources */,
+				MACB000000000000000000A1 /* MagazineToolsView.swift in Sources */,
+				MACB000000000000000000A2 /* MagazineReaderView.swift in Sources */,
+				MACB000000000000000000A3 /* MagazineReadingStore.swift in Sources */,
 				MAC000000000000000000063 /* SessionTimelineToolsView.swift in Sources */,
 				MAC000000000000000000064 /* SessionTimelineLoader.swift in Sources */,
 				MAC000000000000000000065 /* TabManager.swift in Sources */,
@@ -1448,7 +1466,7 @@
 				ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS = YES;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 426;
+				CURRENT_PROJECT_VERSION = 427;
 				DEVELOPMENT_TEAM = 699G2QY959;
 				ENABLE_PREVIEWS = YES;
 				INFOPLIST_FILE = stashy/Info.plist;
@@ -1478,7 +1496,7 @@
 				ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS = YES;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 426;
+				CURRENT_PROJECT_VERSION = 427;
 				DEVELOPMENT_TEAM = 699G2QY959;
 				ENABLE_PREVIEWS = YES;
 				INFOPLIST_FILE = stashy/Info.plist;
@@ -1512,7 +1530,7 @@
 				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 364;
+				CURRENT_PROJECT_VERSION = 365;
 				DEVELOPMENT_TEAM = 699G2QY959;
 				ENABLE_PREVIEWS = YES;
 				ENABLE_USER_SCRIPT_SANDBOXING = YES;
@@ -1554,7 +1572,7 @@
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 364;
+				CURRENT_PROJECT_VERSION = 365;
 				DEVELOPMENT_TEAM = 699G2QY959;
 				ENABLE_PREVIEWS = YES;
 				ENABLE_USER_SCRIPT_SANDBOXING = YES;
@@ -1592,7 +1610,7 @@
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 360;
+				CURRENT_PROJECT_VERSION = 362;
 				DEVELOPMENT_TEAM = 699G2QY959;
 				ENABLE_HARDENED_RUNTIME = YES;
 				ENABLE_PREVIEWS = YES;
@@ -1623,7 +1641,7 @@
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 360;
+				CURRENT_PROJECT_VERSION = 362;
 				DEVELOPMENT_TEAM = 699G2QY959;
 				ENABLE_HARDENED_RUNTIME = YES;
 				ENABLE_PREVIEWS = YES;

@@ -35,6 +35,13 @@ protocol GalleryRepositoryProtocol {
         sortBy: StashDBViewModel.GallerySortOption
     ) async throws -> (galleries: [Gallery], total: Int)
     
+    /// Fetches `custom_fields` by gallery id. Separate from `GalleryFields`: that fragment has to
+    /// keep working on servers whose galleries have no custom fields.
+    func fetchCustomFields(galleryIds: [String]) async throws -> [String: [String: StashJSONValue]]
+    
+    /// Sets the given custom fields, leaving all others untouched
+    func updateCustomFields(galleryId: String, partial: [String: Any]) async throws
+    
     /// Fetches images for a gallery
     func fetchGalleryImages(
         galleryId: String,
@@ -157,6 +164,51 @@ class GalleryRepository: GalleryRepositoryProtocol {
         let galleries = response.data?.findGalleries.galleries ?? []
         let total = response.data?.findGalleries.count ?? 0
         return (galleries, total)
+    }
+    
+    // MARK: - Gallery Custom Fields
+    
+    private struct CustomFieldsResponse: Decodable {
+        struct DataContainer: Decodable {
+            struct Result: Decodable {
+                let galleries: [Entry]
+            }
+            let findGalleries: Result
+        }
+        struct Entry: Decodable {
+            let id: String
+            let custom_fields: [String: StashJSONValue]?
+        }
+        let data: DataContainer?
+    }
+    
+    func fetchCustomFields(galleryIds: [String]) async throws -> [String: [String: StashJSONValue]] {
+        let variables: [String: Any] = [
+            "filter": ["per_page": galleryIds.count],
+            "ids": galleryIds
+        ]
+        let response: CustomFieldsResponse = try await graphQLClient.execute(
+            query: GraphQLQueries.loadQuery(named: "findGalleriesCustomFields"),
+            variables: variables
+        )
+        var fields: [String: [String: StashJSONValue]] = [:]
+        for gallery in response.data?.findGalleries.galleries ?? [] {
+            fields[gallery.id] = gallery.custom_fields ?? [:]
+        }
+        return fields
+    }
+    
+    func updateCustomFields(galleryId: String, partial: [String: Any]) async throws {
+        let variables: [String: Any] = [
+            "input": [
+                "id": galleryId,
+                "custom_fields": ["partial": partial]
+            ]
+        ]
+        _ = try await graphQLClient.executeRaw(
+            query: GraphQLQueries.loadQuery(named: "galleryUpdateCustomFields"),
+            variables: variables
+        )
     }
     
     // MARK: - Fetch Gallery Images

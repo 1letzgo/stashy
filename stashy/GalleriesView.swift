@@ -8,6 +8,15 @@
 
 import SwiftUI
 
+/// Lets another screen reuse the full gallery list (filter, sort, presets) with its own behaviour.
+struct GalleryListHost {
+    /// Replaces the push to `ImagesView`.
+    var onOpen: (Gallery) -> Void
+    /// Wraps each card, e.g. with a progress bar or context menu.
+    var decorateCard: (Gallery, AnyView) -> AnyView
+    var onGalleriesChanged: ([Gallery]) -> Void
+}
+
 private struct GalleriesViewContent: View {
     @ObservedObject var viewModel: StashDBViewModel
     @ObservedObject var configManager = ServerConfigManager.shared
@@ -367,11 +376,13 @@ private struct GalleriesViewContent: View {
         viewModel: StashDBViewModel,
         initialSort: StashDBViewModel.GallerySortOption? = nil,
         hideTitle: Bool = false,
-        filterMemory: CatalogListFilterMemory<CatalogListFilterSnapshot<StashDBViewModel.GallerySortOption>>? = nil
+        filterMemory: CatalogListFilterMemory<CatalogListFilterSnapshot<StashDBViewModel.GallerySortOption>>? = nil,
+        host: GalleryListHost? = nil
     ) {
         self.viewModel = viewModel
         self.hideTitle = hideTitle
         self.filterMemory = filterMemory
+        self.host = host
         let savedSort = StashDBViewModel.GallerySortOption(rawValue: TabManager.shared.getSortOption(for: .galleries) ?? "")
         _selectedSortOption = State(initialValue: initialSort ?? savedSort ?? .dateDesc)
         if let filterMemory {
@@ -387,6 +398,8 @@ private struct GalleriesViewContent: View {
             }
         }
     }
+
+    private let host: GalleryListHost?
 
     /// Host-owned filter state (Home sub-tab, see `CatalogRootFilterMemories`); `nil` = the
     /// state lives and dies with this view.
@@ -542,13 +555,26 @@ private struct GalleriesViewContent: View {
             VStack(spacing: 0) {
             LazyVGrid(columns: columns, spacing: 12) {
                 ForEach(viewModel.galleries) { gallery in
-                    NavigationLink(destination: LazyView { ImagesView(gallery: gallery) }) {
-                        GalleryCardView(
-                            gallery: gallery,
-                            aspectRatio: cardColumns.cardAspectRatio
-                        )
+                    if let host {
+                        Button {
+                            HapticManager.light()
+                            host.onOpen(gallery)
+                        } label: {
+                            host.decorateCard(gallery, AnyView(GalleryCardView(
+                                gallery: gallery,
+                                aspectRatio: cardColumns.cardAspectRatio
+                            )))
+                        }
+                        .buttonStyle(.plain)
+                    } else {
+                        NavigationLink(destination: LazyView { ImagesView(gallery: gallery) }) {
+                            GalleryCardView(
+                                gallery: gallery,
+                                aspectRatio: cardColumns.cardAspectRatio
+                            )
+                        }
+                        .buttonStyle(.plain)
                     }
-                    .buttonStyle(.plain)
                 }
 
                 if viewModel.isLoadingGalleries {
@@ -609,6 +635,7 @@ private struct GalleriesViewContent: View {
                 }
             }
             .onAppear(perform: handleGalleriesAppear)
+            .onChange(of: viewModel.galleries) { _, galleries in host?.onGalleriesChanged(galleries) }
             .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("DefaultFilterChanged"))) { notification in
                 handleGalleriesDefaultFilterChanged(notification)
             }
@@ -789,17 +816,20 @@ struct GalleriesView: View {
     let initialSort: StashDBViewModel.GallerySortOption?
     var hideTitle: Bool = false
     let filterMemory: CatalogListFilterMemory<CatalogListFilterSnapshot<StashDBViewModel.GallerySortOption>>?
+    let host: GalleryListHost?
 
     init(
         initialSort: StashDBViewModel.GallerySortOption? = nil,
         hideTitle: Bool = false,
         catalogBrowserViewModel: StashDBViewModel? = nil,
-        filterMemory: CatalogListFilterMemory<CatalogListFilterSnapshot<StashDBViewModel.GallerySortOption>>? = nil
+        filterMemory: CatalogListFilterMemory<CatalogListFilterSnapshot<StashDBViewModel.GallerySortOption>>? = nil,
+        host: GalleryListHost? = nil
     ) {
         self.catalogBrowserViewModel = catalogBrowserViewModel
         self.initialSort = initialSort
         self.hideTitle = hideTitle
         self.filterMemory = filterMemory
+        self.host = host
     }
 
     var body: some View {
@@ -807,7 +837,8 @@ struct GalleriesView: View {
                 viewModel: catalogBrowserViewModel ?? ownedViewModel,
                 initialSort: initialSort,
                 hideTitle: hideTitle,
-                filterMemory: filterMemory
+                filterMemory: filterMemory,
+                host: host
             )
         return content
     }

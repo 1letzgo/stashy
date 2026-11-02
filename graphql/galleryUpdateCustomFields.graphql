@@ -1,0 +1,5 @@
+mutation GalleryUpdateCustomFields($input: GalleryUpdateInput!) {
+  galleryUpdate(input: $input) {
+    id
+  }
+}

@@ -309,6 +309,7 @@ struct ToolsView: View {
     enum ToolsTab: String, CaseIterable {
         case downloads = "Downloads"
         case watchlist = "Watchlist"
+        case magazine = "Magazin"
         case overview = "Overview"
         case oCount = "O-Count"
         case timeline = "Timeline"
@@ -320,6 +321,7 @@ struct ToolsView: View {
             switch self {
             case .downloads: return "square.and.arrow.down"
             case .watchlist: return "text.badge.checkmark"
+            case .magazine: return "magazine.fill"
             case .overview: return "chart.bar.fill"
             case .oCount: return "calendar"
             case .timeline: return "calendar.day.timeline.left"
@@ -334,7 +336,7 @@ struct ToolsView: View {
     /// hand-sorted flat list stopped being a good way in once Tools grew — the grid needs stable
     /// categories, so the order is part of the design now rather than a setting.
     static let toolGroups: [(title: String, tools: [ToolsTab])] = [
-        ("Library", [.downloads, .watchlist]),
+        ("Library", [.downloads, .watchlist, .magazine]),
         ("Insights", [.overview, .topLists, .oCount, .timeline]),
         ("Discover", [.hotOrNot, .rateMe])
     ]
@@ -375,6 +377,8 @@ struct ToolsView: View {
                 DownloadsView()
             case .watchlist:
                 WatchlistToolsView()
+            case .magazine:
+                MagazineToolsView()
             case .overview:
                 ToolsStatisticsView(viewModel: statisticsViewModel)
             case .oCount:

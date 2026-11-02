@@ -1,0 +1,8 @@
+query FindGalleriesCustomFields($filter: FindFilterType, $ids: [ID!]) {
+  findGalleries(filter: $filter, ids: $ids) {
+    galleries {
+      id
+      custom_fields
+    }
+  }
+}
