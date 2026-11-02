@@ -956,7 +956,14 @@ struct HotOrNotUpdated: Codable {
 }
 
 struct HotOrNotMutationResponse: Codable {
+    struct ResponseError: Codable {
+        let message: String
+    }
+
     let data: HotOrNotMutationData?
+    /// Stash rejects an update with `{"data":{"performerUpdate":null},"errors":[…]}`. The client
+    /// tolerates that as a partial error, so the reason is only available here.
+    let errors: [ResponseError]?
 }
 
 /// Per-side duel outcome: `delta100` is the change in Stash `rating100` (Ascension-style math / server update); `rating100After` is the clamped new value.
@@ -1544,8 +1551,9 @@ final class HotOrNotViewModel: ObservableObject {
 
     /// Rating proposals from the finishing places, against fresh ratings / stats of the pool.
     func loadBracketResults() async {
-        guard let state = bracket, state.isFinished else { return }
+        guard let state = bracket, state.isFinished, !isLoadingBracketResults else { return }
         isLoadingBracketResults = true
+        errorMessage = nil
         defer { isLoadingBracketResults = false }
         do {
             let pool = try await fetchRatingSortedPool()
@@ -1566,10 +1574,20 @@ final class HotOrNotViewModel: ObservableObject {
         }
     }
 
+    /// After a failed final: the results may not even have loaded, then that comes first.
+    func retryBracketSave() async {
+        if bracketProposals.isEmpty {
+            await loadBracketResults()
+        } else {
+            await applyBracket()
+        }
+    }
+
     /// Writes every proposal (rating + stats + match records). Already written performers are
-    /// skipped, so a failed run can simply be retried.
+    /// skipped, so a failed run can simply be retried. One failure does not stop the others: a
+    /// performer deleted on the server would otherwise block everyone behind it on each retry.
     func applyBracket() async {
-        guard var state = bracket, state.isFinished, !bracketProposals.isEmpty else { return }
+        guard var state = bracket, state.isFinished, !bracketProposals.isEmpty, !isApplyingBracket else { return }
         isApplyingBracket = true
         errorMessage = nil
         defer { isApplyingBracket = false }
@@ -1582,6 +1600,8 @@ final class HotOrNotViewModel: ObservableObject {
             errorMessage = error.localizedDescription
             return
         }
+        var failedCount = 0
+        var firstFailure: String?
         for proposal in bracketProposals where !state.appliedIds.contains(proposal.id) {
             guard let performer = current[proposal.id] ?? state.entrant(proposal.id) else { continue }
             let matches = state.results(for: proposal.id).map { r in
@@ -1596,14 +1616,43 @@ final class HotOrNotViewModel: ObservableObject {
                 bracketAppliedCount = state.appliedIds.count
                 HotOrNotBracketStore.save(state)
             } catch {
-                errorMessage = error.localizedDescription
-                return
+                // Deleted on the server since the draw: nothing left to rate, and no save
+                // could ever succeed. It must not hold up the next tournament.
+                if await performerIsGone(proposal.id) {
+                    bracketProposals.removeAll { $0.id == proposal.id }
+                    state.appliedIds.append(proposal.id)
+                    bracket = state
+                    bracketAppliedCount = state.appliedIds.count
+                    HotOrNotBracketStore.save(state)
+                    continue
+                }
+                failedCount += 1
+                if firstFailure == nil { firstFailure = "\(proposal.name): \(error.localizedDescription)" }
             }
         }
-        #if !os(tvOS)
-        HapticManager.success()
-        #endif
+        if let firstFailure {
+            errorMessage = "\(failedCount) of \(bracketProposals.count) ratings not saved. \(firstFailure)"
+        } else {
+            #if !os(tvOS)
+            HapticManager.success()
+            #endif
+        }
         if section == .leaderboard { await refreshLeaderboard() }
+    }
+
+    /// Only an explicit "no such performer" counts; a failed lookup says nothing.
+    private func performerIsGone(_ id: String) async -> Bool {
+        struct Response: Decodable {
+            struct Payload: Decodable {
+                struct Ref: Decodable { let id: String }
+                let findPerformer: Ref?
+            }
+            let data: Payload?
+        }
+        let query = "query HotOrNotPerformerExists($id: ID!) { findPerformer(id: $id) { id } }"
+        guard let res: Response = try? await client.execute(query: query, variables: ["id": id]),
+              let data = res.data else { return false }
+        return data.findPerformer == nil
     }
 
     var bracketIsApplied: Bool {
@@ -1836,7 +1885,7 @@ final class HotOrNotViewModel: ObservableObject {
             variables: ["input": input]
         )
         if res.data?.performerUpdate == nil {
-            throw NSError(domain: "HotOrNot", code: 1, userInfo: [NSLocalizedDescriptionKey: "Update failed"])
+            throw NSError(domain: "HotOrNot", code: 1, userInfo: [NSLocalizedDescriptionKey: res.errors?.first?.message ?? "Update failed"])
         }
     }
 }
@@ -2194,6 +2243,7 @@ private struct HotOrNotBracketResultsCard: View {
     @ObservedObject var model: HotOrNotViewModel
     @ObservedObject private var appearance = AppearanceManager.shared
     let showTree: () -> Void
+    @State private var confirmEnd = false
 
     private var champion: HotOrNotPerformerData? {
         guard let id = model.bracket?.championId else { return nil }
@@ -2254,10 +2304,11 @@ private struct HotOrNotBracketResultsCard: View {
                     }
                     .buttonStyle(.borderedProminent)
                     .tint(appearance.tintColor)
-                } else if !model.isApplyingBracket && !model.isLoadingBracketResults && !model.bracketProposals.isEmpty {
-                    // Only after a failed automatic save.
+                } else if !model.isApplyingBracket && !model.isLoadingBracketResults {
+                    // Only after a failed automatic save. Ending it is the way out when a save
+                    // can never succeed; without it the mode stayed on this card for good.
                     Button {
-                        Task { await model.applyBracket() }
+                        Task { await model.retryBracketSave() }
                     } label: {
                         Label("Retry", systemImage: "arrow.clockwise")
                             .font(.subheadline.weight(.semibold))
@@ -2265,7 +2316,21 @@ private struct HotOrNotBracketResultsCard: View {
                     }
                     .buttonStyle(.borderedProminent)
                     .tint(appearance.tintColor)
+
+                    Button(role: .destructive) {
+                        confirmEnd = true
+                    } label: {
+                        Text("End")
+                            .font(.subheadline.weight(.semibold))
+                            .frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(.bordered)
                 }
+            }
+            .confirmationDialog("End tournament?", isPresented: $confirmEnd, titleVisibility: .visible) {
+                Button("End tournament", role: .destructive) { model.newBracket() }
+            } message: {
+                Text("Ratings that were not saved are lost.")
             }
         }
         .padding(16)

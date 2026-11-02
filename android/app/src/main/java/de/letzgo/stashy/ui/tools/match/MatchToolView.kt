@@ -42,6 +42,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Autorenew
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.DragHandle
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.outlined.Groups
@@ -515,6 +516,7 @@ private fun BracketResultsCard(model: MatchViewModel) {
     val view = LocalView.current
     val state = model.bracket ?: return
     var showTree by remember { mutableStateOf(false) }
+    var confirmEnd by remember { mutableStateOf(false) }
     Column(
         Modifier.fillMaxWidth().widthIn(max = 720.dp).matchCard().padding(16.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -558,13 +560,28 @@ private fun BracketResultsCard(model: MatchViewModel) {
             MatchActionButton("32:1", SF.trophy, prominent = false, enabled = true, modifier = Modifier.weight(1f)) { showTree = true }
             if (model.bracketIsApplied) {
                 MatchActionButton("New tournament", Icons.Filled.Autorenew, prominent = true, enabled = true, modifier = Modifier.weight(1f)) { model.newBracket() }
-            } else if (!model.isApplyingBracket && !model.isLoadingBracketResults && model.bracketProposals.isNotEmpty()) {
-                // Only after a failed automatic save.
-                MatchActionButton("Retry", Icons.Filled.Autorenew, prominent = true, enabled = true, modifier = Modifier.weight(1f)) { model.applyBracketAsync() }
+            } else if (!model.isApplyingBracket && !model.isLoadingBracketResults) {
+                // Only after a failed automatic save. Ending it is the way out when a save can
+                // never succeed; without it the mode stayed on this card for good.
+                MatchActionButton("Retry", Icons.Filled.Autorenew, prominent = true, enabled = true, modifier = Modifier.weight(1f)) { model.retryBracketSave() }
+                MatchActionButton("End", Icons.Filled.Close, prominent = false, enabled = true, modifier = Modifier.weight(1f)) { confirmEnd = true }
             }
         }
     }
     if (showTree) BracketTreeDialog(state) { showTree = false }
+    if (confirmEnd) {
+        AlertDialog(
+            onDismissRequest = { confirmEnd = false },
+            title = { Text("End tournament?") },
+            text = { Text("Ratings that were not saved are lost.") },
+            confirmButton = {
+                TextButton(onClick = { confirmEnd = false; model.newBracket() }) { Text("End tournament") }
+            },
+            dismissButton = {
+                TextButton(onClick = { confirmEnd = false }) { Text("Cancel") }
+            },
+        )
+    }
 }
 
 /** iOS: Legend / Rise finished — "Legend!" card with New run. */

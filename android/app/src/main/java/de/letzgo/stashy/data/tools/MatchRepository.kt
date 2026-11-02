@@ -9,9 +9,11 @@ import de.letzgo.stashy.data.Prefs
 import de.letzgo.stashy.data.ServerConfigManager
 import de.letzgo.stashy.data.obj
 import de.letzgo.stashy.data.stringOrNull
+import kotlinx.coroutines.CancellationException
 import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.builtins.serializer
 import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
@@ -161,5 +163,15 @@ object MatchRepository {
         val input = MatchBracket.performerUpdate(performer, newRating, matches)
         val data = GraphQL.data(UPDATE_MUTATION.trimIndent(), buildJsonObject { put("input", input) })
         if (data["performerUpdate"] !is JsonObject) throw Exception("Update failed")
+    }
+
+    /** Only an explicit "no such performer" counts; a failed lookup says nothing. */
+    suspend fun performerIsGone(id: String): Boolean = try {
+        val query = "query MatchPerformerExists(\$id: ID!) { findPerformer(id: \$id) { id } }"
+        GraphQL.data(query, buildJsonObject { put("id", JsonPrimitive(id)) })["findPerformer"] is JsonNull
+    } catch (e: CancellationException) {
+        throw e
+    } catch (e: Exception) {
+        false
     }
 }

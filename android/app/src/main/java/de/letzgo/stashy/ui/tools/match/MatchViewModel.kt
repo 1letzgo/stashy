@@ -491,7 +491,9 @@ class MatchViewModel : ViewModel() {
     /** Rating proposals from the finishing places, against fresh ratings / stats of the pool. */
     suspend fun loadBracketResults() {
         val state = bracket?.takeIf { it.isFinished } ?: return
+        if (isLoadingBracketResults) return
         isLoadingBracketResults = true
+        errorMessage = null
         try {
             val pool = ratingSorted(MatchRepository.pool(selectedGenders).items)
             bracketProposals = MatchBracket.proposals(state, pool.associateBy { it.id }, pool.map { MatchElo.rating(it) })
@@ -508,9 +510,16 @@ class MatchViewModel : ViewModel() {
         if (!bracketIsApplied) applyBracket()
     }
 
-    fun applyBracketAsync() { viewModelScope.launch { applyBracket() } }
+    /** After a failed final: the results may not even have loaded, then that comes first. */
+    fun retryBracketSave() {
+        viewModelScope.launch { if (bracketProposals.isEmpty()) loadBracketResults() else applyBracket() }
+    }
 
-    /** Writes every proposal; already written performers are skipped, so a failed run can be retried. */
+    /**
+     * Writes every proposal; already written performers are skipped, so a failed run can be retried.
+     * One failure does not stop the others: a performer deleted on the server would otherwise block
+     * everyone behind it on each retry.
+     */
     suspend fun applyBracket() {
         var state = bracket?.takeIf { it.isFinished } ?: return
         if (bracketProposals.isEmpty() || isApplyingBracket) return
@@ -519,19 +528,43 @@ class MatchViewModel : ViewModel() {
         try {
             // Fresh custom_fields so the run appends to the latest stats / records.
             val current = MatchRepository.pool(selectedGenders).items.associateBy { it.id }
+            var failedCount = 0
+            var firstFailure: String? = null
             for (proposal in bracketProposals) {
                 if (proposal.id in state.appliedIds) continue
                 val performer = current[proposal.id] ?: state.entrant(proposal.id) ?: continue
                 val matches = state.results(proposal.id).map { (oppId, won) ->
                     Triple(oppId, state.entrant(oppId)?.name.orEmpty(), won)
                 }
-                MatchRepository.pushBracketUpdate(performer, proposal.newRating, matches)
+                try {
+                    MatchRepository.pushBracketUpdate(performer, proposal.newRating, matches)
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (e: Exception) {
+                    // Deleted on the server since the draw: nothing left to rate, and no save
+                    // could ever succeed. It must not hold up the next tournament.
+                    if (MatchRepository.performerIsGone(proposal.id)) {
+                        bracketProposals = bracketProposals.filterNot { it.id == proposal.id }
+                        state = state.copy(appliedIds = state.appliedIds + proposal.id)
+                        bracket = state
+                        bracketAppliedCount = state.appliedIds.size
+                        MatchBracketStore.save(state)
+                        continue
+                    }
+                    failedCount++
+                    if (firstFailure == null) firstFailure = "${proposal.name}: ${errorText(e)}"
+                    continue
+                }
                 state = state.copy(appliedIds = state.appliedIds + proposal.id)
                 bracket = state
                 bracketAppliedCount = state.appliedIds.size
                 MatchBracketStore.save(state)
             }
-            haptic(MatchHaptic.Success)
+            if (firstFailure != null) {
+                errorMessage = "$failedCount of ${bracketProposals.size} ratings not saved. $firstFailure"
+            } else {
+                haptic(MatchHaptic.Success)
+            }
             if (section == Section.Leaderboard) refreshLeaderboard()
         } catch (e: CancellationException) {
             throw e

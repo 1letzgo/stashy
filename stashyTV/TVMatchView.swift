@@ -18,6 +18,7 @@ struct TVMatchView: View {
     @Environment(\.tvContentWidth) private var contentWidth
     /// A pop back from a performer page must not draw a new pair.
     @State private var didRunInitialLoad = false
+    @State private var confirmEndBracket = false
     /// `true` = left card, `false` = right card. Entering the screen lands on the left card.
     @FocusState private var focusedCard: Bool?
 
@@ -306,13 +307,21 @@ struct TVMatchView: View {
                     Text("Saving ratings \(model.bracketAppliedCount)/\(model.bracketProposals.count)")
                         .font(.headline)
                         .foregroundStyle(.secondary)
-                } else if !model.bracketProposals.isEmpty {
+                } else {
                     actionButton("Retry", icon: "arrow.clockwise") {
-                        Task { await model.applyBracket() }
+                        Task { await model.retryBracketSave() }
+                    }
+                    actionButton("End", icon: "xmark") {
+                        confirmEndBracket = true
                     }
                 }
             }
             .focusSection()
+            .confirmationDialog("End tournament?", isPresented: $confirmEndBracket, titleVisibility: .visible) {
+                Button("End tournament", role: .destructive) { model.newBracket() }
+            } message: {
+                Text("Ratings that were not saved are lost.")
+            }
 
             if model.isLoadingBracketResults && model.bracketProposals.isEmpty {
                 loadingBox("Calculating ratings…")
