@@ -308,3 +308,48 @@ class SceneRepository: SceneRepositoryProtocol {
         }
     }
 }
+
+// MARK: - Production date (Stash 0.32+)
+
+/// Kept out of the scene fragments: older servers reject a whole query over the unknown field.
+enum SceneProductionDate {
+    /// Stash stores a partial date with its precision: `2024`, `2024-05` or `2024-05-17`.
+    static func isValid(_ text: String) -> Bool {
+        text.isEmpty || text.range(of: #"^\d{4}(-\d{2}(-\d{2})?)?$"#, options: .regularExpression) != nil
+    }
+
+    private struct FetchResponse: Decodable {
+        struct DataContainer: Decodable {
+            struct SceneDate: Decodable { let production_date: String? }
+            let findScene: SceneDate?
+        }
+        let data: DataContainer?
+    }
+
+    private struct UpdateResponse: Decodable {
+        struct DataContainer: Decodable {
+            struct Updated: Decodable { let id: String }
+            let sceneUpdate: Updated?
+        }
+        let data: DataContainer?
+    }
+
+    static func fetch(sceneId: String) async -> String? {
+        guard StashServerCapabilities.supports032 else { return nil }
+        let response: FetchResponse? = try? await GraphQLClient.shared.execute(
+            query: GraphQLQueries.loadQuery(named: "findSceneProductionDate"),
+            variables: ["id": sceneId]
+        )
+        return response?.data?.findScene?.production_date
+    }
+
+    /// An empty `date` clears the field.
+    static func update(sceneId: String, date: String) async -> Bool {
+        let input: [String: Any] = ["id": sceneId, "production_date": date.isEmpty ? NSNull() : date]
+        let response: UpdateResponse? = try? await GraphQLClient.shared.execute(
+            query: GraphQLQueries.loadQuery(named: "sceneUpdateProductionDate"),
+            variables: ["input": input]
+        )
+        return response?.data?.sceneUpdate != nil
+    }
+}

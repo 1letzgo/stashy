@@ -15,6 +15,8 @@ struct TVStudioDetailView: View {
     @StateObject private var viewModel = StashDBViewModel()
     @State private var studio: Studio?
     @State private var isLoadingStudio = true
+    @ObservedObject private var studioCounts = StudioCountsStore.shared
+    @AppStorage(StudioCountsStore.includeSubStudiosKey) private var includeSubStudios = false
     // Nur beim ersten Erscheinen laden — ein Pop zurück darf die nachgeladenen
     // Seiten (und damit Scroll-Position/Fokus) nicht auf Seite 1 zurücksetzen.
     @State private var didLoad = false
@@ -38,16 +40,22 @@ struct TVStudioDetailView: View {
             hasMoreScenes: viewModel.hasMoreStudioScenes,
             loadMoreScenes: { viewModel.loadMoreStudioScenes(studioId: studioId) },
             infoGrid: { studio in
+                let counts = studioCounts.display(for: studio, includeSubStudios: includeSubStudios)
                 LazyVGrid(columns: TVGridSpec.infoColumns, alignment: .leading, spacing: 12) {
                     Text("Scenes").font(.title3).foregroundStyle(.secondary)
-                    Text("\(studio.sceneCount)").font(.title3).foregroundColor(.white)
+                    Text("\(counts.scenes)").font(.title3).foregroundColor(.white)
 
-                    if let performerCount = studio.performerCount, performerCount > 0 {
+                    if let oCount = counts.oCount, oCount > 0 {
+                        Text("O Count").font(.title3).foregroundStyle(.secondary)
+                        Text("\(oCount)").font(.title3).foregroundColor(.white)
+                    }
+
+                    if let performerCount = counts.performers, performerCount > 0 {
                         Text("Performers").font(.title3).foregroundStyle(.secondary)
                         Text("\(performerCount)").font(.title3).foregroundColor(.white)
                     }
 
-                    if let galleryCount = studio.galleryCount, galleryCount > 0 {
+                    if let galleryCount = counts.galleries, galleryCount > 0 {
                         Text("Galleries").font(.title3).foregroundStyle(.secondary)
                         Text("\(galleryCount)").font(.title3).foregroundColor(.white)
                     }
@@ -73,6 +81,7 @@ struct TVStudioDetailView: View {
                             .lineLimit(1)
                     }
                 }
+                .task(id: studio.id) { studioCounts.request(studio.id, refresh: true) }
             },
             additionalContent: { EmptyView() }
         )

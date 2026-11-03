@@ -46,10 +46,12 @@ object DetailFormatting {
     }
 
     /** iOS `StudioDetailView.getStudioDetails` (URL is shown on its own row). */
-    fun studio(s: Studio, scenes: Int, galleries: Int): List<DetailItem> {
-        val list = mutableListOf(DetailItem("SCENES", "$scenes"))
-        if (galleries > 0) list += DetailItem("GALLERIES", "$galleries")
-        s.performerCount?.takeIf { it > 0 }?.let { list += DetailItem("PERFORMERS", "$it") }
+    fun studio(s: Studio, scenes: Int, galleries: Int, counts: de.letzgo.stashy.data.StudioDisplayCounts? = null): List<DetailItem> {
+        val allCounts = counts?.takeIf { de.letzgo.stashy.data.StudioCountsStore.includeSubStudios }
+        val list = mutableListOf(DetailItem("SCENES", "${allCounts?.scenes ?: scenes}"))
+        (allCounts?.galleries ?: galleries).takeIf { it > 0 }?.let { list += DetailItem("GALLERIES", "$it") }
+        (counts?.performers ?: s.performerCount)?.takeIf { it > 0 }?.let { list += DetailItem("PERFORMERS", "$it") }
+        counts?.oCount?.takeIf { it > 0 }?.let { list += DetailItem("O COUNT", "$it") }
         s.rating100?.let { list += DetailItem("RATING", "$it%") }
         return list
     }

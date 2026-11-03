@@ -436,6 +436,7 @@ struct SceneDetailMetadataCard: View {
     @ObservedObject var viewModel: StashDBViewModel
     @ObservedObject var appearanceManager = AppearanceManager.shared
     @State private var showingEditTitleSheet = false
+    @State private var productionDate: String?
 
     var onSeek: (Double) -> Void
     var onTitleUpdated: ((String?, String?) -> Void)?
@@ -499,10 +500,15 @@ struct SceneDetailMetadataCard: View {
                 // by editing the name it already shows, rather than an empty field.
                 currentTitle: activeScene.displayTitle,
                 currentDetails: activeScene.details,
-                viewModel: viewModel
+                currentProductionDate: productionDate,
+                viewModel: viewModel,
+                onProductionDateSaved: { productionDate = $0 }
             ) { newTitle, newDetails in
                 onTitleUpdated?(newTitle, newDetails)
             }
+        }
+        .task(id: activeScene.id) {
+            productionDate = await SceneProductionDate.fetch(sceneId: activeScene.id)
         }
     }
 
@@ -525,6 +531,12 @@ struct SceneDetailMetadataCard: View {
                 ratingMenu
             }
             .frame(maxWidth: .infinity)
+
+            if let productionDate, !productionDate.isEmpty {
+                Text("Produced \(productionDate)")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+            }
         }
     }
 
@@ -872,14 +884,18 @@ struct EditSceneTitleSheet: View {
     let sceneId: String
     let currentTitle: String?
     let currentDetails: String?
+    var currentProductionDate: String? = nil
     @ObservedObject var viewModel: StashDBViewModel
+    var onProductionDateSaved: (String?) -> Void = { _ in }
     var onComplete: (String?, String?) -> Void
 
     @Environment(\.stashyDismiss) var dismiss
     @ObservedObject var appearanceManager = AppearanceManager.shared
     @State private var title: String = ""
     @State private var details: String = ""
+    @State private var productionDate: String = ""
     @State private var isSaving = false
+    private let showsProductionDate = StashServerCapabilities.supports032
 
     var body: some View {
         NavigationView {
@@ -894,6 +910,14 @@ struct EditSceneTitleSheet: View {
                         .frame(minHeight: 120)
                 }
                 .listRowBackground(Color.secondaryAppBackground)
+
+                if showsProductionDate {
+                    Section(header: Text("Production Date")) {
+                        TextField("YYYY-MM-DD", text: $productionDate)
+                            .keyboardType(.numbersAndPunctuation)
+                    }
+                    .listRowBackground(Color.secondaryAppBackground)
+                }
             }
             .applyAppBackground()
             .scrollContentBackground(.hidden)
@@ -903,18 +927,29 @@ struct EditSceneTitleSheet: View {
             .onAppear {
                 title = currentTitle ?? ""
                 details = currentDetails ?? ""
+                productionDate = currentProductionDate ?? ""
             }
         }
     }
 
     private func save() {
+        let newDate = productionDate.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !showsProductionDate || SceneProductionDate.isValid(newDate) else {
+            ToastManager.shared.show("Use YYYY, YYYY-MM or YYYY-MM-DD", icon: "exclamationmark.triangle", style: .error)
+            return
+        }
         isSaving = true
         let newTitle: String? = title.isEmpty ? nil : title
         let newDetails: String? = details.isEmpty ? nil : details
         viewModel.updateSceneTitleAndDetails(sceneId: sceneId, title: newTitle, details: newDetails) { success in
-            DispatchQueue.main.async {
+            Task { @MainActor in
+                var saved = success
+                if saved, showsProductionDate, newDate != (currentProductionDate ?? "") {
+                    saved = await SceneProductionDate.update(sceneId: sceneId, date: newDate)
+                    if saved { onProductionDateSaved(newDate.isEmpty ? nil : newDate) }
+                }
                 isSaving = false
-                if success {
+                if saved {
                     onComplete(newTitle, newDetails)
                     dismiss()
                 } else {

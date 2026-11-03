@@ -121,6 +121,7 @@ fun AppShell() {
     val p = Theme.palette
     // iOS `ServerConfigChanged`: a switch (or removing the server) ends the mini player.
     val activeServerId = ServerConfigManager.activeConfig?.id
+    LaunchedEffect(activeServerId) { de.letzgo.stashy.data.ServerCapabilities.refresh(ServerConfigManager.activeConfig) }
     LaunchedEffect(activeServerId) {
         // Watchlist first: the restored mini player session checks it for "Playing".
         val switched = de.letzgo.stashy.data.WatchlistStore.onServerChanged(activeServerId)

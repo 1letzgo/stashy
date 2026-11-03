@@ -113,6 +113,14 @@ enum StashConnectionProbe {
         guard let http = response as? HTTPURLResponse else {
             return .failure("No response from the server.")
         }
+        // Stash 0.32+ refuses these before authentication, so "check the API key" would mislead.
+        let body = data.flatMap { String(data: $0, encoding: .utf8) }?.lowercased() ?? ""
+        if http.statusCode == 403, body.contains("public ip") {
+            return .failure("Stash refuses public IPs while it has no credentials. Set a username and password in Stash, or allow this IP with public_whitelist.")
+        }
+        if http.statusCode == 400, body.contains("invalid ip") {
+            return .failure("Stash rejected the reverse proxy in front of it. Add the proxy's IP to trusted_proxies in Stash's config.")
+        }
         if http.statusCode == 401 || http.statusCode == 403 {
             return .failure("Authentication failed — check the API key and custom headers.")
         }
@@ -538,4 +546,64 @@ class ServerConfigManager: ObservableObject {
         // Notify app to reset UI state
         NotificationCenter.default.post(name: NSNotification.Name("ServerConfigChanged"), object: nil)
     }
+}
+// MARK: - Server capabilities
+
+/// What the active server can answer. Stash rejects a whole query over one unknown field or sort,
+/// so anything newer than the oldest supported server is gated here. Unknown version = off.
+enum StashServerCapabilities {
+    private static let versionKeyPrefix = "stash_server_version_"
+
+    static func record(version: String, serverID: UUID) {
+        UserDefaults.standard.set(version, forKey: versionKeyPrefix + serverID.uuidString)
+    }
+
+    /// Asks the active server for its version without touching any view state.
+    static func refresh() async {
+        guard let id = ServerConfigManager.shared.activeConfig?.id else { return }
+        struct Response: Decodable {
+            struct DataContainer: Decodable {
+                struct Version: Decodable { let version: String? }
+                let version: Version
+            }
+            let data: DataContainer?
+        }
+        let response: Response? = try? await GraphQLClient.shared.execute(query: "{ version { version } }")
+        if let version = response?.data?.version.version, !version.isEmpty {
+            record(version: version, serverID: id)
+        }
+    }
+
+    /// `v0.32.0`, `0.32.0` and dev builds like `v0.32.0-1-g944dd694` → `[0, 32, 0]`.
+    static func parse(_ version: String) -> [Int]? {
+        let core = version.trimmingCharacters(in: .whitespacesAndNewlines)
+            .drop { $0 == "v" || $0 == "V" }
+            .prefix { $0.isNumber || $0 == "." }
+        let parts = core.split(separator: ".").compactMap { Int($0) }
+        return parts.count >= 2 ? parts : nil
+    }
+
+    static func isAtLeast032(_ version: String?) -> Bool {
+        guard let version, let parts = parse(version) else { return false }
+        return parts.lexicographicallyPrecedes([0, 32]) == false
+    }
+
+    /// Stash 0.32: `production_date`, recursive studio counts, tag count `depth`, new sorts.
+    static var supports032: Bool {
+        guard let id = ServerConfigManager.shared.activeConfig?.id else { return false }
+        return isAtLeast032(UserDefaults.standard.string(forKey: versionKeyPrefix + id.uuidString))
+    }
+}
+
+/// A sort option that some servers reject as an invalid sort.
+protocol StashVersionedSortOption {
+    var requiresStash032: Bool { get }
+}
+
+extension StashVersionedSortOption {
+    var isAvailableOnServer: Bool { !requiresStash032 || StashServerCapabilities.supports032 }
+}
+
+extension StashVersionedSortOption where Self: CaseIterable {
+    static var availableCases: [Self] { allCases.filter(\.isAvailableOnServer) }
 }

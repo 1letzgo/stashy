@@ -1,0 +1,6 @@
+mutation SceneUpdateProductionDate($input: SceneUpdateInput!) {
+  sceneUpdate(input: $input) {
+    id
+    production_date
+  }
+}

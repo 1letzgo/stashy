@@ -1,0 +1,6 @@
+query FindSceneProductionDate($id: ID!) {
+  findScene(id: $id) {
+    id
+    production_date
+  }
+}

@@ -148,7 +148,7 @@ private fun CountLabel(icon: ImageVector, count: Int) {
 
 /** Logo block (2.2:1, studio header grey) + name/count row (iOS `StudioCardView` / `TagCardView`). */
 @Composable
-private fun LogoCard(modifier: Modifier, onClick: (() -> Unit)?, name: String, scenes: Int?, galleries: Int?, alwaysShowScenes: Boolean, logo: @Composable BoxScope.() -> Unit) {
+private fun LogoCard(modifier: Modifier, onClick: (() -> Unit)?, name: String, scenes: Int?, galleries: Int?, alwaysShowScenes: Boolean, oCount: Int? = null, logo: @Composable BoxScope.() -> Unit) {
     val p = Theme.palette
     NativeCard(modifier.fillMaxWidth(), onClick = onClick) { Column(Modifier.fillMaxWidth()) {
         Box(Modifier.fillMaxWidth().aspectRatio(2.2f).background(p.studioHeader).clip(RoundedCornerShape(0.dp)), content = logo)
@@ -157,6 +157,7 @@ private fun LogoCard(modifier: Modifier, onClick: (() -> Unit)?, name: String, s
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 if (alwaysShowScenes || (scenes ?: 0) > 0) CountLabel(SF.film, scenes ?: 0)
                 if ((galleries ?: 0) > 0) CountLabel(SF.photoStack, galleries ?: 0)
+                if ((oCount ?: 0) > 0) CountLabel(de.letzgo.stashy.ui.oCounterIcon(de.letzgo.stashy.ui.Appearance.oCounterIcon, filled = true), oCount ?: 0)
             }
         }
     } }
@@ -165,7 +166,8 @@ private fun LogoCard(modifier: Modifier, onClick: (() -> Unit)?, name: String, s
 /** iOS: `StudioCardView`. */
 @Composable
 internal fun DetailStudioCard(studio: Studio, modifier: Modifier = Modifier, onClick: (() -> Unit)? = null) {
-    LogoCard(modifier, onClick, studio.name, studio.sceneCount, studio.galleryCount, true) {
+    val counts = de.letzgo.stashy.data.rememberStudioCounts(studio)
+    LogoCard(modifier, onClick, studio.name, counts.scenes, counts.galleries, true, counts.oCount) {
         StudioLogo(studio, Modifier.fillMaxSize().padding(start = 14.dp, end = 14.dp, top = 12.dp))
     }
 }

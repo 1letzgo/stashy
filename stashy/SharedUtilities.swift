@@ -478,14 +478,14 @@ func urlByRemovingApiKeyQuery(_ url: URL) -> URL {
     return comps.url ?? url
 }
 
-/// Redacted absolute string for logs (hides `apikey` values).
+/// Redacted absolute string for logs (hides `apikey` and signed-URL `signature` values).
 func redactedURLString(_ url: URL) -> String {
     guard var comps = URLComponents(url: url, resolvingAgainstBaseURL: false),
           let items = comps.queryItems, !items.isEmpty else {
         return url.absoluteString
     }
     comps.queryItems = items.map { item in
-        item.name.lowercased() == "apikey"
+        ["apikey", "signature"].contains(item.name.lowercased())
             ? URLQueryItem(name: item.name, value: "***")
             : item
     }

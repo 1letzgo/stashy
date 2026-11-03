@@ -138,7 +138,7 @@ enum SettingsTransfer {
         KeychainManager.syncEnabledKey,
     ]
     private static let excludedPrefixes = [
-        "stashy_plus_", "mini_player_last_", "cached", "SK", "revenuecat", "license",
+        "stashy_plus_", "mini_player_last_", "stash_server_version_", "cached", "SK", "revenuecat", "license",
         "passcode", "kPasscode", "NS", "Apple", "com.apple", "WebKit", "AK", "PK", "MSV",
     ]
 

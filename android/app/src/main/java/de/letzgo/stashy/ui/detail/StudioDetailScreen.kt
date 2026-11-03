@@ -134,7 +134,7 @@ class StudioDetailScreen(val studioId: String, val preview: Studio? = null, priv
         val url = s.imageURL?.takeIf { s.hasImage }
         DetailHeroCard(
             title = s.name,
-            items = DetailFormatting.studio(s, catalog.effectiveScenes.coerceAtLeast(s.sceneCount ?: 0), catalog.effectiveGalleries),
+            items = DetailFormatting.studio(s, catalog.effectiveScenes.coerceAtLeast(s.sceneCount ?: 0), catalog.effectiveGalleries, de.letzgo.stashy.data.rememberStudioCounts(s, refresh = true)),
             description = s.details?.takeIf { it.isNotEmpty() },
             expanded = expanded,
             onToggle = { expanded = !expanded },

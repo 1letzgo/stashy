@@ -126,14 +126,16 @@ fun PerformerCard(
 @Composable
 fun StudioCard(studio: Studio, modifier: Modifier = Modifier, onClick: (() -> Unit)? = null) {
     val p = Theme.palette
+    val counts = de.letzgo.stashy.data.rememberStudioCounts(studio)
     NativeCard(modifier.fillMaxWidth(), onClick = onClick) { Column(Modifier.fillMaxWidth()) {
         Box(Modifier.fillMaxWidth().aspectRatio(2.2f).background(p.studioHeader), contentAlignment = Alignment.Center) {
             StudioLogo(studio, Modifier.fillMaxSize().padding(start = 14.dp, end = 14.dp, top = 12.dp))
         }
         Row(Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             Text(studio.name, Modifier.weight(1f), style = NativeType.titleSmall, color = p.text, maxLines = scaledMaxLines(), overflow = TextOverflow.Ellipsis)
-            CountLabel(SF.film, studio.sceneCount ?: 0)
-            studio.galleryCount?.takeIf { it > 0 }?.let { CountLabel(SF.photoStack, it) }
+            CountLabel(SF.film, counts.scenes ?: 0)
+            counts.galleries?.takeIf { it > 0 }?.let { CountLabel(SF.photoStack, it) }
+            counts.oCount?.takeIf { it > 0 }?.let { CountLabel(de.letzgo.stashy.ui.oCounterIcon(de.letzgo.stashy.ui.Appearance.oCounterIcon, filled = true), it) }
         }
     } }
 }

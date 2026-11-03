@@ -88,7 +88,7 @@ object SettingsTransfer {
 
     /** iOS `excludedPrefixes` plus Android state: app lock, self-update, debug / beta switches. */
     private val excludedPrefixes = listOf(
-        "stashy_plus_", "mini_player_last_", "cached", "SK", "revenuecat", "license",
+        "stashy_plus_", "mini_player_last_", "stash_server_version_", "cached", "SK", "revenuecat", "license",
         "passcode", "kPasscode", "NS", "Apple", "com.apple", "WebKit", "AK", "PK", "MSV",
         "app_passcode", "app_update_", "downloads_notification_permission",
     )

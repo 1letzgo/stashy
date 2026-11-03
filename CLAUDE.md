@@ -138,6 +138,9 @@ The `stashy` target uses classic Xcode groups — update `project.pbxproj` in 4 
 - Per-server: `"<key>_<serverID>"` (dashboard rows, tab visibility, …)
 - Tint: `kTintColorRed`, `kTintColorGreen`, `kTintColorBlue`, `kTintColorAlpha`
 
+## Server Versions
+`StashServerCapabilities` (`ServerConfig.swift`; Android `ServerCapabilities` in `ServerConnection.kt`) stores the Stash version per server. Stash rejects a whole query over one unknown field or sort, so anything newer than the oldest supported server stays behind `supports032` (or a later check): give it its own `.graphql` query instead of extending a shared fragment, and mark sort options with `requiresStash032` (their `sortField` then falls back on older servers; menus use `availableCases`). Unknown version = off. Stash 0.32+ extras living apart from the fragments: `SceneProductionDate` and `StudioCountsStore` (one batched query for all visible studios).
+
 ## SSL and Local Servers
 `StashTrustDelegate.acceptsSelfSigned` decides which hosts may present a self-signed certificate: localhost, `.local`, private IPv4 ranges, Tailscale's 100.64.0.0/10 and private / link-local IPv6. No public domain is whitelisted; every other host gets standard TLS validation.
 

@@ -110,6 +110,10 @@ private fun SceneDetailContent(model: SceneDetailModel, openedFromMiniPlayer: Bo
     val scene = model.scene
     val lifecycle = LocalLifecycleOwner.current.lifecycle
     var sheet by remember { mutableStateOf<EditSheet?>(null) }
+    var productionDate by remember(model.scene.id) { mutableStateOf<String?>(null) }
+    LaunchedEffect(model.scene.id, de.letzgo.stashy.data.ServerCapabilities.supports032) {
+        productionDate = runCatching { de.letzgo.stashy.data.SceneEditing.productionDate(model.scene.id) }.getOrNull()
+    }
     PlayerWindow.ObservePictureInPicture()
 
     DisposableEffect(model) {
@@ -258,7 +262,7 @@ private fun SceneDetailContent(model: SceneDetailModel, openedFromMiniPlayer: Bo
                 @Composable
                 fun card(c: SceneDetailCard, modifier: Modifier) {
                     when (c) {
-                        SceneDetailCard.Details -> SceneCardContainer(modifier.fillMaxWidth()) { SceneMetadataCard(model) { sheet = EditSheet.Title } }
+                        SceneDetailCard.Details -> SceneCardContainer(modifier.fillMaxWidth()) { SceneMetadataCard(model, productionDate) { sheet = EditSheet.Title } }
                         SceneDetailCard.Heatmap -> if (scene.interactive == true && scene.hasFunscript) {
                             SceneHeatmapCard(
                                 scene.heatmapURL, scene.sceneDuration ?: 0.0, model.currentPlaybackTime,
@@ -291,7 +295,7 @@ private fun SceneDetailContent(model: SceneDetailModel, openedFromMiniPlayer: Bo
 
     // Sheets and alerts (iOS `SceneDetailAlertModifier`, `ScenePlayerExtrasSheetsModifier`).
     when (sheet) {
-        EditSheet.Title -> EditSceneTitleSheet(scene, { sheet = null }) { t, d -> model.applyEdit(model.scene.copy(title = t, details = d)) }
+        EditSheet.Title -> EditSceneTitleSheet(scene, { sheet = null }, productionDate, { productionDate = it }) { t, d -> model.applyEdit(model.scene.copy(title = t, details = d)) }
         EditSheet.Performers -> EditPerformersSheet(scene, { sheet = null }) { model.applyEdit(model.scene.copy(performers = it)) }
         EditSheet.Studio -> EditStudioSheet(scene, { sheet = null }) { model.applyEdit(model.scene.copy(studio = it)) }
         EditSheet.Groups -> EditGroupsSheet(scene, { sheet = null }) { model.applyEdit(model.scene.copy(groups = it)) }

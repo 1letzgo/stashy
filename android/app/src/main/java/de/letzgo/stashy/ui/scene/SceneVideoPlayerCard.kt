@@ -284,8 +284,9 @@ private fun MarkerStrip(markers: List<SceneMarker>, playing: Boolean, onSeek: (D
  * date · duration · play count · O-counter (tap +1, long-press "Remove one O" / reset) · rating.
  */
 @Composable
-fun SceneMetadataCard(model: SceneDetailModel, onEditTitle: () -> Unit) = SceneMetadataCardContent(
+fun SceneMetadataCard(model: SceneDetailModel, productionDate: String?, onEditTitle: () -> Unit) = SceneMetadataCardContent(
     scene = model.scene,
+    productionDate = productionDate,
     isExpanded = model.isHeaderExpanded,
     onToggleExpanded = { model.isHeaderExpanded = !model.isHeaderExpanded },
     onEditTitle = onEditTitle,
@@ -303,6 +304,7 @@ fun SceneMetadataCard(model: SceneDetailModel, onEditTitle: () -> Unit) = SceneM
 @Composable
 fun SceneMetadataCardContent(
     scene: de.letzgo.stashy.data.Scene,
+    productionDate: String? = null,
     isExpanded: Boolean,
     onToggleExpanded: () -> Unit,
     onEditTitle: (() -> Unit)?,
@@ -328,6 +330,7 @@ fun SceneMetadataCardContent(
                 ExpandChevron(isExpanded, Modifier.align(Alignment.BottomEnd), onToggleExpanded)
             }
         }
+        productionDate?.takeIf { it.isNotEmpty() }?.let { Text("Produced $it", style = IosTypography.caption, color = p.secondaryText) }
         // FlowRow: at large font scales the pills wrap onto a second line instead of squeezing
         // the last ones (rating / O) until their text clips.
         FlowRow(

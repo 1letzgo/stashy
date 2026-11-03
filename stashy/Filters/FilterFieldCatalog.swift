@@ -13,7 +13,8 @@ struct FilterFieldDescriptor: Identifiable, Hashable {
 enum FilterFieldCatalog {
     static func fields(for mode: StashDBViewModel.FilterMode) -> [FilterFieldDescriptor] {
         switch mode {
-        case .scenes: return sceneFields
+        case .scenes:
+            return StashServerCapabilities.supports032 ? sceneFields : sceneFields.filter { $0.key != "production_date" }
         case .performers: return performerFields
         case .studios: return studioFields
         case .galleries: return galleryFields

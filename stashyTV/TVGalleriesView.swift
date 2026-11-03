@@ -24,10 +24,10 @@ struct TVGalleriesView: View {
         _sortBy = State(initialValue: defaultSort)
     }
 
-    private static let sortOrder: [StashDBViewModel.GallerySortOption] = [.random, .titleAsc, .titleDesc, .dateDesc, .dateAsc, .imageCountDesc, .imageCountAsc, .ratingDesc, .ratingAsc, .createdAtDesc, .createdAtAsc, .updatedAtDesc, .updatedAtAsc]
+    private static let sortOrder: [StashDBViewModel.GallerySortOption] = [.random, .performerAgeDesc, .performerAgeAsc, .titleAsc, .titleDesc, .dateDesc, .dateAsc, .imageCountDesc, .imageCountAsc, .ratingDesc, .ratingAsc, .createdAtDesc, .createdAtAsc, .updatedAtDesc, .updatedAtAsc]
 
     private var sortOptions: [TVPickerOption<StashDBViewModel.GallerySortOption>] {
-        Self.sortOrder.map { TVPickerOption($0, label(for: $0)) }
+        Self.sortOrder.filter(\.isAvailableOnServer).map { TVPickerOption($0, label(for: $0)) }
     }
 
     var body: some View {
@@ -134,6 +134,7 @@ struct TVGalleriesView: View {
         case .updatedAtAsc: return "Least Recently Updated"
         case .imageCountDesc: return "Most Images"
         case .imageCountAsc: return "Least Images"
+        case .performerAgeDesc, .performerAgeAsc: return option.displayName
         case .random: return "Random"
         }
     }

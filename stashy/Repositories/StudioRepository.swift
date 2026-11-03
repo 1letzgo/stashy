@@ -403,3 +403,86 @@ final class LibraryCleanupRepository {
         return collected.map(\.candidate)
     }
 }
+
+// MARK: - Recursive studio counts (Stash 0.32+)
+
+struct StudioCounts: Decodable, Equatable {
+    let id: String
+    let o_count: Int
+    let o_count_all: Int
+    let scene_count_all: Int
+    let performer_count_all: Int
+    let gallery_count_all: Int
+}
+
+/// What a studio card shows. `oCount` stays nil until the server has answered.
+struct StudioDisplayCounts {
+    let scenes: Int
+    let galleries: Int?
+    let performers: Int?
+    let oCount: Int?
+}
+
+/// Loads the counts of all visible studios in one query instead of one per card. Separate from
+/// `StudioFields` because older servers reject `o_counter(depth:)`.
+final class StudioCountsStore: ObservableObject {
+    static let shared = StudioCountsStore()
+    static let includeSubStudiosKey = "studio_counts_include_sub_studios"
+    private static let batchSize = 100
+
+    @Published private(set) var counts: [String: StudioCounts] = [:]
+    private var pending: Set<String> = []
+    private var flushTask: Task<Void, Never>?
+    private var serverObserver: NSObjectProtocol?
+
+    private struct Response: Decodable {
+        struct DataContainer: Decodable {
+            struct Find: Decodable { let studios: [StudioCounts] }
+            let findStudios: Find
+        }
+        let data: DataContainer?
+    }
+
+    private init() {
+        serverObserver = NotificationCenter.default.addObserver(
+            forName: NSNotification.Name("ServerConfigChanged"), object: nil, queue: .main
+        ) { [weak self] _ in
+            Task { @MainActor in
+                self?.counts = [:]
+                self?.pending = []
+            }
+        }
+    }
+
+    /// `refresh`: ask again even when known (a detail page opening).
+    func request(_ id: String, refresh: Bool = false) {
+        guard StashServerCapabilities.supports032, refresh || counts[id] == nil else { return }
+        pending.insert(id)
+        guard flushTask == nil else { return }
+        flushTask = Task { @MainActor in
+            try? await Task.sleep(nanoseconds: 100_000_000)
+            await flush()
+            flushTask = nil
+        }
+    }
+
+    private func flush() async {
+        while !pending.isEmpty {
+            let ids = Array(pending.prefix(Self.batchSize))
+            pending.subtract(ids)
+            let response: Response? = try? await GraphQLClient.shared.execute(
+                query: GraphQLQueries.loadQuery(named: "findStudioCounts"),
+                variables: ["ids": ids, "filter": ["per_page": ids.count]]
+            )
+            for studio in response?.data?.findStudios.studios ?? [] { counts[studio.id] = studio }
+        }
+    }
+
+    func display(for studio: Studio, includeSubStudios: Bool) -> StudioDisplayCounts {
+        let known = counts[studio.id]
+        guard includeSubStudios, let known else {
+            return StudioDisplayCounts(scenes: studio.sceneCount, galleries: studio.galleryCount, performers: studio.performerCount, oCount: known?.o_count)
+        }
+        return StudioDisplayCounts(scenes: known.scene_count_all, galleries: known.gallery_count_all, performers: known.performer_count_all, oCount: known.o_count_all)
+    }
+}

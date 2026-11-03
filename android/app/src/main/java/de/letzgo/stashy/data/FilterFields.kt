@@ -123,7 +123,7 @@ object FilterFieldCatalog {
     )
 
     fun fields(mode: FilterMode): List<FilterFieldDescriptor> = when (mode) {
-        FilterMode.Scenes -> sceneFields
+        FilterMode.Scenes -> if (ServerCapabilities.supports032) sceneFields else sceneFields.filter { it.key != "production_date" }
         FilterMode.Performers -> performerFields
         FilterMode.Studios -> studioFields
         FilterMode.Galleries -> galleryFields

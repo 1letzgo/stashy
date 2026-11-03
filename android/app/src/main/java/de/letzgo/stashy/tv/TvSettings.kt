@@ -483,6 +483,9 @@ private fun DefaultSortPage() {
                     if (i == 0) Modifier.focusRequester(first) else Modifier)
             }
         }
+        if (de.letzgo.stashy.data.ServerCapabilities.supports032) item {
+            TvToggleRow("Studio counts include sub-studios", de.letzgo.stashy.data.StudioCountsStore.includeSubStudios, { de.letzgo.stashy.data.StudioCountsStore.includeSubStudios = it })
+        }
     }
 }
 

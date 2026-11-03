@@ -612,6 +612,7 @@ class StashDBViewModel: ObservableObject {
         isInitializing = true
         
         AppLog.debug("🚀 Starting staggered server initialization...")
+        Task { await StashServerCapabilities.refresh() }
         
         // 1. First, fetch saved filters as they are needed for dashboard row queries
         fetchSavedFilters { [weak self] success in
@@ -1059,7 +1060,7 @@ class StashDBViewModel: ObservableObject {
     @Published var currentGalleryPage: Int = 1
     
     // Gallery Sort Options
-    enum GallerySortOption: String, CaseIterable {
+    enum GallerySortOption: String, CaseIterable, StashVersionedSortOption {
         case titleAsc
         case titleDesc
         case dateDesc
@@ -1072,7 +1073,11 @@ class StashDBViewModel: ObservableObject {
         case updatedAtAsc
         case imageCountDesc
         case imageCountAsc
+        case performerAgeDesc
+        case performerAgeAsc
         case random
+
+        var requiresStash032: Bool { self == .performerAgeDesc || self == .performerAgeAsc }
 
         var displayName: String {
             switch self {
@@ -1088,18 +1093,21 @@ class StashDBViewModel: ObservableObject {
             case .updatedAtAsc: return "Updated (Oldest)"
             case .imageCountDesc: return "Image Count (High-Low)"
             case .imageCountAsc: return "Image Count (Low-High)"
+            case .performerAgeDesc: return "Performer Age (Oldest First)"
+            case .performerAgeAsc: return "Performer Age (Youngest First)"
             case .random: return "Random"
             }
         }
 
         var direction: String {
             switch self {
-            case .titleAsc, .dateAsc, .ratingAsc, .createdAtAsc, .updatedAtAsc, .imageCountAsc: return "ASC"
-            case .titleDesc, .dateDesc, .ratingDesc, .createdAtDesc, .updatedAtDesc, .imageCountDesc, .random: return "DESC"
+            case .titleAsc, .dateAsc, .ratingAsc, .createdAtAsc, .updatedAtAsc, .imageCountAsc, .performerAgeAsc: return "ASC"
+            case .titleDesc, .dateDesc, .ratingDesc, .createdAtDesc, .updatedAtDesc, .imageCountDesc, .performerAgeDesc, .random: return "DESC"
             }
         }
 
         var sortField: String {
+            if !isAvailableOnServer { return "date" }
             switch self {
             case .titleAsc, .titleDesc: return "title"
             case .dateDesc, .dateAsc: return "date"
@@ -1107,6 +1115,7 @@ class StashDBViewModel: ObservableObject {
             case .createdAtDesc, .createdAtAsc: return "created_at"
             case .updatedAtDesc, .updatedAtAsc: return "updated_at"
             case .imageCountDesc, .imageCountAsc: return "images_count"
+            case .performerAgeDesc, .performerAgeAsc: return "performer_age"
             case .random: return "random"
             }
         }
@@ -1203,7 +1212,7 @@ class StashDBViewModel: ObservableObject {
     }
 
     // Image Sort Options
-    enum ImageSortOption: String, CaseIterable {
+    enum ImageSortOption: String, CaseIterable, StashVersionedSortOption {
         case titleAsc
         case titleDesc
         case dateDesc
@@ -1214,7 +1223,11 @@ class StashDBViewModel: ObservableObject {
         case createdAtAsc
         case updatedAtDesc
         case updatedAtAsc
+        case performerAgeDesc
+        case performerAgeAsc
         case random
+
+        var requiresStash032: Bool { self == .performerAgeDesc || self == .performerAgeAsc }
         
         var displayName: String {
             switch self {
@@ -1228,24 +1241,28 @@ class StashDBViewModel: ObservableObject {
             case .createdAtAsc: return "Created (Oldest)"
             case .updatedAtDesc: return "Updated (Newest)"
             case .updatedAtAsc: return "Updated (Oldest)"
+            case .performerAgeDesc: return "Performer Age (Oldest First)"
+            case .performerAgeAsc: return "Performer Age (Youngest First)"
             case .random: return "Random"
             }
         }
         
         var direction: String {
             switch self {
-            case .titleAsc, .dateAsc, .ratingAsc, .createdAtAsc, .updatedAtAsc: return "ASC"
-            case .titleDesc, .dateDesc, .ratingDesc, .createdAtDesc, .updatedAtDesc, .random: return "DESC"
+            case .titleAsc, .dateAsc, .ratingAsc, .createdAtAsc, .updatedAtAsc, .performerAgeAsc: return "ASC"
+            case .titleDesc, .dateDesc, .ratingDesc, .createdAtDesc, .updatedAtDesc, .performerAgeDesc, .random: return "DESC"
             }
         }
         
         var sortField: String {
+            if !isAvailableOnServer { return "date" }
             switch self {
             case .titleAsc, .titleDesc: return "title"
             case .dateDesc, .dateAsc: return "date"
             case .ratingDesc, .ratingAsc: return "rating"
             case .createdAtDesc, .createdAtAsc: return "created_at"
             case .updatedAtDesc, .updatedAtAsc: return "updated_at"
+            case .performerAgeDesc, .performerAgeAsc: return "performer_age"
             case .random: return "random"
             }
         }
@@ -1260,6 +1277,7 @@ class StashDBViewModel: ObservableObject {
             switch f {
             case "title": self = isAsc ? .titleAsc : .titleDesc
             case "date": self = isAsc ? .dateAsc : .dateDesc
+            case "performer_age": self = isAsc ? .performerAgeAsc : .performerAgeDesc
             case "rating", "rating100": self = isAsc ? .ratingAsc : .ratingDesc
             case "created_at": self = isAsc ? .createdAtAsc : .createdAtDesc
             case "updated_at": self = isAsc ? .updatedAtAsc : .updatedAtDesc
@@ -1338,7 +1356,7 @@ class StashDBViewModel: ObservableObject {
     }
 
     // Studio sort options
-    enum StudioSortOption: String, CaseIterable, DisplayNameProvider {
+    enum StudioSortOption: String, CaseIterable, DisplayNameProvider, StashVersionedSortOption {
         case random
         case nameAsc
         case nameDesc
@@ -1356,6 +1374,24 @@ class StashDBViewModel: ObservableObject {
         case galleryCountAsc
         case imageCountDesc
         case imageCountAsc
+        case oCounterDesc
+        case oCounterAsc
+        case oCounterAllDesc
+        case oCounterAllAsc
+        case performerCountAllDesc
+        case performerCountAllAsc
+        case markerCountDesc
+        case markerCountAsc
+
+        var requiresStash032: Bool {
+            switch self {
+            case .performerCountDesc, .performerCountAsc, .oCounterDesc, .oCounterAsc, .oCounterAllDesc, .oCounterAllAsc,
+                 .performerCountAllDesc, .performerCountAllAsc, .markerCountDesc, .markerCountAsc:
+                return true
+            default:
+                return false
+            }
+        }
 
         var displayName: String {
             switch self {
@@ -1375,18 +1411,27 @@ class StashDBViewModel: ObservableObject {
             case .galleryCountAsc: return "Gallery Count (Low-High)"
             case .imageCountDesc: return "Image Count (High-Low)"
             case .imageCountAsc: return "Image Count (Low-High)"
+            case .oCounterDesc: return "O Count (High-Low)"
+            case .oCounterAsc: return "O Count (Low-High)"
+            case .oCounterAllDesc: return "O Count incl. Sub-Studios (High-Low)"
+            case .oCounterAllAsc: return "O Count incl. Sub-Studios (Low-High)"
+            case .performerCountAllDesc: return "Performer Count incl. Sub-Studios (High-Low)"
+            case .performerCountAllAsc: return "Performer Count incl. Sub-Studios (Low-High)"
+            case .markerCountDesc: return "Marker Count (High-Low)"
+            case .markerCountAsc: return "Marker Count (Low-High)"
             case .random: return "Random"
             }
         }
 
         var direction: String {
             switch self {
-            case .nameAsc, .sceneCountAsc, .updatedAtAsc, .createdAtAsc, .ratingAsc, .performerCountAsc, .galleryCountAsc, .imageCountAsc: return "ASC"
-            case .nameDesc, .sceneCountDesc, .updatedAtDesc, .createdAtDesc, .ratingDesc, .performerCountDesc, .galleryCountDesc, .imageCountDesc, .random: return "DESC"
+            case .nameAsc, .sceneCountAsc, .updatedAtAsc, .createdAtAsc, .ratingAsc, .performerCountAsc, .galleryCountAsc, .imageCountAsc, .oCounterAsc, .oCounterAllAsc, .performerCountAllAsc, .markerCountAsc: return "ASC"
+            case .nameDesc, .sceneCountDesc, .updatedAtDesc, .createdAtDesc, .ratingDesc, .performerCountDesc, .galleryCountDesc, .imageCountDesc, .oCounterDesc, .oCounterAllDesc, .performerCountAllDesc, .markerCountDesc, .random: return "DESC"
             }
         }
 
         var sortField: String {
+            if !isAvailableOnServer { return "name" }
             switch self {
             case .nameAsc, .nameDesc: return "name"
             case .sceneCountAsc, .sceneCountDesc: return "scenes_count"
@@ -1396,17 +1441,23 @@ class StashDBViewModel: ObservableObject {
             case .performerCountAsc, .performerCountDesc: return "performer_count"
             case .galleryCountAsc, .galleryCountDesc: return "galleries_count"
             case .imageCountAsc, .imageCountDesc: return "images_count"
+            case .oCounterDesc, .oCounterAsc: return "o_counter"
+            case .oCounterAllDesc, .oCounterAllAsc: return "o_counter_all"
+            case .performerCountAllDesc, .performerCountAllAsc: return "performer_count_all"
+            case .markerCountDesc, .markerCountAsc: return "scene_markers_count"
             case .random: return "random"
             }
         }
     }
 
     // Scene sort options
-    enum SceneSortOption: String, CaseIterable, DisplayNameProvider {
+    enum SceneSortOption: String, CaseIterable, DisplayNameProvider, StashVersionedSortOption {
         // ... (existing cases)
         case random
         case dateDesc
         case dateAsc
+        case productionDateDesc
+        case productionDateAsc
         case createdAtDesc
         case createdAtAsc
         case titleAsc
@@ -1428,13 +1479,16 @@ class StashDBViewModel: ObservableObject {
         case sceneNumberDesc
 
         /// Every option that works on any scene list — not the group-only scene number.
-        static var generalCases: [SceneSortOption] { allCases.filter { !$0.isGroupOnly } }
+        static var generalCases: [SceneSortOption] { availableCases.filter { !$0.isGroupOnly } }
+        var requiresStash032: Bool { self == .productionDateDesc || self == .productionDateAsc }
         var isGroupOnly: Bool { self == .sceneNumberAsc || self == .sceneNumberDesc }
 
         var displayName: String {
             switch self {
             case .dateDesc: return "Date (Newest First)"
             case .dateAsc: return "Date (Oldest First)"
+            case .productionDateDesc: return "Production Date (Newest First)"
+            case .productionDateAsc: return "Production Date (Oldest First)"
             case .createdAtDesc: return "Created (Newest First)"
             case .createdAtAsc: return "Created (Oldest First)"
             case .titleAsc: return "Title (A-Z)"
@@ -1459,6 +1513,8 @@ class StashDBViewModel: ObservableObject {
 
         var direction: String {
             switch self {
+            case .productionDateDesc: return "DESC"
+            case .productionDateAsc: return "ASC"
             case .dateDesc, .createdAtDesc, .durationDesc, .lastPlayedAtDesc, .playCountDesc, .playDurationDesc, .oCounterDesc, .ratingDesc, .random: return "DESC"
             case .dateAsc, .createdAtAsc, .titleAsc, .durationAsc, .lastPlayedAtAsc, .playCountAsc, .playDurationAsc, .oCounterAsc, .ratingAsc: return "ASC"
             case .titleDesc, .sceneNumberDesc: return "DESC"
@@ -1467,8 +1523,10 @@ class StashDBViewModel: ObservableObject {
         }
 
         var sortField: String {
+            if !isAvailableOnServer { return "date" }
             switch self {
             case .dateDesc, .dateAsc: return "date"
+            case .productionDateDesc, .productionDateAsc: return "production_date"
             case .createdAtDesc, .createdAtAsc: return "created_at"
             case .titleAsc, .titleDesc: return "title"
             case .durationDesc, .durationAsc: return "duration"
@@ -1491,6 +1549,7 @@ class StashDBViewModel: ObservableObject {
             let isAsc = direction.uppercased() == "ASC"
             switch f {
             case "date": self = isAsc ? .dateAsc : .dateDesc
+            case "production_date": self = isAsc ? .productionDateAsc : .productionDateDesc
             case "created_at": self = isAsc ? .createdAtAsc : .createdAtDesc
             case "title": self = isAsc ? .titleAsc : .titleDesc
             case "duration": self = isAsc ? .durationAsc : .durationDesc
@@ -2851,6 +2910,7 @@ class StashDBViewModel: ObservableObject {
                 let version = response.data?.version.version ?? "Unknown"
                 AppLog.debug("📱 Version erhalten: \(version)")
                 self?.serverStatus = "Connected - Version: \(version)"
+                StashServerCapabilities.record(version: version, serverID: customConfig.id)
                 self?.isServerConnected = true
                 self?.errorMessage = nil // Clear error on success
             }
@@ -9333,12 +9393,7 @@ struct Scene: Codable, Identifiable, Equatable {
 
     var funscriptURL: URL? {
         guard let path = paths?.funscript, let url = URL(string: path) else { return nil }
-        guard let config = ServerConfigManager.shared.activeConfig, let key = config.secureApiKey, !key.isEmpty else { return url }
-        var comps = URLComponents(url: url, resolvingAgainstBaseURL: false)
-        var items = comps?.queryItems ?? []
-        items.append(URLQueryItem(name: "apikey", value: key.trimmingCharacters(in: .whitespacesAndNewlines)))
-        comps?.queryItems = items
-        return comps?.url ?? url
+        return signedURL(url) // Stash 0.32+ already puts its key in this path.
     }
 
     /// Download source: always the signed original file (`paths.stream`).
@@ -9776,8 +9831,9 @@ struct SceneMarker: Codable, Identifiable, Equatable {
         return signedURL(URL(string: "\(config.baseURL)/scenemarker/\(id)/screenshot"))
     }
     
-    /// Server-generated marker clip. Markers are their own short file, never a
-    /// transcode of the scene, so this is unrelated to the scene's playback source.
+    /// Server-generated marker clip. Markers are their own file, never a transcode of the
+    /// scene, so this is unrelated to the scene's playback source. Up to 0.31 it stopped at
+    /// 20 s; from 0.32 it runs to the marker's end, so it can be long.
     var videoURL: URL? {
         let potentialURL: URL?
         if let streamPath = stream, let url = URL(string: streamPath) {

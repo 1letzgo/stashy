@@ -198,7 +198,7 @@ struct ReelsModeSettingsView: View {
         case .clips:
             let current = StashDBViewModel.ImageSortOption(rawValue: tabManager.getReelsDefaultSort(for: .clips) ?? "") ?? .random
             Menu {
-                ForEach(StashDBViewModel.ImageSortOption.allCases, id: \.self) { option in
+                ForEach(StashDBViewModel.ImageSortOption.availableCases, id: \.self) { option in
                     Button(action: { tabManager.setReelsDefaultSort(for: .clips, option: option.rawValue) }) {
                         HStack { Text(option.displayName); if option == current { Image(systemName: "checkmark") } }
                     }
@@ -222,7 +222,7 @@ struct ReelsModeSettingsView: View {
         case .pics:
             let current = StashDBViewModel.ImageSortOption(rawValue: tabManager.getReelsDefaultSort(for: .pics) ?? "") ?? .dateDesc
             Menu {
-                ForEach(StashDBViewModel.ImageSortOption.allCases, id: \.self) { option in
+                ForEach(StashDBViewModel.ImageSortOption.availableCases, id: \.self) { option in
                     Button(action: { tabManager.setReelsDefaultSort(for: .pics, option: option.rawValue) }) {
                         HStack { Text(option.displayName); if option == current { Image(systemName: "checkmark") } }
                     }

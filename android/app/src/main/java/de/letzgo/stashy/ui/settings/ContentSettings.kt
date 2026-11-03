@@ -235,6 +235,7 @@ private fun CatalogTabCard(tab: TabConfig, handle: Modifier) {
         CatalogCardColumnScope.from(tab.id)?.let { scope -> CardSettingRow("Display") { ColumnsMenu(scope) } }
         if (tab.id == AppTab.Images) CardSettingRow("Autoplay") { SettingsSwitch(TabManager.imagesFeedVideoAutoplay) { TabManager.imagesFeedVideoAutoplay = it } }
         if (tab.id == AppTab.Scenes) CardSettingRow("Studio Logos") { SettingsSwitch(TabManager.sceneCardsShowStudioLogo) { TabManager.sceneCardsShowStudioLogo = it } }
+        if (tab.id == AppTab.Studios && de.letzgo.stashy.data.ServerCapabilities.supports032) CardSettingRow("Counts incl. Sub-Studios") { SettingsSwitch(de.letzgo.stashy.data.StudioCountsStore.includeSubStudios) { de.letzgo.stashy.data.StudioCountsStore.includeSubStudios = it } }
         tab.id.filterMode?.let { m -> sortNames(m) to defaultSortFallback(tab.id, m) }?.let { (options, fallback) ->
             CardSettingRow("Default Sort") {
                 MenuValue(options, TabManager.getPersistentSortOption(tab.id) ?: fallback) { TabManager.setPersistentSortOption(tab.id, it) }

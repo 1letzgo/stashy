@@ -243,6 +243,13 @@ struct DashboardSettingsView: View {
                     .padding(.bottom, 4)
                 }
 
+                if tab.id == .studios, StashServerCapabilities.supports032 {
+                    settingRow("Counts incl. Sub-Studios") {
+                        StudioCountsSubStudiosToggle()
+                    }
+                    .padding(.bottom, 4)
+                }
+
                 settingRow("Default Sort") {
                     CatalogDefaultSortMenu(tab: tab.id)
                 }
@@ -302,12 +309,12 @@ struct CatalogDefaultSortMenu: View {
             )
         case .studios:
             sortMenu(
-                StashDBViewModel.StudioSortOption.allCases.map { ($0.rawValue, $0.displayName) },
+                StashDBViewModel.StudioSortOption.availableCases.map { ($0.rawValue, $0.displayName) },
                 fallback: StashDBViewModel.StudioSortOption.sceneCountDesc.rawValue
             )
         case .galleries:
             sortMenu(
-                StashDBViewModel.GallerySortOption.allCases.map { ($0.rawValue, $0.displayName) },
+                StashDBViewModel.GallerySortOption.availableCases.map { ($0.rawValue, $0.displayName) },
                 fallback: StashDBViewModel.GallerySortOption.dateDesc.rawValue
             )
         case .tags:
@@ -317,7 +324,7 @@ struct CatalogDefaultSortMenu: View {
             )
         case .images:
             sortMenu(
-                StashDBViewModel.ImageSortOption.allCases.map { ($0.rawValue, $0.displayName) },
+                StashDBViewModel.ImageSortOption.availableCases.map { ($0.rawValue, $0.displayName) },
                 fallback: StashDBViewModel.ImageSortOption.dateDesc.rawValue
             )
         case .groups:
@@ -396,6 +403,17 @@ struct CatalogCardColumnsMenu: View {
     }
 }
 
+private struct StudioCountsSubStudiosToggle: View {
+    @AppStorage(StudioCountsStore.includeSubStudiosKey) private var includeSubStudios = false
+    @ObservedObject var appearanceManager = AppearanceManager.shared
+
+    var body: some View {
+        Toggle("", isOn: $includeSubStudios)
+            .labelsHidden()
+            .tint(appearanceManager.tintColor)
+    }
+}
+
 private struct ImagesFeedAutoplayToggle: View {
     @AppStorage("images_feed_video_autoplay") private var videoAutoplay = true
     @ObservedObject var appearanceManager = AppearanceManager.shared
@@ -425,13 +443,13 @@ struct CatalogDetailSortMenu: View {
     var body: some View {
         if context == .gallery {
             sortMenu(
-                StashDBViewModel.ImageSortOption.allCases.map { ($0.rawValue, $0.displayName) },
+                StashDBViewModel.ImageSortOption.availableCases.map { ($0.rawValue, $0.displayName) },
                 fallback: StashDBViewModel.ImageSortOption.dateDesc.rawValue
             )
         } else {
             // Groups also sort by scene number (picked on the group page), so offer those too.
             let cases = context == .group
-                ? StashDBViewModel.SceneSortOption.allCases
+                ? StashDBViewModel.SceneSortOption.availableCases
                 : StashDBViewModel.SceneSortOption.generalCases
             sortMenu(
                 cases.map { ($0.rawValue, $0.displayName) },

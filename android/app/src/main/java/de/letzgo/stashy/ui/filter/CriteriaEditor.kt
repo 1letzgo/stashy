@@ -348,7 +348,11 @@ private fun CriterionEditorBody(document: CriteriaDocument, field: FilterFieldDe
     when (field.kind) {
         CriterionKind.boolean -> BoolRow(document.value(key, path).boolOrNull, { document.setCriterion(key, it?.let { b -> JsonPrimitive(b) }, path) }, onApply)
         CriterionKind.string -> StringRow(dict, setDict, suggestions = FilterFieldCatalog.valueSuggestions(key, document.mode), onChange = onApply)
-        CriterionKind.int, CriterionKind.hierarchicalCount -> NumericRow(dict, setDict, isFloat = false, onApply)
+        CriterionKind.int -> NumericRow(dict, setDict, isFloat = false, onApply)
+        CriterionKind.hierarchicalCount -> {
+            NumericRow(dict, setDict, isFloat = false, onApply)
+            if (de.letzgo.stashy.data.ServerCapabilities.supports032) CountDepthRow(dict, setDict, onApply)
+        }
         CriterionKind.float -> NumericRow(dict, setDict, isFloat = true, onApply)
         CriterionKind.date -> DateRow(dict, setDict, onApply)
         CriterionKind.timestamp -> StringRow(
@@ -472,6 +476,18 @@ private fun DateRow(value: JsonObject, set: (JsonObject) -> Unit, onChange: () -
         val two = mod?.needsSecondValue == true
         NativeDateField(text("value"), { setText("value", it) }, label = null, placeholder = if (two) "From (YYYY-MM-DD)" else "YYYY-MM-DD", onCommit = ::commitIfValid)
         if (two) NativeDateField(text("value2"), { setText("value2", it) }, label = null, placeholder = "To (YYYY-MM-DD)", onCommit = ::commitIfValid)
+    }
+}
+
+/** iOS: `FilterCountDepthRow` — off leaves `depth` out, so the filter stays valid on older servers. */
+@Composable
+private fun CountDepthRow(value: JsonObject, set: (JsonObject) -> Unit, onChange: () -> Unit) {
+    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+        Text("Include sub-tags", Modifier.weight(1f), color = Theme.palette.text)
+        androidx.compose.material3.Switch(value["depth"].numberOrNull == -1.0, { on ->
+            set(if (on) value.with("depth", JsonPrimitive(-1)) else value.without("depth"))
+            onChange()
+        })
     }
 }
 

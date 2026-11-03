@@ -24,10 +24,10 @@ struct TVScenesView: View {
         _sortBy = State(initialValue: sortBy ?? defaultSort)
     }
 
-    private static let sortOrder: [StashDBViewModel.SceneSortOption] = [.random, .dateDesc, .dateAsc, .createdAtDesc, .createdAtAsc, .lastPlayedAtDesc, .lastPlayedAtAsc, .titleAsc, .titleDesc, .durationDesc, .durationAsc, .playCountDesc, .playCountAsc, .oCounterDesc, .oCounterAsc, .ratingDesc, .ratingAsc]
+    private static let sortOrder: [StashDBViewModel.SceneSortOption] = [.random, .productionDateDesc, .productionDateAsc, .dateDesc, .dateAsc, .createdAtDesc, .createdAtAsc, .lastPlayedAtDesc, .lastPlayedAtAsc, .titleAsc, .titleDesc, .durationDesc, .durationAsc, .playCountDesc, .playCountAsc, .oCounterDesc, .oCounterAsc, .ratingDesc, .ratingAsc]
 
     private var sortOptions: [TVPickerOption<StashDBViewModel.SceneSortOption>] {
-        Self.sortOrder.map { TVPickerOption($0, label(for: $0)) }
+        Self.sortOrder.filter(\.isAvailableOnServer).map { TVPickerOption($0, label(for: $0)) }
     }
 
     var body: some View {
@@ -144,7 +144,7 @@ struct TVScenesView: View {
         case .ratingDesc: return "Highest Rated"
         case .ratingAsc: return "Lowest Rated"
         case .random: return "Random"
-        case .sceneNumberAsc, .sceneNumberDesc: return option.displayName
+        case .sceneNumberAsc, .sceneNumberDesc, .productionDateDesc, .productionDateAsc: return option.displayName
         }
     }
 }

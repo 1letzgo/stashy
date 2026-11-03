@@ -123,6 +123,7 @@ fun DashboardPerformerCard(performer: Performer, badge: PerformerBadge, width: D
 /** iOS: `HomeStudioCardView` — logo on the grey header, name + scene/gallery counts below. */
 @Composable
 fun DashboardStudioCard(studio: Studio, isLarge: Boolean, width: Dp, height: Dp, modifier: Modifier = Modifier, onClick: (() -> Unit)? = null) {
+    val counts = de.letzgo.stashy.data.rememberStudioCounts(studio)
     val p = Theme.palette
     val barHeight = if (isLarge) 40.dp else 34.dp
     NativeCard(modifier.size(width, height), shape = dashboardCardShape(isLarge), onClick = onClick) {
@@ -144,9 +145,9 @@ fun DashboardStudioCard(studio: Studio, isLarge: Boolean, width: Dp, height: Dp,
                 val style = if (isLarge) NativeType.labelMedium else NativeType.labelSmall
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(3.dp)) {
                     Icon(SF.film, null, tint = p.secondaryText, modifier = Modifier.size(iconSize))
-                    Text("${studio.sceneCount ?: 0}", style = style, color = p.secondaryText)
+                    Text("${counts.scenes ?: 0}", style = style, color = p.secondaryText)
                 }
-                studio.galleryCount?.takeIf { it > 0 }?.let { gc ->
+                counts.galleries?.takeIf { it > 0 }?.let { gc ->
                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(3.dp)) {
                         Icon(SF.photoStack, null, tint = p.secondaryText, modifier = Modifier.size(iconSize))
                         Text("$gc", style = style, color = p.secondaryText)

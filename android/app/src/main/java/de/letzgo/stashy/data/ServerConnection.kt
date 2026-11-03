@@ -1,5 +1,7 @@
 package de.letzgo.stashy.data
 
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.FormBody
@@ -35,8 +37,12 @@ object ServerConnection {
             }.build()
         try {
             probeClient.newCall(request).execute().use { r ->
-                if (r.code == 401 || r.code == 403) return@withContext Outcome.Failure("Authentication failed — check the API key and custom headers.")
                 val text = r.body?.string().orEmpty()
+                // Stash 0.32+ refuses these before authentication, so "check the API key" would mislead.
+                val body = text.lowercase()
+                if (r.code == 403 && "public ip" in body) return@withContext Outcome.Failure("Stash refuses public IPs while it has no credentials. Set a username and password in Stash, or allow this IP with public_whitelist.")
+                if (r.code == 400 && "invalid ip" in body) return@withContext Outcome.Failure("Stash rejected the reverse proxy in front of it. Add the proxy's IP to trusted_proxies in Stash's config.")
+                if (r.code == 401 || r.code == 403) return@withContext Outcome.Failure("Authentication failed — check the API key and custom headers.")
                 val root = runCatching { Json.parseToJsonElement(text).obj }.getOrNull()
                 val version = root?.get("data").obj?.get("version").obj?.get("version").stringOrNull
                 if (!version.isNullOrEmpty()) return@withContext Outcome.Stash(version)
@@ -86,4 +92,35 @@ private class MemoryCookieJar : CookieJar {
     private val cookies = mutableListOf<Cookie>()
     override fun saveFromResponse(url: HttpUrl, cookies: List<Cookie>) { this.cookies.addAll(cookies) }
     override fun loadForRequest(url: HttpUrl): List<Cookie> = cookies.filter { it.matches(url) }
+}
+
+/**
+ * iOS: `StashServerCapabilities`. Stash rejects a whole query over one unknown field or sort, so
+ * anything newer than the oldest supported server is gated here. Unknown version = off.
+ */
+object ServerCapabilities {
+    private const val VERSION_KEY_PREFIX = "stash_server_version_"
+
+    /** Compose state, so sort menus and editors follow a late answer. */
+    var supports032 by androidx.compose.runtime.mutableStateOf(false)
+        private set
+
+    fun isAtLeast032(version: String?): Boolean {
+        val parts = version?.trim()?.trimStart('v', 'V')?.takeWhile { it.isDigit() || it == '.' }
+            ?.split('.')?.mapNotNull { it.toIntOrNull() }.orEmpty()
+        if (parts.size < 2) return false
+        return parts[0] > 0 || parts[1] >= 32
+    }
+
+    /** Call on app start and on a server switch: the last known answer, then the server's own. */
+    suspend fun refresh(config: ServerConfig?) {
+        StudioCountsStore.clear()
+        supports032 = config != null && isAtLeast032(Prefs.string(VERSION_KEY_PREFIX + config.id))
+        if (config == null) return
+        val outcome = ServerConnection.probe(config.baseURL, config.apiKey, config.customHeaders)
+        if (outcome is ServerConnection.Outcome.Stash && ServerConfigManager.activeConfig?.id == config.id) {
+            Prefs.setString(VERSION_KEY_PREFIX + config.id, outcome.version)
+            supports032 = isAtLeast032(outcome.version)
+        }
+    }
 }

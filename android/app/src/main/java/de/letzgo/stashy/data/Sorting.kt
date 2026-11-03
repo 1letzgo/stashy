@@ -30,6 +30,7 @@ object SortCatalog {
     val scenes = listOf(
         o("random", "Random", "random", "DESC"),
         o("dateDesc", "Date (Newest First)", "date", "DESC"), o("dateAsc", "Date (Oldest First)", "date", "ASC"),
+        o("productionDateDesc", "Production Date (Newest First)", "production_date", "DESC"), o("productionDateAsc", "Production Date (Oldest First)", "production_date", "ASC"),
         o("createdAtDesc", "Created (Newest First)", "created_at", "DESC"), o("createdAtAsc", "Created (Oldest First)", "created_at", "ASC"),
         o("titleAsc", "Title (A-Z)", "title", "ASC"), o("titleDesc", "Title (Z-A)", "title", "DESC"),
         o("durationDesc", "Duration (Longest First)", "duration", "DESC"), o("durationAsc", "Duration (Shortest First)", "duration", "ASC"),
@@ -54,6 +55,7 @@ object SortCatalog {
         o("ratingDesc", "Rating (High-Low)", "rating", "DESC"), o("ratingAsc", "Rating (Low-High)", "rating", "ASC"),
         o("createdAtDesc", "Created (Newest)", "created_at", "DESC"), o("createdAtAsc", "Created (Oldest)", "created_at", "ASC"),
         o("updatedAtDesc", "Updated (Newest)", "updated_at", "DESC"), o("updatedAtAsc", "Updated (Oldest)", "updated_at", "ASC"),
+        o("performerAgeDesc", "Performer Age (Oldest First)", "performer_age", "DESC"), o("performerAgeAsc", "Performer Age (Youngest First)", "performer_age", "ASC"),
         o("random", "Random", "random", "DESC"),
     )
 
@@ -64,6 +66,7 @@ object SortCatalog {
         o("createdAtDesc", "Created (Newest)", "created_at", "DESC"), o("createdAtAsc", "Created (Oldest)", "created_at", "ASC"),
         o("updatedAtDesc", "Updated (Newest)", "updated_at", "DESC"), o("updatedAtAsc", "Updated (Oldest)", "updated_at", "ASC"),
         o("imageCountDesc", "Image Count (High-Low)", "images_count", "DESC"), o("imageCountAsc", "Image Count (Low-High)", "images_count", "ASC"),
+        o("performerAgeDesc", "Performer Age (Oldest First)", "performer_age", "DESC"), o("performerAgeAsc", "Performer Age (Youngest First)", "performer_age", "ASC"),
         o("random", "Random", "random", "DESC"),
     )
 
@@ -90,6 +93,10 @@ object SortCatalog {
         o("performerCountDesc", "Performer Count (High-Low)", "performer_count", "DESC"), o("performerCountAsc", "Performer Count (Low-High)", "performer_count", "ASC"),
         o("galleryCountDesc", "Gallery Count (High-Low)", "galleries_count", "DESC"), o("galleryCountAsc", "Gallery Count (Low-High)", "galleries_count", "ASC"),
         o("imageCountDesc", "Image Count (High-Low)", "images_count", "DESC"), o("imageCountAsc", "Image Count (Low-High)", "images_count", "ASC"),
+        o("oCounterDesc", "O Count (High-Low)", "o_counter", "DESC"), o("oCounterAsc", "O Count (Low-High)", "o_counter", "ASC"),
+        o("oCounterAllDesc", "O Count incl. Sub-Studios (High-Low)", "o_counter_all", "DESC"), o("oCounterAllAsc", "O Count incl. Sub-Studios (Low-High)", "o_counter_all", "ASC"),
+        o("performerCountAllDesc", "Performer Count incl. Sub-Studios (High-Low)", "performer_count_all", "DESC"), o("performerCountAllAsc", "Performer Count incl. Sub-Studios (Low-High)", "performer_count_all", "ASC"),
+        o("markerCountDesc", "Marker Count (High-Low)", "scene_markers_count", "DESC"), o("markerCountAsc", "Marker Count (Low-High)", "scene_markers_count", "ASC"),
     )
 
     val tags = listOf(
@@ -116,7 +123,19 @@ object SortCatalog {
         o("createdAtDesc", "Created (Newest First)", "created_at", "DESC"), o("createdAtAsc", "Created (Oldest First)", "created_at", "ASC"),
     )
 
-    fun choices(mode: FilterMode): List<SortOption> = when (mode) {
+    /** Sort fields older servers reject as invalid (iOS: `requiresStash032`). */
+    private fun requires032(mode: FilterMode, field: String): Boolean = when (mode) {
+        FilterMode.Scenes -> field == "production_date"
+        FilterMode.Images, FilterMode.Galleries -> field == "performer_age"
+        FilterMode.Studios -> field in setOf("performer_count", "performer_count_all", "o_counter", "o_counter_all", "scene_markers_count")
+        else -> false
+    }
+
+    private fun available(mode: FilterMode, field: String) = !requires032(mode, field) || ServerCapabilities.supports032
+
+    fun choices(mode: FilterMode): List<SortOption> = allChoices(mode).filter { available(mode, it.field) }
+
+    private fun allChoices(mode: FilterMode): List<SortOption> = when (mode) {
         FilterMode.Scenes -> scenes
         FilterMode.SceneMarkers -> markers
         FilterMode.Images -> images
@@ -163,9 +182,11 @@ object SortCatalog {
     }
 
     /** Field kinds offered by each sheet's sort picker, in iOS order. */
-    fun fieldKinds(mode: FilterMode): List<SortFieldKind> = when (mode) {
+    fun fieldKinds(mode: FilterMode): List<SortFieldKind> = allFieldKinds(mode).filter { available(mode, it.field) }
+
+    private fun allFieldKinds(mode: FilterMode): List<SortFieldKind> = when (mode) {
         FilterMode.Scenes -> listOf(
-            SortFieldKind("date", "Date"), SortFieldKind("created_at", "Created"), SortFieldKind("title", "Title"),
+            SortFieldKind("date", "Date"), SortFieldKind("production_date", "Production date"), SortFieldKind("created_at", "Created"), SortFieldKind("title", "Title"),
             SortFieldKind("duration", "Duration"), SortFieldKind("last_played_at", "Last played"), SortFieldKind("play_count", "Play count"),
             SortFieldKind("play_duration", "Watch time"), SortFieldKind("o_counter", "O Count"), SortFieldKind("rating", "Rating"),
             SortFieldKind("random", "Random"),
@@ -188,18 +209,19 @@ object SortCatalog {
         )
         FilterMode.Studios -> listOf(
             SortFieldKind("name", "Name"), SortFieldKind("scenes_count", "Scene count"), SortFieldKind("rating", "Rating"),
-            SortFieldKind("performer_count", "Performer count"), SortFieldKind("galleries_count", "Gallery count"),
-            SortFieldKind("images_count", "Image count"), SortFieldKind("updated_at", "Updated"), SortFieldKind("created_at", "Created"),
+            SortFieldKind("performer_count", "Performer count"), SortFieldKind("performer_count_all", "Performer count incl. sub-studios"),
+            SortFieldKind("o_counter", "O Count"), SortFieldKind("o_counter_all", "O Count incl. sub-studios"), SortFieldKind("scene_markers_count", "Marker count"),
+            SortFieldKind("galleries_count", "Gallery count"), SortFieldKind("images_count", "Image count"), SortFieldKind("updated_at", "Updated"), SortFieldKind("created_at", "Created"),
             SortFieldKind("random", "Random"),
         )
         FilterMode.Galleries -> listOf(
             SortFieldKind("title", "Title"), SortFieldKind("date", "Date"), SortFieldKind("rating", "Rating"),
             SortFieldKind("created_at", "Created"), SortFieldKind("updated_at", "Updated"), SortFieldKind("images_count", "Image count"),
-            SortFieldKind("random", "Random"),
+            SortFieldKind("performer_age", "Performer age"), SortFieldKind("random", "Random"),
         )
         FilterMode.Images -> listOf(
             SortFieldKind("title", "Title"), SortFieldKind("date", "Date"), SortFieldKind("rating", "Rating"),
-            SortFieldKind("created_at", "Created"), SortFieldKind("updated_at", "Updated"), SortFieldKind("random", "Random"),
+            SortFieldKind("created_at", "Created"), SortFieldKind("updated_at", "Updated"), SortFieldKind("performer_age", "Performer age"), SortFieldKind("random", "Random"),
         )
         FilterMode.Groups -> listOf(
             SortFieldKind("name", "Name"), SortFieldKind("scenes_count", "Scene count"), SortFieldKind("galleries_count", "Gallery count"),

@@ -1,0 +1,12 @@
+query FindStudioCounts($ids: [ID!], $filter: FindFilterType) {
+  findStudios(ids: $ids, filter: $filter) {
+    studios {
+      id
+      o_count: o_counter(depth: 0)
+      o_count_all: o_counter(depth: -1)
+      scene_count_all: scene_count(depth: -1)
+      performer_count_all: performer_count(depth: -1)
+      gallery_count_all: gallery_count(depth: -1)
+    }
+  }
+}

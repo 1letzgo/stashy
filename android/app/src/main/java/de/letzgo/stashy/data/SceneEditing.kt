@@ -23,6 +23,8 @@ object SceneQueries {
     const val sceneUpdateTags = "mutation SceneUpdate(\$input: SceneUpdateInput!) { sceneUpdate(input: \$input) { id tags { id name } } }"
     const val sceneUpdateGroups = "mutation SceneUpdate(\$input: SceneUpdateInput!) { sceneUpdate(input: \$input) { id groups { group { id name updated_at front_image_path } scene_index } } }"
     const val sceneUpdateGalleries = "mutation SceneUpdate(\$input: SceneUpdateInput!) { sceneUpdate(input: \$input) { id galleries { id title date image_count updated_at cover { id paths { thumbnail } } } } }"
+    const val findProductionDate = "query FindSceneProductionDate(\$id: ID!) { findScene(id: \$id) { id production_date } }"
+    const val sceneUpdateProductionDate = "mutation SceneUpdateProductionDate(\$input: SceneUpdateInput!) { sceneUpdate(input: \$input) { id production_date } }"
     const val sceneUpdateTitleDetails = "mutation SceneUpdate(\$input: SceneUpdateInput!) { sceneUpdate(input: \$input) { id title details } }"
     const val sceneUpdateCoverImage = "mutation SceneUpdate(\$input: SceneUpdateInput!) { sceneUpdate(input: \$input) { id } }"
     const val sceneMarkerCreate = "mutation SceneMarkerCreate(\$input: SceneMarkerCreateInput!) { sceneMarkerCreate(input: \$input) { id title seconds screenshot } }"
@@ -107,6 +109,20 @@ object SceneEditing {
 
     suspend fun updateTitleAndDetails(sceneId: String, title: String?, details: String?) {
         GraphQL.data(SceneQueries.sceneUpdateTitleDetails, input("id" to sceneId, "title" to title, "details" to details))
+    }
+
+    /** iOS: `SceneProductionDate.isValid` — Stash stores a partial date with its precision. */
+    fun isValidProductionDate(text: String) = text.isEmpty() || Regex("""\d{4}(-\d{2}(-\d{2})?)?""").matches(text)
+
+    /** iOS: `SceneProductionDate.fetch`. Kept out of the scene queries: older servers reject the field. */
+    suspend fun productionDate(sceneId: String): String? {
+        if (!ServerCapabilities.supports032) return null
+        return GraphQL.data(SceneQueries.findProductionDate, vars("id" to sceneId))["findScene"].obj?.get("production_date").stringOrNull
+    }
+
+    /** iOS: `SceneProductionDate.update`. An empty [date] clears the field. */
+    suspend fun updateProductionDate(sceneId: String, date: String) {
+        GraphQL.data(SceneQueries.sceneUpdateProductionDate, input("id" to sceneId, "production_date" to date.ifEmpty { null }))
     }
 
     suspend fun updatePerformers(sceneId: String, ids: List<String>) {

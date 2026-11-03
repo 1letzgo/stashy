@@ -847,6 +847,8 @@ struct StudioImageView: View {
 struct StudioRowView: View {
     let studio: Studio
     @ObservedObject private var appearance = AppearanceManager.shared
+    @ObservedObject private var studioCounts = StudioCountsStore.shared
+    @AppStorage(StudioCountsStore.includeSubStudiosKey) private var includeSubStudios = false
 
     var body: some View {
         HStack(spacing: 16) {
@@ -871,7 +873,7 @@ struct StudioRowView: View {
                 HStack(spacing: 4) {
                     Image(systemName: "film")
                         .font(.caption2)
-                    Text("\(studio.sceneCount) Scenes")
+                    Text("\(studioCounts.display(for: studio, includeSubStudios: includeSubStudios).scenes) Scenes")
                         .font(.caption)
                 }
                 .foregroundColor(.appAccent)
@@ -885,14 +887,18 @@ struct StudioRowView: View {
         .padding(.vertical, 12)
         .background(Color.secondaryAppBackground(for: appearance.currentTheme))
         .contentShape(Rectangle())
+        .task(id: studio.id) { studioCounts.request(studio.id) }
     }
 }
 
 struct StudioCardView: View {
     let studio: Studio
     @ObservedObject private var appearance = AppearanceManager.shared
+    @ObservedObject private var studioCounts = StudioCountsStore.shared
+    @AppStorage(StudioCountsStore.includeSubStudiosKey) private var includeSubStudios = false
 
     var body: some View {
+        let counts = studioCounts.display(for: studio, includeSubStudios: includeSubStudios)
         VStack(alignment: .leading, spacing: 0) {
             // Logo Block (Top)
             Color.studioHeaderGray(for: appearance.currentTheme)
@@ -920,16 +926,26 @@ struct StudioCardView: View {
                     HStack(spacing: 3) {
                         Image(systemName: "film")
                             .font(.system(size: 10))
-                        Text("\(studio.sceneCount)")
+                        Text("\(counts.scenes)")
                             .font(.system(size: 11, weight: .medium))
                     }
                     
                     // Galleries
-                    if let galleryCount = studio.galleryCount, galleryCount > 0 {
+                    if let galleryCount = counts.galleries, galleryCount > 0 {
                         HStack(spacing: 3) {
                             Image(systemName: "photo.stack")
                                 .font(.system(size: 10))
                             Text("\(galleryCount)")
+                                .font(.system(size: 11, weight: .medium))
+                        }
+                    }
+
+                    // O Count (Stash 0.32+)
+                    if let oCount = counts.oCount, oCount > 0 {
+                        HStack(spacing: 3) {
+                            Image(systemName: appearance.oCounterIcon)
+                                .font(.system(size: 10))
+                            Text("\(oCount)")
                                 .font(.system(size: 11, weight: .medium))
                         }
                     }
@@ -943,6 +959,7 @@ struct StudioCardView: View {
         .background(Color.secondaryAppBackground(for: appearance.currentTheme))
         .clipShape(RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.card))
         .cardShadow()
+        .task(id: studio.id) { studioCounts.request(studio.id) }
     }
 }
 

@@ -361,8 +361,13 @@ struct FilterCriteriaEditorView: View {
                 suggestions: FilterFieldCatalog.valueSuggestions(key: field.key, mode: document.mode),
                 onChange: applyChange
             )
-        case .int, .hierarchicalCount:
+        case .int:
             FilterNumericCriterionRow(value: dictBinding(for: field.key), isFloat: false, onChange: applyChange)
+        case .hierarchicalCount:
+            FilterNumericCriterionRow(value: dictBinding(for: field.key), isFloat: false, onChange: applyChange)
+            if StashServerCapabilities.supports032 {
+                FilterCountDepthRow(value: dictBinding(for: field.key), onChange: applyChange)
+            }
         case .float:
             FilterNumericCriterionRow(value: dictBinding(for: field.key), isFloat: true, onChange: applyChange)
         case .date:
@@ -904,6 +909,24 @@ struct FilterDateCriterionRow: View {
     private func commitIfValid() {
         guard value["value_text"] == nil, value["value2_text"] == nil else { return }
         onChange()
+    }
+}
+
+/// `HierarchicalCountInput.depth` (Stash 0.32+). Off leaves the key out, so the filter stays valid
+/// on older servers.
+struct FilterCountDepthRow: View {
+    @Binding var value: [String: Any]
+    var onChange: () -> Void
+
+    var body: some View {
+        Toggle("Include sub-tags", isOn: Binding(
+            get: { (value["depth"] as? NSNumber)?.intValue == -1 },
+            set: { include in
+                if include { value["depth"] = -1 } else { value.removeValue(forKey: "depth") }
+                onChange()
+            }
+        ))
+        .tint(AppearanceManager.shared.tintColor)
     }
 }
 

@@ -62,6 +62,9 @@ struct StudioDetailView: View {
 
     /// `filterPerformerId`: opened from that performer's page — its scenes, galleries and images
     /// start filtered on the performer.
+    @ObservedObject private var studioCounts = StudioCountsStore.shared
+    @AppStorage(StudioCountsStore.includeSubStudiosKey) private var includeSubStudios = false
+
     init(studio: Studio, filterPerformerId: String? = nil) {
         _studio = State(initialValue: studio)
         let sc = studio.sceneCount
@@ -413,6 +416,7 @@ struct StudioDetailView: View {
             }
         }
         .sceneLiveUpdates(using: viewModel)
+        .task(id: studio.id) { studioCounts.request(studio.id, refresh: true) }
         .sceneBulkDownloadDialog(
             isPresented: $showingSceneDownloadOptions,
             scope: .studio(id: studio.id),
@@ -825,16 +829,22 @@ struct StudioDetailView: View {
         var list: [(label: String, value: String)] = []
         
         // Add Scenes and Galleries as the first row (matching PerformerDetailView)
-        list.append((label: "SCENES", value: "\(effectiveScenesCount)"))
+        let counts = studioCounts.display(for: s, includeSubStudios: includeSubStudios)
+        list.append((label: "SCENES", value: "\(includeSubStudios ? counts.scenes : effectiveScenesCount)"))
         
-        if effectiveGalleriesCount > 0 {
-            list.append((label: "GALLERIES", value: "\(effectiveGalleriesCount)"))
+        let galleries = includeSubStudios ? (counts.galleries ?? 0) : effectiveGalleriesCount
+        if galleries > 0 {
+            list.append((label: "GALLERIES", value: "\(galleries)"))
         } else {
              // Optional: Add placeholder if needed for grid alignment, but usually fine to omit
         }
         
-        if let count = s.performerCount, count > 0 {
+        if let count = counts.performers, count > 0 {
             list.append((label: "PERFORMERS", value: "\(count)"))
+        }
+
+        if let oCount = counts.oCount, oCount > 0 {
+            list.append((label: "O COUNT", value: "\(oCount)"))
         }
 
         if let rating = s.rating100 {

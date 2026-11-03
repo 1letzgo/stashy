@@ -233,9 +233,11 @@ class TvStudioDetailRoute(private val id: String, private val name: String) : Tv
             },
         ) {
             if (s != null) {
-                TvInfoRow("Scenes", "${s.sceneCount ?: 0}")
-                s.performerCount?.takeIf { it > 0 }?.let { TvInfoRow("Performers", "$it") }
-                s.galleryCount?.takeIf { it > 0 }?.let { TvInfoRow("Galleries", "$it") }
+                val counts = de.letzgo.stashy.data.rememberStudioCounts(s, refresh = true)
+                TvInfoRow("Scenes", "${counts.scenes ?: 0}")
+                counts.oCount?.takeIf { it > 0 }?.let { TvInfoRow("O Count", "$it") }
+                counts.performers?.takeIf { it > 0 }?.let { TvInfoRow("Performers", "$it") }
+                counts.galleries?.takeIf { it > 0 }?.let { TvInfoRow("Galleries", "$it") }
                 s.rating100?.let { r -> TvInfoRow("Rating") { RatingValue(r) } }
                 if (s.favorite == true) TvInfoRow("Favorite") { Icon(TvIcons.heart, null, Modifier.size(pt(36)), tint = TvColors.red) }
                 s.url?.takeIf { it.isNotEmpty() }?.let { TvInfoRow("URL") { Text(it, style = TvType.callout, color = TvColors.tint, maxLines = 1, overflow = TextOverflow.Ellipsis) } }

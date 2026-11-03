@@ -106,21 +106,36 @@ private fun LoadingRow(text: String = "Loading...") {
 
 /** iOS: `EditSceneTitleSheet` ("Edit Scene": Title + Description). */
 @Composable
-fun EditSceneTitleSheet(scene: Scene, onDismiss: () -> Unit, onSaved: (String?, String?) -> Unit) {
+fun EditSceneTitleSheet(scene: Scene, onDismiss: () -> Unit, currentProductionDate: String? = null, onProductionDateSaved: (String?) -> Unit = {}, onSaved: (String?, String?) -> Unit) {
+    val showsProductionDate = de.letzgo.stashy.data.ServerCapabilities.supports032
+    var productionDate by remember { mutableStateOf(currentProductionDate.orEmpty()) }
     var title by remember { mutableStateOf(scene.displayTitle) }
     var details by remember { mutableStateOf(scene.details.orEmpty()) }
     var saving by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
     SceneModalSheet("Edit Scene", onDismiss, actionTitle = "Save", actionEnabled = !saving, actionBusy = saving, onAction = {
+        val newDate = productionDate.trim()
+        if (showsProductionDate && !SceneEditing.isValidProductionDate(newDate)) {
+            SceneToast.show("Use YYYY, YYYY-MM or YYYY-MM-DD", PlayerIcons.close, SceneToast.Style.Error)
+            return@SceneModalSheet
+        }
         saving = true
         val t = title.ifEmpty { null }; val d = details.ifEmpty { null }
         scope.launch {
-            if (runCatching { SceneEditing.updateTitleAndDetails(scene.id, t, d) }.isSuccess) { onSaved(t, d); onDismiss() }
+            val saved = runCatching {
+                SceneEditing.updateTitleAndDetails(scene.id, t, d)
+                if (showsProductionDate && newDate != currentProductionDate.orEmpty()) {
+                    SceneEditing.updateProductionDate(scene.id, newDate)
+                    onProductionDateSaved(newDate.ifEmpty { null })
+                }
+            }.isSuccess
+            if (saved) { onSaved(t, d); onDismiss() }
             else { saving = false; SceneToast.show("Failed to update scene", PlayerIcons.close, SceneToast.Style.Error) }
         }
     }) {
         FormSection("Title") { FormTextField(title, { title = it }, "Title", Modifier.fillMaxWidth()) }
         FormSection("Description") { FormTextField(details, { details = it }, "", Modifier.fillMaxWidth().heightIn(min = 120.dp), singleLine = false) }
+        if (showsProductionDate) FormSection("Production Date") { FormTextField(productionDate, { productionDate = it }, "YYYY-MM-DD", Modifier.fillMaxWidth()) }
     }
 }
 

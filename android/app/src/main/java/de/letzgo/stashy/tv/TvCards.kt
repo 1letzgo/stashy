@@ -158,11 +158,12 @@ fun TvPerformerCard(performer: Performer, onClick: () -> Unit, modifier: Modifie
 /** iOS: `TVStudioCardView` (410 × 230, logo fitted with 24 pt padding). */
 @Composable
 fun TvStudioCard(studio: Studio, onClick: () -> Unit, modifier: Modifier = Modifier) {
+    val counts = de.letzgo.stashy.data.rememberStudioCounts(studio)
     TvCardButton(onClick, modifier) {
         Box(Modifier.width(pt(410)).height(pt(230)).clip(RoundedCornerShape(pt(10))).background(TvColors.placeholder)) {
             TvImage(studio.imageURL?.takeIf { studio.hasImage }, Modifier.fillMaxSize().padding(pt(24)), TvIcons.building, Color.Transparent, ContentScale.Fit, pt(40))
             Box(Modifier.matchParentSize().background(cardGradient))
-            CountPill(studio.sceneCount)
+            CountPill(counts.scenes)
             Row(Modifier.align(Alignment.BottomStart).fillMaxWidth().padding(pt(12)), verticalAlignment = Alignment.Bottom) {
                 Text(studio.name, Modifier.weight(1f), style = TvType.body.copy(fontWeight = FontWeight.Bold), color = Color.White, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 studio.rating100?.let { TvRatingBadge(it, Modifier.padding(start = pt(12))) }

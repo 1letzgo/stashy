@@ -24,10 +24,10 @@ struct TVStudiosView: View {
         _sortBy = State(initialValue: defaultSort)
     }
 
-    private static let sortOrder: [StashDBViewModel.StudioSortOption] = [.random, .nameAsc, .nameDesc, .sceneCountDesc, .sceneCountAsc, .createdAtDesc, .createdAtAsc, .updatedAtDesc, .updatedAtAsc]
+    private static let sortOrder: [StashDBViewModel.StudioSortOption] = [.random, .performerCountDesc, .performerCountAsc, .performerCountAllDesc, .performerCountAllAsc, .oCounterDesc, .oCounterAsc, .oCounterAllDesc, .oCounterAllAsc, .markerCountDesc, .markerCountAsc, .nameAsc, .nameDesc, .sceneCountDesc, .sceneCountAsc, .createdAtDesc, .createdAtAsc, .updatedAtDesc, .updatedAtAsc]
 
     private var sortOptions: [TVPickerOption<StashDBViewModel.StudioSortOption>] {
-        Self.sortOrder.map { TVPickerOption($0, label(for: $0)) }
+        Self.sortOrder.filter(\.isAvailableOnServer).map { TVPickerOption($0, label(for: $0)) }
     }
 
     var body: some View {
@@ -139,6 +139,7 @@ struct TVStudiosView: View {
         case .galleryCountAsc: return "Least Galleries"
         case .imageCountDesc: return "Most Images"
         case .imageCountAsc: return "Least Images"
+        case .oCounterDesc, .oCounterAsc, .oCounterAllDesc, .oCounterAllAsc, .performerCountAllDesc, .performerCountAllAsc, .markerCountDesc, .markerCountAsc: return option.displayName
         case .random: return "Random"
         }
     }

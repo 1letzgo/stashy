@@ -955,6 +955,10 @@ private enum StudioCatalogSortFieldKind: String, CaseIterable, Identifiable {
     case scenes_count
     case rating
     case performer_count
+    case performer_count_all
+    case o_counter
+    case o_counter_all
+    case scene_markers_count
     case galleries_count
     case images_count
     case updated_at
@@ -969,6 +973,10 @@ private enum StudioCatalogSortFieldKind: String, CaseIterable, Identifiable {
         case .scenes_count: return "Scene count"
         case .rating: return "Rating"
         case .performer_count: return "Performer count"
+        case .performer_count_all: return "Performer count incl. sub-studios"
+        case .o_counter: return "O Count"
+        case .o_counter_all: return "O Count incl. sub-studios"
+        case .scene_markers_count: return "Marker count"
         case .galleries_count: return "Gallery count"
         case .images_count: return "Image count"
         case .updated_at: return "Updated"
@@ -988,6 +996,10 @@ private enum StudioCatalogSortFieldKind: String, CaseIterable, Identifiable {
         case .scenes_count: return ascending ? .sceneCountAsc : .sceneCountDesc
         case .rating: return ascending ? .ratingAsc : .ratingDesc
         case .performer_count: return ascending ? .performerCountAsc : .performerCountDesc
+        case .performer_count_all: return ascending ? .performerCountAllAsc : .performerCountAllDesc
+        case .o_counter: return ascending ? .oCounterAsc : .oCounterDesc
+        case .o_counter_all: return ascending ? .oCounterAllAsc : .oCounterAllDesc
+        case .scene_markers_count: return ascending ? .markerCountAsc : .markerCountDesc
         case .galleries_count: return ascending ? .galleryCountAsc : .galleryCountDesc
         case .images_count: return ascending ? .imageCountAsc : .imageCountDesc
         case .updated_at: return ascending ? .updatedAtAsc : .updatedAtDesc
@@ -1464,7 +1476,7 @@ struct StudiosCatalogFilterSortSheet: View {
                 if case .unmapped(let f) = pickerValue {
                     Text("Other (\(f))").tag(StudioCatalogSortPickerValue.unmapped(sortField: f))
                 }
-                ForEach(StudioCatalogSortFieldKind.allCases) { k in
+                ForEach(StudioCatalogSortFieldKind.allCases.filter { $0.studioSortOption(ascending: false).isAvailableOnServer }) { k in
                     Text(k.menuLabel).tag(StudioCatalogSortPickerValue.known(k))
                 }
             }
@@ -1486,6 +1498,7 @@ private enum GalleryCatalogSortFieldKind: String, CaseIterable, Identifiable {
     case created_at
     case updated_at
     case images_count
+    case performer_age
     case random
 
     var id: String { rawValue }
@@ -1498,6 +1511,7 @@ private enum GalleryCatalogSortFieldKind: String, CaseIterable, Identifiable {
         case .created_at: return "Created"
         case .updated_at: return "Updated"
         case .images_count: return "Image count"
+        case .performer_age: return "Performer age"
         case .random: return "Random"
         }
     }
@@ -1515,6 +1529,7 @@ private enum GalleryCatalogSortFieldKind: String, CaseIterable, Identifiable {
         case .created_at: return ascending ? .createdAtAsc : .createdAtDesc
         case .updated_at: return ascending ? .updatedAtAsc : .updatedAtDesc
         case .images_count: return ascending ? .imageCountAsc : .imageCountDesc
+        case .performer_age: return ascending ? .performerAgeAsc : .performerAgeDesc
         case .random: return .random
         }
     }
@@ -1675,7 +1690,7 @@ struct GalleriesCatalogFilterSortSheet: View {
                 if case .unmapped(let f) = pickerValue {
                     Text("Other (\(f))").tag(GalleryCatalogSortPickerValue.unmapped(sortField: f))
                 }
-                ForEach(GalleryCatalogSortFieldKind.allCases) { k in
+                ForEach(GalleryCatalogSortFieldKind.allCases.filter { $0.gallerySortOption(ascending: false).isAvailableOnServer }) { k in
                     Text(k.menuLabel).tag(GalleryCatalogSortPickerValue.known(k))
                 }
             }
@@ -1696,6 +1711,7 @@ private enum ImageCatalogSortFieldKind: String, CaseIterable, Identifiable {
     case rating
     case created_at
     case updated_at
+    case performer_age
     case random
 
     var id: String { rawValue }
@@ -1707,6 +1723,7 @@ private enum ImageCatalogSortFieldKind: String, CaseIterable, Identifiable {
         case .rating: return "Rating"
         case .created_at: return "Created"
         case .updated_at: return "Updated"
+        case .performer_age: return "Performer age"
         case .random: return "Random"
         }
     }
@@ -1723,6 +1740,7 @@ private enum ImageCatalogSortFieldKind: String, CaseIterable, Identifiable {
         case .rating: return ascending ? .ratingAsc : .ratingDesc
         case .created_at: return ascending ? .createdAtAsc : .createdAtDesc
         case .updated_at: return ascending ? .updatedAtAsc : .updatedAtDesc
+        case .performer_age: return ascending ? .performerAgeAsc : .performerAgeDesc
         case .random: return .random
         }
     }
@@ -1933,7 +1951,7 @@ struct ImagesCatalogFilterSortSheet: View {
                 if case .unmapped(let f) = pickerValue {
                     Text("Other (\(f))").tag(ImageCatalogSortPickerValue.unmapped(sortField: f))
                 }
-                ForEach(ImageCatalogSortFieldKind.allCases) { k in
+                ForEach(ImageCatalogSortFieldKind.allCases.filter { $0.imageSortOption(ascending: false).isAvailableOnServer }) { k in
                     Text(k.menuLabel).tag(ImageCatalogSortPickerValue.known(k))
                 }
             }

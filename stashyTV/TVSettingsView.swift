@@ -626,6 +626,8 @@ private struct TVSecuritySettingsView: View {
 private struct TVDefaultSortSettingsView: View {
     @ObservedObject private var tabManager = TabManager.shared
 
+    @AppStorage(StudioCountsStore.includeSubStudiosKey) private var includeSubStudios = false
+
     var body: some View {
         List {
             Section {
@@ -634,6 +636,11 @@ private struct TVDefaultSortSettingsView: View {
                 sortRow(label: "Studios", tab: .studios, type: StashDBViewModel.StudioSortOption.self, fallback: .nameAsc)
                 sortRow(label: "Tags", tab: .tags, type: StashDBViewModel.TagSortOption.self, fallback: .nameAsc)
                 sortRow(label: "Groups", tab: .groups, type: StashDBViewModel.GroupSortOption.self, fallback: .nameAsc)
+            }
+            if StashServerCapabilities.supports032 {
+                Section {
+                    Toggle("Studio counts include sub-studios", isOn: $includeSubStudios)
+                }
             }
         }
         .tvSettingsPage("Default Sorting", description: "The sort order each section opens with.")
@@ -656,7 +663,9 @@ private struct TVDefaultSortSettingsView: View {
         )
         TVSettingsPickerRow(
             title: label,
-            options: Option.allCases.map { TVPickerOption($0, $0.displayName) },
+            options: Option.allCases
+                .filter { ($0 as? any StashVersionedSortOption)?.isAvailableOnServer ?? true }
+                .map { TVPickerOption($0, $0.displayName) },
             selection: binding
         )
     }

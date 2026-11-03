@@ -231,7 +231,7 @@ extension ReelsModeType {
         case .markers:
             return StashDBViewModel.SceneMarkerSortOption.allCases.map { ($0.rawValue, $0.displayName) }
         case .clips, .pics:
-            return StashDBViewModel.ImageSortOption.allCases.map { ($0.rawValue, $0.displayName) }
+            return StashDBViewModel.ImageSortOption.availableCases.map { ($0.rawValue, $0.displayName) }
         }
     }
 }

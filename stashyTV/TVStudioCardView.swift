@@ -9,8 +9,11 @@ import SwiftUI
 
 struct TVStudioCardView: View {
     let studio: Studio
+    @ObservedObject private var studioCounts = StudioCountsStore.shared
+    @AppStorage(StudioCountsStore.includeSubStudiosKey) private var includeSubStudios = false
 
     var body: some View {
+        let sceneCount = studioCounts.display(for: studio, includeSubStudios: includeSubStudios).scenes
         ZStack(alignment: .topTrailing) {
             thumbnailView
                 .frame(width: 410, height: 230)
@@ -24,8 +27,8 @@ struct TVStudioCardView: View {
             )
             .clipShape(RoundedRectangle(cornerRadius: 10))
 
-            if studio.sceneCount > 0 {
-                Text("\(studio.sceneCount)")
+            if sceneCount > 0 {
+                Text("\(sceneCount)")
                     .font(.caption.weight(.bold))
                     .foregroundColor(.white)
                     .padding(.horizontal, 12)
@@ -61,6 +64,7 @@ struct TVStudioCardView: View {
             }
         }
         .frame(width: 410, height: 230)
+        .task(id: studio.id) { studioCounts.request(studio.id) }
     }
 
     @ViewBuilder

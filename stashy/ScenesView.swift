@@ -16,6 +16,7 @@ typealias SceneLivePresetTag = ListLivePresetTag
 /// Maps to `SceneSortOption.sortField` for the live-filter sheet (dropdown + asc/desc).
 private enum SceneLiveSortFieldKind: String, CaseIterable, Identifiable {
     case date
+    case production_date
     case created_at
     case title
     case duration
@@ -31,6 +32,7 @@ private enum SceneLiveSortFieldKind: String, CaseIterable, Identifiable {
     var menuLabel: String {
         switch self {
         case .date: return "Date"
+        case .production_date: return "Production date"
         case .created_at: return "Created"
         case .title: return "Title"
         case .duration: return "Duration"
@@ -50,6 +52,7 @@ private enum SceneLiveSortFieldKind: String, CaseIterable, Identifiable {
     func sceneSortOption(ascending: Bool) -> StashDBViewModel.SceneSortOption {
         switch self {
         case .date: return ascending ? .dateAsc : .dateDesc
+        case .production_date: return ascending ? .productionDateAsc : .productionDateDesc
         case .created_at: return ascending ? .createdAtAsc : .createdAtDesc
         case .title: return ascending ? .titleAsc : .titleDesc
         case .duration: return ascending ? .durationAsc : .durationDesc
@@ -1944,7 +1947,7 @@ struct SceneLiveFilterSheet: View {
                 if case .unmapped(let f) = pickerValue {
                     Text("Other (\(f))").tag(SceneLiveSortPickerValue.unmapped(sortField: f))
                 }
-                ForEach(SceneLiveSortFieldKind.allCases) { k in
+                ForEach(SceneLiveSortFieldKind.allCases.filter { $0.sceneSortOption(ascending: false).isAvailableOnServer }) { k in
                     Text(k.menuLabel).tag(SceneLiveSortPickerValue.known(k))
                 }
             }
