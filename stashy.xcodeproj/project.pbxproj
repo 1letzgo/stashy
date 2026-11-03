@@ -130,6 +130,10 @@
 		C0A7F1300000000000000003 /* SceneDetailLayoutSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5CDL00022F80A00000000002 /* SceneDetailLayoutSettingsView.swift */; };
 		C0A7F1400000000000000002 /* SettingsTransfer.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0A7F1400000000000000001 /* SettingsTransfer.swift */; };
 		C0A7F1400000000000000003 /* SettingsTransfer.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0A7F1400000000000000001 /* SettingsTransfer.swift */; };
+		C0A7F1420000000000000002 /* ICloudSettingsMerge.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0A7F1420000000000000001 /* ICloudSettingsMerge.swift */; };
+		C0A7F1420000000000000003 /* ICloudSettingsMerge.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0A7F1420000000000000001 /* ICloudSettingsMerge.swift */; };
+		C0A7F1410000000000000002 /* ICloudSettingsSync.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0A7F1410000000000000001 /* ICloudSettingsSync.swift */; };
+		C0A7F1410000000000000003 /* ICloudSettingsSync.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0A7F1410000000000000001 /* ICloudSettingsSync.swift */; };
 		C4B0E00200000000000000B1 /* NativeChromeSupport.swift in Sources */ = {isa = PBXBuildFile; fileRef = C4B0E00100000000000000A1 /* NativeChromeSupport.swift */; };
 		C4B0E00200000000000000B2 /* CatalogChrome.swift in Sources */ = {isa = PBXBuildFile; fileRef = C4B0E00100000000000000A2 /* CatalogChrome.swift */; };
 		C4B0E00200000000000000B3 /* StashyDetailToolbar.swift in Sources */ = {isa = PBXBuildFile; fileRef = C4B0E00100000000000000A3 /* StashyDetailToolbar.swift */; };
@@ -441,6 +445,8 @@
 		C0A7F1100000000000000001 /* CatalogQuickFilters.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CatalogQuickFilters.swift; sourceTree = "<group>"; };
 		C0A7F1200000000000000001 /* MiniPlayerStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MiniPlayerStore.swift; sourceTree = "<group>"; };
 		C0A7F1400000000000000001 /* SettingsTransfer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsTransfer.swift; sourceTree = "<group>"; };
+		C0A7F1420000000000000001 /* ICloudSettingsMerge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ICloudSettingsMerge.swift; sourceTree = "<group>"; };
+		C0A7F1410000000000000001 /* ICloudSettingsSync.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ICloudSettingsSync.swift; sourceTree = "<group>"; };
 		C4B0E00100000000000000A1 /* NativeChromeSupport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NativeChromeSupport.swift; sourceTree = "<group>"; };
 		C4B0E00100000000000000A2 /* CatalogChrome.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CatalogChrome.swift; sourceTree = "<group>"; };
 		C4B0E00100000000000000A3 /* StashyDetailToolbar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StashyDetailToolbar.swift; sourceTree = "<group>"; };
@@ -792,6 +798,8 @@
 				A1ED4C0112345678901234AB /* EditModeSettingsView.swift */,
 				5CDL00022F80A00000000002 /* SceneDetailLayoutSettingsView.swift */,
 				C0A7F1400000000000000001 /* SettingsTransfer.swift */,
+				C0A7F1420000000000000001 /* ICloudSettingsMerge.swift */,
+				C0A7F1410000000000000001 /* ICloudSettingsSync.swift */,
 				DFSEC0062F2A000100000006 /* SecuritySettingsView.swift */,
 				DFST0000A2F30A000000000A /* ContentSettingsSection.swift */,
 				DFST0000C2F30A000000000C /* DashboardSettingsView.swift */,
@@ -1093,6 +1101,8 @@
 				A1ED4C0012345678901234AB /* EditModeSettingsView.swift in Sources */,
 				5CDL00012F80A00000000001 /* SceneDetailLayoutSettingsView.swift in Sources */,
 				C0A7F1400000000000000002 /* SettingsTransfer.swift in Sources */,
+				C0A7F1420000000000000002 /* ICloudSettingsMerge.swift in Sources */,
+				C0A7F1410000000000000002 /* ICloudSettingsSync.swift in Sources */,
 				DF90B7642F1ACEA3003ED852 /* ServerSetupWizardView.swift in Sources */,
 				DFGQ000012F28A0000000001 /* GraphQLClient.swift in Sources */,
 				DFGQ000032F28A0000000003 /* GraphQLQueries.swift in Sources */,
@@ -1298,6 +1308,8 @@
 				MAC00000000000000000005F /* FilterPickerOptionsStore.swift in Sources */,
 				C0A7F1300000000000000003 /* SceneDetailLayoutSettingsView.swift in Sources */,
 				C0A7F1400000000000000003 /* SettingsTransfer.swift in Sources */,
+				C0A7F1420000000000000003 /* ICloudSettingsMerge.swift in Sources */,
+				C0A7F1410000000000000003 /* ICloudSettingsSync.swift in Sources */,
 				C0A7F1100000000000000003 /* CatalogQuickFilters.swift in Sources */,
 				MAC000000000000000000060 /* FilterCriteriaEditorView.swift in Sources */,
 				MAC000000000000000000061 /* FiltersToolsView.swift in Sources */,
@@ -1465,8 +1477,9 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS = YES;
 				CODE_SIGN_IDENTITY = "Apple Development";
+				CODE_SIGN_ENTITLEMENTS = stashy.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 428;
+				CURRENT_PROJECT_VERSION = 429;
 				DEVELOPMENT_TEAM = 699G2QY959;
 				ENABLE_PREVIEWS = YES;
 				INFOPLIST_FILE = stashy/Info.plist;
@@ -1495,8 +1508,9 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS = YES;
 				CODE_SIGN_IDENTITY = "Apple Development";
+				CODE_SIGN_ENTITLEMENTS = stashy.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 428;
+				CURRENT_PROJECT_VERSION = 429;
 				DEVELOPMENT_TEAM = 699G2QY959;
 				ENABLE_PREVIEWS = YES;
 				INFOPLIST_FILE = stashy/Info.plist;

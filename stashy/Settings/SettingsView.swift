@@ -177,6 +177,12 @@ struct SettingsView: View {
             stashyScrollingSectionFooter("Servers, settings, default filters, dashboard and tabs as one JSON file — imports on iPhone, iPad, Mac and Android.")
         }
 
+        Section {
+            stashyScrollingSectionHeader("iCloud")
+            ICloudSettingsSyncRow()
+            stashyScrollingSectionFooter("Keeps servers, API keys and settings the same on your iPhone, iPad and Mac. Turn it on per device. The active server stays each device's own choice.")
+        }
+
         aboutSection
     }
 

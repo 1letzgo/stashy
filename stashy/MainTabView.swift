@@ -102,6 +102,7 @@ struct MainTabView: View {
             .onAppear {
                 ServerConfigManager.shared.scrubPlaintextAPIKeysFromDisk()
                 checkConfiguration()
+                ICloudSettingsSync.shared.start()
                 #if !os(tvOS)
                 MiniPlayerStore.shared.restoreLastSessionIfNeeded()
                 #endif

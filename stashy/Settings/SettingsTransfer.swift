@@ -135,6 +135,7 @@ enum SettingsTransfer {
     private static let excludedKeys: Set<String> = [
         "stashy_server_config", "stashy_saved_servers", "stashy_saved_servers_backup",
         "totalTipsCount", "kBiometricsEnabled", "kAutoLockOnBackground",
+        KeychainManager.syncEnabledKey,
     ]
     private static let excludedPrefixes = [
         "stashy_plus_", "mini_player_last_", "cached", "SK", "revenuecat", "license",
@@ -148,36 +149,49 @@ enum SettingsTransfer {
         return !excludedPrefixes.contains { key.hasPrefix($0) }
     }
 
+    /// State that belongs to one device or changes constantly: fine in a one-off file, wrong in
+    /// a live sync.
+    private static let deviceLocalPrefixes = [
+        "reels_last_visible_", "reels_session_", "reels_playback_checkpoint_", "reels_restart_from_top_",
+        "stashy.magazine.progress_", "stashy.hotOrNot.bracket", "stashy_timeline_image_o_actions_",
+        "download_sync_jobs_", "stashyDebug", "StashyWindowSize",
+    ]
+
+    static func isSyncable(_ key: String) -> Bool {
+        isTransferable(key) && !deviceLocalPrefixes.contains { key.hasPrefix($0) }
+    }
+
     // MARK: Export
+
+    static func serverEntry(for config: ServerConfig, includeSecrets: Bool) -> SettingsTransferFile.Server {
+        var server = SettingsTransferFile.Server(
+            id: config.id.uuidString,
+            name: config.name,
+            serverAddress: config.serverAddress,
+            port: config.port,
+            serverProtocol: config.serverProtocol.rawValue,
+            subpath: config.subpath
+        )
+        if includeSecrets {
+            server.apiKey = config.secureApiKey
+            let headers = config.secureCustomHeaders
+            server.customHeaders = headers.isEmpty ? nil : headers.map {
+                .init(id: $0.id.uuidString, name: $0.name, value: $0.value)
+            }
+        }
+        return server
+    }
+
+    static func settingEntries(where include: (String) -> Bool) -> [SettingsTransferFile.Setting] {
+        let bundleId = Bundle.main.bundleIdentifier ?? "de.letzgo.stashy"
+        let domain = UserDefaults.standard.persistentDomain(forName: bundleId) ?? [:]
+        return domain.keys.sorted().filter(include).compactMap { entry(for: $0, value: domain[$0]!) }
+    }
 
     static func export(includeSecrets: Bool) throws -> Data {
         let manager = ServerConfigManager.shared
-        let servers = manager.getSavedServers().map { config -> SettingsTransferFile.Server in
-            var server = SettingsTransferFile.Server(
-                id: config.id.uuidString,
-                name: config.name,
-                serverAddress: config.serverAddress,
-                port: config.port,
-                serverProtocol: config.serverProtocol.rawValue,
-                subpath: config.subpath
-            )
-            if includeSecrets {
-                server.apiKey = config.secureApiKey
-                let headers = config.secureCustomHeaders
-                server.customHeaders = headers.isEmpty ? nil : headers.map {
-                    .init(id: $0.id.uuidString, name: $0.name, value: $0.value)
-                }
-            }
-            return server
-        }
-
-        let bundleId = Bundle.main.bundleIdentifier ?? "de.letzgo.stashy"
-        let domain = UserDefaults.standard.persistentDomain(forName: bundleId) ?? [:]
-        var settings: [SettingsTransferFile.Setting] = []
-        for key in domain.keys.sorted() where isTransferable(key) {
-            guard let entry = entry(for: key, value: domain[key]!) else { continue }
-            settings.append(entry)
-        }
+        let servers = manager.getSavedServers().map { serverEntry(for: $0, includeSecrets: includeSecrets) }
+        let settings = settingEntries(where: isTransferable)
 
         let info = Bundle.main.infoDictionary
         #if os(macOS)
@@ -245,19 +259,11 @@ enum SettingsTransfer {
         let manager = ServerConfigManager.shared
         var imported: [ServerConfig] = []
         for server in file.servers {
-            guard let id = UUID(uuidString: server.id),
-                  let proto = ServerProtocol(rawValue: server.serverProtocol.uppercased()) else {
+            guard let config = config(from: server) else {
                 summary.skipped += 1
                 continue
             }
-            var config = ServerConfig(
-                serverAddress: server.serverAddress,
-                port: server.port,
-                serverProtocol: proto
-            )
-            config.id = id
-            config.name = server.name
-            config.subpath = server.subpath
+            let id = config.id
             if let key = server.apiKey, !key.isEmpty {
                 _ = KeychainManager.shared.saveAPIKey(key, forServerID: id)
             }
@@ -281,8 +287,22 @@ enum SettingsTransfer {
         return summary
     }
 
+    static func config(from server: SettingsTransferFile.Server) -> ServerConfig? {
+        guard let id = UUID(uuidString: server.id),
+              let proto = ServerProtocol(rawValue: server.serverProtocol.uppercased()) else { return nil }
+        var config = ServerConfig(
+            serverAddress: server.serverAddress,
+            port: server.port,
+            serverProtocol: proto
+        )
+        config.id = id
+        config.name = server.name
+        config.subpath = server.subpath
+        return config
+    }
+
     /// Stores one entry the way this platform keeps that key; an existing key keeps its type.
-    private static func apply(_ entry: SettingsTransferFile.Setting, to defaults: UserDefaults) -> Bool {
+    static func apply(_ entry: SettingsTransferFile.Setting, to defaults: UserDefaults) -> Bool {
         let existing = defaults.object(forKey: entry.key)
         switch entry.type {
         case "bool":
@@ -332,6 +352,7 @@ enum SettingsTransfer {
     /// Lets the singletons that cache settings pick up the new values.
     private static func reloadAfterImport() {
         ServerConfigManager.shared.savedServers = ServerConfigManager.shared.getSavedServers()
+        AppearanceManager.shared.reload()
         NotificationCenter.default.post(name: NSNotification.Name("ServerConfigChanged"), object: nil)
         NotificationCenter.default.post(name: .stashySettingsImported, object: nil)
     }

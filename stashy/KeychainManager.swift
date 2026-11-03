@@ -13,6 +13,10 @@ class KeychainManager {
     static let shared = KeychainManager()
     
     private let service = "com.letzgo.stashy"
+
+    /// Set while the iCloud settings sync is on (`ICloudSettingsSync`).
+    static let syncEnabledKey = "icloud_settings_sync_enabled"
+    private var syncsSecrets: Bool { UserDefaults.standard.bool(forKey: Self.syncEnabledKey) }
     
     private init() {}
     
@@ -33,6 +37,7 @@ class KeychainManager {
         invalidateAPIKeyCache(forServerID: serverID)
 
         guard let data = apiKey.data(using: .utf8) else { return false }
+        if syncsSecrets { saveSynced(data, account: key) }
 
         let attributes: [String: Any] = [
             kSecValueData as String: data,
@@ -78,6 +83,7 @@ class KeychainManager {
 
     private func loadAPIKeyFromKeychain(forServerID serverID: UUID) -> String? {
         let key = "apikey_\(serverID.uuidString)"
+        if syncsSecrets, let synced = loadSynced(account: key) { return synced }
 
         var query = baseQuery(account: key)
         query[kSecReturnData as String] = true
@@ -99,6 +105,7 @@ class KeychainManager {
     func deleteAPIKey(forServerID serverID: UUID) -> Bool {
         let key = "apikey_\(serverID.uuidString)"
         invalidateAPIKeyCache(forServerID: serverID)
+        if syncsSecrets { deleteSynced(account: key) }
         return deleteRaw(account: key)
     }
     
@@ -113,8 +120,10 @@ class KeychainManager {
     func saveCustomHeaders(_ headers: [ServerHTTPHeader], forServerID serverID: UUID) -> Bool {
         let account = "headers_\(serverID.uuidString)"
         headersCacheLock.lock(); headersCache[serverID] = nil; headersCacheLock.unlock()
-        guard !headers.isEmpty else { return deleteRaw(account: account) }
         guard let data = try? JSONEncoder().encode(headers) else { return false }
+        // Synced as an empty list, not deleted: other devices must see the removal.
+        if syncsSecrets { saveSynced(data, account: account) }
+        guard !headers.isEmpty else { return deleteRaw(account: account) }
 
         let attributes: [String: Any] = [
             kSecValueData as String: data,
@@ -137,7 +146,8 @@ class KeychainManager {
         headersCacheLock.unlock()
 
         var loaded: [ServerHTTPHeader] = []
-        if let raw = loadRawString(account: "headers_\(serverID.uuidString)"),
+        let account = "headers_\(serverID.uuidString)"
+        if let raw = (syncsSecrets ? loadSynced(account: account) : nil) ?? loadRawString(account: account),
            let decoded = try? JSONDecoder().decode([ServerHTTPHeader].self, from: Data(raw.utf8)) {
             loaded = decoded
         }
@@ -148,7 +158,94 @@ class KeychainManager {
     @discardableResult
     func deleteCustomHeaders(forServerID serverID: UUID) -> Bool {
         headersCacheLock.lock(); headersCache[serverID] = nil; headersCacheLock.unlock()
+        if syncsSecrets { deleteSynced(account: "headers_\(serverID.uuidString)") }
         return deleteRaw(account: "headers_\(serverID.uuidString)")
+    }
+
+    // MARK: - iCloud Keychain copies (only while the iCloud settings sync is on)
+
+    /// The device-only items above stay in place, so turning the sync off loses nothing.
+    private func syncedQuery(account: String) -> [String: Any] {
+        var query = baseQuery(account: account)
+        query[kSecAttrSynchronizable as String] = true
+        return query
+    }
+
+    private func saveSynced(_ data: Data, account: String) {
+        let attributes: [String: Any] = [
+            kSecValueData as String: data,
+            kSecAttrAccessible as String: kSecAttrAccessibleAfterFirstUnlock
+        ]
+        let query = syncedQuery(account: account)
+        guard SecItemUpdate(query as CFDictionary, attributes as CFDictionary) == errSecItemNotFound else { return }
+        SecItemAdd(query.merging(attributes) { $1 } as CFDictionary, nil)
+    }
+
+    private func loadSynced(account: String) -> String? {
+        var query = syncedQuery(account: account)
+        query[kSecReturnData as String] = true
+        query[kSecMatchLimit as String] = kSecMatchLimitOne
+        var result: AnyObject?
+        guard SecItemCopyMatching(query as CFDictionary, &result) == errSecSuccess,
+              let data = result as? Data else { return nil }
+        return String(data: data, encoding: .utf8)
+    }
+
+    private func deleteSynced(account: String) {
+        SecItemDelete(syncedQuery(account: account) as CFDictionary)
+    }
+
+    private func secretAccounts(forServerID id: UUID) -> [String] {
+        ["apikey_\(id.uuidString)", "headers_\(id.uuidString)"]
+    }
+
+    /// Turning the sync on: copies what this device has, without replacing what iCloud has.
+    func uploadSecretsToICloud(serverIDs: [UUID]) {
+        for account in serverIDs.flatMap(secretAccounts) where loadSynced(account: account) == nil {
+            if let local = loadRawString(account: account) {
+                saveSynced(Data(local.utf8), account: account)
+            }
+        }
+        clearSecretCaches()
+    }
+
+    /// Turning the sync off: this device keeps the newest values as its own copies.
+    func adoptSyncedSecrets(serverIDs: [UUID]) {
+        for id in serverIDs {
+            guard syncsSecrets else { return }
+            if let key = loadSynced(account: "apikey_\(id.uuidString)") {
+                let attributes: [String: Any] = [kSecValueData as String: Data(key.utf8)]
+                saveLocal(attributes, account: "apikey_\(id.uuidString)")
+            }
+            if let headers = loadSynced(account: "headers_\(id.uuidString)") {
+                let attributes: [String: Any] = [kSecValueData as String: Data(headers.utf8)]
+                saveLocal(attributes, account: "headers_\(id.uuidString)")
+            }
+        }
+    }
+
+    private func saveLocal(_ attributes: [String: Any], account: String) {
+        let query = baseQuery(account: account)
+        guard SecItemUpdate(query as CFDictionary, attributes as CFDictionary) == errSecItemNotFound else { return }
+        var addQuery = query.merging(attributes) { $1 }
+        addQuery[kSecAttrAccessible as String] = kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly
+        SecItemAdd(addQuery as CFDictionary, nil)
+    }
+
+    /// Removes every synced copy from iCloud Keychain; device-only items are not touched.
+    func removeSyncedSecrets() {
+        let query: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: service,
+            kSecAttrSynchronizable as String: true,
+            kSecUseDataProtectionKeychain as String: true
+        ]
+        SecItemDelete(query as CFDictionary)
+    }
+
+    func clearSecretCaches() {
+        apiKeyCacheLock.lock(); apiKeyCache = [:]; apiKeyCacheLock.unlock()
+        headersCacheLock.lock(); headersCache = [:]; headersCacheLock.unlock()
     }
 
     // MARK: - App Passcode (salted hash only — never store plaintext PIN)

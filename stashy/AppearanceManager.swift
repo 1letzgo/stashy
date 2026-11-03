@@ -113,6 +113,16 @@ class AppearanceManager: ObservableObject {
         self.loadColor()
     }
     
+    /// Re-reads everything from UserDefaults (after a settings import).
+    func reload() {
+        oCounterIcon = UserDefaults.standard.string(forKey: kOCounterIcon) ?? "heart"
+        let storedGlass = UserDefaults.standard.object(forKey: kGlassTransparency) as? Double
+        glassTransparency = min(1, max(0.2, storedGlass ?? Self.defaultGlassTransparency))
+        preferredTheme = AppTheme(rawValue: UserDefaults.standard.string(forKey: kPreferredTheme) ?? "") ?? .darkBlue
+        isEditModeEnabled = UserDefaults.standard.object(forKey: kEditModeEnabled) as? Bool ?? true
+        loadColor()
+    }
+
     // MARK: - Persistence
     
     /// `UIColor.getRed` reports success; AppKit's variant returns nothing and traps on

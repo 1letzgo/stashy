@@ -20,6 +20,7 @@ struct ServerSetupWizardView: View {
     @State private var serverAddress = ""
     @State private var serverProtocol: ServerProtocol = .https
     @State private var apiKey = ""
+    @State private var waitsForICloud = false
     /// Custom HTTP headers (SSO / reverse proxy); a server behind one can't pass the test without them.
     @State private var customHeaders: [ServerHTTPHeader] = []
     @State private var showsCustomHeaders = false
@@ -81,6 +82,19 @@ struct ServerSetupWizardView: View {
                     }
                     .buttonStyle(.borderless)
                     .padding(.bottom, 8)
+
+                    Button {
+                        waitsForICloud = true
+                        ICloudSettingsSync.shared.enable()
+                    } label: {
+                        Label(waitsForICloud ? "Waiting for iCloud…" : "Restore from iCloud", systemImage: "icloud.and.arrow.down")
+                    }
+                    .disabled(waitsForICloud)
+                    .buttonStyle(.borderless)
+                    .padding(.bottom, 8)
+                    .onReceive(ServerConfigManager.shared.$activeConfig) { active in
+                        if waitsForICloud, active != nil { dismiss() }
+                    }
                 }
 
                 // Navigation Buttons

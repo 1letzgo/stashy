@@ -752,6 +752,11 @@ class TabManager: ObservableObject {
     }
     #endif
     
+    /// Re-reads the stored settings without resetting anything (a settings sync from iCloud).
+    func reloadSettings() {
+        loadAllConfigs()
+    }
+
     private func loadAllConfigs() {
         loadConfig()
         loadDetailConfigs()
