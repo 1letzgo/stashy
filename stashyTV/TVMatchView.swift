@@ -317,8 +317,9 @@ struct TVMatchView: View {
                 }
             }
             .focusSection()
-            .confirmationDialog("End tournament?", isPresented: $confirmEndBracket, titleVisibility: .visible) {
+            .alert("End tournament?", isPresented: $confirmEndBracket) {
                 Button("End tournament", role: .destructive) { model.newBracket() }
+                Button("Cancel", role: .cancel) {}
             } message: {
                 Text("Ratings that were not saved are lost.")
             }

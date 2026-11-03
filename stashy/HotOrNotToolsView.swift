@@ -2327,8 +2327,9 @@ private struct HotOrNotBracketResultsCard: View {
                     .buttonStyle(.bordered)
                 }
             }
-            .confirmationDialog("End tournament?", isPresented: $confirmEnd, titleVisibility: .visible) {
+            .alert("End tournament?", isPresented: $confirmEnd) {
                 Button("End tournament", role: .destructive) { model.newBracket() }
+                Button("Cancel", role: .cancel) {}
             } message: {
                 Text("Ratings that were not saved are lost.")
             }

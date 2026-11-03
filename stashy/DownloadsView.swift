@@ -895,7 +895,7 @@ struct DownloadDetailView: View {
             .padding(16)
         }
         .applyAppBackground()
-        .confirmationDialog("Delete this download?", isPresented: $confirmingDelete, titleVisibility: .visible) {
+        .alert("Delete this download?", isPresented: $confirmingDelete) {
             Button("Delete Download", role: .destructive) {
                 downloadManager.deleteDownload(id: downloaded.id)
                 dismiss()

@@ -485,7 +485,7 @@ private struct TVSavedServerRow: View {
             Button("Edit", action: onEdit)
             Button("Delete", role: .destructive) { confirmingDelete = true }
         }
-        .confirmationDialog("Delete \"\(server.name)\"?", isPresented: $confirmingDelete, titleVisibility: .visible) {
+        .alert("Delete \"\(server.name)\"?", isPresented: $confirmingDelete) {
             Button("Delete", role: .destructive, action: onDelete)
             Button("Cancel", role: .cancel) {}
         }
