@@ -134,7 +134,12 @@ final class MagazineReadingStore: ObservableObject {
     }
 }
 
-/// Settings › Tools: the saved gallery filter Magazin opens with, per server.
+/// Settings › stashy+: whether Home shows Magazin.
+enum MagazineMode {
+    static let enabledKey = "stashy.magazine.enabled"
+}
+
+/// Settings › stashy+: the saved gallery filter Magazin opens with, per server.
 enum MagazineDefaultFilter {
     static let changeKey = "magazine"
 

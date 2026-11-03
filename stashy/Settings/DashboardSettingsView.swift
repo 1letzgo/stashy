@@ -13,6 +13,8 @@ struct DashboardSettingsView: View {
     @ObservedObject var appearanceManager = AppearanceManager.shared
     /// Channels are stashy+ — row toggle and the Channels section only show while unlocked.
     @ObservedObject private var stashyPlus = StashyPlusManager.shared
+    /// Same key as the switch in Settings › stashy+, so either one updates the other.
+    @AppStorage(MagazineMode.enabledKey) private var isMagazineEnabled = false
     @StateObject private var viewModel = StashDBViewModel()
 
     private var catalogTabs: [TabConfig] {
@@ -20,7 +22,8 @@ struct DashboardSettingsView: View {
             .filter {
                 $0.id == .scenes || $0.id == .galleries || $0.id == .performers ||
                 $0.id == .studios || $0.id == .tags || $0.id == .images ||
-                $0.id == .groups || $0.id == .markers
+                $0.id == .groups || $0.id == .markers ||
+                ($0.id == .magazine && stashyPlus.isUnlocked)
             }
             .sorted { $0.sortOrder < $1.sortOrder }
     }
@@ -205,15 +208,29 @@ struct DashboardSettingsView: View {
                     .font(.subheadline.weight(.semibold))
                     .foregroundColor(appearanceManager.tintColor)
                 Spacer()
-                Toggle("", isOn: Binding(
-                    get: { tab.isVisible },
-                    set: { _ in tabManager.toggle(tab.id) }
-                ))
-                .labelsHidden()
-                .tint(appearanceManager.tintColor)
+                if tab.id == .magazine {
+                    Toggle("", isOn: $isMagazineEnabled)
+                        .labelsHidden()
+                        .tint(appearanceManager.tintColor)
+                } else {
+                    Toggle("", isOn: Binding(
+                        get: { tab.isVisible },
+                        set: { _ in tabManager.toggle(tab.id) }
+                    ))
+                    .labelsHidden()
+                    .tint(appearanceManager.tintColor)
+                }
             }
 
-            if tab.isVisible {
+            if tab.id == .magazine {
+                if isMagazineEnabled {
+                    Divider()
+                        .padding(.vertical, 8)
+                    settingRow("Default Filter") {
+                        MagazineDefaultFilterMenu(viewModel: viewModel)
+                    }
+                }
+            } else if tab.isVisible {
                 Divider()
                     .padding(.vertical, 8)
 

@@ -8,12 +8,23 @@
 #if !os(tvOS)
 import SwiftUI
 
-/// Settings › Tools: default filter of the Magazin tool.
+/// Default filter of Magazin, in Settings › stashy+ and Settings › Home Tabs.
 struct MagazineDefaultFilterMenu: View {
     @ObservedObject var viewModel: StashDBViewModel
     @State private var currentId = MagazineDefaultFilter.id ?? ""
 
     var body: some View {
+        menu
+            // The other settings screen may have changed it while this one stayed alive.
+            .onAppear { currentId = MagazineDefaultFilter.id ?? "" }
+            .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("DefaultFilterChanged"))) { notification in
+                guard notification.userInfo?["tab"] as? String == MagazineDefaultFilter.changeKey else { return }
+                currentId = MagazineDefaultFilter.id ?? ""
+            }
+    }
+
+    @ViewBuilder
+    private var menu: some View {
         let filters = viewModel.savedFilters.values
             .filter { $0.mode == .galleries }
             .sorted { $0.name < $1.name }

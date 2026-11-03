@@ -51,11 +51,27 @@ struct MagazineReaderView: View {
     @Environment(\.scenePhase) private var scenePhase
     /// Next and previous pages, loaded ahead into `ImageCache`.
     @State private var prefetchers: [URL: ImageLoader] = [:]
+    /// Chapters and tags; a failure just leaves the reader without them.
+    @State private var info = GalleryReaderInfo(chapters: [], tags: [])
+    @State private var activeSheet: MagazineReaderSheet?
     #if os(macOS)
     @FocusState private var hasKeyboardFocus: Bool
     #endif
 
     private var spreadCount: Int { (pages.count + 1) / 2 }
+
+    /// 0-based; on a spread its first page.
+    private var currentPage: Int { showsFullscreen ? fullscreenPage : spreadIndex * 2 }
+
+    private var chapters: [GalleryReaderInfo.Chapter] {
+        info.chapters.sorted { $0.image_index < $1.image_index }
+    }
+
+    /// The chapter of the last page on screen: a chapter can start on a spread's second page.
+    private var currentChapter: GalleryReaderInfo.Chapter? {
+        let lastVisiblePage = showsFullscreen ? fullscreenPage : currentPage + 1
+        return chapters.last { $0.image_index - 1 <= lastVisiblePage }
+    }
 
     var body: some View {
         ZStack {
@@ -67,14 +83,34 @@ struct MagazineReaderView: View {
             }
 
             if showsFullscreen {
-                MagazineFullscreenView(pages: pages, page: $fullscreenPage, onClose: closeFullscreen)
+                MagazineFullscreenView(
+                    pages: pages,
+                    page: $fullscreenPage,
+                    onClose: closeFullscreen,
+                    onShowPagePicker: { activeSheet = .pagePicker }
+                )
                     .transition(.opacity)
             }
         }
         .foregroundStyle(.white)
         .statusBarHidden(true)
         .persistentSystemOverlays(.hidden)
+        .sheet(item: $activeSheet, onDismiss: restoreKeyboardFocus) { sheet in
+            switch sheet {
+            case .pagePicker:
+                MagazinePagePickerSheet(
+                    pages: pages,
+                    chapters: chapters,
+                    currentPage: currentPage,
+                    currentChapterId: currentChapter?.id,
+                    onSelect: jump(toPage:)
+                )
+            case .details:
+                MagazineDetailsSheet(gallery: gallery, tags: info.tags, pageCount: pages.count, chapterCount: chapters.count)
+            }
+        }
         .task { await loadPages() }
+        .task { await loadInfo() }
         .onChange(of: spreadIndex) { _, _ in pageDidChange() }
         .onChange(of: fullscreenPage) { _, _ in pageDidChange() }
         .onChange(of: showsFullscreen) { _, _ in updatePrefetch() }
@@ -148,17 +184,47 @@ struct MagazineReaderView: View {
             }
             .buttonStyle(.plain)
 
-            Text(gallery.displayName)
-                .font(.subheadline.weight(.semibold))
-                .lineLimit(1)
+            Button { activeSheet = .details } label: {
+                VStack(alignment: .leading, spacing: 1) {
+                    HStack(spacing: 4) {
+                        Text(gallery.displayName)
+                            .font(.subheadline.weight(.semibold))
+                            .lineLimit(1)
+                        Image(systemName: "info.circle")
+                            .font(.caption)
+                            .foregroundStyle(.white.opacity(0.7))
+                    }
+                    if let currentChapter {
+                        Text(currentChapter.title)
+                            .font(.caption2)
+                            .foregroundStyle(.white.opacity(0.7))
+                            .lineLimit(1)
+                    }
+                }
+                .frame(minHeight: 44)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Gallery details")
 
             Spacer(minLength: 0)
 
             if !pages.isEmpty {
-                Text(pageLabel)
-                    .font(.caption.monospacedDigit())
+                Button { activeSheet = .pagePicker } label: {
+                    HStack(spacing: 3) {
+                        Text(pageLabel)
+                            .font(.caption.monospacedDigit())
+                            .fixedSize()
+                        Image(systemName: "chevron.down")
+                            .font(.caption2.weight(.semibold))
+                    }
                     .foregroundStyle(.white.opacity(0.7))
-                    .padding(.trailing, spreadIndex > 0 ? 0 : 16)
+                    .frame(minHeight: 44)
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Go to page")
+                .padding(.trailing, spreadIndex > 0 ? 0 : 16)
             }
 
             if spreadIndex > 0 {
@@ -193,6 +259,21 @@ struct MagazineReaderView: View {
     private func closeFullscreen() {
         spreadIndex = fullscreenPage / 2
         withAnimation(.easeOut(duration: 0.2)) { showsFullscreen = false }
+    }
+
+    private func jump(toPage page: Int) {
+        HapticManager.light()
+        if showsFullscreen {
+            fullscreenPage = page
+        } else {
+            spreadIndex = page / 2
+        }
+    }
+
+    private func restoreKeyboardFocus() {
+        #if os(macOS)
+        hasKeyboardFocus = true
+        #endif
     }
 
     #if os(macOS)
@@ -239,6 +320,14 @@ struct MagazineReaderView: View {
         isLoading = false
     }
 
+    private func loadInfo() async {
+        do {
+            info = try await GalleryRepository().fetchReaderInfo(galleryId: gallery.id)
+        } catch {
+            AppLog.debug("Magazin: chapters and tags not loaded: \(error.localizedDescription)")
+        }
+    }
+
     // MARK: Reading position
 
     private func restoreReadingPosition() async {
@@ -265,8 +354,7 @@ struct MagazineReaderView: View {
 
     private func noteReadingPosition() {
         guard didRestorePosition, !pages.isEmpty else { return }
-        let page = showsFullscreen ? fullscreenPage : spreadIndex * 2
-        MagazineReadingStore.shared.note(page: page + 1, galleryId: gallery.id)
+        MagazineReadingStore.shared.note(page: currentPage + 1, galleryId: gallery.id)
     }
 
     private func pushReadingPosition() {
@@ -305,6 +393,291 @@ struct MagazineReaderView: View {
     private func cancelPrefetch() {
         prefetchers.values.forEach { $0.updateURL(nil) }
         prefetchers = [:]
+    }
+}
+
+// MARK: - Sheets
+
+private enum MagazineReaderSheet: String, Identifiable {
+    case pagePicker, details
+    var id: String { rawValue }
+}
+
+/// Go to a page by number, from the page list, or by chapter when the gallery has any.
+private struct MagazinePagePickerSheet: View {
+    private enum Mode: String, CaseIterable, Identifiable {
+        case chapters = "Chapters"
+        case pages = "Pages"
+        var id: String { rawValue }
+    }
+
+    let pages: [StashImage]
+    let chapters: [GalleryReaderInfo.Chapter]
+    let currentPage: Int
+    let currentChapterId: String?
+    let onSelect: (Int) -> Void
+
+    @Environment(\.stashyDismiss) private var dismiss
+    @ObservedObject private var appearance = AppearanceManager.shared
+    @State private var pageInput = ""
+    @State private var mode: Mode
+
+    init(
+        pages: [StashImage],
+        chapters: [GalleryReaderInfo.Chapter],
+        currentPage: Int,
+        currentChapterId: String?,
+        onSelect: @escaping (Int) -> Void
+    ) {
+        self.pages = pages
+        self.chapters = chapters
+        self.currentPage = currentPage
+        self.currentChapterId = currentChapterId
+        self.onSelect = onSelect
+        _mode = State(initialValue: chapters.isEmpty ? .pages : .chapters)
+    }
+
+    /// 0-based page the input stands for; nil while it is no page of this gallery.
+    private var enteredPage: Int? {
+        guard let number = Int(pageInput.trimmingCharacters(in: .whitespaces)), (1...pages.count).contains(number) else { return nil }
+        return number - 1
+    }
+
+    var body: some View {
+        NavigationStack {
+            VStack(spacing: 12) {
+                pageField
+                if !chapters.isEmpty { modeChips }
+                ScrollViewReader { proxy in
+                    ScrollView {
+                        LazyVStack(spacing: 8) {
+                            switch mode {
+                            case .chapters:
+                                ForEach(chapters) { chapter in
+                                    chapterRow(chapter).id(chapter.id)
+                                }
+                            case .pages:
+                                ForEach(pages.indices, id: \.self) { index in
+                                    pageRow(index).id(index)
+                                }
+                            }
+                        }
+                        .padding(.horizontal, 16)
+                        .padding(.bottom, 16)
+                    }
+                    .onAppear { scrollToCurrent(proxy) }
+                    .onChange(of: mode) { _, _ in scrollToCurrent(proxy) }
+                }
+            }
+            .background(Color.appBackground.ignoresSafeArea())
+            .stashyModalSheetChrome("Go to page", onBack: { dismiss() })
+        }
+        .presentationDetents([.medium, .large])
+        .presentationDragIndicator(.visible)
+        .presentationBackground(Color.appBackground)
+        #if os(macOS)
+        .frame(minWidth: 380, minHeight: 480)
+        #endif
+    }
+
+    private var pageField: some View {
+        HStack(spacing: 8) {
+            Image(systemName: "number")
+                .font(.subheadline.weight(.semibold))
+                .foregroundColor(.secondary)
+            TextField("Page (1–\(pages.count))", text: $pageInput)
+                .font(.subheadline)
+                .keyboardType(.numberPad)
+                .onSubmit(goToEnteredPage)
+            // The number pad has no return key.
+            CatalogFilterChip(title: "Go", isActive: enteredPage != nil, action: goToEnteredPage)
+                .disabled(enteredPage == nil)
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 8)
+        .background(Color.secondaryAppBackground)
+        .clipShape(RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.card))
+        .padding(.horizontal, 16)
+    }
+
+    private var modeChips: some View {
+        HStack(spacing: 8) {
+            ForEach(Mode.allCases) { option in
+                CatalogFilterChip(title: option.rawValue, isActive: mode == option) { mode = option }
+            }
+            Spacer(minLength: 0)
+        }
+        .padding(.horizontal, 16)
+    }
+
+    private func chapterRow(_ chapter: GalleryReaderInfo.Chapter) -> some View {
+        // A chapter can point past the pages the reader kept (it leaves out videos).
+        let page = min(max(chapter.image_index - 1, 0), pages.count - 1)
+        return row(isCurrent: chapter.id == currentChapterId, action: { select(page) }) {
+            Text(chapter.title)
+                .font(.subheadline.weight(.medium))
+                .lineLimit(2)
+                .multilineTextAlignment(.leading)
+            Spacer(minLength: 8)
+            Text("Page \(page + 1)")
+                .font(.caption.monospacedDigit())
+                .foregroundColor(.secondary)
+        }
+    }
+
+    private func pageRow(_ index: Int) -> some View {
+        row(isCurrent: index == currentPage, action: { select(index) }) {
+            CustomAsyncImage(url: pages[index].thumbnailURL) { loader in
+                if let loaded = loader.image {
+                    loaded
+                        .resizable()
+                        .scaledToFill()
+                } else {
+                    Color.gray.opacity(0.2)
+                }
+            }
+            .frame(width: 36, height: 50)
+            .clipShape(RoundedRectangle(cornerRadius: 4))
+
+            Text("Page \(index + 1)")
+                .font(.subheadline.weight(.medium).monospacedDigit())
+            Spacer(minLength: 8)
+        }
+    }
+
+    private func row<Content: View>(
+        isCurrent: Bool,
+        action: @escaping () -> Void,
+        @ViewBuilder content: () -> Content
+    ) -> some View {
+        Button(action: action) {
+            HStack(spacing: 12) {
+                content()
+                Image(systemName: "checkmark")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(appearance.tintColor)
+                    .opacity(isCurrent ? 1 : 0)
+            }
+            .foregroundStyle(.primary)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 10)
+            .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+            .background(Color.secondaryAppBackground)
+            .clipShape(RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.card))
+            .contentShape(RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.card))
+        }
+        .buttonStyle(.plain)
+    }
+
+    private func scrollToCurrent(_ proxy: ScrollViewProxy) {
+        switch mode {
+        case .chapters:
+            if let currentChapterId { proxy.scrollTo(currentChapterId, anchor: .center) }
+        case .pages:
+            proxy.scrollTo(currentPage, anchor: .center)
+        }
+    }
+
+    private func goToEnteredPage() {
+        guard let enteredPage else { return }
+        select(enteredPage)
+    }
+
+    private func select(_ page: Int) {
+        onSelect(page)
+        dismiss()
+    }
+}
+
+/// What the open gallery is: the list's fields plus the tags, which the list does not keep.
+private struct MagazineDetailsSheet: View {
+    let gallery: Gallery
+    let tags: [GalleryReaderInfo.Tag]
+    let pageCount: Int
+    let chapterCount: Int
+
+    @Environment(\.stashyDismiss) private var dismiss
+
+    var body: some View {
+        NavigationStack {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 16) {
+                    card {
+                        Text(gallery.displayName)
+                            .font(.headline)
+                        fact("Pages", "\(pageCount)")
+                        if chapterCount > 0 { fact("Chapters", "\(chapterCount)") }
+                        if let studio = gallery.studio { fact("Studio", studio.name) }
+                        if let date = gallery.date, !date.isEmpty { fact("Date", date) }
+                        if let rating = gallery.rating100 {
+                            fact("Rating", String(format: "%g / 5", Double(rating) / 20))
+                        }
+                    }
+                    if let performers = gallery.performers, !performers.isEmpty {
+                        section("Performers") {
+                            card { Text(performers.map(\.name).joined(separator: ", ")).font(.subheadline) }
+                        }
+                    }
+                    if !tags.isEmpty {
+                        section("Tags") {
+                            card {
+                                FlowLayout(spacing: 6) {
+                                    ForEach(tags) { tag in
+                                        Text(tag.name)
+                                            .font(.caption)
+                                            .padding(.horizontal, 10)
+                                            .padding(.vertical, 5)
+                                            .background(Color.appBackground, in: Capsule())
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    if let details = gallery.details, !details.isEmpty {
+                        section("Details") {
+                            card { Text(details).font(.subheadline) }
+                        }
+                    }
+                }
+                .padding(.horizontal, 16)
+                .padding(.bottom, 16)
+            }
+            .background(Color.appBackground.ignoresSafeArea())
+            .stashyModalSheetChrome("Details", onBack: { dismiss() })
+        }
+        .presentationDetents([.medium, .large])
+        .presentationDragIndicator(.visible)
+        .presentationBackground(Color.appBackground)
+        #if os(macOS)
+        .frame(minWidth: 380, minHeight: 420)
+        #endif
+    }
+
+    private func card<Content: View>(@ViewBuilder content: () -> Content) -> some View {
+        VStack(alignment: .leading, spacing: 10, content: content)
+            .padding(12)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(Color.secondaryAppBackground)
+            .clipShape(RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.card))
+    }
+
+    private func section<Content: View>(_ title: String, @ViewBuilder content: () -> Content) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text(title)
+                .font(.footnote)
+                .foregroundStyle(.secondary)
+                .textCase(.uppercase)
+            content()
+        }
+    }
+
+    private func fact(_ label: String, _ value: String) -> some View {
+        HStack {
+            Text(label).foregroundStyle(.secondary)
+            Spacer(minLength: 8)
+            Text(value)
+        }
+        .font(.subheadline)
     }
 }
 
@@ -372,6 +745,7 @@ private struct MagazineFullscreenView: View {
     let pages: [StashImage]
     @Binding var page: Int
     let onClose: () -> Void
+    let onShowPagePicker: () -> Void
 
     @State private var isZoomed = false
     @State private var showsChrome = true
@@ -404,11 +778,20 @@ private struct MagazineFullscreenView: View {
 
                     Spacer()
 
-                    Text("\(page + 1) / \(pages.count)")
-                        .font(.caption.monospacedDigit())
+                    Button(action: onShowPagePicker) {
+                        HStack(spacing: 3) {
+                            Text("\(page + 1) / \(pages.count)")
+                                .font(.caption.monospacedDigit())
+                            Image(systemName: "chevron.down")
+                                .font(.caption2.weight(.semibold))
+                        }
                         .padding(.horizontal, 12)
                         .padding(.vertical, 8)
                         .background(.black.opacity(0.45), in: Capsule())
+                        .contentShape(Capsule())
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("Go to page")
                 }
                 .padding(.horizontal, 12)
                 .transition(.opacity)

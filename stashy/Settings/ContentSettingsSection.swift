@@ -40,7 +40,6 @@ struct ContentSettingsSection: View {
 struct ToolsSettingsView: View {
     @ObservedObject var tabManager = TabManager.shared
     @ObservedObject var appearanceManager = AppearanceManager.shared
-    @StateObject private var viewModel = StashDBViewModel()
 
     private var toolsTabIsVisible: Bool {
         tabManager.tabs.first(where: { $0.id == .tools })?.isVisible ?? true
@@ -64,22 +63,12 @@ struct ToolsSettingsView: View {
                 stashyScrollingSectionFooter("Tools are grouped on the Tools page.")
             }
 
-            Section {
-                stashyScrollingSectionHeader("Magazin")
-                HStack {
-                    Text("Default Filter")
-                    Spacer()
-                    MagazineDefaultFilterMenu(viewModel: viewModel)
-                }
-                .stashyGroupedSettingsRow()
-            }
         }
         .stashySettingsList()
         .applyAppBackground()
         .stashySettingsDetailChrome("Tools")
         .onAppear {
             tabManager.repairMissingToolsIfNeeded()
-            viewModel.fetchSavedFilters()
         }
     }
 }

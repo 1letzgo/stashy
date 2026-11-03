@@ -17,6 +17,8 @@ struct CatalogsView: View {
     /// Filter / sort state of every catalog sub-tab list — lives here so it survives the sub-tab
     /// switch remounting the list (and, for Images, pushing FullScreenImageView).
     @StateObject private var rootFilters = CatalogRootFilterMemories()
+    @AppStorage(MagazineMode.enabledKey) private var isMagazineEnabled = false
+    @ObservedObject private var stashyPlus = StashyPlusManager.shared
     /// Settings / select actions of the active sub-tab, shown pinned right in the Home chrome.
     
     enum CatalogsTab: String, CaseIterable {
@@ -29,6 +31,7 @@ struct CatalogsView: View {
         case tags = "Tags"
         case groups = "Groups"
         case markers = "Markers"
+        case magazine = "Magazin"
         
         var icon: String {
             switch self {
@@ -41,6 +44,7 @@ struct CatalogsView: View {
             case .tags: return "tag"
             case .groups: return "rectangle.stack.fill"
             case .markers: return "bookmark.fill"
+            case .magazine: return "magazine.fill"
             }
         }
 
@@ -55,6 +59,7 @@ struct CatalogsView: View {
             case .tags: return .tags
             case .groups: return .groups
             case .markers: return .markers
+            case .magazine: return .magazine
             default: return nil
             }
         }
@@ -62,7 +67,7 @@ struct CatalogsView: View {
     
     private var sortedVisibleTabs: [CatalogsTab] {
         var tabs = tabManager.tabs
-            .filter { ($0.id == .dashboard || $0.id == .performers || $0.id == .studios || $0.id == .tags || $0.id == .scenes || $0.id == .galleries || $0.id == .images || $0.id == .groups || $0.id == .markers) && $0.isVisible }
+            .filter { ($0.id == .dashboard || $0.id == .performers || $0.id == .studios || $0.id == .tags || $0.id == .scenes || $0.id == .galleries || $0.id == .images || $0.id == .groups || $0.id == .markers || ($0.id == .magazine && isMagazineEnabled && stashyPlus.isUnlocked)) && $0.isVisible }
             .sorted { $0.sortOrder < $1.sortOrder }
             .compactMap { (config: TabConfig) -> CatalogsTab? in
                 switch config.id {
@@ -75,11 +80,12 @@ struct CatalogsView: View {
                 case .tags: return .tags
                 case .groups: return .groups
                 case .markers: return .markers
+                case .magazine: return .magazine
                 default: return nil
                 }
             }
         // Search → Show All / stats deep links can target a hidden catalog tab.
-        if let current = CatalogsTab(rawValue: coordinator.catalogueSubTab), !tabs.contains(current) {
+        if let current = CatalogsTab(rawValue: coordinator.catalogueSubTab), !tabs.contains(current), current != .magazine {
             tabs.append(current)
         }
         return tabs
@@ -136,6 +142,8 @@ struct CatalogsView: View {
             GroupsView(hideTitle: false, catalogBrowserViewModel: catalogBrowserViewModel, filterMemory: rootFilters.groups)
         case .markers:
             MarkersView(hideTitle: false, catalogBrowserViewModel: catalogBrowserViewModel, filterMemory: rootFilters.markers)
+        case .magazine:
+            MagazineListView(filterMemory: rootFilters.magazine)
         }
     }
     
@@ -214,6 +222,7 @@ final class CatalogRootFilterMemories: ObservableObject {
     let studios = CatalogListFilterMemory<CatalogListFilterSnapshot<StashDBViewModel.StudioSortOption>>(mode: .studios)
     let tags = CatalogListFilterMemory<CatalogListFilterSnapshot<StashDBViewModel.TagSortOption>>(mode: .tags)
     let galleries = CatalogListFilterMemory<CatalogListFilterSnapshot<StashDBViewModel.GallerySortOption>>(mode: .galleries)
+    let magazine = CatalogListFilterMemory<CatalogListFilterSnapshot<StashDBViewModel.GallerySortOption>>(mode: .galleries)
     let groups = CatalogListFilterMemory<CatalogListFilterSnapshot<StashDBViewModel.GroupSortOption>>(mode: .groups)
     let markers = CatalogListFilterMemory<MarkersListFilterSnapshot>(mode: .sceneMarkers)
     /// Images keep their whole session in the filter model (also survives FullScreenImageView).
@@ -236,6 +245,7 @@ final class CatalogRootFilterMemories: ObservableObject {
         studios.reset()
         tags.reset()
         galleries.reset()
+        magazine.reset()
         groups.reset()
         markers.reset()
         images.resetForServerChange()

@@ -1,0 +1,14 @@
+query FindGalleryReaderInfo($id: ID!) {
+  findGallery(id: $id) {
+    id
+    chapters {
+      id
+      title
+      image_index
+    }
+    tags {
+      id
+      name
+    }
+  }
+}

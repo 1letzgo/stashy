@@ -101,6 +101,7 @@ enum AppTab: String, CaseIterable, Codable, Identifiable {
     case groups
     case markers
     case stashline
+    case magazine
 
     var id: String { rawValue }
 
@@ -124,6 +125,7 @@ enum AppTab: String, CaseIterable, Codable, Identifiable {
         case .groups: return "Groups"
         case .markers: return "Markers"
         case .stashline: return "StashLine"
+        case .magazine: return "Magazin"
         }
     }
 
@@ -147,6 +149,7 @@ enum AppTab: String, CaseIterable, Codable, Identifiable {
         case .groups: return "rectangle.stack.fill"
         case .markers: return "bookmark.fill"
         case .stashline: return "camera.fill"
+        case .magazine: return "magazine.fill"
         }
     }
 }
@@ -1023,7 +1026,8 @@ class TabManager: ObservableObject {
                 TabConfig(id: .settings, isVisible: true, sortOrder: 9, defaultSortOption: nil),
                 TabConfig(id: .groups, isVisible: true, sortOrder: 11, defaultSortOption: "nameAsc", defaultFilterId: nil, defaultFilterName: nil),
                 TabConfig(id: .markers, isVisible: true, sortOrder: 12, defaultSortOption: "createdAtDesc", defaultFilterId: nil, defaultFilterName: nil),
-                TabConfig(id: .stashline, isVisible: true, sortOrder: 13, defaultSortOption: "dateDesc", defaultFilterId: nil, defaultFilterName: nil)
+                TabConfig(id: .stashline, isVisible: true, sortOrder: 13, defaultSortOption: "dateDesc", defaultFilterId: nil, defaultFilterName: nil),
+                TabConfig(id: .magazine, isVisible: true, sortOrder: 14, defaultSortOption: nil)
             ]
 
             var hasChanges = false
@@ -1057,7 +1061,8 @@ class TabManager: ObservableObject {
                 TabConfig(id: .settings, isVisible: true, sortOrder: 9, defaultSortOption: nil),
                 TabConfig(id: .groups, isVisible: true, sortOrder: 11, defaultSortOption: "nameAsc", defaultFilterId: nil, defaultFilterName: nil),
                 TabConfig(id: .markers, isVisible: true, sortOrder: 12, defaultSortOption: "createdAtDesc", defaultFilterId: nil, defaultFilterName: nil),
-                TabConfig(id: .stashline, isVisible: true, sortOrder: 13, defaultSortOption: "dateDesc", defaultFilterId: nil, defaultFilterName: nil)
+                TabConfig(id: .stashline, isVisible: true, sortOrder: 13, defaultSortOption: "dateDesc", defaultFilterId: nil, defaultFilterName: nil),
+                TabConfig(id: .magazine, isVisible: true, sortOrder: 14, defaultSortOption: nil)
             ]
             saveConfig()
         }
@@ -1920,7 +1925,7 @@ class TabManager: ObservableObject {
     
     func move(from source: IndexSet, to destination: Int) {
         // We only allow reordering of the top-level content tabs (excluding settings and sub-tabs)
-        var configurableTabs = tabs.filter { $0.id != .settings && $0.id != .studios && $0.id != .tags && $0.id != .scenes && $0.id != .galleries && $0.id != .performers && $0.id != .dashboard && $0.id != .media && $0.id != .catalogue && $0.id != .images && $0.id != .groups && $0.id != .markers }
+        var configurableTabs = tabs.filter { $0.id != .settings && $0.id != .studios && $0.id != .tags && $0.id != .scenes && $0.id != .galleries && $0.id != .performers && $0.id != .dashboard && $0.id != .media && $0.id != .catalogue && $0.id != .images && $0.id != .groups && $0.id != .markers && $0.id != .magazine }
             .sorted { $0.sortOrder < $1.sortOrder }
             
         configurableTabs.move(fromOffsets: source, toOffset: destination)
@@ -1935,11 +1940,20 @@ class TabManager: ObservableObject {
         saveConfig()
     }
     
+    /// Magazin is stashy+ only; while locked it is no row in Settings › Home Tabs either.
+    private var listsMagazineTab: Bool {
+        #if os(tvOS)
+        false
+        #else
+        StashyPlusManager.isUnlockedNow
+        #endif
+    }
+
     func moveSubTab(from source: IndexSet, to destination: Int, within parent: AppTab) {
         let filter: (TabConfig) -> Bool = {
             switch parent {
             case .catalogue:
-                return $0.id == .performers || $0.id == .studios || $0.id == .tags || $0.id == .scenes || $0.id == .galleries || $0.id == .images || $0.id == .dashboard || $0.id == .groups || $0.id == .markers
+                return $0.id == .performers || $0.id == .studios || $0.id == .tags || $0.id == .scenes || $0.id == .galleries || $0.id == .images || $0.id == .dashboard || $0.id == .groups || $0.id == .markers || ($0.id == .magazine && self.listsMagazineTab)
             case .media:
                 return false
             default:

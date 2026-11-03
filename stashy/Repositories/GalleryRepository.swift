@@ -7,6 +7,23 @@
 
 import Foundation
 
+// MARK: - Gallery Reader Info
+
+struct GalleryReaderInfo: Decodable, Equatable {
+    struct Chapter: Decodable, Identifiable, Equatable {
+        let id: String
+        let title: String
+        /// 1-based page the chapter starts on.
+        let image_index: Int
+    }
+    struct Tag: Decodable, Identifiable, Equatable {
+        let id: String
+        let name: String
+    }
+    let chapters: [Chapter]
+    let tags: [Tag]
+}
+
 // MARK: - Gallery Repository Protocol
 
 protocol GalleryRepositoryProtocol {
@@ -41,6 +58,9 @@ protocol GalleryRepositoryProtocol {
     
     /// Sets the given custom fields, leaving all others untouched
     func updateCustomFields(galleryId: String, partial: [String: Any]) async throws
+    
+    /// Fetches what the Magazin reader shows beyond the list's `GalleryFields`
+    func fetchReaderInfo(galleryId: String) async throws -> GalleryReaderInfo
     
     /// Fetches images for a gallery
     func fetchGalleryImages(
@@ -209,6 +229,23 @@ class GalleryRepository: GalleryRepositoryProtocol {
             query: GraphQLQueries.loadQuery(named: "galleryUpdateCustomFields"),
             variables: variables
         )
+    }
+    
+    // MARK: - Gallery Reader Info
+    
+    private struct ReaderInfoResponse: Decodable {
+        struct DataContainer: Decodable {
+            let findGallery: GalleryReaderInfo?
+        }
+        let data: DataContainer?
+    }
+    
+    func fetchReaderInfo(galleryId: String) async throws -> GalleryReaderInfo {
+        let response: ReaderInfoResponse = try await graphQLClient.execute(
+            query: GraphQLQueries.loadQuery(named: "findGalleryReaderInfo"),
+            variables: ["id": galleryId]
+        )
+        return response.data?.findGallery ?? GalleryReaderInfo(chapters: [], tags: [])
     }
     
     // MARK: - Fetch Gallery Images

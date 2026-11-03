@@ -42,6 +42,7 @@ struct SettingsView: View {
     // IAP / stashy+
     @ObservedObject private var storeManager = StoreManager.shared
     @ObservedObject private var stashyPlus = StashyPlusManager.shared
+    @AppStorage(MagazineMode.enabledKey) private var isMagazineEnabled = false
 
     enum SettingsSection: String, CaseIterable, Identifiable {
         case main = "Settings"
@@ -242,6 +243,25 @@ struct SettingsView: View {
             }
 
             Section {
+                stashyScrollingSectionHeader("Magazin")
+                Toggle(isOn: $isMagazineEnabled) {
+                    Label("Magazin eReader", systemImage: "magazine")
+                }
+                .tint(appearanceManager.tintColor)
+                .stashyGroupedBlockRow(index: 0, count: isMagazineEnabled ? 2 : 1)
+
+                if isMagazineEnabled {
+                    HStack {
+                        Text("Default Filter")
+                        Spacer()
+                        MagazineDefaultFilterMenu(viewModel: viewModel)
+                    }
+                    .stashyGroupedBlockRow(index: 1, count: 2)
+                    .task { viewModel.fetchSavedFilters() }
+                }
+            }
+
+            Section {
                 stashyScrollingSectionHeader("AI Subtitles and translation", isBeta: true)
                 StashyPlusAISubtitlesSettings()
             }
@@ -266,38 +286,41 @@ struct SettingsView: View {
                 stashyScrollingSectionHeader("Included with stashy+")
                 Label("Custom App Icons", systemImage: "lock.fill")
                     .foregroundColor(.secondary)
-                    .stashyGroupedBlockRow(index: 0, count: 12)
+                    .stashyGroupedBlockRow(index: 0, count: 13)
                 Label("Download Scenes", systemImage: "lock.fill")
                     .foregroundColor(.secondary)
-                    .stashyGroupedBlockRow(index: 1, count: 12)
+                    .stashyGroupedBlockRow(index: 1, count: 13)
                 Label("Miniplayer & Watchlist", systemImage: "lock.fill")
                     .foregroundColor(.secondary)
-                    .stashyGroupedBlockRow(index: 2, count: 12)
+                    .stashyGroupedBlockRow(index: 2, count: 13)
                 lockedPlusFeature("AI Subtitles and translation", systemImage: "lock.fill", isBeta: true)
-                    .stashyGroupedBlockRow(index: 3, count: 12)
+                    .stashyGroupedBlockRow(index: 3, count: 13)
                 lockedPlusFeature(AIMotionCopy.name, systemImage: "lock.fill", isBeta: true)
-                    .stashyGroupedBlockRow(index: 4, count: 12)
+                    .stashyGroupedBlockRow(index: 4, count: 13)
                 Label(ToolsItem.statistics.plusFeatureTitle, systemImage: "lock.fill")
                     .foregroundColor(.secondary)
-                    .stashyGroupedBlockRow(index: 5, count: 12)
+                    .stashyGroupedBlockRow(index: 5, count: 13)
                 Label(ToolsItem.oCount.plusFeatureTitle, systemImage: "lock.fill")
                     .foregroundColor(.secondary)
-                    .stashyGroupedBlockRow(index: 6, count: 12)
+                    .stashyGroupedBlockRow(index: 6, count: 13)
                 Label(ToolsItem.timeline.plusFeatureTitle, systemImage: "lock.fill")
                     .foregroundColor(.secondary)
-                    .stashyGroupedBlockRow(index: 7, count: 12)
+                    .stashyGroupedBlockRow(index: 7, count: 13)
                 Label(ToolsItem.topLists.plusFeatureTitle, systemImage: "lock.fill")
                     .foregroundColor(.secondary)
-                    .stashyGroupedBlockRow(index: 8, count: 12)
+                    .stashyGroupedBlockRow(index: 8, count: 13)
                 Label(ToolsItem.filters.plusFeatureTitle, systemImage: "lock.fill")
                     .foregroundColor(.secondary)
-                    .stashyGroupedBlockRow(index: 9, count: 12)
+                    .stashyGroupedBlockRow(index: 9, count: 13)
                 Label(ToolsItem.hotOrNot.plusFeatureTitle, systemImage: "lock.fill")
                     .foregroundColor(.secondary)
-                    .stashyGroupedBlockRow(index: 10, count: 12)
+                    .stashyGroupedBlockRow(index: 10, count: 13)
                 Label(ToolsItem.rateMe.title, systemImage: "lock.fill")
                     .foregroundColor(.secondary)
-                    .stashyGroupedBlockRow(index: 11, count: 12)
+                    .stashyGroupedBlockRow(index: 11, count: 13)
+                Label("Magazin", systemImage: "lock.fill")
+                    .foregroundColor(.secondary)
+                    .stashyGroupedBlockRow(index: 12, count: 13)
             }
         }
 

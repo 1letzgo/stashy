@@ -10,10 +10,13 @@ import SwiftUI
 
 /// Lets another screen reuse the full gallery list (filter, sort, presets) with its own behaviour.
 struct GalleryListHost {
+    var title: String
     /// Replaces the push to `ImagesView`.
     var onOpen: (Gallery) -> Void
-    /// Wraps each card, e.g. with a progress bar or context menu.
-    var decorateCard: (Gallery, AnyView) -> AnyView
+    /// Replaces `GalleryCardView`.
+    var card: (Gallery) -> AnyView
+    /// Replaces the Settings card columns; gets the grid width.
+    var gridItems: (CGFloat) -> [GridItem]
     var onGalleriesChanged: ([Gallery]) -> Void
     /// The host's own Settings default filter, replacing the Galleries tab's.
     var defaultFilterId: () -> String?
@@ -426,7 +429,8 @@ private struct GalleriesViewContent: View {
 
 
     private var columns: [GridItem] {
-        tabManager.catalogCardColumns(for: CatalogCardColumnScope.galleries).gridItems(width: cardGridWidth)
+        if let host { return host.gridItems(cardGridWidth) }
+        return tabManager.catalogCardColumns(for: CatalogCardColumnScope.galleries).gridItems(width: cardGridWidth)
     }
 
     // Safe sort change function
@@ -564,10 +568,7 @@ private struct GalleriesViewContent: View {
                             HapticManager.light()
                             host.onOpen(gallery)
                         } label: {
-                            host.decorateCard(gallery, AnyView(GalleryCardView(
-                                gallery: gallery,
-                                aspectRatio: cardColumns.cardAspectRatio
-                            )))
+                            host.card(gallery)
                         }
                         .buttonStyle(.plain)
                     } else {
@@ -612,7 +613,7 @@ private struct GalleriesViewContent: View {
     /// Single source for nav bar + slot chrome. The legacy/native branch lives in `stashyCatalogChrome`.
     private var catalogChromeConfig: CatalogChromeConfig {
         CatalogChromeConfig(
-            title: "Galleries",
+            title: host?.title ?? "Galleries",
             ownsNavigationBar: !hideTitle,
             visibility: galleriesFloatingBarChrome,
             isPresented: true,
@@ -694,12 +695,17 @@ private struct GalleriesViewContent: View {
         }
     }
 
+    private var defaultFilterId: String? {
+        if let host { return host.defaultFilterId() }
+        return TabManager.shared.getDefaultFilterId(for: .galleries)
+    }
+
     /// Applies Settings → Default Filters for Galleries. Returns `true` if selection changed.
     @discardableResult
     private func applyGalleriesDefaultFilterFromSettingsIfNeeded(force: Bool) -> Bool {
         if !force, didApplyDefaultFilter || selectedFilter != nil { return false }
 
-        if let defaultId = host.map({ $0.defaultFilterId() }) ?? TabManager.shared.getDefaultFilterId(for: .galleries),
+        if let defaultId = defaultFilterId,
            let filter = viewModel.savedFilters[defaultId] {
             let already =
                 selectedFilter?.id == filter.id
@@ -747,7 +753,7 @@ private struct GalleriesViewContent: View {
         }
 
         let appliedDefault = applyGalleriesDefaultFilterFromSettingsIfNeeded(force: false)
-        let defaultPending = TabManager.shared.getDefaultFilterId(for: .galleries) != nil && viewModel.savedFilters.isEmpty
+        let defaultPending = defaultFilterId != nil && viewModel.savedFilters.isEmpty
         if !defaultPending, (forceRefresh || appliedDefault || viewModel.galleries.isEmpty) {
             performSearch()
         }
