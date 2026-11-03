@@ -319,7 +319,8 @@ object TabManager {
     val catalogSubTabs: List<TabConfig> get() {
         ensureLoaded()
         val ids = setOf(AppTab.Scenes, AppTab.Galleries, AppTab.Performers, AppTab.Studios, AppTab.Tags, AppTab.Images, AppTab.Groups, AppTab.Markers)
-        return tabs.filter { it.id in ids }.sortedBy { it.sortOrder }
+        // Magazin is stashy+ only; while locked it is no row in Home Tabs either.
+        return tabs.filter { it.id in ids || (it.id == AppTab.Magazine && StashyPlus.isUnlocked) }.sortedBy { it.sortOrder }
     }
 
     /** iOS `toggle(_:)` — the dashboard can't be hidden. */
@@ -333,7 +334,7 @@ object TabManager {
     /** iOS `moveSubTab(from:to:within: .catalogue)` with indices into [catalogSubTabs]; dashboard stays first. */
     fun moveCatalogSubTab(from: Int, to: Int) {
         val ids = setOf(AppTab.Performers, AppTab.Studios, AppTab.Tags, AppTab.Scenes, AppTab.Galleries, AppTab.Images, AppTab.Dashboard, AppTab.Groups, AppTab.Markers)
-        val sub = tabs.filter { it.id in ids }.sortedBy { it.sortOrder }.toMutableList()
+        val sub = tabs.filter { it.id in ids || (it.id == AppTab.Magazine && StashyPlus.isUnlocked) }.sortedBy { it.sortOrder }.toMutableList()
         sub.indexOfFirst { it.id == AppTab.Dashboard }.takeIf { it >= 0 }?.let { sub.add(0, sub.removeAt(it)) }
         val moved = listOf(sub.first()) + TabConfigLogic.move(sub.drop(1), from, to)
         val order = moved.mapIndexed { i, t -> t.id to i }.toMap()
@@ -415,7 +416,8 @@ object TabManager {
     val visibleCatalogTabs: List<AppTab> get() {
         ensureLoaded()
         val ids = setOf(AppTab.Dashboard, AppTab.Scenes, AppTab.Galleries, AppTab.Performers, AppTab.Studios, AppTab.Tags, AppTab.Images, AppTab.Groups, AppTab.Markers)
-        return tabs.filter { it.id in ids && it.isVisible }.sortedBy { it.sortOrder }.map { it.id }
+        val showsMagazine = de.letzgo.stashy.data.tools.MagazineMode.isEnabled && StashyPlus.isUnlocked
+        return tabs.filter { (it.id in ids && it.isVisible) || (it.id == AppTab.Magazine && showsMagazine) }.sortedBy { it.sortOrder }.map { it.id }
     }
 
     // MARK: home rows

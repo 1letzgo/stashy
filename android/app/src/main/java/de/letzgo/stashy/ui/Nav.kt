@@ -27,19 +27,19 @@ enum class MainTab { Home, Feeds, Tools, Settings, Search }
 /** iOS: `CatalogsView.CatalogsTab` (order and icons identical). */
 enum class CatalogTab(val title: String) {
     Dashboard("Dashboard"), Scenes("Scenes"), Images("Images"), Galleries("Galleries"),
-    Performers("Performers"), Studios("Studios"), Tags("Tags"), Groups("Groups"), Markers("Markers");
+    Performers("Performers"), Studios("Studios"), Tags("Tags"), Groups("Groups"), Markers("Markers"), Magazine("Magazin");
 
     val icon get() = when (this) {
         Dashboard -> SF.houseFill; Scenes -> SF.film; Images -> SF.photo; Galleries -> SF.photoStack
         Performers -> SF.personFill; Studios -> SF.building2; Tags -> SF.tag
-        Groups -> SF.rectangleStackFill; Markers -> SF.bookmarkFill
+        Groups -> SF.rectangleStackFill; Markers -> SF.bookmarkFill; Magazine -> SF.magazine
     }
 
     /** iOS `TabManager` `AppTab` of this catalog (order / visibility / defaults). */
     val appTab: AppTab get() = when (this) {
         Dashboard -> AppTab.Dashboard; Scenes -> AppTab.Scenes; Images -> AppTab.Images; Galleries -> AppTab.Galleries
         Performers -> AppTab.Performers; Studios -> AppTab.Studios; Tags -> AppTab.Tags
-        Groups -> AppTab.Groups; Markers -> AppTab.Markers
+        Groups -> AppTab.Groups; Markers -> AppTab.Markers; Magazine -> AppTab.Magazine
     }
 
     /** List mode of the catalog (null for the dashboard). */

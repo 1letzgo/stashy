@@ -1,6 +1,8 @@
 package de.letzgo.stashy.data.tools
 
+import de.letzgo.stashy.data.IdName
 import de.letzgo.stashy.data.StashImage
+import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
@@ -11,6 +13,14 @@ import java.time.Instant
 /** iOS: `MagazineReadingStore.Entry` — [page] is 1-based; on a spread its first page. */
 @Serializable
 data class MagazineEntry(val page: Int, val readAt: String, val isSynced: Boolean)
+
+/** iOS: `GalleryReaderInfo.Chapter` — [imageIndex] is the 1-based page the chapter starts on. */
+@Serializable
+data class MagazineChapter(val id: String, val title: String = "", @SerialName("image_index") val imageIndex: Int = 1)
+
+/** iOS: `GalleryReaderInfo`. */
+@Serializable
+data class MagazineReaderInfo(val chapters: List<MagazineChapter> = emptyList(), val tags: List<IdName> = emptyList())
 
 /** Pure Magazin logic (iOS `MagazinePageOrder`, `MagazineReadingStore`, `MagazineToolsView`). */
 object MagazineLogic {
@@ -64,6 +74,29 @@ object MagazineLogic {
     }
 
     fun spreadCount(pageCount: Int): Int = (pageCount + 1) / 2
+
+    /** The last page on screen: a chapter can start on a spread's second page. */
+    fun lastVisiblePage(spreadIndex: Int, pageCount: Int): Int = minOf(spreadIndex * 2 + 1, pageCount - 1)
+
+    fun currentChapter(chapters: List<MagazineChapter>, lastVisiblePage: Int): MagazineChapter? =
+        chapters.sortedBy { it.imageIndex }.lastOrNull { it.imageIndex - 1 <= lastVisiblePage }
+
+    /** 0-based page of a chapter; it can point past the pages kept here (videos are left out). */
+    fun chapterPage(chapter: MagazineChapter, pageCount: Int): Int =
+        (chapter.imageIndex - 1).coerceIn(0, maxOf(pageCount - 1, 0))
+
+    /** 0-based page the input stands for; null while it is no page of this gallery. */
+    fun enteredPage(input: String, pageCount: Int): Int? =
+        input.trim().toIntOrNull()?.takeIf { it in 1..pageCount }?.minus(1)
+
+    /** Three covers per row, more only where three would turn into posters (tablets). */
+    fun coverColumns(widthDp: Float): Int = maxOf(3, ((widthDp + 12f) / (220f + 12f)).toInt())
+
+    /** iOS: `"%g / 5"` of a 0–100 rating. */
+    fun ratingLabel(rating100: Int): String {
+        val stars = rating100 / 20.0
+        return (if (stars % 1.0 == 0.0) stars.toInt().toString() else stars.toString()) + " / 5"
+    }
 
     /** Page 1 counts as not started; the last spread (which can end one page later) fills the bar. */
     fun readFraction(page: Int?, total: Int?): Float? {

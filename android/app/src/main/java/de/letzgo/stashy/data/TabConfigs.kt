@@ -30,7 +30,8 @@ enum class AppTab(val title: String) {
     @SerialName("images") Images("Images"),
     @SerialName("groups") Groups("Groups"),
     @SerialName("markers") Markers("Markers"),
-    @SerialName("stashline") Stashline("StashLine");
+    @SerialName("stashline") Stashline("StashLine"),
+    @SerialName("magazine") Magazine("Magazin");
 
     /** Raw value as stored by iOS. */
     val raw: String get() = name.replaceFirstChar { it.lowercase() }.let { if (this == StashyPlus) "stashyPlus" else it }
@@ -207,6 +208,7 @@ object TabConfigLogic {
         TabConfig(AppTab.Groups, true, 11, "nameAsc"),
         TabConfig(AppTab.Markers, true, 12, "createdAtDesc"),
         TabConfig(AppTab.Stashline, true, 13, "dateDesc"),
+        TabConfig(AppTab.Magazine, true, 14),
     )
 
     private val sortMigrations = mapOf("scenes_count" to "sceneCountDesc", "name" to "nameAsc", "date" to "dateDesc")

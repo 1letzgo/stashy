@@ -12,12 +12,15 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.PagerState
 import androidx.compose.foundation.pager.rememberPagerState
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
@@ -54,7 +57,9 @@ import coil3.request.Disposable
 import coil3.request.ImageRequest
 import de.letzgo.stashy.data.Gallery
 import de.letzgo.stashy.data.StashImage
+import de.letzgo.stashy.data.tools.MagazineChapter
 import de.letzgo.stashy.data.tools.MagazineLogic
+import de.letzgo.stashy.data.tools.MagazineReaderInfo
 import de.letzgo.stashy.data.tools.MagazineReadingStore
 import de.letzgo.stashy.data.tools.MagazineRepository
 import de.letzgo.stashy.ui.Nav
@@ -82,6 +87,34 @@ class MagazineReaderScreen(private val gallery: Gallery) : Screen {
     private var didRestorePosition = false
     private var loadAttempt by mutableIntStateOf(0)
     private var finishedAttempt = -1
+    private var info by mutableStateOf(MagazineReaderInfo(tags = gallery.tags.orEmpty()))
+    private var showsPagePicker by mutableStateOf(false)
+    private var showsDetails by mutableStateOf(false)
+
+    private val chapters: List<MagazineChapter> get() = info.chapters.sortedBy { it.imageIndex }
+
+    /** 0-based; on a spread its first page. */
+    private val currentPage: Int get() = if (showsFullscreen) fullscreenPage else spreadIndex * 2
+
+    private val currentChapter: MagazineChapter? get() = MagazineLogic.currentChapter(
+        chapters,
+        if (showsFullscreen) fullscreenPage else MagazineLogic.lastVisiblePage(spreadIndex, pages.size),
+    )
+
+    /** A failure just leaves the reader without chapters. */
+    private suspend fun loadInfo() {
+        try {
+            info = MagazineRepository.readerInfo(gallery.id)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (_: Exception) {
+        }
+    }
+
+    private fun jump(page: Int) {
+        if (showsFullscreen) fullscreenPage = page else spreadIndex = page / 2
+        notePosition()
+    }
 
     private suspend fun load() {
         isLoading = true
@@ -105,8 +138,7 @@ class MagazineReaderScreen(private val gallery: Gallery) : Screen {
 
     private fun notePosition() {
         if (!didRestorePosition || pages.isEmpty()) return
-        val page = if (showsFullscreen) fullscreenPage else spreadIndex * 2
-        MagazineReadingStore.note(page + 1, gallery.id)
+        MagazineReadingStore.note(currentPage + 1, gallery.id)
     }
 
     private fun openFullscreen(page: Int) {
@@ -128,6 +160,7 @@ class MagazineReaderScreen(private val gallery: Gallery) : Screen {
                 load()
             }
         }
+        LaunchedEffect(Unit) { loadInfo() }
         BackHandler(enabled = showsFullscreen) { closeFullscreen() }
         KeepScreenOn()
         PushPositionWhenLeaving()
@@ -139,6 +172,12 @@ class MagazineReaderScreen(private val gallery: Gallery) : Screen {
                 Box(Modifier.fillMaxWidth().weight(1f), contentAlignment = Alignment.Center) { Body() }
             }
             if (showsFullscreen) Fullscreen()
+        }
+        if (showsPagePicker) {
+            MagazinePagePickerSheet(pages, chapters, currentPage, currentChapter?.id, ::jump) { showsPagePicker = false }
+        }
+        if (showsDetails) {
+            MagazineDetailsSheet(gallery, info.tags, pages.size, chapters.size) { showsDetails = false }
         }
     }
 
@@ -185,17 +224,31 @@ class MagazineReaderScreen(private val gallery: Gallery) : Screen {
     private fun TopBar() {
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             CircleIcon(SF.xmark, "Close") { Nav.pop() }
-            Text(
-                gallery.displayTitle, Modifier.weight(1f), color = Color.White, fontSize = 14.sp,
-                maxLines = 1, overflow = TextOverflow.Ellipsis,
-            )
+            Column(Modifier.weight(1f).heightIn(min = 48.dp).clickable { showsDetails = true }, verticalArrangement = Arrangement.Center) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        gallery.displayTitle, Modifier.weight(1f, fill = false), color = Color.White, fontSize = 14.sp,
+                        maxLines = 1, overflow = TextOverflow.Ellipsis,
+                    )
+                    Icon(Icons.Outlined.Info, "Gallery details", Modifier.padding(start = 4.dp).size(14.dp), tint = Color.White.copy(alpha = 0.7f))
+                }
+                currentChapter?.let { chapter ->
+                    Text(chapter.title, color = Color.White.copy(alpha = 0.7f), fontSize = 11.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                }
+            }
             if (pages.isNotEmpty()) {
                 val first = spreadIndex * 2 + 1
                 val last = minOf(first + 1, pages.size)
-                Text(
-                    if (first == last) "Page $first / ${pages.size}" else "Page $first–$last / ${pages.size}",
-                    Modifier.padding(horizontal = 12.dp), color = Color.White.copy(alpha = 0.7f), fontSize = 12.sp,
-                )
+                Row(
+                    Modifier.heightIn(min = 48.dp).clickable { showsPagePicker = true }.padding(horizontal = 12.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(
+                        if (first == last) "Page $first / ${pages.size}" else "Page $first–$last / ${pages.size}",
+                        color = Color.White.copy(alpha = 0.7f), fontSize = 12.sp,
+                    )
+                    Icon(SF.chevronDown, "Go to page", Modifier.size(16.dp), tint = Color.White.copy(alpha = 0.7f))
+                }
             }
             if (spreadIndex > 0) {
                 CircleIcon(SF.counterclockwise, "Reset position") {
@@ -276,6 +329,10 @@ class MagazineReaderScreen(private val gallery: Gallery) : Screen {
                 zoomed = false
             }
         }
+        // The page sheet jumps without an animation.
+        LaunchedEffect(fullscreenPage) {
+            if (pagerState.settledPage != fullscreenPage) pagerState.scrollToPage(fullscreenPage)
+        }
         Box(Modifier.fillMaxSize().background(Color.Black)) {
             HorizontalPager(
                 pagerState, Modifier.fillMaxSize(),
@@ -294,11 +351,14 @@ class MagazineReaderScreen(private val gallery: Gallery) : Screen {
                 ) {
                     CircleIcon(SF.xmark, "Close", background = true) { closeFullscreen() }
                     Spacer(Modifier.weight(1f))
-                    Text(
-                        "${fullscreenPage + 1} / ${pages.size}",
-                        Modifier.clip(CircleShape).background(Color.Black.copy(alpha = 0.45f)).padding(horizontal = 12.dp, vertical = 8.dp),
-                        color = Color.White, fontSize = 12.sp,
-                    )
+                    Row(
+                        Modifier.clip(CircleShape).background(Color.Black.copy(alpha = 0.45f))
+                            .clickable { showsPagePicker = true }.padding(horizontal = 12.dp, vertical = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text("${fullscreenPage + 1} / ${pages.size}", color = Color.White, fontSize = 12.sp)
+                        Icon(SF.chevronDown, "Go to page", Modifier.size(16.dp), tint = Color.White)
+                    }
                 }
             }
         }

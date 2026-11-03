@@ -76,4 +76,49 @@ class MagazineLogicTest {
         assertFalse(MagazineLogic.remoteWins(older, newer))
         assertTrue(MagazineLogic.remoteWins(older, older))
     }
+
+    private val chapters = listOf(MagazineChapter("b", "Two", 8), MagazineChapter("a", "One", 1), MagazineChapter("c", "Three", 17))
+
+    @Test
+    fun currentChapterFollowsTheLastVisiblePage() {
+        assertEquals("One", MagazineLogic.currentChapter(chapters, MagazineLogic.lastVisiblePage(0, 23))?.title)
+        // Spread 7–8 (index 3): the chapter starts on its second page.
+        assertEquals("Two", MagazineLogic.currentChapter(chapters, MagazineLogic.lastVisiblePage(3, 23))?.title)
+        assertEquals("Three", MagazineLogic.currentChapter(chapters, 22)?.title)
+        assertNull(MagazineLogic.currentChapter(listOf(MagazineChapter("x", "Late", 5)), 1))
+    }
+
+    @Test
+    fun lastVisiblePageStopsAtALoneLastPage() {
+        assertEquals(22, MagazineLogic.lastVisiblePage(11, 23))
+        assertEquals(21, MagazineLogic.lastVisiblePage(10, 23))
+    }
+
+    @Test
+    fun chapterPagesAreClampedToTheGallery() {
+        assertEquals(7, MagazineLogic.chapterPage(MagazineChapter("b", "Two", 8), 23))
+        assertEquals(22, MagazineLogic.chapterPage(MagazineChapter("x", "Past", 99), 23))
+        assertEquals(0, MagazineLogic.chapterPage(MagazineChapter("x", "Zero", 0), 23))
+    }
+
+    @Test
+    fun enteredPageMustBeInTheGallery() {
+        assertEquals(11, MagazineLogic.enteredPage(" 12 ", 23))
+        assertNull(MagazineLogic.enteredPage("0", 23))
+        assertNull(MagazineLogic.enteredPage("24", 23))
+        assertNull(MagazineLogic.enteredPage("", 23))
+    }
+
+    @Test
+    fun coversAreThreePerRowOnPhones() {
+        assertEquals(3, MagazineLogic.coverColumns(0f))
+        assertEquals(3, MagazineLogic.coverColumns(412f))
+        assertEquals(4, MagazineLogic.coverColumns(932f))
+    }
+
+    @Test
+    fun ratingLabelDropsWholeStarDecimals() {
+        assertEquals("4 / 5", MagazineLogic.ratingLabel(80))
+        assertEquals("4.5 / 5", MagazineLogic.ratingLabel(90))
+    }
 }

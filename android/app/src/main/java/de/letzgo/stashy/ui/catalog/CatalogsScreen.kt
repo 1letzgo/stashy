@@ -21,6 +21,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import de.letzgo.stashy.data.AppTab
 import de.letzgo.stashy.data.TabManager
 import de.letzgo.stashy.ui.CatalogTab
 import de.letzgo.stashy.ui.Nav
@@ -41,7 +42,8 @@ fun catalogTopPadding(): Dp = WindowInsets.statusBars.asPaddingValues().calculat
  */
 private fun sortedVisibleTabs(current: CatalogTab): List<CatalogTab> {
     val tabs = TabManager.visibleCatalogTabs.mapNotNull { CatalogTab.from(it) }.toMutableList()
-    if (current !in tabs) tabs.add(current)
+    // Magazin only shows while switched on, unlike a catalog hidden in Home Tabs.
+    if (current !in tabs && current != CatalogTab.Magazine) tabs.add(current)
     return tabs
 }
 
@@ -52,8 +54,11 @@ private fun sortedVisibleTabs(current: CatalogTab): List<CatalogTab> {
 @Composable
 fun CatalogsScreen() {
     val p = Theme.palette
+    // Switched off (or stashy+ lost) while it was the open catalog.
+    val isMagazineGone = Nav.catalogTab == CatalogTab.Magazine && AppTab.Magazine !in TabManager.visibleCatalogTabs
+    LaunchedEffect(isMagazineGone) { if (isMagazineGone) Nav.catalogTab = CatalogTab.Dashboard }
     Box(Modifier.fillMaxSize().background(p.background)) {
-        when (Nav.catalogTab) {
+        when (if (isMagazineGone) CatalogTab.Dashboard else Nav.catalogTab) {
             CatalogTab.Dashboard -> DashboardScreen()
             CatalogTab.Scenes -> ScenesCatalog()
             CatalogTab.Images -> ImagesCatalog()
@@ -63,6 +68,7 @@ fun CatalogsScreen() {
             CatalogTab.Tags -> TagsCatalog()
             CatalogTab.Groups -> GroupsCatalog()
             CatalogTab.Markers -> MarkersCatalog()
+            CatalogTab.Magazine -> de.letzgo.stashy.ui.tools.magazine.MagazineCatalog()
         }
         val tabs = sortedVisibleTabs(Nav.catalogTab)
         // iOS `showTabSwitcher`: only with more than one catalog — on Android the strip also

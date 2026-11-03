@@ -151,6 +151,21 @@ fun LazyListScope.stashyPlusSettingsItems() {
             }
             SectionSpacer()
         }
+        item(key = "plus-magazine") {
+            val mode = de.letzgo.stashy.data.tools.MagazineMode
+            LaunchedEffect(mode.isEnabled) { if (mode.isEnabled) de.letzgo.stashy.data.SavedFiltersStore.load() }
+            SettingsSectionHeader("Magazin")
+            GroupedCard {
+                de.letzgo.stashy.ui.settings.SettingsToggleRow("Magazin eReader", mode.isEnabled, SF.magazine) { mode.isEnabled = it }
+                if (mode.isEnabled) {
+                    RowDivider()
+                    Box(Modifier.padding(horizontal = 16.dp)) {
+                        de.letzgo.stashy.ui.settings.CardSettingRow("Default Filter") { de.letzgo.stashy.ui.settings.MagazineDefaultFilterMenu() }
+                    }
+                }
+            }
+            SectionSpacer()
+        }
         item(key = "plus-app-icons") {
             SettingsSectionHeader("Custom App Icons")
             GroupedCard { Box(Modifier.padding(horizontal = 16.dp)) { AppIconPicker() } }
@@ -187,6 +202,7 @@ fun LazyListScope.stashyPlusSettingsItems() {
                 ToolsItem.Filters.plusFeatureTitle to false,
                 ToolsItem.HotOrNot.plusFeatureTitle to false,
                 ToolsItem.RateMe.title to false,
+                "Magazin" to false,
             )
             GroupedCard {
                 features.forEachIndexed { i, (title, beta) ->

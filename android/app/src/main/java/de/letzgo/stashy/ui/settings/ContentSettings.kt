@@ -54,6 +54,7 @@ fun AppTab.settingsIcon(): ImageVector = when (this) {
     AppTab.Tags -> SF.tag
     AppTab.Groups -> SF.rectangleStackFill
     AppTab.Markers -> SF.bookmarkFill
+    AppTab.Magazine -> SF.magazine
     AppTab.Reels -> SF.playRectangleOnRectangle
     AppTab.Tools -> SF.cubeBox
     else -> SF.squareGrid2x2Fill
@@ -124,7 +125,7 @@ fun DefaultFilterMenu(tab: AppTab, kind: FilterKind = FilterKind.Standard) {
     }
 }
 
-/** iOS: `MagazineDefaultFilterMenu` — Settings › Tools. */
+/** iOS: `MagazineDefaultFilterMenu` — Settings › stashy+ and Home Tabs. */
 @Composable
 fun MagazineDefaultFilterMenu() {
     val filters = SavedFiltersStore.ofMode(FilterMode.Galleries.raw)
@@ -224,6 +225,10 @@ class DashboardSettingsScreen : Screen {
 /** iOS `catalogTabCard(_:)`. */
 @Composable
 private fun CatalogTabCard(tab: TabConfig, handle: Modifier) {
+    if (tab.id == AppTab.Magazine) {
+        MagazineTabCard(handle)
+        return
+    }
     SettingsCard {
         CardHeader(tab.id.title, tab.id.settingsIcon()) {
             SettingsSwitch(tab.isVisible) { TabManager.toggle(tab.id) }
@@ -254,6 +259,22 @@ private fun CatalogTabCard(tab: TabConfig, handle: Modifier) {
             }
         }
         if (tab.id == AppTab.Galleries) CardSettingRow("Opened Gallery") { ColumnsMenu(CatalogCardColumnScope.OpenedGallery) }
+    }
+}
+
+/** Same switch and default filter as Settings › stashy+: both read the one stored value. */
+@Composable
+private fun MagazineTabCard(handle: Modifier) {
+    val mode = de.letzgo.stashy.data.tools.MagazineMode
+    SettingsCard {
+        CardHeader(AppTab.Magazine.title, AppTab.Magazine.settingsIcon()) {
+            SettingsSwitch(mode.isEnabled) { mode.isEnabled = it }
+            Spacer(Modifier.width(8.dp))
+            DragHandle(handle)
+        }
+        if (!mode.isEnabled) return@SettingsCard
+        CardDivider()
+        CardSettingRow("Default Filter") { MagazineDefaultFilterMenu() }
     }
 }
 

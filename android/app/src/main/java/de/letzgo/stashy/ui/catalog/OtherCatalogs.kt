@@ -151,12 +151,14 @@ fun GalleriesList(
     card: @Composable (Gallery, Float) -> Unit = { gallery, aspectRatio ->
         GalleryCard(gallery, aspectRatio = aspectRatio, onClick = { Nav.push(GalleryDetailScreen(gallery.id, gallery)) })
     },
+    /** Replaces the Settings card columns (Magazin); gets the grid width. */
+    columns: ((Float) -> Int)? = null,
 ) {
     val cols = CatalogPrefs.cardColumns(columnScope)
     CatalogScaffold(
         c, CatalogTexts("Loading galleries...", SF.photoStack, "No galleries found", "Reload"),
         CatalogSlots(),
-        columns = { cols.columnCount(it) }, itemKey = { it.id }, topPadding = topPadding, gridKey = cols,
+        columns = columns ?: { cols.columnCount(it) }, itemKey = { it.id }, topPadding = topPadding, gridKey = cols,
     ) { _, gallery ->
         card(gallery, cols.cardAspectRatio)
     }

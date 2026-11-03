@@ -123,7 +123,25 @@ object MagazineReadingStore {
     }
 }
 
-/** iOS: `MagazineDefaultFilter` — Settings › Tools: the saved gallery filter Magazin opens with, per server. */
+/** iOS: `MagazineMode` — whether Home shows Magazin; Settings › stashy+ and Home Tabs share it. */
+object MagazineMode {
+    private const val KEY = "stashy.magazine.enabled"
+
+    /** Bumped on every change so both settings screens and the Home strip read the new value. */
+    private var version by mutableIntStateOf(0)
+
+    var isEnabled: Boolean
+        get() {
+            version
+            return Prefs.bool(KEY)
+        }
+        set(value) {
+            Prefs.setBool(KEY, value)
+            version++
+        }
+}
+
+/** iOS: `MagazineDefaultFilter` — Settings › stashy+: the saved gallery filter Magazin opens with, per server. */
 object MagazineDefaultFilter {
     /** Bumped on every change so a menu or an open list reads the new value. */
     private var version by mutableIntStateOf(0)
@@ -173,6 +191,13 @@ object MagazineRepository {
             }
         }
         GraphQL.named("galleryUpdateCustomFields", variables)
+    }
+
+    /** iOS: `GalleryRepository.fetchReaderInfo` — chapters and tags beyond the list's fields. */
+    suspend fun readerInfo(galleryId: String): MagazineReaderInfo {
+        val variables = buildJsonObject { put("id", galleryId) }
+        val gallery = GraphQL.named("findGalleryReaderInfo", variables)["findGallery"] ?: return MagazineReaderInfo()
+        return GraphQL.decode(MagazineReaderInfo.serializer(), gallery)
     }
 
     /** Every image of the gallery: the natural file order only exists client-side. */

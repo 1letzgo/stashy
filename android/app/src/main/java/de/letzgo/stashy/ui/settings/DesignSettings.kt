@@ -251,9 +251,6 @@ class ToolsSettingsScreen : Screen {
             settingsSection(header = "Tab", footer = "Tools are grouped on the Tools page.", key = "tab") {
                 SettingsToggleRow("Show Tools Tab", TabManager.isVisible(AppTab.Tools), SF.cubeBox) { TabManager.toggle(AppTab.Tools) }
             }
-            settingsSection(header = "Magazin", key = "magazine") {
-                CardSettingRow("Default Filter") { MagazineDefaultFilterMenu() }
-            }
         }
     }
 }
