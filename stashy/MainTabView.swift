@@ -341,8 +341,15 @@ struct ToolsView: View {
         ("Discover", [.hotOrNot, .rateMe])
     ]
 
+    /// Settings › stashy+ › Miniplayer & Watchlist off: no Watchlist tool either.
+    private var visibleToolGroups: [(title: String, tools: [ToolsTab])] {
+        Self.toolGroups.map { group in
+            (group.title, group.tools.filter { $0 != .watchlist || tabManager.isMiniPlayerEnabled })
+        }
+    }
+
     private var sortedTabs: [ToolsTab] {
-        Self.toolGroups.flatMap(\.tools)
+        visibleToolGroups.flatMap(\.tools)
     }
     
     /// Empty (or unknown) sub-tab means the landing grid, not "first tool". Tools grew past the
@@ -368,7 +375,7 @@ struct ToolsView: View {
     var body: some View {
         Group {
             if showsLanding {
-                ToolsLandingView(groups: Self.toolGroups) { tool in
+                ToolsLandingView(groups: visibleToolGroups) { tool in
                     coordinator.toolsSubTab = tool.rawValue
                 }
             } else {
@@ -397,6 +404,7 @@ struct ToolsView: View {
             normalizeToolsSubTab()
         }
         .onChange(of: stashyPlus.isUnlocked) { _, _ in normalizeToolsSubTab() }
+        .onChange(of: tabManager.isMiniPlayerEnabled) { _, _ in normalizeToolsSubTab() }
         .popNavigationToRootOnChange(effectiveTab.rawValue)
         .stashySectionChrome {
             toolsCategoryRow

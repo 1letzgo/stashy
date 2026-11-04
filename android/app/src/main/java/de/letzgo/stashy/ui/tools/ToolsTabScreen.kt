@@ -71,13 +71,16 @@ enum class ToolsTab(val title: String, val icon: ImageVector) {
     companion object {
         fun from(raw: String) = entries.firstOrNull { it.title == raw }
 
-        /** iOS: `ToolsView.toolGroups` — fixed grouping and order. */
-        val groups: List<Pair<String, List<ToolsTab>>> = listOf(
-            "Library" to listOf(Downloads, Watchlist),
+        /**
+         * iOS: `ToolsView.visibleToolGroups` — fixed grouping and order; Settings › stashy+ ›
+         * Miniplayer & Watchlist off: no Watchlist tool either.
+         */
+        val groups: List<Pair<String, List<ToolsTab>>> get() = listOf(
+            "Library" to if (de.letzgo.stashy.data.TabManager.isMiniPlayerEnabled) listOf(Downloads, Watchlist) else listOf(Downloads),
             "Insights" to listOf(Overview, TopLists, OCount, Timeline),
             "Discover" to listOf(HotOrNot, RateMe),
         )
-        val sorted: List<ToolsTab> = groups.flatMap { it.second }
+        val sorted: List<ToolsTab> get() = groups.flatMap { it.second }
     }
 }
 
@@ -113,7 +116,7 @@ private fun ToolsView() {
         ToolsConfig.repairMissingToolsIfNeeded()
         normalizeToolsSubTab()
     }
-    LaunchedEffect(StashyPlus.isUnlocked) { normalizeToolsSubTab() }
+    LaunchedEffect(StashyPlus.isUnlocked, de.letzgo.stashy.data.TabManager.isMiniPlayerEnabled) { normalizeToolsSubTab() }
     val selected = ToolsTab.from(ToolsNav.subTab)?.takeIf { it in ToolsTab.sorted }
     val p = Theme.palette
     Box(Modifier.fillMaxSize().background(p.background)) {
@@ -139,7 +142,7 @@ private fun normalizeToolsSubTab() {
         raw == "Hot or Not" || raw == "Server" -> ToolsTab.sorted.first().title
         raw == "Statistics" -> ToolsTab.Overview.title
         raw == "Top 10" || raw == "Top" -> ToolsTab.TopLists.title
-        ToolsTab.from(raw) == null -> ""
+        ToolsTab.from(raw)?.takeIf { it in ToolsTab.sorted } == null -> ""
         else -> raw
     }
 }

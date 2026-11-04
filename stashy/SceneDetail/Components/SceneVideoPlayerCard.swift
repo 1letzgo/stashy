@@ -970,9 +970,10 @@ private struct SceneWatchlistCoverButton: View {
     @ObservedObject private var appearance = AppearanceManager.shared
 
     @ObservedObject private var stashyPlus = StashyPlusManager.shared
+    @ObservedObject private var tabManager = TabManager.shared
 
     var body: some View {
-        if stashyPlus.isUnlocked {
+        if stashyPlus.isUnlocked, tabManager.isMiniPlayerEnabled {
             button
         }
     }

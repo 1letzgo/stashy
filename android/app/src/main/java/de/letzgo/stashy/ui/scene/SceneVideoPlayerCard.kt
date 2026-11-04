@@ -185,8 +185,8 @@ private fun CoverWithOverlay(model: SceneDetailModel) {
                                 .clickable { model.startPlayback(false) }.padding(horizontal = 12.dp, vertical = 6.dp),
                             color = Color.White, style = IosTypography.caption.copy(fontWeight = FontWeight.Medium),
                         )
-                        // stashy+: the watchlist belongs to the mini player.
-                        if (de.letzgo.stashy.data.StashyPlus.isUnlocked) WatchlistCoverButton(scene)
+                        // stashy+ and switched on: the watchlist belongs to the mini player.
+                        if (de.letzgo.stashy.ui.player.MiniPlayerStore.isEnabled) WatchlistCoverButton(scene)
                     }
                 } else {
                     Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(16.dp)) {
@@ -195,8 +195,8 @@ private fun CoverWithOverlay(model: SceneDetailModel) {
                                 .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) { model.startPlayback(false) },
                             contentAlignment = Alignment.Center,
                         ) { Icon(PlayerIcons.play, "Play", tint = Color.White, modifier = Modifier.size(40.dp).padding(start = 2.dp)) }
-                        // stashy+: the watchlist belongs to the mini player.
-                        if (de.letzgo.stashy.data.StashyPlus.isUnlocked) WatchlistCoverButton(scene)
+                        // stashy+ and switched on: the watchlist belongs to the mini player.
+                        if (de.letzgo.stashy.ui.player.MiniPlayerStore.isEnabled) WatchlistCoverButton(scene)
                     }
                 }
             }
