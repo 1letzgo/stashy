@@ -22,6 +22,18 @@ import SwiftDraw
 /// Konsumenten: `SceneStudioBadge` (Scene-Cards, klein), `StudioImageView` (iOS
 /// Kacheln/Header) und `TVStudioImageView` (tvOS). Niemals ein SVG live in einer
 /// WebView rendern — das war die alte, nicht scrollbare Lösung.
+/// Scale of the window on screen; the logo store runs outside any view.
+@MainActor
+private func activeDisplayScale() -> CGFloat {
+    #if os(macOS)
+    return UIScreen.main.scale
+    #else
+    let scenes = UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }
+    let scene = scenes.first { $0.activationState == .foregroundActive } ?? scenes.first
+    return scene?.traitCollection.displayScale ?? 3
+    #endif
+}
+
 actor StudioLogoStore {
     static let shared = StudioLogoStore()
 
@@ -105,7 +117,7 @@ actor StudioLogoStore {
             return nil
         }
 
-        let scale = await MainActor.run { UIScreen.main.scale }
+        let scale = await MainActor.run { activeDisplayScale() }
         let contentType = (http.allHeaderFields["Content-Type"] as? String)?.lowercased() ?? ""
 
         // 3. Rastern abseits des Main Threads — beim ersten Scrollen laden alle
@@ -259,6 +271,7 @@ struct RasterizedSVGImage: View {
     var height: CGFloat = 240
 
     @State private var image: UIImage?
+    @Environment(\.displayScale) private var displayScale
 
     var body: some View {
         Group {
@@ -271,7 +284,7 @@ struct RasterizedSVGImage: View {
         .task(id: data) {
             let height = height
             let data = data
-            let scale = UIScreen.main.scale
+            let scale = displayScale
             image = await Task.detached(priority: .userInitiated) {
                 StudioLogoRasterizer.rasterize(svgData: data, height: height, maxWidth: height * 4, scale: scale)
             }.value

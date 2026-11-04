@@ -72,6 +72,7 @@
 		971A00A12F9990A1 /* MagazineListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 971A00A22F9990A2 /* MagazineListView.swift */; };
 		971A00A32F9990A3 /* MagazineReaderView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 971A00A42F9990A4 /* MagazineReaderView.swift */; };
 		971A00A52F9990A5 /* MagazineReadingStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 971A00A62F9990A6 /* MagazineReadingStore.swift */; };
+		F95BC67954064162862E0604 /* FoldLayout.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4744D22031FF44FBA5328431 /* FoldLayout.swift */; };
 		971A00082F999008 /* SessionTimelineToolsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 971A00072F999007 /* SessionTimelineToolsView.swift */; };
 		971A000A2F99900A /* SessionTimelineLoader.swift in Sources */ = {isa = PBXBuildFile; fileRef = 971A00092F999009 /* SessionTimelineLoader.swift */; };
 		9AA0A05BF61443C2B087A163 /* SharedUtilities.swift in Sources */ = {isa = PBXBuildFile; fileRef = DF22BB1C2F16743C007C2090 /* SharedUtilities.swift */; };
@@ -323,6 +324,7 @@
 		MACB000000000000000000A1 /* MagazineListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 971A00A22F9990A2 /* MagazineListView.swift */; };
 		MACB000000000000000000A2 /* MagazineReaderView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 971A00A42F9990A4 /* MagazineReaderView.swift */; };
 		MACB000000000000000000A3 /* MagazineReadingStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 971A00A62F9990A6 /* MagazineReadingStore.swift */; };
+		AD00F60925364274B55735B7 /* FoldLayout.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4744D22031FF44FBA5328431 /* FoldLayout.swift */; };
 		MAC000000000000000000063 /* SessionTimelineToolsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 971A00072F999007 /* SessionTimelineToolsView.swift */; };
 		MAC000000000000000000064 /* SessionTimelineLoader.swift in Sources */ = {isa = PBXBuildFile; fileRef = 971A00092F999009 /* SessionTimelineLoader.swift */; };
 		MAC000000000000000000065 /* TabManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = DFF7EE402F0D3D2800344A8B /* TabManager.swift */; };
@@ -418,6 +420,7 @@
 		971A00A22F9990A2 /* MagazineListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MagazineListView.swift; sourceTree = "<group>"; };
 		971A00A42F9990A4 /* MagazineReaderView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MagazineReaderView.swift; sourceTree = "<group>"; };
 		971A00A62F9990A6 /* MagazineReadingStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MagazineReadingStore.swift; sourceTree = "<group>"; };
+		4744D22031FF44FBA5328431 /* FoldLayout.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FoldLayout.swift; sourceTree = "<group>"; };
 		971A00072F999007 /* SessionTimelineToolsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionTimelineToolsView.swift; sourceTree = "<group>"; };
 		971A00092F999009 /* SessionTimelineLoader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionTimelineLoader.swift; sourceTree = "<group>"; };
 		A1B2C3D40001400180011001 /* FilterPickerOptionsStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FilterPickerOptionsStore.swift; sourceTree = "<group>"; };
@@ -618,6 +621,7 @@
 				971A00A22F9990A2 /* MagazineListView.swift */,
 				971A00A42F9990A4 /* MagazineReaderView.swift */,
 				971A00A62F9990A6 /* MagazineReadingStore.swift */,
+				4744D22031FF44FBA5328431 /* FoldLayout.swift */,
 				971A00072F999007 /* SessionTimelineToolsView.swift */,
 				372E2D692F6339EE00603361 /* LoginAuthHelper.swift */,
 				DF22BB262F167CDC007C2090 /* ImageCacheManager.swift */,
@@ -1093,6 +1097,7 @@
 				971A00A12F9990A1 /* MagazineListView.swift in Sources */,
 				971A00A32F9990A3 /* MagazineReaderView.swift in Sources */,
 				971A00A52F9990A5 /* MagazineReadingStore.swift in Sources */,
+				F95BC67954064162862E0604 /* FoldLayout.swift in Sources */,
 				971A00082F999008 /* SessionTimelineToolsView.swift in Sources */,
 				971A000A2F99900A /* SessionTimelineLoader.swift in Sources */,
 				DFF7EE412F0D3D2800344A8B /* TabManager.swift in Sources */,
@@ -1317,6 +1322,7 @@
 				MACB000000000000000000A1 /* MagazineListView.swift in Sources */,
 				MACB000000000000000000A2 /* MagazineReaderView.swift in Sources */,
 				MACB000000000000000000A3 /* MagazineReadingStore.swift in Sources */,
+				AD00F60925364274B55735B7 /* FoldLayout.swift in Sources */,
 				MAC000000000000000000063 /* SessionTimelineToolsView.swift in Sources */,
 				MAC000000000000000000064 /* SessionTimelineLoader.swift in Sources */,
 				MAC000000000000000000065 /* TabManager.swift in Sources */,

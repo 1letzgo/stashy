@@ -561,6 +561,11 @@ extension EnvironmentValues {
     }
 }
 
+extension EnvironmentValues {
+    /// The scene page sits in a column beside the list (open iPhone Duo), not on the stack.
+    @Entry var stashySceneDetailInColumn = false
+}
+
 private struct StashyDismissOverrideKey: EnvironmentKey {
     static let defaultValue: StashyDismissAction? = nil
 }

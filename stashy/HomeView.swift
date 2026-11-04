@@ -21,6 +21,7 @@ private struct HomeViewContent: View {
     @ObservedObject var configManager = ServerConfigManager.shared
     @ObservedObject private var stashyPlus = StashyPlusManager.shared
     @EnvironmentObject var coordinator: NavigationCoordinator
+    @State private var contentWidth: CGFloat = 0
 
     var body: some View {
         // Workaround for occasional Swift compiler diagnostic/type-check issues:
@@ -108,6 +109,11 @@ private struct HomeViewContent: View {
             }
         }
         .scrollContentBackground(.hidden)
+        .environment(\.homeContentWidth, contentWidth)
+        .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { width in
+            guard abs(width - contentWidth) > 1 else { return }
+            contentWidth = width
+        }
         .refreshable {
             viewModel.homeRowScenes.removeAll()
             viewModel.homeRowPerformers.removeAll()

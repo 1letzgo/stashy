@@ -18,14 +18,19 @@ extension Array {
 private let homeHeroCardWidthFraction: CGFloat = 0.8
 private let homeHeroCardFixedWidth: CGFloat = 280
 
+/// Up to this width the hero card follows the space it has (upright iPhone, closed iPhone Duo).
+private let homeHeroCardFractionMaxWidth: CGFloat = 520
+
 func homeHeroCardWidth(screenWidth: CGFloat) -> CGFloat {
-    let screenHeight = UIScreen.main.bounds.height
-    let isPortrait = screenHeight > screenWidth
-    let isPhone = UIDevice.current.userInterfaceIdiom == .phone
-    if isPhone && isPortrait {
+    if screenWidth > 0, screenWidth < homeHeroCardFractionMaxWidth {
         return screenWidth * homeHeroCardWidthFraction
     }
     return homeHeroCardFixedWidth
+}
+
+extension EnvironmentValues {
+    /// Width of the dashboard, measured in `HomeView`. Zero until its first layout.
+    @Entry var homeContentWidth: CGFloat = 0
 }
 
 /// Edge length of the square dashboard cards (Channels, Statistics) — one source so the two
@@ -160,8 +165,10 @@ struct HomeRowView: View {
 
     // MARK: - Body
 
+    @Environment(\.homeContentWidth) private var homeContentWidth
+
     var body: some View {
-        let screenWidth = UIScreen.main.bounds.width
+        let screenWidth = homeContentWidth
 
         VStack(alignment: .leading, spacing: isLarge ? 8 : 12) {
             headerRow

@@ -942,6 +942,11 @@ private struct ScenesViewContent: View {
 
 
     @State private var cardGridWidth: CGFloat = 0
+    /// Open iPhone Duo, plain scene list: the fold splits the screen into list and scene page.
+    @State private var columnFold: FoldRegion?
+    @State private var columnScene: Scene?
+    /// A scene that was open in the column when the phone folded carries on as a normal page.
+    @State private var pushedColumnScene: Scene?
     /// A caller handed in its own filter (Director, and anything else scoping the catalogue list
     /// without a detail scope). Such a list must never take the Settings default, and must not
     /// wait for it either — waiting is what left it empty.
@@ -1200,20 +1205,50 @@ private struct ScenesViewContent: View {
                 } else if primarySceneListIsEmpty {
                     scenesEmptyContent
                 } else if scrollHeader == nil {
-                    // Pinned above the list so it always shows, also after coming back from a detail page.
-                    VStack(spacing: 0) {
-                        quickBar
-                        scenesGrid
+                    // One structure with and without the fold, so the list keeps its scroll
+                    // position when the phone folds or unfolds.
+                    HStack(spacing: columnFold?.frame.width ?? 0) {
+                        // Pinned above the list so it always shows, also after coming back from a detail page.
+                        VStack(spacing: 0) {
+                            quickBar
+                            scenesGrid
+                        }
+                        .frame(width: columnFold.map { max(0, $0.frame.minX) })
+
+                        if columnFold != nil {
+                            sceneColumn
+                        }
                     }
                 } else {
                     scenesGrid
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .onGeometryChange(for: FoldRegion?.self) { proxy in
+                guard scope == .catalog, scrollHeader == nil else { return nil }
+                return proxy.foldRegion.flatMap { $0.isVertical ? $0 : nil }
+            } action: { fold in
+                columnFold = fold
+                if fold == nil, let scene = columnScene {
+                    columnScene = nil
+                    pushedColumnScene = scene
+                }
+            }
         }
 
         .applyAppBackground()
         .stashyCatalogChrome(catalogChromeConfig)
+        .navigationDestination(isPresented: Binding(
+            get: { pushedColumnScene != nil },
+            set: { if !$0 { pushedColumnScene = nil } }
+        )) {
+            if let scene = pushedColumnScene {
+                SceneDetailView(scene: scene)
+            }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("ServerConfigChanged"))) { _ in
+            columnScene = nil
+        }
         .onChange(of: liveFilterFABHasSomethingSet, initial: true) { _, isActive in
             externalLiveFilterActiveBinding?.wrappedValue = isActive
         }
@@ -1498,6 +1533,51 @@ private struct ScenesViewContent: View {
         }
     }
 
+    @ViewBuilder
+    private func sceneGridItem(_ scene: Scene) -> some View {
+        let card = SceneCardView(
+            scene: scene,
+            aspectRatio: CatalogCardColumns.one.cardAspectRatio
+        )
+        .contentShape(Rectangle())
+
+        if columnFold != nil {
+            Button {
+                columnScene = scene
+            } label: {
+                card.overlay {
+                    if columnScene?.id == scene.id {
+                        RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.card)
+                            .stroke(.tint, lineWidth: 2)
+                    }
+                }
+            }
+            .buttonStyle(.plain)
+        } else {
+            NavigationLink(destination: LazyView { SceneDetailView(scene: scene) }) {
+                card
+            }
+            .buttonStyle(.plain)
+        }
+    }
+
+    /// The page of the scene picked in the list, right of the fold. Links inside it push full
+    /// pages on the surrounding stack; its top button closes the column instead of popping.
+    @ViewBuilder
+    private var sceneColumn: some View {
+        Group {
+            if let scene = columnScene {
+                SceneDetailView(scene: scene)
+                    .id(scene.id)
+                    .environment(\.stashyDismiss, StashyDismissAction { columnScene = nil })
+                    .environment(\.stashySceneDetailInColumn, true)
+            } else {
+                ContentUnavailableView("Select a scene", systemImage: "film")
+            }
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+
     private var scenesGrid: some View {
             ScrollView {
                 VStack(spacing: 12) {
@@ -1508,15 +1588,8 @@ private struct ScenesViewContent: View {
                     }
                     LazyVGrid(columns: columns, spacing: 12) {
                     ForEach(primaryScenes) { scene in
-                            NavigationLink(destination: LazyView { SceneDetailView(scene: scene) }) {
-                                SceneCardView(
-                                    scene: scene,
-                                    aspectRatio: CatalogCardColumns.one.cardAspectRatio
-                                )
-                                    .contentShape(Rectangle())
-                            }
-                            .buttonStyle(.plain)
-                            .id(scene.id)
+                            sceneGridItem(scene)
+                                .id(scene.id)
                         }
 
                         // Loading indicator for pagination

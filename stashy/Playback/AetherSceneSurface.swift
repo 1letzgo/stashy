@@ -55,6 +55,12 @@ struct AetherSceneSurface: View {
     @State private var areControlsVisible = true
     /// Fullscreen auto-rotate to landscape ran for this surface.
     @State private var didAutoRotate = false
+    #if os(iOS)
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+    @Environment(\.verticalSizeClass) private var verticalSizeClass
+    @State private var isHingeHalfOpen = false
+    @State private var horizontalFold: FoldRegion?
+    #endif
     /// Fullscreen only: crop to fill the whole screen instead of letterboxing.
     @State private var fillsScreen = false
     @State private var controlsHideToken = UUID()
@@ -110,6 +116,7 @@ struct AetherSceneSurface: View {
                 .ignoresSafeArea()
 
             AetherPlayerSurface(engine: engine.engine)
+                .padding(.bottom, tabletopPictureInset)
                 .ignoresSafeArea()
 
             if !engine.hasPresentedFrame {
@@ -129,6 +136,7 @@ struct AetherSceneSurface: View {
                 // Fullscreen: keep the controls inside the picture. A 16:9 file in landscape
                 // is pillarboxed, and controls hanging into the black bars read as clipped.
                 .padding(.horizontal, videoHorizontalInset)
+                .padding(.top, tabletopControlsInset)
 
             #if DEBUG
             if showsDebugStats {
@@ -158,6 +166,24 @@ struct AetherSceneSurface: View {
             surfaceSize = size
             applyFillForGeometry()
         }
+        #if os(iOS)
+        .onGeometryChange(for: FoldRegion?.self) { proxy in
+            proxy.foldRegion.flatMap { $0.isVertical ? nil : $0 }
+        } action: { horizontalFold = $0 }
+        .observesHalfOpenHinge($isHingeHalfOpen)
+        // Folding or unfolding the iPhone Duo mid-fullscreen: the inner display ignores
+        // orientation requests, so no narrowed mask may stay behind, and the closed phone gets
+        // the same auto-rotate as a fresh fullscreen.
+        .onChange(of: horizontalSizeClass == .regular && verticalSizeClass == .regular) { _, isRegularBoth in
+            guard isFullscreen else { return }
+            didAutoRotate = false
+            if isRegularBoth {
+                Self.freeOrientationLock()
+            } else {
+                rotateToLandscapeForWideVideo()
+            }
+        }
+        #endif
         #if os(macOS)
         .modifier(MacPlayerKeyboard(
             onTogglePlay: {
@@ -542,7 +568,7 @@ struct AetherSceneSurface: View {
                 dismissOrExpandButton
             }
             #if os(iOS)
-            if isFullscreen { rotateButton }
+            if isFullscreen, !ignoresRotateRequests { rotateButton }
             #endif
             routeCapsule
         }
@@ -764,6 +790,35 @@ struct AetherSceneSurface: View {
     /// Fullscreen only: flips the interface between portrait and landscape through the window
     /// scene, so it works with the device's orientation lock on — the reason it exists.
     @ViewBuilder
+    /// The inner display of an iPhone Duo narrows the allowed orientations on request but never
+    /// turns (seen in the simulator): the button would do nothing and leave a lock behind.
+    /// Tabletop: an iPhone Duo standing half open with the fold across. Picture on the upright
+    /// half, controls on the half lying down. In the book hold (vertical fold) nothing changes.
+    private var tabletopFold: FoldRegion? {
+        #if os(iOS)
+        return isFullscreen && isHingeHalfOpen ? horizontalFold : nil
+        #else
+        return nil
+        #endif
+    }
+
+    private var tabletopPictureInset: CGFloat {
+        tabletopFold.map { max(0, surfaceSize.height - $0.frame.minY) } ?? 0
+    }
+
+    private var tabletopControlsInset: CGFloat {
+        tabletopFold?.frame.maxY ?? 0
+    }
+
+    private var ignoresRotateRequests: Bool {
+        #if os(iOS)
+        horizontalSizeClass == .regular && verticalSizeClass == .regular
+            && UITraitCollection.current.userInterfaceIdiom == .phone
+        #else
+        false
+        #endif
+    }
+
     private var rotateButton: some View {
         Button {
             HapticManager.light()
@@ -783,11 +838,8 @@ struct AetherSceneSurface: View {
             .first(where: { $0.activationState == .foregroundActive })
             ?? UIApplication.shared.connectedScenes.compactMap({ $0 as? UIWindowScene }).first
         else { return }
-        let target: UIInterfaceOrientationMask = scene.interfaceOrientation.isLandscape ? .portrait : .landscape
-        // Only the geometry request: the app's supported orientations stay `.all`. Narrowing
-        // them to one orientation crashed UIKit as soon as a sheet + keyboard came up in
-        // landscape ("no common orientation with the application"). With the device's
-        // orientation lock on there is no rotation event, so the new orientation holds anyway.
+        let target: UIInterfaceOrientationMask = Self.isWiderThanTall(scene) ? .portrait : .landscape
+        // `rotate` narrows the app's orientations until fullscreen closes; see there.
         Self.didRotateInFullscreen = true
         Self.rotate(scene, to: target)
         #endif
@@ -796,6 +848,28 @@ struct AetherSceneSurface: View {
     private static var didRotateInFullscreen = false
 
     #if os(iOS)
+    /// The shape the app actually has; interface orientation doesn't tell it on iPhone Duo.
+    private static func isWiderThanTall(_ scene: UIWindowScene) -> Bool {
+        guard let bounds = (scene.keyWindow ?? scene.windows.first)?.bounds else { return false }
+        return bounds.width > bounds.height
+    }
+
+    /// Whether orientation requests make sense here: not on an iPad and not on the inner display
+    /// of an iPhone Duo, which are regular in both dimensions. Every phone-sized space has a
+    /// compact one (a Pro Max in landscape is regular width, compact height).
+    private static func canTurnInterface(_ scene: UIWindowScene) -> Bool {
+        let traits = scene.traitCollection
+        return !(traits.horizontalSizeClass == .regular && traits.verticalSizeClass == .regular)
+    }
+
+    private static func freeOrientationLock() {
+        didRotateInFullscreen = false
+        AppDelegate.orientationLock = .all
+        UIApplication.shared.connectedScenes
+            .compactMap { $0 as? UIWindowScene }
+            .forEach { refreshSupportedOrientations(in: $0) }
+    }
+
     /// A geometry request only takes once the presented controllers re-read their supported
     /// orientations — without this the fullscreen cover often stayed upright.
     private static func refreshSupportedOrientations(in scene: UIWindowScene) {
@@ -825,8 +899,7 @@ struct AetherSceneSurface: View {
     /// Once per fullscreen session, so a manual rotate back to portrait sticks.
     private func rotateToLandscapeForWideVideo(attempt: Int = 0) {
         #if os(iOS)
-        guard !didAutoRotate, TabManager.isFullscreenAutoRotateOn,
-              UIDevice.current.userInterfaceIdiom == .phone else { return }
+        guard !didAutoRotate, TabManager.isFullscreenAutoRotateOn else { return }
         // The video size can still be unknown when fullscreen opens (and may arrive without a
         // new first frame): ask again for up to ~3 s.
         guard let size = engine.sourceSize else {
@@ -845,7 +918,8 @@ struct AetherSceneSurface: View {
                 .compactMap({ $0 as? UIWindowScene })
                 .first(where: { $0.activationState == .foregroundActive })
                 ?? UIApplication.shared.connectedScenes.compactMap({ $0 as? UIWindowScene }).first,
-                  !scene.interfaceOrientation.isLandscape else { return }
+                  Self.canTurnInterface(scene),
+                  !Self.isWiderThanTall(scene) else { return }
             Self.didRotateInFullscreen = true
             Self.rotate(scene, to: .landscape)
         }
@@ -857,10 +931,11 @@ struct AetherSceneSurface: View {
         #if os(iOS)
         guard didRotateInFullscreen || AppDelegate.orientationLock != .all else { return }
         didRotateInFullscreen = false
-        let scenes = UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }
-        guard UIDevice.current.userInterfaceIdiom == .phone else {
-            AppDelegate.orientationLock = .all
-            scenes.forEach { refreshSupportedOrientations(in: $0) }
+        let scenes = UIApplication.shared.connectedScenes
+            .compactMap { $0 as? UIWindowScene }
+            .filter { canTurnInterface($0) }
+        guard !scenes.isEmpty else {
+            freeOrientationLock()
             return
         }
         // Back upright, then free again (after the rotation) so the device decides from here on.

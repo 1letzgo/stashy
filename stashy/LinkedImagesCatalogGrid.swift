@@ -103,7 +103,7 @@ struct LinkedImagesCatalogGrid: View {
            let window = scene.windows.first(where: \.isKeyWindow) ?? scene.windows.first {
             return window.bounds
         }
-        return UIScreen.main.bounds
+        return .zero
         #endif
     }
 

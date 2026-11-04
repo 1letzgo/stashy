@@ -8,6 +8,14 @@ struct SecuritySettingsView: View {
     @State private var tempPasscode: String = ""
     @State private var setPasscodeStep: SetPasscodeStep = .initial
     
+    private var biometryName: String {
+        switch securityManager.biometryType {
+        case .faceID: return "FaceID"
+        case .touchID: return "Touch ID"
+        default: return "Biometrics"
+        }
+    }
+
     enum SetPasscodeStep {
         case initial, confirm
     }
@@ -28,7 +36,7 @@ struct SecuritySettingsView: View {
                     }
                     .stashyGroupedBlockRow(index: 1, count: 3)
 
-                    Toggle("Use \(securityManager.biometryType == .faceID ? "FaceID" : "Biometrics")", isOn: $securityManager.isBiometricsEnabled)
+                    Toggle("Use \(biometryName)", isOn: $securityManager.isBiometricsEnabled)
                         .tint(appearanceManager.tintColor)
                         .disabled(!securityManager.isPasscodeSet)
                         .stashyGroupedBlockRow(index: 2, count: 3)

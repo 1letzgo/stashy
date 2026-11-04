@@ -77,8 +77,9 @@ struct HomeChannelsRowView: View {
             }
     }
 
+    @Environment(\.homeContentWidth) private var screenWidth
+
     var body: some View {
-        let screenWidth = UIScreen.main.bounds.width
         let cardWidth = homeCardWidth(for: config, isLarge: false, screenWidth: screenWidth)
         let cardHeight = homeCardHeight(for: config, isLarge: false, screenWidth: screenWidth)
 

@@ -78,7 +78,10 @@ enum ReelsTabBarLayout {
            bar.alpha > 0.01,
            bar.bounds.height > 1 {
             let frameInWindow = bar.convert(bar.bounds, to: window)
-            value = max(0, window.bounds.maxY - frameInWindow.minY)
+            // iPhone Duo stands its bars up along the side: nothing overlaps from below then.
+            value = frameInWindow.height > frameInWindow.width
+                ? 0
+                : max(0, window.bounds.maxY - frameInWindow.minY)
         } else {
             // Fallback before UITabBar is attached: standard bar + home indicator.
             value = 49 + window.safeAreaInsets.bottom
@@ -89,6 +92,16 @@ enum ReelsTabBarLayout {
         return value
         #endif
     }
+}
+
+/// Latest measured size of a view, kept out of SwiftUI state: a resize reports a new size every
+/// animation frame, and storing each one in `@State` re-evaluates the whole feed (the device
+/// watchdog killed the app over that churn, see `AetherSceneSurface`). Readers are tap handlers
+/// and one-shot checks that don't need an invalidation.
+final class LiveSizeBox {
+    var size: CGSize = .zero
+    /// Bumped per resize so a delayed follow-up only runs for the latest one.
+    var generation = 0
 }
 
 /// Bottom chrome heights for immersive video fill (scrubber + tab bar; no capsule bar).
@@ -403,10 +416,8 @@ struct ReelsViewBody: View {
     @State private var isMenuOpen = false
     @State private var isMediaZoomed = false
     @State private var isRotating = false
-    #if os(iOS)
-    /// Last layout the device orientation asked for; see the orientation observer on the list.
-    @State private var deviceWantsLandscape = UIScreen.main.bounds.width > UIScreen.main.bounds.height
-    #endif
+    /// Width the feed last laid out at; see `handleFeedResize`.
+    @State private var feedSizeBox = LiveSizeBox()
     @State private var isUIVisible = true
     /// Section chrome faded out once the user swipes through the feed (on top of `isUIVisible`,
     /// which stays the tap toggle). Stays hidden while watching until a tap; flips only at
@@ -3423,9 +3434,6 @@ struct ReelsViewBody: View {
             // Scrubber / info overlay must stay interactive whenever the chrome is visible.
             .allowsHitTesting(isUIVisible)
         }
-        .onReceive(NotificationCenter.default.publisher(for: UIDevice.orientationDidChangeNotification)) { _ in
-            ReelsTabBarLayout.invalidateCache()
-        }
     }
 
     private func handleDefaultFilterChanged(_ notification: Notification) {
@@ -4679,21 +4687,29 @@ struct ReelsViewBody: View {
             .onDisappear {
                 reelsListMounted = false
             }
-            .onReceive(NotificationCenter.default.publisher(for: UIDevice.orientationDidChangeNotification)) { _ in
-                #if os(iOS)
-                // Fires for every tilt of the phone (face up / down, upside down), not only when
-                // the interface turns. Only a real portrait <-> landscape change may pause playback.
-                let orientation = UIDevice.current.orientation
-                guard orientation == .portrait || orientation.isLandscape,
-                      orientation.isLandscape != deviceWantsLandscape else { return }
-                deviceWantsLandscape = orientation.isLandscape
-                #endif
-                withAnimation(.easeInOut(duration: 0.3)) { isRotating = true }
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) {
-                    withAnimation { isRotating = false }
-                }
-            }
+            .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { handleFeedResize(width: $0) }
         }
+    }
+
+    /// The feed's width changes when the interface turns and when the iPhone Duo folds or unfolds
+    /// (which needs no change of device orientation at all). Height-only changes such as the
+    /// keyboard don't count. Playback pauses for the transition, then resumes.
+    private func handleFeedResize(width: CGFloat) {
+        let previous = feedSizeBox.size.width
+        feedSizeBox.size.width = width
+        guard previous > 0, abs(width - previous) > 1 else { return }
+        ReelsTabBarLayout.invalidateCache()
+        #if os(iOS)
+        feedSizeBox.generation += 1
+        let generation = feedSizeBox.generation
+        if !isRotating {
+            withAnimation(.easeInOut(duration: 0.3)) { isRotating = true }
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) {
+            guard generation == feedSizeBox.generation else { return }
+            withAnimation { isRotating = false }
+        }
+        #endif
     }
 
     /// Scrolls to pending restore target once it's present in the list. No overlay,
@@ -5597,6 +5613,9 @@ struct ReelItemView: View {
     @Binding var isMenuOpen: Bool
     @Binding var isZoomed: Bool
     @Binding var isRotating: Bool
+    /// Shape of the space this item has, not of the screen or device.
+    @State private var isTallerThanWide = true
+    @State private var mediaSizeBox = LiveSizeBox()
     @State private var showStashSyncSheet = false
     @State private var isFastForwarding = false
     /// Steps the playhead forward while held when the Feeds hold speed exceeds the engine's
@@ -5658,8 +5677,7 @@ struct ReelItemView: View {
         // Only fill if the setting is enabled
         guard tabManager.reelsFillHeight else { return false }
 
-        let isPortraitDevice = UIScreen.main.bounds.height > UIScreen.main.bounds.width
-        if isPortraitDevice {
+        if isTallerThanWide {
             return !effectiveContentIsLandscape
         } else {
             return effectiveContentIsLandscape
@@ -5689,6 +5707,11 @@ struct ReelItemView: View {
     private var mainContent: some View {
         ZStack(alignment: .bottom) {
             mediaLayer
+                .onGeometryChange(for: CGSize.self) { $0.size } action: { size in
+                    mediaSizeBox.size = size
+                    let tall = size.height > size.width
+                    if tall != isTallerThanWide { isTallerThanWide = tall }
+                }
             playbackErrorOverlay
             fastForwardOverlay
             playButtonOverlay
@@ -6045,7 +6068,7 @@ extension ReelItemView {
     }
 
     private func handleMediaTap(at location: CGPoint) {
-        let screenHeight = UIScreen.main.bounds.height
+        let screenHeight = mediaSizeBox.size.height
         // Ignore taps in the top chrome and bottom info/scrubber area
         if location.y > 0 && location.y < 120 { return }
         if location.y > 0 && location.y > screenHeight - 160 { return }
@@ -6065,7 +6088,7 @@ extension ReelItemView {
     /// (like the scene player); the middle third keeps zooming.
     private func handleDoubleTap(at location: CGPoint) -> Bool {
         guard !item.isAnimated, item.videoURL != nil, let aether = aetherEngine else { return false }
-        let width = UIScreen.main.bounds.width
+        let width = mediaSizeBox.size.width
         let third = width / 3
         let delta: Double
         if location.x < third {

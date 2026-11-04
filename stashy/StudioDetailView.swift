@@ -10,6 +10,8 @@ import SwiftUI
 
 
 struct StudioDetailView: View {
+    /// The fold of an open iPhone Duo, when it runs top to bottom through this view.
+    @State private var detailFold: FoldRegion?
     @State private var studio: Studio
     @ObservedObject var appearanceManager = AppearanceManager.shared
     @ObservedObject var configManager = ServerConfigManager.shared
@@ -145,10 +147,10 @@ struct StudioDetailView: View {
             externalLiveFilterSheetBinding: $studioLiveFilterSheetPresented,
             externalLiveFilterActiveBinding: $studioSceneFilterActive,
             showsFloatingFilterButton: false,
-            scrollHeader: AnyView(
-                headerCard
-                    .padding(.horizontal, 16)
-            ),
+            // Open iPhone Duo: the header has its own column left of the fold.
+            scrollHeader: detailFold == nil
+                ? AnyView(headerCard.padding(.horizontal, 16))
+                : AnyView(EmptyView()),
             filterMemory: scenesFilterMemory
         )
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
@@ -191,7 +193,9 @@ struct StudioDetailView: View {
     private var nonScenesStudioScroll: some View {
         ScrollView {
             VStack(spacing: 12) {
-                headerCard
+                if detailFold == nil {
+                    headerCard
+                }
 
                 if selectedDetailTab == .galleries {
                     if !viewModel.studioGalleries.isEmpty {
@@ -369,14 +373,32 @@ struct StudioDetailView: View {
     }
 
     @ViewBuilder
+    private var studioTabContent: some View {
+        if selectedDetailTab == .scenes {
+            studioScenesStack
+        } else {
+            nonScenesStudioScroll
+        }
+    }
+
+    @ViewBuilder
     private var studioDetailCoreChrome: some View {
         Group {
-            if selectedDetailTab == .scenes {
-                studioScenesStack
+            if let fold = detailFold {
+                HStack(spacing: fold.frame.width) {
+                    ScrollView {
+                        headerCard.padding(16)
+                    }
+                    .frame(width: max(0, fold.frame.minX))
+                    studioTabContent
+                }
             } else {
-                nonScenesStudioScroll
+                studioTabContent
             }
         }
+        .onGeometryChange(for: FoldRegion?.self) { proxy in
+            proxy.foldRegion.flatMap { $0.isVertical ? $0 : nil }
+        } action: { detailFold = $0 }
         .applyAppBackground()
         .onAppear {
             // If we know from the passed studio object that there are no scenes but there are galleries,

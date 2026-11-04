@@ -5,7 +5,8 @@ import SwiftUI
 struct HomeSceneCardView: View {
     let scene: Scene
     var isLarge: Bool = false
-    let screenWidth: CGFloat
+    /// Only the hero card (`isLarge`) sizes itself from this.
+    var screenWidth: CGFloat = 0
     @ObservedObject var appearanceManager = AppearanceManager.shared
 
     @StateObject private var previewPlayer = AetherPreviewPlayer()

@@ -691,10 +691,15 @@ private struct MagazineSpreadView: View {
 
     var body: some View {
         GeometryReader { geometry in
-            let isLandscape = geometry.size.width > geometry.size.height
+            // On an iPhone Duo the fold is the magazine's own fold: one page on each side of
+            // it, nothing underneath. It also decides the direction when the display is taller
+            // than wide (fold across) or the other way round.
+            let fold = geometry.foldRegion
+            let isLandscape = fold?.isVertical ?? (geometry.size.width > geometry.size.height)
+            let spacing = fold.map { isLandscape ? $0.frame.width : $0.frame.height } ?? 2
             let layout = isLandscape
-                ? AnyLayout(HStackLayout(spacing: 2))
-                : AnyLayout(VStackLayout(spacing: 2))
+                ? AnyLayout(HStackLayout(spacing: spacing))
+                : AnyLayout(VStackLayout(spacing: spacing))
             layout {
                 ForEach(Array(pages.enumerated()), id: \.element.id) { offset, image in
                     MagazinePageImage(image: image)
@@ -705,6 +710,10 @@ private struct MagazineSpreadView: View {
                         )
                         .contentShape(Rectangle())
                         .onTapGesture { onSelectPage(firstPageIndex + offset) }
+                }
+                // The last page of an odd gallery stays on its side of the fold.
+                if fold != nil, pages.count == 1 {
+                    Color.clear
                 }
             }
         }

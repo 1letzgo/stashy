@@ -10,6 +10,8 @@ import SwiftUI
 
 
 struct PerformerDetailView: View {
+    /// The fold of an open iPhone Duo, when it runs top to bottom through this view.
+    @State private var detailFold: FoldRegion?
     @State var performer: Performer
     @ObservedObject var appearanceManager = AppearanceManager.shared
     @ObservedObject var configManager = ServerConfigManager.shared
@@ -177,10 +179,13 @@ struct PerformerDetailView: View {
             externalLiveFilterSheetBinding: $performerLiveFilterSheetPresented,
             externalLiveFilterActiveBinding: $performerSceneFilterActive,
             showsFloatingFilterButton: false,
-            scrollHeader: AnyView(
-                headerView(displayPerformer: displayPerformer, battleLine: hotOrNotBattleLine)
-                    .padding(.horizontal, 16)
-            ),
+            // Open iPhone Duo: the header has its own column left of the fold.
+            scrollHeader: detailFold == nil
+                ? AnyView(
+                    headerView(displayPerformer: displayPerformer, battleLine: hotOrNotBattleLine)
+                        .padding(.horizontal, 16)
+                )
+                : AnyView(EmptyView()),
             filterMemory: scenesFilterMemory
         )
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
@@ -190,7 +195,9 @@ struct PerformerDetailView: View {
     private var nonScenesScrollContent: some View {
         ScrollView {
             VStack(spacing: 12) {
-                headerView(displayPerformer: displayPerformer, battleLine: hotOrNotBattleLine)
+                if detailFold == nil {
+                    headerView(displayPerformer: displayPerformer, battleLine: hotOrNotBattleLine)
+                }
 
                 if selectedDetailTab == .galleries {
                     if !viewModel.performerGalleries.isEmpty {
@@ -430,14 +437,33 @@ struct PerformerDetailView: View {
         }
     }
 
+    @ViewBuilder
+    private var performerTabContent: some View {
+        if showsPerformerScenesStack {
+            performerScenesStack
+        } else {
+            nonScenesScrollContent
+        }
+    }
+
     private var performerDetailCoreChrome: some View {
         Group {
-            if showsPerformerScenesStack {
-                performerScenesStack
+            if let fold = detailFold {
+                HStack(spacing: fold.frame.width) {
+                    ScrollView {
+                        headerView(displayPerformer: displayPerformer, battleLine: hotOrNotBattleLine)
+                            .padding(16)
+                    }
+                    .frame(width: max(0, fold.frame.minX))
+                    performerTabContent
+                }
             } else {
-                nonScenesScrollContent
+                performerTabContent
             }
         }
+        .onGeometryChange(for: FoldRegion?.self) { proxy in
+            proxy.foldRegion.flatMap { $0.isVertical ? $0 : nil }
+        } action: { detailFold = $0 }
         .applyAppBackground()
         .task(id: displayPerformer.id) {
             hotOrNotBattleLine = nil

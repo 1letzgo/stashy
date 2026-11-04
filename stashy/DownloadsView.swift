@@ -1018,7 +1018,7 @@ struct DownloadDetailView: View {
         if let scene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
            let rootVC = scene.windows.first?.rootViewController {
             activityVC.popoverPresentationController?.sourceView = rootVC.view
-            activityVC.popoverPresentationController?.sourceRect = CGRect(x: UIScreen.main.bounds.width / 2, y: UIScreen.main.bounds.height / 2, width: 0, height: 0)
+            activityVC.popoverPresentationController?.sourceRect = CGRect(x: rootVC.view.bounds.midX, y: rootVC.view.bounds.midY, width: 0, height: 0)
             activityVC.popoverPresentationController?.permittedArrowDirections = []
             
             rootVC.present(activityVC, animated: true)

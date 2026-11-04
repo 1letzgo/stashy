@@ -65,8 +65,6 @@ enum UIUserInterfaceIdiom { case unspecified, phone, pad, tv, carPlay, mac, visi
 final class UIDevice {
     static let current = UIDevice()
     let userInterfaceIdiom: UIUserInterfaceIdiom = .mac
-    /// Macs never rotate; nothing posts this name.
-    static let orientationDidChangeNotification = Notification.Name("stashy.mac.orientationDidChange")
 }
 
 final class UIScreen {

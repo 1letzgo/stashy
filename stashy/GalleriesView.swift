@@ -961,6 +961,9 @@ struct GalleryCardView: View {
 // MARK: - Gallery Item View (Feeds-style per-item view)
 
 struct GalleryItemView: View {
+    /// Shape of the space this item has, not of the screen or device.
+    @State private var isTallerThanWide = true
+    @State private var mediaSizeBox = LiveSizeBox()
     let image: StashImage
     @Binding var isMuted: Bool
     @ObservedObject var viewModel: StashDBViewModel
@@ -1006,8 +1009,7 @@ struct GalleryItemView: View {
     /// Match Feeds: fill only when immersive is on and content orientation matches the device.
     private var shouldFill: Bool {
         guard immersiveScaling else { return false }
-        let isPortraitDevice = UIScreen.main.bounds.height > UIScreen.main.bounds.width
-        if isPortraitDevice {
+        if isTallerThanWide {
             return isPortrait
         } else {
             return !isPortrait
@@ -1118,7 +1120,7 @@ struct GalleryItemView: View {
     /// third keeps zooming.
     private func handleDoubleTapSkip(at location: CGPoint) -> Bool {
         guard image.isVideo, !isAnimatedImage, let engine else { return false }
-        let width = UIScreen.main.bounds.width
+        let width = mediaSizeBox.size.width
         let third = width / 3
         let delta: Double
         if location.x < third {
@@ -1173,6 +1175,11 @@ struct GalleryItemView: View {
     var body: some View {
         ZStack {
             mediaLayer
+                .onGeometryChange(for: CGSize.self) { $0.size } action: { size in
+                    mediaSizeBox.size = size
+                    let tall = size.height > size.width
+                    if tall != isTallerThanWide { isTallerThanWide = tall }
+                }
 
             fastForwardOverlay
 

@@ -355,8 +355,7 @@ struct UniversalSearchView: View {
     }
     
     private func sceneCard(_ scene: Scene) -> some View {
-        HomeSceneCardView(scene: scene, isLarge: false,
-                          screenWidth: UIScreen.main.bounds.width)
+        HomeSceneCardView(scene: scene, isLarge: false)
     }
     
     private var scenePlaceholder: some View {

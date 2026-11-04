@@ -43,8 +43,8 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
     }
 
     /// Orientations the app allows right now. `.all` normally; the fullscreen player narrows it
-    /// to landscape for a moment so a programmatic rotation takes, then restores it (keeping it
-    /// narrowed crashed UIKit with a sheet + keyboard in landscape).
+    /// so a programmatic rotation takes and holds, and frees it again when fullscreen closes or
+    /// the iPhone Duo unfolds (`AetherSceneSurface`).
     static var orientationLock: UIInterfaceOrientationMask = .all
 
     func application(_ application: UIApplication, supportedInterfaceOrientationsFor window: UIWindow?) -> UIInterfaceOrientationMask {

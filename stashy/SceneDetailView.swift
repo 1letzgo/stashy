@@ -48,6 +48,7 @@ struct SceneDetailView: View {
     @Environment(\.stashyDismiss) var dismiss
     @Environment(\.stashyPresentedFromMiniPlayer) private var presentedFromMiniPlayer
     @Environment(\.stashyScenePlayerOnly) private var playerOnly
+    @Environment(\.stashySceneDetailInColumn) private var isInColumn
     /// Taken back from a paused mini player: keep it paused instead of autoplaying.
     @State private var adoptedPaused = false
     @EnvironmentObject var coordinator: NavigationCoordinator
@@ -138,8 +139,8 @@ struct SceneDetailView: View {
     /// Back on top (Close when opened from the mini player); actions live in the floating bar.
     private var sceneDetailNavBar: some View {
         StashyDetailTopBar(
-            backTitle: presentedFromMiniPlayer ? "Close" : "Back",
-            backIcon: presentedFromMiniPlayer ? "xmark" : "chevron.left",
+            backTitle: presentedFromMiniPlayer || isInColumn ? "Close" : "Back",
+            backIcon: presentedFromMiniPlayer || isInColumn ? "xmark" : "chevron.left",
             onBack: { dismiss() }
         )
     }
@@ -262,6 +263,9 @@ struct SceneDetailView: View {
         // The reader sits *outside* the ScrollView, so it reports the space available to the
         // view rather than the width its own content ended up needing.
         GeometryReader { proxy in
+        if let fold = proxy.foldRegion, fold.isVertical {
+            foldedColumns(proxy: proxy, fold: fold)
+        } else {
         VStack(spacing: 12) {
             // Pinned only while the player runs: then it keeps its place at the top and the
             // page scrolls underneath. On the cover it scrolls along, as before. The swap
@@ -315,6 +319,38 @@ struct SceneDetailView: View {
         }
         .animation(nil, value: isPlayerPinned)
         }
+        }
+    }
+
+    /// Open iPhone Duo: player and the first card left of the fold, the other cards right of it,
+    /// so the picture never lies on the fold and neither column has to share the height.
+    private func foldedColumns(proxy: GeometryProxy, fold: FoldRegion) -> some View {
+        let cards = renderedCards
+        return HStack(spacing: fold.frame.width) {
+            ScrollView {
+                VStack(spacing: 12) {
+                    playerCardView
+                    if let first = cards.first { sceneCard(first) }
+                }
+                .padding(.vertical, 16)
+                .padding(.leading, 16)
+                .padding(.trailing, 8)
+            }
+            .frame(width: max(0, fold.frame.minX))
+
+            ScrollView {
+                VStack(spacing: 12) {
+                    ForEach(cards.dropFirst()) { card in
+                        sceneCard(card)
+                    }
+                }
+                .padding(.vertical, 16)
+                .padding(.leading, 8)
+                .padding(.trailing, 16)
+            }
+            .frame(width: max(0, proxy.size.width - fold.frame.maxX))
+        }
+        .frame(width: proxy.size.width, alignment: .leading)
     }
 
 
