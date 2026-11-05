@@ -1,0 +1,8 @@
+query FindTagPickerOptions($filter: FindFilterType) {
+  findTags(filter: $filter) {
+    count
+    tags {
+      id name aliases
+    }
+  }
+}

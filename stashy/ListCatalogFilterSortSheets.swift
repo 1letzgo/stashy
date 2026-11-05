@@ -406,16 +406,23 @@ struct CatalogNamedEntityLiveFilterMultiPickerRow<Item: Identifiable & Equatable
     fileprivate struct PickerEntry: Identifiable, Equatable {
         let id: String
         let name: String
+        var aliases: [String] = []
+
+        func matches(_ term: String) -> Bool {
+            name.localizedCaseInsensitiveContains(term)
+                || aliases.contains { $0.localizedCaseInsensitiveContains(term) }
+        }
     }
 
     private var entries: [PickerEntry] {
-        var out = items.map { PickerEntry(id: $0.id, name: displayName($0)) }
-        if let searchKind {
-            var seen = Set(out.map(\.id))
-            for hit in pickerStore.searchHits(searchKind) where !seen.contains(hit.id) {
-                seen.insert(hit.id)
-                out.append(PickerEntry(id: hit.id, name: hit.name))
-            }
+        let hits = searchKind.map { pickerStore.searchHits($0) } ?? []
+        // The caller's items know no aliases, a tag found through one needs them from its hit.
+        let hitAliases = Dictionary(hits.map { ($0.id, $0.aliases) }, uniquingKeysWith: { first, _ in first })
+        var out = items.map { PickerEntry(id: $0.id, name: displayName($0), aliases: hitAliases[$0.id] ?? []) }
+        var seen = Set(out.map(\.id))
+        for hit in hits where !seen.contains(hit.id) {
+            seen.insert(hit.id)
+            out.append(PickerEntry(id: hit.id, name: hit.name, aliases: hit.aliases))
         }
         return out
     }
@@ -441,7 +448,7 @@ struct CatalogNamedEntityLiveFilterMultiPickerRow<Item: Identifiable & Equatable
         let term = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
         let rest = all.filter { entry in
             !chosenSet.contains(entry.id)
-                && (term.isEmpty || entry.name.localizedCaseInsensitiveContains(term))
+                && (term.isEmpty || entry.matches(term))
         }
         return pinned + rest
     }

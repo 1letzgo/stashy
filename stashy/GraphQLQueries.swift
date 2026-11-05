@@ -190,6 +190,10 @@ class GraphQLQueries {
         case "findGroups", "findGroup":
             // Groups don't have a dedicated fragment yet, they use inline fields in findGroups.graphql
             fragments = ""
+
+        case "findTagPickerOptions":
+            // Inline fields only: id, name and the aliases the filter pickers match against.
+            fragments = ""
             
         default:
             AppLog.error("⚠️ Warning: No explicit fragment mapping for \(queryName)")

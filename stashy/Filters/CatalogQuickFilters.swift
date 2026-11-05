@@ -675,7 +675,7 @@ private struct QuickEntityFilterSection: View {
         let all = store.availableOptions(kind)
         let term = query.trimmingCharacters(in: .whitespaces)
         if !term.isEmpty {
-            return Array(all.filter { $0.name.localizedCaseInsensitiveContains(term) }.prefix(30))
+            return Array(all.filter { $0.matches(term) }.prefix(30))
         }
         // Top list keeps its order so a tapped chip never moves under the finger; picked
         // long-tail entries (from a search) go in front.

@@ -7975,8 +7975,11 @@ struct GenerateData: Codable {
         // slices, and re-applying that filter here would hide exactly the long-tail hits the
         // search exists for.
         case .tags, .imageTags, .performerTags, .studioTags, .galleryTags, .markerTags, .allTags:
-            run("findTags") { (r: TagsResponse) in
-                (r.data?.findTags.tags ?? []).map { FilterEntityOption(id: $0.id, name: $0.name) }
+            // Stash's `q` also matches tag aliases, so the hits need them for the local filter.
+            run("findTagPickerOptions") { (r: TagsResponse) in
+                (r.data?.findTags.tags ?? []).map {
+                    FilterEntityOption(id: $0.id, name: $0.name, aliases: $0.aliases ?? [])
+                }
             }
         case .studios, .imageStudios, .galleryStudios:
             run("findStudios") { (r: StudiosResponse) in

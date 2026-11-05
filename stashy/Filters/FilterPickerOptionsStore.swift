@@ -74,8 +74,11 @@ final class FilterPickerOptionsStore: ObservableObject {
         let base = cached(kind)
         let extra = searchResults[kind.rawValue] ?? []
         guard !extra.isEmpty else { return base }
+        // A hit replaces its cached twin: only the hit knows the aliases, and a tag found through
+        // an alias must survive the picker's local filter.
+        let hitsById = Dictionary(extra.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
         var seen = Set(base.map(\.id))
-        var merged = base
+        var merged = base.map { hitsById[$0.id] ?? $0 }
         for option in extra where !seen.contains(option.id) {
             seen.insert(option.id)
             merged.append(option)

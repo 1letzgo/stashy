@@ -205,6 +205,13 @@ enum StashOrientationOption: String, CaseIterable, Identifiable {
 struct FilterEntityOption: Identifiable, Equatable, Hashable {
     let id: String
     let name: String
+    /// Only tag search hits carry these; the cached "most used" lists do not.
+    var aliases: [String] = []
+
+    func matches(_ term: String) -> Bool {
+        name.localizedCaseInsensitiveContains(term)
+            || aliases.contains { $0.localizedCaseInsensitiveContains(term) }
+    }
 }
 
 enum StashGenderOption: String, CaseIterable, Identifiable {
