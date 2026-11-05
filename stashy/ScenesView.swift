@@ -1117,7 +1117,8 @@ private struct ScenesViewContent: View {
             onClearPreset: { resetAllSceneFilters() },
             onFiltersChanged: { applyLiveFilter() },
             onOpenFilters: { liveFilterSheetPresented.wrappedValue = true },
-            leadingSortFields: groupScopeSortFields
+            leadingSortFields: groupScopeSortFields,
+            collapsesOnScroll: scrollHeader == nil && !hideTitle
         )
     }
 
@@ -1209,10 +1210,8 @@ private struct ScenesViewContent: View {
                     // position when the phone folds or unfolds.
                     HStack(spacing: columnFold?.frame.width ?? 0) {
                         // Pinned above the list so it always shows, also after coming back from a detail page.
-                        VStack(spacing: 0) {
-                            quickBar
-                            scenesGrid
-                        }
+                        scenesGrid
+                            .catalogPinnedQuickBar { quickBar }
                         .frame(width: columnFold.map { max(0, $0.frame.minX) })
 
                         if columnFold != nil {
@@ -1612,6 +1611,7 @@ private struct ScenesViewContent: View {
                 // Match PerformerDetail non-scene tabs (`.padding(16)`).
                 .padding(.top, scrollHeader != nil ? 16 : 0)
             }
+            .collapsesCatalogChrome(enabled: scrollHeader == nil && !hideTitle)
             .background(Color.appBackground)
             .refreshable { performSearch() }
     }

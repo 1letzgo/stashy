@@ -115,6 +115,8 @@ struct MainTabView: View {
                 showConfigWarning = true
             }
             .onChange(of: coordinator.selectedTab) { oldTab, newTab in
+                // TabView does not always call onDisappear on the list we leave.
+                CatalogChromeCollapse.shared.reset()
                 if newTab != .reels {
                     coordinator.suppressNextFeedsIconRemount = false
                 }

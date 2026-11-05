@@ -574,10 +574,8 @@ private struct PerformersViewContent: View {
                 }
             } else {
                 // Pinned above the list so it always shows, also after coming back from a detail page.
-                VStack(spacing: 0) {
-                    quickBar
-                    performersGrid
-                }
+                performersGrid
+                    .catalogPinnedQuickBar { quickBar }
             }
         }
         .applyAppBackground()
@@ -737,7 +735,8 @@ private struct PerformersViewContent: View {
                 applyLiveFilter()
             },
             onFiltersChanged: { applyLiveFilter() },
-            onOpenFilters: { showFilterSortSheet = true }
+            onOpenFilters: { showFilterSortSheet = true },
+            collapsesOnScroll: true
         )
     }
 
@@ -788,6 +787,7 @@ private struct PerformersViewContent: View {
                 .padding([.horizontal, .bottom], 16)
                 }
             }
+            .collapsesCatalogChrome()
             .refreshable { performSearch() }
             .onChange(of: viewModel.isLoadingMorePerformers) { oldValue, isLoading in
                 if !isLoading && shouldRestoreScroll {

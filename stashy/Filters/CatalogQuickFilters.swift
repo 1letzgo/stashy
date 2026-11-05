@@ -332,6 +332,9 @@ struct CatalogListQuickBar<Option: CatalogQuickSortable>: View {
         return keys.map { ($0, chipLabel(key: $0, value: dict[$0] as Any)) }
     }
 
+    /// Off where the bar scrolls with the content instead of being pinned above the list.
+    var collapsesOnScroll = false
+
     var body: some View {
         // Same pills, sizes and spacing as the Tools section rows (`ToolsPillMenuRow`).
         VStack(alignment: .leading, spacing: DesignTokens.Tools.menuBottomPadding) {
@@ -379,7 +382,13 @@ struct CatalogListQuickBar<Option: CatalogQuickSortable>: View {
         }
         .padding(.top, DesignTokens.Tools.menuTopPadding)
         .padding(.bottom, DesignTokens.Tools.menuBottomPadding)
-    }
+            // The list scrolls underneath. The fill closes the gap up to the section bar and fades with
+        // the quick bar; as a plain view it stays out of the safe area.
+        .background {
+            Color.appBackground.padding(.top, -DesignTokens.Chrome.contentTopGap)
+        }
+        .modifier(CatalogChromeCollapsible(enabled: collapsesOnScroll))
+}
 
     /// Replaces the chrome's former "Settings" slot; the dot marks an active filter.
     private func settingsButton(action: @escaping () -> Void) -> some View {

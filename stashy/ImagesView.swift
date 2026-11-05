@@ -351,9 +351,6 @@ private struct ImagesViewBody: View {
                 // from an image (the return scroll used to push it under the chrome). An opened
                 // gallery keeps it in the scroll content below its header.
                 VStack(spacing: 0) {
-                if showsQuickBar && gallery == nil {
-                    quickBar
-                }
                 GeometryReader { viewport in
                     ScrollViewReader { proxy in
                         ScrollView {
@@ -373,6 +370,7 @@ private struct ImagesViewBody: View {
                             .padding(.top, showsQuickBar && gallery == nil ? 0 : 16)
                             .padding(.bottom, 16 + (isSelectionMode ? 80 : 0))
                         }
+                        .collapsesCatalogChrome(enabled: gallery == nil)
                         .onScrollPhaseChange { _, newPhase in
                             let scrolling = newPhase != .idle
                             isFeedScrolling = scrolling
@@ -412,6 +410,11 @@ private struct ImagesViewBody: View {
                         }
                     }
                     .frame(width: viewport.size.width, height: viewport.size.height)
+                }
+                .catalogPinnedQuickBar {
+                    if showsQuickBar && gallery == nil {
+                        quickBar
+                    }
                 }
                 .refreshable {
                     imageListFilters.refetchImages(viewModel: viewModel, initial: true)
@@ -949,7 +952,8 @@ private struct ImagesViewBody: View {
             presetName: activeImagePresetName,
             onClearPreset: { resetAllImageFilters() },
             onFiltersChanged: { imageListFilters.applyLiveFilter(viewModel: viewModel) },
-            onOpenFilters: { imageListFilters.showFilterSortSheet = true }
+            onOpenFilters: { imageListFilters.showFilterSortSheet = true },
+            collapsesOnScroll: gallery == nil
         )
     }
 

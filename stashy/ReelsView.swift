@@ -1521,7 +1521,7 @@ struct ReelsViewBody: View {
     /// Short-video style: the section chrome fades out when a finger starts paging and stays out
     /// while watching — only a tap on the media (or a menu / sheet / mode switch) brings it back.
     /// Only a user drag (`.interacting`) hides it — auto-advance and the Mac arrow keys animate the
-    /// scroll too, and must not hide the chrome. Pics never hides.
+    /// scroll too, and must not hide the chrome. Pics follows `CatalogChromeCollapse` instead.
     /// The tab bar is left alone: toggling it mid-page resizes the feed and drifts `scrollPosition`.
     private func reelsUpdateChromeAutoHide(for phase: ScrollPhase) {
         guard phase == .interacting, reelsMode != .pics, !reelsChromeAutoHideBlocked, !isChromeScrollHidden else { return }
@@ -3175,6 +3175,12 @@ struct ReelsViewBody: View {
                 handleModeChange(from: oldValue, to: newValue)
             }
             // A menu, sheet or alert always gets the chrome back (and keeps it, see `reelsChromeAutoHideBlocked`).
+            // Pics is a plain list, not paged media with a surface to tap: it hides and returns
+            // its chrome like Home and the catalog lists, from their shared scroll state.
+            .onReceive(CatalogChromeCollapse.shared.$isCollapsed) { collapsed in
+                guard reelsMode == .pics, !reelsChromeAutoHideBlocked else { return }
+                isChromeScrollHidden = collapsed
+            }
             .onChange(of: reelsChromeAutoHideBlocked) { _, blocked in
                 if blocked { _ = reelsRevealChromeAfterScroll() }
             }
@@ -4787,9 +4793,11 @@ struct ReelsViewBody: View {
         }
         .opacity(isUIVisible && !isChromeScrollHidden ? 1 : 0)
         // Slide towards the screen edge it sits on; Reduce Motion keeps the plain fade.
-        .offset(y: isChromeScrollHidden && !reduceMotion ? (prefersBottom ? 16 : -16) : 0)
+        .offset(y: isChromeScrollHidden && !reduceMotion
+                 ? (prefersBottom ? StashyChromeAutoHide.slideDistance : -StashyChromeAutoHide.slideDistance)
+                 : 0)
         .animation(.easeInOut(duration: 0.2), value: isUIVisible)
-        .animation(reduceMotion ? .easeInOut(duration: 0.15) : .easeOut(duration: 0.25), value: isChromeScrollHidden)
+        .animation(StashyChromeAutoHide.animation(reduceMotion: reduceMotion), value: isChromeScrollHidden)
     }
 
     @ViewBuilder

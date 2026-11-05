@@ -517,10 +517,8 @@ private struct GalleriesViewContent: View {
             }
         } else {
             // Pinned above the list so it always shows, also after coming back from a detail page.
-            VStack(spacing: 0) {
-                quickBar
-                galleriesGridScroll
-            }
+            galleriesGridScroll
+                .catalogPinnedQuickBar { quickBar }
         }
     }
 
@@ -553,7 +551,8 @@ private struct GalleriesViewContent: View {
             presetName: activePresetName,
             onClearPreset: { resetAllCatalogFilters() },
             onFiltersChanged: { applyLiveFilter() },
-            onOpenFilters: { showFilterSortSheet = true }
+            onOpenFilters: { showFilterSortSheet = true },
+            collapsesOnScroll: !hideTitle
         )
     }
 
@@ -598,6 +597,7 @@ private struct GalleriesViewContent: View {
             .padding([.horizontal, .bottom], 16)
             }
         }
+        .collapsesCatalogChrome(enabled: !hideTitle)
         .background(Color.appBackground)
         .refreshable { performSearch() }
     }

@@ -11,6 +11,156 @@ import SwiftUI
 
 // MARK: - Section roots (Home / Settings / Tools)
 
+/// How section chrome leaves while scrolling: the same fade and short slide in Feeds and in the
+/// catalog lists. Opacity and offset only, so no list ever relays out because of it.
+enum StashyChromeAutoHide {
+    static let slideDistance: CGFloat = 16
+
+    static func animation(reduceMotion: Bool) -> Animation {
+        reduceMotion ? .easeInOut(duration: 0.15) : .easeOut(duration: 0.25)
+    }
+}
+
+/// Top chrome takes about a fifth of an iPhone before any content shows. Catalog lists report
+/// their scrolling here. As in Feeds, a finger dragging the list hides the section strip and the
+/// quick bar; lists have no empty media to tap, so scrolling back up or reaching the top returns
+/// them. Only flips publish, so scrolling does not rebuild anything.
+@MainActor
+final class CatalogChromeCollapse: ObservableObject {
+    static let shared = CatalogChromeCollapse()
+
+    @Published private(set) var isCollapsed = false
+    /// Only a drag hides, as in Feeds: scroll restoration and programmatic scrolls must not.
+    var isDragging = false
+    private var anchor: CGFloat = 0
+
+    private static let hideDistance: CGFloat = 12
+    private static let showDistance: CGFloat = 20
+    private static let minimumHidePosition: CGFloat = 40
+    /// Not worth hiding anything for a list that barely scrolls.
+    private static let minimumScrollRange: CGFloat = 200
+
+    func update(offset: CGFloat, scrollRange: CGFloat) {
+        #if os(iOS)
+        // VoiceOver reads the screen in order; chrome that moves away would lose its place.
+        guard !UIAccessibility.isVoiceOverRunning else {
+            reset()
+            return
+        }
+        // Rubber-banding at either end is not a scroll direction.
+        let position = min(max(offset, 0), max(scrollRange, 0))
+
+        if position <= Self.showDistance {
+            anchor = position
+            setCollapsed(false)
+        } else if position > anchor {
+            if isCollapsed {
+                anchor = position
+            } else if position - anchor >= Self.hideDistance {
+                anchor = position
+                if isDragging, position >= Self.minimumHidePosition, scrollRange >= Self.minimumScrollRange {
+                    setCollapsed(true)
+                }
+            }
+        } else if isCollapsed {
+            if anchor - position >= Self.showDistance {
+                anchor = position
+                setCollapsed(false)
+            }
+        } else {
+            anchor = position
+        }
+        #endif
+    }
+
+    func reset() {
+        anchor = 0
+        isDragging = false
+        setCollapsed(false)
+    }
+
+    private func setCollapsed(_ value: Bool) {
+        guard isCollapsed != value else { return }
+        isCollapsed = value
+    }
+}
+
+/// Hides top chrome together with `CatalogChromeCollapse`, the way Feeds hides its own.
+struct CatalogChromeCollapsible: ViewModifier {
+    var enabled = true
+
+    @ObservedObject private var collapse = CatalogChromeCollapse.shared
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    func body(content: Content) -> some View {
+        let collapsed = enabled && collapse.isCollapsed
+        content
+            .opacity(collapsed ? 0 : 1)
+            .offset(y: collapsed && !reduceMotion ? -StashyChromeAutoHide.slideDistance : 0)
+            .allowsHitTesting(!collapsed)
+            .accessibilityHidden(collapsed)
+            .animation(StashyChromeAutoHide.animation(reduceMotion: reduceMotion), value: collapsed)
+    }
+}
+
+/// Keeps the status bar readable once the section bar, whose material reaches behind it, is gone.
+private struct CatalogStatusBarScrim: View {
+    @ObservedObject private var collapse = CatalogChromeCollapse.shared
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    var body: some View {
+        Color.clear
+            .frame(height: 0)
+            .background(.bar)
+            .colorScheme(.dark)
+            .opacity(collapse.isCollapsed ? 1 : 0)
+            .animation(StashyChromeAutoHide.animation(reduceMotion: reduceMotion), value: collapse.isCollapsed)
+            .allowsHitTesting(false)
+    }
+}
+
+private struct CatalogScrollMetrics: Equatable {
+    var offset: CGFloat
+    var range: CGFloat
+}
+
+extension View {
+    /// Pins the quick bar over a catalog list. The list scrolls underneath, so the bar can slide
+    /// away without changing the list's layout.
+    func catalogPinnedQuickBar<Bar: View>(@ViewBuilder _ bar: @escaping () -> Bar) -> some View {
+        safeAreaInset(edge: .top, spacing: 0) {
+            bar()
+        }
+    }
+
+    /// Goes on the vertical scroll view of a catalog list whose chrome is pinned above it.
+    /// `enabled: false` for lists embedded in a detail page, whose bar scrolls with the content.
+    @ViewBuilder
+    func collapsesCatalogChrome(enabled: Bool = true) -> some View {
+        #if os(iOS)
+        if enabled {
+            onScrollGeometryChange(for: CatalogScrollMetrics.self) { geometry in
+                CatalogScrollMetrics(
+                    offset: geometry.contentOffset.y + geometry.contentInsets.top,
+                    range: geometry.contentSize.height + geometry.contentInsets.top
+                        + geometry.contentInsets.bottom - geometry.containerSize.height
+                )
+            } action: { _, metrics in
+                CatalogChromeCollapse.shared.update(offset: metrics.offset, scrollRange: metrics.range)
+            }
+            .onScrollPhaseChange { _, phase in
+                CatalogChromeCollapse.shared.isDragging = phase == .interacting
+            }
+            .onDisappear { CatalogChromeCollapse.shared.reset() }
+        } else {
+            self
+        }
+        #else
+        self
+        #endif
+    }
+}
+
 struct SectionChromeModifier<Row: View>: ViewModifier {
     let showsSwitcher: Bool
     @ViewBuilder let row: () -> Row
@@ -25,7 +175,11 @@ struct SectionChromeModifier<Row: View>: ViewModifier {
                             .padding(.horizontal, StashyExpandingDock.edgePadding)
                             .padding(.vertical, 6)
                     }
+                    .modifier(CatalogChromeCollapsible())
                 }
+            }
+            .overlay(alignment: .top) {
+                if showsSwitcher { CatalogStatusBarScrim() }
             }
     }
 }

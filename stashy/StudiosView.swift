@@ -519,10 +519,8 @@ private struct StudiosViewContent: View {
                 }
             } else {
                 // Pinned above the list so it always shows, also after coming back from a detail page.
-                VStack(spacing: 0) {
-                    quickBar
-                    studiosList
-                }
+                studiosList
+                    .catalogPinnedQuickBar { quickBar }
             }
         }
         .applyAppBackground()
@@ -717,7 +715,8 @@ private struct StudiosViewContent: View {
             presetName: activePresetName,
             onClearPreset: { resetAllCatalogFilters() },
             onFiltersChanged: { applyLiveFilter() },
-            onOpenFilters: { showFilterSortSheet = true }
+            onOpenFilters: { showFilterSortSheet = true },
+            collapsesOnScroll: !hideTitle
         )
     }
 
@@ -755,6 +754,7 @@ private struct StudiosViewContent: View {
                 .padding([.horizontal, .bottom], 16)
                 }
             }
+            .collapsesCatalogChrome(enabled: !hideTitle)
             .refreshable { performSearch() }
             .onAppear {
                 if let id = lastOpenedStudioId {

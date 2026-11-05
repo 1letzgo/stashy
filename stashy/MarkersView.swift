@@ -526,10 +526,8 @@ private struct MarkersViewContent: View {
                 }
             } else {
                 // Pinned above the list so it always shows, also after coming back from a detail page.
-                VStack(spacing: 0) {
-                    quickBar
-                    markersList
-                }
+                markersList
+                    .catalogPinnedQuickBar { quickBar }
             }
         }
         .applyAppBackground()
@@ -706,7 +704,8 @@ private struct MarkersViewContent: View {
             presetName: activePresetName,
             onClearPreset: { resetAllCatalogFilters() },
             onFiltersChanged: { applyLiveFilterFromSheet() },
-            onOpenFilters: { showFilterSortSheet = true }
+            onOpenFilters: { showFilterSortSheet = true },
+            collapsesOnScroll: !hideTitle
         )
     }
 
@@ -742,6 +741,7 @@ private struct MarkersViewContent: View {
             .padding([.horizontal, .bottom], 16)
             }
         }
+        .collapsesCatalogChrome(enabled: !hideTitle)
         .refreshable { performSearch() }
     }
 }

@@ -108,6 +108,7 @@ private struct HomeViewContent: View {
                 }
             }
         }
+        .collapsesCatalogChrome()
         .scrollContentBackground(.hidden)
         .environment(\.homeContentWidth, contentWidth)
         .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { width in
