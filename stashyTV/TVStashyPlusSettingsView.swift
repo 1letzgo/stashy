@@ -181,9 +181,21 @@ struct TVStashyPlusSettingsView: View {
                     }
                 }
 
-                featureRow(icon: ToolsItem.hotOrNot.icon, text: ToolsItem.hotOrNot.plusFeatureTitle)
-                featureRow(icon: ToolsItem.rateMe.icon, text: ToolsItem.rateMe.plusFeatureTitle)
-                featureRow(icon: "sparkles.tv.fill", text: "Channels")
+                featureRow(
+                    icon: ToolsItem.hotOrNot.icon,
+                    text: ToolsItem.hotOrNot.plusFeatureTitle,
+                    detail: "Puts performers against each other under Discover. You pick the winner and their ratings update on your server."
+                )
+                featureRow(
+                    icon: ToolsItem.rateMe.icon,
+                    text: ToolsItem.rateMe.plusFeatureTitle,
+                    detail: "Shows unrated scenes or images one at a time under Discover, so you can rate them with stars."
+                )
+                featureRow(
+                    icon: "sparkles.tv.fill",
+                    text: "Channels",
+                    detail: "Plays scenes back to back from a row on Home: recently released, recently added or your saved scene filters. Performer, studio, tag and group pages get their own channel."
+                )
                     // Wer stashy+ bereits besitzt, bekommt weder Kauf- noch
                     // Restore-Button; während eines Kaufs oder Restores sind sie
                     // alle deaktiviert. In beiden Fällen ist diese Zeile das
@@ -193,7 +205,11 @@ struct TVStashyPlusSettingsView: View {
                             || store.isPurchasing
                             || store.isRestoringPurchases
                     )
-                featureRow(icon: "sparkles.rectangle.stack", text: "Similar Scenes & Up Next")
+                featureRow(
+                    icon: "sparkles.rectangle.stack",
+                    text: "Similar Scenes & Up Next",
+                    detail: "Shows similar scenes on the scene page. When a scene ends, a similar one is offered as Up Next."
+                )
             } footer: {
                 Text("stashy+ unlocks premium features across stashy for iPhone and Apple TV with one purchase.")
             }
@@ -277,15 +293,20 @@ struct TVStashyPlusSettingsView: View {
         }
     }
 
-    private func featureRow(icon: String, text: String) -> some View {
+    private func featureRow(icon: String, text: String, detail: String) -> some View {
         HStack(spacing: 20) {
             Image(systemName: icon)
                 .font(.title3)
                 .foregroundColor(appearanceManager.tintColor)
                 .frame(width: 44)
 
-            Text(text)
-                .font(.body)
+            VStack(alignment: .leading, spacing: 4) {
+                Text(text)
+                    .font(.body)
+                Text(detail)
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+            }
         }
     }
 
