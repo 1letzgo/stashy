@@ -168,7 +168,7 @@ private fun SelectionActions(sel: CatalogSelectionChrome) {
             SF.trash, "Delete", tint = if (sel.count > 0) de.letzgo.stashy.ui.StashyColors.systemRed else p.tertiaryText,
             enabled = sel.count > 0, busy = sel.isDeleting, onClick = sel.onDelete,
         )
-        androidx.compose.material3.TextButton(onClick = sel.onDone) { Text("Done", style = NativeType.labelLarge, color = nativeAccent()) }
+        androidx.compose.material3.TextButton(onClick = sel.onDone) { Text("Done", style = NativeType.labelLarge, color = de.letzgo.stashy.ui.textAccent()) }
     }
 }
 

@@ -439,6 +439,13 @@ val NativeGroupShape: Shape = RoundedCornerShape(16.dp)
 @Composable
 fun nativeAccent(): Color = Appearance.tint.takeIf { it != StashyColors.defaultTint } ?: Theme.palette.text
 
+/** The accent for text and links on the app's surfaces (4.5:1 on background and cards); fills keep [nativeAccent]. */
+@Composable
+fun textAccent(): Color {
+    val p = Theme.palette
+    return readableTextColor(nativeAccent(), p.text, p.background, p.secondaryBackground)
+}
+
 /** Readable content colour on an [accent] fill (white on dark fills, dark on light ones). */
 @Composable
 fun onNativeAccent(accent: Color = nativeAccent()): Color {
@@ -455,7 +462,7 @@ fun NativeSectionHeader(title: String, modifier: Modifier = Modifier, badge: (@C
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        Text(title, style = NativeType.titleSmall, color = nativeAccent())
+        Text(title, style = NativeType.titleSmall, color = textAccent())
         badge?.invoke()
     }
 }
@@ -615,7 +622,7 @@ fun <T> NativeSelectionDialog(title: String?, options: List<T>, selected: T?, la
             }
         },
         confirmButton = {},
-        dismissButton = { TextButton(onDismiss) { Text("Cancel", color = nativeAccent(), style = NativeType.labelLarge) } },
+        dismissButton = { TextButton(onDismiss) { Text("Cancel", color = textAccent(), style = NativeType.labelLarge) } },
     )
 }
 
@@ -719,7 +726,7 @@ fun NativeConfirmDialog(
                 Text(confirmLabel, style = NativeType.labelLarge, color = if (destructive) StashyColors.systemRed else nativeAccent())
             }
         },
-        dismissButton = dismissLabel?.let { { TextButton(onDismiss) { Text(it, style = NativeType.labelLarge, color = nativeAccent()) } } },
+        dismissButton = dismissLabel?.let { { TextButton(onDismiss) { Text(it, style = NativeType.labelLarge, color = textAccent()) } } },
     )
 }
 
@@ -788,7 +795,7 @@ fun NativeTextField(
             focusedTextColor = p.text, unfocusedTextColor = p.text,
             focusedBorderColor = accent, unfocusedBorderColor = p.secondaryText.copy(alpha = 0.5f),
             focusedLabelColor = accent, unfocusedLabelColor = p.secondaryText,
-            cursorColor = accent, focusedPlaceholderColor = p.tertiaryText, unfocusedPlaceholderColor = p.tertiaryText,
+            cursorColor = accent, focusedPlaceholderColor = p.secondaryText, unfocusedPlaceholderColor = p.secondaryText,
             focusedLeadingIconColor = p.secondaryText, unfocusedLeadingIconColor = p.secondaryText,
             focusedTrailingIconColor = p.secondaryText, unfocusedTrailingIconColor = p.secondaryText,
             focusedSupportingTextColor = p.secondaryText, unfocusedSupportingTextColor = p.secondaryText,
@@ -835,7 +842,7 @@ fun NativeSearchField(
             focusedContainerColor = containerColor, unfocusedContainerColor = containerColor,
             focusedIndicatorColor = Color.Transparent, unfocusedIndicatorColor = Color.Transparent, disabledIndicatorColor = Color.Transparent,
             cursorColor = accent,
-            focusedPlaceholderColor = p.tertiaryText, unfocusedPlaceholderColor = p.tertiaryText,
+            focusedPlaceholderColor = p.secondaryText, unfocusedPlaceholderColor = p.secondaryText,
             focusedLeadingIconColor = p.secondaryText, unfocusedLeadingIconColor = p.secondaryText,
             focusedTrailingIconColor = p.secondaryText, unfocusedTrailingIconColor = p.secondaryText,
         ),
@@ -866,8 +873,8 @@ fun NativeTextInputDialog(
                 NativeTextField(text, { text = it }, label, secret = secret)
             }
         },
-        confirmButton = { TextButton({ onConfirm(text) }) { Text(confirmLabel, style = NativeType.labelLarge, color = nativeAccent()) } },
-        dismissButton = { TextButton(onDismiss) { Text("Cancel", style = NativeType.labelLarge, color = nativeAccent()) } },
+        confirmButton = { TextButton({ onConfirm(text) }) { Text(confirmLabel, style = NativeType.labelLarge, color = textAccent()) } },
+        dismissButton = { TextButton(onDismiss) { Text("Cancel", style = NativeType.labelLarge, color = textAccent()) } },
     )
 }
 

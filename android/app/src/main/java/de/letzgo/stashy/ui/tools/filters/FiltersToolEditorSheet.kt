@@ -230,7 +230,7 @@ fun FiltersToolEditorSheet(
                     }
                 }) { Text("Delete", color = StashyColors.systemRed) }
             },
-            dismissButton = { TextButton({ showDelete = false }) { Text("Cancel", color = Appearance.tint) } },
+            dismissButton = { TextButton({ showDelete = false }) { Text("Cancel", color = de.letzgo.stashy.ui.textAccent()) } },
             containerColor = p.secondaryBackground, titleContentColor = p.text, textContentColor = p.secondaryText,
         )
     }
@@ -301,7 +301,7 @@ private fun SaveFilterChoiceDialog(
             }
         },
         confirmButton = {},
-        dismissButton = { TextButton(onCancel) { Text("Cancel", color = Appearance.tint) } },
+        dismissButton = { TextButton(onCancel) { Text("Cancel", color = de.letzgo.stashy.ui.textAccent()) } },
         containerColor = p.secondaryBackground, titleContentColor = p.text, textContentColor = p.text,
     )
 }

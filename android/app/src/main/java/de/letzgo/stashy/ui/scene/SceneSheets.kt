@@ -251,7 +251,7 @@ fun EntityPickerSheet(
                         })) {
                             Icon(PlayerIcons.plusCircle, null, tint = Appearance.tint, modifier = Modifier.size(20.dp))
                             Spacer(Modifier.width(8.dp))
-                            Text("Create \"$search\"", color = Appearance.tint)
+                            Text("Create \"$search\"", color = de.letzgo.stashy.ui.textAccent())
                         }
                     }
                 }

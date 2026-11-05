@@ -31,7 +31,12 @@ class MainActivity : FragmentActivity() {
         if (android.os.Build.VERSION.SDK_INT >= 33) setRecentsScreenshotEnabled(false)
         // Screen stays on while a video plays (ui/player/ScreenAwake.kt).
         de.letzgo.stashy.ui.player.ScreenAwake.bind(this)
-        setContent { StashyTheme { de.letzgo.stashy.ui.settings.AppLockGate { AppShell() } } }
+        setContent {
+            StashyTheme {
+                de.letzgo.stashy.ui.SystemBarAppearance()
+                de.letzgo.stashy.ui.settings.AppLockGate { AppShell() }
+            }
+        }
     }
 
     override fun onResume() {

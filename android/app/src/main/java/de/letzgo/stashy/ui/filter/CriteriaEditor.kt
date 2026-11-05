@@ -266,7 +266,7 @@ private fun GroupCard(document: CriteriaDocument, group: String, path: List<Stri
                     Modifier.clip(RoundedCornerShape(8.dp)).clickable { menu = true }.padding(start = 8.dp, top = 12.dp, bottom = 12.dp, end = 4.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    Text(groupTitle(group), style = NativeType.titleSmall, color = nativeAccent())
+                    Text(groupTitle(group), style = NativeType.titleSmall, color = de.letzgo.stashy.ui.textAccent())
                     Icon(androidx.compose.material.icons.Icons.Filled.ArrowDropDown, null, tint = nativeAccent(), modifier = Modifier.size(24.dp))
                 }
                 DropdownMenu(menu, { menu = false }, containerColor = p.secondaryBackground) {
@@ -640,7 +640,7 @@ private fun CustomFieldsRow(value: List<JsonObject>, set: (List<JsonObject>) -> 
         Text("Add custom field", Modifier.clickable {
             set(value + JsonObject(mapOf("field" to JsonPrimitive(""), "value" to JsonArray(emptyList()), "modifier" to JsonPrimitive("EQUALS"))))
             onChange()
-        }, style = IosTypography.subheadline.copy(fontWeight = FontWeight.SemiBold), color = Appearance.tint)
+        }, style = IosTypography.subheadline.copy(fontWeight = FontWeight.SemiBold), color = de.letzgo.stashy.ui.textAccent())
     }
 }
 
@@ -782,7 +782,7 @@ fun MultiEntityPicker(
                 var mm by remember { mutableStateOf(false) }
                 Box {
                     Row(Modifier.clickable { mm = true }.padding(vertical = 9.dp), verticalAlignment = Alignment.CenterVertically) {
-                        Text("(${CriterionModifier.from(matchMode)?.label ?: matchMode})", style = IosTypography.subheadline.copy(fontStyle = FontStyle.Italic), color = Appearance.tint)
+                        Text("(${CriterionModifier.from(matchMode)?.label ?: matchMode})", style = IosTypography.subheadline.copy(fontStyle = FontStyle.Italic), color = de.letzgo.stashy.ui.textAccent())
                         Icon(SF.chevronUpChevronDown, null, tint = Appearance.tint, modifier = Modifier.size(12.dp))
                     }
                     DropdownMenu(mm, { mm = false }, containerColor = p.secondaryBackground) {

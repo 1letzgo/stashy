@@ -338,7 +338,7 @@ fun SceneHeatmapCard(heatmapURL: String?, duration: Double, currentTime: Double,
                 listOf(0f, 0.25f, 0.5f, 0.75f, 1f).forEach { pos ->
                     Text(
                         PlaybackFormat.time(duration * pos),
-                        style = IosTypography.caption2.copy(fontSize = 9.sp, fontWeight = FontWeight.Medium, fontFamily = FontFamily.Monospace), color = p.text.copy(alpha = 0.8f),
+                        style = IosTypography.caption2.copy(fontSize = 11.sp, fontWeight = FontWeight.Medium, fontFamily = FontFamily.Monospace), color = p.text.copy(alpha = 0.8f),
                         maxLines = 1,
                     )
                 }

@@ -172,5 +172,5 @@ fun FormSection(header: String?, footer: String? = null, content: @Composable Co
     }
 }
 
-internal val pillTextStyle = IosTypography.caption2.copy(fontSize = 10.sp, fontWeight = FontWeight.Bold)
+internal val pillTextStyle = IosTypography.caption2.copy(fontSize = 11.sp, fontWeight = FontWeight.Bold)
 

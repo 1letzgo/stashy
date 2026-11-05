@@ -163,7 +163,7 @@ private fun NowPlayingContent(initial: Scene, onOpen: (de.letzgo.stashy.ui.Scree
                             Text("Clear", color = StashyColors.systemRed, fontWeight = FontWeight.SemiBold)
                         }
                         if (watchlist.isNotEmpty()) TextButton(onClick = { sorting = !sorting }) {
-                            Text(if (sorting) "Done" else "Sort", color = Appearance.tint, fontWeight = FontWeight.SemiBold)
+                            Text(if (sorting) "Done" else "Sort", color = de.letzgo.stashy.ui.textAccent(), fontWeight = FontWeight.SemiBold)
                         }
                     }
                 }
@@ -226,7 +226,7 @@ private fun DetailsPill(onClick: () -> Unit) {
         horizontalArrangement = Arrangement.spacedBy(5.dp),
     ) {
         Icon(Icons.Outlined.Info, null, tint = Appearance.tint, modifier = Modifier.size(16.dp))
-        Text("Details", fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = Appearance.tint, maxLines = 1)
+        Text("Details", fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = de.letzgo.stashy.ui.textAccent(), maxLines = 1)
     }
 }
 

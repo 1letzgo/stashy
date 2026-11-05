@@ -130,7 +130,7 @@ class AppearanceSettingsScreen : Screen {
                                     .border(if (selected) 2.dp else 1.dp, if (selected) Appearance.tint else Theme.palette.text.copy(alpha = 0.2f), CircleShape),
                                 contentAlignment = Alignment.Center,
                             ) { Icon(oCounterIcon(icon, filled = true), null, tint = if (selected) Appearance.tint else Theme.palette.text.copy(alpha = 0.6f), modifier = Modifier.size(22.dp)) }
-                            Text(label, fontSize = 10.sp, color = Theme.palette.secondaryText, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                            Text(label, fontSize = 11.sp, color = Theme.palette.secondaryText, maxLines = 1, overflow = TextOverflow.Ellipsis)
                         }
                     }
                 }
@@ -278,7 +278,7 @@ class AcknowledgementsScreen : Screen {
                         Text(e.name, style = NativeType.titleMedium, color = Theme.palette.text)
                         Text(e.license, style = NativeType.bodyMedium, color = Theme.palette.secondaryText)
                         e.note?.let { Text(it, style = NativeType.bodySmall, color = Theme.palette.secondaryText) }
-                        Text(e.url, style = NativeType.bodySmall, color = Appearance.tint, modifier = Modifier.clickable {
+                        Text(e.url, style = NativeType.bodySmall, color = de.letzgo.stashy.ui.textAccent(), modifier = Modifier.clickable {
                             runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(e.url))) }
                         })
                     }

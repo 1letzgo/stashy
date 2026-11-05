@@ -365,7 +365,7 @@ private fun LeaderboardCard(
                 thumbnail()
                 Text(
                     "#$place",
-                    fontSize = 9.sp, fontWeight = FontWeight.Bold, color = p.text, maxLines = 1,
+                    fontSize = 11.sp, fontWeight = FontWeight.Bold, color = p.text, maxLines = 1,
                     modifier = Modifier
                         .align(Alignment.BottomEnd)
                         .padding(end = 4.dp, bottom = 4.dp)
@@ -420,12 +420,12 @@ private fun PlaceholderIcon(icon: ImageVector, modifier: Modifier = Modifier) {
     Icon(icon, null, tint = StashyColors.appAccent.copy(alpha = 0.45f), modifier = modifier.size(26.dp))
 }
 
-/** iOS: `TopListsStatColumn` — tiny uppercase caption over a big monospaced value. */
+/** iOS: `TopListsStatColumn` — small caption over a big monospaced value. */
 @Composable
 private fun RowScope.StatColumn(title: String, value: String, emphasized: Boolean) {
     val p = Theme.palette
     Column(Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(1.dp)) {
-        Text(title.uppercase(), fontSize = 8.sp, lineHeight = 10.sp, color = p.secondaryText, maxLines = 2, overflow = TextOverflow.Ellipsis, textAlign = TextAlign.Center)
+        Text(title, fontSize = 11.sp, lineHeight = 13.sp, color = p.secondaryText, maxLines = 2, overflow = TextOverflow.Ellipsis, textAlign = TextAlign.Center)
         ShrinkingText(
             value,
             IosTypography.title2.copy(fontWeight = FontWeight.Bold, fontFeatureSettings = "tnum", textAlign = TextAlign.Center),

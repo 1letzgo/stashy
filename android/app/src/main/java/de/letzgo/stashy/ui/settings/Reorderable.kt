@@ -82,6 +82,6 @@ fun <T> ReorderableColumn(
 /** The ≡ drag handle shown at the trailing edge of movable rows. */
 @Composable
 fun DragHandle(modifier: Modifier) {
-    Icon(SFS.dragHandle, "Reorder", tint = Theme.palette.tertiaryText, modifier = modifier.size(24.dp))
+    Icon(SFS.dragHandle, "Reorder", tint = Theme.palette.secondaryText, modifier = modifier.size(24.dp))
 }
 

@@ -59,7 +59,7 @@ fun DownloadOptionsAlert(title: String, message: String?, options: List<Download
                         )
                     }
                 }
-                TextButton(onClick = onDismiss) { Text("Cancel", color = Appearance.tint) }
+                TextButton(onClick = onDismiss) { Text("Cancel", color = de.letzgo.stashy.ui.textAccent()) }
             }
         },
     )

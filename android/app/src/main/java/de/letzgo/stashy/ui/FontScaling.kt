@@ -21,6 +21,9 @@ import androidx.compose.ui.unit.sp
 /** Max font scale applied to text drawn over video (Feeds overlay, player chrome). */
 const val OverlayMaxFontScale: Float = 1.3f
 
+/** Max font scale of the tab bar labels; five labels stay whole on a phone up to here. */
+const val TabBarMaxFontScale: Float = 1.3f
+
 /**
  * [base] grown like a `base.value.sp` text would at the current font scale (follows Android 14's
  * non-linear scaling), never smaller than [base] and capped at [maxScale] × [base].

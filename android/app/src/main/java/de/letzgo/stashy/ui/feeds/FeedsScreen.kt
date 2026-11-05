@@ -96,6 +96,7 @@ import kotlinx.coroutines.launch
 @Composable
 fun FeedsScreen() {
     val model = FeedsModel
+    de.letzgo.stashy.ui.DarkSurfaceBehindSystemBars(model.mode != de.letzgo.stashy.data.ReelsModeType.Pics)
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val pool = remember { FeedPlayerPool(context) }

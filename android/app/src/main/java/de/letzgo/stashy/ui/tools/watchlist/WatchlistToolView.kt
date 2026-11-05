@@ -117,7 +117,7 @@ fun WatchlistToolView() {
                         .clickable { sorting = !sorting }.padding(horizontal = 18.dp),
                     contentAlignment = Alignment.Center,
                 ) {
-                    Text(if (sorting) "Done" else "Sort", style = IosTypography.subheadline.copy(fontWeight = FontWeight.SemiBold), color = Appearance.tint)
+                    Text(if (sorting) "Done" else "Sort", style = IosTypography.subheadline.copy(fontWeight = FontWeight.SemiBold), color = de.letzgo.stashy.ui.textAccent())
                 }
             }
         }

@@ -94,15 +94,15 @@ fun SettingsTransferDialogs(state: SettingsTransferState, launchers: SettingsTra
             Column(Modifier.fillMaxWidth()) {
                 Text("With API keys the file gives full access to your servers. Keep it private.", style = NativeType.bodyMedium)
                 TextButton({ state.showsSecretsChoice = false; launchers.export(false) }) {
-                    Text("Without API keys", color = nativeAccent(), style = NativeType.labelLarge)
+                    Text("Without API keys", color = de.letzgo.stashy.ui.textAccent(), style = NativeType.labelLarge)
                 }
                 TextButton({ state.showsSecretsChoice = false; launchers.export(true) }) {
-                    Text("With API keys and headers", color = nativeAccent(), style = NativeType.labelLarge)
+                    Text("With API keys and headers", color = de.letzgo.stashy.ui.textAccent(), style = NativeType.labelLarge)
                 }
             }
         },
         confirmButton = {},
-        dismissButton = { TextButton({ state.showsSecretsChoice = false }) { Text("Cancel", color = nativeAccent(), style = NativeType.labelLarge) } },
+        dismissButton = { TextButton({ state.showsSecretsChoice = false }) { Text("Cancel", color = de.letzgo.stashy.ui.textAccent(), style = NativeType.labelLarge) } },
     )
     state.resultMessage?.let { message ->
         NativeConfirmDialog("Settings", message, onDismiss = { state.resultMessage = null }, dismissLabel = null)

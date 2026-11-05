@@ -104,7 +104,7 @@ fun BetaBadge() {
     val tint = Appearance.tint
     Text(
         "Beta",
-        fontSize = 10.sp, fontWeight = FontWeight.Bold, color = tint,
+        fontSize = 11.sp, fontWeight = FontWeight.Bold, color = de.letzgo.stashy.ui.textAccent(),
         modifier = Modifier.background(tint.copy(alpha = 0.16f), RoundedCornerShape(50)).padding(horizontal = 6.dp, vertical = 2.dp),
     )
 }

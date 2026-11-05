@@ -266,7 +266,7 @@ private fun MarkerStrip(markers: List<SceneMarker>, playing: Boolean, onSeek: (D
                     Text(
                         PlaybackFormat.time(marker.seconds),
                         Modifier.align(Alignment.BottomEnd).padding(2.dp).clip(RoundedCornerShape(50)).background(Color.Black.copy(alpha = 0.6f)).padding(horizontal = 4.dp, vertical = 1.dp),
-                        style = IosTypography.caption2.copy(fontSize = 10.sp, fontWeight = FontWeight.Bold), color = Color.White, maxLines = 1,
+                        style = IosTypography.caption2.copy(fontSize = 11.sp, fontWeight = FontWeight.Bold), color = Color.White, maxLines = 1,
                     )
                 }
                 Text(

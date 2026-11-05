@@ -563,7 +563,7 @@ private fun WatchlistButton() {
             "$count",
             Modifier.align(Alignment.TopEnd).padding(top = 2.dp, end = 2.dp)
                 .clip(RoundedCornerShape(50)).background(Appearance.tint).padding(horizontal = 4.dp),
-            fontSize = 9.sp, fontWeight = FontWeight.Bold, color = androidx.compose.ui.graphics.Color.White,
+            fontSize = 11.sp, fontWeight = FontWeight.Bold, color = androidx.compose.ui.graphics.Color.White,
         )
     }
 }

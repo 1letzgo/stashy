@@ -669,7 +669,7 @@ private fun DownloadedSceneCard(downloaded: DownloadedScene, onOpen: () -> Unit,
                 }
                 formatDuration(downloaded.duration)?.let { text ->
                     Text(
-                        text, color = Color.White, fontSize = 10.sp, fontWeight = FontWeight.Bold,
+                        text, color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Bold,
                         modifier = Modifier.align(Alignment.BottomEnd).padding(4.dp)
                             .stashyGlass(RoundedCornerShape(50)).padding(horizontal = 4.dp, vertical = 2.dp),
                     )

@@ -327,8 +327,8 @@ private fun FloatingTabBar(modifier: Modifier = Modifier) {
                 selected = selected,
                 onClick = { Nav.select(item.tab) },
                 icon = { Icon(if (selected) item.selectedIcon else item.icon, contentDescription = item.title) },
-                // Scales with the font size (sp); one line so a very large scale ellipsizes instead of wrapping mid-word.
-                label = { Text(item.title, style = androidx.compose.material3.MaterialTheme.typography.labelMedium, maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis) },
+                // Follows the font size only up to a limit: a bar cell has a fixed width, past that every label would ellipsize.
+                label = { CappedFontScale(TabBarMaxFontScale) { Text(item.title, style = androidx.compose.material3.MaterialTheme.typography.labelMedium, maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis) } },
                 colors = NavigationBarItemDefaults.colors(
                     selectedIconColor = p.text,
                     selectedTextColor = p.text,

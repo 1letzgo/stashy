@@ -95,8 +95,8 @@ class GroupDetailScreen(val groupId: String, val preview: StashGroup? = null) : 
     private fun Header(g: StashGroup) {
         // iOS shows the loaded scene total here (`viewModel.totalGroupScenes`).
         val items = DetailFormatting.group(g, catalog.scenes?.totalCount ?: 0, catalog.effectiveGalleries).toMutableList()
-        g.director?.takeIf { it.isNotBlank() }?.let { items += DetailItem("DIRECTOR", it) }
-        de.letzgo.stashy.ui.components.formatDuration(g.duration?.toDouble())?.let { items += DetailItem("DURATION", it) }
+        g.director?.takeIf { it.isNotBlank() }?.let { items += DetailItem("Director", it) }
+        de.letzgo.stashy.ui.components.formatDuration(g.duration?.toDouble())?.let { items += DetailItem("Duration", it) }
         g.subGroupCount?.takeIf { it > 0 }?.let { items += DetailItem("SUB-GROUPS", "$it") }
         val thumb = groupThumbnailURL(g)?.takeIf { g.frontImagePath?.contains("default=true") != true }
         val full = g.frontImageURL

@@ -9,6 +9,8 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.lerp
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.unit.dp
 import de.letzgo.stashy.data.Prefs
 
@@ -80,6 +82,24 @@ object StashyColors {
     val systemIndigo = Color(0xFF5E5CE6)
 }
 
+/**
+ * [color] as a text colour: blended towards [text] just far enough to reach 4.5:1 on both
+ * surfaces, so a custom accent keeps its hue where it can and stays readable where it cannot.
+ */
+fun readableTextColor(color: Color, text: Color, surface: Color, otherSurface: Color): Color {
+    for (step in 0..10) {
+        val candidate = lerp(color, text, step / 10f)
+        if (contrastRatio(candidate, surface) >= 4.5f && contrastRatio(candidate, otherSurface) >= 4.5f) return candidate
+    }
+    return text
+}
+
+private fun contrastRatio(a: Color, b: Color): Float {
+    val la = a.luminance()
+    val lb = b.luminance()
+    return (maxOf(la, lb) + 0.05f) / (minOf(la, lb) + 0.05f)
+}
+
 /** Resolved palette for the current theme (what `Color.appBackground` etc. return on iOS). */
 data class Palette(
     val isDark: Boolean,
@@ -100,7 +120,7 @@ object Theme {
             return when (Appearance.theme) {
                 AppTheme.DarkBlue -> Palette(
                     true, Color(0xFF1E293B), Color(0xFF334155), Color(0xFF2A3A52),
-                    Color.White, Color(0x99EBEBF5), Color(0x4DEBEBF5), Color(0x33FFFFFF), Color.White.copy(alpha = 0.9f),
+                    Color.White, Color(0xB3EBEBF5), Color(0x4DEBEBF5), Color(0x33FFFFFF), Color.White.copy(alpha = 0.9f),
                 )
                 AppTheme.Dark -> dark()
                 AppTheme.Light -> light()
@@ -110,11 +130,13 @@ object Theme {
 
     private fun dark() = Palette(
         true, Color(0xFF000000), Color(0xFF1C1C1E), Color(0xFF3A3A3C),
-        Color.White, Color(0x99EBEBF5), Color(0x4DEBEBF5), Color(0x33FFFFFF), Appearance.tint,
+        Color.White, Color(0x99EBEBF5), Color(0x4DEBEBF5), Color(0x33FFFFFF),
+        readableTextColor(Appearance.tint, Color.White, Color(0xFF000000), Color(0xFF1C1C1E)),
     )
     private fun light() = Palette(
         false, Color(0xFFF2F2F7), Color(0xFFFFFFFF), Color(0xFF3A3A3C),
-        Color.Black, Color(0x993C3C43), Color(0x4D3C3C43), Color(0x33000000), Appearance.tint,
+        Color.Black, Color(0xFF636366), Color(0x4D3C3C43), Color(0x33000000),
+        readableTextColor(Appearance.tint, Color.Black, Color(0xFFF2F2F7), Color(0xFFFFFFFF)),
     )
 }
 
@@ -138,4 +160,34 @@ fun StashyTheme(content: @Composable () -> Unit) {
         onBackground = p.text, onSurface = p.text,
     )
     MaterialTheme(colorScheme = scheme, typography = IosTypography.material, content = content)
+}
+
+/**
+ * Status and navigation bar icons follow the theme: dark icons on the light palette, light icons
+ * otherwise. A screen with its own dark surface behind the bars declares [DarkSurfaceBehindSystemBars].
+ */
+@Composable
+fun SystemBarAppearance() {
+    val view = androidx.compose.ui.platform.LocalView.current
+    val lightIcons = Theme.palette.isDark || SystemBarSurfaces.darkCount > 0
+    androidx.compose.runtime.SideEffect {
+        val window = (view.context as? android.app.Activity)?.window ?: return@SideEffect
+        androidx.core.view.WindowCompat.getInsetsController(window, view).apply {
+            isAppearanceLightStatusBars = !lightIcons
+            isAppearanceLightNavigationBars = !lightIcons
+        }
+    }
+}
+
+/** Keeps the system bar icons light while this is composed, whatever the theme (video, dark heroes). */
+@Composable
+fun DarkSurfaceBehindSystemBars(enabled: Boolean = true) {
+    androidx.compose.runtime.DisposableEffect(enabled) {
+        if (enabled) SystemBarSurfaces.darkCount++
+        onDispose { if (enabled) SystemBarSurfaces.darkCount-- }
+    }
+}
+
+private object SystemBarSurfaces {
+    var darkCount by androidx.compose.runtime.mutableIntStateOf(0)
 }

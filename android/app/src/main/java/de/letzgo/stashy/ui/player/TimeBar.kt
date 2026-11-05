@@ -93,7 +93,7 @@ fun TimeBar(
     val template = PlaybackFormat.widestLabel(dur)
     val barHeight = if (isCompact) 36.dp else 44.dp
     val progress = if (dur > 0) (shown / dur).coerceIn(0.0, 1.0).toFloat() else 0f
-    val labelStyle = TextStyle(fontSize = if (isCompact) 10.sp else 12.sp, fontWeight = FontWeight.SemiBold, fontFamily = FontFamily.Monospace)
+    val labelStyle = TextStyle(fontSize = if (isCompact) 11.sp else 12.sp, fontWeight = FontWeight.SemiBold, fontFamily = FontFamily.Monospace)
     val tint = Appearance.tint
     val changed by rememberUpdatedState(onScrubChanged)
     val ended by rememberUpdatedState(onScrubEnded)
@@ -188,11 +188,11 @@ fun TimeBar(
                     if (previewImage != null) Image(previewImage, null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
                     else if (previewPlaceholderURL != null) AsyncImage(previewPlaceholderURL, null, Modifier.fillMaxSize().alpha(0.55f), contentScale = ContentScale.Crop)
                 }
-                Text(PlaybackFormat.time(shown), style = TextStyle(fontSize = 10.sp, fontWeight = FontWeight.SemiBold, fontFamily = FontFamily.Monospace), color = Color.White)
+                Text(PlaybackFormat.time(shown), style = TextStyle(fontSize = 11.sp, fontWeight = FontWeight.SemiBold, fontFamily = FontFamily.Monospace), color = Color.White)
                 markerAt(markers, shown)?.title?.takeIf { it.isNotEmpty() }?.let { title ->
                     Text(
                         title, Modifier.widthIn(max = maxOf(previewW, 120.dp) + 40.dp).clip(RoundedCornerShape(50)).background(Color.Black.copy(alpha = 0.6f)).padding(horizontal = 7.dp, vertical = 3.dp),
-                        style = TextStyle(fontSize = 10.sp, fontWeight = FontWeight.SemiBold), color = Color.White, maxLines = 1, overflow = TextOverflow.Ellipsis,
+                        style = TextStyle(fontSize = 11.sp, fontWeight = FontWeight.SemiBold), color = Color.White, maxLines = 1, overflow = TextOverflow.Ellipsis,
                     )
                 }
             }

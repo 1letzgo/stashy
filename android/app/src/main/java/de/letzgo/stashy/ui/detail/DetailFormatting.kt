@@ -19,11 +19,11 @@ object DetailFormatting {
     /** iOS `PerformerDetailView.getPerformerDetails`. */
     fun performer(p: Performer, totalGalleries: Int, battleLine: String? = null): List<DetailItem> {
         val list = mutableListOf<DetailItem>()
-        list += DetailItem("SCENES", "${p.sceneCount ?: 0}")
-        list += DetailItem("GALLERIES", "${maxOf(p.galleryCount ?: 0, totalGalleries)}")
-        list += DetailItem("RATING", p.rating100?.toString() ?: "—")
-        if (!battleLine.isNullOrEmpty()) list += DetailItem("BATTLE", battleLine)
-        p.gender?.takeIf { it.isNotEmpty() }?.let { list += DetailItem("GENDER", it) }
+        list += DetailItem("Scenes", "${p.sceneCount ?: 0}")
+        list += DetailItem("Galleries", "${maxOf(p.galleryCount ?: 0, totalGalleries)}")
+        list += DetailItem("Rating", p.rating100?.toString() ?: "—")
+        if (!battleLine.isNullOrEmpty()) list += DetailItem("Battle", battleLine)
+        p.gender?.takeIf { it.isNotEmpty() }?.let { list += DetailItem("Gender", it) }
 
         val gender = p.gender?.uppercase() ?: ""
         val tits = p.fakeTits?.takeIf { it.isNotEmpty() }?.let { DetailItem("Tits", it) }
@@ -33,48 +33,48 @@ object DetailFormatting {
             gender.contains("MALE") || gender == "MAN" -> penis?.let { list += it }
             else -> { tits?.let { list += it }; penis?.let { list += it } }
         }
-        p.birthdate?.takeIf { it.isNotEmpty() }?.let { list += DetailItem("BORN", it) }
-        p.country?.takeIf { it.isNotEmpty() }?.let { list += DetailItem("COUNTRY", it) }
-        p.ethnicity?.takeIf { it.isNotEmpty() }?.let { list += DetailItem("ETHNICITY", it) }
-        p.heightCm?.takeIf { it > 0 }?.let { list += DetailItem("HEIGHT", "$it cm") }
-        p.weight?.takeIf { it > 0 }?.let { list += DetailItem("WEIGHT", "$it kg") }
-        p.measurements?.takeIf { it.isNotEmpty() }?.let { list += DetailItem("MEASUREMENTS", it) }
-        p.careerLength?.takeIf { it.isNotEmpty() }?.let { list += DetailItem("CAREER", it) }
-        p.tattoos?.takeIf { it.isNotEmpty() }?.let { list += DetailItem("TATTOOS", it) }
-        p.piercings?.takeIf { it.isNotEmpty() }?.let { list += DetailItem("PIERCINGS", it) }
+        p.birthdate?.takeIf { it.isNotEmpty() }?.let { list += DetailItem("Born", it) }
+        p.country?.takeIf { it.isNotEmpty() }?.let { list += DetailItem("Country", it) }
+        p.ethnicity?.takeIf { it.isNotEmpty() }?.let { list += DetailItem("Ethnicity", it) }
+        p.heightCm?.takeIf { it > 0 }?.let { list += DetailItem("Height", "$it cm") }
+        p.weight?.takeIf { it > 0 }?.let { list += DetailItem("Weight", "$it kg") }
+        p.measurements?.takeIf { it.isNotEmpty() }?.let { list += DetailItem("Measurements", it) }
+        p.careerLength?.takeIf { it.isNotEmpty() }?.let { list += DetailItem("Career", it) }
+        p.tattoos?.takeIf { it.isNotEmpty() }?.let { list += DetailItem("Tattoos", it) }
+        p.piercings?.takeIf { it.isNotEmpty() }?.let { list += DetailItem("Piercings", it) }
         return list
     }
 
     /** iOS `StudioDetailView.getStudioDetails` (URL is shown on its own row). */
     fun studio(s: Studio, scenes: Int, galleries: Int, counts: de.letzgo.stashy.data.StudioDisplayCounts? = null): List<DetailItem> {
         val allCounts = counts?.takeIf { de.letzgo.stashy.data.StudioCountsStore.includeSubStudios }
-        val list = mutableListOf(DetailItem("SCENES", "${allCounts?.scenes ?: scenes}"))
-        (allCounts?.galleries ?: galleries).takeIf { it > 0 }?.let { list += DetailItem("GALLERIES", "$it") }
-        (counts?.performers ?: s.performerCount)?.takeIf { it > 0 }?.let { list += DetailItem("PERFORMERS", "$it") }
-        counts?.oCount?.takeIf { it > 0 }?.let { list += DetailItem("O COUNT", "$it") }
-        s.rating100?.let { list += DetailItem("RATING", "$it%") }
+        val list = mutableListOf(DetailItem("Scenes", "${allCounts?.scenes ?: scenes}"))
+        (allCounts?.galleries ?: galleries).takeIf { it > 0 }?.let { list += DetailItem("Galleries", "$it") }
+        (counts?.performers ?: s.performerCount)?.takeIf { it > 0 }?.let { list += DetailItem("Performers", "$it") }
+        counts?.oCount?.takeIf { it > 0 }?.let { list += DetailItem("O count", "$it") }
+        s.rating100?.let { list += DetailItem("Rating", "$it%") }
         return list
     }
 
     /** iOS `TagDetailView.getTagDetails`. */
     fun tag(t: Tag, scenes: Int, galleries: Int): List<DetailItem> {
-        val list = mutableListOf(DetailItem("SCENES", "$scenes"))
-        if (galleries > 0) list += DetailItem("GALLERIES", "$galleries")
-        t.performerCount?.takeIf { it > 0 }?.let { list += DetailItem("PERFORMERS", "$it") }
-        t.sceneMarkerCount?.takeIf { it > 0 }?.let { list += DetailItem("MARKERS", "$it") }
-        t.aliases?.takeIf { it.isNotEmpty() }?.let { list += DetailItem("ALIASES", it.joinToString(", ")) }
-        t.createdAt?.takeIf { it.isNotEmpty() }?.let { list += DetailItem("CREATED", it.take(10)) }
-        t.updatedAt?.takeIf { it.isNotEmpty() }?.let { list += DetailItem("UPDATED", it.take(10)) }
+        val list = mutableListOf(DetailItem("Scenes", "$scenes"))
+        if (galleries > 0) list += DetailItem("Galleries", "$galleries")
+        t.performerCount?.takeIf { it > 0 }?.let { list += DetailItem("Performers", "$it") }
+        t.sceneMarkerCount?.takeIf { it > 0 }?.let { list += DetailItem("Markers", "$it") }
+        t.aliases?.takeIf { it.isNotEmpty() }?.let { list += DetailItem("Aliases", it.joinToString(", ")) }
+        t.createdAt?.takeIf { it.isNotEmpty() }?.let { list += DetailItem("Created", it.take(10)) }
+        t.updatedAt?.takeIf { it.isNotEmpty() }?.let { list += DetailItem("Updated", it.take(10)) }
         return list
     }
 
     /** iOS `GroupDetailView.getGroupDetails`. */
     fun group(g: StashGroup, scenes: Int, galleries: Int): List<DetailItem> {
-        val list = mutableListOf(DetailItem("SCENES", "$scenes"))
-        if (galleries > 0) list += DetailItem("GALLERIES", "$galleries")
-        g.studio?.name?.let { list += DetailItem("STUDIO", it) }
-        g.date?.let { list += DetailItem("DATE", it) }
-        g.rating100?.let { list += DetailItem("RATING", "$it%") }
+        val list = mutableListOf(DetailItem("Scenes", "$scenes"))
+        if (galleries > 0) list += DetailItem("Galleries", "$galleries")
+        g.studio?.name?.let { list += DetailItem("Studio", it) }
+        g.date?.let { list += DetailItem("Date", it) }
+        g.rating100?.let { list += DetailItem("Rating", "$it%") }
         return list
     }
 
@@ -85,10 +85,10 @@ object DetailFormatting {
     fun gallery(g: Gallery, totalImages: Int): List<DetailItem> {
         val list = mutableListOf<DetailItem>()
         val count = maxOf(totalImages, g.imageCount ?: 0)
-        if (count > 0) list += DetailItem("IMAGES", "$count")
-        g.date?.takeIf { it.isNotEmpty() }?.let { list += DetailItem("DATE", it) }
-        g.rating100?.let { list += DetailItem("RATING", "$it%") }
-        if (g.organized == true) list += DetailItem("ORGANIZED", "Yes")
+        if (count > 0) list += DetailItem("Images", "$count")
+        g.date?.takeIf { it.isNotEmpty() }?.let { list += DetailItem("Date", it) }
+        g.rating100?.let { list += DetailItem("Rating", "$it%") }
+        if (g.organized == true) list += DetailItem("Organized", "Yes")
         return list
     }
 

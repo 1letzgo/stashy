@@ -179,6 +179,7 @@ class ImageViewerScreen(
     @Composable
     override fun Content() {
         val context = LocalContext.current
+        de.letzgo.stashy.ui.DarkSurfaceBehindSystemBars()
         val scope = rememberCoroutineScope()
         LaunchedEffect(Unit) { isMuted = initialMute() }
         // iOS `ImageTagsUpdated` / `BulkTagsApplied` → `patchImageTagsInLists` / `patchBulkAppliedTag`.

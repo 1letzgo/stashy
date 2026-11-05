@@ -267,7 +267,7 @@ internal const val DetailGridColumns = 2
 internal fun heroGridColumns(count: Int): Int = count.coerceIn(2, 4)
 
 /**
- * Label/value grid of the detail headers (8pt uppercase label, 11pt medium value, one line each).
+ * Label/value grid of the detail headers (11 sp secondary label, 11 sp medium value, one line each).
  * [shadow] adds the iOS text shadow used on a picture.
  */
 @Composable
@@ -284,7 +284,7 @@ internal fun DetailItemsGrid(
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 row.forEach { d ->
                     Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(1.dp)) {
-                        Text(d.label.uppercase(), fontSize = 8.sp, lineHeight = 10.sp, color = labelColor, maxLines = 1, overflow = TextOverflow.Ellipsis, style = TextStyle(shadow = textShadow))
+                        Text(d.label, fontSize = 11.sp, lineHeight = 13.sp, color = labelColor, maxLines = 1, overflow = TextOverflow.Ellipsis, style = TextStyle(shadow = textShadow))
                         Text(d.value, fontSize = 11.sp, lineHeight = 13.sp, fontWeight = FontWeight.Medium, color = valueColor, maxLines = 1, overflow = TextOverflow.Ellipsis, style = TextStyle(shadow = textShadow))
                     }
                 }
@@ -390,9 +390,9 @@ private fun HeaderPlaceholder(icon: ImageVector) {
 internal fun HeaderLink(url: String) {
     val handler = LocalUriHandler.current
     Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-        Text("URL", fontSize = 8.sp, color = Theme.palette.secondaryText)
+        Text("URL", fontSize = 11.sp, color = Theme.palette.secondaryText)
         Text(
-            url, fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Appearance.tint, maxLines = 1, overflow = TextOverflow.Ellipsis,
+            url, fontSize = 11.sp, fontWeight = FontWeight.Bold, color = de.letzgo.stashy.ui.textAccent(), maxLines = 1, overflow = TextOverflow.Ellipsis,
             modifier = Modifier.clickable { runCatching { handler.openUri(url) } },
         )
     }

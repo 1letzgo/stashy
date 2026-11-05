@@ -27,7 +27,7 @@ fun AppUpdateDialog() {
     val state = AppUpdate.state
 
     fun action(label: String, onClick: () -> Unit) = @Composable {
-        TextButton(onClick) { Text(label, color = Appearance.tint, fontWeight = FontWeight.SemiBold) }
+        TextButton(onClick) { Text(label, color = de.letzgo.stashy.ui.textAccent(), fontWeight = FontWeight.SemiBold) }
     }
 
     val (title, body, confirm, dismiss) = when (state) {

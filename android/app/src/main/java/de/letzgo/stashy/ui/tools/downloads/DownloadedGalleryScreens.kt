@@ -229,6 +229,7 @@ class DownloadedImageViewerScreen(val entryId: String, val startIndex: Int) : Sc
         val pager = rememberPagerState(initialPage = startIndex.coerceIn(0, (images.size - 1).coerceAtLeast(0))) { images.size }
         var showUI by remember { mutableStateOf(true) }
         var isMuted by remember { mutableStateOf(Prefs.bool(MUTE_KEY, false)) }
+        de.letzgo.stashy.ui.DarkSurfaceBehindSystemBars()
         var isPlaying by remember { mutableStateOf(true) }
         LaunchedEffect(pager.currentPage) { isPlaying = true }
 

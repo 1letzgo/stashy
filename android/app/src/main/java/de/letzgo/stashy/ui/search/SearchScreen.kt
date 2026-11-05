@@ -296,7 +296,7 @@ private fun Section(title: String, count: Int, limit: Int, onShowAll: () -> Unit
             Text(" ($count)", style = IosTypography.subheadline, color = p.secondaryText)
             Spacer(Modifier.weight(1f))
             if (count >= limit) {
-                Text("Show All", style = IosTypography.subheadline, color = Appearance.tint)
+                Text("Show All", style = IosTypography.subheadline, color = de.letzgo.stashy.ui.textAccent())
                 Icon(SFS.chevronRight, null, tint = Appearance.tint, modifier = Modifier.padding(start = 4.dp).size(12.dp))
             }
         }
@@ -355,13 +355,13 @@ private fun MarkerCard(marker: SceneMarker) {
         Box(Modifier.size(160.dp, 90.dp).clip(RoundedCornerShape(Tokens.Radius.card)).background(Color.Gray.copy(alpha = 0.2f)), contentAlignment = Alignment.Center) {
             Icon(SF.bookmarkFill, null, tint = p.secondaryText)
             AsyncImage(marker.screenshotURL, null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
-            Text(formatDuration(marker.seconds) ?: "0:00", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = Color.White,
+            Text(formatDuration(marker.seconds) ?: "0:00", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Color.White,
                 modifier = Modifier.align(Alignment.BottomEnd).padding(4.dp).background(Color.Black.copy(alpha = 0.7f), RoundedCornerShape(4.dp)).padding(horizontal = 4.dp, vertical = 2.dp))
         }
         Column(Modifier.padding(horizontal = 4.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
             Text(marker.title?.takeIf { it.isNotBlank() } ?: marker.scene?.title ?: "Unknown Marker", style = IosTypography.caption.copy(fontWeight = FontWeight.Bold), color = p.text, maxLines = 1, overflow = TextOverflow.Ellipsis)
             marker.primaryTag?.name?.let {
-                Text(it, fontSize = 9.sp, fontWeight = FontWeight.Medium, color = Appearance.tint,
+                Text(it, fontSize = 11.sp, fontWeight = FontWeight.Medium, color = de.letzgo.stashy.ui.textAccent(),
                     modifier = Modifier.background(Appearance.tint.copy(alpha = 0.1f), RoundedCornerShape(4.dp)).padding(horizontal = 4.dp, vertical = 1.dp))
             }
         }

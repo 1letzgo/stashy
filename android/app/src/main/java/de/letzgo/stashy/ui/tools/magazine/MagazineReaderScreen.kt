@@ -154,6 +154,7 @@ class MagazineReaderScreen(private val gallery: Gallery) : Screen {
 
     @Composable
     override fun Content() {
+        de.letzgo.stashy.ui.DarkSurfaceBehindSystemBars()
         LaunchedEffect(loadAttempt) {
             if (finishedAttempt != loadAttempt) {
                 finishedAttempt = loadAttempt

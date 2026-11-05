@@ -364,7 +364,7 @@ fun ScenePlayerSurface(
                     if (abs(player.rateState - 1f) > 0.001f) {
                         Text(
                             PlaybackFormat.speedLabel(player.rateState), Modifier.align(Alignment.BottomCenter).padding(bottom = 1.dp),
-                            style = TextStyle(fontSize = 8.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace), color = Color.White,
+                            style = TextStyle(fontSize = 11.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace), color = Color.White,
                         )
                     }
                     PlayerMenu(menuOpen, onDismiss = { menuOpen = false; onOptionsMenuClosed(); reveal() }) {
@@ -524,7 +524,7 @@ private fun SkipButton(forward: Boolean, size: Dp, compact: Boolean, onClick: ()
     ) {
         Icon(PlayerIcons.skip, if (forward) "Forward $seconds seconds" else "Back $seconds seconds", tint = Color.White,
             modifier = Modifier.size(if (compact) 30.dp else 40.dp).scale(scaleX = if (forward) -1f else 1f, scaleY = 1f))
-        Text("$seconds", Modifier.offset(y = 1.dp), color = Color.White, style = TextStyle(fontSize = if (compact) 9.sp else 12.sp, fontWeight = FontWeight.Bold))
+        Text("$seconds", Modifier.offset(y = 1.dp), color = Color.White, style = TextStyle(fontSize = if (compact) 11.sp else 12.sp, fontWeight = FontWeight.Bold))
     }
 }
 

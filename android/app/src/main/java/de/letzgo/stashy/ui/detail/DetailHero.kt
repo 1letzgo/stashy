@@ -350,6 +350,7 @@ internal class HeroPictureViewerScreen(
     @Composable
     override fun Content() {
         var showUI by remember { mutableStateOf(true) }
+        de.letzgo.stashy.ui.DarkSurfaceBehindSystemBars()
         var scale by remember { mutableFloatStateOf(1f) }
         var offset by remember { mutableStateOf(Offset.Zero) }
         Box(

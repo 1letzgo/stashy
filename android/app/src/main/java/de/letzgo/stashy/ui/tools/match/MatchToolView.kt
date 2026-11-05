@@ -667,7 +667,7 @@ private fun BattleColumn(
                         Row(Modifier.fillMaxWidth()) {
                             pair.forEach { (label, value) ->
                                 Column(Modifier.weight(1f)) {
-                                    Text(label.uppercase(), fontSize = 8.sp, lineHeight = 10.sp, color = p.secondaryText, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                    Text(label, fontSize = 11.sp, lineHeight = 13.sp, color = p.secondaryText, maxLines = 1, overflow = TextOverflow.Ellipsis)
                                     Text(
                                         value, fontSize = 11.sp, lineHeight = 13.sp, fontWeight = FontWeight.Medium, color = p.text,
                                         maxLines = 2, overflow = TextOverflow.Ellipsis,
@@ -705,7 +705,7 @@ private fun BattleColumn(
                             style = numberStyle.copy(fontSize = 30.sp, fontWeight = FontWeight.ExtraBold, shadow = shadow),
                             color = Color.White,
                         )
-                        Text("SCORE", fontSize = 9.sp, fontWeight = FontWeight.SemiBold, color = Color.White.copy(alpha = 0.92f))
+                        Text("Score", fontSize = 11.sp, fontWeight = FontWeight.SemiBold, color = Color.White.copy(alpha = 0.92f))
                         Text(
                             "${vote.rating100After}",
                             style = IosTypography.title2.merge(numberStyle).copy(fontWeight = FontWeight.Bold, shadow = shadow),
@@ -783,7 +783,7 @@ private fun StarterPickCard(model: MatchViewModel, performer: Performer, modifie
                 maxLines = 2, minLines = 2, overflow = TextOverflow.Ellipsis,
             )
             Column {
-                Text("RATING", fontSize = 8.sp, lineHeight = 10.sp, color = p.secondaryText)
+                Text("Rating", fontSize = 11.sp, lineHeight = 13.sp, color = p.secondaryText)
                 Text(
                     "${performer.rating100 ?: MatchElo.DEFAULT_RATING}",
                     style = numberStyle.copy(fontSize = 11.sp, lineHeight = 13.sp, fontWeight = FontWeight.Medium), color = p.text,
@@ -843,7 +843,7 @@ private fun LeaderboardCard(performer: Performer, place: Int, onClick: () -> Uni
                 PerformerPhoto(performer, Modifier.fillMaxSize(), placeholderSize = 24.dp)
                 Text(
                     "#$place",
-                    fontSize = 9.sp, fontWeight = FontWeight.Bold, color = p.text,
+                    fontSize = 11.sp, fontWeight = FontWeight.Bold, color = p.text,
                     modifier = Modifier
                         .align(Alignment.BottomEnd)
                         .padding(4.dp)
@@ -875,7 +875,7 @@ private fun LeaderboardCard(performer: Performer, place: Int, onClick: () -> Uni
                         StatColumn("D", "${s.draws}", Modifier.weight(1f))
                     }
                     MatchElo.streakSummaryLine(s)?.let {
-                        Text(it, style = IosTypography.caption2, color = p.tertiaryText, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                        Text(it, style = IosTypography.caption2, color = p.secondaryText, maxLines = 2, overflow = TextOverflow.Ellipsis)
                     }
                 }
             }
@@ -887,7 +887,7 @@ private fun LeaderboardCard(performer: Performer, place: Int, onClick: () -> Uni
 private fun StatColumn(title: String, value: String, modifier: Modifier) {
     val p = Theme.palette
     Column(modifier, horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(1.dp)) {
-        Text(title.uppercase(), fontSize = 8.sp, lineHeight = 10.sp, color = p.secondaryText, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        Text(title, fontSize = 11.sp, lineHeight = 13.sp, color = p.secondaryText, maxLines = 1, overflow = TextOverflow.Ellipsis)
         Text(
             value,
             style = IosTypography.title2.merge(numberStyle).copy(fontWeight = FontWeight.Bold),
