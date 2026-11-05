@@ -14,10 +14,10 @@ import SwiftUI
 /// How section chrome leaves while scrolling: the same fade and short slide in Feeds and in the
 /// catalog lists. Opacity and offset only, so no list ever relays out because of it.
 enum StashyChromeAutoHide {
-    static let slideDistance: CGFloat = 16
+    static let slideDistance: CGFloat = 36
 
     static func animation(reduceMotion: Bool) -> Animation {
-        reduceMotion ? .easeInOut(duration: 0.15) : .easeOut(duration: 0.25)
+        reduceMotion ? .easeInOut(duration: 0.15) : .smooth(duration: 0.4)
     }
 }
 
@@ -33,12 +33,12 @@ final class CatalogChromeCollapse: ObservableObject {
     /// Only a drag hides, as in Feeds: scroll restoration and programmatic scrolls must not.
     var isDragging = false
     private var anchor: CGFloat = 0
+    /// What the scrolling decided; `isCollapsed` follows it one run loop later.
+    private var targetCollapsed = false
 
     private static let hideDistance: CGFloat = 12
     private static let showDistance: CGFloat = 20
     private static let minimumHidePosition: CGFloat = 40
-    /// Not worth hiding anything for a list that barely scrolls.
-    private static let minimumScrollRange: CGFloat = 200
 
     func update(offset: CGFloat, scrollRange: CGFloat) {
         #if os(iOS)
@@ -54,15 +54,19 @@ final class CatalogChromeCollapse: ObservableObject {
             anchor = position
             setCollapsed(false)
         } else if position > anchor {
-            if isCollapsed {
+            if targetCollapsed {
                 anchor = position
             } else if position - anchor >= Self.hideDistance {
-                anchor = position
-                if isDragging, position >= Self.minimumHidePosition, scrollRange >= Self.minimumScrollRange {
+                if !isDragging {
+                    anchor = position
+                } else if position >= Self.minimumHidePosition {
+                    // The anchor stays put below the minimum: a short list has no second
+                    // `hideDistance` left to travel once it got there.
+                    anchor = position
                     setCollapsed(true)
                 }
             }
-        } else if isCollapsed {
+        } else if targetCollapsed {
             if anchor - position >= Self.showDistance {
                 anchor = position
                 setCollapsed(false)
@@ -80,8 +84,13 @@ final class CatalogChromeCollapse: ObservableObject {
     }
 
     private func setCollapsed(_ value: Bool) {
-        guard isCollapsed != value else { return }
-        isCollapsed = value
+        guard targetCollapsed != value else { return }
+        targetCollapsed = value
+        // Not from inside the scroll update: published there, the chrome jumps in a single frame
+        // and its animation never runs.
+        DispatchQueue.main.async { [weak self] in
+            self?.isCollapsed = value
+        }
     }
 }
 
@@ -142,14 +151,17 @@ extension View {
             onScrollGeometryChange(for: CatalogScrollMetrics.self) { geometry in
                 CatalogScrollMetrics(
                     offset: geometry.contentOffset.y + geometry.contentInsets.top,
-                    range: geometry.contentSize.height + geometry.contentInsets.top
-                        + geometry.contentInsets.bottom - geometry.containerSize.height
+                    // The container already excludes the insets; adding them again overstates the
+                    // range, and the bounce back from the list's end reads as scrolling up.
+                    range: geometry.contentSize.height - geometry.containerSize.height
                 )
             } action: { _, metrics in
                 CatalogChromeCollapse.shared.update(offset: metrics.offset, scrollRange: metrics.range)
             }
             .onScrollPhaseChange { _, phase in
-                CatalogChromeCollapse.shared.isDragging = phase == .interacting
+                // `.tracking` too: a quick drag on a short list can reach its end in the first
+                // geometry update, before the phase turns `.interacting`.
+                CatalogChromeCollapse.shared.isDragging = phase == .tracking || phase == .interacting
             }
             .onDisappear { CatalogChromeCollapse.shared.reset() }
         } else {

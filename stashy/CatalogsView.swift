@@ -478,10 +478,8 @@ private struct GroupsViewContent: View {
                 }
             } else {
                 // Pinned above the list so it always shows, also after coming back from a detail page.
-                VStack(spacing: 0) {
-                    quickBar
-                    groupsGrid
-                }
+                groupsGrid
+                    .catalogPinnedQuickBar { quickBar }
             }
         }
         .applyAppBackground()
@@ -641,7 +639,8 @@ private struct GroupsViewContent: View {
                     groupsCriteriaDocument.load(f.criteriaObjectFilter())
                 }
                 showGroupsFilterSheet = true
-            }
+            },
+            collapsesOnScroll: !hideTitle
         )
     }
 
@@ -679,6 +678,7 @@ private struct GroupsViewContent: View {
                 .padding([.horizontal, .bottom], 16)
                 }
             }
+            .collapsesCatalogChrome(enabled: !hideTitle)
             .refreshable { performSearch() }
             .onAppear {
                 if let id = lastOpenedGroupId {

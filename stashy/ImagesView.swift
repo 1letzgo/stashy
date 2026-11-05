@@ -350,7 +350,6 @@ private struct ImagesViewBody: View {
                 // Plain lists pin the bar above the grid so it always shows, also after coming back
                 // from an image (the return scroll used to push it under the chrome). An opened
                 // gallery keeps it in the scroll content below its header.
-                VStack(spacing: 0) {
                 GeometryReader { viewport in
                     ScrollViewReader { proxy in
                         ScrollView {
@@ -367,10 +366,20 @@ private struct ImagesViewBody: View {
                             .padding(.horizontal, 16)
                             // Same top inset as SceneDetail under custom chrome (no phantom nav gap);
                             // under the pinned bar its own bottom padding is the gap, like the other lists.
-                            .padding(.top, showsQuickBar && gallery == nil ? 0 : 16)
+                            .padding(.top, pinsQuickBar ? 0 : 16)
                             .padding(.bottom, 16 + (isSelectionMode ? 80 : 0))
                         }
                         .collapsesCatalogChrome(enabled: gallery == nil)
+                        .refreshable {
+                            imageListFilters.refetchImages(viewModel: viewModel, initial: true)
+                        }
+                        // After `.refreshable`: with the refresh action outside the bar, the sort pills
+                        // of this list laid out and took taps but were never drawn.
+                        .catalogPinnedQuickBar {
+                            if pinsQuickBar {
+                                quickBar
+                            }
+                        }
                         .onScrollPhaseChange { _, newPhase in
                             let scrolling = newPhase != .idle
                             isFeedScrolling = scrolling
@@ -410,15 +419,6 @@ private struct ImagesViewBody: View {
                         }
                     }
                     .frame(width: viewport.size.width, height: viewport.size.height)
-                }
-                .catalogPinnedQuickBar {
-                    if showsQuickBar && gallery == nil {
-                        quickBar
-                    }
-                }
-                .refreshable {
-                    imageListFilters.refetchImages(viewModel: viewModel, initial: true)
-                }
                 }
             }
         }
@@ -942,6 +942,7 @@ private struct ImagesViewBody: View {
 
     /// Feeds embed this list under their own chrome, so the bar stays out of there.
     private var showsQuickBar: Bool { !feedsEmbedded }
+    private var pinsQuickBar: Bool { showsQuickBar && gallery == nil }
 
     private var quickBar: some View {
         CatalogListQuickBar(

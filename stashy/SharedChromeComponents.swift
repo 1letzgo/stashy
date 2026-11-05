@@ -29,6 +29,9 @@ private struct StashyGlassModifier<S: Shape>: ViewModifier {
     let shape: S
     let tint: Color?
 
+    // Without this the transparency slider did nothing: `StashyGlass.dimOpacity` is read in
+    // `body`, and SwiftUI skips a modifier's body while its own inputs stay equal.
+    @ObservedObject private var appearance = AppearanceManager.shared
     @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
     @Environment(\.colorSchemeContrast) private var contrast
 
