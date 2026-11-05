@@ -126,6 +126,40 @@ fun PlusMessageToasts() {
     }
 }
 
+/** iOS: `StashyPlusFeatureCopy` — what each stashy+ feature does, locked and unlocked. */
+private object StashyPlusFeatureCopy {
+    class Feature(val title: String, val detail: String, val isBeta: Boolean = false)
+
+    const val APP_ICONS = "Changes the stashy app icon to the color you pick."
+    const val DOWNLOADS = "Saves scenes to your device so you can watch them offline. They are listed in Tools."
+    const val MINI_PLAYER = "Keeps a scene playing in a small bar when you leave its page. Add scenes to your watchlist on the scene page and they play one after another; the list is in Tools."
+    const val MAGAZINE = "Adds a Magazin view on Home that shows your galleries as covers. They open like a magazine and remember the page you stopped on."
+    const val AI_SUBTITLES = "Creates subtitles from a scene's speech on your device and translates them into your subtitle language. Turn them on in the player's AI Subtitles menu."
+    const val TAG_SUGGESTIONS = "Suggests tags based on how your library is already tagged, and shows scenes with the same performers, studio or tags on the scene page. No outside service is involved."
+    const val OVERVIEW = "Shows your library at a glance in Tools: playback, catalog counts and storage."
+    const val O_COUNT = "Shows the O-Counts of your scenes and images as a month calendar in Tools."
+    const val TIMELINE = "Lists your scene plays, O-Counts and markers over time in Tools."
+    const val CHARTS = "Ranks your top scenes, performers, studios and tags in Tools, by measures like O-Count or rating."
+    const val FILTERS = "Lets you create, edit, rename and delete the filters saved on your server, under Settings › Server."
+    const val MATCH = "Puts performers against each other in Tools. You pick the winner and their ratings update on your server."
+    const val RATE_ME = "Shows unrated scenes or images one at a time in Tools, so you can rate them with stars."
+
+    val locked = listOf(
+        Feature("Custom App Icons", APP_ICONS),
+        Feature("Download Scenes", DOWNLOADS),
+        Feature("Miniplayer & Watchlist", MINI_PLAYER),
+        Feature("AI Subtitles and translation", AI_SUBTITLES, isBeta = true),
+        Feature(ToolsItem.Statistics.plusFeatureTitle, OVERVIEW),
+        Feature(ToolsItem.OCount.plusFeatureTitle, O_COUNT),
+        Feature(ToolsItem.Timeline.plusFeatureTitle, TIMELINE),
+        Feature(ToolsItem.TopLists.plusFeatureTitle, CHARTS),
+        Feature(ToolsItem.Filters.plusFeatureTitle, FILTERS),
+        Feature(ToolsItem.HotOrNot.plusFeatureTitle, MATCH),
+        Feature(ToolsItem.RateMe.title, RATE_ME),
+        Feature("Magazin", MAGAZINE),
+    )
+}
+
 /**
  * iOS: `SettingsView.stashyPlusSettings` + `stashyPlusPurchaseSection`, in the iOS order.
  * Unlocked: Custom App Icons · AI Subtitles and translation (Beta) · Tag Suggestions & Similar
@@ -149,6 +183,7 @@ fun LazyListScope.stashyPlusSettingsItems() {
                     "Miniplayer & Watchlist", de.letzgo.stashy.data.TabManager.isMiniPlayerEnabled, de.letzgo.stashy.ui.SFS.miniPlayer,
                 ) { de.letzgo.stashy.data.TabManager.isMiniPlayerEnabled = it }
             }
+            SettingsSectionFooter(StashyPlusFeatureCopy.MINI_PLAYER)
             SectionSpacer()
         }
         item(key = "plus-magazine") {
@@ -164,17 +199,20 @@ fun LazyListScope.stashyPlusSettingsItems() {
                     }
                 }
             }
+            SettingsSectionFooter(StashyPlusFeatureCopy.MAGAZINE)
             SectionSpacer()
         }
         item(key = "plus-app-icons") {
             SettingsSectionHeader("Custom App Icons")
             GroupedCard { Box(Modifier.padding(horizontal = 16.dp)) { AppIconPicker() } }
+            SettingsSectionFooter(StashyPlusFeatureCopy.APP_ICONS)
             SectionSpacer()
         }
         item(key = "plus-ai-subtitles") {
             SettingsSectionHeader("AI Subtitles and translation", isBeta = true)
             // iOS: `StashyPlusAISubtitlesSettings` (Android adds the pack cleanup as last row).
             GroupedCard { de.letzgo.stashy.ui.settings.AiSubtitlesSettingsRows() }
+            SettingsSectionFooter(StashyPlusFeatureCopy.AI_SUBTITLES)
             SectionSpacer()
         }
         item(key = "plus-ai-tags") {
@@ -184,30 +222,22 @@ fun LazyListScope.stashyPlusSettingsItems() {
                     Nav.push(de.letzgo.stashy.ui.tools.aitags.AITagsSettingsScreen())
                 })
             }
+            SettingsSectionFooter(StashyPlusFeatureCopy.TAG_SUGGESTIONS)
             SectionSpacer()
         }
     } else {
         item(key = "plus-included") {
             SettingsSectionHeader("Included with stashy+")
-            // (title, isBeta) — iOS `lockedPlusFeature` list without AI Motion.
-            val features = listOf(
-                "Custom App Icons" to false,
-                "Download Scenes" to false,
-                "Miniplayer & Watchlist" to false,
-                "AI Subtitles and translation" to true,
-                ToolsItem.Statistics.plusFeatureTitle to false,
-                ToolsItem.OCount.plusFeatureTitle to false,
-                ToolsItem.Timeline.plusFeatureTitle to false,
-                ToolsItem.TopLists.plusFeatureTitle to false,
-                ToolsItem.Filters.plusFeatureTitle to false,
-                ToolsItem.HotOrNot.plusFeatureTitle to false,
-                ToolsItem.RateMe.title to false,
-                "Magazin" to false,
-            )
+            // iOS `lockedPlusFeature` list without AI Motion.
+            val features = StashyPlusFeatureCopy.locked
             GroupedCard {
-                features.forEachIndexed { i, (title, beta) ->
-                    SettingsRow(title, SF.lockFill, iconTint = Theme.palette.secondaryText, titleColor = Theme.palette.secondaryText) {
-                        if (beta) BetaBadge()
+                features.forEachIndexed { i, feature ->
+                    // Directly, not `SettingsRow`: the default limit of 3 lines would cut the text.
+                    de.letzgo.stashy.ui.NativeListItem(
+                        feature.title, supporting = feature.detail, supportingMaxLines = Int.MAX_VALUE,
+                        icon = SF.lockFill, iconTint = Theme.palette.secondaryText, headlineColor = Theme.palette.secondaryText,
+                    ) {
+                        if (feature.isBeta) BetaBadge()
                     }
                     if (i < features.lastIndex) RowDivider()
                 }

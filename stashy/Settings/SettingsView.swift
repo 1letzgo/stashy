@@ -21,6 +21,50 @@ private enum StashyLegalLinks {
     static let privacyPolicy = URL(string: "https://github.com/1letzgo/stashy#privacy")!
 }
 
+/// What each stashy+ feature does, shown on the stashy+ page while locked and while unlocked.
+private enum StashyPlusFeatureCopy {
+    struct LockedFeature {
+        let title: String
+        let detail: String
+        var isBeta = false
+    }
+
+    #if os(macOS)
+    static let appIcons = "Changes the stashy app icon on iPhone and iPad. The Mac app keeps its own icon."
+    #else
+    static let appIcons = "Changes the stashy app icon to the color you pick."
+    #endif
+    static let downloads = "Saves scenes to your device so you can watch them offline. They are listed in Tools."
+    static let miniPlayer = "Keeps a scene playing in a small bar when you leave its page. Add scenes to your watchlist on the scene page and they play one after another; the list is in Tools."
+    static let magazine = "Adds a Magazin view on Home that shows your galleries as covers. They open like a magazine and remember the page you stopped on."
+    static let aiSubtitles = "Creates subtitles from a scene's speech on your device and translates them into your subtitle language. Turn them on in the player's AI Subtitles menu."
+    static let tagSuggestions = "Suggests tags based on how your library is already tagged, and shows scenes with the same performers, studio or tags on the scene page. No outside service is involved."
+    static let aiMotion = "Analyzes the playing video live on your device and moves your connected hardware in sync with it. Uses a lot of CPU and battery."
+    static let overview = "Shows your library at a glance in Tools: playback, catalog counts and storage."
+    static let oCount = "Shows the O-Counts of your scenes and images as a month calendar in Tools."
+    static let timeline = "Lists your scene plays, O-Counts and markers over time in Tools."
+    static let charts = "Ranks your top scenes, performers, studios and tags in Tools, by measures like O-Count or rating."
+    static let filters = "Lets you create, edit, rename and delete the filters saved on your server, under Settings › Server."
+    static let match = "Puts performers against each other in Tools. You pick the winner and their ratings update on your server."
+    static let rateMe = "Shows unrated scenes or images one at a time in Tools, so you can rate them with stars."
+
+    static let lockedFeatures: [LockedFeature] = [
+        .init(title: "Custom App Icons", detail: appIcons),
+        .init(title: "Download Scenes", detail: downloads),
+        .init(title: "Miniplayer & Watchlist", detail: miniPlayer),
+        .init(title: "AI Subtitles and translation", detail: aiSubtitles, isBeta: true),
+        .init(title: AIMotionCopy.name, detail: aiMotion, isBeta: true),
+        .init(title: ToolsItem.statistics.plusFeatureTitle, detail: overview),
+        .init(title: ToolsItem.oCount.plusFeatureTitle, detail: oCount),
+        .init(title: ToolsItem.timeline.plusFeatureTitle, detail: timeline),
+        .init(title: ToolsItem.topLists.plusFeatureTitle, detail: charts),
+        .init(title: ToolsItem.filters.plusFeatureTitle, detail: filters),
+        .init(title: ToolsItem.hotOrNot.plusFeatureTitle, detail: match),
+        .init(title: ToolsItem.rateMe.title, detail: rateMe),
+        .init(title: "Magazin", detail: magazine),
+    ]
+}
+
 struct SettingsView: View {
     /// When true, this instance is the locked stashy+ tab (paywall only — no Settings chrome).
     var stashyPlusOnly: Bool = false
@@ -231,6 +275,7 @@ struct SettingsView: View {
                 stashyScrollingSectionHeader("Custom App Icons")
                 StashyPlusAppIconSettings()
                     .stashyGroupedSettingsRow()
+                stashyScrollingSectionFooter(StashyPlusFeatureCopy.appIcons)
             }
 
             Section {
@@ -240,6 +285,7 @@ struct SettingsView: View {
                 }
                 .tint(appearanceManager.tintColor)
                 .stashyGroupedSettingsRow()
+                stashyScrollingSectionFooter(StashyPlusFeatureCopy.miniPlayer)
             }
 
             Section {
@@ -259,11 +305,13 @@ struct SettingsView: View {
                     .stashyGroupedBlockRow(index: 1, count: 2)
                     .task { viewModel.fetchSavedFilters() }
                 }
+                stashyScrollingSectionFooter(StashyPlusFeatureCopy.magazine)
             }
 
             Section {
                 stashyScrollingSectionHeader("AI Subtitles and translation", isBeta: true)
                 StashyPlusAISubtitlesSettings()
+                stashyScrollingSectionFooter(StashyPlusFeatureCopy.aiSubtitles)
             }
 
             Section {
@@ -272,6 +320,7 @@ struct SettingsView: View {
                     Label("Tag Suggestions & Similar Scenes", systemImage: "sparkles")
                 }
                 .stashyGroupedSettingsRow()
+                stashyScrollingSectionFooter(StashyPlusFeatureCopy.tagSuggestions)
             }
 
             Section {
@@ -280,58 +329,35 @@ struct SettingsView: View {
                     Label(AIMotionCopy.name, systemImage: "bolt.fill")
                 }
                 .stashyGroupedSettingsRow()
+                stashyScrollingSectionFooter(StashyPlusFeatureCopy.aiMotion)
             }
         } else {
             Section {
                 stashyScrollingSectionHeader("Included with stashy+")
-                Label("Custom App Icons", systemImage: "lock.fill")
-                    .foregroundColor(.secondary)
-                    .stashyGroupedBlockRow(index: 0, count: 13)
-                Label("Download Scenes", systemImage: "lock.fill")
-                    .foregroundColor(.secondary)
-                    .stashyGroupedBlockRow(index: 1, count: 13)
-                Label("Miniplayer & Watchlist", systemImage: "lock.fill")
-                    .foregroundColor(.secondary)
-                    .stashyGroupedBlockRow(index: 2, count: 13)
-                lockedPlusFeature("AI Subtitles and translation", systemImage: "lock.fill", isBeta: true)
-                    .stashyGroupedBlockRow(index: 3, count: 13)
-                lockedPlusFeature(AIMotionCopy.name, systemImage: "lock.fill", isBeta: true)
-                    .stashyGroupedBlockRow(index: 4, count: 13)
-                Label(ToolsItem.statistics.plusFeatureTitle, systemImage: "lock.fill")
-                    .foregroundColor(.secondary)
-                    .stashyGroupedBlockRow(index: 5, count: 13)
-                Label(ToolsItem.oCount.plusFeatureTitle, systemImage: "lock.fill")
-                    .foregroundColor(.secondary)
-                    .stashyGroupedBlockRow(index: 6, count: 13)
-                Label(ToolsItem.timeline.plusFeatureTitle, systemImage: "lock.fill")
-                    .foregroundColor(.secondary)
-                    .stashyGroupedBlockRow(index: 7, count: 13)
-                Label(ToolsItem.topLists.plusFeatureTitle, systemImage: "lock.fill")
-                    .foregroundColor(.secondary)
-                    .stashyGroupedBlockRow(index: 8, count: 13)
-                Label(ToolsItem.filters.plusFeatureTitle, systemImage: "lock.fill")
-                    .foregroundColor(.secondary)
-                    .stashyGroupedBlockRow(index: 9, count: 13)
-                Label(ToolsItem.hotOrNot.plusFeatureTitle, systemImage: "lock.fill")
-                    .foregroundColor(.secondary)
-                    .stashyGroupedBlockRow(index: 10, count: 13)
-                Label(ToolsItem.rateMe.title, systemImage: "lock.fill")
-                    .foregroundColor(.secondary)
-                    .stashyGroupedBlockRow(index: 11, count: 13)
-                Label("Magazin", systemImage: "lock.fill")
-                    .foregroundColor(.secondary)
-                    .stashyGroupedBlockRow(index: 12, count: 13)
+                let features = StashyPlusFeatureCopy.lockedFeatures
+                ForEach(features.indices, id: \.self) { index in
+                    lockedPlusFeature(features[index])
+                        .stashyGroupedBlockRow(index: index, count: features.count)
+                }
             }
         }
 
         stashyPlusPurchaseSection
     }
 
-    private func lockedPlusFeature(_ title: String, systemImage: String, isBeta: Bool = false) -> some View {
+    private func lockedPlusFeature(_ feature: StashyPlusFeatureCopy.LockedFeature) -> some View {
         HStack {
-            Label(title, systemImage: systemImage)
-                .foregroundColor(.secondary)
-            if isBeta {
+            Label {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(feature.title)
+                    Text(feature.detail)
+                        .font(.footnote)
+                }
+            } icon: {
+                Image(systemName: "lock.fill")
+            }
+            .foregroundColor(.secondary)
+            if feature.isBeta {
                 Spacer()
                 StashyBetaBadge()
             }
