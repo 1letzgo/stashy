@@ -4991,7 +4991,8 @@ struct ReelsViewBody: View {
     private func reelsPerformerNameButton(_ performer: ScenePerformer) -> some View {
         Button(action: { applyPerformerFilter(performer) }) {
             Text(performer.name)
-                .font(.system(size: 15, weight: .bold))
+                .font(.subheadline.weight(.bold))
+                .dynamicTypeSize(...DynamicTypeSize.accessibility1)
                 .foregroundColor(.white)
                 .lineLimit(1)
         }
@@ -5039,14 +5040,16 @@ struct ReelsViewBody: View {
             if let scene = item.titleLinkScene {
                 NavigationLink(destination: LazyView { SceneDetailView(scene: scene, autoPlay: item.titleLinkAutoPlays) }) {
                     Text(title)
-                        .font(.system(size: 15, weight: .medium))
+                        .font(.subheadline.weight(.medium))
+                        .dynamicTypeSize(...DynamicTypeSize.accessibility1)
                         .foregroundColor(.white.opacity(0.85))
                         .lineLimit(1)
                 }
                 .buttonStyle(.plain)
             } else {
                 Text(title)
-                    .font(.system(size: 15, weight: .medium))
+                    .font(.subheadline.weight(.medium))
+                    .dynamicTypeSize(...DynamicTypeSize.accessibility1)
                     .foregroundColor(.white.opacity(0.85))
                     .lineLimit(1)
             }
@@ -6300,7 +6303,8 @@ extension ReelItemView {
     private func titleText(_ title: String, item: ReelsViewBody.ReelItemData) -> some View {
         HStack(spacing: 8) {
             Text(title)
-                .font(.system(size: 15, weight: .medium))
+                .font(.subheadline.weight(.medium))
+                .dynamicTypeSize(...DynamicTypeSize.accessibility1)
                 .foregroundColor(.white.opacity(0.9))
                 .lineLimit(1)
                 .shadow(color: .black.opacity(0.5), radius: 2, x: 0, y: 1)

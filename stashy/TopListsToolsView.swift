@@ -1137,7 +1137,7 @@ private struct TopListsMetricChipRow<Metric: Identifiable & Hashable & TopListsM
                 } label: {
                     Text(metric.label)
                         .font(.caption.weight(.semibold))
-                        .foregroundStyle(selected ? Color.white : Color.primary.opacity(0.85))
+                        .foregroundStyle(selected ? Color.onAppTint : Color.primary.opacity(0.85))
                         .lineLimit(1)
                         .minimumScaleFactor(0.65)
                         .frame(maxWidth: .infinity)
@@ -1452,7 +1452,7 @@ private struct TopListsLeaderboardCard<Stats: View>: View {
                 .clipShape(thumbnailClip)
 
             Text("#\(place)")
-                .font(.system(size: 9, weight: .bold))
+                .font(.system(size: 11, weight: .bold))
                 .foregroundStyle(.primary)
                 .padding(.horizontal, 6)
                 .padding(.vertical, 3)
@@ -1502,7 +1502,7 @@ private struct TopListsStatColumn: View {
     var body: some View {
         VStack(alignment: .center, spacing: 1) {
             Text(title)
-                .font(.system(size: 8))
+                .font(.system(size: 11))
                 .foregroundStyle(.secondary)
                 .textCase(.uppercase)
                 .lineLimit(1)

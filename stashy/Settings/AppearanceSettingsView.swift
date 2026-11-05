@@ -87,7 +87,7 @@ struct AppearanceSettingsView: View {
                         Text("Back")
                             .font(.subheadline.weight(.semibold))
                     }
-                    .foregroundColor(.white)
+                    .foregroundColor(Color.onAppTint)
                     .modifier(StashyChromePillStyle(height: StashyExpandingDock.activeHeight, accent: true))
                 }
                 Button {} label: {
@@ -184,7 +184,7 @@ struct AppearanceSettingsView: View {
             }
 
             Text(option.label)
-                .font(.system(size: 10))
+                .font(.system(size: 11))
                 .foregroundColor(.secondary)
         }
         .onTapGesture {

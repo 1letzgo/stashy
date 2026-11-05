@@ -1150,7 +1150,7 @@ struct PerformerDetailView: View {
     private func cardBadge(icon: String, text: String) -> some View {
         HStack(spacing: 3) {
             Image(systemName: icon).font(.system(size: 10))
-            Text(text).font(.system(size: 10, weight: .bold))
+            Text(text).font(.system(size: 11, weight: .bold))
         }
         .foregroundColor(Color.pillAccent)
         .padding(.horizontal, 6)
@@ -1162,7 +1162,7 @@ struct PerformerDetailView: View {
     private func thumbnailBadge(icon: String, text: String) -> some View {
         HStack(spacing: 3) {
             Image(systemName: icon).font(.system(size: 10))
-            Text(text).font(.system(size: 10, weight: .bold))
+            Text(text).font(.system(size: 11, weight: .bold))
         }
         .foregroundColor(.white)
         .padding(.horizontal, 6)

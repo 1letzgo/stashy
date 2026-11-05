@@ -128,6 +128,8 @@ struct SceneCardView: View {
                     Text(scene.displayTitle ?? "Unknown Title")
                         .font(.headline)
                         .fontWeight(.medium)
+                        // Sits on the thumbnail: larger sizes would bury the picture.
+                        .dynamicTypeSize(...DynamicTypeSize.accessibility1)
                         .lineLimit(2)
                         .foregroundColor(.white)
                         .frame(maxWidth: .infinity, alignment: .leading)

@@ -137,6 +137,25 @@ class AppearanceManager: ObservableObject {
         #endif
     }
 
+    /// White while it reaches 4.5:1 on the accent colour, black otherwise.
+    var onTintColor: Color {
+        var red: CGFloat = 0, green: CGFloat = 0, blue: CGFloat = 0, alpha: CGFloat = 0
+        guard rgbaComponents(of: UIColor(tintColor), &red, &green, &blue, &alpha) else { return .white }
+        func linear(_ c: CGFloat) -> CGFloat { c <= 0.03928 ? c / 12.92 : pow((c + 0.055) / 1.055, 2.4) }
+        let luminance = 0.2126 * linear(red) + 0.7152 * linear(green) + 0.0722 * linear(blue)
+        return 1.05 / (luminance + 0.05) >= 4.5 ? .white : .black
+    }
+
+    /// Tab bar tint. A gray accent is weaker than the white labels of the other tabs, which
+    /// reads as if the selected tab were disabled; neutral accents use the label colour there.
+    var tabBarTint: Color {
+        var red: CGFloat = 0, green: CGFloat = 0, blue: CGFloat = 0, alpha: CGFloat = 0
+        guard rgbaComponents(of: UIColor(tintColor), &red, &green, &blue, &alpha) else { return tintColor }
+        let top = max(red, green, blue)
+        let saturation = top > 0 ? (top - min(red, green, blue)) / top : 0
+        return saturation < 0.15 ? .primary : tintColor
+    }
+
     private func saveColor(_ color: Color) {
         let uiColor = UIColor(color)
         var red: CGFloat = 0

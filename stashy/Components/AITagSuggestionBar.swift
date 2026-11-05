@@ -83,7 +83,7 @@ struct AITagSuggestionBar: View {
                     .font(.system(size: 11, weight: .semibold))
                     .lineLimit(1)
                 Text("\(Int((suggestion.confidence * 100).rounded()))%")
-                    .font(.system(size: 9, weight: .bold))
+                    .font(.system(size: 11, weight: .bold))
                     .foregroundColor(.white.opacity(0.5))
             }
             .foregroundColor(.white.opacity(0.9))

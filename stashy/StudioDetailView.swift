@@ -828,7 +828,7 @@ struct StudioDetailView: View {
                 if let linkURL {
                     VStack(alignment: .leading, spacing: 2) {
                         Text("URL")
-                            .font(.system(size: 8))
+                            .font(.system(size: 11))
                             .foregroundColor(.secondary)
                             .textCase(.uppercase)
                         Link(destination: linkURL) {
@@ -883,7 +883,7 @@ struct StudioDetailView: View {
             Image(systemName: icon)
                 .font(.system(size: 9, weight: .bold))
             Text(text)
-                .font(.system(size: 10, weight: .medium))
+                .font(.system(size: 11, weight: .medium))
         }
         .foregroundColor(.white)
         .padding(.horizontal, 6)

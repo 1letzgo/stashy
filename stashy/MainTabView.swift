@@ -89,11 +89,12 @@ struct MainTabView: View {
                 Tab("Search", systemImage: "magnifyingglass", value: AppTab.search, role: .search) {
                     UniversalSearchView()
                         .applyAppBackground()
+                        .tint(appearanceManager.tintColor)
                 }
             }
             .id(coordinator.serverSwitchID)
             .animation(nil, value: coordinator.selectedTab)
-            .tint(appearanceManager.tintColor)
+            .tint(appearanceManager.tabBarTint)
             .withToasts()
             .modifier(TabBarNeverMinimizes())
             #if !os(tvOS)

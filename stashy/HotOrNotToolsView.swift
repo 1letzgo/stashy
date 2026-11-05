@@ -644,7 +644,7 @@ private struct HotOrNotBattleColumn: View {
                             .foregroundStyle(.white)
                             .shadow(color: .black.opacity(0.35), radius: 2, y: 1)
                         Text("Score")
-                            .font(.system(size: 9, weight: .semibold))
+                            .font(.system(size: 11, weight: .semibold))
                             .foregroundStyle(.white.opacity(0.92))
                             .textCase(.uppercase)
                         Text("\(vote.rating100After)")
@@ -743,7 +743,7 @@ private struct HotOrNotBattleColumn: View {
             ForEach(Array(rows.enumerated()), id: \.offset) { _, detail in
                 VStack(alignment: .leading, spacing: 0) {
                     Text(detail.label)
-                        .font(.system(size: 8))
+                        .font(.system(size: 11))
                         .foregroundColor(.secondary)
                         .textCase(.uppercase)
                     Text(detail.value)
@@ -850,7 +850,7 @@ private struct HotOrNotGauntletStarterPickCard: View {
     private var ratingOnlyRow: some View {
         VStack(alignment: .leading, spacing: 0) {
             Text("RATING")
-                .font(.system(size: 8))
+                .font(.system(size: 11))
                 .foregroundColor(.secondary)
                 .textCase(.uppercase)
             Text(ratingText)
@@ -2554,7 +2554,7 @@ private struct HotOrNotLeaderboardCard: View {
                 .clipShape(thumbnailClip)
 
             Text("#\(place)")
-                .font(.system(size: 9, weight: .bold))
+                .font(.system(size: 11, weight: .bold))
                 .foregroundStyle(.primary)
                 .padding(.horizontal, 6)
                 .padding(.vertical, 3)
@@ -2587,7 +2587,7 @@ private struct HotOrNotLeaderboardCard: View {
     private func leaderboardStatColumn(title: String, value: String) -> some View {
         VStack(alignment: .center, spacing: 1) {
             Text(title)
-                .font(.system(size: 8))
+                .font(.system(size: 11))
                 .foregroundStyle(.secondary)
                 .textCase(.uppercase)
                 .lineLimit(1)

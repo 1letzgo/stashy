@@ -2027,7 +2027,7 @@ struct FullScreenImageView: View {
                             .font(.subheadline.weight(.semibold))
                     }
                     .fixedSize()
-                    .foregroundColor(.white)
+                    .foregroundColor(Color.onAppTint)
                     .modifier(StashyChromePillStyle(height: chromePillHeight, accent: true))
                 }
                 .buttonStyle(.plain)

@@ -137,7 +137,7 @@ private struct TimelineFilterChipRow: View {
                     // and shadow, only multi-select.
                     Text(kind.label)
                         .font(.subheadline.weight(.semibold))
-                        .foregroundStyle(selected ? Color.white : Color.primary.opacity(0.85))
+                        .foregroundStyle(selected ? Color.onAppTint : Color.primary.opacity(0.85))
                         .lineLimit(1)
                         .minimumScaleFactor(0.65)
                         .frame(maxWidth: .infinity)

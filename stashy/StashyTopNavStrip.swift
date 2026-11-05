@@ -276,7 +276,7 @@ private struct StashyExpandingDockChip: View {
     }
 
     private var activeBackground: Color { appearance.tintColor }
-    private var activeForeground: Color { .white }
+    private var activeForeground: Color { Color.onAppTint }
     private var inactiveBackground: Color { palette.inactiveBackground }
     private var inactiveForeground: Color { palette.inactiveForeground }
 
@@ -322,6 +322,9 @@ private struct StashyExpandingDockChip: View {
             .contentShape(Capsule(style: .continuous))
         }
         .buttonStyle(StashyExpandingDockButtonStyle())
+        .accessibilityShowsLargeContentViewer {
+            Label(item.title, systemImage: item.systemImage)
+        }
         .accessibilityLabel(item.title)
         .accessibilityAddTraits(isSelected ? .isSelected : [])
     }
@@ -352,7 +355,7 @@ struct ToolsPillMenuRow: View {
                 } label: {
                     Text(item.title)
                         .font(.subheadline.weight(.semibold))
-                        .foregroundStyle(selected ? Color.white : Color.primary.opacity(0.85))
+                        .foregroundStyle(selected ? Color.onAppTint : Color.primary.opacity(0.85))
                         .lineLimit(1)
                         .minimumScaleFactor(0.65)
                         .frame(maxWidth: .infinity)

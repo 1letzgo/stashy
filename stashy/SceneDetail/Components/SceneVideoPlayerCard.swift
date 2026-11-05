@@ -239,11 +239,13 @@ struct SceneVideoPlayerCard: View {
                     Image(systemName: "clock.arrow.circlepath")
                     Text("Resume from \(formatTime(activeScene.resumeTime ?? 0))")
                         .fontWeight(.bold)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.8)
                 }
                 .padding(.horizontal, 20)
                 .padding(.vertical, 12)
                 .background(appearanceManager.tintColor)
-                .foregroundColor(.white)
+                .foregroundColor(Color.onAppTint)
                 .clipShape(Capsule())
                 .shadow(color: .black.opacity(0.3), radius: 5)
             }
@@ -252,7 +254,7 @@ struct SceneVideoPlayerCard: View {
                 Text("Start from beginning")
                     .font(.caption)
                     .fontWeight(.medium)
-                    .foregroundColor(.white)
+                    .foregroundColor(Color.onAppTint)
                     .padding(.horizontal, 12)
                     .padding(.vertical, 6)
                     .background(appearanceManager.tintColor)
@@ -263,6 +265,8 @@ struct SceneVideoPlayerCard: View {
             SceneWatchlistCoverButton(scene: activeScene)
             #endif
         }
+        // These sit on a 16:9 cover and must not outgrow it.
+        .dynamicTypeSize(...DynamicTypeSize.xxLarge)
     }
 
     @ViewBuilder
@@ -368,7 +372,7 @@ struct SceneVideoPlayerCard: View {
                 
                 // Timestamp label
                 Text(formatTime(marker.seconds))
-                    .font(.system(size: 8))
+                    .font(.system(size: 11))
                     .fontWeight(.bold)
                     .padding(.horizontal, 4)
                     .padding(.vertical, 1)
@@ -381,7 +385,7 @@ struct SceneVideoPlayerCard: View {
             
             // Marker Title
             Text(marker.title ?? "Marker at \(formatTime(marker.seconds))")
-                .font(.system(size: 10))
+                .font(.system(size: 11))
                 .fontWeight(.medium)
                 .lineLimit(1)
                 .truncationMode(.tail)
@@ -425,6 +429,7 @@ private enum SceneMetadataPillStyle {
 }
 
 struct SceneDetailMetadataCard: View {
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @Binding var activeScene: Scene
     /// Non-nil once playback has started.
     let aetherEngine: AetherSceneEngine?
@@ -453,7 +458,7 @@ struct SceneDetailMetadataCard: View {
                         .font(.title2)
                         .fontWeight(.bold)
                         .foregroundColor(.primary)
-                        .lineLimit(2)
+                        .lineLimit(isHeaderExpanded || dynamicTypeSize.isAccessibilitySize ? nil : 2)
                     Spacer()
                     if appearanceManager.isEditModeEnabled {
                         Button {
@@ -515,28 +520,55 @@ struct SceneDetailMetadataCard: View {
     @ViewBuilder
     private var metadataSwipeBar: some View {
         VStack(alignment: .leading, spacing: 8) {
-            HStack(spacing: 0) {
-                if let date = activeScene.date {
-                    infoPill(icon: "calendar", text: date)
+            // One line while everything fits; narrow columns and large text give the stars
+            // their own line, so the date and duration never truncate.
+            ViewThatFits(in: .horizontal) {
+                HStack(spacing: 0) {
+                    timePills
                     Spacer(minLength: 4)
-                }
-                if let duration = activeScene.sceneDuration {
-                    infoPill(icon: "clock", text: formatMetaTime(duration))
+                    countPills
                     Spacer(minLength: 4)
+                    ratingMenu
                 }
-                infoPill(icon: "play.circle", text: "\(activeScene.playCount ?? 0)")
-                Spacer(minLength: 4)
-                oCounterButton
-                Spacer(minLength: 4)
-                ratingMenu
+                VStack(alignment: .leading, spacing: 8) {
+                    HStack(spacing: 8) {
+                        timePills
+                        countPills
+                    }
+                    ratingMenu
+                }
+                VStack(alignment: .leading, spacing: 8) {
+                    timePills
+                    countPills
+                    ratingMenu
+                }
             }
-            .frame(maxWidth: .infinity)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .dynamicTypeSize(...DynamicTypeSize.accessibility1)
 
             if let productionDate, !productionDate.isEmpty {
                 Text("Produced \(productionDate)")
                     .font(.caption)
                     .foregroundColor(.secondary)
             }
+        }
+    }
+
+    private var timePills: some View {
+        HStack(spacing: 8) {
+            if let date = activeScene.date {
+                infoPill(icon: "calendar", text: date)
+            }
+            if let duration = activeScene.sceneDuration {
+                infoPill(icon: "clock", text: formatMetaTime(duration))
+            }
+        }
+    }
+
+    private var countPills: some View {
+        HStack(spacing: 8) {
+            infoPill(icon: "play.circle", text: "\(activeScene.playCount ?? 0)")
+            oCounterButton
         }
     }
 
@@ -612,11 +644,11 @@ struct SceneDetailMetadataCard: View {
     private func infoPill(icon: String, text: String, color: Color = Color.pillAccent) -> some View {
         pillContainer(color: color) {
             Image(systemName: icon)
-                .font(.system(size: 10, weight: .bold))
+                .font(.caption2.weight(.bold))
             Text(text)
-                .font(.system(size: 10, weight: .bold))
+                .font(.caption2.weight(.bold))
                 .lineLimit(1)
-                .minimumScaleFactor(0.8)
+                .fixedSize(horizontal: true, vertical: false)
         }
     }
 
@@ -629,7 +661,7 @@ struct SceneDetailMetadataCard: View {
             content()
         }
         .padding(.horizontal, 8)
-        .frame(height: SceneMetadataPillStyle.height)
+        .frame(minHeight: SceneMetadataPillStyle.height)
         .background(color.opacity(0.1))
         .foregroundColor(color)
         .clipShape(Capsule())
@@ -992,7 +1024,7 @@ private struct SceneWatchlistCoverButton: View {
             Label(listed ? "On watchlist" : "Add to watchlist",
                   systemImage: listed ? "text.badge.checkmark" : "text.badge.plus")
                 .font(.caption.weight(.medium))
-                .foregroundColor(.white)
+                .foregroundColor(listed ? Color.onAppTint : .white)
                 .padding(.horizontal, 12)
                 .padding(.vertical, 6)
                 .background(listed ? appearance.tintColor : Color.black.opacity(0.45))
@@ -1000,6 +1032,7 @@ private struct SceneWatchlistCoverButton: View {
                 .shadow(color: .black.opacity(0.2), radius: 3)
         }
         .buttonStyle(.plain)
+        .dynamicTypeSize(...DynamicTypeSize.xxLarge)
         .accessibilityLabel(listed ? "Remove from watchlist" : "Add to watchlist")
     }
 }

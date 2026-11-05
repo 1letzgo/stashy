@@ -469,7 +469,7 @@ struct ServerSetupWizardView: View {
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 16)
                 .background(canProceed ? appearanceManager.tintColor : Color.gray.opacity(0.3))
-                .foregroundColor(.white)
+                .foregroundColor(Color.onAppTint)
                 .cornerRadius(DesignTokens.CornerRadius.button)
             }
             .disabled(!canProceed)

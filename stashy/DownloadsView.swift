@@ -513,7 +513,7 @@ struct DownloadedSceneCard: View {
                 // Duration Badge (Bottom Right)
                 if let duration = downloaded.duration, duration > 0 {
                     Text(formatDuration(duration))
-                        .font(.system(size: 10, weight: .bold))
+                        .font(.system(size: 11, weight: .bold))
                         .foregroundColor(.white)
                         .padding(.horizontal, 4)
                         .padding(.vertical, 2)
@@ -689,7 +689,7 @@ struct DownloadDetailView: View {
                                         .padding(.horizontal, 20)
                                         .padding(.vertical, 12)
                                         .background(appearanceManager.tintColor)
-                                        .foregroundColor(.white)
+                                        .foregroundColor(Color.onAppTint)
                                         .clipShape(Capsule())
                                     }
                                     .buttonStyle(.plain)
@@ -700,7 +700,7 @@ struct DownloadDetailView: View {
                                         Text("Start from beginning")
                                             .font(.caption)
                                             .fontWeight(.medium)
-                                            .foregroundColor(.white)
+                                            .foregroundColor(Color.onAppTint)
                                             .padding(.horizontal, 12)
                                             .padding(.vertical, 6)
                                             .background(appearanceManager.tintColor)

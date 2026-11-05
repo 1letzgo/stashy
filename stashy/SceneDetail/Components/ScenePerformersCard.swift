@@ -233,8 +233,8 @@ struct CircleNameTile<Content: View>: View {
                 .overlay(alignment: .topTrailing) {
                     if let badge {
                         Text(badge)
-                            .font(.system(size: 10, weight: .bold))
-                            .foregroundColor(.white)
+                            .font(.system(size: 11, weight: .bold))
+                            .foregroundColor(Color.onAppTint)
                             .frame(width: 22, height: 22)
                             .background(appearanceManager.tintColor)
                             .clipShape(Circle())
@@ -245,6 +245,9 @@ struct CircleNameTile<Content: View>: View {
             Text(name)
                 .font(.caption2)
                 .fontWeight(.bold)
+                // The pill overlaps a fixed-size circle: past xLarge it would cover the picture.
+                .dynamicTypeSize(...DynamicTypeSize.xLarge)
+                .lineLimit(1)
                 .padding(.horizontal, 8)
                 .padding(.vertical, 4)
                 .background(

@@ -99,7 +99,7 @@ struct DirectorDetailView: View {
                 LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], alignment: .leading, spacing: 6) {
                     VStack(alignment: .leading, spacing: 0) {
                         Text("Scenes")
-                            .font(.system(size: 8))
+                            .font(.system(size: 11))
                             .foregroundColor(.secondary)
                             .textCase(.uppercase)
                         Text("\(viewModel.totalScenes)")

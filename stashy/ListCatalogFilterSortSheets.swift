@@ -139,7 +139,7 @@ struct CatalogFilterChip: View {
                 .padding(.horizontal, 12)
                 .padding(.vertical, 6)
                 .background(isActive ? appearance.tintColor : Color.secondaryAppBackground)
-                .foregroundColor(isActive ? .white : .primary)
+                .foregroundColor(isActive ? Color.onAppTint : .primary)
                 .clipShape(Capsule())
         }
         .buttonStyle(.plain)
@@ -203,7 +203,7 @@ struct CatalogNameRegexSearchCard: View {
                     Image(systemName: "magnifyingglass")
                         .font(.subheadline.weight(.semibold))
                         .foregroundColor(.secondary)
-                    TextField("Name or regex", text: $text)
+                    TextField("Name or regex", text: $text, prompt: Text("Name or regex").foregroundColor(Color.primary.opacity(0.7)))
                         .font(.subheadline)
                         .textInputAutocapitalization(.never)
                         .autocorrectionDisabled()

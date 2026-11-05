@@ -661,7 +661,7 @@ struct SceneMarkerStrip: View {
                                 .frame(width: 80, height: 45)
                                 .clipped()
                                 Text(Self.time(marker.seconds))
-                                    .font(.system(size: 8, weight: .bold))
+                                    .font(.system(size: 11, weight: .bold))
                                     .padding(.horizontal, 4)
                                     .padding(.vertical, 1)
                                     .background(Color.black.opacity(0.6))
@@ -671,7 +671,7 @@ struct SceneMarkerStrip: View {
                             }
                             .clipShape(RoundedRectangle(cornerRadius: 4))
                             Text(marker.title ?? "Marker at \(Self.time(marker.seconds))")
-                                .font(.system(size: 10, weight: .medium))
+                                .font(.system(size: 11, weight: .medium))
                                 .lineLimit(1)
                                 .frame(width: 80, alignment: .leading)
                         }
@@ -720,7 +720,7 @@ struct WatchlistToolsView: View {
                             } label: {
                                 Label("Play all", systemImage: "play.fill")
                                     .font(.subheadline.weight(.semibold))
-                                    .foregroundStyle(Color.white)
+                                    .foregroundStyle(Color.onAppTint)
                                     .frame(maxWidth: .infinity)
                                     .frame(height: StashyExpandingDock.activeHeight)
                                     .stashyChromeFill(shape: Capsule(style: .continuous), activeColor: appearance.tintColor)
@@ -740,7 +740,7 @@ struct WatchlistToolsView: View {
                             } label: {
                                 Text(sortMode.isEditing ? "Done" : "Sort")
                                     .font(.subheadline.weight(.semibold))
-                                    .foregroundStyle(sortMode.isEditing ? Color.white : Color.primary.opacity(0.85))
+                                    .foregroundStyle(sortMode.isEditing ? Color.onAppTint : Color.primary.opacity(0.85))
                                     .padding(.horizontal, 18)
                                     .frame(height: StashyExpandingDock.activeHeight)
                                     .stashyChromeFill(
@@ -946,8 +946,8 @@ private struct MiniPlayerBarContent: View {
                     .overlay(alignment: .topTrailing) {
                         if watchlist.scenes.count > 0 {
                             Text("\(watchlist.scenes.count)")
-                                .font(.system(size: 9, weight: .bold))
-                                .foregroundColor(.white)
+                                .font(.system(size: 11, weight: .bold))
+                                .foregroundColor(Color.onAppTint)
                                 .padding(.horizontal, 4)
                                 .frame(minWidth: 14, minHeight: 14)
                                 .background(appearance.tintColor, in: Capsule())

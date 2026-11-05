@@ -21,6 +21,10 @@ extension Color {
     /// Default accent on a fresh install (matches the Gray preset).
     static let appDefaultTint = Color.gray
 
+    /// Label colour for anything drawn on a fill of the accent colour. White on the default
+    /// gray is only 3.3:1, and people can pick any tint, so it follows the tint's luminance.
+    static var onAppTint: Color { AppearanceManager.shared.onTintColor }
+
     static func appBackground(for theme: AppTheme) -> Color {
         #if os(tvOS)
         switch theme {

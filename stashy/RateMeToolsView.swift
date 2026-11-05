@@ -1026,7 +1026,7 @@ struct RateMeToolsView: View {
             .font(.subheadline.weight(.semibold))
             .lineLimit(1)
             .fixedSize(horizontal: true, vertical: false)
-            .foregroundStyle(selected ? Color.white : Color.primary.opacity(0.85))
+            .foregroundStyle(selected ? Color.onAppTint : Color.primary.opacity(0.85))
             .padding(.horizontal, 16)
             .frame(height: StashyExpandingDock.activeHeight)
             .stashyChromeFill(

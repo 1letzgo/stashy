@@ -114,7 +114,7 @@ struct ServerStatisticsView: View {
                 .lineLimit(1)
                 .minimumScaleFactor(0.6)
             Text(label.uppercased())
-                .font(.system(size: 10, weight: .semibold))
+                .font(.system(size: 11, weight: .semibold))
                 .foregroundStyle(.secondary)
                 .tracking(0.8)
         }

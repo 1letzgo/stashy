@@ -167,13 +167,13 @@ struct AetherTimeBar: View {
             .shadow(color: .black.opacity(0.55), radius: 6, x: 0, y: 2)
 
             Text(AetherTimeBar.formatTime(time))
-                .font(.system(size: 10, weight: .semibold).monospacedDigit())
+                .font(.system(size: 11, weight: .semibold).monospacedDigit())
                 .foregroundStyle(.white)
 
             // Which marker the finger is in.
             if let marker = marker(at: time), let title = marker.title, !title.isEmpty {
                 Text(title)
-                    .font(.system(size: 10, weight: .semibold))
+                    .font(.system(size: 11, weight: .semibold))
                     .lineLimit(1)
                     .foregroundStyle(.white)
                 .padding(.horizontal, 7)

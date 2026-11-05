@@ -2057,7 +2057,7 @@ struct SceneLiveFilterSheet: View {
                 .padding(.horizontal, 12)
                 .padding(.vertical, 6)
                 .background(isActive ? appearance.tintColor : Color.secondaryAppBackground)
-                .foregroundColor(isActive ? .white : .primary)
+                .foregroundColor(isActive ? Color.onAppTint : .primary)
                 .clipShape(Capsule())
         }
         .buttonStyle(.plain)

@@ -43,7 +43,7 @@ struct SceneTagsCard: View {
                                     Image(systemName: "tag.fill")
                                         .font(.system(size: 10, weight: .bold))
                                     Text(tag.name)
-                                        .font(.system(size: 10, weight: .bold))
+                                        .font(.system(size: 11, weight: .bold))
                                 }
                                 .padding(.horizontal, 10)
                                 .padding(.vertical, 6)

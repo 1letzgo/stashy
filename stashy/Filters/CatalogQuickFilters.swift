@@ -429,7 +429,7 @@ struct CatalogListQuickBar<Option: CatalogQuickSortable>: View {
             }
             .font(.subheadline.weight(.semibold))
             // Chrome nav chip look: tinted glass when active, plain glass otherwise, no glow.
-            .foregroundStyle(isActive ? Color.white : Color.white.opacity(StashyExpandingDock.inactiveIconOpacity))
+            .foregroundStyle(isActive ? Color.onAppTint : Color.white.opacity(StashyExpandingDock.inactiveIconOpacity))
             .padding(.horizontal, StashyExpandingDock.activeHorizontalPadding)
             .frame(height: StashyExpandingDock.activeHeight)
             .stashyChromeFill(

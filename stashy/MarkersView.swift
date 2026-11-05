@@ -807,7 +807,7 @@ struct MarkerCardView: View {
                     HStack(alignment: .top) {
                         // Marker Name (Top Left)
                         Text(marker.title ?? "Marker")
-                            .font(.system(size: 10, weight: .bold))
+                            .font(.system(size: 11, weight: .bold))
                             .foregroundColor(.white)
                             .padding(.horizontal, 8).padding(.vertical, 4)
                             .stashyGlass(shape: Capsule())
@@ -821,7 +821,7 @@ struct MarkerCardView: View {
                                 Image(systemName: "play.circle.fill")
                                     .font(.system(size: 8))
                                 Text("\(playCount)")
-                                    .font(.system(size: 10, weight: .bold))
+                                    .font(.system(size: 11, weight: .bold))
                             }
                             .foregroundColor(.white)
                             .padding(.horizontal, 8).padding(.vertical, 4)

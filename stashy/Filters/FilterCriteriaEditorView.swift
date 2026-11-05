@@ -225,7 +225,7 @@ struct FilterCriteriaEditorView: View {
                         Image(systemName: "chevron.up.chevron.down")
                             .font(.system(size: 9, weight: .bold))
                     }
-                    .foregroundColor(.white)
+                    .foregroundColor(Color.onAppTint)
                     .padding(.horizontal, 8)
                     .padding(.vertical, 4)
                     .background(Capsule().fill(appearance.tintColor))

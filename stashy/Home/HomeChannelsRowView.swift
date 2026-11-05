@@ -220,7 +220,7 @@ private struct HomeChannelCardView: View {
                 .font(.system(size: 9, weight: .bold))
                 .foregroundColor(appearanceManager.tintColor)
             Text(text.uppercased())
-                .font(.system(size: 8, weight: .bold))
+                .font(.system(size: 11, weight: .bold))
                 .foregroundColor(.secondary)
         }
         .padding(.horizontal, 6)

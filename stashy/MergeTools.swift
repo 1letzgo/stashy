@@ -528,7 +528,7 @@ struct MergeToolsView<Item: MergeableItem>: View {
                                 .lineLimit(1)
                                 .opacity(0.75)
                         }
-                        .foregroundColor(isActive ? .white : .primary)
+                        .foregroundColor(isActive ? Color.onAppTint : .primary)
                         .padding(.horizontal, DesignTokens.Spacing.sm)
                         .frame(height: MergeToolsLayout.presetPillHeight)
                         .background(isActive ? appearance.tintColor : Color.secondaryAppBackground)

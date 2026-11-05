@@ -615,7 +615,7 @@ struct UniversalSearchView: View {
                 
                 // Timestamp badge
                 Text(formatDuration(marker.seconds))
-                    .font(.system(size: 10, weight: .bold))
+                    .font(.system(size: 11, weight: .bold))
                     .foregroundColor(.white)
                     .padding(.horizontal, 4)
                     .padding(.vertical, 2)
@@ -635,7 +635,7 @@ struct UniversalSearchView: View {
                 
                 if let tagName = marker.primaryTag?.name {
                     Text(tagName)
-                        .font(.system(size: 9, weight: .medium))
+                        .font(.system(size: 11, weight: .medium))
                         .foregroundColor(appearanceManager.tintColor)
                         .padding(.horizontal, 4)
                         .padding(.vertical, 1)

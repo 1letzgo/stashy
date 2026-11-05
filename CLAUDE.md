@@ -106,6 +106,7 @@ Shared code with `#if !os(tvOS)` guards. Many iOS-only files guard their *entire
 - **stashy+ gating**: `StashyPlusManager.isUnlockedNow` / product IDs in `Managers/StashyPlusManager.swift`. Subscriptions + lifetime IAP + legacy paid purchase unlock; tips never do. Gate new premium features through this manager, never an ad-hoc flag.
 - **Chrome**: `FloatingCatalogBar.swift` (`FloatingActionBar`, `CatalogFloatingChromeState` — floating bar hides when no server or empty-list-with-error), `StashyTopNavStrip.swift`, `SharedChromeComponents.swift`.
 - **Design system**: `DesignTokens.swift` (spacing, corner radius `DesignTokens.CornerRadius.card` = 12pt, shadows, animation presets, `DesignTokens.Chrome.*`), view extensions `.cardShadow()` / `.subtleShadow()` / `.floatingShadow()`, `HapticManager`, `ToastManager`.
+- **Accent and accessibility**: text or icons on a fill of the accent colour use `Color.onAppTint` (white or black by luminance), never a literal `.white`. All chrome goes through `stashyGlass`, which answers Reduce Transparency and Increase Contrast and limits its text to xxLarge. Text sits at 11 pt or larger; text on a fixed-size image or cover gets a `.dynamicTypeSize(...)` limit.
 
 ## Important Patterns
 

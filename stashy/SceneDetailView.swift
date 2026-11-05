@@ -1476,7 +1476,7 @@ struct AddMarkerSheet: View {
                             } label: {
                                 Text("+\(duration)s")
                                     .font(.subheadline.weight(.semibold))
-                                    .foregroundColor(isSelected ? .white : .primary)
+                                    .foregroundColor(isSelected ? Color.onAppTint : .primary)
                                     .frame(maxWidth: .infinity)
                                     .padding(.vertical, 8)
                                     .background(isSelected ? appearanceManager.tintColor : Color.appBackground)

@@ -22,44 +22,59 @@ enum StashyGlass {
     }
 }
 
+/// Everything chrome is drawn through. Answers the system's accessibility settings in one place:
+/// Reduce Transparency gets an opaque fill, Increase Contrast a visible edge. Chrome has a fixed
+/// height, so its text stops growing at xxLarge (Large Content Viewer covers the rest).
+private struct StashyGlassModifier<S: Shape>: ViewModifier {
+    let shape: S
+    let tint: Color?
+
+    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
+    @Environment(\.colorSchemeContrast) private var contrast
+
+    func body(content: Content) -> some View {
+        // `contentShape` on every branch: at 100 % transparency the wash has opacity 0
+        // and a fully transparent fill is not hit-testable, so taps on the chrome fell
+        // through to whatever lay underneath.
+        glass(content.dynamicTypeSize(...DynamicTypeSize.xxLarge))
+            .overlay {
+                if contrast == .increased {
+                    shape.stroke(Color.primary.opacity(0.6), lineWidth: 1)
+                }
+            }
+            .contentShape(shape)
+    }
+
+    @ViewBuilder
+    private func glass<V: View>(_ view: V) -> some View {
+        if reduceTransparency {
+            view.background(shape.fill(tint ?? Color.secondaryAppBackground))
+        } else if #available(iOS 26.0, *) {
+            view
+                .background(shape.fill((tint ?? .black).opacity(StashyGlass.dimOpacity)))
+                .glassEffect(tint.map { .regular.tint($0) } ?? .regular, in: shape)
+        } else {
+            // Pre-26 fallback: material plus a translucent wash and a hairline.
+            view
+                .background(shape.fill(tint.map { $0.opacity(0.6 + 0.4 * StashyGlass.dimOpacity) }
+                                       ?? Color.black.opacity(StashyGlass.dimOpacity)))
+                .background(.ultraThinMaterial, in: shape)
+                .overlay(shape.stroke(Color.white.opacity(0.25), lineWidth: 0.5))
+        }
+    }
+}
+
 extension View {
     /// Liquid Glass where the system has it, a material fill with a hairline everywhere else.
     /// Shared by the Aether transport surface and the Feeds overlay chrome.
-    @ViewBuilder
     func stashyGlass<S: Shape>(shape: S) -> some View {
-        // `contentShape` on both branches: at 100 % transparency the wash has opacity 0
-        // and a fully transparent fill is not hit-testable, so taps on the chrome fell
-        // through to whatever lay underneath.
-        if #available(iOS 26.0, *) {
-            self
-                .background(shape.fill(Color.black.opacity(StashyGlass.dimOpacity)))
-                .glassEffect(.regular, in: shape)
-                .contentShape(shape)
-        } else {
-            self
-                .background(shape.fill(Color.black.opacity(StashyGlass.dimOpacity)))
-                .background(.ultraThinMaterial, in: shape)
-                .overlay(shape.stroke(Color.white.opacity(0.25), lineWidth: 0.5))
-                .contentShape(shape)
-        }
+        modifier(StashyGlassModifier(shape: shape, tint: nil))
     }
 
     /// Tinted glass — the same material as `stashyGlass`, coloured with `tint` (accent Back
-    /// pills, selected chrome chips). Pre-26 fallback: material plus a translucent tint wash.
-    @ViewBuilder
+    /// pills, selected chrome chips).
     func stashyGlass<S: Shape>(shape: S, tint: Color) -> some View {
-        if #available(iOS 26.0, *) {
-            self
-                .background(shape.fill(tint.opacity(StashyGlass.dimOpacity)))
-                .glassEffect(.regular.tint(tint), in: shape)
-                .contentShape(shape)
-        } else {
-            self
-                .background(shape.fill(tint.opacity(0.6 + 0.4 * StashyGlass.dimOpacity)))
-                .background(.ultraThinMaterial, in: shape)
-                .overlay(shape.stroke(Color.white.opacity(0.25), lineWidth: 0.5))
-                .contentShape(shape)
-        }
+        modifier(StashyGlassModifier(shape: shape, tint: tint))
     }
 
     /// Chrome chip fill: a selected chip is tinted glass, an inactive one plain glass.
@@ -453,7 +468,7 @@ struct StashyDetailTopBar<Tab: Hashable>: View {
                 } label: {
                     Image(systemName: icon(tab))
                         .font(.system(size: StashyExpandingDock.iconSize, weight: .semibold))
-                        .foregroundColor(isSelected ? .white : .white.opacity(StashyExpandingDock.inactiveIconOpacity))
+                        .foregroundColor(isSelected ? Color.onAppTint : .white.opacity(StashyExpandingDock.inactiveIconOpacity))
                         .frame(width: StashyExpandingDock.circleSize, height: StashyExpandingDock.circleSize)
                         .stashyChromeFill(
                             shape: Capsule(style: .continuous),
@@ -500,7 +515,7 @@ struct StashyChromeBackButton: View {
                 Text(title)
                     .font(.subheadline.weight(.semibold))
             }
-            .foregroundColor(.white)
+            .foregroundColor(Color.onAppTint)
             .modifier(StashyChromePillStyle(height: StashyExpandingDock.activeHeight, accent: true))
         }
         .buttonStyle(.plain)
@@ -958,7 +973,7 @@ struct PrimaryFilledButtonStyle: ButtonStyle {
             .fontWeight(.semibold)
             .frame(maxWidth: .infinity)
             .padding(.vertical, DesignTokens.Spacing.sm)
-            .foregroundColor(.white)
+            .foregroundColor(Color.onAppTint)
             .background(appearance.tintColor.opacity(configuration.isPressed ? 0.85 : 1))
             .clipShape(RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.button, style: .continuous))
     }
@@ -1103,7 +1118,7 @@ struct ToolsAddButtonLabel: View {
     var body: some View {
         Image(systemName: "plus")
             .font(.system(size: StashyExpandingDock.iconSize, weight: .semibold))
-            .foregroundColor(.white)
+            .foregroundColor(Color.onAppTint)
             .frame(width: StashyExpandingDock.circleSize, height: StashyExpandingDock.circleSize)
             .background(appearance.tintColor)
             .clipShape(Circle())
@@ -1476,7 +1491,7 @@ struct DetailHeroCard<Backdrop: View, Avatar: View, Accessory: View, Footer: Vie
                 ForEach(visible) { item in
                     VStack(alignment: .leading, spacing: 1) {
                         Text(item.label)
-                            .font(.system(size: 8))
+                            .font(.system(size: 11))
                             .foregroundColor(.secondary)
                             .textCase(.uppercase)
                         Text(item.value)

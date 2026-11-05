@@ -1443,7 +1443,7 @@ struct StashyBetaBadge: View {
 
     var body: some View {
         Text("Beta")
-            .font(.system(size: 10, weight: .bold))
+            .font(.system(size: 11, weight: .bold))
             .foregroundStyle(appearance.tintColor)
             .padding(.horizontal, 6)
             .padding(.vertical, 2)
@@ -2080,7 +2080,7 @@ struct SidebarButton: View {
                 ZStack {
                     if !hideCount && count > 0 {
                         Text("\(count)")
-                            .font(.system(size: 10, weight: .heavy))
+                            .font(.system(size: 11, weight: .heavy))
                             .foregroundColor(.white)
                             .shadow(color: .black.opacity(0.8), radius: 2, x: 0, y: 1)
                     }
@@ -2118,7 +2118,7 @@ struct BottomBarButton: View {
                 .overlay(alignment: .topTrailing) {
                     if !hideCount && count > 0 {
                         Text("\(count)")
-                            .font(.system(size: 10, weight: .black))
+                            .font(.system(size: 11, weight: .black))
                             .foregroundColor(.white)
                             .padding(.horizontal, 4)
                             .padding(.vertical, 2)
@@ -2694,7 +2694,7 @@ struct StashSyncCard: View {
                         .font(.subheadline.weight(.semibold))
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 10)
-                        .foregroundColor(.white)
+                        .foregroundColor(Color.onAppTint)
                         .background(appearanceManager.tintColor)
                         .clipShape(RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.button, style: .continuous))
                     }

@@ -142,7 +142,7 @@ struct HomeStatisticsRowView: View {
             
             Text(title)
                 .font(.caption)
-                .foregroundColor(.white.opacity(0.9))
+                .foregroundColor(.white)
                 .lineLimit(1)
             
             Spacer()
@@ -158,6 +158,7 @@ struct HomeStatisticsRowView: View {
         .frame(height: 36) // Reduced height for more compact look
         .background(
             LinearGradient(colors: [color, color.opacity(0.7)], startPoint: .topLeading, endPoint: .bottomTrailing)
+                .overlay(Color.black.opacity(0.28))
         )
         .clipShape(RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.small))
         .cardShadow()
@@ -184,11 +185,19 @@ struct StatCard: View {
 
     var body: some View {
         VStack(alignment: .center, spacing: 8) {
-            Image(systemName: icon).font(.system(size: 28, weight: .bold)).foregroundColor(.white)
-            Text(value).font(.system(size: 20, weight: .bold)).foregroundColor(.white)
+            // Fixed icon box: symbols differ in height, which put the numbers on different lines.
+            Image(systemName: icon)
+                .font(.system(size: 28, weight: .bold))
+                .foregroundColor(.white)
+                .frame(height: 34)
+            Text(value)
+                .font(.system(size: 20, weight: .bold))
+                .foregroundColor(.white)
+                .lineLimit(1)
+                .minimumScaleFactor(0.7)
             Text(title.uppercased())
                 .font(.system(size: 11, weight: .bold))
-                .foregroundColor(.white.opacity(0.8))
+                .foregroundColor(.white)
                 .multilineTextAlignment(.center)
         }
         .padding(.horizontal, 10)
@@ -196,8 +205,12 @@ struct StatCard: View {
         .frame(width: homeSquareCardSide, height: homeSquareCardSide)
         .background(
             LinearGradient(colors: [color, color.opacity(0.6)], startPoint: .topLeading, endPoint: .bottomTrailing)
+                // White text needs at least 3:1 on green, teal and orange too.
+                .overlay(Color.black.opacity(0.28))
         )
         .clipShape(RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.card))
+        .accessibilityElement(children: .combine)
+        .accessibilityAddTraits(.isButton)
     }
 }
 #endif

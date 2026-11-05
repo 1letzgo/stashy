@@ -180,7 +180,7 @@ struct ServerFormViewNew: View {
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 8)
                         .background(username.isEmpty || password.isEmpty || isFetchingKey ? Color.gray.opacity(0.3) : appearanceManager.tintColor)
-                        .foregroundColor(.white)
+                        .foregroundColor(Color.onAppTint)
                         .cornerRadius(DesignTokens.CornerRadius.button)
                     }
                     .disabled(username.isEmpty || password.isEmpty || isFetchingKey)
