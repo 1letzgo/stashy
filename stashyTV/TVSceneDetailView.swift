@@ -258,7 +258,7 @@ struct TVSceneDetailView: View {
             .overlay {
                 // Complex Gradient Overlay to fade into the black background and side
                 LinearGradient(
-                    colors: [themeBackground.opacity(0.9), themeBackground.opacity(0.5), .clear, .clear],
+                    colors: [themeBackground.opacity(0.95), themeBackground.opacity(0.75), themeBackground.opacity(0.25), .clear],
                     startPoint: .leading,
                     endPoint: .trailing
                 )
@@ -302,7 +302,7 @@ struct TVSceneDetailView: View {
             if let details = scene.details, !details.isEmpty {
                 Text(details)
                     .font(.title3)
-                    .foregroundColor(.white.opacity(0.6))
+                    .foregroundColor(.white.opacity(0.85))
                     .lineLimit(3)
                     .frame(maxWidth: 1000, alignment: .leading)
             }
@@ -460,7 +460,7 @@ struct TVSceneDetailView: View {
     ) -> some View {
         let button = Button(action: action, label: label)
             .frame(width: Self.heroButtonWidth, height: Self.heroButtonHeight)
-            .buttonStyle(.card)
+            .buttonStyle(TVChromeButtonStyle())
             .disabled(disabled)
         if let focus {
             button.focused($focusedHeroAction, equals: focus)

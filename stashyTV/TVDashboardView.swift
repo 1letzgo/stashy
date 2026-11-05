@@ -24,6 +24,10 @@ struct TVDashboardView: View {
     /// (`hasLoaded`), so the first frame shows the spinner, not the empty state.
     @State private var loadingRows: Set<HomeRowType> = []
     @State private var loadedRows: Set<HomeRowType> = []
+    /// The first card of the first row, once. Nothing is focusable while the rows load, so
+    /// the system parks focus on the sidebar and would leave it open over the content.
+    @FocusState private var focusedCard: String?
+    @State private var didSetInitialFocus = false
 
     private static let rowLimit = 15
 
@@ -94,6 +98,13 @@ struct TVDashboardView: View {
             loadedRows = []
             playingChannel = nil
             isLoadingChannelPreviews = false
+        }
+        .onChange(of: loadedRows) { _, loaded in
+            guard !didSetInitialFocus, let first = enabledRows.first, loaded.contains(first.type),
+                  sceneRows[first.type]?.isEmpty == false else { return }
+            didSetInitialFocus = true
+            // After the row's first layout: focus can only go to a card that exists.
+            DispatchQueue.main.async { focusedCard = "first" }
         }
         // Kanäle nachträglich einblenden, wenn stashy+ im Settings gekauft wurde.
         .onReceive(NotificationCenter.default.publisher(for: .stashyPlusUnlocked)) { _ in
@@ -188,6 +199,12 @@ struct TVDashboardView: View {
         tabManager.homeRows.filter { $0.isEnabled && $0.type.isAvailableOnTV }
     }
 
+    /// True once the first row has loaded, or Channels is itself the first row.
+    private var channelsMayShow: Bool {
+        guard let first = enabledRows.first, first.type != .channels else { return true }
+        return loadedRows.contains(first.type)
+    }
+
     private var isAnyRowLoading: Bool {
         enabledRows.contains { row in
             row.type != .channels && (loadingRows.contains(row.type) || !loadedRows.contains(row.type))
@@ -238,7 +255,9 @@ struct TVDashboardView: View {
         let title = row.type.tvTitle
         switch row.type {
         case .channels:
-            if !channels.isEmpty {
+            // Channels load first. Shown before the row above them they took the initial focus,
+            // so the app opened on the second row.
+            if !channels.isEmpty, channelsMayShow {
                 channelsRow
                     .focusSection()
             }
@@ -247,12 +266,14 @@ struct TVDashboardView: View {
         case .lastPlayed:
             if let scenes = sceneRows[row.type], !scenes.isEmpty {
                 sceneRow(title: title, scenes: scenes, sortBy: .lastPlayedAtDesc,
-                         cardWidth: 560, cardHeight: 315)
+                         cardWidth: 560, cardHeight: 315,
+                         takesInitialFocus: row.id == enabledRows.first?.id)
                     .focusSection()
             }
         case .newest3Min, .lastAdded3Min, .mostViewed3Min, .topCounter3Min, .topRating3Min, .random:
             if let scenes = sceneRows[row.type], !scenes.isEmpty {
-                sceneRow(title: title, scenes: scenes, sortBy: Self.sceneSort(for: row.type))
+                sceneRow(title: title, scenes: scenes, sortBy: Self.sceneSort(for: row.type),
+                         takesInitialFocus: row.id == enabledRows.first?.id)
                     .focusSection()
             }
         case .newPerformers, .performersHighestSceneCount, .performersHighestOCount, .performersHighestRating:
@@ -495,7 +516,7 @@ struct TVDashboardView: View {
     // MARK: - Scene Row
 
     @ViewBuilder
-    private func sceneRow(title: String, scenes: [Scene], sortBy: StashDBViewModel.SceneSortOption, cardWidth: CGFloat = 400, cardHeight: CGFloat = 225) -> some View {
+    private func sceneRow(title: String, scenes: [Scene], sortBy: StashDBViewModel.SceneSortOption, cardWidth: CGFloat = 400, cardHeight: CGFloat = 225, takesInitialFocus: Bool = false) -> some View {
         VStack(alignment: .leading, spacing: 18) {
             // Section heading (Static)
             Text(title)
@@ -512,6 +533,7 @@ struct TVDashboardView: View {
                             TVNavButton(value: TVSceneLink(sceneId: scene.id)) {
                                 TVSceneCardView(scene: scene, width: cardWidth + 10, height: cardHeight + 5)
                             }
+                            .focused($focusedCard, equals: takesInitialFocus && scene.id == scenes.first?.id ? "first" : "\(title)-\(scene.id)")
                             
                             TVSceneCardTitleView(scene: scene)
                         }

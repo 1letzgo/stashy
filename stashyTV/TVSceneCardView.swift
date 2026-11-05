@@ -50,7 +50,8 @@ struct TVSceneCardView: View {
                             .lineLimit(1)
                             .padding(.horizontal, 12)
                             .padding(.vertical, 6)
-                            .background(Color.black.opacity(0.6))
+                            // Sits on posters with their own printed title.
+                            .background(Color.black.opacity(0.82))
                             .clipShape(RoundedRectangle(cornerRadius: 8))
                     }
                     

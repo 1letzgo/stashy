@@ -46,7 +46,7 @@ struct TVOptionPickerButton<Value: Hashable>: View {
         } label: {
             TVChromeButtonLabel(icon: icon, text: currentLabel)
         }
-        .buttonStyle(.card)
+        .buttonStyle(TVChromeButtonStyle())
         .confirmationDialog(title, isPresented: $isPresented, titleVisibility: .visible) {
             ForEach(options) { option in
                 Button(option.value == selection ? "✓ \(option.label)" : option.label) {
@@ -55,6 +55,34 @@ struct TVOptionPickerButton<Value: Hashable>: View {
             }
             Button("Cancel", role: .cancel) {}
         }
+    }
+}
+
+/// Controls in the chrome and on a detail hero. The card style only lifts a focused button and
+/// leaves it gray with light text, which is barely visible from the couch; this is the same white
+/// focus as the sidebar and the Settings rows.
+struct TVChromeButtonStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        TVChromeButtonBody(configuration: configuration)
+    }
+}
+
+private struct TVChromeButtonBody: View {
+    let configuration: ButtonStyle.Configuration
+    @Environment(\.isFocused) private var isFocused
+    @Environment(\.isEnabled) private var isEnabled
+
+    var body: some View {
+        configuration.label
+            .foregroundStyle(isFocused ? Color.black : Color.white)
+            .background(
+                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    .fill(isFocused ? Color.white : Color.white.opacity(0.14))
+            )
+            .scaleEffect(configuration.isPressed ? 0.98 : (isFocused ? 1.06 : 1))
+            .shadow(color: .black.opacity(isFocused ? 0.35 : 0), radius: 14, y: 8)
+            .opacity(isEnabled ? 1 : 0.5)
+            .animation(.easeOut(duration: 0.15), value: isFocused)
     }
 }
 
@@ -76,7 +104,7 @@ struct TVFilterPickerButton: View {
                 text: selection?.name ?? "No Filter"
             )
         }
-        .buttonStyle(.card)
+        .buttonStyle(TVChromeButtonStyle())
         .confirmationDialog("Filter", isPresented: $isPresented, titleVisibility: .visible) {
             Button(selection == nil ? "✓ No Filter" : "No Filter") {
                 selection = nil
