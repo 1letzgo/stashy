@@ -397,6 +397,9 @@ private struct PerformersViewContent: View {
     /// Host-owned filter state (Home sub-tab, see `CatalogRootFilterMemories`); `nil` = the
     /// state lives and dies with this view.
     private let filterMemory: CatalogListFilterMemory<CatalogListFilterSnapshot<StashDBViewModel.PerformerSortOption>>?
+    /// Set on Home: the section bar becomes a breadcrumb (Home menu + this list's sort row), and
+    /// only the active-filter chips stay above the grid.
+    @Environment(\.homeBreadcrumbMenu) private var homeMenu
 
     private var filterMemorySnapshot: CatalogListFilterSnapshot<StashDBViewModel.PerformerSortOption> {
         CatalogListFilterSnapshot(
@@ -588,6 +591,7 @@ private struct PerformersViewContent: View {
             }
         }
         .stashyCatalogChrome(catalogChromeConfig)
+        .homeBreadcrumbChrome(homeMenu, showsSort: showsSortInChrome) { quickBar(part: .sortMenu) }
     }
 
     private var catalogChromeConfig: CatalogChromeConfig {
@@ -721,7 +725,18 @@ private struct PerformersViewContent: View {
         return selectedFilter?.name
     }
 
+    /// Above the grid: the whole quick bar, or on Home (breadcrumb chrome) only the filter chips.
     private var quickBar: some View {
+        quickBar(part: homeMenu == nil ? .all : .chipsOnly)
+    }
+
+    /// The sort row sits in the chrome unless there is nothing to sort (no server, load error).
+    private var showsSortInChrome: Bool {
+        configManager.activeConfig != nil
+            && !(viewModel.performers.isEmpty && viewModel.errorMessage != nil && !viewModel.isLoading)
+    }
+
+    private func quickBar(part: CatalogQuickBarPart) -> some View {
         CatalogListQuickBar(
             mode: .performers,
             sort: selectedSortOption,
@@ -736,7 +751,8 @@ private struct PerformersViewContent: View {
             },
             onFiltersChanged: { applyLiveFilter() },
             onOpenFilters: { showFilterSortSheet = true },
-            collapsesOnScroll: true
+            collapsesOnScroll: true,
+            part: part
         )
     }
 

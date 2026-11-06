@@ -31,7 +31,18 @@ final class CatalogChromeCollapse: ObservableObject {
 
     @Published private(set) var isCollapsed = false
     /// Only a drag hides, as in Feeds: scroll restoration and programmatic scrolls must not.
-    var isDragging = false
+    var isDragging = false {
+        didSet {
+            guard isDragging != oldValue else { return }
+            #if os(iOS)
+            // A swipe that starts on an open chrome menu (Home views, sort) closes the menu and
+            // scrolls at once. Hiding the bar then sends the menu's closing animation back to a
+            // button that is already sliding away, and it hangs under the status bar.
+            dragStartedWithMenuOpen = isDragging && ContextMenuPresence.isMenuOpen
+            #endif
+        }
+    }
+    private var dragStartedWithMenuOpen = false
     private var anchor: CGFloat = 0
     /// What the scrolling decided; `isCollapsed` follows it one run loop later.
     private var targetCollapsed = false
@@ -49,6 +60,10 @@ final class CatalogChromeCollapse: ObservableObject {
         }
         // Rubber-banding at either end is not a scroll direction.
         let position = min(max(offset, 0), max(scrollRange, 0))
+        guard !dragStartedWithMenuOpen else {
+            anchor = position
+            return
+        }
 
         if position <= Self.showDistance {
             anchor = position
@@ -93,6 +108,25 @@ final class CatalogChromeCollapse: ObservableObject {
         }
     }
 }
+
+#if os(iOS)
+/// Whether a UIKit context menu (what a SwiftUI `Menu` presents) is on screen, including while
+/// it animates closed. Only checked when a drag starts, so the shallow view walk is cheap.
+enum ContextMenuPresence {
+    static var isMenuOpen: Bool {
+        UIApplication.shared.connectedScenes
+            .compactMap { $0 as? UIWindowScene }
+            .flatMap(\.windows)
+            .contains { containsMenu($0, depth: 0) }
+    }
+
+    private static func containsMenu(_ view: UIView, depth: Int) -> Bool {
+        if String(describing: type(of: view)).contains("ContextMenu") { return true }
+        guard depth < 4 else { return false }
+        return view.subviews.contains { containsMenu($0, depth: depth + 1) }
+    }
+}
+#endif
 
 /// Hides top chrome together with `CatalogChromeCollapse`, the way Feeds hides its own.
 struct CatalogChromeCollapsible: ViewModifier {
@@ -180,7 +214,9 @@ struct SectionChromeModifier<Row: View>: ViewModifier {
     func body(content: Content) -> some View {
         content
             .navigationBarHidden(true)
-            .stashyCustomChromeInset(spacing: DesignTokens.Chrome.contentTopGap) {
+            // No gap without a bar: a hidden Home bar (Performers draws its own breadcrumb)
+            // would otherwise push the list's bar down, and the Home button would jump.
+            .stashyCustomChromeInset(spacing: showsSwitcher ? DesignTokens.Chrome.contentTopGap : 0) {
                 if showsSwitcher {
                     StashySectionChromeBar {
                         row()

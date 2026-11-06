@@ -542,7 +542,14 @@ private struct GalleriesViewContent: View {
         return selectedFilter?.name
     }
 
+    @Environment(\.homeBreadcrumbMenu) private var homeMenu
+
+    /// Above the list: the whole quick bar, or on Home (breadcrumb chrome) only the filter chips.
     private var quickBar: some View {
+        quickBar(part: homeMenu == nil ? .all : .chipsOnly)
+    }
+
+    private func quickBar(part: CatalogQuickBarPart) -> some View {
         CatalogListQuickBar(
             mode: .galleries,
             sort: selectedSortOption,
@@ -552,7 +559,8 @@ private struct GalleriesViewContent: View {
             onClearPreset: { resetAllCatalogFilters() },
             onFiltersChanged: { applyLiveFilter() },
             onOpenFilters: { showFilterSortSheet = true },
-            collapsesOnScroll: !hideTitle
+            collapsesOnScroll: !hideTitle,
+            part: part
         )
     }
 
@@ -631,6 +639,7 @@ private struct GalleriesViewContent: View {
         galleriesPrimaryContent
             .applyAppBackground()
             .stashyCatalogChrome(catalogChromeConfig)
+            .homeBreadcrumbChrome(homeMenu) { quickBar(part: .sortMenu) }
             .onChange(of: searchText) { _, newValue in
                 NSObject.cancelPreviousPerformRequests(withTarget: self)
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {

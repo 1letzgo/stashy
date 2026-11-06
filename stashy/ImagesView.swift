@@ -625,6 +625,7 @@ private struct ImagesViewBody: View {
             }
         }
         .stashyCatalogChrome(imagesChromeConfig)
+        .homeBreadcrumbChrome(homeMenu) { quickBar(part: .sortMenu) }
         .modifier(GalleryDownloadOptionsAlert(
             gallery: gallery,
             isPresented: $showingGalleryDownloadOptions
@@ -944,7 +945,14 @@ private struct ImagesViewBody: View {
     private var showsQuickBar: Bool { !feedsEmbedded }
     private var pinsQuickBar: Bool { showsQuickBar && gallery == nil }
 
+    @Environment(\.homeBreadcrumbMenu) private var homeMenu
+
+    /// Above the list: the whole quick bar, or on Home (breadcrumb chrome) only the filter chips.
     private var quickBar: some View {
+        quickBar(part: homeMenu == nil ? .all : .chipsOnly)
+    }
+
+    private func quickBar(part: CatalogQuickBarPart) -> some View {
         CatalogListQuickBar(
             mode: .images,
             sort: imageListFilters.selectedSortOption,
@@ -954,7 +962,8 @@ private struct ImagesViewBody: View {
             onClearPreset: { resetAllImageFilters() },
             onFiltersChanged: { imageListFilters.applyLiveFilter(viewModel: viewModel) },
             onOpenFilters: { imageListFilters.showFilterSortSheet = true },
-            collapsesOnScroll: gallery == nil
+            collapsesOnScroll: gallery == nil,
+            part: part
         )
     }
 

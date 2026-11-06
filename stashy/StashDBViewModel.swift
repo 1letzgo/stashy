@@ -10451,6 +10451,20 @@ struct StashGroup: Codable, Identifiable, Equatable {
         }
         return signedURL(URL(string: fallbackPath))
     }
+
+    /// Back cover, only when the group has one (Stash leaves `back_image_path` empty otherwise).
+    var backImageURL: URL? {
+        guard var path = back_image_path, !path.isEmpty else { return nil }
+        let separator = path.contains("?") ? "&" : "?"
+        path = "\(path)\(separator)width=640"
+        if let updated = updatedAt {
+            path = "\(path)&t=\(updated.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? updated)"
+        }
+        guard let url = URL(string: path) else { return nil }
+        if path.starts(with: "http") { return signedURL(url) }
+        guard let config = ServerConfigManager.shared.loadConfig() else { return nil }
+        return signedURL(URL(string: config.baseURL + path))
+    }
 }
 
 struct GroupStudio: Codable, Identifiable, Equatable {

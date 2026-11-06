@@ -479,6 +479,7 @@ private struct TagsViewContent: View {
             }
         }
         .stashyCatalogChrome(catalogChromeConfig)
+        .homeBreadcrumbChrome(homeMenu) { quickBar(part: .sortMenu) }
     }
 
     private var catalogChromeConfig: CatalogChromeConfig {
@@ -629,7 +630,14 @@ private struct TagsViewContent: View {
         return selectedFilter?.name
     }
 
+    @Environment(\.homeBreadcrumbMenu) private var homeMenu
+
+    /// Above the list: the whole quick bar, or on Home (breadcrumb chrome) only the filter chips.
     private var quickBar: some View {
+        quickBar(part: homeMenu == nil ? .all : .chipsOnly)
+    }
+
+    private func quickBar(part: CatalogQuickBarPart) -> some View {
         CatalogListQuickBar(
             mode: .tags,
             sort: selectedSortOption,
@@ -639,7 +647,8 @@ private struct TagsViewContent: View {
             onClearPreset: { resetAllCatalogFilters() },
             onFiltersChanged: { applyLiveFilter() },
             onOpenFilters: { showFilterSortSheet = true },
-            collapsesOnScroll: !hideTitle
+            collapsesOnScroll: !hideTitle,
+            part: part
         )
     }
 

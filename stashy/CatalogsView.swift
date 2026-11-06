@@ -99,7 +99,12 @@ struct CatalogsView: View {
     }
 
     private var showTabSwitcher: Bool {
-        sortedVisibleTabs.count > 1
+        // Every list draws its own breadcrumb (Home › view › sort); only the dashboard uses this one.
+        sortedVisibleTabs.count > 1 && (effectiveTab == .dashboard || effectiveTab == nil)
+    }
+
+    private var homeViewsMenu: HomeViewsMenu {
+        HomeViewsMenu(tabs: sortedVisibleTabs, selection: selectedTabBinding)
     }
 
     private var effectiveTab: CatalogsTab? {
@@ -151,6 +156,7 @@ struct CatalogsView: View {
         Group {
             if let tab = effectiveTab {
                 catalogRoot(for: tab)
+                    .environment(\.homeBreadcrumbMenu, tab == .dashboard || sortedVisibleTabs.count < 2 ? nil : homeViewsMenu)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                     .transition(.identity)
             } else {
@@ -172,7 +178,7 @@ struct CatalogsView: View {
         // Swipe-back can desync UIKit/SwiftUI stacks; menu switches must always clear details.
         .popNavigationToRootOnChange("\(coordinator.catalogueSubTab)|\(coordinator.cataloguePopToken.uuidString)")
         .stashySectionChrome(showsSwitcher: showTabSwitcher) {
-            CatalogCategoryRow(tabs: sortedVisibleTabs, selection: selectedTabBinding)
+            HomeBreadcrumbRow(menu: homeViewsMenu) { EmptyView() }
         }
     }
 }
@@ -484,6 +490,7 @@ private struct GroupsViewContent: View {
         }
         .applyAppBackground()
         .stashyCatalogChrome(catalogChromeConfig)
+        .homeBreadcrumbChrome(homeMenu) { quickBar(part: .sortMenu) }
         .sheet(isPresented: $showGroupsFilterSheet) {
             GroupsCatalogFilterSortSheet(
                 serverFilters: viewModel.savedFilters.values.filter { $0.mode == .groups }.sorted { $0.name < $1.name },
@@ -624,7 +631,14 @@ private struct GroupsViewContent: View {
         return selectedFilter?.name
     }
 
+    @Environment(\.homeBreadcrumbMenu) private var homeMenu
+
+    /// Above the list: the whole quick bar, or on Home (breadcrumb chrome) only the filter chips.
     private var quickBar: some View {
+        quickBar(part: homeMenu == nil ? .all : .chipsOnly)
+    }
+
+    private func quickBar(part: CatalogQuickBarPart) -> some View {
         CatalogListQuickBar(
             mode: .groups,
             sort: selectedSortOption,
@@ -640,7 +654,8 @@ private struct GroupsViewContent: View {
                 }
                 showGroupsFilterSheet = true
             },
-            collapsesOnScroll: !hideTitle
+            collapsesOnScroll: !hideTitle,
+            part: part
         )
     }
 
@@ -937,6 +952,8 @@ struct GroupDetailView: View {
         ScrollView {
             VStack(spacing: 12) {
                 headerView
+                    // Same gap under the chrome as the Scenes tab, whose list carries the header.
+                    .padding(.top, 16)
 
                 if selectedDetailTab == .galleries {
                     if !viewModel.groupGalleries.isEmpty {
@@ -1572,6 +1589,15 @@ struct GroupDetailView: View {
             onHeroTap: nil,
             isExpanded: $isHeaderExpanded,
             placeholderSystemImage: "rectangle.stack",
+            // DVD case instead of the circle: front cover, and the back cover beside it if any.
+            leadingAvatars: AnyView(
+                HStack(alignment: .top, spacing: 6) {
+                    GroupDVDCover(url: coverURL, accessibilityLabel: "Front cover")
+                    if let back = selectedGroup.backImageURL {
+                        GroupDVDCover(url: back, accessibilityLabel: "Back cover")
+                    }
+                }
+            ),
             backdrop: { groupHeroImage(coverURL, alignment: .center) },
             avatar: { groupHeroImage(coverURL, alignment: .top) },
             accessory: { _ in EmptyView() },
@@ -1621,6 +1647,59 @@ struct GroupDetailView: View {
             list.append((label: "RATING", value: "\(rating)%"))
         }
         return list
+    }
+}
+
+// MARK: - DVD cover
+
+/// A group cover drawn as a DVD case: portrait 5:7, hinge strip on the left edge, a soft sheen,
+/// hairline rim and a drop shadow. Used in the group detail header in place of the circle.
+struct GroupDVDCover: View {
+    let url: URL?
+    var accessibilityLabel: String = "Cover"
+
+    static let width: CGFloat = 72
+    static var height: CGFloat { width * 7 / 5 }
+    private static let shape = RoundedRectangle(cornerRadius: 4, style: .continuous)
+
+    var body: some View {
+        ZStack(alignment: .leading) {
+            Color.gray.opacity(DesignTokens.Opacity.placeholder)
+            if let url {
+                CustomAsyncImage(url: url) { loader in
+                    if let image = loader.image {
+                        image.resizable().scaledToFill()
+                    } else if loader.isLoading {
+                        InlineSpinner(scale: .compact)
+                    } else {
+                        Image(systemName: "rectangle.stack")
+                            .font(.system(size: 22))
+                            .foregroundColor(.appAccent.opacity(0.5))
+                    }
+                }
+                .frame(width: Self.width, height: Self.height)
+                .clipped()
+            }
+            // Case hinge: a dark strip with a light ridge, as on a DVD keep case.
+            HStack(spacing: 0) {
+                Color.black.opacity(0.45).frame(width: 5)
+                Color.white.opacity(0.25).frame(width: 1)
+                Spacer(minLength: 0)
+            }
+            // Plastic sleeve sheen.
+            LinearGradient(
+                colors: [.white.opacity(0.18), .clear, .clear, .white.opacity(0.06)],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+        }
+        .frame(width: Self.width, height: Self.height)
+        .clipShape(Self.shape)
+        .overlay(Self.shape.stroke(Color.white.opacity(0.18), lineWidth: 0.5))
+        .shadow(color: .black.opacity(0.45), radius: 6, x: 0, y: 3)
+        .accessibilityElement()
+        .accessibilityLabel(accessibilityLabel)
+        .accessibilityAddTraits(.isImage)
     }
 }
 

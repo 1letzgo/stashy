@@ -1107,7 +1107,14 @@ private struct ScenesViewContent: View {
         return selectedFilter?.name
     }
 
+    @Environment(\.homeBreadcrumbMenu) private var homeMenu
+
+    /// Above the list: the whole quick bar, or on Home (breadcrumb chrome) only the filter chips.
     private var quickBar: some View {
+        quickBar(part: homeMenu == nil ? .all : .chipsOnly)
+    }
+
+    private func quickBar(part: CatalogQuickBarPart) -> some View {
         CatalogListQuickBar(
             mode: .scenes,
             sort: selectedSortOption,
@@ -1118,7 +1125,8 @@ private struct ScenesViewContent: View {
             onFiltersChanged: { applyLiveFilter() },
             onOpenFilters: { liveFilterSheetPresented.wrappedValue = true },
             leadingSortFields: groupScopeSortFields,
-            collapsesOnScroll: scrollHeader == nil && !hideTitle
+            collapsesOnScroll: scrollHeader == nil && !hideTitle,
+            part: part
         )
     }
 
@@ -1237,6 +1245,7 @@ private struct ScenesViewContent: View {
 
         .applyAppBackground()
         .stashyCatalogChrome(catalogChromeConfig)
+        .homeBreadcrumbChrome(homeMenu) { quickBar(part: .sortMenu) }
         .navigationDestination(isPresented: Binding(
             get: { pushedColumnScene != nil },
             set: { if !$0 { pushedColumnScene = nil } }

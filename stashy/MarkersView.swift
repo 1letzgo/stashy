@@ -540,6 +540,7 @@ private struct MarkersViewContent: View {
             }
         }
         .stashyCatalogChrome(catalogChromeConfig)
+        .homeBreadcrumbChrome(homeMenu) { quickBar(part: .sortMenu) }
     }
 
     private var catalogChromeConfig: CatalogChromeConfig {
@@ -695,7 +696,14 @@ private struct MarkersViewContent: View {
         return selectedFilter?.name
     }
 
+    @Environment(\.homeBreadcrumbMenu) private var homeMenu
+
+    /// Above the list: the whole quick bar, or on Home (breadcrumb chrome) only the filter chips.
     private var quickBar: some View {
+        quickBar(part: homeMenu == nil ? .all : .chipsOnly)
+    }
+
+    private func quickBar(part: CatalogQuickBarPart) -> some View {
         CatalogListQuickBar(
             mode: .sceneMarkers,
             sort: selectedSortOption,
@@ -705,7 +713,8 @@ private struct MarkersViewContent: View {
             onClearPreset: { resetAllCatalogFilters() },
             onFiltersChanged: { applyLiveFilterFromSheet() },
             onOpenFilters: { showFilterSortSheet = true },
-            collapsesOnScroll: !hideTitle
+            collapsesOnScroll: !hideTitle,
+            part: part
         )
     }
 

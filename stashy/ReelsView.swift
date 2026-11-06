@@ -4779,6 +4779,10 @@ struct ReelsViewBody: View {
                     .fixedSize()
                 }
                 .frame(minHeight: reelsTopChromePillHeight)
+                // The same air toward the content that `StashyTopNavNameDropdownRow` and the Home
+                // breadcrumb give their rows (else Feeds sat 4 pt shorter). On the whole row, not
+                // the mode dock alone: there it pushed the filter pill 2 pt below the dock chips.
+                .padding(StashyChromePlacement.prefersBottom ? .top : .bottom, 4)
                 .padding(.horizontal, StashyExpandingDock.edgePadding)
                 .padding(.vertical, 6)
             }
@@ -4841,9 +4845,6 @@ struct ReelsViewBody: View {
         ) { id in
             selectReelsDockEntry(id)
         }
-        // The same air toward the content that `StashyTopNavNameDropdownRow` gives the strip in
-        // Home, Tools and Settings. Without it the Feeds chrome sat 4 pt shorter than the rest.
-        .padding(StashyChromePlacement.prefersBottom ? .top : .bottom, 4)
     }
 
     private static let verticalsDockID = "Verticals"

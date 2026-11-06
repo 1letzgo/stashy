@@ -76,6 +76,28 @@ enum CatalogQuickSortCatalog {
 
     static func isRandom(_ field: String) -> Bool { field.hasPrefix("random") }
 
+    /// Symbol for a sort field (sort menu and its collapsed label). `oCounterIcon` is the
+    /// user's O-counter symbol from Appearance.
+    static func icon(for field: String, oCounterIcon: String) -> String {
+        if isRandom(field) { return "shuffle" }
+        switch field {
+        case "date": return "calendar"
+        case "created_at": return "plus.circle"
+        case "rating": return "star"
+        case "o_counter": return oCounterIcon
+        case "duration": return "clock"
+        case "last_played_at": return "clock.arrow.circlepath"
+        case "play_count": return "play.circle"
+        case "scenes_count": return "film"
+        case "images_count": return "photo"
+        case "name", "title": return "textformat"
+        case "birthdate": return "gift"
+        case "seconds": return "timer"
+        case "group_scene_number": return "number"
+        default: return "arrow.up.arrow.down"
+        }
+    }
+
     /// Names read A→Z first; counts, dates and ratings read highest/newest first.
     static func defaultAscending(_ field: String) -> Bool {
         field == "name" || field == "title" || field == "group_scene_number"
@@ -296,6 +318,11 @@ enum QuickFilterCatalog {
 
 // MARK: - List header: quick sort + active filters
 
+/// Which part of `CatalogListQuickBar` to draw. The Home breadcrumb chrome puts the sort menu
+/// into the section bar (`.sortMenu`) and keeps only the active-filter chips above the list
+/// (`.chipsOnly`).
+enum CatalogQuickBarPart { case all, sortOnly, sortMenu, chipsOnly }
+
 /// Sits at the top of a catalog list and scrolls away with it — not pinned.
 struct CatalogListQuickBar<Option: CatalogQuickSortable>: View {
     let mode: StashDBViewModel.FilterMode
@@ -335,49 +362,85 @@ struct CatalogListQuickBar<Option: CatalogQuickSortable>: View {
     /// Off where the bar scrolls with the content instead of being pinned above the list.
     var collapsesOnScroll = false
 
+    typealias Part = CatalogQuickBarPart
+    var part: Part = .all
+
+    /// Settings button + scrolling sort pills, without outer padding.
+    private var sortRow: some View {
+        HStack(spacing: DesignTokens.Spacing.sm) {
+            // Pinned: only the sort pills scroll, the settings button stays put.
+            if let onOpenFilters {
+                settingsButton(action: onOpenFilters)
+            }
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: StashyExpandingDock.itemSpacing) {
+                    ForEach(sortFields, id: \.self) { field in
+                        sortChip(field)
+                    }
+                }
+                // The selected pill's glow (radius 6, y 3) must fit inside the clipped
+                // scroll area on every side, or it shows as a hard-edged box.
+                .padding(.vertical, Self.shadowRoom)
+                .padding(.trailing, part == .sortOnly ? 0 : DesignTokens.Tools.contentPadding)
+            }
+            .padding(.vertical, -Self.shadowRoom)
+        }
+    }
+
     var body: some View {
+        switch part {
+        case .sortOnly:
+            sortRow
+        case .sortMenu:
+            // Right-aligned: sort menu, then the list's settings button (Feeds' 6 pt gap).
+            HStack(spacing: 6) {
+                Spacer(minLength: 0)
+                sortMenu
+                if let onOpenFilters {
+                    settingsButton(action: onOpenFilters)
+                }
+            }
+        case .chipsOnly:
+            if !activeChips.isEmpty || presetName != nil {
+                chipsRow
+                    .padding(.vertical, DesignTokens.Tools.menuBottomPadding)
+                    .background { Color.appBackground.padding(.top, -DesignTokens.Chrome.contentTopGap) }
+                    .modifier(CatalogChromeCollapsible(enabled: collapsesOnScroll))
+            }
+        case .all:
+            fullBar
+        }
+    }
+
+    private var chipsRow: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 8) {
+                if let presetName {
+                    removableChip(icon: "bookmark.fill", text: presetName) {
+                        onClearPreset?()
+                    }
+                }
+                ForEach(activeChips, id: \.key) { chip in
+                    removableChip(icon: nil, text: chip.label) {
+                        HapticManager.light()
+                        document.removeCriterion(key: chip.key)
+                        onFiltersChanged()
+                    }
+                }
+            }
+            .padding(.horizontal, DesignTokens.Tools.contentPadding)
+        }
+    }
+
+    private var fullBar: some View {
         // Same pills, sizes and spacing as the Tools section rows (`ToolsPillMenuRow`).
         VStack(alignment: .leading, spacing: DesignTokens.Tools.menuBottomPadding) {
             // Like Merge Scenes' template row: the gap sits outside the scroll area, so pills
             // scrolled under it are cut off with air to the pinned button, not right at it.
-            HStack(spacing: DesignTokens.Spacing.sm) {
-                // Pinned: only the sort pills scroll, the settings button stays put.
-                if let onOpenFilters {
-                    settingsButton(action: onOpenFilters)
-                }
-                ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: StashyExpandingDock.itemSpacing) {
-                        ForEach(sortFields, id: \.self) { field in
-                            sortChip(field)
-                        }
-                    }
-                    // The selected pill's glow (radius 6, y 3) must fit inside the clipped
-                    // scroll area on every side, or it shows as a hard-edged box.
-                    .padding(.vertical, Self.shadowRoom)
-                    .padding(.trailing, DesignTokens.Tools.contentPadding)
-                }
-                .padding(.vertical, -Self.shadowRoom)
-            }
-            .padding(.leading, DesignTokens.Tools.contentPadding)
-            let chips = activeChips
-            if !chips.isEmpty || presetName != nil {
-                ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: 8) {
-                        if let presetName {
-                            removableChip(icon: "bookmark.fill", text: presetName) {
-                                onClearPreset?()
-                            }
-                        }
-                        ForEach(chips, id: \.key) { chip in
-                            removableChip(icon: nil, text: chip.label) {
-                                HapticManager.light()
-                                document.removeCriterion(key: chip.key)
-                                onFiltersChanged()
-                            }
-                        }
-                    }
-                    .padding(.horizontal, DesignTokens.Tools.contentPadding)
-                }
+            sortRow
+                .padding(.leading, DesignTokens.Tools.contentPadding)
+            if !activeChips.isEmpty || presetName != nil {
+                chipsRow
             }
         }
         .padding(.top, DesignTokens.Tools.menuTopPadding)
@@ -394,13 +457,12 @@ struct CatalogListQuickBar<Option: CatalogQuickSortable>: View {
     private func settingsButton(action: @escaping () -> Void) -> some View {
         let filtered = presetName != nil || !document.isEmpty
         return Button(action: action) {
-            // Same glass circle as the chrome's nav buttons (`StashyExpandingDockChip`).
+            // Built exactly like the Feeds filter/sort pill (`reelsFilterSortPill`).
             Image(systemName: "slider.horizontal.3")
                 .font(.system(size: StashyExpandingDock.iconSize, weight: .semibold))
                 .foregroundStyle(Color.white.opacity(StashyExpandingDock.inactiveIconOpacity))
-                .frame(width: StashyExpandingDock.circleSize, height: StashyExpandingDock.circleSize)
-                .stashyChromeFill(shape: Circle(), activeColor: nil)
-                .contentShape(Circle())
+                .frame(width: StashyExpandingDock.iconSize, height: StashyExpandingDock.iconSize)
+                .modifier(StashyChromePillStyle(height: StashyExpandingDock.activeHeight, iconOnly: true))
                 .overlay(alignment: .topTrailing) {
                     if filtered {
                         Circle()
@@ -412,6 +474,87 @@ struct CatalogListQuickBar<Option: CatalogQuickSortable>: View {
         }
         .buttonStyle(.plain)
         .accessibilityLabel("Filter and sort settings")
+    }
+
+    private func isActive(_ field: CatalogQuickSortCatalog.Field) -> Bool {
+        CatalogQuickSortCatalog.isRandom(field.field)
+            ? CatalogQuickSortCatalog.isRandom(sort.sortField)
+            : sort.sortField == field.field
+    }
+
+    private func sortIcon(_ field: String) -> String {
+        CatalogQuickSortCatalog.icon(for: field, oCounterIcon: appearance.oCounterIcon)
+    }
+
+    private var sortDirectionIcon: String {
+        if CatalogQuickSortCatalog.isRandom(sort.sortField) { return "shuffle" }
+        return sort.direction == "ASC" ? "arrow.up" : "arrow.down"
+    }
+
+    /// Native menu with the quick sorts: picking the active one again flips its direction,
+    /// and the second section sets the direction explicitly.
+    private var sortMenu: some View {
+        let fields = sortFields
+        let active = fields.first(where: isActive)
+        return Menu {
+            Section("Sort by") {
+                ForEach(fields, id: \.self) { field in
+                    // A toggle so the menu shows the checkmark and the field's icon together.
+                    Toggle(isOn: Binding(
+                        get: { isActive(field) },
+                        set: { _ in
+                            HapticManager.selection()
+                            if let next = CatalogQuickSortCatalog.next(after: sort, tapping: field.field) {
+                                onSort(next)
+                            }
+                        }
+                    )) {
+                        Label(field.label, systemImage: sortIcon(field.field))
+                    }
+                }
+            }
+            if !CatalogQuickSortCatalog.isRandom(sort.sortField) {
+                Section("Order") {
+                    ForEach(["ASC", "DESC"], id: \.self) { direction in
+                        Toggle(isOn: Binding(
+                            get: { sort.direction == direction },
+                            set: { _ in
+                                guard sort.direction != direction,
+                                      let next = CatalogQuickSortCatalog.next(after: sort, tapping: sort.sortField)
+                                else { return }
+                                HapticManager.selection()
+                                onSort(next)
+                            }
+                        )) {
+                            Label(direction == "ASC" ? "Ascending" : "Descending",
+                                  systemImage: direction == "ASC" ? "arrow.up" : "arrow.down")
+                        }
+                    }
+                }
+            }
+        } label: {
+            HStack(spacing: 5) {
+                // The active sort as its icon; the name is in the menu and for VoiceOver.
+                Image(systemName: sortIcon(active?.field ?? sort.sortField))
+                    .font(.system(size: 16, weight: .semibold))
+                Image(systemName: sortDirectionIcon)
+                    .font(.caption.weight(.bold))
+                Image(systemName: "chevron.up.chevron.down")
+                    .font(.system(size: 11, weight: .bold))
+            }
+            .font(.subheadline.weight(.semibold))
+            // A control like the settings button beside it, so plain glass, not highlighted.
+            .foregroundStyle(Color.white.opacity(StashyExpandingDock.inactiveIconOpacity))
+            .padding(.horizontal, StashyExpandingDock.activeHorizontalPadding)
+            .frame(height: StashyExpandingDock.activeHeight)
+            .stashyChromeFill(shape: Capsule(style: .continuous), activeColor: nil)
+            .contentShape(Capsule(style: .continuous))
+        }
+        .menuStyle(.button)
+        .buttonStyle(.plain)
+        .menuIndicator(.hidden)
+        .fixedSize()
+        .accessibilityLabel("Sort, \(active?.label ?? "custom"), \(sort.direction == "ASC" ? "ascending" : "descending")")
     }
 
     private func sortChip(_ field: CatalogQuickSortCatalog.Field) -> some View {
