@@ -8447,13 +8447,35 @@ struct GenerateData: Codable {
         }
     }
 
-    /// Updates group metadata shown on the detail screen (edit mode).
+    /// Fields the group edit sheet needs beyond the list model (aliases, duration, director,
+    /// URLs, studio, tags).
+    func fetchGroupEditFields(groupId: String, completion: @escaping (GroupEditFields?) -> Void) {
+        let query = """
+            query GroupEditFields($id: ID!) {
+                findGroup(id: $id) { aliases duration director urls studio { id name } tags { id name } }
+            }
+            """
+        let variables: [String: Any] = ["id": groupId]
+        guard let bodyData = try? JSONSerialization.data(withJSONObject: ["query": query, "variables": variables]),
+              let bodyString = String(data: bodyData, encoding: .utf8) else {
+            completion(nil)
+            return
+        }
+        performGraphQLQuery(query: bodyString) { (response: GroupEditFieldsResponse?) in
+            completion(response?.data?.findGroup)
+        }
+    }
+
+    /// Updates group metadata shown on the detail screen (edit mode). `extra` carries further
+    /// `GroupUpdateInput` keys (aliases, duration, director, studio_id, tag_ids, urls,
+    /// front_image, back_image); `NSNull()` clears a field.
     func updateGroupDetails(
         groupId: String,
         name: String,
         date: String?,
         synopsis: String?,
         rating100: Int?,
+        extra: [String: Any] = [:],
         completion: @escaping (Bool) -> Void
     ) {
         let mutation = GraphQLQueries.groupUpdateDetailsMutation
@@ -8464,6 +8486,7 @@ struct GenerateData: Codable {
         input["date"] = date ?? NSNull()
         input["synopsis"] = synopsis ?? NSNull()
         input["rating100"] = rating100 ?? NSNull()
+        input.merge(extra) { _, new in new }
 
         let variables: [String: Any] = ["input": input]
         guard let bodyData = try? JSONSerialization.data(withJSONObject: ["query": mutation, "variables": variables]),
@@ -10465,6 +10488,21 @@ struct StashGroup: Codable, Identifiable, Equatable {
         guard let config = ServerConfigManager.shared.loadConfig() else { return nil }
         return signedURL(URL(string: config.baseURL + path))
     }
+}
+
+/// What the group edit sheet loads on top of `StashGroup`.
+struct GroupEditFields: Decodable {
+    let aliases: String?
+    let duration: Int?
+    let director: String?
+    let urls: [String]?
+    let studio: GroupStudio?
+    let tags: [GroupStudio]?
+}
+
+struct GroupEditFieldsResponse: Decodable {
+    struct Payload: Decodable { let findGroup: GroupEditFields? }
+    let data: Payload?
 }
 
 struct GroupStudio: Codable, Identifiable, Equatable {

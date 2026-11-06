@@ -7,6 +7,7 @@
 
 #if !os(tvOS)
 import Combine
+import PhotosUI
 import SwiftUI
 
 struct CatalogsView: View {
@@ -1715,24 +1716,110 @@ struct EditGroupSheet: View {
     @ObservedObject private var appearanceManager = AppearanceManager.shared
 
     @State private var name: String = ""
+    @State private var aliases: String = ""
     @State private var date: String = ""
+    @State private var durationText: String = ""
     @State private var ratingText: String = ""
+    @State private var director: String = ""
     @State private var synopsis: String = ""
+    @State private var urls: [String] = []
+    @State private var studio: FilterEntityOption?
+    @State private var tags: [FilterEntityOption] = []
+    /// The extra fields are written back only once they were loaded, so a failed load never
+    /// wipes aliases, studio, tags … on save.
+    @State private var extraFieldsLoaded = false
+    @State private var frontItem: PhotosPickerItem?
+    @State private var backItem: PhotosPickerItem?
+    @State private var newFront: GroupCoverUpload?
+    @State private var newBack: GroupCoverUpload?
+    @State private var removeBack = false
+    @State private var picker: GroupEntityPickerKind?
     @State private var isSaving = false
     @State private var isDeleting = false
     @State private var showingDeleteConfirmation = false
 
+    private var canSave: Bool {
+        !name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            && StashDateInput.isAcceptable(date)
+            && GroupDurationText.seconds(from: durationText) != .invalid
+    }
+
     var body: some View {
         NavigationView {
             Form {
+                Section("Covers") {
+                    HStack(alignment: .top, spacing: 16) {
+                        coverColumn(
+                            title: "Front",
+                            preview: newFront?.preview,
+                            url: group.thumbnailURL,
+                            item: $frontItem,
+                            onRemove: nil
+                        )
+                        coverColumn(
+                            title: "Back",
+                            preview: newBack?.preview,
+                            url: removeBack ? nil : group.backImageURL,
+                            item: $backItem,
+                            onRemove: (newBack != nil || (!removeBack && group.backImageURL != nil)) ? {
+                                newBack = nil
+                                backItem = nil
+                                removeBack = true
+                            } : nil
+                        )
+                        Spacer(minLength: 0)
+                    }
+                    .padding(.vertical, 4)
+                }
+                .listRowBackground(Color.secondaryAppBackground)
+
                 Section("Identity") {
                     TextField("Name", text: $name)
+                    TextField("Aliases", text: $aliases)
                     StashDateField(placeholder: "Date (YYYY-MM-DD)", text: $date)
+                    TextField("Duration (h:mm:ss)", text: $durationText)
+                        .keyboardType(.numbersAndPunctuation)
                     TextField("Rating (0–100)", text: $ratingText)
                         .keyboardType(.numberPad)
                         .numericKeyboardDoneBar()
+                    TextField("Director", text: $director)
                 }
                 .listRowBackground(Color.secondaryAppBackground)
+
+                Section("Studio & Tags") {
+                    pickerRow(title: "Studio", value: studio?.name ?? "None") { picker = .studio }
+                    pickerRow(
+                        title: "Tags",
+                        value: tags.isEmpty ? "None" : tags.map(\.name).joined(separator: ", ")
+                    ) { picker = .tags }
+                }
+                .listRowBackground(Color.secondaryAppBackground)
+                .disabled(!extraFieldsLoaded)
+
+                Section("URLs") {
+                    ForEach(urls.indices, id: \.self) { index in
+                        HStack {
+                            TextField("https://…", text: $urls[index])
+                                .keyboardType(.URL)
+                                .textInputAutocapitalization(.never)
+                                .autocorrectionDisabled()
+                            Button {
+                                urls.remove(at: index)
+                            } label: {
+                                Image(systemName: "minus.circle.fill").foregroundStyle(.red)
+                            }
+                            .buttonStyle(.plain)
+                            .accessibilityLabel("Remove URL")
+                        }
+                    }
+                    Button {
+                        urls.append("")
+                    } label: {
+                        Label("Add URL", systemImage: "plus.circle.fill")
+                    }
+                }
+                .listRowBackground(Color.secondaryAppBackground)
+                .disabled(!extraFieldsLoaded)
 
                 Section("Synopsis") {
                     TextEditor(text: $synopsis)
@@ -1765,7 +1852,7 @@ struct EditGroupSheet: View {
             .stashyModalSheetChrome("Edit Group", onBack: { dismiss() }) {
                 StashyChromeTrailingTextButton(
                     title: "Save",
-                    enabled: !name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && StashDateInput.isAcceptable(date),
+                    enabled: canSave,
                     isBusy: isSaving
                 ) { save() }
             }
@@ -1774,6 +1861,23 @@ struct EditGroupSheet: View {
                 date = group.date ?? ""
                 ratingText = group.rating100.map(String.init) ?? ""
                 synopsis = group.synopsis ?? ""
+                loadExtraFields()
+            }
+            .onChange(of: frontItem) { _, item in
+                loadCover(item) { newFront = $0 }
+            }
+            .onChange(of: backItem) { _, item in
+                loadCover(item) { upload in
+                    newBack = upload
+                    if upload != nil { removeBack = false }
+                }
+            }
+            .sheet(item: $picker) { kind in
+                GroupEntityPickerSheet(
+                    kind: kind,
+                    studio: $studio,
+                    tags: $tags
+                )
             }
             .alert("Delete Group", isPresented: $showingDeleteConfirmation) {
                 Button("Cancel", role: .cancel) { }
@@ -1783,6 +1887,103 @@ struct EditGroupSheet: View {
             }
         }
     }
+
+    // MARK: Rows
+
+    private func pickerRow(title: String, value: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            HStack {
+                Text(title).foregroundStyle(.primary)
+                Spacer()
+                Text(value)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+                Image(systemName: "chevron.right")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.tertiary)
+            }
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+    }
+
+    /// One cover: the current (or newly picked) image as a DVD case, Change / Remove below.
+    private func coverColumn(
+        title: String,
+        preview: UIImage?,
+        url: URL?,
+        item: Binding<PhotosPickerItem?>,
+        onRemove: (() -> Void)?
+    ) -> some View {
+        VStack(spacing: 8) {
+            Group {
+                if let preview {
+                    Image(uiImage: preview)
+                        .resizable()
+                        .scaledToFill()
+                        .frame(width: GroupDVDCover.width, height: GroupDVDCover.height)
+                        .clipShape(RoundedRectangle(cornerRadius: 4, style: .continuous))
+                } else if url != nil {
+                    GroupDVDCover(url: url, accessibilityLabel: "\(title) cover")
+                } else {
+                    RoundedRectangle(cornerRadius: 4, style: .continuous)
+                        .strokeBorder(Color.secondary.opacity(0.5), style: StrokeStyle(lineWidth: 1, dash: [4]))
+                        .frame(width: GroupDVDCover.width, height: GroupDVDCover.height)
+                        .overlay(Image(systemName: "photo").foregroundStyle(.secondary))
+                }
+            }
+            Text(title).font(.caption).foregroundStyle(.secondary)
+            PhotosPicker(selection: item, matching: .images) {
+                Text(url == nil && preview == nil ? "Add" : "Change").font(.caption.weight(.semibold))
+            }
+            if let onRemove {
+                Button("Remove", role: .destructive, action: onRemove)
+                    .font(.caption.weight(.semibold))
+                    .buttonStyle(.plain)
+                    .foregroundStyle(.red)
+            }
+        }
+    }
+
+    // MARK: Loading
+
+    private func loadExtraFields() {
+        viewModel.fetchGroupEditFields(groupId: group.id) { fields in
+            DispatchQueue.main.async {
+                guard let fields else {
+                    ToastManager.shared.show("Couldn't load all group fields", icon: "exclamationmark.triangle", style: .error)
+                    return
+                }
+                aliases = fields.aliases ?? ""
+                durationText = GroupDurationText.format(fields.duration)
+                director = fields.director ?? ""
+                urls = fields.urls ?? []
+                studio = fields.studio.map { FilterEntityOption(id: $0.id, name: $0.name) }
+                tags = (fields.tags ?? []).map { FilterEntityOption(id: $0.id, name: $0.name) }
+                extraFieldsLoaded = true
+            }
+        }
+    }
+
+    /// Photos hands out HEIC; Stash wants JPEG or PNG, so the pick is re-encoded as JPEG.
+    private func loadCover(_ item: PhotosPickerItem?, apply: @escaping (GroupCoverUpload?) -> Void) {
+        guard let item else { return }
+        Task {
+            guard let data = try? await item.loadTransferable(type: Data.self),
+                  let image = UIImage(data: data),
+                  let jpeg = image.jpegData(compressionQuality: 0.9) else {
+                await MainActor.run {
+                    ToastManager.shared.show("Couldn't read that image", icon: "exclamationmark.triangle", style: .error)
+                }
+                return
+            }
+            let upload = GroupCoverUpload(preview: image, dataURL: "data:image/jpeg;base64," + jpeg.base64EncodedString())
+            await MainActor.run { apply(upload) }
+        }
+    }
+
+    // MARK: Delete / save
 
     private func performDelete() {
         isDeleting = true
@@ -1813,30 +2014,191 @@ struct EditGroupSheet: View {
         guard !trimmedName.isEmpty else { return }
         let rating = Int(ratingText.trimmingCharacters(in: .whitespacesAndNewlines)).map { min(100, max(0, $0)) }
 
+        var extra: [String: Any] = [:]
+        if extraFieldsLoaded {
+            extra["aliases"] = optionalTrimmed(aliases) ?? NSNull()
+            if case .seconds(let value) = GroupDurationText.seconds(from: durationText) {
+                extra["duration"] = value ?? NSNull()
+            }
+            extra["director"] = optionalTrimmed(director) ?? NSNull()
+            extra["studio_id"] = studio?.id ?? NSNull()
+            extra["tag_ids"] = tags.map(\.id)
+            extra["urls"] = urls.compactMap { optionalTrimmed($0) }
+        }
+        if let newFront { extra["front_image"] = newFront.dataURL }
+        if let newBack {
+            extra["back_image"] = newBack.dataURL
+        } else if removeBack {
+            extra["back_image"] = NSNull()
+        }
+
         isSaving = true
         viewModel.updateGroupDetails(
             groupId: group.id,
             name: trimmedName,
             date: optionalTrimmed(date),
             synopsis: optionalTrimmed(synopsis),
-            rating100: rating
+            rating100: rating,
+            extra: extra
         ) { success in
-            DispatchQueue.main.async {
-                isSaving = false
-                if success {
-                    var updated = group
-                    updated.name = trimmedName
-                    updated.date = optionalTrimmed(date)
-                    updated.synopsis = optionalTrimmed(synopsis)
-                    updated.rating100 = rating
+            guard success else {
+                DispatchQueue.main.async {
+                    isSaving = false
+                    ToastManager.shared.show("Failed to update group", icon: "exclamationmark.triangle", style: .error)
+                }
+                return
+            }
+            // Reload: the new `updated_at` refreshes the cover URLs, and a new back cover
+            // only appears once `back_image_path` comes back set.
+            viewModel.fetchGroup(groupId: group.id) { fresh in
+                DispatchQueue.main.async {
+                    isSaving = false
+                    var updated = fresh ?? group
+                    if fresh == nil {
+                        updated.name = trimmedName
+                        updated.date = optionalTrimmed(date)
+                        updated.synopsis = optionalTrimmed(synopsis)
+                        updated.rating100 = rating
+                    }
                     onComplete(updated)
                     ToastManager.shared.show("Group updated", icon: "checkmark.circle", style: .success)
                     dismiss()
-                } else {
-                    ToastManager.shared.show("Failed to update group", icon: "exclamationmark.triangle", style: .error)
                 }
             }
         }
+    }
+}
+
+/// A picked cover, re-encoded for Stash's `front_image` / `back_image`.
+private struct GroupCoverUpload {
+    let preview: UIImage
+    let dataURL: String
+}
+
+/// Group duration as typed: "1:32:05", "92:05" or plain minutes ("92").
+enum GroupDurationText {
+    enum Parsed: Equatable {
+        case seconds(Int?)
+        case invalid
+    }
+
+    static func format(_ seconds: Int?) -> String {
+        guard let seconds, seconds > 0 else { return "" }
+        let h = seconds / 3600, m = (seconds % 3600) / 60, s = seconds % 60
+        return h > 0 ? String(format: "%d:%02d:%02d", h, m, s) : String(format: "%d:%02d", m, s)
+    }
+
+    static func seconds(from text: String) -> Parsed {
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        if trimmed.isEmpty { return .seconds(nil) }
+        let parts = trimmed.split(separator: ":", omittingEmptySubsequences: false).map { Int($0) }
+        guard !parts.contains(where: { $0 == nil || $0! < 0 }) else { return .invalid }
+        let values = parts.compactMap { $0 }
+        switch values.count {
+        case 1: return .seconds(values[0] * 60)
+        case 2: return .seconds(values[0] * 60 + values[1])
+        case 3: return .seconds(values[0] * 3600 + values[1] * 60 + values[2])
+        default: return .invalid
+        }
+    }
+}
+
+enum GroupEntityPickerKind: String, Identifiable {
+    case studio, tags
+    var id: String { rawValue }
+}
+
+/// Studio (single) or tags (multi) for the group edit sheet, from the shared option cache;
+/// typing also searches the server, so entries beyond the cached list are reachable.
+private struct GroupEntityPickerSheet: View {
+    let kind: GroupEntityPickerKind
+    @Binding var studio: FilterEntityOption?
+    @Binding var tags: [FilterEntityOption]
+
+    @Environment(\.stashyDismiss) private var dismiss
+    @ObservedObject private var store = FilterPickerOptionsStore.shared
+    @ObservedObject private var appearanceManager = AppearanceManager.shared
+    @State private var query = ""
+
+    private var storeKind: FilterPickerOptionsStore.Kind { kind == .studio ? .studios : .allTags }
+
+    private var options: [FilterEntityOption] {
+        let term = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        let chosen = Set(tags.map(\.id))
+        return store.availableOptions(storeKind).filter { option in
+            (kind == .studio || !chosen.contains(option.id))
+                && (term.isEmpty || option.name.localizedCaseInsensitiveContains(term))
+        }
+    }
+
+    var body: some View {
+        NavigationView {
+            Form {
+                Section {
+                    TextField("Search…", text: $query)
+                        .textInputAutocapitalization(.never)
+                        .autocorrectionDisabled()
+                }
+                .listRowBackground(Color.secondaryAppBackground)
+
+                if kind == .studio {
+                    Section {
+                        row(name: "None", selected: studio == nil) { studio = nil; dismiss() }
+                    }
+                    .listRowBackground(Color.secondaryAppBackground)
+                } else if !tags.isEmpty {
+                    // Chosen tags lead, whatever the search says.
+                    Section("Selected") {
+                        ForEach(tags) { tag in
+                            row(name: tag.name, selected: true) { tags.removeAll { $0.id == tag.id } }
+                        }
+                    }
+                    .listRowBackground(Color.secondaryAppBackground)
+                }
+
+                Section(kind == .studio ? "Studios" : "Tags") {
+                    if store.isLoading(storeKind) && options.isEmpty {
+                        HStack { Spacer(); InlineSpinner(); Spacer() }
+                    } else {
+                        ForEach(options.prefix(200)) { option in
+                            row(name: option.name, selected: kind == .studio && studio?.id == option.id) {
+                                if kind == .studio {
+                                    studio = option
+                                    dismiss()
+                                } else {
+                                    tags.append(option)
+                                }
+                            }
+                        }
+                    }
+                }
+                .listRowBackground(Color.secondaryAppBackground)
+            }
+            .applyAppBackground()
+            .scrollContentBackground(.hidden)
+            .stashyModalSheetChrome(kind == .studio ? "Studio" : "Tags", onBack: { dismiss() }) {
+                StashyChromeTrailingTextButton(title: "Done") { dismiss() }
+            }
+            .onAppear { store.load(storeKind) }
+            .onChange(of: query) { _, newValue in
+                let term = newValue.trimmingCharacters(in: .whitespacesAndNewlines)
+                if term.count >= 2 { store.search(storeKind, query: term) }
+            }
+        }
+    }
+
+    private func row(name: String, selected: Bool, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            HStack {
+                Text(name).foregroundStyle(.primary)
+                Spacer()
+                if selected {
+                    Image(systemName: "checkmark").foregroundStyle(appearanceManager.tintColor)
+                }
+            }
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
     }
 }
 #endif
