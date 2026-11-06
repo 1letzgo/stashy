@@ -153,6 +153,9 @@ struct MainTabView: View {
             }
             .interactiveDismissDisabled()
         }
+        .modifier(LegacySupporterTipPrompt(
+            isBlocked: securityManager.isAppLocked || showOnboarding || showConfigWarning
+        ))
         .alert(isPresented: $showConfigWarning) {
             switch warningType {
             case .noServer:

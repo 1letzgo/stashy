@@ -921,7 +921,10 @@ class StoreManager: ObservableObject {
         defer { purchasingProductID = nil }
         let (message, customerInfo) = await StashyRevenueCat.purchase(product)
         if let message { return message }
-        if StashyPlusProduct.tipIDs.contains(product.id) { return nil }
+        if StashyPlusProduct.tipIDs.contains(product.id) {
+            UserDefaults.standard.set(true, forKey: LegacySupporterTipPrompt.hasTippedKey)
+            return nil
+        }
         StashyPlusManager.shared.clearDebugForceLock()
         await syncUnlockFromStore(customerInfo: customerInfo)
         return nil
@@ -930,6 +933,9 @@ class StoreManager: ObservableObject {
     /// Refresh entitlements (RevenueCat + StoreKit: subscriptions, lifetime, paid app before 3.0).
     func syncUnlockFromStore(customerInfo: CustomerInfo? = nil) async {
         let snapshot = await StashyRevenueCat.entitlementSnapshot(customerInfo: customerInfo)
+        if snapshot.hasTipped {
+            UserDefaults.standard.set(true, forKey: LegacySupporterTipPrompt.hasTippedKey)
+        }
 
         let legacyPaidApp: Bool
         switch await Self.isLegacyPaidAppPurchaser() {
@@ -1350,6 +1356,81 @@ struct StashSyncSettingsView: View {
 
 #Preview {
     SettingsView()
+}
+
+// MARK: - One-time tip prompt for pre-subscription buyers
+
+/// Buyers of the paid app (before 3.0, the same `legacyPaidApp` check that grants them
+/// stashy+ Lifetime) see an alert offering a tip, at most every 90 days, until they have
+/// tipped once (here, in Settings, or on another device via RevenueCat / iCloud sync).
+/// Closing is the filled default; the tips sit above it.
+struct LegacySupporterTipPrompt: ViewModifier {
+    /// Time the prompt last appeared (seconds since 1970); set when it appears.
+    nonisolated static let lastShownKey = "stashy_legacy_supporter_tip_prompt_last_shown"
+    /// Set once any tip was bought; the prompt never appears again.
+    nonisolated static let hasTippedKey = "stashy_has_tipped"
+    nonisolated static let interval: TimeInterval = 90 * 24 * 60 * 60
+    /// DEBUG only: `-stashy_debug_supporter_prompt YES` treats this install as a pre-3.0 buyer.
+    nonisolated static let debugForceKey = "stashy_debug_supporter_prompt"
+
+    @ObservedObject private var store = StoreManager.shared
+    @ObservedObject private var stashyPlus = StashyPlusManager.shared
+    /// Something else is on screen (lock, onboarding, another alert): wait.
+    var isBlocked: Bool
+    @State private var isPresented = false
+
+    private var isEligible: Bool {
+        #if DEBUG
+        if UserDefaults.standard.bool(forKey: Self.debugForceKey) { return !store.tipProducts.isEmpty && Self.isDue() }
+        #endif
+        return stashyPlus.source == .legacyPaidApp
+            && !store.tipProducts.isEmpty
+            && Self.isDue()
+    }
+
+    nonisolated static func isDue(now: Date = Date(), defaults: UserDefaults = .standard) -> Bool {
+        guard !defaults.bool(forKey: hasTippedKey) else { return false }
+        let last = defaults.double(forKey: lastShownKey)
+        return last <= 0 || now.timeIntervalSince1970 - last >= interval
+    }
+
+    private var trigger: String {
+        "\(stashyPlus.source.rawValue)|\(store.tipProducts.count)|\(isBlocked)"
+    }
+
+    func body(content: Content) -> some View {
+        content
+            .task(id: trigger) {
+                guard isEligible, !isBlocked, !isPresented else { return }
+                // Let the app settle first; no prompt in the user's face at launch.
+                try? await Task.sleep(for: .seconds(6))
+                guard !Task.isCancelled, isEligible, !isBlocked else { return }
+                UserDefaults.standard.set(Date().timeIntervalSince1970, forKey: Self.lastShownKey)
+                isPresented = true
+            }
+            .alert("stashy has grown a lot", isPresented: $isPresented) {
+                ForEach(store.tipProducts) { product in
+                    Button("Tip \(product.displayPrice)") {
+                        Task { await tip(product) }
+                    }
+                }
+                // Preferred action: drawn as the filled, prominent button, so closing is
+                // the easiest choice; Return / Esc also close it on macOS.
+                Button("No thanks", role: .cancel) {}
+                    .keyboardShortcut(.defaultAction)
+            } message: {
+                Text("You bought stashy before it moved to subscriptions, so stashy+ stays yours for life. Since then the app has grown massively. If you'd like to support its development, a tip is a kind gesture, entirely optional.")
+            }
+    }
+
+    private func tip(_ product: StashyStoreProduct) async {
+        if let error = await store.purchase(product) {
+            guard error != "Purchase cancelled" else { return }
+            ToastManager.shared.show(error, icon: "exclamationmark.triangle", style: .error)
+        } else {
+            ToastManager.shared.show("Thank you for the tip!", icon: "heart.fill", style: .success)
+        }
+    }
 }
 
 #endif

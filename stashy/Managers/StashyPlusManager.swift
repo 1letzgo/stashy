@@ -546,7 +546,8 @@ enum StashyRevenueCat {
         var hasLifetimePurchase = false
         var subscriptionProductID: String?
         var subscriptionExpiration: Date?
-
+        /// Any tip ever bought (RevenueCat keeps consumables in `nonSubscriptions`).
+        var hasTipped = false
 
         mutating func addSubscription(_ productID: String, expiration: Date?) {
             let exp = expiration ?? .distantFuture
@@ -558,6 +559,7 @@ enum StashyRevenueCat {
 
         mutating func merge(_ other: EntitlementSnapshot) {
             hasLifetimePurchase = hasLifetimePurchase || other.hasLifetimePurchase
+            hasTipped = hasTipped || other.hasTipped
             if let id = other.subscriptionProductID {
                 addSubscription(id, expiration: other.subscriptionExpiration)
             }
@@ -583,6 +585,9 @@ enum StashyRevenueCat {
         var snapshot = EntitlementSnapshot()
         snapshot.hasLifetimePurchase = info.nonSubscriptions.contains {
             $0.productIdentifier == StashyPlusProduct.lifetime
+        }
+        snapshot.hasTipped = info.nonSubscriptions.contains {
+            StashyPlusProduct.tipIDs.contains($0.productIdentifier)
         }
         for id in StashyPlusProduct.subscriptionIDs where info.activeSubscriptions.contains(id) {
             snapshot.addSubscription(id, expiration: info.expirationDate(forProductIdentifier: id))
