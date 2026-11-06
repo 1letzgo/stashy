@@ -95,6 +95,17 @@ final class MiniPlayerStore: ObservableObject {
         }
     }
 
+    /// Feeds own the screen and the sound. While they show, the bar's video stays paused: the
+    /// pause notification on the tab switch arrives before the scene page hands its engine over,
+    /// and a deferred `play()` from that page could start it again under the feed.
+    private(set) var feedsActive = false
+
+    func setFeedsActive(_ active: Bool) {
+        guard feedsActive != active else { return }
+        feedsActive = active
+        if active { session?.engine.pause() }
+    }
+
     /// Whether a page being left should hand its playing engine over instead of stopping it.
     /// stashy+ feature, like the watchlist behind it.
     var isEnabled: Bool { TabManager.shared.isMiniPlayerEnabled && StashyPlusManager.isUnlockedNow }
@@ -118,6 +129,10 @@ final class MiniPlayerStore: ObservableObject {
         }
         engine.onPlayingChanged = { [weak self, weak engine] playing in
             guard let self else { return }
+            if playing, self.feedsActive {
+                engine?.pause()
+                return
+            }
             if playing { self.tracker.start() } else { self.tracker.stop() }
             // Paused: the exact spot is worth one write; while playing it is saved sparingly.
             if !playing, let engine { self.saveSession(position: engine.currentTime) }
@@ -142,6 +157,7 @@ final class MiniPlayerStore: ObservableObject {
         }
         notePlaying(scene)
         saveSession(position: engine.currentTime)
+        if feedsActive { engine.pause() }
     }
 
     /// Switches the bar to `scene` on the same engine (watchlist tap, or the next entry).

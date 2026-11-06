@@ -1090,7 +1090,7 @@ private struct TabBarNeverMinimizes: ViewModifier {
 #if !os(tvOS)
 /// Puts the mini player above the tab bar and reopens its scene full screen on tap.
 private struct MiniPlayerHost: ViewModifier {
-    /// Feeds own the whole screen; the bar steps aside there (the engine is paused anyway).
+    /// Feeds own the whole screen; the bar steps aside there and its video pauses.
     var hidden: Bool
     @ObservedObject private var store = MiniPlayerStore.shared
     @ObservedObject private var tabManager = TabManager.shared
@@ -1101,6 +1101,9 @@ private struct MiniPlayerHost: ViewModifier {
                 isEnabled: store.session != nil && !hidden && store.isEnabled,
                 floats: store.tabBarHiddenByPage
             ))
+            .onChange(of: hidden, initial: true) { _, onFeeds in
+                store.setFeedsActive(onFeeds)
+            }
             // Settings › stashy+ › Miniplayer & Watchlist off: the bar closes (its spot is kept).
             .onChange(of: tabManager.isMiniPlayerEnabled) { _, enabled in
                 if !enabled { store.close(forget: false) }
