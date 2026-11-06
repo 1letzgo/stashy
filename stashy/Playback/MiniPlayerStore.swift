@@ -880,11 +880,13 @@ struct WatchlistSceneRow: View {
 /// The bar above the tab bar: live picture, title, play/pause, close. Tap reopens the scene,
 /// a swipe down closes it.
 struct MiniPlayerBar: View {
+    /// Inline beside the shrunk tab bar: cover, title and play only (Music's compact bar).
+    var compact: Bool = false
     @ObservedObject private var store = MiniPlayerStore.shared
 
     var body: some View {
         if let session = store.session {
-            MiniPlayerBarContent(session: session, engine: session.engine)
+            MiniPlayerBarContent(session: session, engine: session.engine, compact: compact)
         }
     }
 }
@@ -895,6 +897,7 @@ private struct MiniPlayerBarContent: View {
     /// (inside the tab bar's Liquid Glass) at that rate crashed SwiftUI's async glass renderer.
     /// The bar mirrors only what it draws, and the progress line ticks once a second.
     let engine: AetherSceneEngine
+    var compact: Bool = false
     @ObservedObject private var appearance = AppearanceManager.shared
     @ObservedObject private var watchlist = WatchlistStore.shared
     @ObservedObject private var store = MiniPlayerStore.shared
@@ -951,6 +954,7 @@ private struct MiniPlayerBarContent: View {
                 }
             }
             Spacer(minLength: 4)
+            if !compact {
             Button {
                 HapticManager.light()
                 MiniPlayerStore.shared.expand()
@@ -973,6 +977,7 @@ private struct MiniPlayerBarContent: View {
             }
             .buttonStyle(.plain)
             .accessibilityLabel("Watchlist")
+            }
             Button {
                 HapticManager.light()
                 MiniPlayerStore.shared.togglePlayPause()
@@ -984,17 +989,19 @@ private struct MiniPlayerBarContent: View {
             }
             .buttonStyle(.plain)
             .accessibilityLabel(isPlaying ? "Pause" : "Play")
-            Button {
-                HapticManager.light()
-                MiniPlayerStore.shared.close()
-            } label: {
-                Image(systemName: "xmark")
-                    .font(.system(size: 15, weight: .semibold))
-                    .frame(width: 32, height: 36)
-                    .contentShape(Rectangle())
+            if !compact {
+                Button {
+                    HapticManager.light()
+                    MiniPlayerStore.shared.close()
+                } label: {
+                    Image(systemName: "xmark")
+                        .font(.system(size: 15, weight: .semibold))
+                        .frame(width: 32, height: 36)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Close mini player")
             }
-            .buttonStyle(.plain)
-            .accessibilityLabel("Close mini player")
         }
         .padding(.leading, 8)
         .padding(.trailing, 6)

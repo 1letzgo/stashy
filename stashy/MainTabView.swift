@@ -96,7 +96,7 @@ struct MainTabView: View {
             .animation(nil, value: coordinator.selectedTab)
             .tint(appearanceManager.tabBarTint)
             .withToasts()
-            .modifier(TabBarNeverMinimizes())
+            .modifier(TabBarMinimizesOnScroll())
             #if !os(tvOS)
             .modifier(MiniPlayerHost(hidden: coordinator.selectedTab == .reels))
             #endif
@@ -1072,13 +1072,14 @@ private struct ToolsStatisticsView: View {
     MainTabView()
 }
 
-/// The tab bar must stay put while scrolling. iOS 26 would otherwise be free to collapse it.
-private struct TabBarNeverMinimizes: ViewModifier {
+/// Like Music: scrolling down shrinks the tab bar to its selected tab, and the mini player
+/// (the bottom accessory) moves into the same row; scrolling up brings both back.
+private struct TabBarMinimizesOnScroll: ViewModifier {
     @ViewBuilder
     func body(content: Content) -> some View {
         #if os(iOS)
         if #available(iOS 26.0, *) {
-            content.tabBarMinimizeBehavior(.never)
+            content.tabBarMinimizeBehavior(.onScrollDown)
         } else {
             content
         }
@@ -1138,6 +1139,19 @@ private struct MiniPlayerHost: ViewModifier {
     }
 }
 
+#if os(iOS)
+/// The bar in the accessory slot: full above the tab bar, compact (cover, title, play) once the
+/// tab bar has shrunk and the accessory sits inline beside it.
+@available(iOS 26.1, *)
+private struct MiniPlayerAccessoryBar: View {
+    @Environment(\.tabViewBottomAccessoryPlacement) private var placement
+
+    var body: some View {
+        MiniPlayerBar(compact: placement == .inline)
+    }
+}
+#endif
+
 /// iOS 26's tab bar accessory slot (the Music-style bar). Older systems, and pages that hide
 /// the tab bar (and with it the accessory), get a floating bar instead.
 private struct MiniPlayerAccessory: ViewModifier {
@@ -1156,7 +1170,7 @@ private struct MiniPlayerAccessory: ViewModifier {
         if #available(iOS 26.1, *) {
             content
                 .tabViewBottomAccessory(isEnabled: isEnabled && !floats) {
-                    MiniPlayerBar()
+                    MiniPlayerAccessoryBar()
                 }
                 .overlay(alignment: .bottom) {
                     floatingBar(visible: isEnabled && floats, bottomPadding: 8)
