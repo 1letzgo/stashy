@@ -148,6 +148,10 @@ struct HomeBreadcrumbRow<Trailing: View>: View {
                 trailing()
             }
         }
+        // The icon strip renders its glass under a mask (its scroll view's side clip); the Home
+        // button outside it kept live glass, which fades on its own curve when the chrome hides.
+        // The same mask over the whole row makes every pill fade as one.
+        .mask(Rectangle().padding(.vertical, -24))
         .padding(.bottom, 4)
     }
 
