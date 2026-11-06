@@ -715,61 +715,60 @@ struct TagCardView: View {
         tag.imagePath != nil && tag.imagePath?.contains("default") != true
     }
 
+    /// Same build as the gallery and performer cards: the image fills the card, counts sit as
+    /// glass pills at the top, the name over a dark gradient at the bottom. A tag without its
+    /// own image gets the studio grey with a number sign in the accent colour.
     var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            // Image Block (Top)
-            Color.studioHeaderGray
-                .aspectRatio(2.2, contentMode: .fit)
-                .overlay(
-                    Group {
-                        if hasCustomImage {
-                            TagImageView(tag: tag)
-                        } else {
-                            Image(systemName: "number")
-                                .font(.system(size: 32, weight: .bold))
-                                .foregroundColor(appearanceManager.tintColor)
-                        }
-                    }
-                )
-                .clipped()
-
-            // Name & Count Area (Below)
-            HStack(spacing: 8) {
-                Text(tag.name)
-                    .font(.subheadline)
-                    .fontWeight(.bold)
-                    .foregroundColor(.primary)
-                    .lineLimit(1)
-
-                Spacer()
-
-                HStack(spacing: 8) {
-                    if let sceneCount = tag.sceneCount, sceneCount > 0 {
-                        HStack(spacing: 3) {
-                            Image(systemName: "film")
-                                .font(.system(size: 10))
-                            Text("\(sceneCount)")
-                                .font(.system(size: 11, weight: .medium))
-                        }
-                    }
-                    if let galleryCount = tag.galleryCount, galleryCount > 0 {
-                        HStack(spacing: 3) {
-                            Image(systemName: "photo.stack")
-                                .font(.system(size: 10))
-                            Text("\(galleryCount)")
-                                .font(.system(size: 11, weight: .medium))
-                        }
+        Color.clear
+            .aspectRatio(4 / 3, contentMode: .fit)
+            .overlay(
+                Group {
+                    if hasCustomImage {
+                        TagImageView(tag: tag)
+                    } else {
+                        Rectangle()
+                            .fill(Color.studioHeaderGray(for: appearanceManager.currentTheme))
+                            .overlay(
+                                Image(systemName: "number")
+                                    .font(.system(size: 34, weight: .bold))
+                                    .foregroundColor(appearanceManager.tintColor)
+                                    .padding(.bottom, 24)
+                                    .accessibilityHidden(true)
+                            )
                     }
                 }
-                .foregroundColor(.secondary)
-                .layoutPriority(1)
+            )
+            .clipped()
+            .overlay(alignment: .bottom) {
+                LinearGradient(colors: [.clear, .black.opacity(0.8)], startPoint: .top, endPoint: .bottom)
+                    .frame(height: 72)
+                    .allowsHitTesting(false)
             }
-            .padding(.horizontal, 10)
-            .padding(.vertical, 8)
-        }
-        .background(Color.secondaryAppBackground)
-        .clipShape(RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.card))
-        .cardShadow()
+            .overlay(alignment: .topTrailing) {
+                HStack(spacing: 4) {
+                    if let sceneCount = tag.sceneCount, sceneCount > 0 {
+                        CatalogCardCountPill(icon: "film", count: sceneCount, noun: "scene")
+                    }
+                    if let galleryCount = tag.galleryCount, galleryCount > 0 {
+                        CatalogCardCountPill(icon: "photo.stack", count: galleryCount, noun: "gallery")
+                    }
+                }
+                .padding(8)
+            }
+            .overlay(alignment: .bottomLeading) {
+                Text(tag.name)
+                    .font(.headline)
+                    .foregroundColor(.white)
+                    .lineLimit(2)
+                    .multilineTextAlignment(.leading)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(12)
+            }
+            .background(Color.secondaryAppBackground)
+            .clipShape(RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.card))
+            .contentShape(RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.card))
+            .cardShadow()
+            .dynamicTypeSize(...DynamicTypeSize.xxLarge)
     }
 }
 

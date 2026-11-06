@@ -772,6 +772,8 @@ private struct StudiosViewContent: View {
 /// gerastert, dann aus dem Cache. Kein WebView, kein eigener Request.
 struct StudioImageView: View {
     let studio: Studio
+    /// The catalog card prints the name itself, so its placeholder shows only the symbol.
+    var showsNameInPlaceholder: Bool = true
     @State private var imageLoadState: ImageLoadState = .loading
 
     enum ImageLoadState {
@@ -816,11 +818,13 @@ struct StudioImageView: View {
                     Image(systemName: "building.2")
                         .font(.largeTitle)
                         .foregroundColor(.secondary)
-                    Text(studio.name)
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                        .lineLimit(1)
-                        .padding(.horizontal, 4)
+                    if showsNameInPlaceholder {
+                        Text(studio.name)
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                            .lineLimit(1)
+                            .padding(.horizontal, 4)
+                    }
                 }
             )
     }
@@ -897,69 +901,78 @@ struct StudioCardView: View {
     @ObservedObject private var studioCounts = StudioCountsStore.shared
     @AppStorage(StudioCountsStore.includeSubStudiosKey) private var includeSubStudios = false
 
+    /// Same build as the gallery and performer cards: one surface, counts as glass pills at the
+    /// top, the name over the bottom edge. A logo is never cropped, so it sits centred on the
+    /// studio grey between the pills and the name instead of filling the card.
     var body: some View {
         let counts = studioCounts.display(for: studio, includeSubStudios: includeSubStudios)
-        VStack(alignment: .leading, spacing: 0) {
-            // Logo Block (Top)
-            Color.studioHeaderGray(for: appearance.currentTheme)
-                .aspectRatio(2.2, contentMode: .fit)
-                .overlay(
-                    // Logos ran edge to edge; wordmarks in particular need breathing room.
-                    StudioImageView(studio: studio)
-                        .padding(.horizontal, 14)
-                        .padding(.top, 12)
-                )
-                .clipped()
-            
-            // Name & Info Area (Below)
-            HStack(spacing: 8) {
-                Text(studio.name)
-                    .font(.subheadline)
-                    .fontWeight(.bold)
-                    .foregroundColor(.primary)
-                    .lineLimit(1)
-                
-                Spacer()
-                
-                HStack(spacing: 8) {
-                    // Scenes
-                    HStack(spacing: 3) {
-                        Image(systemName: "film")
-                            .font(.system(size: 10))
-                        Text("\(counts.scenes)")
-                            .font(.system(size: 11, weight: .medium))
-                    }
-                    
-                    // Galleries
+        Color.studioHeaderGray(for: appearance.currentTheme)
+            .aspectRatio(4 / 3, contentMode: .fit)
+            .overlay(
+                StudioImageView(studio: studio, showsNameInPlaceholder: false)
+                    .padding(.horizontal, 16)
+                    .padding(.top, 40)
+                    .padding(.bottom, 50)
+            )
+            .overlay(alignment: .topTrailing) {
+                HStack(spacing: 4) {
+                    CatalogCardCountPill(icon: "film", count: counts.scenes, noun: "scene")
                     if let galleryCount = counts.galleries, galleryCount > 0 {
-                        HStack(spacing: 3) {
-                            Image(systemName: "photo.stack")
-                                .font(.system(size: 10))
-                            Text("\(galleryCount)")
-                                .font(.system(size: 11, weight: .medium))
-                        }
+                        CatalogCardCountPill(icon: "photo.stack", count: galleryCount, noun: "gallery")
                     }
-
-                    // O Count (Stash 0.32+)
+                    // O count (Stash 0.32+)
                     if let oCount = counts.oCount, oCount > 0 {
-                        HStack(spacing: 3) {
-                            Image(systemName: appearance.oCounterIcon)
-                                .font(.system(size: 10))
-                            Text("\(oCount)")
-                                .font(.system(size: 11, weight: .medium))
-                        }
+                        CatalogCardCountPill(icon: appearance.oCounterIcon, count: oCount, noun: "O")
                     }
                 }
-                .foregroundColor(.secondary)
-                .layoutPriority(1) // Ensure counts get space first
+                .padding(8)
             }
-            .padding(.horizontal, 10)
-            .padding(.vertical, 8)
+            .overlay(alignment: .bottomLeading) {
+                Text(studio.name)
+                    .font(.headline)
+                    .foregroundColor(.white)
+                    .lineLimit(2)
+                    .multilineTextAlignment(.leading)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(12)
+            }
+            .clipShape(RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.card))
+            .contentShape(RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.card))
+            .cardShadow()
+            .dynamicTypeSize(...DynamicTypeSize.xxLarge)
+            .task(id: studio.id) { studioCounts.request(studio.id) }
+    }
+}
+
+/// Count badge on a catalog card (studios, tags): glass capsule, white symbol and number,
+/// read by VoiceOver as "12 scenes".
+struct CatalogCardCountPill: View {
+    let icon: String
+    let count: Int
+    /// Singular noun for VoiceOver; "gallery" becomes "galleries".
+    let noun: String
+
+    private var spokenLabel: String {
+        guard count != 1 else { return "1 \(noun)" }
+        if noun.hasSuffix("y") { return "\(count) \(noun.dropLast())ies" }
+        if noun == "O" { return "\(count) O" }
+        return "\(count) \(noun)s"
+    }
+
+    var body: some View {
+        HStack(spacing: 3) {
+            Image(systemName: icon)
+                .font(.caption2.weight(.bold))
+            Text("\(count)")
+                .font(.caption.weight(.semibold))
+                .monospacedDigit()
         }
-        .background(Color.secondaryAppBackground(for: appearance.currentTheme))
-        .clipShape(RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.card))
-        .cardShadow()
-        .task(id: studio.id) { studioCounts.request(studio.id) }
+        .foregroundColor(.white)
+        .padding(.horizontal, 8)
+        .padding(.vertical, 4)
+        .stashyGlass(shape: Capsule())
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(spokenLabel)
     }
 }
 
