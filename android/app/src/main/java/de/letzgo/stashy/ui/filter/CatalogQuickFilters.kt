@@ -85,7 +85,12 @@ fun Modifier.bleedHorizontally(horizontal: Dp): Modifier = layout { measurable, 
  * active) a removable chip for the selected saved filter / preset and one per criterion.
  */
 @Composable
-fun CatalogListQuickBar(controller: CatalogController<*>, modifier: Modifier = Modifier) {
+fun CatalogListQuickBar(
+    controller: CatalogController<*>,
+    modifier: Modifier = Modifier,
+    /** Home breadcrumb: the settings button and sort live in the strip; only the chips row here. */
+    chipsOnly: Boolean = false,
+) {
     val mode = controller.mode
     val sort = controller.sort
     val document = controller.criteria
@@ -111,7 +116,7 @@ fun CatalogListQuickBar(controller: CatalogController<*>, modifier: Modifier = M
         // The settings button is pinned at the leading edge; only the sort pills scroll. The 12 dp
         // gap sits outside the scroll area (like Merge Scenes' template row), so pills scrolled
         // left are cut off 12 dp from the button instead of sliding up to it.
-        Row(
+        if (!chipsOnly) Row(
             Modifier.fillMaxWidth().padding(start = ToolsTokens.contentPadding),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(12.dp),

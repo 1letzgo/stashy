@@ -127,6 +127,8 @@ data class CatalogSelectionChrome(
  */
 object CatalogTopActions {
     var slots by mutableStateOf<CatalogSlots?>(null)
+    /** The open catalog root's controller while the Home breadcrumb shows its sort and settings ([HomeBreadcrumbStrip]). */
+    var controller by mutableStateOf<CatalogController<*>?>(null)
     internal var owner: Any? = null
 
     val hasActions: Boolean get() = slots?.let { it.quickFilter != null || it.contextual != null || it.filterSort != null || it.selection?.isActive == true } == true
@@ -270,8 +272,17 @@ fun <T> CatalogScaffold(
     // All slots → right-pinned icons in the Home tab strip.
     val token = remember { Any() }
     val published = if (showBar) slots else null
-    SideEffect { CatalogTopActions.owner = token; CatalogTopActions.slots = published }
-    DisposableEffect(token) { onDispose { if (CatalogTopActions.owner === token) { CatalogTopActions.owner = null; CatalogTopActions.slots = null } } }
+    // Home breadcrumb: sort menu and settings button move from the quick bar into the strip.
+    val inBreadcrumb = LocalHomeBreadcrumb.current && showsQuickBar
+    val publishedController = if (inBreadcrumb && hasServer) controller else null
+    SideEffect { CatalogTopActions.owner = token; CatalogTopActions.slots = published; CatalogTopActions.controller = publishedController }
+    DisposableEffect(token) {
+        onDispose {
+            if (CatalogTopActions.owner === token) {
+                CatalogTopActions.owner = null; CatalogTopActions.slots = null; CatalogTopActions.controller = null
+            }
+        }
+    }
     Box(Modifier.fillMaxSize().background(p.background)) {
         when {
             !hasServer -> StatusPlaceholder(SF.server, "Server not reachable", "Retry Connection", { controller.refresh() })
@@ -327,8 +338,11 @@ private fun QuickBarAbove(controller: CatalogController<*>, topPadding: Dp, cont
 @Composable
 private fun QuickBarAbove(controller: CatalogController<*>, topPadding: Dp, shown: Boolean, content: @Composable (topPadding: Dp) -> Unit) {
     if (!shown) return content(topPadding)
+    // Home breadcrumb: sort and settings sit in the strip, so only the active-filter chips stay here.
+    val chipsOnly = LocalHomeBreadcrumb.current
+    if (chipsOnly && controller.activePresetName == null && controller.criteria.isEmpty) return content(topPadding)
     Column(Modifier.fillMaxSize().padding(top = topPadding)) {
-        CatalogListQuickBar(controller, Modifier.padding(bottom = de.letzgo.stashy.ui.tools.ToolsTokens.menuBottomPadding))
+        CatalogListQuickBar(controller, Modifier.padding(bottom = de.letzgo.stashy.ui.tools.ToolsTokens.menuBottomPadding), chipsOnly = chipsOnly)
         Box(Modifier.fillMaxWidth().weight(1f)) { content(0.dp) }
     }
 }

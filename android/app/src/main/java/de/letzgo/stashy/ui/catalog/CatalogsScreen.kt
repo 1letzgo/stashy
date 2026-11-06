@@ -57,7 +57,11 @@ fun CatalogsScreen() {
     // Switched off (or stashy+ lost) while it was the open catalog.
     val isMagazineGone = Nav.catalogTab == CatalogTab.Magazine && AppTab.Magazine !in TabManager.visibleCatalogTabs
     LaunchedEffect(isMagazineGone) { if (isMagazineGone) Nav.catalogTab = CatalogTab.Dashboard }
+    val tabs = sortedVisibleTabs(Nav.catalogTab)
+    // iOS Home breadcrumb: a catalog (not the dashboard) moves its sort and settings into the strip.
+    val breadcrumb = Nav.catalogTab != CatalogTab.Dashboard && !isMagazineGone && tabs.size > 1
     Box(Modifier.fillMaxSize().background(p.background)) {
+        androidx.compose.runtime.CompositionLocalProvider(LocalHomeBreadcrumb provides breadcrumb) {
         when (if (isMagazineGone) CatalogTab.Dashboard else Nav.catalogTab) {
             CatalogTab.Dashboard -> DashboardScreen()
             CatalogTab.Scenes -> ScenesCatalog()
@@ -70,10 +74,13 @@ fun CatalogsScreen() {
             CatalogTab.Markers -> MarkersCatalog()
             CatalogTab.Magazine -> de.letzgo.stashy.ui.tools.magazine.MagazineCatalog()
         }
-        val tabs = sortedVisibleTabs(Nav.catalogTab)
+        }
+        // iOS: the dashboard shows Home + every library view as icons; a catalog the breadcrumb
+        // (Home › views menu, sort and settings at the right).
+        if (breadcrumb) HomeBreadcrumbStrip(tabs)
         // iOS `showTabSwitcher`: only with more than one catalog — on Android the strip also
         // carries the catalog's settings button (filter & sort), so it stays for that.
-        if (tabs.size > 1 || CatalogTopActions.hasActions) TopNavStrip(tabs)
+        else if (tabs.size > 1 || CatalogTopActions.hasActions) TopNavStrip(tabs)
     }
 }
 
