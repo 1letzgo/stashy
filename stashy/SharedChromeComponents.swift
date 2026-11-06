@@ -367,6 +367,106 @@ enum StashyChromePlacement {
     }
 }
 
+#if os(iOS)
+/// The iPad tab bar floats over the top of each tab, and the tab's safe area normally makes room for
+/// it. Now and then (seen on iPadOS 26) that room is missing and the section bar lands in the tab
+/// bar's row, half hidden behind it. This measures the visible tab bar of the bar's own tab bar
+/// controller and reports how far the bar has to move down; zero whenever the safe area is right.
+/// It measures the top of the whole bar, which the clearance does not move, so it never feeds back.
+struct TabBarClearanceProbe: UIViewRepresentable {
+    @Binding var clearance: CGFloat
+
+    func makeUIView(context: Context) -> ProbeView {
+        let view = ProbeView()
+        view.isUserInteractionEnabled = false
+        view.onChange = { value in
+            if abs(clearance - value) > 0.5 { clearance = value }
+        }
+        return view
+    }
+
+    func updateUIView(_ uiView: ProbeView, context: Context) {
+        uiView.onChange = { value in
+            if abs(clearance - value) > 0.5 { clearance = value }
+        }
+    }
+
+    final class ProbeView: UIView {
+        var onChange: ((CGFloat) -> Void)?
+        private weak var tabBar: UIView?
+        private var timer: Timer?
+        private static let gap: CGFloat = 8
+
+        override func didMoveToWindow() {
+            super.didMoveToWindow()
+            timer?.invalidate()
+            timer = nil
+            tabBar = nil
+            guard window != nil else { return }
+            check()
+            // The broken case never relayouts this view, so look again now and then. Cheap: two
+            // frame conversions once the tab bar is cached.
+            let timer = Timer(timeInterval: 1, repeats: true) { [weak self] _ in self?.check() }
+            RunLoop.main.add(timer, forMode: .common)
+            self.timer = timer
+        }
+
+        override func layoutSubviews() {
+            super.layoutSubviews()
+            check()
+        }
+
+        private func check() {
+            guard let window, traitCollection.userInterfaceIdiom == .pad,
+                  let bar = tabBar ?? findTabBar() else {
+                report(0)
+                return
+            }
+            tabBar = bar
+            guard bar.window === window, !bar.isHidden, bar.alpha > 0.01 else {
+                report(0)
+                return
+            }
+            let barFrame = bar.convert(bar.bounds, to: window)
+            let myFrame = convert(bounds, to: window)
+            // Only a tab bar at the top, sharing columns with this bar.
+            guard barFrame.minY < window.bounds.midY,
+                  barFrame.maxX > myFrame.minX, barFrame.minX < myFrame.maxX else {
+                report(0)
+                return
+            }
+            report(max(0, (barFrame.maxY + Self.gap - myFrame.minY).rounded()))
+        }
+
+        private func report(_ value: CGFloat) {
+            onChange?(value)
+        }
+
+        /// The floating tab bar of the tab bar controller this view lives in. A full-screen cover or
+        /// a sheet has none, so their bars are never moved.
+        private func findTabBar() -> UIView? {
+            var responder: UIResponder? = self
+            var controller: UIViewController?
+            while let next = responder?.next {
+                if let vc = next as? UIViewController { controller = vc; break }
+                responder = next
+            }
+            guard let root = controller?.tabBarController?.view else { return nil }
+            return Self.firstView(in: root) { String(describing: type(of: $0)).hasSuffix("FloatingTabBar") }
+        }
+
+        private static func firstView(in view: UIView, depth: Int = 0, where match: (UIView) -> Bool) -> UIView? {
+            if match(view) { return view }
+            guard depth < 30 else { return nil }
+            for sub in view.subviews {
+                if let found = firstView(in: sub, depth: depth + 1, where: match) { return found }
+            }
+            return nil
+        }
+    }
+}
+#endif
+
 /// Section dock (Home / Tools / Settings) with divider on the correct side for top vs bottom placement.
 ///
 /// `isOpaque` adds a solid fill under the `.bar` material for sheets, where the presenting view would
@@ -375,6 +475,8 @@ enum StashyChromePlacement {
 struct StashySectionChromeBar<Content: View>: View {
     var isOpaque: Bool = false
     @ViewBuilder var content: () -> Content
+    /// Room left for the iPad tab bar when the safe area forgot it (see `TabBarClearanceProbe`).
+    @State private var tabBarClearance: CGFloat = 0
 
     var body: some View {
         VStack(spacing: 0) {
@@ -382,10 +484,18 @@ struct StashySectionChromeBar<Content: View>: View {
                 Divider().overlay(Color.white.opacity(0.15))
                 content()
             } else {
+                Color.clear.frame(height: tabBarClearance)
                 content()
                 Divider().overlay(Color.white.opacity(0.15))
             }
         }
+        #if os(iOS)
+        .background {
+            if !StashyChromePlacement.prefersBottom {
+                TabBarClearanceProbe(clearance: $tabBarClearance)
+            }
+        }
+        #endif
         .background {
             if isOpaque {
                 Color(UIColor.secondarySystemGroupedBackground)
