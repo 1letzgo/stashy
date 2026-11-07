@@ -100,6 +100,8 @@ class GroupDetailScreen(val groupId: String, val preview: StashGroup? = null) : 
         g.subGroupCount?.takeIf { it > 0 }?.let { items += DetailItem("SUB-GROUPS", "$it") }
         val thumb = groupThumbnailURL(g)?.takeIf { g.frontImagePath?.contains("default=true") != true }
         val full = g.frontImageURL
+        var fullscreen by remember { mutableStateOf<HeroImageFullscreenItem?>(null) }
+        fullscreen?.let { HeroImageFullscreen(it) { fullscreen = null } }
         DetailHeroCard(
             title = g.name,
             // iOS shows no aliases in the header (URLs are never shown); they appear only expanded here.
@@ -110,7 +112,7 @@ class GroupDetailScreen(val groupId: String, val preview: StashGroup? = null) : 
             onToggle = { expanded = !expanded },
             hero = if (thumb != null && full != null) {
                 DetailHero(
-                    DetailHero.Style.Cover, thumb, Color.Black, "Open cover", { Nav.push(HeroPictureViewerScreen(full, g.name)) },
+                    DetailHero.Style.Cover, thumb, Color.Black, "Open cover", { fullscreen = HeroImageFullscreenItem(full, g.name) },
                     backdropAlignment = HeroPortraitBias,
                 ) { HeroPicture(thumb, g.name, ContentScale.Crop, rectangleStackIcon(), alignment = HeroPortraitBias) }
             } else DetailHero(DetailHero.Style.Cover, null, Color.Black, "Open cover", null) { HeroPlaceholder(rectangleStackIcon()) },

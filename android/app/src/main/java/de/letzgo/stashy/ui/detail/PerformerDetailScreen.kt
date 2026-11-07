@@ -263,6 +263,8 @@ class PerformerDetailScreen(val performerId: String, val preview: Performer? = n
         val url = p?.let { performerThumbnailURL(it.id, it.imagePath) }
         val disambiguation = p?.disambiguation?.takeIf { it.isNotBlank() }
         val details = profile?.details?.takeIf { it.isNotBlank() }
+        var fullscreen by remember { mutableStateOf<HeroImageFullscreenItem?>(null) }
+        fullscreen?.let { HeroImageFullscreen(it) { fullscreen = null } }
         DetailHeroCard(
             title = name,
             // iOS shows no disambiguation / details in the header (URLs are never shown); they appear only expanded here.
@@ -273,7 +275,7 @@ class PerformerDetailScreen(val performerId: String, val preview: Performer? = n
             onToggle = { expanded = !expanded },
             hero = url?.let {
                 DetailHero(
-                    DetailHero.Style.Cover, it, Color.Black, "Open image", { Nav.push(HeroPictureViewerScreen(it, name)) },
+                    DetailHero.Style.Cover, it, Color.Black, "Open image", { fullscreen = HeroImageFullscreenItem(it, name) },
                     backdropAlignment = HeroPortraitBias,
                 ) { HeroPicture(it, name, ContentScale.Crop, SF.personFill, alignment = HeroPortraitBias) }
             } ?: DetailHero(DetailHero.Style.Cover, null, Color.Black, "Open image", null) { HeroPlaceholder(SF.personFill) },

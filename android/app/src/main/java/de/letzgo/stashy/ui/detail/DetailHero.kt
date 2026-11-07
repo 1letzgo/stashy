@@ -1,14 +1,28 @@
 package de.letzgo.stashy.ui.detail
 
+import android.net.Uri
 import android.os.Build
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
+import android.view.ViewGroup
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animate
+import androidx.compose.animation.core.spring
+import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.runtime.SideEffect
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.ui.input.pointer.util.VelocityTracker
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
+import androidx.compose.ui.window.DialogWindowProvider
+import androidx.core.view.WindowCompat
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.launch
+import kotlin.math.hypot
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.gestures.detectTapGestures
-import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
@@ -29,7 +43,6 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -59,8 +72,6 @@ import coil3.compose.AsyncImage
 import coil3.compose.SubcomposeAsyncImage
 import de.letzgo.stashy.ui.Appearance
 import de.letzgo.stashy.ui.IosTypography
-import de.letzgo.stashy.ui.NativeTopBar
-import de.letzgo.stashy.ui.Screen
 import de.letzgo.stashy.ui.StashyColors
 import de.letzgo.stashy.ui.Theme
 
@@ -334,51 +345,127 @@ internal fun HeroPicture(
 }
 
 /**
- * Fullscreen view of a header picture that is not a Stash image (tag image, studio logo): the
- * whole picture fit on [background], pinch / double-tap zoom, tap toggles the back bar.
+ * iOS `HeroImageFullscreenItem`: a header picture to show full screen (performer portrait, studio
+ * logo, group cover, tag image). [url] is the full-size image: the header loads a resized copy
+ * (`width` / `height` / `size` query items), the viewer drops them so zooming shows the original;
+ * everything else (api key, cache busters) stays. Logos pass their [background] and [inset].
  */
-internal class HeroPictureViewerScreen(
-    val url: String,
+internal class HeroImageFullscreenItem(
+    url: String,
     val title: String,
     val background: Color = Color.Black,
-    /** Logos get breathing room around them. */
+    /** Logos get breathing room around them (fitted, never cropped). */
     val inset: Boolean = false,
-) : Screen {
-    override val key = "hero-picture-$url"
-    override val hidesTabBar = true
+) {
+    val url: String = fullSizeImageURL(url)
+}
 
-    @Composable
-    override fun Content() {
-        var showUI by remember { mutableStateOf(true) }
-        de.letzgo.stashy.ui.DarkSurfaceBehindSystemBars()
-        var scale by remember { mutableFloatStateOf(1f) }
-        var offset by remember { mutableStateOf(Offset.Zero) }
+/** [url] without the resize query items (`width`, `height`, `size`); the rest keeps its exact encoding. */
+internal fun fullSizeImageURL(url: String): String {
+    val q = url.indexOf('?')
+    if (q < 0) return url
+    val hash = url.indexOf('#', q).let { if (it < 0) url.length else it }
+    val resize = setOf("width", "height", "size")
+    val kept = url.substring(q + 1, hash).split('&').filter { item ->
+        item.isNotEmpty() && Uri.decode(item.substringBefore('=')).lowercase() !in resize
+    }
+    val base = url.substring(0, q)
+    return (if (kept.isEmpty()) base else base + "?" + kept.joinToString("&")) + url.substring(hash)
+}
+
+/**
+ * iOS `RemoteHeroImageFullscreen` (`.fullScreenCover`): [item] in a full-window dialog over the
+ * detail page (no dim, so the page shows through while a swipe fades the background). The
+ * picture is fitted (never cropped). Back, tap, ✕ or a swipe close it via [onDismiss].
+ */
+@Composable
+internal fun HeroImageFullscreen(item: HeroImageFullscreenItem, onDismiss: () -> Unit) {
+    Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false)) {
+        val dialogView = LocalView.current
+        SideEffect {
+            (dialogView.parent as? DialogWindowProvider)?.window?.let { w ->
+                w.setLayout(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT)
+                w.setDimAmount(0f)
+                WindowCompat.getInsetsController(w, w.decorView).apply {
+                    isAppearanceLightStatusBars = false
+                    isAppearanceLightNavigationBars = false
+                }
+            }
+        }
+        DetailHeroFullscreenViewer(item.background, onDismiss) {
+            Box(Modifier.fillMaxSize().padding(if (item.inset) 32.dp else 0.dp)) {
+                HeroPicture(item.url, item.title, ContentScale.Fit, de.letzgo.stashy.ui.SF.photo)
+            }
+        }
+    }
+}
+
+/**
+ * iOS `DetailHeroFullscreenViewer`: [background] (black for pictures), pinch / double-tap zoom
+ * ([ZoomableBox]), tap or the ✕ closes. Swipe to close: the picture follows the finger and
+ * shrinks a little while the background fades; released past 120dp or with a fast fling it
+ * closes, otherwise it springs back. While zoomed a drag pans the picture instead.
+ */
+@Composable
+internal fun DetailHeroFullscreenViewer(
+    background: Color,
+    onDismiss: () -> Unit,
+    content: @Composable () -> Unit,
+) {
+    val density = LocalDensity.current
+    val closeDistance = with(density) { 120.dp.toPx() }
+    val closeSpeed = with(density) { 1000.dp.toPx() }
+    val fadeDistance = with(density) { 300.dp.toPx() }
+    var zoomed by remember { mutableStateOf(false) }
+    var drag by remember { mutableStateOf(Offset.Zero) }
+    val scope = rememberCoroutineScope()
+    var springBack by remember { mutableStateOf<Job?>(null) }
+    val progress = (drag.getDistance() / fadeDistance).coerceIn(0f, 1f)
+    fun settle() {
+        val start = drag
+        springBack = scope.launch {
+            animate(1f, 0f, animationSpec = spring(stiffness = Spring.StiffnessMediumLow)) { f, _ -> drag = start * f }
+        }
+    }
+    Box(Modifier.fillMaxSize()) {
+        Box(Modifier.fillMaxSize().graphicsLayer { alpha = 1f - progress * 0.7f }.background(background))
         Box(
-            Modifier.fillMaxSize().background(background)
+            Modifier.fillMaxSize()
+                // Gets single-finger drags the zoom box passes through (not zoomed); pinches
+                // and pans while zoomed are consumed there and cancel this.
                 .pointerInput(Unit) {
-                    detectTransformGestures { _, pan, zoom, _ ->
-                        scale = (scale * zoom).coerceIn(1f, 6f)
-                        offset = if (scale == 1f) Offset.Zero else offset + pan
+                    val tracker = VelocityTracker()
+                    detectDragGestures(
+                        onDragStart = { springBack?.cancel(); tracker.resetTracking() },
+                        onDragEnd = {
+                            val v = tracker.calculateVelocity()
+                            if (drag.getDistance() > closeDistance || hypot(v.x, v.y) > closeSpeed) onDismiss() else settle()
+                        },
+                        onDragCancel = { settle() },
+                    ) { change, amount ->
+                        if (zoomed) return@detectDragGestures
+                        change.consume()
+                        tracker.addPosition(change.uptimeMillis, change.position)
+                        drag += amount
                     }
                 }
-                .pointerInput(Unit) {
-                    detectTapGestures(
-                        onTap = { showUI = !showUI },
-                        onDoubleTap = {
-                            if (scale > 1f) { scale = 1f; offset = Offset.Zero } else scale = 2.5f
-                        },
-                    )
+                .graphicsLayer {
+                    translationX = drag.x
+                    translationY = drag.y
+                    val s = 1f - progress * 0.15f
+                    scaleX = s
+                    scaleY = s
                 },
         ) {
-            Box(
-                Modifier.fillMaxSize().padding(if (inset) 32.dp else 0.dp)
-                    .graphicsLayer { scaleX = scale; scaleY = scale; translationX = offset.x; translationY = offset.y },
-            ) {
-                HeroPicture(url, title, ContentScale.Fit, de.letzgo.stashy.ui.SF.photo)
-            }
-            AnimatedVisibility(showUI, enter = fadeIn(), exit = fadeOut(), modifier = Modifier.align(Alignment.TopStart)) {
-                NativeTopBar(title, transparent = true)
-            }
+            ZoomableBox(onTap = onDismiss, onZoomChange = { zoomed = it }) { content() }
+        }
+        Box(
+            Modifier.align(Alignment.TopEnd).statusBarsPadding().padding(16.dp).size(36.dp)
+                .clip(CircleShape).background(Color.Black.copy(alpha = 0.5f))
+                .clickable(onClickLabel = "Close", onClick = onDismiss),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(de.letzgo.stashy.ui.SF.xmark, "Close", tint = Color.White, modifier = Modifier.size(18.dp))
         }
     }
 }

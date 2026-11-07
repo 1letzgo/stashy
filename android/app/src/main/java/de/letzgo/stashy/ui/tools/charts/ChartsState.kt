@@ -4,6 +4,8 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.graphics.vector.ImageVector
+import de.letzgo.stashy.ui.SF
 import de.letzgo.stashy.data.Page
 import de.letzgo.stashy.data.Performer
 import de.letzgo.stashy.data.Scene
@@ -213,8 +215,8 @@ class TopListsViewModel {
 }
 
 /** iOS: `TopListsToolsContainerView.Section`. */
-enum class ChartsSection(val title: String) {
-    Scenes("Scenes"), Performers("Performers"), Studios("Studios"), Tags("Tags"),
+enum class ChartsSection(val title: String, val icon: ImageVector) {
+    Scenes("Scenes", SF.film), Performers("Performers", SF.person2), Studios("Studios", SF.building2), Tags("Tags", SF.tag),
 }
 
 /** Process-wide state of Tools › Charts (survives switching tools). */

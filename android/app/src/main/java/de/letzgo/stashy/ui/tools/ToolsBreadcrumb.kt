@@ -168,6 +168,37 @@ fun ToolsRowMenu(
     }
 }
 
+/** iOS: `ToolsRowMenuOption` — one choice of a tool's section menu (Charts' Scenes / Performers …). */
+class ToolsRowMenuOption<T>(val value: T, val title: String, val icon: ImageVector)
+
+/**
+ * iOS: `ToolsRowPickerMenu` — a tool's section switch as a menu in the Tools row (it was a pill
+ * row above the content): the current section's icon collapsed, every section with icon, title
+ * and checkmark open. [onSelect] only fires for a different value; haptics are the caller's.
+ */
+@Composable
+fun <T> ToolsRowPickerMenu(
+    title: String,
+    options: List<ToolsRowMenuOption<T>>,
+    selection: T,
+    enabled: Boolean = true,
+    onSelect: (T) -> Unit,
+) {
+    val current = options.firstOrNull { it.value == selection }
+    ToolsRowMenu(
+        icon = current?.icon ?: SF.squareGrid2x2,
+        accessibilityLabel = "$title, ${current?.title.orEmpty()}",
+        enabled = enabled,
+    ) { dismiss ->
+        options.forEach { option ->
+            ToolsMenuItem(option.title, option.icon, checked = option.value == selection) {
+                dismiss()
+                if (option.value != selection) onSelect(option.value)
+            }
+        }
+    }
+}
+
 /** Menu item colours: text, icon and checkmark in the normal content colour, never the accent. */
 @Composable
 fun toolsMenuItemColors(): MenuItemColors {

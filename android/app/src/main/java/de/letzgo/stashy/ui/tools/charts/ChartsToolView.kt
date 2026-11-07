@@ -83,34 +83,30 @@ import de.letzgo.stashy.ui.tools.NoServerPlaceholder
 import de.letzgo.stashy.ui.tools.ToolsBreadcrumbChrome
 import de.letzgo.stashy.ui.tools.ToolsMenuItem
 import de.letzgo.stashy.ui.tools.ToolsRowMenu
+import de.letzgo.stashy.ui.tools.ToolsRowMenuOption
+import de.letzgo.stashy.ui.tools.ToolsRowPickerMenu
 import de.letzgo.stashy.ui.tools.ToolsTokens
 import de.letzgo.stashy.ui.tools.toolsTopPadding
 import kotlinx.coroutines.launch
 import kotlin.math.roundToInt
 
-/** iOS: `StashyExpandingDock.itemSpacing` / `activeHeight`. */
-private val DockItemSpacing = 10.dp
-private val DockActiveHeight = 40.dp
 /** iOS: `DesignTokens.Opacity.placeholder`. */
 private const val PlaceholderOpacity = 0.1f
 
 /**
- * iOS: `TopListsToolsContainerView` — Tools › Charts: a pill row (Scenes · Performers · Studios ·
- * Tags) above the ranked list of the selected category; the metric menu sits at the right of the
- * Tools row. State lives in [ChartsState].
+ * iOS: `TopListsToolsContainerView` — Tools › Charts: the ranked list of the selected category;
+ * the section menu (Scenes · Performers · Studios · Tags) and the metric menu sit at the right of
+ * the Tools row. State lives in [ChartsState].
  */
 @Composable
 fun ChartsToolView() {
     val vm = ChartsState.viewModel
     val section = ChartsState.section
+    val haptics = LocalHapticFeedback.current
     Box(Modifier.fillMaxSize().background(Theme.palette.background)) {
         Column(Modifier.fillMaxSize()) {
-            Spacer(Modifier.height(toolsTopPadding()))
-            ChartsPillMenuRow(
-                items = ChartsSection.entries.map { it to it.title },
-                selected = section,
-                onSelect = { ChartsState.section = it },
-            )
+            // The top bar plus the air the section pills used to give (they moved into the Tools row).
+            Spacer(Modifier.height(toolsTopPadding() + ToolsTokens.menuTopPadding))
             Box(Modifier.weight(1f).fillMaxWidth()) {
                 key(section) {
                     when (section) {
@@ -122,13 +118,24 @@ fun ChartsToolView() {
                 }
             }
         }
-        // iOS: `toolsBreadcrumbChrome { metricMenu }` — the ranking metric sits in the Tools row.
+        // iOS: `toolsBreadcrumbChrome { sectionMenu; metricMenu }` — section and ranking metric
+        // sit in the Tools row. A section switch only swaps the list (no back-stack reset).
         ToolsBreadcrumbChrome {
-            when (section) {
-                ChartsSection.Scenes -> TopListsMetricMenu(vm.scenes)
-                ChartsSection.Performers -> TopListsMetricMenu(vm.performers)
-                ChartsSection.Studios -> TopListsMetricMenu(vm.studios)
-                ChartsSection.Tags -> TopListsMetricMenu(vm.tags)
+            Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
+                ToolsRowPickerMenu(
+                    title = "Charts list",
+                    options = ChartsSection.entries.map { ToolsRowMenuOption(it, it.title, it.icon) },
+                    selection = section,
+                ) {
+                    haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                    ChartsState.section = it
+                }
+                when (section) {
+                    ChartsSection.Scenes -> TopListsMetricMenu(vm.scenes)
+                    ChartsSection.Performers -> TopListsMetricMenu(vm.performers)
+                    ChartsSection.Studios -> TopListsMetricMenu(vm.studios)
+                    ChartsSection.Tags -> TopListsMetricMenu(vm.tags)
+                }
             }
         }
     }
@@ -314,57 +321,6 @@ private fun <M : TopListsMetric, T> TopListSection(
                 }
             }
         }
-    }
-}
-
-/** iOS: `ToolsPillMenuRow` — equally wide capsules, tinted when selected. */
-@Composable
-private fun <K> ChartsPillMenuRow(items: List<Pair<K, String>>, selected: K, onSelect: (K) -> Unit) {
-    val haptics = LocalHapticFeedback.current
-    Row(
-        Modifier.fillMaxWidth()
-            .padding(start = ToolsTokens.contentPadding, end = ToolsTokens.contentPadding, top = ToolsTokens.menuTopPadding, bottom = ToolsTokens.menuBottomPadding),
-        horizontalArrangement = Arrangement.spacedBy(DockItemSpacing),
-    ) {
-        items.forEach { (id, title) ->
-            val isSelected = id == selected
-            CapsuleChip(
-                title, isSelected, DockActiveHeight, IosTypography.subheadline.copy(fontWeight = FontWeight.SemiBold), 6.dp,
-                Modifier.weight(1f),
-            ) {
-                if (!isSelected) {
-                    haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                    onSelect(id)
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun CapsuleChip(
-    title: String,
-    selected: Boolean,
-    height: Dp,
-    style: TextStyle,
-    shadowRadius: Dp,
-    modifier: Modifier,
-    onClick: () -> Unit,
-) {
-    val p = Theme.palette
-    val tint = Appearance.tint
-    val shape = RoundedCornerShape(50)
-    Box(
-        modifier
-            .heightIn(min = height)
-            .let { if (selected) it.shadow(shadowRadius, shape, ambientColor = tint.copy(alpha = 0.35f), spotColor = tint.copy(alpha = 0.35f)) else it }
-            .clip(shape)
-            .background(if (selected) tint else p.secondaryBackground, shape)
-            .noRippleClickable(onClick)
-            .padding(horizontal = 4.dp, vertical = 4.dp),
-        contentAlignment = Alignment.Center,
-    ) {
-        ShrinkingText(title, style, if (selected) Color.White else p.text.copy(alpha = 0.85f), minScale = 0.65f)
     }
 }
 

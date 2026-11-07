@@ -114,13 +114,18 @@ import de.letzgo.stashy.ui.Tokens
 import de.letzgo.stashy.ui.cardShadow
 import de.letzgo.stashy.ui.detail.PerformerDetailScreen
 import de.letzgo.stashy.ui.tools.NoServerPlaceholder
+import de.letzgo.stashy.ui.tools.ToolsBreadcrumbChrome
+import de.letzgo.stashy.ui.tools.ToolsRowMenuOption
+import de.letzgo.stashy.ui.tools.ToolsRowPickerMenu
 import de.letzgo.stashy.ui.tools.ToolsTokens
+import androidx.compose.material.icons.automirrored.filled.TrendingUp
+import androidx.compose.material.icons.filled.EmojiEvents
+import androidx.compose.material.icons.filled.People
+import androidx.compose.material.icons.filled.WorkspacePremium
 import de.letzgo.stashy.ui.tools.toolsTopPadding
 
 // iOS: `HotOrNotToolsView` and its private views (`stashy/HotOrNotToolsView.swift`).
 
-/** iOS: `StashyExpandingDock.activeHeight` / `itemSpacing`. */
-internal val MatchPillSpacing: Dp = 10.dp
 
 /** iOS `HapticManager` counterpart on a [View]. */
 internal fun View.performMatchHaptic(kind: MatchHaptic) {
@@ -142,7 +147,10 @@ private val numberStyle = TextStyle(fontFeatureSettings = "tnum")
 fun MatchToolView() {
     val config = ServerConfigManager.activeConfig
     if (config == null) {
-        NoServerPlaceholder(SF.flame, "Select a server first to use Match.")
+        Box(Modifier.fillMaxSize()) {
+            NoServerPlaceholder(SF.flame, "Select a server first to use Match.")
+            ToolsBreadcrumbChrome()
+        }
         return
     }
     val model: MatchViewModel = viewModel(key = "match-${config.id}")
@@ -167,24 +175,8 @@ fun MatchToolView() {
                     modifier = Modifier.fillMaxWidth().padding(horizontal = ToolsTokens.contentPadding),
                 )
             }
-            MatchPillMenuRow(
-                items = MatchViewModel.Section.entries.map { it.title },
-                selectedIndex = model.section.ordinal,
-                onSelect = { idx ->
-                    view.performMatchHaptic(MatchHaptic.Selection)
-                    model.selectSection(MatchViewModel.Section.entries[idx])
-                },
-            )
-            // Game modes right under the sections, same pills (only while playing).
-            if (model.section == MatchViewModel.Section.Battle) {
-                val modes = MatchDuelMode.entries
-                MatchPillMenuRow(
-                    items = modes.map { it.label },
-                    selectedIndex = modes.indexOf(model.duelMode),
-                    onSelect = { idx -> if (!model.isSubmitting) model.selectDuelMode(modes[idx]) },
-                    topPadding = 0.dp,
-                )
-            }
+            // The air the section pills used to give (they moved into the Tools row).
+            Spacer(Modifier.height(ToolsTokens.menuTopPadding))
             val bottom = bottomBarContentPadding() + if (model.section == MatchViewModel.Section.Battle) bottomChrome else 0.dp
             when (model.section) {
                 MatchViewModel.Section.Battle -> BattleContent(model, hPad, isRegular, bottom)
@@ -206,27 +198,51 @@ fun MatchToolView() {
                 if (model.showsDuelActions) Box(Modifier.padding(bottom = 6.dp)) { DuelActionsRow(model, hPad) }
             }
         }
+        // iOS: `toolsBreadcrumbChrome { sectionMenu; modeMenu }` — Game / Charts / Settings, and the
+        // game mode while playing, at the right of the Tools row (they were pill rows).
+        ToolsBreadcrumbChrome {
+            Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
+                ToolsRowPickerMenu(
+                    title = "Match section",
+                    options = MatchViewModel.Section.entries.map { ToolsRowMenuOption(it, it.title, sectionIcon(it)) },
+                    selection = model.section,
+                ) { section ->
+                    view.performMatchHaptic(MatchHaptic.Selection)
+                    model.selectSection(section)
+                }
+                if (model.section == MatchViewModel.Section.Battle) {
+                    ToolsRowPickerMenu(
+                        title = "Match mode",
+                        options = MatchDuelMode.entries.map { ToolsRowMenuOption(it, it.label, duelModeIcon(it)) },
+                        selection = model.duelMode,
+                        enabled = !model.isSubmitting,
+                    ) { mode ->
+                        if (!model.isSubmitting) {
+                            view.performMatchHaptic(MatchHaptic.Selection)
+                            model.selectDuelMode(mode)
+                        }
+                    }
+                }
+            }
+        }
     }
 }
 
 // MARK: - Chrome
 
-/** iOS: `ToolsPillMenuRow` — equal-width capsules, selected = tint with glow. */
-@Composable
-internal fun MatchPillMenuRow(items: List<String>, selectedIndex: Int, onSelect: (Int) -> Unit, topPadding: Dp = ToolsTokens.menuTopPadding) {
-    Row(
-        Modifier
-            .fillMaxWidth()
-            .padding(horizontal = ToolsTokens.contentPadding)
-            .padding(top = topPadding, bottom = ToolsTokens.menuBottomPadding),
-        horizontalArrangement = Arrangement.spacedBy(MatchPillSpacing),
-    ) {
-        items.forEachIndexed { i, title ->
-            MatchPill(title, selected = i == selectedIndex, modifier = Modifier.weight(1f)) {
-                if (i != selectedIndex) onSelect(i)
-            }
-        }
-    }
+/** iOS: `HotOrNotToolsView.icon(for: Section)`. */
+private fun sectionIcon(section: MatchViewModel.Section): ImageVector = when (section) {
+    MatchViewModel.Section.Battle -> SF.flameFill
+    MatchViewModel.Section.Leaderboard -> SF.listNumber
+    MatchViewModel.Section.Settings -> SF.sliderHorizontal3
+}
+
+/** iOS: `HotOrNotToolsView.icon(for: DuelMode)` — person.2.fill, trophy.fill, chart.line.uptrend.xyaxis, crown.fill. */
+private fun duelModeIcon(mode: MatchDuelMode): ImageVector = when (mode) {
+    MatchDuelMode.HeadToHead -> Icons.Filled.People
+    MatchDuelMode.Bracket -> Icons.Filled.EmojiEvents
+    MatchDuelMode.Placement -> Icons.AutoMirrored.Filled.TrendingUp
+    MatchDuelMode.Champion -> Icons.Filled.WorkspacePremium
 }
 
 /** Pill of `ToolsPillMenuRow` / `hotOrNotDuelModeChip` — Material `FilterChip`, label centred for equal-width rows. */

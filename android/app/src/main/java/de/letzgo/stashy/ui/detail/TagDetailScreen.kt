@@ -159,6 +159,8 @@ class TagDetailScreen(val tagId: String, val preview: Tag? = null, private val f
     @Composable
     private fun Header(t: Tag) {
         val url = t.imageURL?.takeIf { t.hasImage }
+        var fullscreen by remember { mutableStateOf<HeroImageFullscreenItem?>(null) }
+        fullscreen?.let { HeroImageFullscreen(it) { fullscreen = null } }
         DetailHeroCard(
             title = t.name,
             items = DetailFormatting.tag(t, catalog.effectiveScenes, catalog.effectiveGalleries),
@@ -166,7 +168,7 @@ class TagDetailScreen(val tagId: String, val preview: Tag? = null, private val f
             expanded = expanded,
             onToggle = { expanded = !expanded },
             hero = url?.let {
-                DetailHero(DetailHero.Style.Cover, it, Color.Black, "Open image", { Nav.push(HeroPictureViewerScreen(it, t.name)) }) {
+                DetailHero(DetailHero.Style.Cover, it, Color.Black, "Open image", { fullscreen = HeroImageFullscreenItem(it, t.name) }) {
                     HeroPicture(it, t.name, ContentScale.Crop, SF.number)
                 }
             } ?: DetailHero(DetailHero.Style.Cover, null, Color.Black, "Open image", null) { HeroPlaceholder(SF.number) },

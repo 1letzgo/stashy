@@ -158,10 +158,10 @@ private fun ToolsView() {
 }
 
 /**
- * iOS: `ToolsView.toolsWithOwnControls` — tools that put their own control (metric / theme /
- * filter menu) at the right of the Tools row and draw the row themselves ([ToolsBreadcrumbChrome]).
+ * iOS: `ToolsView.toolsWithOwnControls` — tools that put their own controls (section / metric /
+ * theme / mode menu) at the right of the Tools row and draw the row themselves ([ToolsBreadcrumbChrome]).
  */
-private val toolsWithOwnControls = setOf(ToolsTab.TopLists, ToolsTab.RateMe, ToolsTab.Timeline)
+private val toolsWithOwnControls = setOf(ToolsTab.TopLists, ToolsTab.RateMe, ToolsTab.Timeline, ToolsTab.HotOrNot)
 
 /** iOS: `toolPage` + `ToolPageChrome` — the tool with its Tools row. */
 @Composable

@@ -132,6 +132,8 @@ class StudioDetailScreen(val studioId: String, val preview: Studio? = null, priv
     private fun Header(s: Studio) {
         val p = Theme.palette
         val url = s.imageURL?.takeIf { s.hasImage }
+        var fullscreen by remember { mutableStateOf<HeroImageFullscreenItem?>(null) }
+        fullscreen?.let { HeroImageFullscreen(it) { fullscreen = null } }
         DetailHeroCard(
             title = s.name,
             items = DetailFormatting.studio(s, catalog.effectiveScenes.coerceAtLeast(s.sceneCount ?: 0), catalog.effectiveGalleries, de.letzgo.stashy.data.rememberStudioCounts(s, refresh = true)),
@@ -139,7 +141,7 @@ class StudioDetailScreen(val studioId: String, val preview: Studio? = null, priv
             expanded = expanded,
             onToggle = { expanded = !expanded },
             hero = url?.let {
-                DetailHero(DetailHero.Style.Logo, it, p.studioHeader, "Open logo", { Nav.push(HeroPictureViewerScreen(it, s.name, p.studioHeader, inset = true)) }) {
+                DetailHero(DetailHero.Style.Logo, it, p.studioHeader, "Open logo", { fullscreen = HeroImageFullscreenItem(it, s.name, p.studioHeader, inset = true) }) {
                     HeroPicture(it, s.name, ContentScale.Fit, SF.building2)
                 }
             } ?: DetailHero(DetailHero.Style.Cover, null, p.studioHeader, "Open logo", null) { HeroPlaceholder(SF.building2) },

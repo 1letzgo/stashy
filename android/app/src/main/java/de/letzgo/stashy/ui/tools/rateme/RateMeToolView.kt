@@ -114,12 +114,12 @@ import de.letzgo.stashy.ui.tools.ToolsBreadcrumbChrome
 import de.letzgo.stashy.ui.tools.ToolsMenuItem
 import de.letzgo.stashy.ui.tools.ToolsMenuSectionHeader
 import de.letzgo.stashy.ui.tools.ToolsRowMenu
+import de.letzgo.stashy.ui.tools.ToolsRowMenuOption
+import de.letzgo.stashy.ui.tools.ToolsRowPickerMenu
 import de.letzgo.stashy.ui.tools.ToolsTokens
 import de.letzgo.stashy.ui.tools.match.MatchActionButton
 import de.letzgo.stashy.ui.tools.match.MatchLoadingView
 import de.letzgo.stashy.ui.tools.match.MatchPill
-import de.letzgo.stashy.ui.tools.match.MatchPillMenuRow
-import de.letzgo.stashy.ui.tools.match.MatchPillSpacing
 import de.letzgo.stashy.ui.tools.match.MatchUnavailableView
 import de.letzgo.stashy.ui.tools.match.matchCard
 import de.letzgo.stashy.ui.tools.toolsTopPadding
@@ -179,16 +179,8 @@ fun RateMeToolView() {
                     modifier = Modifier.fillMaxWidth().padding(horizontal = ToolsTokens.contentPadding),
                 )
             }
-            MatchPillMenuRow(
-                items = RateMeMode.entries.map { it.label },
-                selectedIndex = model.mode.ordinal,
-                onSelect = { idx ->
-                    if (!model.isSubmitting) {
-                        view.performRateMeHaptic(RateMeHaptic.Selection)
-                        model.selectMode(RateMeMode.entries[idx])
-                    }
-                },
-            )
+            // The air the Scenes / Images pills used to give (they moved into the Tools row).
+            Spacer(Modifier.height(ToolsTokens.menuTopPadding))
             val bottom = bottomBarContentPadding() + if (item != null) bottomChrome else 0.dp
             Content(model, hPad, isRegular, bottom) { showDeleteConfirmation = true }
         }
@@ -205,8 +197,24 @@ fun RateMeToolView() {
                 ActionRow(model, item, hPad)
             }
         }
-        // iOS: `toolsBreadcrumbChrome { themeMenu }` — theme (and media kind) in the Tools row.
-        ToolsBreadcrumbChrome { ThemeMenu(model) { themePicker = it } }
+        // iOS: `toolsBreadcrumbChrome { modeMenu; themeMenu }` — Scenes / Images, then theme (and
+        // media kind) in the Tools row.
+        ToolsBreadcrumbChrome {
+            Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
+                ToolsRowPickerMenu(
+                    title = "RateMe section",
+                    options = RateMeMode.entries.map { ToolsRowMenuOption(it, it.label, ModeIcons.getValue(it)) },
+                    selection = model.mode,
+                    enabled = !model.isSubmitting,
+                ) { mode ->
+                    if (!model.isSubmitting) {
+                        view.performRateMeHaptic(RateMeHaptic.Selection)
+                        model.selectMode(mode)
+                    }
+                }
+                ThemeMenu(model) { themePicker = it }
+            }
+        }
     }
 
     themePicker?.let { kind ->
