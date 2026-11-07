@@ -1351,6 +1351,9 @@ private struct FeedsTimeBarAccessory: View {
                 .opacity(accessory.isUIVisible ? 1 : 0)
                 .allowsHitTesting(accessory.isUIVisible)
                 .animation(.easeInOut(duration: 0.2), value: accessory.isUIVisible)
+                .onChange(of: placement == .inline, initial: true) { _, inline in
+                    if accessory.isInline != inline { accessory.isInline = inline }
+                }
         }
     }
 }

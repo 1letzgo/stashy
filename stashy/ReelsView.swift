@@ -432,6 +432,8 @@ struct ReelsViewBody: View {
     /// Bewusst `@State`, **nicht** `@StateObject`: Der Scrubber tickt mit 10 Hz und soll
     /// `ReelsViewBody` nicht neu rendern. Observiert wird nur in ``IsolatedScrubberBar``.
     @State private var scrubberState = ScrubberState()
+    /// Where the time bar sits in the tab bar slot (full above it, or inline beside it).
+    @ObservedObject private var timeBarAccessory = FeedsScrubberAccessory.shared
     @State private var isInitialized = false
     /// Set once a remount is announced: this instance is about to be replaced and must not
     /// resume or restart playback in the meantime.
@@ -3459,6 +3461,10 @@ struct ReelsViewBody: View {
                 }
                 if !reelsBottomChromeSuppressed {
                     reelsInfoOverlay(currentItem: currentItem)
+                        // The full time bar in the tab bar slot sits right under the tag row; give
+                        // it the 8 pt the in-feed bar had. Inline beside the shrunk tab bar the
+                        // gap is already there.
+                        .padding(.bottom, timeBarAccessory.showsBar && !timeBarAccessory.isInline ? 8 : 0)
                     reelsScrubberBar(currentItem: currentItem)
                 }
             }
@@ -7102,6 +7108,8 @@ final class FeedsScrubberAccessory: ObservableObject {
     @Published var showsBar = false
     /// Feeds' chrome is visible (a tap hides it, and the bar with it).
     @Published var isUIVisible = true
+    /// The slot sits inline beside the shrunk tab bar (set by the accessory view).
+    @Published var isInline = false
 
     /// The slot exists from iOS 26.1; before that the bar stays inside Feeds.
     static var isAvailable: Bool {
