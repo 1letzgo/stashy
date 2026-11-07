@@ -160,21 +160,11 @@ class NavigationCoordinator: ObservableObject {
     /// Do not remount `catalogueTabID` here — a new `NavigationStack` identity zooms
     /// in from the top-left (especially when leaving the Search tab).
     private func switchToCatalogue(_ subTab: String) {
-        #if os(iOS)
-        UIView.setAnimationsEnabled(false)
-        #endif
-        var transaction = Transaction()
-        transaction.disablesAnimations = true
-        withTransaction(transaction) {
-            cataloguePopToken = UUID()
-            catalogueSubTab = subTab
-            selectedTab = .catalogue
-        }
-        #if os(iOS)
-        DispatchQueue.main.async {
-            UIView.setAnimationsEnabled(true)
-        }
-        #endif
+        // Plain state change: with animations switched off (UIView + transaction) the Home stack's
+        // `navigationDestination(isPresented:)` never pushed, so every Home row link went nowhere.
+        cataloguePopToken = UUID()
+        catalogueSubTab = subTab
+        selectedTab = .catalogue
     }
     
     func navigateToScenes(sort: StashDBViewModel.SceneSortOption? = nil, filter: StashDBViewModel.SavedFilter? = nil, search: String = "", noDefaultFilter: Bool = false) {
