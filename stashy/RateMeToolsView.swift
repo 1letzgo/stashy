@@ -863,23 +863,28 @@ struct RateMeToolsView: View {
                     .padding(.horizontal, DesignTokens.Tools.contentPadding)
             }
 
-            ToolsPillMenuRow(
-                items: RateMeViewModel.Mode.allCases.map {
-                    ToolsPillMenuRow.Item(id: $0.rawValue, title: $0.label)
-                },
-                selectionID: model.mode.rawValue,
-                accessibilityLabel: "RateMe section"
-            ) { id in
-                if let mode = RateMeViewModel.Mode(rawValue: id), !model.isSubmitting {
-                    model.mode = mode
-                }
-            }
-
             content
+                // The air the section pills used to give (they moved into the Tools row).
+                .padding(.top, DesignTokens.Tools.menuTopPadding)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(Color.appBackground)
-        .toolsBreadcrumbChrome(toolsBreadcrumb) { themeMenu }
+        .toolsBreadcrumbChrome(toolsBreadcrumb) {
+            HStack(spacing: 6) {
+                ToolsRowPickerMenu(
+                    title: "RateMe section",
+                    options: RateMeViewModel.Mode.allCases.map {
+                        ToolsRowMenuOption(value: $0, title: $0.label, systemImage: $0.emptyIcon)
+                    },
+                    selection: Binding(
+                        get: { model.mode },
+                        set: { if !model.isSubmitting { model.mode = $0 } }
+                    ),
+                    isDisabled: model.isSubmitting
+                )
+                themeMenu
+            }
+        }
         .safeAreaInset(edge: .bottom, spacing: 0) {
             if let item = model.item {
                 actionRow(item)

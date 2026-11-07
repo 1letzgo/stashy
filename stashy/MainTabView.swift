@@ -451,7 +451,7 @@ struct ToolsView: View {
 
     /// Tools that put their own controls (sort / filter menu) at the right of the Tools row:
     /// they draw the row themselves from `toolsBreadcrumb`.
-    static let toolsWithOwnControls: Set<ToolsTab> = [.topLists, .rateMe, .timeline]
+    static let toolsWithOwnControls: Set<ToolsTab> = [.topLists, .rateMe, .timeline, .hotOrNot]
 
     /// nil is the grid.
     private func select(_ tool: ToolsTab?) {
@@ -621,6 +621,51 @@ extension View {
         } else {
             self
         }
+    }
+}
+
+/// One choice of a tool's section menu (Charts' Scenes / Performers …, RateMe's Scenes / Images).
+struct ToolsRowMenuOption<Value: Hashable>: Identifiable {
+    let value: Value
+    let title: String
+    let systemImage: String
+    var id: Value { value }
+}
+
+/// A tool's section switch as a menu in the Tools row (it was a pill row above the content):
+/// the current section's icon collapsed, every section with icon and title open.
+struct ToolsRowPickerMenu<Value: Hashable>: View {
+    let title: String
+    let options: [ToolsRowMenuOption<Value>]
+    @Binding var selection: Value
+    var isDisabled = false
+
+    var body: some View {
+        let current = options.first { $0.value == selection }
+        Menu {
+            Picker(title, selection: Binding(
+                get: { selection },
+                set: { value in
+                    guard value != selection else { return }
+                    HapticManager.selection()
+                    selection = value
+                }
+            )) {
+                ForEach(options) { option in
+                    Label(option.title, systemImage: option.systemImage).tag(option.value)
+                }
+            }
+            .pickerStyle(.inline)
+        } label: {
+            ToolsRowMenuLabel(systemImage: current?.systemImage ?? "square.grid.2x2")
+        }
+        .menuStyle(.button)
+        .buttonStyle(.plain)
+        .menuIndicator(.hidden)
+        .stashyNeutralMenuItems()
+        .fixedSize()
+        .disabled(isDisabled)
+        .accessibilityLabel("\(title), \(current?.title ?? "")")
     }
 }
 

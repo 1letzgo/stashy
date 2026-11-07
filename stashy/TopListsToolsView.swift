@@ -768,20 +768,19 @@ struct TopListsToolsContainerView: View {
             case .tags: return "Tags"
             }
         }
+
+        var icon: String {
+            switch self {
+            case .scenes: return "film"
+            case .performers: return "person.2"
+            case .studios: return "building.2"
+            case .tags: return "tag"
+            }
+        }
     }
 
     var body: some View {
         VStack(spacing: 0) {
-            ToolsPillMenuRow(
-                items: Section.allCases.map { ToolsPillMenuRow.Item(id: $0.rawValue, title: $0.title) },
-                selectionID: section.rawValue,
-                accessibilityLabel: "Charts list"
-            ) { id in
-                if let next = Section(rawValue: id) {
-                    section = next
-                }
-            }
-
             Group {
                 switch section {
                 case .scenes:
@@ -795,12 +794,25 @@ struct TopListsToolsContainerView: View {
                 }
             }
             .id(section)
+            // The air the section pills used to give the list (now in the Tools row).
+            .contentMargins(.top, DesignTokens.Tools.menuTopPadding, for: .scrollContent)
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(Color.appBackground)
-        .popNavigationToRootOnChange(section.rawValue)
-        .toolsBreadcrumbChrome(toolsBreadcrumb) { metricMenu }
+        // A section switch clears details pushed above Charts, never Charts itself (popping to
+        // the root would leave the tool for the Tools grid).
+        .background(CatalogueStackTrim(trigger: section.rawValue, keepsLibraryPage: true))
+        .toolsBreadcrumbChrome(toolsBreadcrumb) {
+            HStack(spacing: 6) {
+                ToolsRowPickerMenu(
+                    title: "Charts list",
+                    options: Section.allCases.map { ToolsRowMenuOption(value: $0, title: $0.title, systemImage: $0.icon) },
+                    selection: $section
+                )
+                metricMenu
+            }
+        }
     }
 
     /// The open list's metric, at the right of the Tools row.

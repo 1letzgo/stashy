@@ -1901,8 +1901,58 @@ struct HotOrNotToolsView: View {
     /// Avoids re-running `loadDuelPair` when returning from `NavigationLink` (e.g. Profile): `.task` restarts after disappear/reappear.
     @State private var didRunInitialHotOrNotLoad = false
     @State private var showBracketTree = false
+    @Environment(\.toolsBreadcrumb) private var toolsBreadcrumb
 
     private var isRegular: Bool { horizontalSizeClass == .regular }
+
+    /// The game mode at the right of the Tools row while playing (it was a pill row under the
+    /// sections); Charts and Settings have none.
+    @ViewBuilder
+    private var modeMenu: some View {
+        if model.section == .battle {
+            Menu {
+                Picker("Mode", selection: Binding(
+                    get: { model.duelMode },
+                    set: { mode in
+                        guard !model.isSubmitting, mode != model.duelMode else { return }
+                        HapticManager.selection()
+                        model.duelMode = mode
+                    }
+                )) {
+                    ForEach([HotOrNotViewModel.DuelMode.headToHead, .bracket, .placement, .champion]) { mode in
+                        Label(mode.label, systemImage: Self.icon(for: mode)).tag(mode)
+                    }
+                }
+                .pickerStyle(.inline)
+            } label: {
+                ToolsRowMenuLabel(systemImage: Self.icon(for: model.duelMode))
+            }
+            .menuStyle(.button)
+            .buttonStyle(.plain)
+            .menuIndicator(.hidden)
+            .stashyNeutralMenuItems()
+            .fixedSize()
+            .disabled(model.isSubmitting)
+            .accessibilityLabel("Match mode, \(model.duelMode.label)")
+        }
+    }
+
+    private static func icon(for section: HotOrNotViewModel.Section) -> String {
+        switch section {
+        case .battle: return "flame.fill"
+        case .leaderboard: return "list.number"
+        case .settings: return "slider.horizontal.3"
+        }
+    }
+
+    private static func icon(for mode: HotOrNotViewModel.DuelMode) -> String {
+        switch mode {
+        case .headToHead: return "person.2.fill"
+        case .bracket: return "trophy.fill"
+        case .placement: return "chart.line.uptrend.xyaxis"
+        case .champion: return "crown.fill"
+        }
+    }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -1914,32 +1964,8 @@ struct HotOrNotToolsView: View {
                     .padding(.horizontal, DesignTokens.Tools.contentPadding)
             }
 
-            ToolsPillMenuRow(
-                items: HotOrNotViewModel.Section.allCases.map {
-                    ToolsPillMenuRow.Item(id: $0.rawValue, title: $0.rawValue)
-                },
-                selectionID: model.section.rawValue,
-                accessibilityLabel: "Match section"
-            ) { id in
-                if let section = HotOrNotViewModel.Section(rawValue: id) {
-                    model.section = section
-                }
-            }
-
-            // Game modes right under the sections, same pills (only while playing).
-            if model.section == .battle {
-                ToolsPillMenuRow(
-                    items: [HotOrNotViewModel.DuelMode.headToHead, .bracket, .placement, .champion].map {
-                        ToolsPillMenuRow.Item(id: $0.rawValue, title: $0.label)
-                    },
-                    selectionID: model.duelMode.rawValue,
-                    accessibilityLabel: "Match mode"
-                ) { id in
-                    guard !model.isSubmitting, let mode = HotOrNotViewModel.DuelMode(rawValue: id) else { return }
-                    model.duelMode = mode
-                }
-                .padding(.top, -DesignTokens.Tools.menuTopPadding)
-            }
+            // The air the section pills used to give (they moved into the Tools row).
+            Color.clear.frame(height: DesignTokens.Tools.menuTopPadding)
 
             switch model.section {
             case .battle:
@@ -1952,6 +1978,18 @@ struct HotOrNotToolsView: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(Color.appBackground)
+        .toolsBreadcrumbChrome(toolsBreadcrumb) {
+            HStack(spacing: 6) {
+                ToolsRowPickerMenu(
+                    title: "Match section",
+                    options: HotOrNotViewModel.Section.allCases.map {
+                        ToolsRowMenuOption(value: $0, title: $0.rawValue, systemImage: Self.icon(for: $0))
+                    },
+                    selection: $model.section
+                )
+                modeMenu
+            }
+        }
         .safeAreaInset(edge: .bottom, spacing: 0) {
             VStack(spacing: 8) {
                 if shouldShowDuelActionsAboveFloatingBar {
