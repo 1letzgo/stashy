@@ -51,8 +51,16 @@ private struct DetailSlotBar: ViewModifier {
     @ViewBuilder
     func body(content: Content) -> some View {
         if let slots {
-            content.floatingActionBar(isPresented: slots.isPresented && slots.hasAnySlot, catalogChrome: slots.visibility) {
-                CatalogSlotBar(slots: slots)
+            // An empty list with an error hides the list's actions, never the page's own
+            // (Edit, Favorite): a group without scenes could not be edited otherwise, since a
+            // failing side fetch (galleries, images) sets the shared error.
+            let listActionsVisible = slots.visibility.floatingBarVisible(isPresented: slots.isPresented)
+            let shown = listActionsVisible
+                ? slots
+                : CatalogSlotSet(visibility: slots.visibility, entityActions: slots.entityActions)
+            let showBar = slots.isPresented && slots.visibility.hasActiveServerConfig && shown.hasAnySlot
+            content.floatingActionBar(isPresented: showBar) {
+                CatalogSlotBar(slots: shown)
             }
         } else {
             content
