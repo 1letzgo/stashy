@@ -33,12 +33,14 @@ extension HomeRowType {
         case .newGalleries: return "New Galleries"
         case .recentlyUpdatedGalleries: return "Recently Updated Galleries"
         case .galleriesHighestImageCount: return "Largest Galleries"
+        case .recommendations: return "For You"
         }
     }
 
     /// The tvOS Home has no statistics block; the row stays in the shared store but is
     /// neither rendered nor offered here.
-    var isAvailableOnTV: Bool { self != .statistics }
+    /// For You is built on iOS and macOS only.
+    var isAvailableOnTV: Bool { self != .statistics && self != .recommendations }
 }
 
 struct TVHomeRowsSettingsView: View {

@@ -13,6 +13,7 @@ struct DashboardSettingsView: View {
     @ObservedObject var appearanceManager = AppearanceManager.shared
     /// Channels are stashy+ — row toggle and the Channels section only show while unlocked.
     @ObservedObject private var stashyPlus = StashyPlusManager.shared
+    @ObservedObject private var forYou = SceneRecommendationEngine.shared
     /// Same key as the switch in Settings › stashy+, so either one updates the other.
     @AppStorage(MagazineMode.enabledKey) private var isMagazineEnabled = false
     @StateObject private var viewModel = StashDBViewModel()
@@ -116,7 +117,12 @@ struct DashboardSettingsView: View {
 
     /// Dashboard rows offered in Settings; the Channels row (stashy+) is hidden while locked.
     private var visibleHomeRows: [HomeRowConfig] {
-        stashyPlus.isUnlocked ? tabManager.homeRows : tabManager.homeRows.filter { $0.type != .channels }
+        tabManager.homeRows.filter { row in
+            if row.type.requiresStashyPlus && !stashyPlus.isUnlocked { return false }
+            // For You comes with Settings › stashy+ › Recommendations.
+            if row.type == .recommendations && !forYou.isFeatureOn { return false }
+            return true
+        }
     }
 
     /// Maps a move in `visibleHomeRows` onto `tabManager.homeRows` (hidden rows keep their place).

@@ -7,6 +7,12 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		F0A30000000000000000000B /* RecommendationSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F0A30000000000000000000A /* RecommendationSettingsView.swift */; };
+		F0A30000000000000000000C /* RecommendationSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F0A30000000000000000000A /* RecommendationSettingsView.swift */; };
+		F0A20000000000000000000B /* HomeRecommendationsRowView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F0A20000000000000000000A /* HomeRecommendationsRowView.swift */; };
+		F0A20000000000000000000C /* HomeRecommendationsRowView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F0A20000000000000000000A /* HomeRecommendationsRowView.swift */; };
+		F0A10000000000000000000B /* SceneRecommendationEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = F0A10000000000000000000A /* SceneRecommendationEngine.swift */; };
+		F0A10000000000000000000C /* SceneRecommendationEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = F0A10000000000000000000A /* SceneRecommendationEngine.swift */; };
 		02B19A59AAFE4A16B45A861F /* DownloadsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DF22BB172F16743C007C2090 /* DownloadsView.swift */; };
 		08FB7793FE84155DC02AAC07 /* App.swift in Sources */ = {isa = PBXBuildFile; fileRef = 08FB7794FE84155DC02AAC07 /* App.swift */; };
 		08FB7797FE84155DC02AAC07 /* MainTabView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 08FB7798FE84155DC02AAC07 /* MainTabView.swift */; };
@@ -390,6 +396,9 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+		F0A30000000000000000000A /* RecommendationSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecommendationSettingsView.swift; sourceTree = "<group>"; };
+		F0A20000000000000000000A /* HomeRecommendationsRowView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeRecommendationsRowView.swift; sourceTree = "<group>"; };
+		F0A10000000000000000000A /* SceneRecommendationEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SceneRecommendationEngine.swift; sourceTree = "<group>"; };
 		08FB7794FE84155DC02AAC07 /* App.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = App.swift; sourceTree = "<group>"; };
 		08FB7798FE84155DC02AAC07 /* MainTabView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = MainTabView.swift; sourceTree = "<group>"; };
 		08FB779EFE84155DC02AAC07 /* ServerConfig.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = ServerConfig.swift; sourceTree = "<group>"; };
@@ -681,6 +690,7 @@
 			children = (
 				AITAG00022F70A00000000002 /* AITagSuggestionManager.swift */,
 				5115C0020000000000000002 /* SimilarScenesFinder.swift */,
+				F0A10000000000000000000A /* SceneRecommendationEngine.swift */,
 				372E2D982F64272300603361 /* VideoAnalysisManager.swift */,
 				372E2D9A2F64425000603361 /* StashSyncManager.swift */,
 				A1PLUS022F30B00000000002 /* StashyPlusManager.swift */,
@@ -741,6 +751,7 @@
 				DF675E5E2F2A46A1004CA019 /* HomeSceneCardView.swift */,
 				DF675E5F2F2A46A1004CA019 /* HomeStatisticsRowView.swift */,
 				DFC1A2B32F3A46A1004CA019 /* HomeChannelsRowView.swift */,
+				F0A20000000000000000000A /* HomeRecommendationsRowView.swift */,
 			);
 			path = Home;
 			sourceTree = "<group>";
@@ -798,6 +809,7 @@
 			children = (
 				AE7E0000000000000000B031 /* AcknowledgementsView.swift */,
 				AITAG00062F70A00000000006 /* AITagsSettingsView.swift */,
+				F0A30000000000000000000A /* RecommendationSettingsView.swift */,
 				DF22BB332F1831C7007C2090 /* AppearanceSettingsView.swift */,
 				A1ED4C0112345678901234AB /* EditModeSettingsView.swift */,
 				5CDL00022F80A00000000002 /* SceneDetailLayoutSettingsView.swift */,
@@ -993,6 +1005,9 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				F0A30000000000000000000B /* RecommendationSettingsView.swift in Sources */,
+				F0A20000000000000000000B /* HomeRecommendationsRowView.swift in Sources */,
+				F0A10000000000000000000B /* SceneRecommendationEngine.swift in Sources */,
 				AE7E0000000000000000B012 /* AetherSceneEngine.swift in Sources */,
 				AE7E0000000000000000B022 /* Scene+AetherPlayback.swift in Sources */,
 				AE7E0000000000000000B042 /* AetherSceneSurface.swift in Sources */,
@@ -1214,6 +1229,9 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				F0A30000000000000000000C /* RecommendationSettingsView.swift in Sources */,
+				F0A20000000000000000000C /* HomeRecommendationsRowView.swift in Sources */,
+				F0A10000000000000000000C /* SceneRecommendationEngine.swift in Sources */,
 				MAC000000000000000000001 /* AetherSceneEngine.swift in Sources */,
 				MAC000000000000000000002 /* Scene+AetherPlayback.swift in Sources */,
 				MAC000000000000000000003 /* AetherSceneSurface.swift in Sources */,

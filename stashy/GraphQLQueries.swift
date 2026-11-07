@@ -159,6 +159,9 @@ class GraphQLQueries {
         case "findScenesSimilar":
             // Same slim list fragment; the query itself adds `tags` for the ranking.
             fragments = loadQuery(named: "fragment_SceneListFields")
+        case "findScenesRecommendHistory", "findScenesRecommendCandidates":
+            // For You (stashy+): list fragment; the queries add tag counts and history.
+            fragments = loadQuery(named: "fragment_SceneListFields")
         case "findScenesByIds":
             // Watchlist / Now Playing check against the server: list fields are enough.
             fragments = loadQuery(named: "fragment_SceneListFields")

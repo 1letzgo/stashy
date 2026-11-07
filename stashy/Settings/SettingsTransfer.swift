@@ -154,7 +154,7 @@ enum SettingsTransfer {
     private static let deviceLocalPrefixes = [
         "reels_last_visible_", "reels_session_", "reels_playback_checkpoint_", "reels_restart_from_top_",
         "stashy.magazine.progress_", "stashy.hotOrNot.bracket", "stashy_timeline_image_o_actions_",
-        "download_sync_jobs_", "stashyDebug", "StashyWindowSize",
+        "download_sync_jobs_", "stashyDebug", "StashyWindowSize", "recommendations_last_picks_",
     ]
 
     static func isSyncable(_ key: String) -> Bool {

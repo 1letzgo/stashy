@@ -261,7 +261,7 @@ struct TVDashboardView: View {
                 channelsRow
                     .focusSection()
             }
-        case .statistics:
+        case .statistics, .recommendations:
             EmptyView()
         case .lastPlayed:
             if let scenes = sceneRows[row.type], !scenes.isEmpty {
@@ -415,7 +415,7 @@ struct TVDashboardView: View {
             loadedRows.insert(type)
         }
         switch type {
-        case .channels, .statistics:
+        case .channels, .statistics, .recommendations:
             loadingRows.remove(type)
         case .newPerformers, .performersHighestSceneCount, .performersHighestOCount, .performersHighestRating:
             viewModel.fetchPerformersForHomeRow(config: row, limit: limit, forceRefresh: forceRefresh) { performers in

@@ -2,8 +2,8 @@
 //  AITagsSettingsView.swift
 //  stashy
 //
-//  stashy+ hub for Suggestions: one kill switch and one statistics model behind both tag
-//  suggestions and Similar Scenes.
+//  stashy+ hub "Recommendations": tag suggestions, Similar Scenes and the For You row on
+//  Home share one statistics model. For You is on whenever either switch is.
 //
 
 #if !os(tvOS)
@@ -15,6 +15,7 @@ struct AITagsSettingsView: View {
     @ObservedObject private var similar = SimilarScenesFinder.shared
     @ObservedObject private var appearanceManager = AppearanceManager.shared
     @ObservedObject private var stashyPlus = StashyPlusManager.shared
+    @ObservedObject private var forYou = SceneRecommendationEngine.shared
 
 
     private var isUnlocked: Bool { stashyPlus.isUnlocked }
@@ -23,7 +24,7 @@ struct AITagsSettingsView: View {
         List {
             if !isUnlocked {
                 Section {
-                    Label("Tag Suggestions & Similar Scenes require stashy+", systemImage: "lock.fill")
+                    Label("Recommendations require stashy+", systemImage: "lock.fill")
                         .foregroundColor(.secondary)
                         .stashyGroupedSettingsRow()
                     stashyScrollingSectionFooter("Unlock stashy+ to use this feature.")
@@ -31,12 +32,13 @@ struct AITagsSettingsView: View {
             }
 
             togglesSection
+            forYouSection
             modelSection
             tuningSection
         }
         .stashySettingsList()
         .applyAppBackground()
-        .stashySettingsDetailChrome("Tag Suggestions & Similar Scenes")
+        .stashySettingsDetailChrome("Recommendations")
         .task { await manager.loadIfNeeded() }
     }
 
@@ -65,6 +67,22 @@ struct AITagsSettingsView: View {
             .tint(appearanceManager.tintColor)
             .disabled(!isUnlocked)
             .stashyGroupedBlockRow(index: 1, count: 2)
+        }
+    }
+
+    private var forYouSection: some View {
+        Section {
+            stashyScrollingSectionHeader("For You on Home", isBeta: true)
+            NavigationLink(destination: RecommendationSettingsView()) {
+                HStack {
+                    Label("For You", systemImage: "wand.and.stars")
+                    Spacer()
+                    Text(forYou.isFeatureOn ? "On" : "Off").foregroundColor(.secondary)
+                }
+            }
+            .disabled(!isUnlocked)
+            .stashyGroupedSettingsRow()
+            stashyScrollingSectionFooter("A Home row with scenes picked from what you played, your O-Counts and ratings, each with the reason it was picked. On while Tag suggestions or Similar scenes is on; move or hide it in Settings › Home.")
         }
     }
 
