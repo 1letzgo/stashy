@@ -629,8 +629,10 @@ enum FilterCriterionSummary {
             break
         }
 
-        let value = displayValue(dict["value"])
-        let value2 = displayValue(dict["value2"])
+        // Timestamps read "2026-11-03 00:00", not the GraphQL "…T00:00".
+        let readable: (String) -> String = { field.kind == .timestamp ? $0.replacingOccurrences(of: "T", with: " ") : $0 }
+        let value = readable(displayValue(dict["value"]))
+        let value2 = readable(displayValue(dict["value2"]))
         guard !value.isEmpty else { return anyText }
         if modifier == .matchesRegex || modifier == .notMatchesRegex {
             return regexText(value, negated: modifier == .notMatchesRegex)

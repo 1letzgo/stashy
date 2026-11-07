@@ -60,6 +60,9 @@ struct FilterCriteriaEditorView: View {
     private func isExpanded(_ key: String) -> Bool { expandedKeys.contains(key) }
 
     private func toggleExpanded(_ key: String) {
+        #if os(iOS)
+        UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
+        #endif
         if expandedKeys.contains(key) {
             expandedKeys.remove(key)
         } else {
@@ -101,8 +104,9 @@ struct FilterCriteriaEditorView: View {
         }
         .padding(.horizontal, embedsInCard ? DesignTokens.Spacing.md : 0)
         .padding(.bottom, embedsInCard ? DesignTokens.Spacing.xs : 0)
-        // Tapping another row closes an open number pad instead of leaving it covering the sheet.
-        .dismissesKeyboardOnTap()
+        // No tap-anywhere keyboard dismissal here: a tap gesture over the editor swallowed the
+        // day taps of the graphical date picker. Opening or closing a row dismisses the
+        // keyboard instead, and every text field has the Done bar.
         .sheet(item: Binding(
             get: { nestedEditorKey.map { NestedEditorIdentity(key: $0) } },
             set: { nestedEditorKey = $0?.key }
