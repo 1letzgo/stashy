@@ -568,7 +568,11 @@ enum StashServerCapabilities {
             }
             let data: DataContainer?
         }
-        let response: Response? = try? await GraphQLClient.shared.execute(query: "{ version { version } }")
+        // `variables: [:]`: without variables GraphQLClient sends the string as the raw body
+        // (meant for pre-encoded mutations) and Stash rejects it.
+        let response: Response? = try? await GraphQLClient.shared.execute(
+            query: "{ version { version } }", variables: [:]
+        )
         if let version = response?.data?.version.version, !version.isEmpty {
             record(version: version, serverID: id)
         }

@@ -122,7 +122,9 @@ final class SimilarScenesFinder: ObservableObject {
         }
         do {
             let response: Response = try await GraphQLClient.shared.execute(
-                query: "{ stats { scene_count } }"
+                query: "{ stats { scene_count } }",
+                // Without variables the client would send the bare string as the body.
+                variables: [:]
             )
             let count = response.data?.stats.scene_count ?? 0
             totalSceneCount = count
@@ -198,7 +200,7 @@ final class SimilarScenesFinder: ObservableObject {
     ) async -> [Scene] {
         var clauses: [(name: String, filter: [String: Any])] = []
         if !performerIds.isEmpty {
-            clauses.append(("performers", ["performers": ["value": performerIds, "modifier": "INCLUDES", "depth": 0]]))
+            clauses.append(("performers", ["performers": ["value": performerIds, "modifier": "INCLUDES"]]))
         }
         if !tagIds.isEmpty {
             clauses.append(("tags", ["tags": ["value": tagIds, "modifier": "INCLUDES", "depth": 0]]))
