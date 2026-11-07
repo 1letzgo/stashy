@@ -15,6 +15,8 @@ struct MainTabView: View {
     @ObservedObject var appearanceManager = AppearanceManager.shared
     @ObservedObject var securityManager = SecurityManager.shared
     @ObservedObject private var stashyPlus = StashyPlusManager.shared
+    /// Feeds' time bar in the tab bar accessory: the tab bar may shrink on scroll there too.
+    @ObservedObject private var feedsScrubber = FeedsScrubberAccessory.shared
     /// Feeds (`ReelsView`): bleibt über Tab-Wechsel erhalten; Szenen-/Marker-Scroll-Position in `ReelsSessionRAM`.
     @StateObject private var reelsFeedViewModel = StashDBViewModel()
     @State private var hasValidConfig = false
@@ -96,7 +98,7 @@ struct MainTabView: View {
             .animation(nil, value: coordinator.selectedTab)
             .tint(appearanceManager.tabBarTint)
             .withToasts()
-            .modifier(TabBarMinimizesOnScroll(enabled: coordinator.selectedTab != .reels))
+            .modifier(TabBarMinimizesOnScroll(enabled: coordinator.selectedTab != .reels || feedsScrubber.showsBar))
             #if !os(tvOS)
             .modifier(MiniPlayerHost(hidden: coordinator.selectedTab == .reels))
             #endif
@@ -1291,12 +1293,15 @@ private struct MiniPlayerHost: ViewModifier {
     var hidden: Bool
     @ObservedObject private var store = MiniPlayerStore.shared
     @ObservedObject private var tabManager = TabManager.shared
+    @ObservedObject private var feedsScrubber = FeedsScrubberAccessory.shared
 
     func body(content: Content) -> some View {
         content
             .modifier(MiniPlayerAccessory(
                 isEnabled: store.session != nil && !hidden && store.isEnabled,
-                floats: store.tabBarHiddenByPage
+                floats: store.tabBarHiddenByPage,
+                // Feeds put their time bar in the same slot (not Pics, not GIFs).
+                showsFeedsTimeBar: hidden && feedsScrubber.showsBar && FeedsScrubberAccessory.isAvailable
             ))
             .onChange(of: hidden, initial: true) { _, onFeeds in
                 store.setFeedsActive(onFeeds)
@@ -1333,6 +1338,52 @@ private struct MiniPlayerHost: ViewModifier {
 }
 
 #if os(iOS)
+/// Feeds' time bar in the accessory slot: full above the tab bar, compact beside it once the tab
+/// bar has shrunk. The slot draws the glass, so the bar doesn't add its own.
+@available(iOS 26.1, *)
+private struct FeedsTimeBarAccessory: View {
+    @Environment(\.tabViewBottomAccessoryPlacement) private var placement
+    @ObservedObject private var accessory = FeedsScrubberAccessory.shared
+
+    var body: some View {
+        if let state = accessory.state {
+            FeedsTimeBar(state: state, isCompact: placement == .inline)
+                .opacity(accessory.isUIVisible ? 1 : 0)
+                .allowsHitTesting(accessory.isUIVisible)
+                .animation(.easeInOut(duration: 0.2), value: accessory.isUIVisible)
+        }
+    }
+}
+
+@available(iOS 26.1, *)
+private struct FeedsTimeBar: View {
+    @ObservedObject var state: ScrubberState
+    var isCompact: Bool
+
+    var body: some View {
+        AetherTimeBar(
+            currentTime: state.time,
+            duration: state.duration,
+            isScrubbing: state.seeking,
+            previewImage: state.previewImage,
+            previewPlaceholderURL: state.previewPlaceholderURL,
+            markerSeconds: [],
+            isCompact: isCompact,
+            showsGlass: false,
+            onScrubChanged: { seconds in
+                state.seeking = true
+                state.time = seconds
+                state.seekTarget = seconds
+            },
+            onScrubEnded: { seconds in
+                state.time = seconds
+                state.seekTarget = seconds
+                state.seeking = false
+            }
+        )
+    }
+}
+
 /// The bar in the accessory slot: full above the tab bar, compact (cover, title, play) once the
 /// tab bar has shrunk and the accessory sits inline beside it.
 @available(iOS 26.1, *)
@@ -1351,6 +1402,8 @@ private struct MiniPlayerAccessory: ViewModifier {
     var isEnabled: Bool
     /// The tab bar is hidden by the current page: float at the bottom edge.
     var floats: Bool
+    /// Feeds: the slot holds the feed's time bar instead of the mini player.
+    var showsFeedsTimeBar: Bool = false
 
     func body(content: Content) -> some View {
         #if os(macOS)
@@ -1362,8 +1415,12 @@ private struct MiniPlayerAccessory: ViewModifier {
         #else
         if #available(iOS 26.1, *) {
             content
-                .tabViewBottomAccessory(isEnabled: isEnabled && !floats) {
-                    MiniPlayerAccessoryBar()
+                .tabViewBottomAccessory(isEnabled: (isEnabled && !floats) || showsFeedsTimeBar) {
+                    if showsFeedsTimeBar {
+                        FeedsTimeBarAccessory()
+                    } else {
+                        MiniPlayerAccessoryBar()
+                    }
                 }
                 .overlay(alignment: .bottom) {
                     floatingBar(visible: isEnabled && floats, bottomPadding: 8)

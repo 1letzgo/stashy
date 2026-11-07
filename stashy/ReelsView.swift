@@ -2779,6 +2779,19 @@ struct ReelsViewBody: View {
     }
 
     /// Lookup without remapping the entire feed list (chrome reads this every body pass).
+    private struct TimeBarAccessoryKey: Equatable {
+        var showsBar: Bool
+        var isUIVisible: Bool
+    }
+
+    private var reelsTimeBarAccessoryKey: TimeBarAccessoryKey {
+        let item = currentVisibleReelItem
+        return TimeBarAccessoryKey(
+            showsBar: reelsMode != .pics && item != nil && item?.isAnimated == false,
+            isUIVisible: isUIVisible
+        )
+    }
+
     private var currentVisibleReelItem: ReelItemData? {
         guard let id = currentVisibleSceneId else { return nil }
         switch reelsMode {
@@ -3184,6 +3197,14 @@ struct ReelsViewBody: View {
             .onChange(of: reelsChromeAutoHideBlocked) { _, blocked in
                 if blocked { _ = reelsRevealChromeAfterScroll() }
             }
+            // The time bar in the tab bar's accessory slot follows the feed and its chrome.
+            .onChange(of: reelsTimeBarAccessoryKey, initial: true) { _, key in
+                let accessory = FeedsScrubberAccessory.shared
+                if accessory.state !== scrubberState { accessory.state = scrubberState }
+                if accessory.showsBar != key.showsBar { accessory.showsBar = key.showsBar }
+                if accessory.isUIVisible != key.isUIVisible { accessory.isUIVisible = key.isUIVisible }
+            }
+            .onDisappear { FeedsScrubberAccessory.shared.showsBar = false }
             .onChange(of: reelsPicsFilters.selectedSortOption) { _, _ in
                 guard reelsMode == .pics else { return }
                 saveSessionState(for: .pics)
@@ -5207,8 +5228,9 @@ struct ReelsViewBody: View {
     @ViewBuilder
     private func reelsScrubberBar(currentItem: ReelItemData?) -> some View {
         if let item = currentItem {
-            if item.isAnimated {
+            if item.isAnimated || FeedsScrubberAccessory.isAvailable {
                 // GIFs don't have a scrubber; don't reserve scrubber space (it pushed the overlay too high).
+                // From iOS 26.1 the bar lives in the tab bar's accessory slot instead.
                 EmptyView()
             } else {
                 IsolatedScrubberBar(state: scrubberState, isUIVisible: isUIVisible)
@@ -7069,6 +7091,27 @@ struct ReelsView: View {
 }
 
 // MARK: - Scrubber Isolation
+/// Feeds' time bar for the tab bar accessory slot (iOS 26.1+): above the tab bar, and beside it
+/// once the bar shrinks on scroll, where the mini player sits on other tabs. Feeds publishes its
+/// `ScrubberState` here; `MainTabView` shows the bar while `showsBar`.
+@MainActor
+final class FeedsScrubberAccessory: ObservableObject {
+    static let shared = FeedsScrubberAccessory()
+    @Published var state: ScrubberState?
+    /// A feed other than Pics with an item that has a timeline (not a GIF).
+    @Published var showsBar = false
+    /// Feeds' chrome is visible (a tap hides it, and the bar with it).
+    @Published var isUIVisible = true
+
+    /// The slot exists from iOS 26.1; before that the bar stays inside Feeds.
+    static var isAvailable: Bool {
+        #if os(iOS)
+        if #available(iOS 26.1, *) { return true }
+        #endif
+        return false
+    }
+}
+
 class ScrubberState: ObservableObject {
     @Published var time: Double = 0.0
     @Published var duration: Double = 1.0

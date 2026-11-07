@@ -35,6 +35,8 @@ struct AetherTimeBar: View {
     /// names the marker the finger is in. Wins over `markerSeconds` when non-empty.
     var markers: [AetherTimeBarMarker] = []
     var isCompact: Bool = false
+    /// Off where the host already draws the glass (the tab bar accessory in Feeds).
+    var showsGlass: Bool = true
     var onScrubChanged: (Double) -> Void
     var onScrubEnded: (Double) -> Void
 
@@ -93,7 +95,7 @@ struct AetherTimeBar: View {
         }
         .padding(.horizontal, 16)
         .frame(height: barHeight)
-        .stashyGlass(shape: Capsule())
+        .modifier(OptionalGlass(isOn: showsGlass))
     }
 
     /// Ein kleiner Punkt pro Marker; Marker außerhalb der Laufzeit werden übersprungen.
@@ -226,6 +228,18 @@ struct AetherTimeBar: View {
 struct AetherTimeBarMarker: Equatable {
     var seconds: Double
     var title: String?
+}
+
+private struct OptionalGlass: ViewModifier {
+    let isOn: Bool
+    @ViewBuilder
+    func body(content: Content) -> some View {
+        if isOn {
+            content.stashyGlass(shape: Capsule())
+        } else {
+            content
+        }
+    }
 }
 
 #endif
