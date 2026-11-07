@@ -643,10 +643,24 @@ private struct ImagesViewBody: View {
         StashyDetailChromeConfig(listSlots: nil, insetSpacing: 0)
     }
 
-    /// Opened gallery: Back, and at the right Edit (edit mode), Select and Download. The floating
-    /// bar only appears for selection mode's Done.
+    /// Opened gallery: Back, and at the right Edit (edit mode), Select, Download, the sort menu and
+    /// the filter / sort settings — like the other detail pages, no sort row above the grid. The
+    /// floating bar only appears for selection mode's Done.
     private var openedGalleryNavBar: some View {
-        StashyDetailTopBar(trailingSlots: openedGalleryActions, onBack: { dismiss() })
+        StashySectionChromeBar {
+            DetailBreadcrumbRow(crumb: openedGalleryCrumb) { quickBar(part: .sortMenu) }
+                .padding(.horizontal, StashyExpandingDock.edgePadding)
+                .padding(.vertical, 6)
+        }
+    }
+
+    private var openedGalleryCrumb: DetailBreadcrumb {
+        DetailBreadcrumb(
+            sections: [.init(id: "images", title: "Images", systemImage: "photo")],
+            selectionID: "images",
+            onSelect: { _ in },
+            onBack: { dismiss() }
+        )
     }
 
     private var openedGalleryActions: [CatalogChromeSlot] {
@@ -964,13 +978,13 @@ private struct ImagesViewBody: View {
 
     /// Above the list: the whole quick bar, or on Home (breadcrumb chrome) only the filter chips.
     private var quickBar: some View {
-        quickBar(part: homeMenu == nil ? .all : .chipsOnly)
+        quickBar(part: homeMenu == nil && gallery == nil ? .all : .chipsOnly)
     }
 
     private func quickBar(part: CatalogQuickBarPart) -> some View {
         CatalogListQuickBar(
             mode: .images,
-            trailingActions: part == .sortMenu ? [selectImagesSlot] : [],
+            trailingActions: part == .sortMenu ? (gallery != nil ? openedGalleryActions : [selectImagesSlot]) : [],
             sort: imageListFilters.selectedSortOption,
             onSort: { changeSortOption(to: $0) },
             document: imageListFilters.criteriaDocument,
