@@ -1345,8 +1345,10 @@ private struct MiniPlayerHost: ViewModifier {
             .modifier(MiniPlayerAccessory(
                 isEnabled: store.session != nil && !hidden && store.isEnabled,
                 floats: store.tabBarHiddenByPage,
-                // Feeds put their time bar in the same slot (not Pics, not GIFs).
-                showsFeedsTimeBar: hidden && feedsScrubber.showsBar && FeedsScrubberAccessory.isAvailable
+                // Feeds put their time bar in the same slot (not Pics, not GIFs). A tap that hides
+                // Feeds' chrome takes the whole slot away, or its empty glass would stay.
+                showsFeedsTimeBar: hidden && feedsScrubber.showsBar && feedsScrubber.isUIVisible
+                    && FeedsScrubberAccessory.isAvailable
             ))
             .onChange(of: hidden, initial: true) { _, onFeeds in
                 store.setFeedsActive(onFeeds)
