@@ -13,6 +13,8 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlinx.serialization.builtins.ListSerializer
+import kotlinx.serialization.builtins.serializer
 
 /** iOS: `ForgottenFavoritesRanking` (raw values identical). */
 enum class ForgottenFavoritesRanking(val raw: String, val title: String, val detail: String) {
@@ -117,6 +119,7 @@ object ForgottenFavorites {
         val gen = ++generation
         if (items.isEmpty()) state = ForgottenFavoritesState.Loading
         val days = days; val pool = pool; val ranking = ranking
+        val recent = loadRecentPicks()
         job = scope.launch {
             AITagSuggestions.loadIfNeeded()
             val index = AITagSuggestions.sceneIndex()?.takeIf { it.scenes.isNotEmpty() }
@@ -128,9 +131,11 @@ object ForgottenFavorites {
                 scope.launch { AITagSuggestions.ensureStatistics() }
                 return@launch
             }
-            val (picked, count) = withContext(Dispatchers.Default) { pickForgottenFavorites(index.scenes, days, pool, ranking) }
+            val (picked, count) = withContext(Dispatchers.Default) { pickForgottenFavorites(index.scenes, days, pool, ranking, recent) }
             if (gen != generation) return@launch
             items = picked; poolCount = count
+            // Shown now: these step back in the next lists.
+            saveRecentPicks(picked.map { it.id }, recent)
             state = ForgottenFavoritesState.Ready
             job = null
         }
@@ -141,12 +146,38 @@ object ForgottenFavorites {
         withContext(Dispatchers.Main) { rebuild() }
         job?.join()
     }
+
+    // MARK: Recent lists (iOS `loadRecentPicks` / `saveRecentPicks`), device-local, one per server.
+
+    private const val LAST_PICKS_PREFIX = "forgotten_favorites_last_picks_"
+    private const val REMEMBERED_LISTS = 3
+    private val lastPicksKey: String? get() = ServerConfigManager.activeConfig?.id?.let { "$LAST_PICKS_PREFIX$it" }
+
+    private fun loadRecentPicks(): List<Set<String>> {
+        val raw = lastPicksKey?.let(Prefs::string) ?: return emptyList()
+        return runCatching {
+            de.letzgo.stashy.data.Json.decodeFromString(ListSerializer(ListSerializer(String.serializer())), raw).map { it.toSet() }
+        }.getOrDefault(emptyList())
+    }
+
+    private fun saveRecentPicks(ids: List<String>, previous: List<Set<String>>) {
+        val key = lastPicksKey ?: return
+        if (ids.isEmpty()) return
+        val lists = listOf(ids) + previous.take(REMEMBERED_LISTS - 1).map { it.toList() }
+        Prefs.setString(key, de.letzgo.stashy.data.Json.encodeToString(ListSerializer(ListSerializer(String.serializer())), lists))
+    }
 }
 
-/** iOS `ForgottenFavoritesEngine.pick`: the favourites pool (top [pool] per ranking), minus everything played within [days], best ranked first. */
+/**
+ * iOS `ForgottenFavoritesEngine.pick`: the favourites pool (top [pool] per ranking), minus everything
+ * played within [days]. Like For You, each build draws a new random order and scenes shown in the
+ * [recent] lists go to the back, so app start and pull to refresh bring others.
+ */
 fun pickForgottenFavorites(
     scenes: List<LocalSceneIndex.Entry>, days: Int, pool: Int, ranking: ForgottenFavoritesRanking,
+    recent: List<Set<String>> = emptyList(),
     nowMillis: Long = System.currentTimeMillis(),
+    random: kotlin.random.Random = kotlin.random.Random.Default,
 ): Pair<List<ForgottenFavorite>, Int> {
     val rank = HashMap<String, Int>()
     fun take(ranked: List<LocalSceneIndex.Entry>) {
@@ -166,8 +197,10 @@ fun pickForgottenFavorites(
         if (e.lp != null && e.lp > cutoff) return@mapNotNull null
         e to position
     }
-        .sortedWith(compareBy<Pair<LocalSceneIndex.Entry, Int>> { it.second }.thenByDescending { it.first.pc + it.first.oc })
+        // Shown in fewer recent lists first, random within each group.
+        .map { (e, _) -> Triple(e, recent.count { e.id in it }, random.nextDouble()) }
+        .sortedWith(compareBy<Triple<LocalSceneIndex.Entry, Int, Double>> { it.second }.thenBy { it.third })
         .take(ForgottenFavorites.ROW_LIMIT)
-        .map { (e, _) -> ForgottenFavorite(e.scene!!, e.lp, e.pc, e.oc) }
+        .map { (e, _, _) -> ForgottenFavorite(e.scene!!, e.lp, e.pc, e.oc) }
     return forgotten to rank.size
 }

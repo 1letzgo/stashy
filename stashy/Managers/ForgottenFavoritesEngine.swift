@@ -209,6 +209,7 @@ final class ForgottenFavoritesEngine: ObservableObject {
         let gen = generation
         if items.isEmpty { state = .loading }
         let days = days, pool = pool, ranking = ranking
+        let recent = Self.loadRecentPicks()
         buildTask = Task { [weak self] in
             let index = await AITagSuggestionManager.shared.sceneIndex()
             guard let self, gen == self.generation, !Task.isCancelled else { return }
@@ -222,10 +223,12 @@ final class ForgottenFavoritesEngine: ObservableObject {
                 return
             }
             let result = await Task.detached(priority: .userInitiated) {
-                Self.pick(from: index.scenes, days: days, pool: pool, ranking: ranking)
+                Self.pick(from: index.scenes, days: days, pool: pool, ranking: ranking, recent: recent)
             }.value
             guard gen == self.generation, !Task.isCancelled else { return }
             self.items = result.items
+            // Shown now: these step back in the next lists.
+            Self.saveRecentPicks(result.items.map(\.id), keeping: recent)
             self.poolCount = result.poolCount
             self.state = .ready
             self.buildTask = nil
@@ -238,10 +241,12 @@ final class ForgottenFavoritesEngine: ObservableObject {
         await buildTask?.value
     }
 
-    /// The favourites pool (top `pool` per ranking), minus everything played within `days`,
-    /// best ranked first.
+    /// The favourites pool (top `pool` per ranking), minus everything played within `days`.
+    /// Like For You, every build draws a new random order, and scenes shown in the last
+    /// `rememberedLists` lists go to the back, so app start and pull to refresh bring others.
     nonisolated static func pick(from scenes: [LocalSceneIndex.Entry], days: Int, pool: Int,
-                                 ranking: ForgottenFavoritesRanking) -> (items: [ForgottenFavorite], poolCount: Int) {
+                                 ranking: ForgottenFavoritesRanking,
+                                 recent: [Set<String>] = []) -> (items: [ForgottenFavorite], poolCount: Int) {
         // Best rank (0 = top) a scene reaches in any ranking that applies.
         var rank: [String: Int] = [:]
         func take(_ ranked: [LocalSceneIndex.Entry]) {
@@ -261,22 +266,49 @@ final class ForgottenFavoritesEngine: ObservableObject {
         }
         let cutoff = Date().addingTimeInterval(-Double(days) * 86_400)
         let byId = Dictionary(scenes.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
-        let forgotten = rank
-            .compactMap { id, position -> (LocalSceneIndex.Entry, Int)? in
-                guard let entry = byId[id], entry.scene != nil else { return nil }
-                if let last = entry.lp, last > cutoff { return nil }
-                return (entry, position)
-            }
-            .sorted { lhs, rhs in
-                if lhs.1 != rhs.1 { return lhs.1 < rhs.1 }
-                return (lhs.0.pc + lhs.0.oc) > (rhs.0.pc + rhs.0.oc)
-            }
-            .prefix(rowLimit)
-            .compactMap { entry, _ -> ForgottenFavorite? in
-                guard let scene = entry.scene else { return nil }
-                return ForgottenFavorite(scene: scene, lastPlayed: entry.lp, plays: entry.pc, oCount: entry.oc)
-            }
-        return (Array(forgotten), rank.count)
+        struct Candidate {
+            let entry: LocalSceneIndex.Entry
+            let scene: Scene
+            /// In how many of the recent lists it was shown.
+            let shown: Int
+            let draw: Double
+        }
+        var candidates: [Candidate] = []
+        for id in rank.keys {
+            guard let entry = byId[id], let scene = entry.scene else { continue }
+            if let last = entry.lp, last > cutoff { continue }
+            let shown = recent.reduce(0) { $0 + ($1.contains(id) ? 1 : 0) }
+            candidates.append(Candidate(entry: entry, scene: scene, shown: shown, draw: Double.random(in: 0..<1)))
+        }
+        // Shown in fewer recent lists first, random within each group.
+        candidates.sort { $0.shown != $1.shown ? $0.shown < $1.shown : $0.draw < $1.draw }
+        let items = candidates.prefix(rowLimit).map {
+            ForgottenFavorite(scene: $0.scene, lastPlayed: $0.entry.lp, plays: $0.entry.pc, oCount: $0.entry.oc)
+        }
+        return (items, rank.count)
+    }
+
+    // MARK: Recent lists
+
+    /// Device-local (`SettingsTransfer.deviceLocalPrefixes`), one list per server.
+    private static let lastPicksPrefix = "forgotten_favorites_last_picks_"
+    private static let rememberedLists = 3
+
+    private static var lastPicksKey: String? {
+        ServerConfigManager.shared.activeConfig.map { "\(lastPicksPrefix)\($0.id)" }
+    }
+
+    /// The last lists shown, newest first.
+    private static func loadRecentPicks() -> [Set<String>] {
+        guard let key = lastPicksKey,
+              let stored = UserDefaults.standard.array(forKey: key) as? [[String]] else { return [] }
+        return stored.map(Set.init)
+    }
+
+    private static func saveRecentPicks(_ ids: [String], keeping previous: [Set<String>]) {
+        guard let key = lastPicksKey, !ids.isEmpty else { return }
+        let lists = [ids] + previous.prefix(rememberedLists - 1).map { Array($0) }
+        UserDefaults.standard.set(lists, forKey: key)
     }
 }
 
