@@ -37,6 +37,8 @@ struct AetherTimeBar: View {
     var isCompact: Bool = false
     /// Off where the host already draws the glass (the tab bar accessory in Feeds).
     var showsGlass: Bool = true
+    /// Play / pause at the leading end (Feeds); nil leaves the bar a pure timeline.
+    var playPause: AetherTimeBarPlayPause? = nil
     var onScrubChanged: (Double) -> Void
     var onScrubEnded: (Double) -> Void
 
@@ -50,6 +52,18 @@ struct AetherTimeBar: View {
         // not jump when the elapsed time gains a digit (9:59 → 10:00).
         let template = AetherTimeBar.widestLabel(for: duration)
         HStack(spacing: 12) {
+            if let playPause {
+                Button(action: playPause.toggle) {
+                    Image(systemName: playPause.isPlaying ? "pause.fill" : "play.fill")
+                        .font(.system(size: isCompact ? 15 : 17, weight: .semibold))
+                        .foregroundStyle(.white)
+                        .frame(width: 28, height: barHeight)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .padding(.trailing, -4)
+                .accessibilityLabel(playPause.isPlaying ? "Pause" : "Play")
+            }
             timeLabel(AetherTimeBar.formatTime(displayedTime), template: template)
 
             GeometryReader { geo in
@@ -225,6 +239,11 @@ struct AetherTimeBar: View {
 }
 
 /// A marker on the time bar: where it starts and what it is called.
+struct AetherTimeBarPlayPause {
+    var isPlaying: Bool
+    var toggle: () -> Void
+}
+
 struct AetherTimeBarMarker: Equatable {
     var seconds: Double
     var title: String?

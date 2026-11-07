@@ -1406,6 +1406,7 @@ private struct FeedsTimeBarAccessory: View {
 @available(iOS 26.1, *)
 private struct FeedsTimeBar: View {
     @ObservedObject var state: ScrubberState
+    @ObservedObject private var accessory = FeedsScrubberAccessory.shared
     var isCompact: Bool
 
     var body: some View {
@@ -1418,6 +1419,7 @@ private struct FeedsTimeBar: View {
             markerSeconds: [],
             isCompact: isCompact,
             showsGlass: false,
+            playPause: AetherTimeBarPlayPause(isPlaying: accessory.isPlaying) { accessory.togglePlay?() },
             onScrubChanged: { seconds in
                 state.seeking = true
                 state.time = seconds

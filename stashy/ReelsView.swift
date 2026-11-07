@@ -3186,6 +3186,12 @@ struct ReelsViewBody: View {
                 if accessory.state !== scrubberState { accessory.state = scrubberState }
                 if accessory.showsBar != key.showsBar { accessory.showsBar = key.showsBar }
                 if accessory.isUIVisible != key.isUIVisible { accessory.isUIVisible = key.isUIVisible }
+                accessory.togglePlay = { currentItemIsPlaying.toggle() }
+            }
+            .onChange(of: currentItemIsPlaying, initial: true) { _, playing in
+                let accessory = FeedsScrubberAccessory.shared
+                if accessory.isPlaying != playing { accessory.isPlaying = playing }
+                accessory.togglePlay = { currentItemIsPlaying.toggle() }
             }
             .onDisappear { FeedsScrubberAccessory.shared.showsBar = false }
             .onChange(of: reelsPicsFilters.selectedSortOption) { _, _ in
@@ -5220,7 +5226,11 @@ struct ReelsViewBody: View {
                 // From iOS 26.1 the bar lives in the tab bar's accessory slot instead.
                 EmptyView()
             } else {
-                IsolatedScrubberBar(state: scrubberState, isUIVisible: isUIVisible)
+                IsolatedScrubberBar(
+                    state: scrubberState,
+                    isUIVisible: isUIVisible,
+                    playPause: AetherTimeBarPlayPause(isPlaying: currentItemIsPlaying) { currentItemIsPlaying.toggle() }
+                )
             }
         }
     }
@@ -5266,13 +5276,17 @@ struct ReelsViewBody: View {
 
                         // Animated clips (GIF/WebP) have no player, but with continuous play on
                         // the button pauses the auto-advance, like it does for stills in Pics.
+                        // Videos play and pause from the time bar; only an animated clip, which has
+                        // no time bar, keeps a button here.
                         let pausesAdvance = item.isAnimated && TabManager.shared.reelsContinuousPlay
-                        ChromePillIconButton(
-                            systemImage: currentItemIsPlaying ? "pause.fill" : "play.fill",
-                            enabled: isVideo || pausesAdvance,
-                            accessibilityLabel: currentItemIsPlaying ? "Pause" : "Play"
-                        ) {
-                            if isVideo || pausesAdvance { currentItemIsPlaying.toggle() }
+                        if !isVideo && pausesAdvance {
+                            ChromePillIconButton(
+                                systemImage: currentItemIsPlaying ? "pause.fill" : "play.fill",
+                                enabled: true,
+                                accessibilityLabel: currentItemIsPlaying ? "Pause" : "Play"
+                            ) {
+                                currentItemIsPlaying.toggle()
+                            }
                         }
                     }
                 }
@@ -7091,6 +7105,10 @@ final class FeedsScrubberAccessory: ObservableObject {
     @Published var isUIVisible = true
     /// The slot sits inline beside the shrunk tab bar (set by the accessory view).
     @Published var isInline = false
+    /// The active item's play state, for the bar's play / pause button.
+    @Published var isPlaying = true
+    /// Toggles the active item (set by Feeds).
+    var togglePlay: (() -> Void)?
 
     /// The slot exists from iOS 26.1; before that the bar stays inside Feeds.
     static var isAvailable: Bool {
@@ -7221,6 +7239,8 @@ final class ReelsScrubThumbnailProvider: ObservableObject {
 struct IsolatedScrubberBar: View {
     @ObservedObject var state: ScrubberState
     var isUIVisible: Bool
+    /// Feeds: play / pause inside the bar instead of a button of its own.
+    var playPause: AetherTimeBarPlayPause? = nil
 
     var body: some View {
         AetherTimeBar(
@@ -7231,6 +7251,7 @@ struct IsolatedScrubberBar: View {
             previewPlaceholderURL: state.previewPlaceholderURL,
             markerSeconds: [],
             isCompact: false,
+            playPause: playPause,
             onScrubChanged: { seconds in
                 state.seeking = true
                 state.time = seconds
