@@ -214,6 +214,12 @@ object SceneRecommendations {
         return recommendations.map { it.scene }
     }
 
+    /** iOS `rebuildAndWait`: a new list, returning once it is shown (pull to refresh). */
+    suspend fun rebuildAndWait() {
+        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) { rebuild() }
+        job?.join()
+    }
+
     fun rebuild() {
         if (!isAvailable || ServerConfigManager.activeConfig == null) return
         loadPreparedIfNeeded()

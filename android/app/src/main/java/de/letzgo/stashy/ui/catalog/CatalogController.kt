@@ -203,7 +203,17 @@ class CatalogController<T>(
         CatalogQuickSortCatalog.next(mode, sort, field)?.let { changeSort(it) }
     }
 
-    fun refresh() = list.refresh()
+    /** Pull to refresh. Sorted For You, a new For You list is built first — otherwise the list would only re-read the one shown. */
+    fun refresh() {
+        if (mode == FilterMode.Scenes && sort.isForYou) {
+            coroutineScope.launch {
+                de.letzgo.stashy.data.tools.SceneRecommendations.rebuildAndWait()
+                list.refresh()
+            }
+        } else {
+            list.refresh()
+        }
+    }
 
     /** iOS `changeSortOption(to:)` — Random twice reshuffles. */
     fun changeSort(option: SortOption) {

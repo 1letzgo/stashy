@@ -1050,6 +1050,17 @@ private struct ScenesViewContent: View {
         return true
     }
 
+    /// Pull to refresh. Sorted For You, it builds a new For You list first (and the spinner
+    /// waits for it) — otherwise the list would only re-read the one already shown.
+    private func refreshList() async {
+        #if !os(tvOS)
+        if selectedSortOption == .forYou {
+            await SceneRecommendationEngine.shared.rebuildAndWait()
+        }
+        #endif
+        performSearch()
+    }
+
     private func performSearch() {
         switch scope {
         case .catalog:
@@ -1547,7 +1558,7 @@ private struct ScenesViewContent: View {
                 .padding(.top, 16)
             }
             .background(Color.appBackground)
-            .refreshable { performSearch() }
+            .refreshable { await refreshList() }
         } else {
             VStack(spacing: 0) {
                 if !criteriaDocument.isEmpty || activePresetName != nil { quickBar }
@@ -1637,7 +1648,7 @@ private struct ScenesViewContent: View {
             }
             .collapsesCatalogChrome(enabled: scrollHeader == nil && !hideTitle)
             .background(Color.appBackground)
-            .refreshable { performSearch() }
+            .refreshable { await refreshList() }
     }
 }
 
