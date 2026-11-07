@@ -326,6 +326,8 @@ enum CatalogQuickBarPart { case all, sortOnly, sortMenu, chipsOnly }
 /// Sits at the top of a catalog list and scrolls away with it — not pinned.
 struct CatalogListQuickBar<Option: CatalogQuickSortable>: View {
     let mode: StashDBViewModel.FilterMode
+    /// List actions shown left of the sort menu in the Home row (`.sortMenu`), e.g. Select.
+    var trailingActions: [CatalogChromeSlot] = []
     let sort: Option
     let onSort: (Option) -> Void
     @ObservedObject var document: FilterCriteriaDocument
@@ -395,6 +397,9 @@ struct CatalogListQuickBar<Option: CatalogQuickSortable>: View {
             // Right-aligned: sort menu, then the list's settings button (Feeds' 6 pt gap).
             HStack(spacing: 6) {
                 Spacer(minLength: 0)
+                ForEach(Array(trailingActions.enumerated()), id: \.offset) { _, slot in
+                    DetailTopBarSlotButton(slot: slot)
+                }
                 sortMenu
                 if let onOpenFilters {
                     settingsButton(action: onOpenFilters)
@@ -476,85 +481,8 @@ struct CatalogListQuickBar<Option: CatalogQuickSortable>: View {
         .accessibilityLabel("Filter and sort settings")
     }
 
-    private func isActive(_ field: CatalogQuickSortCatalog.Field) -> Bool {
-        CatalogQuickSortCatalog.isRandom(field.field)
-            ? CatalogQuickSortCatalog.isRandom(sort.sortField)
-            : sort.sortField == field.field
-    }
-
-    private func sortIcon(_ field: String) -> String {
-        CatalogQuickSortCatalog.icon(for: field, oCounterIcon: appearance.oCounterIcon)
-    }
-
-    private var sortDirectionIcon: String {
-        if CatalogQuickSortCatalog.isRandom(sort.sortField) { return "shuffle" }
-        return sort.direction == "ASC" ? "arrow.up" : "arrow.down"
-    }
-
-    /// Native menu with the quick sorts: picking the active one again flips its direction,
-    /// and the second section sets the direction explicitly.
     private var sortMenu: some View {
-        let fields = sortFields
-        let active = fields.first(where: isActive)
-        return Menu {
-            Section("Sort by") {
-                ForEach(fields, id: \.self) { field in
-                    // A toggle so the menu shows the checkmark and the field's icon together.
-                    Toggle(isOn: Binding(
-                        get: { isActive(field) },
-                        set: { _ in
-                            HapticManager.selection()
-                            if let next = CatalogQuickSortCatalog.next(after: sort, tapping: field.field) {
-                                onSort(next)
-                            }
-                        }
-                    )) {
-                        Label(field.label, systemImage: sortIcon(field.field))
-                    }
-                }
-            }
-            if !CatalogQuickSortCatalog.isRandom(sort.sortField) {
-                Section("Order") {
-                    ForEach(["ASC", "DESC"], id: \.self) { direction in
-                        Toggle(isOn: Binding(
-                            get: { sort.direction == direction },
-                            set: { _ in
-                                guard sort.direction != direction,
-                                      let next = CatalogQuickSortCatalog.next(after: sort, tapping: sort.sortField)
-                                else { return }
-                                HapticManager.selection()
-                                onSort(next)
-                            }
-                        )) {
-                            Label(direction == "ASC" ? "Ascending" : "Descending",
-                                  systemImage: direction == "ASC" ? "arrow.up" : "arrow.down")
-                        }
-                    }
-                }
-            }
-        } label: {
-            HStack(spacing: 5) {
-                // The active sort as its icon; the name is in the menu and for VoiceOver.
-                Image(systemName: sortIcon(active?.field ?? sort.sortField))
-                    .font(.system(size: 16, weight: .semibold))
-                Image(systemName: sortDirectionIcon)
-                    .font(.caption.weight(.bold))
-                Image(systemName: "chevron.up.chevron.down")
-                    .font(.system(size: 11, weight: .bold))
-            }
-            .font(.subheadline.weight(.semibold))
-            // A control like the settings button beside it, so plain glass, not highlighted.
-            .foregroundStyle(Color.white.opacity(StashyExpandingDock.inactiveIconOpacity))
-            .padding(.horizontal, StashyExpandingDock.activeHorizontalPadding)
-            .frame(height: StashyExpandingDock.activeHeight)
-            .stashyChromeFill(shape: Capsule(style: .continuous), activeColor: nil)
-            .contentShape(Capsule(style: .continuous))
-        }
-        .menuStyle(.button)
-        .buttonStyle(.plain)
-        .menuIndicator(.hidden)
-        .fixedSize()
-        .accessibilityLabel("Sort, \(active?.label ?? "custom"), \(sort.direction == "ASC" ? "ascending" : "descending")")
+        CatalogQuickSortMenu(mode: mode, sort: sort, onSort: onSort, leadingSortFields: leadingSortFields)
     }
 
     private func sortChip(_ field: CatalogQuickSortCatalog.Field) -> some View {
@@ -917,4 +845,112 @@ private struct QuickEntityFilterSection: View {
         onChange()
     }
 }
+
+/// The quick sorts as one native menu: the active sort's icon and direction collapsed, every
+/// field with its icon open. Home's breadcrumb and the Feeds bar both use it.
+struct CatalogQuickSortMenu<Option: CatalogQuickSortable>: View {
+    let mode: StashDBViewModel.FilterMode
+    let sort: Option
+    let onSort: (Option) -> Void
+    /// Fields only this list offers, in front of the mode's own (a group's scene number).
+    var leadingSortFields: [CatalogQuickSortCatalog.Field] = []
+
+    @ObservedObject private var appearance = AppearanceManager.shared
+
+    private var sortFields: [CatalogQuickSortCatalog.Field] {
+        let available = Set(Option.allCases.map(\.sortField))
+        return (leadingSortFields + CatalogQuickSortCatalog.fields(for: mode)).filter { field in
+            CatalogQuickSortCatalog.isRandom(field.field)
+                ? available.contains { CatalogQuickSortCatalog.isRandom($0) }
+                : available.contains(field.field)
+        }
+    }
+
+    private func isActive(_ field: CatalogQuickSortCatalog.Field) -> Bool {
+        CatalogQuickSortCatalog.isRandom(field.field)
+            ? CatalogQuickSortCatalog.isRandom(sort.sortField)
+            : sort.sortField == field.field
+    }
+
+    private func sortIcon(_ field: String) -> String {
+        CatalogQuickSortCatalog.icon(for: field, oCounterIcon: appearance.oCounterIcon)
+    }
+
+    private var sortDirectionIcon: String {
+        if CatalogQuickSortCatalog.isRandom(sort.sortField) { return "shuffle" }
+        return sort.direction == "ASC" ? "arrow.up" : "arrow.down"
+    }
+
+    /// Native menu with the quick sorts: picking the active one again flips its direction,
+    /// and the second section sets the direction explicitly.
+    var body: some View {
+        let fields = sortFields
+        let active = fields.first(where: isActive)
+        return Menu {
+            Section("Sort by") {
+                ForEach(fields, id: \.self) { field in
+                    // A toggle so the menu shows the checkmark and the field's icon together.
+                    Toggle(isOn: Binding(
+                        get: { isActive(field) },
+                        set: { _ in
+                            HapticManager.selection()
+                            if let next = CatalogQuickSortCatalog.next(after: sort, tapping: field.field) {
+                                onSort(next)
+                            }
+                        }
+                    )) {
+                        Label(field.label, systemImage: sortIcon(field.field))
+                    }
+                }
+            }
+            if !CatalogQuickSortCatalog.isRandom(sort.sortField) {
+                Section("Order") {
+                    ForEach(["ASC", "DESC"], id: \.self) { direction in
+                        Toggle(isOn: Binding(
+                            get: { sort.direction == direction },
+                            set: { _ in
+                                guard sort.direction != direction,
+                                      let next = CatalogQuickSortCatalog.next(after: sort, tapping: sort.sortField)
+                                else { return }
+                                HapticManager.selection()
+                                onSort(next)
+                            }
+                        )) {
+                            Label(direction == "ASC" ? "Ascending" : "Descending",
+                                  systemImage: direction == "ASC" ? "arrow.up" : "arrow.down")
+                        }
+                    }
+                }
+            }
+        } label: {
+            HStack(spacing: 5) {
+                // The active sort as its icon; the name is in the menu and for VoiceOver.
+                Image(systemName: sortIcon(active?.field ?? sort.sortField))
+                    .font(.system(size: 16, weight: .semibold))
+                // Random has no direction; its shuffle icon already says it.
+                if !CatalogQuickSortCatalog.isRandom(sort.sortField) {
+                    Image(systemName: sortDirectionIcon)
+                        .font(.caption.weight(.bold))
+                }
+                Image(systemName: "chevron.up.chevron.down")
+                    .font(.system(size: 11, weight: .bold))
+            }
+            .font(.subheadline.weight(.semibold))
+            // A control like the settings button beside it, so plain glass, not highlighted.
+            .foregroundStyle(Color.white.opacity(StashyExpandingDock.inactiveIconOpacity))
+            .padding(.horizontal, StashyExpandingDock.activeHorizontalPadding)
+            .frame(height: StashyExpandingDock.activeHeight)
+            .stashyChromeFill(shape: Capsule(style: .continuous), activeColor: nil)
+            .contentShape(Capsule(style: .continuous))
+        }
+        .menuStyle(.button)
+        .buttonStyle(.plain)
+        .menuIndicator(.hidden)
+        .stashyNeutralMenuItems()
+        .fixedSize()
+        .accessibilityLabel("Sort, \(active?.label ?? "custom"), \(sort.direction == "ASC" ? "ascending" : "descending")")
+    }
+
+}
+
 #endif

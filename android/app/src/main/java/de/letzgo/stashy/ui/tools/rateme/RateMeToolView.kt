@@ -36,7 +36,11 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.FastForward
+import androidx.compose.material.icons.filled.Business
 import androidx.compose.material.icons.filled.OpenInFull
+import androidx.compose.material.icons.filled.Sell
+import androidx.compose.material.icons.outlined.PlayCircle
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -60,6 +64,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalConfiguration
@@ -105,6 +110,10 @@ import de.letzgo.stashy.ui.scene.SceneDetailScreen
 import de.letzgo.stashy.ui.tabBarHeight
 import de.letzgo.stashy.ui.tools.NoServerPlaceholder
 import de.letzgo.stashy.ui.tools.StashyAlert
+import de.letzgo.stashy.ui.tools.ToolsBreadcrumbChrome
+import de.letzgo.stashy.ui.tools.ToolsMenuItem
+import de.letzgo.stashy.ui.tools.ToolsMenuSectionHeader
+import de.letzgo.stashy.ui.tools.ToolsRowMenu
 import de.letzgo.stashy.ui.tools.ToolsTokens
 import de.letzgo.stashy.ui.tools.match.MatchActionButton
 import de.letzgo.stashy.ui.tools.match.MatchLoadingView
@@ -139,7 +148,10 @@ private val ModeIcons = mapOf(RateMeMode.Scenes to SF.film, RateMeMode.Images to
 fun RateMeToolView() {
     val config = ServerConfigManager.activeConfig
     if (config == null) {
-        NoServerPlaceholder(SF.starFill, "Select a server first to use RateMe.")
+        Box(Modifier.fillMaxSize()) {
+            NoServerPlaceholder(SF.starFill, "Select a server first to use RateMe.")
+            ToolsBreadcrumbChrome()
+        }
         return
     }
     val model: RateMeViewModel = viewModel(key = "rateme-${config.id}")
@@ -177,7 +189,6 @@ fun RateMeToolView() {
                     }
                 },
             )
-            ThemeRow(model) { themePicker = it }
             val bottom = bottomBarContentPadding() + if (item != null) bottomChrome else 0.dp
             Content(model, hPad, isRegular, bottom) { showDeleteConfirmation = true }
         }
@@ -194,6 +205,8 @@ fun RateMeToolView() {
                 ActionRow(model, item, hPad)
             }
         }
+        // iOS: `toolsBreadcrumbChrome { themeMenu }` — theme (and media kind) in the Tools row.
+        ToolsBreadcrumbChrome { ThemeMenu(model) { themePicker = it } }
     }
 
     themePicker?.let { kind ->
@@ -221,82 +234,67 @@ fun RateMeToolView() {
 
 // MARK: - Chrome
 
-/** iOS: `themeChips` — media kind menu (images), fixed themes, performer / studio / tag pickers. */
+/**
+ * iOS: `themeMenu` — the round's theme (and in Images the media kind) as one menu at the right of
+ * the Tools row; it was a chip row above the card. Performer / Studio / Tag open their picker
+ * sheet ([onPick]) and show the picked name once set. Label: the current theme's icon, with a
+ * tint dot while Images is narrowed to one media kind.
+ */
 @Composable
-private fun ThemeRow(model: RateMeViewModel, onPick: (RateMeThemePickerKind) -> Unit) {
+private fun ThemeMenu(model: RateMeViewModel, onPick: (RateMeThemePickerKind) -> Unit) {
     val view = LocalView.current
-    val state = rememberLazyListState()
-    val fixed = model.availableFixedThemes
-    val pickers = RateMeThemePickerKind.entries
-    val leading = if (model.mode == RateMeMode.Images) 1 else 0
-
-    // A picked performer / studio / tag sits at the far end; bring its pill into view on change.
-    var lastThemeId by remember { mutableStateOf(model.theme.id) }
-    LaunchedEffect(model.theme) {
-        if (model.theme.id == lastThemeId) return@LaunchedEffect
-        lastThemeId = model.theme.id
-        val theme = model.theme
-        val index = leading + when (theme) {
-            is RateMeTheme.Performer -> fixed.size + pickers.indexOf(RateMeThemePickerKind.Performer)
-            is RateMeTheme.Studio -> fixed.size + pickers.indexOf(RateMeThemePickerKind.Studio)
-            is RateMeTheme.Tag -> fixed.size + pickers.indexOf(RateMeThemePickerKind.Tag)
-            else -> fixed.indexOf(theme).coerceAtLeast(0)
-        }
-        val viewport = state.layoutInfo.viewportSize.width
-        state.animateScrollToItem(index, -viewport / 3)
-    }
-
-    LazyRow(
-        Modifier.fillMaxWidth().padding(bottom = ToolsTokens.menuBottomPadding),
-        state = state,
-        contentPadding = PaddingValues(horizontal = ToolsTokens.contentPadding),
-        horizontalArrangement = Arrangement.spacedBy(MatchPillSpacing),
-        userScrollEnabled = !model.isSubmitting,
-    ) {
-        if (model.mode == RateMeMode.Images) item(key = "mediaKind") { MediaKindMenu(model) }
-        items(fixed, key = { it.id }) { theme ->
-            MatchPill(theme.label, selected = model.theme == theme, enabled = !model.isSubmitting) {
+    ToolsRowMenu(
+        icon = themeIcon(model.theme),
+        accessibilityLabel = "Theme, ${model.theme.label}",
+        isActive = model.mode == RateMeMode.Images && model.imageMediaKind != RateMeImageMediaKind.All,
+        enabled = !model.isSubmitting,
+    ) { dismiss ->
+        ToolsMenuSectionHeader("Theme")
+        model.availableFixedThemes.forEach { theme ->
+            ToolsMenuItem(theme.label, themeIcon(theme), checked = model.theme == theme) {
+                dismiss()
                 view.performRateMeHaptic(RateMeHaptic.Selection)
                 model.selectThemeAsync(theme)
             }
         }
-        items(pickers, key = { it.raw }) { kind ->
+        HorizontalDivider()
+        ToolsMenuSectionHeader("Only")
+        RateMeThemePickerKind.entries.forEach { kind ->
             val picked = kind.picked(model.theme)
-            MatchPill(picked?.label ?: "${kind.title}…", selected = picked != null, enabled = !model.isSubmitting) {
+            ToolsMenuItem(picked?.label ?: "${kind.title}…", pickerIcon(kind), checked = picked != null) {
+                dismiss()
                 view.performRateMeHaptic(RateMeHaptic.Selection)
                 onPick(kind)
+            }
+        }
+        if (model.mode == RateMeMode.Images) {
+            HorizontalDivider()
+            ToolsMenuSectionHeader("Media")
+            RateMeImageMediaKind.entries.forEach { kind ->
+                ToolsMenuItem(kind.title, null, checked = kind == model.imageMediaKind) {
+                    dismiss()
+                    if (kind != model.imageMediaKind) model.selectImageMediaKind(kind)
+                }
             }
         }
     }
 }
 
-/** iOS: `mediaKindMenu` — Any media / Images / Videos as a menu pill (images mode). */
-@Composable
-private fun MediaKindMenu(model: RateMeViewModel) {
-    val p = Theme.palette
-    var expanded by remember { mutableStateOf(false) }
-    Box {
-        MatchPill(
-            model.imageMediaKind.title,
-            selected = model.imageMediaKind != RateMeImageMediaKind.All,
-            enabled = !model.isSubmitting,
-        ) { expanded = true }
-        DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }, containerColor = p.secondaryBackground) {
-            RateMeImageMediaKind.entries.forEach { kind ->
-                DropdownMenuItem(
-                    text = { Text(kind.title, style = IosTypography.body, color = p.text) },
-                    leadingIcon = {
-                        if (kind == model.imageMediaKind) Icon(Icons.Filled.Check, null, tint = p.text, modifier = Modifier.size(18.dp))
-                        else Spacer(Modifier.size(18.dp))
-                    },
-                    onClick = {
-                        expanded = false
-                        model.selectImageMediaKind(kind)
-                    },
-                )
-            }
-        }
-    }
+/** iOS: `RateMeViewModel.Theme.icon`. */
+private fun themeIcon(theme: RateMeTheme): ImageVector = when (theme) {
+    RateMeTheme.Random -> SF.shuffle
+    RateMeTheme.Newest -> SF.sparkles
+    RateMeTheme.MostPlayed -> Icons.Outlined.PlayCircle
+    is RateMeTheme.Performer -> SF.personFill
+    is RateMeTheme.Studio -> Icons.Filled.Business
+    is RateMeTheme.Tag -> Icons.Filled.Sell
+}
+
+/** iOS: `ThemePickerKind.icon`. */
+private fun pickerIcon(kind: RateMeThemePickerKind): ImageVector = when (kind) {
+    RateMeThemePickerKind.Performer -> SF.personFill
+    RateMeThemePickerKind.Studio -> Icons.Filled.Business
+    RateMeThemePickerKind.Tag -> Icons.Filled.Sell
 }
 
 // MARK: - Content

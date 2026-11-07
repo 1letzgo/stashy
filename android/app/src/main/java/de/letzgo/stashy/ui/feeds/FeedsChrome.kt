@@ -16,6 +16,7 @@ import androidx.compose.ui.composed
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.foundation.combinedClickable
@@ -113,45 +114,97 @@ fun Modifier.chromePill(height: Dp = FeedsDock.activeHeight, width: Dp? = null):
         .stashyGlass(Capsule)
 
 /**
- * iOS: `StashySectionChromeBar` + `reelsModeDock` + `reelsFilterSortPill` — the Feeds top bar.
- * Selected mode = tinted glass capsule with label (iOS `stashyChromeFill`), the others glass circles.
+ * iOS: `StashySectionChromeBar` + `reelsNavBar` — the Feeds top bar: the feed dropdown
+ * (`reelsModeDock`) at the leading edge, then trailing [delete] · sort dropdown
+ * (`reelsSortMenu`) · Filter & Sort (`reelsFilterSortPill`). [onDelete] is null when the item on
+ * screen has no delete button (setting off, Pics, markers).
  */
 @Composable
 fun FeedsTopBar(
     modes: List<ReelsModeType>,
     selected: ReelsModeType,
     onSelect: (ReelsModeType) -> Unit,
+    sort: FeedsSortMenuState,
+    onDelete: (() -> Unit)?,
     onFilterSort: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    // Native Material tabs over the video (Android look), filter button at the end. Over video
-    // the font scale is capped (OverlayMaxFontScale) so the bar does not eat the picture.
-    de.letzgo.stashy.ui.CappedFontScale { de.letzgo.stashy.ui.NativeTabStrip(
-        modes, selected, { it.title }, { if (it != selected) onSelect(it) }, modifier, transparent = true, icon = { it.icon },
-        trailing = {
-            androidx.compose.material3.IconButton(onClick = onFilterSort) {
-                Icon(SF.sliderHorizontal3, "Filter and sort", tint = Color.White)
+    // Over video the font scale is capped (OverlayMaxFontScale) so the bar does not eat the picture.
+    de.letzgo.stashy.ui.CappedFontScale {
+        Column(
+            // iOS `.background(.bar)` + bottom divider, dark over the feed.
+            modifier.fillMaxWidth().background(Color.Black.copy(alpha = 0.55f))
+                .windowInsetsPadding(WindowInsets.statusBars),
+        ) {
+            Row(
+                Modifier.fillMaxWidth().heightIn(min = FeedsDock.activeHeight)
+                    .padding(horizontal = FeedsDock.edgePadding).padding(top = 6.dp, bottom = 10.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                Box(Modifier.weight(1f)) { FeedModeMenu(modes, selected, onSelect) }
+                Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
+                    onDelete?.let { ChromePillIcon(SF.trash, "Delete", it) }
+                    FeedsSortMenu(sort)
+                    ChromePillIcon(SF.sliderHorizontal3, "Filter and sort", onFilterSort)
+                }
             }
-        },
-    ) }
+            HorizontalDivider(color = Color.White.copy(alpha = 0.15f))
+        }
+    }
 }
 
+/** iOS: icon-only `StashyChromePillStyle` button of the top bar (Delete, Filter & Sort). */
 @Composable
-private fun ModeChip(mode: ReelsModeType, selected: Boolean, onClick: () -> Unit) {
-    val shape = Capsule
-    Row(
-        Modifier
-            .height(FeedsDock.activeHeight)
-            .widthIn(min = FeedsDock.circleSize)
-            .animateContentSize(spring(dampingRatio = 0.72f, stiffness = Spring.StiffnessMediumLow))
-            .let { if (selected) it.stashyGlass(shape, Appearance.tint) else it.stashyGlass(shape) }
-            .noIndicationClick(onClick)
-            .padding(horizontal = if (selected) FeedsDock.activeHorizontalPadding else (FeedsDock.circleSize - FeedsDock.iconSize) / 2),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(if (selected) FeedsDock.iconLabelSpacing else 0.dp),
+private fun ChromePillIcon(icon: ImageVector, description: String, onClick: () -> Unit) {
+    Box(
+        Modifier.chromePill(width = FeedsDock.circleSize).noIndicationClick(onClick)
+            .semantics { role = Role.Button },
+        contentAlignment = Alignment.Center,
     ) {
-        Icon(mode.icon, mode.title, tint = if (selected) Color.White else Color.White.copy(alpha = FeedsDock.inactiveIconOpacity), modifier = Modifier.size(FeedsDock.iconSize))
-        if (selected) Text(mode.title, style = IosTypography.subheadline.copy(fontWeight = FontWeight.SemiBold), color = Color.White, maxLines = 1)
+        Icon(icon, description, tint = Color.White.copy(alpha = FeedsDock.inactiveIconOpacity), modifier = Modifier.size(FeedsDock.iconSize))
+    }
+}
+
+/**
+ * iOS `reelsModeDock`: one menu named after the open feed (tinted capsule: icon · name ·
+ * up/down chevron); it lists every enabled feed with its icon and a checkmark on the open one.
+ */
+@Composable
+private fun FeedModeMenu(modes: List<ReelsModeType>, selected: ReelsModeType, onSelect: (ReelsModeType) -> Unit) {
+    var open by remember { mutableStateOf(false) }
+    val colors = feedsMenuItemColors()
+    Box {
+        Row(
+            Modifier
+                .height(FeedsDock.activeHeight)
+                .stashyGlass(Capsule, Appearance.tint)
+                .noIndicationClick { open = true }
+                .padding(horizontal = FeedsDock.activeHorizontalPadding)
+                .semantics(mergeDescendants = true) { role = Role.Button; contentDescription = "Feed, ${selected.title}" },
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+        ) {
+            Icon(selected.icon, null, tint = Color.White, modifier = Modifier.size(16.dp))
+            Text(
+                selected.title, style = IosTypography.subheadline.copy(fontWeight = FontWeight.SemiBold),
+                color = Color.White, maxLines = 1, overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f, fill = false),
+            )
+            Icon(SF.chevronUpChevronDown, null, tint = Color.White, modifier = Modifier.size(14.dp))
+        }
+        DropdownMenu(open, onDismissRequest = { open = false }, containerColor = de.letzgo.stashy.ui.Theme.palette.secondaryBackground, shape = RoundedCornerShape(12.dp)) {
+            modes.forEach { m ->
+                DropdownMenuItem(
+                    text = { Text(m.title) },
+                    leadingIcon = { Icon(m.icon, null) },
+                    trailingIcon = { if (m == selected) Icon(SF.checkmark, "Selected") },
+                    colors = colors,
+                    // Same as tapping a mode pill did; the open feed again is a no-op.
+                    onClick = { open = false; if (m != selected) onSelect(m) },
+                )
+            }
+        }
     }
 }
 
@@ -276,7 +329,7 @@ fun StackedPill(icon: ImageVector, value: String, active: Boolean, modifier: Mod
 
 /**
  * iOS: `reelsInfoOverlay` — avatar · performer / title on the leading side, the control stack
- * (O-Counter, Rating, Delete, Mute, Play) trailing, hashtags in their own row below.
+ * (O-Counter, Rating, Mute, Play) trailing (Delete sits in the top bar), hashtags in their own row below.
  */
 @Composable
 fun FeedsInfoOverlay(
@@ -284,7 +337,6 @@ fun FeedsInfoOverlay(
     mode: ReelsModeType,
     isMuted: Boolean,
     isPlaying: Boolean,
-    showsDelete: Boolean,
     onPerformerFilter: (FeedPerformer) -> Unit,
     onPerformerOpen: (FeedPerformer) -> Unit,
     onTitle: () -> Unit,
@@ -293,7 +345,6 @@ fun FeedsInfoOverlay(
     onRemoveTag: (IdName) -> Unit,
     onOCounter: (FeedsRepository.OMutation) -> Unit,
     onRating: (Int?) -> Unit,
-    onDelete: () -> Unit,
     onToggleMute: () -> Unit,
     onTogglePlay: () -> Unit,
     pausesAdvance: Boolean,
@@ -302,8 +353,8 @@ fun FeedsInfoOverlay(
     // Over video: text follows the system font scale up to OverlayMaxFontScale (1.3×) so the
     // overlay never covers most of the clip; containers below wrap their content.
     de.letzgo.stashy.ui.CappedFontScale { FeedsInfoOverlayContent(
-        item, mode, isMuted, isPlaying, showsDelete, onPerformerFilter, onPerformerOpen, onTitle, onTag, onAddTags,
-        onRemoveTag, onOCounter, onRating, onDelete, onToggleMute, onTogglePlay, pausesAdvance, onAddPerformers,
+        item, mode, isMuted, isPlaying, onPerformerFilter, onPerformerOpen, onTitle, onTag, onAddTags,
+        onRemoveTag, onOCounter, onRating, onToggleMute, onTogglePlay, pausesAdvance, onAddPerformers,
     ) }
 }
 
@@ -313,7 +364,6 @@ private fun FeedsInfoOverlayContent(
     mode: ReelsModeType,
     isMuted: Boolean,
     isPlaying: Boolean,
-    showsDelete: Boolean,
     onPerformerFilter: (FeedPerformer) -> Unit,
     onPerformerOpen: (FeedPerformer) -> Unit,
     onTitle: () -> Unit,
@@ -322,7 +372,6 @@ private fun FeedsInfoOverlayContent(
     onRemoveTag: (IdName) -> Unit,
     onOCounter: (FeedsRepository.OMutation) -> Unit,
     onRating: (Int?) -> Unit,
-    onDelete: () -> Unit,
     onToggleMute: () -> Unit,
     onTogglePlay: () -> Unit,
     pausesAdvance: Boolean,
@@ -355,7 +404,6 @@ private fun FeedsInfoOverlayContent(
             Spacer(Modifier.width(8.dp))
             Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 if (mode != ReelsModeType.Pics) FeedsRateChrome(item, onOCounter, onRating)
-                if (showsDelete && item.supportsDelete) ChromePillIconButton(SF.trash, "Delete", onClick = onDelete)
                 ChromePillIconButton(if (isMuted) SF.speakerSlashFill else SF.speakerWave2Fill, if (isMuted) "Unmute" else "Mute", enabled = item.isVideo, onClick = onToggleMute)
                 ChromePillIconButton(if (isPlaying) SF.pauseFill else SF.playFill, if (isPlaying) "Pause" else "Play", enabled = item.isVideo || pausesAdvance, onClick = onTogglePlay)
             }

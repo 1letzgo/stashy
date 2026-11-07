@@ -828,6 +828,7 @@ struct RateMeToolsView: View {
     @State private var didRunInitialRateMeLoad = false
     @State private var showDeleteConfirmation = false
     @State private var themePicker: ThemePickerKind?
+    @Environment(\.toolsBreadcrumb) private var toolsBreadcrumb
 
     private var isRegular: Bool { horizontalSizeClass == .regular }
 
@@ -874,13 +875,11 @@ struct RateMeToolsView: View {
                 }
             }
 
-            themeChips
-                .padding(.bottom, DesignTokens.Tools.menuBottomPadding)
-
             content
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(Color.appBackground)
+        .toolsBreadcrumbChrome(toolsBreadcrumb) { themeMenu }
         .safeAreaInset(edge: .bottom, spacing: 0) {
             if let item = model.item {
                 actionRow(item)
@@ -963,43 +962,57 @@ struct RateMeToolsView: View {
 
     // MARK: Themes
 
-    /// The round's theme, same pill look as the section row (glass, tint when picked).
-    private var themeChips: some View {
-        ScrollViewReader { proxy in
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: StashyExpandingDock.itemSpacing) {
-                    if model.mode == .images {
-                        mediaKindMenu
-                    }
-                    ForEach(model.availableFixedThemes) { theme in
-                        themeChip(title: theme.label, selected: model.theme == theme) {
+    /// The round's theme (and in Images the media kind) as one menu at the right of the Tools
+    /// row; it was a chip row above the card. Performer / Studio / Tag open their picker sheet.
+    private var themeMenu: some View {
+        Menu {
+            Section("Theme") {
+                ForEach(model.availableFixedThemes) { theme in
+                    Toggle(isOn: Binding(
+                        get: { model.theme == theme },
+                        set: { _ in
+                            HapticManager.selection()
                             Task { await model.selectTheme(theme) }
                         }
-                        .id(theme.id)
+                    )) {
+                        Label(theme.label, systemImage: theme.icon)
                     }
-                    ForEach([ThemePickerKind.performer, .studio, .tag]) { kind in
-                        let picked = pickedTheme(for: kind)
-                        themeChip(title: picked?.label ?? "\(kind.title)…", selected: picked != nil) {
-                            themePicker = kind
+                }
+            }
+            Section("Only") {
+                ForEach([ThemePickerKind.performer, .studio, .tag]) { kind in
+                    let picked = pickedTheme(for: kind)
+                    Toggle(isOn: Binding(
+                        get: { picked != nil },
+                        set: { _ in themePicker = kind }
+                    )) {
+                        Label(picked?.label ?? "\(kind.title)…", systemImage: kind.icon)
+                    }
+                }
+            }
+            if model.mode == .images {
+                Section("Media") {
+                    Picker("Media", selection: $model.imageMediaKind) {
+                        ForEach(ImageListMediaKind.allCases) { kind in
+                            Text(Self.mediaKindTitle(kind)).tag(kind)
                         }
-                        .id(kind.rawValue)
                     }
+                    .pickerStyle(.inline)
                 }
-                .padding(.horizontal, DesignTokens.Tools.contentPadding)
             }
-            // A picked performer / studio / tag sits at the far end; bring its chip into view.
-            .onChange(of: model.theme) { _, theme in
-                let target: String
-                switch theme {
-                case .performer: target = ThemePickerKind.performer.rawValue
-                case .studio: target = ThemePickerKind.studio.rawValue
-                case .tag: target = ThemePickerKind.tag.rawValue
-                default: target = theme.id
-                }
-                withAnimation { proxy.scrollTo(target, anchor: .center) }
-            }
+        } label: {
+            ToolsRowMenuLabel(
+                systemImage: model.theme.icon,
+                isActive: model.mode == .images && model.imageMediaKind != .all
+            )
         }
+        .menuStyle(.button)
+        .buttonStyle(.plain)
+        .menuIndicator(.hidden)
+        .stashyNeutralMenuItems()
+        .fixedSize()
         .disabled(model.isSubmitting)
+        .accessibilityLabel("Theme, \(model.theme.label)")
     }
 
     private func pickedTheme(for kind: ThemePickerKind) -> RateMeViewModel.Theme? {
@@ -1007,54 +1020,6 @@ struct RateMeToolsView: View {
         case (.performer, .performer), (.studio, .studio), (.tag, .tag): return model.theme
         default: return nil
         }
-    }
-
-    private func themeChip(title: String, selected: Bool, action: @escaping () -> Void) -> some View {
-        Button {
-            HapticManager.selection()
-            action()
-        } label: {
-            pillLabel(Text(title), selected: selected)
-        }
-        .buttonStyle(.plain)
-        .accessibilityAddTraits(selected ? .isSelected : [])
-    }
-
-    /// Text pill with the chrome fill of `ToolsPillMenuRow`.
-    private func pillLabel<Content: View>(_ content: Content, selected: Bool) -> some View {
-        content
-            .font(.subheadline.weight(.semibold))
-            .lineLimit(1)
-            .fixedSize(horizontal: true, vertical: false)
-            .foregroundStyle(selected ? Color.onAppTint : Color.primary.opacity(0.85))
-            .padding(.horizontal, 16)
-            .frame(height: StashyExpandingDock.activeHeight)
-            .stashyChromeFill(
-                shape: Capsule(style: .continuous),
-                activeColor: selected ? appearance.tintColor : nil
-            )
-            .contentShape(Capsule(style: .continuous))
-    }
-
-    /// Any / Image / Video as a menu pill in the theme row (images mode only).
-    private var mediaKindMenu: some View {
-        Menu {
-            Picker("Media", selection: $model.imageMediaKind) {
-                ForEach(ImageListMediaKind.allCases) { kind in
-                    Text(Self.mediaKindTitle(kind)).tag(kind)
-                }
-            }
-        } label: {
-            pillLabel(
-                HStack(spacing: 4) {
-                    Text(Self.mediaKindTitle(model.imageMediaKind))
-                    Image(systemName: "chevron.down")
-                        .font(.caption2.weight(.bold))
-                },
-                selected: model.imageMediaKind != .all
-            )
-        }
-        .disabled(model.isSubmitting)
     }
 
     private static func mediaKindTitle(_ kind: ImageListMediaKind) -> String {

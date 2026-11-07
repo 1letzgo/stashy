@@ -440,6 +440,8 @@ private fun FeedHeader(image: StashImage, currentGalleryId: String?, onAddPerfor
     val openGallery: (() -> Unit)? = gallery?.let { g -> { Nav.push(GalleryDetailScreen(g.id, Gallery(id = g.id, title = g.title ?: g.name ?: "Gallery"), forceOneColumnFeed = true)) } }
     // iOS: `PerformerDetailView(performer:initialTab: .images)`.
     fun openPerformer(p: IdName) = Nav.push(PerformerDetailScreen(p.id, Performer(id = p.id, name = p.name.orEmpty()), initialTab = de.letzgo.stashy.ui.detail.DetailTab.Images))
+    // Feeds › Pics: a name filters the feed instead (iOS `imageFeedPerformerTap`).
+    val performerTap = de.letzgo.stashy.ui.feeds.LocalImageFeedPerformerTap.current
     val nameStyle = IosTypography.subheadline.copy(fontWeight = FontWeight.SemiBold, shadow = textShadow)
     val smallStyle = IosTypography.caption2.copy(shadow = textShadow)
 
@@ -464,7 +466,7 @@ private fun FeedHeader(image: StashImage, currentGalleryId: String?, onAddPerfor
                         performers.forEachIndexed { i, pf ->
                             Text(
                                 pf.name.orEmpty(), style = nameStyle, color = Color.White, maxLines = 1, overflow = TextOverflow.Ellipsis,
-                                modifier = Modifier.weight(1f, fill = false).noRippleClickable { openPerformer(pf) },
+                                modifier = Modifier.weight(1f, fill = false).noRippleClickable { if (performerTap != null) performerTap(pf) else openPerformer(pf) },
                             )
                             if (i < performers.size - 1) Text("&", style = IosTypography.subheadline, color = Color.White.copy(alpha = 0.75f))
                         }

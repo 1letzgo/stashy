@@ -13,6 +13,8 @@ struct SessionTimelineToolsView: View {
     @ObservedObject private var configManager = ServerConfigManager.shared
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @State private var enabledKinds: Set<TimelineKind> = TimelineKind.savedFilter()
+    @Environment(\.toolsBreadcrumb) private var toolsBreadcrumb
+    @ObservedObject private var appearance = AppearanceManager.shared
 
     var body: some View {
         Group {
@@ -26,6 +28,7 @@ struct SessionTimelineToolsView: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .applyAppBackground()
+        .toolsBreadcrumbChrome(toolsBreadcrumb) { kindMenu }
         .task { await loader.reload() }
         .onChange(of: enabledKinds) { _, kinds in
             TimelineKind.saveFilter(kinds)
@@ -36,6 +39,53 @@ struct SessionTimelineToolsView: View {
         }
     }
 
+    /// Which activity shows, at the right of the Tools row (it was a pill row above the list).
+    /// Several can be on; the last one stays.
+    private var kindMenu: some View {
+        Menu {
+            Section("Show") {
+                ForEach(TimelineKind.allCases) { kind in
+                    Toggle(isOn: Binding(
+                        get: { enabledKinds.contains(kind) },
+                        set: { on in
+                            HapticManager.selection()
+                            if on {
+                                enabledKinds.insert(kind)
+                            } else if enabledKinds.count > 1 {
+                                enabledKinds.remove(kind)
+                            }
+                        }
+                    )) {
+                        Label(kind.label, systemImage: icon(for: kind))
+                    }
+                }
+            }
+        } label: {
+            ToolsRowMenuLabel(
+                systemImage: "line.3.horizontal.decrease",
+                isActive: enabledKinds.count < TimelineKind.allCases.count
+            )
+        }
+        .menuStyle(.button)
+        .buttonStyle(.plain)
+        .menuIndicator(.hidden)
+        .stashyNeutralMenuItems()
+        #if os(iOS)
+        // Stays open while toggling several kinds (iOS only; macOS menus close per pick).
+        .menuActionDismissBehavior(.disabled)
+        #endif
+        .fixedSize()
+        .accessibilityLabel("Show activity")
+    }
+
+    private func icon(for kind: TimelineKind) -> String {
+        switch kind {
+        case .watch: return "play.circle"
+        case .oCount: return appearance.oCounterIcon
+        case .marker: return "bookmark"
+        }
+    }
+
     private var visibleDays: [TimelineDayGroup] {
         Self.days(from: loader.sessions.compactMap { $0.filtered(to: enabledKinds) })
     }
@@ -43,13 +93,6 @@ struct SessionTimelineToolsView: View {
     private var timelineList: some View {
         ScrollView {
             VStack(spacing: 0) {
-                // Scrolls with the content (same as the Charts tool) instead of floating in a
-                // `safeAreaInset` above it. Außerhalb des 28er-Rasters, damit die Reihe exakt
-                // wie `ToolsPillMenuRow` sitzt: 12pt oben, 12pt unten.
-                TimelineFilterChipRow(enabled: $enabledKinds)
-                    .padding(.top, DesignTokens.Tools.menuTopPadding)
-                    .padding(.bottom, DesignTokens.Tools.menuBottomPadding)
-
                 LazyVStack(alignment: horizontalSizeClass == .regular ? .center : .leading, spacing: 28) {
                     if loader.isLoading && loader.sessions.isEmpty {
                         StandardLoadingView(message: "Loading timeline...")
@@ -89,6 +132,7 @@ struct SessionTimelineToolsView: View {
                 }
                 .frame(maxWidth: .infinity, alignment: horizontalSizeClass == .regular ? .center : .leading)
             }
+            .padding(.top, DesignTokens.Tools.menuTopPadding)
             .toolsHorizontalPadding(horizontalSizeClass)
             .padding(.bottom, DesignTokens.Tools.menuBottomPadding + 12)
             .frame(maxWidth: DesignTokens.Tools.regularMaxContentWidth)
@@ -119,57 +163,6 @@ private struct TimelineDayGroup: Identifiable {
     let day: Date
     let sessions: [TimelineSession]
     var id: Date { day }
-}
-
-private struct TimelineFilterChipRow: View {
-    @Binding var enabled: Set<TimelineKind>
-    @ObservedObject private var appearance = AppearanceManager.shared
-
-    var body: some View {
-        HStack(spacing: StashyExpandingDock.itemSpacing) {
-            ForEach(TimelineKind.allCases) { kind in
-                let selected = enabled.contains(kind)
-                Button {
-                    HapticManager.selection()
-                    toggle(kind)
-                } label: {
-                    // Mirrors `ToolsPillMenuRow` (Charts' section pills) — same font, height
-                    // and shadow, only multi-select.
-                    Text(kind.label)
-                        .font(.subheadline.weight(.semibold))
-                        .foregroundStyle(selected ? Color.onAppTint : Color.primary.opacity(0.85))
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.65)
-                        .frame(maxWidth: .infinity)
-                        .frame(height: StashyExpandingDock.activeHeight)
-                        .background(
-                            Capsule(style: .continuous)
-                                .fill(selected ? appearance.tintColor : Color.secondaryAppBackground)
-                                .shadow(
-                                    color: selected ? appearance.tintColor.opacity(0.35) : .clear,
-                                    radius: 6,
-                                    x: 0,
-                                    y: 3
-                                )
-                        )
-                        .clipShape(Capsule(style: .continuous))
-                        .contentShape(Capsule(style: .continuous))
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel("\(kind.label)\(selected ? ", selected" : "")")
-                .accessibilityAddTraits(selected ? .isSelected : [])
-            }
-        }
-    }
-
-    private func toggle(_ kind: TimelineKind) {
-        if enabled.contains(kind) {
-            guard enabled.count > 1 else { return }
-            enabled.remove(kind)
-        } else {
-            enabled.insert(kind)
-        }
-    }
 }
 
 private struct TimelineDayBlock: View {

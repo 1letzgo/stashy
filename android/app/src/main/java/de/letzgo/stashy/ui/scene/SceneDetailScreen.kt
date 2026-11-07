@@ -322,9 +322,10 @@ private fun SceneDetailContent(model: SceneDetailModel, openedFromMiniPlayer: Bo
 }
 
 /**
- * iOS: `sceneDetailNavBar` (Back pill · Identify · download state) as a native Material top app
- * bar: back arrow · scene title · Identify (no StashID yet) · download state · "⋮" overflow
- * with the page's rarer actions (edit title & details, delete — same handlers as the cards).
+ * iOS: `sceneDetailNavBar` (`StashyDetailTopBar(trailingSlots: sceneActionSlots)`: Back ·
+ * Identify · download state · Delete) as a native Material top app bar: back arrow · scene title ·
+ * Identify (no StashID yet; spinner while running) · download state · Delete (confirmation) ·
+ * "⋮" overflow with Edit title & details, only in edit mode.
  */
 @Composable
 private fun SceneDetailNavBar(model: SceneDetailModel, openedFromMiniPlayer: Boolean, onEditTitle: () -> Unit) {
@@ -336,9 +337,10 @@ private fun SceneDetailNavBar(model: SceneDetailModel, openedFromMiniPlayer: Boo
         }
         // iOS `sceneDownloadNavButton`: green check · progress ring · "Save scene" (stashy+ gate on tap).
         SceneDownloadNavButton(model.scene)
-        TopBarOverflowMenu { dismiss ->
-            if (Appearance.isEditModeEnabled) OverflowItem("Edit title & details", de.letzgo.stashy.ui.SF.pencil, dismiss, onClick = onEditTitle)
-            OverflowItem("Delete scene", PlayerIcons.trash, dismiss, color = StashyColors.systemRed) { model.showDeleteConfirmation = true }
+        // iOS `sceneActionSlots`: Delete sits in the bar itself (opens the confirmation).
+        TopBarAction(PlayerIcons.trash, "Delete scene") { model.showDeleteConfirmation = true }
+        if (Appearance.isEditModeEnabled) TopBarOverflowMenu { dismiss ->
+            OverflowItem("Edit title & details", de.letzgo.stashy.ui.SF.pencil, dismiss, onClick = onEditTitle)
         }
     }
 }

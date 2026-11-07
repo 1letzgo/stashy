@@ -643,9 +643,34 @@ private struct ImagesViewBody: View {
         StashyDetailChromeConfig(listSlots: nil, insetSpacing: 0)
     }
 
-    /// Opened gallery: Back only; Edit sits in the floating bar (`imagesChromeConfig`).
+    /// Opened gallery: Back, and at the right Edit (edit mode), Select and Download. The floating
+    /// bar only appears for selection mode's Done.
     private var openedGalleryNavBar: some View {
-        StashyDetailTopBar(onBack: { dismiss() })
+        StashyDetailTopBar(trailingSlots: openedGalleryActions, onBack: { dismiss() })
+    }
+
+    private var openedGalleryActions: [CatalogChromeSlot] {
+        var actions: [CatalogChromeSlot] = []
+        if appearanceManager.isEditModeEnabled {
+            actions.append(CatalogChromeSlot(systemImage: "pencil", accessibilityLabel: "Edit gallery") {
+                HapticManager.light()
+                showingEditGallerySheet = true
+            })
+        }
+        actions.append(selectImagesSlot)
+        if let gallery { actions.append(galleryDownloadSlot(gallery)) }
+        return actions
+    }
+
+    /// Enters selection mode; the floating bar then shows Done.
+    private var selectImagesSlot: CatalogChromeSlot {
+        CatalogChromeSlot(
+            systemImage: "checkmark.circle",
+            accessibilityLabel: "Select images",
+            action: {
+                withAnimation(DesignTokens.Animation.quick) { isSelectionMode = true }
+            }
+        )
     }
 
     /// Opened-gallery top block, laid out like scene detail: one header card (cover hero
@@ -841,20 +866,10 @@ private struct ImagesViewBody: View {
                 accessibilityLabel: "Settings",
                 action: { imageListFilters.showFilterSortSheet = true }
             ),
-            contextual: CatalogChromeSlot(
-                systemImage: "checkmark.circle",
-                accessibilityLabel: "Select images",
-                action: {
-                    withAnimation(DesignTokens.Animation.quick) { isSelectionMode = true }
-                }
-            ),
-            secondaryContextual: gallery.map { galleryDownloadSlot($0) },
-            entityActions: isOpenedGallery && appearanceManager.isEditModeEnabled
-                ? [CatalogChromeSlot(systemImage: "pencil", accessibilityLabel: "Edit gallery") {
-                    HapticManager.light()
-                    showingEditGallerySheet = true
-                }]
-                : [],
+            // An opened gallery has Select in its top bar, a Home list in the Home row; only the
+            // Images tab of its own keeps it here.
+            contextual: isOpenedGallery || homeMenu != nil ? nil : selectImagesSlot,
+            entityActions: [],
             selection: CatalogSelectionChrome(
                 isActive: isSelectionMode,
                 count: selectedImageIds.count,
@@ -955,6 +970,7 @@ private struct ImagesViewBody: View {
     private func quickBar(part: CatalogQuickBarPart) -> some View {
         CatalogListQuickBar(
             mode: .images,
+            trailingActions: part == .sortMenu ? [selectImagesSlot] : [],
             sort: imageListFilters.selectedSortOption,
             onSort: { changeSortOption(to: $0) },
             document: imageListFilters.criteriaDocument,
@@ -1633,12 +1649,26 @@ extension ImageGroupCatalogCell {
 }
 
 /// Semi-transparent header overlaid on the 1/row thumbnail.
+/// Feeds › Pics: a tap on a name filters the feed by that performer, like Clips. Elsewhere it is
+/// nil and the name opens the performer.
+private struct ImageFeedPerformerTapKey: EnvironmentKey {
+    static let defaultValue: ((GalleryPerformer) -> Void)? = nil
+}
+
+extension EnvironmentValues {
+    var imageFeedPerformerTap: ((GalleryPerformer) -> Void)? {
+        get { self[ImageFeedPerformerTapKey.self] }
+        set { self[ImageFeedPerformerTapKey.self] = newValue }
+    }
+}
+
 struct ImageCatalogFeedHeader: View {
     let image: StashImage
     var currentGalleryId: String? = nil
     /// Edit mode "+" behind the names; `nil` hides it (no view model to save with).
     var onEditPerformers: (() -> Void)? = nil
     @ObservedObject private var appearanceManager = AppearanceManager.shared
+    @Environment(\.imageFeedPerformerTap) private var onPerformerTap
 
     private var performers: [GalleryPerformer] {
         image.performers ?? []
@@ -1757,25 +1787,11 @@ struct ImageCatalogFeedHeader: View {
                 .lineLimit(1)
                 .shadow(color: .black.opacity(0.35), radius: 1, y: 1)
         } else if performers.count == 1 {
-            NavigationLink(destination: PerformerDetailView(performer: performers[0].toPerformer(), initialTab: .images)) {
-                Text(performers[0].name)
-                    .font(.subheadline).fontWeight(.semibold)
-                    .foregroundColor(.white)
-                    .lineLimit(1)
-                    .shadow(color: .black.opacity(0.35), radius: 1, y: 1)
-            }
-            .buttonStyle(.plain)
+            performerName(performers[0])
         } else {
             HStack(spacing: 4) {
                 ForEach(Array(performers.enumerated()), id: \.element.id) { idx, performer in
-                    NavigationLink(destination: PerformerDetailView(performer: performer.toPerformer(), initialTab: .images)) {
-                        Text(performer.name)
-                            .font(.subheadline).fontWeight(.semibold)
-                            .foregroundColor(.white)
-                            .lineLimit(1)
-                            .shadow(color: .black.opacity(0.35), radius: 1, y: 1)
-                    }
-                    .buttonStyle(.plain)
+                    performerName(performer)
                     if idx < performers.count - 1 {
                         Text("&")
                             .font(.subheadline)
@@ -1783,6 +1799,26 @@ struct ImageCatalogFeedHeader: View {
                     }
                 }
             }
+        }
+    }
+
+    /// Filters Feeds › Pics by the performer when the feed provides that, otherwise opens them.
+    @ViewBuilder
+    private func performerName(_ performer: GalleryPerformer) -> some View {
+        let label = Text(performer.name)
+            .font(.subheadline).fontWeight(.semibold)
+            .foregroundColor(.white)
+            .lineLimit(1)
+            .shadow(color: .black.opacity(0.35), radius: 1, y: 1)
+        if let onPerformerTap {
+            Button { onPerformerTap(performer) } label: { label }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Filter by \(performer.name)")
+        } else {
+            NavigationLink(destination: PerformerDetailView(performer: performer.toPerformer(), initialTab: .images)) {
+                label
+            }
+            .buttonStyle(.plain)
         }
     }
 

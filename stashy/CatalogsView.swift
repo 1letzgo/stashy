@@ -153,7 +153,82 @@ struct CatalogsView: View {
         }
     }
     
+    /// With the dashboard on, Home is a real stack: the dashboard is the root and every library
+    /// view is pushed onto it, so the system's own swipe-back, corners, shadow and parallax take
+    /// it back. Without the dashboard there is nothing to return to and the view is the root.
+    private var pushesLibraryViews: Bool {
+        sortedVisibleTabs.contains(.dashboard) && sortedVisibleTabs.count > 1
+    }
+
+    /// Pushed while the open view is not the dashboard. A pop (swipe-back, tab re-tap) writes the
+    /// dashboard back, so the breadcrumb, the dropdown and deep links all go through one value.
+    private var libraryPushedBinding: Binding<Bool> {
+        Binding(
+            get: { effectiveTab.map { $0 != .dashboard } ?? false },
+            set: { pushed in
+                if !pushed, effectiveTab != .dashboard {
+                    coordinator.catalogueSubTab = CatalogsTab.dashboard.rawValue
+                }
+            }
+        )
+    }
+
+    /// The dashboard's own row always draws the icon strip, also while a library page is pushed
+    /// on top: it shows through during the swipe-back.
+    private var dashboardRowMenu: HomeViewsMenu {
+        HomeViewsMenu(
+            tabs: sortedVisibleTabs,
+            selection: Binding(get: { .dashboard }, set: { selectedTabBinding.wrappedValue = $0 })
+        )
+    }
+
+    /// The pushed page keeps showing the last library view while it slides away; the open view
+    /// is already the dashboard by then.
+    @State private var lastLibraryTab: CatalogsTab?
+
+    @ViewBuilder
+    private var libraryPage: some View {
+        if let tab = (effectiveTab == .dashboard ? nil : effectiveTab) ?? lastLibraryTab {
+            catalogRoot(for: tab)
+                .environment(\.homeBreadcrumbMenu, homeViewsMenu)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                // The dropdown swaps the view inside this page, instantly.
+                .transaction(value: coordinator.catalogueSubTab) { $0.animation = nil }
+                .animation(nil, value: coordinator.catalogueSubTab)
+                // A switch in the dropdown or a deep link clears details pushed above this page.
+                .background(CatalogueStackTrim(
+                    trigger: "\(coordinator.catalogueSubTab)|\(coordinator.cataloguePopToken.uuidString)",
+                    keepsLibraryPage: true
+                ))
+                .hideSystemNavigationBarForCustomChrome()
+                .enableSwipeBackWhenNavBarHidden()
+        }
+    }
+
     var body: some View {
+        if pushesLibraryViews {
+            catalogRoot(for: .dashboard)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .navigationDestination(isPresented: libraryPushedBinding) { libraryPage }
+                .onChange(of: effectiveTab, initial: true) { _, tab in
+                    if let tab, tab != .dashboard { lastLibraryTab = tab }
+                }
+                // A deep link to the dashboard clears what was pushed from it.
+                .background(CatalogueStackTrim(
+                    trigger: coordinator.cataloguePopToken.uuidString,
+                    keepsLibraryPage: false,
+                    isEnabled: effectiveTab == .dashboard
+                ))
+                .stashySectionChrome(showsSwitcher: true) {
+                    HomeBreadcrumbRow(menu: dashboardRowMenu) { EmptyView() }
+                }
+        } else {
+            switchedRoot
+        }
+    }
+
+    /// Without a dashboard: the single library view is the root and the dropdown switches it.
+    private var switchedRoot: some View {
         Group {
             if let tab = effectiveTab {
                 catalogRoot(for: tab)
@@ -183,6 +258,84 @@ struct CatalogsView: View {
         }
     }
 }
+
+#if os(iOS)
+/// Trims the catalogue stack when `trigger` changes. On the pushed library page it keeps the
+/// dashboard and that page (details above it go, and so do details a deep link left beneath it);
+/// on the dashboard it pops to the root. With `isEnabled` false a change is only noted.
+struct CatalogueStackTrim: UIViewControllerRepresentable {
+    let trigger: String
+    let keepsLibraryPage: Bool
+    var isEnabled = true
+
+    func makeCoordinator() -> Coordinator { Coordinator() }
+
+    func makeUIViewController(context: Context) -> Host {
+        let host = Host()
+        host.view.isHidden = true
+        host.view.isUserInteractionEnabled = false
+        host.keepsLibraryPage = keepsLibraryPage
+        return host
+    }
+
+    func updateUIViewController(_ host: Host, context: Context) {
+        guard context.coordinator.lastTrigger != trigger else { return }
+        let isFirst = context.coordinator.lastTrigger == nil
+        context.coordinator.lastTrigger = trigger
+        guard !isFirst, isEnabled else { return }
+        // Defer so SwiftUI finishes its own push / swap first.
+        DispatchQueue.main.async { host.trim(keepingAbove: false) }
+    }
+
+    final class Coordinator {
+        var lastTrigger: String?
+    }
+
+    final class Host: UIViewController {
+        var keepsLibraryPage = false
+
+        override func viewDidAppear(_ animated: Bool) {
+            super.viewDidAppear(animated)
+            // A page pushed by a deep link while a dashboard detail was open sits above that
+            // detail; drop what lies between the dashboard and this page.
+            if keepsLibraryPage { trim(keepingAbove: true) }
+        }
+
+        /// The view controller of this page: the ancestor whose parent is the navigation controller.
+        private var page: UIViewController? {
+            var current: UIViewController? = self
+            while let vc = current {
+                if vc.parent is UINavigationController { return vc }
+                current = vc.parent
+            }
+            return nil
+        }
+
+        func trim(keepingAbove: Bool) {
+            guard let nav = navigationController, nav.transitionCoordinator == nil,
+                  let root = nav.viewControllers.first else { return }
+            guard keepsLibraryPage else {
+                if nav.viewControllers.count > 1 { nav.popToRootViewController(animated: false) }
+                return
+            }
+            guard let page, let index = nav.viewControllers.firstIndex(of: page) else { return }
+            let above = keepingAbove ? Array(nav.viewControllers[(index + 1)...]) : []
+            let wanted = [root, page] + above
+            if wanted != nav.viewControllers {
+                nav.setViewControllers(wanted, animated: false)
+            }
+        }
+    }
+}
+#else
+/// macOS: the stack is remounted on `cataloguePopToken` (MainTabView); nothing to trim here.
+struct CatalogueStackTrim: View {
+    let trigger: String
+    let keepsLibraryPage: Bool
+    var isEnabled = true
+    var body: some View { Color.clear.frame(width: 0, height: 0) }
+}
+#endif
 
 // MARK: - Catalog root filter memory
 

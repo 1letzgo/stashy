@@ -70,6 +70,15 @@ extension View {
 /// Middle crumb of the Home chrome: a native menu with every library view (not the dashboard,
 /// that is the Home button), labelled with the icon of the one shown. The list's own controls
 /// (sort menu, filter button) follow it in the same row.
+extension View {
+    /// Menu items in the label colour instead of the accent: on clear Liquid Glass over busy
+    /// covers a coloured icon or checkmark (a bright purple accent, say) makes the rows hard to
+    /// read. The pill that opens the menu sets its own colours, so it keeps the accent.
+    func stashyNeutralMenuItems() -> some View {
+        tint(.primary)
+    }
+}
+
 struct HomeViewsMenu: View {
     let tabs: [CatalogsView.CatalogsTab]
     @Binding var selection: CatalogsView.CatalogsTab
@@ -106,6 +115,7 @@ struct HomeViewsMenu: View {
         .menuStyle(.button)
         .buttonStyle(.plain)
         .menuIndicator(.hidden)
+        .stashyNeutralMenuItems()
         .fixedSize()
         .accessibilityLabel("Library, \(selection.rawValue)")
     }

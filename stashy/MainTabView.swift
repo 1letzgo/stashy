@@ -96,7 +96,7 @@ struct MainTabView: View {
             .animation(nil, value: coordinator.selectedTab)
             .tint(appearanceManager.tabBarTint)
             .withToasts()
-            .modifier(TabBarMinimizesOnScroll())
+            .modifier(TabBarMinimizesOnScroll(enabled: coordinator.selectedTab != .reels))
             #if !os(tvOS)
             .modifier(MiniPlayerHost(hidden: coordinator.selectedTab == .reels))
             #endif
@@ -371,39 +371,27 @@ struct ToolsView: View {
         return sortedTabs.first ?? .overview
     }
 
-    private var selectedTabBinding: Binding<ToolsTab> {
+    /// Like Home: the tool grid is the root and every tool is pushed onto it, so the system's
+    /// swipe-back returns to the grid. The row reads Tools › tool menu.
+    private var toolPushedBinding: Binding<Bool> {
         Binding(
-            get: { effectiveTab },
-            set: { coordinator.toolsSubTab = $0.rawValue }
+            get: { !showsLanding },
+            set: { pushed in
+                if !pushed, !showsLanding { coordinator.toolsSubTab = "" }
+            }
         )
     }
-    
+
+    /// The pushed page keeps its tool while it slides away (the grid is already selected then).
+    @State private var lastTool: ToolsTab?
+
     var body: some View {
-        Group {
-            if showsLanding {
-                ToolsLandingView(groups: visibleToolGroups) { tool in
-                    coordinator.toolsSubTab = tool.rawValue
-                }
-            } else {
-            switch effectiveTab {
-            case .downloads:
-                DownloadsView()
-            case .watchlist:
-                WatchlistToolsView()
-            case .overview:
-                ToolsStatisticsView(viewModel: statisticsViewModel)
-            case .oCount:
-                OCountHeatmapToolsView()
-            case .timeline:
-                SessionTimelineToolsView()
-            case .topLists:
-                TopListsToolsContainerView(viewModel: topListsViewModel)
-            case .hotOrNot:
-                HotOrNotToolsView()
-            case .rateMe:
-                RateMeToolsView()
-            }
-            }
+        ToolsLandingView(groups: visibleToolGroups) { tool in
+            coordinator.toolsSubTab = tool.rawValue
+        }
+        .navigationDestination(isPresented: toolPushedBinding) { toolPage }
+        .onChange(of: showsLanding ? nil : effectiveTab, initial: true) { _, tool in
+            if let tool { lastTool = tool }
         }
         .onAppear {
             tabManager.repairMissingToolsIfNeeded()
@@ -411,45 +399,59 @@ struct ToolsView: View {
         }
         .onChange(of: stashyPlus.isUnlocked) { _, _ in normalizeToolsSubTab() }
         .onChange(of: tabManager.isMiniPlayerEnabled) { _, _ in normalizeToolsSubTab() }
-        .popNavigationToRootOnChange(effectiveTab.rawValue)
         .stashySectionChrome {
-            toolsCategoryRow
+            ToolsBreadcrumbRow(tools: sortedTabs, current: nil) { select($0) }
         }
     }
 
-    /// Only the dropdown — its pinned "Tools" entry is the way back to the grid. A separate button
-    /// beside it repeated the same icon in the same bar.
-    private var toolsCategoryRow: some View {
-        toolsDropdown
+    @ViewBuilder
+    private var toolPage: some View {
+        if let tool = (showsLanding ? nil : effectiveTab) ?? lastTool {
+            toolContent(tool)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                // The dropdown swaps the tool inside this page, instantly.
+                .transaction(value: coordinator.toolsSubTab) { $0.animation = nil }
+                .animation(nil, value: coordinator.toolsSubTab)
+                // Switching tools clears details pushed above this page.
+                .background(CatalogueStackTrim(trigger: coordinator.toolsSubTab, keepsLibraryPage: true))
+                .modifier(ToolPageChrome(
+                    context: ToolsBreadcrumbContext(tools: sortedTabs, current: tool) { select($0) },
+                    toolDrawsRow: Self.toolsWithOwnControls.contains(tool)
+                ))
+                .hideSystemNavigationBarForCustomChrome()
+                .enableSwipeBackWhenNavBarHidden()
+        }
     }
 
-    private static let allToolsMenuID = "__all_tools__"
-
-    private var toolsDropdown: some View {
-        StashyTopNavNameDropdownRow(
-            title: "Tools",
-            items: [
-                StashyNavMenuItem(
-                    id: Self.allToolsMenuID,
-                    title: "Tools",
-                    systemImage: "square.grid.2x2"
-                )
-            ] + sortedTabs.map {
-                StashyNavMenuItem(id: $0.rawValue, title: $0.rawValue, systemImage: $0.icon)
-            },
-            selectionID: showsLanding ? Self.allToolsMenuID : effectiveTab.rawValue,
-            titleColor: .white,
-            menuAccessibilityLabel: "Tool",
-            menuAccessibilityHint: "Chooses which tool to show",
-            // Der Weg zurück zur Übersicht darf nicht wegscrollen.
-            pinnedItemID: Self.allToolsMenuID
-        ) { id in
-            if id == Self.allToolsMenuID {
-                coordinator.toolsSubTab = ""
-            } else if let tab = ToolsTab(rawValue: id) {
-                selectedTabBinding.wrappedValue = tab
-            }
+    @ViewBuilder
+    private func toolContent(_ tool: ToolsTab) -> some View {
+        switch tool {
+        case .downloads:
+            DownloadsView()
+        case .watchlist:
+            WatchlistToolsView()
+        case .overview:
+            ToolsStatisticsView(viewModel: statisticsViewModel)
+        case .oCount:
+            OCountHeatmapToolsView()
+        case .timeline:
+            SessionTimelineToolsView()
+        case .topLists:
+            TopListsToolsContainerView(viewModel: topListsViewModel)
+        case .hotOrNot:
+            HotOrNotToolsView()
+        case .rateMe:
+            RateMeToolsView()
         }
+    }
+
+    /// Tools that put their own controls (sort / filter menu) at the right of the Tools row:
+    /// they draw the row themselves from `toolsBreadcrumb`.
+    static let toolsWithOwnControls: Set<ToolsTab> = [.topLists, .rateMe, .timeline]
+
+    /// nil is the grid.
+    private func select(_ tool: ToolsTab?) {
+        coordinator.toolsSubTab = tool?.rawValue ?? ""
     }
 
     private func normalizeToolsSubTab() {
@@ -467,6 +469,192 @@ struct ToolsView: View {
     }
 }
 
+
+/// The Tools row, built like Home's breadcrumb. On the grid: Tools (highlighted) › every tool as
+/// an icon. In a tool: Tools › a native menu named after the open tool.
+struct ToolsBreadcrumbRow<Trailing: View>: View {
+    let tools: [ToolsView.ToolsTab]
+    /// nil on the grid.
+    let current: ToolsView.ToolsTab?
+    var onSelect: (ToolsView.ToolsTab?) -> Void
+    /// The tool's own controls at the right edge (sort / filter menu).
+    @ViewBuilder var trailing: () -> Trailing
+
+    @ObservedObject private var appearance = AppearanceManager.shared
+
+    var body: some View {
+        HStack(spacing: 6) {
+            rootButton
+            Image(systemName: "chevron.compact.right")
+                .font(.system(size: 16, weight: .semibold))
+                .foregroundStyle(Color.white.opacity(0.4))
+                .accessibilityHidden(true)
+            if let current {
+                toolMenu(current)
+                Spacer(minLength: 0)
+                trailing()
+            } else {
+                StashyExpandingDockBrowseStrip(
+                    items: tools.map { StashyNavMenuItem(id: $0.rawValue, title: $0.rawValue, systemImage: $0.icon) },
+                    selectionID: "",
+                    accessibilityLabel: "Tool",
+                    accessibilityHint: "Opens a tool"
+                ) { id in
+                    if let tool = ToolsView.ToolsTab(rawValue: id) { onSelect(tool) }
+                }
+            }
+        }
+        // As on Home: one mask over the row, so every pill fades as one when the chrome hides.
+        .mask(Rectangle().padding(.vertical, -24))
+        .padding(.bottom, 4)
+    }
+
+    private var rootButton: some View {
+        let onRoot = current == nil
+        return Button {
+            guard !onRoot else { return }
+            HapticManager.light()
+            onSelect(nil)
+        } label: {
+            Image(systemName: "square.grid.2x2.fill")
+                .font(.system(size: StashyExpandingDock.iconSize, weight: .semibold))
+                .foregroundStyle(onRoot ? Color.onAppTint : Color.white.opacity(StashyExpandingDock.inactiveIconOpacity))
+                .frame(width: StashyExpandingDock.circleSize, height: StashyExpandingDock.circleSize)
+                .stashyChromeFill(shape: Circle(), activeColor: onRoot ? appearance.tintColor : nil)
+                .contentShape(Circle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("Tools")
+        .accessibilityAddTraits(onRoot ? .isSelected : [])
+    }
+
+    private func toolMenu(_ current: ToolsView.ToolsTab) -> some View {
+        Menu {
+            Picker("Tool", selection: Binding(get: { current }, set: { onSelect($0) })) {
+                ForEach(tools, id: \.self) { tool in
+                    Label(tool.rawValue, systemImage: tool.icon).tag(tool)
+                }
+            }
+            .pickerStyle(.inline)
+        } label: {
+            HStack(spacing: 6) {
+                Text(current.rawValue)
+                    .font(.subheadline.weight(.semibold))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
+                Image(systemName: "chevron.up.chevron.down")
+                    .font(.system(size: 11, weight: .bold))
+            }
+            .foregroundStyle(Color.onAppTint)
+            .padding(.horizontal, StashyExpandingDock.activeHorizontalPadding)
+            .frame(height: StashyExpandingDock.activeHeight)
+            .stashyChromeFill(shape: Capsule(style: .continuous), activeColor: appearance.tintColor)
+            .contentShape(Capsule(style: .continuous))
+        }
+        .menuStyle(.button)
+        .buttonStyle(.plain)
+        .menuIndicator(.hidden)
+        .stashyNeutralMenuItems()
+        .fixedSize()
+        .accessibilityLabel("Tool, \(current.rawValue)")
+    }
+}
+
+extension ToolsBreadcrumbRow where Trailing == EmptyView {
+    init(tools: [ToolsView.ToolsTab], current: ToolsView.ToolsTab?, onSelect: @escaping (ToolsView.ToolsTab?) -> Void) {
+        self.init(tools: tools, current: current, onSelect: onSelect) { EmptyView() }
+    }
+}
+
+/// What a tool needs to draw the Tools row itself, with its own controls at the right.
+struct ToolsBreadcrumbContext {
+    let tools: [ToolsView.ToolsTab]
+    let current: ToolsView.ToolsTab
+    let onSelect: (ToolsView.ToolsTab?) -> Void
+}
+
+private struct ToolsBreadcrumbKey: EnvironmentKey {
+    static let defaultValue: ToolsBreadcrumbContext? = nil
+}
+
+extension EnvironmentValues {
+    /// Set by `ToolsView` for a tool in `toolsWithOwnControls`; nil everywhere else.
+    var toolsBreadcrumb: ToolsBreadcrumbContext? {
+        get { self[ToolsBreadcrumbKey.self] }
+        set { self[ToolsBreadcrumbKey.self] = newValue }
+    }
+}
+
+/// The page's Tools row: drawn here, or handed to the tool to draw with its own controls.
+private struct ToolPageChrome: ViewModifier {
+    let context: ToolsBreadcrumbContext
+    let toolDrawsRow: Bool
+
+    func body(content: Content) -> some View {
+        if toolDrawsRow {
+            content.environment(\.toolsBreadcrumb, context)
+        } else {
+            content.stashySectionChrome {
+                ToolsBreadcrumbRow(tools: context.tools, current: context.current, onSelect: context.onSelect)
+            }
+        }
+    }
+}
+
+extension View {
+    /// Tools row with the tool's controls at the right. Without a context (the tool shown
+    /// outside Tools) it draws nothing; it clears the context for everything below.
+    @ViewBuilder
+    func toolsBreadcrumbChrome<Trailing: View>(
+        _ context: ToolsBreadcrumbContext?,
+        @ViewBuilder trailing: @escaping () -> Trailing
+    ) -> some View {
+        if let context {
+            environment(\.toolsBreadcrumb, nil)
+                .stashySectionChrome {
+                    ToolsBreadcrumbRow(tools: context.tools, current: context.current, onSelect: context.onSelect, trailing: trailing)
+                }
+        } else {
+            self
+        }
+    }
+}
+
+/// Plain-glass menu pill for a tool's control in the Tools row, like the catalog sort menu:
+/// an icon (and optional second icon) plus the up/down chevron.
+struct ToolsRowMenuLabel: View {
+    let systemImage: String
+    var secondaryImage: String? = nil
+    /// Tint dot: the control narrows what is shown.
+    var isActive = false
+    @ObservedObject private var appearance = AppearanceManager.shared
+
+    var body: some View {
+        HStack(spacing: 5) {
+            Image(systemName: systemImage)
+                .font(.system(size: 16, weight: .semibold))
+            if let secondaryImage {
+                Image(systemName: secondaryImage)
+                    .font(.caption.weight(.bold))
+            }
+            Image(systemName: "chevron.up.chevron.down")
+                .font(.system(size: 11, weight: .bold))
+        }
+        .foregroundStyle(Color.white.opacity(StashyExpandingDock.inactiveIconOpacity))
+        .padding(.horizontal, StashyExpandingDock.activeHorizontalPadding)
+        .frame(height: StashyExpandingDock.activeHeight)
+        .stashyChromeFill(shape: Capsule(style: .continuous), activeColor: nil)
+        .overlay(alignment: .topTrailing) {
+            if isActive {
+                Circle()
+                    .fill(appearance.tintColor)
+                    .frame(width: 9, height: 9)
+                    .offset(x: -1, y: 1)
+            }
+        }
+        .contentShape(Capsule(style: .continuous))
+    }
+}
 
 /// Tools landing: every enabled tool as an icon tile. Tools outgrew a single dropdown, and a
 /// grid inside the tab keeps the tab bar and the back gesture intact — unlike a sheet or an
@@ -1075,11 +1263,14 @@ private struct ToolsStatisticsView: View {
 /// Like Music: scrolling down shrinks the tab bar to its selected tab, and the mini player
 /// (the bottom accessory) moves into the same row; scrolling up brings both back.
 private struct TabBarMinimizesOnScroll: ViewModifier {
+    /// Off on Feeds: there is no mini player to make room for, and the feed scrolls all the time.
+    var enabled: Bool
+
     @ViewBuilder
     func body(content: Content) -> some View {
         #if os(iOS)
         if #available(iOS 26.0, *) {
-            content.tabBarMinimizeBehavior(.onScrollDown)
+            content.tabBarMinimizeBehavior(enabled ? .onScrollDown : .never)
         } else {
             content
         }

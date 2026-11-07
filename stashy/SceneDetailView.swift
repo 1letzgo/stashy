@@ -98,13 +98,10 @@ struct SceneDetailView: View {
 
     @Environment(\.verticalSizeClass) var verticalSizeClass
 
-    /// Shared detail chrome: Back on top; Identify, Download and Delete in the floating bar.
+    /// Shared detail chrome. The top bar holds only Back, so Identify, Download and Delete sit at
+    /// its right edge; no floating bar.
     private var sceneDetailChromeConfig: StashyDetailChromeConfig {
-        var slots = CatalogSlotSet(visibility: CatalogFloatingChromeState(
-            hasActiveServerConfig: true, primaryListIsEmpty: false, errorMessage: nil, imageFindListError: nil
-        ))
-        slots.entityActions = sceneActionSlots
-        return StashyDetailChromeConfig(listSlots: playerOnly ? nil : slots, insetSpacing: 0)
+        StashyDetailChromeConfig(listSlots: nil, insetSpacing: 0)
     }
 
     private var sceneActionSlots: [CatalogChromeSlot] {
@@ -129,18 +126,19 @@ struct SceneDetailView: View {
                 downloadManager.downloadScene(activeScene)
             })
         }
-        // Rarely used, so it lives in the bar instead of as a big card under the scene.
+        // Rarely used, so it lives in the top bar instead of as a big card under the scene.
         actions.append(CatalogChromeSlot(systemImage: "trash", accessibilityLabel: "Delete Scene") {
             showDeleteWithFilesConfirmation = true
         })
         return actions
     }
 
-    /// Back on top (Close when opened from the mini player); actions live in the floating bar.
+    /// Back (Close when opened from the mini player) and the scene's actions at the right.
     private var sceneDetailNavBar: some View {
         StashyDetailTopBar(
             backTitle: presentedFromMiniPlayer || isInColumn ? "Close" : "Back",
             backIcon: presentedFromMiniPlayer || isInColumn ? "xmark" : "chevron.left",
+            trailingSlots: sceneActionSlots,
             onBack: { dismiss() }
         )
     }

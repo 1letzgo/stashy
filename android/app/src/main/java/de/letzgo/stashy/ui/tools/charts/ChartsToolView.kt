@@ -78,7 +78,11 @@ import de.letzgo.stashy.ui.detail.StudioDetailScreen
 import de.letzgo.stashy.ui.detail.TagDetailScreen
 import de.letzgo.stashy.ui.noRippleClickable
 import de.letzgo.stashy.ui.scene.SceneDetailScreen
+import de.letzgo.stashy.ui.oCounterIcon
 import de.letzgo.stashy.ui.tools.NoServerPlaceholder
+import de.letzgo.stashy.ui.tools.ToolsBreadcrumbChrome
+import de.letzgo.stashy.ui.tools.ToolsMenuItem
+import de.letzgo.stashy.ui.tools.ToolsRowMenu
 import de.letzgo.stashy.ui.tools.ToolsTokens
 import de.letzgo.stashy.ui.tools.toolsTopPadding
 import kotlinx.coroutines.launch
@@ -92,30 +96,80 @@ private const val PlaceholderOpacity = 0.1f
 
 /**
  * iOS: `TopListsToolsContainerView` — Tools › Charts: a pill row (Scenes · Performers · Studios ·
- * Tags) above the ranked list of the selected category. State lives in [ChartsState].
+ * Tags) above the ranked list of the selected category; the metric menu sits at the right of the
+ * Tools row. State lives in [ChartsState].
  */
 @Composable
 fun ChartsToolView() {
     val vm = ChartsState.viewModel
     val section = ChartsState.section
-    Column(Modifier.fillMaxSize().background(Theme.palette.background)) {
-        Spacer(Modifier.height(toolsTopPadding()))
-        ChartsPillMenuRow(
-            items = ChartsSection.entries.map { it to it.title },
-            selected = section,
-            onSelect = { ChartsState.section = it },
-        )
-        Box(Modifier.weight(1f).fillMaxWidth()) {
-            key(section) {
-                when (section) {
-                    ChartsSection.Scenes -> TopScenesList(vm)
-                    ChartsSection.Performers -> TopPerformersList(vm)
-                    ChartsSection.Studios -> TopStudiosList(vm)
-                    ChartsSection.Tags -> TopTagsList(vm)
+    Box(Modifier.fillMaxSize().background(Theme.palette.background)) {
+        Column(Modifier.fillMaxSize()) {
+            Spacer(Modifier.height(toolsTopPadding()))
+            ChartsPillMenuRow(
+                items = ChartsSection.entries.map { it to it.title },
+                selected = section,
+                onSelect = { ChartsState.section = it },
+            )
+            Box(Modifier.weight(1f).fillMaxWidth()) {
+                key(section) {
+                    when (section) {
+                        ChartsSection.Scenes -> TopScenesList(vm)
+                        ChartsSection.Performers -> TopPerformersList(vm)
+                        ChartsSection.Studios -> TopStudiosList(vm)
+                        ChartsSection.Tags -> TopTagsList(vm)
+                    }
+                }
+            }
+        }
+        // iOS: `toolsBreadcrumbChrome { metricMenu }` — the ranking metric sits in the Tools row.
+        ToolsBreadcrumbChrome {
+            when (section) {
+                ChartsSection.Scenes -> TopListsMetricMenu(vm.scenes)
+                ChartsSection.Performers -> TopListsMetricMenu(vm.performers)
+                ChartsSection.Studios -> TopListsMetricMenu(vm.studios)
+                ChartsSection.Tags -> TopListsMetricMenu(vm.tags)
+            }
+        }
+    }
+}
+
+/**
+ * iOS: `TopListsMetricMenu` — the active metric's icon with a down arrow (rankings are always
+ * descending); the menu lists every metric of the section with its icon.
+ */
+@Composable
+private fun <M : TopListsMetric> TopListsMetricMenu(state: TopListsSectionState<M, *>) {
+    val haptics = LocalHapticFeedback.current
+    val selection = state.metric
+    ToolsRowMenu(
+        icon = metricIcon(selection),
+        accessibilityLabel = "Rank by, ${selection.label}",
+        secondaryIcon = SF.arrowDown,
+    ) { dismiss ->
+        state.metrics.forEach { metric ->
+            ToolsMenuItem(metric.label, metricIcon(metric), checked = metric == selection) {
+                dismiss()
+                if (metric != selection) {
+                    haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                    state.metric = metric
                 }
             }
         }
     }
+}
+
+/** iOS: `TopListsMetricLabel.icon(oCounterIcon:)` — one symbol per ranking field. */
+private fun metricIcon(metric: TopListsMetric): ImageVector = when (metric.sortField) {
+    "play_count" -> SF.eye
+    "o_counter" -> oCounterIcon(Appearance.oCounterIcon)
+    "play_duration" -> SF.clock
+    "rating" -> SF.star
+    "scenes_count" -> SF.film
+    "images_count" -> SF.photo
+    "galleries_count" -> SF.photoStack
+    "scene_markers_count" -> SF.bookmark
+    else -> SF.listNumber
 }
 
 /** iOS: `TopScenesToolsView`. */
@@ -232,9 +286,6 @@ private fun <M : TopListsMetric, T> TopListSection(
                 contentPadding = PaddingValues(start = ToolsTokens.contentPadding, end = ToolsTokens.contentPadding, bottom = bottomBarContentPadding()),
                 verticalArrangement = Arrangement.spacedBy(ToolsTokens.rankedGridSpacing),
             ) {
-                item(key = "metrics") {
-                    MetricChipRow(state.metrics, metric) { state.metric = it }
-                }
                 if (items.isEmpty()) {
                     item(key = "empty") {
                         Text(
@@ -285,24 +336,6 @@ private fun <K> ChartsPillMenuRow(items: List<Pair<K, String>>, selected: K, onS
                     haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                     onSelect(id)
                 }
-            }
-        }
-    }
-}
-
-/** iOS: `TopListsMetricChipRow` — 28 pt capsules sharing the width. */
-@Composable
-private fun <M : TopListsMetric> MetricChipRow(metrics: List<M>, selection: M, onSelect: (M) -> Unit) {
-    val haptics = LocalHapticFeedback.current
-    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(DockItemSpacing)) {
-        metrics.forEach { metric ->
-            val isSelected = metric == selection
-            CapsuleChip(
-                metric.label, isSelected, 28.dp, IosTypography.caption.copy(fontWeight = FontWeight.SemiBold), 4.dp,
-                Modifier.weight(1f),
-            ) {
-                haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                onSelect(metric)
             }
         }
     }

@@ -507,7 +507,8 @@ struct StashySectionChromeBar<Content: View>: View {
 }
 
 /// The standard top chrome of a detail page: Back on the left, the section pills right-aligned
-/// (scrolling when they don't fit). Entity and list actions live in the floating bar, never here.
+/// (scrolling when they don't fit). A page without tabs has room for its few actions at the right
+/// (`trailingSlots`); tabbed pages keep theirs in the floating bar.
 struct StashyDetailTopBar<Tab: Hashable>: View {
     var backTitle: String = "Back"
     var backIcon: String = "chevron.left"
@@ -518,6 +519,8 @@ struct StashyDetailTopBar<Tab: Hashable>: View {
     var besideBack: [CatalogChromeSlot] = []
     /// A labelled pill at the right edge (Now Playing's Details).
     var trailingAction: (title: String, systemImage: String, action: () -> Void)? = nil
+    /// Round action buttons at the right edge (a scene's Download / Delete).
+    var trailingSlots: [CatalogChromeSlot] = []
     var tabs: [Tab] = []
     var selection: Tab? = nil
     var icon: (Tab) -> String = { _ in "circle" }
@@ -548,6 +551,9 @@ struct StashyDetailTopBar<Tab: Hashable>: View {
                             .scrollBounceBehavior(.basedOnSize, axes: .horizontal)
                     }
                     .layoutPriority(-1)
+                }
+                ForEach(Array(trailingSlots.enumerated()), id: \.offset) { _, slot in
+                    DetailTopBarSlotButton(slot: slot)
                 }
                 if let trailingAction {
                     Button(action: trailingAction.action) {
@@ -605,12 +611,42 @@ extension StashyDetailTopBar where Tab == Never {
         title: String? = nil,
         besideBack: [CatalogChromeSlot] = [],
         trailingAction: (title: String, systemImage: String, action: () -> Void)? = nil,
+        trailingSlots: [CatalogChromeSlot] = [],
         onBack: @escaping () -> Void
     ) {
         self.init(
             backTitle: backTitle, backIcon: backIcon, onBack: onBack, title: title,
-            besideBack: besideBack, trailingAction: trailingAction, tabs: []
+            besideBack: besideBack, trailingAction: trailingAction, trailingSlots: trailingSlots, tabs: []
         )
+    }
+}
+
+/// A floating-bar action as a round glass button in a top bar: the same glyph (tint, active dot)
+/// at the size of the bar's other circles.
+struct DetailTopBarSlotButton: View {
+    let slot: CatalogChromeSlot
+    @ObservedObject private var appearance = AppearanceManager.shared
+
+    var body: some View {
+        Button(action: slot.action) {
+            Image(systemName: slot.systemImage)
+                .font(.system(size: StashyExpandingDock.iconSize, weight: .semibold))
+                .foregroundColor(slot.isActive ? appearance.tintColor : (slot.tint ?? .white.opacity(StashyExpandingDock.inactiveIconOpacity)))
+                .frame(width: StashyExpandingDock.circleSize, height: StashyExpandingDock.circleSize)
+                .stashyGlass(shape: Circle())
+                .overlay(alignment: .topTrailing) {
+                    if slot.isActive {
+                        Circle()
+                            .fill(appearance.tintColor)
+                            .frame(width: 9, height: 9)
+                            .offset(x: -1, y: 1)
+                    }
+                }
+                .contentShape(Circle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(slot.accessibilityLabel)
+        .accessibilityHint(slot.accessibilityHint ?? "")
     }
 }
 

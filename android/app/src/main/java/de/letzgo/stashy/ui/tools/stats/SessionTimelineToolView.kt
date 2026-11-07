@@ -62,6 +62,8 @@ import de.letzgo.stashy.data.tools.TimelineKindFilter
 import de.letzgo.stashy.data.tools.TimelineSceneSnapshot
 import de.letzgo.stashy.data.tools.TimelineSession
 import de.letzgo.stashy.data.tools.TimelineVisit
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.PlayCircle
 import de.letzgo.stashy.ui.Appearance
 import de.letzgo.stashy.ui.IosTypography
 import de.letzgo.stashy.ui.Nav
@@ -72,6 +74,10 @@ import de.letzgo.stashy.ui.cardShadow
 import de.letzgo.stashy.ui.oCounterIcon
 import de.letzgo.stashy.ui.scene.SceneDetailScreen
 import de.letzgo.stashy.ui.tools.ToolsTokens
+import de.letzgo.stashy.ui.tools.ToolsBreadcrumbChrome
+import de.letzgo.stashy.ui.tools.ToolsMenuItem
+import de.letzgo.stashy.ui.tools.ToolsMenuSectionHeader
+import de.letzgo.stashy.ui.tools.ToolsRowMenu
 import de.letzgo.stashy.ui.tools.toolsTopPadding
 import kotlinx.coroutines.launch
 import java.time.Instant
@@ -81,10 +87,6 @@ import java.time.format.DateTimeFormatter
 import java.time.format.FormatStyle
 import java.util.Locale
 import kotlin.math.roundToLong
-
-/** iOS: `StashyExpandingDock.itemSpacing` / `activeHeight`. */
-private val ChipSpacing = 10.dp
-private val ChipHeight = 40.dp
 
 /** iOS: `SessionTimelineToolsView` (SessionTimelineToolsView.swift) — Tools → Timeline. */
 @Composable
@@ -111,19 +113,61 @@ fun SessionTimelineToolView() {
                 onRefresh = { scope.launch { refreshing = true; loader.reload().join(); refreshing = false } },
                 indicatorTop = top,
             ) {
-                TimelineList(enabledKinds, top) { kinds ->
-                    enabledKinds = kinds
-                    TimelineKindFilter.save(kinds)
+                TimelineList(enabledKinds, top)
+            }
+        }
+        // iOS: `toolsBreadcrumbChrome { kindMenu }` — which activity shows, in the Tools row.
+        ToolsBreadcrumbChrome {
+            TimelineKindMenu(enabledKinds) { kinds ->
+                enabledKinds = kinds
+                TimelineKindFilter.save(kinds)
+            }
+        }
+    }
+}
+
+/**
+ * iOS: `kindMenu` — Watch / O-Count / Markers as checkable items (it was a pill row above the
+ * list). Several can be on; the last one stays. The menu stays open while toggling. Label: a
+ * filter icon with a tint dot while not every kind shows.
+ */
+@Composable
+private fun TimelineKindMenu(enabled: Set<TimelineKind>, onChange: (Set<TimelineKind>) -> Unit) {
+    val haptics = androidx.compose.ui.platform.LocalHapticFeedback.current
+    ToolsRowMenu(
+        icon = SF.line3HorizontalDecrease,
+        accessibilityLabel = "Show activity",
+        isActive = enabled.size < TimelineKind.entries.size,
+    ) { _ ->
+        ToolsMenuSectionHeader("Show")
+        TimelineKind.entries.forEach { kind ->
+            val on = kind in enabled
+            ToolsMenuItem(kind.label, kindIcon(kind), checked = on) {
+                if (on) {
+                    if (enabled.size > 1) {
+                        haptics.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.TextHandleMove)
+                        onChange(enabled - kind)
+                    }
+                } else {
+                    haptics.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.TextHandleMove)
+                    onChange(enabled + kind)
                 }
             }
         }
     }
 }
 
+/** iOS: `icon(for:)`. */
+private fun kindIcon(kind: TimelineKind): androidx.compose.ui.graphics.vector.ImageVector = when (kind) {
+    TimelineKind.Watch -> Icons.Outlined.PlayCircle
+    TimelineKind.OCount -> de.letzgo.stashy.ui.oCounterIcon(Appearance.oCounterIcon)
+    TimelineKind.Marker -> SF.bookmark
+}
+
 private data class TimelineDayGroup(val day: LocalDate, val sessions: List<TimelineSession>)
 
 @Composable
-private fun TimelineList(enabledKinds: Set<TimelineKind>, top: androidx.compose.ui.unit.Dp, onKindsChange: (Set<TimelineKind>) -> Unit) {
+private fun TimelineList(enabledKinds: Set<TimelineKind>, top: androidx.compose.ui.unit.Dp) {
     val loader = SessionTimelineLoader
     val p = Theme.palette
     val zone = ZoneId.systemDefault()
@@ -135,15 +179,9 @@ private fun TimelineList(enabledKinds: Set<TimelineKind>, top: androidx.compose.
         Modifier.fillMaxSize(),
         contentPadding = PaddingValues(
             start = ToolsTokens.contentPadding, end = ToolsTokens.contentPadding,
-            top = top, bottom = bottomBarContentPadding(),
+            top = top + ToolsTokens.menuTopPadding, bottom = bottomBarContentPadding(),
         ),
     ) {
-        item(key = "chips") {
-            TimelineFilterChipRow(
-                enabledKinds, onKindsChange,
-                Modifier.padding(top = ToolsTokens.menuTopPadding, bottom = ToolsTokens.menuBottomPadding),
-            )
-        }
         when {
             loader.isLoading && loader.sessions.isEmpty() -> item(key = "loading") {
                 InsightsLoading("Loading timeline...", Modifier.fillMaxWidth().padding(top = 40.dp))
@@ -184,46 +222,6 @@ private fun CenteredNote(text: String) {
         text, style = IosTypography.subheadline, color = Theme.palette.secondaryText, textAlign = TextAlign.Center,
         modifier = Modifier.fillMaxWidth().padding(top = 40.dp),
     )
-}
-
-/** iOS: `TimelineFilterChipRow` — multi-select pills like `ToolsPillMenuRow`; one stays on. */
-@Composable
-private fun TimelineFilterChipRow(enabled: Set<TimelineKind>, onChange: (Set<TimelineKind>) -> Unit, modifier: Modifier = Modifier) {
-    val p = Theme.palette
-    val tint = Appearance.tint
-    Row(modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(ChipSpacing)) {
-        TimelineKind.entries.forEach { kind ->
-            val selected = kind in enabled
-            val shape = RoundedCornerShape(50)
-            Box(
-                Modifier
-                    .weight(1f)
-                    .heightIn(min = ChipHeight)
-                    .let { if (selected) it.shadow(6.dp, shape, ambientColor = tint.copy(alpha = 0.35f), spotColor = tint.copy(alpha = 0.35f)) else it }
-                    .clip(shape)
-                    .background(if (selected) tint else p.secondaryBackground, shape)
-                    // iOS: "<kind>, selected" + `.isSelected` trait.
-                    .semantics { this.selected = selected }
-                    .clickable(role = Role.Button) {
-                        if (selected) {
-                            if (enabled.size > 1) onChange(enabled - kind)
-                        } else {
-                            onChange(enabled + kind)
-                        }
-                    },
-                contentAlignment = Alignment.Center,
-            ) {
-                Text(
-                    kind.label,
-                    style = IosTypography.subheadline.copy(fontWeight = FontWeight.SemiBold),
-                    color = if (selected) Color.White else p.text.copy(alpha = 0.85f),
-                    // Equal-width chips: wrap to a 2nd line at large font scales instead of clipping.
-                    maxLines = 2, textAlign = androidx.compose.ui.text.style.TextAlign.Center,
-                    modifier = Modifier.padding(horizontal = 4.dp, vertical = 6.dp),
-                )
-            }
-        }
-    }
 }
 
 private val dayFormatter: DateTimeFormatter get() = DateTimeFormatter.ofPattern("EEEE, d MMM", Locale.getDefault())

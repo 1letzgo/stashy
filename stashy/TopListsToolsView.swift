@@ -12,6 +12,23 @@ private protocol TopListsMetricLabel {
     var label: String { get }
 }
 
+extension TopListsMetricLabel where Self: RawRepresentable, Self.RawValue == String {
+    /// Symbol in the metric menu; the same one stands for the metric everywhere else.
+    func icon(oCounterIcon: String) -> String {
+        switch rawValue {
+        case "views": return "eye"
+        case "oCount": return oCounterIcon
+        case "watchTime": return "clock"
+        case "rating": return "star"
+        case "scenes": return "film"
+        case "images": return "photo"
+        case "galleries": return "photo.stack"
+        case "markers": return "bookmark"
+        default: return "arrow.up.arrow.down"
+        }
+    }
+}
+
 private let topListPageSize = 25
 
 private struct TopListPage {
@@ -735,6 +752,7 @@ final class TopListsViewModel: ObservableObject {
 struct TopListsToolsContainerView: View {
     @ObservedObject var viewModel: TopListsViewModel
     @State private var section: Section = .scenes
+    @Environment(\.toolsBreadcrumb) private var toolsBreadcrumb
 
     private enum Section: String, CaseIterable {
         case scenes
@@ -782,6 +800,22 @@ struct TopListsToolsContainerView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(Color.appBackground)
         .popNavigationToRootOnChange(section.rawValue)
+        .toolsBreadcrumbChrome(toolsBreadcrumb) { metricMenu }
+    }
+
+    /// The open list's metric, at the right of the Tools row.
+    @ViewBuilder
+    private var metricMenu: some View {
+        switch section {
+        case .scenes:
+            TopListsMetricMenu(metrics: SceneTopMetric.allCases, selection: $viewModel.sceneMetric)
+        case .performers:
+            TopListsMetricMenu(metrics: PerformerTopMetric.allCases, selection: $viewModel.performerMetric)
+        case .studios:
+            TopListsMetricMenu(metrics: StudioTopMetric.allCases, selection: $viewModel.studioMetric)
+        case .tags:
+            TopListsMetricMenu(metrics: TagTopMetric.allCases, selection: $viewModel.tagMetric)
+        }
     }
 }
 
@@ -820,11 +854,6 @@ struct TopScenesToolsView: View {
     private var scenesScroll: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 12) {
-                TopListsMetricChipRow(
-                    metrics: SceneTopMetric.allCases,
-                    selection: $viewModel.sceneMetric
-                )
-
                 let scenes = viewModel.scenesForSelectedMetric
                 if scenes.isEmpty {
                     Text("No scenes yet.")
@@ -891,11 +920,6 @@ struct TopPerformersToolsView: View {
     private var performersScroll: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 12) {
-                TopListsMetricChipRow(
-                    metrics: PerformerTopMetric.allCases,
-                    selection: $viewModel.performerMetric
-                )
-
                 let performers = viewModel.performersForSelectedMetric
                 if performers.isEmpty {
                     Text("No performers yet.")
@@ -962,11 +986,6 @@ struct TopStudiosToolsView: View {
     private var studiosScroll: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 12) {
-                TopListsMetricChipRow(
-                    metrics: StudioTopMetric.allCases,
-                    selection: $viewModel.studioMetric
-                )
-
                 let studios = viewModel.studiosForSelectedMetric
                 if studios.isEmpty {
                     Text("No studios yet.")
@@ -1042,11 +1061,6 @@ struct TopTagsToolsView: View {
     private var tagsScroll: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 12) {
-                TopListsMetricChipRow(
-                    metrics: TagTopMetric.allCases,
-                    selection: $viewModel.tagMetric
-                )
-
                 let tags = viewModel.tagsForSelectedMetric
                 if tags.isEmpty {
                     Text("No tags yet.")
@@ -1122,44 +1136,38 @@ private struct TopListsPaginationFooter: View {
 
 // MARK: - Metric chips
 
-private struct TopListsMetricChipRow<Metric: Identifiable & Hashable & TopListsMetricLabel>: View {
+/// The list's metric as a menu in the Tools row (it was a chip row above the list): the active
+/// metric's icon collapsed, every metric with its icon open. Every list ranks high to low.
+private struct TopListsMetricMenu<Metric: Identifiable & Hashable & TopListsMetricLabel & RawRepresentable>: View
+where Metric.RawValue == String {
     let metrics: [Metric]
     @Binding var selection: Metric
     @ObservedObject private var appearance = AppearanceManager.shared
 
     var body: some View {
-        HStack(spacing: StashyExpandingDock.itemSpacing) {
-            ForEach(metrics) { metric in
-                let selected = selection == metric
-                Button {
-                    HapticManager.selection()
-                    selection = metric
-                } label: {
-                    Text(metric.label)
-                        .font(.caption.weight(.semibold))
-                        .foregroundStyle(selected ? Color.onAppTint : Color.primary.opacity(0.85))
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.65)
-                        .frame(maxWidth: .infinity)
-                        .frame(height: 28)
-                        .background(
-                            Capsule(style: .continuous)
-                                .fill(selected ? appearance.tintColor : Color.secondaryAppBackground)
-                                .shadow(
-                                    color: selected ? appearance.tintColor.opacity(0.35) : .clear,
-                                    radius: 4,
-                                    x: 0,
-                                    y: 2
-                                )
-                        )
-                        .clipShape(Capsule(style: .continuous))
-                        .contentShape(Capsule(style: .continuous))
+        Menu {
+            Picker("Rank by", selection: Binding(
+                get: { selection },
+                set: { HapticManager.selection(); selection = $0 }
+            )) {
+                ForEach(metrics) { metric in
+                    Label(metric.label, systemImage: metric.icon(oCounterIcon: appearance.oCounterIcon))
+                        .tag(metric)
                 }
-                .buttonStyle(.plain)
-                .accessibilityLabel("\(metric.label)\(selected ? ", selected" : "")")
-                .accessibilityAddTraits(selected ? .isSelected : [])
             }
+            .pickerStyle(.inline)
+        } label: {
+            ToolsRowMenuLabel(
+                systemImage: selection.icon(oCounterIcon: appearance.oCounterIcon),
+                secondaryImage: "arrow.down"
+            )
         }
+        .menuStyle(.button)
+        .buttonStyle(.plain)
+        .menuIndicator(.hidden)
+        .stashyNeutralMenuItems()
+        .fixedSize()
+        .accessibilityLabel("Rank by, \(selection.label)")
     }
 }
 

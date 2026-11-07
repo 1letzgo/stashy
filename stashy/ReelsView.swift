@@ -3404,6 +3404,10 @@ struct ReelsViewBody: View {
                         feedsEmbedded: true,
                         sharedImageListFilters: reelsPicsFilters
                     )
+                    // A name filters the feed by that performer, like Clips.
+                    .environment(\.imageFeedPerformerTap) { performer in
+                        applyPerformerFilter(performer.toScenePerformer())
+                    }
                 } else {
                     StandardLoadingView(message: "Loading feeds...")
                 }
@@ -4774,6 +4778,13 @@ struct ReelsViewBody: View {
                         ReelsAIMotionPill(pillHeight: reelsTopChromePillHeight,
                                           isPicsMode: reelsMode == .pics)
                         #endif
+                        // Delete sits left of the settings, for the item on screen (not in Pics,
+                        // which deletes from its own image list; markers share their scene).
+                        if reelsMode != .pics, tabManager.reelsShowsDeleteButton,
+                           let currentItem, reelsItemSupportsDelete(currentItem) {
+                            reelsDeletePill(for: currentItem)
+                        }
+                        reelsSortMenu
                         reelsFilterSortPill
                     }
                     .fixedSize()
@@ -4828,23 +4839,60 @@ struct ReelsViewBody: View {
         .colorScheme(.dark)
     }
 
+    /// Every enabled feed, as the Home library menu has its views: one native menu named after the
+    /// open feed.
+    private var reelsModeItems: [StashyNavMenuItem] {
+        tabManager.enabledReelsModes.map { type in
+            if type == .verticals {
+                return StashyNavMenuItem(id: Self.verticalsDockID, title: type.defaultTitle, systemImage: type.icon)
+            }
+            let mode = ReelsMode(from: type)
+            return StashyNavMenuItem(id: mode.rawValue, title: mode.rawValue, systemImage: mode.icon)
+        }
+    }
+
+    private var reelsModeSelectionID: String {
+        reelsVerticals && reelsMode == .scenes ? Self.verticalsDockID : reelsMode.rawValue
+    }
+
     @ViewBuilder
     private var reelsModeDock: some View {
-        let enabledTypes = tabManager.enabledReelsModes
-        StashyExpandingDockBrowseStrip(
-            items: enabledTypes.map { type in
-                if type == .verticals {
-                    return StashyNavMenuItem(id: Self.verticalsDockID, title: type.defaultTitle, systemImage: type.icon)
+        let items = reelsModeItems
+        let current = items.first { $0.id == reelsModeSelectionID }
+        Menu {
+            Picker("Feed", selection: Binding(
+                get: { reelsModeSelectionID },
+                set: { selectReelsDockEntry($0) }
+            )) {
+                ForEach(items, id: \.id) { item in
+                    Label(item.title, systemImage: item.systemImage).tag(item.id)
                 }
-                let mode = ReelsMode(from: type)
-                return StashyNavMenuItem(id: mode.rawValue, title: mode.rawValue, systemImage: mode.icon)
-            },
-            selectionID: reelsVerticals && reelsMode == .scenes ? Self.verticalsDockID : reelsMode.rawValue,
-            accessibilityLabel: "Feed",
-            accessibilityHint: "Chooses which feed mode to show"
-        ) { id in
-            selectReelsDockEntry(id)
+            }
+            .pickerStyle(.inline)
+        } label: {
+            HStack(spacing: 6) {
+                Image(systemName: current?.systemImage ?? reelsMode.icon)
+                    .font(.system(size: 14, weight: .semibold))
+                Text(current?.title ?? reelsMode.rawValue)
+                    .font(.subheadline.weight(.semibold))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
+                Image(systemName: "chevron.up.chevron.down")
+                    .font(.system(size: 11, weight: .bold))
+            }
+            .foregroundStyle(Color.onAppTint)
+            .padding(.horizontal, StashyExpandingDock.activeHorizontalPadding)
+            .frame(height: StashyExpandingDock.activeHeight)
+            .stashyChromeFill(shape: Capsule(style: .continuous), activeColor: appearanceManager.tintColor)
+            .contentShape(Capsule(style: .continuous))
         }
+        .menuStyle(.button)
+        .buttonStyle(.plain)
+        .menuIndicator(.hidden)
+        .stashyNeutralMenuItems()
+        .fixedSize()
+        .accessibilityLabel("Feed, \(current?.title ?? reelsMode.rawValue)")
+        .accessibilityHint("Chooses which feed mode to show")
     }
 
     private static let verticalsDockID = "Verticals"
@@ -5196,13 +5244,6 @@ struct ReelsViewBody: View {
                             reelsRateChrome(currentItem: item)
                         }
 
-                        if tabManager.reelsShowsDeleteButton, reelsItemSupportsDelete(item) {
-                            ChromePillIconButton(systemImage: "trash", accessibilityLabel: "Delete") {
-                                reelsItemToDelete = item
-                                showDeleteConfirmation = true
-                            }
-                        }
-
                         ChromePillIconButton(
                             systemImage: isMuted ? "speaker.slash.fill" : "speaker.wave.2.fill",
                             enabled: isVideo,
@@ -5460,7 +5501,42 @@ struct ReelsViewBody: View {
         }
     }
 
+    /// The feed's quick sorts as Home's lists have them: one native menu showing the active sort's
+    /// icon and direction. Each feed changes its sort exactly as its filter sheet does.
     @ViewBuilder
+    private var reelsSortMenu: some View {
+        switch reelsMode {
+        case .scenes, .previews:
+            CatalogQuickSortMenu(mode: .scenes, sort: selectedSortOption) { changeReelsSceneSortFromSheet($0) }
+        case .markers:
+            CatalogQuickSortMenu(mode: .sceneMarkers, sort: selectedMarkerSortOption) { changeReelsMarkerSortFromSheet($0) }
+        case .clips:
+            CatalogQuickSortMenu(mode: .images, sort: reelsClipImageFilters.selectedSortOption) { new in
+                reelsClipImageFilters.changeSortOption(to: new, viewModel: viewModel)
+                refetchReelsClipsFromModel(viewModel)
+            }
+        case .pics:
+            CatalogQuickSortMenu(mode: .images, sort: reelsPicsFilters.selectedSortOption) { new in
+                reelsPicsFilters.changeSortOption(to: new, viewModel: reelsPicsViewModel)
+            }
+        }
+    }
+
+    private func reelsDeletePill(for item: ReelItemData) -> some View {
+        Button {
+            reelsItemToDelete = item
+            showDeleteConfirmation = true
+        } label: {
+            Image(systemName: "trash")
+                .font(.system(size: StashyExpandingDock.iconSize, weight: .semibold))
+                .foregroundColor(.white.opacity(StashyExpandingDock.inactiveIconOpacity))
+                .frame(width: StashyExpandingDock.iconSize, height: StashyExpandingDock.iconSize)
+                .modifier(StashyChromePillStyle(height: reelsTopChromePillHeight, iconOnly: true))
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("Delete")
+    }
+
     private var reelsFilterSortPill: some View {
         Button {
             switch reelsMode {

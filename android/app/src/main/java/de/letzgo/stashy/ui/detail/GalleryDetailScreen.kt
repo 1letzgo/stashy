@@ -23,6 +23,7 @@ import de.letzgo.stashy.data.Gallery
 import de.letzgo.stashy.data.Scene
 import de.letzgo.stashy.data.SortCatalog
 import de.letzgo.stashy.data.StashImage
+import de.letzgo.stashy.ui.Appearance
 import de.letzgo.stashy.ui.Nav
 import de.letzgo.stashy.ui.SF
 import de.letzgo.stashy.ui.catalog.CatalogChromeSlot
@@ -61,7 +62,7 @@ import kotlinx.coroutines.launch
 import kotlinx.serialization.json.JsonObject
 
 /**
- * iOS: `ImagesView(gallery:)` for an opened gallery — chrome bar Back · Edit, one header card
+ * iOS: `ImagesView(gallery:)` for an opened gallery — top bar Back · Edit · Select · Download, one header card
  * with the cover as a hero and the gallery title + IMAGES / DATE / ORGANIZED overlaid on it
  * (plain card without a picture; description below, expandable), the scene-detail Metadata card (only when set), then the image grid (2/row) or the grouped feed (1/row). The top bar's "Settings"
  * opens the images filter & sort sheet (iOS `ImagesCatalogFilterSortSheet` with
@@ -142,15 +143,16 @@ class GalleryDetailScreen(
                     ),
                 )
             } else {
-                // iOS `galleryDownloadSlot` (secondary contextual, before filter & sort).
-                val download = gallery?.let { imageSetDownloadSlot(it.id, "Download gallery") { showDownloadOptions = true } }
+                // iOS `openedGalleryActions`: Edit (edit mode only) · Select · `galleryDownloadSlot`,
+                // all in the top bar, before filter & sort.
+                val edit = if (Appearance.isEditModeEnabled && gallery != null) ChromeSlot(SF.pencil, "Edit gallery") { editing = true } else null
                 val select = ChromeSlot(SF.checkmarkCircle, "Select images") { selection.begin() }
+                val download = gallery?.let { imageSetDownloadSlot(it.id, "Download gallery") { showDownloadOptions = true } }
                 DetailTopBar(
-                    gallery?.displayTitle ?: "", emptyList(), null, {}, listOfNotNull(select, download),
+                    gallery?.displayTitle ?: "", emptyList(), null, {}, listOfNotNull(edit, select, download),
                     settings = CatalogChromeSlot(SF.sliderHorizontal3, images.isFilterActive || kind.kind != ImageListMediaKind.All, "Settings") {
                         images.isSheetPresented = true
                     },
-                    onEdit = { editing = true }, editLabel = "Edit gallery",
                 )
             }
         }

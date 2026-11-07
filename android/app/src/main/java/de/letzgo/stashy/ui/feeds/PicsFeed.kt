@@ -8,10 +8,13 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import de.letzgo.stashy.data.IdName
 import de.letzgo.stashy.data.ServerConfigManager
 import de.letzgo.stashy.ui.SF
 import de.letzgo.stashy.ui.Theme
@@ -22,6 +25,12 @@ import de.letzgo.stashy.ui.catalog.StatusPlaceholder
 import de.letzgo.stashy.ui.filter.CatalogFilterSortSheet
 import de.letzgo.stashy.ui.filter.ImageMediaTypeCard
 import de.letzgo.stashy.ui.filter.ImagesFeedAutoplaySettingsCard
+
+/**
+ * iOS `\.imageFeedPerformerTap`: what a performer's name on an image feed card does. Null (the
+ * Images tab, galleries …) opens the performer page; Feeds › Pics filters the feed by them.
+ */
+val LocalImageFeedPerformerTap = staticCompositionLocalOf<((IdName) -> Unit)?> { null }
 
 /**
  * iOS: Feeds → Pics, which embeds `ImagesView(forceOneColumnFeed: true, feedsEmbedded: true)`
@@ -52,6 +61,7 @@ fun PicsFeed(model: FeedsModel, topPadding: Dp, bottomPadding: Dp) {
         if (firstId != initialFirst && model.picsListState.firstVisibleItemIndex > 0) model.picsListState.scrollToItem(0)
     }
 
+    val performerTap = remember(model) { { p: IdName -> model.filterByPerformer(p) } }
     Box(Modifier.fillMaxSize().background(Theme.palette.background)) {
         val hasServer = ServerConfigManager.activeConfig != null
         val inset = Modifier.fillMaxSize()
@@ -60,7 +70,8 @@ fun PicsFeed(model: FeedsModel, topPadding: Dp, bottomPadding: Dp) {
             list.items.isEmpty() && (list.isLoading || !list.loadedOnce) -> StandardLoading("Loading images...")
             list.items.isEmpty() && list.error != null -> StatusPlaceholder(SF.server, list.error ?: "Server not reachable", "Retry Connection", { c.refresh() }, inset)
             list.items.isEmpty() -> StatusPlaceholder(SF.cameraFill, "No images found", "Reload", { c.refresh() }, inset)
-            else -> PullToRefreshBox(isRefreshing = false, onRefresh = { c.refresh() }, modifier = Modifier.fillMaxSize()) {
+            // A name filters the feed by that performer, like Clips (iOS `applyPerformerFilter`).
+            else -> PullToRefreshBox(isRefreshing = false, onRefresh = { c.refresh() }, modifier = Modifier.fillMaxSize()) { CompositionLocalProvider(LocalImageFeedPerformerTap provides performerTap) {
                 ImageFeedList(
                     images = list.items,
                     sortRaw = c.sort.raw,
@@ -73,7 +84,7 @@ fun PicsFeed(model: FeedsModel, topPadding: Dp, bottomPadding: Dp) {
                     onImageUpdated = { model.patchPicsImage(it) },
                     state = model.picsListState,
                 )
-            }
+            } }
         }
     }
 

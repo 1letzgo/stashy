@@ -78,16 +78,15 @@ import kotlinx.coroutines.launch
  * iOS: `ReelsView` / `ReelsViewBody` (StashTok) — the Feeds tab.
  *
  * Edge-to-edge vertical pager (one row per screen) with autoplay of the settled row and
- * preloading of its neighbours ([FeedPlayerPool]); the section chrome (mode dock + Filter &
- * Sort) floats on top, the info overlay and scrubber sit right above the floating tab bar.
+ * preloading of its neighbours ([FeedPlayerPool]); the section chrome (feed dropdown, then
+ * Delete · sort dropdown · Filter & Sort) floats on top, the info overlay and scrubber sit right above the floating tab bar.
  * Tapping the media hides all chrome including the tab bar, like iOS. With "Auto-hide tab bar"
  * on, a swipe to a later row also slides the bar away (the overlay follows it down); the first
  * row, a tab / mode switch or tapping the chrome back in returns it. Pics is the Images
  * catalog's 1/row feed under the same chrome ([PicsFeed]); loading / empty / error states and
  * Pics sit on the app background like iOS (`StashyThemeFill(.app)`), video rows on black.
  *
- * Known differences to iOS: the AI Motion pill (device control) is not ported (Play policy);
- * the mode chip's label appears without iOS's delayed fade.
+ * Known differences to iOS: the AI Motion pill (device control) is not ported (Play policy).
  *
  * Markers play their window of the original scene (`seconds … end_seconds`, else 30 s — see
  * [FeedSegment]) with audio, not Stash's generated marker clip; the scrubber spans that window.
@@ -229,7 +228,6 @@ fun FeedsScreen() {
                         if (FeedsChromeAutoHide.hidesOnDrag(mode, overlayOpen, isZoomed)) chromeScrollHidden = true
                     },
                     onZoom = { isZoomed = it },
-                    onDelete = { deleteTarget = it },
                     onAddTags = { target ->
                         // iOS `.onChange(of: tagEditorTarget?.id)`: nobody wants a clip looping
                         // with sound behind the tag picker.
@@ -246,7 +244,7 @@ fun FeedsScreen() {
             }
         }
 
-        // Top chrome: mode dock + Filter & Sort, criterion chips below (iOS `reelsNavBar`).
+        // Top chrome: feed dropdown · Delete · sort · Filter & Sort, criterion chips below (iOS `reelsNavBar`).
         // Auto-hide (pager modes only): slides up and fades out together with the tab bar, on
         // the same trigger and animation; rows are full-screen, so the video just gains room.
         val tapAlpha by animateFloatAsState(if (isUIVisible) 1f else 0f, tween(200), label = "chrome")
@@ -264,10 +262,16 @@ fun FeedsScreen() {
                 .onSizeChanged { with(density) { if (chromeAlpha > 0.99f) measuredChrome = it.height.toDp() } },
         ) {
             if (chromeAlpha > 0.01f) {
+                // iOS `reelsNavBar`: Delete (item on screen; not Pics, never markers, only with
+                // "Show delete button") · sort menu · Filter & Sort.
+                val currentItem = if (mode == ReelsModeType.Pics) null
+                    else model.currentIds[mode]?.let { id -> items.firstOrNull { it.id == id } }
                 FeedsTopBar(
                     modes = FeedsConfig.enabledModes,
                     selected = mode,
                     onSelect = { m -> pool.teardown(); isZoomed = false; model.selectMode(m) },
+                    sort = feedsSortMenuState(model, mode) { pool.teardown() },
+                    onDelete = currentItem?.takeIf { FeedsConfig.showsDeleteButton && it.supportsDelete }?.let { item -> { deleteTarget = item } },
                     onFilterSort = { if (mode == ReelsModeType.Pics) model.pics.isSheetPresented = true else showSheet = true },
                 )
                 val c = model.criteria
@@ -359,7 +363,6 @@ private fun FeedPager(
     onToggleUI: () -> Unit,
     onDragStarted: () -> Unit,
     onZoom: (Boolean) -> Unit,
-    onDelete: (FeedItem) -> Unit,
     onAddTags: (AITagTarget) -> Unit,
     onAddPerformers: (FeedItem) -> Unit,
 ) {
@@ -533,7 +536,6 @@ private fun FeedPager(
                     mode = mode,
                     isMuted = pool.muted,
                     isPlaying = isPlaying,
-                    showsDelete = FeedsConfig.showsDeleteButton,
                     onPerformerFilter = { p -> model.filterByPerformer(IdName(p.id, p.name)) },
                     // iOS: Clips (and Pics) are image feeds — open the performer on Images.
                     onPerformerOpen = { p ->
@@ -548,7 +550,6 @@ private fun FeedPager(
                     onRemoveTag = { t -> model.removeTag(t.id, activeItem.aiTagTarget) },
                     onOCounter = { m -> model.changeOCounter(activeItem, m) },
                     onRating = { r -> model.setRating(activeItem, r) },
-                    onDelete = { onDelete(activeItem) },
                     onToggleMute = {
                         val new = !pool.muted
                         model.isMuted = new

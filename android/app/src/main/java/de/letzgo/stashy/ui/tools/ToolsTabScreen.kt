@@ -2,7 +2,14 @@ package de.letzgo.stashy.ui.tools
 
 import de.letzgo.stashy.ui.bottomBarContentPadding
 import de.letzgo.stashy.ui.scaledMaxLines
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.ExitTransition
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -109,7 +116,12 @@ fun ToolsTabScreen() {
     ToolsView()
 }
 
-/** iOS: `ToolsView` — landing grid or the selected tool, with the tool strip on top. */
+/**
+ * iOS: `ToolsView` — like Home, the tool grid is the root and a tool is a page pushed onto it
+ * (system back returns to the grid, see `AppShell`). The grid's row reads Tools › every tool as
+ * an icon; a tool's row reads Tools › tool menu (› the tool's own control, see
+ * [toolsWithOwnControls]). Picking another tool from the menu swaps it in place.
+ */
 @Composable
 private fun ToolsView() {
     LaunchedEffect(Unit) {
@@ -119,9 +131,45 @@ private fun ToolsView() {
     LaunchedEffect(StashyPlus.isUnlocked, de.letzgo.stashy.data.TabManager.isMiniPlayerEnabled) { normalizeToolsSubTab() }
     val selected = ToolsTab.from(ToolsNav.subTab)?.takeIf { it in ToolsTab.sorted }
     val p = Theme.palette
-    Box(Modifier.fillMaxSize().background(p.background)) {
-        when (selected) {
-            null -> ToolsLandingView { ToolsNav.subTab = it.title }
+    AnimatedContent(
+        targetState = selected,
+        // Push / pop between the grid and a tool; switching tools from the menu is instant.
+        contentKey = { it == null },
+        transitionSpec = {
+            when {
+                initialState == null && targetState != null ->
+                    slideInHorizontally { it } togetherWith slideOutHorizontally { -it / 3 }
+                initialState != null && targetState == null ->
+                    slideInHorizontally { -it / 3 } togetherWith slideOutHorizontally { it }
+                else -> EnterTransition.None togetherWith ExitTransition.None
+            }
+        },
+        label = "toolsPush",
+    ) { tool ->
+        Box(Modifier.fillMaxSize().background(p.background)) {
+            if (tool == null) {
+                ToolsLandingView { ToolsNav.subTab = it.title }
+                ToolsStrip()
+            } else {
+                ToolPage(tool)
+            }
+        }
+    }
+}
+
+/**
+ * iOS: `ToolsView.toolsWithOwnControls` — tools that put their own control (metric / theme /
+ * filter menu) at the right of the Tools row and draw the row themselves ([ToolsBreadcrumbChrome]).
+ */
+private val toolsWithOwnControls = setOf(ToolsTab.TopLists, ToolsTab.RateMe, ToolsTab.Timeline)
+
+/** iOS: `toolPage` + `ToolPageChrome` — the tool with its Tools row. */
+@Composable
+private fun ToolPage(tool: ToolsTab) {
+    val context = ToolsBreadcrumbContext(ToolsTab.sorted, tool) { ToolsNav.subTab = it?.title ?: "" }
+    val drawsOwnRow = tool in toolsWithOwnControls
+    CompositionLocalProvider(LocalToolsBreadcrumb provides context.takeIf { drawsOwnRow }) {
+        when (tool) {
             ToolsTab.Downloads -> DownloadsToolView()
             ToolsTab.Watchlist -> de.letzgo.stashy.ui.tools.watchlist.WatchlistToolView()
             ToolsTab.Overview -> OverviewToolView()
@@ -131,8 +179,8 @@ private fun ToolsView() {
             ToolsTab.HotOrNot -> MatchToolView()
             ToolsTab.RateMe -> RateMeToolView()
         }
-        ToolsStrip(selected)
     }
+    if (!drawsOwnRow) ToolsBreadcrumbStrip(context)
 }
 
 /** iOS: `normalizeToolsSubTab()` — legacy names map to their tools, unknown → landing grid. */
@@ -148,14 +196,14 @@ private fun normalizeToolsSubTab() {
 }
 
 /**
- * iOS: `toolsDropdown` (`StashyTopNavNameDropdownRow` with the pinned "Tools" entry): the pinned
- * grid chip stays left, the tools scroll beside it; selected = labelled glass capsule.
+ * iOS: `ToolsBreadcrumbRow(current: nil)` on the grid — Tools (grid icon, highlighted) pinned at
+ * the left, every tool as an icon beside it; tapping one opens that tool. Same native strip as
+ * the Home dashboard row.
  */
 @Composable
-private fun ToolsStrip(selected: ToolsTab?) {
-    // First tab = the landing grid ("Tools"), then every enabled tool (native Material tabs).
+private fun ToolsStrip() {
     val items: List<ToolsTab?> = listOf<ToolsTab?>(null) + ToolsTab.sorted
-    de.letzgo.stashy.ui.NativeTabStrip(items, selected, { it?.title ?: "Tools" }, { ToolsNav.subTab = it?.title ?: "" }, icon = { it?.icon ?: de.letzgo.stashy.ui.SF.squareGrid2x2 }, pinFirst = true)
+    de.letzgo.stashy.ui.NativeTabStrip(items, null, { it?.title ?: "Tools" }, { tool -> tool?.let { ToolsNav.subTab = it.title } }, icon = { it?.icon ?: de.letzgo.stashy.ui.SF.squareGrid2x2 }, pinFirst = true)
 }
 
 /**
