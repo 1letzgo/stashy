@@ -2178,8 +2178,14 @@ public struct FilterMapper {
     ///   - dict: The raw filter dictionary (either from saved_filter or UI).
     ///   - isMarker: Whether this is a marker filter (requires nesting some scene criteria).
     /// - Returns: A sanitized dictionary ready for GraphQL.
-    public static func sanitize(_ dict: [String: Any], isMarker: Bool = false) -> [String: Any] {
+    public static func sanitize(_ dict: [String: Any], isMarker: Bool = false, entity: Entity? = nil) -> [String: Any] {
+        let entity = entity ?? (isMarker ? .markers : nil)
         var newDict = dict
+        // Legacy key (Stash renamed movies → groups); the web UI reads it as groups too.
+        if let movies = newDict["movies"], newDict["groups"] == nil {
+            newDict["groups"] = movies
+            newDict.removeValue(forKey: "movies")
+        }
         
         // 1. Handle the "c" (criteria) array format used by Stash UI.
         // Build `c` into a side dict first, then overlay remaining GraphQL keys so live-chip
@@ -2198,9 +2204,9 @@ public struct FilterMapper {
                     // Otherwise, it's a leaf criterion - process it directly using its ID as the field key.
                     let processedItem: Any
                     if outputItem["c"] != nil || outputItem["AND"] != nil || outputItem["OR"] != nil || outputItem["NOT"] != nil {
-                        processedItem = sanitize(outputItem, isMarker: false)
+                        processedItem = sanitize(outputItem, isMarker: false, entity: entity)
                     } else {
-                        processedItem = processCriterion(key: key, dict: outputItem)
+                        processedItem = processCriterion(key: key, dict: outputItem, entity: entity)
                     }
 
                     if isMarker && isSceneSpecificKey(key) {
@@ -2232,9 +2238,9 @@ public struct FilterMapper {
             // Handle Logic Operators (AND, OR, NOT) which can be Arrays or Dicts
             if ["AND", "OR", "NOT"].contains(key) {
                 if let filterArray = value as? [[String: Any]] {
-                    newDict[key] = filterArray.map { sanitize($0, isMarker: false) }
+                    newDict[key] = filterArray.map { sanitize($0, isMarker: false, entity: entity) }
                 } else if let filterDict = value as? [String: Any] {
-                    newDict[key] = sanitize(filterDict, isMarker: false)
+                    newDict[key] = sanitize(filterDict, isMarker: false, entity: entity)
                 }
                 continue
             }
@@ -2242,19 +2248,55 @@ public struct FilterMapper {
             // Handle nested sub-filters (e.g., performers_filter, scene_filter)
             if key.hasSuffix("_filter") || key == "scene_filter" {
                 if let subFilter = value as? [String: Any] {
-                    newDict[key] = sanitize(subFilter, isMarker: false)
+                    // `files_filter` / `folders_filter` are file-level types: their keys are not
+                    // the list criteria above, so they pass through untouched.
+                    if key == "files_filter" || key == "folders_filter" {
+                        newDict[key] = subFilter
+                    } else {
+                        newDict[key] = sanitize(subFilter, isMarker: false, entity: subFilterEntity(key))
+                    }
                 }
                 continue
             }
             
             // Handle Criterion Input objects (which often have "value", "modifier", etc.)
             if let subDict = value as? [String: Any] {
-                newDict[key] = processCriterion(key: key, dict: subDict)
+                newDict[key] = processCriterion(key: key, dict: subDict, entity: entity)
+            } else if case .boolean = savedFamily(key, entity: entity), let s = value as? String {
+                newDict[key] = castToBool(s)
             }
         }
 
         omitEmptyMultiIdCriteria(&newDict)
         return newDict
+    }
+
+    /// Last step before a query leaves the app. The Folder criterion (scenes, images) lives under
+    /// its web UI key `folder` in the app's filters — GraphQL wants it as
+    /// `files_filter.parent_folder`. Saved filters (`object_filter`) keep the web UI key.
+    public static func queryVariables(_ variables: [String: Any]) -> [String: Any] {
+        var out = variables
+        for (key, value) in variables
+        where key.hasSuffix("_filter") && key != "object_filter" && key != "find_filter" {
+            if let filter = value as? [String: Any] { out[key] = hoistFolder(filter) }
+        }
+        return out
+    }
+
+    private static func hoistFolder(_ dict: [String: Any]) -> [String: Any] {
+        var out = dict
+        for (key, value) in dict {
+            if ["AND", "OR", "NOT"].contains(key) || (key.hasSuffix("_filter") && key != "files_filter") {
+                if let d = value as? [String: Any] { out[key] = hoistFolder(d) }
+            }
+        }
+        if let folder = out["folder"] as? [String: Any] {
+            out.removeValue(forKey: "folder")
+            var files = (out["files_filter"] as? [String: Any]) ?? [:]
+            files["parent_folder"] = folder
+            out["files_filter"] = files
+        }
+        return out
     }
 
     /// `INCLUDES` with no ids is Stash UI "Any" — omit the criterion instead of persisting an empty
@@ -2292,86 +2334,353 @@ public struct FilterMapper {
         return keys.contains(key)
     }
     
-    /// Multi-id fields that the Stash web UI stores as `value: { items, excluded, depth }`.
-    static let uiMultiSelectFields: Set<String> = [
-        "performers", "studios", "tags", "galleries", "scenes", "groups", "movies"
-    ]
-    private static let uiHierarchicalFields: Set<String> = ["tags", "studios", "groups", "movies"]
+    // MARK: - Saved format (Stash web UI) ↔ query format (GraphQL)
 
-    /// Rewrites a GraphQL-shaped `object_filter` into the web UI's own storage format.
-    ///
-    /// `SavedFilter.object_filter` is an opaque JSON column — the server never validates it against
-    /// `HierarchicalMultiCriterionInput`. The web UI writes and reads
-    /// `value: { items: [{id,label}], excluded: [{id,label}], depth }`, so a filter saved in our
-    /// query format loads back as empty over there. Query paths keep using the GraphQL shape;
-    /// only what we persist goes through here.
-    ///
-    /// `labels` maps entity id → display name. Missing names fall back to the id, which the web UI
-    /// re-resolves on load.
-    /// Scalar criteria the app keeps as a bare value (GraphQL shape: `is_missing: "stash_id"`,
-    /// `organized: true`). The web UI stores every criterion as `{ value, modifier }` and
-    /// ignores a bare value when it loads the filter, so they are wrapped on the way out.
-    private static let uiScalarCriterionFields: Set<String> = [
-        "is_missing", "has_markers", "has_chapters",
-        "interactive", "organized", "favorite", "performer_favorite", "studio_favorite",
-        "gallery_favorite", "filter_favorites", "has_image", "ignore_auto_tag"
+    /// The list a filter belongs to. A few keys mean different things per list (`parents` is a
+    /// plain studio list on studios but a tag hierarchy on tags).
+    public enum Entity: String {
+        case scenes, performers, studios, galleries, images, groups, tags, markers
+    }
+
+    /// Entity a picked id names, for the `{id, label}` pairs the web UI stores.
+    public enum LabelKind: String {
+        case tag, studio, performer, group, gallery, scene, folder
+    }
+
+    /// How the web UI stores a criterion (`ui/v2.5/src/models/list-filter/criteria`, Stash 0.32+).
+    enum SavedFamily {
+        case hierarchical(LabelKind)   // {value:{items,excluded,depth}, modifier}
+        case performerItems            // {value:{items,excluded}, modifier}
+        case labeledIds(LabelKind)     // {value:[{id,label}], modifier}
+        case resolution, orientation, gender, circumcised, captions
+        case boolean                   // {value:"true"|"false", modifier:EQUALS}  ↔ Bool
+        case stringValue               // {value:"…", modifier:EQUALS}  ↔ bare String
+        case date, timestamp           // {value:{value,value2}, modifier}
+        case stashID                   // {value:{endpoint,stashID}, modifier}
+        case phash                     // {value:{value,distance}, modifier}
+        case duplicated                // {value:{phash,url,stash_id,title}, modifier:EQUALS}
+        case passthrough               // stored as queried (custom_fields, app-only keys)
+        case generic                   // numbers → nested range, strings stay flat
+    }
+
+    static func savedFamily(_ key: String, entity: Entity?) -> SavedFamily {
+        switch key {
+        case "tags", "scene_tags", "performer_tags", "children": return .hierarchical(.tag)
+        case "parents": return entity == .studios ? .labeledIds(.studio) : .hierarchical(.tag)
+        case "studios": return .hierarchical(.studio)
+        case "groups", "movies", "containing_groups", "sub_groups": return .hierarchical(.group)
+        case "folder", "parent_folder": return .hierarchical(.folder)
+        case "performers": return .performerItems
+        case "galleries": return .labeledIds(.gallery)
+        case "scenes": return .labeledIds(.scene)
+        case "resolution", "average_resolution": return .resolution
+        case "orientation": return .orientation
+        case "gender": return .gender
+        case "circumcised": return .circumcised
+        case "captions": return .captions
+        case "organized", "interactive", "performer_favorite", "filter_favorites", "favorite",
+             "ignore_auto_tag", "is_zip", "studio_favorite", "gallery_favorite", "has_image":
+            return .boolean
+        case "has_markers", "has_chapters", "is_missing": return .stringValue
+        case "date", "production_date", "birthdate", "death_date", "career_start", "career_end",
+             "scene_date":
+            return .date
+        case "created_at", "updated_at", "last_played_at", "scene_created_at", "scene_updated_at":
+            return .timestamp
+        case "stash_id_endpoint": return .stashID
+        case "phash_distance": return .phash
+        case "duplicated": return .duplicated
+        case "custom_fields", "stash_ids_endpoint", "id": return .passthrough
+        default: return .generic
+        }
+    }
+
+    /// `*_filter` sub-filter key → the list it filters.
+    static func subFilterEntity(_ key: String) -> Entity? {
+        switch key {
+        case "scene_filter", "scenes_filter": return .scenes
+        case "performers_filter": return .performers
+        case "studios_filter": return .studios
+        case "galleries_filter": return .galleries
+        case "images_filter": return .images
+        case "groups_filter", "movies_filter": return .groups
+        case "tags_filter": return .tags
+        case "markers_filter": return .markers
+        default: return nil
+        }
+    }
+
+    // Value maps, exactly as the web UI writes them (`src/utils/*.ts`).
+    static let resolutionLabels: [(label: String, value: String)] = [
+        ("144p", "VERY_LOW"), ("240p", "LOW"), ("360p", "R360P"), ("480p", "STANDARD"),
+        ("540p", "WEB_HD"), ("720p", "STANDARD_HD"), ("1080p", "FULL_HD"), ("1440p", "QUAD_HD"),
+        ("4k", "FOUR_K"), ("5k", "FIVE_K"), ("6k", "SIX_K"), ("7k", "SEVEN_K"), ("8k", "EIGHT_K"),
+        ("Huge", "HUGE")
+    ]
+    static let genderLabels: [(label: String, value: String)] = [
+        ("Male", "MALE"), ("Female", "FEMALE"), ("Transgender Male", "TRANSGENDER_MALE"),
+        ("Transgender Female", "TRANSGENDER_FEMALE"), ("Intersex", "INTERSEX"),
+        ("Non-Binary", "NON_BINARY")
+    ]
+    static let circumcisedLabels: [(label: String, value: String)] = [("Uncut", "UNCUT"), ("Cut", "CUT")]
+    static let orientationLabels: [(label: String, value: String)] = [
+        ("Landscape", "LANDSCAPE"), ("Portrait", "PORTRAIT"), ("Square", "SQUARE")
+    ]
+    static let captionLabels: [(label: String, value: String)] = [
+        ("Deutsche", "de"), ("English", "en"), ("Español", "es"), ("Français", "fr"),
+        ("Italiano", "it"), ("日本", "ja"), ("한국인", "ko"), ("Holandés", "nl"),
+        ("Português", "pt"), ("Русский", "ru"), ("Unknown", "00")
     ]
 
-    public static func uiObjectFilter(from dict: [String: Any], labels: [String: String] = [:]) -> [String: Any] {
+    /// Saved label or query value (any case, `-`/space/`_` alike) → query value.
+    static func queryValue(_ raw: String, in map: [(label: String, value: String)]) -> String? {
+        func norm(_ s: String) -> String {
+            s.lowercased().replacingOccurrences(of: "-", with: "_").replacingOccurrences(of: " ", with: "_")
+        }
+        let n = norm(raw)
+        return map.first { norm($0.label) == n || norm($0.value) == n }?.value
+    }
+
+    /// Query value (or a label already) → the label the web UI saves.
+    static func savedLabel(_ raw: String, in map: [(label: String, value: String)]) -> String {
+        guard let value = queryValue(raw, in: map) else { return raw }
+        return map.first { $0.value == value }?.label ?? raw
+    }
+
+    private static func stringList(_ raw: Any?) -> [String] {
+        if let s = raw as? String { return [s] }
+        return jsonArray(raw).compactMap { item in
+            if let s = item as? String { return s }
+            if let d = item as? [String: Any] { return (d["id"] as? String) ?? (d["label"] as? String) }
+            return nil
+        }
+    }
+
+    /// "2024-01-31T13:45" / "2024-01-31 13:45:00" → the web UI's "2024-01-31 13:45".
+    static func savedTimestamp(_ raw: String) -> String {
+        let t = raw.trimmingCharacters(in: .whitespaces).replacingOccurrences(of: "T", with: " ")
+        if t.count >= 16, t.range(of: #"^\d{4}-\d{2}-\d{2} \d{2}:\d{2}"#, options: .regularExpression) != nil {
+            return String(t.prefix(16))
+        }
+        return t
+    }
+
+    /// The web UI's "2024-01-31 13:45" → GraphQL "2024-01-31T13:45" (date-only stays as is).
+    static func queryTimestamp(_ raw: String) -> String {
+        let t = raw.trimmingCharacters(in: .whitespaces)
+        if t.range(of: #"^\d{4}-\d{2}-\d{2} \d{2}:\d{2}"#, options: .regularExpression) != nil {
+            return t.replacingOccurrences(of: " ", with: "T")
+        }
+        return t
+    }
+
+    /// Rewrites a query-shaped filter (what the app edits and sends) into the web UI's own
+    /// storage format, so a filter saved here opens unchanged in Stash and the other way round.
+    ///
+    /// The server stores `object_filter` without looking at it; the web UI saves display values
+    /// (`"1440p"`, `["Female"]`, `"English"`, ranges nested in `value`) and maps them to GraphQL
+    /// only when it queries. `sanitize` is the way back. `label` names an id for the
+    /// `{id, label}` pairs (nil → the id, which the web UI re-resolves).
+    public static func savedObjectFilter(
+        from dict: [String: Any],
+        entity: Entity?,
+        label: (LabelKind, String) -> String? = { _, _ in nil }
+    ) -> [String: Any] {
         var out: [String: Any] = [:]
         for (key, value) in dict {
-            guard let criterion = value as? [String: Any] else {
-                if uiScalarCriterionFields.contains(key) {
-                    let text: String
-                    if let b = value as? Bool { text = b ? "true" : "false" }
-                    else { text = "\(value)" }
-                    out[key] = ["value": text, "modifier": "EQUALS"]
+            if ["AND", "OR", "NOT"].contains(key) {
+                if let d = value as? [String: Any] {
+                    out[key] = savedObjectFilter(from: d, entity: entity, label: label)
+                } else if let arr = value as? [[String: Any]] {
+                    out[key] = arr.map { savedObjectFilter(from: $0, entity: entity, label: label) }
                 } else {
                     out[key] = value
                 }
                 continue
             }
-            // Nested boolean groups / sub-filters keep the same treatment one level down.
-            if ["AND", "OR", "NOT"].contains(key) || key.hasSuffix("_filter") {
-                out[key] = uiObjectFilter(from: criterion, labels: labels)
-                continue
-            }
-            guard uiMultiSelectFields.contains(key) else {
-                out[key] = criterion
-                continue
-            }
-
-            func entries(_ raw: Any?) -> [[String: Any]] {
-                idStrings(from: raw).map { id in
-                    ["id": id, "label": labels[id] ?? id]
+            if key == "files_filter", var files = value as? [String: Any] {
+                // The web UI's Folder criterion (scenes / images) is `files_filter.parent_folder`.
+                if (entity == .scenes || entity == .images), let folder = files["parent_folder"] as? [String: Any] {
+                    out["folder"] = savedCriterion(key: "folder", folder, entity: entity, label: label)
+                    files.removeValue(forKey: "parent_folder")
                 }
+                if !files.isEmpty { out[key] = files }
+                continue
             }
-
-            var uiValue: [String: Any] = [
-                "items": entries(criterion["value"]),
-                "excluded": entries(criterion["excludes"])
-            ]
-            if uiHierarchicalFields.contains(key) {
-                uiValue["depth"] = criterion["depth"] ?? 0
+            if key.hasSuffix("_filter") {
+                if let d = value as? [String: Any] {
+                    out[key] = savedObjectFilter(from: d, entity: subFilterEntity(key), label: label)
+                } else {
+                    out[key] = value
+                }
+                continue
             }
-            var rewritten: [String: Any] = ["value": uiValue]
-            if let modifier = criterion["modifier"] { rewritten["modifier"] = modifier }
-            out[key] = rewritten
+            let savedKey = key == "movies" ? "groups" : key
+            out[savedKey] = savedCriterion(key: key, value, entity: entity, label: label)
         }
         return out
     }
 
-    private static func processCriterion(key: String, dict: [String: Any]) -> Any {
+    private static func savedCriterion(
+        key: String,
+        _ value: Any,
+        entity: Entity?,
+        label: (LabelKind, String) -> String?
+    ) -> Any {
+        let family = savedFamily(key, entity: entity)
+        // Bare scalars (GraphQL `organized: true`, `is_missing: "cover"`).
+        guard let criterion = value as? [String: Any] else {
+            switch family {
+            case .boolean:
+                let b = (value as? Bool) ?? ((value as? String)?.lowercased() == "true")
+                return ["value": b ? "true" : "false", "modifier": "EQUALS"]
+            case .stringValue:
+                return ["value": "\(value)", "modifier": "EQUALS"]
+            default:
+                return value
+            }
+        }
+        var c = criterion
+        let modifier = c["modifier"]
+        func withModifier(_ v: Any, default def: String? = nil) -> [String: Any] {
+            var r: [String: Any] = ["value": v]
+            if let modifier { r["modifier"] = modifier } else if let def { r["modifier"] = def }
+            return r
+        }
+        func entries(_ raw: Any?, _ kind: LabelKind) -> [[String: Any]] {
+            idStrings(from: raw).map { ["id": $0, "label": label(kind, $0) ?? $0] }
+        }
+        // Already in the saved shape (a criterion the app never touched): keep it.
+        if let v = c["value"] as? [String: Any], v["items"] != nil || v["value"] != nil
+            || v["endpoint"] != nil || v["stashID"] != nil {
+            return c
+        }
+
+        switch family {
+        case .hierarchical(let kind):
+            var v: [String: Any] = ["items": entries(c["value"], kind), "excluded": entries(c["excludes"], kind)]
+            v["depth"] = c["depth"] ?? 0
+            return withModifier(v, default: "INCLUDES")
+        case .performerItems:
+            return withModifier(["items": entries(c["value"], .performer), "excluded": entries(c["excludes"], .performer)],
+                                default: "INCLUDES")
+        case .labeledIds(let kind):
+            let items = entries(c["value"], kind)
+            let excluded = entries(c["excludes"], kind)
+            // No `excluded` in this shape: an exclude-only criterion becomes EXCLUDES.
+            if items.isEmpty, !excluded.isEmpty {
+                return ["value": excluded, "modifier": "EXCLUDES"]
+            }
+            var r = withModifier(items, default: "INCLUDES")
+            if !excluded.isEmpty { r["excludes"] = idStrings(from: c["excludes"]) }
+            return r
+        case .resolution:
+            guard let raw = c["value"] as? String else { return c }
+            return withModifier(savedLabel(raw, in: resolutionLabels), default: "EQUALS")
+        case .orientation:
+            return ["value": stringList(c["value"]).map { savedLabel($0, in: orientationLabels) }, "modifier": "EQUALS"]
+        case .gender:
+            let raw = c["value_list"] ?? c["value"]
+            return withModifier(stringList(raw).map { savedLabel($0, in: genderLabels) }, default: "INCLUDES")
+        case .circumcised:
+            return withModifier(stringList(c["value"]).map { savedLabel($0, in: circumcisedLabels) }, default: "INCLUDES")
+        case .captions:
+            guard let raw = c["value"] as? String else { return c }
+            return withModifier(savedLabel(raw, in: captionLabels), default: "INCLUDES")
+        case .boolean, .stringValue:
+            if let v = c["value"] {
+                let text = (v as? Bool).map { $0 ? "true" : "false" } ?? "\(v)"
+                return ["value": text, "modifier": "EQUALS"]
+            }
+            return c
+        case .date, .timestamp:
+            let isTime: Bool = { if case .timestamp = family { return true } else { return false } }()
+            func fmt(_ x: Any?) -> Any? {
+                guard let s = x as? String else { return x }
+                return isTime ? savedTimestamp(s) : s
+            }
+            var inner: [String: Any] = [:]
+            if let v = fmt(c["value"]) { inner["value"] = v }
+            if let v2 = fmt(c["value2"]) { inner["value2"] = v2 }
+            return withModifier(inner, default: isTime ? "GREATER_THAN" : "EQUALS")
+        case .stashID:
+            var inner: [String: Any] = [:]
+            if let e = c["endpoint"] { inner["endpoint"] = e }
+            if let id = c["stash_id"] ?? c["value"] { inner["stashID"] = id }
+            return withModifier(inner, default: "EQUALS")
+        case .phash:
+            var inner: [String: Any] = [:]
+            if let v = c["value"] { inner["value"] = v }
+            inner["distance"] = c["distance"] ?? 0
+            return withModifier(inner, default: "EQUALS")
+        case .duplicated:
+            var inner: [String: Any] = [:]
+            for k in ["phash", "url", "stash_id", "title", "distance"] where c[k] != nil { inner[k] = c[k] }
+            // App-written `{duplicated: true}` = duplicate phash, as the web UI reads it.
+            if inner["phash"] == nil, let d = c["duplicated"] as? Bool { inner["phash"] = d }
+            return ["value": inner, "modifier": "EQUALS"]
+        case .passthrough:
+            return c
+        case .generic:
+            // Numbers / ratings / durations: the range lives inside `value`.
+            let isNumber: (Any?) -> Bool = { $0 is Int || $0 is Double || $0 is NSNumber }
+            if isNumber(c["value"]) || isNumber(c["value2"]) {
+                var inner: [String: Any] = [:]
+                if let v = c["value"] { inner["value"] = v }
+                if let v2 = c["value2"] { inner["value2"] = v2 }
+                c.removeValue(forKey: "value2")
+                c["value"] = inner
+                if c["modifier"] == nil { c["modifier"] = "EQUALS" }
+                return c
+            }
+            return c
+        }
+    }
+
+    private static func processCriterion(key: String, dict: [String: Any], entity: Entity? = nil) -> Any {
         var subDict = dict
         
         // Strip UI-only metadata inside criteria
         for uiKey in ["id", "type", "inputType", "criterionOption"] {
             subDict.removeValue(forKey: uiKey)
         }
+
+        // Shapes whose saved `value` object is not a range or an id list.
+        switch savedFamily(key, entity: entity) {
+        case .stashID:
+            var out: [String: Any] = ["modifier": subDict["modifier"] ?? "EQUALS"]
+            if let v = subDict["value"] as? [String: Any] {
+                if let e = v["endpoint"] as? String, !e.isEmpty { out["endpoint"] = e }
+                if let id = (v["stashID"] ?? v["stash_id"]) as? String, !id.isEmpty { out["stash_id"] = id }
+            } else if let id = subDict["value"] as? String, !id.isEmpty {
+                out["stash_id"] = id
+            }
+            if let e = subDict["endpoint"] { out["endpoint"] = e }
+            if let id = subDict["stash_id"] { out["stash_id"] = id }
+            return out
+        case .phash:
+            if let v = subDict["value"] as? [String: Any] {
+                subDict["value"] = v["value"] ?? ""
+                subDict["distance"] = v["distance"] ?? subDict["distance"] ?? 0
+            }
+            return subDict
+        case .duplicated:
+            // DuplicationCriterionInput has no modifier.
+            if let v = subDict["value"] as? [String: Any] { return v }
+            if let s = subDict["value"] as? String { return ["phash": castToBool(s)] }
+            subDict.removeValue(forKey: "modifier")
+            return subDict
+        default:
+            break
+        }
         
         // Unwrap nested value structures (Stash UI `{ items: [...] }` and Swift `[String]` arrays).
         if let valueDict = subDict["value"] as? [String: Any] {
-            if let inner = valueDict["value"] { subDict["value"] = inner }
+            if let inner = valueDict["value"] {
+                // Ranges (numbers, dates, timestamps) keep both ends inside `value`.
+                subDict["value"] = inner
+                if let inner2 = valueDict["value2"] { subDict["value2"] = inner2 }
+            }
             else if let inner = valueDict["id"] { subDict["value"] = inner }
             else {
                 let items = jsonArray(valueDict["items"])
@@ -2433,8 +2742,36 @@ public struct FilterMapper {
         }
         
         // Resolution mapping
+        // The web UI saves "1440p" / "4k"; GraphQL wants QUAD_HD / FOUR_K.
         if key == "resolution" || key == "average_resolution" {
-            if let s = subDict["value"] as? String { subDict["value"] = s.uppercased() }
+            if let s = subDict["value"] as? String {
+                subDict["value"] = queryValue(s, in: resolutionLabels) ?? s.uppercased()
+            }
+        }
+
+        // Saved "Cut" / "Uncut" → CUT / UNCUT.
+        if key == "circumcised" {
+            subDict["value"] = stringList(subDict["value"]).map { queryValue($0, in: circumcisedLabels) ?? $0.uppercased() }
+            if subDict["modifier"] == nil { subDict["modifier"] = "INCLUDES" }
+        }
+
+        // Saved ["Female", "Transgender Female"] (or a legacy single value) → value_list enums.
+        if key == "gender" {
+            let raw = subDict["value_list"] ?? subDict["value"]
+            subDict["value_list"] = stringList(raw).map { queryValue($0, in: genderLabels) ?? $0.uppercased() }
+            subDict.removeValue(forKey: "value")
+            if subDict["modifier"] == nil { subDict["modifier"] = "INCLUDES" }
+        }
+
+        // Saved display name ("English") → language code ("en").
+        if key == "captions", let s = subDict["value"] as? String {
+            subDict["value"] = queryValue(s, in: captionLabels) ?? s
+        }
+
+        // Saved "2024-01-31 13:45" → GraphQL "2024-01-31T13:45".
+        if case .timestamp = savedFamily(key, entity: entity) {
+            if let s = subDict["value"] as? String { subDict["value"] = queryTimestamp(s) }
+            if let s = subDict["value2"] as? String { subDict["value2"] = queryTimestamp(s) }
         }
         
         // Integer field casting
@@ -2456,7 +2793,8 @@ public struct FilterMapper {
         // reached the server as maps ("cannot use map as ID") once the criteria document sent them.
         let multiSelectFields: Set<String> = [
             "performers", "studios", "tags", "galleries", "scenes", "groups", "movies",
-            "performer_tags", "scene_tags", "parents", "children", "containing_groups", "sub_groups"
+            "performer_tags", "scene_tags", "parents", "children", "containing_groups", "sub_groups",
+            "folder", "parent_folder"
         ]
         if multiSelectFields.contains(key) {
             if subDict["value"] != nil {
@@ -2469,29 +2807,25 @@ public struct FilterMapper {
             // Empty value is "Any" and is dropped later — don't persist `depth` on a blank criterion.
             let hierarchicalFields: Set<String> = [
                 "tags", "studios", "groups", "movies",
-                "performer_tags", "scene_tags", "parents", "children", "containing_groups", "sub_groups"
+                "performer_tags", "scene_tags", "containing_groups", "sub_groups",
+                "folder", "parent_folder"
             ]
             if hierarchicalFields.contains(key) {
                 if subDict["depth"] == nil, !idStrings(from: subDict["value"]).isEmpty {
                     subDict["depth"] = 0
                 }
+            } else if key == "parents" || key == "children" {
+                // Tag parents / children are hierarchical; studio parents are a plain
+                // MultiCriterionInput that rejects `depth`.
+                if entity == .studios { subDict.removeValue(forKey: "depth") }
             } else {
                 subDict.removeValue(forKey: "depth")
             }
         }
         
-        // Single enum field mapping (flatten array to string, uppercase)
-        let singleEnumFields: Set<String> = ["gender", "ethnicity", "fake_tits", "hair_color", "eye_color", "career_length"]
-        if singleEnumFields.contains(key) {
-            if let valArray = subDict["value"] as? [Any], let first = valArray.first as? String {
-                subDict["value"] = first.uppercased()
-            } else if let s = subDict["value"] as? String {
-                subDict["value"] = s.uppercased()
-            }
-        }
         
         // Boolean field flattening (Stash API expects simple Bool for these, not a criterion object)
-        let booleanFields: Set<String> = ["interactive", "organized", "favorite", "performer_favorite", "studio_favorite", "gallery_favorite", "filter_favorites", "has_image", "ignore_auto_tag"]
+        let booleanFields: Set<String> = ["interactive", "organized", "favorite", "performer_favorite", "studio_favorite", "gallery_favorite", "filter_favorites", "has_image", "ignore_auto_tag", "is_zip"]
         if booleanFields.contains(key) {
             if let v = subDict["value"] {
                 return castToBool(v)

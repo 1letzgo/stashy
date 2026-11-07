@@ -228,6 +228,21 @@ class StashDBViewModel: ObservableObject {
             let string = try container.decode(String.self).uppercased()
             self = FilterMode(rawValue: string) ?? .unknown
         }
+
+        /// The list `FilterMapper` encodes and decodes saved criteria for.
+        var filterEntity: FilterMapper.Entity? {
+            switch self {
+            case .scenes: return .scenes
+            case .performers: return .performers
+            case .studios: return .studios
+            case .galleries: return .galleries
+            case .images: return .images
+            case .tags: return .tags
+            case .groups: return .groups
+            case .sceneMarkers: return .markers
+            case .unknown: return nil
+            }
+        }
     }
 
     struct SavedFilter: Codable, Identifiable, Hashable {
@@ -2553,9 +2568,10 @@ class StashDBViewModel: ObservableObject {
             "name": trimmedName,
             "find_filter": findFilter,
             // Web UI storage shape, same as the other save paths.
-            "object_filter": FilterMapper.uiObjectFilter(
+            "object_filter": FilterMapper.savedObjectFilter(
                 from: merged,
-                labels: filterPickerLabels
+                entity: mode.filterEntity,
+                label: filterPickerLabel
             ),
             "ui_options": uiOptions
         ]
@@ -2632,9 +2648,10 @@ class StashDBViewModel: ObservableObject {
             "name": trimmedName,
             "find_filter": findFilter,
             // Same storage shape as `saveFullObjectFilter` — the web UI cannot read our query format.
-            "object_filter": FilterMapper.uiObjectFilter(
+            "object_filter": FilterMapper.savedObjectFilter(
                 from: merged,
-                labels: filterPickerLabels
+                entity: mode.filterEntity,
+                label: filterPickerLabel
             ),
             "ui_options": uiOptions
         ]
@@ -2670,17 +2687,16 @@ class StashDBViewModel: ObservableObject {
         }
     }
 
-    /// Label-Map für `FilterMapper.uiObjectFilter`.
+    /// Name of a picked id for `FilterMapper.savedObjectFilter`'s `{id, label}` pairs.
     ///
-    /// `FilterPickerOptionsStore` lebt hinter `#if !os(tvOS)` — es hängt an
-    /// ViewModel-Methoden, die dort ebenfalls geguarded sind. tvOS speichert
-    /// keine Filter, es wählt nur gespeicherte aus; ohne Labels fehlen dort
-    /// höchstens die Klartextnamen in `ui_options`.
-    private var filterPickerLabels: [String: String] {
+    /// `FilterPickerOptionsStore` lebt hinter `#if !os(tvOS)` — tvOS speichert keine Filter, es
+    /// wählt nur gespeicherte aus; ohne Namen fällt das Label auf die ID zurück.
+    private var filterPickerLabel: (FilterMapper.LabelKind, String) -> String? {
         #if os(tvOS)
-        return [:]
+        return { _, _ in nil }
         #else
-        return FilterPickerOptionsStore.shared.knownLabels()
+        let labels = FilterPickerOptionsStore.shared.knownLabels()
+        return { kind, id in labels[kind]?[id] }
         #endif
     }
 
@@ -2729,10 +2745,11 @@ class StashDBViewModel: ObservableObject {
             "mode": mode.rawValue,
             "name": trimmedName,
             "find_filter": findFilter,
-            // Persist in the web UI's storage shape, not our query shape — see `uiObjectFilter`.
-            "object_filter": FilterMapper.uiObjectFilter(
+            // Persist in the web UI's storage shape, not our query shape — see `savedObjectFilter`.
+            "object_filter": FilterMapper.savedObjectFilter(
                 from: sanitized,
-                labels: filterPickerLabels
+                entity: mode.filterEntity,
+                label: filterPickerLabel
             ),
             "ui_options": uiOptions
         ]
@@ -3435,11 +3452,6 @@ class StashDBViewModel: ObservableObject {
             } else if let obj = savedFilter.object_filter, let objDict = obj.value as? [String: Any] {
                 sceneFilter = sanitizeFilter(objDict)
             }
-            if savedFilter.id != "merged_temp" {
-                for (key, value) in sanitizeFilter(savedFilter.stashyLiveFragment) {
-                    sceneFilter[key] = value
-                }
-            }
             if !sceneFilter.isEmpty {
                 variables["scene_filter"] = sceneFilter
             }
@@ -3486,11 +3498,6 @@ class StashDBViewModel: ObservableObject {
                 }
             } else if let obj = savedFilter.object_filter, let objDict = obj.value as? [String: Any] {
                 for (key, value) in sanitizeFilter(objDict) where key != "path" {
-                    imageFilter[key] = value
-                }
-            }
-            if savedFilter.id != "merged_temp" {
-                for (key, value) in sanitizeFilter(savedFilter.stashyLiveFragment) where key != "path" {
                     imageFilter[key] = value
                 }
             }
@@ -3751,14 +3758,9 @@ class StashDBViewModel: ObservableObject {
                     variables["scene_filter"] = obj.value
                 }
             }
-            let stashyLive = savedFilter.stashyLiveFragment
-            if !stashyLive.isEmpty, savedFilter.id != "merged_temp" {
-                var merged = (variables["scene_filter"] as? [String: Any]) ?? [:]
-                for (key, value) in sanitizeFilter(stashyLive) {
-                    merged[key] = value
-                }
-                variables["scene_filter"] = merged
-            }
+            // `object_filter` already holds the chips merged at save time; the old
+            // `ui_options.stashy.liveFragment` copy is not layered on top any more, or it would
+            // undo edits made in Stash itself.
         }
 
         // Merge live filter on top of saved filter (Reels scenes vs previews use separate live dicts).
@@ -8026,6 +8028,41 @@ struct GenerateData: Codable {
             run("findPerformers") { (r: PerformersResponse) in
                 (r.data?.findPerformers.performers ?? []).map { FilterEntityOption(id: $0.id, name: $0.name) }
             }
+        case .folders:
+            fetchFolderPickerOptions(pathContains: term, limit: limit, completion: completion)
+        }
+    }
+
+    /// Folders for the Folder criterion (Stash 0.32+), named by their full path like the web UI.
+    /// Without a search term: the first folders by path.
+    func fetchFolderPickerOptions(
+        pathContains term: String? = nil,
+        limit: Int = 300,
+        completion: @escaping ([FilterEntityOption]) -> Void
+    ) {
+        guard StashServerCapabilities.supports032 else {
+            Task { @MainActor in completion([]) }
+            return
+        }
+        var variables: [String: Any] = [
+            "filter": ["page": 1, "per_page": limit, "sort": "path", "direction": "ASC"]
+        ]
+        if let term, !term.isEmpty {
+            variables["folder_filter"] = ["path": ["value": term, "modifier": "INCLUDES"]]
+        }
+        let query = GraphQLQueries.loadQuery(named: "findFolderPickerOptions")
+        guard let bodyData = try? JSONSerialization.data(withJSONObject: ["query": query, "variables": variables]),
+              let bodyString = String(data: bodyData, encoding: .utf8) else {
+            Task { @MainActor in completion([]) }
+            return
+        }
+        performGraphQLQuery(
+            query: bodyString,
+            clearsGlobalErrorMessageOnStart: false,
+            setsGlobalLoading: false
+        ) { (response: FolderPickerResponse?) in
+            let list = (response?.data?.findFolders.folders ?? []).map { FilterEntityOption(id: $0.id, name: $0.path) }
+            Task { @MainActor in completion(list) }
         }
     }
 
@@ -10374,6 +10411,14 @@ struct Studio: Codable, Identifiable, Equatable {
 // MARK: - Tag Models
 struct TagsResponse: Codable {
     let data: TagsData?
+}
+
+/// `findFolders` for the Folder filter picker.
+struct FolderPickerResponse: Decodable {
+    struct Folder: Decodable { let id: String; let path: String }
+    struct Result: Decodable { let folders: [Folder] }
+    struct DataField: Decodable { let findFolders: Result }
+    let data: DataField?
 }
 
 struct TagsData: Codable {

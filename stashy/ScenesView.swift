@@ -581,7 +581,7 @@ private struct ScenesViewContent: View {
         if liveFilterMinRating == -1 {
             dict["rating100"] = ["modifier": "IS_NULL"]
         } else if liveFilterMinRating > 0, dict["rating100"] == nil {
-            dict["rating100"] = ["value": (liveFilterMinRating * 20), "modifier": "EQUALS"]
+            dict["rating100"] = ["value": (liveFilterMinRating * 20 - 1), "modifier": "GREATER_THAN"]
         }
         return dict
     }
@@ -719,18 +719,9 @@ private struct ScenesViewContent: View {
     private func applyServerSceneSavedFilter(_ f: StashDBViewModel.SavedFilter) {
         selectedFilter = f
         if let meta = f.stashyScenePresetMetadata {
-            var merged: [String: Any]
-            if let bid = meta.baseSavedFilterId, let base = viewModel.savedFilters[bid] {
-                merged = base.criteriaObjectFilter()
-                for (k, v) in FilterMapper.sanitize(meta.liveFragment, isMarker: false) {
-                    merged[k] = v
-                }
-            } else if !meta.liveFragment.isEmpty {
-                merged = FilterMapper.sanitize(meta.liveFragment, isMarker: false)
-            } else {
-                merged = f.criteriaObjectFilter()
-            }
-            criteriaDocument.load(merged)
+            // `object_filter` holds every criterion in the web UI's format (base and chips merged
+            // when it was saved); the old `ui_options.stashy` copy would override edits made in Stash.
+            criteriaDocument.load(f.criteriaObjectFilter())
             mapLiveFragmentToChips(meta.liveFragment)
             let resolvedSort: StashDBViewModel.SceneSortOption
             if let sr = meta.sortRaw, let parsed = StashDBViewModel.SceneSortOption(rawValue: sr) {

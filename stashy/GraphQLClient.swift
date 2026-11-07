@@ -313,7 +313,7 @@ actor GraphQLClient {
         if let variables = variables {
             let body: [String: Any] = [
                 "query": query,
-                "variables": variables
+                "variables": FilterMapper.queryVariables(variables)
             ]
             request.httpBody = try? JSONSerialization.data(withJSONObject: body)
         } else {

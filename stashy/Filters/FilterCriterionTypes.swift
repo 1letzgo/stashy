@@ -83,8 +83,11 @@ enum FilterCriterionKind: String, CaseIterable, Hashable {
             return [.equals, .notEquals, .includes, .excludes, .matchesRegex, .notMatchesRegex, .isNull, .notNull]
         case .int, .float, .hierarchicalCount:
             return [.equals, .notEquals, .greaterThan, .lessThan, .between, .notBetween, .isNull, .notNull]
-        case .date, .timestamp:
+        case .date:
             return [.equals, .notEquals, .greaterThan, .lessThan, .between, .notBetween, .isNull, .notNull]
+        case .timestamp:
+            // Stash's MandatoryTimestamp set (created / updated / last played).
+            return [.greaterThan, .lessThan, .between, .notBetween]
         case .resolution:
             return [.equals, .notEquals, .greaterThan, .lessThan]
         case .orientation, .gender, .circumcision:
@@ -113,8 +116,12 @@ enum FilterCriterionKind: String, CaseIterable, Hashable {
             return ["value": "", "modifier": StashCriterionModifier.includes.rawValue]
         case .int, .float, .hierarchicalCount:
             return ["value": 0, "modifier": StashCriterionModifier.equals.rawValue]
-        case .date, .timestamp:
+        case .date:
             return ["value": "", "modifier": StashCriterionModifier.equals.rawValue]
+        case .timestamp:
+            // Complete from the start (today 00:00), so the row is never dropped as half-filled.
+            return ["value": FilterTimestampFormat.string(from: Calendar.current.startOfDay(for: Date())),
+                    "modifier": StashCriterionModifier.greaterThan.rawValue]
         case .resolution:
             return ["value": "FULL_HD", "modifier": StashCriterionModifier.equals.rawValue]
         case .orientation:
@@ -223,4 +230,29 @@ enum StashGenderOption: String, CaseIterable, Identifiable {
     case nonBinary = "NON_BINARY"
     var id: String { rawValue }
     var label: String { rawValue.replacingOccurrences(of: "_", with: " ").capitalized }
+}
+
+
+/// GraphQL `Timestamp` text the app writes ("2024-01-31T13:45", local time, like the web UI).
+enum FilterTimestampFormat {
+    private static let formatter: DateFormatter = {
+        let f = DateFormatter()
+        f.locale = Locale(identifier: "en_US_POSIX")
+        f.dateFormat = "yyyy-MM-dd'T'HH:mm"
+        return f
+    }()
+    private static let dateOnly: DateFormatter = {
+        let f = DateFormatter()
+        f.locale = Locale(identifier: "en_US_POSIX")
+        f.dateFormat = "yyyy-MM-dd"
+        return f
+    }()
+
+    static func string(from date: Date) -> String { formatter.string(from: date) }
+
+    /// Accepts "2024-01-31T13:45", "2024-01-31 13:45" (web UI) and a bare date.
+    static func date(from text: String) -> Date? {
+        let t = text.trimmingCharacters(in: .whitespaces).replacingOccurrences(of: " ", with: "T")
+        return formatter.date(from: String(t.prefix(16))) ?? dateOnly.date(from: String(t.prefix(10)))
+    }
 }

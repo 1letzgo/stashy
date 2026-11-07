@@ -373,12 +373,7 @@ struct FilterCriteriaEditorView: View {
         case .date:
             FilterDateCriterionRow(value: dictBinding(for: field.key), onChange: applyChange)
         case .timestamp:
-            FilterStringCriterionRow(
-                value: dictBinding(for: field.key),
-                placeholder: "Timestamp / relative",
-                modifiers: FilterCriterionKind.defaultModifiers(for: field.kind),
-                onChange: applyChange
-            )
+            FilterTimestampCriterionRow(value: dictBinding(for: field.key), onChange: applyChange)
         case .resolution:
             FilterResolutionCriterionRow(value: dictBinding(for: field.key), onChange: applyChange)
         case .orientation:
@@ -909,6 +904,63 @@ struct FilterDateCriterionRow: View {
     private func commitIfValid() {
         guard value["value_text"] == nil, value["value2_text"] == nil else { return }
         onChange()
+    }
+}
+
+/// Created / updated / last played: date and time pickers, two of them for a range.
+struct FilterTimestampCriterionRow: View {
+    @Binding var value: [String: Any]
+    var onChange: () -> Void
+
+    private var modifierRaw: String {
+        (value["modifier"] as? String) ?? StashCriterionModifier.greaterThan.rawValue
+    }
+
+    private var needsSecond: Bool {
+        StashCriterionModifier(rawValue: modifierRaw)?.needsSecondValue == true
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            FilterModifierPicker(
+                modifier: Binding(
+                    get: { modifierRaw },
+                    set: { raw in
+                        var next = value
+                        next["modifier"] = raw
+                        if StashCriterionModifier(rawValue: raw)?.needsSecondValue == true, next["value2"] == nil {
+                            next["value2"] = FilterTimestampFormat.string(from: Date())
+                        }
+                        if StashCriterionModifier(rawValue: raw)?.needsSecondValue != true {
+                            next.removeValue(forKey: "value2")
+                        }
+                        value = next
+                        onChange()
+                    }
+                ),
+                options: FilterCriterionKind.defaultModifiers(for: .timestamp),
+                onChange: {}
+            )
+            DatePicker(needsSecond ? "From" : "Date", selection: dateBinding(key: "value"),
+                       displayedComponents: [.date, .hourAndMinute])
+            if needsSecond {
+                DatePicker("To", selection: dateBinding(key: "value2"),
+                           displayedComponents: [.date, .hourAndMinute])
+            }
+        }
+        .font(.subheadline)
+    }
+
+    private func dateBinding(key: String) -> Binding<Date> {
+        Binding(
+            get: { (value[key] as? String).flatMap(FilterTimestampFormat.date(from:)) ?? Calendar.current.startOfDay(for: Date()) },
+            set: { date in
+                var next = value
+                next[key] = FilterTimestampFormat.string(from: date)
+                value = next
+                onChange()
+            }
+        )
     }
 }
 
@@ -1517,8 +1569,29 @@ struct FilterMultiIdCriterionRow: View {
                 onSelectionChange: {},
                 searchKind: kind
             )
+            if let subLabel = subLevelLabel {
+                // `depth` -1 = every level below, like the web UI's "include sub-…" box.
+                Toggle(subLabel, isOn: Binding(
+                    get: { ((value["depth"] as? NSNumber)?.intValue ?? 0) != 0 },
+                    set: { patch(["depth": $0 ? -1 : 0]) }
+                ))
+                .font(.subheadline)
+                .tint(AppearanceManager.shared.tintColor)
+            }
         }
         .onAppear(perform: loadIfNeeded)
+    }
+
+    /// Hierarchical pickers whose entity has levels (tags, studios, groups).
+    private var subLevelLabel: String? {
+        guard hierarchical else { return nil }
+        switch entityKey {
+        case "tags", "scene_tags", "performer_tags", "parents", "children": return "Include sub-tags"
+        case "studios": return "Include sub-studios"
+        case "groups", "movies", "containing_groups", "sub_groups": return "Include sub-groups"
+        case "folder", "parent_folder": return "Include sub-folders"
+        default: return nil
+        }
     }
 
     private func patch(_ updates: [String: Any]) {

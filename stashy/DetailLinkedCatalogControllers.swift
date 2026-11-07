@@ -192,17 +192,10 @@ final class DetailLinkedPerformersFilterModel: ObservableObject {
     /// Mirrors a selected server filter into the advanced criteria editor so its criteria stay
     /// editable; fetches then pass `filter: nil` and send the document instead.
     private func loadCriteriaDocument(from filter: StashDBViewModel.SavedFilter, viewModel: StashDBViewModel) {
-        if let meta = filter.stashyCatalogPresetMetadata {
-            // A filter saved from stashy carries `ui_options.stashy` even as a plain server
-            // filter (empty fragment, no base); its own criteria are the base then.
-            var merged: [String: Any] = (meta.baseSavedFilterId.flatMap { viewModel.savedFilters[$0] } ?? filter).criteriaObjectFilter()
-            for (key, value) in FilterMapper.sanitize(meta.liveFragment, isMarker: false) {
-                merged[key] = value
-            }
-            criteriaDocument.load(merged)
-        } else {
-            criteriaDocument.load(filter.criteriaObjectFilter())
-        }
+        // `object_filter` holds every criterion in the web UI's format (base filter and chips
+        // merged when it was saved); the old `ui_options.stashy` copy would override edits
+        // made in Stash itself.
+        criteriaDocument.load(filter.criteriaObjectFilter())
     }
 
     func applyServerSavedFilter(_ f: StashDBViewModel.SavedFilter, viewModel: StashDBViewModel) {
@@ -526,17 +519,10 @@ final class DetailLinkedTagsFilterModel: ObservableObject {
     /// Mirrors a selected server filter into the advanced criteria editor so its criteria stay
     /// editable; fetches then pass `filter: nil` and send the document instead.
     private func loadCriteriaDocument(from filter: StashDBViewModel.SavedFilter, viewModel: StashDBViewModel) {
-        if let meta = filter.stashyCatalogPresetMetadata {
-            // A filter saved from stashy carries `ui_options.stashy` even as a plain server
-            // filter (empty fragment, no base); its own criteria are the base then.
-            var merged: [String: Any] = (meta.baseSavedFilterId.flatMap { viewModel.savedFilters[$0] } ?? filter).criteriaObjectFilter()
-            for (key, value) in FilterMapper.sanitize(meta.liveFragment, isMarker: false) {
-                merged[key] = value
-            }
-            criteriaDocument.load(merged)
-        } else {
-            criteriaDocument.load(filter.criteriaObjectFilter())
-        }
+        // `object_filter` holds every criterion in the web UI's format (base filter and chips
+        // merged when it was saved); the old `ui_options.stashy` copy would override edits
+        // made in Stash itself.
+        criteriaDocument.load(filter.criteriaObjectFilter())
     }
 
     func applyServerSavedFilter(_ f: StashDBViewModel.SavedFilter, viewModel: StashDBViewModel) {
@@ -863,17 +849,10 @@ final class DetailLinkedStudiosFilterModel: ObservableObject {
     /// Mirrors a selected server filter into the advanced criteria editor so its criteria stay
     /// editable; fetches then pass `filter: nil` and send the document instead.
     private func loadCriteriaDocument(from filter: StashDBViewModel.SavedFilter, viewModel: StashDBViewModel) {
-        if let meta = filter.stashyCatalogPresetMetadata {
-            // A filter saved from stashy carries `ui_options.stashy` even as a plain server
-            // filter (empty fragment, no base); its own criteria are the base then.
-            var merged: [String: Any] = (meta.baseSavedFilterId.flatMap { viewModel.savedFilters[$0] } ?? filter).criteriaObjectFilter()
-            for (key, value) in FilterMapper.sanitize(meta.liveFragment, isMarker: false) {
-                merged[key] = value
-            }
-            criteriaDocument.load(merged)
-        } else {
-            criteriaDocument.load(filter.criteriaObjectFilter())
-        }
+        // `object_filter` holds every criterion in the web UI's format (base filter and chips
+        // merged when it was saved); the old `ui_options.stashy` copy would override edits
+        // made in Stash itself.
+        criteriaDocument.load(filter.criteriaObjectFilter())
     }
 
     func applyServerSavedFilter(_ f: StashDBViewModel.SavedFilter, viewModel: StashDBViewModel) {
@@ -1213,17 +1192,10 @@ final class DetailLinkedGalleriesFilterModel: ObservableObject {
     /// Mirrors a selected server filter into the advanced criteria editor so its criteria stay
     /// editable; fetches then pass `filter: nil` and send the document instead.
     private func loadCriteriaDocument(from filter: StashDBViewModel.SavedFilter, viewModel: StashDBViewModel) {
-        if let meta = filter.stashyCatalogPresetMetadata {
-            // A filter saved from stashy carries `ui_options.stashy` even as a plain server
-            // filter (empty fragment, no base); its own criteria are the base then.
-            var merged: [String: Any] = (meta.baseSavedFilterId.flatMap { viewModel.savedFilters[$0] } ?? filter).criteriaObjectFilter()
-            for (key, value) in FilterMapper.sanitize(meta.liveFragment, isMarker: false) {
-                merged[key] = value
-            }
-            criteriaDocument.load(merged)
-        } else {
-            criteriaDocument.load(filter.criteriaObjectFilter())
-        }
+        // `object_filter` holds every criterion in the web UI's format (base filter and chips
+        // merged when it was saved); the old `ui_options.stashy` copy would override edits
+        // made in Stash itself.
+        criteriaDocument.load(filter.criteriaObjectFilter())
     }
 
     func applyServerSavedFilter(_ f: StashDBViewModel.SavedFilter, viewModel: StashDBViewModel) {
@@ -1831,18 +1803,10 @@ final class DetailLinkedImagesFilterModel: ObservableObject {
     /// Mirrors a selected server filter into the advanced criteria editor so its criteria stay
     /// editable; fetches then pass `filter: nil` and send the document instead.
     private func loadCriteriaDocument(from filter: StashDBViewModel.SavedFilter, viewModel: StashDBViewModel) {
-        if let meta = filter.stashyCatalogPresetMetadata {
-            // A filter saved from stashy carries `ui_options.stashy` even as a plain server
-            // filter (empty fragment, no base); its own criteria are the base then.
-            var merged: [String: Any] = (meta.baseSavedFilterId.flatMap { viewModel.savedFilters[$0] } ?? filter).criteriaObjectFilter()
-            for (key, value) in FilterMapper.sanitize(meta.liveFragment, isMarker: false) {
-                merged[key] = value
-            }
-            criteriaDocument.load(merged)
-        } else {
-            criteriaDocument.load(filter.criteriaObjectFilter())
-        }
-        criteriaDocumentSourceId = filter.id
+        // `object_filter` holds every criterion in the web UI's format (base filter and chips
+        // merged when it was saved); the old `ui_options.stashy` copy would override edits
+        // made in Stash itself.
+        criteriaDocument.load(filter.criteriaObjectFilter())
     }
 
     func applyServerSavedFilter(_ f: StashDBViewModel.SavedFilter, viewModel: StashDBViewModel) {

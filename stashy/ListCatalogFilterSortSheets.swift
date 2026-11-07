@@ -438,7 +438,7 @@ struct CatalogNamedEntityLiveFilterMultiPickerRow<Item: Identifiable & Equatable
             + chosen.filter { !selectionOrder.contains($0) }
         var byId: [String: PickerEntry] = [:]
         for entry in all where byId[entry.id] == nil { byId[entry.id] = entry }
-        let labels = pickerStore.knownLabels()
+        let labels = pickerStore.knownLabelsAcrossKinds()
         let pinned: [PickerEntry] = ordered.compactMap { id in
             if let entry = byId[id] { return entry }
             if let name = labels[id] { return PickerEntry(id: id, name: name) }
@@ -2040,7 +2040,7 @@ struct SceneLiveChipRowState: Equatable {
         if minRating == -1 {
             dict["rating100"] = ["modifier": "IS_NULL"]
         } else if minRating > 0 {
-            dict["rating100"] = ["value": (minRating * 20), "modifier": "EQUALS"]
+            dict["rating100"] = ["value": (minRating * 20 - 1), "modifier": "GREATER_THAN"]
         }
         if let org = organized { dict["organized"] = org }
         if let interactive { dict["interactive"] = interactive }
@@ -2089,7 +2089,7 @@ struct SceneLiveChipRowState: Equatable {
         if minRating == -1 {
             dict["rating100"] = ["modifier": "IS_NULL"]
         } else if minRating > 0, dict["rating100"] == nil {
-            dict["rating100"] = ["value": (minRating * 20), "modifier": "EQUALS"]
+            dict["rating100"] = ["value": (minRating * 20 - 1), "modifier": "GREATER_THAN"]
         }
         return dict
     }
@@ -2115,7 +2115,8 @@ struct SceneLiveChipRowState: Equatable {
             if mod == "IS_NULL" {
                 minRating = -1
             } else if let raw = rating["value"], let v = Self.intFromLiveJSON(raw) {
-                minRating = max(0, min(5, v / 20))
+                // GREATER_THAN 79 = "4 stars or more"; EQUALS 80 from older saves = 4 too.
+                minRating = max(0, min(5, (mod == "GREATER_THAN" ? v + 1 : v) / 20))
             } else {
                 minRating = 0
             }

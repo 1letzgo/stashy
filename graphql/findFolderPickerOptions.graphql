@@ -1,0 +1,9 @@
+query FindFolderPickerOptions($filter: FindFilterType, $folder_filter: FolderFilterType) {
+  findFolders(filter: $filter, folder_filter: $folder_filter) {
+    count
+    folders {
+      id
+      path
+    }
+  }
+}

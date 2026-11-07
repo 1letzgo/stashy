@@ -95,18 +95,10 @@ private struct MarkersViewContent: View {
 
     /// Mirrors a selected server filter into the advanced criteria editor so it stays editable.
     private func loadCriteriaDocument(from filter: StashDBViewModel.SavedFilter) {
-        if let meta = filter.stashyScenePresetMetadata {
-            var merged: [String: Any] = [:]
-            if let bid = meta.baseSavedFilterId, let base = viewModel.savedFilters[bid] {
-                merged = base.criteriaObjectFilter()
-            }
-            for (key, value) in FilterMapper.sanitize(meta.liveFragment, isMarker: true) {
-                merged[key] = value
-            }
-            criteriaDocument.load(merged)
-        } else {
-            criteriaDocument.load(filter.criteriaObjectFilter())
-        }
+        // `object_filter` holds every criterion in the web UI's format (base filter and chips
+        // merged when it was saved); the old `ui_options.stashy` copy would override edits
+        // made in Stash itself.
+        criteriaDocument.load(filter.criteriaObjectFilter())
     }
 
     private var sortedServerMarkerFilters: [StashDBViewModel.SavedFilter] {

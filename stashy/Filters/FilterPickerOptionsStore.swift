@@ -17,6 +17,8 @@ final class FilterPickerOptionsStore: ObservableObject {
         /// Tag pickers scoped to the entity the criterion refers to — `performer_tags` lists the
         /// tags on performers, not the tags on scenes.
         case performerTags, studioTags, galleryTags, markerTags, allTags
+        /// Folder criterion (scenes / images `folder`, galleries `parent_folder`), named by path.
+        case folders
     }
 
     @Published private(set) var options: [String: [FilterEntityOption]] = [:]
@@ -55,18 +57,32 @@ final class FilterPickerOptionsStore: ObservableObject {
     /// Name-search hits collected this session for `kind`.
     func searchHits(_ kind: Kind) -> [FilterEntityOption] { searchResults[kind.rawValue] ?? [] }
 
-    /// entity id → display name across every cached kind, for writing the web UI's `{id,label}`
-    /// pairs into a saved filter. Ids are unique per entity type; a collision across types would
-    /// only mislabel, never mis-filter.
-    func knownLabels() -> [String: String] {
-        var out: [String: String] = [:]
-        for list in options.values {
-            for option in list { out[option.id] = option.name }
+    /// Picked id → display name, per entity type, for the web UI's `{id, label}` pairs in a
+    /// saved filter. Ids repeat across types (tag 5 and studio 5), so the maps stay apart.
+    func knownLabels() -> [FilterMapper.LabelKind: [String: String]] {
+        func labelKind(_ raw: String) -> FilterMapper.LabelKind? {
+            switch Kind(rawValue: raw) {
+            case .studios, .imageStudios, .galleryStudios: return .studio
+            case .tags, .imageTags, .performerTags, .studioTags, .galleryTags, .markerTags, .allTags: return .tag
+            case .groups: return .group
+            case .performers: return .performer
+            case .folders: return .folder
+            case nil: return nil
+            }
         }
-        for list in searchResults.values {
-            for option in list { out[option.id] = option.name }
+        var out: [FilterMapper.LabelKind: [String: String]] = [:]
+        for source in [options, searchResults] {
+            for (raw, list) in source {
+                guard let kind = labelKind(raw) else { continue }
+                for option in list { out[kind, default: [:]][option.id] = option.name }
+            }
         }
         return out
+    }
+
+    /// Every known id → name in one map, for UI that already knows the entity type it shows.
+    func knownLabelsAcrossKinds() -> [String: String] {
+        knownLabels().values.reduce(into: [:]) { $0.merge($1) { first, _ in first } }
     }
 
     /// Cached most-used list plus every search hit seen this session, de-duplicated by id.
@@ -125,6 +141,9 @@ final class FilterPickerOptionsStore: ObservableObject {
         case "performer_tags": return .performerTags
         case "scene_tags": return .tags
         // Tag hierarchy (`FilterMode.tags` only); a parent tag need not be attached to anything.
+        // On studios `parents` are parent studios, not tags.
+        case "parents" where mode == .studios: return .studios
+        case "folder", "parent_folder": return .folders
         case "parents", "children": return .allTags
         default: break
         }
@@ -214,6 +233,10 @@ final class FilterPickerOptionsStore: ObservableObject {
             }
         case .performers:
             viewModel.fetchPerformersForFilterPicker { list in
+                Task { @MainActor in finish(list) }
+            }
+        case .folders:
+            viewModel.fetchFolderPickerOptions { list in
                 Task { @MainActor in finish(list) }
             }
         }

@@ -519,7 +519,7 @@ final class FilterCriteriaDocument: ObservableObject {
     }
 
     nonisolated static func sanitizeNonisolated(_ dict: [String: Any], mode: StashDBViewModel.FilterMode) -> [String: Any] {
-        let mapped = FilterMapper.sanitize(deepStringKeyed(dict), isMarker: mode == .sceneMarkers)
+        let mapped = FilterMapper.sanitize(deepStringKeyed(dict), isMarker: mode == .sceneMarkers, entity: mode.filterEntity)
         return stripEditorScratchKeys(mapped)
     }
 

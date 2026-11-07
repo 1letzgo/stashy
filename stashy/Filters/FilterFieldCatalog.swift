@@ -13,12 +13,11 @@ struct FilterFieldDescriptor: Identifiable, Hashable {
 enum FilterFieldCatalog {
     static func fields(for mode: StashDBViewModel.FilterMode) -> [FilterFieldDescriptor] {
         switch mode {
-        case .scenes:
-            return StashServerCapabilities.supports032 ? sceneFields : sceneFields.filter { $0.key != "production_date" }
+        case .scenes: return availableOnServer(sceneFields)
         case .performers: return performerFields
         case .studios: return studioFields
-        case .galleries: return galleryFields
-        case .images: return imageFields
+        case .galleries: return availableOnServer(galleryFields)
+        case .images: return availableOnServer(imageFields)
         case .tags: return tagFields
         case .groups: return groupFields
         case .sceneMarkers: return markerFields
@@ -26,17 +25,28 @@ enum FilterFieldCatalog {
         }
     }
 
+    /// Fields only Stash 0.32+ knows; an older server rejects the whole query over one of them.
+    private static let stash032Keys: Set<String> = ["production_date", "folder", "parent_folder"]
+
+    private static func availableOnServer(_ fields: [FilterFieldDescriptor]) -> [FilterFieldDescriptor] {
+        StashServerCapabilities.supports032 ? fields : fields.filter { !stash032Keys.contains($0.key) }
+    }
+
     static func field(key: String, mode: StashDBViewModel.FilterMode) -> FilterFieldDescriptor? {
         fields(for: mode).first { $0.key == key }
     }
 
-    /// Fields the user can still add. Boolean groups are excluded: AND/OR/NOT are structure, not
+    /// Fields the user can still add — the web UI's criteria. Boolean groups are excluded: AND/OR/NOT are structure, not
     /// fields, and listing them next to "Rating" was the main source of confusion. The editor
     /// offers them through its own "Add group" control instead.
     static func addableFields(for mode: StashDBViewModel.FilterMode, excludingKeys: Set<String>) -> [FilterFieldDescriptor] {
         fields(for: mode).filter { field in
             if field.isDeprecated { return false }
             if field.kind == .booleanGroup { return false }
+            // Sub-filters (`scenes_filter`, …), raw `files_filter` and the multi Stash ID list
+            // exist only in the API: the web UI neither offers nor keeps them. A loaded filter
+            // that already has one still shows and edits it.
+            if field.kind == .nestedFilter || field.kind == .raw || field.kind == .stashIDs { return false }
             return !excludingKeys.contains(field.key)
         }
     }
@@ -107,11 +117,12 @@ enum FilterFieldCatalog {
         .init(key: "tags_filter", label: "Tags filter", kind: .nestedFilter, nestedMode: .tags),
         .init(key: "groups_filter", label: "Groups filter", kind: .nestedFilter, nestedMode: .groups),
         .init(key: "markers_filter", label: "Markers filter", kind: .nestedFilter, nestedMode: .sceneMarkers),
+        .init(key: "folder", label: "Folder", kind: .hierarchicalMulti),
         .init(key: "files_filter", label: "Files filter", kind: .raw),
         .init(key: "custom_fields", label: "Custom fields", kind: .customFields),
         .init(key: "movies", label: "Movies", kind: .multi, isDeprecated: true),
         .init(key: "phash", label: "PHash", kind: .string, isDeprecated: true),
-        .init(key: "stash_id_endpoint", label: "Stash ID (legacy)", kind: .stashID, isDeprecated: true),
+        .init(key: "stash_id_endpoint", label: "Stash ID", kind: .stashID),
         .init(key: "movies_filter", label: "Movies filter", kind: .nestedFilter, nestedMode: .groups, isDeprecated: true)
     ]
 
@@ -132,7 +143,6 @@ enum FilterFieldCatalog {
         .init(key: "fake_tits", label: "Implants", kind: .string),
         .init(key: "penis_length", label: "Penis length", kind: .float),
         .init(key: "circumcised", label: "Circumcised", kind: .circumcision),
-        .init(key: "career_length", label: "Career length (years)", kind: .int),
         .init(key: "career_start", label: "Career start", kind: .date),
         .init(key: "career_end", label: "Career end", kind: .date),
         .init(key: "tattoos", label: "Tattoos", kind: .string),
@@ -168,7 +178,7 @@ enum FilterFieldCatalog {
         .init(key: "created_at", label: "Created", kind: .timestamp),
         .init(key: "updated_at", label: "Updated", kind: .timestamp),
         .init(key: "custom_fields", label: "Custom fields", kind: .customFields),
-        .init(key: "stash_id_endpoint", label: "Stash ID (legacy)", kind: .stashID, isDeprecated: true)
+        .init(key: "stash_id_endpoint", label: "Stash ID", kind: .stashID)
     ]
 
     // MARK: - Studios
@@ -178,6 +188,7 @@ enum FilterFieldCatalog {
         .init(key: "details", label: "Details", kind: .string),
         .init(key: "parents", label: "Parents", kind: .multi),
         .init(key: "stash_ids_endpoint", label: "Stash IDs", kind: .stashIDs),
+        .init(key: "stash_id_endpoint", label: "Stash ID", kind: .stashID),
         .init(key: "tags", label: "Tags", kind: .hierarchicalMulti),
         .init(key: "is_missing", label: "Is missing", kind: .isMissing),
         .init(key: "rating100", label: "Rating", kind: .int),
@@ -237,6 +248,7 @@ enum FilterFieldCatalog {
         .init(key: "performers_filter", label: "Performers filter", kind: .nestedFilter, nestedMode: .performers),
         .init(key: "studios_filter", label: "Studios filter", kind: .nestedFilter, nestedMode: .studios),
         .init(key: "tags_filter", label: "Tags filter", kind: .nestedFilter, nestedMode: .tags),
+        .init(key: "parent_folder", label: "Folder", kind: .hierarchicalMulti),
         .init(key: "files_filter", label: "Files filter", kind: .raw),
         .init(key: "custom_fields", label: "Custom fields", kind: .customFields)
     ]
@@ -276,6 +288,7 @@ enum FilterFieldCatalog {
         .init(key: "performers_filter", label: "Performers filter", kind: .nestedFilter, nestedMode: .performers),
         .init(key: "studios_filter", label: "Studios filter", kind: .nestedFilter, nestedMode: .studios),
         .init(key: "tags_filter", label: "Tags filter", kind: .nestedFilter, nestedMode: .tags),
+        .init(key: "folder", label: "Folder", kind: .hierarchicalMulti),
         .init(key: "files_filter", label: "Files filter", kind: .raw),
         .init(key: "custom_fields", label: "Custom fields", kind: .customFields)
     ]
@@ -302,6 +315,7 @@ enum FilterFieldCatalog {
         .init(key: "child_count", label: "Child count", kind: .int),
         .init(key: "ignore_auto_tag", label: "Ignore auto-tag", kind: .boolean),
         .init(key: "stash_ids_endpoint", label: "Stash IDs", kind: .stashIDs),
+        .init(key: "stash_id_endpoint", label: "Stash ID", kind: .stashID),
         .init(key: "scenes_filter", label: "Scenes filter", kind: .nestedFilter, nestedMode: .scenes),
         .init(key: "images_filter", label: "Images filter", kind: .nestedFilter, nestedMode: .images),
         .init(key: "galleries_filter", label: "Galleries filter", kind: .nestedFilter, nestedMode: .galleries),

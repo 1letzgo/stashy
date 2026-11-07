@@ -569,7 +569,7 @@ struct CatalogListQuickBar<Option: CatalogQuickSortable>: View {
         }
         if field.kind == .hierarchicalMulti || field.kind == .multi,
            let dict = FilterCriteriaDocument.stringKeyedDict(value) {
-            let names = pickerOptions.knownLabels()
+            let names = pickerOptions.knownLabelsAcrossKinds()
             let included = FilterMapper.idStrings(from: dict["value"])
             let excluded = FilterMapper.idStrings(from: dict["excludes"])
             let prefix = key == "tags" ? "#" : ""

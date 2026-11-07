@@ -185,18 +185,10 @@ private struct TagsViewContent: View {
     /// Mirrors a selected server filter into the advanced criteria editor so its criteria stay
     /// editable in the app; fetches then pass `filter: nil` and send the document instead.
     private func loadCriteriaDocument(from filter: StashDBViewModel.SavedFilter) {
-        if let meta = filter.stashyCatalogPresetMetadata {
-            var merged: [String: Any] = [:]
-            if let bid = meta.baseSavedFilterId, let base = viewModel.savedFilters[bid] {
-                merged = base.criteriaObjectFilter()
-            }
-            for (key, value) in FilterMapper.sanitize(meta.liveFragment, isMarker: false) {
-                merged[key] = value
-            }
-            criteriaDocument.load(merged)
-        } else {
-            criteriaDocument.load(filter.criteriaObjectFilter())
-        }
+        // `object_filter` holds every criterion in the web UI's format (base filter and chips
+        // merged when it was saved); the old `ui_options.stashy` copy would override edits
+        // made in Stash itself.
+        criteriaDocument.load(filter.criteriaObjectFilter())
     }
 
     private func applyServerTagSavedFilter(_ f: StashDBViewModel.SavedFilter) {
