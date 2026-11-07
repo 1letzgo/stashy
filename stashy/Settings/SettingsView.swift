@@ -38,7 +38,7 @@ private enum StashyPlusFeatureCopy {
     static let miniPlayer = "Keeps a scene playing in a small bar when you leave its page. Add scenes to your watchlist on the scene page and they play one after another; the list is in Tools."
     static let magazine = "Adds a Magazin view on Home that shows your galleries as covers. They open like a magazine and remember the page you stopped on."
     static let aiSubtitles = "Creates subtitles from a scene's speech on your device and translates them into your subtitle language. Turn them on in the player's AI Subtitles menu."
-    static let tagSuggestions = "Suggests tags based on how your library is already tagged, shows scenes with the same performers, studio or tags on the scene page, and adds a For You row on Home with scenes picked from what you played, your O-Counts and ratings. No outside service is involved."
+    static let tagSuggestions = "Suggests tags based on how your library is already tagged, shows scenes with the same performers, studio or tags on the scene page, and adds For You and Forgotten Favorites rows on Home: scenes picked from what you played, your O-Counts and ratings, and favorites you have not played for a while. No outside service is involved."
     static let aiMotion = "Analyzes the playing video live on your device and moves your connected hardware in sync with it. Uses a lot of CPU and battery."
     static let overview = "Shows your library at a glance in Tools: playback, catalog counts and storage."
     static let oCount = "Shows the O-Counts of your scenes and images as a month calendar in Tools."

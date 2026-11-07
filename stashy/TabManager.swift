@@ -264,9 +264,11 @@ enum HomeRowType: String, Codable {
     case channels
     /// stashy+: "For You" — scenes picked from the user's own watch history.
     case recommendations
+    /// stashy+: top played / O-Counted scenes not played for a while.
+    case forgottenFavorites
 
     /// Rows that exist only with stashy+ (hidden from Home and Settings while locked).
-    var requiresStashyPlus: Bool { self == .channels || self == .recommendations }
+    var requiresStashyPlus: Bool { self == .channels || self == .recommendations || self == .forgottenFavorites }
     
     var defaultTitle: String {
         switch self {
@@ -289,6 +291,7 @@ enum HomeRowType: String, Codable {
         case .galleriesHighestImageCount: return "Galleries - Image Count"
         case .channels: return "Channels"
         case .recommendations: return "Scenes - For You"
+        case .forgottenFavorites: return "Scenes - Forgotten Favorites"
         }
     }
 }
@@ -1121,6 +1124,7 @@ class TabManager: ObservableObject {
             ensureGalleriesHighestImageCountRow()
             ensureChannelsRow()
             ensureRecommendationsRow()
+            ensureForgottenFavoritesRow()
             promoteLastPlayedRowToTopIfNeeded()
         } else {
             // Default Home Rows
@@ -1145,6 +1149,7 @@ class TabManager: ObservableObject {
                 HomeRowConfig(id: UUID(), title: HomeRowType.channels.defaultTitle, isEnabled: true, sortOrder: 17, type: .channels)
             ]
             ensureRecommendationsRow()
+            ensureForgottenFavoritesRow()
             saveHomeRows()
         }
         #if os(tvOS)
@@ -1170,7 +1175,7 @@ class TabManager: ObservableObject {
         let disabled: [HomeRowType] = [
             .mostViewed3Min, .topCounter3Min, .newPerformers, .performersHighestRating,
             .performersHighestOCount, .newStudios, .newGalleries, .recentlyUpdatedGalleries,
-            .galleriesHighestImageCount, .statistics, .recommendations
+            .galleriesHighestImageCount, .statistics, .recommendations, .forgottenFavorites
         ]
         var rows: [HomeRowConfig] = []
         for (type, isEnabled) in enabled.map({ ($0, true) }) + disabled.map({ ($0, false) }) {
@@ -1335,6 +1340,18 @@ class TabManager: ObservableObject {
         let anchor = homeRows.firstIndex(where: { $0.type == .lastPlayed }).map { $0 + 1 } ?? 0
         let row = HomeRowConfig(id: UUID(), title: HomeRowType.recommendations.defaultTitle,
                                 isEnabled: true, sortOrder: anchor, type: .recommendations)
+        homeRows.insert(row, at: min(anchor, homeRows.count))
+        for i in homeRows.indices { homeRows[i].sortOrder = i }
+        saveHomeRows()
+    }
+
+    /// Right below For You (or Last Played), hidden anyway without stashy+.
+    private func ensureForgottenFavoritesRow() {
+        guard !homeRows.contains(where: { $0.type == .forgottenFavorites }) else { return }
+        let anchor = (homeRows.firstIndex(where: { $0.type == .recommendations })
+            ?? homeRows.firstIndex(where: { $0.type == .lastPlayed })).map { $0 + 1 } ?? 0
+        let row = HomeRowConfig(id: UUID(), title: HomeRowType.forgottenFavorites.defaultTitle,
+                                isEnabled: true, sortOrder: anchor, type: .forgottenFavorites)
         homeRows.insert(row, at: min(anchor, homeRows.count))
         for i in homeRows.indices { homeRows[i].sortOrder = i }
         saveHomeRows()

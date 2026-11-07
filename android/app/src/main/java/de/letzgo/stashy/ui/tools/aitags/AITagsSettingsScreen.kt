@@ -141,6 +141,27 @@ fun AITagsSettingsView() {
                 SectionSpacer()
             }
 
+            // MARK: Forgotten Favorites
+            item {
+                val forgotten = de.letzgo.stashy.data.tools.ForgottenFavorites
+                SettingsSectionHeader("Forgotten Favorites on Home", isBeta = true)
+                GroupedCard {
+                    ToggleRow(
+                        "Forgotten Favorites", SF.arrowClockwise,
+                        checked = isUnlocked && forgotten.hasStatistics && forgotten.isEnabled,
+                        enabled = isUnlocked && forgotten.hasStatistics,
+                    ) { if (isUnlocked) forgotten.updateEnabled(it) }
+                    RowDivider()
+                    SettingsRow("Forgotten Favorites settings", SF.sliderHorizontal3, enabled = isUnlocked, onClick = { Nav.push(ForgottenFavoritesSettingsScreen()) })
+                }
+                SettingsSectionFooter(
+                    if (forgotten.hasStatistics)
+                        "A Home row with your most played or most O-Counted scenes that you have not played for a while. Move it in Settings › Home."
+                    else "A Home row with your most played or most O-Counted scenes that you have not played for a while. Needs Tag suggestions or Similar scenes."
+                )
+                SectionSpacer()
+            }
+
             // MARK: Statistics
             item {
                 SettingsSectionHeader("Statistics")

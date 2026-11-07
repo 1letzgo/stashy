@@ -93,10 +93,12 @@ enum class HomeRowType(val defaultTitle: String) {
     @SerialName("galleriesHighestImageCount") GalleriesHighestImageCount("Galleries - Image Count"),
     @SerialName("channels") Channels("Channels"),
     /** stashy+: "For You" — scenes picked from the user's own watch history (iOS `.recommendations`). */
-    @SerialName("recommendations") Recommendations("Scenes - For You");
+    @SerialName("recommendations") Recommendations("Scenes - For You"),
+    /** stashy+: top played / O-Counted scenes not played for a while (iOS `.forgottenFavorites`). */
+    @SerialName("forgottenFavorites") ForgottenFavorites("Scenes - Forgotten Favorites");
 
     /** iOS `requiresStashyPlus`: rows hidden from Home and Settings while locked. */
-    val requiresStashyPlus get() = this == Channels || this == Recommendations
+    val requiresStashyPlus get() = this == Channels || this == Recommendations || this == ForgottenFavorites
 
     val isPerformerRow get() = this in setOf(NewPerformers, PerformersHighestSceneCount, PerformersHighestOCount, PerformersHighestRating)
     val isStudioRow get() = this == NewStudios || this == StudiosHighestSceneCount
@@ -257,7 +259,7 @@ object TabConfigLogic {
             HomeRowType.MostViewed3Min to true, HomeRowType.Random to true,
             HomeRowType.TopCounter3Min to false, HomeRowType.TopRating3Min to false, HomeRowType.Channels to true,
         )
-        return insertRecommendations(order.mapIndexed { i, (type, enabled) -> HomeRowConfig(title = type.defaultTitle, isEnabled = enabled, sortOrder = i, type = type) })
+        return insertForgottenFavorites(insertRecommendations(order.mapIndexed { i, (type, enabled) -> HomeRowConfig(title = type.defaultTitle, isEnabled = enabled, sortOrder = i, type = type) }))
     }
 
     /** iOS `ensureRecommendationsRow()`: For You goes right below Last Played, not to the end. */
@@ -266,6 +268,17 @@ object TabConfigLogic {
         val anchor = rows.indexOfFirst { it.type == HomeRowType.LastPlayed }.let { if (it >= 0) it + 1 else 0 }
         val list = rows.toMutableList()
         list.add(minOf(anchor, list.size), HomeRowConfig(title = HomeRowType.Recommendations.defaultTitle, isEnabled = true, sortOrder = anchor, type = HomeRowType.Recommendations))
+        return list.mapIndexed { i, r -> r.copy(sortOrder = i) }
+    }
+
+    /** iOS `ensureForgottenFavoritesRow()`: right below For You (or Last Played). */
+    private fun insertForgottenFavorites(rows: List<HomeRowConfig>): List<HomeRowConfig> {
+        if (rows.any { it.type == HomeRowType.ForgottenFavorites }) return rows
+        val after = rows.indexOfFirst { it.type == HomeRowType.Recommendations }.takeIf { it >= 0 }
+            ?: rows.indexOfFirst { it.type == HomeRowType.LastPlayed }
+        val anchor = if (after >= 0) after + 1 else 0
+        val list = rows.toMutableList()
+        list.add(minOf(anchor, list.size), HomeRowConfig(title = HomeRowType.ForgottenFavorites.defaultTitle, isEnabled = true, sortOrder = anchor, type = HomeRowType.ForgottenFavorites))
         return list.mapIndexed { i, r -> r.copy(sortOrder = i) }
     }
 
@@ -298,6 +311,11 @@ object TabConfigLogic {
         }
         if (rows.none { it.type == HomeRowType.Recommendations }) {
             val inserted = insertRecommendations(rows)
+            rows.clear(); rows.addAll(inserted)
+            changed = true
+        }
+        if (rows.none { it.type == HomeRowType.ForgottenFavorites }) {
+            val inserted = insertForgottenFavorites(rows)
             rows.clear(); rows.addAll(inserted)
             changed = true
         }

@@ -16,6 +16,7 @@ struct AITagsSettingsView: View {
     @ObservedObject private var appearanceManager = AppearanceManager.shared
     @ObservedObject private var stashyPlus = StashyPlusManager.shared
     @ObservedObject private var forYou = SceneRecommendationEngine.shared
+    @ObservedObject private var forgotten = ForgottenFavoritesEngine.shared
 
 
     private var isUnlocked: Bool { stashyPlus.isUnlocked }
@@ -33,6 +34,7 @@ struct AITagsSettingsView: View {
 
             togglesSection
             forYouSection
+            forgottenSection
             modelSection
             tuningSection
         }
@@ -95,6 +97,34 @@ struct AITagsSettingsView: View {
             stashyScrollingSectionFooter(forYou.hasStatistics
                 ? "A Home row with scenes picked from what you played, your O-Counts and ratings, each with the reason it was picked. Move it in Settings › Home."
                 : "A Home row with scenes picked from what you played, your O-Counts and ratings. Needs Tag suggestions or Similar scenes.")
+        }
+    }
+
+    private var forgottenSection: some View {
+        Section {
+            stashyScrollingSectionHeader("Forgotten Favorites on Home", isBeta: true)
+            Toggle(isOn: Binding(
+                get: { isUnlocked && forgotten.hasStatistics && forgotten.isEnabled },
+                set: { newValue in
+                    guard isUnlocked else { return }
+                    forgotten.isEnabled = newValue
+                }
+            )) {
+                Label("Forgotten Favorites", systemImage: "clock.arrow.circlepath")
+            }
+            .tint(appearanceManager.tintColor)
+            .disabled(!isUnlocked || !forgotten.hasStatistics)
+            .stashyGroupedBlockRow(index: 0, count: 2)
+
+            NavigationLink(destination: LazyView { ForgottenFavoritesSettingsView() }) {
+                Label("Forgotten Favorites settings", systemImage: "slider.horizontal.3")
+            }
+            .disabled(!isUnlocked)
+            .stashyGroupedBlockRow(index: 1, count: 2)
+
+            stashyScrollingSectionFooter(forgotten.hasStatistics
+                ? "A Home row with your most played or most O-Counted scenes that you have not played for a while. Move it in Settings › Home."
+                : "A Home row with your most played or most O-Counted scenes that you have not played for a while. Needs Tag suggestions or Similar scenes.")
         }
     }
 

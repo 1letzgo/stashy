@@ -14,6 +14,7 @@ struct DashboardSettingsView: View {
     /// Channels are stashy+ — row toggle and the Channels section only show while unlocked.
     @ObservedObject private var stashyPlus = StashyPlusManager.shared
     @ObservedObject private var forYou = SceneRecommendationEngine.shared
+    @ObservedObject private var forgotten = ForgottenFavoritesEngine.shared
     /// Same key as the switch in Settings › stashy+, so either one updates the other.
     @AppStorage(MagazineMode.enabledKey) private var isMagazineEnabled = false
     @StateObject private var viewModel = StashDBViewModel()
@@ -121,6 +122,7 @@ struct DashboardSettingsView: View {
             if row.type.requiresStashyPlus && !stashyPlus.isUnlocked { return false }
             // For You comes with Settings › stashy+ › Recommendations.
             if row.type == .recommendations && !forYou.isFeatureOn { return false }
+            if row.type == .forgottenFavorites && !forgotten.isFeatureOn { return false }
             return true
         }
     }

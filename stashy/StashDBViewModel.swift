@@ -3990,7 +3990,7 @@ class StashDBViewModel: ObservableObject {
             setSort(.ratingDesc)
         case .random:
             setSort(.random)
-        case .statistics, .channels, .recommendations, .newPerformers, .performersHighestSceneCount, .performersHighestOCount, .performersHighestRating, .newStudios, .studiosHighestSceneCount, .newGalleries, .recentlyUpdatedGalleries, .galleriesHighestImageCount:
+        case .statistics, .channels, .recommendations, .forgottenFavorites, .newPerformers, .performersHighestSceneCount, .performersHighestOCount, .performersHighestRating, .newStudios, .studiosHighestSceneCount, .newGalleries, .recentlyUpdatedGalleries, .galleriesHighestImageCount:
             homeRowLoadingState[rowType] = false
             completion([])
             return

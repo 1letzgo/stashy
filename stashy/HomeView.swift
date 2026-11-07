@@ -24,6 +24,8 @@ private struct HomeViewContent: View {
     @State private var contentWidth: CGFloat = 0
     /// Mirrors `SceneRecommendationEngine.isFeatureOn` without observing the whole engine.
     @State private var isForYouOn = SceneRecommendationEngine.shared.isFeatureOn
+    @State private var isForgottenOn = ForgottenFavoritesEngine.shared.isFeatureOn
+    @State private var isForgottenEmpty = ForgottenFavoritesEngine.shared.isEmptyAndReady
 
     var body: some View {
         // Workaround for occasional Swift compiler diagnostic/type-check issues:
@@ -63,6 +65,8 @@ private struct HomeViewContent: View {
             // single resume-time update ran through every row's handler.
             .sceneLiveUpdates(using: viewModel)
             .onReceive(SceneRecommendationEngine.shared.$isFeatureOn.removeDuplicates()) { isForYouOn = $0 }
+            .onReceive(ForgottenFavoritesEngine.shared.$isFeatureOn.removeDuplicates()) { isForgottenOn = $0 }
+            .onReceive(ForgottenFavoritesEngine.shared.$isEmptyAndReady.removeDuplicates()) { isForgottenEmpty = $0 }
             .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("DefaultFilterChanged"))) { notification in
                 if let tabId = notification.userInfo?["tab"] as? String, tabId == AppTab.dashboard.rawValue {
                     viewModel.homeRowScenes.removeAll()
@@ -92,11 +96,13 @@ private struct HomeViewContent: View {
                 let activeRows = tabManager.homeRows.filter {
                     $0.isEnabled && (!$0.type.requiresStashyPlus || stashyPlus.isUnlocked)
                         && ($0.type != .recommendations || isForYouOn)
+                        && ($0.type != .forgottenFavorites || (isForgottenOn && !isForgottenEmpty))
                 }
                 let firstRowId = activeRows.first?.id
-                // For You is a scene row too and takes the hero when it comes first.
+                // For You and Forgotten Favorites are scene rows too and take the hero when first.
                 let firstSceneRowId = activeRows.first(where: {
-                    $0.type != .statistics && (!$0.type.requiresStashyPlus || $0.type == .recommendations)
+                    $0.type != .statistics && (!$0.type.requiresStashyPlus || $0.type == .recommendations
+                        || $0.type == .forgottenFavorites)
                 })?.id
 
                 ForEach(activeRows) { row in
@@ -111,6 +117,10 @@ private struct HomeViewContent: View {
                             HomeRecommendationsRowView(config: row,
                                                        isLarge: row.id == firstSceneRowId,
                                                        isFirst: row.id == firstRowId)
+                        } else if row.type == .forgottenFavorites {
+                            HomeForgottenFavoritesRowView(config: row,
+                                                          isLarge: row.id == firstSceneRowId,
+                                                          isFirst: row.id == firstRowId)
                         } else {
                             HomeRowView(config: row,
                                         viewModel: viewModel,
@@ -135,7 +145,9 @@ private struct HomeViewContent: View {
             viewModel.homeRowGalleries.removeAll()
             viewModel.initializeServerConnection()
             // The spinner stays until the new For You list is on screen.
+            async let forgotten: Void = ForgottenFavoritesEngine.shared.rebuildAndWait()
             await SceneRecommendationEngine.shared.rebuildAndWait()
+            await forgotten
         }
     }
 }

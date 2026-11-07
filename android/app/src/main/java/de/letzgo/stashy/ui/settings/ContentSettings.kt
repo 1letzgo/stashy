@@ -178,7 +178,8 @@ class DashboardSettingsScreen : Screen {
                         val rows = allRows.filter {
                             (!it.type.requiresStashyPlus || StashyPlus.isUnlocked) &&
                                 // For You comes with Settings › stashy+ › Recommendations.
-                                (it.type != HomeRowType.Recommendations || de.letzgo.stashy.data.tools.SceneRecommendations.isFeatureOn)
+                                (it.type != HomeRowType.Recommendations || de.letzgo.stashy.data.tools.SceneRecommendations.isFeatureOn) &&
+                                (it.type != HomeRowType.ForgottenFavorites || de.letzgo.stashy.data.tools.ForgottenFavorites.isFeatureOn)
                         }
                         SettingsGroup {
                             ReorderableColumn(rows, { it.id }, { from, to ->

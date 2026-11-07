@@ -187,17 +187,22 @@ private fun DashboardContent() {
     // stashy+ rows drop out while locked; For You also needs Tag Suggestions or Similar Scenes.
     val activeRows = TabManager.homeRows.filter {
         it.isEnabled && (!it.type.requiresStashyPlus || StashyPlus.isUnlocked) &&
-            (it.type != HomeRowType.Recommendations || de.letzgo.stashy.data.tools.SceneRecommendations.isFeatureOn)
+            (it.type != HomeRowType.Recommendations || de.letzgo.stashy.data.tools.SceneRecommendations.isFeatureOn) &&
+            // Nothing forgotten is good news: the row is left out, not shown with a message.
+            (it.type != HomeRowType.ForgottenFavorites ||
+                (de.letzgo.stashy.data.tools.ForgottenFavorites.isFeatureOn && !de.letzgo.stashy.data.tools.ForgottenFavorites.isEmptyAndReady))
     }
     val firstRowId = activeRows.firstOrNull()?.id
     // For You is a scene row too and takes the hero when it comes first.
     val firstSceneRowId = activeRows.firstOrNull {
-        it.type != HomeRowType.Statistics && (!it.type.requiresStashyPlus || it.type == HomeRowType.Recommendations)
+        it.type != HomeRowType.Statistics &&
+            (!it.type.requiresStashyPlus || it.type == HomeRowType.Recommendations || it.type == HomeRowType.ForgottenFavorites)
     }?.id
 
     PullToRefreshBox(refreshing, onRefresh = {
         refreshing = true
         de.letzgo.stashy.data.tools.SceneRecommendations.rebuild()
+        de.letzgo.stashy.data.tools.ForgottenFavorites.rebuild()
         DashboardStore.refreshAll()
     }, Modifier.fillMaxSize()) {
         LazyColumn(
@@ -211,6 +216,7 @@ private fun DashboardContent() {
                     HomeRowType.Statistics -> StatisticsRow(isFirst)
                     HomeRowType.Channels -> ChannelsRow(row, isFirst)
                     HomeRowType.Recommendations -> RecommendationsRow(row, isLarge = row.id == firstSceneRowId, isFirst = isFirst)
+                    HomeRowType.ForgottenFavorites -> ForgottenFavoritesRow(row, isLarge = row.id == firstSceneRowId, isFirst = isFirst)
                     else -> HomeRow(row, isLarge = row.id == firstSceneRowId, isFirst = isFirst)
                 }
             }
@@ -574,6 +580,61 @@ private fun RecommendationsRow(config: HomeRowConfig, isLarge: Boolean, isFirst:
             }
         }
     }
+    }
+}
+
+/**
+ * iOS: `HomeForgottenFavoritesRowView` (stashy+) — top played / O-Counted scenes not played for
+ * a while, each with how long it has been. No "See all": the list exists only here.
+ */
+@Composable
+private fun ForgottenFavoritesRow(config: HomeRowConfig, isLarge: Boolean, isFirst: Boolean) {
+    val p = Theme.palette
+    val engine = de.letzgo.stashy.data.tools.ForgottenFavorites
+    LaunchedEffect(ServerConfigManager.activeConfig?.id) { engine.refreshIfNeeded() }
+    LaunchedEffect(de.letzgo.stashy.data.tools.AITagSuggestions.lastBuiltAt) { engine.onIndexBuilt() }
+    val w = homeCardWidth(config.type, isLarge)
+    val h = homeCardHeight(config.type, isLarge)
+    val showsHero = isLarge && isFirst && TabManager.showDashboardHeroBackground
+    val listState = rememberLazyListState()
+    val focusedIndex by remember { derivedStateOf { listState.firstVisibleItemIndex + if (listState.firstVisibleItemScrollOffset > 200) 1 else 0 } }
+    val items = engine.items
+
+    Box {
+        if (showsHero) {
+            HeroBackdrop((items.getOrNull(focusedIndex) ?: items.firstOrNull())?.scene?.thumbnailURL, Modifier.matchParentSize())
+        }
+        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            DashboardSectionHeader(config.title, Modifier.padding(top = if (isFirst) 12.dp else 0.dp), onHero = showsHero, onSeeAll = null)
+            when {
+                engine.state == de.letzgo.stashy.data.tools.ForgottenFavoritesState.Preparing ->
+                    Text(de.letzgo.stashy.data.tools.SceneRecommendations.PREPARING_MESSAGE, style = NativeType.bodyMedium, color = p.secondaryText, modifier = Modifier.padding(horizontal = RowMargin))
+                items.isEmpty() -> LazyRow(contentPadding = PaddingValues(horizontal = RowMargin), horizontalArrangement = Arrangement.spacedBy(RowGap), userScrollEnabled = false) {
+                    items(4) {
+                        Box(Modifier.size(w, h).background(p.secondaryBackground, dashboardCardShape(isLarge)), contentAlignment = Alignment.Center) {
+                            CircularProgressIndicator(Modifier.size(20.dp), color = p.secondaryText, strokeWidth = 2.dp)
+                        }
+                    }
+                }
+                else -> LazyRow(
+                    state = listState, flingBehavior = rememberSnapFlingBehavior(listState),
+                    contentPadding = PaddingValues(horizontal = RowMargin), horizontalArrangement = Arrangement.spacedBy(RowGap),
+                ) {
+                    items(items, key = { it.id }) { item ->
+                        Column(Modifier.width(w), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                            DashboardSceneCard(item.scene, isLarge, w, h, onClick = { DetailLinks.scene(item.scene) })
+                            Row(Modifier.fillMaxWidth().padding(horizontal = 2.dp), verticalAlignment = Alignment.CenterVertically) {
+                                Icon(SF.arrowClockwise, null, tint = nativeAccent(), modifier = Modifier.size(14.dp))
+                                Text(
+                                    item.label, style = NativeType.labelMedium, color = if (showsHero) Color.White.copy(alpha = 0.8f) else p.secondaryText,
+                                    maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(start = 4.dp).weight(1f),
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        }
     }
 }
 
