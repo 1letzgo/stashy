@@ -409,6 +409,8 @@ struct ToolsView: View {
         if let tool = (showsLanding ? nil : effectiveTab) ?? lastTool {
             toolContent(tool)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
+                // Pushed pages don't inherit the grid's background.
+                .applyAppBackground()
                 // The dropdown swaps the tool inside this page, instantly.
                 .transaction(value: coordinator.toolsSubTab) { $0.animation = nil }
                 .animation(nil, value: coordinator.toolsSubTab)

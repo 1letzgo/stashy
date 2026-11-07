@@ -1798,15 +1798,43 @@ struct DetailHeroFullscreenViewer<Content: View>: View {
     @ViewBuilder var content: () -> Content
     @Environment(\.dismiss) private var dismiss
     @State private var isZoomed = false
+    /// Swipe to close: the image follows the finger and the black fades; far or fast enough
+    /// closes. Off while zoomed, where a drag pans the image.
+    @State private var dragOffset: CGSize = .zero
+
+    private var dragProgress: CGFloat {
+        min(1, hypot(dragOffset.width, dragOffset.height) / 300)
+    }
 
     var body: some View {
         ZStack(alignment: .topTrailing) {
-            Color.black.ignoresSafeArea()
+            Color.black
+                .opacity(1 - dragProgress * 0.7)
+                .ignoresSafeArea()
             ZoomableScrollView(isZoomed: $isZoomed, onTap: { _ in dismiss() }) {
                 content()
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
             .ignoresSafeArea()
+            .offset(dragOffset)
+            .scaleEffect(1 - dragProgress * 0.15)
+            .simultaneousGesture(
+                DragGesture(minimumDistance: 12)
+                    .onChanged { value in
+                        guard !isZoomed else { return }
+                        dragOffset = value.translation
+                    }
+                    .onEnded { value in
+                        guard !isZoomed else { return }
+                        let distance = hypot(value.translation.width, value.translation.height)
+                        let predicted = hypot(value.predictedEndTranslation.width, value.predictedEndTranslation.height)
+                        if distance > 120 || predicted > 400 {
+                            dismiss()
+                        } else {
+                            withAnimation(.spring(duration: 0.3)) { dragOffset = .zero }
+                        }
+                    }
+            )
 
             Button {
                 dismiss()

@@ -192,6 +192,9 @@ struct CatalogsView: View {
             catalogRoot(for: tab)
                 .environment(\.homeBreadcrumbMenu, homeViewsMenu)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
+                // A pushed page doesn't inherit the root's background (MainTabView sets it on
+                // the dashboard); lists without their own (Tags) would show plain black.
+                .applyAppBackground()
                 // The dropdown swaps the view inside this page, instantly.
                 .transaction(value: coordinator.catalogueSubTab) { $0.animation = nil }
                 .animation(nil, value: coordinator.catalogueSubTab)
