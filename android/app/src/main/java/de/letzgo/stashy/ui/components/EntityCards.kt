@@ -135,7 +135,6 @@ fun StudioCard(studio: Studio, modifier: Modifier = Modifier, onClick: (() -> Un
             Text(studio.name, Modifier.weight(1f), style = NativeType.titleSmall, color = p.text, maxLines = scaledMaxLines(), overflow = TextOverflow.Ellipsis)
             CountLabel(SF.film, counts.scenes ?: 0)
             counts.galleries?.takeIf { it > 0 }?.let { CountLabel(SF.photoStack, it) }
-            counts.oCount?.takeIf { it > 0 }?.let { CountLabel(de.letzgo.stashy.ui.oCounterIcon(de.letzgo.stashy.ui.Appearance.oCounterIcon, filled = true), it) }
         }
     } }
 }

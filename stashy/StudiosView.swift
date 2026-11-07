@@ -908,22 +908,19 @@ struct StudioCardView: View {
     var body: some View {
         let counts = studioCounts.display(for: studio, includeSubStudios: includeSubStudios)
         Color.studioHeaderGray(for: appearance.currentTheme)
-            .aspectRatio(4 / 3, contentMode: .fit)
+            // 16:9 like the scene cards: the lower studio rows no longer tower over the others.
+            .aspectRatio(16 / 9, contentMode: .fit)
             .overlay(
                 StudioImageView(studio: studio, showsNameInPlaceholder: false)
-                    .padding(.horizontal, 16)
-                    .padding(.top, 40)
-                    .padding(.bottom, 50)
+                    .padding(.horizontal, 24)
+                    .padding(.top, 36)
+                    .padding(.bottom, 36)
             )
             .overlay(alignment: .topTrailing) {
                 HStack(spacing: 4) {
                     CatalogCardCountPill(icon: "film", count: counts.scenes, noun: "scene")
                     if let galleryCount = counts.galleries, galleryCount > 0 {
                         CatalogCardCountPill(icon: "photo.stack", count: galleryCount, noun: "gallery")
-                    }
-                    // O count (Stash 0.32+)
-                    if let oCount = counts.oCount, oCount > 0 {
-                        CatalogCardCountPill(icon: appearance.oCounterIcon, count: oCount, noun: "O")
                     }
                 }
                 .padding(8)
@@ -932,7 +929,7 @@ struct StudioCardView: View {
                 Text(studio.name)
                     .font(.headline)
                     .foregroundColor(.white)
-                    .lineLimit(2)
+                    .lineLimit(1)
                     .multilineTextAlignment(.leading)
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(12)

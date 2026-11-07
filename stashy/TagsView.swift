@@ -721,7 +721,8 @@ struct TagCardView: View {
     /// own image gets the studio grey with a number sign in the accent colour.
     var body: some View {
         Color.clear
-            .aspectRatio(4 / 3, contentMode: .fit)
+            // 16:9 like the scene cards.
+            .aspectRatio(16 / 9, contentMode: .fit)
             .overlay(
                 Group {
                     if hasCustomImage {
@@ -733,7 +734,7 @@ struct TagCardView: View {
                                 Image(systemName: "number")
                                     .font(.system(size: 34, weight: .bold))
                                     .foregroundColor(appearanceManager.tintColor)
-                                    .padding(.bottom, 24)
+                                    .padding(.bottom, 16)
                                     .accessibilityHidden(true)
                             )
                     }
@@ -760,7 +761,7 @@ struct TagCardView: View {
                 Text(tag.name)
                     .font(.headline)
                     .foregroundColor(.white)
-                    .lineLimit(2)
+                    .lineLimit(1)
                     .multilineTextAlignment(.leading)
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(12)
