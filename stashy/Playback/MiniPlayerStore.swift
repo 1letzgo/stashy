@@ -902,7 +902,7 @@ struct WatchlistSceneRow: View {
 /// The bar above the tab bar: live picture, title, play/pause, close. Tap reopens the scene,
 /// a swipe down closes it.
 struct MiniPlayerBar: View {
-    /// Inline beside the shrunk tab bar: cover, title, play and close.
+    /// Inline beside the shrunk tab bar: cover, title, play and close (a tap anywhere opens Now Playing).
     var compact: Bool = false
     @ObservedObject private var store = MiniPlayerStore.shared
 
@@ -921,7 +921,6 @@ private struct MiniPlayerBarContent: View {
     let engine: AetherSceneEngine
     var compact: Bool = false
     @ObservedObject private var appearance = AppearanceManager.shared
-    @ObservedObject private var watchlist = WatchlistStore.shared
     @ObservedObject private var store = MiniPlayerStore.shared
     @GestureState private var dragOffset: CGFloat = 0
     @State private var isPlaying = false
@@ -976,30 +975,6 @@ private struct MiniPlayerBarContent: View {
                 }
             }
             Spacer(minLength: 4)
-            if !compact {
-            Button {
-                HapticManager.light()
-                MiniPlayerStore.shared.expand()
-            } label: {
-                Image(systemName: "list.bullet")
-                    .font(.system(size: 16, weight: .semibold))
-                    .frame(width: 32, height: 36)
-                    .contentShape(Rectangle())
-                    .overlay(alignment: .topTrailing) {
-                        if watchlist.scenes.count > 0 {
-                            Text("\(watchlist.scenes.count)")
-                                .font(.system(size: 11, weight: .bold))
-                                .foregroundColor(Color.onAppTint)
-                                .padding(.horizontal, 4)
-                                .frame(minWidth: 14, minHeight: 14)
-                                .background(appearance.tintColor, in: Capsule())
-                                .offset(x: 2, y: 2)
-                        }
-                    }
-            }
-            .buttonStyle(.plain)
-            .accessibilityLabel("Watchlist")
-            }
             Button {
                 HapticManager.light()
                 MiniPlayerStore.shared.togglePlayPause()
