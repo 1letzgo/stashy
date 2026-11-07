@@ -9,6 +9,7 @@ import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
@@ -255,7 +256,17 @@ private fun AddConditionBar(addable: List<FilterFieldDescriptor>, onAdd: (Filter
         Box(Modifier.align(Alignment.TopStart)) {
             DropdownMenu(open, { open = false }, Modifier.heightIn(max = 420.dp), containerColor = p.secondaryBackground) {
                 addable.forEach { f ->
-                    DropdownMenuItem(text = { Text(f.label, color = p.text) }, onClick = { open = false; onAdd(f) })
+                    // Sub-filters and the raw files filter: the web UI drops them when it re-saves.
+                    val appOnly = f.kind == CriterionKind.nestedFilter || f.kind == CriterionKind.raw
+                    DropdownMenuItem(
+                        text = {
+                            Column {
+                                Text(f.label, color = p.text)
+                                if (appOnly) Text("App only", color = p.secondaryText, style = MaterialTheme.typography.bodySmall)
+                            }
+                        },
+                        onClick = { open = false; onAdd(f) },
+                    )
                 }
             }
         }

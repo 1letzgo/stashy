@@ -366,7 +366,10 @@ class FilterSavedFormatTest {
 
     @Test fun catalogFieldsFollowWebUi() {
         val sceneAddable = FilterFieldCatalog.addableFields(FilterMode.Scenes, emptySet())
-        assertTrue(sceneAddable.none { it.kind == CriterionKind.nestedFilter || it.kind == CriterionKind.raw || it.kind == CriterionKind.stashIDs })
+        // Sub-filters and files_filter are offered (marked "App only"); the Stash ID list is not.
+        assertTrue(sceneAddable.any { it.kind == CriterionKind.nestedFilter })
+        assertTrue(sceneAddable.any { it.key == "files_filter" })
+        assertTrue(sceneAddable.none { it.kind == CriterionKind.stashIDs })
         assertEquals("Stash ID", sceneAddable.single { it.key == "stash_id_endpoint" }.label)
         // Loaded filters still show sub-filters and raw files filters.
         assertNotNull(FilterFieldCatalog.field("files_filter", FilterMode.Scenes))

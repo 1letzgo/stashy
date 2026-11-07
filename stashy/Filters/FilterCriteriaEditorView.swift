@@ -173,12 +173,18 @@ struct FilterCriteriaEditorView: View {
             Spacer(minLength: 0)
             Menu {
                 ForEach(addableFields) { field in
-                    Button(field.label) {
+                    Button {
                         // Empty shell only: the row opens with nothing set, so adding a condition
                         // never silently filters (a default gender/resolution would).
                         stickyKeys.insert(field.key)
                         expandedKeys.insert(field.key)
                         HapticManager.selection()
+                    } label: {
+                        Text(field.label)
+                        if field.isAppOnly {
+                            // Menu subtitle: the web UI drops these when it re-saves the filter.
+                            Text("App only")
+                        }
                     }
                 }
             } label: {

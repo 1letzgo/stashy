@@ -161,14 +161,14 @@ object FilterFieldCatalog {
     fun field(key: String, mode: FilterMode): FilterFieldDescriptor? = fields(mode).firstOrNull { it.key == key }
 
     /**
-     * Fields the user can still add — the web UI's criteria. Sub-filters (`scenes_filter`, …), raw
-     * `files_filter` and the multi Stash ID list exist only in the API: the web UI neither offers
-     * nor keeps them. A loaded filter that already has one still shows and edits it.
+     * Fields the user can still add. The multi Stash ID list is covered by "Stash ID". Sub-filters
+     * and the raw files filter are offered, marked "App only" in the menu: the web UI drops them
+     * when it re-saves a filter.
      */
     fun addableFields(mode: FilterMode, excludingKeys: Set<String>): List<FilterFieldDescriptor> =
         fields(mode).filter {
             !it.isDeprecated && it.kind != CriterionKind.booleanGroup && it.key !in excludingKeys &&
-                it.kind != CriterionKind.nestedFilter && it.kind != CriterionKind.raw && it.kind != CriterionKind.stashIDs
+                it.kind != CriterionKind.stashIDs
         }
 
     private val sceneFields: List<FilterFieldDescriptor> = run {

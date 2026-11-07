@@ -8,6 +8,10 @@ struct FilterFieldDescriptor: Identifiable, Hashable {
     var isDeprecated: Bool = false
 
     var id: String { key }
+
+    /// Sub-filters (`scenes_filter`, …) and the raw `files_filter` work in the API, but the web UI
+    /// neither offers them nor keeps them when it re-saves a filter.
+    var isAppOnly: Bool { kind == .nestedFilter || kind == .raw }
 }
 
 enum FilterFieldCatalog {
@@ -36,17 +40,15 @@ enum FilterFieldCatalog {
         fields(for: mode).first { $0.key == key }
     }
 
-    /// Fields the user can still add — the web UI's criteria. Boolean groups are excluded: AND/OR/NOT are structure, not
+    /// Fields the user can still add. Boolean groups are excluded: AND/OR/NOT are structure, not
     /// fields, and listing them next to "Rating" was the main source of confusion. The editor
     /// offers them through its own "Add group" control instead.
     static func addableFields(for mode: StashDBViewModel.FilterMode, excludingKeys: Set<String>) -> [FilterFieldDescriptor] {
         fields(for: mode).filter { field in
             if field.isDeprecated { return false }
             if field.kind == .booleanGroup { return false }
-            // Sub-filters (`scenes_filter`, …), raw `files_filter` and the multi Stash ID list
-            // exist only in the API: the web UI neither offers nor keeps them. A loaded filter
-            // that already has one still shows and edits it.
-            if field.kind == .nestedFilter || field.kind == .raw || field.kind == .stashIDs { return false }
+            // The multi Stash ID list is covered by "Stash ID" (the web UI's criterion).
+            if field.kind == .stashIDs { return false }
             return !excludingKeys.contains(field.key)
         }
     }
