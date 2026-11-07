@@ -98,8 +98,10 @@ struct MainTabView: View {
             .animation(nil, value: coordinator.selectedTab)
             .tint(appearanceManager.tabBarTint)
             .withToasts()
-            .modifier(TabBarMinimizesOnScroll(enabled: coordinator.selectedTab != .reels || feedsScrubber.showsBar))
-            #if !os(tvOS)
+            #if os(tvOS)
+            .modifier(TabBarMinimizesOnScroll(enabled: false))
+            #else
+            // Collapsing the tab bar is decided there: only with something in the accessory slot.
             .modifier(MiniPlayerHost(hidden: coordinator.selectedTab == .reels))
             #endif
             .onAppear {
@@ -1312,7 +1314,8 @@ private struct ToolsStatisticsView: View {
 /// Like Music: scrolling down shrinks the tab bar to its selected tab, and the mini player
 /// (the bottom accessory) moves into the same row; scrolling up brings both back.
 private struct TabBarMinimizesOnScroll: ViewModifier {
-    /// Off on Feeds: there is no mini player to make room for, and the feed scrolls all the time.
+    /// Only while the accessory slot holds something (a loaded mini player, Feeds' time bar):
+    /// without it, a shrunken tab bar makes room for nothing.
     var enabled: Bool
 
     @ViewBuilder
@@ -1340,8 +1343,14 @@ private struct MiniPlayerHost: ViewModifier {
     @ObservedObject private var tabManager = TabManager.shared
     @ObservedObject private var feedsScrubber = FeedsScrubberAccessory.shared
 
+    /// The mini player sits in the tab bar's accessory slot (not floating over a page without one).
+    private var showsMiniPlayerInTabBar: Bool {
+        store.session != nil && !hidden && store.isEnabled && !store.tabBarHiddenByPage
+    }
+
     func body(content: Content) -> some View {
         content
+            .modifier(TabBarMinimizesOnScroll(enabled: hidden ? feedsScrubber.showsBar : showsMiniPlayerInTabBar))
             .modifier(MiniPlayerAccessory(
                 isEnabled: store.session != nil && !hidden && store.isEnabled,
                 floats: store.tabBarHiddenByPage,
