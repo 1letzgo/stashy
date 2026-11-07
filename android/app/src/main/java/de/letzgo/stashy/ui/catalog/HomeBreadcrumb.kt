@@ -212,6 +212,7 @@ private fun SettingsButton(controller: CatalogController<*>) {
 @Composable
 private fun sortIcon(field: String): ImageVector = when {
     CatalogQuickSortCatalog.isRandom(field) -> SF.shuffle
+    field == de.letzgo.stashy.data.SortOption.FOR_YOU_FIELD -> SF.sparkles
     else -> when (field) {
         "date" -> SF.calendar
         "created_at" -> Icons.Outlined.AddCircleOutline

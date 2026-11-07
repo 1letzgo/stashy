@@ -8,7 +8,14 @@ import kotlin.random.Random
  * (`AppTabsConfig.sortOption`, `ui_options.stashy.sortRaw`) round-trip with iOS.
  */
 data class SortOption(val raw: String, val label: String, val field: String, val direction: String) {
-    val isRandom: Boolean get() = this.field == "random"
+    /** Random or For You: one order, no direction (For You is answered by the app, see [isForYou]). */
+    val isRandom: Boolean get() = this.field == "random" || isForYou
+    /** iOS `SceneSortOption.forYou`: the stashy+ For You list, up to 25, in place of a server sort. */
+    val isForYou: Boolean get() = this.field == FOR_YOU_FIELD
+
+    companion object {
+        const val FOR_YOU_FIELD = "for_you"
+    }
     val isAscending: Boolean get() = direction == "ASC"
 }
 
@@ -29,6 +36,7 @@ object SortCatalog {
 
     val scenes = listOf(
         o("random", "Random", "random", "DESC"),
+        o("forYou", "For You", SortOption.FOR_YOU_FIELD, "DESC"),
         o("dateDesc", "Date (Newest First)", "date", "DESC"), o("dateAsc", "Date (Oldest First)", "date", "ASC"),
         o("productionDateDesc", "Production Date (Newest First)", "production_date", "DESC"), o("productionDateAsc", "Production Date (Oldest First)", "production_date", "ASC"),
         o("createdAtDesc", "Created (Newest First)", "created_at", "DESC"), o("createdAtAsc", "Created (Oldest First)", "created_at", "ASC"),
@@ -131,7 +139,10 @@ object SortCatalog {
         else -> false
     }
 
-    private fun available(mode: FilterMode, field: String) = !requires032(mode, field) || ServerCapabilities.supports032
+    private fun available(mode: FilterMode, field: String) =
+        // runCatching: the engine reads app prefs, which plain unit tests do not have.
+        if (field == SortOption.FOR_YOU_FIELD) mode == FilterMode.Scenes && runCatching { de.letzgo.stashy.data.tools.SceneRecommendations.isAvailable }.getOrDefault(false)
+        else !requires032(mode, field) || ServerCapabilities.supports032
 
     fun choices(mode: FilterMode): List<SortOption> = allChoices(mode).filter { available(mode, it.field) }
 
@@ -189,7 +200,7 @@ object SortCatalog {
             SortFieldKind("date", "Date"), SortFieldKind("production_date", "Production date"), SortFieldKind("created_at", "Created"), SortFieldKind("title", "Title"),
             SortFieldKind("duration", "Duration"), SortFieldKind("last_played_at", "Last played"), SortFieldKind("play_count", "Play count"),
             SortFieldKind("play_duration", "Watch time"), SortFieldKind("o_counter", "O Count"), SortFieldKind("rating", "Rating"),
-            SortFieldKind("random", "Random"),
+            SortFieldKind("random", "Random"), SortFieldKind(SortOption.FOR_YOU_FIELD, "For You"),
         )
         FilterMode.SceneMarkers -> listOf(
             SortFieldKind("created_at", "Created"), SortFieldKind("updated_at", "Updated"), SortFieldKind("title", "Title"),
@@ -234,7 +245,8 @@ object SortCatalog {
     /** iOS: `<Kind>.performerSortOption(ascending:)` etc. — option for a field kind + direction. */
     fun optionFor(mode: FilterMode, field: String, ascending: Boolean): SortOption? {
         val list = choices(mode)
-        if (field == "random") return list.firstOrNull { it.isRandom }
+        if (field == "random") return list.firstOrNull { it.field == "random" }
+        if (field == SortOption.FOR_YOU_FIELD) return list.firstOrNull { it.isForYou }
         return list.firstOrNull { it.field == field && it.isAscending == ascending }
     }
 

@@ -24,7 +24,9 @@ struct RecommendationSettingsView: View {
                 }
             } else if !engine.isFeatureOn {
                 Section {
-                    Label("Turn on Tag suggestions or Similar scenes to show For You on Home.", systemImage: "info.circle")
+                    Label(engine.hasStatistics
+                          ? "For You is off. Turn it on in Recommendations to show it on Home."
+                          : "Turn on Tag suggestions or Similar scenes to show For You on Home.", systemImage: "info.circle")
                         .foregroundColor(.secondary)
                         .stashyGroupedSettingsRow()
                 }
@@ -40,7 +42,8 @@ struct RecommendationSettingsView: View {
         .applyAppBackground()
         .stashySettingsDetailChrome("For You")
         .disabled(!stashyPlus.isUnlocked)
-        // Changes take effect when Home shows the row again; leaving here starts the rebuild.
+        // Changed settings apply from the next list (pull to refresh, Refresh above, app start);
+        // leaving here only builds one when none is shown yet.
         .onDisappear { engine.refreshIfNeeded() }
         // Feedback for Refresh: a prepared list swaps in instantly and would otherwise go unseen.
         .onChange(of: engine.builtAt) { old, new in
@@ -195,7 +198,7 @@ struct RecommendationSettingsView: View {
         case .noHistory: return "No plays yet"
         case .failed(let message): return message
         case .ready:
-            let picks = "\(engine.recommendations.count) scenes from \(engine.seedCount) watched"
+            let picks = "\(engine.homeItems.count) scenes from \(engine.seedCount) watched"
             if let date = engine.builtAt {
                 return "\(picks) · \(date.formatted(date: .omitted, time: .shortened))"
             }

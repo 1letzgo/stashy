@@ -124,11 +124,20 @@ fun AITagsSettingsView() {
             item {
                 SettingsSectionHeader("For You on Home", isBeta = true)
                 GroupedCard {
-                    SettingsRow("For You", SF.wand, enabled = isUnlocked, onClick = { Nav.push(RecommendationSettingsScreen()) }) {
-                        Text(if (de.letzgo.stashy.data.tools.SceneRecommendations.isFeatureOn) "On" else "Off", style = NativeType.bodyMedium, color = p.secondaryText)
-                    }
+                    val forYou = de.letzgo.stashy.data.tools.SceneRecommendations
+                    ToggleRow(
+                        "For You", SF.wand,
+                        checked = isUnlocked && forYou.hasStatistics && forYou.isEnabled,
+                        enabled = isUnlocked && forYou.hasStatistics,
+                    ) { if (isUnlocked) forYou.updateEnabled(it) }
+                    RowDivider()
+                    SettingsRow("For You settings", SF.sliderHorizontal3, enabled = isUnlocked, onClick = { Nav.push(RecommendationSettingsScreen()) })
                 }
-                SettingsSectionFooter("A Home row with scenes picked from what you played, your O-Counts and ratings, each with the reason it was picked. On while Tag suggestions or Similar scenes is on; move or hide it in Settings › Home.")
+                SettingsSectionFooter(
+                    if (de.letzgo.stashy.data.tools.SceneRecommendations.hasStatistics)
+                        "A Home row with scenes picked from what you played, your O-Counts and ratings, each with the reason it was picked. Move it in Settings › Home."
+                    else "A Home row with scenes picked from what you played, your O-Counts and ratings. Needs Tag suggestions or Similar scenes."
+                )
                 SectionSpacer()
             }
 

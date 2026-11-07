@@ -148,7 +148,8 @@ fun DashboardScreen() {
         DashboardStore.syncServer()
         TabManager.ensureLoaded()
         if (server != null) {
-            if (DashboardStore.statistics == null) DashboardStore.loadStatistics(force = true) else DashboardStore.loadStatistics()
+            // Within a session Home keeps what it loaded; pull to refresh reloads.
+            if (DashboardStore.statistics == null) DashboardStore.loadStatistics(force = true)
             SavedFiltersStore.load()
         }
     }
@@ -178,14 +179,21 @@ private fun ConnectionErrorView(onRetry: () -> Unit) {
 @Composable
 private fun DashboardContent() {
     var refreshing by remember { mutableStateOf(false) }
-    LaunchedEffect(DashboardStore.isLoadingStatistics) { if (!DashboardStore.isLoadingStatistics) refreshing = false }
+    // The spinner stays until the statistics and a new For You list are in.
+    val forYouRefreshing = de.letzgo.stashy.data.tools.SceneRecommendations.isRefreshing
+    LaunchedEffect(DashboardStore.isLoadingStatistics, forYouRefreshing) {
+        if (!DashboardStore.isLoadingStatistics && !forYouRefreshing) refreshing = false
+    }
     // stashy+ rows drop out while locked; For You also needs Tag Suggestions or Similar Scenes.
     val activeRows = TabManager.homeRows.filter {
         it.isEnabled && (!it.type.requiresStashyPlus || StashyPlus.isUnlocked) &&
             (it.type != HomeRowType.Recommendations || de.letzgo.stashy.data.tools.SceneRecommendations.isFeatureOn)
     }
     val firstRowId = activeRows.firstOrNull()?.id
-    val firstSceneRowId = activeRows.firstOrNull { it.type != HomeRowType.Statistics && !it.type.requiresStashyPlus }?.id
+    // For You is a scene row too and takes the hero when it comes first.
+    val firstSceneRowId = activeRows.firstOrNull {
+        it.type != HomeRowType.Statistics && (!it.type.requiresStashyPlus || it.type == HomeRowType.Recommendations)
+    }?.id
 
     PullToRefreshBox(refreshing, onRefresh = {
         refreshing = true
@@ -202,7 +210,7 @@ private fun DashboardContent() {
                 when (row.type) {
                     HomeRowType.Statistics -> StatisticsRow(isFirst)
                     HomeRowType.Channels -> ChannelsRow(row, isFirst)
-                    HomeRowType.Recommendations -> RecommendationsRow(row, isFirst)
+                    HomeRowType.Recommendations -> RecommendationsRow(row, isLarge = row.id == firstSceneRowId, isFirst = isFirst)
                     else -> HomeRow(row, isLarge = row.id == firstSceneRowId, isFirst = isFirst)
                 }
             }
@@ -513,26 +521,28 @@ private fun ChannelCard(channel: FeedsChannelRequest, onClick: () -> Unit) {
  * card with the reason it was picked below it; the header's tune button opens the settings.
  */
 @Composable
-private fun RecommendationsRow(config: HomeRowConfig, isFirst: Boolean) {
+private fun RecommendationsRow(config: HomeRowConfig, isLarge: Boolean, isFirst: Boolean) {
     val p = Theme.palette
     val engine = de.letzgo.stashy.data.tools.SceneRecommendations
     LaunchedEffect(ServerConfigManager.activeConfig?.id) { engine.refreshIfNeeded() }
-    val w = homeCardWidth(config.type, false)
-    val h = homeCardHeight(config.type, false)
+    val w = homeCardWidth(config.type, isLarge)
+    val h = homeCardHeight(config.type, isLarge)
+    val showsHero = isLarge && isFirst && TabManager.showDashboardHeroBackground
+    val listState = rememberLazyListState()
+    val focusedIndex by remember { derivedStateOf { listState.firstVisibleItemIndex + if (listState.firstVisibleItemScrollOffset > 200) 1 else 0 } }
 
+    Box {
+    if (showsHero) {
+        val items = engine.homeItems
+        HeroBackdrop((items.getOrNull(focusedIndex) ?: items.firstOrNull())?.scene?.thumbnailURL, Modifier.matchParentSize())
+    }
     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-        Row(
-            Modifier.fillMaxWidth().heightIn(min = 48.dp).padding(top = if (isFirst) 12.dp else 0.dp).padding(start = RowMargin, end = 4.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Text(config.title, style = NativeType.titleLarge, color = p.text, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            Icon(SF.sparkles, null, tint = nativeAccent(), modifier = Modifier.padding(start = 6.dp).size(16.dp))
-            Spacer(Modifier.weight(1f))
-            androidx.compose.material3.IconButton(onClick = { Nav.push(de.letzgo.stashy.ui.tools.aitags.RecommendationSettingsScreen()) }) {
-                Icon(SF.sliderHorizontal3, "For You settings", tint = p.secondaryText)
-            }
-        }
-        val items = engine.recommendations
+        // Like every scene row: "See all" opens Scenes, here sorted For You.
+        DashboardSectionHeader(
+            config.title, Modifier.padding(top = if (isFirst) 12.dp else 0.dp),
+            onHero = showsHero, onSeeAll = { Nav.openCatalog(CatalogTab.Scenes, sort = "forYou") },
+        )
+        val items = engine.homeItems
         val message = when {
             items.isNotEmpty() -> null
             engine.state == de.letzgo.stashy.data.tools.RecommendationState.NoHistory -> "Watch a few scenes and stashy will suggest more like them here."
@@ -543,33 +553,33 @@ private fun RecommendationsRow(config: HomeRowConfig, isFirst: Boolean) {
         when {
             items.isEmpty() && message == null -> LazyRow(contentPadding = PaddingValues(horizontal = RowMargin), horizontalArrangement = Arrangement.spacedBy(RowGap), userScrollEnabled = false) {
                 items(4) {
-                    Box(Modifier.size(w, h).background(p.secondaryBackground, dashboardCardShape(false)), contentAlignment = Alignment.Center) {
+                    Box(Modifier.size(w, h).background(p.secondaryBackground, dashboardCardShape(isLarge)), contentAlignment = Alignment.Center) {
                         CircularProgressIndicator(Modifier.size(20.dp), color = p.secondaryText, strokeWidth = 2.dp)
                     }
                 }
             }
             items.isEmpty() -> Text(message.orEmpty(), style = NativeType.bodyMedium, color = p.secondaryText, modifier = Modifier.padding(horizontal = RowMargin))
             else -> {
-                val listState = rememberLazyListState()
                 LazyRow(
                     state = listState, flingBehavior = rememberSnapFlingBehavior(listState),
                     contentPadding = PaddingValues(horizontal = RowMargin), horizontalArrangement = Arrangement.spacedBy(RowGap),
                 ) {
                     items(items, key = { it.id }) { item ->
                         Column(Modifier.width(w), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                            DashboardSceneCard(item.scene, false, w, h, onClick = { DetailLinks.scene(item.scene) })
-                            RecommendationReasonLine(item)
+                            DashboardSceneCard(item.scene, isLarge, w, h, onClick = { DetailLinks.scene(item.scene) })
+                            RecommendationReasonLine(item, onHero = showsHero)
                         }
                     }
                 }
             }
         }
     }
+    }
 }
 
 /** iOS `reasonLine(_:)`: icon, reason, NEW badge for scenes never played. */
 @Composable
-private fun RecommendationReasonLine(item: de.letzgo.stashy.data.tools.SceneRecommendation) {
+private fun RecommendationReasonLine(item: de.letzgo.stashy.data.tools.SceneRecommendation, onHero: Boolean = false) {
     val p = Theme.palette
     val icon = when (item.reason) {
         is de.letzgo.stashy.data.tools.RecommendationReason.Performer -> SF.personFill
@@ -583,7 +593,7 @@ private fun RecommendationReasonLine(item: de.letzgo.stashy.data.tools.SceneReco
     Row(Modifier.fillMaxWidth().padding(horizontal = 2.dp), verticalAlignment = Alignment.CenterVertically) {
         Icon(icon, null, tint = nativeAccent(), modifier = Modifier.size(14.dp))
         Text(
-            item.reason.label, style = NativeType.labelMedium, color = p.secondaryText, maxLines = 1, overflow = TextOverflow.Ellipsis,
+            item.reason.label, style = NativeType.labelMedium, color = if (onHero) Color.White.copy(alpha = 0.8f) else p.secondaryText, maxLines = 1, overflow = TextOverflow.Ellipsis,
             modifier = Modifier.padding(start = 4.dp).weight(1f),
         )
         if (item.isUnwatched) {

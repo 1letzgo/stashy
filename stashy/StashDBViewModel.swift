@@ -700,8 +700,10 @@ class StashDBViewModel: ObservableObject {
         }
     }
 
-    /// How long a loaded row counts as fresh for `loadHomeRowIfNeeded`.
-    static let homeRowFreshness: TimeInterval = 60
+    /// How long a loaded row counts as fresh for `loadHomeRowIfNeeded`: the whole session.
+    /// Home reloads only on pull to refresh, a server switch or a new default filter — those
+    /// clear the rows, and an empty row always loads.
+    static let homeRowFreshness: TimeInterval = .infinity
 
     /// Loads a row unless it was loaded recently. Replaces the old “refresh every row on
     /// every appear”, which refetched the whole dashboard after each detail page.
@@ -1458,6 +1460,8 @@ class StashDBViewModel: ObservableObject {
     enum SceneSortOption: String, CaseIterable, DisplayNameProvider, StashVersionedSortOption {
         // ... (existing cases)
         case random
+        /// stashy+ For You picks (`SceneRecommendationEngine`), up to 25; reads like any other sort.
+        case forYou
         case dateDesc
         case dateAsc
         case productionDateDesc
@@ -1482,8 +1486,20 @@ class StashDBViewModel: ObservableObject {
         case sceneNumberAsc
         case sceneNumberDesc
 
-        /// Every option that works on any scene list — not the group-only scene number.
-        static var generalCases: [SceneSortOption] { availableCases.filter { !$0.isGroupOnly } }
+        /// Every option that works on any scene list — not the group-only scene number, and not For
+        /// You, which only the Scenes list answers (Home rows and Feeds fetch on their own).
+        static var generalCases: [SceneSortOption] { availableCases.filter { !$0.isGroupOnly && $0 != .forYou } }
+        /// For You only while stashy+ and the For You switch are on.
+        static var availableCases: [SceneSortOption] {
+            allCases.filter { $0.isAvailableOnServer && ($0 != .forYou || isForYouAvailable) }
+        }
+        static var isForYouAvailable: Bool {
+            #if os(tvOS)
+            return false
+            #else
+            return StashyPlusManager.isUnlockedNow && SceneRecommendationEngine.isFeatureOnNow
+            #endif
+        }
         var requiresStash032: Bool { self == .productionDateDesc || self == .productionDateAsc }
         var isGroupOnly: Bool { self == .sceneNumberAsc || self == .sceneNumberDesc }
 
@@ -1510,6 +1526,7 @@ class StashDBViewModel: ObservableObject {
             case .ratingDesc: return "Rating (High-Low)"
             case .ratingAsc: return "Rating (Low-High)"
             case .random: return "Random"
+            case .forYou: return "For You"
             case .sceneNumberAsc: return "Scene No. (Ascending)"
             case .sceneNumberDesc: return "Scene No. (Descending)"
             }
@@ -1519,7 +1536,7 @@ class StashDBViewModel: ObservableObject {
             switch self {
             case .productionDateDesc: return "DESC"
             case .productionDateAsc: return "ASC"
-            case .dateDesc, .createdAtDesc, .durationDesc, .lastPlayedAtDesc, .playCountDesc, .playDurationDesc, .oCounterDesc, .ratingDesc, .random: return "DESC"
+            case .dateDesc, .createdAtDesc, .durationDesc, .lastPlayedAtDesc, .playCountDesc, .playDurationDesc, .oCounterDesc, .ratingDesc, .random, .forYou: return "DESC"
             case .dateAsc, .createdAtAsc, .titleAsc, .durationAsc, .lastPlayedAtAsc, .playCountAsc, .playDurationAsc, .oCounterAsc, .ratingAsc: return "ASC"
             case .titleDesc, .sceneNumberDesc: return "DESC"
             case .sceneNumberAsc: return "ASC"
@@ -1540,6 +1557,9 @@ class StashDBViewModel: ObservableObject {
             case .oCounterDesc, .oCounterAsc: return "o_counter"
             case .ratingDesc, .ratingAsc: return "rating"
             case .random: return "random"
+            // Never reaches the server from the Scenes list (`loadScenesPage` answers it); any
+            // other place that sends it gets random order.
+            case .forYou: return "random"
             case .sceneNumberAsc, .sceneNumberDesc: return "group_scene_number"
             }
         }
@@ -3355,6 +3375,34 @@ class StashDBViewModel: ObservableObject {
         loadScenesPage(page: page, sortBy: currentSceneSortOption, searchQuery: currentSceneSearchQuery, fetchGeneration: scenesFetchGeneration)
     }
 
+    #if !os(tvOS)
+    /// The For You sort: the current For You list (up to 25), one page, no paging. A search
+    /// narrows it by title; filters do not apply.
+    private func loadForYouScenes(searchQuery: String, fetchGeneration: Int, isInitialLoad: Bool) {
+        guard isInitialLoad else {
+            hasMoreScenes = false
+            isLoadingMoreScenes = false
+            return
+        }
+        isLoadingScenes = true
+        Task { @MainActor in
+            var list = await SceneRecommendationEngine.shared.scenesForList()
+            guard fetchGeneration == self.scenesFetchGeneration else { return }
+            let query = searchQuery.trimmingCharacters(in: .whitespaces)
+            if !query.isEmpty {
+                list = list.filter { ($0.title ?? "").localizedCaseInsensitiveContains(query) }
+            }
+            self.scenesInitialInflightKey = nil
+            self.scenes = list
+            self.totalScenes = list.count
+            self.hasMoreScenes = false
+            self.isLoadingScenes = false
+            self.isLoadingMoreScenes = false
+            self.isLoading = false
+        }
+    }
+    #endif
+
     /// The scene list was fetched for Feeds (`findScenesFeed`, with marker times).
     private var currentScenesForFeeds = false
 
@@ -3649,6 +3697,12 @@ class StashDBViewModel: ObservableObject {
 
     private func loadScenesPage(page: Int, sortBy: SceneSortOption, searchQuery: String = "", previewOnly: Bool = false, fetchGeneration: Int) {
         let isInitialLoad = (page == 1)
+        #if !os(tvOS)
+        if sortBy == .forYou, !previewOnly {
+            loadForYouScenes(searchQuery: searchQuery, fetchGeneration: fetchGeneration, isInitialLoad: isInitialLoad)
+            return
+        }
+        #endif
         if !previewOnly {
             if isInitialLoad {
                 isLoadingScenes = true
@@ -6695,6 +6749,10 @@ class StashDBViewModel: ObservableObject {
                 let result = try await GraphQLClient.shared.performMutation(mutation: mutation, variables: variables)
                 if let data = result["data"]?.value as? [String: Any],
                    let payload = data["sceneAddPlay"] as? [String: Any] {
+                    #if !os(tvOS)
+                    // For You and Similar Scenes read the device's scene index: the play counts now.
+                    await MainActor.run { AITagSuggestionManager.shared.noteLocalPlay(sceneId: sceneId) }
+                    #endif
                     if let newCount = payload["count"] as? Int {
                         AppLog.debug("✅ SCENE PLAY: Success for scene \(sceneId). New count: \(newCount)")
                         await MainActor.run { completion?(newCount) }

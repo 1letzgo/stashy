@@ -141,6 +141,44 @@ data class AITagStatsModel(
     val builtAtMillis: Long get() = ((builtAt + AITagStatsMath.REFERENCE_DATE_OFFSET) * 1000).toLong()
 }
 
+/**
+ * iOS: `LocalSceneIndex` — every tagged scene in a few ids and numbers, persisted beside the
+ * statistics as `AITagStats/<key>.scenes.json`. For You scores the whole library from it on the
+ * device; only its picks are loaded from the server. [builtAt] is epoch milliseconds.
+ */
+@Serializable
+data class LocalSceneIndex(
+    val builtAt: Long,
+    val scenes: List<Entry>,
+    val performerNames: Map<String, String>,
+    val studioNames: Map<String, String>,
+    val tagNames: Map<String, String> = emptyMap(),
+) {
+    /** Tag / performer / studio ids; play count, O count, rating, last played (epoch ms), watched seconds, duration. */
+    @Serializable
+    data class Entry(
+        val id: String,
+        val title: String? = null,
+        val t: List<String> = emptyList(),
+        val p: List<String> = emptyList(),
+        val s: String? = null,
+        val pc: Int = 0,
+        val oc: Int = 0,
+        val r: Int? = null,
+        val lp: Long? = null,
+        val pd: Double? = null,
+        val d: Double? = null,
+        /** The scene as the lists load it (`SceneListFields`), for its card. */
+        val scene: Scene? = null,
+    ) {
+        /** Played from this app: counts at once, not only after the next statistics build. */
+        fun playedNow(nowMillis: Long): Entry = copy(
+            pc = pc + 1, lp = nowMillis,
+            scene = scene?.copy(playCount = pc + 1, lastPlayedAt = java.time.Instant.ofEpochMilli(nowMillis).toString()),
+        )
+    }
+}
+
 /** One counted item (scene or image): ids only. */
 data class AITagStatsItem(
     val tagIds: List<String>,
@@ -233,7 +271,8 @@ class AITagStatsBuilder {
 
 /** Scoring, local updates and storage helpers of the manager as pure functions. */
 object AITagStatsMath {
-    const val MODEL_VERSION = 2
+    /** 4: the build also writes the per-scene index ([LocalSceneIndex]) with each scene's card, read by For You and Similar Scenes. */
+    const val MODEL_VERSION = 4
     /** One "Ignore Tag" is the answer, not a vote. */
     const val DISMISS_STRIKES = 1
     /** Laplace-style damping: one of one item is not a certainty. */
@@ -633,6 +672,9 @@ object AITagSuggestions {
         itemCount = 0
         state = AITagModelState.Idle
         modelFile()?.let { f -> scope.launch(Dispatchers.IO) { f.delete() } }
+        sceneIndexFile()?.let { f -> scope.launch(Dispatchers.IO) { f.delete() } }
+        sceneIndexCache = null
+        sceneIndexLoadedFor = null
     }
 
     private suspend fun performBuild() {
@@ -646,6 +688,7 @@ object AITagSuggestions {
             return
         }
         val builder = AITagStatsBuilder()
+        val index = IndexCollector()
         var processed = 0
         var expected = 0
         try {
@@ -655,7 +698,7 @@ object AITagSuggestions {
                 while (true) {
                     coroutineContext.ensureActive()
                     val batch = try {
-                        fetchStatsPage(source, page)
+                        fetchStatsPage(source, page, if (source == "scenes") index else null)
                     } catch (e: CancellationException) {
                         throw e
                     } catch (e: Exception) {
@@ -682,6 +725,72 @@ object AITagSuggestions {
         didLoadFromDisk = true
         apply(built)
         persist(built)
+        val sceneIndex = index.build(System.currentTimeMillis())
+        sceneIndexCache = sceneIndex
+        sceneIndexLoadedFor = sceneIndexFile()?.path
+        persistSceneIndex(sceneIndex)
+        // A new index: For You's next list reads it, and a row still waiting gets its list now.
+        SceneRecommendations.onSceneIndexChanged()
+    }
+
+    // MARK: - Local scene index (For You)
+
+    private class IndexCollector {
+        val entries = mutableListOf<LocalSceneIndex.Entry>()
+        val performerNames = HashMap<String, String>()
+        val studioNames = HashMap<String, String>()
+        val tagNames = HashMap<String, String>()
+        fun build(builtAt: Long) = LocalSceneIndex(builtAt, entries.toList(), performerNames, studioNames, tagNames)
+    }
+
+    private var sceneIndexCache: LocalSceneIndex? = null
+    private var sceneIndexLoadedFor: String? = null
+
+    /** The per-scene index written by the last statistics build, or null before the first one. */
+    suspend fun sceneIndex(): LocalSceneIndex? {
+        val file = sceneIndexFile() ?: return null
+        if (sceneIndexLoadedFor == file.path) sceneIndexCache?.let { return it }
+        val loaded = withContext(Dispatchers.IO) {
+            runCatching { if (file.exists()) de.letzgo.stashy.data.Json.decodeFromString(LocalSceneIndex.serializer(), file.readText()) else null }.getOrNull()
+        }
+        sceneIndexCache = loaded
+        sceneIndexLoadedFor = file.path
+        return loaded
+    }
+
+    /**
+     * iOS `waitForSceneIndex`: the scene index, waiting for a statistics build that is running
+     * (or starting one when none exists yet) — right after an update the first build takes a while.
+     */
+    suspend fun waitForSceneIndex(timeoutMs: Long = 300_000): LocalSceneIndex? {
+        sceneIndex()?.takeIf { it.scenes.isNotEmpty() }?.let { return it }
+        ensureStatistics()
+        val deadline = System.currentTimeMillis() + timeoutMs
+        while (System.currentTimeMillis() < deadline && state is AITagModelState.Building) delay(500)
+        return sceneIndex()
+    }
+
+    /** iOS `noteLocalPlay`: a play from this app goes into the index at once. */
+    fun noteLocalPlay(sceneId: String) {
+        val index = sceneIndexCache ?: return
+        val position = index.scenes.indexOfFirst { it.id == sceneId }.takeIf { it >= 0 } ?: return
+        val updated = index.copy(scenes = index.scenes.toMutableList().also { it[position] = it[position].playedNow(System.currentTimeMillis()) })
+        sceneIndexCache = updated
+        persistSceneIndex(updated)
+    }
+
+    private fun sceneIndexFile(): File? = modelFile()?.let { File(it.parentFile, it.nameWithoutExtension + ".scenes.json") }
+
+    private fun persistSceneIndex(index: LocalSceneIndex) {
+        val file = sceneIndexFile() ?: return
+        scope.launch(Dispatchers.IO) {
+            runCatching {
+                file.parentFile?.mkdirs()
+                val tmp = File(file.parentFile, file.name + ".tmp")
+                tmp.writeText(de.letzgo.stashy.data.Json.encodeToString(LocalSceneIndex.serializer(), index))
+                if (!tmp.renameTo(file)) { file.delete(); tmp.renameTo(file) }
+            }
+        }
     }
 
     private fun persist(built: AITagStatsModel) {
@@ -904,7 +1013,7 @@ object AITagSuggestions {
         query StatsScenes(${'$'}filter: FindFilterType, ${'$'}scene_filter: SceneFilterType) {
             findScenes(filter: ${'$'}filter, scene_filter: ${'$'}scene_filter) {
                 count
-                scenes { id tags { id name } performers { id } studio { id } galleries { id } }
+                scenes { ...SceneListFields gallery_refs: galleries { id } }
             }
         }
     """
@@ -917,13 +1026,24 @@ object AITagSuggestions {
         }
     """
 
-    @Serializable private data class StatsRef(val id: String)
+    @Serializable private data class StatsRef(val id: String, val name: String? = null)
+    @Serializable private data class StatsFile(val duration: Double? = null)
     @Serializable private data class StatsItem(
         val id: String,
+        val title: String? = null,
         val tags: List<StatsRef>? = null,
         val performers: List<StatsRef>? = null,
         val studio: StatsRef? = null,
         val galleries: List<StatsRef>? = null,
+        /** Scenes send their galleries under this alias, so [Scene] does not try to read them. */
+        val gallery_refs: List<StatsRef>? = null,
+        // Scenes only: For You's local index.
+        val play_count: Int? = null,
+        val o_counter: Int? = null,
+        val rating100: Int? = null,
+        val last_played_at: String? = null,
+        val play_duration: Double? = null,
+        val files: List<StatsFile>? = null,
     )
 
     private suspend fun fetchAllTags(): List<Tag> {
@@ -933,19 +1053,33 @@ object AITagSuggestions {
     }
 
     /** One page of the census: (items, total count). */
-    private suspend fun fetchStatsPage(source: String, page: Int): Pair<List<AITagStatsItem>, Int> {
+    private suspend fun fetchStatsPage(source: String, page: Int, index: IndexCollector? = null): Pair<List<AITagStatsItem>, Int> {
         val filter = mapOf("page" to page, "per_page" to AITagStatsMath.PAGE_SIZE, "sort" to "id", "direction" to "ASC")
         val scopeFilter = mapOf("tag_count" to mapOf("value" to 0, "modifier" to "GREATER_THAN"))
-        val (query, field, list, filterVar) = if (source == "scenes") listOf(STATS_SCENES, "findScenes", "scenes", "scene_filter")
+        val (query, field, list, filterVar) = if (source == "scenes") listOf(STATS_SCENES + "\n" + de.letzgo.stashy.data.GraphQLQueries.load("fragment_SceneListFields"), "findScenes", "scenes", "scene_filter")
         else listOf(STATS_IMAGES, "findImages", "images", "image_filter")
         val obj = GraphQL.data(query, vars("filter" to filter, filterVar to scopeFilter))[field].obj
         val count = obj?.get("count").stringOrNull?.toIntOrNull() ?: 0
-        val items = obj?.get(list)?.let { GraphQL.decode(ListSerializer(StatsItem.serializer()), it) }.orEmpty()
+        val rows = (obj?.get(list) as? kotlinx.serialization.json.JsonArray).orEmpty()
+        val items = rows.map { GraphQL.decode(StatsItem.serializer(), it) }
+        if (index != null) for ((position, item) in items.withIndex()) {
+            item.performers.orEmpty().forEach { p -> p.name?.let { index.performerNames[p.id] = it } }
+            item.studio?.let { s -> s.name?.let { index.studioNames[s.id] = it } }
+            item.tags.orEmpty().forEach { t -> t.name?.let { index.tagNames[t.id] = it } }
+            index.entries += LocalSceneIndex.Entry(
+                id = item.id, title = item.title,
+                t = item.tags.orEmpty().map { it.id }, p = item.performers.orEmpty().map { it.id }, s = item.studio?.id,
+                pc = item.play_count ?: 0, oc = item.o_counter ?: 0, r = item.rating100,
+                lp = item.last_played_at?.let(OCountHeatmapBucketing::parseTimestamp)?.toEpochMilli(),
+                pd = item.play_duration, d = item.files?.firstOrNull()?.duration,
+                scene = runCatching { GraphQL.decode(Scene.serializer(), rows[position]) }.getOrNull(),
+            )
+        }
         return items.map { item ->
             AITagStatsItem(
                 tagIds = item.tags.orEmpty().map { it.id },
                 performerIds = item.performers.orEmpty().map { it.id },
-                galleryIds = item.galleries.orEmpty().map { it.id },
+                galleryIds = (item.galleries ?: item.gallery_refs).orEmpty().map { it.id },
                 studioId = item.studio?.id,
             )
         } to count

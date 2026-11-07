@@ -2,18 +2,25 @@
 import SwiftUI
 
 /// stashy+ "For You" row on Home: `SceneRecommendationEngine` picks, each card with the reason
-/// it was picked. Rendered only while stashy+ is unlocked (`HomeView`).
+/// it was picked. Rendered only while stashy+ is unlocked (`HomeView`). As the first scene row
+/// it is the hero: large cards and, as the very first row, the blurred backdrop.
 struct HomeRecommendationsRowView: View {
     let config: HomeRowConfig
+    var isLarge: Bool = false
     var isFirst: Bool = false
     @ObservedObject private var engine = SceneRecommendationEngine.shared
+    @ObservedObject private var tabManager = TabManager.shared
     @Environment(\.homeContentWidth) private var homeContentWidth
+    @EnvironmentObject private var coordinator: NavigationCoordinator
+    @State private var scrollID: String?
 
-    private let cardWidth: CGFloat = 125 * 16 / 9
-    private let cardHeight: CGFloat = 125
+    private var cardWidth: CGFloat {
+        isLarge ? homeHeroCardWidth(screenWidth: homeContentWidth) : 125 * 16 / 9
+    }
+    private var cardHeight: CGFloat { isLarge ? cardWidth * 9 / 16 : 125 }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: isLarge ? 8 : 12) {
             header
                 .padding(.top, isFirst ? 16 : 0)
 
@@ -32,32 +39,37 @@ struct HomeRecommendationsRowView: View {
                 }
             }
         }
+        .background {
+            if isLarge && isFirst && tabManager.showDashboardHeroBackground {
+                let items = engine.homeItems
+                let focused = items.first { $0.id == scrollID } ?? items.first
+                HomeDashboardHeroBackdrop(thumbnailURL: focused?.scene.thumbnailURL)
+                    .equatable()
+            }
+        }
         .onAppear { engine.refreshIfNeeded() }
     }
 
     // MARK: - Header
 
+    /// Like every scene row: "Title ›" opens Scenes, here sorted For You.
     private var header: some View {
-        HStack(spacing: 6) {
-            Text(config.title)
-                .font(.headline)
-                .foregroundColor(.primary)
-            Image(systemName: "sparkles")
-                .font(.system(size: 12, weight: .semibold))
-                .foregroundStyle(AppearanceManager.shared.tintColor)
-                .accessibilityHidden(true)
-            Spacer(minLength: 0)
-            NavigationLink(destination: LazyView { RecommendationSettingsView() }) {
-                Image(systemName: "slider.horizontal.3")
-                    .font(.system(size: 14, weight: .semibold))
-                    .foregroundColor(.secondary)
-                    .frame(width: 32, height: 24)
-                    .contentShape(Rectangle())
+        Button {
+            coordinator.navigateToScenes(sort: .forYou)
+        } label: {
+            HStack(spacing: 4) {
+                Text(config.title)
+                    .font(.headline)
+                    .foregroundColor(isLarge ? .white : .primary)
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundColor(isLarge ? .white.opacity(0.7) : .secondary)
+                Spacer(minLength: 0)
             }
-            .buttonStyle(.plain)
-            .accessibilityLabel("For You settings")
+            .padding(.horizontal, 12)
+            .contentShape(Rectangle())
         }
-        .padding(.horizontal, 12)
+        .buttonStyle(.plain)
     }
 
     // MARK: - Content
@@ -65,21 +77,23 @@ struct HomeRecommendationsRowView: View {
     private var cards: some View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: 12) {
-                ForEach(engine.recommendations) { item in
+                ForEach(engine.homeItems) { item in
                     NavigationLink(destination: LazyView { SceneDetailView(scene: item.scene) }) {
                         VStack(alignment: .leading, spacing: 6) {
-                            HomeSceneCardView(scene: item.scene, isLarge: false, screenWidth: homeContentWidth)
+                            HomeSceneCardView(scene: item.scene, isLarge: isLarge, screenWidth: homeContentWidth)
                             reasonLine(item)
                         }
                     }
                     .buttonStyle(.plain)
                     .frame(width: cardWidth)
                     .accessibilityHint(item.reason.label)
+                    .id(item.id)
                 }
             }
             .padding(.horizontal, 12)
             .scrollTargetLayout()
         }
+        .scrollPosition(id: $scrollID)
         .scrollTargetBehavior(.viewAligned)
         .scrollContentBackground(.hidden)
     }
@@ -93,7 +107,7 @@ struct HomeRecommendationsRowView: View {
                 .accessibilityHidden(true)
             Text(item.reason.label)
                 .font(.system(size: 11, weight: .medium))
-                .foregroundColor(.secondary)
+                .foregroundColor(isLarge && isFirst && tabManager.showDashboardHeroBackground ? .white.opacity(0.8) : .secondary)
                 .lineLimit(1)
                 .truncationMode(.tail)
             if item.isUnwatched {

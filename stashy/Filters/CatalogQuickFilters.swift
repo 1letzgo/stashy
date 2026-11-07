@@ -17,9 +17,18 @@ import SwiftUI
 protocol CatalogQuickSortable: CaseIterable, Hashable {
     var sortField: String { get }
     var direction: String { get }
+    /// The field the quick sort strip keys on; `sortField` unless a sort is stashy's own.
+    var quickSortField: String { get }
 }
 
-extension StashDBViewModel.SceneSortOption: CatalogQuickSortable {}
+extension CatalogQuickSortable {
+    var quickSortField: String { sortField }
+}
+
+extension StashDBViewModel.SceneSortOption: CatalogQuickSortable {
+    /// For You is sent to the server as nothing (the list answers it); in the strip it is its own field.
+    var quickSortField: String { self == .forYou ? CatalogQuickSortCatalog.forYouField : sortField }
+}
 extension StashDBViewModel.PerformerSortOption: CatalogQuickSortable {}
 extension StashDBViewModel.StudioSortOption: CatalogQuickSortable {}
 extension StashDBViewModel.TagSortOption: CatalogQuickSortable {}
@@ -42,6 +51,7 @@ enum CatalogQuickSortCatalog {
                     .init(field: "rating", label: "Rating"), .init(field: "o_counter", label: "O Count"),
                     .init(field: "duration", label: "Duration"), .init(field: "last_played_at", label: "Last played"),
                     .init(field: "play_count", label: "Plays"), .init(field: "random", label: "Random")]
+                + (StashDBViewModel.SceneSortOption.isForYouAvailable ? [.init(field: forYouField, label: "For You")] : [])
         case .performers:
             return [.init(field: "scenes_count", label: "Scenes"), .init(field: "name", label: "Name"),
                     .init(field: "o_counter", label: "O Count"), .init(field: "rating", label: "Rating"),
@@ -75,11 +85,16 @@ enum CatalogQuickSortCatalog {
     }
 
     static func isRandom(_ field: String) -> Bool { field.hasPrefix("random") }
+    static let forYouField = "for_you"
+    /// Random and For You: one order, no direction.
+    static func hasFixedOrder(_ field: String) -> Bool { isRandom(field) || field == forYouField }
+    /// The symbol shown in place of a direction arrow for a fixed-order sort.
+    static func fixedOrderIcon(_ field: String) -> String { field == forYouField ? "sparkles" : "shuffle" }
 
     /// Symbol for a sort field (sort menu and its collapsed label). `oCounterIcon` is the
     /// user's O-counter symbol from Appearance.
     static func icon(for field: String, oCounterIcon: String) -> String {
-        if isRandom(field) { return "shuffle" }
+        if hasFixedOrder(field) { return fixedOrderIcon(field) }
         switch field {
         case "date": return "calendar"
         case "created_at": return "plus.circle"
@@ -104,15 +119,15 @@ enum CatalogQuickSortCatalog {
     }
 
     static func option<Option: CatalogQuickSortable>(_ type: Option.Type, field: String, ascending: Bool) -> Option? {
-        if isRandom(field) { return Option.allCases.first { isRandom($0.sortField) } }
-        return Option.allCases.first { $0.sortField == field && ($0.direction == "ASC") == ascending }
+        if isRandom(field) { return Option.allCases.first { isRandom($0.quickSortField) } }
+        return Option.allCases.first { $0.quickSortField == field && ($0.direction == "ASC") == ascending }
     }
 
     /// Sort after tapping `field`: the active field flips direction (Random re-rolls), any other
     /// field starts in its natural direction.
     static func next<Option: CatalogQuickSortable>(after current: Option, tapping field: String) -> Option? {
-        if isRandom(field) { return option(Option.self, field: field, ascending: false) }
-        if current.sortField == field {
+        if hasFixedOrder(field) { return option(Option.self, field: field, ascending: false) }
+        if current.quickSortField == field {
             return option(Option.self, field: field, ascending: current.direction != "ASC")
         }
         let natural = defaultAscending(field)
@@ -346,7 +361,7 @@ struct CatalogListQuickBar<Option: CatalogQuickSortable>: View {
     private static var shadowRoom: CGFloat { 12 }
 
     private var sortFields: [CatalogQuickSortCatalog.Field] {
-        let available = Set(Option.allCases.map(\.sortField))
+        let available = Set(Option.allCases.map(\.quickSortField))
         return (leadingSortFields + CatalogQuickSortCatalog.fields(for: mode)).filter { field in
             CatalogQuickSortCatalog.isRandom(field.field)
                 ? available.contains { CatalogQuickSortCatalog.isRandom($0) }
@@ -487,11 +502,11 @@ struct CatalogListQuickBar<Option: CatalogQuickSortable>: View {
 
     private func sortChip(_ field: CatalogQuickSortCatalog.Field) -> some View {
         let isActive = CatalogQuickSortCatalog.isRandom(field.field)
-            ? CatalogQuickSortCatalog.isRandom(sort.sortField)
-            : sort.sortField == field.field
+            ? CatalogQuickSortCatalog.isRandom(sort.quickSortField)
+            : sort.quickSortField == field.field
         let icon: String? = {
             guard isActive else { return nil }
-            if CatalogQuickSortCatalog.isRandom(field.field) { return "shuffle" }
+            if CatalogQuickSortCatalog.hasFixedOrder(field.field) { return CatalogQuickSortCatalog.fixedOrderIcon(field.field) }
             return sort.direction == "ASC" ? "arrow.up" : "arrow.down"
         }()
         return Button {
@@ -858,7 +873,7 @@ struct CatalogQuickSortMenu<Option: CatalogQuickSortable>: View {
     @ObservedObject private var appearance = AppearanceManager.shared
 
     private var sortFields: [CatalogQuickSortCatalog.Field] {
-        let available = Set(Option.allCases.map(\.sortField))
+        let available = Set(Option.allCases.map(\.quickSortField))
         return (leadingSortFields + CatalogQuickSortCatalog.fields(for: mode)).filter { field in
             CatalogQuickSortCatalog.isRandom(field.field)
                 ? available.contains { CatalogQuickSortCatalog.isRandom($0) }
@@ -868,8 +883,8 @@ struct CatalogQuickSortMenu<Option: CatalogQuickSortable>: View {
 
     private func isActive(_ field: CatalogQuickSortCatalog.Field) -> Bool {
         CatalogQuickSortCatalog.isRandom(field.field)
-            ? CatalogQuickSortCatalog.isRandom(sort.sortField)
-            : sort.sortField == field.field
+            ? CatalogQuickSortCatalog.isRandom(sort.quickSortField)
+            : sort.quickSortField == field.field
     }
 
     private func sortIcon(_ field: String) -> String {
@@ -877,7 +892,7 @@ struct CatalogQuickSortMenu<Option: CatalogQuickSortable>: View {
     }
 
     private var sortDirectionIcon: String {
-        if CatalogQuickSortCatalog.isRandom(sort.sortField) { return "shuffle" }
+        if CatalogQuickSortCatalog.hasFixedOrder(sort.quickSortField) { return CatalogQuickSortCatalog.fixedOrderIcon(sort.quickSortField) }
         return sort.direction == "ASC" ? "arrow.up" : "arrow.down"
     }
 
@@ -903,14 +918,14 @@ struct CatalogQuickSortMenu<Option: CatalogQuickSortable>: View {
                     }
                 }
             }
-            if !CatalogQuickSortCatalog.isRandom(sort.sortField) {
+            if !CatalogQuickSortCatalog.hasFixedOrder(sort.quickSortField) {
                 Section("Order") {
                     ForEach(["ASC", "DESC"], id: \.self) { direction in
                         Toggle(isOn: Binding(
                             get: { sort.direction == direction },
                             set: { _ in
                                 guard sort.direction != direction,
-                                      let next = CatalogQuickSortCatalog.next(after: sort, tapping: sort.sortField)
+                                      let next = CatalogQuickSortCatalog.next(after: sort, tapping: sort.quickSortField)
                                 else { return }
                                 HapticManager.selection()
                                 onSort(next)
@@ -925,10 +940,10 @@ struct CatalogQuickSortMenu<Option: CatalogQuickSortable>: View {
         } label: {
             HStack(spacing: 5) {
                 // The active sort as its icon; the name is in the menu and for VoiceOver.
-                Image(systemName: sortIcon(active?.field ?? sort.sortField))
+                Image(systemName: sortIcon(active?.field ?? sort.quickSortField))
                     .font(.system(size: 16, weight: .semibold))
                 // Random has no direction; its shuffle icon already says it.
-                if !CatalogQuickSortCatalog.isRandom(sort.sortField) {
+                if !CatalogQuickSortCatalog.hasFixedOrder(sort.quickSortField) {
                     Image(systemName: sortDirectionIcon)
                         .font(.caption.weight(.bold))
                 }

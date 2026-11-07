@@ -83,6 +83,8 @@ object FeedsRepository {
     /** iOS: `addScenePlay` (`sceneAddPlay`, `SceneAddPlay.graphql`). */
     suspend fun addScenePlay(id: String): Int? = if (!TabManager.tracksActivity(id)) null else runCatching {
         val data = GraphQL.named("sceneAddPlay", buildJsonObject { put("id", JsonPrimitive(id)); put("times", JsonArray(emptyList())) })
+        // For You and Similar Scenes read the device's scene index: the play counts now.
+        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) { de.letzgo.stashy.data.tools.AITagSuggestions.noteLocalPlay(id) }
         (data["sceneAddPlay"].obj?.get("count") as? JsonPrimitive)?.intOrNull
     }.getOrNull()
 

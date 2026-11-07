@@ -144,7 +144,7 @@ struct TVScenesView: View {
         case .ratingDesc: return "Highest Rated"
         case .ratingAsc: return "Lowest Rated"
         case .random: return "Random"
-        case .sceneNumberAsc, .sceneNumberDesc, .productionDateDesc, .productionDateAsc: return option.displayName
+        case .sceneNumberAsc, .sceneNumberDesc, .productionDateDesc, .productionDateAsc, .forYou: return option.displayName
         }
     }
 }

@@ -472,7 +472,7 @@ struct CatalogDetailSortMenu: View {
         } else {
             // Groups also sort by scene number (picked on the group page), so offer those too.
             let cases = context == .group
-                ? StashDBViewModel.SceneSortOption.availableCases
+                ? StashDBViewModel.SceneSortOption.availableCases.filter { $0 != .forYou }
                 : StashDBViewModel.SceneSortOption.generalCases
             sortMenu(
                 cases.map { ($0.rawValue, $0.displayName) },

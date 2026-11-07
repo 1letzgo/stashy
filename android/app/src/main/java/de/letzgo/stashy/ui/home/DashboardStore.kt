@@ -47,7 +47,8 @@ data class HomeRowState(
  */
 object DashboardStore {
     /** iOS `homeRowFreshness`: a row loaded within 60 s is not refetched on appear. */
-    private const val FRESHNESS_MS = 60_000L
+    /** iOS `homeRowFreshness`: the whole session — pull to refresh, a server switch or a new default filter clear the rows. */
+    private const val FRESHNESS_MS = Long.MAX_VALUE
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
 
     var statistics by mutableStateOf<StashStatistics?>(null); private set

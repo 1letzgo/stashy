@@ -187,7 +187,7 @@ class AITagCooccurrenceTest {
     @Test
     fun decodesAnIosShapedFile() {
         val ios = """
-            {"version":2,"builtAt":0,"itemCount":1,
+            {"version":4,"builtAt":0,"itemCount":1,
              "tags":[{"id":"1","name":"Plants","scene_count":1}],
              "performerCounts":{"7":{"1":1}},"performerTotals":{"7":1},
              "galleryCounts":{},"galleryTotals":{},"studioCounts":{"3":{"1":1}},"studioTotals":{"3":1},

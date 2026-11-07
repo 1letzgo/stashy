@@ -102,6 +102,15 @@ object CatalogRepository {
 
     /** Loads one page of [query] (1-based). The caller casts to the entity type of `query.mode`. */
     suspend fun <T> find(query: CatalogQuery, page: Int, perPage: Int = pageSize(query.mode)): Page<T> {
+        // For You: the app's own list (up to 25) on one page; a search narrows it by title.
+        if (query.mode == FilterMode.Scenes && query.sort.isForYou) {
+            if (page > 1) return Page(0, emptyList())
+            val q = query.search.trim()
+            val list = de.letzgo.stashy.data.tools.SceneRecommendations.scenesForList()
+                .filter { q.isEmpty() || (it.title ?: "").contains(q, ignoreCase = true) }
+            @Suppress("UNCHECKED_CAST")
+            return Page(list.size, list as List<T>)
+        }
         val s = spec<T>(query.mode)
         val document = s.document
         return findPage(document, document, s.listField, s.serializer, findFilter(query, page, perPage), s.filterVar, query.entityFilter())

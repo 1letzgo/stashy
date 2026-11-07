@@ -83,7 +83,7 @@ func homeCardHeight(for config: HomeRowConfig, isLarge: Bool, screenWidth: CGFlo
 /// Blurred wash behind the first (large) dashboard row. Equatable so horizontal
 /// `scrollPosition` churn does not rebuild the safe-area-ignoring host unless the
 /// focused thumbnail actually changes — that remount was flickering the status bar.
-private struct HomeDashboardHeroBackdrop: View, Equatable {
+struct HomeDashboardHeroBackdrop: View, Equatable {
     let thumbnailURL: URL?
 
     static func == (lhs: Self, rhs: Self) -> Bool {

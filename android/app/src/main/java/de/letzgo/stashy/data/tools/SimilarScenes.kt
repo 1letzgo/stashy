@@ -108,9 +108,6 @@ object SimilarScenes {
     const val ENABLED_KEY = "similar_scenes_enabled"
     const val MAX_COUNT_KEY = "similar_scenes_max"
 
-    /** Upper bound on what the server sends back before local ranking. */
-    private const val CANDIDATE_LIMIT = 200
-
     private var enabledState by mutableStateOf(Prefs.bool(ENABLED_KEY))
     /** Own kill switch — independent of tag suggestions; shares their statistics. */
     var isEnabled: Boolean
@@ -129,8 +126,6 @@ object SimilarScenes {
 
     val isActive: Boolean get() = isEnabled && StashyPlus.isUnlocked
 
-    /** Library scene count for the rarity factor, fetched once per session (per server). */
-    private var totalSceneCount: Int? = null
     private var cacheServer: String? = null
     /** Keyed by [signature], not by scene id (the detail first renders the list version). */
     private val cache = HashMap<String, List<Scene>>()
@@ -139,7 +134,6 @@ object SimilarScenes {
 
     fun invalidate() {
         cache.clear()
-        totalSceneCount = null
     }
 
     /**
@@ -160,22 +154,12 @@ object SimilarScenes {
 
         // The ranking bonus reads the shared statistics; load them even when suggestions are off.
         AITagSuggestions.loadIfNeeded()
-
-        val candidates = fetchCandidates(performerIds, tagIds, studioId)
-        if (candidates.isEmpty()) {
-            cache[key] = emptyList()
-            return emptyList()
-        }
-        val ranked = SimilarScenesScoring.rank(
-            candidates = candidates,
-            performerIds = performerIds.toSet(),
-            sourceTags = scene.tags.orEmpty(),
-            studioId = studioId,
-            totalScenes = loadTotalSceneCount(),
-            excludingSceneId = scene.id,
-            related = AITagSuggestions.relatedTagWeights(tagIds.distinct()),
-            maxCount = maxOf(limit, maxCount),
-        )
+        // Everything from the device's scene index, cards included — no server request.
+        // Right after an update the index is still being built: wait for it instead of showing nothing.
+        val index = AITagSuggestions.waitForSceneIndex()?.takeIf { it.scenes.isNotEmpty() } ?: return emptyList()
+        val ids = rankLocal(index, performerIds.toSet(), tagIds.toSet(), studioId, scene.id, maxOf(limit, maxCount))
+        val scenes = index.scenes.mapNotNull { e -> e.scene?.let { e.id to it } }.toMap()
+        val ranked = ids.mapNotNull { scenes[it] }
         cache[key] = ranked
         return ranked.take(limit)
     }
@@ -183,39 +167,34 @@ object SimilarScenes {
     /** iOS name. */
     suspend fun similarScenes(scene: Scene): List<Scene> = find(scene)
 
-    private suspend fun loadTotalSceneCount(): Int {
-        totalSceneCount?.let { return it }
-        val count = try {
-            GraphQL.data("{ stats { scene_count } }")["stats"].obj?.get("scene_count").stringOrNull?.toIntOrNull() ?: 0
-        } catch (e: CancellationException) {
-            throw e
-        } catch (e: Exception) {
-            0
-        }
-        totalSceneCount = count
-        return count
-    }
+    /** Scenes per tag in the index, counted once per index build. */
+    private var indexTagCounts: Pair<Long, Map<String, Int>>? = null
 
-    /** One query per criterion, run concurrently and merged; one failing still leaves the others. */
-    private suspend fun fetchCandidates(performerIds: List<String>, tagIds: List<String>, studioId: String?): List<Scene> {
-        val clauses = buildList<Map<String, Any>> {
-            // Performers are not hierarchical: Stash rejects `depth` there.
-            if (performerIds.isNotEmpty()) add(mapOf("performers" to mapOf("value" to performerIds, "modifier" to "INCLUDES")))
-            if (tagIds.isNotEmpty()) add(mapOf("tags" to mapOf("value" to tagIds, "modifier" to "INCLUDES", "depth" to 0)))
-            if (studioId != null) add(mapOf("studios" to mapOf("value" to listOf(studioId), "modifier" to "INCLUDES", "depth" to 0)))
+    /** iOS `rankLocal`: the same weighting as [SimilarScenesScoring.rank] over every scene of the index; best ids first. */
+    private fun rankLocal(index: LocalSceneIndex, performerIds: Set<String>, tagIds: Set<String>, studioId: String?, excluding: String, limit: Int): List<String> {
+        val counts = indexTagCounts?.takeIf { it.first == index.builtAt }?.second ?: HashMap<String, Int>().also { built ->
+            index.scenes.forEach { e -> e.t.forEach { built.merge(it, 1, Int::plus) } }
+            indexTagCounts = index.builtAt to built
         }
-        if (clauses.isEmpty()) return emptyList()
-        val results = coroutineScope { clauses.map { async { runCandidateQuery(it) } }.awaitAll() }
-        val seen = HashSet<String>()
-        return results.flatten().filter { seen.add(it.id) }
-    }
-
-    private suspend fun runCandidateQuery(filter: Map<String, Any>): List<Scene> = try {
-        val data = GraphQL.named("findScenesSimilar", vars("filter" to mapOf("page" to 1, "per_page" to CANDIDATE_LIMIT), "scene_filter" to filter))
-        data["findScenes"].obj?.get("scenes")?.let { GraphQL.decode(ListSerializer(Scene.serializer()), it) }.orEmpty()
-    } catch (e: CancellationException) {
-        throw e
-    } catch (e: Exception) {
-        emptyList()
+        val total = index.scenes.size
+        val rarityById = tagIds.associateWith { SimilarScenesScoring.rarity(counts[it], total) }
+        val related = AITagSuggestions.relatedTagWeights(tagIds.toList())
+        return index.scenes.asSequence()
+            .filter { it.id != excluding && it.scene != null }
+            .mapNotNull { e ->
+                var score = e.p.count { it in performerIds } * SimilarScenesScoring.PERFORMER_WEIGHT
+                var bonus = 0.0
+                for (t in e.t) {
+                    val r = rarityById[t]
+                    if (r != null) score += SimilarScenesScoring.TAG_WEIGHT * r else related[t]?.let { bonus += it }
+                }
+                if (studioId != null && e.s == studioId) score += SimilarScenesScoring.STUDIO_WEIGHT
+                score += minOf(bonus, SimilarScenesScoring.RELATED_BONUS_CAP) * SimilarScenesScoring.RELATED_TAG_WEIGHT
+                if (score > 0) e.id to score else null
+            }
+            .sortedWith(compareByDescending<Pair<String, Double>> { it.second }.thenBy { it.first })
+            .take(limit)
+            .map { it.first }
+            .toList()
     }
 }

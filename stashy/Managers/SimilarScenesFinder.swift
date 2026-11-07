@@ -159,7 +159,20 @@ final class SimilarScenesFinder: ObservableObject {
         // The ranking bonus reads the shared statistics; make sure they are in memory even
         // when tag suggestions are switched off.
         await AITagSuggestionManager.shared.loadIfNeeded()
-        #endif
+        // Everything from the device's scene index: the whole library is ranked here and the
+        // cards come from it too — no server request. Right after an update the index is still
+        // being built: wait for it (the card shows its spinner) instead of showing nothing.
+        guard let index = await AITagSuggestionManager.shared.waitForSceneIndex(), !index.scenes.isEmpty else {
+            return []
+        }
+        let ids = rankLocal(index: index, performerIds: Set(performerIds), tagIds: Set(tagIds),
+                            studioId: studioId, excluding: scene.id)
+        let scenes = Dictionary(index.scenes.compactMap { e in e.scene.map { (e.id, $0) } }, uniquingKeysWith: { a, _ in a })
+        let ranked = ids.compactMap { scenes[$0] }
+        cache[key] = ranked
+        AppLog.debug("🎞️ SIMILAR SCENES: scene \(scene.id) — \(index.scenes.count) scenes → \(ranked.count) shown")
+        return ranked
+        #else
 
         let candidates = await fetchCandidates(
             performerIds: performerIds,
@@ -183,6 +196,7 @@ final class SimilarScenesFinder: ObservableObject {
         cache[key] = ranked
         AppLog.debug("🎞️ SIMILAR SCENES: scene \(scene.id) — \(candidates.count) candidates → \(ranked.count) shown")
         return ranked
+        #endif
     }
 
     // MARK: - Query
@@ -245,6 +259,64 @@ final class SimilarScenesFinder: ObservableObject {
             return []
         }
     }
+
+    // MARK: - Local ranking
+
+    #if !os(tvOS)
+    /// Scenes per tag in the index, counted once per index build.
+    private var indexTagCounts: (builtAt: Date, counts: [String: Int])?
+
+    /// The same weighting as `rank`, over every scene of the device's index. Returns the ids of
+    /// the best `maxCount`, best first.
+    private func rankLocal(
+        index: LocalSceneIndex,
+        performerIds: Set<String>,
+        tagIds: Set<String>,
+        studioId: String?,
+        excluding sceneId: String
+    ) -> [String] {
+        let counts: [String: Int]
+        if let cached = indexTagCounts, cached.builtAt == index.builtAt {
+            counts = cached.counts
+        } else {
+            var built: [String: Int] = [:]
+            for entry in index.scenes { for tagId in entry.t { built[tagId, default: 0] += 1 } }
+            indexTagCounts = (index.builtAt, built)
+            counts = built
+        }
+        let total = index.scenes.count
+        func rarity(_ tagId: String) -> Double {
+            let df = max(1, counts[tagId] ?? 1)
+            guard total > 1, df < total else { return Self.minRarity }
+            let idf = log(Double(total) / Double(df)) / log(Double(total))
+            return min(1.0, max(Self.minRarity, idf))
+        }
+        let rarityById = Dictionary(uniqueKeysWithValues: tagIds.map { ($0, rarity($0)) })
+        let related = AITagSuggestionManager.shared.relatedTagWeights(for: Array(tagIds))
+
+        var scored: [(id: String, score: Double)] = []
+        for entry in index.scenes where entry.id != sceneId && entry.scene != nil {
+            var score = 0.0
+            score += Double(entry.p.filter { performerIds.contains($0) }.count) * Self.performerWeight
+            var bonus = 0.0
+            for tagId in entry.t {
+                if let r = rarityById[tagId] {
+                    score += Self.tagWeight * r
+                } else if let w = related[tagId] {
+                    bonus += w
+                }
+            }
+            if let studioId, entry.s == studioId { score += Self.studioWeight }
+            score += min(bonus, 2.0) * Self.relatedTagWeight
+            if score > 0 { scored.append((entry.id, score)) }
+        }
+        return scored
+            .sorted { $0.score == $1.score ? $0.id < $1.id : $0.score > $1.score }
+            .prefix(maxCount)
+            .map(\.id)
+    }
+
+    #endif
 
     // MARK: - Ranking
 

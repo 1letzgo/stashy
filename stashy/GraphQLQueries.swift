@@ -159,9 +159,6 @@ class GraphQLQueries {
         case "findScenesSimilar":
             // Same slim list fragment; the query itself adds `tags` for the ranking.
             fragments = loadQuery(named: "fragment_SceneListFields")
-        case "findScenesRecommendHistory", "findScenesRecommendCandidates":
-            // For You (stashy+): list fragment; the queries add tag counts and history.
-            fragments = loadQuery(named: "fragment_SceneListFields")
         case "findScenesByIds":
             // Watchlist / Now Playing check against the server: list fields are enough.
             fragments = loadQuery(named: "fragment_SceneListFields")
@@ -374,14 +371,18 @@ class GraphQLQueries {
 
     /// Compact census queries for the AI Tags statistics model — ids only, so a
     /// 250-item page stays small even across a whole library.
-    static let statsScenesQuery = """
+    /// The statistics census of scenes. Each row is the list fragment (what a card shows) plus
+    /// galleries: the statistics count from it, and For You / Similar Scenes keep it on the device.
+    static var statsScenesQuery: String {
+        """
         query StatsScenes($filter: FindFilterType, $scene_filter: SceneFilterType) {
             findScenes(filter: $filter, scene_filter: $scene_filter) {
                 count
-                scenes { id tags { id name } performers { id } studio { id } galleries { id } }
+                scenes { ...SceneListFields gallery_refs: galleries { id } }
             }
         }
-        """
+        """ + "\n" + loadQuery(named: "fragment_SceneListFields")
+    }
 
     static let statsImagesQuery = """
         query StatsImages($filter: FindFilterType, $image_filter: ImageFilterType) {

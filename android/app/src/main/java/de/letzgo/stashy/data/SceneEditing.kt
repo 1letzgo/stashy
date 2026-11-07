@@ -74,6 +74,8 @@ object SceneEditing {
     suspend fun addPlay(sceneId: String): Int? {
         if (!TabManager.tracksActivity(sceneId)) return null
         val data = GraphQL.named("sceneAddPlay", vars("id" to sceneId, "times" to emptyList<String>()))
+        // For You and Similar Scenes read the device's scene index: the play counts now.
+        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) { de.letzgo.stashy.data.tools.AITagSuggestions.noteLocalPlay(sceneId) }
         return data["sceneAddPlay"].obj?.get("count")?.jsonPrimitive?.content?.toDoubleOrNull()?.toInt()
     }
 

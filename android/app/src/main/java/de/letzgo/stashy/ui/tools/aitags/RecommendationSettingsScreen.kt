@@ -81,7 +81,7 @@ fun RecommendationSettingsView() {
                 item {
                     GroupedCard {
                         SettingsRow(
-                            if (!isUnlocked) "For You requires stashy+" else "Turn on Tag suggestions or Similar scenes to show For You on Home.",
+                            if (!isUnlocked) "For You requires stashy+" else if (engine.hasStatistics) "For You is off. Turn it on in Recommendations to show it on Home." else "Turn on Tag suggestions or Similar scenes to show For You on Home.",
                             icon = if (!isUnlocked) SF.lock else Icons.Outlined.Info, iconTint = p.secondaryText, titleColor = p.secondaryText,
                         )
                     }

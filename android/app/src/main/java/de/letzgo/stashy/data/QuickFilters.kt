@@ -22,6 +22,7 @@ object CatalogQuickSortCatalog {
         FilterMode.Scenes -> listOf(
             f("date", "Date"), f("created_at", "Added"), f("rating", "Rating"), f("o_counter", "O Count"),
             f("duration", "Duration"), f("last_played_at", "Last played"), f("play_count", "Plays"), f("random", "Random"),
+            f(SortOption.FOR_YOU_FIELD, "For You"),
         )
         FilterMode.Performers -> listOf(
             f("scenes_count", "Scenes"), f("name", "Name"), f("o_counter", "O Count"), f("rating", "Rating"),
@@ -71,6 +72,7 @@ object CatalogQuickSortCatalog {
      */
     fun next(mode: FilterMode, current: SortOption, field: String): SortOption? {
         if (isRandom(field)) return SortCatalog.optionFor(mode, "random", false)
+        if (field == SortOption.FOR_YOU_FIELD) return SortCatalog.optionFor(mode, field, false)
         if (current.field == field) return SortCatalog.optionFor(mode, field, !current.isAscending)
         val natural = defaultAscending(field)
         return SortCatalog.optionFor(mode, field, natural) ?: SortCatalog.optionFor(mode, field, !natural)

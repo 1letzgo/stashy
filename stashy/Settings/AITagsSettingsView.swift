@@ -73,16 +73,28 @@ struct AITagsSettingsView: View {
     private var forYouSection: some View {
         Section {
             stashyScrollingSectionHeader("For You on Home", isBeta: true)
-            NavigationLink(destination: RecommendationSettingsView()) {
-                HStack {
-                    Label("For You", systemImage: "wand.and.stars")
-                    Spacer()
-                    Text(forYou.isFeatureOn ? "On" : "Off").foregroundColor(.secondary)
+            Toggle(isOn: Binding(
+                get: { isUnlocked && forYou.hasStatistics && forYou.isEnabled },
+                set: { newValue in
+                    guard isUnlocked else { return }
+                    forYou.isEnabled = newValue
                 }
+            )) {
+                Label("For You", systemImage: "wand.and.stars")
+            }
+            .tint(appearanceManager.tintColor)
+            .disabled(!isUnlocked || !forYou.hasStatistics)
+            .stashyGroupedBlockRow(index: 0, count: 2)
+
+            NavigationLink(destination: LazyView { RecommendationSettingsView() }) {
+                Label("For You settings", systemImage: "slider.horizontal.3")
             }
             .disabled(!isUnlocked)
-            .stashyGroupedSettingsRow()
-            stashyScrollingSectionFooter("A Home row with scenes picked from what you played, your O-Counts and ratings, each with the reason it was picked. On while Tag suggestions or Similar scenes is on; move or hide it in Settings › Home.")
+            .stashyGroupedBlockRow(index: 1, count: 2)
+
+            stashyScrollingSectionFooter(forYou.hasStatistics
+                ? "A Home row with scenes picked from what you played, your O-Counts and ratings, each with the reason it was picked. Move it in Settings › Home."
+                : "A Home row with scenes picked from what you played, your O-Counts and ratings. Needs Tag suggestions or Similar scenes.")
         }
     }
 

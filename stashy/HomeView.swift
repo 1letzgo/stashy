@@ -50,9 +50,8 @@ private struct HomeViewContent: View {
                 if viewModel.statistics == nil {
                     viewModel.initializeServerConnection()
                 } else {
-                    viewModel.fetchStatistics()
-                    // Only rows whose cache is older than the freshness window refetch.
-                    // Coming back from a detail page used to reload every row.
+                    // Within a session Home keeps what it loaded (pull to refresh reloads);
+                    // only rows that are still empty load here.
                     loadRowsIfNeeded()
                 }
             }
@@ -95,7 +94,10 @@ private struct HomeViewContent: View {
                         && ($0.type != .recommendations || isForYouOn)
                 }
                 let firstRowId = activeRows.first?.id
-                let firstSceneRowId = activeRows.first(where: { $0.type != .statistics && !$0.type.requiresStashyPlus })?.id
+                // For You is a scene row too and takes the hero when it comes first.
+                let firstSceneRowId = activeRows.first(where: {
+                    $0.type != .statistics && (!$0.type.requiresStashyPlus || $0.type == .recommendations)
+                })?.id
 
                 ForEach(activeRows) { row in
                     if row.isEnabled {
@@ -106,7 +108,9 @@ private struct HomeViewContent: View {
                                                 viewModel: viewModel,
                                                 isFirst: row.id == firstRowId)
                         } else if row.type == .recommendations {
-                            HomeRecommendationsRowView(config: row, isFirst: row.id == firstRowId)
+                            HomeRecommendationsRowView(config: row,
+                                                       isLarge: row.id == firstSceneRowId,
+                                                       isFirst: row.id == firstRowId)
                         } else {
                             HomeRowView(config: row,
                                         viewModel: viewModel,
@@ -125,12 +129,13 @@ private struct HomeViewContent: View {
             contentWidth = width
         }
         .refreshable {
-            SceneRecommendationEngine.shared.rebuild()
             viewModel.homeRowScenes.removeAll()
             viewModel.homeRowPerformers.removeAll()
             viewModel.homeRowStudios.removeAll()
             viewModel.homeRowGalleries.removeAll()
             viewModel.initializeServerConnection()
+            // The spinner stays until the new For You list is on screen.
+            await SceneRecommendationEngine.shared.rebuildAndWait()
         }
     }
 }

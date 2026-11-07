@@ -26,6 +26,7 @@ private enum SceneLiveSortFieldKind: String, CaseIterable, Identifiable {
     case o_counter
     case rating
     case random
+    case for_you
 
     var id: String { rawValue }
 
@@ -42,11 +43,22 @@ private enum SceneLiveSortFieldKind: String, CaseIterable, Identifiable {
         case .o_counter: return "O Count"
         case .rating: return "Rating"
         case .random: return "Random"
+        case .for_you: return "For You"
         }
     }
 
+    /// Fields with a fixed order (no Asc/Desc).
+    var hasFixedOrder: Bool { self == .random || self == .for_you }
+
+    /// Listed in the dropdown: works on this server, For You only while it is on.
+    var isOffered: Bool {
+        if self == .for_you { return StashDBViewModel.SceneSortOption.isForYouAvailable }
+        return sceneSortOption(ascending: false).isAvailableOnServer
+    }
+
     static func from(_ option: StashDBViewModel.SceneSortOption) -> SceneLiveSortFieldKind {
-        SceneLiveSortFieldKind(rawValue: option.sortField) ?? .date
+        if option == .forYou { return .for_you }
+        return SceneLiveSortFieldKind(rawValue: option.sortField) ?? .date
     }
 
     func sceneSortOption(ascending: Bool) -> StashDBViewModel.SceneSortOption {
@@ -62,6 +74,7 @@ private enum SceneLiveSortFieldKind: String, CaseIterable, Identifiable {
         case .o_counter: return ascending ? .oCounterAsc : .oCounterDesc
         case .rating: return ascending ? .ratingAsc : .ratingDesc
         case .random: return .random
+        case .for_you: return .forYou
         }
     }
 }
@@ -73,6 +86,7 @@ private enum SceneLiveSortPickerValue: Hashable {
     case unmapped(sortField: String)
 
     static func from(_ option: StashDBViewModel.SceneSortOption) -> SceneLiveSortPickerValue {
+        if option == .forYou { return .known(.for_you) }
         if option.sortField == "random" { return .known(.random) }
         if let k = SceneLiveSortFieldKind(rawValue: option.sortField) { return .known(k) }
         return .unmapped(sortField: option.sortField)
@@ -85,8 +99,9 @@ private enum SceneLiveSortPickerValue: Hashable {
         }
     }
 
+    /// Random or For You: a fixed order, no Asc/Desc.
     var isRandom: Bool {
-        if case .known(.random) = self { return true }
+        if case .known(let k) = self { return k.hasFixedOrder }
         return false
     }
 
@@ -2014,8 +2029,8 @@ struct SceneLiveFilterSheet: View {
                 set: { newVal in
                     switch newVal {
                     case .known(let newKind):
-                        if newKind == .random {
-                            onSortChange(.random)
+                        if newKind.hasFixedOrder {
+                            onSortChange(newKind.sceneSortOption(ascending: false))
                         } else if SceneLiveSortPickerValue.from(sortOption).isRandom {
                             onSortChange(newKind.sceneSortOption(ascending: false))
                         } else {
@@ -2029,7 +2044,7 @@ struct SceneLiveFilterSheet: View {
                 if case .unmapped(let f) = pickerValue {
                     Text("Other (\(f))").tag(SceneLiveSortPickerValue.unmapped(sortField: f))
                 }
-                ForEach(SceneLiveSortFieldKind.allCases.filter { $0.sceneSortOption(ascending: false).isAvailableOnServer }) { k in
+                ForEach(SceneLiveSortFieldKind.allCases.filter { $0.isOffered || pickerValue == .known($0) }) { k in
                     Text(k.menuLabel).tag(SceneLiveSortPickerValue.known(k))
                 }
             }

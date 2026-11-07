@@ -92,22 +92,24 @@ object SceneRecommendations {
     private const val KEY_RATING = "recommendations_weight_rating"
     private const val KEY_SIMILAR = "recommendations_weight_similar"
     private const val KEY_DISCOVERY = "recommendations_discovery"
+    private const val KEY_ENABLED = "recommendations_enabled"
     /** Device-local, one entry per server: the last lists shown, newest first. */
     private const val LAST_PICKS_PREFIX = "recommendations_last_picks_"
 
     val lookbackChoices = listOf(7, 14, 30, 60, 90)
     val countRange = 5..10
+    /** The For You sort of the Scenes list shows this many; Home shows the first [count]. */
+    const val LIST_LIMIT = 25
     val weightRange = 0f..2f
 
-    private const val FRESH_FOR_MS = 3 * 60 * 60 * 1000L
     private const val HISTORY_PAGE_SIZE = 100
     private const val HISTORY_MAX_PAGES = 4
     private const val CANDIDATES_PER_QUERY = 150
     private const val MIN_RARITY = 0.15
     private const val REMEMBERED_LISTS = 3
 
-    /** New on every app start: candidate order and jitter change with it. */
-    private val sessionSeed = (0 until 100_000_000).random()
+    /** New for every build: candidate order and jitter change with it, so each list differs. */
+    private var sessionSeed = (0 until 100_000_000).random()
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
 
@@ -155,8 +157,13 @@ object SceneRecommendations {
     /** A visible rebuild is running (Settings shows it; the row keeps its cards meanwhile). */
     var isRefreshing by mutableStateOf(false); private set
 
-    /** iOS `isFeatureOn`: part of Recommendations — on while Tag Suggestions or Similar Scenes is. */
-    val isFeatureOn: Boolean get() = AITagSuggestions.isEnabled || SimilarScenes.isEnabled
+    /** The user's own switch for the row (Settings › Recommendations). On by default. */
+    var isEnabled by mutableStateOf(Prefs.bool(KEY_ENABLED, true)); private set
+    fun updateEnabled(v: Boolean) { isEnabled = v; Prefs.setBool(KEY_ENABLED, v); if (!v) reset() }
+    /** Tag Suggestions or Similar Scenes is on: the statistics the row draws on are there. */
+    val hasStatistics: Boolean get() = AITagSuggestions.isEnabled || SimilarScenes.isEnabled
+    /** iOS `isFeatureOn`: the user's switch is on and so is Tag Suggestions or Similar Scenes. */
+    val isFeatureOn: Boolean get() = isEnabled && hasStatistics
     val isAvailable: Boolean get() = StashyPlus.isUnlocked && isFeatureOn
 
     private var job: Job? = null
@@ -186,9 +193,8 @@ object SceneRecommendations {
         val server = ServerConfigManager.activeConfig?.id
         if (server != builtForServer) { reset(); builtForServer = server }
         if (job != null) return
-        val at = builtAt
-        if (!stale && at != null && System.currentTimeMillis() - at < FRESH_FOR_MS &&
-            (state == RecommendationState.Ready || state == RecommendationState.NoHistory)) return
+        // Within a session the list stays: a new one comes at app start, on pull to refresh or Refresh.
+        if (state == RecommendationState.Ready || state == RecommendationState.NoHistory) return
         rebuild()
     }
 
@@ -196,6 +202,18 @@ object SceneRecommendations {
      * A new list now: the prepared one when it fits the current settings (instant), else a
      * visible build. Either way the next list is prepared right after.
      */
+    /** What Home shows: the first [count] of the list. */
+    val homeItems: List<SceneRecommendation> get() = recommendations.take(count)
+
+    /** The For You sort of the Scenes list: the current list (up to [LIST_LIMIT]), built first when there is none. */
+    suspend fun scenesForList(): List<Scene> {
+        if (recommendations.isEmpty()) {
+            kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) { rebuild() }
+            job?.join()
+        }
+        return recommendations.map { it.scene }
+    }
+
     fun rebuild() {
         if (!isAvailable || ServerConfigManager.activeConfig == null) return
         loadPreparedIfNeeded()
@@ -219,7 +237,7 @@ object SceneRecommendations {
         state = RecommendationState.Ready
         builtAt = System.currentTimeMillis()
         // Shown now: it steps back in the next picks.
-        saveRecentPicks(list.items.map { it.id }, loadRecentPicks())
+        saveRecentPicks(list.items.take(count).map { it.id }, loadRecentPicks())
         prepareNext()
     }
 
@@ -237,9 +255,9 @@ object SceneRecommendations {
                 recommendations = picks
                 seedCount = seeds
                 state = if (picks.isEmpty() && seeds == 0) RecommendationState.NoHistory else RecommendationState.Ready
-                if (picks.isNotEmpty()) saveRecentPicks(picks.map { it.id }, loadRecentPicks())
+                if (picks.isNotEmpty()) saveRecentPicks(picks.take(count).map { it.id }, loadRecentPicks())
             }.onFailure {
-                if (recommendations.isEmpty()) { failure = "Could not read your watch history"; state = RecommendationState.Failed }
+                if (recommendations.isEmpty()) { failure = it.message ?: "Could not build your list"; state = RecommendationState.Failed }
             }
             builtAt = System.currentTimeMillis()
             isRefreshing = false
@@ -307,9 +325,51 @@ object SceneRecommendations {
 
     // MARK: Build
 
-    private class Seed(val scene: Scene, val weight: Double)
+    /** iOS `RecItem`: what scoring needs of one scene — from the local index or a server scene. */
+    private class RecItem(
+        val id: String,
+        val title: String?,
+        val performers: List<Pair<String, String>>,
+        val studio: Pair<String, String>?,
+        val tagIds: List<String>,
+        val playCount: Int,
+        val oCounter: Int,
+        val rating: Int?,
+        val lastPlayedAt: Instant?,
+        val playDuration: Double?,
+        val duration: Double?,
+    ) {
+        val isUnwatched get() = playCount == 0 && lastPlayedAt == null
 
-    private class HistoryRow(val scene: Scene, val plays: List<Instant>, val oStamps: List<Instant>, val hasOHistory: Boolean)
+        companion object {
+            fun of(e: de.letzgo.stashy.data.tools.LocalSceneIndex.Entry, index: de.letzgo.stashy.data.tools.LocalSceneIndex) = RecItem(
+                e.id, e.title,
+                e.p.map { it to (index.performerNames[it] ?: "this performer") },
+                e.s?.let { it to (index.studioNames[it] ?: "this studio") },
+                e.t, e.pc, e.oc, e.r, e.lp?.let(Instant::ofEpochMilli), e.pd, e.d,
+            )
+        }
+    }
+
+    /** Tag names and how many scenes carry each tag, for labels and the rarity weighting. */
+    private class Vocabulary {
+        val tagNames = HashMap<String, String>()
+        val tagScenes = HashMap<String, Int>()
+        var totalScenes = 0
+
+        fun rarity(tagId: String): Double {
+            val df = max(1, tagScenes[tagId] ?: 1)
+            if (totalScenes <= 1 || df >= totalScenes) return MIN_RARITY
+            val idf = ln(totalScenes.toDouble() / df) / ln(totalScenes.toDouble())
+            return min(1.0, max(MIN_RARITY, idf))
+        }
+    }
+
+    private class Seed(val item: RecItem, val weight: Double)
+
+    private class Scored(val item: RecItem, val reason: RecommendationReason, val score: Double)
+
+    private class Anchor(val item: RecItem, val weight: Double, val performerIds: Set<String>, val tagMass: Map<String, Double>, val totalMass: Double)
 
     private class Profile {
         var performers = HashMap<String, Double>()
@@ -333,77 +393,97 @@ object SceneRecommendations {
     }
 
     private suspend fun build(): Result<Pair<List<SceneRecommendation>, Int>> {
+        sessionSeed = (0 until 100_000_000).random()
+        // Everything comes from the Suggestions statistics on this device: the scene index for
+        // the candidates and their cards, the tag pairs for the related-tag bonus.
+        AITagSuggestions.loadIfNeeded()
+        val index = AITagSuggestions.sceneIndex()?.takeIf { it.scenes.isNotEmpty() }
+            ?: return Result.failure(IllegalStateException(PREPARING_MESSAGE))
+        return buildLocal(index)
+    }
+
+    /** Shown until the first statistics build on this device is done. */
+    const val PREPARING_MESSAGE = "Getting your library ready on this device…"
+
+    /** A finished statistics build: the next list reads the new index; a row still waiting gets its list now. */
+    fun onSceneIndexChanged() {
+        stale = true
+        prepared = null
+        if (recommendations.isEmpty()) rebuild()
+    }
+
+    /** iOS `buildLocal`: the whole library from the device's scene index — no server request. */
+    private fun buildLocal(index: de.letzgo.stashy.data.tools.LocalSceneIndex): Result<Pair<List<SceneRecommendation>, Int>> {
         val now = Instant.now()
         val windowStart = now.minusSeconds(lookbackDays * 86_400L)
+        val entries = index.scenes.filter { it.scene != null }
+        val items = entries.map { RecItem.of(it, index) }
+        val vocabulary = Vocabulary()
+        vocabulary.tagNames.putAll(index.tagNames)
+        vocabulary.totalScenes = items.size
+        items.forEach { item -> item.tagIds.forEach { vocabulary.tagScenes.merge(it, 1, Int::plus) } }
 
-        AITagSuggestions.loadIfNeeded()
-
-        val history = fetchHistory(windowStart)
-        var seeds = history.mapNotNull { seed(it, windowStart, now) }
-        if (seeds.isEmpty()) seeds = fetchFavoriteSeeds()
+        var seeds = items.mapNotNull { item ->
+            val last = item.lastPlayedAt?.takeIf { it >= windowStart } ?: return@mapNotNull null
+            seed(item, listOf(last), null, windowStart, now)
+        }
+        if (seeds.isEmpty()) seeds = favoriteSeeds(items)
         if (seeds.isEmpty()) return Result.success(emptyList<SceneRecommendation>() to 0)
+        val recentlyPlayed = items.filter { (it.lastPlayedAt ?: Instant.EPOCH) >= windowStart }.map { it.id }.toSet()
 
-        val totalScenes = loadTotalSceneCount()
+        val picks = rank(items, seeds, recentlyPlayed, vocabulary, now)
+        val scenes = entries.associate { it.id to it.scene!! }
+        val recommendations = picks.mapNotNull { pick ->
+            scenes[pick.item.id]?.let { SceneRecommendation(it, pick.reason, pick.item.isUnwatched, pick.score) }
+        }
+        return Result.success(recommendations to seeds.size)
+    }
+
+    private fun makeProfile(seeds: List<Seed>, vocabulary: Vocabulary): Profile {
         val profile = Profile()
         for (seed in seeds) {
-            seed.scene.performers.forEach { profile.performers.merge(it.id, seed.weight, Double::plus) }
-            seed.scene.studio?.let { profile.studios.merge(it.id, seed.weight, Double::plus) }
-            seed.scene.tags.orEmpty().forEach { tag ->
-                val r = rarity(tag, totalScenes)
-                profile.tags.merge(tag.id, seed.weight * r * r, Double::plus)
+            seed.item.performers.forEach { profile.performers.merge(it.first, seed.weight, Double::plus) }
+            seed.item.studio?.let { profile.studios.merge(it.first, seed.weight, Double::plus) }
+            seed.item.tagIds.forEach { tagId ->
+                val r = vocabulary.rarity(tagId)
+                profile.tags.merge(tagId, seed.weight * r * r, Double::plus)
             }
         }
         profile.normalize(seeds.sumOf { it.weight })
-        if (profile.isEmpty) return Result.success(emptyList<SceneRecommendation>() to seeds.size)
+        return profile
+    }
 
-        // Scenes played in the window are what the user just saw — never suggest them again.
-        val recentlyPlayed = history.map { it.scene.id }.toSet()
-        val topPerformers = profile.top(profile.performers, 8)
-        val topStudios = profile.top(profile.studios, 4)
+    /** Scores every candidate, steps back what the last lists showed and picks a diverse list. */
+    private fun rank(candidates: List<RecItem>, seeds: List<Seed>, recentlyPlayed: Set<String>, vocabulary: Vocabulary, now: Instant): List<Scored> {
+        val profile = makeProfile(seeds, vocabulary)
+        if (profile.isEmpty) return emptyList()
         val topTags = profile.top(profile.tags, 10)
-
         val seenAnchor = HashSet<String>()
-        val anchors = seeds.sortedByDescending { it.weight }.filter { seenAnchor.add(it.scene.id) }.take(if (similarWeight > 0) 6 else 0)
-        val maxSeedWeight = anchors.firstOrNull()?.weight ?: 1.0
-
-        val (profilePool, anchorPool) = coroutineScope {
-            val a = async {
-                fetchCandidates(
-                    if (performerWeight > 0) topPerformers else emptyList(),
-                    if (studioWeight > 0) topStudios else emptyList(),
-                    if (tagWeight > 0) topTags else emptyList(),
-                    includeFavorites = discovery == RecommendationDiscovery.Favorites,
-                )
+        val anchors = seeds.sortedByDescending { it.weight }.filter { seenAnchor.add(it.item.id) }
+            .take(if (similarWeight > 0) 6 else 0)
+            .map { s ->
+                val mass = s.item.tagIds.associateWith { vocabulary.rarity(it) }
+                Anchor(s.item, s.weight, s.item.performers.map { it.first }.toSet(), mass, mass.values.sum())
             }
-            val b = async { fetchUnwatchedSimilar(anchors.map { it.scene }, totalScenes) }
-            a.await() to b.await()
-        }
-        val ids = HashSet<String>()
-        val candidates = (profilePool + anchorPool).filter { ids.add(it.id) }
-
+        val maxSeedWeight = anchors.firstOrNull()?.weight ?: 1.0
         val related = if (tagWeight > 0) AITagSuggestions.relatedTagWeights(topTags) else emptyMap()
         val scored = candidates.mapNotNull { c ->
-            if (c.id in recentlyPlayed) null else score(c, profile, related, anchors, maxSeedWeight, totalScenes, now)
+            if (c.id in recentlyPlayed) null else score(c, profile, related, anchors, maxSeedWeight, vocabulary, now)
         }
-
         // What the recent lists showed steps back, so the next one is a new list.
         val recentLists = loadRecentPicks()
         val rotated = scored.map { item ->
-            val index = recentLists.indexOfFirst { item.id in it }
-            if (index < 0) item else item.copy(score = item.score * if (index == 0) 0.3 else 0.55)
+            val i = recentLists.indexOfFirst { item.item.id in it }
+            if (i < 0) item else Scored(item.item, item.reason, item.score * if (i == 0) 0.3 else 0.55)
         }
-        val picks = diversify(rotated)
-        return Result.success(picks to seeds.size)
+        return diversify(rotated)
     }
 
-    /** Weight of one watched scene for the profile. */
-    private fun seed(row: HistoryRow, windowStart: Instant, now: Instant): Seed? {
-        val scene = row.scene
-        var plays = row.plays.filter { it >= windowStart }
-        if (plays.isEmpty()) {
-            scene.lastPlayedAt?.let(OCountHeatmapBucketing::parseTimestamp)?.takeIf { it >= windowStart }?.let { plays = listOf(it) }
-        }
-        val os = row.oStamps.filter { it >= windowStart }
+    /** Weight of one watched scene for the profile. Without play stamps (local index) the play count stands in. */
+    private fun seed(item: RecItem, allPlays: List<Instant>, oStamps: List<Instant>?, windowStart: Instant, now: Instant): Seed? {
+        var plays = allPlays.filter { it >= windowStart }
+        if (plays.isEmpty()) item.lastPlayedAt?.takeIf { it >= windowStart }?.let { plays = listOf(it) }
+        val os = oStamps.orEmpty().filter { it >= windowStart }
         val lastEvent = (plays + os).maxOrNull() ?: return null
 
         // Recency: half-life of a third of the window.
@@ -412,63 +492,81 @@ object SceneRecommendations {
         val recency = 0.5.pow(age / halfLife)
 
         var engagement = 1.0
-        engagement += 0.4 * min(max(plays.size - 1, 0), 5)
-        val oCount = if (row.hasOHistory) os.size else if ((scene.oCounter ?: 0) > 0) 1 else 0
+        val replays = if (oStamps == null && plays.size <= 1) min(item.playCount - 1, 3) else plays.size - 1
+        engagement += 0.4 * min(max(replays, 0), 5)
+        val oCount = if (oStamps != null) os.size else if (item.oCounter > 0) 1 else 0
         engagement += 1.5 * oCountWeight * min(oCount, 4)
-        val duration = scene.sceneDuration
-        val watched = scene.playDuration
+        val duration = item.duration
+        val watched = item.playDuration
         if (duration != null && duration > 0 && watched != null && watched > 0) {
-            val perPlay = watched / max(scene.playCount ?: plays.size, 1)
+            val perPlay = watched / maxOf(item.playCount, plays.size, 1)
             engagement += 0.5 * min(1.0, perPlay / duration)
         }
-        scene.rating100?.let { rating ->
+        item.rating?.let { rating ->
             if (rating >= 80) engagement += 0.6 * ratingWeight
             else if (rating <= 40) engagement *= max(0.1, 1 - 0.7 * ratingWeight)
         }
-        return Seed(scene, recency * engagement)
+        return Seed(item, recency * engagement)
     }
 
+    /** Cold start: scenes with O-Counts or high ratings, weighted lower than real plays. */
+    private fun favoriteSeeds(items: List<RecItem>): List<Seed> = items
+        .filter { it.oCounter > 0 || (it.rating ?: 0) >= 80 }
+        .map { item ->
+            var w = 0.5 + 0.3 * oCountWeight * min(item.oCounter, 4)
+            if ((item.rating ?: 0) >= 80) w += 0.4 * ratingWeight
+            Seed(item, w)
+        }
+        .sortedByDescending { it.weight }
+        .take(120)
+
     private fun score(
-        candidate: Scene,
+        candidate: RecItem,
         profile: Profile,
         related: Map<String, Double>,
-        anchors: List<Seed>,
+        anchors: List<Anchor>,
         maxSeedWeight: Double,
-        totalScenes: Int,
+        vocabulary: Vocabulary,
         now: Instant,
-    ): SceneRecommendation? {
-        val isUnwatched = (candidate.playCount ?: 0) == 0 && candidate.lastPlayedAt == null
+    ): Scored? {
+        val isUnwatched = candidate.isUnwatched
         if (discovery == RecommendationDiscovery.Fresh && !isUnwatched) return null
 
-        val performerHits = candidate.performers.mapNotNull { p -> profile.performers[p.id]?.let { p to it } }.sortedByDescending { it.second }
+        val performerHits = candidate.performers.mapNotNull { p -> profile.performers[p.first]?.let { p to it } }.sortedByDescending { it.second }
         var performerScore = performerHits.mapIndexed { i, h -> if (i == 0) h.second else h.second * 0.3 }.sum()
         performerScore *= 3.0 * performerWeight
 
-        val studioScore = candidate.studio?.let { s -> profile.studios[s.id]?.let { it * 1.5 * studioWeight } } ?: 0.0
+        val studioScore = candidate.studio?.let { s -> profile.studios[s.first]?.let { it * 1.5 * studioWeight } } ?: 0.0
 
-        val tags = candidate.tags.orEmpty()
-        val tagHits = tags.mapNotNull { t -> profile.tags[t.id]?.let { t to it } }.sortedByDescending { it.second }
+        val tagHits = candidate.tagIds.mapNotNull { t -> profile.tags[t]?.let { t to it } }.sortedByDescending { it.second }
         val tagScore = min(tagHits.sumOf { it.second }, 1.2) * 2.0 * tagWeight
 
         var relatedScore = 0.0
-        var bestRelated: Pair<Tag, Double>? = null
+        var bestRelated: Pair<String, Double>? = null
         if (related.isNotEmpty()) {
-            for (tag in tags) {
-                if (profile.tags.containsKey(tag.id)) continue
-                val w = (related[tag.id] ?: continue) * rarity(tag, totalScenes)
+            for (tagId in candidate.tagIds) {
+                if (profile.tags.containsKey(tagId)) continue
+                val w = (related[tagId] ?: continue) * vocabulary.rarity(tagId)
                 relatedScore += w
-                if (w > (bestRelated?.second ?: 0.0)) bestRelated = tag to w
+                if (w > (bestRelated?.second ?: 0.0)) bestRelated = tagId to w
             }
             relatedScore = min(relatedScore, 1.0) * 0.6 * tagWeight
         }
 
-        // Closeness to a single watched scene; every candidate here is unplayed in the window.
+        // Closeness to a single watched scene, scaled by how much that scene counted.
         var similarScore = 0.0
-        var similarAnchor: Scene? = null
-        if (similarWeight > 0) {
+        var similarAnchor: RecItem? = null
+        if (similarWeight > 0 && anchors.isNotEmpty()) {
+            val candidatePerformers = candidate.performers.map { it.first }
             for (anchor in anchors) {
-                val value = similarity(candidate, anchor.scene, totalScenes) * (anchor.weight / max(maxSeedWeight, 0.0001))
-                if (value > similarScore) { similarScore = value; similarAnchor = anchor.scene }
+                if (anchor.item.id == candidate.id) continue
+                val shared = candidatePerformers.count { it in anchor.performerIds }
+                val performerPart = if (anchor.performerIds.isEmpty()) 0.0 else min(shared, 2) / 2.0
+                val sharedMass = candidate.tagIds.sumOf { anchor.tagMass[it] ?: 0.0 }
+                val tagPart = if (anchor.totalMass > 0) sharedMass / anchor.totalMass else 0.0
+                val studioPart = if (anchor.item.studio?.first != null && anchor.item.studio.first == candidate.studio?.first) 1.0 else 0.0
+                val value = (0.5 * performerPart + 0.35 * tagPart + 0.15 * studioPart) * (anchor.weight / max(maxSeedWeight, 0.0001))
+                if (value > similarScore) { similarScore = value; similarAnchor = anchor.item }
             }
             similarScore *= 3.0 * similarWeight
         }
@@ -476,11 +574,10 @@ object SceneRecommendations {
         var score = performerScore + studioScore + tagScore + relatedScore + similarScore
         if (score <= 0) return null
 
-        candidate.rating100?.let { score *= 1 + ratingWeight * (it - 60) / 200.0 }
+        candidate.rating?.let { score *= 1 + ratingWeight * (it - 60) / 200.0 }
 
-        val oCounter = candidate.oCounter ?: 0
-        val lastPlayed = candidate.lastPlayedAt?.let(OCountHeatmapBucketing::parseTimestamp)
-        val daysSincePlay = lastPlayed?.let { (now.epochSecond - it.epochSecond) / 86_400.0 } ?: Double.POSITIVE_INFINITY
+        val oCounter = candidate.oCounter
+        val daysSincePlay = candidate.lastPlayedAt?.let { (now.epochSecond - it.epochSecond) / 86_400.0 } ?: Double.POSITIVE_INFINITY
         var isRediscover = false
         when (discovery) {
             RecommendationDiscovery.Fresh -> score *= 1.2
@@ -488,20 +585,21 @@ object SceneRecommendations {
             RecommendationDiscovery.Balanced -> if (!isUnwatched) isRediscover = oCounter > 0 && daysSincePlay > 60
             RecommendationDiscovery.Favorites -> if (isUnwatched) score *= 0.85 else {
                 score *= 1 + 0.25 * oCountWeight * min(oCounter, 4)
-                if ((candidate.rating100 ?: 0) >= 80) score *= 1 + 0.2 * ratingWeight
+                if ((candidate.rating ?: 0) >= 80) score *= 1 + 0.2 * ratingWeight
                 isRediscover = daysSincePlay > 60
             }
         }
 
-        // Launch-seeded jitter: close scores resolve differently on each app start.
+        // Per-build jitter: close scores resolve differently in every list.
         score *= 1 + 0.35 * jitter(candidate.id)
 
+        fun tagName(id: String) = vocabulary.tagNames[id] ?: "this tag"
         val factors = listOf(
-            performerScore to performerHits.firstOrNull()?.let { RecommendationReason.Performer(it.first.name) },
-            studioScore to candidate.studio?.let { RecommendationReason.Studio(it.name) },
-            tagScore to tagHits.firstOrNull()?.let { RecommendationReason.Tag(it.first.name) },
-            relatedScore to bestRelated?.let { RecommendationReason.RelatedTag(it.first.name) },
-            similarScore to similarAnchor?.let { RecommendationReason.SimilarTo(it.displayTitle) },
+            performerScore to performerHits.firstOrNull()?.let { RecommendationReason.Performer(it.first.second) },
+            studioScore to candidate.studio?.let { RecommendationReason.Studio(it.second) },
+            tagScore to tagHits.firstOrNull()?.let { RecommendationReason.Tag(tagName(it.first)) },
+            relatedScore to bestRelated?.let { RecommendationReason.RelatedTag(tagName(it.first)) },
+            similarScore to similarAnchor?.let { RecommendationReason.SimilarTo(it.title ?: "a scene you watched") },
         )
         val strongest = factors.filter { it.second != null && it.first > 0 }.maxByOrNull { it.first }?.second
         val reason = when {
@@ -509,62 +607,49 @@ object SceneRecommendations {
             strongest != null -> strongest
             else -> return null
         }
-        return SceneRecommendation(candidate, reason, isUnwatched, score)
+        return Scored(candidate, reason, score)
     }
 
     /** Greedy pick; repeating a performer, studio or reason costs ground. */
-    private fun diversify(scored: List<SceneRecommendation>): List<SceneRecommendation> {
-        val pool = scored.toMutableList()
-        val picks = mutableListOf<SceneRecommendation>()
+    private fun diversify(scored: List<Scored>): List<Scored> {
+        // Only the best few hundred can make the list; the greedy pass is quadratic.
+        val pool = scored.sortedByDescending { it.score }.take(600).toMutableList()
+        val picks = mutableListOf<Scored>()
         val performerUses = HashMap<String, Int>()
         val studioUses = HashMap<String, Int>()
         val reasonUses = HashMap<String, Int>()
-        fun adjusted(item: SceneRecommendation): Double {
-            val pp = item.scene.performers.maxOfOrNull { performerUses[it.id] ?: 0 } ?: 0
-            val sp = item.scene.studio?.let { studioUses[it.id] ?: 0 } ?: 0
-            val rp = reasonUses[item.reason.label] ?: 0
-            return item.score * 0.6.pow(pp) * 0.75.pow(sp) * 0.7.pow(rp)
+        // Balanced keeps never-played and played-before scenes level: the pool holds far more
+        // unplayed scenes, so equal scores alone would fill the list with NEW ones.
+        var newPicks = 0
+        var seenPicks = 0
+        val balances = discovery == RecommendationDiscovery.Balanced && pool.any { !it.item.isUnwatched }
+        fun adjusted(entry: Scored): Double {
+            val pp = entry.item.performers.maxOfOrNull { performerUses[it.first] ?: 0 } ?: 0
+            val sp = entry.item.studio?.let { studioUses[it.first] ?: 0 } ?: 0
+            val rp = reasonUses[entry.reason.label] ?: 0
+            val lead = if (!balances) 0 else if (entry.item.isUnwatched) newPicks - seenPicks else seenPicks - newPicks
+            return entry.score * 0.5.pow(maxOf(lead, 0)) * 0.6.pow(pp) * 0.75.pow(sp) * 0.7.pow(rp)
         }
-        while (picks.size < count && pool.isNotEmpty()) {
+        while (picks.size < maxOf(count, LIST_LIMIT) && pool.isNotEmpty()) {
             var best = 0
             var bestScore = Double.NEGATIVE_INFINITY
-            pool.forEachIndexed { i, item ->
-                val v = adjusted(item)
-                if (v > bestScore || (v == bestScore && item.id < pool[best].id)) { bestScore = v; best = i }
+            pool.forEachIndexed { i, entry ->
+                val v = adjusted(entry)
+                if (v > bestScore || (v == bestScore && entry.item.id < pool[best].item.id)) { bestScore = v; best = i }
             }
             val pick = pool.removeAt(best)
             picks += pick
-            pick.scene.performers.forEach { performerUses.merge(it.id, 1, Int::plus) }
-            pick.scene.studio?.let { studioUses.merge(it.id, 1, Int::plus) }
+            pick.item.performers.forEach { performerUses.merge(it.first, 1, Int::plus) }
+            pick.item.studio?.let { studioUses.merge(it.first, 1, Int::plus) }
             reasonUses.merge(pick.reason.label, 1, Int::plus)
+            if (pick.item.isUnwatched) newPicks++ else seenPicks++
         }
         return picks
     }
 
     // MARK: Helpers
 
-    /** 0…1: shared performers (50 %), shared rare tags (35 %), same studio (15 %). */
-    private fun similarity(candidate: Scene, anchor: Scene, totalScenes: Int): Double {
-        val anchorPerformers = anchor.performers.map { it.id }.toSet()
-        val shared = candidate.performers.count { it.id in anchorPerformers }
-        val performerPart = if (anchorPerformers.isEmpty()) 0.0 else min(shared, 2) / 2.0
-        val anchorTags = anchor.tags.orEmpty()
-        val candidateTags = candidate.tags.orEmpty().map { it.id }.toSet()
-        val mass = anchorTags.sumOf { rarity(it, totalScenes) }
-        val sharedMass = anchorTags.filter { it.id in candidateTags }.sumOf { rarity(it, totalScenes) }
-        val tagPart = if (mass > 0) sharedMass / mass else 0.0
-        val studioPart = if (anchor.studio?.id != null && anchor.studio.id == candidate.studio?.id) 1.0 else 0.0
-        return 0.5 * performerPart + 0.35 * tagPart + 0.15 * studioPart
-    }
-
-    private fun rarity(tag: Tag, totalScenes: Int): Double {
-        val df = max(1, tag.sceneCount ?: 1)
-        if (totalScenes <= 1 || df >= totalScenes) return MIN_RARITY
-        val idf = ln(totalScenes.toDouble() / df) / ln(totalScenes.toDouble())
-        return min(1.0, max(MIN_RARITY, idf))
-    }
-
-    /** 0…1, stable for a scene within one app run. */
+    /** 0…1, stable for a scene within one build. */
     private fun jitter(id: String): Double {
         var hash = -0x340d631b7bdddcdbL xor sessionSeed.toLong()
         for (b in id.toByteArray()) { hash = hash xor (b.toLong() and 0xff); hash *= 0x100000001b3L }
@@ -587,111 +672,5 @@ object SceneRecommendations {
         if (ids.isEmpty()) return
         val lists = listOf(ids) + previous.take(REMEMBERED_LISTS - 1).map { it.toList() }
         Prefs.setString(key, de.letzgo.stashy.data.Json.encodeToString(ListSerializer(ListSerializer(String.serializer())), lists))
-    }
-
-    private suspend fun loadTotalSceneCount(): Int {
-        totalSceneCount?.let { return it }
-        val count = try {
-            GraphQL.data("{ stats { scene_count } }")["stats"].obj?.get("scene_count").stringOrNull?.toIntOrNull() ?: 0
-        } catch (e: CancellationException) { throw e } catch (e: Exception) { 0 }
-        if (count > 0) totalSceneCount = count
-        return count
-    }
-
-    // MARK: Queries
-
-    private fun decodeHistory(element: JsonObject): HistoryRow? {
-        val scene = runCatching { GraphQL.decode(Scene.serializer(), element) }.getOrNull() ?: return null
-        val plays = (element["play_history"] as? JsonArray)?.mapNotNull { OCountHeatmapBucketing.flexibleTime(it) }.orEmpty()
-        val oArray = element["o_history"] as? JsonArray
-        val os = oArray?.mapNotNull { OCountHeatmapBucketing.flexibleTime(it) }.orEmpty()
-        return HistoryRow(scene, plays, os, oArray != null)
-    }
-
-    private suspend fun fetchHistory(start: Instant): List<HistoryRow> {
-        val filter = mapOf("last_played_at" to mapOf("modifier" to "GREATER_THAN", "value" to DateTimeFormatter.ISO_INSTANT.format(start.truncatedTo(java.time.temporal.ChronoUnit.SECONDS))))
-        return try {
-            pagedHistory("findScenesRecommendHistory", filter)
-        } catch (e: CancellationException) { throw e } catch (e: Exception) {
-            // Older servers without play_history / o_history.
-            pagedHistory("findScenesRecommendCandidates", filter)
-        }
-    }
-
-    private suspend fun pagedHistory(query: String, sceneFilter: Map<String, Any>): List<HistoryRow> {
-        val rows = mutableListOf<HistoryRow>()
-        for (page in 1..HISTORY_MAX_PAGES) {
-            val data = GraphQL.named(query, vars(
-                "filter" to mapOf("page" to page, "per_page" to HISTORY_PAGE_SIZE, "sort" to "last_played_at", "direction" to "DESC"),
-                "scene_filter" to sceneFilter,
-            ))
-            val block = data["findScenes"].obj ?: break
-            val scenes = (block["scenes"] as? JsonArray).orEmpty().mapNotNull { (it as? JsonObject)?.let(::decodeHistory) }
-            rows += scenes
-            val total = block["count"].stringOrNull?.toIntOrNull() ?: 0
-            if (scenes.size < HISTORY_PAGE_SIZE || rows.size >= total) break
-        }
-        return rows
-    }
-
-    /** Cold start: scenes with O-Counts or high ratings, weighted lower than real plays. */
-    private suspend fun fetchFavoriteSeeds(): List<Seed> = coroutineScope {
-        val byO = async { runCandidateQuery(mapOf("o_counter" to mapOf("value" to 0, "modifier" to "GREATER_THAN")), "o_counter", 60) }
-        val byRating = async { runCandidateQuery(mapOf("rating100" to mapOf("value" to 79, "modifier" to "GREATER_THAN")), "rating", 60) }
-        val seen = HashSet<String>()
-        (byO.await() + byRating.await()).filter { seen.add(it.id) }.map { scene ->
-            var w = 0.5 + 0.3 * oCountWeight * min(scene.oCounter ?: 0, 4)
-            if ((scene.rating100 ?: 0) >= 80) w += 0.4 * ratingWeight
-            Seed(scene, w)
-        }
-    }
-
-    private suspend fun fetchCandidates(performerIds: List<String>, studioIds: List<String>, tagIds: List<String>, includeFavorites: Boolean): List<Scene> {
-        val sort = "random_$sessionSeed"
-        val clauses = buildList<Map<String, Any>> {
-            // Performers are not hierarchical: Stash rejects `depth` there.
-            if (performerIds.isNotEmpty()) add(mapOf("performers" to mapOf("value" to performerIds, "modifier" to "INCLUDES")))
-            if (studioIds.isNotEmpty()) add(mapOf("studios" to mapOf("value" to studioIds, "modifier" to "INCLUDES", "depth" to 0)))
-            if (tagIds.isNotEmpty()) add(mapOf("tags" to mapOf("value" to tagIds, "modifier" to "INCLUDES", "depth" to 0)))
-            if (includeFavorites) add(mapOf("o_counter" to mapOf("value" to 0, "modifier" to "GREATER_THAN")))
-        }
-        if (clauses.isEmpty()) return emptyList()
-        val results = coroutineScope { clauses.map { async { runCandidateQuery(it, sort, CANDIDATES_PER_QUERY) } }.awaitAll() }
-        val seen = HashSet<String>()
-        return results.flatten().filter { seen.add(it.id) }
-    }
-
-    /** Unplayed scenes per anchor: its performers, and its three rarest tags together. */
-    private suspend fun fetchUnwatchedSimilar(anchors: List<Scene>, totalScenes: Int): List<Scene> {
-        if (anchors.isEmpty()) return emptyList()
-        // New only asks the server for unplayed scenes; the other modes take any and drop the
-        // ones played in the window afterwards.
-        val onlyUnplayed = discovery == RecommendationDiscovery.Fresh
-        fun scoped(filter: Map<String, Any>): Map<String, Any> =
-            if (onlyUnplayed) filter + ("play_count" to mapOf("value" to 0, "modifier" to "EQUALS")) else filter
-        val filters = buildList<Map<String, Any>> {
-            for (anchor in anchors) {
-                val performerIds = anchor.performers.map { it.id }
-                if (performerIds.isNotEmpty()) add(scoped(mapOf("performers" to mapOf("value" to performerIds, "modifier" to "INCLUDES"))))
-                val rare = anchor.tags.orEmpty().sortedByDescending { rarity(it, totalScenes) }.take(3).map { it.id }
-                if (rare.size >= 2) add(scoped(mapOf("tags" to mapOf("value" to rare, "modifier" to "INCLUDES_ALL", "depth" to 0))))
-            }
-        }
-        val sort = "random_$sessionSeed"
-        val results = coroutineScope { filters.map { async { runCandidateQuery(it, sort, 40) } }.awaitAll() }
-        val seen = HashSet<String>()
-        return results.flatten().filter { seen.add(it.id) }
-    }
-
-    private suspend fun runCandidateQuery(filter: Map<String, Any>, sort: String, perPage: Int): List<Scene> = try {
-        val data = GraphQL.named("findScenesRecommendCandidates", vars(
-            "filter" to mapOf("page" to 1, "per_page" to perPage, "sort" to sort, "direction" to "DESC"),
-            "scene_filter" to filter,
-        ))
-        data["findScenes"].obj?.get("scenes")?.let { GraphQL.decode(ListSerializer(Scene.serializer()), it) }.orEmpty()
-    } catch (e: CancellationException) {
-        throw e
-    } catch (e: Exception) {
-        emptyList()
     }
 }

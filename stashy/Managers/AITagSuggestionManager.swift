@@ -108,6 +108,41 @@ struct AITagTarget: Identifiable, Equatable {
     }
 }
 
+/// Every tagged scene, persisted beside the statistics: a few ids and numbers for scoring, plus
+/// the scene as the lists load it (`SceneListFields`) for its card. For You and Similar Scenes
+/// work from it alone, without asking the server.
+struct LocalSceneIndex: Codable {
+    struct Entry: Codable {
+        let id: String
+        let title: String?
+        /// Tag, performer and studio ids.
+        let t: [String]
+        let p: [String]
+        let s: String?
+        /// Play count, O count, rating (0–100), last played, watched seconds, file duration.
+        let pc: Int
+        let oc: Int
+        let r: Int?
+        let lp: Date?
+        let pd: Double?
+        let d: Double?
+        /// The scene for its card.
+        var scene: Scene?
+
+        /// Played from this app: counts at once, not only after the next statistics build.
+        func playedNow(at date: Date) -> Entry {
+            let stamp = ISO8601DateFormatter().string(from: date)
+            return Entry(id: id, title: title, t: t, p: p, s: s, pc: pc + 1, oc: oc, r: r, lp: date, pd: pd, d: d,
+                         scene: scene?.withPlay(count: pc + 1, at: stamp))
+        }
+    }
+    var builtAt: Date
+    var scenes: [Entry]
+    var performerNames: [String: String]
+    var studioNames: [String: String]
+    var tagNames: [String: String]?
+}
+
 /// Everything counted from the library, persisted per server.
 struct AITagStatsModel: Codable {
     var version: Int
@@ -124,6 +159,21 @@ struct AITagStatsModel: Codable {
     /// tag id → co-occurring tag id → number of items carrying both
     var pairCounts: [String: [String: Int]]
     var tagTotals: [String: Int]
+}
+
+extension Scene {
+    /// The same scene after one more play at `stamp` (ISO 8601).
+    func withPlay(count: Int, at stamp: String) -> Scene {
+        Scene(
+            id: id, title: title, details: details, director: director, date: date, duration: duration,
+            studio: studio, performers: performers, files: files, tags: tags,
+            galleries: galleries, groups: groups, organized: organized,
+            resumeTime: resumeTime, playCount: count, oCounter: oCounter,
+            rating100: rating100, createdAt: createdAt, updatedAt: updatedAt,
+            paths: paths, sceneMarkers: sceneMarkers, interactive: interactive, stashIds: stashIds, captions: captions, customFields: customFields,
+            playDuration: playDuration, lastPlayedAt: stamp
+        )
+    }
 }
 
 // MARK: - Manager
@@ -210,6 +260,8 @@ final class AITagSuggestionManager: ObservableObject {
 
     private var model: AITagStatsModel?
     private var tagsById: [String: Tag] = [:]
+    /// Every tag of the library as of the last build (names for For You's reasons).
+    var knownTags: [Tag] { model?.tags ?? [] }
     private var buildTask: Task<Void, Never>?
     private var persistTask: Task<Void, Never>?
     private var didLoadFromDisk = false
@@ -228,7 +280,9 @@ final class AITagSuggestionManager: ObservableObject {
         static let dismissed = "ai_tags_dismissed"
     }
 
-    private static let modelVersion = 2
+    /// 4: the build also writes the per-scene index (`LocalSceneIndex`) with each scene's card
+    /// fields, which For You and Similar Scenes read.
+    private static let modelVersion = 4
     /// One "Ignore Tag" is the answer, not a vote — the tag is out until it is
     /// accepted somewhere.
     private static let dismissStrikes = 1
@@ -391,6 +445,11 @@ final class AITagSuggestionManager: ObservableObject {
         if let url = Self.modelURL() {
             try? FileManager.default.removeItem(at: url)
         }
+        if let url = Self.sceneIndexURL() {
+            try? FileManager.default.removeItem(at: url)
+        }
+        sceneIndexCache = nil
+        sceneIndexLoadedFor = nil
     }
 
     private func performBuild() async {
@@ -415,6 +474,32 @@ final class AITagSuggestionManager: ObservableObject {
         var tagTotals: [String: Int] = [:]
         var processed = 0
         var expected = 0
+        var indexEntries: [LocalSceneIndex.Entry] = []
+        var performerNames: [String: String] = [:]
+        var studioNames: [String: String] = [:]
+        var tagNames: [String: String] = [:]
+
+        func index(_ item: StatsItem, scene: Scene?) {
+            for tag in item.tags ?? [] { tagNames[tag.id] = tag.name }
+            for performer in item.performers ?? [] {
+                if let name = performer.name { performerNames[performer.id] = name }
+            }
+            if let studio = item.studio, let name = studio.name { studioNames[studio.id] = name }
+            indexEntries.append(LocalSceneIndex.Entry(
+                id: item.id,
+                title: item.title,
+                t: (item.tags ?? []).map(\.id),
+                p: (item.performers ?? []).map(\.id),
+                s: item.studio?.id,
+                pc: item.play_count ?? 0,
+                oc: item.o_counter ?? 0,
+                r: item.rating100,
+                lp: item.last_played_at.flatMap(OCountHeatmapLoader.parseTimestamp),
+                pd: item.play_duration,
+                d: item.files?.first?.duration,
+                scene: scene
+            ))
+        }
 
         func absorb(_ item: StatsItem) {
             let tagIds = (item.tags ?? []).map(\.id)
@@ -434,7 +519,7 @@ final class AITagSuggestionManager: ObservableObject {
                     performerCounts[performer.id, default: [:]][tagId, default: 0] += 1
                 }
             }
-            for gallery in item.galleries ?? [] {
+            for gallery in item.galleries ?? item.gallery_refs ?? [] {
                 galleryTotals[gallery.id, default: 0] += 1
                 for tagId in tagIds {
                     galleryCounts[gallery.id, default: [:]][tagId, default: 0] += 1
@@ -458,6 +543,11 @@ final class AITagSuggestionManager: ObservableObject {
                     if page == 1 { expected += batch.count }
                     guard !batch.items.isEmpty else { break }
                     batch.items.forEach(absorb)
+                    if source == .scenes {
+                        for (offset, item) in batch.items.enumerated() {
+                            index(item, scene: offset < batch.scenes.count ? batch.scenes[offset] : nil)
+                        }
+                    }
                     processed += batch.items.count
                     state = .building(processed: processed, total: max(expected, processed))
                     if batch.items.count < Self.pageSize { break }
@@ -503,6 +593,12 @@ final class AITagSuggestionManager: ObservableObject {
         )
         apply(built)
         persist(built)
+        let sceneIndex = LocalSceneIndex(builtAt: built.builtAt, scenes: indexEntries,
+                                         performerNames: performerNames, studioNames: studioNames,
+                                         tagNames: tagNames)
+        self.sceneIndexCache = sceneIndex
+        self.sceneIndexLoadedFor = Self.sceneIndexURL()
+        Self.persistSceneIndex(sceneIndex)
         AppLog.debug("AITags: statistics model built from \(processed) items")
     }
 
@@ -1024,24 +1120,50 @@ final class AITagSuggestionManager: ObservableObject {
     }
 
     private struct StatsItem: Decodable {
-        struct Reference: Decodable { let id: String }
+        struct Reference: Decodable {
+            let id: String
+            let name: String?
+        }
+        struct File: Decodable { let duration: Double? }
         let id: String
+        let title: String?
         let tags: [Tag]?
         let performers: [Reference]?
         let studio: Reference?
         let galleries: [Reference]?
+        /// Scenes send their galleries under this alias, so `Scene` does not try to read them.
+        let gallery_refs: [Reference]?
+        // Scenes only: For You's local index.
+        let play_count: Int?
+        let o_counter: Int?
+        let rating100: Int?
+        let last_played_at: String?
+        let play_duration: Double?
+        let files: [File]?
     }
 
     private struct StatsBatch {
         let items: [StatsItem]
         let count: Int
+        /// Scenes only: the same rows decoded as `Scene`, for the local index (aligned with `items`).
+        var scenes: [Scene?] = []
+    }
+
+    /// One scene row read twice: as counts for the statistics and as the card for the index.
+    private struct StatsSceneRow: Decodable {
+        let item: StatsItem
+        let scene: Scene?
+        init(from decoder: Decoder) throws {
+            item = try StatsItem(from: decoder)
+            scene = try? Scene(from: decoder)
+        }
     }
 
     private struct StatsScenesResponse: Decodable {
         struct DataBlock: Decodable {
             struct FindScenes: Decodable {
                 let count: Int
-                let scenes: [StatsItem]
+                let scenes: [StatsSceneRow]
             }
             let findScenes: FindScenes
         }
@@ -1091,9 +1213,11 @@ final class AITagSuggestionManager: ObservableObject {
                 query: GraphQLQueries.statsScenesQuery,
                 variables: ["filter": filter, "scene_filter": scope]
             )
+            let rows = response.data?.findScenes.scenes ?? []
             return StatsBatch(
-                items: response.data?.findScenes.scenes ?? [],
-                count: response.data?.findScenes.count ?? 0
+                items: rows.map(\.item),
+                count: response.data?.findScenes.count ?? 0,
+                scenes: rows.map(\.scene)
             )
         case .images:
             let response: StatsImagesResponse = try await GraphQLClient.shared.execute(
@@ -1104,6 +1228,63 @@ final class AITagSuggestionManager: ObservableObject {
                 items: response.data?.findImages.images ?? [],
                 count: response.data?.findImages.count ?? 0
             )
+        }
+    }
+
+    // MARK: - Local scene index (For You)
+
+    private var sceneIndexCache: LocalSceneIndex?
+    private var sceneIndexLoadedFor: URL?
+
+    /// The per-scene index written by the last statistics build, or nil before the first one.
+    func sceneIndex() async -> LocalSceneIndex? {
+        guard let url = Self.sceneIndexURL() else { return nil }
+        if let sceneIndexCache, sceneIndexLoadedFor == url { return sceneIndexCache }
+        let loaded: LocalSceneIndex? = await Task.detached(priority: .userInitiated) {
+            guard let data = try? Data(contentsOf: url) else { return nil }
+            return try? JSONDecoder().decode(LocalSceneIndex.self, from: data)
+        }.value
+        sceneIndexCache = loaded
+        sceneIndexLoadedFor = url
+        return loaded
+    }
+
+    /// The scene index, waiting for a statistics build that is running (or starting one when
+    /// none exists yet) — right after an update the first build takes a minute or two.
+    func waitForSceneIndex(timeout: TimeInterval = 300) async -> LocalSceneIndex? {
+        if let index = await sceneIndex(), !index.scenes.isEmpty { return index }
+        await ensureStatistics()
+        let deadline = Date().addingTimeInterval(timeout)
+        while Date() < deadline, !Task.isCancelled {
+            guard case .building = state else { break }
+            try? await Task.sleep(for: .milliseconds(500))
+        }
+        return await sceneIndex()
+    }
+
+    /// A play from this app goes into the index at once, so For You does not suggest the scene
+    /// again before the next statistics build.
+    func noteLocalPlay(sceneId: String) {
+        guard var index = sceneIndexCache,
+              let position = index.scenes.firstIndex(where: { $0.id == sceneId }) else { return }
+        index.scenes[position] = index.scenes[position].playedNow(at: Date())
+        sceneIndexCache = index
+        Self.persistSceneIndex(index)
+    }
+
+    private static func sceneIndexURL() -> URL? {
+        modelURL().map { $0.deletingPathExtension().appendingPathExtension("scenes.json") }
+    }
+
+    private static func persistSceneIndex(_ index: LocalSceneIndex) {
+        guard let url = sceneIndexURL() else { return }
+        Task.detached(priority: .utility) {
+            do {
+                try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
+                try JSONEncoder().encode(index).write(to: url, options: .atomic)
+            } catch {
+                AppLog.error("AITags: could not save the scene index — \(error.localizedDescription)")
+            }
         }
     }
 
