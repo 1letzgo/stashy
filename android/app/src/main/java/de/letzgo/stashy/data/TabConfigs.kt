@@ -91,12 +91,17 @@ enum class HomeRowType(val defaultTitle: String) {
     @SerialName("performersHighestOCount") PerformersHighestOCount("Performers - Counter"),
     @SerialName("performersHighestRating") PerformersHighestRating("Performers - Rating"),
     @SerialName("galleriesHighestImageCount") GalleriesHighestImageCount("Galleries - Image Count"),
-    @SerialName("channels") Channels("Channels");
+    @SerialName("channels") Channels("Channels"),
+    /** stashy+: "For You" — scenes picked from the user's own watch history (iOS `.recommendations`). */
+    @SerialName("recommendations") Recommendations("Scenes - For You");
+
+    /** iOS `requiresStashyPlus`: rows hidden from Home and Settings while locked. */
+    val requiresStashyPlus get() = this == Channels || this == Recommendations
 
     val isPerformerRow get() = this in setOf(NewPerformers, PerformersHighestSceneCount, PerformersHighestOCount, PerformersHighestRating)
     val isStudioRow get() = this == NewStudios || this == StudiosHighestSceneCount
     val isGalleryRow get() = this in setOf(NewGalleries, RecentlyUpdatedGalleries, GalleriesHighestImageCount)
-    val isSceneRow get() = !isPerformerRow && !isStudioRow && !isGalleryRow && this != Statistics && this != Channels
+    val isSceneRow get() = !isPerformerRow && !isStudioRow && !isGalleryRow && this != Statistics && !requiresStashyPlus
 }
 
 /** iOS: `HomeRowConfig` (UUID encoded as uppercase string like Swift). */
@@ -252,7 +257,16 @@ object TabConfigLogic {
             HomeRowType.MostViewed3Min to true, HomeRowType.Random to true,
             HomeRowType.TopCounter3Min to false, HomeRowType.TopRating3Min to false, HomeRowType.Channels to true,
         )
-        return order.mapIndexed { i, (type, enabled) -> HomeRowConfig(title = type.defaultTitle, isEnabled = enabled, sortOrder = i, type = type) }
+        return insertRecommendations(order.mapIndexed { i, (type, enabled) -> HomeRowConfig(title = type.defaultTitle, isEnabled = enabled, sortOrder = i, type = type) })
+    }
+
+    /** iOS `ensureRecommendationsRow()`: For You goes right below Last Played, not to the end. */
+    private fun insertRecommendations(rows: List<HomeRowConfig>): List<HomeRowConfig> {
+        if (rows.any { it.type == HomeRowType.Recommendations }) return rows
+        val anchor = rows.indexOfFirst { it.type == HomeRowType.LastPlayed }.let { if (it >= 0) it + 1 else 0 }
+        val list = rows.toMutableList()
+        list.add(minOf(anchor, list.size), HomeRowConfig(title = HomeRowType.Recommendations.defaultTitle, isEnabled = true, sortOrder = anchor, type = HomeRowType.Recommendations))
+        return list.mapIndexed { i, r -> r.copy(sortOrder = i) }
     }
 
     /** iOS: the `ensure…Row()` order (types appended when missing, with their default enabled state). */
@@ -281,6 +295,11 @@ object TabConfigLogic {
                 rows.add(HomeRowConfig(title = type.defaultTitle, isEnabled = enabled, sortOrder = rows.size, type = type))
                 changed = true
             }
+        }
+        if (rows.none { it.type == HomeRowType.Recommendations }) {
+            val inserted = insertRecommendations(rows)
+            rows.clear(); rows.addAll(inserted)
+            changed = true
         }
         if (promoteLastPlayed) {
             val idx = rows.indexOfFirst { it.type == HomeRowType.LastPlayed }

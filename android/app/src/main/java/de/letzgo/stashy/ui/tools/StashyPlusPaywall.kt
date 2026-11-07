@@ -135,7 +135,7 @@ private object StashyPlusFeatureCopy {
     const val MINI_PLAYER = "Keeps a scene playing in a small bar when you leave its page. Add scenes to your watchlist on the scene page and they play one after another; the list is in Tools."
     const val MAGAZINE = "Adds a Magazin view on Home that shows your galleries as covers. They open like a magazine and remember the page you stopped on."
     const val AI_SUBTITLES = "Creates subtitles from a scene's speech on your device and translates them into your subtitle language. Turn them on in the player's AI Subtitles menu."
-    const val TAG_SUGGESTIONS = "Suggests tags based on how your library is already tagged, and shows scenes with the same performers, studio or tags on the scene page. No outside service is involved."
+    const val TAG_SUGGESTIONS = "Suggests tags based on how your library is already tagged, shows scenes with the same performers, studio or tags on the scene page, and adds a For You row on Home with scenes picked from what you played, your O-Counts and ratings. No outside service is involved."
     const val OVERVIEW = "Shows your library at a glance in Tools: playback, catalog counts and storage."
     const val O_COUNT = "Shows the O-Counts of your scenes and images as a month calendar in Tools."
     const val TIMELINE = "Lists your scene plays, O-Counts and markers over time in Tools."
@@ -157,13 +157,13 @@ private object StashyPlusFeatureCopy {
         Feature(ToolsItem.HotOrNot.plusFeatureTitle, MATCH),
         Feature(ToolsItem.RateMe.title, RATE_ME),
         Feature("Magazin", MAGAZINE),
+        Feature("Recommendations", TAG_SUGGESTIONS, isBeta = true),
     )
 }
 
 /**
  * iOS: `SettingsView.stashyPlusSettings` + `stashyPlusPurchaseSection`, in the iOS order.
- * Unlocked: Custom App Icons · AI Subtitles and translation (Beta) · Tag Suggestions & Similar
- * Scenes (Beta) · stashy+ status and plans. Locked: "Included with stashy+" · "Unlock stashy+".
+ * Unlocked: Custom App Icons · AI Subtitles and translation (Beta) · Recommendations (Beta) · stashy+ status and plans. Locked: "Included with stashy+" · "Unlock stashy+".
  * AI Motion is not ported to Android, so its section is left out. Shared by the Settings tab's
  * "stashy+" section and the paywall.
  */
@@ -216,9 +216,9 @@ fun LazyListScope.stashyPlusSettingsItems() {
             SectionSpacer()
         }
         item(key = "plus-ai-tags") {
-            SettingsSectionHeader("Tag Suggestions & Similar Scenes", isBeta = true)
+            SettingsSectionHeader("Recommendations", isBeta = true)
             GroupedCard {
-                SettingsRow("Tag Suggestions & Similar Scenes", SF.sparkles, onClick = {
+                SettingsRow("Recommendations", SF.sparkles, onClick = {
                     Nav.push(de.letzgo.stashy.ui.tools.aitags.AITagsSettingsScreen())
                 })
             }

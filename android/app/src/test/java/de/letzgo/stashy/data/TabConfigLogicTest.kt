@@ -38,12 +38,14 @@ class TabConfigLogicTest {
         assertTrue(rows.all { it.title == it.type.defaultTitle })
         assertFalse(rows.first { it.type == HomeRowType.TopCounter3Min }.isEnabled) // ensured rows keep iOS defaults
         assertTrue(rows.any { it.type == HomeRowType.Channels })
+        assertEquals(1, rows.count { it.type == HomeRowType.Recommendations })
     }
 
     @Test fun defaultHomeRowsMatchIos() {
         val rows = TabConfigLogic.defaultHomeRows()
-        assertEquals(18, rows.size)
-        assertEquals(listOf(HomeRowType.LastPlayed, HomeRowType.Statistics, HomeRowType.LastAdded3Min), rows.take(3).map { it.type })
+        assertEquals(19, rows.size)
+        // For You sits right below Last Played (iOS `ensureRecommendationsRow`).
+        assertEquals(listOf(HomeRowType.LastPlayed, HomeRowType.Recommendations, HomeRowType.Statistics, HomeRowType.LastAdded3Min), rows.take(4).map { it.type })
         assertFalse(rows.first { it.type == HomeRowType.TopRating3Min }.isEnabled)
     }
 

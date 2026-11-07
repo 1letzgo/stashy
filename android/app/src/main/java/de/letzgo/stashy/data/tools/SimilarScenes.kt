@@ -199,7 +199,8 @@ object SimilarScenes {
     /** One query per criterion, run concurrently and merged; one failing still leaves the others. */
     private suspend fun fetchCandidates(performerIds: List<String>, tagIds: List<String>, studioId: String?): List<Scene> {
         val clauses = buildList<Map<String, Any>> {
-            if (performerIds.isNotEmpty()) add(mapOf("performers" to mapOf("value" to performerIds, "modifier" to "INCLUDES", "depth" to 0)))
+            // Performers are not hierarchical: Stash rejects `depth` there.
+            if (performerIds.isNotEmpty()) add(mapOf("performers" to mapOf("value" to performerIds, "modifier" to "INCLUDES")))
             if (tagIds.isNotEmpty()) add(mapOf("tags" to mapOf("value" to tagIds, "modifier" to "INCLUDES", "depth" to 0)))
             if (studioId != null) add(mapOf("studios" to mapOf("value" to listOf(studioId), "modifier" to "INCLUDES", "depth" to 0)))
         }

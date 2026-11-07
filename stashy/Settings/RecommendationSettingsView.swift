@@ -42,6 +42,11 @@ struct RecommendationSettingsView: View {
         .disabled(!stashyPlus.isUnlocked)
         // Changes take effect when Home shows the row again; leaving here starts the rebuild.
         .onDisappear { engine.refreshIfNeeded() }
+        // Feedback for Refresh: a prepared list swaps in instantly and would otherwise go unseen.
+        .onChange(of: engine.builtAt) { old, new in
+            guard old != nil, new != nil, engine.state == .ready else { return }
+            ToastManager.shared.show("New suggestions on Home", icon: "sparkles", style: .success)
+        }
     }
 
     // MARK: - Sections
@@ -62,10 +67,14 @@ struct RecommendationSettingsView: View {
             Button {
                 engine.rebuild()
             } label: {
-                Label("Refresh suggestions", systemImage: "arrow.triangle.2.circlepath")
-                    .foregroundColor(appearanceManager.tintColor)
+                HStack {
+                    Label("Refresh suggestions", systemImage: "arrow.triangle.2.circlepath")
+                        .foregroundColor(appearanceManager.tintColor)
+                    Spacer()
+                    if engine.isRefreshing { ProgressView() }
+                }
             }
-            .disabled(engine.state == .loading)
+            .disabled(engine.isRefreshing)
             .stashyGroupedBlockRow(index: 1, count: 2)
 
             stashyScrollingSectionFooter("Suggests scenes on Home from what you played, the O-Counts you gave and your ratings. Each card says why it was picked. Everything is worked out on this device from your own server. Move or hide the row in Settings › Home.")
@@ -182,6 +191,7 @@ struct RecommendationSettingsView: View {
         switch engine.state {
         case .idle: return "Not built yet"
         case .loading: return "Looking…"
+        case .ready where engine.isRefreshing: return "Looking…"
         case .noHistory: return "No plays yet"
         case .failed(let message): return message
         case .ready:

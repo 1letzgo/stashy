@@ -133,7 +133,7 @@ object DashboardStore {
      */
     fun loadRowIfNeeded(config: HomeRowConfig, maxAgeMs: Long = FRESHNESS_MS) {
         val type = config.type
-        if (type == HomeRowType.Statistics || type == HomeRowType.Channels) return
+        if (type == HomeRowType.Statistics || type.requiresStashyPlus) return
         val filterId = TabManager.getDefaultFilterId(AppTab.Dashboard)
         if (filterId != null && SavedFiltersStore.byId[filterId] == null && (SavedFiltersStore.isLoading || !SavedFiltersStore.loadedOnce)) {
             if (!SavedFiltersStore.isLoading) scope.launch { SavedFiltersStore.load() }

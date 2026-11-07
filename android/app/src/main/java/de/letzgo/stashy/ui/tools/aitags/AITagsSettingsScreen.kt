@@ -68,8 +68,8 @@ import java.text.DateFormat
 import java.util.Date
 
 /**
- * iOS: `AITagsSettingsView` (Settings → Tag Suggestions & Similar Scenes) — stashy+ hub: one kill
- * switch each, one statistics model behind both features.
+ * iOS: `AITagsSettingsView` (Settings → Recommendations) — stashy+ hub: tag suggestions, Similar
+ * Scenes and the For You row share one statistics model; For You is on while either switch is.
  */
 class AITagsSettingsScreen : Screen {
     override val key: String = "ai-tags-settings"
@@ -78,7 +78,7 @@ class AITagsSettingsScreen : Screen {
     override fun Content() = AITagsSettingsView()
 }
 
-private const val TITLE = "Tag Suggestions & Similar Scenes"
+private const val TITLE = "Recommendations"
 
 @Composable
 fun AITagsSettingsView() {
@@ -98,7 +98,7 @@ fun AITagsSettingsView() {
             if (!isUnlocked) {
                 item {
                     GroupedCard {
-                        SettingsRow("Tag Suggestions & Similar Scenes require stashy+", icon = SF.lock, iconTint = p.secondaryText, titleColor = p.secondaryText)
+                        SettingsRow("Recommendations require stashy+", icon = SF.lock, iconTint = p.secondaryText, titleColor = p.secondaryText)
                     }
                     SettingsSectionFooter("Unlock stashy+ to use this feature.")
                     SectionSpacer()
@@ -117,6 +117,18 @@ fun AITagsSettingsView() {
                         if (isUnlocked) similar.isEnabled = it
                     }
                 }
+                SectionSpacer()
+            }
+
+            // MARK: For You
+            item {
+                SettingsSectionHeader("For You on Home", isBeta = true)
+                GroupedCard {
+                    SettingsRow("For You", SF.wand, enabled = isUnlocked, onClick = { Nav.push(RecommendationSettingsScreen()) }) {
+                        Text(if (de.letzgo.stashy.data.tools.SceneRecommendations.isFeatureOn) "On" else "Off", style = NativeType.bodyMedium, color = p.secondaryText)
+                    }
+                }
+                SettingsSectionFooter("A Home row with scenes picked from what you played, your O-Counts and ratings, each with the reason it was picked. On while Tag suggestions or Similar scenes is on; move or hide it in Settings › Home.")
                 SectionSpacer()
             }
 
@@ -197,7 +209,7 @@ private fun ToggleRow(title: String, icon: androidx.compose.ui.graphics.vector.I
 
 /** iOS: `Stepper(value:in:)` — value plus Material tonal −/+ icon buttons. */
 @Composable
-private fun StepperRow(title: String, value: Int, range: IntRange, enabled: Boolean, onChange: (Int) -> Unit) {
+internal fun StepperRow(title: String, value: Int, range: IntRange, enabled: Boolean, onChange: (Int) -> Unit) {
     val p = Theme.palette
     val colors = IconButtonDefaults.filledTonalIconButtonColors(
         containerColor = nativeAccent().copy(alpha = 0.16f), contentColor = p.text,

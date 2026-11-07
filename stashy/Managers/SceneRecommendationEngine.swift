@@ -13,8 +13,8 @@ import SwiftUI
 import Combine
 
 /// One suggested scene and why it is there.
-struct SceneRecommendation: Identifiable, Equatable {
-    enum Reason: Equatable {
+struct SceneRecommendation: Identifiable, Equatable, Codable {
+    enum Reason: Equatable, Codable {
         case performer(String)
         case studio(String)
         case tag(String)
@@ -96,7 +96,7 @@ enum RecommendationDiscovery: String, CaseIterable, Identifiable {
     var detail: String {
         switch self {
         case .fresh: return "Only scenes you have never played."
-        case .balanced: return "Mostly unplayed scenes, now and then an old favorite."
+        case .balanced: return "Unplayed scenes and scenes you have not played in this period, weighed the same."
         case .favorites: return "Scenes with O-Counts or high ratings you have not played in a while."
         }
     }
@@ -187,6 +187,8 @@ final class SceneRecommendationEngine: ObservableObject {
     @Published private(set) var builtAt: Date?
     /// How many plays the profile was built from — shown in Settings.
     @Published private(set) var seedCount = 0
+    /// A visible rebuild is running (Settings shows it; the row keeps its cards meanwhile).
+    @Published private(set) var isRefreshing = false
 
     /// The row belongs to the Recommendations features: it is there whenever Tag Suggestions or
     /// Similar Scenes is on. stashy+ is checked separately (`isAvailable`, `HomeView`).
@@ -199,6 +201,11 @@ final class SceneRecommendationEngine: ObservableObject {
     // MARK: Private
 
     private var buildTask: Task<Void, Never>?
+    /// Builds the list for the next app start (or the next refresh) in the background.
+    private var prepareTask: Task<Void, Never>?
+    /// The next list, ready to show; mirrored to disk per server so a cold start shows it at once.
+    private var prepared: PreparedList?
+    private var preparedLoadedFor: String?
     /// Settings changed since the last build; the next `refreshIfNeeded` rebuilds.
     private var isStale = false
     private var generation = 0
@@ -258,6 +265,11 @@ final class SceneRecommendationEngine: ObservableObject {
     func reset() {
         buildTask?.cancel()
         buildTask = nil
+        prepareTask?.cancel()
+        prepareTask = nil
+        prepared = nil
+        preparedLoadedFor = nil
+        isRefreshing = false
         generation += 1
         recommendations = []
         builtAt = nil
@@ -265,7 +277,7 @@ final class SceneRecommendationEngine: ObservableObject {
         state = .idle
     }
 
-    /// Builds when nothing is there, the list is older than three hours or a setting changed.
+    /// Shows a list when nothing is there, the list is older than three hours or a setting changed.
     func refreshIfNeeded() {
         guard isAvailable else { return }
         if buildTask != nil { return }
@@ -276,12 +288,44 @@ final class SceneRecommendationEngine: ObservableObject {
         rebuild()
     }
 
+    /// A new list now: the prepared one when it fits the current settings (instant), else a
+    /// visible build. Either way the next list is prepared right after.
     func rebuild() {
         guard isAvailable, ServerConfigManager.shared.activeConfig != nil else { return }
+        loadPreparedIfNeeded()
+        if !isStale, let next = prepared, next.settings == settingsSignature,
+           Date().timeIntervalSince(next.builtAt) < Self.preparedMaxAge, !next.items.isEmpty {
+            show(next)
+            return
+        }
+        buildVisible()
+    }
+
+    private func show(_ list: PreparedList) {
+        generation += 1
         buildTask?.cancel()
+        buildTask = nil
+        isRefreshing = false
+        prepared = nil
+        Self.savePrepared(nil)
+        recommendations = list.items
+        seedCount = list.seedCount
+        state = .ready
+        builtAt = Date()
+        // Shown now: it steps back in the next picks.
+        Self.saveRecentPicks(list.items.map(\.id), keeping: Self.loadRecentPicks())
+        AppLog.debug("✨ FOR YOU: showing prepared list (\(list.items.count))")
+        prepareNext()
+    }
+
+    private func buildVisible() {
+        buildTask?.cancel()
+        prepareTask?.cancel()
+        prepareTask = nil
         generation += 1
         let gen = generation
         isStale = false
+        isRefreshing = true
         if recommendations.isEmpty { state = .loading }
         buildTask = Task { [weak self] in
             guard let self else { return }
@@ -292,11 +336,91 @@ final class SceneRecommendationEngine: ObservableObject {
                 self.recommendations = picks
                 self.seedCount = seeds
                 self.state = picks.isEmpty && seeds == 0 ? .noHistory : .ready
+                if !picks.isEmpty {
+                    Self.saveRecentPicks(picks.map(\.id), keeping: Self.loadRecentPicks())
+                }
             case .failure(let message):
                 if self.recommendations.isEmpty { self.state = .failed(message) }
             }
             self.builtAt = Date()
+            self.isRefreshing = false
             self.buildTask = nil
+            self.prepareNext()
+        }
+    }
+
+    /// Builds the following list in the background and keeps it (memory + disk) for the next
+    /// refresh or app start.
+    private func prepareNext() {
+        guard isAvailable else { return }
+        prepareTask?.cancel()
+        let gen = generation
+        let signature = settingsSignature
+        prepareTask = Task { [weak self] in
+            guard let self else { return }
+            let outcome = await self.build()
+            guard gen == self.generation, !Task.isCancelled, signature == self.settingsSignature else { return }
+            if case .success(let picks, let seeds) = outcome, !picks.isEmpty {
+                let list = PreparedList(settings: signature, builtAt: Date(), seedCount: seeds, items: picks)
+                self.prepared = list
+                Self.savePrepared(list)
+                AppLog.debug("✨ FOR YOU: prepared next list (\(picks.count))")
+            }
+            self.prepareTask = nil
+        }
+    }
+
+    // MARK: - Prepared list
+
+    struct PreparedList: Codable {
+        let settings: String
+        let builtAt: Date
+        let seedCount: Int
+        let items: [SceneRecommendation]
+    }
+
+    /// A prepared list older than this is not shown: scenes may have been played meanwhile.
+    private static let preparedMaxAge: TimeInterval = 36 * 60 * 60
+
+    /// Everything a list depends on besides the library itself.
+    private var settingsSignature: String {
+        [String(lookbackDays), String(count), discovery.rawValue,
+         performerWeight, studioWeight, tagWeight, oCountWeight, ratingWeight, similarWeight]
+            .map { "\($0)" }
+            .joined(separator: "|")
+    }
+
+    private func loadPreparedIfNeeded() {
+        let server = ServerConfigManager.shared.activeConfig?.id.uuidString
+        guard preparedLoadedFor != server else { return }
+        preparedLoadedFor = server
+        prepared = Self.loadPrepared()
+    }
+
+    private static var preparedURL: URL? {
+        guard let id = ServerConfigManager.shared.activeConfig?.id,
+              let base = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first else { return nil }
+        return base.appendingPathComponent("ForYou", isDirectory: true).appendingPathComponent("\(id.uuidString).json")
+    }
+
+    private static func loadPrepared() -> PreparedList? {
+        guard let url = preparedURL, let data = try? Data(contentsOf: url) else { return nil }
+        return try? JSONDecoder().decode(PreparedList.self, from: data)
+    }
+
+    private static func savePrepared(_ list: PreparedList?) {
+        guard let url = preparedURL else { return }
+        guard let list else {
+            try? FileManager.default.removeItem(at: url)
+            return
+        }
+        Task.detached(priority: .utility) {
+            do {
+                try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
+                try JSONEncoder().encode(list).write(to: url, options: .atomic)
+            } catch {
+                AppLog.error("✨ FOR YOU: could not save prepared list — \(error.localizedDescription)")
+            }
         }
     }
 
@@ -441,7 +565,6 @@ final class SceneRecommendationEngine: ObservableObject {
                                        isUnwatched: item.isUnwatched, score: item.score * factor)
         }
         let picks = diversify(rotated)
-        Self.saveRecentPicks(picks.map(\.id), keeping: recentLists)
         #if DEBUG
         for pick in picks {
             AppLog.debug("✨ FOR YOU pick: \(String(format: "%.2f", pick.score)) \(pick.isUnwatched ? "new" : "seen") \(pick.reason.label) — \(pick.scene.displayTitle ?? pick.id)")
@@ -531,11 +654,11 @@ final class SceneRecommendationEngine: ObservableObject {
             relatedScore = min(relatedScore, 1.0) * 0.6 * tagWeight
         }
 
-        // Closeness to a single watched scene, scaled by how much that scene counted. Only for
-        // unplayed candidates: for played ones the profile factors say enough.
+        // Closeness to a single watched scene, scaled by how much that scene counted. Every
+        // candidate here is unplayed in the window (played ones were dropped before).
         var similarScore = 0.0
         var similarAnchor: Scene?
-        if isUnwatched, similarWeight > 0 {
+        if similarWeight > 0 {
             for anchor in anchors {
                 let closeness = similarity(candidate, to: anchor.scene, totalScenes: totalScenes)
                 let value = closeness * (anchor.weight / max(maxSeedWeight, 0.0001))
@@ -563,10 +686,8 @@ final class SceneRecommendationEngine: ObservableObject {
         case .fresh:
             score *= 1.2
         case .balanced:
-            if isUnwatched {
-                score *= 1.15
-            } else {
-                score *= 0.75 + 0.1 * oCountWeight * Double(min(oCounter, 3))
+            // Never played and not played in the window weigh the same.
+            if !isUnwatched {
                 isRediscover = oCounter > 0 && daysSincePlay > 60
             }
         case .favorites:
@@ -868,25 +989,29 @@ final class SceneRecommendationEngine: ObservableObject {
     /// close to a single watched one are in the pool even when the profile queries miss them.
     private func fetchUnwatchedSimilar(to anchors: [Scene], totalScenes: Int) async -> [Scene] {
         guard !anchors.isEmpty else { return [] }
-        let unplayed: [String: Any] = ["value": 0, "modifier": "EQUALS"]
+        // New only asks the server for unplayed scenes; the other modes take any and drop the
+        // ones played in the window afterwards.
+        let onlyUnplayed = discovery == .fresh
+        func scoped(_ filter: [String: Any]) -> [String: Any] {
+            guard onlyUnplayed else { return filter }
+            return filter.merging(["play_count": ["value": 0, "modifier": "EQUALS"]]) { $1 }
+        }
         var filters: [[String: Any]] = []
         for anchor in anchors {
             let performerIds = anchor.performers.map(\.id)
             if !performerIds.isEmpty {
-                filters.append([
-                    "performers": ["value": performerIds, "modifier": "INCLUDES"],
-                    "play_count": unplayed
-                ])
+                filters.append(scoped([
+                    "performers": ["value": performerIds, "modifier": "INCLUDES"]
+                ]))
             }
             let rareTags = (anchor.tags ?? [])
                 .sorted { rarity(of: $0, totalScenes: totalScenes) > rarity(of: $1, totalScenes: totalScenes) }
                 .prefix(3)
                 .map(\.id)
             if rareTags.count >= 2 {
-                filters.append([
-                    "tags": ["value": rareTags, "modifier": "INCLUDES_ALL", "depth": 0],
-                    "play_count": unplayed
-                ])
+                filters.append(scoped([
+                    "tags": ["value": rareTags, "modifier": "INCLUDES_ALL", "depth": 0]
+                ]))
             }
         }
         let sort = "random_\(Self.sessionSeed)"

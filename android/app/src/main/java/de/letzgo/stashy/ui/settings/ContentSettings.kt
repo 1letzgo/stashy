@@ -175,7 +175,11 @@ class DashboardSettingsScreen : Screen {
                         SectionHeaderText("Visible Dashboard Rows")
                         // Channels are stashy+: the row is hidden while locked; moves map back onto the full list.
                         val allRows = TabManager.homeRows
-                        val rows = if (StashyPlus.isUnlocked) allRows else allRows.filter { it.type != HomeRowType.Channels }
+                        val rows = allRows.filter {
+                            (!it.type.requiresStashyPlus || StashyPlus.isUnlocked) &&
+                                // For You comes with Settings › stashy+ › Recommendations.
+                                (it.type != HomeRowType.Recommendations || de.letzgo.stashy.data.tools.SceneRecommendations.isFeatureOn)
+                        }
                         SettingsGroup {
                             ReorderableColumn(rows, { it.id }, { from, to ->
                                 val fullFrom = allRows.indexOfFirst { it.id == rows[from].id }
