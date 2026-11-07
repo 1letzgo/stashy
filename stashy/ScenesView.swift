@@ -1342,17 +1342,23 @@ private struct ScenesViewContent: View {
         }
         .onAppear {
             // Check for injected sort from coordinator FIRST (before filters load)
+            // A Home row link (e.g. "For You") hands over a sort or filter. The catalog list
+            // keeps its rows warm across visits, so it must refetch — otherwise the new sort
+            // shows in the bar over the old order.
+            var injectedNow = false
             if let injectedSortStr = coordinator.activeSortOption,
                let injectedSort = StashDBViewModel.SceneSortOption(rawValue: injectedSortStr) {
                 selectedSortOption = injectedSort
                 coordinator.activeSortOption = nil
                 hasInjectedSort = true  // Mark that we have an injected sort
+                injectedNow = true
             }
             
             if let injectedFilter = coordinator.activeFilter {
                 selectedFilter = injectedFilter
                 coordinator.activeFilter = nil
                 syncLiveChipsToMatchSelectedFilter()
+                injectedNow = true
             }
             
             if !coordinator.activeSearchText.isEmpty {
@@ -1371,9 +1377,11 @@ private struct ScenesViewContent: View {
                 performSearch()
             } else if isSceneListDetailScope || hasInjectedFilter || TabManager.shared.getDefaultFilterId(for: .scenes) == nil {
                 // Ohne Standardfilter (oder in einem Detail-Scope) muss nicht darauf gewartet werden.
-                if primarySceneListIsEmpty {
+                if primarySceneListIsEmpty || injectedNow {
                     performSearch()
                 }
+            } else if injectedNow {
+                performSearch()
             }
         }
         .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("ServerConfigChanged"))) { _ in
