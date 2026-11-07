@@ -42,6 +42,9 @@ final class MiniPlayerStore: ObservableObject {
     /// Deleted since the last server switch: a page still showing one (Now Playing closing
     /// over it) must not hand its engine to the bar.
     private var deletedSceneIds = Set<String>()
+    /// Closed from the full view: its page hands the engine over when it goes away, and that
+    /// hand-over must stop the video instead of bringing the bar back.
+    private var closedFromNowPlayingId: String?
 
     /// Resume time and play duration keep syncing while only the bar shows the video.
     private let tracker = ScenePlaybackActivityTracker()
@@ -118,6 +121,12 @@ final class MiniPlayerStore: ObservableObject {
         // would leave a second, still playing video behind the sheet.
         if (showsNowPlaying && nowPlayingScene.map({ $0.id != scene.id }) == true)
             || deletedSceneIds.contains(scene.id) {
+            engine.stop()
+            return
+        }
+        if closedFromNowPlayingId == scene.id {
+            closedFromNowPlayingId = nil
+            forgetLastSession(sceneId: scene.id)
             engine.stop()
             return
         }
@@ -327,6 +336,19 @@ final class MiniPlayerStore: ObservableObject {
         if nowPlayingScene?.id == sceneId { showsNowPlaying = false; nowPlayingScene = nil }
         playingQueue.removeAll { $0.id == sceneId }
         if WatchlistStore.shared.contains(sceneId) { WatchlistStore.shared.remove(sceneId) }
+    }
+
+    /// The full view's Close: the video leaves the player (bar included) and the sheet closes.
+    func closeNowPlaying() {
+        let sceneId = nowPlayingScene?.id ?? session?.scene.id
+        closedFromNowPlayingId = sceneId
+        close()
+        showsNowPlaying = false
+        // Nothing handed over within a moment (the page had no engine): drop the marker so a
+        // later hand-over of the same scene works again.
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2) { [weak self] in
+            if self?.closedFromNowPlayingId == sceneId { self?.closedFromNowPlayingId = nil }
+        }
     }
 
     /// From the full view to the scene page (metadata, markers, editing). The page takes the
@@ -880,7 +902,7 @@ struct WatchlistSceneRow: View {
 /// The bar above the tab bar: live picture, title, play/pause, close. Tap reopens the scene,
 /// a swipe down closes it.
 struct MiniPlayerBar: View {
-    /// Inline beside the shrunk tab bar: cover, title and play only (Music's compact bar).
+    /// Inline beside the shrunk tab bar: cover, title, play and close.
     var compact: Bool = false
     @ObservedObject private var store = MiniPlayerStore.shared
 
@@ -989,19 +1011,17 @@ private struct MiniPlayerBarContent: View {
             }
             .buttonStyle(.plain)
             .accessibilityLabel(isPlaying ? "Pause" : "Play")
-            if !compact {
-                Button {
-                    HapticManager.light()
-                    MiniPlayerStore.shared.close()
-                } label: {
-                    Image(systemName: "xmark")
-                        .font(.system(size: 15, weight: .semibold))
-                        .frame(width: 32, height: 36)
-                        .contentShape(Rectangle())
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel("Close mini player")
+            Button {
+                HapticManager.light()
+                MiniPlayerStore.shared.close()
+            } label: {
+                Image(systemName: "xmark")
+                    .font(.system(size: 15, weight: .semibold))
+                    .frame(width: 32, height: 36)
+                    .contentShape(Rectangle())
             }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Close mini player")
         }
         .padding(.leading, 8)
         .padding(.trailing, 6)
@@ -1221,14 +1241,17 @@ private struct NowPlayingContent: View {
         .frame(width: proxy.size.width)
         }
         .background(Color.appBackground.ignoresSafeArea())
-        // Standard chrome: Minimize like Back on the left, Details on the right.
+        // Close (ends playback) where Back sits; Details and Minimize as round buttons on the right.
         .hideSystemNavigationBarForCustomChrome()
         .stashyCustomChromeInset(spacing: 0) {
             StashyDetailTopBar(
-                backTitle: "Minimize",
-                backIcon: "chevron.down",
-                trailingAction: ("Details", "info.circle", { player.openSceneDetails() }),
-                onBack: { dismiss() }
+                backTitle: "Close",
+                backIcon: "xmark",
+                trailingSlots: [
+                    CatalogChromeSlot(systemImage: "info.circle", accessibilityLabel: "Details") { player.openSceneDetails() },
+                    CatalogChromeSlot(systemImage: "chevron.down", accessibilityLabel: "Minimize") { dismiss() }
+                ],
+                onBack: { player.closeNowPlaying() }
             )
         }
         }
