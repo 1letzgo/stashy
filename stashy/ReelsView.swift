@@ -6540,6 +6540,14 @@ extension ReelItemView {
             // the 404 case is already gone within a second through the availability probe.
             guard self.isActive else { return }
             if !self.isPlaybackMoving, !self.hasUsableMedia {
+                // Slow storage (a NAS waking up) can take 5–10 s before the first frame. A file
+                // the server does have is still loading, not missing: keep waiting, the engine's
+                // own error path reports a real failure.
+                if let url = self.item.videoURL, !(await ReelsViewBody.generatedFileIsMissing(at: url)) {
+                    AppLog.debug("🎬 Reel watchdog: file is on the server, still loading — waiting")
+                    return
+                }
+                guard self.isActive, !self.isPlaybackMoving, !self.hasUsableMedia else { return }
                 AppLog.error("🎬 Reel watchdog: no playable media for this row — skipping it")
                 self.engineErrorMessage = "No playable source"
                 self.onPlaybackUnavailable()
@@ -6881,6 +6889,8 @@ extension ReelItemView {
 
         aether.onFirstFrame = {
             self.videoSurfaceReadiness.markFrameReady()
+            // It plays after all (slow source): no error over a running video.
+            if self.engineErrorMessage != nil { self.engineErrorMessage = nil }
         }
 
         aether.onReachedEnd = {
