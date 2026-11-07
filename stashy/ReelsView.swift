@@ -2675,8 +2675,9 @@ struct ReelsViewBody: View {
     }
 
     private func handlePlayCountChange(item: ReelItemData, newCount: Int) {
-        // As requested: bypass view counter for Previews
-        if case .preview = item { return }
+        // Only scenes count plays: Previews by choice, Markers because Stash keeps no
+        // play count for a marker (the mutation was rejected on every marker).
+        guard case .scene = item else { return }
         
         if case .scene(let scene) = item {
             let sceneId = scene.id
@@ -2721,26 +2722,6 @@ struct ReelsViewBody: View {
                             }
                         }
                         ToastManager.shared.show("View count update failed", icon: "exclamationmark.triangle", style: .error)
-                    }
-                }
-            }
-        } else if case .marker(let marker) = item {
-            let markerId = marker.id
-            let originalCount = viewModel.sceneMarkers.first(where: { $0.id == markerId })?.playCount ?? 0
-            if let index = viewModel.sceneMarkers.firstIndex(where: { $0.id == markerId }) {
-                viewModel.sceneMarkers[index] = viewModel.sceneMarkers[index].withPlayCount(newCount)
-            }
-            viewModel.addSceneMarkerPlay(markerId: markerId) { returnedCount in
-                DispatchQueue.main.async {
-                    if let count = returnedCount {
-                        if let idx = viewModel.sceneMarkers.firstIndex(where: { $0.id == markerId }) {
-                            viewModel.sceneMarkers[idx] = viewModel.sceneMarkers[idx].withPlayCount(count)
-                        }
-                    } else {
-                        if let idx = viewModel.sceneMarkers.firstIndex(where: { $0.id == markerId }) {
-                            viewModel.sceneMarkers[idx] = viewModel.sceneMarkers[idx].withPlayCount(originalCount)
-                        }
-                        ToastManager.shared.show("Marker view count update failed", icon: "exclamationmark.triangle", style: .error)
                     }
                 }
             }

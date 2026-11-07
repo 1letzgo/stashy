@@ -331,15 +331,6 @@ class GraphQLQueries {
         }
         """
 
-    static let sceneMarkerIncrementPlayMutation = """
-        mutation SceneMarkerIncrementPlay($id: ID!) {
-          sceneMarkerUpdate(input: { id: $id }) {
-            id
-            play_count
-          }
-        }
-        """
-
     static let sceneMarkerCreateMutation = """
         mutation SceneMarkerCreate($input: SceneMarkerCreateInput!) {
             sceneMarkerCreate(input: $input) {

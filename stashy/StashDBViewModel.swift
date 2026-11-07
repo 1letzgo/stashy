@@ -6720,31 +6720,6 @@ class StashDBViewModel: ObservableObject {
         }
     }
     
-    func addSceneMarkerPlay(markerId: String, completion: ((Int?) -> Void)? = nil) {
-        let mutation = GraphQLQueries.sceneMarkerIncrementPlayMutation
-        
-        let variables: [String: Any] = ["id": markerId]
-        
-        AppLog.debug("🎬 MARKER PLAY: Sending increment via sceneMarkerUpdate for marker \(markerId)")
-        Task {
-            do {
-                let result = try await GraphQLClient.shared.performMutation(mutation: mutation, variables: variables)
-                if let data = result["data"]?.value as? [String: Any],
-                   let payload = data["sceneMarkerUpdate"] as? [String: Any] {
-                    if let newCount = payload["play_count"] as? Int {
-                        AppLog.debug("✅ MARKER PLAY: Success for marker \(markerId). New count: \(newCount)")
-                        await MainActor.run { completion?(newCount) }
-                        return
-                    }
-                }
-                await MainActor.run { completion?(nil) }
-            } catch {
-                AppLog.error("❌ MARKER PLAY: Error for marker \(markerId): \(error)")
-                await MainActor.run { completion?(nil) }
-            }
-        }
-    }
-    
     func incrementOCounter(sceneId: String, completion: ((Int?) -> Void)? = nil) {
         let mutation = """
         {

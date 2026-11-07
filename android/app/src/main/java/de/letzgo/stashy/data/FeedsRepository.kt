@@ -86,12 +86,6 @@ object FeedsRepository {
         (data["sceneAddPlay"].obj?.get("count") as? JsonPrimitive)?.intOrNull
     }.getOrNull()
 
-    /** iOS: `addSceneMarkerPlay` (`sceneMarkerIncrementPlayMutation`). Servers without marker play counts answer with an error → null. */
-    suspend fun addSceneMarkerPlay(id: String): Int? = runCatching {
-        val data = GraphQL.data("mutation SceneMarkerIncrementPlay(\$id: ID!) { sceneMarkerUpdate(input: { id: \$id }) { id play_count } }", vars("id" to id))
-        (data["sceneMarkerUpdate"].obj?.get("play_count") as? JsonPrimitive)?.intOrNull
-    }.getOrNull()
-
     /** iOS: `deleteSceneWithFiles` — destroys the scene, then its files. */
     suspend fun deleteSceneWithFiles(scene: Scene): Boolean = runCatching {
         GraphQL.data("mutation SceneDestroy(\$id: ID!) { sceneDestroy(input: { id: \$id }) }", vars("id" to scene.id))

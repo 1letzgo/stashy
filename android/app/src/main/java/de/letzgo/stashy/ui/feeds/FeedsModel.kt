@@ -1005,13 +1005,12 @@ object FeedsModel {
         }
     }
 
-    /** iOS `handlePlayCountChange` — credited once per row after the Feeds threshold. */
+    /** iOS `handlePlayCountChange` — credited once per row after the Feeds threshold. Scenes only: Stash keeps no play count for a marker. */
     fun creditPlay(item: FeedItem) {
         when (item) {
             is FeedItem.SceneItem -> scope.launch {
                 FeedsRepository.addScenePlay(item.scene.id)?.let { c -> patchScene(item.scene.id) { it.copy(playCount = c) } }
             }
-            is FeedItem.MarkerItem -> scope.launch { FeedsRepository.addSceneMarkerPlay(item.marker.id) }
             else -> {}
         }
     }
