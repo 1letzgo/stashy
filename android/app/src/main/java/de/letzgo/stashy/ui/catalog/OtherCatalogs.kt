@@ -64,7 +64,7 @@ fun PerformersCatalog() {
 fun PerformersList(c: CatalogController<Performer>, topPadding: androidx.compose.ui.unit.Dp = catalogTopPadding()) {
     CatalogScaffold(
         c, CatalogTexts("Loading performers...", SF.person3, "No performers found", "Load Performers"),
-        CatalogSlots(), posterColumns, { it.id }, topPadding,
+        CatalogSlots(), posterColumns, { it.id }, topPadding, gridKey = c.listResetToken,
     ) { _, performer ->
         PerformerCard(performer, badgeType = PerformerBadgeType.forSort(c.sort), onClick = { Nav.push(PerformerDetailScreen(performer.id, performer)) })
     }
@@ -82,7 +82,7 @@ fun StudiosCatalog() {
 fun StudiosList(c: CatalogController<Studio>, topPadding: androidx.compose.ui.unit.Dp = catalogTopPadding()) {
     CatalogScaffold(
         c, CatalogTexts("Loading studios...", SF.building2, "No studios found", "Load Studios"),
-        CatalogSlots(), posterColumns, { it.id }, topPadding,
+        CatalogSlots(), posterColumns, { it.id }, topPadding, gridKey = c.listResetToken,
     ) { _, studio ->
         StudioCard(studio, onClick = { Nav.push(StudioDetailScreen(studio.id, studio)) })
     }
@@ -100,7 +100,7 @@ fun TagsCatalog() {
 fun TagsList(c: CatalogController<Tag>, topPadding: androidx.compose.ui.unit.Dp = catalogTopPadding()) {
     CatalogScaffold(
         c, CatalogTexts("Loading tags...", SF.tag, "No tags found", "Load Tags"),
-        CatalogSlots(), posterColumns, { it.id }, topPadding,
+        CatalogSlots(), posterColumns, { it.id }, topPadding, gridKey = c.listResetToken,
     ) { _, tag ->
         TagCard(tag, onClick = { Nav.push(TagDetailScreen(tag.id, tag)) })
     }
@@ -113,7 +113,7 @@ fun GroupsCatalog() {
     val c = rememberCatalogController<StashGroup>(FilterMode.Groups)
     CatalogScaffold(
         c, CatalogTexts("Loading groups...", SF.rectangleStackFill, "No groups found", "Load Groups"),
-        CatalogSlots(), posterColumns, { it.id },
+        CatalogSlots(), posterColumns, { it.id }, gridKey = c.listResetToken,
     ) { _, group ->
         GroupCard(group, onClick = { Nav.push(GroupDetailScreen(group.id, group)) })
     }
@@ -126,7 +126,7 @@ fun MarkersCatalog() {
     val c = rememberCatalogController<SceneMarker>(FilterMode.SceneMarkers)
     CatalogScaffold(
         c, CatalogTexts("Loading markers...", SF.bookmarkFill, "No markers found", "Load Markers"),
-        CatalogSlots(), posterColumns, { it.id },
+        CatalogSlots(), posterColumns, { it.id }, gridKey = c.listResetToken,
     ) { _, marker ->
         MarkerCard(marker, onClick = {
             marker.scene?.let { scene -> Nav.push(SceneDetailScreen(scene.id, scene.copy(resumeTime = marker.seconds), autoPlay = true)) }
@@ -158,7 +158,7 @@ fun GalleriesList(
     CatalogScaffold(
         c, CatalogTexts("Loading galleries...", SF.photoStack, "No galleries found", "Reload"),
         CatalogSlots(),
-        columns = columns ?: { cols.columnCount(it) }, itemKey = { it.id }, topPadding = topPadding, gridKey = cols,
+        columns = columns ?: { cols.columnCount(it) }, itemKey = { it.id }, topPadding = topPadding, gridKey = cols to c.listResetToken,
     ) { _, gallery ->
         card(gallery, cols.cardAspectRatio)
     }
@@ -205,7 +205,7 @@ fun ImagesList(c: CatalogController<StashImage>, holder: ImageMediaKindHolder, c
                 onDelete = { selection.requestDelete() },
             ),
         ),
-        columns = { cols.columnCount(it) }, itemKey = { it.id }, topPadding = topPadding, gridKey = cols,
+        columns = { cols.columnCount(it) }, itemKey = { it.id }, topPadding = topPadding, gridKey = cols to c.listResetToken,
         // iOS `usesOneColumnFeedLayout`: 1/row is the grouped feed, not a grid of cards —
         // except while selecting, where every image is its own selectable card.
         listBody = if (cols == CatalogCardColumns.One && !selection.isActive) { top ->

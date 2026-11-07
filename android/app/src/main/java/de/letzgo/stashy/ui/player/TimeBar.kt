@@ -3,6 +3,7 @@ package de.letzgo.stashy.ui.player
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -23,6 +24,7 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
 import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Text
@@ -45,6 +47,10 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -54,10 +60,18 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
 import de.letzgo.stashy.ui.Appearance
+import de.letzgo.stashy.ui.SF
 import de.letzgo.stashy.ui.stashyGlass
 
 /** A marker on the time bar (iOS: `AetherTimeBarMarker`). */
 data class TimeBarMarker(val seconds: Double, val title: String?)
+
+/** iOS: `AetherTimeBarPlayPause` — play / pause at the bar's trailing end (Feeds). */
+data class TimeBarPlayPause(val isPlaying: Boolean, val toggle: () -> Unit)
+
+/** Width of the play / pause target and how far it tucks into the row spacing before it (iOS 28 pt, -4 pt). */
+private val PLAY_PAUSE_WIDTH = 28.dp
+private val PLAY_PAUSE_TUCK = 4.dp
 
 /** iOS: `AetherTimeBar.markerLabelWindow` — the scrub preview names a marker up to 60 s after its start. */
 internal fun markerAt(markers: List<TimeBarMarker>, time: Double): TimeBarMarker? {
@@ -84,6 +98,8 @@ fun TimeBar(
     isCompact: Boolean = false,
     /** Video aspect (w / h) for the still while no sprite tile is shown; the tile's own size wins. */
     previewAspectRatio: Float? = null,
+    /** Play / pause at the trailing end (Feeds); null leaves the bar a pure timeline. */
+    playPause: TimeBarPlayPause? = null,
     onScrubChanged: (Double) -> Unit,
     onScrubEnded: (Double) -> Unit,
 ) {
@@ -154,6 +170,29 @@ fun TimeBar(
                 },
             )
             FixedLabel("-" + PlaybackFormat.time(remaining), "-$template", labelStyle)
+            if (playPause != null) {
+                val label = if (playPause.isPlaying) "Pause" else "Play"
+                Box(
+                    Modifier
+                        // iOS `.padding(.leading, -4)`: reports 4 dp less, so the gap to the label is 8 dp.
+                        .layout { measurable, constraints ->
+                            val placeable = measurable.measure(constraints)
+                            val tuck = PLAY_PAUSE_TUCK.roundToPx()
+                            layout((placeable.width - tuck).coerceAtLeast(0), placeable.height) { placeable.place(-tuck, 0) }
+                        }
+                        .width(PLAY_PAUSE_WIDTH)
+                        .fillMaxHeight()
+                        .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null, onClick = playPause.toggle)
+                        .semantics { role = Role.Button; contentDescription = label },
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(
+                        if (playPause.isPlaying) SF.pauseFill else SF.playFill, null,
+                        tint = Color.White,
+                        modifier = Modifier.size(if (isCompact) 18.dp else 20.dp),
+                    )
+                }
+            }
         }
         if (isScrubbing && dur > 0) {
             // Floating still just above the thumb, clamped to the bar so it never leaves the surface.
@@ -161,7 +200,9 @@ fun TimeBar(
             // clamp is what made it ~3:1), and placed by its bottom edge a small gap above the bar.
             val labelWidth = with(LocalDensity.current) { (labelStyle.fontSize.toDp() * template.length * 0.62f) }
             val trackStart = 16.dp + labelWidth + 12.dp
-            val trackWidth = (maxWidth - trackStart * 2).coerceAtLeast(1.dp)
+            // The trailing play / pause (12 dp spacing + 28 dp − 4 dp tuck) narrows the track on its side.
+            val trackEnd = trackStart + if (playPause != null) 12.dp + PLAY_PAUSE_WIDTH - PLAY_PAUSE_TUCK else 0.dp
+            val trackWidth = (maxWidth - trackStart - trackEnd).coerceAtLeast(1.dp)
             val aspect = scrubPreviewAspect(previewImage?.let { it.width to it.height }, previewAspectRatio)
             val (pw, ph) = scrubPreviewSize(aspect)
             val previewW = pw.dp

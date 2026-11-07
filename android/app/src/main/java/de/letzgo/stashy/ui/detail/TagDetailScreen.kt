@@ -122,7 +122,7 @@ class TagDetailScreen(val tagId: String, val preview: Tag? = null, private val f
         LaunchedEffect(Unit) { if (!started) { started = true; load() } }
         AutoSwitchTab(catalog, tab) { tab = it }
         Box(Modifier.fillMaxSize().background(Theme.palette.background)) {
-            DetailGrid(gridState, { w -> columnsFor(tab, w, catalog.imageColumns) }, hasTabs = catalog.available.size > 1, header = { tag?.let { Header(it) } }) {
+            DetailGrid(gridState, { w -> columnsFor(tab, w, catalog.imageColumns) }, header = { tag?.let { Header(it) } }) {
                 linkedSection(catalog, tab, gridState)
             }
             // iOS: the scenes tab adds `SceneBulkDownloadChrome.slot` (contextual, before filter & sort).
@@ -134,7 +134,7 @@ class TagDetailScreen(val tagId: String, val preview: Tag? = null, private val f
             }
             DetailTopBar(
                 tag?.name ?: "", catalog.available, tab, { tab = it }, extra,
-                settings = catalog.settingsSlot(tab),
+                settings = catalog.settingsSlot(tab), sort = catalog.controller(tab),
                 isFavorite = isFavorite, favoriteBusy = favoriteBusy, onFavorite = ::toggleFavorite,
                 onEdit = { editing = true }, editLabel = "Edit tag",
             )

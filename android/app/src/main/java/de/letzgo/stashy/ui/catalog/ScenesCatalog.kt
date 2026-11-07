@@ -40,6 +40,8 @@ fun ScenesList(controller: CatalogController<Scene>, topPadding: androidx.compos
         itemKey = { it.id },
         topPadding = topPadding,
         showsFloatingBar = showsFloatingBar,
+        // A sort / filter / search change sends the list back to the top (iOS `listResetToken`).
+        gridKey = controller.listResetToken,
     ) { _, scene ->
         SceneCard(scene, aspectRatio = CatalogCardColumns.One.cardAspectRatio, onClick = { Nav.push(SceneDetailScreen(scene.id, scene)) })
     }

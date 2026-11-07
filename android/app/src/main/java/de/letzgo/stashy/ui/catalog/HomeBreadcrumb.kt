@@ -136,15 +136,62 @@ private fun LibraryMenu(tabs: List<CatalogTab>) {
     }
 }
 
-/** iOS: the quick-sort menu — collapsed it shows the active field's icon and the direction. */
+/**
+ * iOS `DetailBreadcrumbRow.sectionMenu`: the shown section's name, highlighted like the Home
+ * views menu ([LibraryMenu]); the menu lists [items]. A single item is a plain label.
+ */
 @Composable
-private fun SortMenu(controller: CatalogController<*>) {
+internal fun <T> BreadcrumbSectionMenu(
+    current: T,
+    items: List<T>,
+    title: (T) -> String,
+    icon: (T) -> ImageVector,
+    onSelect: (T) -> Unit,
+    modifier: Modifier = Modifier,
+    accessibilityPrefix: String = "Section",
+) {
+    var open by remember { mutableStateOf(false) }
+    val selectable = items.size > 1
+    Box(modifier) {
+        Row(
+            Modifier.heightIn(min = 40.dp).clip(RoundedCornerShape(12.dp)).clickable(enabled = selectable) { open = true }
+                .padding(horizontal = 10.dp)
+                .semantics(mergeDescendants = true) { contentDescription = "$accessibilityPrefix, ${title(current)}" },
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(4.dp),
+        ) {
+            Text(
+                title(current), Modifier.weight(1f, fill = false), style = MaterialTheme.typography.titleSmall, color = nativeAccent(),
+                maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+            )
+            if (selectable) Icon(SF.chevronUpChevronDown, null, tint = nativeAccent(), modifier = Modifier.size(16.dp))
+        }
+        DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
+            items.forEach { item ->
+                DropdownMenuItem(
+                    text = { Text(title(item)) },
+                    leadingIcon = { Icon(icon(item), null) },
+                    trailingIcon = { if (item == current) Icon(SF.checkmark, null) },
+                    onClick = { open = false; if (item != current) onSelect(item) },
+                )
+            }
+        }
+    }
+}
+
+/**
+ * iOS: the quick-sort menu — collapsed it shows the active field's icon and the direction.
+ * [offersForYou] false drops the For You sort (detail pages: it ignores their scope).
+ */
+@Composable
+internal fun SortMenu(controller: CatalogController<*>, offersForYou: Boolean = true) {
     val p = Theme.palette
     var open by remember { mutableStateOf(false) }
     val sort = controller.sort
     val fields = controller.extraSorts.distinctBy { it.field }
         .map { CatalogQuickSortCatalog.Field(it.field, it.label.substringBefore(" (")) } +
         CatalogQuickSortCatalog.availableFields(controller.mode)
+            .filter { offersForYou || it.field != de.letzgo.stashy.data.SortOption.FOR_YOU_FIELD }
     val active = fields.firstOrNull { CatalogQuickSortCatalog.isActive(sort, it.field) }
     val direction = when {
         sort.isRandom -> null

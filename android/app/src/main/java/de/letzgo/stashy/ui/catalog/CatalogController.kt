@@ -204,8 +204,24 @@ class CatalogController<T>(
         CatalogQuickSortCatalog.next(mode, sort, field)?.let { changeSort(it) }
     }
 
+    /**
+     * Bumped on every fresh first-page fetch (sort, filter, search, request, pull to refresh).
+     * The list screens key their grid with it, so it returns to the top: the old rows stay until
+     * the new first page arrives, and an offset deep in the old list would lie past the end of
+     * the new one (iOS ad48c351 `listResetToken`).
+     */
+    var listResetToken by mutableStateOf(0)
+        private set
+
+    /** First page again without rebuilding For You (iOS `performSearch`) — catalog requests. */
+    fun refetch() {
+        listResetToken++
+        list.refresh()
+    }
+
     /** Pull to refresh. Sorted For You, a new For You list is built first — otherwise the list would only re-read the one shown. */
     fun refresh() {
+        listResetToken++
         if (mode == FilterMode.Scenes && sort.isForYou) {
             coroutineScope.launch {
                 de.letzgo.stashy.data.tools.SceneRecommendations.rebuildAndWait()
@@ -286,7 +302,9 @@ class CatalogController<T>(
     /**
      * iOS `NavigationCoordinator.activeSortOption` / `activeSearchText` / `noDefaultFilter` —
      * what a dashboard header, a stats tile or Search "Show All" asked this catalog for.
-     * Returns whether the list must be refetched.
+     * Returns whether the list must be refetched. iOS (54fe29a8): an injected sort always
+     * refetches, even when it equals the current one — the catalog list stays warm across
+     * visits, so its rows may predate the Home row that linked here.
      */
     fun applyRequest(request: Nav.CatalogRequest): Boolean {
         var changed = false
@@ -295,8 +313,8 @@ class CatalogController<T>(
                 if (s.isRandom && sort.isRandom) RandomSeeds.refresh(mode)
                 sort = s
                 persistSort(s)
-                changed = true
             }
+            changed = true
         }
         if (request.noDefaultFilter) {
             didApplyDefaultFilter = true
@@ -524,11 +542,13 @@ fun <T> rememberCatalogController(
         controller.syncDefaults()
         val wasLoaded = controller.list.loadedOnce
         controller.onAppear()
-        if (changed && wasLoaded) controller.refresh()
+        // `refetch()`, not `refresh()`: sorted For You, the link shows the list
+        // the Home row just showed (iOS `performSearch`) instead of building the next one.
+        if (changed && wasLoaded) controller.refetch()
         // Requests arriving while this catalog is on screen.
         if (controller.isCatalogRoot && catalogTab != null) {
             snapshotFlow { Nav.catalogRequest }.collect { req ->
-                if (req?.tab == catalogTab) Nav.consumeCatalogRequest(catalogTab)?.let { if (controller.applyRequest(it)) controller.refresh() }
+                if (req?.tab == catalogTab) Nav.consumeCatalogRequest(catalogTab)?.let { if (controller.applyRequest(it)) controller.refetch() }
             }
         }
     }

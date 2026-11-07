@@ -200,13 +200,16 @@ private fun CoverWithOverlay(model: SceneDetailModel) {
                     }
                 }
             }
-            PlaybackFormat.resolutionLabel(scene.files?.firstOrNull()?.height)?.let { label ->
+            // iOS: resolution pill, then the frame rate ("30 fps") in its own pill after it.
+            val resolutionLabel = PlaybackFormat.resolutionLabel(scene.files?.firstOrNull()?.height)
+            val frameRateLabel = coverFrameRateLabel(scene.files?.firstOrNull()?.frameRate)
+            if (resolutionLabel != null || frameRateLabel != null) {
                 Row(
-                    Modifier.align(Alignment.TopEnd).padding(10.dp).heightIn(min = 24.dp).stashyGlass(RoundedCornerShape(50)).padding(horizontal = 9.dp, vertical = 3.dp),
-                    verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp),
+                    Modifier.align(Alignment.TopEnd).padding(10.dp),
+                    verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp),
                 ) {
-                    Icon(PlayerIcons.video, null, tint = Color.White, modifier = Modifier.size(scaledIconSize(11.dp)))
-                    Text(label, color = Color.White, style = IosTypography.caption2.copy(fontWeight = FontWeight.Bold))
+                    resolutionLabel?.let { CoverInfoPill(it, PlayerIcons.video) }
+                    frameRateLabel?.let { CoverInfoPill(it, PlayerIcons.speed) }
                 }
             }
             val duration = scene.sceneDuration
@@ -215,6 +218,27 @@ private fun CoverWithOverlay(model: SceneDetailModel) {
                 Box(Modifier.align(Alignment.BottomStart).fillMaxWidth((resume / duration).toFloat().coerceIn(0f, 1f)).height(4.dp).background(tint))
             }
         } }
+    }
+}
+
+/** iOS `coverFrameRateLabel`: "30 fps", "29.97 fps", "23.98 fps" (two decimals, trailing zero dropped). */
+private fun coverFrameRateLabel(fps: Double?): String? {
+    if (fps == null || !(fps > 0)) return null
+    val rounded = Math.round(fps * 100) / 100.0
+    val text = if (rounded == Math.rint(rounded)) rounded.toLong().toString()
+        else String.format(java.util.Locale.US, "%.2f", rounded).removeSuffix("0")
+    return "$text fps"
+}
+
+/** iOS `coverInfoPill`: glass capsule with an icon and bold caption, on the cover's top trailing edge. */
+@Composable
+private fun CoverInfoPill(text: String, icon: androidx.compose.ui.graphics.vector.ImageVector) {
+    Row(
+        Modifier.heightIn(min = 24.dp).stashyGlass(RoundedCornerShape(50)).padding(horizontal = 9.dp, vertical = 3.dp),
+        verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp),
+    ) {
+        Icon(icon, null, tint = Color.White, modifier = Modifier.size(scaledIconSize(11.dp)))
+        Text(text, color = Color.White, style = IosTypography.caption2.copy(fontWeight = FontWeight.Bold))
     }
 }
 

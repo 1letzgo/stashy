@@ -68,7 +68,8 @@ class DirectorDetailScreen(val director: String) : Screen {
                     }
                 }
             }
-            DetailTopBar(director, emptyList(), null, {}, settings = filterSortSlot(scenes))
+            // iOS: Back · "Scenes" (the only section), the list's sort and settings at the right.
+            DetailTopBar(director, listOf(DetailTab.Scenes), DetailTab.Scenes, {}, settings = filterSortSlot(scenes), sort = scenes)
         }
         CatalogFilterSortSheet(scenes)
     }

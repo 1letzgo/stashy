@@ -65,7 +65,7 @@ class GroupDetailScreen(val groupId: String, val preview: StashGroup? = null) : 
         LaunchedEffect(Unit) { if (!started) { started = true; load() } }
         AutoSwitchTab(catalog, tab) { tab = it }
         Box(Modifier.fillMaxSize().background(Theme.palette.background)) {
-            DetailGrid(gridState, { w -> columnsFor(tab, w, catalog.imageColumns) }, hasTabs = catalog.available.size > 1, header = { group?.let { Header(it) } }) {
+            DetailGrid(gridState, { w -> columnsFor(tab, w, catalog.imageColumns) }, header = { group?.let { Header(it) } }) {
                 linkedSection(catalog, tab, gridState)
             }
             // iOS: the scenes tab adds `SceneBulkDownloadChrome.slot` (contextual, before filter & sort).
@@ -74,7 +74,7 @@ class GroupDetailScreen(val groupId: String, val preview: StashGroup? = null) : 
                 else -> emptyList()
             }
             DetailTopBar(group?.name ?: "", catalog.available, tab, { tab = it }, extra,
-                settings = catalog.settingsSlot(tab), onEdit = { editing = true }, editLabel = "Edit group")
+                settings = catalog.settingsSlot(tab), sort = catalog.controller(tab), onEdit = { editing = true }, editLabel = "Edit group")
         }
         LinkedSettingsSheets(catalog)
         val g = group

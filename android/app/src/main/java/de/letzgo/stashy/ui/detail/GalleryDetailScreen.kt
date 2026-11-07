@@ -148,11 +148,13 @@ class GalleryDetailScreen(
                 val edit = if (Appearance.isEditModeEnabled && gallery != null) ChromeSlot(SF.pencil, "Edit gallery") { editing = true } else null
                 val select = ChromeSlot(SF.checkmarkCircle, "Select images") { selection.begin() }
                 val download = gallery?.let { imageSetDownloadSlot(it.id, "Download gallery") { showDownloadOptions = true } }
+                // iOS bf9d8830: Back · "Images", then the actions, the sort menu and the settings.
                 DetailTopBar(
-                    gallery?.displayTitle ?: "", emptyList(), null, {}, listOfNotNull(edit, select, download),
+                    gallery?.displayTitle ?: "", listOf(DetailTab.Images), DetailTab.Images, {}, listOfNotNull(edit, select, download),
                     settings = CatalogChromeSlot(SF.sliderHorizontal3, images.isFilterActive || kind.kind != ImageListMediaKind.All, "Settings") {
                         images.isSheetPresented = true
                     },
+                    sort = images,
                 )
             }
         }

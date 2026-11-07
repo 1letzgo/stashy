@@ -214,7 +214,6 @@ class PerformerDetailScreen(val performerId: String, val preview: Performer? = n
         if (initialTab == null) AutoSwitchTab(catalog, tab) { tab = it }
         LaunchedEffect(tab) { if (tab == DetailTab.AppearsWith) loadCoPerformers(force = false) }
         val p = performer
-        val hasTabs = catalog.available.size > 1
         // Pull-to-refresh only on "Appears with" (the catalog tabs keep their behavior).
         val pullState = rememberPullToRefreshState()
         val appearsWith = tab == DetailTab.AppearsWith
@@ -224,13 +223,13 @@ class PerformerDetailScreen(val performerId: String, val preview: Performer? = n
             Modifier.fillMaxSize().background(Theme.palette.background)
                 .pullToRefresh(coRefreshing, pullState, enabled = appearsWith) { loadCoPerformers(force = true) },
         ) {
-            DetailGrid(gridState, { w -> columnsFor(tab, w, catalog.imageColumns) }, hasTabs = hasTabs, header = { Header(p) }) {
+            DetailGrid(gridState, { w -> columnsFor(tab, w, catalog.imageColumns) }, header = { Header(p) }) {
                 if (appearsWith) appearsWithSection() else linkedSection(catalog, tab, gridState)
             }
             if (appearsWith) {
                 PullToRefreshDefaults.Indicator(
                     state = pullState, isRefreshing = coRefreshing,
-                    modifier = Modifier.align(Alignment.TopCenter).padding(top = detailTopPadding(hasTabs)),
+                    modifier = Modifier.align(Alignment.TopCenter).padding(top = detailTopPadding()),
                 )
             }
             // iOS: the scenes tab adds `SceneBulkDownloadChrome.slot` (contextual, before filter & sort).
@@ -241,6 +240,8 @@ class PerformerDetailScreen(val performerId: String, val preview: Performer? = n
             DetailTopBar(
                 p?.name ?: "", catalog.available, tab, { tab = it }, extra,
                 settings = if (appearsWith) filterSortSlot(coPerformers) else catalog.settingsSlot(tab),
+                // "Appears with" sorts by shared scenes, offered in its sheet only.
+                sort = if (appearsWith) null else catalog.controller(tab),
                 isFavorite = isFavorite, favoriteBusy = favoriteBusy, onFavorite = ::toggleFavorite,
                 onEdit = { editing = true }, editLabel = "Edit performer",
             )

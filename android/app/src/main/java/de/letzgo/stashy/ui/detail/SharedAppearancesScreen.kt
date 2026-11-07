@@ -81,10 +81,10 @@ class SharedAppearancesScreen(
         LaunchedEffect(Unit) { if (!started) { started = true; load() } }
         AutoSwitchTab(catalog, tab) { tab = it }
         Box(Modifier.fillMaxSize().background(Theme.palette.background)) {
-            DetailGrid(gridState, { w -> columnsFor(tab, w, catalog.imageColumns) }, hasTabs = catalog.available.size > 1, header = { Header() }) {
+            DetailGrid(gridState, { w -> columnsFor(tab, w, catalog.imageColumns) }, header = { Header() }) {
                 linkedSection(catalog, tab, gridState)
             }
-            DetailTopBar(title, catalog.available, tab, { tab = it }, settings = catalog.settingsSlot(tab))
+            DetailTopBar(title, catalog.available, tab, { tab = it }, settings = catalog.settingsSlot(tab), sort = catalog.controller(tab))
         }
         LinkedSettingsSheets(catalog)
     }

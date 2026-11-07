@@ -575,6 +575,8 @@ private fun FeedPager(
                     FeedsScrubber(
                         time = time, duration = duration, placeholderURL = activeItem.posterURL,
                         previewImageAt = previewAt,
+                        // iOS: play / pause sits at the bar's trailing end, not in the control stack.
+                        playPause = de.letzgo.stashy.ui.player.TimeBarPlayPause(isPlaying) { model.isPlaying = !model.isPlaying },
                         aspectRatio = pool.videoSizes[activeItem.id]?.let { if (it.width > 0 && it.height > 0) it.width.toFloat() / it.height else null } ?: fileAspect(activeItem),
                         onScrub = { s -> seeking = true; time = s; pool.player(activeId)?.playWhenReady = false; pool.seek(activeId, s) },
                         onScrubEnd = { s ->

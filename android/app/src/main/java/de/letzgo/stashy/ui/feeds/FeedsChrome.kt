@@ -329,7 +329,7 @@ fun StackedPill(icon: ImageVector, value: String, active: Boolean, modifier: Mod
 
 /**
  * iOS: `reelsInfoOverlay` — avatar · performer / title on the leading side, the control stack
- * (O-Counter, Rating, Mute, Play) trailing (Delete sits in the top bar), hashtags in their own row below.
+ * (O-Counter, Rating, Mute; Play only for animated clips, videos play / pause in the time bar) trailing (Delete sits in the top bar), hashtags in their own row below.
  */
 @Composable
 fun FeedsInfoOverlay(
@@ -405,7 +405,11 @@ private fun FeedsInfoOverlayContent(
             Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 if (mode != ReelsModeType.Pics) FeedsRateChrome(item, onOCounter, onRating)
                 ChromePillIconButton(if (isMuted) SF.speakerSlashFill else SF.speakerWave2Fill, if (isMuted) "Unmute" else "Mute", enabled = item.isVideo, onClick = onToggleMute)
-                ChromePillIconButton(if (isPlaying) SF.pauseFill else SF.playFill, if (isPlaying) "Pause" else "Play", enabled = item.isVideo || pausesAdvance, onClick = onTogglePlay)
+                // Videos play and pause from the time bar ([FeedsScrubber]); only an animated clip,
+                // which has no time bar, keeps a button here (iOS parity).
+                if (!item.isVideo && pausesAdvance) {
+                    ChromePillIconButton(if (isPlaying) SF.pauseFill else SF.playFill, if (isPlaying) "Pause" else "Play", onClick = onTogglePlay)
+                }
             }
         }
         // Hashtags on their own full-width row (iOS: top 8): the shared Material [TagChipRow] —
@@ -515,7 +519,7 @@ private fun PerformerThumbnail(p: FeedPerformer, onClick: () -> Unit) {
 
 /**
  * iOS: `IsolatedScrubberBar` — the shared `AetherTimeBar` (44 pt glass capsule: elapsed · track ·
- * remaining) with 16 pt sides and 8 pt above / below. The scrub preview shows
+ * remaining · play / pause) with 16 pt sides and 8 pt above / below. The scrub preview shows
  * [previewImageAt] (Scenes / Markers: the scene's sprite tile, iOS `ReelsView` scrub stills)
  * when it has one for the scrubbed time, else the row's poster ([placeholderURL]).
  */
@@ -526,6 +530,8 @@ fun FeedsScrubber(
     placeholderURL: String?,
     aspectRatio: Float? = null,
     previewImageAt: ((Double) -> androidx.compose.ui.graphics.ImageBitmap?)? = null,
+    /** Play / pause at the bar's trailing end (iOS `IsolatedScrubberBar.playPause`). */
+    playPause: de.letzgo.stashy.ui.player.TimeBarPlayPause? = null,
     onScrub: (Double) -> Unit,
     onScrubEnd: (Double) -> Unit,
 ) {
@@ -541,6 +547,7 @@ fun FeedsScrubber(
         previewAspectRatio = aspectRatio,
         markers = emptyList(),
         modifier = Modifier.padding(horizontal = 16.dp).padding(top = 8.dp, bottom = 8.dp),
+        playPause = playPause,
         onScrubChanged = { s ->
             scrubbing = true
             // A missing tile (sheet still loading, gap in the VTT) keeps the last still.

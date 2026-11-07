@@ -167,6 +167,11 @@ object MiniPlayerStore {
     private var playingQueueServerId: String? = null
     /** Scenes deleted (in the app or found missing on the server) since the last server switch. */
     private val deletedSceneIds = mutableSetOf<String>()
+    /**
+     * Closed from Now Playing: its player module hands the player over when the sheet goes away,
+     * and that hand-over must stop the video instead of bringing the bar back.
+     */
+    private var closedFromNowPlayingId: String? = null
 
     // MARK: Queue
 
@@ -210,6 +215,20 @@ object MiniPlayerStore {
         if (nowPlayingScene?.id == sceneId) { showsNowPlaying = false; nowPlayingScene = null }
         if (playingQueue.any { it.id == sceneId }) playingQueue = playingQueue.filter { it.id != sceneId }
         if (WatchlistStore.contains(sceneId)) WatchlistStore.remove(sceneId)
+    }
+
+    /** iOS `closeNowPlaying` — the full view's Close: the video leaves the player (bar included) and the sheet closes. */
+    fun closeNowPlaying() {
+        val sceneId = nowPlayingScene?.id ?: session?.scene?.id
+        closedFromNowPlayingId = sceneId
+        close()
+        showsNowPlaying = false
+        // Nothing handed over within a moment (the module had no player): drop the marker so a
+        // later hand-over of the same scene works again.
+        scope.launch {
+            kotlinx.coroutines.delay(2_000)
+            if (closedFromNowPlayingId == sceneId) closedFromNowPlayingId = null
+        }
     }
 
     /** Now Playing: switch to [scene] (row tap, previous / next, end of a scene); the view rebuilds its player module for it. */
@@ -260,6 +279,16 @@ object MiniPlayerStore {
         // A deleted scene (its Now Playing module closing) is not taken either.
         val shown = nowPlayingScene
         if ((showsNowPlaying && shown != null && shown.id != scene.id) || scene.id in deletedSceneIds) {
+            player.onTime = null
+            player.onPlayingChanged = null
+            player.onReachedEnd = null
+            player.pause()
+            player.release()
+            return
+        }
+        if (closedFromNowPlayingId == scene.id) {
+            closedFromNowPlayingId = null
+            forgetLastSession(scene.id, serverId)
             player.onTime = null
             player.onPlayingChanged = null
             player.onReachedEnd = null
@@ -452,9 +481,9 @@ object MiniPlayerStore {
 }
 
 /**
- * iOS: `MiniPlayerBar` — live picture, title, performers / studio, play/pause, close and a tint
- * progress line, plus the watchlist button. Tap opens the Now Playing view; a swipe down or
- * sideways closes it.
+ * iOS: `MiniPlayerBar` — live picture, title, performers / studio, play/pause, close (✕ unloads
+ * the video) and a tint progress line. Tap opens the Now Playing view (watchlist included); a
+ * swipe down or sideways closes it.
  */
 @Composable
 fun MiniPlayerBar(visible: Boolean, modifier: Modifier = Modifier) {
@@ -522,7 +551,6 @@ private fun MiniPlayerBarContent(session: MiniPlayerStore.Session) {
                 Text(scene.displayTitle, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = p.text, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 if (subtitle.isNotEmpty()) Text(subtitle, fontSize = 12.sp, color = p.secondaryText, maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
-            WatchlistButton()
             IconButton(onClick = { MiniPlayerStore.togglePlayPause() }, modifier = Modifier.size(40.dp)) {
                 Icon(if (playing) SF.pauseFill else SF.playFill, if (playing) "Pause" else "Play", tint = p.text)
             }
@@ -548,23 +576,6 @@ private fun MiniPlayerProgressLine(player: StashPlayer, modifier: Modifier) {
     }
     Box(modifier) {
         Box(Modifier.fillMaxWidth(progress).height(2.dp).clip(RoundedCornerShape(1.dp)).background(Appearance.tint))
-    }
-}
-
-/** The bar's list button: opens Now Playing, badge = watchlist size. */
-@Composable
-private fun WatchlistButton() {
-    val count = WatchlistStore.all.size
-    Box {
-        IconButton(onClick = { MiniPlayerStore.expand() }, modifier = Modifier.size(36.dp)) {
-            Icon(WatchlistIcons.list, "Watchlist", tint = Theme.palette.text, modifier = Modifier.size(22.dp))
-        }
-        if (count > 0) Text(
-            "$count",
-            Modifier.align(Alignment.TopEnd).padding(top = 2.dp, end = 2.dp)
-                .clip(RoundedCornerShape(50)).background(Appearance.tint).padding(horizontal = 4.dp),
-            fontSize = 11.sp, fontWeight = FontWeight.Bold, color = androidx.compose.ui.graphics.Color.White,
-        )
     }
 }
 

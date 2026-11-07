@@ -1,5 +1,6 @@
 package de.letzgo.stashy.ui.detail
 
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import de.letzgo.stashy.ui.scaledIconSize
 import android.widget.Toast
 import androidx.compose.material.icons.automirrored.filled.Sort
@@ -31,6 +32,11 @@ import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.LocalContentColor
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -73,8 +79,6 @@ import de.letzgo.stashy.ui.Appearance
 import de.letzgo.stashy.ui.IosTypography
 import de.letzgo.stashy.ui.MainTab
 import de.letzgo.stashy.ui.Nav
-import de.letzgo.stashy.ui.NativeTabStrip
-import de.letzgo.stashy.ui.NativeTopBar
 import de.letzgo.stashy.ui.OverflowItem
 import de.letzgo.stashy.ui.TopBarAction
 import de.letzgo.stashy.ui.TopBarOverflowMenu
@@ -121,13 +125,13 @@ internal fun detailToast(message: String) {
     Toast.makeText(Prefs.appContext, message, Toast.LENGTH_SHORT).show()
 }
 
-/** Height of the section [de.letzgo.stashy.ui.NativeTabStrip] under the app bar (Material tab + hairline). */
-internal val DetailTabStripHeight: Dp = 48.5.dp
+/** Height of the [DetailTopBar] row below the status bar (48dp row + hairline, like the Home breadcrumb strip). */
+internal val DetailTopBarHeight: Dp = 48.5.dp
 
-/** Top padding for detail content under [DetailTopBar] (+ the section tabs when shown). */
+/** Top padding for detail content under [DetailTopBar]. */
 @Composable
-internal fun detailTopPadding(hasTabs: Boolean = false): Dp =
-    nativeTopBarPadding() + (if (hasTabs) DetailTabStripHeight else 0.dp) + Tokens.Chrome.contentTopGap
+internal fun detailTopPadding(): Dp =
+    WindowInsets.statusBars.asPaddingValues().calculateTopPadding() + DetailTopBarHeight + Tokens.Chrome.contentTopGap
 
 /** iOS: `StashyChromePillStyle` round icon button (glass, optional tint fill) — media overlays only. */
 @Composable
@@ -153,12 +157,15 @@ internal fun DockIconButton(
 }
 
 /**
- * iOS: the detail chrome bar (`StashySectionChromeBar`: Back · section icons · Favorite · Edit)
- * plus the floating list slots (`CatalogSlotBar`), as one native Material top app bar:
- * back arrow · [title] · slot icons (download state …) · the catalog
- * "Settings" action ([settings], opens the filter & sort sheet) · favorite ·
- * "⋮" overflow (slots marked [ChromeSlot.inOverflow] such as card columns, and Edit). The
- * sections become a [NativeTabStrip] under the bar, shown only when more than one has content.
+ * iOS: `DetailBreadcrumbRow` in a `StashySectionChromeBar`, built like the overviews' Home
+ * breadcrumb ([de.letzgo.stashy.ui.catalog.HomeBreadcrumbStrip]): Back · a dropdown naming the
+ * shown section ([tabs], [selected]; one section is a plain label) and at the right the
+ * section's controls — active slots (download running / done), favorite, the section's sort
+ * menu ([sort]), its filter & sort settings ([settings]) and the "⋮" overflow with the other
+ * slots (download, select …) and Edit. There is no title and no tab strip any more; the
+ * entity's name is in the hero header.
+ *
+ * Without [selected] (gallery selection mode) the row shows [title] and every slot as an icon.
  */
 @Composable
 internal fun DetailTopBar(
@@ -168,42 +175,70 @@ internal fun DetailTopBar(
     onSelect: (DetailTab) -> Unit,
     slots: List<ChromeSlot> = emptyList(),
     settings: de.letzgo.stashy.ui.catalog.CatalogChromeSlot? = null,
+    sort: de.letzgo.stashy.ui.catalog.CatalogController<*>? = null,
     isFavorite: Boolean? = null,
     favoriteBusy: Boolean = false,
     onFavorite: () -> Unit = {},
     onEdit: (() -> Unit)? = null,
     editLabel: String = "Edit",
 ) {
-    Column(Modifier.fillMaxWidth()) {
-        NativeTopBar(title) {
-            slots.filter { !it.inOverflow }.forEach { s ->
-                TopBarAction(s.icon, s.label, tint = if (s.isActive) Appearance.tint else null, onClick = s.onClick)
+    val p = Theme.palette
+    val breadcrumb = selected != null
+    val inline = slots.filter { !it.inOverflow && (!breadcrumb || it.isActive) }
+    val overflow = slots.filter { it !in inline }
+    val canEdit = onEdit != null && Appearance.isEditModeEnabled
+    Column(
+        Modifier.fillMaxWidth().background(p.background)
+            .windowInsetsPadding(WindowInsets.statusBars),
+    ) {
+        Row(
+            Modifier.fillMaxWidth().height(DetailTopBarHeight - 0.5.dp).padding(horizontal = 4.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            IconButton(onClick = { Nav.pop() }) {
+                Icon(androidx.compose.material.icons.Icons.AutoMirrored.Filled.ArrowBack, "Back", tint = p.text)
             }
-            settings?.let { de.letzgo.stashy.ui.catalog.FilterSortAction(it) }
-            if (isFavorite != null) {
-                TopBarAction(
-                    if (isFavorite) SF.heartFill else SF.heart,
-                    if (isFavorite) "Remove favorite" else "Add favorite",
-                    tint = if (isFavorite) StashyColors.systemRed else null,
-                    enabled = !favoriteBusy,
-                    onClick = onFavorite,
-                )
+            // Takes the free width, so a long section name shortens instead of pushing the icons out.
+            Box(Modifier.weight(1f), contentAlignment = Alignment.CenterStart) {
+                if (selected != null) {
+                    de.letzgo.stashy.ui.catalog.BreadcrumbSectionMenu(
+                        current = selected,
+                        items = if (selected in tabs) tabs else listOf(selected),
+                        title = { it.title },
+                        icon = { it.icon },
+                        onSelect = onSelect,
+                    )
+                } else {
+                    Text(
+                        title, Modifier.padding(horizontal = 8.dp), style = MaterialTheme.typography.titleLarge,
+                        color = p.text, maxLines = 1, overflow = TextOverflow.Ellipsis,
+                    )
+                }
             }
-            val overflow = slots.filter { it.inOverflow }
-            val canEdit = onEdit != null && Appearance.isEditModeEnabled
-            if (overflow.isNotEmpty() || canEdit) {
-                TopBarOverflowMenu { dismiss ->
-                    overflow.forEach { s -> OverflowItem(s.label, s.icon, dismiss, onClick = s.onClick) }
-                    if (canEdit) OverflowItem(editLabel, SF.pencil, dismiss) { onEdit?.invoke() }
+            CompositionLocalProvider(LocalContentColor provides p.text) {
+                inline.forEach { s ->
+                    TopBarAction(s.icon, s.label, tint = if (s.isActive) Appearance.tint else null, onClick = s.onClick)
+                }
+                if (isFavorite != null) {
+                    TopBarAction(
+                        if (isFavorite) SF.heartFill else SF.heart,
+                        if (isFavorite) "Remove favorite" else "Add favorite",
+                        tint = if (isFavorite) StashyColors.systemRed else null,
+                        enabled = !favoriteBusy,
+                        onClick = onFavorite,
+                    )
+                }
+                sort?.let { de.letzgo.stashy.ui.catalog.SortMenu(it, offersForYou = false) }
+                settings?.let { de.letzgo.stashy.ui.catalog.FilterSortAction(it) }
+                if (overflow.isNotEmpty() || canEdit) {
+                    TopBarOverflowMenu { dismiss ->
+                        overflow.forEach { s -> OverflowItem(s.label, s.icon, dismiss, onClick = s.onClick) }
+                        if (canEdit) OverflowItem(editLabel, SF.pencil, dismiss) { onEdit?.invoke() }
+                    }
                 }
             }
         }
-        if (tabs.size > 1) {
-            NativeTabStrip(
-                tabs, selected, { it.title }, { if (it != selected) onSelect(it) },
-                Modifier.consumeWindowInsets(WindowInsets.statusBars), icon = { it.icon },
-            )
-        }
+        Box(Modifier.fillMaxWidth().height(0.5.dp).background(p.separator))
     }
 }
 

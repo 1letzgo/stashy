@@ -1,6 +1,5 @@
 package de.letzgo.stashy.ui.components
 
-import de.letzgo.stashy.ui.scaledMaxLines
 import de.letzgo.stashy.ui.scaledIconSize
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -120,19 +119,19 @@ fun PerformerCard(
 }
 
 /**
- * iOS: `StudioCardView` — logo block (2.2:1, header grey, logo fitted with 14/12 insets) above a
- * name row with scene and gallery counts.
+ * iOS: `StudioCardView` — logo block (16:9 like the scene cards, header grey, logo fitted with
+ * 24/16 insets) above a one-line name row with scene and gallery counts.
  */
 @Composable
 fun StudioCard(studio: Studio, modifier: Modifier = Modifier, onClick: (() -> Unit)? = null) {
     val p = Theme.palette
     val counts = de.letzgo.stashy.data.rememberStudioCounts(studio)
     NativeCard(modifier.fillMaxWidth(), onClick = onClick) { Column(Modifier.fillMaxWidth()) {
-        Box(Modifier.fillMaxWidth().aspectRatio(2.2f).background(p.studioHeader), contentAlignment = Alignment.Center) {
-            StudioLogo(studio, Modifier.fillMaxSize().padding(start = 14.dp, end = 14.dp, top = 12.dp))
+        Box(Modifier.fillMaxWidth().aspectRatio(16f / 9f).background(p.studioHeader), contentAlignment = Alignment.Center) {
+            StudioLogo(studio, Modifier.fillMaxSize().padding(horizontal = 24.dp, vertical = 16.dp))
         }
         Row(Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text(studio.name, Modifier.weight(1f), style = NativeType.titleSmall, color = p.text, maxLines = scaledMaxLines(), overflow = TextOverflow.Ellipsis)
+            Text(studio.name, Modifier.weight(1f), style = NativeType.titleSmall, color = p.text, maxLines = 1, overflow = TextOverflow.Ellipsis)
             CountLabel(SF.film, counts.scenes ?: 0)
             counts.galleries?.takeIf { it > 0 }?.let { CountLabel(SF.photoStack, it) }
         }
@@ -170,14 +169,14 @@ private fun CountLabel(icon: ImageVector, count: Int) {
 val Tag.hasCustomImage: Boolean get() = imagePath != null && !imagePath.contains("default")
 
 /**
- * iOS: `TagCardView` — image block (2.2:1, cover-cropped) or a tinted `#` on header grey, then the
- * name with scene / gallery counts.
+ * iOS: `TagCardView` — image block (16:9 like the scene cards, cover-cropped) or a tinted `#` on
+ * header grey, then the one-line name with scene / gallery counts.
  */
 @Composable
 fun TagCard(tag: Tag, modifier: Modifier = Modifier, onClick: (() -> Unit)? = null) {
     val p = Theme.palette
     NativeCard(modifier.fillMaxWidth(), onClick = onClick) { Column(Modifier.fillMaxWidth()) {
-        Box(Modifier.fillMaxWidth().aspectRatio(2.2f).background(p.studioHeader), contentAlignment = Alignment.Center) {
+        Box(Modifier.fillMaxWidth().aspectRatio(16f / 9f).background(p.studioHeader), contentAlignment = Alignment.Center) {
             if (tag.hasCustomImage) {
                 var failed by remember(tag.id) { mutableStateOf(false) }
                 if (failed) {
@@ -190,7 +189,7 @@ fun TagCard(tag: Tag, modifier: Modifier = Modifier, onClick: (() -> Unit)? = nu
             }
         }
         Row(Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text(tag.name, Modifier.weight(1f), style = NativeType.titleSmall, color = p.text, maxLines = scaledMaxLines(), overflow = TextOverflow.Ellipsis)
+            Text(tag.name, Modifier.weight(1f), style = NativeType.titleSmall, color = p.text, maxLines = 1, overflow = TextOverflow.Ellipsis)
             tag.sceneCount?.takeIf { it > 0 }?.let { CountLabel(SF.film, it) }
             tag.galleryCount?.takeIf { it > 0 }?.let { CountLabel(SF.photoStack, it) }
         }

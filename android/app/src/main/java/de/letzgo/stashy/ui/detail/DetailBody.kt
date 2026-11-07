@@ -274,7 +274,6 @@ internal fun AutoSwitchTab(catalog: LinkedCatalog, selected: DetailTab, onSelect
 internal fun DetailGrid(
     state: LazyGridState,
     columnsFor: (widthDp: Float) -> Int,
-    hasTabs: Boolean = false,
     header: @Composable () -> Unit,
     content: LazyGridScope.() -> Unit,
 ) {
@@ -283,7 +282,7 @@ internal fun DetailGrid(
         LazyVerticalGrid(
             columns = GridCells.Fixed(columns),
             state = state,
-            contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = detailTopPadding(hasTabs), bottom = bottomBarContentPadding()),
+            contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = detailTopPadding(), bottom = bottomBarContentPadding()),
             verticalArrangement = Arrangement.spacedBy(12.dp),
             horizontalArrangement = Arrangement.spacedBy(12.dp),
             modifier = Modifier.fillMaxSize(),

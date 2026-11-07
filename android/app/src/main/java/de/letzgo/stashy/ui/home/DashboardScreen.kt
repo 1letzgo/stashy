@@ -276,7 +276,8 @@ private fun HomeRow(config: HomeRowConfig, isLarge: Boolean, isFirst: Boolean) {
                             }
                             items(list, key = { it.id }) { DashboardPerformerCard(it, badge, w, h, isLarge = isLarge, onClick = { DetailLinks.performer(it) }) }
                         }
-                        config.type.isStudioRow -> items(state.studios, key = { it.id }) { DashboardStudioCard(it, isLarge, w, h, onClick = { DetailLinks.studio(it) }) }
+                        // iOS `HomeStudioCardView`: the Studios list's card at the row's width.
+                        config.type.isStudioRow -> items(state.studios, key = { it.id }) { de.letzgo.stashy.ui.components.StudioCard(it, Modifier.width(w), onClick = { DetailLinks.studio(it) }) }
                         config.type.isGalleryRow -> items(state.galleries, key = { it.id }) { (if (isLarge) w else 125.dp).let { gw -> GalleryCard(it, Modifier.size(gw, 125.dp), aspectRatio = gw / 125.dp, shape = dashboardCardShape(isLarge), onClick = { DetailLinks.gallery(it) }) } }
                         else -> items(state.scenes, key = { it.id }) { DashboardSceneCard(it, isLarge, w, h, onClick = { DetailLinks.scene(it) }) }
                     }

@@ -96,7 +96,11 @@ class FeedPlayerPool(context: Context, val size: Int = 3) {
         }
 
         override fun onRenderedFirstFrame() {
-            request?.let { firstFrame[it.id] = true }
+            request?.let {
+                firstFrame[it.id] = true
+                // It plays after all (slow source): no error over a running video (iOS `onFirstFrame`).
+                failed.remove(it.id)
+            }
         }
 
         override fun onVideoSizeChanged(videoSize: VideoSize) {

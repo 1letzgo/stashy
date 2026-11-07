@@ -1,7 +1,5 @@
 package de.letzgo.stashy.ui.home
 
-import de.letzgo.stashy.ui.scaledIconSize
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -36,7 +34,6 @@ import coil3.compose.AsyncImage
 import de.letzgo.stashy.data.Downloads
 import de.letzgo.stashy.data.Performer
 import de.letzgo.stashy.data.Scene
-import de.letzgo.stashy.data.Studio
 import de.letzgo.stashy.data.TabManager
 import de.letzgo.stashy.ui.Appearance
 import de.letzgo.stashy.ui.NativeCard
@@ -120,40 +117,3 @@ fun DashboardPerformerCard(performer: Performer, badge: PerformerBadge, width: D
     }
 }
 
-/** iOS: `HomeStudioCardView` — logo on the grey header, name + scene/gallery counts below. */
-@Composable
-fun DashboardStudioCard(studio: Studio, isLarge: Boolean, width: Dp, height: Dp, modifier: Modifier = Modifier, onClick: (() -> Unit)? = null) {
-    val counts = de.letzgo.stashy.data.rememberStudioCounts(studio)
-    val p = Theme.palette
-    val barHeight = if (isLarge) 40.dp else 34.dp
-    NativeCard(modifier.size(width, height), shape = dashboardCardShape(isLarge), onClick = onClick) {
-        Column(Modifier.fillMaxSize()) {
-            // Header takes what the name bar leaves: the bar grows with the font scale (min height).
-            Box(Modifier.fillMaxWidth().weight(1f).background(p.studioHeader).padding(12.dp), contentAlignment = Alignment.Center) {
-                if (studio.hasImage) AsyncImage(studio.imageURL, studio.name, Modifier.fillMaxSize(), contentScale = ContentScale.Fit)
-                else Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    Icon(SF.building2, null, tint = p.secondaryText, modifier = Modifier.size(30.dp))
-                    Text(studio.name, style = NativeType.labelMedium, color = p.secondaryText, maxLines = 1)
-                }
-            }
-            Row(
-                Modifier.fillMaxWidth().heightIn(min = barHeight).padding(horizontal = if (isLarge) 12.dp else 10.dp, vertical = 4.dp),
-                verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                Text(studio.name, style = if (isLarge) NativeType.titleSmall else NativeType.labelLarge, color = p.text, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
-                val iconSize = scaledIconSize(if (isLarge) 14.dp else 12.dp)
-                val style = if (isLarge) NativeType.labelMedium else NativeType.labelSmall
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(3.dp)) {
-                    Icon(SF.film, null, tint = p.secondaryText, modifier = Modifier.size(iconSize))
-                    Text("${counts.scenes ?: 0}", style = style, color = p.secondaryText)
-                }
-                counts.galleries?.takeIf { it > 0 }?.let { gc ->
-                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(3.dp)) {
-                        Icon(SF.photoStack, null, tint = p.secondaryText, modifier = Modifier.size(iconSize))
-                        Text("$gc", style = style, color = p.secondaryText)
-                    }
-                }
-            }
-        }
-    }
-}

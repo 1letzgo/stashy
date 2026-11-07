@@ -132,10 +132,11 @@ private fun NowPlayingContent(initial: Scene, onOpen: (de.letzgo.stashy.ui.Scree
     // Pinned to the sheet's width: nothing (a long title or description) may widen the content.
     androidx.compose.foundation.layout.BoxWithConstraints(Modifier.fillMaxSize()) {
         Column(Modifier.width(maxWidth).fillMaxHeight().navigationBarsPadding()) {
-            // Standard chrome: Minimize like Back on the left, Details on the right edge.
+            // Close (ends playback, bar included) where Back sits, Details on the right edge;
+            // minimizing is the sheet's swipe down (or system back).
             Row(Modifier.fillMaxWidth().padding(start = 4.dp, end = NowPlayingMargin), verticalAlignment = Alignment.CenterVertically) {
-                IconButton(onClick = { MiniPlayerStore.showsNowPlaying = false }) {
-                    Icon(SF.chevronDown, "Minimize", tint = p.text)
+                IconButton(onClick = { MiniPlayerStore.closeNowPlaying() }) {
+                    Icon(SF.xmark, "Close player", tint = p.text)
                 }
                 Box(Modifier.weight(1f))
                 DetailsPill { onOpen(de.letzgo.stashy.ui.scene.SceneDetailScreen(scene.id, scene, openedFromMiniPlayer = true)) }
