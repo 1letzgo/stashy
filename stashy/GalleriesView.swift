@@ -927,11 +927,15 @@ struct GalleryCardView: View {
                                         Text("\(count)")
                                             .font(.caption)
                                             .fontWeight(.medium)
+                                            .monospacedDigit()
                                     }
                                     .foregroundColor(.white)
                                     .padding(.horizontal, 8)
                                     .padding(.vertical, 4)
                                     .stashyGlass(shape: Capsule())
+                                    // The count never wraps; on a narrow card the studio pill shortens.
+                                    .fixedSize()
+                                    .layoutPriority(1)
                                 }
                             }
                             .padding(8)

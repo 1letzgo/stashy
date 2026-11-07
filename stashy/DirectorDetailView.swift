@@ -60,14 +60,22 @@ struct DirectorDetailView: View {
             hideTitle: true,
             scope: .catalog,
             sharedViewModel: viewModel,
-            showsFloatingFilterButton: true,
+            // Filter & sort sit in the top row now.
+            showsFloatingFilterButton: false,
             scrollHeader: AnyView(
                 heroHeader
                     .padding(.horizontal, 16)
             )
         )
+        // Same row as the other detail pages: Back · Scenes, the list's sort and settings right.
+        .environment(\.detailBreadcrumb, DetailBreadcrumb(
+            sections: [.init(id: "scenes", title: "Scenes", systemImage: "film")],
+            selectionID: "scenes",
+            onSelect: { _ in },
+            onBack: { dismiss() }
+        ))
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-        .stashyDetailChrome(directorChromeConfig) { navBar }
+        .stashyDetailChrome(directorChromeConfig) { EmptyView() }
     }
 
     private var directorChromeConfig: StashyDetailChromeConfig {
@@ -123,8 +131,5 @@ struct DirectorDetailView: View {
         .fixedSize(horizontal: false, vertical: true)
     }
 
-    private var navBar: some View {
-        StashyDetailTopBar(onBack: { dismiss() })
-    }
 }
 #endif

@@ -1092,10 +1092,13 @@ private struct ScenesViewContent: View {
     }
 
     @Environment(\.homeBreadcrumbMenu) private var homeMenu
+    /// A detail page's section row (Back · Scenes ▾): sort menu and settings move up into it.
+    @Environment(\.detailBreadcrumb) private var detailCrumb
 
-    /// Above the list: the whole quick bar, or on Home (breadcrumb chrome) only the filter chips.
+    /// Above the list: the whole quick bar, or under breadcrumb chrome (Home or a detail page)
+    /// only the filter chips.
     private var quickBar: some View {
-        quickBar(part: homeMenu == nil ? .all : .chipsOnly)
+        quickBar(part: homeMenu == nil && detailCrumb == nil ? .all : .chipsOnly)
     }
 
     private func quickBar(part: CatalogQuickBarPart) -> some View {
@@ -1231,6 +1234,7 @@ private struct ScenesViewContent: View {
         .applyAppBackground()
         .stashyCatalogChrome(catalogChromeConfig)
         .homeBreadcrumbChrome(homeMenu) { quickBar(part: .sortMenu) }
+        .detailBreadcrumbChrome(detailCrumb) { quickBar(part: .sortMenu) }
         .navigationDestination(isPresented: Binding(
             get: { pushedColumnScene != nil },
             set: { if !$0 { pushedColumnScene = nil } }

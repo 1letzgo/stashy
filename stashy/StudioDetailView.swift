@@ -155,20 +155,86 @@ struct StudioDetailView: View {
                 : AnyView(EmptyView()),
             filterMemory: scenesFilterMemory
         )
+        .environment(\.detailBreadcrumb, detailCrumb)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
     }
 
-    /// Custom top chrome (PerformerDetail template): Back · section icons · Favorite · Edit.
+    /// Back · section dropdown, like the overviews' breadcrumb (PerformerDetail template).
+    private var detailCrumb: DetailBreadcrumb {
+        DetailBreadcrumb(
+            sections: availableTabs.map { .init(id: $0.rawValue, title: $0.rawValue, systemImage: $0.icon) },
+            selectionID: selectedDetailTab.rawValue,
+            onSelect: { id in
+                if let tab = DetailTab(rawValue: id) { selectedDetailTab = tab }
+            },
+            onBack: { dismiss() }
+        )
+    }
+
+    /// Top chrome. The Scenes list draws this row itself (`detailBreadcrumbChrome`); every
+    /// other section gets it here with its sort menu and settings.
     @ViewBuilder
     private var studioDetailNavBar: some View {
-        StashyDetailTopBar(
-            onBack: { dismiss() },
-            tabs: availableTabs,
-            selection: selectedDetailTab,
-            icon: { $0.icon },
-            label: { $0.rawValue },
-            onSelect: { selectedDetailTab = $0 }
-        )
+        if selectedDetailTab != .scenes {
+            StashySectionChromeBar {
+                DetailBreadcrumbRow(crumb: detailCrumb) { sectionControls }
+                    .padding(.horizontal, StashyExpandingDock.edgePadding)
+                    .padding(.vertical, 6)
+            }
+        }
+    }
+
+    /// Sort menu and filter / sort settings of the shown section.
+    @ViewBuilder
+    private var sectionControls: some View {
+        HStack(spacing: 6) {
+            switch selectedDetailTab {
+            case .galleries:
+                CatalogQuickSortMenu(mode: .galleries, sort: linkedGalleries.selectedSortOption) {
+                    linkedGalleries.changeSortOption(to: $0, viewModel: viewModel)
+                }
+            case .images:
+                CatalogQuickSortMenu(mode: .images, sort: linkedImages.selectedSortOption) {
+                    linkedImages.changeSortOption(to: $0, viewModel: viewModel)
+                }
+            case .studios:
+                CatalogQuickSortMenu(mode: .studios, sort: linkedChildStudios.selectedSortOption) {
+                    linkedChildStudios.changeSortOption(to: $0, viewModel: viewModel)
+                }
+            case .performers:
+                CatalogQuickSortMenu(mode: .performers, sort: linkedPerformers.selectedSortOption) {
+                    linkedPerformers.changeSortOption(to: $0, viewModel: viewModel)
+                }
+            case .tags:
+                CatalogQuickSortMenu(mode: .tags, sort: linkedTags.selectedSortOption) {
+                    linkedTags.changeSortOption(to: $0, viewModel: viewModel)
+                }
+            case .scenes, .groups:
+                EmptyView()
+            }
+            if let filter = sectionFilterSlot {
+                DetailTopBarSlotButton(slot: filter)
+            }
+        }
+    }
+
+    /// The shown section's filter and sort sheet (Groups has none yet).
+    private var sectionFilterSlot: CatalogChromeSlot? {
+        func slot(active: Bool, open: @escaping () -> Void) -> CatalogChromeSlot {
+            CatalogChromeSlot(systemImage: "slider.horizontal.3", isActive: active, accessibilityLabel: "Filter and sort") {
+                HapticManager.light()
+                open()
+            }
+        }
+        switch selectedDetailTab {
+        case .scenes: return slot(active: studioSceneFilterActive) { studioLiveFilterSheetPresented = true }
+        case .galleries: return slot(active: linkedGalleries.catalogFilterSortFABActive) { linkedGalleries.showFilterSortSheet = true }
+        case .performers: return slot(active: linkedPerformers.catalogFilterSortFABActive) { linkedPerformers.showFilterSortSheet = true }
+        case .tags: return slot(active: linkedTags.catalogFilterSortFABActive) { linkedTags.showFilterSortSheet = true }
+        case .studios: return slot(active: linkedChildStudios.catalogFilterSortFABActive) { linkedChildStudios.showFilterSortSheet = true }
+        case .images: return slot(active: linkedImages.catalogFilterSortFABActive) { linkedImages.showFilterSortSheet = true }
+        case .groups: return nil
+        }
     }
 
     private func toggleFavorite() {
@@ -482,68 +548,11 @@ struct StudioDetailView: View {
     private var studioDetailListSlots: CatalogSlotSet {
         var slots = CatalogSlotSet(visibility: studioDetailCatalogFloatingChromeForFooter)
         slots.entityActions = entityActionSlots
-        switch selectedDetailTab {
-        case .scenes:
-            // Filter & sort also in the bar (far right), like every other tab.
-            slots.filterSort = CatalogChromeSlot(
-                systemImage: "slider.horizontal.3",
-                isActive: studioSceneFilterActive,
-                accessibilityLabel: "Filter and sort"
-            ) {
-                HapticManager.light()
-                studioLiveFilterSheetPresented = true
-            }
+        // Filter & sort live in the top bar now (breadcrumb row); the bar keeps the actions.
+        if selectedDetailTab == .scenes {
             slots.contextual = SceneBulkDownloadChrome.slot {
                 showingSceneDownloadOptions = true
             }
-        case .galleries:
-            slots.filterSort = CatalogChromeSlot(
-                systemImage: "slider.horizontal.3",
-                isActive: linkedGalleries.catalogFilterSortFABActive,
-                accessibilityLabel: "Filter and sort"
-            ) {
-                HapticManager.light()
-                linkedGalleries.showFilterSortSheet = true
-            }
-        case .performers:
-            slots.filterSort = CatalogChromeSlot(
-                systemImage: "slider.horizontal.3",
-                isActive: linkedPerformers.catalogFilterSortFABActive,
-                accessibilityLabel: "Filter and sort"
-            ) {
-                HapticManager.light()
-                linkedPerformers.showFilterSortSheet = true
-            }
-        case .tags:
-            slots.filterSort = CatalogChromeSlot(
-                systemImage: "slider.horizontal.3",
-                isActive: linkedTags.catalogFilterSortFABActive,
-                accessibilityLabel: "Filter and sort"
-            ) {
-                HapticManager.light()
-                linkedTags.showFilterSortSheet = true
-            }
-        case .studios:
-            slots.filterSort = CatalogChromeSlot(
-                systemImage: "slider.horizontal.3",
-                isActive: linkedChildStudios.catalogFilterSortFABActive,
-                accessibilityLabel: "Filter and sort"
-            ) {
-                HapticManager.light()
-                linkedChildStudios.showFilterSortSheet = true
-            }
-        case .images:
-            slots.filterSort = CatalogChromeSlot(
-                systemImage: "slider.horizontal.3",
-                isActive: linkedImages.catalogFilterSortFABActive,
-                accessibilityLabel: "Filter and sort"
-            ) {
-                HapticManager.light()
-                linkedImages.showFilterSortSheet = true
-            }
-        case .groups:
-            // No groups filter model yet; the bar still carries Favorite / Edit.
-            break
         }
         return slots
     }

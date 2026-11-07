@@ -448,55 +448,13 @@ struct HomeStudioCardView: View {
     let config: HomeRowConfig
     var isLarge: Bool = false
     let screenWidth: CGFloat
-    @ObservedObject var appearanceManager = AppearanceManager.shared
 
-    private var cardWidth: CGFloat  { homeCardWidth(for: config, isLarge: isLarge, screenWidth: screenWidth) }
-    private var cardHeight: CGFloat { cardWidth * 9 / 16 }
+    private var cardWidth: CGFloat { homeCardWidth(for: config, isLarge: isLarge, screenWidth: screenWidth) }
 
+    /// The Studios list's card (counts as pills, logo centred, name below) at the row's width.
     var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            ZStack(alignment: .bottom) {
-                Color.studioHeaderGray
-                StudioImageView(studio: studio)
-                    .padding(12)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-            }
-            .frame(height: cardHeight - (isLarge ? 36 : 32))
-
-            HStack(spacing: 8) {
-                Text(studio.name)
-                    .font(.system(size: 12, weight: .bold))
-                    .foregroundColor(.primary)
-                    .lineLimit(1)
-                Spacer()
-                HStack(spacing: 6) {
-                    HStack(spacing: 2) {
-                        Image(systemName: "film").font(.system(size: isLarge ? 10 : 8))
-                        Text("\(studio.sceneCount)").font(.system(size: isLarge ? 11 : 9, weight: .medium))
-                    }
-                    if let gc = studio.galleryCount, gc > 0 {
-                        HStack(spacing: 2) {
-                            Image(systemName: "photo.stack").font(.system(size: isLarge ? 10 : 8))
-                            Text("\(gc)").font(.system(size: isLarge ? 11 : 9, weight: .medium))
-                        }
-                        .padding(.horizontal, 6)
-                        .padding(.vertical, 2)
-                        .background(Color.black.opacity(0.1))
-                        .clipShape(Capsule())
-                    }
-                }
-                .foregroundColor(.secondary)
-                .layoutPriority(1)
-            }
-            .padding(.horizontal, isLarge ? 10 : 8)
-            .padding(.vertical, isLarge ? 8 : 6)
-            .frame(height: isLarge ? 36 : 32)
-        }
-        .frame(width: cardWidth, height: cardHeight)
-        .background(Color.secondaryAppBackground)
-        .clipShape(RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.card))
-        .contentShape(Rectangle())
-        .cardShadow()
+        StudioCardView(studio: studio)
+            .frame(width: cardWidth)
     }
 }
 

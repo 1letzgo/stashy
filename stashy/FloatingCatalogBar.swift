@@ -121,6 +121,117 @@ struct HomeViewsMenu: View {
     }
 }
 
+/// A detail page's sections (a performer's Scenes, Galleries, Images, …) for the breadcrumb row:
+/// Back, then a dropdown naming the shown section, like `HomeViewsMenu` in the overviews.
+struct DetailBreadcrumb {
+    struct Section: Identifiable, Hashable {
+        let id: String
+        let title: String
+        let systemImage: String
+    }
+
+    let sections: [Section]
+    let selectionID: String
+    let onSelect: (String) -> Void
+    let onBack: () -> Void
+
+    var selectedTitle: String {
+        sections.first { $0.id == selectionID }?.title ?? sections.first?.title ?? ""
+    }
+}
+
+private struct DetailBreadcrumbKey: EnvironmentKey {
+    static let defaultValue: DetailBreadcrumb? = nil
+}
+
+extension EnvironmentValues {
+    /// Set by a detail page for the list it shows: the list draws Back · section menu with its
+    /// own sort menu and settings at the right edge (`detailBreadcrumbChrome`).
+    var detailBreadcrumb: DetailBreadcrumb? {
+        get { self[DetailBreadcrumbKey.self] }
+        set { self[DetailBreadcrumbKey.self] = newValue }
+    }
+}
+
+/// Back · section dropdown, and the shown list's controls at the right edge.
+struct DetailBreadcrumbRow<Trailing: View>: View {
+    let crumb: DetailBreadcrumb
+    @ViewBuilder var trailing: () -> Trailing
+
+    @ObservedObject private var appearance = AppearanceManager.shared
+
+    var body: some View {
+        HStack(spacing: 6) {
+            Button {
+                HapticManager.light()
+                crumb.onBack()
+            } label: {
+                // Like the overviews' Home button: plain glass; the section menu is the highlight.
+                Image(systemName: "chevron.left")
+                    .font(.system(size: StashyExpandingDock.iconSize, weight: .semibold))
+                    .foregroundStyle(Color.white.opacity(StashyExpandingDock.inactiveIconOpacity))
+                    .frame(width: StashyExpandingDock.circleSize, height: StashyExpandingDock.circleSize)
+                    .stashyChromeFill(shape: Circle(), activeColor: nil)
+                    .contentShape(Circle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Back")
+            sectionMenu
+            Spacer(minLength: 0)
+            trailing()
+        }
+        .mask(Rectangle().padding(.vertical, -24))
+        .padding(.bottom, 4)
+    }
+
+    @ViewBuilder
+    private var sectionMenu: some View {
+        if crumb.sections.count > 1 {
+            Menu {
+                Picker("Section", selection: Binding(
+                    get: { crumb.selectionID },
+                    set: { crumb.onSelect($0) }
+                )) {
+                    ForEach(crumb.sections) { section in
+                        Label(section.title, systemImage: section.systemImage).tag(section.id)
+                    }
+                }
+                .pickerStyle(.inline)
+            } label: {
+                sectionLabel(showsChevron: true)
+            }
+            .menuStyle(.button)
+            .buttonStyle(.plain)
+            .menuIndicator(.hidden)
+            .stashyNeutralMenuItems()
+            .fixedSize()
+            .accessibilityLabel("Section, \(crumb.selectedTitle)")
+        } else if !crumb.sections.isEmpty {
+            sectionLabel(showsChevron: false)
+                .fixedSize()
+        }
+    }
+
+    private func sectionLabel(showsChevron: Bool) -> some View {
+        HStack(spacing: 6) {
+            Text(crumb.selectedTitle)
+                .font(.subheadline.weight(.semibold))
+                .lineLimit(1)
+                .minimumScaleFactor(0.8)
+            if showsChevron {
+                Image(systemName: "chevron.up.chevron.down")
+                    .font(.system(size: 11, weight: .bold))
+            }
+        }
+        // Always highlighted, like the overviews' views menu: it names what is shown.
+        .foregroundStyle(Color.onAppTint)
+        .padding(.horizontal, StashyExpandingDock.activeHorizontalPadding)
+        .frame(height: StashyExpandingDock.activeHeight)
+        .stashyChromeFill(shape: Capsule(style: .continuous), activeColor: appearance.tintColor)
+        .contentShape(Capsule(style: .continuous))
+    }
+}
+
 /// One row of breadcrumb chrome. On the dashboard: Home (highlighted) › every library view as
 /// an icon. In a view: Home › views menu, and at the right edge whatever the list puts there
 /// (sort menu, settings).
@@ -208,6 +319,30 @@ extension EnvironmentValues {
 extension View {
     /// Home breadcrumb chrome for a catalog list: Home › views menu › the list's sort menu.
     /// No-op (apart from clearing the menu for descendants) when `menu` is nil.
+    /// Detail pages: Back · section menu · the list's sort menu and settings, as the section
+    /// chrome above the list. No-op without a breadcrumb.
+    @ViewBuilder
+    func detailBreadcrumbChrome<Sort: View>(
+        _ crumb: DetailBreadcrumb?,
+        @ViewBuilder sort: @escaping () -> Sort
+    ) -> some View {
+        if let crumb {
+            // Same inset as the detail page's own bar on its other sections (no extra gap under
+            // the bar), so Scenes and Galleries start at the same height.
+            environment(\.detailBreadcrumb, nil)
+                .navigationBarHidden(true)
+                .stashyCustomChromeInset(spacing: 0) {
+                    StashySectionChromeBar {
+                        DetailBreadcrumbRow(crumb: crumb) { sort() }
+                            .padding(.horizontal, StashyExpandingDock.edgePadding)
+                            .padding(.vertical, 6)
+                    }
+                }
+        } else {
+            self
+        }
+    }
+
     func homeBreadcrumbChrome<Sort: View>(
         _ menu: HomeViewsMenu?,
         showsSort: Bool = true,
