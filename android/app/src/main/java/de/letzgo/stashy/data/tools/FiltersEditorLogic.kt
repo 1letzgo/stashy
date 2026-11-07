@@ -1,5 +1,6 @@
 package de.letzgo.stashy.data.tools
 
+import de.letzgo.stashy.data.FilterMapper
 import de.letzgo.stashy.data.FilterMode
 import de.letzgo.stashy.data.SavedFilter
 import de.letzgo.stashy.data.SavedFiltersRepository
@@ -46,7 +47,7 @@ object FiltersEditorLogic {
         name: String,
         sort: SortOption,
         objectFilter: JsonObject,
-        labels: Map<String, String> = emptyMap(),
+        labels: Map<FilterMapper.LabelKind, Map<String, String>> = emptyMap(),
     ): JsonObject? {
         if (name.trim().isEmpty()) return null
         val liveFragment = existing?.takeIf { existingId != null && it.id == existingId }?.stashyMetadata?.liveFragment

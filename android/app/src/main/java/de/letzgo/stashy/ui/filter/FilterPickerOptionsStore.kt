@@ -2,6 +2,7 @@ package de.letzgo.stashy.ui.filter
 
 import androidx.compose.runtime.mutableStateMapOf
 import de.letzgo.stashy.data.FilterEntityOption
+import de.letzgo.stashy.data.FilterMapper
 import de.letzgo.stashy.data.FilterPickerRepository
 import de.letzgo.stashy.data.PickerKind
 import kotlinx.coroutines.Job
@@ -30,11 +31,22 @@ object FilterPickerOptionsStore {
     fun isSearching(kind: PickerKind) = searching[kind] == true
     fun searchHits(kind: PickerKind): List<FilterEntityOption> = searchResults[kind] ?: emptyList()
 
-    /** id → name over every cached list (labels for the web UI's `{id,label}` pairs). */
-    fun knownLabels(): Map<String, String> {
+    /**
+     * Picked id → display name, per entity type, for the web UI's `{id, label}` pairs in a saved
+     * filter. Ids repeat across types (tag 5 and studio 5), so the maps stay apart.
+     */
+    fun knownLabels(): Map<FilterMapper.LabelKind, Map<String, String>> {
+        val out = HashMap<FilterMapper.LabelKind, HashMap<String, String>>()
+        for (source in listOf(options, searchResults)) {
+            source.forEach { (kind, list) -> list.forEach { out.getOrPut(kind.labelKind) { HashMap() }[it.id] = it.name } }
+        }
+        return out
+    }
+
+    /** Every known id → name in one map, for UI that already knows the entity type it shows. */
+    fun knownLabelsAcrossKinds(): Map<String, String> {
         val out = HashMap<String, String>()
-        options.values.forEach { l -> l.forEach { out[it.id] = it.name } }
-        searchResults.values.forEach { l -> l.forEach { out[it.id] = it.name } }
+        knownLabels().values.forEach { m -> m.forEach { (id, name) -> out.putIfAbsent(id, name) } }
         return out
     }
 

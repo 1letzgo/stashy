@@ -27,7 +27,14 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DatePicker
+import androidx.compose.material3.DatePickerDialog
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.TimePicker
+import androidx.compose.material3.rememberDatePickerState
+import androidx.compose.material3.rememberTimePickerState
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -63,6 +70,7 @@ import de.letzgo.stashy.data.FilterEntityOption
 import de.letzgo.stashy.data.FilterFieldDescriptor
 import de.letzgo.stashy.data.FilterMapper
 import de.letzgo.stashy.data.FilterMode
+import de.letzgo.stashy.data.FilterTimestampFormat
 import de.letzgo.stashy.data.GenderOption
 import de.letzgo.stashy.data.Json
 import de.letzgo.stashy.data.OrientationOption
@@ -101,6 +109,12 @@ import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
+import java.time.Instant
+import java.time.LocalDate
+import java.time.LocalDateTime
+import java.time.ZoneOffset
+import java.time.format.DateTimeFormatter
+import java.time.format.FormatStyle
 
 /**
  * iOS: `FilterCriteriaApplyScheduler` — collapses a burst of edits into one refetch (450 ms);
@@ -355,10 +369,7 @@ private fun CriterionEditorBody(document: CriteriaDocument, field: FilterFieldDe
         }
         CriterionKind.float -> NumericRow(dict, setDict, isFloat = true, onApply)
         CriterionKind.date -> DateRow(dict, setDict, onApply)
-        CriterionKind.timestamp -> StringRow(
-            dict, setDict, placeholder = "Timestamp / relative",
-            modifiers = field.kind.defaultModifiers, onChange = onApply,
-        )
+        CriterionKind.timestamp -> TimestampRow(dict, setDict, onApply)
         CriterionKind.resolution -> ResolutionRow(dict, setDict, onApply)
         CriterionKind.orientation -> OrientationRow(dict, setDict, onApply)
         CriterionKind.gender -> GenderRow(dict, setDict, onApply)
@@ -476,6 +487,82 @@ private fun DateRow(value: JsonObject, set: (JsonObject) -> Unit, onChange: () -
         val two = mod?.needsSecondValue == true
         NativeDateField(text("value"), { setText("value", it) }, label = null, placeholder = if (two) "From (YYYY-MM-DD)" else "YYYY-MM-DD", onCommit = ::commitIfValid)
         if (two) NativeDateField(text("value2"), { setText("value2", it) }, label = null, placeholder = "To (YYYY-MM-DD)", onCommit = ::commitIfValid)
+    }
+}
+
+/** iOS: `FilterTimestampCriterionRow` — created / updated / last played: date and time, two of them for a range. */
+@Composable
+private fun TimestampRow(value: JsonObject, set: (JsonObject) -> Unit, onChange: () -> Unit) {
+    val modifierRaw = value["modifier"].stringValue ?: CriterionModifier.GreaterThan.raw
+    val needsSecond = CriterionModifier.from(modifierRaw)?.needsSecondValue == true
+    // The live criterion: a dialog's callback may outlive the composition that built it.
+    val holder = remember { DateRowHolder(value) }
+    holder.latest = value
+    fun update(next: JsonObject) { holder.latest = next; set(next); onChange() }
+    ModifierPicker(modifierRaw, CriterionKind.timestamp.defaultModifiers) { raw ->
+        var next = holder.latest.patch("modifier" to JsonPrimitive(raw))
+        val two = CriterionModifier.from(raw)?.needsSecondValue == true
+        if (two && next["value2"] == null) {
+            next = next.with("value2", JsonPrimitive(FilterTimestampFormat.format(LocalDateTime.now().withSecond(0).withNano(0))))
+        }
+        if (!two) next = next.without("value2")
+        update(next)
+    }
+    TimestampField(if (needsSecond) "From" else "Date", value["value"].stringValue) {
+        update(holder.latest.with("value", JsonPrimitive(it)))
+    }
+    if (needsSecond) TimestampField("To", value["value2"].stringValue) {
+        update(holder.latest.with("value2", JsonPrimitive(it)))
+    }
+}
+
+/** One date + time pair; each part opens its Material picker. */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun TimestampField(label: String, raw: String?, onPick: (String) -> Unit) {
+    val p = Theme.palette
+    val current = raw?.let { FilterTimestampFormat.parse(it) } ?: LocalDate.now().atStartOfDay()
+    var showDate by remember { mutableStateOf(false) }
+    var showTime by remember { mutableStateOf(false) }
+    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        Text(label, Modifier.weight(1f), style = IosTypography.subheadline, color = p.text)
+        CatalogFilterChip(current.toLocalDate().format(DateTimeFormatter.ofLocalizedDate(FormatStyle.MEDIUM)), false) { showDate = true }
+        CatalogFilterChip(current.toLocalTime().format(DateTimeFormatter.ofPattern("HH:mm")), false) { showTime = true }
+    }
+    if (showDate) {
+        val state = rememberDatePickerState(
+            initialSelectedDateMillis = current.toLocalDate().atStartOfDay(ZoneOffset.UTC).toInstant().toEpochMilli(),
+        )
+        DatePickerDialog(
+            onDismissRequest = { showDate = false },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        state.selectedDateMillis?.let { millis ->
+                            val day = Instant.ofEpochMilli(millis).atZone(ZoneOffset.UTC).toLocalDate()
+                            onPick(FilterTimestampFormat.format(day.atTime(current.toLocalTime())))
+                        }
+                        showDate = false
+                    },
+                    enabled = state.selectedDateMillis != null,
+                ) { Text("OK") }
+            },
+            dismissButton = { TextButton({ showDate = false }) { Text("Cancel") } },
+        ) { DatePicker(state) }
+    }
+    if (showTime) {
+        val state = rememberTimePickerState(current.hour, current.minute, is24Hour = true)
+        AlertDialog(
+            onDismissRequest = { showTime = false },
+            confirmButton = {
+                TextButton({
+                    onPick(FilterTimestampFormat.format(current.toLocalDate().atTime(state.hour, state.minute)))
+                    showTime = false
+                }) { Text("OK") }
+            },
+            dismissButton = { TextButton({ showTime = false }) { Text("Cancel") } },
+            text = { TimePicker(state) },
+        )
     }
 }
 
@@ -691,6 +778,27 @@ private fun MultiIdRow(value: JsonObject, set: (JsonObject) -> Unit, entityKey: 
             patch("value" to JsonArray(inc.map { JsonPrimitive(it) }), "excludes" to JsonArray(exc.map { JsonPrimitive(it) }), "modifier" to JsonPrimitive(m))
         },
     )
+    // `depth` -1 = every level below, like the web UI's "include sub-…" box.
+    subLevelLabel(entityKey, hierarchical)?.let { label ->
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            Text(label, Modifier.weight(1f), style = IosTypography.subheadline, color = Theme.palette.text)
+            androidx.compose.material3.Switch((value["depth"].numberOrNull ?: 0.0) != 0.0, { on ->
+                patch("depth" to JsonPrimitive(if (on) -1 else 0))
+            })
+        }
+    }
+}
+
+/** Hierarchical pickers whose entity has levels (tags, studios, groups, folders). */
+private fun subLevelLabel(entityKey: String, hierarchical: Boolean): String? {
+    if (!hierarchical) return null
+    return when (entityKey) {
+        "tags", "scene_tags", "performer_tags", "parents", "children" -> "Include sub-tags"
+        "studios" -> "Include sub-studios"
+        "groups", "movies", "containing_groups", "sub_groups" -> "Include sub-groups"
+        "folder", "parent_folder" -> "Include sub-folders"
+        else -> null
+    }
 }
 
 /**
@@ -724,7 +832,7 @@ fun MultiEntityPicker(
         val chosenSet = chosen.toSet()
         val ordered = selectionOrder.filter { it in chosenSet } + chosen.filter { it !in selectionOrder }
         val byId = entries.associateBy { it.id }
-        val labels = if (ordered.any { it !in byId }) FilterPickerOptionsStore.knownLabels() else emptyMap()
+        val labels = if (ordered.any { it !in byId }) FilterPickerOptionsStore.knownLabelsAcrossKinds() else emptyMap()
         val pinned = ordered.mapNotNull { id ->
             byId[id] ?: labels[id]?.let { FilterEntityOption(id, it) } ?: if (isLoading) null else FilterEntityOption(id, "#$id")
         }

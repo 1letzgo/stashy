@@ -45,8 +45,11 @@ class FiltersTest {
         assertEquals(JsonPrimitive(true), out["scene_filter"]!!.jsonObject["organized"])
     }
 
-    @Test fun uiObjectFilterWritesWebUiShape() {
-        val out = FilterMapper.uiObjectFilter(obj("""{"tags":{"value":["1"],"excludes":["2"],"modifier":"INCLUDES","depth":0},"organized":true}"""), mapOf("1" to "One"))
+    @Test fun savedObjectFilterWritesWebUiShape() {
+        val out = FilterMapper.savedObjectFilter(
+            obj("""{"tags":{"value":["1"],"excludes":["2"],"modifier":"INCLUDES","depth":0},"organized":true}"""),
+            FilterMapper.Entity.Scenes,
+        ) { kind, id -> if (kind == FilterMapper.LabelKind.Tag && id == "1") "One" else null }
         assertEquals(
             obj("""{"tags":{"value":{"items":[{"id":"1","label":"One"}],"excluded":[{"id":"2","label":"2"}],"depth":0},"modifier":"INCLUDES"},"organized":{"value":"true","modifier":"EQUALS"}}"""),
             out,

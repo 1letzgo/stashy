@@ -470,16 +470,12 @@ object FeedsModel {
             else -> FilterMode.Scenes
         }
         de.letzgo.stashy.data.CriteriaDocument(fm, pinsDefaults = true).also { doc ->
-            val source = advanced[m] ?: filters[m]?.let { f ->
-                val merged = LinkedHashMap<String, JsonElement>(f.criteriaObjectFilter())
-                f.stashyMetadataLive()?.let { live -> merged.putAll(de.letzgo.stashy.data.FilterMapper.sanitize(live, m == ReelsModeType.Markers)) }
-                JsonObject(merged)
-            }
+            // `object_filter` alone: the old `ui_options.stashy.liveFragment` copy would undo
+            // edits made in Stash itself.
+            val source = advanced[m] ?: filters[m]?.criteriaObjectFilter()
             source?.let { doc.load(it) }
         }
     }
-
-    private fun SavedFilter.stashyMetadataLive(): JsonObject? = FeedsQuery.stashyLiveFragment(this)?.takeIf { it.isNotEmpty() }
 
     /** Editor change → the document replaces the criteria and the filter base (refetch). */
     fun applyCriteriaDocument(m: ReelsModeType) {
@@ -609,7 +605,7 @@ object FeedsModel {
         val previousLive = existingId?.let { id -> savedFilters.firstOrNull { it.id == id } }
             ?.let { FeedsQuery.stashyLiveFragment(it) } ?: JsonObject(emptyMap())
         val base = filters[m]?.takeIf { it.id != existingId }
-        val merged = mergedObjectFilterForSave(base, live, previousLive, isMarker)
+        val merged = mergedObjectFilterForSave(base, live, previousLive, isMarker, filterMode(m))
         val input = SavedFiltersRepository.saveInput(
             filterMode(m), existingId, name, catalogSort(m), merged, live, base?.id,
             de.letzgo.stashy.ui.filter.FilterPickerOptionsStore.knownLabels(),

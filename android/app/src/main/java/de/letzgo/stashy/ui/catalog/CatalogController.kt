@@ -16,6 +16,7 @@ import de.letzgo.stashy.data.CatalogQuery
 import de.letzgo.stashy.data.CatalogRepository
 import de.letzgo.stashy.data.CriteriaDocument
 import de.letzgo.stashy.data.FilterMapper
+import de.letzgo.stashy.data.filterEntity
 import de.letzgo.stashy.data.FilterMode
 import de.letzgo.stashy.data.ListLivePresetTag
 import de.letzgo.stashy.data.LocalFilterPreset
@@ -339,27 +340,17 @@ class CatalogController<T>(
     private fun applyServerFilter(f: SavedFilter) {
         selectedFilter = f
         val meta = f.stashyMetadata
-        val isMarker = mode == FilterMode.SceneMarkers
+        // `object_filter` holds every criterion in the web UI's format (base filter and chips
+        // merged when it was saved); the old `ui_options.stashy` copy would override edits made
+        // in Stash itself.
+        loadCriteria(f.criteriaObjectFilter())
         if (meta != null) {
-            val base = meta.baseSavedFilterId?.let { SavedFiltersStore.byId[it] }
-            val merged: JsonObject = when {
-                base != null -> {
-                    val m = LinkedHashMap<String, JsonElement>(base.criteriaObjectFilter())
-                    FilterMapper.sanitize(meta.liveFragment, isMarker).forEach { (k, v) -> m[k] = v }
-                    JsonObject(m)
-                }
-                meta.liveFragment.isNotEmpty() -> FilterMapper.sanitize(meta.liveFragment, isMarker)
-                else -> f.criteriaObjectFilter()
-            }
-            loadCriteria(merged)
             val parsed = SortCatalog.option(mode, meta.sortRaw)
             if (parsed != null && parsed != sort) {
                 if (parsed.isRandom && sort.isRandom) RandomSeeds.refresh(mode)
                 sort = parsed
                 persistSort(parsed)
             }
-        } else {
-            loadCriteria(f.criteriaObjectFilter())
         }
         applyLive()
     }
@@ -370,7 +361,7 @@ class CatalogController<T>(
         val base = p.baseSavedFilterId?.let { SavedFiltersStore.byId[it] }
         selectedFilter = base
         val m = LinkedHashMap<String, JsonElement>(base?.criteriaObjectFilter() ?: JsonObject(emptyMap()))
-        FilterMapper.sanitize(p.liveFragment, mode == FilterMode.SceneMarkers).forEach { (k, v) -> m[k] = v }
+        FilterMapper.sanitize(p.liveFragment, mode == FilterMode.SceneMarkers, mode.filterEntity).forEach { (k, v) -> m[k] = v }
         loadCriteria(JsonObject(m))
         applyLive()
     }
@@ -414,7 +405,7 @@ class CatalogController<T>(
     private fun saveServer(existingId: String?, name: String) {
         val previousLive = existingId?.let { SavedFiltersStore.byId[it]?.stashyMetadata?.liveFragment } ?: JsonObject(emptyMap())
         val base = selectedFilter?.takeIf { it.id != existingId }
-        val merged = mergedObjectFilterForSave(base, liveFragment, previousLive, isMarker = mode == FilterMode.SceneMarkers)
+        val merged = mergedObjectFilterForSave(base, liveFragment, previousLive, isMarker = mode == FilterMode.SceneMarkers, mode = mode)
         // A list-only sort (performer "Appears with": Shared scenes) means nothing to Stash.
         val saveSort = SortCatalog.option(mode, sort.raw) ?: SortCatalog.option(mode, SortCatalog.defaultRaw(mode)) ?: sort
         val input = SavedFiltersRepository.saveInput(

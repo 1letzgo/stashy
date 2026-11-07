@@ -43,7 +43,9 @@ enum class CriterionKind {
     val defaultModifiers: List<CriterionModifier> get() {
         return when (this) {
             string -> listOf(CriterionModifier.Equals, CriterionModifier.NotEquals, CriterionModifier.Includes, CriterionModifier.Excludes, CriterionModifier.MatchesRegex, CriterionModifier.NotMatchesRegex, CriterionModifier.IsNull, CriterionModifier.NotNull)
-            int, float, hierarchicalCount, date, timestamp -> listOf(CriterionModifier.Equals, CriterionModifier.NotEquals, CriterionModifier.GreaterThan, CriterionModifier.LessThan, CriterionModifier.Between, CriterionModifier.NotBetween, CriterionModifier.IsNull, CriterionModifier.NotNull)
+            int, float, hierarchicalCount, date -> listOf(CriterionModifier.Equals, CriterionModifier.NotEquals, CriterionModifier.GreaterThan, CriterionModifier.LessThan, CriterionModifier.Between, CriterionModifier.NotBetween, CriterionModifier.IsNull, CriterionModifier.NotNull)
+            // Stash's MandatoryTimestamp set (created / updated / last played).
+            timestamp -> listOf(CriterionModifier.GreaterThan, CriterionModifier.LessThan, CriterionModifier.Between, CriterionModifier.NotBetween)
             resolution -> listOf(CriterionModifier.Equals, CriterionModifier.NotEquals, CriterionModifier.GreaterThan, CriterionModifier.LessThan)
             orientation, gender, circumcision -> listOf(CriterionModifier.Includes, CriterionModifier.Excludes, CriterionModifier.Equals, CriterionModifier.NotEquals)
             // No `EXCLUDES` - the picker's red state writes the `excludes` list instead.
@@ -62,7 +64,9 @@ enum class CriterionKind {
             boolean -> JsonPrimitive(true)
             string -> obj("value" to s(""), "modifier" to s("INCLUDES"))
             int, float, hierarchicalCount -> obj("value" to JsonPrimitive(0), "modifier" to s("EQUALS"))
-            date, timestamp -> obj("value" to s(""), "modifier" to s("EQUALS"))
+            date -> obj("value" to s(""), "modifier" to s("EQUALS"))
+            // Complete from the start (today 00:00), so the row is never dropped as half-filled.
+            timestamp -> obj("value" to s(FilterTimestampFormat.format(java.time.LocalDate.now().atStartOfDay())), "modifier" to s("GREATER_THAN"))
             resolution -> obj("value" to s("FULL_HD"), "modifier" to s("EQUALS"))
             orientation -> obj("value" to JsonArray(listOf(s("LANDSCAPE"))))
             gender -> obj("value_list" to JsonArray(listOf(s("FEMALE"))), "modifier" to s("INCLUDES"))
@@ -77,6 +81,20 @@ enum class CriterionKind {
             hasMarkers, hasChapters -> s("true")
             booleanGroup, nestedFilter, raw -> JsonObject(emptyMap())
         }
+    }
+}
+
+/** GraphQL `Timestamp` text the app writes ("2024-01-31T13:45", local time, like the web UI). */
+object FilterTimestampFormat {
+    private val formatter = java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm", Locale.US)
+
+    fun format(dateTime: java.time.LocalDateTime): String = dateTime.format(formatter)
+
+    /** Accepts "2024-01-31T13:45", "2024-01-31 13:45" (web UI) and a bare date. */
+    fun parse(text: String): java.time.LocalDateTime? {
+        val t = text.trim().replace(" ", "T")
+        runCatching { return java.time.LocalDateTime.parse(t.take(16), formatter) }
+        return runCatching { java.time.LocalDate.parse(t.take(10)).atStartOfDay() }.getOrNull()
     }
 }
 
@@ -123,21 +141,35 @@ object FilterFieldCatalog {
     )
 
     fun fields(mode: FilterMode): List<FilterFieldDescriptor> = when (mode) {
-        FilterMode.Scenes -> if (ServerCapabilities.supports032) sceneFields else sceneFields.filter { it.key != "production_date" }
+        FilterMode.Scenes -> availableOnServer(sceneFields)
         FilterMode.Performers -> performerFields
         FilterMode.Studios -> studioFields
-        FilterMode.Galleries -> galleryFields
-        FilterMode.Images -> imageFields
+        FilterMode.Galleries -> availableOnServer(galleryFields)
+        FilterMode.Images -> availableOnServer(imageFields)
         FilterMode.Tags -> tagFields
         FilterMode.Groups -> groupFields
         FilterMode.SceneMarkers -> markerFields
         FilterMode.Unknown -> emptyList()
     }
 
+    /** Fields only Stash 0.32+ knows; an older server rejects the whole query over one of them. */
+    private val stash032Keys = setOf("production_date", "folder", "parent_folder")
+
+    private fun availableOnServer(fields: List<FilterFieldDescriptor>): List<FilterFieldDescriptor> =
+        if (ServerCapabilities.supports032) fields else fields.filter { it.key !in stash032Keys }
+
     fun field(key: String, mode: FilterMode): FilterFieldDescriptor? = fields(mode).firstOrNull { it.key == key }
 
+    /**
+     * Fields the user can still add — the web UI's criteria. Sub-filters (`scenes_filter`, …), raw
+     * `files_filter` and the multi Stash ID list exist only in the API: the web UI neither offers
+     * nor keeps them. A loaded filter that already has one still shows and edits it.
+     */
     fun addableFields(mode: FilterMode, excludingKeys: Set<String>): List<FilterFieldDescriptor> =
-        fields(mode).filter { !it.isDeprecated && it.kind != CriterionKind.booleanGroup && it.key !in excludingKeys }
+        fields(mode).filter {
+            !it.isDeprecated && it.kind != CriterionKind.booleanGroup && it.key !in excludingKeys &&
+                it.kind != CriterionKind.nestedFilter && it.kind != CriterionKind.raw && it.kind != CriterionKind.stashIDs
+        }
 
     private val sceneFields: List<FilterFieldDescriptor> = run {
         boolOps + listOf(
@@ -164,9 +196,10 @@ object FilterFieldCatalog {
             f("tags_filter", "Tags filter", nestedFilter, FilterMode.Tags),
             f("groups_filter", "Groups filter", nestedFilter, FilterMode.Groups),
             f("markers_filter", "Markers filter", nestedFilter, FilterMode.SceneMarkers),
+            f("folder", "Folder", hierarchicalMulti),
             f("files_filter", "Files filter", raw), f("custom_fields", "Custom fields", customFields),
             f("movies", "Movies", multi, deprecated = true), f("phash", "PHash", string, deprecated = true),
-            f("stash_id_endpoint", "Stash ID (legacy)", stashID, deprecated = true),
+            f("stash_id_endpoint", "Stash ID", stashID),
             f("movies_filter", "Movies filter", nestedFilter, FilterMode.Groups, deprecated = true),
         )
     }
@@ -178,7 +211,7 @@ object FilterFieldCatalog {
             f("ethnicity", "Ethnicity", string), f("country", "Country", string), f("eye_color", "Eye color", string),
             f("height_cm", "Height (cm)", int), f("measurements", "Measurements", string), f("fake_tits", "Implants", string),
             f("penis_length", "Penis length", float), f("circumcised", "Circumcised", circumcision),
-            f("career_length", "Career length (years)", int), f("career_start", "Career start", date), f("career_end", "Career end", date),
+            f("career_start", "Career start", date), f("career_end", "Career end", date),
             f("tattoos", "Tattoos", string), f("piercings", "Piercings", string), f("aliases", "Aliases", string),
             f("gender", "Gender", gender), f("is_missing", "Is missing", isMissing), f("tags", "Tags", hierarchicalMulti),
             f("tag_count", "Tag count", int), f("scene_count", "Scene count", int), f("marker_count", "Marker count", int),
@@ -193,14 +226,15 @@ object FilterFieldCatalog {
             f("tags_filter", "Tags filter", nestedFilter, FilterMode.Tags),
             f("markers_filter", "Markers filter", nestedFilter, FilterMode.SceneMarkers),
             f("created_at", "Created", timestamp), f("updated_at", "Updated", timestamp), f("custom_fields", "Custom fields", customFields),
-            f("stash_id_endpoint", "Stash ID (legacy)", stashID, deprecated = true),
+            f("stash_id_endpoint", "Stash ID", stashID),
         )
     }
 
     private val studioFields: List<FilterFieldDescriptor> = run {
         boolOps + listOf(
             f("name", "Name", string), f("details", "Details", string), f("parents", "Parents", multi),
-            f("stash_ids_endpoint", "Stash IDs", stashIDs), f("tags", "Tags", hierarchicalMulti), f("is_missing", "Is missing", isMissing),
+            f("stash_ids_endpoint", "Stash IDs", stashIDs), f("stash_id_endpoint", "Stash ID", stashID),
+            f("tags", "Tags", hierarchicalMulti), f("is_missing", "Is missing", isMissing),
             f("rating100", "Rating", int), f("favorite", "Favorite", boolean), f("scene_count", "Scene count", int),
             f("image_count", "Image count", int), f("gallery_count", "Gallery count", int), f("group_count", "Group count", int),
             f("tag_count", "Tag count", int), f("url", "URL", string), f("aliases", "Aliases", string), f("child_count", "Child count", int),
@@ -230,6 +264,7 @@ object FilterFieldCatalog {
             f("performers_filter", "Performers filter", nestedFilter, FilterMode.Performers),
             f("studios_filter", "Studios filter", nestedFilter, FilterMode.Studios),
             f("tags_filter", "Tags filter", nestedFilter, FilterMode.Tags),
+            f("parent_folder", "Folder", hierarchicalMulti),
             f("files_filter", "Files filter", raw), f("custom_fields", "Custom fields", customFields),
         )
     }
@@ -249,6 +284,7 @@ object FilterFieldCatalog {
             f("performers_filter", "Performers filter", nestedFilter, FilterMode.Performers),
             f("studios_filter", "Studios filter", nestedFilter, FilterMode.Studios),
             f("tags_filter", "Tags filter", nestedFilter, FilterMode.Tags),
+            f("folder", "Folder", hierarchicalMulti),
             f("files_filter", "Files filter", raw), f("custom_fields", "Custom fields", customFields),
         )
     }
@@ -263,6 +299,7 @@ object FilterFieldCatalog {
             f("marker_count", "Marker count", hierarchicalCount), f("parents", "Parents", hierarchicalMulti),
             f("children", "Children", hierarchicalMulti), f("parent_count", "Parent count", int), f("child_count", "Child count", int),
             f("ignore_auto_tag", "Ignore auto-tag", boolean), f("stash_ids_endpoint", "Stash IDs", stashIDs),
+            f("stash_id_endpoint", "Stash ID", stashID),
             f("scenes_filter", "Scenes filter", nestedFilter, FilterMode.Scenes),
             f("images_filter", "Images filter", nestedFilter, FilterMode.Images),
             f("galleries_filter", "Galleries filter", nestedFilter, FilterMode.Galleries),

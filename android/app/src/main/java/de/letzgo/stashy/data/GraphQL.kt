@@ -112,7 +112,8 @@ object GraphQL {
         val config = ServerConfigManager.activeConfig?.takeIf { it.hasValidConfig } ?: throw GraphQLError.NoServerConfig
         val body = buildJsonObject {
             put("query", JsonPrimitive(query))
-            if (variables != null) put("variables", variables)
+            // The Folder criterion moves to `files_filter.parent_folder` here (iOS `buildRequest`).
+            if (variables != null) put("variables", FilterMapper.queryVariables(variables))
         }.toString()
         val request = Request.Builder()
             .url("${config.baseURL}/graphql")

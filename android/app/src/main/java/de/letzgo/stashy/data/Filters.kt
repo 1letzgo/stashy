@@ -212,7 +212,7 @@ class CriteriaDocument(mode: FilterMode, objectFilter: JsonObject = JsonObject(e
 
         /** iOS: `sanitizeNonisolated` — `FilterMapper.sanitize` plus scratch-key removal. */
         fun sanitize(dict: JsonObject, mode: FilterMode): JsonObject =
-            stripEditorScratchKeys(FilterMapper.sanitize(dict, isMarker = mode == FilterMode.SceneMarkers))
+            stripEditorScratchKeys(FilterMapper.sanitize(dict, isMarker = mode == FilterMode.SceneMarkers, entity = mode.filterEntity))
 
         /** Removes UI scratch values (`value_text` …). */
         fun stripEditorScratchKeys(dict: JsonObject): JsonObject {
@@ -420,10 +420,17 @@ object LocalFilterPresetStore {
  * iOS: `mergedSceneObjectFilterForSave(base:live:previousLive:isMarker:)` — base saved filter
  * criteria with the live fragment on top; keys the chips owned before but no longer set are removed.
  */
-fun mergedObjectFilterForSave(base: SavedFilter?, live: JsonObject, previousLive: JsonObject = JsonObject(emptyMap()), isMarker: Boolean = false): JsonObject {
+fun mergedObjectFilterForSave(
+    base: SavedFilter?,
+    live: JsonObject,
+    previousLive: JsonObject = JsonObject(emptyMap()),
+    isMarker: Boolean = false,
+    mode: FilterMode? = null,
+): JsonObject {
+    val entity = (mode ?: base?.filterMode)?.filterEntity
     val merged = LinkedHashMap<String, JsonElement>()
-    base?.filterDict?.takeIf { it.isNotEmpty() }?.let { merged.putAll(FilterMapper.sanitize(it, isMarker)) }
-    val liveSan = FilterMapper.sanitize(live, isMarker)
+    base?.filterDict?.takeIf { it.isNotEmpty() }?.let { merged.putAll(FilterMapper.sanitize(it, isMarker, entity)) }
+    val liveSan = FilterMapper.sanitize(live, isMarker, entity)
     liveSan.forEach { (k, v) -> merged[k] = v }
     for (key in previousLive.keys) if (liveSan[key] == null) merged.remove(key)
     return JsonObject(merged)

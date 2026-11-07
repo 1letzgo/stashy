@@ -163,12 +163,13 @@ class FeedsQueryTest {
         assertNull(FeedsQuery.variables(FeedQueryKind.Pics, 1, 20, ImageSortOption.dateDesc, 1, null)["image_filter"])
     }
 
-    @Test fun stashyLiveFragmentAndAdvancedCriteriaLayerOnTop() {
+    @Test fun objectFilterIsTheSourceAndAdvancedCriteriaLayerOnTop() {
         val ui = Json.parseToJsonElement("""{"stashy":{"liveFragment":{"organized":true},"sortRaw":"ratingDesc"}}""")
         val filter = SavedFilter("3", objectFilter = JsonObject(mapOf("organized" to JsonPrimitive(false))), uiOptions = ui)
         val live = JsonObject(mapOf("interactive" to JsonPrimitive(true)))
         val sf = FeedsQuery.variables(FeedQueryKind.Previews, 1, 20, SceneSortOption.dateDesc, 1, filter, live)["scene_filter"]!!.jsonObject
-        assertEquals("true", sf["organized"]!!.jsonPrimitive.content)
+        // The old `ui_options.stashy.liveFragment` copy no longer overrides `object_filter`.
+        assertEquals("false", sf["organized"]!!.jsonPrimitive.content)
         assertEquals("true", sf["interactive"]!!.jsonPrimitive.content)
         assertEquals(SceneSortOption.ratingDesc, FeedsQuery.resolvedSceneSort(filter))
     }

@@ -25,11 +25,12 @@ data class CatalogQuery(
     /** Entity filter variable (`scene_filter`, `performer_filter`, …) or `null` when empty. */
     fun entityFilter(): JsonObject? {
         if (mode == FilterMode.SceneMarkers) return markerFilter()
-        var merged: JsonObject = base?.filterDict?.let { FilterMapper.sanitize(it) } ?: JsonObject(emptyMap())
+        val entity = mode.filterEntity
+        var merged: JsonObject = base?.filterDict?.let { FilterMapper.sanitize(it, entity = entity) } ?: JsonObject(emptyMap())
         if (!live.isNullOrEmpty()) {
             val m = LinkedHashMap<String, JsonElement>(merged)
             live.forEach { (k, v) -> m[k] = v }
-            merged = FilterMapper.sanitize(JsonObject(m))
+            merged = FilterMapper.sanitize(JsonObject(m), entity = entity)
         }
         if (!scope.isNullOrEmpty()) {
             val m = LinkedHashMap<String, JsonElement>(merged)
@@ -48,9 +49,9 @@ data class CatalogQuery(
         if (!live.isNullOrEmpty()) {
             val l = LinkedHashMap<String, JsonElement>(live)
             val sceneNested = LinkedHashMap<String, JsonElement>((marker["scene_filter"] as? JsonObject) ?: JsonObject(emptyMap()))
-            (l.remove("scene_filter") as? JsonObject)?.let { chips -> FilterMapper.sanitize(chips).forEach { (k, v) -> sceneNested[k] = v } }
-            FilterMapper.sanitize(JsonObject(l)).forEach { (k, v) -> marker[k] = v }
-            if (sceneNested.isNotEmpty()) marker["scene_filter"] = FilterMapper.sanitize(JsonObject(sceneNested))
+            (l.remove("scene_filter") as? JsonObject)?.let { chips -> FilterMapper.sanitize(chips, entity = FilterMapper.Entity.Scenes).forEach { (k, v) -> sceneNested[k] = v } }
+            FilterMapper.sanitize(JsonObject(l), entity = FilterMapper.Entity.Markers).forEach { (k, v) -> marker[k] = v }
+            if (sceneNested.isNotEmpty()) marker["scene_filter"] = FilterMapper.sanitize(JsonObject(sceneNested), entity = FilterMapper.Entity.Scenes)
         }
         scope?.forEach { (k, v) -> marker[k] = v }
         if (marker.isEmpty()) return null
@@ -68,7 +69,7 @@ data class CatalogQuery(
             val out = LinkedHashMap<String, JsonElement>(markerFilter)
             val nested = LinkedHashMap<String, JsonElement>((out["scene_filter"] as? JsonObject) ?: JsonObject(emptyMap()))
             for (key in hoistFromRoot) out.remove(key)?.let { nested[key] = it }
-            if (nested.isNotEmpty()) out["scene_filter"] = FilterMapper.sanitize(JsonObject(nested))
+            if (nested.isNotEmpty()) out["scene_filter"] = FilterMapper.sanitize(JsonObject(nested), entity = FilterMapper.Entity.Scenes)
             return FilterMapper.sanitize(JsonObject(out), isMarker = true)
         }
     }
@@ -151,7 +152,7 @@ object SavedFiltersRepository {
         objectFilter: JsonObject,
         liveFragment: JsonObject?,
         baseSavedFilterId: String? = null,
-        labels: Map<String, String> = emptyMap(),
+        labels: Map<FilterMapper.LabelKind, Map<String, String>> = emptyMap(),
     ): JsonObject {
         val stashy = LinkedHashMap<String, JsonElement>()
         stashy["liveFragment"] = liveFragment ?: JsonObject(emptyMap())
@@ -165,7 +166,8 @@ object SavedFiltersRepository {
                 put("sort", JsonPrimitive(RandomSeeds.sortField(mode, sort)))
                 put("direction", JsonPrimitive(sort.direction))
             })
-            put("object_filter", FilterMapper.uiObjectFilter(objectFilter, labels))
+            // Web UI storage shape, not the query shape (see `FilterMapper.savedObjectFilter`).
+            put("object_filter", FilterMapper.savedObjectFilter(objectFilter, mode.filterEntity) { kind, id -> labels[kind]?.get(id) })
             put("ui_options", buildJsonObject { put("stashy", JsonObject(stashy)) })
         }
     }
@@ -187,7 +189,18 @@ object SavedFiltersRepository {
  * queries — "most used" entity lists for the criteria editor's multi-pickers.
  */
 enum class PickerKind {
-    Studios, Tags, Groups, Performers, ImageTags, ImageStudios, GalleryStudios, PerformerTags, StudioTags, GalleryTags, MarkerTags, AllTags;
+    Studios, Tags, Groups, Performers, ImageTags, ImageStudios, GalleryStudios, PerformerTags, StudioTags, GalleryTags, MarkerTags, AllTags,
+    /** Folder criterion (scenes / images `folder`, galleries `parent_folder`), named by path. */
+    Folders;
+
+    /** Entity the picked ids name, for the saved filter's `{id, label}` pairs. */
+    val labelKind: FilterMapper.LabelKind get() = when (this) {
+        Studios, ImageStudios, GalleryStudios -> FilterMapper.LabelKind.Studio
+        Tags, ImageTags, PerformerTags, StudioTags, GalleryTags, MarkerTags, AllTags -> FilterMapper.LabelKind.Tag
+        Groups -> FilterMapper.LabelKind.Group
+        Performers -> FilterMapper.LabelKind.Performer
+        Folders -> FilterMapper.LabelKind.Folder
+    }
 
     companion object {
         /** iOS: `kind(forCriterionKey:mode:)`. */
@@ -196,7 +209,10 @@ enum class PickerKind {
             when (k) {
                 "performer_tags" -> return PerformerTags
                 "scene_tags" -> return Tags
-                "parents", "children" -> return AllTags
+                // On studios `parents` are parent studios, not tags.
+                "parents" -> return if (mode == FilterMode.Studios) Studios else AllTags
+                "children" -> return AllTags
+                "folder", "parent_folder" -> return Folders
             }
             if ("tag" in k) return when (mode) {
                 FilterMode.Performers -> PerformerTags
@@ -249,6 +265,22 @@ object FilterPickerRepository {
         PickerKind.AllTags -> tags(null, "name", "ASC")
         PickerKind.Groups -> names("findGroups", "groups", "group_filter", FindFilter(1, 1000, "scenes_count", "DESC"), countFilter("scene_count"))
         PickerKind.Performers -> names("findPerformers", "performers", "performer_filter", FindFilter(1, 1000, "scenes_count", "DESC"), null)
+        PickerKind.Folders -> folders(null, 300)
+    }
+
+    /**
+     * Folders for the Folder criterion (Stash 0.32+), named by their full path like the web UI.
+     * Without a search term: the first folders by path.
+     */
+    private suspend fun folders(pathContains: String?, limit: Int): List<FilterEntityOption> {
+        if (!ServerCapabilities.supports032) return emptyList()
+        val variables = buildJsonObject {
+            put("filter", FindFilter(1, limit, "path", "ASC").json())
+            if (!pathContains.isNullOrEmpty()) put("folder_filter", buildJsonObject { put("path", criterion(pathContains, "INCLUDES")) })
+        }
+        val data = GraphQL.named("findFolderPickerOptions", variables)
+        val list = (data["findFolders"].obj?.get("folders") as? JsonArray) ?: return emptyList()
+        return list.mapNotNull { el -> el.obj?.let { o -> o["id"].primitiveContent?.let { FilterEntityOption(it, o["path"].primitiveContent ?: "") } } }
     }
 
     /** iOS: `searchFilterPickerOptions` — name search over the full list (60 hits). */
@@ -260,6 +292,7 @@ object FilterPickerRepository {
             PickerKind.Studios, PickerKind.ImageStudios, PickerKind.GalleryStudios -> names("findStudios", "studios", null, filter, null)
             PickerKind.Groups -> names("findGroups", "groups", null, filter, null)
             PickerKind.Performers -> names("findPerformers", "performers", null, filter, null)
+            PickerKind.Folders -> folders(term, limit)
             else -> names("findTags", "tags", null, filter, null)
         }
     }

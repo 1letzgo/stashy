@@ -105,7 +105,7 @@ fun CatalogListQuickBar(
         if (kind == CriterionKind.multi || kind == CriterionKind.hierarchicalMulti) PickerKind.forCriterion(key, mode) else null
     }.distinct()
     LaunchedEffect(entityKinds) { entityKinds.forEach { FilterPickerOptionsStore.load(it) } }
-    val names = if (entityKinds.isEmpty()) emptyMap() else FilterPickerOptionsStore.knownLabels()
+    val names = if (entityKinds.isEmpty()) emptyMap() else FilterPickerOptionsStore.knownLabelsAcrossKinds()
 
     // iOS `ToolsPillMenuRow` metrics (Tools pages): Tools content padding, menu top padding; the
     // list's own 12 dp gutter below is the menu bottom padding. 8 between the two rows.
@@ -334,7 +334,7 @@ private fun QuickEntityFilterSection(document: CriteriaDocument, key: String, ti
         if (term.isNotEmpty()) all.filter { it.name.contains(term, ignoreCase = true) }.take(30)
         else {
             val selected = selectedIds.toSet()
-            val labels = FilterPickerOptionsStore.knownLabels()
+            val labels = FilterPickerOptionsStore.knownLabelsAcrossKinds()
             val byId = all.associateBy { it.id }
             val picked = selectedIds.mapNotNull { id -> byId[id] ?: labels[id]?.let { de.letzgo.stashy.data.FilterEntityOption(id, it) } }
             picked + FilterPickerOptionsStore.cached(kind).filter { it.id !in selected }.take(VISIBLE_ENTITY_COUNT)
