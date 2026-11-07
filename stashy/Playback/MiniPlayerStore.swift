@@ -1122,6 +1122,14 @@ private struct NowPlayingContent: View {
     @EnvironmentObject private var coordinator: NavigationCoordinator
     @Environment(\.dismiss) private var dismiss
 
+    private static func minimizeSlots(_ action: @escaping () -> Void) -> [CatalogChromeSlot] {
+        #if os(macOS)
+        [CatalogChromeSlot(systemImage: "chevron.down", accessibilityLabel: "Minimize", action: action)]
+        #else
+        []
+        #endif
+    }
+
     var body: some View {
         // Toolbar (minimize · Details), then the player with a slim side margin; it stays put
         // while the watchlist scrolls.
@@ -1241,16 +1249,15 @@ private struct NowPlayingContent: View {
         .frame(width: proxy.size.width)
         }
         .background(Color.appBackground.ignoresSafeArea())
-        // Close (ends playback) where Back sits; Details and Minimize as round buttons on the right.
+        // Close (ends playback) where Back sits, Details on the right; minimizing is the sheet's swipe down.
         .hideSystemNavigationBarForCustomChrome()
         .stashyCustomChromeInset(spacing: 0) {
             StashyDetailTopBar(
                 backTitle: "Close",
                 backIcon: "xmark",
-                trailingSlots: [
-                    CatalogChromeSlot(systemImage: "info.circle", accessibilityLabel: "Details") { player.openSceneDetails() },
-                    CatalogChromeSlot(systemImage: "chevron.down", accessibilityLabel: "Minimize") { dismiss() }
-                ],
+                trailingAction: ("Details", "info.circle", { player.openSceneDetails() }),
+                // A macOS sheet has no swipe down: it keeps a Minimize button.
+                trailingSlots: Self.minimizeSlots { dismiss() },
                 onBack: { player.closeNowPlaying() }
             )
         }
