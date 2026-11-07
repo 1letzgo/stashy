@@ -960,6 +960,12 @@ private struct ScenesViewContent: View {
     /// Open iPhone Duo, plain scene list: the fold splits the screen into list and scene page.
     @State private var columnFold: FoldRegion?
     @State private var columnScene: Scene?
+    /// A sort, filter or search change keeps the old rows until the new first page arrives
+    /// (`fetchScenes`). Left deep in the old list, the scroll offset then lies past the end of
+    /// the one new page and the screen stays black until the next scroll — so every fresh
+    /// fetch sends the list back to the top.
+    @State private var listScrollPosition = ScrollPosition(edge: .top)
+    @State private var listResetToken = 0
     /// A scene that was open in the column when the phone folded carries on as a normal page.
     @State private var pushedColumnScene: Scene?
     /// A caller handed in its own filter (Director, and anything else scoping the catalogue list
@@ -989,47 +995,7 @@ private struct ScenesViewContent: View {
         }
         selectedSortOption = newOption
         persistSceneSort(newOption)
-
-        switch scope {
-        case .catalog:
-            viewModel.fetchScenes(sortBy: newOption, searchQuery: searchText, filter: fetchBaseFilter, liveFilter: effectiveSceneLiveFilterForFetch)
-        case .performer(let performerId):
-            viewModel.fetchPerformerScenes(
-                performerId: performerId,
-                sortBy: newOption,
-                isInitialLoad: true,
-                filter: fetchBaseFilter,
-                liveFilter: effectiveSceneLiveFilterForFetch,
-                searchQuery: searchText
-            )
-        case .studio(let studioId):
-            viewModel.fetchStudioScenes(
-                studioId: studioId,
-                sortBy: newOption,
-                isInitialLoad: true,
-                filter: fetchBaseFilter,
-                liveFilter: effectiveSceneLiveFilterForFetch,
-                searchQuery: searchText
-            )
-        case .tag(let tagId):
-            viewModel.fetchTagScenes(
-                tagId: tagId,
-                sortBy: newOption,
-                isInitialLoad: true,
-                filter: fetchBaseFilter,
-                liveFilter: effectiveSceneLiveFilterForFetch,
-                searchQuery: searchText
-            )
-        case .group(let groupId):
-            viewModel.fetchGroupScenes(
-                groupId: groupId,
-                sortBy: newOption,
-                isInitialLoad: true,
-                filter: fetchBaseFilter,
-                liveFilter: effectiveSceneLiveFilterForFetch,
-                searchQuery: searchText
-            )
-        }
+        performSearch()
     }
     
     // Search function with debouncing
@@ -1062,6 +1028,7 @@ private struct ScenesViewContent: View {
     }
 
     private func performSearch() {
+        listResetToken &+= 1
         switch scope {
         case .catalog:
             viewModel.fetchScenes(sortBy: selectedSortOption, searchQuery: searchText, filter: fetchBaseFilter, liveFilter: effectiveSceneLiveFilterForFetch)
@@ -1157,6 +1124,7 @@ private struct ScenesViewContent: View {
     }
 
     private func applyLiveFilter() {
+        listResetToken &+= 1
         persistSceneSort(selectedSortOption)
         // Full criteria live in `criteriaDocument` — do not also pass `selectedFilter` or base criteria double-apply.
         switch scope {
@@ -1645,6 +1613,10 @@ private struct ScenesViewContent: View {
                 }
                 // Match PerformerDetail non-scene tabs (`.padding(16)`).
                 .padding(.top, scrollHeader != nil ? 16 : 0)
+            }
+            .scrollPosition($listScrollPosition)
+            .onChange(of: listResetToken) { _, _ in
+                listScrollPosition.scrollTo(edge: .top)
             }
             .collapsesCatalogChrome(enabled: scrollHeader == nil && !hideTitle)
             .background(Color.appBackground)
