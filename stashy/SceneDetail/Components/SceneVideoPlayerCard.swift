@@ -115,6 +115,29 @@ struct SceneVideoPlayerCard: View {
         return "\(height)p"
     }
 
+    /// The file's frame rate ("30 fps", "29.97 fps"), its own pill after the resolution.
+    private var coverFrameRateLabel: String? {
+        guard let fps = activeScene.files?.first?.frameRate, fps > 0 else { return nil }
+        let rounded = (fps * 100).rounded() / 100
+        let text = rounded == rounded.rounded()
+            ? String(Int(rounded))
+            : String(format: "%.2f", rounded).replacingOccurrences(of: #"0$"#, with: "", options: .regularExpression)
+        return "\(text) fps"
+    }
+
+    private func coverInfoPill(_ text: String, systemImage: String) -> some View {
+        HStack(spacing: 4) {
+            Image(systemName: systemImage)
+                .font(.system(size: 10, weight: .bold))
+            Text(text)
+                .font(.system(size: 11, weight: .bold))
+        }
+        .foregroundStyle(.white)
+        .padding(.horizontal, 9)
+        .frame(height: 24)
+        .stashyGlass(shape: Capsule())
+    }
+
     private var thumbnailWithOverlay: some View {
         ZStack {
             // Background / Thumbnail
@@ -167,17 +190,15 @@ struct SceneVideoPlayerCard: View {
         .overlay(alignment: .topTrailing) {
             // Source quality on the cover, before playback starts (the player shows it in
             // its options menu once running).
-            if !isPreviewing, let resolution = coverResolutionLabel {
-                HStack(spacing: 4) {
-                    Image(systemName: "video.fill")
-                        .font(.system(size: 10, weight: .bold))
-                    Text(resolution)
-                        .font(.system(size: 11, weight: .bold))
+            if !isPreviewing, coverResolutionLabel != nil || coverFrameRateLabel != nil {
+                HStack(spacing: 6) {
+                    if let resolution = coverResolutionLabel {
+                        coverInfoPill(resolution, systemImage: "video.fill")
+                    }
+                    if let frameRate = coverFrameRateLabel {
+                        coverInfoPill(frameRate, systemImage: "speedometer")
+                    }
                 }
-                .foregroundStyle(.white)
-                .padding(.horizontal, 9)
-                .frame(height: 24)
-                .stashyGlass(shape: Capsule())
                 .padding(10)
                 .allowsHitTesting(false)
             }
