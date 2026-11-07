@@ -593,7 +593,15 @@ private fun CountDepthRow(value: JsonObject, set: (JsonObject) -> Unit, onChange
 private fun NumericRow(value: JsonObject, set: (JsonObject) -> Unit, isFloat: Boolean, onChange: () -> Unit) {
     val modifierRaw = value["modifier"].stringValue ?: "EQUALS"
     val mod = CriterionModifier.from(modifierRaw)
-    ModifierPicker(modifierRaw, (if (isFloat) CriterionKind.float else CriterionKind.int).defaultModifiers) { set(value.patch("modifier" to JsonPrimitive(it))); onChange() }
+    ModifierPicker(modifierRaw, (if (isFloat) CriterionKind.float else CriterionKind.int).defaultModifiers) { raw ->
+        set(value.patch("modifier" to JsonPrimitive(raw)))
+        // Without a value there is nothing to fetch yet: a refetch would sanitize the incomplete
+        // criterion away and the picker would fall back to Equals.
+        val next = CriterionModifier.from(raw)
+        val complete = next?.needsValue != true ||
+            (value["value"].numberOrNull != null && (!next.needsSecondValue || value["value2"].numberOrNull != null))
+        if (complete) onChange()
+    }
     if (mod?.needsValue == true) {
         fun text(key: String): String = value["${key}_text"].stringValue ?: value[key].numberOrNull?.let {
             if (!isFloat || it == Math.floor(it)) it.toLong().toString() else it.toString()

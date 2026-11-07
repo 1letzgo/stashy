@@ -1,0 +1,11 @@
+query FindPerformerGalleryCoAppearances($gallery_filter: GalleryFilterType, $filter: FindFilterType) {
+  findGalleries(gallery_filter: $gallery_filter, filter: $filter) {
+    count
+    galleries {
+      id
+      performers {
+        id
+      }
+    }
+  }
+}

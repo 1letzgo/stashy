@@ -33,6 +33,7 @@ import androidx.compose.material3.pulltorefresh.PullToRefreshDefaults
 import androidx.compose.material3.pulltorefresh.pullToRefresh
 import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
 import androidx.compose.ui.Alignment
+import de.letzgo.stashy.data.CoAppearanceCounts
 import de.letzgo.stashy.data.CoPerformersRepository
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.material3.DropdownMenu
@@ -73,7 +74,7 @@ class PerformerDetailScreen(val performerId: String, val preview: Performer? = n
     private val gridState = LazyGridState()
 
     /** Shared-scene count per co-performer id of the last "Appears with" load (card badge). */
-    private var coCounts by mutableStateOf<Map<String, Int>>(emptyMap())
+    private var coCounts by mutableStateOf<Map<String, CoAppearanceCounts>>(emptyMap())
     /** Next "Appears with" load drops the repository cache (pull-to-refresh). */
     private var coForceNext = false
 
@@ -94,7 +95,7 @@ class PerformerDetailScreen(val performerId: String, val preview: Performer? = n
                 val force = coForceNext
                 coForceNext = false
                 val list = CoPerformersRepository.load(performerId, q, force)
-                coCounts = list.associate { it.performer.id to it.sharedScenes }
+                coCounts = list.associate { it.performer.id to it.shared }
                 Page(list.size, list.map { it.performer })
             }
         },
@@ -113,8 +114,12 @@ class PerformerDetailScreen(val performerId: String, val preview: Performer? = n
         sceneContext = DetailViewContext.Performer,
         previewScenes = preview?.sceneCount ?: 0,
         previewGalleries = preview?.galleryCount ?: 0,
-        // "Appears with" only for a performer with at least one scene.
-        screenCount = { tab -> if (tab == DetailTab.AppearsWith && (performer?.sceneCount ?: 0) > 0) 1 else 0 },
+        // "Appears with" only for a performer with at least one scene, gallery or image.
+        screenCount = { tab ->
+            val p = performer
+            val any = p != null && ((p.sceneCount ?: 0) > 0 || (p.galleryCount ?: 0) > 0 || (p.imageCount ?: 0) > 0)
+            if (tab == DetailTab.AppearsWith && any) 1 else 0
+        },
     )
 
     // iOS init: no scene signal → open Galleries instead of an empty Scenes stack.
@@ -153,7 +158,7 @@ class PerformerDetailScreen(val performerId: String, val preview: Performer? = n
     /**
      * "Appears with" tab: the co-performers as the Performers catalog grid ([PerformerCard], shared
      * scene count as badge whatever the sort), in the order of the tab's sort (default: most shared
-     * scenes first). Tap → the scenes both share ([SharedScenesScreen]); long-press → "Open performer".
+     * most shared first). Tap → what both share ([SharedAppearancesScreen]); long-press → "Open performer".
      */
     private fun LazyGridScope.appearsWithSection() {
         val list = coPerformers.list
@@ -163,22 +168,22 @@ class PerformerDetailScreen(val performerId: String, val preview: Performer? = n
                     list.isLoading || !list.loadedOnce -> LoadingFooter("Loading performers...")
                     list.error != null -> InlineEmptyState(SF.exclamationTriangle, "Couldn't load performers")
                     coPerformers.isFilterActive -> InlineEmptyState(SF.person2, "No performers match the filter")
-                    else -> InlineEmptyState(SF.person2, "No shared scenes")
+                    else -> InlineEmptyState(SF.person2, "No shared scenes, galleries or images")
                 }
             }
             // Repository list is distinctBy id, so the keys are unique.
-            else -> items(list.items, key = { "co-${it.id}" }) { p -> CoPerformerCard(p, coCounts[p.id] ?: 0) }
+            else -> items(list.items, key = { "co-${it.id}" }) { p -> CoPerformerCard(p, coCounts[p.id] ?: CoAppearanceCounts()) }
         }
     }
 
     @Composable
-    private fun CoPerformerCard(other: Performer, sharedScenes: Int) {
+    private fun CoPerformerCard(other: Performer, shared: CoAppearanceCounts) {
         var menu by remember { mutableStateOf(false) }
         Box {
             PerformerCard(
                 other, Modifier.onLongPress { menu = true },
-                badge = SF.person2 to "$sharedScenes",
-                onClick = { Nav.push(SharedScenesScreen(performerId, performer?.name ?: "", other.id, other.name, performer, other, sharedScenes)) },
+                badge = SF.person2 to "${shared.total}",
+                onClick = { Nav.push(SharedAppearancesScreen(performerId, performer?.name ?: "", other.id, other.name, performer, other, shared)) },
             )
             DropdownMenu(menu, onDismissRequest = { menu = false }, containerColor = Theme.palette.secondaryBackground) {
                 OverflowItem("Open performer", SF.personFill, { menu = false }) { Nav.push(PerformerDetailScreen(other.id, other)) }

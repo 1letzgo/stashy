@@ -1055,6 +1055,13 @@ enum DetailLinkedGalleriesScope: Equatable {
     case studio(String)
     case tag(String)
     case group(String)
+    /// "Appears with" › card: galleries with both performers.
+    case sharedPerformers(String, String)
+}
+
+/// `performers` criterion matching items that list both performers.
+func sharedPerformersCriterion(_ first: String, _ second: String) -> [String: Any] {
+    ["value": [first, second], "modifier": "INCLUDES_ALL"]
 }
 
 @MainActor
@@ -1140,6 +1147,11 @@ final class DetailLinkedGalleriesFilterModel: ObservableObject {
             viewModel.fetchTagGalleries(tagId: id, sortBy: selectedSortOption, isInitialLoad: initial, filter: fetchBaseFilter, liveFilter: live)
         case .group(let id):
             viewModel.fetchGroupGalleries(groupId: id, sortBy: selectedSortOption, isInitialLoad: initial, filter: fetchBaseFilter, liveFilter: live)
+        case .sharedPerformers(let first, let second):
+            // Live wins over the scope in the merge, so the pair criterion replaces the single performer.
+            var pinned = live ?? [:]
+            pinned["performers"] = sharedPerformersCriterion(first, second)
+            viewModel.fetchPerformerGalleries(performerId: first, sortBy: selectedSortOption, isInitialLoad: initial, filter: fetchBaseFilter, liveFilter: pinned)
         }
     }
 
@@ -1400,6 +1412,8 @@ enum DetailLinkedImagesScope: Equatable {
     case tag(String)
     case group(String)
     case gallery(String)
+    /// "Appears with" › card: images with both performers.
+    case sharedPerformers(String, String)
     /// Reels „Clips“: `refetchImages` delegates to `fetchClips` (or `externalRefetchClips` when set).
     case reelsClips
     /// Embedded StashLine in Reels „Pics“: still images only, optional performer id.
@@ -1582,7 +1596,9 @@ final class DetailLinkedImagesFilterModel: ObservableObject {
             criteriaDocumentSourceId = nil
             return
         }
-        guard criteriaDocumentSourceId != f.id || criteriaDocument.isEmpty else { return }
+        // Once per filter: Feeds calls this on every clip change, and reloading would undo
+        // whatever the user edited in the sheet (an emptied document included).
+        guard criteriaDocumentSourceId != f.id else { return }
         loadCriteriaDocument(from: f, viewModel: viewModel)
     }
 
@@ -1682,6 +1698,10 @@ final class DetailLinkedImagesFilterModel: ObservableObject {
             viewModel.fetchDetailImages(groupId: id, sortBy: selectedSortOption, isInitialLoad: initial, filter: fetchBaseFilter, liveFilter: live)
         case .gallery(let id):
             viewModel.fetchGalleryImages(galleryId: id, sortBy: selectedSortOption, isInitialLoad: initial, filter: fetchBaseFilter, liveFilter: live)
+        case .sharedPerformers(let first, let second):
+            var pinned = live ?? [:]
+            pinned["performers"] = sharedPerformersCriterion(first, second)
+            viewModel.fetchDetailImages(performerId: first, sortBy: selectedSortOption, isInitialLoad: initial, filter: fetchBaseFilter, liveFilter: pinned)
         case .reelsStashLine:
             viewModel.fetchImages(
                 sortBy: selectedSortOption,
@@ -1796,6 +1816,8 @@ final class DetailLinkedImagesFilterModel: ObservableObject {
         var mergedPresetCriteria: [String: Any] = selectedFilter?.criteriaObjectFilter() ?? [:]
         for (key, value) in preset.liveFragment { mergedPresetCriteria[key] = value }
         criteriaDocument.load(mergedPresetCriteria)
+        // The preset's criteria sit on top of its base filter: do not mirror the bare filter over them.
+        criteriaDocumentSourceId = selectedFilter?.id
         applyLiveFilter(viewModel: viewModel)
     }
 
@@ -1807,6 +1829,7 @@ final class DetailLinkedImagesFilterModel: ObservableObject {
         // merged when it was saved); the old `ui_options.stashy` copy would override edits
         // made in Stash itself.
         criteriaDocument.load(filter.criteriaObjectFilter())
+        criteriaDocumentSourceId = filter.id
     }
 
     func applyServerSavedFilter(_ f: StashDBViewModel.SavedFilter, viewModel: StashDBViewModel) {

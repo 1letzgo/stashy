@@ -1012,7 +1012,9 @@ struct FilterNumericCriterionRow: View {
             FilterModifierPicker(
                 modifier: Binding(
                     get: { modifierRaw },
-                    set: { patch(["modifier": $0], commit: true) }
+                    // Without a value there is nothing to fetch yet: a refetch would sanitize the
+                    // incomplete criterion away and the picker would fall back to Equals.
+                    set: { patch(["modifier": $0], commit: Self.isComplete(value, modifier: $0)) }
                 ),
                 options: FilterCriterionKind.defaultModifiers(for: isFloat ? .float : .int),
                 onChange: {}
@@ -1074,6 +1076,13 @@ struct FilterNumericCriterionRow: View {
         for (k, v) in updates { next[k] = v }
         value = next
         if commit { onChange() }
+    }
+
+    /// The criterion can be sent with `modifier`: it needs no value, or has every value it needs.
+    static func isComplete(_ value: [String: Any], modifier raw: String) -> Bool {
+        guard let mod = StashCriterionModifier(rawValue: raw), mod.needsValue else { return true }
+        func has(_ key: String) -> Bool { value[key] is Int || value[key] is Double || value[key] is NSNumber }
+        return has("value") && (!mod.needsSecondValue || has("value2"))
     }
 }
 

@@ -11,6 +11,27 @@ import org.junit.Test
 
 class CoPerformerLogicTest {
 
+    private fun Map<String, Int>.scenes() = mapValues { CoAppearanceCounts(scenes = it.value) }
+
+    @Test fun countsGalleriesAndLooseImagesOnly() {
+        val scenes = listOf(CoAppearanceRow(null, listOf("me", "a")))
+        val galleries = listOf(CoAppearanceRow("g1", listOf("me", "a", "b")), CoAppearanceRow("g2", listOf("me", "c")))
+        val images = listOf(
+            CoAppearanceRow(null, listOf("me", "a"), listOf("g1")), // inside a shared gallery → not again
+            CoAppearanceRow(null, listOf("me", "a")),               // loose → counts
+            CoAppearanceRow(null, listOf("me", "d"), listOf("g2")), // gallery without d → counts
+        )
+        assertEquals(
+            mapOf(
+                "a" to CoAppearanceCounts(scenes = 1, galleries = 1, images = 1),
+                "b" to CoAppearanceCounts(galleries = 1),
+                "c" to CoAppearanceCounts(galleries = 1),
+                "d" to CoAppearanceCounts(images = 1),
+            ),
+            CoPerformerLogic.countAll(scenes, galleries, images, "me"),
+        )
+    }
+
     @Test fun countsSharedScenesExcludingSelf() {
         val scenes = listOf(
             listOf("me", "a", "b"),
@@ -35,9 +56,9 @@ class CoPerformerLogicTest {
             Performer("1", "zoe"), Performer("2", "Anna"), Performer("3", "bella"), Performer("4", "Carl"),
         )
         val counts = mapOf("1" to 5, "2" to 2, "3" to 2, "4" to 7)
-        val result = CoPerformerLogic.sorted(performers, counts)
+        val result = CoPerformerLogic.sorted(performers, counts.scenes())
         assertEquals(listOf("Carl", "zoe", "Anna", "bella"), result.map { it.performer.name })
-        assertEquals(listOf(7, 5, 2, 2), result.map { it.sharedScenes })
+        assertEquals(listOf(7, 5, 2, 2), result.map { it.shared.total })
     }
 
     private fun performerSort(raw: String) = SortCatalog.option(FilterMode.Performers, raw)!!
@@ -93,17 +114,17 @@ class CoPerformerLogicTest {
         // Stash co-appearance also matches image / gallery partners: "4" has no shared scene.
         val server = listOf(Performer("4", "img only"), Performer("1", "a"), Performer("2", "b"))
         val counts = mapOf("1" to 1, "2" to 3, "3" to 2)
-        assertEquals(listOf("1", "2"), CoPerformerLogic.ordered(server, counts, performerSort("nameAsc")).map { it.performer.id })
-        assertEquals(listOf(3, 1), CoPerformerLogic.ordered(server, counts, CoPerformerSort.Desc).map { it.sharedScenes })
+        assertEquals(listOf("1", "2"), CoPerformerLogic.ordered(server, counts.scenes(), performerSort("nameAsc")).map { it.performer.id })
+        assertEquals(listOf(3, 1), CoPerformerLogic.ordered(server, counts.scenes(), CoPerformerSort.Desc).map { it.shared.total })
     }
 
     @Test fun orderedBySharedAscendingOrKeepsServerOrder() {
         val performers = listOf(Performer("1", "zoe"), Performer("2", "Anna"), Performer("3", "bella"), Performer("4", "x"))
         val counts = mapOf("1" to 5, "2" to 2, "3" to 2)
-        assertEquals(listOf("Anna", "bella", "zoe"), CoPerformerLogic.ordered(performers, counts, CoPerformerSort.Asc).map { it.performer.name })
-        assertEquals(listOf("zoe", "Anna", "bella"), CoPerformerLogic.ordered(performers, counts, CoPerformerSort.Desc).map { it.performer.name })
+        assertEquals(listOf("Anna", "bella", "zoe"), CoPerformerLogic.ordered(performers, counts.scenes(), CoPerformerSort.Asc).map { it.performer.name })
+        assertEquals(listOf("zoe", "Anna", "bella"), CoPerformerLogic.ordered(performers, counts.scenes(), CoPerformerSort.Desc).map { it.performer.name })
         // Server sort: server order kept, performers without a shared scene dropped.
-        assertEquals(listOf("zoe", "Anna", "bella"), CoPerformerLogic.ordered(performers, counts, performerSort("nameDesc")).map { it.performer.name })
+        assertEquals(listOf("zoe", "Anna", "bella"), CoPerformerLogic.ordered(performers, counts.scenes(), performerSort("nameDesc")).map { it.performer.name })
     }
 
     @Test fun cacheKeyChangesWithFilterAndSort() {
@@ -120,7 +141,7 @@ class CoPerformerLogicTest {
 
     @Test fun sheetSortPickerOffersSharedScenesFirst() {
         val kinds = SortCatalog.fieldKinds(FilterMode.Performers, CoPerformerSort.options)
-        assertEquals(SortFieldKind(CoPerformerSort.FIELD, "Shared scenes"), kinds.first())
+        assertEquals(SortFieldKind(CoPerformerSort.FIELD, "Most shared"), kinds.first())
         assertEquals(1, kinds.count { it.field == CoPerformerSort.FIELD })
         assertEquals(CoPerformerSort.Asc, SortCatalog.optionFor(FilterMode.Performers, CoPerformerSort.FIELD, true, CoPerformerSort.options))
         assertEquals(performerSort("nameAsc"), SortCatalog.optionFor(FilterMode.Performers, "name", true, CoPerformerSort.options))
@@ -131,7 +152,7 @@ class CoPerformerLogicTest {
 
     @Test fun dropsPerformersWithoutCountAndDuplicates() {
         val performers = listOf(Performer("1", "A"), Performer("1", "A"), Performer("2", "B"))
-        val result = CoPerformerLogic.sorted(performers, mapOf("1" to 1))
-        assertEquals(listOf(CoPerformer(Performer("1", "A"), 1)), result)
+        val result = CoPerformerLogic.sorted(performers, mapOf("1" to 1).scenes())
+        assertEquals(listOf(CoPerformer(Performer("1", "A"), CoAppearanceCounts(scenes = 1))), result)
     }
 }

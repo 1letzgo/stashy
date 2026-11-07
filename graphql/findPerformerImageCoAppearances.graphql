@@ -1,0 +1,14 @@
+query FindPerformerImageCoAppearances($image_filter: ImageFilterType, $filter: FindFilterType) {
+  findImages(image_filter: $image_filter, filter: $filter) {
+    count
+    images {
+      id
+      performers {
+        id
+      }
+      galleries {
+        id
+      }
+    }
+  }
+}

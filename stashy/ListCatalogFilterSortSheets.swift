@@ -1192,7 +1192,7 @@ struct PerformersCatalogFilterSortSheet: View {
                 }
             )) {
                 if sharedScenesSortSelected != nil {
-                    Text("Shared scenes").tag(PerformerCatalogSortPickerValue.sharedScenes)
+                    Text("Most shared").tag(PerformerCatalogSortPickerValue.sharedScenes)
                 }
                 if case .unmapped(let f) = pickerValue {
                     Text("Other (\(f))").tag(PerformerCatalogSortPickerValue.unmapped(sortField: f))

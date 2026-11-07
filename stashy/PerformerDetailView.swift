@@ -140,7 +140,7 @@ struct PerformerDetailView: View {
         if viewModel.totalDetailStudios > 0 { tabs.append(.studios) }
         if viewModel.totalDetailTags > 0 { tabs.append(.tags) }
         if viewModel.totalDetailGroups > 0 { tabs.append(.groups) }
-        if effectiveScenes > 0 { tabs.append(.appearsWith) }
+        if effectiveScenes > 0 || effectiveGalleries > 0 || effectiveImages > 0 { tabs.append(.appearsWith) }
         return tabs
     }
 
@@ -190,6 +190,7 @@ struct PerformerDetailView: View {
                 : AnyView(EmptyView()),
             filterMemory: scenesFilterMemory
         )
+        .environment(\.detailBreadcrumb, detailCrumb)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
     }
 
@@ -408,17 +409,90 @@ struct PerformerDetailView: View {
         navigationBackTrigger = UUID()
     }
 
-    /// Custom top chrome: Back · section icons · Favorite · Edit (edit mode). Feeds lives in the header.
+    /// Back · section dropdown, like the overviews' breadcrumb; the shown list's sort menu and
+    /// settings sit at its right edge.
+    private var detailCrumb: DetailBreadcrumb {
+        DetailBreadcrumb(
+            sections: availableTabs.map { .init(id: $0.rawValue, title: $0.rawValue, systemImage: $0.icon) },
+            selectionID: selectedDetailTab.rawValue,
+            onSelect: { id in
+                if let tab = DetailTab(rawValue: id) { selectedDetailTab = tab }
+            },
+            onBack: { goBack() }
+        )
+    }
+
+    /// Top chrome. The Scenes list draws this row itself (`detailBreadcrumbChrome`), with its own
+    /// sort menu and settings; every other section gets it here.
     @ViewBuilder
     private var performerDetailNavBar: some View {
-        StashyDetailTopBar(
-            onBack: { goBack() },
-            tabs: availableTabs,
-            selection: selectedDetailTab,
-            icon: { $0.icon },
-            label: { $0.rawValue },
-            onSelect: { selectedDetailTab = $0 }
-        )
+        if !showsPerformerScenesStack {
+            StashySectionChromeBar {
+                DetailBreadcrumbRow(crumb: detailCrumb) { sectionControls }
+                    .padding(.horizontal, StashyExpandingDock.edgePadding)
+                    .padding(.vertical, 6)
+            }
+        }
+    }
+
+    /// Sort menu and filter / sort settings of the shown section (the overviews' right edge).
+    @ViewBuilder
+    private var sectionControls: some View {
+        HStack(spacing: 6) {
+            switch selectedDetailTab {
+            case .galleries:
+                CatalogQuickSortMenu(mode: .galleries, sort: linkedGalleries.selectedSortOption) {
+                    linkedGalleries.changeSortOption(to: $0, viewModel: viewModel)
+                }
+            case .images:
+                CatalogQuickSortMenu(mode: .images, sort: linkedImages.selectedSortOption) {
+                    linkedImages.changeSortOption(to: $0, viewModel: viewModel)
+                }
+            case .studios:
+                CatalogQuickSortMenu(mode: .studios, sort: linkedStudios.selectedSortOption) {
+                    linkedStudios.changeSortOption(to: $0, viewModel: viewModel)
+                }
+            case .tags:
+                CatalogQuickSortMenu(mode: .tags, sort: linkedTags.selectedSortOption) {
+                    linkedTags.changeSortOption(to: $0, viewModel: viewModel)
+                }
+            case .appearsWith:
+                CatalogQuickSortMenu(mode: .performers, sort: linkedCoPerformers.selectedSortOption) {
+                    linkedCoPerformers.changeSortOption(to: $0, viewModel: viewModel)
+                }
+            case .scenes, .groups:
+                EmptyView()
+            }
+            if let filter = sectionFilterSlot {
+                DetailTopBarSlotButton(slot: filter)
+            }
+        }
+    }
+
+    /// The shown section's filter and sort sheet (Groups has none yet).
+    private var sectionFilterSlot: CatalogChromeSlot? {
+        func slot(active: Bool, open: @escaping () -> Void) -> CatalogChromeSlot {
+            CatalogChromeSlot(systemImage: "slider.horizontal.3", isActive: active, accessibilityLabel: "Filter and sort") {
+                HapticManager.light()
+                open()
+            }
+        }
+        switch selectedDetailTab {
+        case .scenes:
+            return slot(active: performerSceneFilterActive) { performerLiveFilterSheetPresented = true }
+        case .galleries:
+            return slot(active: linkedGalleries.catalogFilterSortFABActive) { linkedGalleries.showFilterSortSheet = true }
+        case .studios:
+            return slot(active: linkedStudios.catalogFilterSortFABActive) { linkedStudios.showFilterSortSheet = true }
+        case .tags:
+            return slot(active: linkedTags.catalogFilterSortFABActive) { linkedTags.showFilterSortSheet = true }
+        case .images:
+            return slot(active: linkedImages.catalogFilterSortFABActive) { linkedImages.showFilterSortSheet = true }
+        case .appearsWith:
+            return slot(active: linkedCoPerformers.catalogFilterSortFABActive) { linkedCoPerformers.showFilterSortSheet = true }
+        case .groups:
+            return nil
+        }
     }
 
     private func toggleFavorite() {
@@ -577,67 +651,10 @@ struct PerformerDetailView: View {
     private var performerDetailListSlots: CatalogSlotSet {
         var slots = CatalogSlotSet(visibility: performerDetailCatalogFloatingChromeForFooter)
         slots.entityActions = entityActionSlots
-        switch selectedDetailTab {
-        case .scenes:
-            // Filter & sort also in the bar (far right), like every other tab.
-            slots.filterSort = CatalogChromeSlot(
-                systemImage: "slider.horizontal.3",
-                isActive: performerSceneFilterActive,
-                accessibilityLabel: "Filter and sort"
-            ) {
-                HapticManager.light()
-                performerLiveFilterSheetPresented = true
-            }
+        // Filter & sort live in the top bar now (breadcrumb row); the bar keeps the actions.
+        if selectedDetailTab == .scenes {
             slots.contextual = SceneBulkDownloadChrome.slot {
                 showingSceneDownloadOptions = true
-            }
-        case .galleries:
-            slots.filterSort = CatalogChromeSlot(
-                systemImage: "slider.horizontal.3",
-                isActive: linkedGalleries.catalogFilterSortFABActive,
-                accessibilityLabel: "Filter and sort"
-            ) {
-                HapticManager.light()
-                linkedGalleries.showFilterSortSheet = true
-            }
-        case .studios:
-            slots.filterSort = CatalogChromeSlot(
-                systemImage: "slider.horizontal.3",
-                isActive: linkedStudios.catalogFilterSortFABActive,
-                accessibilityLabel: "Filter and sort"
-            ) {
-                HapticManager.light()
-                linkedStudios.showFilterSortSheet = true
-            }
-        case .tags:
-            slots.filterSort = CatalogChromeSlot(
-                systemImage: "slider.horizontal.3",
-                isActive: linkedTags.catalogFilterSortFABActive,
-                accessibilityLabel: "Filter and sort"
-            ) {
-                HapticManager.light()
-                linkedTags.showFilterSortSheet = true
-            }
-        case .images:
-            slots.filterSort = CatalogChromeSlot(
-                systemImage: "slider.horizontal.3",
-                isActive: linkedImages.catalogFilterSortFABActive,
-                accessibilityLabel: "Filter and sort"
-            ) {
-                HapticManager.light()
-                linkedImages.showFilterSortSheet = true
-            }
-        case .groups:
-            // No groups filter model yet; the bar still carries Favorite / Edit.
-            break
-        case .appearsWith:
-            slots.filterSort = CatalogChromeSlot(
-                systemImage: "slider.horizontal.3",
-                isActive: linkedCoPerformers.catalogFilterSortFABActive,
-                accessibilityLabel: "Filter and sort"
-            ) {
-                HapticManager.light()
-                linkedCoPerformers.showFilterSortSheet = true
             }
         }
         return slots
@@ -992,20 +1009,21 @@ struct PerformerDetailView: View {
         } else {
             InlineEmptyStateView(
                 icon: "person.2",
-                title: linkedCoPerformers.catalogFilterSortFABActive ? "No performers match this filter" : "No shared scenes"
+                title: linkedCoPerformers.catalogFilterSortFABActive ? "No performers match this filter" : "No shared scenes, galleries or images"
             )
         }
     }
 
-    /// Same cards / columns as the Performers catalog; the badge shows the shared-scene count.
-    /// Tap → scenes with both performers; context menu → the co-performer's detail.
+    /// Same cards / columns as the Performers catalog; the badge shows how often both appear
+    /// together (scenes + galleries + images outside those galleries).
+    /// Tap → what both share; context menu → the co-performer's detail.
     private func appearsWithGrid(_ coPerformers: [CoPerformer]) -> some View {
         LazyVGrid(columns: galleryColumns, spacing: 12) {
             ForEach(coPerformers) { co in
                 NavigationLink(destination: LazyView {
-                    SharedScenesView(first: displayPerformer, second: co.performer)
+                    SharedAppearancesView(first: displayPerformer, second: co.performer, shared: co.shared)
                 }) {
-                    PerformerCardView(performer: co.performer, sharedSceneCount: co.sharedSceneCount)
+                    PerformerCardView(performer: co.performer, sharedCount: co.shared.total)
                 }
                 .buttonStyle(.plain)
                 .contextMenu {
@@ -1014,7 +1032,7 @@ struct PerformerDetailView: View {
                     }
                 }
                 .accessibilityLabel(co.performer.name)
-                .accessibilityValue("\(co.sharedSceneCount) shared \(co.sharedSceneCount == 1 ? "scene" : "scenes")")
+                .accessibilityValue(co.shared.accessibilityText)
             }
         }
         .measuresGridWidth($galleryGridWidth)
@@ -1045,11 +1063,11 @@ struct PerformerDetailView: View {
         let sort = model.coPerformersServerSort(viewModel: viewModel)
         do {
             let repository = PerformerRepository()
-            let counts: [String: Int]
+            let counts: [String: CoAppearanceCounts]
             if let cachedCounts = CoPerformerCache.shared.counts(performerId) {
                 counts = cachedCounts
             } else {
-                counts = try await repository.fetchCoPerformerSceneCounts(performerId: performerId)
+                counts = try await repository.fetchCoAppearanceCounts(performerId: performerId)
                 CoPerformerCache.shared.setCounts(performerId, counts)
             }
             let result = try await repository.fetchCoPerformers(
@@ -1467,40 +1485,188 @@ struct EditPerformerSheet: View {
     }
 }
 
-// MARK: - Shared scenes ("Appears with" → card)
+// MARK: - Shared appearances ("Appears with" → card)
 
-/// Scenes with both performers, pushed from an "Appears with" card. Fixed scope like
-/// `DirectorDetailView`: the filter is injected, so sort changes stay local to this list.
-struct SharedScenesView: View {
+/// What two performers share, pushed from an "Appears with" card: Scenes, Galleries and Images
+/// in the detail-page section dropdown. Fixed scope like `DirectorDetailView`: the pair filter is
+/// pinned, so sort changes stay local to this page.
+struct SharedAppearancesView: View {
     let first: Performer
     let second: Performer
+    let shared: CoAppearanceCounts
+
+    enum Section: String, CaseIterable {
+        case scenes = "Scenes"
+        case galleries = "Galleries"
+        case images = "Images"
+
+        var icon: String {
+            switch self {
+            case .scenes: return "film"
+            case .galleries: return "photo.stack"
+            case .images: return "photo"
+            }
+        }
+    }
 
     @Environment(\.dismiss) private var dismiss
     @ObservedObject private var appearanceManager = AppearanceManager.shared
     @StateObject private var viewModel = StashDBViewModel()
+    @StateObject private var linkedGalleries: DetailLinkedGalleriesFilterModel
+    @StateObject private var linkedImages: DetailLinkedImagesFilterModel
+    @State private var selected: Section
     @State private var isHeaderExpanded = false
+    @State private var gridWidth: CGFloat = 0
+    @State private var imagesFeedScrolling = false
     /// UIKit pop when `dismiss()` is a no-op under custom chrome.
     @State private var navigationBackTrigger: UUID?
 
-    var body: some View {
-        ScenesView(
-            filter: .scenesShared(by: first, and: second),
-            hideTitle: true,
-            scope: .catalog,
-            sharedViewModel: viewModel,
-            showsFloatingFilterButton: true,
-            scrollHeader: AnyView(
-                heroHeader
-                    .padding(.horizontal, 16)
-            )
+    init(first: Performer, second: Performer, shared: CoAppearanceCounts) {
+        self.first = first
+        self.second = second
+        self.shared = shared
+        _linkedGalleries = StateObject(wrappedValue: DetailLinkedGalleriesFilterModel(scope: .sharedPerformers(first.id, second.id)))
+        _linkedImages = StateObject(wrappedValue: DetailLinkedImagesFilterModel(scope: .sharedPerformers(first.id, second.id)))
+        _selected = State(initialValue: Self.sections(for: shared).first ?? .scenes)
+    }
+
+    /// Images show with shared galleries too: their pictures are shared images, just not counted twice.
+    static func sections(for shared: CoAppearanceCounts) -> [Section] {
+        var result: [Section] = []
+        if shared.scenes > 0 { result.append(.scenes) }
+        if shared.galleries > 0 { result.append(.galleries) }
+        if shared.images > 0 || shared.galleries > 0 { result.append(.images) }
+        return result
+    }
+
+    private var crumb: DetailBreadcrumb {
+        DetailBreadcrumb(
+            sections: Self.sections(for: shared).map { .init(id: $0.rawValue, title: $0.rawValue, systemImage: $0.icon) },
+            selectionID: selected.rawValue,
+            onSelect: { id in if let section = Section(rawValue: id) { selected = section } },
+            onBack: { navigationBackTrigger = UUID() }
         )
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-        .background {
-            StashyNavigationBackTrigger(trigger: $navigationBackTrigger) {
-                dismiss()
+    }
+
+    private var columns: [GridItem] {
+        DesignTokens.Grid.adaptiveColumns(width: gridWidth, ideal: DesignTokens.Grid.idealPosterCardWidth, minimum: 2, maximum: 8)
+    }
+
+    var body: some View {
+        content
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+            .applyAppBackground()
+            .background {
+                StashyNavigationBackTrigger(trigger: $navigationBackTrigger) {
+                    dismiss()
+                }
+            }
+            .stashyDetailChrome(StashyDetailChromeConfig(insetSpacing: 0)) { navBar }
+            .onChange(of: selected, initial: true) { _, section in
+                switch section {
+                case .galleries where viewModel.performerGalleries.isEmpty:
+                    linkedGalleries.refetchGalleries(viewModel: viewModel, initial: true)
+                case .images where viewModel.detailImages.isEmpty:
+                    linkedImages.refetchImages(viewModel: viewModel, initial: true)
+                default:
+                    break
+                }
+            }
+    }
+
+    @ViewBuilder
+    private var content: some View {
+        if selected == .scenes {
+            ScenesView(
+                filter: .scenesShared(by: first, and: second),
+                hideTitle: true,
+                scope: .catalog,
+                sharedViewModel: viewModel,
+                showsFloatingFilterButton: false,
+                scrollHeader: AnyView(
+                    heroHeader
+                        .padding(.horizontal, 16)
+                )
+            )
+            .environment(\.detailBreadcrumb, crumb)
+        } else {
+            ScrollView {
+                VStack(spacing: 12) {
+                    heroHeader
+                    if selected == .galleries {
+                        galleryGrid
+                    } else {
+                        LinkedImagesCatalogGrid(
+                            images: $viewModel.detailImages,
+                            sortOption: linkedImages.selectedSortOption,
+                            isLoading: viewModel.isLoadingDetailImages,
+                            hasMore: viewModel.hasMoreDetailImages,
+                            onLoadMore: { linkedImages.refetchImages(viewModel: viewModel, initial: false) },
+                            multiColumnGridItems: columns,
+                            isFeedScrolling: imagesFeedScrolling,
+                            viewModel: viewModel
+                        )
+                        .measuresGridWidth($gridWidth)
+                    }
+                }
+                .padding(16)
+            }
+            .onScrollPhaseChange { _, phase in
+                imagesFeedScrolling = selected == .images && phase != .idle
             }
         }
-        .stashyDetailChrome(StashyDetailChromeConfig(insetSpacing: 0)) { navBar }
+    }
+
+    @ViewBuilder
+    private var galleryGrid: some View {
+        if viewModel.performerGalleries.isEmpty {
+            if viewModel.isLoadingPerformerGalleries {
+                VStack {
+                    InlineSpinner()
+                    Text("Loading galleries...").font(.caption).foregroundColor(.secondary)
+                }.padding(.top, 40)
+            } else {
+                InlineEmptyStateView(icon: "photo.on.rectangle", title: "No galleries found")
+            }
+        } else {
+            LazyVGrid(columns: columns, spacing: 12) {
+                ForEach(viewModel.performerGalleries) { gallery in
+                    NavigationLink(destination: ImagesView(gallery: gallery)) {
+                        GalleryCardView(gallery: gallery)
+                    }
+                    .buttonStyle(.plain)
+                }
+                if viewModel.isLoadingPerformerGalleries {
+                    ProgressView().padding(.vertical, 20)
+                } else if viewModel.hasMorePerformerGalleries {
+                    Color.clear.frame(height: 1).onAppear { viewModel.loadMorePerformerGalleries(performerId: first.id) }
+                }
+            }
+            .measuresGridWidth($gridWidth)
+        }
+    }
+
+    /// Scenes draws this row itself (`detailBreadcrumbChrome` in `ScenesView`); Galleries and
+    /// Images get it here with their sort menu.
+    @ViewBuilder
+    private var navBar: some View {
+        if selected != .scenes {
+            StashySectionChromeBar {
+                DetailBreadcrumbRow(crumb: crumb) {
+                    if selected == .galleries {
+                        CatalogQuickSortMenu(mode: .galleries, sort: linkedGalleries.selectedSortOption) {
+                            linkedGalleries.changeSortOption(to: $0, viewModel: viewModel)
+                        }
+                    } else {
+                        CatalogQuickSortMenu(mode: .images, sort: linkedImages.selectedSortOption) {
+                            linkedImages.changeSortOption(to: $0, viewModel: viewModel)
+                        }
+                    }
+                }
+                .padding(.horizontal, StashyExpandingDock.edgePadding)
+                .padding(.vertical, 6)
+            }
+        }
     }
 
     /// Same `DetailHeroCard` as the other detail screens: blurred band from the first performer,
@@ -1510,7 +1676,7 @@ struct SharedScenesView: View {
         let backdropURL = first.thumbnailURL ?? second.thumbnailURL
         return DetailHeroCard(
             title: "\(first.name) & \(second.name)",
-            items: [DetailHeroItem(label: "SHARED SCENES", value: sharedScenesValue)],
+            items: sharedItems,
             description: nil,
             showsHero: backdropURL != nil,
             onHeroTap: nil,
@@ -1524,9 +1690,13 @@ struct SharedScenesView: View {
         )
     }
 
-    private var sharedScenesValue: String {
-        if viewModel.totalScenes == 0 && (viewModel.isLoading || viewModel.isLoadingScenes) { return "—" }
-        return "\(viewModel.totalScenes)"
+    /// Counts from the "Appears with" card; images are those outside the shared galleries.
+    private var sharedItems: [DetailHeroItem] {
+        var items: [DetailHeroItem] = []
+        if shared.scenes > 0 { items.append(DetailHeroItem(label: "SHARED SCENES", value: "\(shared.scenes)")) }
+        if shared.galleries > 0 { items.append(DetailHeroItem(label: "SHARED GALLERIES", value: "\(shared.galleries)")) }
+        if shared.images > 0 { items.append(DetailHeroItem(label: "SHARED IMAGES", value: "\(shared.images)")) }
+        return items
     }
 
     private var avatarPair: some View {
@@ -1571,10 +1741,6 @@ struct SharedScenesView: View {
         }
     }
 
-    /// Same top chrome as the performer / studio detail screens: Back pill only.
-    private var navBar: some View {
-        StashyDetailTopBar(onBack: { navigationBackTrigger = UUID() })
-    }
 }
 
 extension StashDBViewModel.SavedFilter {
