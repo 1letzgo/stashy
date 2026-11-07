@@ -1754,6 +1754,46 @@ extension View {
 }
 
 /// Minimal fullscreen viewer for a single hero image (pinch to zoom, tap or X to close).
+/// A header image to show full screen (performer portrait, group cover).
+struct HeroImageFullscreenItem: Identifiable {
+    let id = UUID()
+    let url: URL
+
+    /// Opens the full-size image: the header loads a resized copy (`width` / `height` /
+    /// `size` query items), the viewer drops them so zooming shows the original.
+    init(url: URL) {
+        guard var components = URLComponents(url: url, resolvingAgainstBaseURL: false) else {
+            self.url = url
+            return
+        }
+        let resize: Set<String> = ["width", "height", "size"]
+        let kept = (components.queryItems ?? []).filter { !resize.contains($0.name) }
+        components.queryItems = kept.isEmpty ? nil : kept
+        self.url = components.url ?? url
+    }
+}
+
+/// `DetailHeroFullscreenViewer` for a remote image.
+struct RemoteHeroImageFullscreen: View {
+    let url: URL
+
+    var body: some View {
+        DetailHeroFullscreenViewer {
+            CustomAsyncImage(url: url) { loader in
+                if let image = loader.image {
+                    image.resizable().scaledToFit()
+                } else if loader.isLoading {
+                    InlineSpinner(tint: .white)
+                } else {
+                    Image(systemName: "photo")
+                        .font(.system(size: 48, weight: .bold))
+                        .foregroundColor(.white.opacity(0.6))
+                }
+            }
+        }
+    }
+}
+
 struct DetailHeroFullscreenViewer<Content: View>: View {
     @ViewBuilder var content: () -> Content
     @Environment(\.dismiss) private var dismiss

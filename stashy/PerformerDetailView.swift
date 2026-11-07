@@ -20,6 +20,8 @@ struct PerformerDetailView: View {
     @EnvironmentObject var coordinator: NavigationCoordinator
     @Environment(\.stashyDismiss) private var dismiss
     @State private var isHeaderExpanded = false
+    /// Header portrait opened full screen.
+    @State private var heroFullscreen: HeroImageFullscreenItem?
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @State private var fullPerformer: Performer?
     @State private var performerLiveFilterSheetPresented = false
@@ -1095,7 +1097,7 @@ struct PerformerDetailView: View {
             description: nil,
             showsHero: imageURL != nil,
             heroAccessibilityLabel: "Performer image",
-            onHeroTap: nil,
+            onHeroTap: imageURL.map { url in { heroFullscreen = HeroImageFullscreenItem(url: url) } },
             isExpanded: $isHeaderExpanded,
             collapsedItemLimit: 8,
             placeholderSystemImage: "person.fill",
@@ -1119,6 +1121,7 @@ struct PerformerDetailView: View {
             },
             footer: { EmptyView() }
         )
+        .fullScreenCover(item: $heroFullscreen) { RemoteHeroImageFullscreen(url: $0.url) }
     }
 
     /// Performer image filling its frame; `alignment` picks the crop (top for the circle so

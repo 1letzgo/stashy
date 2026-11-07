@@ -975,6 +975,8 @@ struct GroupDetailView: View {
     @State private var showingSceneDownloadOptions = false
     @State private var groupSceneFilterActive = false
     @State private var isHeaderExpanded = false
+    /// A cover opened full screen.
+    @State private var coverFullscreen: HeroImageFullscreenItem?
     @State private var showingEditGroupSheet = false
     @StateObject private var linkedPerformers: DetailLinkedPerformersFilterModel
     @StateObject private var linkedTags: DetailLinkedTagsFilterModel
@@ -1746,9 +1748,9 @@ struct GroupDetailView: View {
             // DVD case instead of the circle: front cover, and the back cover beside it if any.
             leadingAvatars: AnyView(
                 HStack(alignment: .top, spacing: 6) {
-                    GroupDVDCover(url: coverURL, accessibilityLabel: "Front cover")
+                    coverButton(coverURL, label: "Front cover")
                     if let back = selectedGroup.backImageURL {
-                        GroupDVDCover(url: back, accessibilityLabel: "Back cover")
+                        coverButton(back, label: "Back cover")
                     }
                 }
             ),
@@ -1758,6 +1760,23 @@ struct GroupDetailView: View {
             footer: { EmptyView() }
         )
         .padding(.horizontal, 16)
+        .fullScreenCover(item: $coverFullscreen) { RemoteHeroImageFullscreen(url: $0.url) }
+    }
+
+    /// A DVD cover that opens full screen.
+    @ViewBuilder
+    private func coverButton(_ url: URL?, label: String) -> some View {
+        if let url {
+            Button {
+                coverFullscreen = HeroImageFullscreenItem(url: url)
+            } label: {
+                GroupDVDCover(url: url, accessibilityLabel: label)
+            }
+            .buttonStyle(.plain)
+            .accessibilityHint("Opens the cover full screen")
+        } else {
+            GroupDVDCover(url: nil, accessibilityLabel: label)
+        }
     }
 
     /// Front cover filling its frame; `alignment` picks the crop (top for the circle).

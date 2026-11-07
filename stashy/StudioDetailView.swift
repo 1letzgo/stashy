@@ -33,6 +33,8 @@ struct StudioDetailView: View {
     @State private var isFavorite: Bool = false
     @State private var isUpdatingFavorite: Bool = false
     @State private var isHeaderExpanded = false
+    /// The studio logo opened full screen.
+    @State private var showingLogoFullscreen = false
     @State private var showingEditStudioSheet = false
 
     private var showsFeedsNavButton: Bool {
@@ -795,6 +797,8 @@ struct StudioDetailView: View {
             items: getStudioDetails(studio).map { DetailHeroItem(label: $0.label, value: $0.value) },
             description: studio.details,
             showsHero: studioHasCustomImage,
+            heroAccessibilityLabel: "Studio logo",
+            onHeroTap: { showingLogoFullscreen = true },
             isExpanded: $isHeaderExpanded,
             placeholderSystemImage: AppTab.studios.icon,
             backdrop: {
@@ -845,6 +849,13 @@ struct StudioDetailView: View {
                 }
             }
         )
+        .fullScreenCover(isPresented: $showingLogoFullscreen) {
+            // A logo, so fitted on the logo grey rather than cropped.
+            DetailHeroFullscreenViewer {
+                StudioImageView(studio: studio)
+                    .padding(24)
+            }
+        }
     }
 
     private func getStudioDetails(_ s: Studio) -> [(label: String, value: String)] {
