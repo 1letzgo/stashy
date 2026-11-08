@@ -75,11 +75,9 @@ struct DirectorDetailView: View {
             onBack: { dismiss() }
         ))
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-        .stashyDetailChrome(directorChromeConfig) { EmptyView() }
-    }
-
-    private var directorChromeConfig: StashyDetailChromeConfig {
-        StashyDetailChromeConfig(insetSpacing: 0)
+        // The breadcrumb row above is the list's own chrome; no second, empty inset here.
+        .hideSystemNavigationBarForCustomChrome()
+        .enableSwipeBackWhenNavBarHidden()
     }
 
     // Hero modeled after PerformerDetailView.headerView.

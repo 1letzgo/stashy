@@ -1,0 +1,3 @@
+mutation MetadataAutoTag($input: AutoTagMetadataInput!) {
+  metadataAutoTag(input: $input)
+}

@@ -859,6 +859,8 @@ struct GalleriesView: View {
 struct GalleryCardView: View {
     let gallery: Gallery
     var aspectRatio: CGFloat = 1
+    /// 125 pt cards (Home rows, Search): the title in the Home cards' 12 pt bold.
+    var compactTitle: Bool = false
     @ObservedObject var appearanceManager = AppearanceManager.shared
     
     var body: some View {
@@ -944,13 +946,14 @@ struct GalleryCardView: View {
                             
                             HStack(alignment: .bottom) {
                                 Text(gallery.displayName)
-                                    .font(.headline)
-                                    .fontWeight(.medium)
+                                    .font(compactTitle ? .system(size: 12, weight: .bold) : .headline.weight(.medium))
+                                    .dynamicTypeSize(...(compactTitle ? DynamicTypeSize.xxLarge : DynamicTypeSize.accessibility5))
                                     .foregroundColor(.white)
                                     .lineLimit(2)
+                                    .shadow(color: .black.opacity(compactTitle ? 0.8 : 0), radius: 2, x: 0, y: 1)
                                     .frame(maxWidth: .infinity, alignment: .leading)
                             }
-                            .padding(12)
+                            .padding(compactTitle ? 8 : 12)
                         }
                     }
                 }

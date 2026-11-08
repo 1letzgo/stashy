@@ -7399,7 +7399,10 @@ class StashDBViewModel: ObservableObject {
         // Only send enabled flags + scope — matches Stash web and avoids odd no-op jobs.
         var input: [String: Any] = [:]
         if covers { input["covers"] = true }
-        if previews { input["previews"] = true }
+        // Stash renders animated image previews only inside the video preview task, so
+        // `imagePreviews` alone is a job that does nothing (the web UI greys it out without
+        // Previews). Existing video previews are skipped unless `overwrite` is set.
+        if previews || imagePreviews { input["previews"] = true }
         if imagePreviews { input["imagePreviews"] = true }
         if sprites { input["sprites"] = true }
         if markers { input["markers"] = true }
@@ -7434,6 +7437,113 @@ class StashDBViewModel: ObservableObject {
                 completion(false, "Failed to start generate. Please check your server configuration.", nil)
             }
         }
+    }
+
+    // MARK: - Server tasks (Settings › Server, as on the web UI's Tasks page)
+
+    /// Result of a server task: whether the server took it, and its job id or returned text.
+    struct ServerTaskResult {
+        let ok: Bool
+        let value: String?
+        let error: String?
+    }
+
+    /// Runs one task mutation and reads `data.<field>`. GraphQL errors come back as the
+    /// server's own message instead of a generic failure.
+    func runServerTask(_ queryName: String, field: String, input: [String: Any]?) async -> ServerTaskResult {
+        let query = GraphQLQueries.loadQuery(named: queryName)
+        let variables: [String: Any] = input.map { ["input": $0] } ?? [:]
+        do {
+            let data = try await GraphQLClient.shared.executeRaw(query: query, variables: variables)
+            guard let json = try JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+                return ServerTaskResult(ok: false, value: nil, error: "Unreadable server response.")
+            }
+            if let errors = json["errors"] as? [[String: Any]], !errors.isEmpty {
+                let message = errors.compactMap { $0["message"] as? String }.joined(separator: "\n")
+                return ServerTaskResult(ok: false, value: nil, error: message.isEmpty ? "The server rejected the task." : message)
+            }
+            let value = (json["data"] as? [String: Any])?[field]
+            let text = value as? String ?? (value as? NSNumber)?.stringValue
+            return ServerTaskResult(ok: true, value: text, error: nil)
+        } catch {
+            AppLog.error("❌ \(queryName) failed: \(error.localizedDescription)")
+            return ServerTaskResult(ok: false, value: nil, error: error.localizedDescription)
+        }
+    }
+
+    /// What the web UI's Tasks page starts `task` ("autoTag" / "generate") with:
+    /// `ui.taskDefaults.<task>`, else `configuration.defaults.<task>`. Empty when neither is set.
+    private func fetchServerTaskDefaults(_ task: String) async -> [String: Any] {
+        let query = GraphQLQueries.loadQuery(named: "configurationTaskDefaults")
+        guard let data = try? await GraphQLClient.shared.executeRaw(query: query, variables: [:]),
+              let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let configuration = (json["data"] as? [String: Any])?["configuration"] as? [String: Any]
+        else { return [:] }
+        let ui = configuration["ui"] as? [String: Any]
+        if let fromUI = (ui?["taskDefaults"] as? [String: Any])?[task] as? [String: Any], !fromUI.isEmpty {
+            return fromUI
+        }
+        return ((configuration["defaults"] as? [String: Any])?[task] as? [String: Any]) ?? [:]
+    }
+
+    private static let generateFlagKeys: Set<String> = [
+        "covers", "sprites", "previews", "imagePreviews", "markers", "markerImagePreviews",
+        "markerScreenshots", "transcodes", "forceTranscodes", "phashes", "interactiveHeatmapsSpeeds",
+        "imageThumbnails", "clipPreviews", "imagePhashes", "overwrite"
+    ]
+
+    /// Generate with the server's saved choices, like the web UI's Generate button. Without
+    /// saved choices it uses the web UI's own defaults (covers, sprites, phashes, previews, markers).
+    func triggerGenerateWithServerDefaults() async -> ServerTaskResult {
+        let defaults = await fetchServerTaskDefaults("generate")
+        var input: [String: Any] = [:]
+        for (key, value) in defaults where Self.generateFlagKeys.contains(key) {
+            if let flag = value as? Bool, flag { input[key] = true }
+        }
+        // Newer than the oldest supported server: dropped rather than failing the whole job.
+        if !StashServerCapabilities.supports031 { input["imagePhashes"] = nil }
+        if input.isEmpty {
+            input = ["covers": true, "sprites": true, "phashes": true, "previews": true, "markers": true]
+        }
+        if input["imagePreviews"] != nil { input["previews"] = true }
+        return await runServerTask("metadataGenerate", field: "metadataGenerate", input: input)
+    }
+
+    /// Auto Tag over the whole library with the server's saved choices; all performers,
+    /// studios and tags when none are saved (the web UI's default).
+    func triggerAutoTag() async -> ServerTaskResult {
+        let defaults = await fetchServerTaskDefaults("autoTag")
+        var input: [String: Any] = [:]
+        for key in ["performers", "studios", "tags"] {
+            if let ids = defaults[key] as? [String], !ids.isEmpty { input[key] = ids }
+        }
+        if input.isEmpty {
+            input = ["performers": ["*"], "studios": ["*"], "tags": ["*"]]
+        }
+        return await runServerTask("metadataAutoTag", field: "metadataAutoTag", input: input)
+    }
+
+    /// Removes database entries whose files are gone. `dryRun` only logs what it would remove.
+    func triggerClean(dryRun: Bool) async -> ServerTaskResult {
+        await runServerTask("metadataClean", field: "metadataClean", input: ["dryRun": dryRun])
+    }
+
+    /// Deletes generated files without a database entry (the web UI's defaults: everything).
+    func triggerCleanGenerated() async -> ServerTaskResult {
+        await runServerTask("metadataCleanGenerated", field: "metadataCleanGenerated", input: [
+            "blobFiles": true, "sprites": true, "screenshots": true, "transcodes": true,
+            "markers": true, "imageThumbnails": true, "dryRun": false
+        ])
+    }
+
+    func triggerOptimiseDatabase() async -> ServerTaskResult {
+        await runServerTask("optimiseDatabase", field: "optimiseDatabase", input: nil)
+    }
+
+    /// Writes a database backup into the server's backup directory. Runs synchronously on the
+    /// server; `value` is empty because nothing is downloaded.
+    func triggerBackupDatabase() async -> ServerTaskResult {
+        await runServerTask("backupDatabase", field: "backupDatabase", input: ["download": false])
     }
 
     /// Generates still thumbnails for markers on a scene (frame at each marker's start time).

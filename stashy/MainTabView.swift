@@ -301,6 +301,11 @@ extension MainTabView {
         case .reels:
             NavigationStack {
                 ReelsView(viewModel: reelsFeedViewModel, deepLink: coordinator.reelsDeepLink)
+                    #if os(iOS)
+                    // Video under the tab bar: its glass and the time bar in its accessory slot
+                    // stay dark in Light Mode, or the white time bar vanishes on light glass.
+                    .toolbarColorScheme(.dark, for: .tabBar)
+                    #endif
             }
             .id(coordinator.reelsTabID)
 
@@ -421,6 +426,8 @@ struct ToolsView: View {
     private var toolPage: some View {
         if let tool = (showsLanding ? nil : effectiveTab) ?? lastTool {
             toolContent(tool)
+                // Scrolling a tool hides the Tools row like in Home (reaches the tool's scroll view).
+                .collapsesCatalogChrome()
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 // Pushed pages don't inherit the grid's background.
                 .applyAppBackground()
@@ -759,6 +766,7 @@ private struct ToolsLandingView: View {
             .padding(.top, DesignTokens.Tools.menuTopPadding)
             .padding(.bottom, DesignTokens.Tools.menuBottomPadding)
         }
+        .collapsesCatalogChrome()
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .applyAppBackground()
     }
@@ -814,6 +822,40 @@ struct ToolsServerView: View {
     @State private var jobs: [StashQueuedJob] = []
     @State private var jobsLoaded = false
     @State private var stoppingJobIds: Set<String> = []
+    @State private var showAutoTagConfirmation = false
+    @State private var showCleanConfirmation = false
+    @State private var showCleanGeneratedConfirmation = false
+
+    /// One Generate option on its own, in the order of the web UI's Generate dialog.
+    struct GenerateOption: Identifiable {
+        let id: String
+        let label: String
+        let icon: String
+        let start: (StashDBViewModel, @escaping (Bool, String) -> Void) -> Void
+    }
+
+    private var generateOptions: [GenerateOption] {
+        var options: [GenerateOption] = [
+            .init(id: "covers", label: "Covers", icon: "photo.fill") { $0.triggerGenerate(covers: true, completion: $1) },
+            .init(id: "previews", label: "Video Previews", icon: "play.rectangle.fill") { $0.triggerGenerate(previews: true, completion: $1) },
+            // Stash only renders these inside the video preview task (see triggerGenerate).
+            .init(id: "imagePreviews", label: "Animated Image Previews", icon: "photo.on.rectangle.angled") { $0.triggerGenerate(imagePreviews: true, completion: $1) },
+            .init(id: "sprites", label: "Scrubber Sprites", icon: "square.grid.3x3.fill") { $0.triggerGenerate(sprites: true, completion: $1) },
+            .init(id: "markers", label: "Marker Previews", icon: "mappin.and.ellipse") { $0.triggerGenerate(markers: true, completion: $1) },
+            .init(id: "markerImagePreviews", label: "Marker Animated Image Previews", icon: "mappin.and.ellipse.circle.fill") { $0.triggerGenerate(markerImagePreviews: true, completion: $1) },
+            .init(id: "markerScreenshots", label: "Marker Screenshots", icon: "camera.fill") { $0.triggerGenerate(markerScreenshots: true, completion: $1) },
+            .init(id: "transcodes", label: "Transcodes", icon: "film.stack") { $0.triggerGenerate(transcodes: true, completion: $1) },
+            .init(id: "phashes", label: "Video Perceptual Hashes", icon: "number.square.fill") { $0.triggerGenerate(phashes: true, completion: $1) },
+            .init(id: "heatmaps", label: "Interactive Heatmaps & Speeds", icon: "waveform.path.ecg") { $0.triggerGenerate(interactiveHeatmapsSpeeds: true, completion: $1) },
+            .init(id: "clipPreviews", label: "Image Clip Previews", icon: "play.rectangle.on.rectangle.fill") { $0.triggerGenerate(clipPreviews: true, completion: $1) },
+            .init(id: "imageThumbnails", label: "Image Thumbnails", icon: "photo.on.rectangle") { $0.triggerGenerate(imageThumbnails: true, completion: $1) },
+        ]
+        // Image phashes arrived with Stash 0.31; older servers reject the whole job.
+        if StashServerCapabilities.supports031 {
+            options.append(.init(id: "imagePhashes", label: "Image Perceptual Hashes", icon: "number.circle.fill") { $0.triggerGenerate(imagePhashes: true, completion: $1) })
+        }
+        return options
+    }
 
     private let tagRepository = TagRepository()
     private let cleanupRepository = LibraryCleanupRepository()
@@ -848,86 +890,51 @@ struct ToolsServerView: View {
                         jobsBlock
                     }
 
+                    // Same tasks and order as the Tasks page of the Stash web UI.
                     Section {
-                        stashyScrollingSectionHeader("Scan & Identify")
-                        taskRow(label: "Scan Library", icon: "arrow.triangle.2.circlepath", taskId: "scan", index: 0, count: 2) {
+                        stashyScrollingSectionHeader("Library")
+                        taskRow(label: "Scan", icon: "arrow.triangle.2.circlepath", taskId: "scan", index: 0, count: 3) {
                             viewModel.triggerLibraryScan { _, message in
-                                showResult(title: "Scan Library", message: message)
+                                showResult(title: "Scan", message: message)
                             }
                         }
-                        taskRow(label: "Identify", icon: "person.crop.square.filled.and.at.rectangle", taskId: "identify", index: 1, count: 2) {
+                        taskRow(label: "Identify", icon: "person.crop.square.filled.and.at.rectangle", taskId: "identify", index: 1, count: 3) {
                             viewModel.triggerIdentify { _, message, _ in
                                 showResult(title: "Identify", message: message)
                             }
+                        }
+                        taskRow(label: "Auto Tag", icon: "tag", taskId: "autotag", index: 2, count: 3, starts: false) {
+                            showAutoTagConfirmation = true
                         }
                     }
 
                     Section {
                         stashyScrollingSectionHeader("Generate")
-                        taskRow(label: "Scene covers", icon: "photo.fill", taskId: "gen_covers", index: 0, count: 13) {
-                            viewModel.triggerGenerate(covers: true) { _, message in
-                                showResult(title: "Scene covers", message: message)
+                        taskRow(label: "Generate", icon: "wand.and.stars", taskId: "gen_defaults", index: 0, count: generateOptions.count + 1) {
+                            runServerTask("Generate", taskId: "gen_defaults", queued: true) { await viewModel.triggerGenerateWithServerDefaults() }
+                        }
+                        ForEach(Array(generateOptions.enumerated()), id: \.element.id) { index, option in
+                            taskRow(label: option.label, icon: option.icon, taskId: "gen_\(option.id)", index: index + 1, count: generateOptions.count + 1) {
+                                option.start(viewModel) { _, message in
+                                    showResult(title: option.label, message: message)
+                                }
                             }
                         }
-                        taskRow(label: "Video perceptual hashes", icon: "number.square.fill", taskId: "gen_phashes", index: 1, count: 13) {
-                            viewModel.triggerGenerate(phashes: true) { _, message in
-                                showResult(title: "Video perceptual hashes", message: message)
-                            }
+                    }
+
+                    Section {
+                        stashyScrollingSectionHeader("Maintenance")
+                        taskRow(label: "Clean", icon: "trash.slash", taskId: "clean", index: 0, count: 4, starts: false) {
+                            showCleanConfirmation = true
                         }
-                        taskRow(label: "Previews", icon: "play.rectangle.fill", taskId: "gen_previews", index: 2, count: 13) {
-                            viewModel.triggerGenerate(previews: true) { _, message in
-                                showResult(title: "Previews", message: message)
-                            }
+                        taskRow(label: "Clean Generated Files", icon: "folder.badge.minus", taskId: "clean_generated", index: 1, count: 4, starts: false) {
+                            showCleanGeneratedConfirmation = true
                         }
-                        taskRow(label: "Animated image previews", icon: "photo.on.rectangle.angled", taskId: "gen_imagePreviews", index: 3, count: 13) {
-                            viewModel.triggerGenerate(imagePreviews: true) { _, message in
-                                showResult(title: "Animated image previews", message: message)
-                            }
+                        taskRow(label: "Optimise Database", icon: "cylinder.split.1x2", taskId: "optimise", index: 2, count: 4) {
+                            runServerTask("Optimise Database", taskId: "optimise", queued: true) { await viewModel.triggerOptimiseDatabase() }
                         }
-                        taskRow(label: "Scene scrubber sprites", icon: "square.grid.3x3.fill", taskId: "gen_sprites", index: 4, count: 13) {
-                            viewModel.triggerGenerate(sprites: true) { _, message in
-                                showResult(title: "Scene scrubber sprites", message: message)
-                            }
-                        }
-                        taskRow(label: "Marker previews", icon: "mappin.and.ellipse", taskId: "gen_markers", index: 5, count: 13) {
-                            viewModel.triggerGenerate(markers: true) { _, message in
-                                showResult(title: "Marker previews", message: message)
-                            }
-                        }
-                        taskRow(label: "Marker animated image previews", icon: "mappin.and.ellipse.circle.fill", taskId: "gen_markerImagePreviews", index: 6, count: 13) {
-                            viewModel.triggerGenerate(markerImagePreviews: true) { _, message in
-                                showResult(title: "Marker animated image previews", message: message)
-                            }
-                        }
-                        taskRow(label: "Marker screenshots", icon: "camera.fill", taskId: "gen_markerScreenshots", index: 7, count: 13) {
-                            viewModel.triggerGenerate(markerScreenshots: true) { _, message in
-                                showResult(title: "Marker screenshots", message: message)
-                            }
-                        }
-                        taskRow(label: "Transcodes", icon: "film.stack", taskId: "gen_transcodes", index: 8, count: 13) {
-                            viewModel.triggerGenerate(transcodes: true) { _, message in
-                                showResult(title: "Transcodes", message: message)
-                            }
-                        }
-                        taskRow(label: "Generate heatmaps and speeds for interactive scenes", icon: "waveform.path.ecg", taskId: "gen_heatmaps", index: 9, count: 13) {
-                            viewModel.triggerGenerate(interactiveHeatmapsSpeeds: true) { _, message in
-                                showResult(title: "Generate heatmaps and speeds", message: message)
-                            }
-                        }
-                        taskRow(label: "Image clip previews", icon: "play.rectangle.on.rectangle.fill", taskId: "gen_clipPreviews", index: 10, count: 13) {
-                            viewModel.triggerGenerate(clipPreviews: true) { _, message in
-                                showResult(title: "Image clip previews", message: message)
-                            }
-                        }
-                        taskRow(label: "Image thumbnails", icon: "photo.on.rectangle", taskId: "gen_imageThumbnails", index: 11, count: 13) {
-                            viewModel.triggerGenerate(imageThumbnails: true) { _, message in
-                                showResult(title: "Image thumbnails", message: message)
-                            }
-                        }
-                        taskRow(label: "Image perceptual hashes", icon: "number.circle.fill", taskId: "gen_imagePhashes", index: 12, count: 13) {
-                            viewModel.triggerGenerate(imagePhashes: true) { _, message in
-                                showResult(title: "Image perceptual hashes", message: message)
-                            }
+                        taskRow(label: "Backup Database", icon: "externaldrive.badge.timemachine", taskId: "backup", index: 3, count: 4) {
+                            runServerTask("Backup Database", taskId: "backup", queued: false, note: "The backup is in the server's backup folder.") { await viewModel.triggerBackupDatabase() }
                         }
                     }
 
@@ -998,6 +1005,35 @@ struct ToolsServerView: View {
             Button("OK", role: .cancel) { }
         } message: {
             Text(alertMessage)
+        }
+        .alert("Auto Tag the whole library?", isPresented: $showAutoTagConfirmation) {
+            Button("Auto Tag") {
+                runServerTask("Auto Tag", taskId: "autotag", queued: true) { await viewModel.triggerAutoTag() }
+            }
+            Button("Cancel", role: .cancel) { }
+        } message: {
+            Text("Matches performer, studio and tag names against file paths and adds them to scenes, images and galleries. Short names can match by mistake.")
+        }
+        .alert("Clean the library?", isPresented: $showCleanConfirmation) {
+            Button("Dry Run") {
+                runServerTask("Clean (Dry Run)", taskId: "clean", queued: true, note: "The server log lists what would be removed.") {
+                    await viewModel.triggerClean(dryRun: true)
+                }
+            }
+            Button("Clean", role: .destructive) {
+                runServerTask("Clean", taskId: "clean", queued: true) { await viewModel.triggerClean(dryRun: false) }
+            }
+            Button("Cancel", role: .cancel) { }
+        } message: {
+            Text("Removes scenes, images and galleries whose files no longer exist, with their generated files. This cannot be undone. A dry run only writes to the server log.")
+        }
+        .alert("Clean generated files?", isPresented: $showCleanGeneratedConfirmation) {
+            Button("Clean", role: .destructive) {
+                runServerTask("Clean Generated Files", taskId: "clean_generated", queued: true) { await viewModel.triggerCleanGenerated() }
+            }
+            Button("Cancel", role: .cancel) { }
+        } message: {
+            Text("Deletes covers, previews, sprites, transcodes, marker files and thumbnails that no longer belong to anything in the database.")
         }
         .alert("Remove unused \(cleanupKind.noun)?", isPresented: $showCleanupConfirmation) {
             Button("Delete \(cleanupCandidates.count)", role: .destructive) { deleteUnused() }
@@ -1146,8 +1182,32 @@ struct ToolsServerView: View {
         }
     }
 
+    /// Starts a task through `run` and reports what the server answered.
+    private func runServerTask(
+        _ title: String,
+        taskId: String,
+        queued: Bool,
+        note: String? = nil,
+        run: @escaping () async -> StashDBViewModel.ServerTaskResult
+    ) {
+        runningTask = taskId
+        Task {
+            let result = await run()
+            await refreshJobs()
+            let message: String
+            if result.ok {
+                message = [queued ? "Added to the server's job queue." : "Done.", note]
+                    .compactMap { $0 }.joined(separator: " ")
+            } else {
+                message = result.error ?? "The server did not start the task."
+            }
+            showResult(title: title, message: message)
+        }
+    }
+
+    /// `starts: false` for rows that only ask first (their alert starts the task).
     @ViewBuilder
-    private func taskRow(label: String, icon: String, taskId: String, index: Int, count: Int, action: @escaping () -> Void) -> some View {
+    private func taskRow(label: String, icon: String, taskId: String, index: Int, count: Int, starts: Bool = true, action: @escaping () -> Void) -> some View {
         HStack {
             Label {
                 Text(label)
@@ -1163,6 +1223,10 @@ struct ToolsServerView: View {
                     .padding(.trailing, 4)
             } else {
                 Button(action: {
+                    guard starts else {
+                        action()
+                        return
+                    }
                     runningTask = taskId
                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
                         action()
@@ -1453,6 +1517,9 @@ private struct FeedsTimeBarAccessory: View {
                 .opacity(accessory.isUIVisible ? 1 : 0)
                 .allowsHitTesting(accessory.isUIVisible)
                 .animation(.easeInOut(duration: 0.2), value: accessory.isUIVisible)
+                // The bar draws in white over video; in Light Mode the slot's glass turned light
+                // and swallowed it. Video chrome stays dark, as Feeds' own overlays do.
+                .colorScheme(.dark)
                 .onChange(of: placement == .inline, initial: true) { _, inline in
                     if accessory.isInline != inline { accessory.isInline = inline }
                 }

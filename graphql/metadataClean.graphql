@@ -1,0 +1,3 @@
+mutation MetadataClean($input: CleanMetadataInput!) {
+  metadataClean(input: $input)
+}

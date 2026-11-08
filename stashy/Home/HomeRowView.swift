@@ -319,7 +319,7 @@ struct HomeRowView: View {
                 case .newGalleries, .recentlyUpdatedGalleries, .galleriesHighestImageCount:
                     ForEach(galleries) { g in
                         cardLink(destination: ImagesView(gallery: g), id: g.id, width: w) {
-                            GalleryCardView(gallery: g).frame(width: isLarge ? w : 125, height: 125)
+                            GalleryCardView(gallery: g, compactTitle: !isLarge).frame(width: isLarge ? w : 125, height: 125)
                         }
                     }
                 default:

@@ -592,6 +592,14 @@ enum StashServerCapabilities {
         return parts.lexicographicallyPrecedes([0, 32]) == false
     }
 
+    /// Stash 0.31: image phashes in Generate.
+    static var supports031: Bool {
+        guard let id = ServerConfigManager.shared.activeConfig?.id,
+              let version = UserDefaults.standard.string(forKey: versionKeyPrefix + id.uuidString),
+              let parts = parse(version) else { return false }
+        return parts.lexicographicallyPrecedes([0, 31]) == false
+    }
+
     /// Stash 0.32: `production_date`, recursive studio counts, tag count `depth`, new sorts.
     static var supports032: Bool {
         guard let id = ServerConfigManager.shared.activeConfig?.id else { return false }

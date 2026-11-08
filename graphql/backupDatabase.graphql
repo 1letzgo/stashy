@@ -1,0 +1,3 @@
+mutation BackupDatabase($input: BackupDatabaseInput!) {
+  backupDatabase(input: $input)
+}

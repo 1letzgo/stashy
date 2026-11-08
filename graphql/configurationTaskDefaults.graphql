@@ -1,0 +1,28 @@
+# Task defaults the Stash web UI's Tasks page starts Auto Tag and Generate with:
+# `ui.taskDefaults.<task>` (what the web UI last used), else `defaults.<task>`.
+query ConfigurationTaskDefaults {
+  configuration {
+    ui
+    defaults {
+      autoTag {
+        performers
+        studios
+        tags
+      }
+      generate {
+        covers
+        sprites
+        previews
+        imagePreviews
+        markers
+        markerImagePreviews
+        markerScreenshots
+        transcodes
+        phashes
+        interactiveHeatmapsSpeeds
+        imageThumbnails
+        clipPreviews
+      }
+    }
+  }
+}

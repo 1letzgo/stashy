@@ -40,9 +40,14 @@ final class CatalogChromeCollapse: ObservableObject {
             // button that is already sliding away, and it hangs under the status bar.
             dragStartedWithMenuOpen = isDragging && ContextMenuPresence.isMenuOpen
             #endif
+            if isDragging { flippedThisGesture = false }
         }
     }
     private var dragStartedWithMenuOpen = false
+    /// One flip per swipe (its drag and the deceleration after it). Scrolling up a lazy list
+    /// measures the rows coming into view, and the offset corrections that follow read as a
+    /// scroll down: on iPad the chrome came back, left again and came back in one swipe.
+    private var flippedThisGesture = false
     private var anchor: CGFloat = 0
     /// The list the finger last dragged. Lists kept alive off screen (other Home sections)
     /// report their geometry too; loading a page re-lays them out at offset 0, which read as
@@ -73,6 +78,8 @@ final class CatalogChromeCollapse: ObservableObject {
         if position <= Self.showDistance {
             anchor = position
             setCollapsed(false)
+        } else if flippedThisGesture {
+            anchor = position
         } else if position > anchor {
             if targetCollapsed {
                 anchor = position
@@ -120,6 +127,7 @@ final class CatalogChromeCollapse: ObservableObject {
     private func setCollapsed(_ value: Bool) {
         guard targetCollapsed != value else { return }
         targetCollapsed = value
+        flippedThisGesture = true
         // Not from inside the scroll update: published there, the chrome jumps in a single frame
         // and its animation never runs.
         DispatchQueue.main.async { [weak self] in
@@ -162,22 +170,6 @@ struct CatalogChromeCollapsible: ViewModifier {
             .allowsHitTesting(!collapsed)
             .accessibilityHidden(collapsed)
             .animation(StashyChromeAutoHide.animation(reduceMotion: reduceMotion), value: collapsed)
-    }
-}
-
-/// Keeps the status bar readable once the section bar, whose material reaches behind it, is gone.
-private struct CatalogStatusBarScrim: View {
-    @ObservedObject private var collapse = CatalogChromeCollapse.shared
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
-
-    var body: some View {
-        Color.clear
-            .frame(height: 0)
-            .background(.bar)
-            .colorScheme(.dark)
-            .opacity(collapse.isCollapsed ? 1 : 0)
-            .animation(StashyChromeAutoHide.animation(reduceMotion: reduceMotion), value: collapse.isCollapsed)
-            .allowsHitTesting(false)
     }
 }
 
@@ -257,9 +249,6 @@ struct SectionChromeModifier<Row: View>: ViewModifier {
                     }
                     .modifier(CatalogChromeCollapsible())
                 }
-            }
-            .overlay(alignment: .top) {
-                if showsSwitcher { CatalogStatusBarScrim() }
             }
     }
 }
