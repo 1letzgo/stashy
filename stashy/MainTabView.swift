@@ -1342,6 +1342,30 @@ private struct MiniPlayerHost: ViewModifier {
     @ObservedObject private var store = MiniPlayerStore.shared
     @ObservedObject private var tabManager = TabManager.shared
     @ObservedObject private var feedsScrubber = FeedsScrubberAccessory.shared
+    @ObservedObject private var security = SecurityManager.shared
+
+    /// The passcode screen is a ZStack overlay in `MainTabView`; a sheet or cover sits above it,
+    /// so the full view stayed readable on the lock screen. While locked both step aside and
+    /// the store keeps its state, so they come back after unlocking.
+    private var nowPlayingPresented: Binding<Bool> {
+        Binding(
+            get: { store.showsNowPlaying && !security.isAppLocked },
+            set: { shown in
+                guard !security.isAppLocked else { return }
+                store.showsNowPlaying = shown
+            }
+        )
+    }
+
+    private var expandedScenePresented: Binding<Scene?> {
+        Binding(
+            get: { security.isAppLocked ? nil : store.expandedScene },
+            set: { scene in
+                guard !security.isAppLocked else { return }
+                store.expandedScene = scene
+            }
+        )
+    }
 
     /// The mini player sits in the tab bar's accessory slot (not floating over a page without one).
     private var showsMiniPlayerInTabBar: Bool {
@@ -1366,7 +1390,7 @@ private struct MiniPlayerHost: ViewModifier {
             .onChange(of: tabManager.isMiniPlayerEnabled) { _, enabled in
                 if !enabled { store.close(forget: false) }
             }
-            .sheet(isPresented: $store.showsNowPlaying) {
+            .sheet(isPresented: nowPlayingPresented) {
                 NowPlayingView()
                     #if os(macOS)
                     .frame(minWidth: 640, minHeight: 720)
@@ -1374,7 +1398,7 @@ private struct MiniPlayerHost: ViewModifier {
             }
             #if os(macOS)
             // macOS has no full-screen cover: a large sheet carries the scene page instead.
-            .sheet(item: $store.expandedScene) { scene in
+            .sheet(item: expandedScenePresented) { scene in
                 NavigationStack {
                     SceneDetailView(scene: scene, autoPlay: true)
                         .environment(\.stashyPresentedFromMiniPlayer, true)
@@ -1382,7 +1406,7 @@ private struct MiniPlayerHost: ViewModifier {
                 .frame(minWidth: 820, minHeight: 640)
             }
             #else
-            .fullScreenCover(item: $store.expandedScene) { scene in
+            .fullScreenCover(item: expandedScenePresented) { scene in
                 // The page shows Close instead of Back here; leaving hands the video back to the bar.
                 NavigationStack {
                     SceneDetailView(scene: scene, autoPlay: true)
