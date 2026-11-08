@@ -42,7 +42,7 @@ struct HomeForgottenFavoritesRowView: View {
         }
         .background {
             if onBackdrop {
-                let focused = engine.items.first { $0.id == scrollID } ?? engine.items.first
+                let focused = engine.items.first { $0.id == HomeHeroPreview.shared.focusedID(row: config.id.uuidString, current: scrollID, in: engine.items.map(\.id)) }
                 HomeDashboardHeroBackdrop(thumbnailURL: focused?.scene.thumbnailURL)
                     .equatable()
             }
@@ -56,7 +56,9 @@ struct HomeForgottenFavoritesRowView: View {
                 ForEach(engine.items) { item in
                     NavigationLink(destination: LazyView { SceneDetailView(scene: item.scene) }) {
                         VStack(alignment: .leading, spacing: 6) {
-                            HomeSceneCardView(scene: item.scene, isLarge: isLarge, screenWidth: homeContentWidth)
+                            HomeSceneCardView(scene: item.scene, isLarge: isLarge, screenWidth: homeContentWidth,
+                                              autoplaysPreview: isLarge && isFirst && tabManager.dashboardHeroAutoplay
+                                                  && HomeHeroPreview.shared.focusedID(row: config.id.uuidString, current: scrollID, in: engine.items.map(\.id)) == item.id)
                             label(item)
                         }
                     }
@@ -69,7 +71,7 @@ struct HomeForgottenFavoritesRowView: View {
             .padding(.horizontal, 12)
             .scrollTargetLayout()
         }
-        .scrollPosition(id: $scrollID)
+        .homeRowPosition($scrollID, row: config.id.uuidString, ids: engine.items.map(\.id))
         .scrollTargetBehavior(.viewAligned)
         .scrollContentBackground(.hidden)
     }

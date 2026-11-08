@@ -186,7 +186,8 @@ struct HomeRowView: View {
         .padding(.bottom, 0)
         .background {
             if isLarge && isFirst && tabManager.showDashboardHeroBackground {
-                let focusedScene = scenes.first { $0.id == scrollID } ?? scenes.first
+                let focusedID = HomeHeroPreview.shared.focusedID(row: config.id.uuidString, current: scrollID, in: scenes.map(\.id))
+                let focusedScene = scenes.first { $0.id == focusedID }
                 // Keep the under-status-bar host mounted; only swap the image.
                 // Remounting `.ignoresSafeArea` on every scroll snap flickers the status bar.
                 HomeDashboardHeroBackdrop(thumbnailURL: focusedScene?.thumbnailURL)
@@ -324,7 +325,8 @@ struct HomeRowView: View {
                 default:
                     ForEach(scenes) { scene in
                         cardLink(destination: SceneDetailView(scene: scene), id: scene.id, width: w) {
-                            HomeSceneCardView(scene: scene, isLarge: isLarge, screenWidth: screenWidth)
+                            HomeSceneCardView(scene: scene, isLarge: isLarge, screenWidth: screenWidth,
+                                              autoplaysPreview: heroAutoplays(scene.id))
                         }
                     }
                 }
@@ -332,7 +334,7 @@ struct HomeRowView: View {
             .padding(.horizontal, 12)
             .scrollTargetLayout()
         }
-        .scrollPosition(id: $scrollID)
+        .homeRowPosition($scrollID, row: config.id.uuidString, ids: items)
         .scrollTargetBehavior(.viewAligned)
         .scrollContentBackground(.hidden)
     }
@@ -348,6 +350,11 @@ struct HomeRowView: View {
             .buttonStyle(.plain)
             .frame(width: width)
             .id(id)
+    }
+
+    /// Hero Autoplay: the focused card of the first, large row.
+    private func heroAutoplays(_ id: String) -> Bool {
+        isLarge && isFirst && tabManager.dashboardHeroAutoplay && HomeHeroPreview.shared.focusedID(row: config.id.uuidString, current: scrollID, in: scenes.map(\.id)) == id
     }
 
     // MARK: - Sort mapping

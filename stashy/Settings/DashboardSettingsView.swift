@@ -186,6 +186,16 @@ struct DashboardSettingsView: View {
             }
             .padding(.top, 4)
 
+            settingRow("Hero Autoplay") {
+                Toggle("", isOn: Binding(
+                    get: { tabManager.dashboardHeroAutoplay },
+                    set: { tabManager.dashboardHeroAutoplay = $0 }
+                ))
+                .labelsHidden()
+                .tint(appearanceManager.tintColor)
+            }
+            .padding(.top, 4)
+
             settingRow("Compact Statistics") {
                 Toggle("", isOn: Binding(
                     get: { tabManager.useCompactStatistics },

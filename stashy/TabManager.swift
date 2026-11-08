@@ -688,6 +688,12 @@ class TabManager: ObservableObject {
             UserDefaults.standard.set(showDashboardHeroBackground, forKey: showDashboardHeroBackgroundKey)
         }
     }
+    /// Home: the hero row's focused card plays its muted preview on its own.
+    @Published var dashboardHeroAutoplay: Bool = true {
+        didSet {
+            UserDefaults.standard.set(dashboardHeroAutoplay, forKey: dashboardHeroAutoplayKey)
+        }
+    }
     @Published var useColoredStatistics: Bool = true {
         didSet {
             UserDefaults.standard.set(useColoredStatistics, forKey: useColoredStatisticsKey)
@@ -739,6 +745,7 @@ class TabManager: ObservableObject {
     private let sceneCardsShowStudioLogoKey = "SceneCardsShowStudioLogo"
     private let useCompactStatisticsKey = "useCompactStatistics"
     private let showDashboardHeroBackgroundKey = "showDashboardHeroBackground"
+    private let dashboardHeroAutoplayKey = "dashboardHeroAutoplay"
     private let useColoredStatisticsKey = "useColoredStatistics"
     private let catalogCardColumnsKey = "CatalogCardColumns"
     
@@ -817,6 +824,7 @@ class TabManager: ObservableObject {
         }
         self.useCompactStatistics = UserDefaults.standard.bool(forKey: useCompactStatisticsKey)
         self.showDashboardHeroBackground = UserDefaults.standard.object(forKey: showDashboardHeroBackgroundKey) as? Bool ?? true
+        self.dashboardHeroAutoplay = UserDefaults.standard.object(forKey: dashboardHeroAutoplayKey) as? Bool ?? true
         self.useColoredStatistics = UserDefaults.standard.object(forKey: useColoredStatisticsKey) as? Bool ?? true
         loadCatalogCardColumns()
     }

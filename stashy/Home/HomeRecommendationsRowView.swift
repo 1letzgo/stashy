@@ -42,7 +42,7 @@ struct HomeRecommendationsRowView: View {
         .background {
             if isLarge && isFirst && tabManager.showDashboardHeroBackground {
                 let items = engine.homeItems
-                let focused = items.first { $0.id == scrollID } ?? items.first
+                let focused = items.first { $0.id == HomeHeroPreview.shared.focusedID(row: config.id.uuidString, current: scrollID, in: items.map(\.id)) }
                 HomeDashboardHeroBackdrop(thumbnailURL: focused?.scene.thumbnailURL)
                     .equatable()
             }
@@ -80,7 +80,9 @@ struct HomeRecommendationsRowView: View {
                 ForEach(engine.homeItems) { item in
                     NavigationLink(destination: LazyView { SceneDetailView(scene: item.scene) }) {
                         VStack(alignment: .leading, spacing: 6) {
-                            HomeSceneCardView(scene: item.scene, isLarge: isLarge, screenWidth: homeContentWidth)
+                            HomeSceneCardView(scene: item.scene, isLarge: isLarge, screenWidth: homeContentWidth,
+                                              autoplaysPreview: isLarge && isFirst && tabManager.dashboardHeroAutoplay
+                                                  && HomeHeroPreview.shared.focusedID(row: config.id.uuidString, current: scrollID, in: engine.homeItems.map(\.id)) == item.id)
                             reasonLine(item)
                         }
                     }
@@ -93,7 +95,7 @@ struct HomeRecommendationsRowView: View {
             .padding(.horizontal, 12)
             .scrollTargetLayout()
         }
-        .scrollPosition(id: $scrollID)
+        .homeRowPosition($scrollID, row: config.id.uuidString, ids: engine.homeItems.map(\.id))
         .scrollTargetBehavior(.viewAligned)
         .scrollContentBackground(.hidden)
     }

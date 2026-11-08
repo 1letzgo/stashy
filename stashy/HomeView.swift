@@ -133,6 +133,12 @@ private struct HomeViewContent: View {
         }
         .collapsesCatalogChrome()
         .scrollContentBackground(.hidden)
+        // Hero Autoplay: pause the hero preview while Home is off screen, carry on when back.
+        .onAppear { HomeHeroPreview.shared.setHomeVisible(true) }
+        .onDisappear { HomeHeroPreview.shared.setHomeVisible(false) }
+        .onChange(of: tabManager.dashboardHeroAutoplay) { _, on in
+            if !on { HomeHeroPreview.shared.stop() }
+        }
         .environment(\.homeContentWidth, contentWidth)
         .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { width in
             guard abs(width - contentWidth) > 1 else { return }
