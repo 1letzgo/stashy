@@ -142,13 +142,22 @@ struct MainTabView: View {
                 ensureSelectedTabIsVisible()
             }
 
+            #if !os(iOS)
             if securityManager.isAppLocked || Self.debugShowsLockScreen {
                 PasscodeEntryView()
                     .transition(.move(edge: .bottom).combined(with: .opacity))
                     .zIndex(100)
             }
+            #endif
         }
         .animation(.snappy(duration: 0.3, extraBounce: 0), value: securityManager.isAppLocked)
+        #if os(iOS)
+        // iOS: the passcode screen gets a window of its own above the app's, so open menus,
+        // sheets and covers can never show on top of it.
+        .onChange(of: securityManager.isAppLocked || Self.debugShowsLockScreen, initial: true) { _, locked in
+            LockScreenWindow.shared.update(locked: locked)
+        }
+        #endif
         .sheet(isPresented: $showOnboarding) {
             ServerSetupWizardView { newConfig in
                 ServerConfigManager.shared.addOrUpdateServer(newConfig)
@@ -1550,3 +1559,62 @@ private struct MiniPlayerAccessory: ViewModifier {
 }
 #endif
 
+
+#if os(iOS)
+/// Same light / dark choice as the app window (Settings › Appearance); a window of its own
+/// does not inherit it.
+private struct LockScreenWindowRoot: View {
+    @ObservedObject private var appearance = AppearanceManager.shared
+
+    var body: some View {
+        PasscodeEntryView()
+            .preferredColorScheme(appearance.preferredTheme.colorScheme)
+    }
+}
+
+/// The passcode screen in its own window at alert level. As an overlay inside the app window
+/// it lost to anything UIKit puts above the content: an open menu (sort, Home views) or a
+/// sheet stayed readable on the lock screen after switching apps.
+@MainActor
+final class LockScreenWindow {
+    static let shared = LockScreenWindow()
+    private var windows: [ObjectIdentifier: UIWindow] = [:]
+
+    func update(locked: Bool) {
+        if locked {
+            show()
+            // Scenes may still be connecting on a cold start.
+            DispatchQueue.main.async { if SecurityManager.shared.isAppLocked { self.show() } }
+        } else {
+            hide()
+        }
+    }
+
+    private func show() {
+        let scenes = UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }
+        for scene in scenes where windows[ObjectIdentifier(scene)] == nil {
+            let window = UIWindow(windowScene: scene)
+            window.windowLevel = .alert + 1
+            let host = UIHostingController(rootView: LockScreenWindowRoot())
+            host.view.backgroundColor = .clear
+            window.rootViewController = host
+            window.isHidden = false
+            windows[ObjectIdentifier(scene)] = window
+        }
+    }
+
+    private func hide() {
+        let leaving = windows.values
+        windows.removeAll()
+        for window in leaving {
+            UIView.animate(withDuration: 0.25, animations: {
+                window.alpha = 0
+                window.transform = CGAffineTransform(translationX: 0, y: window.bounds.height * 0.08)
+            }, completion: { _ in
+                window.isHidden = true
+                window.rootViewController = nil
+            })
+        }
+    }
+}
+#endif
