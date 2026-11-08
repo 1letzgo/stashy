@@ -1539,7 +1539,15 @@ struct DownloadedGalleryFullScreenView: View {
     @ViewBuilder
     private var scrubberBar: some View {
         if currentImage?.isVideo == true {
-            IsolatedScrubberBar(state: scrubberState, isUIVisible: showUI)
+            IsolatedScrubberBar(
+                state: scrubberState,
+                isUIVisible: showUI,
+                playPause: AetherTimeBarPlayPause(isPlaying: isPlaying) { isPlaying.toggle() },
+                mute: AetherTimeBarMute(isMuted: isMuted) {
+                    isMuted.toggle()
+                    ScenePlayerMute.remember(isMuted)
+                }
+            )
         }
     }
 
@@ -1593,30 +1601,9 @@ struct DownloadedGalleryFullScreenView: View {
                             .frame(maxWidth: .infinity, alignment: .leading)
                         }
                     }
+                    // Mute and play / pause sit in the time bar, as in Feeds. Rating and the
+                    // O-counter are server state, so the offline viewer has no use for them.
                     Spacer(minLength: 8)
-
-                    // Mute · Play stacked on the trailing edge. Rating and the O-counter are
-                    // server state, so the offline viewer has no use for them.
-                    VStack(alignment: .trailing, spacing: 8) {
-                        ChromePillIconButton(
-                            systemImage: isMuted ? "speaker.slash.fill" : "speaker.wave.2.fill",
-                            enabled: isVideo,
-                            accessibilityLabel: isMuted ? "Ton an" : "Stumm"
-                        ) {
-                            if isVideo {
-                                isMuted.toggle()
-                                ScenePlayerMute.remember(isMuted)
-                            }
-                        }
-
-                        ChromePillIconButton(
-                            systemImage: isPlaying ? "pause.fill" : "play.fill",
-                            enabled: isVideo,
-                            accessibilityLabel: isPlaying ? "Pause" : "Play"
-                        ) {
-                            if isVideo { isPlaying.toggle() }
-                        }
-                    }
                 }
                 .padding(.horizontal, StashyExpandingDock.edgePadding)
 

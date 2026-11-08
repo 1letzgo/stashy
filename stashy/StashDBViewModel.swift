@@ -3362,7 +3362,7 @@ class StashDBViewModel: ObservableObject {
             // Feeds › Scenes also needs each scene's marker times (start position).
             currentScenesForFeeds = forFeeds
             let key = feedCriteriaKey([
-                "scenes", sortBy.sortField, sortBy.direction, searchQuery,
+                "scenes", sortBy.rawValue, sortBy.direction, searchQuery,
                 filter?.id, liveFilterKey(liveFilter)
             ])
             if scenesInitialInflightKey == key, isLoadingScenes {

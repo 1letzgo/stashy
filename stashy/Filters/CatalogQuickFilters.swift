@@ -354,6 +354,9 @@ struct CatalogListQuickBar<Option: CatalogQuickSortable>: View {
     var onOpenFilters: (() -> Void)? = nil
     /// Fields only this list offers, in front of the mode's own (a group's scene number).
     var leadingSortFields: [CatalogQuickSortCatalog.Field] = []
+    /// For You is a library-wide pick: only the Scenes list and Feeds offer it, never a
+    /// performer, studio or tag page.
+    var offersForYou: Bool = true
 
     @ObservedObject private var appearance = AppearanceManager.shared
     @ObservedObject private var pickerOptions = FilterPickerOptionsStore.shared
@@ -363,7 +366,8 @@ struct CatalogListQuickBar<Option: CatalogQuickSortable>: View {
     private var sortFields: [CatalogQuickSortCatalog.Field] {
         let available = Set(Option.allCases.map(\.quickSortField))
         return (leadingSortFields + CatalogQuickSortCatalog.fields(for: mode)).filter { field in
-            CatalogQuickSortCatalog.isRandom(field.field)
+            guard offersForYou || field.field != CatalogQuickSortCatalog.forYouField else { return false }
+            return CatalogQuickSortCatalog.isRandom(field.field)
                 ? available.contains { CatalogQuickSortCatalog.isRandom($0) }
                 : available.contains(field.field)
         }
@@ -497,7 +501,7 @@ struct CatalogListQuickBar<Option: CatalogQuickSortable>: View {
     }
 
     private var sortMenu: some View {
-        CatalogQuickSortMenu(mode: mode, sort: sort, onSort: onSort, leadingSortFields: leadingSortFields)
+        CatalogQuickSortMenu(mode: mode, sort: sort, onSort: onSort, leadingSortFields: leadingSortFields, offersForYou: offersForYou)
     }
 
     private func sortChip(_ field: CatalogQuickSortCatalog.Field) -> some View {
@@ -869,13 +873,17 @@ struct CatalogQuickSortMenu<Option: CatalogQuickSortable>: View {
     let onSort: (Option) -> Void
     /// Fields only this list offers, in front of the mode's own (a group's scene number).
     var leadingSortFields: [CatalogQuickSortCatalog.Field] = []
+    /// For You is a library-wide pick: only the Scenes list and Feeds offer it, never a
+    /// performer, studio or tag page.
+    var offersForYou: Bool = true
 
     @ObservedObject private var appearance = AppearanceManager.shared
 
     private var sortFields: [CatalogQuickSortCatalog.Field] {
         let available = Set(Option.allCases.map(\.quickSortField))
         return (leadingSortFields + CatalogQuickSortCatalog.fields(for: mode)).filter { field in
-            CatalogQuickSortCatalog.isRandom(field.field)
+            guard offersForYou || field.field != CatalogQuickSortCatalog.forYouField else { return false }
+            return CatalogQuickSortCatalog.isRandom(field.field)
                 ? available.contains { CatalogQuickSortCatalog.isRandom($0) }
                 : available.contains(field.field)
         }

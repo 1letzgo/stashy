@@ -1466,6 +1466,7 @@ struct FullScreenImageView: View {
     /// Same setting the item views read; here it decides whether pause applies to stills.
     @AppStorage("images_fullscreen_continuous") private var continuousPlay = false
     @State private var scrubberState = ScrubberState()
+    @ObservedObject private var timeBarAccessory = FeedsScrubberAccessory.images
     /// Triggers UIKit pop when `dismiss()` is a no-op under `safeAreaInset` chrome.
     @State private var navigationBackTrigger: UUID?
 
@@ -1589,6 +1590,16 @@ struct FullScreenImageView: View {
             }
             .onDisappear {
                 showUI = true
+                releaseTimeBarSlot()
+            }
+            .onAppear { claimTimeBarSlot() }
+            // The time bar sits in the tab bar's accessory slot, as in Feeds.
+            .onChange(of: timeBarSlotKey, initial: true) { _, key in
+                let accessory = FeedsScrubberAccessory.images
+                if accessory.showsBar != key.showsBar { accessory.showsBar = key.showsBar }
+                if accessory.isUIVisible != key.isUIVisible { accessory.isUIVisible = key.isUIVisible }
+                if accessory.isPlaying != key.isPlaying { accessory.isPlaying = key.isPlaying }
+                if accessory.isMuted != key.isMuted { accessory.isMuted = key.isMuted }
             }
             .task(id: selectedImageId) {
                 currentVisibleId = selectedImageId
@@ -1767,7 +1778,7 @@ struct FullScreenImageView: View {
         let rating100 = image.rating100 ?? 0
         let stars = max(0, min(5, Int(round(Double(rating100) / 20.0))))
 
-        VStack(alignment: .trailing, spacing: 8) {
+        HStack(spacing: 8) {
             Button {
                 incrementCurrentOCounter()
             } label: {
@@ -1853,29 +1864,20 @@ struct FullScreenImageView: View {
                     }
                     Spacer(minLength: 8)
 
-                    // O-Counter · Rating · Mute · Play stacked on the trailing edge.
+                    // O-Counter · Rating side by side on the trailing edge, as in Feeds. Videos
+                    // play, pause and mute from the time bar; a still or an animation keeps a
+                    // play button here only while continuous play can pause the auto-advance.
                     VStack(alignment: .trailing, spacing: 8) {
                         fullScreenRateChrome(image: image)
 
-                        ChromePillIconButton(
-                            systemImage: isMuted ? "speaker.slash.fill" : "speaker.wave.2.fill",
-                            enabled: isVideo,
-                            accessibilityLabel: isMuted ? "Ton an" : "Stumm"
-                        ) {
-                            if isVideo {
-                                isMuted.toggle()
-                                ScenePlayerMute.remember(isMuted)
+                        if !isVideo && continuousPlay {
+                            ChromePillIconButton(
+                                systemImage: currentItemIsPlaying ? "pause.fill" : "play.fill",
+                                enabled: true,
+                                accessibilityLabel: currentItemIsPlaying ? "Pause" : "Play"
+                            ) {
+                                currentItemIsPlaying.toggle()
                             }
-                        }
-
-                        // Also live for stills while continuous play is on: pausing there
-                        // stops the auto-advance.
-                        ChromePillIconButton(
-                            systemImage: currentItemIsPlaying ? "pause.fill" : "play.fill",
-                            enabled: isVideo || continuousPlay,
-                            accessibilityLabel: currentItemIsPlaying ? "Pause" : "Play"
-                        ) {
-                            if isVideo || continuousPlay { currentItemIsPlaying.toggle() }
                         }
                     }
                 }
@@ -1952,9 +1954,12 @@ struct FullScreenImageView: View {
                 .padding(.horizontal, StashyExpandingDock.edgePadding)
             }
         }
-        // Bei Videos liefert die Scrubbar darunter den Abstand zur Tab-Bar; bei Fotos
+        // Mit Tab-Bar-Slot wie Feeds: 8 pt über der vollen Zeitleiste, 0 neben der eingeklappten
+        // Tab-Bar und bei Fotos. Ohne Slot liefert die Scrubbar darunter den Abstand; bei Fotos
         // gibt es keine, also hier — wie das Bar-Padding in `IsolatedScrubberBar`.
-        .padding(.bottom, isVideo ? 0 : 8)
+        .padding(.bottom, FeedsScrubberAccessory.isAvailable
+            ? (timeBarAccessory.showsBar && !timeBarAccessory.isInline ? 8 : 0)
+            : (isVideo ? 0 : 8))
         .colorScheme(.dark)
         .opacity(showUI ? 1 : 0)
         .animation(.easeInOut(duration: 0.2), value: showUI)
@@ -1977,14 +1982,57 @@ struct FullScreenImageView: View {
         }
     }
 
-    /// Matches `ReelsView.reelsScrubberBar` / `IsolatedScrubberBar`.
+    private struct TimeBarSlotKey: Equatable {
+        var showsBar: Bool
+        var isUIVisible: Bool
+        var isPlaying: Bool
+        var isMuted: Bool
+    }
+
+    private var timeBarSlotKey: TimeBarSlotKey {
+        TimeBarSlotKey(
+            showsBar: currentImage.map { $0.isVideo && !$0.isAnimated } ?? false,
+            isUIVisible: showUI,
+            isPlaying: currentItemIsPlaying,
+            isMuted: isMuted
+        )
+    }
+
+    private func claimTimeBarSlot() {
+        let accessory = FeedsScrubberAccessory.images
+        accessory.state = scrubberState
+        accessory.togglePlay = { currentItemIsPlaying.toggle() }
+        accessory.toggleMute = {
+            isMuted.toggle()
+            ScenePlayerMute.remember(isMuted)
+        }
+        accessory.ownerTab = FeedsScrubberAccessory.selectedTab
+    }
+
+    private func releaseTimeBarSlot() {
+        let accessory = FeedsScrubberAccessory.images
+        guard accessory.state === scrubberState else { return }
+        accessory.ownerTab = nil
+        accessory.showsBar = false
+    }
+
+    /// Matches `ReelsView.reelsScrubberBar` / `IsolatedScrubberBar`. From iOS 26.1 the bar
+    /// lives in the tab bar's accessory slot instead, as in Feeds.
     @ViewBuilder
     private func feedsStyleScrubberBar(currentImage: StashImage?) -> some View {
         // Stills and animations have nothing to scrub — no bar, no placeholder. The info
         // row moves down by the bar's height between photo and video; that beats an
         // empty band under every photo.
-        if let image = currentImage, image.isVideo, !image.isAnimated {
-            IsolatedScrubberBar(state: scrubberState, isUIVisible: showUI)
+        if let image = currentImage, image.isVideo, !image.isAnimated, !FeedsScrubberAccessory.isAvailable {
+            IsolatedScrubberBar(
+                state: scrubberState,
+                isUIVisible: showUI,
+                playPause: AetherTimeBarPlayPause(isPlaying: currentItemIsPlaying) { currentItemIsPlaying.toggle() },
+                mute: AetherTimeBarMute(isMuted: isMuted) {
+                    isMuted.toggle()
+                    ScenePlayerMute.remember(isMuted)
+                }
+            )
         }
     }
 

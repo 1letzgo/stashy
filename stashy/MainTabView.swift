@@ -102,7 +102,7 @@ struct MainTabView: View {
             .modifier(TabBarMinimizesOnScroll(enabled: false))
             #else
             // Collapsing the tab bar is decided there: only with something in the accessory slot.
-            .modifier(MiniPlayerHost(hidden: coordinator.selectedTab == .reels))
+            .modifier(MiniPlayerHost(hidden: coordinator.selectedTab == .reels, selectedTab: coordinator.selectedTab))
             #endif
             .onAppear {
                 ServerConfigManager.shared.scrubPlaintextAPIKeysFromDisk()
@@ -1339,9 +1339,17 @@ private struct TabBarMinimizesOnScroll: ViewModifier {
 private struct MiniPlayerHost: ViewModifier {
     /// Feeds own the whole screen; the bar steps aside there and its video pauses.
     var hidden: Bool
+    var selectedTab: AppTab
     @ObservedObject private var store = MiniPlayerStore.shared
     @ObservedObject private var tabManager = TabManager.shared
     @ObservedObject private var feedsScrubber = FeedsScrubberAccessory.shared
+    @ObservedObject private var imageScrubber = FeedsScrubberAccessory.images
+
+    /// The image fullscreen viewer is open in this tab: like Feeds, it owns the slot.
+    private var imageViewerOpen: Bool { imageScrubber.ownerTab == selectedTab }
+    /// Feeds or the image viewer: the mini player steps aside and the slot holds a time bar.
+    private var timeBarOwnsSlot: Bool { hidden || imageViewerOpen }
+    private var activeScrubber: FeedsScrubberAccessory { hidden ? feedsScrubber : imageScrubber }
     @ObservedObject private var security = SecurityManager.shared
 
     /// The passcode screen is a ZStack overlay in `MainTabView`; a sheet or cover sits above it,
@@ -1374,17 +1382,22 @@ private struct MiniPlayerHost: ViewModifier {
 
     func body(content: Content) -> some View {
         content
-            .modifier(TabBarMinimizesOnScroll(enabled: hidden ? feedsScrubber.showsBar : showsMiniPlayerInTabBar))
+            .modifier(TabBarMinimizesOnScroll(enabled: timeBarOwnsSlot ? activeScrubber.showsBar : showsMiniPlayerInTabBar))
             .modifier(MiniPlayerAccessory(
-                isEnabled: store.session != nil && !hidden && store.isEnabled,
+                isEnabled: store.session != nil && !timeBarOwnsSlot && store.isEnabled,
                 floats: store.tabBarHiddenByPage,
-                // Feeds put their time bar in the same slot (not Pics, not GIFs). A tap that hides
-                // Feeds' chrome takes the whole slot away, or its empty glass would stay.
-                showsFeedsTimeBar: hidden && feedsScrubber.showsBar && feedsScrubber.isUIVisible
-                    && FeedsScrubberAccessory.isAvailable
+                // Feeds put their time bar in the same slot (not Pics, not GIFs), and so does the
+                // image viewer for videos. A tap that hides the chrome takes the whole slot away,
+                // or its empty glass would stay.
+                showsFeedsTimeBar: timeBarOwnsSlot && activeScrubber.showsBar && activeScrubber.isUIVisible
+                    && FeedsScrubberAccessory.isAvailable,
+                timeBarSource: activeScrubber
             ))
-            .onChange(of: hidden, initial: true) { _, onFeeds in
-                store.setFeedsActive(onFeeds)
+            .onChange(of: timeBarOwnsSlot, initial: true) { _, owned in
+                store.setFeedsActive(owned)
+            }
+            .onChange(of: selectedTab, initial: true) { _, tab in
+                FeedsScrubberAccessory.selectedTab = tab
             }
             // Settings › stashy+ › Miniplayer & Watchlist off: the bar closes (its spot is kept).
             .onChange(of: tabManager.isMiniPlayerEnabled) { _, enabled in
@@ -1423,11 +1436,11 @@ private struct MiniPlayerHost: ViewModifier {
 @available(iOS 26.1, *)
 private struct FeedsTimeBarAccessory: View {
     @Environment(\.tabViewBottomAccessoryPlacement) private var placement
-    @ObservedObject private var accessory = FeedsScrubberAccessory.shared
+    @ObservedObject var accessory: FeedsScrubberAccessory
 
     var body: some View {
         if let state = accessory.state {
-            FeedsTimeBar(state: state, isCompact: placement == .inline)
+            FeedsTimeBar(state: state, accessory: accessory, isCompact: placement == .inline)
                 .opacity(accessory.isUIVisible ? 1 : 0)
                 .allowsHitTesting(accessory.isUIVisible)
                 .animation(.easeInOut(duration: 0.2), value: accessory.isUIVisible)
@@ -1441,7 +1454,7 @@ private struct FeedsTimeBarAccessory: View {
 @available(iOS 26.1, *)
 private struct FeedsTimeBar: View {
     @ObservedObject var state: ScrubberState
-    @ObservedObject private var accessory = FeedsScrubberAccessory.shared
+    @ObservedObject var accessory: FeedsScrubberAccessory
     var isCompact: Bool
 
     var body: some View {
@@ -1455,6 +1468,7 @@ private struct FeedsTimeBar: View {
             isCompact: isCompact,
             showsGlass: false,
             playPause: AetherTimeBarPlayPause(isPlaying: accessory.isPlaying) { accessory.togglePlay?() },
+            mute: AetherTimeBarMute(isMuted: accessory.isMuted) { accessory.toggleMute?() },
             onScrubChanged: { seconds in
                 state.seeking = true
                 state.time = seconds
@@ -1489,6 +1503,8 @@ private struct MiniPlayerAccessory: ViewModifier {
     var floats: Bool
     /// Feeds: the slot holds the feed's time bar instead of the mini player.
     var showsFeedsTimeBar: Bool = false
+    /// Which page's bar the slot shows: Feeds or the image viewer.
+    var timeBarSource: FeedsScrubberAccessory = .shared
 
     func body(content: Content) -> some View {
         #if os(macOS)
@@ -1502,7 +1518,7 @@ private struct MiniPlayerAccessory: ViewModifier {
             content
                 .tabViewBottomAccessory(isEnabled: (isEnabled && !floats) || showsFeedsTimeBar) {
                     if showsFeedsTimeBar {
-                        FeedsTimeBarAccessory()
+                        FeedsTimeBarAccessory(accessory: timeBarSource)
                     } else {
                         MiniPlayerAccessoryBar()
                     }

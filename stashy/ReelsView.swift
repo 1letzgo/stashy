@@ -2055,7 +2055,9 @@ struct ReelsViewBody: View {
         case .scenes:
             return viewModel.makeReelsFeedSignature(
                 kind: kind,
-                sortField: selectedSortOption.sortField,
+                // For You sends "random" to the server, but it is a different list: keyed on its
+                // own name, or switching Random → For You kept the random feed.
+                sortField: selectedSortOption == .forYou ? CatalogQuickSortCatalog.forYouField : selectedSortOption.sortField,
                 direction: selectedSortOption.direction,
                 filterId: selectedFilter?.id,
                 liveFilter: reelsSceneFeedLive(reelsSceneLiveChips.effectiveLiveFilter(for: selectedFilter)),
@@ -3187,6 +3189,12 @@ struct ReelsViewBody: View {
                 if accessory.showsBar != key.showsBar { accessory.showsBar = key.showsBar }
                 if accessory.isUIVisible != key.isUIVisible { accessory.isUIVisible = key.isUIVisible }
                 accessory.togglePlay = { currentItemIsPlaying.toggle() }
+                accessory.toggleMute = { toggleFeedsMute() }
+            }
+            .onChange(of: isMuted, initial: true) { _, muted in
+                let accessory = FeedsScrubberAccessory.shared
+                if accessory.isMuted != muted { accessory.isMuted = muted }
+                accessory.toggleMute = { toggleFeedsMute() }
             }
             .onChange(of: currentItemIsPlaying, initial: true) { _, playing in
                 let accessory = FeedsScrubberAccessory.shared
@@ -5133,7 +5141,7 @@ struct ReelsViewBody: View {
         let rating100 = currentItem?.rating100 ?? 0
         let stars = max(0, min(5, Int(round(Double(rating100) / 20.0))))
 
-        VStack(alignment: .trailing, spacing: 8) {
+        HStack(spacing: 8) {
             Button {
                 if let item = currentItem {
                     handleOCounterChange(item: item, newCount: oCounter + 1)
@@ -5217,6 +5225,11 @@ struct ReelsViewBody: View {
         .fixedSize()
     }
 
+    private func toggleFeedsMute() {
+        isMuted.toggle()
+        ScenePlayerMute.remember(isMuted)
+    }
+
     // MARK: - Scrubber bar
     @ViewBuilder
     private func reelsScrubberBar(currentItem: ReelItemData?) -> some View {
@@ -5229,7 +5242,8 @@ struct ReelsViewBody: View {
                 IsolatedScrubberBar(
                     state: scrubberState,
                     isUIVisible: isUIVisible,
-                    playPause: AetherTimeBarPlayPause(isPlaying: currentItemIsPlaying) { currentItemIsPlaying.toggle() }
+                    playPause: AetherTimeBarPlayPause(isPlaying: currentItemIsPlaying) { currentItemIsPlaying.toggle() },
+                    mute: AetherTimeBarMute(isMuted: isMuted) { toggleFeedsMute() }
                 )
             }
         }
@@ -5257,21 +5271,11 @@ struct ReelsViewBody: View {
                     }
                     Spacer(minLength: 8)
 
-                    // O-Counter · Rating · Mute · Play stacked on the trailing edge.
+                    // O-Counter · Rating side by side on the trailing edge; mute sits in the
+                    // time bar beside play / pause.
                     VStack(alignment: .trailing, spacing: 8) {
                         if reelsMode != .pics {
                             reelsRateChrome(currentItem: item)
-                        }
-
-                        ChromePillIconButton(
-                            systemImage: isMuted ? "speaker.slash.fill" : "speaker.wave.2.fill",
-                            enabled: isVideo,
-                            accessibilityLabel: isMuted ? "Ton an" : "Stumm"
-                        ) {
-                            if isVideo {
-                                isMuted.toggle()
-                                ScenePlayerMute.remember(isMuted)
-                            }
                         }
 
                         // Animated clips (GIF/WebP) have no player, but with continuous play on
@@ -7108,6 +7112,12 @@ struct ReelsView: View {
 @MainActor
 final class FeedsScrubberAccessory: ObservableObject {
     static let shared = FeedsScrubberAccessory()
+    /// The image fullscreen viewer's bar: same slot, same behaviour as Feeds.
+    static let images = FeedsScrubberAccessory()
+    /// The tab on screen, kept by the tab bar host so a viewer knows which tab it opened in.
+    static var selectedTab: AppTab?
+    /// Image viewer only: the tab it is open in, nil once it closes.
+    @Published var ownerTab: AppTab?
     @Published var state: ScrubberState?
     /// A feed other than Pics with an item that has a timeline (not a GIF).
     @Published var showsBar = false
@@ -7119,6 +7129,9 @@ final class FeedsScrubberAccessory: ObservableObject {
     @Published var isPlaying = true
     /// Toggles the active item (set by Feeds).
     var togglePlay: (() -> Void)?
+    /// Feeds' mute, for the bar's mute button.
+    @Published var isMuted = false
+    var toggleMute: (() -> Void)?
 
     /// The slot exists from iOS 26.1; before that the bar stays inside Feeds.
     static var isAvailable: Bool {
@@ -7251,6 +7264,7 @@ struct IsolatedScrubberBar: View {
     var isUIVisible: Bool
     /// Feeds: play / pause inside the bar instead of a button of its own.
     var playPause: AetherTimeBarPlayPause? = nil
+    var mute: AetherTimeBarMute? = nil
 
     var body: some View {
         AetherTimeBar(
@@ -7262,6 +7276,7 @@ struct IsolatedScrubberBar: View {
             markerSeconds: [],
             isCompact: false,
             playPause: playPause,
+            mute: mute,
             onScrubChanged: { seconds in
                 state.seeking = true
                 state.time = seconds

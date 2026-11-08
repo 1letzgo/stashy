@@ -136,6 +136,8 @@ struct CatalogFilterChip: View {
         Button(action: action) {
             Text(title)
                 .font(.system(size: 13, weight: .medium))
+                .lineLimit(1)
+                .fixedSize()
                 .padding(.horizontal, 12)
                 .padding(.vertical, 6)
                 .background(isActive ? appearance.tintColor : Color.secondaryAppBackground)
@@ -1154,7 +1156,9 @@ struct PerformersCatalogFilterSortSheet: View {
             Text("Sort")
                 .font(.subheadline.weight(.semibold))
                 .foregroundColor(.secondary)
-                .frame(width: CatalogFilterSortSheetLayout.labelColumnWidth, alignment: .leading)
+                // Gives way to a long sort name instead of widening the sheet.
+                .frame(minWidth: 44, idealWidth: CatalogFilterSortSheetLayout.labelColumnWidth, maxWidth: CatalogFilterSortSheetLayout.labelColumnWidth, alignment: .leading)
+                .layoutPriority(1)
             HStack(spacing: 6) {
                 CatalogFilterChip(title: "Asc", isActive: ascending && !orderDisabled) {
                     guard let k = pickerValue.knownKind, !orderDisabled else { return }
@@ -1307,7 +1311,9 @@ struct TagsCatalogFilterSortSheet: View {
             Text("Sort")
                 .font(.subheadline.weight(.semibold))
                 .foregroundColor(.secondary)
-                .frame(width: CatalogFilterSortSheetLayout.labelColumnWidth, alignment: .leading)
+                // Gives way to a long sort name instead of widening the sheet.
+                .frame(minWidth: 44, idealWidth: CatalogFilterSortSheetLayout.labelColumnWidth, maxWidth: CatalogFilterSortSheetLayout.labelColumnWidth, alignment: .leading)
+                .layoutPriority(1)
             HStack(spacing: 6) {
                 CatalogFilterChip(title: "Asc", isActive: ascending && !orderDisabled) {
                     guard let k = pickerValue.knownKind, !orderDisabled else { return }
@@ -1348,6 +1354,8 @@ struct TagsCatalogFilterSortSheet: View {
             .pickerStyle(.menu)
             .labelsHidden()
             .tint(appearance.tintColor)
+            // One line: a wrapped label ("Image count") stretched the card.
+            .fixedSize()
         }
         .catalogFilterSortControlCardChrome()
     }
@@ -1449,7 +1457,9 @@ struct StudiosCatalogFilterSortSheet: View {
             Text("Sort")
                 .font(.subheadline.weight(.semibold))
                 .foregroundColor(.secondary)
-                .frame(width: CatalogFilterSortSheetLayout.labelColumnWidth, alignment: .leading)
+                // Gives way to a long sort name instead of widening the sheet.
+                .frame(minWidth: 44, idealWidth: CatalogFilterSortSheetLayout.labelColumnWidth, maxWidth: CatalogFilterSortSheetLayout.labelColumnWidth, alignment: .leading)
+                .layoutPriority(1)
             HStack(spacing: 6) {
                 CatalogFilterChip(title: "Asc", isActive: ascending && !orderDisabled) {
                     guard let k = pickerValue.knownKind, !orderDisabled else { return }
@@ -1490,6 +1500,8 @@ struct StudiosCatalogFilterSortSheet: View {
             .pickerStyle(.menu)
             .labelsHidden()
             .tint(appearance.tintColor)
+            // One line: a wrapped label ("Image count") stretched the card.
+            .fixedSize()
         }
         .catalogFilterSortControlCardChrome()
     }
@@ -1663,7 +1675,9 @@ struct GalleriesCatalogFilterSortSheet: View {
             Text("Sort")
                 .font(.subheadline.weight(.semibold))
                 .foregroundColor(.secondary)
-                .frame(width: CatalogFilterSortSheetLayout.labelColumnWidth, alignment: .leading)
+                // Gives way to a long sort name instead of widening the sheet.
+                .frame(minWidth: 44, idealWidth: CatalogFilterSortSheetLayout.labelColumnWidth, maxWidth: CatalogFilterSortSheetLayout.labelColumnWidth, alignment: .leading)
+                .layoutPriority(1)
             HStack(spacing: 6) {
                 CatalogFilterChip(title: "Asc", isActive: ascending && !orderDisabled) {
                     guard let k = pickerValue.knownKind, !orderDisabled else { return }
@@ -1704,6 +1718,8 @@ struct GalleriesCatalogFilterSortSheet: View {
             .pickerStyle(.menu)
             .labelsHidden()
             .tint(appearance.tintColor)
+            // One line: a wrapped label ("Image count") stretched the card.
+            .fixedSize()
         }
         .catalogFilterSortControlCardChrome()
     }
@@ -1924,7 +1940,9 @@ struct ImagesCatalogFilterSortSheet: View {
             Text("Sort")
                 .font(.subheadline.weight(.semibold))
                 .foregroundColor(.secondary)
-                .frame(width: CatalogFilterSortSheetLayout.labelColumnWidth, alignment: .leading)
+                // Gives way to a long sort name instead of widening the sheet.
+                .frame(minWidth: 44, idealWidth: CatalogFilterSortSheetLayout.labelColumnWidth, maxWidth: CatalogFilterSortSheetLayout.labelColumnWidth, alignment: .leading)
+                .layoutPriority(1)
             HStack(spacing: 6) {
                 CatalogFilterChip(title: "Asc", isActive: ascending && !orderDisabled) {
                     guard let k = pickerValue.knownKind, !orderDisabled else { return }
@@ -1965,6 +1983,8 @@ struct ImagesCatalogFilterSortSheet: View {
             .pickerStyle(.menu)
             .labelsHidden()
             .tint(appearance.tintColor)
+            // One line: a wrapped label ("Image count") stretched the card.
+            .fixedSize()
         }
         .catalogFilterSortControlCardChrome()
     }
@@ -2305,7 +2325,9 @@ struct GroupsCatalogFilterSortSheet: View {
             Text("Sort")
                 .font(.subheadline.weight(.semibold))
                 .foregroundColor(.secondary)
-                .frame(width: CatalogFilterSortSheetLayout.labelColumnWidth, alignment: .leading)
+                // Gives way to a long sort name instead of widening the sheet.
+                .frame(minWidth: 44, idealWidth: CatalogFilterSortSheetLayout.labelColumnWidth, maxWidth: CatalogFilterSortSheetLayout.labelColumnWidth, alignment: .leading)
+                .layoutPriority(1)
             HStack(spacing: 6) {
                 CatalogFilterChip(title: "Asc", isActive: ascending && !orderDisabled) {
                     guard !orderDisabled else { return }
@@ -2339,6 +2361,8 @@ struct GroupsCatalogFilterSortSheet: View {
             .pickerStyle(.menu)
             .labelsHidden()
             .tint(appearance.tintColor)
+            // One line: a wrapped label ("Image count") stretched the card.
+            .fixedSize()
         }
         .catalogFilterSortControlCardChrome()
     }

@@ -39,6 +39,8 @@ struct AetherTimeBar: View {
     var showsGlass: Bool = true
     /// Play / pause at the trailing end (Feeds); nil leaves the bar a pure timeline.
     var playPause: AetherTimeBarPlayPause? = nil
+    /// Mute just before play / pause (Feeds); nil leaves it out.
+    var mute: AetherTimeBarMute? = nil
     var onScrubChanged: (Double) -> Void
     var onScrubEnded: (Double) -> Void
 
@@ -94,6 +96,18 @@ struct AetherTimeBar: View {
             .frame(maxHeight: .infinity)
 
             timeLabel("-\(AetherTimeBar.formatTime(remaining))", template: "-" + template)
+            if let mute {
+                Button(action: mute.toggle) {
+                    Image(systemName: mute.isMuted ? "speaker.slash.fill" : "speaker.wave.2.fill")
+                        .font(.system(size: isCompact ? 14 : 16, weight: .semibold))
+                        .foregroundStyle(.white)
+                        .frame(width: 28, height: barHeight)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .padding(.leading, -4)
+                .accessibilityLabel(mute.isMuted ? "Unmute" : "Mute")
+            }
             if let playPause {
                 Button(action: playPause.toggle) {
                     Image(systemName: playPause.isPlaying ? "pause.fill" : "play.fill")
@@ -241,6 +255,11 @@ struct AetherTimeBar: View {
 /// A marker on the time bar: where it starts and what it is called.
 struct AetherTimeBarPlayPause {
     var isPlaying: Bool
+    var toggle: () -> Void
+}
+
+struct AetherTimeBarMute {
+    var isMuted: Bool
     var toggle: () -> Void
 }
 

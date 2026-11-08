@@ -1015,6 +1015,10 @@ private struct ScenesViewContent: View {
             await SceneRecommendationEngine.shared.rebuildAndWait()
         }
         #endif
+        // Pull to refresh on Random deals a new order instead of the same shuffle again.
+        if selectedSortOption == .random {
+            viewModel.refreshRandomSeed(for: .scenes)
+        }
         performSearch()
     }
 
@@ -1101,6 +1105,12 @@ private struct ScenesViewContent: View {
         quickBar(part: homeMenu == nil && detailCrumb == nil ? .all : .chipsOnly)
     }
 
+    /// For You ranks the whole library: only the Scenes list itself offers it.
+    private var offersForYouSort: Bool {
+        if case .catalog = scope { return true }
+        return false
+    }
+
     private func quickBar(part: CatalogQuickBarPart) -> some View {
         CatalogListQuickBar(
             mode: .scenes,
@@ -1112,6 +1122,7 @@ private struct ScenesViewContent: View {
             onFiltersChanged: { applyLiveFilter() },
             onOpenFilters: { liveFilterSheetPresented.wrappedValue = true },
             leadingSortFields: groupScopeSortFields,
+            offersForYou: offersForYouSort,
             collapsesOnScroll: scrollHeader == nil && !hideTitle,
             part: part
         )
@@ -1266,6 +1277,7 @@ private struct ScenesViewContent: View {
                 criteriaDocument: criteriaDocument,
                 sortOption: selectedSortOption,
                 onSortChange: { changeSortOption(to: $0) },
+                offersForYou: offersForYouSort,
                 onApply: { applyLiveFilter() },
                 onReset: { resetAllSceneFilters() },
                 onRequestSave: { saveLivePresetOverwrite() },
@@ -1816,6 +1828,8 @@ struct SceneLiveFilterSheet: View {
     @ObservedObject var criteriaDocument: FilterCriteriaDocument
     var sortOption: StashDBViewModel.SceneSortOption
     var onSortChange: (StashDBViewModel.SceneSortOption) -> Void
+    /// For You only in the Scenes list (and Feeds), not on a performer / studio / tag page.
+    var offersForYou: Bool = true
     var onApply: () -> Void
     var onReset: () -> Void
     var onRequestSave: () -> Void
@@ -1932,7 +1946,9 @@ struct SceneLiveFilterSheet: View {
             Text("Sort")
                 .font(.subheadline.weight(.semibold))
                 .foregroundColor(.secondary)
-                .frame(width: Self.labelColumnWidth, alignment: .leading)
+                // Gives way to a long sort name instead of widening the sheet.
+                .frame(minWidth: 44, idealWidth: Self.labelColumnWidth, maxWidth: Self.labelColumnWidth, alignment: .leading)
+                .layoutPriority(1)
 
             HStack(spacing: 6) {
                 filterChip("Asc", isActive: ascending && !orderControlsDisabled) {
@@ -1974,6 +1990,8 @@ struct SceneLiveFilterSheet: View {
             .labelsHidden()
             .accessibilityLabel("Sort field")
             .tint(appearance.tintColor)
+            // One line: a wrapped label ("Image count") stretched the card.
+            .fixedSize()
         }
         .catalogFilterSortControlCardChrome()
     }
@@ -1989,7 +2007,9 @@ struct SceneLiveFilterSheet: View {
             Text("Sort")
                 .font(.subheadline.weight(.semibold))
                 .foregroundColor(.secondary)
-                .frame(width: Self.labelColumnWidth, alignment: .leading)
+                // Gives way to a long sort name instead of widening the sheet.
+                .frame(minWidth: 44, idealWidth: Self.labelColumnWidth, maxWidth: Self.labelColumnWidth, alignment: .leading)
+                .layoutPriority(1)
 
             HStack(spacing: 6) {
                 filterChip("Asc", isActive: ascending && !orderControlsDisabled) {
@@ -2030,7 +2050,7 @@ struct SceneLiveFilterSheet: View {
                 if case .unmapped(let f) = pickerValue {
                     Text("Other (\(f))").tag(SceneLiveSortPickerValue.unmapped(sortField: f))
                 }
-                ForEach(SceneLiveSortFieldKind.allCases.filter { $0.isOffered || pickerValue == .known($0) }) { k in
+                ForEach(SceneLiveSortFieldKind.allCases.filter { ($0.isOffered && ($0 != .for_you || offersForYou)) || pickerValue == .known($0) }) { k in
                     Text(k.menuLabel).tag(SceneLiveSortPickerValue.known(k))
                 }
             }
@@ -2038,6 +2058,8 @@ struct SceneLiveFilterSheet: View {
             .labelsHidden()
             .accessibilityLabel("Sort field")
             .tint(appearance.tintColor)
+            // One line: a wrapped label ("Image count") stretched the card.
+            .fixedSize()
         }
         .catalogFilterSortControlCardChrome()
     }
@@ -2064,6 +2086,8 @@ struct SceneLiveFilterSheet: View {
         Button(action: action) {
             Text(label)
                 .font(.system(size: 13, weight: .medium))
+                .lineLimit(1)
+                .fixedSize()
                 .padding(.horizontal, 12)
                 .padding(.vertical, 6)
                 .background(isActive ? appearance.tintColor : Color.secondaryAppBackground)

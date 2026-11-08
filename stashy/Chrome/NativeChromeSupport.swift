@@ -44,6 +44,10 @@ final class CatalogChromeCollapse: ObservableObject {
     }
     private var dragStartedWithMenuOpen = false
     private var anchor: CGFloat = 0
+    /// The list the finger last dragged. Lists kept alive off screen (other Home sections)
+    /// report their geometry too; loading a page re-lays them out at offset 0, which read as
+    /// "back at the top" and brought the bar back on every page load.
+    private var owner: AnyHashable?
     /// What the scrolling decided; `isCollapsed` follows it one run loop later.
     private var targetCollapsed = false
 
@@ -51,8 +55,9 @@ final class CatalogChromeCollapse: ObservableObject {
     private static let showDistance: CGFloat = 20
     private static let minimumHidePosition: CGFloat = 40
 
-    func update(offset: CGFloat, scrollRange: CGFloat) {
+    func update(offset: CGFloat, scrollRange: CGFloat, source: AnyHashable? = nil) {
         #if os(iOS)
+        if let owner, let source, owner != source { return }
         // VoiceOver reads the screen in order; chrome that moves away would lose its place.
         guard !UIAccessibility.isVoiceOverRunning else {
             reset()
@@ -92,7 +97,21 @@ final class CatalogChromeCollapse: ObservableObject {
         #endif
     }
 
+    /// Scroll phase of one list; a drag makes it the list that drives the chrome.
+    func setDragging(_ dragging: Bool, source: AnyHashable) {
+        if dragging { owner = source }
+        guard owner == source else { return }
+        isDragging = dragging
+    }
+
+    /// A list leaving the screen resets only if it was driving the chrome.
+    func reset(source: AnyHashable) {
+        guard owner == nil || owner == source else { return }
+        reset()
+    }
+
     func reset() {
+        owner = nil
         anchor = 0
         isDragging = false
         setCollapsed(false)
@@ -167,6 +186,34 @@ private struct CatalogScrollMetrics: Equatable {
     var range: CGFloat
 }
 
+#if os(iOS)
+/// Reports one list's scrolling to `CatalogChromeCollapse`, tagged so only the list being
+/// scrolled moves the chrome.
+private struct CatalogChromeScrollReporter: ViewModifier {
+    @State private var id = UUID()
+
+    func body(content: Content) -> some View {
+        content
+            .onScrollGeometryChange(for: CatalogScrollMetrics.self) { geometry in
+                CatalogScrollMetrics(
+                    offset: geometry.contentOffset.y + geometry.contentInsets.top,
+                    // The container already excludes the insets; adding them again overstates the
+                    // range, and the bounce back from the list's end reads as scrolling up.
+                    range: geometry.contentSize.height - geometry.containerSize.height
+                )
+            } action: { _, metrics in
+                CatalogChromeCollapse.shared.update(offset: metrics.offset, scrollRange: metrics.range, source: id)
+            }
+            .onScrollPhaseChange { _, phase in
+                // `.tracking` too: a quick drag on a short list can reach its end in the first
+                // geometry update, before the phase turns `.interacting`.
+                CatalogChromeCollapse.shared.setDragging(phase == .tracking || phase == .interacting, source: id)
+            }
+            .onDisappear { CatalogChromeCollapse.shared.reset(source: id) }
+    }
+}
+#endif
+
 extension View {
     /// Pins the quick bar over a catalog list. The list scrolls underneath, so the bar can slide
     /// away without changing the list's layout.
@@ -182,22 +229,7 @@ extension View {
     func collapsesCatalogChrome(enabled: Bool = true) -> some View {
         #if os(iOS)
         if enabled {
-            onScrollGeometryChange(for: CatalogScrollMetrics.self) { geometry in
-                CatalogScrollMetrics(
-                    offset: geometry.contentOffset.y + geometry.contentInsets.top,
-                    // The container already excludes the insets; adding them again overstates the
-                    // range, and the bounce back from the list's end reads as scrolling up.
-                    range: geometry.contentSize.height - geometry.containerSize.height
-                )
-            } action: { _, metrics in
-                CatalogChromeCollapse.shared.update(offset: metrics.offset, scrollRange: metrics.range)
-            }
-            .onScrollPhaseChange { _, phase in
-                // `.tracking` too: a quick drag on a short list can reach its end in the first
-                // geometry update, before the phase turns `.interacting`.
-                CatalogChromeCollapse.shared.isDragging = phase == .tracking || phase == .interacting
-            }
-            .onDisappear { CatalogChromeCollapse.shared.reset() }
+            modifier(CatalogChromeScrollReporter())
         } else {
             self
         }
