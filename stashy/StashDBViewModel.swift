@@ -828,6 +828,8 @@ class StashDBViewModel: ObservableObject {
     private var markersInitialInflightKey: String?
     private var previewsInitialInflightKey: String?
     private var clipsInitialInflightKey: String?
+    /// Same single-flight for the Images list (Feeds › Pics asked for page 1 twice on open).
+    private var imagesInitialInflightKey: String?
 
     /// Visible Reels sub-feed. Prefetch / stale completions for other modes are dropped.
     enum ReelsFeedKind: String {
@@ -3484,13 +3486,7 @@ class StashDBViewModel: ObservableObject {
         completion: @escaping (_ images: [StashImage], _ total: Int) -> Void
     ) {
         let query = GraphQLQueries.queryWithFragments("findImages")
-        let videoRegex = "(?i).*\\.(mp4|gif|webp|mov|webm|m4v|mkv)$"
-        var imageFilter: [String: Any] = [
-            "path": [
-                "value": videoRegex,
-                "modifier": "MATCHES_REGEX"
-            ]
-        ]
+        var imageFilter: [String: Any] = [:]
         if let savedFilter = filter {
             if let dict = savedFilter.filterDict {
                 for (key, value) in sanitizeFilter(dict) where key != "path" {
@@ -3509,7 +3505,7 @@ class StashDBViewModel: ObservableObject {
                 "sort": sortBy.sortField == "random" ? randomSort(.images) : sortBy.sortField,
                 "direction": sortBy.direction
             ],
-            "image_filter": sanitizeFilter(imageFilter)
+            "image_filter": Self.clipImageFilter(sanitizeFilter(imageFilter))
         ]
         let body: [String: Any] = [
             "query": query,
@@ -6195,6 +6191,16 @@ class StashDBViewModel: ObservableObject {
         AppLog.debug("🖼️ fetchImages called, sortBy: \(sortBy.rawValue), isInitialLoad: \(isInitialLoad)")
 
         if isInitialLoad {
+            let key = feedCriteriaKey([
+                "images", sortBy.sortField, sortBy.direction, filter?.id,
+                staticPathFilter ? "static" : nil, performerId,
+                currentImageSearchQuery, liveFilterKey(liveFilter)
+            ])
+            if imagesInitialInflightKey == key, isLoadingImages {
+                AppLog.debug("📥 fetchImages: identical initial fetch already in flight — skipping")
+                return
+            }
+            imagesInitialInflightKey = key
             imagesFetchGeneration += 1
             currentImagePage = 1
             allImages = []
@@ -6297,6 +6303,7 @@ class StashDBViewModel: ObservableObject {
                 DispatchQueue.main.async {
                     guard requestGeneration == self.imagesFetchGeneration else { return }
                     if isInitialLoad {
+                        self.imagesInitialInflightKey = nil
                         self.allImages = result.images
                         self.totalImages = result.count
                     } else {
@@ -6314,6 +6321,7 @@ class StashDBViewModel: ObservableObject {
             } else {
                 DispatchQueue.main.async {
                     guard requestGeneration == self.imagesFetchGeneration else { return }
+                    if isInitialLoad { self.imagesInitialInflightKey = nil }
                     self.isLoadingImages = false
                     let msg = self.errorMessage ?? "Could not load images"
                     self.imageFindListError = msg
@@ -6516,6 +6524,34 @@ class StashDBViewModel: ObservableObject {
         return s.visibleItemId
     }
 
+    /// File extensions the Clips feed treats as video or animation.
+    nonisolated static let clipExtensions = ["mp4", "gif", "webp", "mov", "webm", "m4v", "mkv"]
+
+    /// The given image criteria limited to clip files. Each extension is a `path INCLUDES`
+    /// criterion (a plain SQL `LIKE`), chained with `OR` and joined to the rest with `AND`.
+    /// A `MATCHES_REGEX` on `path` made Stash run its regex on every image row: over two
+    /// seconds per page on a large library. The regex stays only when the criteria already
+    /// use `AND` / `OR` / `NOT` themselves, since Stash allows one of them per level.
+    nonisolated static func clipImageFilter(_ criteria: [String: Any]) -> [String: Any] {
+        var result = criteria
+        result["path"] = nil
+        if result["AND"] != nil || result["OR"] != nil || result["NOT"] != nil {
+            result["path"] = [
+                "value": "(?i).*\\.(" + clipExtensions.joined(separator: "|") + ")$",
+                "modifier": "MATCHES_REGEX"
+            ]
+            return result
+        }
+        var chain: [String: Any]?
+        for ext in clipExtensions.reversed() {
+            var node: [String: Any] = ["path": ["value": "." + ext, "modifier": "INCLUDES"]]
+            if let next = chain { node["OR"] = next }
+            chain = node
+        }
+        result["AND"] = chain
+        return result
+    }
+
     func fetchClips(sortBy: ImageSortOption = .dateDesc, filter: SavedFilter? = nil, isInitialLoad: Bool = true, liveFilter: [String: Any]? = nil) {
         if isInitialLoad {
             let key = feedCriteriaKey([
@@ -6543,20 +6579,10 @@ class StashDBViewModel: ObservableObject {
         let perPage = clipsPerPage
         let requestGeneration = clipsFetchGeneration
 
-        // Filter for video-like and animated extensions
-        // Regex: .*\.(mp4|gif|mov|webm|m4v|mkv|webp)$ (case insensitive usually requires flags, but Stash regex is Go-flavor? or PCRE?)
-        // Stash uses Go regex. (?i) is case insensitive.
-        let videoRegex = "(?i).*\\.(mp4|gif|webp|mov|webm|m4v|mkv)$"
-        
         let query = GraphQLQueries.queryWithFragments("findImages")
-        
-        // Build image filter, starting with video regex
-        var imageFilter: [String: Any] = [
-            "path": [
-                "value": videoRegex,
-                "modifier": "MATCHES_REGEX"
-            ]
-        ]
+
+        // Saved / live criteria; the video-extension part is added by `clipImageFilter`.
+        var imageFilter: [String: Any] = [:]
         
         // Merge with saved filter if provided
         if let savedFilter = filter {
@@ -6598,7 +6624,7 @@ class StashDBViewModel: ObservableObject {
                 "sort": currentClipSortOption.sortField == "random" ? randomSort(.images) : currentClipSortOption.sortField,
                 "direction": currentClipSortOption.direction
             ],
-            "image_filter": sanitizeFilter(imageFilter)
+            "image_filter": Self.clipImageFilter(sanitizeFilter(imageFilter))
         ]
         
         AppLog.debug("🔍 fetchClips: Variables = \(variables)")

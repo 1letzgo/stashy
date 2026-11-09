@@ -36,6 +36,32 @@ object FeedsQuery {
     /** iOS `fetchClips`: video-like and animated image files only. */
     const val VIDEO_REGEX = "(?i).*\\.(mp4|gif|webp|mov|webm|m4v|mkv)$"
 
+    /** File extensions the Clips feed treats as video or animation (iOS `clipExtensions`). */
+    val CLIP_EXTENSIONS = listOf("mp4", "gif", "webp", "mov", "webm", "m4v", "mkv")
+
+    /**
+     * iOS `clipImageFilter`: one `path INCLUDES` per extension (a plain SQL LIKE), chained with
+     * OR and joined to the other criteria with AND. A `MATCHES_REGEX` made Stash run its regex
+     * on every image row (about 2 s against 1.2 s per page on a large library). The regex stays
+     * only when the criteria use AND / OR / NOT themselves: Stash allows one per level.
+     */
+    fun applyClipPathCriteria(entity: MutableMap<String, JsonElement>) {
+        entity.remove("path")
+        if (entity.containsKey("AND") || entity.containsKey("OR") || entity.containsKey("NOT")) {
+            entity["path"] = buildJsonObject { put("value", JsonPrimitive(VIDEO_REGEX)); put("modifier", JsonPrimitive("MATCHES_REGEX")) }
+            return
+        }
+        var chain: JsonObject? = null
+        for (ext in CLIP_EXTENSIONS.reversed()) {
+            val next = chain
+            chain = buildJsonObject {
+                put("path", buildJsonObject { put("value", JsonPrimitive(".$ext")); put("modifier", JsonPrimitive("INCLUDES")) })
+                if (next != null) put("OR", next)
+            }
+        }
+        entity["AND"] = chain!!
+    }
+
     /** iOS per-page sizes (`scenesPerPage` 20 on iPhone, markers/previews/clips 20). */
     const val PER_PAGE = 20
 
@@ -131,14 +157,7 @@ object FeedsQuery {
         val isMarker = kind == FeedQueryKind.Markers
         val entity = entityFilter(filter, live, isMarker, sanitize)
         applyCriteria(entity, criteria, kind)
-        if (kind == FeedQueryKind.Clips) {
-            entity.remove("path")
-            val path = buildJsonObject { put("value", JsonPrimitive(VIDEO_REGEX)); put("modifier", JsonPrimitive("MATCHES_REGEX")) }
-            val ordered = LinkedHashMap<String, JsonElement>()
-            ordered["path"] = path
-            ordered.putAll(entity)
-            entity.clear(); entity.putAll(ordered)
-        }
+        if (kind == FeedQueryKind.Clips) applyClipPathCriteria(entity)
         val filterVar = when (kind) {
             FeedQueryKind.Scenes, FeedQueryKind.Previews -> "scene_filter"
             FeedQueryKind.Markers -> "scene_marker_filter"

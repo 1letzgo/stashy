@@ -152,12 +152,24 @@ class FeedsQueryTest {
         assertEquals("s1", mf["scene_filter"]!!.jsonObject["studios"]!!.jsonObject["value"]!!.jsonArray[0].jsonPrimitive.content)
     }
 
-    @Test fun clipsAlwaysCarryTheVideoRegex() {
+    @Test fun clipsAlwaysCarryTheVideoExtensions() {
         val obj = JsonObject(mapOf("path" to JsonObject(mapOf("value" to JsonPrimitive("x"), "modifier" to JsonPrimitive("INCLUDES")))))
         val v = FeedsQuery.variables(FeedQueryKind.Clips, 1, 20, ImageSortOption.random, 9, SavedFilter("2", objectFilter = obj))
         val f = v["image_filter"]!!.jsonObject
-        assertEquals(FeedsQuery.VIDEO_REGEX, f["path"]!!.jsonObject["value"]!!.jsonPrimitive.content)
-        assertEquals("MATCHES_REGEX", f["path"]!!.jsonObject["modifier"]!!.jsonPrimitive.content)
+        // The saved filter's own path is replaced by the extension chain under AND.
+        assertNull(f["path"])
+        var node: JsonObject? = f["AND"]!!.jsonObject
+        val exts = mutableListOf<String>()
+        while (node != null) {
+            exts += node["path"]!!.jsonObject["value"]!!.jsonPrimitive.content
+            assertEquals("INCLUDES", node["path"]!!.jsonObject["modifier"]!!.jsonPrimitive.content)
+            node = node["OR"]?.jsonObject
+        }
+        assertEquals(FeedsQuery.CLIP_EXTENSIONS.map { ".$it" }, exts)
+        // Criteria with their own AND / OR / NOT keep the regex.
+        val withOr = JsonObject(mapOf("OR" to JsonObject(mapOf("organized" to JsonPrimitive(true)))))
+        val r = FeedsQuery.variables(FeedQueryKind.Clips, 1, 20, ImageSortOption.random, 9, SavedFilter("3", objectFilter = withOr))["image_filter"]!!.jsonObject
+        assertEquals(FeedsQuery.VIDEO_REGEX, r["path"]!!.jsonObject["value"]!!.jsonPrimitive.content)
         assertEquals("random_9", v["filter"]!!.jsonObject["sort"]!!.jsonPrimitive.content)
         // Pics: plain image query without the regex.
         assertNull(FeedsQuery.variables(FeedQueryKind.Pics, 1, 20, ImageSortOption.dateDesc, 1, null)["image_filter"])

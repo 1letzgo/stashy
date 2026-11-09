@@ -482,7 +482,6 @@ class ImageLoader: ObservableObject {
 
     private var url: URL?
     private var fetchTask: Task<Void, Never>?
-    private var session: URLSession { Self.sharedSession }
     private var imageRefreshObservers: [NSObjectProtocol] = []
 
     /// One session for every loader. Each loader used to build its own, so every card opened
@@ -660,7 +659,7 @@ class ImageLoader: ObservableObject {
             }
             
             do {
-                let loaded = try await sharedDownload(url)
+                let loaded = try await Self.sharedDownload(url)
                 if Task.isCancelled { return }
 
                 self.imageData = loaded.data
@@ -678,13 +677,25 @@ class ImageLoader: ObservableObject {
         }
     }
 
+    /// Loads images that are about to scroll in into the cache, so the server's time for a
+    /// thumbnail is spent before the card shows. Skips what is cached or already loading.
+    static func prefetch(_ urls: [URL]) {
+        for url in urls where inFlight[url] == nil
+            && ImageCache.shared.memoryObject(forKey: url as NSURL) == nil {
+            Task {
+                if await ImageCache.shared.loadObject(forKey: url as NSURL) != nil { return }
+                _ = try? await sharedDownload(url)
+            }
+        }
+    }
+
     /// Download, shrink (`downsampledForCache`), decode and cache — once per URL even when
     /// several loaders ask at the same time.
-    private func sharedDownload(_ url: URL) async throws -> (data: Data, image: UIImage?) {
+    private static func sharedDownload(_ url: URL) async throws -> (data: Data, image: UIImage?) {
         if let running = Self.inFlight[url] {
             return try await running.value
         }
-        let raw = Task { () throws -> Data in try await self.loadImage(from: url) }
+        let raw = Task { () throws -> Data in try await Self.loadImage(from: url) }
         let task = Task { () throws -> (data: Data, image: UIImage?) in
             let data = try await raw.value
             let prepared = await Task.detached(priority: .userInitiated) { () -> (data: Data, image: UIImage?) in
@@ -703,7 +714,7 @@ class ImageLoader: ObservableObject {
         return try await task.value
     }
 
-    private func loadImage(from url: URL) async throws -> Data {
+    private static func loadImage(from url: URL) async throws -> Data {
         let authenticatedURL = signedURL(url) ?? url
         var request = URLRequest(url: authenticatedURL)
         request.timeoutInterval = 10.0 // Reduced timeout for faster failure
@@ -715,7 +726,7 @@ class ImageLoader: ObservableObject {
         }
 
         do {
-            let (data, response) = try await session.data(for: request)
+            let (data, response) = try await sharedSession.data(for: request)
             
             if let httpResponse = response as? HTTPURLResponse,
                !(200...299).contains(httpResponse.statusCode) {

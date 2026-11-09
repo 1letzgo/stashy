@@ -1013,6 +1013,9 @@ private struct ImagesViewBody: View {
                             if post.id == posts.last?.id {
                                 loadMoreImagesIfNeeded()
                             }
+                            if let index = posts.firstIndex(where: { $0.id == post.id }) {
+                                prefetchThumbnails(posts.dropFirst(index + 1).prefix(4).compactMap(\.images.first))
+                            }
                         }
                 }
             } else {
@@ -1021,6 +1024,10 @@ private struct ImagesViewBody: View {
                         .onAppear {
                             if image.id == displayedImages.last?.id {
                                 loadMoreImagesIfNeeded()
+                            }
+                            let images = displayedImages
+                            if let index = images.firstIndex(where: { $0.id == image.id }) {
+                                prefetchThumbnails(Array(images.dropFirst(index + 1).prefix(6)))
                             }
                         }
                 }
@@ -1039,6 +1046,12 @@ private struct ImagesViewBody: View {
     
     /// 2-column grid stays square; 1/row uses per-image orientation (see `StashImage.oneColumnFeedAspectRatio`).
     private var imageCardAspectRatio: CGFloat { 1.0 }
+
+    /// Stash makes an image thumbnail on request (0.3–0.9 s each on a large library): fetch the
+    /// next ones while the user looks at the current card.
+    private func prefetchThumbnails(_ images: [StashImage]) {
+        ImageLoader.prefetch(images.compactMap(\.thumbnailURL))
+    }
 
     private func loadMoreImagesIfNeeded() {
         if let gallery = gallery {
