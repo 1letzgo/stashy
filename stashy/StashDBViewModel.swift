@@ -9996,9 +9996,22 @@ struct MarkerScene: Codable, Identifiable, Equatable {
         }
         
         guard let config = ServerConfigManager.shared.loadConfig() else { return nil }
-        return signedURL(URL(string: "\(config.baseURL)/scene/\(id)/screenshot"))
+        return signedURL(URL(string: imageURLWithWidth("\(config.baseURL)/scene/\(id)/screenshot", 640)))
     }
 }
+
+/// Width hint for card images. Stash ignores it for most images, but `ImageLoader` shrinks
+/// what it downloads to twice this width before caching (`ImageCache.downsampledForCache`),
+/// so a 4K original is never kept or decoded at full size. Full-screen viewers use URLs
+/// without it and keep the original.
+nonisolated func imageURLWithWidth(_ urlString: String, _ width: Int) -> String {
+    if urlString.range(of: "[?&]width=", options: .regularExpression) != nil { return urlString }
+    let separator = urlString.contains("?") ? "&" : "?"
+    return "\(urlString)\(separator)width=\(width)"
+}
+
+/// Performer portraits double as the performer page's header, so they keep more pixels.
+let performerImageWidth = 1000
 
 struct SceneMarker: Codable, Identifiable, Equatable {
     let id: String
@@ -10046,18 +10059,18 @@ struct SceneMarker: Codable, Identifiable, Equatable {
         }
 
         // Use path from API if available
-        if let screenshotPath = screenshot, let url = URL(string: screenshotPath) {
+        if let screenshotPath = screenshot, URL(string: screenshotPath) != nil {
              if screenshotPath.hasPrefix("http") {
-                 return signedURL(url)
+                 return signedURL(URL(string: imageURLWithWidth(screenshotPath, 640)))
              } else if let config = ServerConfigManager.shared.loadConfig() {
                  let path = screenshotPath.hasPrefix("/") ? String(screenshotPath.dropFirst()) : screenshotPath
-                 return signedURL(URL(string: "\(config.baseURL)/\(path)"))
+                 return signedURL(URL(string: imageURLWithWidth("\(config.baseURL)/\(path)", 640)))
              }
         }
         
         // Fallback to manual construction
         guard let config = ServerConfigManager.shared.loadConfig() else { return nil }
-        return signedURL(URL(string: "\(config.baseURL)/scenemarker/\(id)/screenshot"))
+        return signedURL(URL(string: imageURLWithWidth("\(config.baseURL)/scenemarker/\(id)/screenshot", 640)))
     }
     
     /// Server-generated marker clip. Markers are their own file, never a transcode of the
@@ -10158,7 +10171,7 @@ struct ScenePerformer: Codable, Identifiable, Equatable {
         if let updated = updatedAt {
             thumbnailURLString = "\(thumbnailURLString)?t=\(updated.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? updated)"
         }
-        return signedURL(URL(string: thumbnailURLString))
+        return signedURL(URL(string: imageURLWithWidth(thumbnailURLString, performerImageWidth)))
     }
 
     func toGalleryPerformer() -> GalleryPerformer {
@@ -10384,7 +10397,7 @@ struct Performer: Codable, Identifiable, Equatable {
     // Computed property for thumbnail URL
     var thumbnailURL: URL? {
         if let path = imagePath, (path.starts(with: "http://") || path.starts(with: "https://")) {
-            return signedURL(URL(string: path))
+            return signedURL(URL(string: imageURLWithWidth(path, performerImageWidth)))
         }
 
         guard let config = ServerConfigManager.shared.loadConfig() else {
@@ -10392,7 +10405,7 @@ struct Performer: Codable, Identifiable, Equatable {
         }
 
         let thumbnailURLString = "\(config.baseURL)/performer/\(id)/image"
-        return signedURL(URL(string: thumbnailURLString))
+        return signedURL(URL(string: imageURLWithWidth(thumbnailURLString, performerImageWidth)))
     }
 
     func withOCounter(_ newOCounter: Int?) -> Performer {
@@ -10599,7 +10612,7 @@ struct Tag: Codable, Identifiable, Equatable {
         if let updated = updatedAt {
             manualPath = "\(manualPath)?t=\(updated.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? updated)"
         }
-        return signedURL(URL(string: manualPath))
+        return signedURL(URL(string: imageURLWithWidth(manualPath, 640)))
     }
 }
 

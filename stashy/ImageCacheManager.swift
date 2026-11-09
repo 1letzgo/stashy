@@ -8,6 +8,21 @@
 import SwiftUI
 import Combine
 import CryptoKit
+import ImageIO
+#if canImport(UniformTypeIdentifiers)
+import UniformTypeIdentifiers
+#endif
+
+extension UIImage {
+    /// Eager decode where UIKit offers it (macOS draws `NSImage` lazily anyway).
+    nonisolated func preparingForDisplayIfAvailable() -> UIImage {
+        #if os(macOS)
+        return self
+        #else
+        return preparingForDisplay() ?? self
+        #endif
+    }
+}
 
 // MARK: - Image Cache (Memory + Disk)
 
@@ -206,11 +221,54 @@ class ImageCache {
         // decode would otherwise happen during the first draw while scrolling.
         let image = await Task.detached(priority: .utility) { () -> UIImage? in
             guard let data = try? Data(contentsOf: fileURL) else { return nil }
+            // Entries cached before downsampling: shrink once and write the small copy back.
+            if let small = ImageCache.downsampledForCache(data, url: key as URL) {
+                try? small.data.write(to: fileURL)
+                return small.image.preparingForDisplayIfAvailable()
+            }
             return ImageCache.decodedForDisplay(data)
         }.value
         guard let image else { return nil }
         memoryCache.setObject(image, forKey: stableKey, cost: imageCost(image))
         return image
+    }
+
+    /// A downloaded still image requested with `width=` (cards, thumbnails) shrunk to twice
+    /// that width and re-encoded. Stash ignores `width` for scene screenshots and sends the
+    /// original (often 4K, 2–3 MB, ~33 MB decoded); cached as is, a Home page held a few dozen
+    /// of them and the memory cache kept evicting and re-decoding. GIF / WebP / SVG and images
+    /// already small enough come back unchanged (nil).
+    nonisolated static func downsampledForCache(_ data: Data, url: URL) -> (data: Data, image: UIImage)? {
+        guard let widthString = URLComponents(url: url, resolvingAgainstBaseURL: false)?
+                .queryItems?.first(where: { $0.name.lowercased() == "width" })?.value,
+              let width = Int(widthString), width > 0 else { return nil }
+        // Stills only: animations and vectors must keep their bytes.
+        let bytes = [UInt8](data.prefix(12))
+        let isJPEG = bytes.starts(with: [0xFF, 0xD8, 0xFF])
+        let isPNG = bytes.starts(with: [0x89, 0x50, 0x4E, 0x47])
+        guard isJPEG || isPNG else { return nil }
+        guard let source = CGImageSourceCreateWithData(data as CFData, nil),
+              let props = CGImageSourceCopyPropertiesAtIndex(source, 0, nil) as? [CFString: Any],
+              let pixelWidth = props[kCGImagePropertyPixelWidth] as? Int,
+              let pixelHeight = props[kCGImagePropertyPixelHeight] as? Int else { return nil }
+        let maxPixel = width * 2
+        guard max(pixelWidth, pixelHeight) > maxPixel else { return nil }
+        let options: [CFString: Any] = [
+            kCGImageSourceCreateThumbnailFromImageAlways: true,
+            kCGImageSourceCreateThumbnailWithTransform: true,
+            kCGImageSourceShouldCacheImmediately: true,
+            kCGImageSourceThumbnailMaxPixelSize: maxPixel
+        ]
+        guard let cgImage = CGImageSourceCreateThumbnailAtIndex(source, 0, options as CFDictionary) else { return nil }
+        let image = UIImage(cgImage: cgImage)
+        let hasAlpha: Bool = {
+            switch cgImage.alphaInfo {
+            case .none, .noneSkipFirst, .noneSkipLast: return false
+            default: return true
+            }
+        }()
+        guard let encoded = hasAlpha ? image.pngData() : image.jpegData(compressionQuality: 0.85) else { return nil }
+        return (encoded, image)
     }
 
     /// `UIImage(data:)` plus an eager decode (`preparingForDisplay`), so the
@@ -231,11 +289,12 @@ class ImageCache {
         }.value
     }
     
-    func setData(_ data: Data, forKey key: NSURL) {
+    func setData(_ data: Data, forKey key: NSURL, decoded: UIImage? = nil) {
         let stableKey = stableMemoryCacheKey(for: key)
         
-        // Store in Memory
-        if let image = UIImage(data: data) {
+        // Store in Memory — the already decoded bitmap when the caller has one, so the
+        // first draw does not decode on the main thread.
+        if let image = decoded ?? UIImage(data: data) {
             memoryCache.setObject(image, forKey: stableKey, cost: imageCost(image))
         }
         
@@ -423,8 +482,22 @@ class ImageLoader: ObservableObject {
 
     private var url: URL?
     private var fetchTask: Task<Void, Never>?
-    private let session: URLSession
+    private var session: URLSession { Self.sharedSession }
     private var imageRefreshObservers: [NSObjectProtocol] = []
+
+    /// One session for every loader. Each loader used to build its own, so every card opened
+    /// a new connection (TLS handshake included) instead of reusing the server's.
+    private static let sharedSession: URLSession = {
+        let config = URLSessionConfiguration.default
+        config.timeoutIntervalForRequest = 15
+        config.timeoutIntervalForResource = 30
+        config.httpMaximumConnectionsPerHost = 6
+        return URLSession(configuration: config, delegate: StashTrustDelegate(), delegateQueue: nil)
+    }()
+
+    /// Downloads in flight by URL: two cards with the same scene (it is in two Home rows)
+    /// share one request instead of loading the same original twice.
+    private static var inFlight: [URL: Task<(data: Data, image: UIImage?), Error>] = [:]
 
     deinit {
         for observer in imageRefreshObservers {
@@ -436,10 +509,6 @@ class ImageLoader: ObservableObject {
     init(url: URL?) {
         self.url = url
 
-        let config = URLSessionConfiguration.default
-        config.timeoutIntervalForRequest = 15
-        config.timeoutIntervalForResource = 30
-        self.session = URLSession(configuration: config, delegate: StashTrustDelegate(), delegateQueue: nil)
 
         imageRefreshObservers = [
             NotificationCenter.default.addObserver(
@@ -506,8 +575,13 @@ class ImageLoader: ObservableObject {
         // Synchronous memory cache check — avoids any loading flash for warm-cache hits
         if let url, let cachedUIImage = ImageCache.shared.memoryObject(forKey: url as NSURL) {
             self.image = Image(uiImage: cachedUIImage)
-            self.imageData = ImageCache.shared.data(forKey: url as NSURL)
             self.isLoading = false
+            // The raw bytes only tell GIFs and SVGs apart; read them off the main thread
+            // (this used to be a synchronous disk read per card).
+            Task { [weak self] in
+                let data = await ImageCache.shared.loadData(forKey: url as NSURL)
+                if self?.url == url { self?.imageData = data }
+            }
         } else {
             loadImage(bypassCache: false)
         }
@@ -586,17 +660,11 @@ class ImageLoader: ObservableObject {
             }
             
             do {
-                let data = try await loadImage(from: url)
+                let loaded = try await sharedDownload(url)
                 if Task.isCancelled { return }
-                
-                self.imageData = data
-                let decoded = await Task.detached(priority: .userInitiated) {
-                    ImageCache.decodedForDisplay(data)
-                }.value
-                if Task.isCancelled { return }
-                if let uiImage = decoded {
-                    // Save to cache
-                    ImageCache.shared.setData(data, forKey: url as NSURL)
+
+                self.imageData = loaded.data
+                if let uiImage = loaded.image {
                     self.image = Image(uiImage: uiImage)
                 } else {
                     self.error = CustomAsyncImageError.invalidImageData
@@ -608,6 +676,31 @@ class ImageLoader: ObservableObject {
                 self.isLoading = false
             }
         }
+    }
+
+    /// Download, shrink (`downsampledForCache`), decode and cache — once per URL even when
+    /// several loaders ask at the same time.
+    private func sharedDownload(_ url: URL) async throws -> (data: Data, image: UIImage?) {
+        if let running = Self.inFlight[url] {
+            return try await running.value
+        }
+        let raw = Task { () throws -> Data in try await self.loadImage(from: url) }
+        let task = Task { () throws -> (data: Data, image: UIImage?) in
+            let data = try await raw.value
+            let prepared = await Task.detached(priority: .userInitiated) { () -> (data: Data, image: UIImage?) in
+                if let small = ImageCache.downsampledForCache(data, url: url) {
+                    return (small.data, small.image.preparingForDisplayIfAvailable())
+                }
+                return (data, ImageCache.decodedForDisplay(data))
+            }.value
+            if let image = prepared.image {
+                ImageCache.shared.setData(prepared.data, forKey: url as NSURL, decoded: image)
+            }
+            return prepared
+        }
+        Self.inFlight[url] = task
+        defer { Self.inFlight[url] = nil }
+        return try await task.value
     }
 
     private func loadImage(from url: URL) async throws -> Data {
