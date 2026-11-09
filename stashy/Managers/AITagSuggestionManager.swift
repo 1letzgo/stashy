@@ -249,6 +249,11 @@ final class AITagSuggestionManager: ObservableObject {
         return weights
     }
 
+    /// The co-occurrence counts behind `relatedTagWeights`, for scoring off the main actor.
+    var relatedTagStatistics: (pairs: [String: [String: Int]], totals: [String: Int]) {
+        (model?.pairCounts ?? [:], model?.tagTotals ?? [:])
+    }
+
     var buildProgress: Double {
         if case .building(let processed, let total) = state, total > 0 {
             return min(1, Double(processed) / Double(total))

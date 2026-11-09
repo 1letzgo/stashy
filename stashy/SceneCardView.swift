@@ -17,7 +17,6 @@ struct SceneCardView: View {
     // Preview Video State
     @StateObject private var previewPlayer = AetherPreviewPlayer()
     @State private var isPreviewing = false
-    @State private var isPressing = false
     /// Nur nach einem echten Start den Pool freigeben; `onDisappear` feuert beim
     /// Scrollen für jede Zelle, die meisten haben nie eine Vorschau gestartet.
     @State private var didStartPreview = false
@@ -63,14 +62,13 @@ struct SceneCardView: View {
                     }
                 }
             }
-            .onLongPressGesture(minimumDuration: 0.15, pressing: { pressing in
-                isPressing = pressing
-                if pressing {
-                    startPreview()
-                } else {
-                    stopPreview()
-                }
-            }, perform: {})
+            // Starts once the press is recognised: at touch-down every scroll that began on a
+            // card loaded a preview engine and tore it down again on release.
+            .onLongPressGesture(minimumDuration: 0.25, perform: {
+                startPreview()
+            }, onPressingChanged: { pressing in
+                if !pressing { stopPreview() }
+            })
             
             // Ensure full height for the card (default 16:9; catalog can pass 1:1)
             Color.clear

@@ -69,11 +69,16 @@ struct HomeSceneCardView: View {
             .frame(width: cardWidth, height: cardHeight)
             .clipped()
             .contentShape(Rectangle())
-            .onLongPressGesture(minimumDuration: 0.15, pressing: { pressing in
+            // The preview starts once the press is recognised, not at touch-down: every scroll
+            // that began on a card used to start a preview engine and stop the hero's, then
+            // reload both on release, all on the main thread while Home was scrolling.
+            .onLongPressGesture(minimumDuration: 0.25, perform: {
+                if !autoplaysPreview { startPreview() }
+            }, onPressingChanged: { pressing in
                 // The release always ends a preview: a swipe that started on this card can
                 // make it the hero card mid-gesture, and the hero hold must not outlive it.
-                if !pressing { stopPreview() } else if !autoplaysPreview { startPreview() }
-            }, perform: {})
+                if !pressing { stopPreview() }
+            })
 
             LinearGradient(colors: [.black.opacity(0.8), .clear], startPoint: .bottom, endPoint: .top)
                 .frame(height: 60)
@@ -214,6 +219,7 @@ struct HomeSceneCardView: View {
     }
 
     private func stopPreview() {
+        guard isPreviewing || holdsHero else { return }
         withAnimation(.easeOut(duration: 0.2)) { isPreviewing = false }
         previewPlayer.stop(release: true)
         if holdsHero {

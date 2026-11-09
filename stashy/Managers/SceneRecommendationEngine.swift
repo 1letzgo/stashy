@@ -207,7 +207,7 @@ final class SceneRecommendationEngine: ObservableObject {
     static let lookbackChoices = [7, 14, 30, 60, 90]
     static let countRange = 5...10
     /// The For You sort of the Scenes list shows this many; Home shows the first `count`.
-    static let listLimit = 25
+    nonisolated static let listLimit = 25
     static let weightRange: ClosedRange<Double> = 0...2
 
     @Published var lookbackDays: Int { didSet { persist(lookbackDays, Keys.lookbackDays) } }
@@ -347,7 +347,7 @@ final class SceneRecommendationEngine: ObservableObject {
     private var isStale = false
     private var generation = 0
     /// A tag on almost every scene still says a little.
-    private static let minRarity = 0.15
+    nonisolated private static let minRarity = 0.15
 
     private init() {
         let d = UserDefaults.standard
@@ -605,13 +605,13 @@ final class SceneRecommendationEngine: ObservableObject {
 
     // MARK: - Build
 
-    private enum Outcome {
+    nonisolated private enum Outcome {
         case success([SceneRecommendation], seeds: Int)
         case failure(String)
     }
 
     /// What scoring needs of one scene — from the local index or from a server scene.
-    private struct RecItem {
+    nonisolated private struct RecItem {
         let id: String
         let title: String?
         let performers: [(id: String, name: String)]
@@ -642,7 +642,7 @@ final class SceneRecommendationEngine: ObservableObject {
     }
 
     /// Tag names and how many scenes carry each tag, for labels and the rarity weighting.
-    private struct Vocabulary {
+    nonisolated private struct Vocabulary {
         var tagNames: [String: String] = [:]
         var tagScenes: [String: Int] = [:]
         var totalScenes = 0
@@ -655,18 +655,18 @@ final class SceneRecommendationEngine: ObservableObject {
         }
     }
 
-    private struct Seed {
+    nonisolated private struct Seed {
         let item: RecItem
         let weight: Double
     }
 
-    private struct Scored {
+    nonisolated private struct Scored {
         let item: RecItem
         let reason: SceneRecommendation.Reason
         let score: Double
     }
 
-    private struct Profile {
+    nonisolated private struct Profile {
         var performers: [String: Double] = [:]
         var performerNames: [String: String] = [:]
         var studios: [String: Double] = [:]
@@ -694,7 +694,7 @@ final class SceneRecommendationEngine: ObservableObject {
     }
 
     /// One watched scene, seen as an anchor: its performers, studio and tags with their rarity.
-    private struct Anchor {
+    nonisolated private struct Anchor {
         let item: RecItem
         let weight: Double
         let performerIds: Set<String>
@@ -710,26 +710,83 @@ final class SceneRecommendationEngine: ObservableObject {
         guard let index = await AITagSuggestionManager.shared.sceneIndex(), !index.scenes.isEmpty else {
             return .failure(Self.preparingMessage)
         }
-        return buildLocal(index)
+        let cfg = makeBuildConfig()
+        // Scoring the whole library takes a noticeable moment: off the main thread, or Home
+        // stalls while it scrolls right after start (this runs once more for the next list).
+        return await Task.detached(priority: .userInitiated) {
+            Self.buildLocal(index, cfg)
+        }.value
+    }
+
+    /// Everything a build reads from the engine and the statistics, copied on the main actor so
+    /// the scoring can run elsewhere.
+    nonisolated private struct BuildConfig: @unchecked Sendable {
+        let lookbackDays: Int
+        let count: Int
+        let discovery: RecommendationDiscovery
+        let performerWeight: Double
+        let studioWeight: Double
+        let tagWeight: Double
+        let oCountWeight: Double
+        let ratingWeight: Double
+        let similarWeight: Double
+        let adjust: Adjust
+        let sessionSeed: Int
+        let recentLists: [Set<String>]
+        let knownTagNames: [String: String]
+        let pairCounts: [String: [String: Int]]
+        let tagTotals: [String: Int]
+
+        /// Same as `AITagSuggestionManager.relatedTagWeights`, on the copied statistics.
+        func relatedTagWeights(_ tagIds: [String]) -> [String: Double] {
+            var weights: [String: Double] = [:]
+            for tagId in tagIds {
+                guard let partners = pairCounts[tagId] else { continue }
+                let total = Double(tagTotals[tagId] ?? 0)
+                guard total > 0 else { continue }
+                for (partner, count) in partners where !tagIds.contains(partner) {
+                    weights[partner] = max(weights[partner] ?? 0, min(1.0, Double(count) / total))
+                }
+            }
+            return weights
+        }
+    }
+
+    private func makeBuildConfig() -> BuildConfig {
+        #if !os(tvOS)
+        let manager = AITagSuggestionManager.shared
+        var names: [String: String] = [:]
+        for tag in manager.knownTags { names[tag.id] = tag.name }
+        let stats = manager.relatedTagStatistics
+        #else
+        let names: [String: String] = [:]
+        let stats: (pairs: [String: [String: Int]], totals: [String: Int]) = ([:], [:])
+        #endif
+        return BuildConfig(
+            lookbackDays: lookbackDays, count: count, discovery: discovery,
+            performerWeight: performerWeight, studioWeight: studioWeight, tagWeight: tagWeight,
+            oCountWeight: oCountWeight, ratingWeight: ratingWeight, similarWeight: similarWeight,
+            adjust: Adjust(adjustments), sessionSeed: Self.sessionSeed,
+            recentLists: Self.loadRecentPicks(), knownTagNames: names,
+            pairCounts: stats.pairs, tagTotals: stats.totals
+        )
     }
 
     /// Shown until the first statistics build on this device is done.
     static let preparingMessage = "Getting your library ready on this device…"
 
     /// The whole library from the device's scene index — no server request.
-    private func buildLocal(_ index: LocalSceneIndex) -> Outcome {
+    nonisolated private static func buildLocal(_ index: LocalSceneIndex, _ cfg: BuildConfig) -> Outcome {
         let started = Date()
         let now = Date()
-        let windowStart = now.addingTimeInterval(-Double(lookbackDays) * 86_400)
+        let windowStart = now.addingTimeInterval(-Double(cfg.lookbackDays) * 86_400)
 
         let entries = index.scenes.filter { $0.scene != nil }
         let items = entries.map {
             RecItem(entry: $0, performerNames: index.performerNames, studioNames: index.studioNames)
         }
         var vocabulary = Vocabulary()
-        #if !os(tvOS)
-        for tag in AITagSuggestionManager.shared.knownTags { vocabulary.tagNames[tag.id] = tag.name }
-        #endif
+        vocabulary.tagNames = cfg.knownTagNames
         vocabulary.tagNames.merge(index.tagNames ?? [:]) { _, indexed in indexed }
         vocabulary.totalScenes = items.count
         for item in items {
@@ -738,18 +795,18 @@ final class SceneRecommendationEngine: ObservableObject {
 
         var seeds = items.compactMap { item -> Seed? in
             guard let last = item.lastPlayedAt, last >= windowStart else { return nil }
-            return seed(item, plays: [last], oStamps: nil, windowStart: windowStart, now: now)
+            return Self.seed(item, plays: [last], oStamps: nil, windowStart: windowStart, now: now, cfg: cfg)
         }
         var usedFallback = false
         if seeds.isEmpty {
-            seeds = favoriteSeeds(from: items)
+            seeds = Self.favoriteSeeds(from: items, cfg: cfg)
             usedFallback = true
         }
         guard !seeds.isEmpty else { return .success([], seeds: 0) }
         let recentlyPlayed = Set(items.filter { ($0.lastPlayedAt ?? .distantPast) >= windowStart }.map(\.id))
 
-        let picks = rank(items, seeds: seeds, excluding: recentlyPlayed, vocabulary: vocabulary,
-                         adjust: Adjust(adjustments), now: now)
+        let picks = Self.rank(items, seeds: seeds, excluding: recentlyPlayed, vocabulary: vocabulary,
+                              adjust: cfg.adjust, now: now, cfg: cfg)
         let scenes = Dictionary(entries.compactMap { e in e.scene.map { (e.id, $0) } }, uniquingKeysWith: { a, _ in a })
         let recommendations = picks.compactMap { pick -> SceneRecommendation? in
             guard let scene = scenes[pick.item.id] else { return nil }
@@ -760,7 +817,7 @@ final class SceneRecommendationEngine: ObservableObject {
         return .success(recommendations, seeds: seeds.count)
     }
 
-    private func makeProfile(_ seeds: [Seed], vocabulary: Vocabulary, adjust: Adjust) -> Profile {
+    nonisolated private static func makeProfile(_ seeds: [Seed], vocabulary: Vocabulary, adjust: Adjust) -> Profile {
         var profile = Profile()
         for seed in seeds {
             // A hidden item learns nothing from the history; the rest of its scene still counts.
@@ -782,7 +839,7 @@ final class SceneRecommendationEngine: ObservableObject {
     }
 
     /// The user's adjustments, as lookups for one build.
-    private struct Adjust {
+    nonisolated private struct Adjust {
         var performers: [String: Double] = [:]
         var studios: [String: Double] = [:]
         var tags: [String: Double] = [:]
@@ -843,9 +900,9 @@ final class SceneRecommendationEngine: ObservableObject {
     }
 
     /// Scores every candidate, steps back what the last lists showed and picks a diverse list.
-    private func rank(_ candidates: [RecItem], seeds: [Seed], excluding recentlyPlayed: Set<String>,
-                      vocabulary: Vocabulary, adjust: Adjust, now: Date) -> [Scored] {
-        let profile = makeProfile(seeds, vocabulary: vocabulary, adjust: adjust)
+    nonisolated private static func rank(_ candidates: [RecItem], seeds: [Seed], excluding recentlyPlayed: Set<String>,
+                                         vocabulary: Vocabulary, adjust: Adjust, now: Date, cfg: BuildConfig) -> [Scored] {
+        let profile = Self.makeProfile(seeds, vocabulary: vocabulary, adjust: adjust)
         guard !profile.isEmpty else { return [] }
         let topTags = profile.top(profile.tags, 10)
         // The scenes the user engaged with most, one by one: scenes close to any of them get
@@ -854,7 +911,7 @@ final class SceneRecommendationEngine: ObservableObject {
         let anchors = seeds
             .sorted { $0.weight > $1.weight }
             .filter { !adjust.hides($0.item) && seenAnchor.insert($0.item.id).inserted }
-            .prefix(similarWeight > 0 ? 6 : 0)
+            .prefix(cfg.similarWeight > 0 ? 6 : 0)
             .map { seed -> Anchor in
                 var mass: [String: Double] = [:]
                 for tagId in seed.item.tagIds { mass[tagId] = vocabulary.rarity(tagId) }
@@ -863,29 +920,25 @@ final class SceneRecommendationEngine: ObservableObject {
             }
         let maxSeedWeight = anchors.first?.weight ?? 1
 
-        #if !os(tvOS)
-        let related = tagWeight > 0 ? AITagSuggestionManager.shared.relatedTagWeights(for: topTags) : [:]
-        #else
-        let related: [String: Double] = [:]
-        #endif
+        let related = cfg.tagWeight > 0 ? cfg.relatedTagWeights(topTags) : [:]
 
         let scored = candidates.compactMap { candidate -> Scored? in
             guard !recentlyPlayed.contains(candidate.id), !adjust.hides(candidate) else { return nil }
-            guard let scored = score(candidate, profile: profile, related: related, anchors: anchors,
-                                     maxSeedWeight: maxSeedWeight, vocabulary: vocabulary, now: now) else { return nil }
+            guard let scored = Self.score(candidate, profile: profile, related: related, anchors: anchors,
+                                     maxSeedWeight: maxSeedWeight, vocabulary: vocabulary, now: now, cfg: cfg) else { return nil }
             let factor = adjust.multiplier(candidate)
             return factor == 1 ? scored : Scored(item: scored.item, reason: scored.reason, score: scored.score * factor)
         }
         // What the last lists showed steps back, so the next one is a new list. Not excluded:
         // in a small library a strong match may still come back.
-        let recentLists = Self.loadRecentPicks()
+        let recentLists = cfg.recentLists
         let rotated = scored.map { item -> Scored in
             guard let index = recentLists.firstIndex(where: { $0.contains(item.item.id) }) else { return item }
             return Scored(item: item.item, reason: item.reason, score: item.score * (index == 0 ? 0.3 : 0.55))
         }
-        let picks = diversify(rotated)
+        let picks = Self.diversify(rotated, cfg: cfg)
         #if DEBUG
-        for pick in picks.prefix(count) {
+        for pick in picks.prefix(cfg.count) {
             AppLog.debug("✨ FOR YOU pick: \(String(format: "%.2f", pick.score)) \(pick.item.isUnwatched ? "new" : "seen") \(pick.reason.label) — \(pick.item.title ?? pick.item.id)")
         }
         #endif
@@ -893,7 +946,7 @@ final class SceneRecommendationEngine: ObservableObject {
     }
 
     /// Weight of one watched scene for the profile.
-    private func seed(_ item: RecItem, plays allPlays: [Date], oStamps: [Date]?, windowStart: Date, now: Date) -> Seed? {
+    nonisolated private static func seed(_ item: RecItem, plays allPlays: [Date], oStamps: [Date]?, windowStart: Date, now: Date, cfg: BuildConfig) -> Seed? {
         var plays = allPlays.filter { $0 >= windowStart }
         if plays.isEmpty, let last = item.lastPlayedAt, last >= windowStart {
             plays = [last]
@@ -902,7 +955,7 @@ final class SceneRecommendationEngine: ObservableObject {
         guard let lastEvent = (plays + os).max() else { return nil }
 
         // Recency: half-life of a third of the window — last week counts most in a month.
-        let halfLife = max(2, Double(lookbackDays) / 3) * 86_400
+        let halfLife = max(2, Double(cfg.lookbackDays) / 3) * 86_400
         let age = max(0, now.timeIntervalSince(lastEvent))
         let recency = pow(0.5, age / halfLife)
 
@@ -911,29 +964,29 @@ final class SceneRecommendationEngine: ObservableObject {
         let replays = oStamps == nil && plays.count <= 1 ? min(item.playCount - 1, 3) : plays.count - 1
         engagement += 0.4 * Double(min(max(replays, 0), 5))
         let oCount = oStamps != nil ? os.count : (item.oCounter > 0 ? 1 : 0)
-        engagement += 1.5 * oCountWeight * Double(min(oCount, 4))
+        engagement += 1.5 * cfg.oCountWeight * Double(min(oCount, 4))
         if let duration = item.duration, duration > 0, let watched = item.playDuration, watched > 0 {
             let perPlay = watched / Double(max(item.playCount, plays.count, 1))
             engagement += 0.5 * min(1, perPlay / duration)
         }
         if let rating = item.rating {
             if rating >= 80 {
-                engagement += 0.6 * ratingWeight
+                engagement += 0.6 * cfg.ratingWeight
             } else if rating <= 40 {
                 // Rated low: watched, but not liked.
-                engagement *= max(0.1, 1 - 0.7 * ratingWeight)
+                engagement *= max(0.1, 1 - 0.7 * cfg.ratingWeight)
             }
         }
         return Seed(item: item, weight: recency * engagement)
     }
 
     /// Cold start: scenes with O-Counts or high ratings, weighted lower than real plays.
-    private func favoriteSeeds(from items: [RecItem]) -> [Seed] {
+    nonisolated private static func favoriteSeeds(from items: [RecItem], cfg: BuildConfig) -> [Seed] {
         items
             .filter { $0.oCounter > 0 || ($0.rating ?? 0) >= 80 }
             .map { item -> Seed in
-                var weight = 0.5 + 0.3 * oCountWeight * Double(min(item.oCounter, 4))
-                if (item.rating ?? 0) >= 80 { weight += 0.4 * ratingWeight }
+                var weight = 0.5 + 0.3 * cfg.oCountWeight * Double(min(item.oCounter, 4))
+                if (item.rating ?? 0) >= 80 { weight += 0.4 * cfg.ratingWeight }
                 return Seed(item: item, weight: weight)
             }
             .sorted { $0.weight > $1.weight }
@@ -941,17 +994,18 @@ final class SceneRecommendationEngine: ObservableObject {
             .map { $0 }
     }
 
-    private func score(
+    nonisolated private static func score(
         _ candidate: RecItem,
         profile: Profile,
         related: [String: Double],
         anchors: [Anchor],
         maxSeedWeight: Double,
         vocabulary: Vocabulary,
-        now: Date
+        now: Date,
+        cfg: BuildConfig
     ) -> Scored? {
         let isUnwatched = candidate.isUnwatched
-        if discovery == .fresh && !isUnwatched { return nil }
+        if cfg.discovery == .fresh && !isUnwatched { return nil }
 
         // Performer: best match counts fully, further ones add a little.
         let performerHits = candidate.performers
@@ -961,17 +1015,17 @@ final class SceneRecommendationEngine: ObservableObject {
         for (index, hit) in performerHits.enumerated() {
             performerScore += index == 0 ? hit.1 : hit.1 * 0.3
         }
-        performerScore *= 3.0 * performerWeight
+        performerScore *= 3.0 * cfg.performerWeight
 
         var studioScore = 0.0
         if let studio = candidate.studio, let affinity = profile.studios[studio.id] {
-            studioScore = affinity * 1.5 * studioWeight
+            studioScore = affinity * 1.5 * cfg.studioWeight
         }
 
         let tagHits = candidate.tagIds
             .compactMap { t in profile.tags[t].map { (t, $0) } }
             .sorted { $0.1 > $1.1 }
-        let tagScore = min(tagHits.reduce(0) { $0 + $1.1 }, 1.2) * 2.0 * tagWeight
+        let tagScore = min(tagHits.reduce(0) { $0 + $1.1 }, 1.2) * 2.0 * cfg.tagWeight
 
         var relatedScore = 0.0
         var bestRelated: (tagId: String, weight: Double)?
@@ -982,13 +1036,13 @@ final class SceneRecommendationEngine: ObservableObject {
                 relatedScore += w
                 if w > (bestRelated?.weight ?? 0) { bestRelated = (tagId, w) }
             }
-            relatedScore = min(relatedScore, 1.0) * 0.6 * tagWeight
+            relatedScore = min(relatedScore, 1.0) * 0.6 * cfg.tagWeight
         }
 
         // Closeness to a single watched scene, scaled by how much that scene counted.
         var similarScore = 0.0
         var similarAnchor: RecItem?
-        if similarWeight > 0, !anchors.isEmpty {
+        if cfg.similarWeight > 0, !anchors.isEmpty {
             let candidatePerformers = candidate.performers.map(\.id)
             for anchor in anchors where anchor.item.id != candidate.id {
                 let shared = candidatePerformers.filter { anchor.performerIds.contains($0) }.count
@@ -1003,7 +1057,7 @@ final class SceneRecommendationEngine: ObservableObject {
                     similarAnchor = anchor.item
                 }
             }
-            similarScore *= 3.0 * similarWeight
+            similarScore *= 3.0 * cfg.similarWeight
         }
 
         var score = performerScore + studioScore + tagScore + relatedScore + similarScore
@@ -1011,12 +1065,12 @@ final class SceneRecommendationEngine: ObservableObject {
 
         // Quality: the user's own rating of the candidate.
         if let rating = candidate.rating {
-            score *= 1 + ratingWeight * (Double(rating) - 60) / 200
+            score *= 1 + cfg.ratingWeight * (Double(rating) - 60) / 200
         }
 
         let daysSincePlay = candidate.lastPlayedAt.map { now.timeIntervalSince($0) / 86_400 } ?? .infinity
         var isRediscover = false
-        switch discovery {
+        switch cfg.discovery {
         case .fresh:
             score *= 1.2
         case .balanced:
@@ -1028,14 +1082,14 @@ final class SceneRecommendationEngine: ObservableObject {
             if isUnwatched {
                 score *= 0.85
             } else {
-                score *= 1 + 0.25 * oCountWeight * Double(min(candidate.oCounter, 4))
-                if (candidate.rating ?? 0) >= 80 { score *= 1 + 0.2 * ratingWeight }
+                score *= 1 + 0.25 * cfg.oCountWeight * Double(min(candidate.oCounter, 4))
+                if (candidate.rating ?? 0) >= 80 { score *= 1 + 0.2 * cfg.ratingWeight }
                 isRediscover = daysSincePlay > 60
             }
         }
 
         // Per-build jitter: close scores resolve differently in every list.
-        score *= 1 + 0.35 * Self.jitter(candidate.id)
+        score *= 1 + 0.35 * Self.jitter(candidate.id, seed: cfg.sessionSeed)
 
         let tagName = { (id: String) in vocabulary.tagNames[id] ?? "this tag" }
         let factors: [(Double, SceneRecommendation.Reason?)] = [
@@ -1048,7 +1102,7 @@ final class SceneRecommendationEngine: ObservableObject {
         let strongest = factors.filter { $0.1 != nil && $0.0 > 0 }.max { $0.0 < $1.0 }
         let reason: SceneRecommendation.Reason
         if isRediscover {
-            reason = discovery == .favorites && candidate.oCounter > 0 ? .favorite : .rediscover
+            reason = cfg.discovery == .favorites && candidate.oCounter > 0 ? .favorite : .rediscover
         } else if let found = strongest?.1 {
             reason = found
         } else {
@@ -1059,7 +1113,7 @@ final class SceneRecommendationEngine: ObservableObject {
 
     /// Greedy pick; each further scene sharing a performer, studio or reason with the picks
     /// so far loses ground.
-    private func diversify(_ scored: [Scored]) -> [Scored] {
+    nonisolated private static func diversify(_ scored: [Scored], cfg: BuildConfig) -> [Scored] {
         // Only the best few hundred can make the list; the greedy pass is quadratic.
         var pool = Array(scored.sorted { $0.score > $1.score }.prefix(600))
         var picks: [Scored] = []
@@ -1070,7 +1124,7 @@ final class SceneRecommendationEngine: ObservableObject {
         // unplayed scenes, so equal scores alone would fill the list with NEW ones.
         var newPicks = 0
         var seenPicks = 0
-        let balances = discovery == .balanced && pool.contains { !$0.item.isUnwatched }
+        let balances = cfg.discovery == .balanced && pool.contains { !$0.item.isUnwatched }
 
         func adjusted(_ entry: Scored) -> Double {
             let performerPenalty = entry.item.performers.map { performerUses[$0.id] ?? 0 }.max() ?? 0
@@ -1084,7 +1138,7 @@ final class SceneRecommendationEngine: ObservableObject {
                 * pow(0.7, Double(reasonPenalty))
         }
 
-        while picks.count < max(count, Self.listLimit), !pool.isEmpty {
+        while picks.count < max(cfg.count, Self.listLimit), !pool.isEmpty {
             var bestIndex = 0
             var bestScore = -Double.infinity
             for (index, entry) in pool.enumerated() {
@@ -1132,8 +1186,8 @@ final class SceneRecommendationEngine: ObservableObject {
     private static var sessionSeed = Int.random(in: 0..<100_000_000)
 
     /// 0…1, stable for a scene within one build.
-    private static func jitter(_ id: String) -> Double {
-        var hash: UInt64 = 1_469_598_103_934_665_603 ^ UInt64(truncatingIfNeeded: sessionSeed)
+    nonisolated private static func jitter(_ id: String, seed: Int) -> Double {
+        var hash: UInt64 = 1_469_598_103_934_665_603 ^ UInt64(truncatingIfNeeded: seed)
         for byte in id.utf8 {
             hash ^= UInt64(byte)
             hash = hash &* 1_099_511_628_211
