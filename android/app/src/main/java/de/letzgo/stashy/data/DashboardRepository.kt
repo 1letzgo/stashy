@@ -3,6 +3,8 @@ package de.letzgo.stashy.data
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.builtins.ListSerializer
+import kotlinx.coroutines.async
+import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonObject
 
@@ -99,7 +101,33 @@ object UniversalSearchRepository {
     suspend fun groups(q: String, limit: Int) = findPage("findGroups", "findGroups", "groups", StashGroup.serializer(), f(q, limit, "name", "ASC")).items
     /** Most-used first (Tags catalog scene-count sort). */
     suspend fun tags(q: String, limit: Int) = findPage("findTags", "findTags", "tags", Tag.serializer(), f(q, limit, "scenes_count", "DESC")).items
-    suspend fun scenes(q: String, limit: Int) = findPage("findScenes", "findScenes", "scenes", Scene.serializer(), f(q, limit, "date", "DESC")).items
+    /**
+     * iOS `searchScenesAsync`: Stash's `q` (title, details, path, …) plus a match on the studio
+     * code, which `q` does not cover. Exact code hits lead, then the `q` hits, then partial code hits.
+     */
+    suspend fun scenes(q: String, limit: Int): List<Scene> = kotlinx.coroutines.coroutineScope {
+        val text = async { findPage("findScenes", "findScenes", "scenes", Scene.serializer(), f(q, limit, "date", "DESC")).items }
+        val code = async { runCatching { scenesByCode(q, limit) }.getOrDefault(emptyList()) }
+        mergeSceneHits(text.await(), code.await(), q, limit)
+    }
+
+    /** Scenes whose studio code contains [q] (`code` criterion, INCLUDES), each with its code. */
+    private suspend fun scenesByCode(q: String, limit: Int): List<Pair<Scene, String?>> {
+        val needle = q.trim()
+        if (needle.isEmpty()) return emptyList()
+        val variables = buildJsonObject {
+            put("filter", FindFilter(1, limit, "date", "DESC").json())
+            put("scene_filter", vars("code" to mapOf("value" to needle, "modifier" to "INCLUDES")))
+        }
+        val list = GraphQL.named("findScenesByCode", variables)["findScenes"].obj?.get("scenes") as? JsonArray ?: return emptyList()
+        return list.map { GraphQL.decode(Scene.serializer(), it) to it.obj?.get("code").stringOrNull }
+    }
+
+    private fun mergeSceneHits(text: List<Scene>, code: List<Pair<Scene, String?>>, q: String, limit: Int): List<Scene> {
+        val needle = q.trim()
+        val (exact, partial) = code.partition { it.second?.trim()?.equals(needle, ignoreCase = true) == true }
+        return (exact.map { it.first } + text + partial.map { it.first }).distinctBy { it.id }.take(limit)
+    }
     suspend fun images(q: String, limit: Int) = findPage("findImages", "findImages", "images", StashImage.serializer(), f(q, limit, "date", "DESC")).items
     suspend fun galleries(q: String, limit: Int) = findPage("findGalleries", "findGalleries", "galleries", Gallery.serializer(), f(q, limit, "date", "DESC")).items
     suspend fun markers(q: String, limit: Int) = findPage("findSceneMarkers", "findSceneMarkers", "scene_markers", SceneMarker.serializer(), f(q, limit, "title", "ASC")).items

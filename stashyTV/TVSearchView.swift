@@ -17,6 +17,20 @@ struct TVSearchView: View {
     @State private var didAutoFocusSearchField: Bool = false
     @FocusState private var isSearchFieldFocused: Bool
     @State private var searchDebounceTask: Task<Void, Never>?
+    /// Scenes whose studio code matches — Stash's `q` does not search `code`.
+    @State private var codeHits: [SceneCodeSearchHit] = []
+    @State private var codeSearchTask: Task<Void, Never>?
+
+    /// `q` results merged with the studio-code hits (exact code first, no duplicates).
+    private var resultScenes: [Scene] {
+        guard !codeHits.isEmpty else { return viewModel.scenes }
+        return StashDBViewModel.mergeSceneSearchResults(
+            textHits: viewModel.scenes,
+            codeHits: codeHits,
+            query: searchQuery,
+            limit: viewModel.scenes.count + codeHits.count
+        )
+    }
 
     private var hasValidConfig: Bool { configManager.activeConfig?.hasValidConfig == true }
 
@@ -27,7 +41,7 @@ struct TVSearchView: View {
     }
 
     private var hasAnyResults: Bool {
-        !viewModel.scenes.isEmpty || !viewModel.performers.isEmpty ||
+        !resultScenes.isEmpty || !viewModel.performers.isEmpty ||
         !viewModel.studios.isEmpty || !viewModel.tags.isEmpty ||
         !viewModel.groups.isEmpty
     }
@@ -48,7 +62,7 @@ struct TVSearchView: View {
                         } else if hasSearched && !hasAnyResults {
                             emptyResultsBlock
                         } else if hasSearched {
-                            if !viewModel.scenes.isEmpty { scenesResultSection.focusSection() }
+                            if !resultScenes.isEmpty { scenesResultSection.focusSection() }
                             if !viewModel.performers.isEmpty { performersResultSection.focusSection() }
                             if !viewModel.studios.isEmpty { studiosResultSection.focusSection() }
                             if !viewModel.tags.isEmpty { tagsResultSection.focusSection() }
@@ -180,6 +194,7 @@ struct TVSearchView: View {
         let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
         if trimmed.count < 2 {
             viewModel.clearSearchResults()
+            clearCodeHits()
             hasSearched = false
             return
         }
@@ -195,6 +210,7 @@ struct TVSearchView: View {
         let trimmed = searchQuery.trimmingCharacters(in: .whitespacesAndNewlines)
         guard trimmed.count >= 2 else {
             viewModel.clearSearchResults()
+            clearCodeHits()
             hasSearched = false
             return
         }
@@ -204,10 +220,23 @@ struct TVSearchView: View {
     private func runSearch(trimmed: String) {
         hasSearched = true
         viewModel.fetchScenes(sortBy: .dateDesc, searchQuery: trimmed)
+        codeSearchTask?.cancel()
+        codeSearchTask = Task { @MainActor in
+            let hits = await viewModel.searchScenesByCodeAsync(query: trimmed, limit: 20)
+            guard !Task.isCancelled,
+                  trimmed == searchQuery.trimmingCharacters(in: .whitespacesAndNewlines) else { return }
+            codeHits = hits
+        }
         viewModel.fetchPerformers(sortBy: .nameAsc, searchQuery: trimmed)
         viewModel.fetchStudios(sortBy: .nameAsc, searchQuery: trimmed)
         viewModel.fetchTags(sortBy: .nameAsc, searchQuery: trimmed)
         viewModel.fetchGroups(sortBy: .nameAsc, searchQuery: trimmed)
+    }
+
+    private func clearCodeHits() {
+        codeSearchTask?.cancel()
+        codeSearchTask = nil
+        codeHits = []
     }
 
     // MARK: - Scenes Results
@@ -222,7 +251,7 @@ struct TVSearchView: View {
                     .font(.title2)
                     .fontWeight(.bold)
                     .foregroundColor(.white)
-                Text("\(viewModel.scenes.count)")
+                Text("\(resultScenes.count)")
                     .font(.callout)
                     .foregroundStyle(.secondary)
             }
@@ -230,7 +259,7 @@ struct TVSearchView: View {
 
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 30) {
-                    ForEach(viewModel.scenes) { scene in
+                    ForEach(resultScenes) { scene in
                         VStack(alignment: .leading, spacing: 10) {
                             TVNavButton(value: TVSceneLink(sceneId: scene.id)) {
                                 TVSceneCardView(scene: scene)

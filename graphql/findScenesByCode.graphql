@@ -1,0 +1,10 @@
+# Main search: scenes whose studio code contains the query. Stash's `q` covers title, details,
+# path, fingerprint and marker titles, not `code`, so the search merges this in.
+query FindScenesByCode($scene_filter: SceneFilterType, $filter: FindFilterType) {
+  findScenes(scene_filter: $scene_filter, filter: $filter) {
+    scenes {
+      ...SceneListFields
+      code
+    }
+  }
+}

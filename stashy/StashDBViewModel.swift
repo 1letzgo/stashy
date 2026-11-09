@@ -9260,6 +9260,25 @@ struct SimpleScenesData: Codable {
 }
 
 // Alternative response structure for older StashDB versions
+/// One scene from the studio-code search, with its `code` (not part of `Scene`).
+struct SceneCodeSearchHit: Decodable {
+    let scene: Scene
+    let code: String?
+
+    private enum CodingKeys: String, CodingKey { case code }
+
+    init(from decoder: Decoder) throws {
+        scene = try Scene(from: decoder)
+        code = try decoder.container(keyedBy: CodingKeys.self).decodeIfPresent(String.self, forKey: .code)
+    }
+}
+
+struct SceneCodeSearchResponse: Decodable {
+    struct DataBox: Decodable { let findScenes: Result? }
+    struct Result: Decodable { let scenes: [SceneCodeSearchHit] }
+    let data: DataBox?
+}
+
 struct AltScenesResponse: Codable {
     let data: AltScenesData?
 }
@@ -12705,7 +12724,58 @@ extension StashDBViewModel {
         }
     }
     
+    /// Main search for scenes: Stash's `q` (title, details, path, …) plus a match on the studio
+    /// code, which `q` does not cover. Exact code hits lead, then the `q` hits, then partial code hits.
     func searchScenesAsync(query: String, limit: Int = 5) async -> [Scene] {
+        async let textHits = searchScenesByTextAsync(query: query, limit: limit)
+        async let codeHits = searchScenesByCodeAsync(query: query, limit: limit)
+        return Self.mergeSceneSearchResults(textHits: await textHits, codeHits: await codeHits, query: query, limit: limit)
+    }
+
+    /// Merges the `q` results with the studio-code results, without duplicates.
+    nonisolated static func mergeSceneSearchResults(textHits: [Scene], codeHits: [SceneCodeSearchHit], query: String, limit: Int) -> [Scene] {
+        let needle = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        let isExact: (SceneCodeSearchHit) -> Bool = {
+            ($0.code ?? "").trimmingCharacters(in: .whitespacesAndNewlines).caseInsensitiveCompare(needle) == .orderedSame
+        }
+        var seen = Set<String>()
+        var merged: [Scene] = []
+        let ordered = codeHits.filter(isExact).map(\.scene) + textHits + codeHits.filter { !isExact($0) }.map(\.scene)
+        for scene in ordered where seen.insert(scene.id).inserted {
+            merged.append(scene)
+        }
+        return Array(merged.prefix(limit))
+    }
+
+    /// Scenes whose studio code contains the query (`code` criterion, INCLUDES — Stash ≥ 0.18).
+    func searchScenesByCodeAsync(query: String, limit: Int = 5) async -> [SceneCodeSearchHit] {
+        let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return [] }
+        return await withCheckedContinuation { continuation in
+            let body: [String: Any] = [
+                "query": GraphQLQueries.queryWithFragments("findScenesByCode"),
+                "variables": [
+                    "scene_filter": ["code": ["value": trimmed, "modifier": "INCLUDES"]],
+                    "filter": [
+                        "per_page": limit,
+                        "page": 1,
+                        "sort": "date",
+                        "direction": "DESC"
+                    ]
+                ]
+            ]
+            guard let bodyData = try? JSONSerialization.data(withJSONObject: body),
+                  let bodyString = String(data: bodyData, encoding: .utf8) else {
+                continuation.resume(returning: [])
+                return
+            }
+            performGraphQLQuery(query: bodyString) { (response: SceneCodeSearchResponse?) in
+                continuation.resume(returning: response?.data?.findScenes?.scenes ?? [])
+            }
+        }
+    }
+
+    private func searchScenesByTextAsync(query: String, limit: Int) async -> [Scene] {
         await withCheckedContinuation { continuation in
             let graphqlQuery = GraphQLQueries.queryWithFragments("findScenes")
             
