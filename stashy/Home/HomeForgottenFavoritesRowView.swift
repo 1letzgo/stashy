@@ -26,7 +26,6 @@ struct HomeForgottenFavoritesRowView: View {
                 .font(.headline)
                 .foregroundColor(isLarge ? .white : .primary)
                 .padding(.horizontal, 12)
-                .padding(.top, isFirst ? 16 : 0)
 
             switch engine.state {
             case .idle, .loading:

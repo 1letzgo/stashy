@@ -15,7 +15,6 @@ struct HomeStatisticsRowView: View {
                 .font(.headline)
                 .foregroundColor(.primary)
                 .padding(.horizontal, 12)
-                .padding(.top, isFirst ? 16 : 0)
 
             if let stats = viewModel.statistics {
                 let sortedTabs = tabManager.tabs

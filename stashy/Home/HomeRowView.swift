@@ -253,7 +253,6 @@ struct HomeRowView: View {
 
         VStack(alignment: .leading, spacing: isLarge ? 8 : 12) {
             headerRow
-                .padding(.top, isFirst ? 16 : 0)
 
             if isLoading {
                 loadingPlaceholder(screenWidth: screenWidth)

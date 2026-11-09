@@ -22,7 +22,6 @@ struct HomeRecommendationsRowView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: isLarge ? 8 : 12) {
             header
-                .padding(.top, isFirst ? 16 : 0)
 
             switch engine.state {
             case .idle, .loading where engine.recommendations.isEmpty:

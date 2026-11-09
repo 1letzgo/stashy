@@ -97,7 +97,6 @@ struct HomeChannelsRowView: View {
 
         VStack(alignment: .leading, spacing: 12) {
             header
-                .padding(.top, isFirst ? 16 : 0)
 
             if channels.isEmpty {
                 Text(emptyMessage)
