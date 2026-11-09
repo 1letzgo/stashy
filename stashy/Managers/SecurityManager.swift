@@ -66,6 +66,14 @@ class SecurityManager: ObservableObject {
         self.isPasscodeSet = KeychainManager.shared.hasAppPasscode()
     }
     
+    /// App went to the background (iOS scene) or was hidden (macOS): lock if the user asked for it.
+    /// Not while PiP is running.
+    func lockIfAutoLockOnBackground() {
+        if autoLockOnBackground && !isPiPActive {
+            lock()
+        }
+    }
+
     func lock() {
         if isPasscodeSet {
             isAppLocked = true

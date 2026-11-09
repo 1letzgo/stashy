@@ -136,6 +136,8 @@ enum SettingsTransfer {
         "stashy_server_config", "stashy_saved_servers", "stashy_saved_servers_backup",
         "totalTipsCount", "kBiometricsEnabled", "kAutoLockOnBackground",
         KeychainManager.syncEnabledKey,
+        // Pairs with the user's device: stays out of export files and the iCloud store.
+        "handy_connection_key",
     ]
     private static let excludedPrefixes = [
         "stashy_plus_", "mini_player_last_", "stash_server_version_", "cached", "SK", "revenuecat", "license",

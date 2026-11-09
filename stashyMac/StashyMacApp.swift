@@ -29,6 +29,11 @@ struct StashyMacApp: App {
                 .macIOSLikeControlStyles()
                 .frame(minWidth: 900, minHeight: 600)
                 .onAppear(perform: Self.applyLaunchWindowSize)
+                // Auto-lock on Background: Cmd-H / hide others. Not on mere resign-active, which
+                // fires on every click into another app's window.
+                .onReceive(NotificationCenter.default.publisher(for: NSApplication.didHideNotification)) { _ in
+                    SecurityManager.shared.lockIfAutoLockOnBackground()
+                }
         }
         .windowToolbarStyle(.unified)
         .commands {

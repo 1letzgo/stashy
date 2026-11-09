@@ -60,6 +60,8 @@ struct SceneDetailView: View {
     @State private var isTagsExpanded = false
     @State private var isFullscreen = false
     @State private var isPlaybackStarted = false
+    /// Delayed autoplay / resume start; cancelled on disappear so a quick pop never starts playback.
+    @State private var pendingStart = PendingStartBox()
     @State private var tagsTotalHeight: CGFloat = 0
     @State private var isMuted = ScenePlayerMute.initialValue()
     @State private var hasAddedPlay = false
@@ -652,20 +654,14 @@ struct SceneDetailView: View {
                 activeScene = activeScene.withResumeTime(pending.position)
             }
             if pending.wasPlaying {
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-                    if !isPlaybackStarted { startPlayback(resume: true) }
-                }
+                scheduleStart(resume: true)
             }
             return
         }
 
         // Removed automatic setupScene to enforce manual activation unless explicitly requested via autoPlay
         if autoPlay {
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-                if !isPlaybackStarted { 
-                    startPlayback(resume: !autoPlayFromStart)
-                }
-            }
+            scheduleStart(resume: !autoPlayFromStart)
         }
     }
 
@@ -691,7 +687,19 @@ struct SceneDetailView: View {
         aetherEngine?.pause()
     }
 
+    private func scheduleStart(resume: Bool) {
+        pendingStart.item?.cancel()
+        let item = DispatchWorkItem { [pendingStart] in
+            pendingStart.item = nil
+            if !isPlaybackStarted { startPlayback(resume: resume) }
+        }
+        pendingStart.item = item
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3, execute: item)
+    }
+
     private func handleOnDisappear() {
+        pendingStart.item?.cancel()
+        pendingStart.item = nil
         if isDeleting {
             // The scene is gone: nothing to resume or hand to the mini player.
             aetherEngine?.stop()
@@ -1798,6 +1806,11 @@ private struct SceneDetailLifecycleModifier: ViewModifier {
                 }
         }
     }
+}
+
+/// Reference holder: a `@State` write after disappear would be lost, the work item is not.
+private final class PendingStartBox {
+    var item: DispatchWorkItem?
 }
 
 #endif

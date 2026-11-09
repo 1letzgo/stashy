@@ -21,6 +21,8 @@ struct ServerFormViewNew: View {
     /// Custom HTTP headers (SSO / reverse proxy). Kept in the Keychain on save.
     @State private var customHeaders: [ServerHTTPHeader] = []
     @State private var originalCustomHeaders: [ServerHTTPHeader] = []
+    /// API key as loaded (trimmed, empty = none), to detect an edit after the Keychain is overwritten.
+    @State private var originalApiKey: String = ""
     
     // Connection Test State
     @State private var isTesting: Bool = false
@@ -314,9 +316,11 @@ struct ServerFormViewNew: View {
                 // Load API key from Keychain first, fallback to config
                 if let savedKey = KeychainManager.shared.loadAPIKey(forServerID: config.id) {
                     apiKey = savedKey
+                    originalApiKey = savedKey.trimmingCharacters(in: .whitespacesAndNewlines)
                     authMethod = .apiKey
                 } else if let configKey = config.apiKey, !configKey.isEmpty {
                     apiKey = configKey
+                    originalApiKey = configKey.trimmingCharacters(in: .whitespacesAndNewlines)
                     authMethod = .apiKey
                 } else {
                     authMethod = .none
@@ -413,6 +417,9 @@ struct ServerFormViewNew: View {
         let serverID = configToEdit?.id ?? UUID()
         
         // Save API key to Keychain
+        let newApiKey = (authMethod == .apiKey || authMethod == .login)
+            ? apiKey.trimmingCharacters(in: .whitespacesAndNewlines) : ""
+        let apiKeyChanged = newApiKey != originalApiKey
         if authMethod == .apiKey || authMethod == .login {
             if !apiKey.isEmpty {
                 _ = KeychainManager.shared.saveAPIKey(apiKey, forServerID: serverID)
@@ -440,9 +447,9 @@ struct ServerFormViewNew: View {
         )
         onSave(newConfig)
 
-        // The manager compares Keychain reads of the same server, so a header edit on the
-        // active server is invisible to it — reset explicitly so nothing keeps the old auth.
-        if headersChanged, ServerConfigManager.shared.activeConfig?.id == serverID {
+        // The manager compares Keychain reads of the same server, so a header or API key edit
+        // on the active server is invisible to it — reset explicitly so nothing keeps the old auth.
+        if headersChanged || apiKeyChanged, ServerConfigManager.shared.activeConfig?.id == serverID {
             URLCache.shared.removeAllCachedResponses()
             NotificationCenter.default.post(name: NSNotification.Name("ServerConfigChanged"), object: nil)
         }

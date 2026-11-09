@@ -766,15 +766,20 @@ struct FilterStringCriterionRow: View {
 enum StashDateInput {
     static let errorText = "Enter a valid date as YYYY-MM-DD"
 
-    private static let formatter: DateFormatter = {
+    /// Local Gregorian day, like the graphical `DatePicker` (which works in the local time zone),
+    /// so the day shown is the day stored. Built per call: the zone can change while the app runs.
+    private static var formatter: DateFormatter {
+        let zone = TimeZone.current
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = zone
         let f = DateFormatter()
-        f.calendar = Calendar(identifier: .gregorian)
+        f.calendar = calendar
         f.locale = Locale(identifier: "en_US_POSIX")
-        f.timeZone = TimeZone(secondsFromGMT: 0)
+        f.timeZone = zone
         f.dateFormat = "yyyy-MM-dd"
         f.isLenient = false
         return f
-    }()
+    }
 
     /// A real calendar date in exactly `YYYY-MM-DD` (no 2023-02-30, no 2023-2-3).
     static func isValid(_ raw: String) -> Bool {
@@ -789,6 +794,7 @@ enum StashDateInput {
 
     static func date(from raw: String) -> Date? {
         let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+        let formatter = formatter
         guard trimmed.range(of: #"^\d{4}-\d{2}-\d{2}$"#, options: .regularExpression) != nil,
               let date = formatter.date(from: trimmed),
               formatter.string(from: date) == trimmed else { return nil }
@@ -1091,14 +1097,15 @@ struct FilterNumericCriterionRow: View {
                 if raw.isEmpty {
                     next.removeValue(forKey: key)
                     next.removeValue(forKey: "\(key)_text")
-                } else if isFloat, let d = Double(raw) {
+                } else if isFloat, let d = Double(raw.replacingOccurrences(of: ",", with: ".")) {
                     next[key] = d
                     next.removeValue(forKey: "\(key)_text")
                 } else if !isFloat, let i = Int(raw) {
                     next[key] = i
                     next.removeValue(forKey: "\(key)_text")
                 } else {
-                    // Partial input ("-", "1.") — remember the text, keep the last valid number out of the filter.
+                    // Partial input ("-", "1.") — remember the text and drop the stale number, so it is never sent.
+                    next.removeValue(forKey: key)
                     next["\(key)_text"] = raw
                 }
                 value = next

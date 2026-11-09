@@ -308,8 +308,10 @@ final class SessionTimelineLoader: ObservableObject {
         let generation = fetchGeneration
         isLoadingMore = true
         let before = sessions.count
-        while hasMore, sessions.count == before, generation == fetchGeneration {
-            await loadNextWindow(isInitial: false, generation: generation, refreshOHistory: false)
+        while hasMore, sessions.count == before, generation == fetchGeneration, !Task.isCancelled {
+            // Stop on error or cancellation; a later loadMore retries the same window.
+            let advanced = await loadNextWindow(isInitial: false, generation: generation, refreshOHistory: false)
+            if !advanced { break }
         }
         guard generation == fetchGeneration else { return }
         isLoadingMore = false
@@ -341,26 +343,29 @@ final class SessionTimelineLoader: ObservableObject {
         sessions = Self.groupedSessions(from: visits)
     }
 
-    private func loadNextWindow(isInitial: Bool, generation: Int, refreshOHistory: Bool) async {
-        guard generation == fetchGeneration, let windowEnd = nextWindowEnd else { return }
+    /// Returns `false` when the window was not loaded (error, cancellation, stale generation),
+    /// so callers do not retry the same window in a tight loop.
+    @discardableResult
+    private func loadNextWindow(isInitial: Bool, generation: Int, refreshOHistory: Bool) async -> Bool {
+        guard generation == fetchGeneration, let windowEnd = nextWindowEnd else { return false }
         let windowStart = windowEnd.addingTimeInterval(-Self.windowSeconds)
         let earliest = Date().addingTimeInterval(-Self.maxLookbackSeconds)
         if windowEnd <= earliest {
             hasMore = false
-            return
+            return true
         }
 
         do {
             let lookbackStart = Date().addingTimeInterval(-Self.maxLookbackSeconds)
             let eventRange = windowStart..<windowEnd
-            async let raw = fetchScenes(from: windowStart)
-            async let markerRows = fetchMarkers(from: windowStart)
+            async let raw = fetchScenes(from: windowStart, to: windowEnd)
+            async let markerRows = fetchMarkers(from: windowStart, to: windowEnd)
             if isInitial, refreshOHistory || oStampsCache.isEmpty {
                 oStampsCache = await fetchSceneOStamps(from: lookbackStart)
             }
             let rows = try await raw
             let fetchedMarkers = await markerRows
-            guard generation == fetchGeneration else { return }
+            guard generation == fetchGeneration else { return false }
 
             let built = Self.makeSessions(
                 from: rows,
@@ -381,17 +386,19 @@ final class SessionTimelineLoader: ObservableObject {
             nextWindowEnd = windowStart
             loadedWindowStart = windowStart
             hasMore = windowStart > earliest && consecutiveEmptyWindows < 3
+            return true
         } catch {
-            guard generation == fetchGeneration else { return }
+            guard generation == fetchGeneration else { return false }
             if Self.isCancellation(error) {
                 AppLog.error("⚠️ Session timeline cancelled")
-                return
+                return false
             }
             AppLog.error("❌ Session timeline: \(error)")
             if isInitial, sessions.isEmpty {
                 didFail = true
                 hasMore = false
             }
+            return false
         }
     }
 
@@ -406,11 +413,11 @@ final class SessionTimelineLoader: ObservableObject {
         return false
     }
 
-    private func fetchScenes(from start: Date) async throws -> [TimelineSceneRow] {
+    private func fetchScenes(from start: Date, to end: Date) async throws -> [TimelineSceneRow] {
         var lastError: Error?
         for variant in QueryVariant.allCases {
             do {
-                return try await fetchScenes(from: start, variant: variant)
+                return try await fetchScenes(from: start, to: end, variant: variant)
             } catch {
                 if Self.isCancellation(error) { throw error }
                 lastError = error
@@ -420,7 +427,7 @@ final class SessionTimelineLoader: ObservableObject {
         throw lastError ?? GraphQLNetworkError.graphQLError(message: "Query failed")
     }
 
-    private func fetchScenes(from start: Date, variant: QueryVariant) async throws -> [TimelineSceneRow] {
+    private func fetchScenes(from start: Date, to end: Date, variant: QueryVariant) async throws -> [TimelineSceneRow] {
         var page = 1
         let perPage = 100
         var total = Int.max
@@ -429,7 +436,7 @@ final class SessionTimelineLoader: ObservableObject {
         while (page - 1) * perPage < total {
             let response: TimelineScenesResponse = try await GraphQLClient.shared.execute(
                 query: variant.query,
-                variables: Self.variables(page: page, perPage: perPage, start: start, variant: variant)
+                variables: Self.variables(page: page, perPage: perPage, start: start, end: end, variant: variant)
             )
             if let errors = response.errors, !errors.isEmpty, response.data?.findScenes?.scenes == nil {
                 let message = errors.compactMap(\.message).joined(separator: "; ")
@@ -512,7 +519,7 @@ final class SessionTimelineLoader: ObservableObject {
         return stamps
     }
 
-    private func fetchMarkers(from start: Date) async -> [TimelineFetchedMarker] {
+    private func fetchMarkers(from start: Date, to end: Date) async -> [TimelineFetchedMarker] {
         var page = 1
         let perPage = 100
         var total = Int.max
@@ -550,8 +557,9 @@ final class SessionTimelineLoader: ObservableObject {
                         ],
                         "scene_marker_filter": [
                             "created_at": [
-                                "modifier": "GREATER_THAN",
-                                "value": Self.isoString(start)
+                                "modifier": "BETWEEN",
+                                "value": Self.isoString(start),
+                                "value2": Self.isoString(end)
                             ]
                         ]
                     ]
@@ -862,7 +870,7 @@ final class SessionTimelineLoader: ObservableObject {
         return []
     }
 
-    private static func variables(page: Int, perPage: Int, start: Date, variant: QueryVariant) -> [String: Any] {
+    private static func variables(page: Int, perPage: Int, start: Date, end: Date, variant: QueryVariant) -> [String: Any] {
         var vars: [String: Any] = [
             "filter": [
                 "page": page,
@@ -874,8 +882,9 @@ final class SessionTimelineLoader: ObservableObject {
         if variant.usesLastPlayedFilter {
             vars["scene_filter"] = [
                 "last_played_at": [
-                    "modifier": "GREATER_THAN",
-                    "value": isoString(start)
+                    "modifier": "BETWEEN",
+                    "value": isoString(start),
+                    "value2": isoString(end)
                 ]
             ]
         }

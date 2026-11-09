@@ -351,9 +351,17 @@ final class OCountHeatmapLoader: ObservableObject {
             queue: .main
         ) { [weak self] notification in
             guard let sceneId = notification.userInfo?["sceneId"] as? String else { return }
+            // `delta` is +1 for an increment (or absent, e.g. other posters), -1 for a decrement, 0 for a reset.
+            let delta = notification.userInfo?["delta"] as? Int ?? 1
             let loader = self
             Task { @MainActor in
-                loader?.applyLiveOIncrement(kind: .scene, stashID: sceneId)
+                if delta > 0 {
+                    loader?.applyLiveOIncrement(kind: .scene, stashID: sceneId)
+                } else if loader?.hasLoaded == true {
+                    // A decrement removes the most recent entry (not necessarily today's), a reset removes all of them:
+                    // reload the buckets instead of patching them.
+                    await loader?.reload()
+                }
             }
         }
         NotificationCenter.default.addObserver(

@@ -2461,6 +2461,10 @@ class StashDBViewModel: ObservableObject {
                         completion?(false)
                     }
                 case .failure(let error):
+                    if self.isCancellation(error) {
+                        completion?(false)
+                        return
+                    }
                     AppLog.error("❌ Error fetching saved filters: \(error.localizedDescription)")
                     self.errorMessage = "Failed to load filters: \(error.localizedDescription)"
                     completion?(false)
@@ -5276,6 +5280,8 @@ class StashDBViewModel: ObservableObject {
             } else {
                 DispatchQueue.main.async {
                     guard generation == self.performersFetchGeneration else { return }
+                    // Give a failed page back so the next loadMore retries it (only when loadMore advanced the counter)
+                    if !isInitialLoad && self.currentPerformerPage == page { self.currentPerformerPage -= 1 }
                     self.isLoadingPerformers = false
                     self.isLoadingMorePerformers = false
                 }
@@ -5433,6 +5439,7 @@ class StashDBViewModel: ObservableObject {
                         self.isLoadingStudios = false
                         self.errorMessage = "Studios konnten nicht geladen werden"
                     } else {
+                        if self.currentStudioPage == page { self.currentStudioPage -= 1 }
                         self.isLoadingMoreStudios = false
                     }
                 }
@@ -5548,6 +5555,7 @@ class StashDBViewModel: ObservableObject {
             } else {
                 DispatchQueue.main.async {
                     guard generation == self.tagsFetchGeneration else { return }
+                    if !isInitialLoad && self.currentTagPage == page { self.currentTagPage -= 1 }
                     self.isLoadingTags = false
                     self.isLoadingMoreTags = false
                 }
@@ -5653,6 +5661,7 @@ class StashDBViewModel: ObservableObject {
             } else {
                 DispatchQueue.main.async {
                     guard generation == self.groupsFetchGeneration else { return }
+                    if !isInitialLoad && self.currentGroupPage == page { self.currentGroupPage -= 1 }
                     self.isLoadingGroups = false
                     self.isLoadingMoreGroups = false
                 }
@@ -6876,7 +6885,7 @@ class StashDBViewModel: ObservableObject {
                     NotificationCenter.default.post(
                         name: NSNotification.Name("SceneOCounterUpdated"),
                         object: nil,
-                        userInfo: ["sceneId": sceneId, "oCounter": count]
+                        userInfo: ["sceneId": sceneId, "oCounter": count, "delta": 1]
                     )
                 }
             } else {
@@ -6913,7 +6922,7 @@ class StashDBViewModel: ObservableObject {
                 NotificationCenter.default.post(
                     name: NSNotification.Name("SceneOCounterUpdated"),
                     object: nil,
-                    userInfo: ["sceneId": sceneId, "oCounter": count]
+                    userInfo: ["sceneId": sceneId, "oCounter": count, "delta": mutation == .decrement ? -1 : 0]
                 )
             }
             completion?(count)
@@ -7097,7 +7106,15 @@ class StashDBViewModel: ObservableObject {
         }
     }
     
+    /// Requests cancelled by a server switch (`cancelAllRequests`) answer after `resetData`; they are not failures.
+    private func isCancellation(_ error: GraphQLNetworkError) -> Bool {
+        guard case .networkError(let underlying) = error else { return false }
+        if underlying is CancellationError { return true }
+        return (underlying as? URLError)?.code == .cancelled
+    }
+
     private func handleNetworkError(_ error: GraphQLNetworkError) {
+        if isCancellation(error) { return }
         errorMessage = error.errorDescription
         serverStatus = "Connection failed"
         
@@ -13482,6 +13499,8 @@ class ButtplugManager: ObservableObject {
     private var currentScript: Funscript?
     private var syncTimer: CADisplayLink?
     private var lastPlaybackTime: Double = 0
+    private var playStartUptime: TimeInterval = 0
+    private var playStartPosition: Double = 0
     private var lastCommandSentAt: Double = 0
     @Published var isPlayingScript: Bool = false
     @Published var isSyncing: Bool = false
@@ -13525,12 +13544,16 @@ class ButtplugManager: ObservableObject {
             self.statusMessage = "Connecting..."
         }
         
+        // Cancel a previous socket so its callbacks don't pile up on the new one
+        webSocket?.cancel(with: .goingAway, reason: nil)
+        
         let request = URLRequest(url: url)
-        webSocket = URLSession.shared.webSocketTask(with: request)
-        webSocket?.resume()
+        let task = URLSession.shared.webSocketTask(with: request)
+        webSocket = task
+        task.resume()
         
         sendHandshake()
-        receiveMessage()
+        receiveMessage(on: task)
     }
     
     func disconnect() {
@@ -13622,6 +13645,8 @@ class ButtplugManager: ObservableObject {
         
         if isSyncing, currentScript != nil {
             lastPlaybackTime = seconds
+            playStartPosition = seconds
+            playStartUptime = ProcessInfo.processInfo.systemUptime
             lastCommandSentAt = 0
             
             syncTimer?.invalidate()
@@ -13651,10 +13676,8 @@ class ButtplugManager: ObservableObject {
     @objc private func updateSync() {
         guard isPlayingScript, let script = currentScript, let actions = script.actions, !actions.isEmpty else { return }
         
-        // We assume the DisplayLink fires roughly every 16ms. 
-        // We increment our local track of playback time.
-        let frameDuration = 1.0 / 60.0 // Approximated
-        lastPlaybackTime += frameDuration
+        // Playback time follows real elapsed time since play(at:), independent of the display refresh rate.
+        lastPlaybackTime = playStartPosition + (ProcessInfo.processInfo.systemUptime - playStartUptime)
         
         let currentMs = Int(lastPlaybackTime * 1000)
         
@@ -13723,9 +13746,9 @@ class ButtplugManager: ObservableObject {
         }
     }
     
-    private func receiveMessage() {
-        webSocket?.receive { [weak self] result in
-            guard let self = self else { return }
+    private func receiveMessage(on task: URLSessionWebSocketTask) {
+        task.receive { [weak self] result in
+            guard let self = self, self.webSocket === task else { return }
             switch result {
             case .success(let message):
                 switch message {
@@ -13733,7 +13756,7 @@ class ButtplugManager: ObservableObject {
                     self.handleMessage(text)
                 default: break
                 }
-                self.receiveMessage()
+                self.receiveMessage(on: task)
             case .failure(let error):
                 AppLog.error("❌ Buttplug: Receive failed: \(error)")
                 DispatchQueue.main.async {
@@ -13863,6 +13886,8 @@ class LoveSpouseManager: NSObject, ObservableObject {
     private var currentScript: Funscript?
     private var syncTimer: CADisplayLink?
     private var lastPlaybackTime: Double = 0
+    private var playStartUptime: TimeInterval = 0
+    private var playStartPosition: Double = 0
     private var lastCommandSentAt: Double = 0
     @Published var isPlayingScript: Bool = false
 
@@ -13971,6 +13996,8 @@ class LoveSpouseManager: NSObject, ObservableObject {
         
         if isSyncing, currentScript != nil {
             lastPlaybackTime = seconds
+            playStartPosition = seconds
+            playStartUptime = ProcessInfo.processInfo.systemUptime
             lastCommandSentAt = 0
             
             syncTimer?.invalidate()
@@ -13998,8 +14025,8 @@ class LoveSpouseManager: NSObject, ObservableObject {
     @objc private func updateSync() {
         guard isEnabled, isPlayingScript, let script = currentScript, let actions = script.actions, !actions.isEmpty else { return }
         
-        let frameDuration = 1.0 / 60.0 // Approximated
-        lastPlaybackTime += frameDuration
+        // Real elapsed time since play(at:), independent of the display refresh rate
+        lastPlaybackTime = playStartPosition + (ProcessInfo.processInfo.systemUptime - playStartUptime)
         
         let currentMs = Int(lastPlaybackTime * 1000)
         

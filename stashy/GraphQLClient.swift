@@ -372,7 +372,7 @@ actor GraphQLClient {
     private nonisolated func throwOnFatalGraphQLErrors(in data: Data) throws {
         guard let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
               let errors = object["errors"] as? [[String: Any]], !errors.isEmpty,
-              object["data"] == nil else {
+              object["data"] == nil || object["data"] is NSNull else {
             return
         }
 

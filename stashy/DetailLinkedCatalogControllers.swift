@@ -1706,7 +1706,7 @@ final class DetailLinkedImagesFilterModel: ObservableObject {
             viewModel.fetchImages(
                 sortBy: selectedSortOption,
                 isInitialLoad: initial,
-                filter: selectedFilter,
+                filter: fetchBaseFilter,
                 staticPathFilter: true,
                 performerId: reelsStashLinePerformerId,
                 liveFilter: live
@@ -1715,7 +1715,7 @@ final class DetailLinkedImagesFilterModel: ObservableObject {
             if let ext = externalRefetchClips {
                 ext(viewModel)
             } else {
-                viewModel.fetchClips(sortBy: selectedSortOption, filter: selectedFilter, isInitialLoad: initial, liveFilter: live)
+                viewModel.fetchClips(sortBy: selectedSortOption, filter: fetchBaseFilter, isInitialLoad: initial, liveFilter: live)
             }
         }
     }
