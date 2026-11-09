@@ -317,7 +317,7 @@ actor GraphQLClient {
             ]
             request.httpBody = try? JSONSerialization.data(withJSONObject: body)
         } else {
-            request.httpBody = query.data(using: .utf8)
+            request.httpBody = Self.mappedPrebuiltBody(query) ?? query.data(using: .utf8)
         }
 
         #if DEBUG
@@ -325,6 +325,20 @@ actor GraphQLClient {
         #endif
 
         return request
+    }
+
+    /// Most list fetches hand over a finished JSON body (`{"query":…,"variables":…}`) as `query`.
+    /// Its variables get the same last step as separately passed ones (`FilterMapper.queryVariables`:
+    /// Folder → `files_filter.parent_folder`, age / birth year in a performers sub-filter →
+    /// `birthdate`). Nil when `body` is not such a JSON body or nothing changed.
+    nonisolated static func mappedPrebuiltBody(_ body: String) -> Data? {
+        guard body.first == "{", let data = body.data(using: .utf8),
+              var object = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let variables = object["variables"] as? [String: Any] else { return nil }
+        let mapped = FilterMapper.queryVariables(variables)
+        guard !NSDictionary(dictionary: mapped).isEqual(to: variables) else { return nil }
+        object["variables"] = mapped
+        return try? JSONSerialization.data(withJSONObject: object)
     }
 
     private nonisolated func validateResponse(_ response: URLResponse, data: Data) throws {

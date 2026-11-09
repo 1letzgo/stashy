@@ -350,9 +350,6 @@ final class ScenesListFilterMemory: ObservableObject {
         var sortOption: StashDBViewModel.SceneSortOption
         var selectedFilter: StashDBViewModel.SavedFilter?
         var presetSelection: String
-        var studioIds: [String]
-        var tagIds: [String]
-        var groupIds: [String]
         var minRating: Int
         var searchText: String
         var isSearchVisible: Bool
@@ -396,16 +393,11 @@ private struct ScenesViewContent: View {
     @State private var liveFilterPerformerFavorite: Bool? = nil // nil = any
     /// O-counter criterion as "MODIFIER:value" (e.g. GREATER_THAN:0); nil = any
     @State private var liveFilterOCounterTag: String? = nil
-    /// Selected studio ids for live `studios` filter; empty = any studio.
-    @State private var liveFilterStudioIds: [String] = []
     @State private var studioPickerOptions: [Studio] = []
     @State private var studioPickerLoading = false
-    /// Live `tags` `INCLUDES`; tag picker lists only tags with scenes.
-    @State private var liveFilterTagIds: [String] = []
+    /// Tag picker lists only tags with scenes.
     @State private var tagPickerOptions: [Tag] = []
     @State private var tagPickerLoading = false
-    /// Live `groups` `INCLUDES`.
-    @State private var liveFilterGroupIds: [String] = []
     @State private var groupPickerOptions: [StashGroup] = []
     @State private var groupPickerLoading = false
     @State private var liveFilterPresets: [SceneLiveFilterPreset] = SceneLiveFilterPresetStore.loadPresets()
@@ -532,9 +524,6 @@ private struct ScenesViewContent: View {
             sortOption: selectedSortOption,
             selectedFilter: selectedFilter,
             presetSelection: liveSheetPresetSelection,
-            studioIds: liveFilterStudioIds,
-            tagIds: liveFilterTagIds,
-            groupIds: liveFilterGroupIds,
             minRating: liveFilterMinRating,
             searchText: searchText,
             isSearchVisible: isSearchVisible,
@@ -569,15 +558,6 @@ private struct ScenesViewContent: View {
         for (key, value) in activeLiveFilterDict {
             dict[key] = value
         }
-        if !liveFilterStudioIds.isEmpty {
-            dict["studios"] = ["modifier": "INCLUDES", "value": liveFilterStudioIds, "depth": 0]
-        }
-        if !liveFilterTagIds.isEmpty {
-            dict["tags"] = ["modifier": "INCLUDES", "value": liveFilterTagIds, "depth": 0]
-        }
-        if !liveFilterGroupIds.isEmpty {
-            dict["groups"] = ["modifier": "INCLUDES", "value": liveFilterGroupIds, "depth": 0]
-        }
         if liveFilterMinRating == -1 {
             dict["rating100"] = ["modifier": "IS_NULL"]
         } else if liveFilterMinRating > 0, dict["rating100"] == nil {
@@ -586,49 +566,12 @@ private struct ScenesViewContent: View {
         return dict
     }
 
-    /// Reads `INCLUDES` ids each for `studios`, `tags`, `groups` (after clearing other live chips).
-    private func applyLiveAuxIdsFromFragment(_ frag: [String: Any]) {
-        let f = FilterMapper.sanitize(frag, isMarker: false)
-        liveFilterStudioIds = SceneLiveChipFilterSupport.includesIds(fromCriterion: f["studios"])
-        liveFilterTagIds = SceneLiveChipFilterSupport.includesIds(fromCriterion: f["tags"])
-        liveFilterGroupIds = SceneLiveChipFilterSupport.includesIds(fromCriterion: f["groups"])
-    }
-
-    /// Does not change sort: syncs chip state to `selectedFilter` / stashy metadata (e.g. deep link).
-    private func syncLiveChipsToMatchSelectedFilter() {
+    /// Does not change sort: loads `selectedFilter`'s criteria into the document (default filter,
+    /// `DefaultFilterChanged`, deep link). The document is the only source for studios / tags / groups.
+    private func loadSelectedFilterIntoDocument() {
         guard let f = selectedFilter else { return }
-        if let meta = f.stashyScenePresetMetadata {
-            let base: StashDBViewModel.SavedFilter?
-            if let bid = meta.baseSavedFilterId, let b = viewModel.savedFilters[bid] {
-                base = b
-            } else {
-                base = nil
-            }
-            if SceneLiveChipFilterSupport.savedFilterSupportsLiveChipEditor(base) {
-                mapLiveFragmentToChips(meta.liveFragment)
-            } else {
-                clearLiveFilterChipsOnly()
-                applyLiveAuxIdsFromFragment(meta.liveFragment)
-            }
-        } else if SceneLiveChipFilterSupport.savedFilterSupportsLiveChipEditor(f) {
-            if let raw = f.filterDict {
-                mapLiveFragmentToChips(raw)
-                } else {
-                clearLiveFilterChipsOnly()
-            }
-                } else {
-            clearLiveFilterChipsOnly()
-            let flat: [String: Any]? = {
-                if let raw = f.filterDict { return FilterMapper.sanitize(raw, isMarker: false) }
-                if let obj = f.object_filter, let objDict = obj.value as? [String: Any] {
-                    return FilterMapper.sanitize(objDict, isMarker: false)
-                }
-                return nil
-            }()
-            if let flat {
-                applyLiveAuxIdsFromFragment(flat)
-            }
-        }
+        criteriaDocument.load(f.criteriaObjectFilter())
+        clearLiveFilterChipsOnly()
     }
 
     private func mapLiveFragmentToChips(_ frag: [String: Any]) {}
@@ -684,9 +627,6 @@ private struct ScenesViewContent: View {
         liveFilterResolution = nil
         liveFilterPerformerFavorite = nil
         liveFilterOCounterTag = nil
-        liveFilterStudioIds = []
-        liveFilterTagIds = []
-        liveFilterGroupIds = []
     }
 
     private func loadStudiosForSceneLivePicker() {
@@ -935,9 +875,6 @@ private struct ScenesViewContent: View {
                 _selectedSortOption = State(initialValue: snap.sortOption)
                 _selectedFilter = State(initialValue: snap.selectedFilter)
                 _liveSheetPresetSelection = State(initialValue: snap.presetSelection)
-                _liveFilterStudioIds = State(initialValue: snap.studioIds)
-                _liveFilterTagIds = State(initialValue: snap.tagIds)
-                _liveFilterGroupIds = State(initialValue: snap.groupIds)
                 _liveFilterMinRating = State(initialValue: snap.minRating)
                 _searchText = State(initialValue: snap.searchText)
                 _isSearchVisible = State(initialValue: snap.isSearchVisible)
@@ -1003,7 +940,7 @@ private struct ScenesViewContent: View {
         didApplyDefaultFilter = true
         // Keep the sheet's preset row in sync so the default shows as selected.
         liveSheetPresetSelection = SceneLivePresetTag.serverRow(filter.id)
-        syncLiveChipsToMatchSelectedFilter()
+        loadSelectedFilterIntoDocument()
         return true
     }
 
@@ -1077,9 +1014,6 @@ private struct ScenesViewContent: View {
         liveFilterResolution = nil
         liveFilterPerformerFavorite = nil
         liveFilterOCounterTag = nil
-        liveFilterStudioIds = []
-        liveFilterTagIds = []
-        liveFilterGroupIds = []
         liveSheetPresetSelection = ""
         selectedFilter = nil
         applyLiveFilter()
@@ -1373,7 +1307,7 @@ private struct ScenesViewContent: View {
             if let injectedFilter = coordinator.activeFilter {
                 selectedFilter = injectedFilter
                 coordinator.activeFilter = nil
-                syncLiveChipsToMatchSelectedFilter()
+                loadSelectedFilterIntoDocument()
                 injectedNow = true
             }
             
@@ -1420,10 +1354,12 @@ private struct ScenesViewContent: View {
                     didApplyDefaultFilter = true
                     // Keep the sheet's preset row in sync so the default shows as selected.
                     liveSheetPresetSelection = SceneLivePresetTag.serverRow(newFilter.id)
-                    syncLiveChipsToMatchSelectedFilter()
+                    loadSelectedFilterIntoDocument()
                 } else {
                     selectedFilter = nil
                     liveSheetPresetSelection = ""
+                    // The document held the removed default's criteria.
+                    criteriaDocument.clear()
                 }
                 performSearch()
             }
@@ -1463,7 +1399,7 @@ private struct ScenesViewContent: View {
                     didApplyDefaultFilter = true
                     // Keep the sheet's preset row in sync so the default shows as selected.
                     liveSheetPresetSelection = SceneLivePresetTag.serverRow(filter.id)
-                    syncLiveChipsToMatchSelectedFilter()
+                    loadSelectedFilterIntoDocument()
                     // Immer nachladen: `CatalogsView` hält ein ViewModel über alle Sub-Tabs
                     // warm, die Liste ist beim Öffnen also selten leer. Unter der alten
                     // Bedingung stand der Filter nur in der Variable und wirkte nie.

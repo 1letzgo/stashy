@@ -9,17 +9,20 @@
 
 import Foundation
 
-/// Lookup for finished scene downloads in `Documents/Downloads/<sceneID>/`.
+/// Lookup for finished scene downloads in `Documents/Downloads/<serverID>/<sceneID>/`.
 ///
 /// Downloads keep the original container, so the file is `video.<ext>`. The download
 /// metadata is the authoritative answer; the directory scan is the fallback for entries
 /// written before the metadata existed (`video.mp4`) or repaired by hand.
 enum LocalDownloadStore {
 
-    /// Root of the download tree, or nil when the documents directory is unreachable.
+    /// Download tree of the active server (`Documents/Downloads/<serverID>/`): ids repeat across
+    /// servers, so each server has its own. Nil off the main thread before `DownloadManager` exists.
     static var downloadsDirectory: URL? {
-        FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first?
-            .appendingPathComponent("Downloads")
+        if let root = DownloadManager.downloadedSceneIDs.root { return root }
+        guard Thread.isMainThread else { return nil }
+        MainActor.assumeIsolated { _ = DownloadManager.shared }
+        return DownloadManager.downloadedSceneIDs.root
     }
 
     /// File URL of a finished download, or nil when the scene is not downloaded.

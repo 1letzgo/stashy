@@ -1177,6 +1177,11 @@ class StashDBViewModel: ObservableObject {
     private var scenesFetchGeneration = 0
     private var previewsFetchGeneration = 0
     private var markersFetchGeneration = 0
+    private var performersFetchGeneration = 0
+    private var studiosFetchGeneration = 0
+    private var tagsFetchGeneration = 0
+    private var groupsFetchGeneration = 0
+    private var galleriesFetchGeneration = 0
 
     /// Last filter/live used for `fetchGalleryImages` (pagination keeps same criteria).
     private var galleryImagesActiveGalleryId: String = ""
@@ -1980,6 +1985,28 @@ class StashDBViewModel: ObservableObject {
         isLoadingScenes = false
         previewsFetchGeneration += 1
         markersFetchGeneration += 1
+        performersFetchGeneration += 1
+        studiosFetchGeneration += 1
+        tagsFetchGeneration += 1
+        groupsFetchGeneration += 1
+        galleriesFetchGeneration += 1
+        isLoadingPerformers = false
+        isLoadingMorePerformers = false
+        isLoadingStudios = false
+        isLoadingMoreStudios = false
+        isLoadingTags = false
+        isLoadingMoreTags = false
+        isLoadingGroups = false
+        isLoadingMoreGroups = false
+        isLoadingGalleries = false
+        // Same for the other single-flight feeds (markers and previews stayed on their spinner).
+        markersInitialInflightKey = nil
+        previewsInitialInflightKey = nil
+        clipsInitialInflightKey = nil
+        imagesInitialInflightKey = nil
+        isLoadingMarkers = false
+        isLoadingPreviews = false
+        isLoadingMorePreviews = false
         reelsFeedSignatures.removeAll()
         activeReelsFeed = nil
         
@@ -5143,6 +5170,8 @@ class StashDBViewModel: ObservableObject {
             performers = []
             totalPerformers = 0
             isLoadingPerformers = true
+            performersFetchGeneration += 1
+            isLoadingMorePerformers = false
             hasMorePerformers = true
             currentPerformerSortOption = sortBy
             currentPerformerFilter = filter
@@ -5169,6 +5198,7 @@ class StashDBViewModel: ObservableObject {
             isLoadingMorePerformers = true
         }
         errorMessage = nil
+        let generation = performersFetchGeneration
         
         let query = GraphQLQueries.queryWithFragments("findPerformers")
         // Moderate page size keeps initial GraphQL payloads light; pagination loads more via `loadMorePerformers`.
@@ -5226,6 +5256,7 @@ class StashDBViewModel: ObservableObject {
         performGraphQLQuery(query: bodyString) { (response: PerformersResponse?) in
             if let performersResult = response?.data?.findPerformers {
                 DispatchQueue.main.async {
+                    guard generation == self.performersFetchGeneration else { return }
                     if isInitialLoad {
                         self.performers = performersResult.performers
                         self.totalPerformers = performersResult.count
@@ -5244,6 +5275,7 @@ class StashDBViewModel: ObservableObject {
                 }
             } else {
                 DispatchQueue.main.async {
+                    guard generation == self.performersFetchGeneration else { return }
                     self.isLoadingPerformers = false
                     self.isLoadingMorePerformers = false
                 }
@@ -5300,6 +5332,8 @@ class StashDBViewModel: ObservableObject {
             hasMoreStudios = true
             studios = []
             isLoadingStudios = true
+            studiosFetchGeneration += 1
+            isLoadingMoreStudios = false
             currentStudioLiveFilter = liveFilter ?? [:]
         } else {
             isLoadingStudios = true
@@ -5322,6 +5356,7 @@ class StashDBViewModel: ObservableObject {
             isLoadingMoreStudios = true
         }
         errorMessage = nil
+        let generation = studiosFetchGeneration
         
         var studioFilter: [String: Any] = [:]
         
@@ -5368,6 +5403,7 @@ class StashDBViewModel: ObservableObject {
         performGraphQLQuery(query: bodyString) { (response: StudiosResponse?) in
             if let studiosResult = response?.data?.findStudios {
                 DispatchQueue.main.async {
+                    guard generation == self.studiosFetchGeneration else { return }
                     if isInitialLoad {
                         self.studios = studiosResult.studios
                         #if DEBUG
@@ -5392,6 +5428,7 @@ class StashDBViewModel: ObservableObject {
                 }
             } else {
                 DispatchQueue.main.async {
+                    guard generation == self.studiosFetchGeneration else { return }
                     if isInitialLoad {
                         self.isLoadingStudios = false
                         self.errorMessage = "Studios konnten nicht geladen werden"
@@ -5425,6 +5462,8 @@ class StashDBViewModel: ObservableObject {
         if isInitialLoad {
             currentTagPage = 1
             tags = []
+            tagsFetchGeneration += 1
+            isLoadingMoreTags = false
             currentTagLiveFilter = liveFilter ?? [:]
         }
         currentTagSortOption = sortBy
@@ -5447,6 +5486,7 @@ class StashDBViewModel: ObservableObject {
         } else {
             isLoadingMoreTags = true
         }
+        let generation = tagsFetchGeneration
         
         var tagFilter: [String: Any] = [:]
         
@@ -5488,6 +5528,7 @@ class StashDBViewModel: ObservableObject {
         performGraphQLQuery(query: bodyString) { (response: TagsResponse?) in
             if let tagsResult = response?.data?.findTags {
                 DispatchQueue.main.async {
+                    guard generation == self.tagsFetchGeneration else { return }
                     if isInitialLoad {
                         self.tags = tagsResult.tags
                         self.totalTags = tagsResult.count
@@ -5506,6 +5547,7 @@ class StashDBViewModel: ObservableObject {
                 }
             } else {
                 DispatchQueue.main.async {
+                    guard generation == self.tagsFetchGeneration else { return }
                     self.isLoadingTags = false
                     self.isLoadingMoreTags = false
                 }
@@ -5518,6 +5560,8 @@ class StashDBViewModel: ObservableObject {
         if isInitialLoad {
             currentGroupPage = 1
             groups = []
+            groupsFetchGeneration += 1
+            isLoadingMoreGroups = false
         }
         currentGroupSortOption = sortBy
         currentGroupSearchQuery = searchQuery
@@ -5540,6 +5584,7 @@ class StashDBViewModel: ObservableObject {
         } else {
             isLoadingMoreGroups = true
         }
+        let generation = groupsFetchGeneration
         
         var groupFilter: [String: Any] = [:]
         
@@ -5588,6 +5633,7 @@ class StashDBViewModel: ObservableObject {
         performGraphQLQuery(query: bodyString) { (response: GroupsResponse?) in
             if let groupsResult = response?.data?.findGroups {
                 DispatchQueue.main.async {
+                    guard generation == self.groupsFetchGeneration else { return }
                     if isInitialLoad {
                         self.groups = groupsResult.groups
                         self.totalGroups = groupsResult.count
@@ -5606,6 +5652,7 @@ class StashDBViewModel: ObservableObject {
                 }
             } else {
                 DispatchQueue.main.async {
+                    guard generation == self.groupsFetchGeneration else { return }
                     self.isLoadingGroups = false
                     self.isLoadingMoreGroups = false
                 }
@@ -5997,6 +6044,7 @@ class StashDBViewModel: ObservableObject {
             galleries = []
             totalGalleries = 0
             isLoadingGalleries = true
+            galleriesFetchGeneration += 1
             hasMoreGalleries = true
             currentGallerySortOption = sortBy
             currentGalleryFilter = filter
@@ -6013,6 +6061,7 @@ class StashDBViewModel: ObservableObject {
     }
     
     private func loadGalleriesPage(page: Int, sortBy: GallerySortOption, searchQuery: String = "", isInitialLoad: Bool = true, filter: SavedFilter? = nil) {
+        let generation = galleriesFetchGeneration
         var galleryFilter: [String: Any] = [:]
         
         // Use saved filter if provided
@@ -6068,6 +6117,7 @@ class StashDBViewModel: ObservableObject {
         performGraphQLQuery(query: bodyString) { (response: GalleriesResponse?) in
             if let result = response?.data?.findGalleries {
                 DispatchQueue.main.async {
+                    guard generation == self.galleriesFetchGeneration else { return }
                     if isInitialLoad {
                         self.galleries = result.galleries
                         self.totalGalleries = result.count
@@ -6085,6 +6135,7 @@ class StashDBViewModel: ObservableObject {
                 }
             } else {
                 DispatchQueue.main.async {
+                    guard generation == self.galleriesFetchGeneration else { return }
                     self.isLoadingGalleries = false
                     self.errorMessage = "Could not load galleries"
                 }
@@ -9585,13 +9636,8 @@ struct Scene: Codable, Identifiable, Equatable {
         // 0. Check local first — but only for downloaded scenes. A `fileExists`
         //    per card per body evaluation is a disk stat on the main thread while
         //    scrolling; the download index answers the same question from memory.
-        let fileManager = FileManager.default
-        if DownloadManager.downloadedSceneIDs.contains(id),
-           let docs = fileManager.urls(for: .documentDirectory, in: .userDomainMask).first {
-            let localURL = docs.appendingPathComponent("Downloads/\(id)/thumbnail.jpg")
-            if fileManager.fileExists(atPath: localURL.path) {
-                return localURL
-            }
+        if let localURL = DownloadManager.downloadedSceneIDs.thumbnailURL(sceneID: id) {
+            return localURL
         }
 
         // Helper to sign the URL with apikey
@@ -10012,13 +10058,8 @@ struct MarkerScene: Codable, Identifiable, Equatable {
         // 0. Check local first — but only for downloaded scenes. A `fileExists`
         //    per card per body evaluation is a disk stat on the main thread while
         //    scrolling; the download index answers the same question from memory.
-        let fileManager = FileManager.default
-        if DownloadManager.downloadedSceneIDs.contains(id),
-           let docs = fileManager.urls(for: .documentDirectory, in: .userDomainMask).first {
-            let localURL = docs.appendingPathComponent("Downloads/\(id)/thumbnail.jpg")
-            if fileManager.fileExists(atPath: localURL.path) {
-                return localURL
-            }
+        if let localURL = DownloadManager.downloadedSceneIDs.thumbnailURL(sceneID: id) {
+            return localURL
         }
         
         guard let config = ServerConfigManager.shared.loadConfig() else { return nil }
@@ -10074,14 +10115,9 @@ struct SceneMarker: Codable, Identifiable, Equatable {
     // Computed property for thumbnail URL
     var thumbnailURL: URL? {
         // 0. Check local first
-        if let sceneId = scene?.id {
-            let fileManager = FileManager.default
-            if let docs = fileManager.urls(for: .documentDirectory, in: .userDomainMask).first {
-                let localURL = docs.appendingPathComponent("Downloads/\(sceneId)/thumbnail.jpg")
-                if fileManager.fileExists(atPath: localURL.path) {
-                    return localURL
-                }
-            }
+        if let sceneId = scene?.id,
+           let localURL = DownloadManager.downloadedSceneIDs.thumbnailURL(sceneID: sceneId) {
+            return localURL
         }
 
         // Use path from API if available
@@ -11385,6 +11421,26 @@ nonisolated final class DownloadedSceneIDIndex: @unchecked Sendable {
         lock.lock(); defer { lock.unlock() }
         ids = Set(newIDs)
     }
+
+    private var storedRoot: URL?
+
+    /// `Documents/Downloads/<serverID>/` of the active server; nil until `DownloadManager` exists.
+    var root: URL? {
+        lock.lock(); defer { lock.unlock() }
+        return storedRoot
+    }
+
+    func setRoot(_ url: URL) {
+        lock.lock(); defer { lock.unlock() }
+        storedRoot = url
+    }
+
+    /// The downloaded thumbnail of a scene of the active server, when the file is there.
+    func thumbnailURL(sceneID: String) -> URL? {
+        guard contains(sceneID), let root else { return nil }
+        let url = root.appendingPathComponent("\(sceneID)/thumbnail.jpg")
+        return FileManager.default.fileExists(atPath: url.path) ? url : nil
+    }
 }
 
 @MainActor
@@ -11401,7 +11457,13 @@ class DownloadManager: NSObject, ObservableObject {
     @Published var galleryDownloads: [DownloadedGallery] = []
     @Published var activeDownloads: [String: ActiveDownload] = [:] // id: info
     
-    private let downloadsFolder: URL
+    /// `Documents/Downloads/`. Each server keeps its own tree below it, because Stash ids are
+    /// small numbers every server reuses: scene 42 of one server is not scene 42 of another.
+    private let downloadsRoot: URL
+    /// `Documents/Downloads/<serverID>/` of the active server: folders and both metadata files.
+    private var downloadsFolder: URL
+    private var storeServerKey: String
+    private static let perServerMarker = ".per-server"
     private let metadataFile = "downloads_metadata.json"
     private let galleryMetadataFile = "gallery_downloads_metadata.json"
     
@@ -11420,16 +11482,59 @@ class DownloadManager: NSObject, ObservableObject {
     override private init() {
         let fileManager = FileManager.default
         let documents = fileManager.urls(for: .documentDirectory, in: .userDomainMask).first ?? fileManager.temporaryDirectory
-        downloadsFolder = documents.appendingPathComponent("Downloads", isDirectory: true)
-        
-        if !fileManager.fileExists(atPath: downloadsFolder.path) {
-            try? fileManager.createDirectory(at: downloadsFolder, withIntermediateDirectories: true)
-        }
-        
+        downloadsRoot = documents.appendingPathComponent("Downloads", isDirectory: true)
+        let key = Self.activeServerKey()
+        storeServerKey = key
+        downloadsFolder = downloadsRoot.appendingPathComponent(key, isDirectory: true)
+
         super.init()
+        openStore()
+        NotificationCenter.default.addObserver(
+            forName: NSNotification.Name("ServerConfigChanged"), object: nil, queue: .main
+        ) { [weak self] _ in
+            MainActor.assumeIsolated { self?.switchStoreIfNeeded() }
+        }
+    }
+
+    private static func activeServerKey() -> String {
+        ServerConfigManager.shared.loadConfig()?.id.uuidString ?? "no-server"
+    }
+
+    /// Downloads made before the per-server layout lie directly in `Downloads/`. They go to the
+    /// server that is active on the first launch with a server; the marker file ends that.
+    private func migrateLegacyStoreIfNeeded() {
+        let fileManager = FileManager.default
+        let marker = downloadsRoot.appendingPathComponent(Self.perServerMarker)
+        guard storeServerKey != "no-server", !fileManager.fileExists(atPath: marker.path) else { return }
+        let legacy = (try? fileManager.contentsOfDirectory(at: downloadsRoot, includingPropertiesForKeys: nil)) ?? []
+        for item in legacy where item.lastPathComponent != storeServerKey && item.lastPathComponent != "no-server" {
+            let target = downloadsFolder.appendingPathComponent(item.lastPathComponent)
+            if fileManager.fileExists(atPath: target.path) { continue }
+            try? fileManager.moveItem(at: item, to: target)
+        }
+        fileManager.createFile(atPath: marker.path, contents: nil)
+    }
+
+    private func openStore() {
+        try? FileManager.default.createDirectory(at: downloadsFolder, withIntermediateDirectories: true)
+        migrateLegacyStoreIfNeeded()
+        Self.downloadedSceneIDs.setRoot(downloadsFolder)
+        downloads = []
+        galleryDownloads = []
         loadMetadata()
     }
-    
+
+    /// Another server became active: its own downloads replace the list. Transfers still running
+    /// belong to the server left behind and are cancelled.
+    private func switchStoreIfNeeded() {
+        let key = Self.activeServerKey()
+        guard key != storeServerKey else { return }
+        for id in Array(activeDownloads.keys) { cancelActiveDownload(id: id) }
+        storeServerKey = key
+        downloadsFolder = downloadsRoot.appendingPathComponent(key, isDirectory: true)
+        openStore()
+    }
+
     private func loadMetadata() {
         let galleryFile = downloadsFolder.appendingPathComponent(galleryMetadataFile)
         if let data = try? Data(contentsOf: galleryFile),
@@ -12568,7 +12673,21 @@ extension DownloadManager: URLSessionDownloadDelegate {
 
     nonisolated func urlSession(_ session: URLSession, downloadTask: URLSessionDownloadTask, didFinishDownloadingTo location: URL) {
         guard let (id, destination) = taskMap.get(downloadTask.taskIdentifier) else { return }
-        
+
+        // A 401 / 404 / 500 also "finishes" with a file: the error body. Stored as the video it
+        // would count as downloaded and win over the server from then on.
+        if let http = downloadTask.response as? HTTPURLResponse, !(200...299).contains(http.statusCode) {
+            AppLog.error("❌ DownloadManager: HTTP \(http.statusCode) for download \(id)")
+            try? FileManager.default.removeItem(at: location)
+            _ = taskMap.remove(downloadTask.taskIdentifier)
+            Task { @MainActor in
+                self.completionHandlers[id]?(false)
+                self.progressHandlers.removeValue(forKey: id)
+                self.completionHandlers.removeValue(forKey: id)
+            }
+            return
+        }
+
         do {
             if FileManager.default.fileExists(atPath: destination.path) {
                 try? FileManager.default.removeItem(at: destination)

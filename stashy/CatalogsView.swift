@@ -598,9 +598,30 @@ private struct GroupsViewContent: View {
             sortBy: selectedSortOption,
             searchQuery: searchText,
             isInitialLoad: isInitialLoad,
-            filter: selectedFilter,
+            filter: fetchBaseFilter,
             liveFilter: effectiveLiveFilter
         )
+    }
+
+    /// Nil while the document holds the copy of the filter's criteria; the filter itself while the document is still empty.
+    private var fetchBaseFilter: StashDBViewModel.SavedFilter? {
+        groupsCriteriaDocument.isEmpty ? selectedFilter : nil
+    }
+
+    /// The sheet's filter picker changed the selection (only while the sheet is open, so code that sets it does not refetch twice).
+    private func handleGroupsPresetSelectionChange(_ newId: String) {
+        guard showGroupsFilterSheet else { return }
+        if newId.isEmpty {
+            selectedFilter = nil
+            groupsCriteriaDocument.clear()
+            performSearch()
+            return
+        }
+        if let sid = ListLivePresetTag.parseServerId(newId), let f = viewModel.savedFilters[sid] {
+            selectedFilter = f
+            groupsCriteriaDocument.load(f.criteriaObjectFilter())
+            performSearch()
+        }
     }
 
     private var catalogChromeConfig: CatalogChromeConfig {
@@ -648,6 +669,9 @@ private struct GroupsViewContent: View {
         .applyAppBackground()
         .stashyCatalogChrome(catalogChromeConfig)
         .homeBreadcrumbChrome(homeMenu) { quickBar(part: .sortMenu) }
+        .onChange(of: groupsPresetRowSelection) { _, newId in
+            handleGroupsPresetSelectionChange(newId)
+        }
         .sheet(isPresented: $showGroupsFilterSheet) {
             GroupsCatalogFilterSortSheet(
                 serverFilters: viewModel.savedFilters.values.filter { $0.mode == .groups }.sorted { $0.name < $1.name },
@@ -807,7 +831,9 @@ private struct GroupsViewContent: View {
             onOpenFilters: {
                 if let f = selectedFilter {
                     groupsPresetRowSelection = ListLivePresetTag.serverRow(f.id)
-                    groupsCriteriaDocument.load(f.criteriaObjectFilter())
+                    if groupsCriteriaDocument.isEmpty {
+                        groupsCriteriaDocument.load(f.criteriaObjectFilter())
+                    }
                 }
                 showGroupsFilterSheet = true
             },

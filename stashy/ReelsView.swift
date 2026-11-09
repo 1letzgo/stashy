@@ -6980,6 +6980,8 @@ extension ReelItemView {
 }
 
 struct StashSyncManagerModifier: ViewModifier {
+    /// Engine of the row that last started the shared oscillator (identity only, not retained).
+    fileprivate static weak var syncOwner: AetherSceneEngine?
     let isActive: Bool
     let isPlaying: Bool
     /// This row's playback engine. Analysis rides the engine's own item.
@@ -7002,6 +7004,10 @@ struct StashSyncManagerModifier: ViewModifier {
             // (initialSync + Play/Pause-Resume), die quasi dasselbe taten und schwer zu lesen waren.
             .onChange(of: isActive) { _, active in
                 if active { initialSync() }
+                else { applyStashSyncPlaybackState(isActiveOverride: false, isPlayingOverride: false) }
+            }
+            .onDisappear {
+                applyStashSyncPlaybackState(isActiveOverride: false, isPlayingOverride: false)
             }
             .onChange(of: stashSyncManager.isActive) { _, active in
                 if active { initialSync() }
@@ -7054,13 +7060,28 @@ struct StashSyncManagerModifier: ViewModifier {
     private func applyStashSyncPlaybackState(isActiveOverride: Bool?, isPlayingOverride: Bool?) {
         let effActive = isActiveOverride ?? isActive
         let effPlaying = isPlayingOverride ?? isPlaying
-        guard StashSyncManager.shared.isActive && effActive else { return }
+        let anySyncMode = HandyManager.shared.isStashSyncMode
+            || ButtplugManager.shared.isStashSyncMode
+            || LoveSpouseManager.shared.isStashSyncMode
         let currentTime = aetherEngine?.currentTime ?? 0
-        if effPlaying {
+        if effActive && effPlaying {
+            guard anySyncMode else { return }
+            // Pausing stops the pulse oscillator (device sinks re-send on every tick), so resume restarts it.
+            // The playing row always takes the oscillator over: the row before it may report
+            // "inactive" only afterwards and must not stop it then.
+            StashSyncManagerModifier.syncOwner = aetherEngine
+            if !StashSyncManager.shared.isActive { StashSyncManager.shared.start() }
             if HandyManager.shared.isStashSyncMode { HandyManager.shared.play(at: currentTime) }
             if ButtplugManager.shared.isStashSyncMode { ButtplugManager.shared.play(at: currentTime) }
             if LoveSpouseManager.shared.isStashSyncMode { LoveSpouseManager.shared.play(at: currentTime) }
         } else {
+            // Paused, or this row left the screen: silence the oscillator (only if this row owns it,
+            // so a row losing focus cannot kill the next row's sync).
+            if StashSyncManagerModifier.syncOwner == nil || StashSyncManagerModifier.syncOwner === aetherEngine {
+                StashSyncManager.shared.stop()
+                StashSyncManagerModifier.syncOwner = nil
+            }
+            guard effActive else { return }
             if HandyManager.shared.isStashSyncMode { HandyManager.shared.pause() }
             if ButtplugManager.shared.isStashSyncMode { ButtplugManager.shared.pause() }
             if LoveSpouseManager.shared.isStashSyncMode { LoveSpouseManager.shared.pause() }
@@ -7068,7 +7089,10 @@ struct StashSyncManagerModifier: ViewModifier {
     }
 
     private func initialSync() {
-        guard isActive && StashSyncManager.shared.isActive else { return }
+        guard isActive && (StashSyncManager.shared.isActive
+            || HandyManager.shared.isStashSyncMode
+            || ButtplugManager.shared.isStashSyncMode
+            || LoveSpouseManager.shared.isStashSyncMode) else { return }
         ensureVideoAnalysis()
         // Sync-Signale auf den aktuellen Play/Pause-Stand bringen — ersetzt den
         // früheren zweiten `onChange(of: isActive)`-Block.
@@ -7090,8 +7114,8 @@ struct StashSyncManagerModifier: ViewModifier {
         if !HandyManager.shared.isStashSyncMode && 
            !ButtplugManager.shared.isStashSyncMode && 
            !LoveSpouseManager.shared.isStashSyncMode {
-            StashSyncManager.shared.isActive = false
-                        checkAndStopVideoAnalysis()
+            StashSyncManager.shared.stop()
+            checkAndStopVideoAnalysis()
         }
     }
     
