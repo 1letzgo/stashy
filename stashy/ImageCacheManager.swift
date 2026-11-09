@@ -679,6 +679,12 @@ class ImageLoader: ObservableObject {
 
     /// Loads images that are about to scroll in into the cache, so the server's time for a
     /// thumbnail is spent before the card shows. Skips what is cached or already loading.
+    /// The image for `url` from the cache, else downloaded (shared with any card loading it).
+    static func uiImage(for url: URL) async -> UIImage? {
+        if let cached = await ImageCache.shared.loadObject(forKey: url as NSURL) { return cached }
+        return try? await sharedDownload(url).image
+    }
+
     static func prefetch(_ urls: [URL]) {
         for url in urls where inFlight[url] == nil
             && ImageCache.shared.memoryObject(forKey: url as NSURL) == nil {

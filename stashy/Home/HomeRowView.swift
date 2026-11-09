@@ -1,6 +1,7 @@
 
 #if !os(tvOS)
 import SwiftUI
+import CoreImage
 #if canImport(UIKit)
 import UIKit
 #else
@@ -97,18 +98,13 @@ struct HomeDashboardHeroBackdrop: View, Equatable {
                 .overlay(alignment: .bottom) {
                     ZStack {
                         if let thumbnailURL {
-                            CustomAsyncImage(url: thumbnailURL) { loader in
-                                if let image = loader.image {
-                                    image.resizable().scaledToFill()
-                                }
-                            }
-                            .id(thumbnailURL.absoluteString)
-                            .transition(.opacity)
+                            HeroBackdropImage(url: thumbnailURL)
+                                .id(thumbnailURL.absoluteString)
+                                .transition(.opacity)
                         }
                     }
                     .animation(.easeInOut(duration: 0.5), value: thumbnailURL?.absoluteString)
                     .scaleEffect(1.3)
-                    .blur(radius: 40)
                     .frame(maxWidth: .infinity)
                     .frame(height: 1200)
                 }
@@ -119,6 +115,63 @@ struct HomeDashboardHeroBackdrop: View, Equatable {
         .ignoresSafeArea(edges: [.top, .horizontal])
         .allowsHitTesting(false)
         .accessibilityHidden(true)
+    }
+}
+
+/// The backdrop's image, blurred once on a small copy. A live `.blur(radius: 40)` over a
+/// 1200 pt layer was redrawn by the GPU on every frame Home scrolled (with the glass chrome
+/// sampling it once more), which held the Pro's display far below its refresh rate.
+private struct HeroBackdropImage: View {
+    let url: URL
+    @State private var image: UIImage?
+
+    var body: some View {
+        ZStack {
+            if let image {
+                Image(uiImage: image)
+                    .resizable()
+                    .interpolation(.medium)
+                    .scaledToFill()
+                    .transition(.opacity)
+            }
+        }
+        .animation(.easeInOut(duration: 0.3), value: image != nil)
+        .task(id: url) { image = await HeroBackdropBlur.image(for: url) }
+    }
+}
+
+enum HeroBackdropBlur {
+    private static var cache: [URL: UIImage] = [:]
+    nonisolated(unsafe) private static let context = CIContext()
+
+    static func image(for url: URL) async -> UIImage? {
+        if let cached = cache[url] { return cached }
+        guard let source = await ImageLoader.uiImage(for: url)?.cgImage else { return nil }
+        guard let blurred = await Task.detached(priority: .userInitiated, operation: {
+            Self.blurred(source)
+        }).value else { return nil }
+        if cache.count > 24 { cache.removeAll() }
+        let image = UIImage(cgImage: blurred)
+        cache[url] = image
+        return image
+    }
+
+    /// 64 px wide, then a Gaussian blur as wide as the old 40 pt one relative to the image.
+    nonisolated private static func blurred(_ source: CGImage) -> CGImage? {
+        let width = 64
+        let height = max(1, Int((Double(source.height) * Double(width) / Double(max(source.width, 1))).rounded()))
+        guard let ctx = CGContext(data: nil, width: width, height: height, bitsPerComponent: 8, bytesPerRow: 0,
+                                  space: CGColorSpaceCreateDeviceRGB(),
+                                  bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue) else { return nil }
+        ctx.interpolationQuality = .medium
+        ctx.draw(source, in: CGRect(x: 0, y: 0, width: width, height: height))
+        guard let small = ctx.makeImage() else { return nil }
+        let extent = CGRect(x: 0, y: 0, width: width, height: height)
+        let output = CIImage(cgImage: small)
+            .clampedToExtent()
+            .applyingGaussianBlur(sigma: 4.5)
+            .cropped(to: extent)
+        return context.createCGImage(output, from: extent)
     }
 }
 
