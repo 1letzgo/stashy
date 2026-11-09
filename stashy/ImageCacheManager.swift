@@ -289,6 +289,25 @@ class ImageCache {
         }.value
     }
     
+    /// Raw bytes for entries whose consumers need them (GIF / WebP animation, SVG text); `nil`
+    /// for ordinary stills. Only the file header is read to tell, so a still never has its
+    /// bytes read a second time or kept next to the decoded image.
+    func loadDataIfNeededForDisplay(forKey key: NSURL) async -> Data? {
+        let fileURL = cacheFileURL(for: key)
+        return await Task.detached(priority: .utility) { () -> Data? in
+            guard let handle = try? FileHandle(forReadingFrom: fileURL) else { return nil }
+            let head = (try? handle.read(upToCount: 512)) ?? Data()
+            try? handle.close()
+            let bytes = [UInt8](head.prefix(12))
+            let isGIF = bytes.starts(with: [0x47, 0x49, 0x46])
+            let isWebP = bytes.count >= 12 && bytes.starts(with: [0x52, 0x49, 0x46, 0x46])
+                && Array(bytes[8..<12]) == [0x57, 0x45, 0x42, 0x50]
+            let isSVG = String(decoding: head, as: UTF8.self).lowercased().contains("<svg")
+            guard isGIF || isWebP || isSVG else { return nil }
+            return try? Data(contentsOf: fileURL)
+        }.value
+    }
+
     func setData(_ data: Data, forKey key: NSURL, decoded: UIImage? = nil) {
         let stableKey = stableMemoryCacheKey(for: key)
         
@@ -578,7 +597,7 @@ class ImageLoader: ObservableObject {
             // The raw bytes only tell GIFs and SVGs apart; read them off the main thread
             // (this used to be a synchronous disk read per card).
             Task { [weak self] in
-                let data = await ImageCache.shared.loadData(forKey: url as NSURL)
+                let data = await ImageCache.shared.loadDataIfNeededForDisplay(forKey: url as NSURL)
                 if self?.url == url { self?.imageData = data }
             }
         } else {
@@ -652,7 +671,7 @@ class ImageLoader: ObservableObject {
             if !bypassCache,
                let cachedUIImage = await ImageCache.shared.loadObject(forKey: url as NSURL) {
                 if Task.isCancelled { return }
-                self.imageData = await ImageCache.shared.loadData(forKey: url as NSURL)
+                self.imageData = await ImageCache.shared.loadDataIfNeededForDisplay(forKey: url as NSURL)
                 self.image = Image(uiImage: cachedUIImage)
                 self.isLoading = false
                 return

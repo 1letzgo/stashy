@@ -603,7 +603,7 @@ final class AITagSuggestionManager: ObservableObject {
                                          tagNames: tagNames)
         self.sceneIndexCache = sceneIndex
         self.sceneIndexLoadedFor = Self.sceneIndexURL()
-        Self.persistSceneIndex(sceneIndex)
+        enqueueSceneIndexWrite(after: .zero)
         AppLog.debug("AITags: statistics model built from \(processed) items")
     }
 
@@ -1274,23 +1274,43 @@ final class AITagSuggestionManager: ObservableObject {
               let position = index.scenes.firstIndex(where: { $0.id == sceneId }) else { return }
         index.scenes[position] = index.scenes[position].playedNow(at: Date())
         sceneIndexCache = index
-        Self.persistSceneIndex(index)
+        enqueueSceneIndexWrite(after: .seconds(2))
+    }
+
+    /// Index writes run one after another; a new request replaces a pending one (latest state
+    /// wins) and a play's debounced write is dropped when a statistics build replaced the index
+    /// meanwhile (the build queues its own write).
+    private var sceneIndexWriteTask: Task<Void, Never>?
+
+    private func enqueueSceneIndexWrite(after delay: Duration) {
+        guard let index = sceneIndexCache, let url = Self.sceneIndexURL() else { return }
+        let notedBuild = index.builtAt
+        let previous = sceneIndexWriteTask
+        previous?.cancel()
+        sceneIndexWriteTask = Task { [weak self] in
+            await previous?.value
+            if delay > .zero { try? await Task.sleep(for: delay) }
+            guard !Task.isCancelled, let self,
+                  let latest = self.sceneIndexCache,
+                  self.sceneIndexLoadedFor == url,
+                  latest.builtAt == notedBuild else { return }
+            await Self.persistSceneIndex(latest, to: url)
+        }
     }
 
     private static func sceneIndexURL() -> URL? {
         modelURL().map { $0.deletingPathExtension().appendingPathExtension("scenes.json") }
     }
 
-    private static func persistSceneIndex(_ index: LocalSceneIndex) {
-        guard let url = sceneIndexURL() else { return }
-        Task.detached(priority: .utility) {
+    private static func persistSceneIndex(_ index: LocalSceneIndex, to url: URL) async {
+        await Task.detached(priority: .utility) {
             do {
                 try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
                 try JSONEncoder().encode(index).write(to: url, options: .atomic)
             } catch {
                 AppLog.error("AITags: could not save the scene index — \(error.localizedDescription)")
             }
-        }
+        }.value
     }
 
     // MARK: - Storage

@@ -414,6 +414,7 @@ struct ReelsViewBody: View {
     @State private var showReelsSceneRenameAlert = false
     @State private var showReelsSceneDeleteAlert = false
     @State private var isMenuOpen = false
+    @State private var menuAutoCloseGeneration = 0
     @State private var isMediaZoomed = false
     @State private var isRotating = false
     /// Width the feed last laid out at; see `handleFeedResize`.
@@ -2595,7 +2596,9 @@ struct ReelsViewBody: View {
                             viewModel.previews[idx] = viewModel.previews[idx].withOCounter(count)
                         }
                     } else {
-                        if let idx = viewModel.previews.firstIndex(where: { $0.id == sceneId }) {
+                        // Roll back only while this tap's value is still shown; a newer tap owns it otherwise.
+                        if let idx = viewModel.previews.firstIndex(where: { $0.id == sceneId }),
+                           viewModel.previews[idx].oCounter == newCount {
                             viewModel.previews[idx] = viewModel.previews[idx].withOCounter(originalCount)
                         }
                         ToastManager.shared.show("Counter update failed", icon: "exclamationmark.triangle", style: .error)
@@ -2641,12 +2644,15 @@ struct ReelsViewBody: View {
                             }
                         }
                     } else {
-                        if let idx = viewModel.scenes.firstIndex(where: { $0.id == sceneId }) {
+                        // Roll back only while this tap's value is still shown; a newer tap owns it otherwise.
+                        if let idx = viewModel.scenes.firstIndex(where: { $0.id == sceneId }),
+                           viewModel.scenes[idx].oCounter == newCount {
                             viewModel.scenes[idx] = viewModel.scenes[idx].withOCounter(originalSceneCount)
                         }
                         for entry in originalMarkerCounts {
                             if let idx = viewModel.sceneMarkers.firstIndex(where: { $0.id == entry.id }),
-                               let markerScene = viewModel.sceneMarkers[idx].scene {
+                               let markerScene = viewModel.sceneMarkers[idx].scene,
+                               markerScene.oCounter == newCount {
                                 viewModel.sceneMarkers[idx] = viewModel.sceneMarkers[idx]
                                     .withScene(markerScene.withOCounter(entry.count))
                             }
@@ -2668,7 +2674,8 @@ struct ReelsViewBody: View {
                             viewModel.clips[idx] = viewModel.clips[idx].withOCounter(count)
                         }
                     } else {
-                        if let revertIndex = viewModel.clips.firstIndex(where: { $0.id == imageId }) {
+                        if let revertIndex = viewModel.clips.firstIndex(where: { $0.id == imageId }),
+                           viewModel.clips[revertIndex].o_counter == newCount {
                             viewModel.clips[revertIndex] = viewModel.clips[revertIndex].withOCounter(originalCount)
                         }
                         ToastManager.shared.show("Counter update failed", icon: "exclamationmark.triangle", style: .error)
@@ -2881,7 +2888,11 @@ struct ReelsViewBody: View {
             .sceneLiveUpdates(using: viewModel)
             .onChange(of: isMenuOpen) { _, newValue in
                 guard newValue else { return }
+                menuAutoCloseGeneration &+= 1
+                let generation = menuAutoCloseGeneration
                 DispatchQueue.main.asyncAfter(deadline: .now() + 5.0) {
+                    // A later open owns its own close.
+                    guard generation == self.menuAutoCloseGeneration else { return }
                     // Clear both flags — leaving rating overlay true would re-lock menus.
                     self.isMenuOpen = false
                     self.currentItemShowRatingOverlay = false
@@ -7239,8 +7250,9 @@ final class ReelsScrubThumbnailProvider: ObservableObject {
             } else {
                 result = nil
             }
+            // Ended while decoding: a newer task may own the handle, leave it alone.
+            guard self.epoch == startedEpoch, !Task.isCancelled else { return }
             self.task = nil
-            guard self.epoch == startedEpoch else { return }
             if let result {
                 self.image = result
                 self.onImage?(result)
@@ -7256,6 +7268,7 @@ final class ReelsScrubThumbnailProvider: ObservableObject {
     func end() {
         epoch &+= 1
         pendingSeconds = nil
+        task?.cancel()
         task = nil
         image = nil
         onImage?(nil)

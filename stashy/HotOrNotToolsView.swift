@@ -466,6 +466,10 @@ struct HotOrNotPerformerData: Codable {
     }
 
     func replacingRating100(_ newRating: Int) -> HotOrNotPerformerData {
+        replacing(rating100: newRating, customFields: custom_fields)
+    }
+
+    func replacing(rating100 newRating: Int?, customFields: [String: StashJSONValue]?) -> HotOrNotPerformerData {
         HotOrNotPerformerData(
             id: id,
             name: name,
@@ -490,7 +494,7 @@ struct HotOrNotPerformerData: Codable {
             favorite: favorite,
             rating100: newRating,
             o_counter: o_counter,
-            custom_fields: custom_fields
+            custom_fields: customFields
         )
     }
 }
@@ -1170,15 +1174,10 @@ final class HotOrNotViewModel: ObservableObject {
         errorMessage = nil
         defer { isLoadingPair = false }
 
-        let query = GraphQLQueries.queryWithFragments("hotOrNotFindPerformers")
-        let variables: [String: Any] = [
-            "performer_filter": performerFilter,
-            "filter": ["per_page": -1, "sort": "rating", "direction": "DESC"] as [String: Any]
-        ]
         do {
-            let res: HotOrNotFindResponse = try await client.execute(query: query, variables: variables)
-            let list = res.data?.findPerformers.performers ?? []
-            poolCount = res.data?.findPerformers.count ?? list.count
+            let pool = try await fetchDuelPool()
+            let list = pool.list
+            poolCount = pool.count
             guard list.count >= 2 else {
                 errorMessage = "Not enough performers with images for the selected genders."
                 left = nil
@@ -1213,21 +1212,68 @@ final class HotOrNotViewModel: ObservableObject {
         }
     }
 
+    /// The whole performer pool (with `custom_fields`) is large, so the duel pairing fetches it once
+    /// and reuses it for the following pairs. Votes update the cached entries locally
+    /// (`applyPushedUpdateToDuelPool`); the cache is dropped when the genders or the server change,
+    /// and after `duelPoolMaxAge` so ratings changed elsewhere come in.
+    private static let duelPoolMaxAge: TimeInterval = 300
+    private var duelPoolCache: (key: String, loadedAt: Date, list: [HotOrNotPerformerData], count: Int)?
+
+    private var duelPoolKey: String {
+        let server = ServerConfigManager.shared.activeConfig.map { "\($0.id)" } ?? ""
+        return server + "|" + selectedGenders.sorted().joined(separator: ",")
+    }
+
+    private func fetchDuelPool() async throws -> (list: [HotOrNotPerformerData], count: Int) {
+        let key = duelPoolKey
+        if let cache = duelPoolCache, cache.key == key,
+           Date().timeIntervalSince(cache.loadedAt) < Self.duelPoolMaxAge {
+            return (cache.list, cache.count)
+        }
+        duelPoolCache = nil
+        let query = GraphQLQueries.queryWithFragments("hotOrNotFindPerformers")
+        let variables: [String: Any] = [
+            "performer_filter": performerFilter,
+            "filter": ["per_page": -1, "sort": "rating", "direction": "DESC"] as [String: Any]
+        ]
+        let res: HotOrNotFindResponse = try await client.execute(query: query, variables: variables)
+        let list = res.data?.findPerformers.performers ?? []
+        let count = res.data?.findPerformers.count ?? list.count
+        // Only keep it if the filter did not change while the request ran.
+        if key == duelPoolKey {
+            duelPoolCache = (key, Date(), list, count)
+        }
+        return (list, count)
+    }
+
+    /// Mirrors a successful `performerUpdate` into the cached pool (rating, stats, record) and
+    /// keeps the rating-descending order the pairing reads its ranks from.
+    private func applyPushedUpdateToDuelPool(id: String, rating: Int, statsJson: String, recordJson: String) {
+        guard var cache = duelPoolCache, cache.key == duelPoolKey,
+              let idx = cache.list.firstIndex(where: { $0.id == id }) else { return }
+        let old = cache.list[idx]
+        var fields = old.custom_fields ?? [:]
+        fields["hotornot_stats"] = .string(statsJson)
+        fields["performer_record"] = .string(recordJson)
+        cache.list[idx] = old.replacing(rating100: rating, customFields: fields)
+        cache.list = cache.list.enumerated().sorted { a, b in
+            // Unrated last, as the server's `rating DESC` returns them.
+            let ra = a.element.rating100 ?? -1, rb = b.element.rating100 ?? -1
+            return ra != rb ? ra > rb : a.offset < b.offset
+        }.map(\.element)
+        duelPoolCache = cache
+    }
+
     /// Legend / Rise pairing (climb ladder).
     private func loadClimbPair(isPlacement: Bool) async {
         isLoadingPair = true
         errorMessage = nil
         defer { isLoadingPair = false }
 
-        let query = GraphQLQueries.queryWithFragments("hotOrNotFindPerformers")
-        let variables: [String: Any] = [
-            "performer_filter": performerFilter,
-            "filter": ["per_page": -1, "sort": "rating", "direction": "DESC"] as [String: Any]
-        ]
         do {
-            let res: HotOrNotFindResponse = try await client.execute(query: query, variables: variables)
-            let list = res.data?.findPerformers.performers ?? []
-            poolCount = res.data?.findPerformers.count ?? list.count
+            let pool = try await fetchDuelPool()
+            let list = pool.list
+            poolCount = pool.count
             guard list.count >= 2 else {
                 errorMessage = "Not enough performers with images for the selected genders."
                 left = nil
@@ -1887,6 +1933,7 @@ final class HotOrNotViewModel: ObservableObject {
         if res.data?.performerUpdate == nil {
             throw NSError(domain: "HotOrNot", code: 1, userInfo: [NSLocalizedDescriptionKey: res.errors?.first?.message ?? "Update failed"])
         }
+        applyPushedUpdateToDuelPool(id: performer.id, rating: newRating, statsJson: statsJson, recordJson: recordJson)
     }
 }
 

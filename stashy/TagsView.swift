@@ -1868,7 +1868,7 @@ struct TagImageView: View {
             if loader.isLoading {
                 Rectangle()
                     .fill(appearanceManager.tintColor)
-                    .overlay(InlineSpinner(tint: .white))
+                    .overlay(InlineSpinner(tint: Color.onAppTint))
             } else if let image = loader.image {
                 image
                     .resizable()
@@ -1882,7 +1882,7 @@ struct TagImageView: View {
                     .overlay(
                         Image(systemName: "number")
                             .font(.system(size: 32, weight: .bold))
-                            .foregroundColor(.white)
+                            .foregroundColor(Color.onAppTint)
                     )
             }
         }

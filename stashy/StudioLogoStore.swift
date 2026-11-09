@@ -43,13 +43,33 @@ actor StudioLogoStore {
     static let badgeMaxWidth: CGFloat = 640
 
     private let memory = NSCache<NSString, UIImage>()
-    private var inFlight: [String: Task<UIImage?, Never>] = [:]
-    /// Schlüssel, für die es kein Bild gibt (Platzhalter, Fehler). Verhindert,
+    private var inFlight: [String: Task<(image: UIImage?, definitive: Bool), Never>] = [:]
+    /// Schlüssel, für die der Server definitiv kein Bild hat (404, Platzhalter,
+    /// unlesbare Daten) — keine Transportfehler, die sich beheben können. Verhindert,
     /// dass jede Karte den Server erneut fragt.
     private var missing: Set<String> = []
 
+    /// Bumped on a server switch; results of loads started before it are not stored.
+    private var generation = 0
+
     private init() {
         memory.countLimit = 400
+        NotificationCenter.default.addObserver(
+            forName: NSNotification.Name("ServerConfigChanged"),
+            object: nil,
+            queue: nil
+        ) { _ in
+            Task { await StudioLogoStore.shared.resetForServerChange() }
+        }
+    }
+
+    /// Keys carry no server id, so memory, remembered misses and running loads all belong to
+    /// the previous server.
+    private func resetForServerChange() {
+        generation += 1
+        memory.removeAllObjects()
+        missing.removeAll()
+        inFlight.removeAll()
     }
 
     /// Cache-Schlüssel; `updatedAt` sorgt dafür, dass ein neues Studio-Bild den
@@ -65,21 +85,23 @@ actor StudioLogoStore {
 
         if let cached = memory.object(forKey: key as NSString) { return cached }
         if missing.contains(key) { return nil }
-        if let running = inFlight[key] { return await running.value }
+        if let running = inFlight[key] { return await running.value.image }
 
-        let task = Task<UIImage?, Never> {
+        let startGeneration = generation
+        let task = Task<(image: UIImage?, definitive: Bool), Never> {
             await Self.load(studioId: studioId, key: key, height: height, maxWidth: maxWidth)
         }
         inFlight[key] = task
-        let image = await task.value
+        let result = await task.value
+        guard startGeneration == generation else { return result.image }
         inFlight[key] = nil
 
-        if let image {
+        if let image = result.image {
             memory.setObject(image, forKey: key as NSString)
-        } else {
+        } else if result.definitive {
             missing.insert(key)
         }
-        return image
+        return result.image
     }
 
     /// Vergisst gemerkte Fehlschläge — z. B. nach Serverwechsel oder wenn ein
@@ -94,12 +116,13 @@ actor StudioLogoStore {
         NSURL(string: "stashy-studio-logo://\(key)")
     }
 
-    private static func load(studioId: String, key: String, height: CGFloat, maxWidth: CGFloat) async -> UIImage? {
+    /// `definitive` = the server answered and there is no usable logo; transport errors stay retryable.
+    private static func load(studioId: String, key: String, height: CGFloat, maxWidth: CGFloat) async -> (image: UIImage?, definitive: Bool) {
         // 1. Platte: schon einmal gerastert?
         if let diskKey = diskKey(key),
            let data = await ImageCache.shared.loadData(forKey: diskKey),
            let image = UIImage(data: data) {
-            return image
+            return (image, true)
         }
 
         // 2. Server
@@ -111,11 +134,12 @@ actor StudioLogoStore {
             }
             return stashRequest(to: url, config: config, timeout: 20)
         }
-        guard let request = built else { return nil }
+        guard let request = built else { return (nil, false) }
         guard let (data, response) = try? await StashNetworking.session.data(for: request),
-              let http = response as? HTTPURLResponse, http.statusCode == 200 else {
-            return nil
+              let http = response as? HTTPURLResponse else {
+            return (nil, false)
         }
+        guard http.statusCode == 200 else { return (nil, http.statusCode == 404) }
 
         let scale = await MainActor.run { activeDisplayScale() }
         let contentType = (http.allHeaderFields["Content-Type"] as? String)?.lowercased() ?? ""
@@ -143,7 +167,7 @@ actor StudioLogoStore {
         if let rendered, let diskKey = diskKey(key), let png = rendered.pngData() {
             await MainActor.run { ImageCache.shared.setData(png, forKey: diskKey) }
         }
-        return rendered
+        return (rendered, rendered == nil)
     }
 }
 

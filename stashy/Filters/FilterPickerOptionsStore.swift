@@ -31,6 +31,8 @@ final class FilterPickerOptionsStore: ObservableObject {
 
     private lazy var viewModel = StashDBViewModel()
     private var pending: [String: [([FilterEntityOption]) -> Void]] = [:]
+    /// Bumped on every server change; answers from an older generation are dropped.
+    private var generation = 0
 
     private init() {
         NotificationCenter.default.addObserver(
@@ -43,6 +45,7 @@ final class FilterPickerOptionsStore: ObservableObject {
     }
 
     func invalidate() {
+        generation += 1
         options = [:]
         loading = []
         pending = [:]
@@ -179,8 +182,9 @@ final class FilterPickerOptionsStore: ObservableObject {
         guard !loading.contains(key) else { return }
         loading.insert(key)
 
+        let loadGeneration = generation
         let finish: ([FilterEntityOption]) -> Void = { [weak self] list in
-            guard let self else { return }
+            guard let self, self.generation == loadGeneration else { return }
             self.options[key] = list
             self.loading.remove(key)
             let waiters = self.pending.removeValue(forKey: key) ?? []

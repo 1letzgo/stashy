@@ -264,6 +264,7 @@ struct AetherSceneSurface: View {
         .onDisappear {
             rewindTimer?.invalidate()
             rewindTimer = nil
+            stopFastForwardBoost()
             if isFullscreen {
                 engine.setVideoGravity(.resizeAspect)
                 // Every fullscreen host (scene detail, downloads) gets the orientation back.
@@ -1385,6 +1386,8 @@ struct AetherSceneSurface: View {
         scrubPreviewPendingSeconds = nil
         scrubPreviewTask = Task { @MainActor in
             let image = await engine.scrubThumbnail(at: seconds, maxWidth: 240)
+            // Ended (or superseded) while decoding: a newer task owns the handle now.
+            guard !Task.isCancelled else { return }
             scrubPreviewTask = nil
             guard isScrubbing else { return }
             if let image { scrubPreviewImage = image }
@@ -1397,6 +1400,7 @@ struct AetherSceneSurface: View {
 
     private func endScrubPreview() {
         scrubPreviewPendingSeconds = nil
+        scrubPreviewTask?.cancel()
         scrubPreviewTask = nil
         scrubPreviewImage = nil
     }

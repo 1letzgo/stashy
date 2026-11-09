@@ -412,6 +412,9 @@ final class OCountHeatmapLoader: ObservableObject {
         }
     }
 
+    /// Bumped by `reload()` and `reset()`; a fetch that lands under an older value is dropped.
+    private var reloadGeneration = 0
+
     func loadIfNeeded() async {
         let serverID = ServerConfigManager.shared.activeConfig?.id
         if hasLoaded, loadedServerID == serverID { return }
@@ -420,12 +423,16 @@ final class OCountHeatmapLoader: ObservableObject {
 
     func reload() async {
         let serverID = ServerConfigManager.shared.activeConfig?.id
+        reloadGeneration &+= 1
+        let generation = reloadGeneration
         isLoading = true
         didFail = false
-        defer { isLoading = false }
+        defer { if generation == reloadGeneration { isLoading = false } }
 
         do {
             let buckets = try await fetchCountsByDay()
+            // A newer reload or a server switch (reset) overtook this one: drop its answer.
+            guard generation == reloadGeneration else { return }
             countsByDay = buckets.counts
             itemsByDay = buckets.items
             timedEvents = buckets.events
@@ -435,6 +442,7 @@ final class OCountHeatmapLoader: ObservableObject {
             hasLoaded = true
             didFail = false
         } catch {
+            guard generation == reloadGeneration else { return }
             AppLog.error("❌ O-Count heatmap: \(error)")
             didFail = true
             countsByDay = [:]
@@ -513,6 +521,8 @@ final class OCountHeatmapLoader: ObservableObject {
     }
 
     private func reset() {
+        reloadGeneration &+= 1
+        isLoading = false
         countsByDay = [:]
         itemsByDay = [:]
         timedEvents = []

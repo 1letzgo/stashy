@@ -16,8 +16,9 @@ class GraphQLQueries {
     
     // MARK: - Cache & Diagnostics
     private static var cachedQueries: [String: String] = [:]
-    private static let cacheLock = NSLock()
+    #if DEBUG
     private static var hasLoggedAllResources = false
+    #endif
     private static var _composedQueryCache: [String: String] = [:]
     private static var __sceneRelatedFragments: String?
     
@@ -55,7 +56,8 @@ class GraphQLQueries {
             return cached
         }
         
-        // DEBUG: Deep bundle inspection
+        #if DEBUG
+        // Deep bundle inspection (first load only)
         if !hasLoggedAllResources {
             hasLoggedAllResources = true
             AppLog.debug("📁 --- BUNDLE INSPECTION START ---")
@@ -85,6 +87,7 @@ class GraphQLQueries {
             AppLog.debug("📁 Recursive scan found: \(foundGraphql.joined(separator: ", "))")
             AppLog.debug("📁 --- BUNDLE INSPECTION END ---")
         }
+        #endif
 
         // Load from bundle
         var content = ""

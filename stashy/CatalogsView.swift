@@ -2303,10 +2303,22 @@ enum GroupDurationText {
         let parts = trimmed.split(separator: ":", omittingEmptySubsequences: false).map { Int($0) }
         guard !parts.contains(where: { $0 == nil || $0! < 0 }) else { return .invalid }
         let values = parts.compactMap { $0 }
+        // Overflow-safe: a very long number is invalid, not a crash.
+        func total(_ weights: [Int]) -> Int? {
+            var sum = 0
+            for (value, weight) in zip(values, weights) {
+                let (product, o1) = value.multipliedReportingOverflow(by: weight)
+                let (next, o2) = sum.addingReportingOverflow(product)
+                if o1 || o2 { return nil }
+                sum = next
+            }
+            return sum
+        }
         switch values.count {
-        case 1: return .seconds(values[0] * 60)
-        case 2: return .seconds(values[0] * 60 + values[1])
-        case 3: return .seconds(values[0] * 3600 + values[1] * 60 + values[2])
+        case 1, 2, 3:
+            let weights = values.count == 1 ? [60] : values.count == 2 ? [60, 1] : [3600, 60, 1]
+            guard let t = total(weights) else { return .invalid }
+            return .seconds(t)
         default: return .invalid
         }
     }
