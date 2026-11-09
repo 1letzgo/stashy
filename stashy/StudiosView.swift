@@ -775,6 +775,8 @@ struct StudioImageView: View {
     let studio: Studio
     /// The catalog card prints the name itself, so its placeholder shows only the symbol.
     var showsNameInPlaceholder: Bool = true
+    /// Told whether a logo is shown (true) or the placeholder (false) once loading ends.
+    var onLogoResolved: ((Bool) -> Void)? = nil
     @State private var imageLoadState: ImageLoadState = .loading
 
     enum ImageLoadState {
@@ -807,6 +809,11 @@ struct StudioImageView: View {
         }
         .task(id: "\(studio.id)|\(studio.updatedAt ?? "")") {
             await loadImage()
+            switch imageLoadState {
+            case .success: onLogoResolved?(true)
+            case .failure: onLogoResolved?(false)
+            case .loading: break
+            }
         }
     }
 
@@ -902,38 +909,54 @@ struct StudioCardView: View {
     @ObservedObject private var studioCounts = StudioCountsStore.shared
     @AppStorage(StudioCountsStore.includeSubStudiosKey) private var includeSubStudios = false
 
+    /// Whether the logo is on the card; nil while it loads. The name is printed only without one.
+    @State private var showsLogo: Bool?
+
     /// Same build as the gallery and performer cards: one surface, counts as glass pills at the
-    /// top, the name over the bottom edge. A logo is never cropped, so it sits centred on the
-    /// studio grey between the pills and the name instead of filling the card.
+    /// top (galleries left, scenes right). A logo is never cropped, so it sits centred on the
+    /// studio grey between the pills; it names the studio, so the name is printed over the
+    /// bottom edge only when there is no logo.
     var body: some View {
         let counts = studioCounts.display(for: studio, includeSubStudios: includeSubStudios)
         Color.studioHeaderGray(for: appearance.currentTheme)
             // 16:9 like the scene cards: the lower studio rows no longer tower over the others.
             .aspectRatio(16 / 9, contentMode: .fit)
             .overlay(
-                StudioImageView(studio: studio, showsNameInPlaceholder: false)
-                    .padding(.horizontal, 24)
-                    .padding(.top, 36)
-                    .padding(.bottom, 36)
+                StudioImageView(
+                    studio: studio,
+                    showsNameInPlaceholder: false,
+                    onLogoResolved: { showsLogo = $0 }
+                )
+                // The logo stands in for the printed name, so VoiceOver reads the name here.
+                .accessibilityElement()
+                .accessibilityLabel(studio.name)
+                .accessibilityHidden(showsLogo != true)
+                .padding(.horizontal, 24)
+                .padding(.top, 36)
+                .padding(.bottom, 36)
             )
-            .overlay(alignment: .topTrailing) {
-                HStack(spacing: 4) {
-                    CatalogCardCountPill(icon: "film", count: counts.scenes, noun: "scene")
-                    if let galleryCount = counts.galleries, galleryCount > 0 {
-                        CatalogCardCountPill(icon: "photo.stack", count: galleryCount, noun: "gallery")
-                    }
+            .overlay(alignment: .topLeading) {
+                if let galleryCount = counts.galleries, galleryCount > 0 {
+                    CatalogCardCountPill(icon: "photo.stack", count: galleryCount, noun: "gallery")
+                        .padding(8)
                 }
-                .padding(8)
+            }
+            .overlay(alignment: .topTrailing) {
+                CatalogCardCountPill(icon: "film", count: counts.scenes, noun: "scene")
+                    .padding(8)
             }
             .overlay(alignment: .bottomLeading) {
-                Text(studio.name)
-                    .font(.headline)
-                    .foregroundColor(.white)
-                    .lineLimit(1)
-                    .multilineTextAlignment(.leading)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(12)
+                if showsLogo == false {
+                    Text(studio.name)
+                        .font(.headline)
+                        .foregroundColor(.white)
+                        .lineLimit(1)
+                        .multilineTextAlignment(.leading)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(12)
+                }
             }
+
             .clipShape(RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.card))
             .contentShape(RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.card))
             .cardShadow()
