@@ -428,6 +428,34 @@ final class MiniPlayerStore: ObservableObject {
         UserDefaults.standard.removeObject(forKey: key)
     }
 
+    /// Home hero's Play / Resume: the scene plays in the bar right away, from its saved
+    /// position or from the start, without opening its page.
+    func playInBar(_ scene: Scene, fromStart: Bool = false) {
+        guard isEnabled else { return }
+        if let current = session {
+            if current.scene.id == scene.id {
+                if fromStart { Task { await current.engine.seek(to: 0) } }
+                current.engine.play()
+            } else {
+                // Switch the bar over; `play` resumes from `resumeTime`, 0 starts at the top.
+                play(fromStart ? scene.withResumeTime(0) : scene)
+            }
+            return
+        }
+        guard let url = scene.aetherVideoURL, let engine = try? AetherSceneEngine() else { return }
+        engine.isMuted = ScenePlayerMute.initialValue()
+        engine.fallbackSources = scene.transcodeFallbackURLs
+        engine.fallbackDeclaredDuration = scene.sceneDuration
+        adopt(scene: scene, engine: engine, playRegistered: false)
+        let start: Double? = {
+            guard !fromStart, let time = scene.resumeTime, time > 0 else { return nil }
+            // Watched to the end before: start over instead of landing on the credits.
+            if let total = scene.sceneDuration, total > 0, time >= total * 0.95 { return nil }
+            return time
+        }()
+        Task { await engine.load(url: url, startAt: start, autoplay: true) }
+    }
+
     /// App start: the bar comes back with the last scene, paused at its position.
     func restoreLastSessionIfNeeded() {
         guard session == nil, isEnabled, let key = savedSessionKey,

@@ -34,10 +34,13 @@ struct SceneDetailView: View {
     @StateObject private var extrasController = ScenePlayerExtrasController()
     
     let autoPlay: Bool
+    /// With `autoPlay`: start at the beginning instead of the saved position (Home hero's Play).
+    let autoPlayFromStart: Bool
     
-    init(scene: Scene, autoPlay: Bool = false) {
+    init(scene: Scene, autoPlay: Bool = false, autoPlayFromStart: Bool = false) {
         self.scene = scene
         self.autoPlay = autoPlay
+        self.autoPlayFromStart = autoPlayFromStart
         _activeScene = State(initialValue: scene)
     }
     /// The one player. Non-nil from the first `startPlayback` until teardown.
@@ -660,7 +663,7 @@ struct SceneDetailView: View {
         if autoPlay {
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
                 if !isPlaybackStarted { 
-                    startPlayback(resume: true) 
+                    startPlayback(resume: !autoPlayFromStart)
                 }
             }
         }

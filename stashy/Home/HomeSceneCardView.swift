@@ -109,15 +109,20 @@ struct HomeSceneCardView: View {
                     }
                 }
                 Spacer()
-                Text(scene.displayTitle ?? "Untitled Scene")
-                    // Small cards match the Channels card titles (12pt bold); the hero row
-                    // keeps its larger type.
-                    .font(isLarge ? .subheadline : .system(size: 12, weight: .bold))
-                    .fontWeight(.bold)
-                    .foregroundColor(.white)
-                    .lineLimit(2)
-                    .frame(maxWidth: .infinity, alignment: .bottomLeading)
-                    .shadow(color: .black.opacity(0.8), radius: 2, x: 0, y: 1)
+                HStack(alignment: .bottom, spacing: 8) {
+                    Text(scene.displayTitle ?? "Untitled Scene")
+                        // Small cards match the Channels card titles (12pt bold); the hero row
+                        // keeps its larger type.
+                        .font(isLarge ? .subheadline : .system(size: 12, weight: .bold))
+                        .fontWeight(.bold)
+                        .foregroundColor(.white)
+                        .lineLimit(2)
+                        .frame(maxWidth: .infinity, alignment: .bottomLeading)
+                        .shadow(color: .black.opacity(0.8), radius: 2, x: 0, y: 1)
+                    if isLarge {
+                        heroPlayButtons
+                    }
+                }
             }
             .padding(8)
             .padding(.bottom, 4)
@@ -141,6 +146,60 @@ struct HomeSceneCardView: View {
             stopPreview()
             hero.play(scene)
         }
+    }
+
+    /// Hero card, as icons: Play from the start, and Resume when the scene has a saved
+    /// position — the scene page's symbols (play, and `clock.arrow.circlepath`).
+    /// With the mini player on (stashy+) the scene starts in the bar, which opens full size;
+    /// without it, the scene page is pushed and plays at once.
+    private var heroPlayButtons: some View {
+        HStack(spacing: 8) {
+            heroIconButton(
+                systemImage: "play.fill",
+                label: hasResumePoint ? "Start from beginning" : "Play",
+                fromStart: true
+            )
+            if hasResumePoint {
+                heroIconButton(systemImage: "clock.arrow.circlepath", label: "Resume", fromStart: false)
+            }
+        }
+        .fixedSize()
+    }
+
+    @ViewBuilder
+    private func heroIconButton(systemImage: String, label: String, fromStart: Bool) -> some View {
+        let icon = Image(systemName: systemImage)
+            .font(.system(size: 15, weight: .semibold))
+            .foregroundColor(.white)
+            .frame(width: 40, height: 40)
+            .stashyGlass(shape: Circle())
+            .contentShape(Circle())
+        if MiniPlayerStore.shared.isEnabled {
+            Button {
+                stopPreview()
+                HapticManager.light()
+                MiniPlayerStore.shared.playInBar(scene, fromStart: fromStart)
+                // Straight to the full player view, on the bar's engine.
+                MiniPlayerStore.shared.expand()
+            } label: { icon }
+            .buttonStyle(.plain)
+            .accessibilityLabel(label)
+        } else {
+            NavigationLink(destination: LazyView { SceneDetailView(scene: scene, autoPlay: true, autoPlayFromStart: fromStart) }) {
+                icon
+            }
+            .buttonStyle(.plain)
+            .simultaneousGesture(TapGesture().onEnded { stopPreview() })
+            .accessibilityLabel(label)
+        }
+    }
+
+    private var hasResumePoint: Bool {
+        // A few seconds in is no real position to go back to.
+        guard let time = scene.resumeTime, time >= 10 else { return false }
+        // Watched to the end: Resume would land on the credits.
+        if let total = scene.sceneDuration, total > 0, time >= total * 0.95 { return false }
+        return true
     }
 
     private func startPreview() {
