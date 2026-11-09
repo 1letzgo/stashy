@@ -38,25 +38,23 @@ struct TVApp: App {
 
     var body: some SwiftUI.Scene {
         WindowGroup {
-            // Sperre als Overlay statt `fullScreenCover`: tvOS schließt ein Cover bei
-            // Menu trotz `interactiveDismissDisabled` (im Simulator reproduziert) — die
-            // App war danach ohne PIN bedienbar. Die App darunter ist `disabled`, kann
-            // also keinen Fokus nehmen; offene Covers schließen sich über
-            // `dismissOnAppLock`, weil sie sonst über dem Overlay lägen.
-            ZStack {
-                Group {
-                    if configManager.activeConfig?.hasValidConfig == true {
-                        TVMainTabView()
-                    } else {
-                        TVServerSetupView()
-                    }
+            // Die Sperre hat ein eigenes Fenster über allem (`TVLockScreenWindow`): als Overlay
+            // in diesem Fenster erschien sie erst beim nächsten SwiftUI-Update — offene Player
+            // und Covers lagen bis dahin darüber, und der App-Umschalter zeigte den Inhalt.
+            // Kein `fullScreenCover`: tvOS schließt ein Cover bei Menu trotz
+            // `interactiveDismissDisabled`. Die App darunter ist `disabled`, offene Covers
+            // schließen sich über `dismissOnAppLock` (der Player hört damit auch auf).
+            Group {
+                if configManager.activeConfig?.hasValidConfig == true {
+                    TVMainTabView()
+                } else {
+                    TVServerSetupView()
                 }
-                .disabled(securityManager.isAppLocked)
-
-                if securityManager.isAppLocked {
-                    TVPasscodeEntryView()
-                        .zIndex(1)
-                }
+            }
+            .disabled(securityManager.isAppLocked)
+            .onChange(of: securityManager.isAppLocked, initial: true) { _, locked in
+                // Kaltstart: `init` sperrt, bevor es eine Szene gibt — hier kommt das Fenster nach.
+                TVLockScreenWindow.shared.update(locked: locked)
             }
             // Alle tvOS-Themes sind dunkel (`AppTheme.tvOSThemes`) — ohne das würden
             // `.primary`/`.secondary`-Texte beim hellen Apple-TV-Design unlesbar.
@@ -81,7 +79,14 @@ struct TVApp: App {
 final class TVSecurityManager: ObservableObject {
     static let shared = TVSecurityManager()
 
-    @Published var isAppLocked: Bool = false
+    /// Zeigt/entfernt das Sperrfenster sofort, nicht erst beim nächsten SwiftUI-Update.
+    @Published var isAppLocked: Bool = false {
+        didSet {
+            guard isAppLocked != oldValue else { return }
+            TVLockScreenWindow.shared.update(locked: isAppLocked)
+        }
+    }
+    private var backgroundObserver: NSObjectProtocol?
     @Published var isPinSet: Bool = false
     @Published var isPinLockEnabled: Bool {
         didSet {
@@ -104,6 +109,15 @@ final class TVSecurityManager: ObservableObject {
         self.isPinSet = (UserDefaults.standard.string(forKey: kHash) != nil)
         if isPinLockEnabled && isPinSet {
             self.isAppLocked = true
+        }
+        // Synchron beim Wechsel in den Hintergrund sperren: `scenePhase` kommt erst danach,
+        // dann hat tvOS das Bild für den App-Umschalter schon mit dem Inhalt aufgenommen.
+        backgroundObserver = NotificationCenter.default.addObserver(
+            forName: UIApplication.didEnterBackgroundNotification,
+            object: nil,
+            queue: .main
+        ) { _ in
+            MainActor.assumeIsolated { TVSecurityManager.shared.lock() }
         }
     }
 
@@ -203,7 +217,11 @@ struct TVPasscodeEntryView: View {
 
                 TVPinPad(
                     onDigit: { digit in
-                        if pin.count < 4 { pin.append(digit) }
+                        guard pin.count < 4 else { return }
+                        pin.append(digit)
+                        // Direkt prüfen statt per `onChange(of: pin)`: im eigenen Sperrfenster
+                        // (Root eines UIHostingController) feuerte das nicht.
+                        if pin.count == 4 { check(pin) }
                     },
                     onDelete: {
                         if !pin.isEmpty { pin.removeLast() }
@@ -216,19 +234,6 @@ struct TVPasscodeEntryView: View {
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .padding(.horizontal, 80)
         }
-        .onChange(of: pin) { _, newValue in
-            guard newValue.count == 4 else { return }
-            if securityManager.verify(pin: newValue) {
-                securityManager.unlock()
-            } else {
-                errorMessage = "Wrong PIN"
-                shakeTrigger.toggle()
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
-                    pin = ""
-                    errorMessage = nil
-                }
-            }
-        }
         .onExitCommand {
             // Menu/Back-Taste darf die PIN-Sperre NICHT umgehen.
             // Fehler-Feedback statt dismiss.
@@ -239,6 +244,20 @@ struct TVPasscodeEntryView: View {
             // Ensure the lock is actually active when shown.
             securityManager.lock()
             focusedDigit = "5"
+        }
+    }
+
+    private func check(_ entered: String) {
+        if securityManager.verify(pin: entered) {
+            pin = ""
+            securityManager.unlock()
+        } else {
+            errorMessage = "Wrong PIN"
+            shakeTrigger.toggle()
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
+                pin = ""
+                errorMessage = nil
+            }
         }
     }
 }
@@ -689,6 +708,62 @@ private struct TVDismissOnAppLock: ViewModifier {
     func body(content: Content) -> some View {
         content.onChange(of: security.isAppLocked) { _, locked in
             if locked { dismiss() }
+        }
+    }
+}
+
+
+// MARK: - Lock window
+
+/// Die PIN-Sperre in einem eigenen Fenster auf Alert-Ebene: nichts aus dem App-Fenster
+/// (Player, Covers, Bildbetrachter) kann darüber liegen, und sie steht im selben Moment,
+/// in dem gesperrt wird.
+@MainActor
+final class TVLockScreenWindow {
+    static let shared = TVLockScreenWindow()
+    private var windows: [ObjectIdentifier: UIWindow] = [:]
+
+    func update(locked: Bool) {
+        if locked {
+            show()
+            // Beim Kaltstart verbinden sich die Szenen evtl. noch.
+            DispatchQueue.main.async { if TVSecurityManager.shared.isAppLocked { self.show() } }
+        } else {
+            hide()
+        }
+    }
+
+    private func show() {
+        let scenes = UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }
+        for scene in scenes where windows[ObjectIdentifier(scene)] == nil {
+            let window = UIWindow(windowScene: scene)
+            window.windowLevel = .alert + 1
+            let host = UIHostingController(rootView: TVPasscodeEntryView().preferredColorScheme(.dark))
+            host.view.backgroundColor = .black
+            window.rootViewController = host
+            window.backgroundColor = .black
+            // Key, damit der Fokus (PIN-Feld) hier landet und nicht in der App darunter.
+            window.makeKeyAndVisible()
+            // Gleich zeichnen, bevor tvOS das Bild für den App-Umschalter nimmt.
+            window.layoutIfNeeded()
+            windows[ObjectIdentifier(scene)] = window
+        }
+    }
+
+    private func hide() {
+        let leaving = windows
+        windows.removeAll()
+        for (_, window) in leaving {
+            // Fokus zurück ans App-Fenster der Szene.
+            window.windowScene?.windows
+                .first { $0 !== window && $0.windowLevel == .normal }?
+                .makeKey()
+            UIView.animate(withDuration: 0.2, animations: {
+                window.alpha = 0
+            }, completion: { _ in
+                window.isHidden = true
+                window.rootViewController = nil
+            })
         }
     }
 }
