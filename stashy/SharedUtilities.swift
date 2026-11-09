@@ -2278,9 +2278,111 @@ public struct FilterMapper {
         var out = variables
         for (key, value) in variables
         where key.hasSuffix("_filter") && key != "object_filter" && key != "find_filter" {
-            if let filter = value as? [String: Any] { out[key] = hoistFolder(filter) }
+            if let filter = value as? [String: Any] { out[key] = performerAgeAsBirthdate(hoistFolder(filter)) }
         }
         return out
+    }
+
+    /// Stash ignores `birth_year` and `age` inside a `performers_filter` sub-filter (scenes,
+    /// galleries, images…): every scene query with one returns 0, while `birthdate` there and both
+    /// keys on `findPerformers` work. Inside every `performers_filter` they are sent as the
+    /// `birthdate` range they stand for. Age counts from today (Stash counts from the death
+    /// date for a deceased performer).
+    static func performerAgeAsBirthdate(_ dict: [String: Any], today: Date = Date(), inSubFilter: Bool = false) -> [String: Any] {
+        var out = dict
+        for (key, value) in dict {
+            guard let nested = value as? [String: Any] else { continue }
+            if key == "performers_filter" {
+                out[key] = performerAgeAsBirthdate(nested, today: today, inSubFilter: true)
+            } else if ["AND", "OR", "NOT"].contains(key) || key.hasSuffix("_filter") {
+                out[key] = performerAgeAsBirthdate(nested, today: today, inSubFilter: inSubFilter && ["AND", "OR", "NOT"].contains(key))
+            }
+        }
+        guard inSubFilter else { return out }
+        var ranges: [[String: Any]] = []
+        if let criterion = out["birth_year"] as? [String: Any], let range = birthdateRange(birthYear: criterion) {
+            ranges.append(range)
+            out.removeValue(forKey: "birth_year")
+        }
+        if let criterion = out["age"] as? [String: Any], let range = birthdateRange(age: criterion, today: today) {
+            ranges.append(range)
+            out.removeValue(forKey: "age")
+        }
+        for range in ranges {
+            if out["birthdate"] == nil {
+                out["birthdate"] = range
+            } else {
+                // One `birthdate` per level: the rest moves one level down, ANDed.
+                out = ["birthdate": range, "AND": out]
+            }
+        }
+        return out
+    }
+
+    private static let isoDay: DateFormatter = {
+        let f = DateFormatter()
+        f.calendar = Calendar(identifier: .gregorian)
+        f.locale = Locale(identifier: "en_US_POSIX")
+        f.dateFormat = "yyyy-MM-dd"
+        return f
+    }()
+
+    private static func intValue(_ value: Any?) -> Int? {
+        if let i = value as? Int { return i }
+        if let d = value as? Double { return Int(d) }
+        if let s = value as? String { return Int(s.trimmingCharacters(in: .whitespaces)) }
+        return nil
+    }
+
+    /// `birth_year` → `birthdate`: a year is the range from 1 January to 31 December.
+    static func birthdateRange(birthYear criterion: [String: Any]) -> [String: Any]? {
+        let modifier = (criterion["modifier"] as? String) ?? "EQUALS"
+        if modifier == "IS_NULL" || modifier == "NOT_NULL" { return ["value": "", "modifier": modifier] }
+        guard let year = intValue(criterion["value"]) else { return nil }
+        let first = { (y: Int) in String(format: "%04d-01-01", y) }
+        let last = { (y: Int) in String(format: "%04d-12-31", y) }
+        switch modifier {
+        case "EQUALS": return ["value": first(year), "value2": last(year), "modifier": "BETWEEN"]
+        case "NOT_EQUALS": return ["value": first(year), "value2": last(year), "modifier": "NOT_BETWEEN"]
+        case "GREATER_THAN": return ["value": last(year), "modifier": "GREATER_THAN"]
+        case "LESS_THAN": return ["value": first(year), "modifier": "LESS_THAN"]
+        case "BETWEEN", "NOT_BETWEEN":
+            guard let other = intValue(criterion["value2"]) else { return nil }
+            return ["value": first(min(year, other)), "value2": last(max(year, other)), "modifier": modifier]
+        default: return nil
+        }
+    }
+
+    /// `age` → `birthdate`: aged N today means born after today − (N+1) years and on or
+    /// before today − N years.
+    static func birthdateRange(age criterion: [String: Any], today: Date) -> [String: Any]? {
+        let modifier = (criterion["modifier"] as? String) ?? "EQUALS"
+        if modifier == "IS_NULL" || modifier == "NOT_NULL" { return ["value": "", "modifier": modifier] }
+        guard let age = intValue(criterion["value"]) else { return nil }
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = .current
+        let day = calendar.startOfDay(for: today)
+        func yearsAgo(_ n: Int) -> Date { calendar.date(byAdding: .year, value: -n, to: day) ?? day }
+        func plusDay(_ d: Date) -> Date { calendar.date(byAdding: .day, value: 1, to: d) ?? d }
+        let text = { (d: Date) in isoDay.string(from: d) }
+        // Born within [earliest, latest] = aged between `young` and `old` today.
+        func span(young: Int, old: Int) -> (String, String) { (text(plusDay(yearsAgo(old + 1))), text(yearsAgo(young))) }
+        switch modifier {
+        case "EQUALS", "NOT_EQUALS":
+            let (from, to) = span(young: age, old: age)
+            return ["value": from, "value2": to, "modifier": modifier == "EQUALS" ? "BETWEEN" : "NOT_BETWEEN"]
+        case "GREATER_THAN":
+            // Older than N: born on or before today − (N+1) years.
+            return ["value": text(plusDay(yearsAgo(age + 1))), "modifier": "LESS_THAN"]
+        case "LESS_THAN":
+            // Younger than N: born after today − N years.
+            return ["value": text(yearsAgo(age)), "modifier": "GREATER_THAN"]
+        case "BETWEEN", "NOT_BETWEEN":
+            guard let other = intValue(criterion["value2"]) else { return nil }
+            let (from, to) = span(young: min(age, other), old: max(age, other))
+            return ["value": from, "value2": to, "modifier": modifier]
+        default: return nil
+        }
     }
 
     private static func hoistFolder(_ dict: [String: Any]) -> [String: Any] {

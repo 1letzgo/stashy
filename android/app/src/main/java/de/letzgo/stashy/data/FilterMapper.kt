@@ -217,10 +217,108 @@ object FilterMapper {
         for ((key, value) in variables) {
             if (!key.endsWith("_filter") || key == "object_filter" || key == "find_filter") continue
             val filter = value as? JsonObject ?: continue
-            val hoisted = hoistFolder(filter)
+            val hoisted = performerAgeAsBirthdate(hoistFolder(filter))
             if (hoisted !== filter) { out[key] = hoisted; changed = true }
         }
         return if (changed) JsonObject(out) else variables
+    }
+
+    /**
+     * Stash ignores `birth_year` and `age` inside a `performers_filter` sub-filter (scenes,
+     * galleries, images…): every query with one returns 0, while `birthdate` there and both keys
+     * on `findPerformers` work. Inside every `performers_filter` they are sent as the `birthdate`
+     * range they stand for. Age counts from [today] (Stash counts from the death date for a
+     * deceased performer). Returns [dict] itself when nothing changed. Same as iOS
+     * `FilterMapper.performerAgeAsBirthdate`.
+     */
+    fun performerAgeAsBirthdate(
+        dict: JsonObject,
+        today: java.time.LocalDate = java.time.LocalDate.now(),
+        inSubFilter: Boolean = false,
+    ): JsonObject {
+        var out: LinkedHashMap<String, JsonElement>? = null
+        fun mutable() = out ?: LinkedHashMap<String, JsonElement>(dict).also { out = it }
+        for ((key, value) in dict) {
+            val nested = value as? JsonObject ?: continue
+            val rewritten = when {
+                key == "performers_filter" -> performerAgeAsBirthdate(nested, today, inSubFilter = true)
+                key in logicKeys -> performerAgeAsBirthdate(nested, today, inSubFilter)
+                key.endsWith("_filter") -> performerAgeAsBirthdate(nested, today, inSubFilter = false)
+                else -> nested
+            }
+            if (rewritten !== nested) mutable()[key] = rewritten
+        }
+        if (!inSubFilter) return out?.let { JsonObject(it) } ?: dict
+        val ranges = mutableListOf<JsonObject>()
+        (dict["birth_year"] as? JsonObject)?.let { c ->
+            birthdateRangeForBirthYear(c)?.let { ranges += it; mutable().remove("birth_year") }
+        }
+        (dict["age"] as? JsonObject)?.let { c ->
+            birthdateRangeForAge(c, today)?.let { ranges += it; mutable().remove("age") }
+        }
+        var result: Map<String, JsonElement> = out ?: return dict
+        for (range in ranges) {
+            result = if (result["birthdate"] == null) {
+                LinkedHashMap(result).apply { put("birthdate", range) }
+            } else {
+                // One `birthdate` per level: the rest moves one level down, ANDed.
+                linkedMapOf("birthdate" to range, "AND" to JsonObject(result))
+            }
+        }
+        return JsonObject(result)
+    }
+
+    private fun intValue(element: JsonElement?): Int? {
+        val p = element as? JsonPrimitive ?: return null
+        return p.content.trim().toDoubleOrNull()?.toInt()
+    }
+
+    private fun dateRange(from: String, to: String?, modifier: String): JsonObject = buildJsonObject {
+        put("value", JsonPrimitive(from))
+        if (to != null) put("value2", JsonPrimitive(to))
+        put("modifier", JsonPrimitive(modifier))
+    }
+
+    /** `birth_year` → `birthdate`: a year is the range from 1 January to 31 December. */
+    fun birthdateRangeForBirthYear(criterion: JsonObject): JsonObject? {
+        val modifier = (criterion["modifier"] as? JsonPrimitive)?.content ?: "EQUALS"
+        if (modifier == "IS_NULL" || modifier == "NOT_NULL") return dateRange("", null, modifier)
+        val year = intValue(criterion["value"]) ?: return null
+        fun first(y: Int) = String.format(java.util.Locale.ROOT, "%04d-01-01", y)
+        fun last(y: Int) = String.format(java.util.Locale.ROOT, "%04d-12-31", y)
+        return when (modifier) {
+            "EQUALS" -> dateRange(first(year), last(year), "BETWEEN")
+            "NOT_EQUALS" -> dateRange(first(year), last(year), "NOT_BETWEEN")
+            "GREATER_THAN" -> dateRange(last(year), null, "GREATER_THAN")
+            "LESS_THAN" -> dateRange(first(year), null, "LESS_THAN")
+            "BETWEEN", "NOT_BETWEEN" -> {
+                val other = intValue(criterion["value2"]) ?: return null
+                dateRange(first(minOf(year, other)), last(maxOf(year, other)), modifier)
+            }
+            else -> null
+        }
+    }
+
+    /** `age` → `birthdate`: aged N today means born after today − (N+1) years and on or before today − N years. */
+    fun birthdateRangeForAge(criterion: JsonObject, today: java.time.LocalDate): JsonObject? {
+        val modifier = (criterion["modifier"] as? JsonPrimitive)?.content ?: "EQUALS"
+        if (modifier == "IS_NULL" || modifier == "NOT_NULL") return dateRange("", null, modifier)
+        val age = intValue(criterion["value"]) ?: return null
+        fun yearsAgo(n: Int) = today.minusYears(n.toLong())
+        fun earliest(old: Int) = yearsAgo(old + 1).plusDays(1).toString()
+        return when (modifier) {
+            "EQUALS" -> dateRange(earliest(age), yearsAgo(age).toString(), "BETWEEN")
+            "NOT_EQUALS" -> dateRange(earliest(age), yearsAgo(age).toString(), "NOT_BETWEEN")
+            // Older than N: born on or before today − (N+1) years.
+            "GREATER_THAN" -> dateRange(earliest(age), null, "LESS_THAN")
+            // Younger than N: born after today − N years.
+            "LESS_THAN" -> dateRange(yearsAgo(age).toString(), null, "GREATER_THAN")
+            "BETWEEN", "NOT_BETWEEN" -> {
+                val other = intValue(criterion["value2"]) ?: return null
+                dateRange(earliest(maxOf(age, other)), yearsAgo(minOf(age, other)).toString(), modifier)
+            }
+            else -> null
+        }
     }
 
     /** Returns [dict] itself when nothing moved. */
