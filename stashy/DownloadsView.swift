@@ -946,6 +946,9 @@ struct DownloadDetailView: View {
 
     /// Local file URL — the engine skips auth headers for `file://`.
     private func startPlayback(resume: Bool = true) {
+        // The mini player and any other page player stop here: the download plays offline on
+        // its own engine, and both soundtracks ran on top of each other.
+        NotificationCenter.default.post(name: .stashyPauseBackgroundPlayers, object: nil)
         let videoURL = downloadManager.getLocalVideoURL(for: downloaded)
         let storedResume = downloadManager.downloads.first(where: { $0.id == downloaded.id })?.resumeTime
         let startAt: Double? = resume ? storedResume : nil

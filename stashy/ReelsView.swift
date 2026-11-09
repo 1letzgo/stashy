@@ -435,6 +435,8 @@ struct ReelsViewBody: View {
     /// Where the time bar sits in the tab bar slot (full above it, or inline beside it).
     @ObservedObject private var timeBarAccessory = FeedsScrubberAccessory.shared
     @State private var isInitialized = false
+    /// Came back to the foreground under the passcode screen: resume once it is unlocked.
+    @State private var resumesAfterUnlock = false
     /// Set once a remount is announced: this instance is about to be replaced and must not
     /// resume or restart playback in the meantime.
     @State private var isBeingReplaced = false
@@ -2857,6 +2859,17 @@ struct ReelsViewBody: View {
                 // was, like after a tab switch.
                 guard coordinator.selectedTab == .reels else { return }
                 guard isInitialized else { return }
+                // Under the passcode screen the feed waits; it plays on once the app is unlocked.
+                if SecurityManager.shared.isAppLocked {
+                    resumesAfterUnlock = true
+                    return
+                }
+                reelsResumePlaybackAfterReturn()
+            }
+            .onReceive(SecurityManager.shared.$isAppLocked.dropFirst().removeDuplicates()) { locked in
+                guard !locked, resumesAfterUnlock else { return }
+                resumesAfterUnlock = false
+                guard coordinator.selectedTab == .reels, isInitialized else { return }
                 reelsResumePlaybackAfterReturn()
             }
             .onChange(of: coordinator.reelsNavigationToken) { _, _ in

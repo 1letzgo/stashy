@@ -919,6 +919,24 @@ final class AetherSceneEngine: ObservableObject {
     /// Playing when the app went to the background — it plays on when the app comes back.
     private var resumesAfterBackground = false
 
+    #if os(iOS)
+    private var unlockResume: AnyCancellable?
+
+    /// Plays once the passcode screen is gone; a pause or stop meanwhile cancels it.
+    private func resumeAfterUnlock() {
+        unlockResume = SecurityManager.shared.$isAppLocked
+            .dropFirst()
+            .filter { !$0 }
+            .first()
+            .receive(on: RunLoop.main)
+            .sink { [weak self] _ in
+                guard let self else { return }
+                self.unlockResume = nil
+                self.play()
+            }
+    }
+    #endif
+
     /// Going to the background without a live Picture-in-Picture window pauses. The engine would
     /// otherwise keep playing audio in the background (background playback follows the PiP
     /// setting). Whether it was playing is remembered for the return.
@@ -932,6 +950,22 @@ final class AetherSceneEngine: ObservableObject {
     /// Back from the background: a video that was playing plays on at its spot. A session the
     /// engine tore down meanwhile is rebuilt first; a paused one stays paused.
     private func resumeFromBackgroundIfNeeded() {
+        #if os(iOS)
+        // Back under the passcode screen: nothing plays before the code is in. The video picks
+        // up where it was once the app is unlocked.
+        if SecurityManager.shared.isAppLocked {
+            if resumesAfterBackground { resumeAfterUnlock() }
+            resumesAfterBackground = false
+            if isSessionTornDown {
+                Task { [weak self] in
+                    guard let self else { return }
+                    await self.rebuildTornDownSession()
+                    self.engine.pause()
+                }
+            }
+            return
+        }
+        #endif
         let shouldPlay = resumesAfterBackground
         resumesAfterBackground = false
         if isSessionTornDown {
@@ -946,6 +980,9 @@ final class AetherSceneEngine: ObservableObject {
     }
 
     func pause() {
+        #if os(iOS)
+        unlockResume = nil
+        #endif
         cancelAudioOutputRestart()
         // Already paused: nothing to do, and a repeat is not free — on the software route every
         // pause re-sets the synchronizer rate, a synchronous main-thread call into CoreAudio.
@@ -1198,6 +1235,9 @@ final class AetherSceneEngine: ObservableObject {
 
     /// Callers must invoke this before releasing the wrapper: `@State` release is not deterministic.
     func stop() {
+        #if os(iOS)
+        unlockResume = nil
+        #endif
         audioOutputRestart?.cancel()
         audioOutputRestart = nil
         cancellables.removeAll()

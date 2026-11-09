@@ -50,15 +50,17 @@ struct PasscodeEntryView: View {
                             .frame(width: 15, height: 15)
                     }
                 }
-                .offset(x: shakeTrigger ? 10 : 0)
-                .animation(.default, value: shakeTrigger)
+                .modifier(PasscodeShake(trigger: shakeTrigger))
+                .animation(.snappy(duration: 0.15), value: passcode.count)
                 .padding(.top, 8)
+                .accessibilityElement()
+                .accessibilityLabel("\(passcode.count) of 4 digits entered")
             }
             
             Spacer()
             
             // Keypad – unterer Bereich
-            VStack(spacing: 12) {
+            VStack(spacing: 16) {
                 ForEach(0..<3) { row in
                     HStack(spacing: 0) {
                         ForEach(1..<4) { col in
@@ -74,6 +76,7 @@ struct PasscodeEntryView: View {
                         if securityManager.isBiometricsEnabled && !isLockedOut {
                             Button(action: {
                                 guard !isAuthenticating else { return }
+                                HapticManager.light()
                                 isAuthenticating = true
                                 securityManager.authenticateWithBiometrics { _ in
                                     isAuthenticating = false
@@ -81,12 +84,13 @@ struct PasscodeEntryView: View {
                             }) {
                                 Image(systemName: securityManager.biometryType == .faceID ? "faceid" : "touchid")
                                     .font(.title)
-                                    .frame(height: 70)
-                                    .frame(maxWidth: .infinity)
                             }
+                            .buttonStyle(PasscodeKeyStyle(filled: false))
+                            .accessibilityLabel(securityManager.biometryType == .faceID ? "Unlock with Face ID" : "Unlock with Touch ID")
+                            .frame(maxWidth: .infinity)
                         } else {
                             Color.clear
-                                .frame(height: 70)
+                                .frame(height: PasscodeKeyStyle.size)
                                 .frame(maxWidth: .infinity)
                         }
                     }
@@ -95,15 +99,17 @@ struct PasscodeEntryView: View {
                         .frame(maxWidth: .infinity)
                     
                     Button(action: {
-                        if !passcode.isEmpty {
-                            passcode.removeLast()
-                        }
+                        guard !passcode.isEmpty else { return }
+                        HapticManager.selection()
+                        passcode.removeLast()
                     }) {
                         Image(systemName: "delete.left")
-                            .font(.title)
-                            .frame(height: 70)
-                            .frame(maxWidth: .infinity)
+                            .font(.title2)
                     }
+                    .buttonStyle(PasscodeKeyStyle(filled: false))
+                    .accessibilityLabel("Delete")
+                    .frame(maxWidth: .infinity)
+                    .opacity(passcode.isEmpty ? 0.35 : 1)
                     .disabled(isLockedOut)
                 }
             }
@@ -126,13 +132,15 @@ struct PasscodeEntryView: View {
         .onChange(of: passcode) { _, newValue in
             if newValue.count == 4 {
                 if securityManager.verifyPasscode(newValue) {
+                    HapticManager.success()
                     securityManager.unlock()
                 } else {
+                    HapticManager.error()
                     errorMessage = isLockedOut
                         ? "Too many attempts. Try again in \(securityManager.lockoutRemainingSeconds)s"
                         : "Wrong Passcode"
                     shakeTrigger.toggle()
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.45) {
                         passcode = ""
                         if !isLockedOut {
                             errorMessage = nil
@@ -176,22 +184,62 @@ struct PasscodeEntryView: View {
     
     private func button(for number: String) -> some View {
         Button(action: {
-            guard !isLockedOut else { return }
-            if passcode.count < 4 {
-                passcode.append(number)
-            }
+            guard !isLockedOut, passcode.count < 4 else { return }
+            HapticManager.light()
+            passcode.append(number)
         }) {
             Text(number)
-                .font(.title)
-                .fontWeight(.medium)
-                .frame(height: 70)
-                .frame(maxWidth: .infinity)
-                .background(
-                    Circle()
-                        .fill(Color.secondary.opacity(0.1))
-                        .frame(width: 70, height: 70)
-                )
+                .font(.system(size: 34, weight: .regular, design: .rounded))
+                .monospacedDigit()
+                .dynamicTypeSize(...DynamicTypeSize.accessibility1)
         }
+        .buttonStyle(PasscodeKeyStyle(filled: true))
         .disabled(isLockedOut)
+    }
+}
+
+/// A keypad key like the system's: a round key that lights up under the finger and lets go
+/// with a short fade, so every tap is felt and seen.
+private struct PasscodeKeyStyle: ButtonStyle {
+    static let size: CGFloat = 76
+    let filled: Bool
+
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .frame(width: Self.size, height: Self.size)
+            .background(
+                Circle().fill(Color.primary.opacity(fillOpacity(pressed: configuration.isPressed)))
+            )
+            .contentShape(Circle())
+            .scaleEffect(configuration.isPressed ? 0.94 : 1)
+            .animation(
+                configuration.isPressed ? .easeOut(duration: 0.05) : .easeOut(duration: 0.3),
+                value: configuration.isPressed
+            )
+    }
+
+    private func fillOpacity(pressed: Bool) -> Double {
+        if pressed { return 0.28 }
+        return filled ? 0.1 : 0
+    }
+}
+
+/// Wrong code: the dots shake side to side and settle, like the system passcode screen.
+private struct PasscodeShake: ViewModifier {
+    let trigger: Bool
+
+    func body(content: Content) -> some View {
+        content.keyframeAnimator(initialValue: CGFloat(0), trigger: trigger) { view, offset in
+            view.offset(x: offset)
+        } keyframes: { _ in
+            KeyframeTrack {
+                LinearKeyframe(-14, duration: 0.06)
+                LinearKeyframe(12, duration: 0.07)
+                LinearKeyframe(-9, duration: 0.07)
+                LinearKeyframe(6, duration: 0.07)
+                LinearKeyframe(-3, duration: 0.06)
+                SpringKeyframe(0, duration: 0.12)
+            }
+        }
     }
 }
