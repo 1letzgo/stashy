@@ -981,17 +981,18 @@ struct CatalogCardCountPill: View {
     }
 
     var body: some View {
+        // Same type and shadow as the performer card's pills.
         HStack(spacing: 3) {
             Image(systemName: icon)
-                .font(.caption2.weight(.bold))
+                .font(.system(size: 10, weight: .bold))
             Text("\(count)")
-                .font(.caption.weight(.semibold))
-                .monospacedDigit()
+                .font(.system(size: 11, weight: .bold))
         }
         .foregroundColor(.white)
         .padding(.horizontal, 8)
         .padding(.vertical, 4)
         .stashyGlass(shape: Capsule())
+        .shadow(color: .black.opacity(0.2), radius: 2)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(spokenLabel)
     }
