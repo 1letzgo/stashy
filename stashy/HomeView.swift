@@ -145,11 +145,13 @@ private struct HomeViewContent: View {
             contentWidth = width
         }
         .refreshable {
-            viewModel.homeRowScenes.removeAll()
-            viewModel.homeRowPerformers.removeAll()
-            viewModel.homeRowStudios.removeAll()
-            viewModel.homeRowGalleries.removeAll()
+            // The rows keep their cards and reload in place. Emptied first, every row fell back
+            // to "No content found" for the length of the request, the hero row shrank and the
+            // rows below jumped up and back.
             viewModel.initializeServerConnection()
+            for row in tabManager.homeRows where row.isEnabled && row.type != .statistics && !row.type.requiresStashyPlus {
+                viewModel.loadHomeRowIfNeeded(config: row, maxAge: 0)
+            }
             // The spinner stays until the new For You list is on screen.
             async let forgotten: Void = ForgottenFavoritesEngine.shared.rebuildAndWait()
             await SceneRecommendationEngine.shared.rebuildAndWait()

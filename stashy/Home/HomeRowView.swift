@@ -101,6 +101,13 @@ struct HomeDashboardHeroBackdrop: View, Equatable {
                             HeroBackdropImage(url: thumbnailURL)
                                 .id(thumbnailURL.absoluteString)
                                 .transition(.opacity)
+                        } else if let last = HeroBackdropBlur.lastShown {
+                            // Pull to refresh empties the row while it reloads: the wash stays
+                            // instead of flashing to the plain background and back.
+                            Image(uiImage: last)
+                                .resizable()
+                                .interpolation(.medium)
+                                .scaledToFill()
                         }
                     }
                     .animation(.easeInOut(duration: 0.5), value: thumbnailURL?.absoluteString)
@@ -123,7 +130,14 @@ struct HomeDashboardHeroBackdrop: View, Equatable {
 /// sampling it once more), which held the Pro's display far below its refresh rate.
 private struct HeroBackdropImage: View {
     let url: URL
+    /// Starts from the blur cache: a rebuilt row (pull to refresh, scrolling back) shows the
+    /// wash in its first frame instead of fading it in again.
     @State private var image: UIImage?
+
+    init(url: URL) {
+        self.url = url
+        _image = State(initialValue: HeroBackdropBlur.cachedImage(for: url))
+    }
 
     var body: some View {
         ZStack {
@@ -136,16 +150,29 @@ private struct HeroBackdropImage: View {
             }
         }
         .animation(.easeInOut(duration: 0.3), value: image != nil)
-        .task(id: url) { image = await HeroBackdropBlur.image(for: url) }
+        .task(id: url) {
+            guard image == nil else { return }
+            image = await HeroBackdropBlur.image(for: url)
+        }
     }
 }
 
 enum HeroBackdropBlur {
     private static var cache: [URL: UIImage] = [:]
     nonisolated(unsafe) private static let context = CIContext()
+    /// The wash shown last, kept on while the hero row reloads.
+    private(set) static var lastShown: UIImage?
+
+    static func cachedImage(for url: URL) -> UIImage? {
+        if let cached = cache[url] { lastShown = cached }
+        return cache[url]
+    }
 
     static func image(for url: URL) async -> UIImage? {
-        if let cached = cache[url] { return cached }
+        if let cached = cache[url] {
+            lastShown = cached
+            return cached
+        }
         guard let source = await ImageLoader.uiImage(for: url)?.cgImage else { return nil }
         guard let blurred = await Task.detached(priority: .userInitiated, operation: {
             Self.blurred(source)
@@ -153,6 +180,7 @@ enum HeroBackdropBlur {
         if cache.count > 24 { cache.removeAll() }
         let image = UIImage(cgImage: blurred)
         cache[url] = image
+        lastShown = image
         return image
     }
 
