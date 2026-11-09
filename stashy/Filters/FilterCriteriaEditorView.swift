@@ -170,6 +170,7 @@ struct FilterCriteriaEditorView: View {
 
     private var addBar: some View {
         HStack(spacing: DesignTokens.Spacing.sm) {
+            addGroupMenu
             Spacer(minLength: 0)
             Menu {
                 ForEach(addableFields) { field in
@@ -203,11 +204,45 @@ struct FilterCriteriaEditorView: View {
         .padding(.vertical, DesignTokens.Spacing.sm + 2)
     }
 
-    /// One nested AND/OR/NOT group as its own card.
-    ///
-    /// New groups can no longer be created — include/exclude on a single criterion covers what
-    /// they were used for. Existing ones (typically written by the Stash web UI) are still shown
-    /// so they can be inspected or deleted, instead of silently riding along in every save.
+    /// Stash takes one AND, OR or NOT per level: once this level has one, further groups go
+    /// inside it. A new group is empty and sends nothing until a condition is added to it.
+    private var addGroupMenu: some View {
+        let taken = !document.groupKeys(at: path).isEmpty
+        return Menu {
+            ForEach(FilterCriteriaDocument.groupKeys, id: \.self) { group in
+                Button {
+                    document.addGroup(group, at: path)
+                    HapticManager.selection()
+                } label: {
+                    Text(Self.groupTitle(group))
+                    Text(Self.groupHint(group))
+                }
+            }
+        } label: {
+            HStack(spacing: DesignTokens.Spacing.xs) {
+                Image(systemName: "square.stack.3d.up")
+                    .foregroundColor(taken ? .secondary : appearance.tintColor)
+                Text("Add group")
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundColor(taken ? .secondary : .primary)
+            }
+            .contentShape(Rectangle())
+        }
+        .disabled(taken)
+        .accessibilityHint(taken ? "This level already has a group. Add the next one inside it." : "")
+    }
+
+    static func groupHint(_ group: String) -> String {
+        switch group {
+        case "AND": return "Every condition in it must match"
+        case "OR": return "This level or the group must match"
+        case "NOT": return "Leaves out what the group matches"
+        default: return ""
+        }
+    }
+
+    /// One nested AND/OR/NOT group as its own card. Created with "Add group", or written by the
+    /// Stash web UI into a saved filter.
     @ViewBuilder
     private func groupCard(_ group: String) -> some View {
         VStack(alignment: .leading, spacing: DesignTokens.Spacing.xs) {

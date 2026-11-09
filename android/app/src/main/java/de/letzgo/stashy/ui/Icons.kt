@@ -48,6 +48,7 @@ object SF {
     val magazine = Icons.AutoMirrored.Filled.MenuBook
     val counterclockwise = Icons.Filled.Replay
     val plus = Icons.Filled.Add
+    val squareStack3dUp = Icons.Outlined.Layers
     val trash = Icons.Outlined.Delete
     val pencil = Icons.Outlined.Edit
     val playFill = Icons.Filled.PlayArrow

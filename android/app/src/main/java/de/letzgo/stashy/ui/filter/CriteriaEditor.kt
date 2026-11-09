@@ -219,6 +219,8 @@ fun FilterCriteriaEditor(
             if (field.key !in stickyKeys) stickyKeys.add(field.key)
             if (field.key !in expandedKeys) expandedKeys.add(field.key)
         }
+        NativeDivider()
+        AddGroupBar(taken = groupKeys.isNotEmpty()) { group -> document.addGroup(group, path) }
         }
         NativeSectionFooter(explanation)
         groupKeys.forEach { group ->
@@ -271,6 +273,44 @@ private fun AddConditionBar(addable: List<FilterFieldDescriptor>, onAdd: (Filter
             }
         }
     }
+}
+
+/**
+ * Stash takes one AND, OR or NOT per level: once this level has one, further groups go inside
+ * it. A new group is empty and sends nothing until a condition is added. iOS: `addGroupMenu`.
+ */
+@Composable
+private fun AddGroupBar(taken: Boolean, onAdd: (String) -> Unit) {
+    val p = Theme.palette
+    var open by remember { mutableStateOf(false) }
+    Box(Modifier.fillMaxWidth()) {
+        NativeListItem(
+            "Add group", icon = SF.squareStack3dUp, iconTint = p.secondaryText,
+            enabled = !taken, onClick = { open = true },
+        )
+        Box(Modifier.align(Alignment.TopStart)) {
+            DropdownMenu(open, { open = false }, containerColor = p.secondaryBackground) {
+                CriteriaDocument.GROUP_KEYS.forEach { group ->
+                    DropdownMenuItem(
+                        text = {
+                            Column {
+                                Text(groupTitle(group), color = p.text)
+                                Text(groupHint(group), color = p.secondaryText, style = MaterialTheme.typography.bodySmall)
+                            }
+                        },
+                        onClick = { open = false; onAdd(group) },
+                    )
+                }
+            }
+        }
+    }
+}
+
+fun groupHint(group: String) = when (group) {
+    "AND" -> "Every condition in it must match"
+    "OR" -> "This level or the group must match"
+    "NOT" -> "Leaves out what the group matches"
+    else -> ""
 }
 
 /** iOS: `groupTitle(_:)`. */
