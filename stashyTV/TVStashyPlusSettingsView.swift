@@ -114,6 +114,7 @@ final class TVStashyPlusStore: ObservableObject {
             hasLifetimePurchase: snapshot.hasLifetimePurchase,
             subscriptionProductID: snapshot.subscriptionProductID,
             subscriptionExpiration: snapshot.subscriptionExpiration,
+            isTrial: snapshot.isTrial,
             legacyPaidApp: legacyPaidApp
         )
 

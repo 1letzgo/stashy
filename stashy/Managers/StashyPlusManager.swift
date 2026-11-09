@@ -154,6 +154,8 @@ final class StashyPlusManager: ObservableObject {
     @Published private(set) var source: StashyPlusSource
     @Published private(set) var activeProductID: String?
     @Published private(set) var subscriptionExpiration: Date?
+    /// The subscription is still in its free trial (ends at `subscriptionExpiration`).
+    @Published private(set) var isInTrial = false
 
     var hasStashyPlus: Bool { isUnlocked }
     var hasLifetime: Bool {
@@ -261,6 +263,7 @@ final class StashyPlusManager: ObservableObject {
         hasLifetimePurchase: Bool,
         subscriptionProductID: String?,
         subscriptionExpiration: Date?,
+        isTrial: Bool = false,
         legacyPaidApp: Bool
     ) {
         let defaults = UserDefaults.standard
@@ -268,6 +271,7 @@ final class StashyPlusManager: ObservableObject {
             source = .none
             activeProductID = nil
             self.subscriptionExpiration = nil
+            isInTrial = false
             isUnlocked = false
             objectWillChange.send()
             return
@@ -318,6 +322,7 @@ final class StashyPlusManager: ObservableObject {
             ? (hasLifetimePurchase ? StashyPlusProduct.lifetime : activeProductID)
             : (subActive ? subscriptionProductID : nil)
         self.subscriptionExpiration = subActive ? subscriptionExpiration : nil
+        isInTrial = subActive && isTrial && !permanent
         isUnlocked = permanent || subActive || Self.localUnlockActive
         if Self.localUnlockActive, newSource == .none {
             // Anzeige-Quelle; in `defaults` steht weiterhin `newSource`.
@@ -463,6 +468,41 @@ struct StashyStoreProduct: Identifiable {
     var id: String { package.storeProduct.productIdentifier }
     var displayName: String { package.storeProduct.localizedTitle }
     var displayPrice: String { package.storeProduct.localizedPriceString }
+
+    /// The free introductory period set up in App Store Connect, e.g. "7 days". Nil without
+    /// one (or for a paid intro price). Whether this user may still take it is separate:
+    /// `StoreManager.trialEligibleIDs`.
+    var freeTrialLength: String? {
+        guard let offer = package.storeProduct.introductoryDiscount,
+              offer.paymentMode == .freeTrial else { return nil }
+        return Self.lengthText(offer.subscriptionPeriod)
+    }
+
+    /// "4,99 €/month" — what the plan costs once the trial is over.
+    var pricePerPeriod: String {
+        guard let period = package.storeProduct.subscriptionPeriod else { return displayPrice }
+        let unit: String
+        switch period.unit {
+        case .day: unit = period.value == 1 ? "day" : "\(period.value) days"
+        case .week: unit = period.value == 1 ? "week" : "\(period.value) weeks"
+        case .month: unit = period.value == 1 ? "month" : "\(period.value) months"
+        case .year: unit = period.value == 1 ? "year" : "\(period.value) years"
+        @unknown default: return displayPrice
+        }
+        return "\(displayPrice)/\(unit)"
+    }
+
+    private static func lengthText(_ period: RevenueCat.SubscriptionPeriod) -> String {
+        let days: Int
+        switch period.unit {
+        case .day: days = period.value
+        case .week: days = period.value * 7
+        case .month: return period.value == 1 ? "1 month" : "\(period.value) months"
+        case .year: return period.value == 1 ? "1 year" : "\(period.value) years"
+        @unknown default: days = period.value
+        }
+        return days == 1 ? "1 day" : "\(days) days"
+    }
 }
 
 /// Shared RevenueCat plumbing for the iOS `StoreManager` and the tvOS `TVStashyPlusStore`.
@@ -548,6 +588,8 @@ enum StashyRevenueCat {
         var subscriptionExpiration: Date?
         /// Any tip ever bought (RevenueCat keeps consumables in `nonSubscriptions`).
         var hasTipped = false
+        /// The active subscription is still in its free trial.
+        var isTrial = false
 
         mutating func addSubscription(_ productID: String, expiration: Date?) {
             let exp = expiration ?? .distantFuture
@@ -560,6 +602,7 @@ enum StashyRevenueCat {
         mutating func merge(_ other: EntitlementSnapshot) {
             hasLifetimePurchase = hasLifetimePurchase || other.hasLifetimePurchase
             hasTipped = hasTipped || other.hasTipped
+            isTrial = isTrial || other.isTrial
             if let id = other.subscriptionProductID {
                 addSubscription(id, expiration: other.subscriptionExpiration)
             }
@@ -592,6 +635,9 @@ enum StashyRevenueCat {
         for id in StashyPlusProduct.subscriptionIDs where info.activeSubscriptions.contains(id) {
             snapshot.addSubscription(id, expiration: info.expirationDate(forProductIdentifier: id))
         }
+        if let entitlement = info.entitlements.all[entitlementID], entitlement.isActive {
+            snapshot.isTrial = entitlement.periodType == .trial
+        }
         return snapshot
     }
 
@@ -603,9 +649,22 @@ enum StashyRevenueCat {
                 snapshot.hasLifetimePurchase = true
             } else if StashyPlusProduct.subscriptionIDs.contains(transaction.productID) {
                 snapshot.addSubscription(transaction.productID, expiration: transaction.expirationDate)
+                if transaction.offer?.type == .introductory, transaction.offer?.paymentMode == .freeTrial {
+                    snapshot.isTrial = true
+                }
             }
         }
         return snapshot
+    }
+
+    /// Plans whose free trial this Apple ID may still take. Apple grants one introductory
+    /// offer per subscription group; "unknown" counts as not eligible, so the paywall never
+    /// promises a trial the purchase sheet then does not give.
+    static func trialEligibleIDs(for products: [StashyStoreProduct]) async -> Set<String> {
+        let ids = products.filter { $0.freeTrialLength != nil }.map(\.id)
+        guard !ids.isEmpty else { return [] }
+        let result = await purchases.checkTrialOrIntroDiscountEligibility(productIdentifiers: ids)
+        return Set(result.filter { $0.value.status == .eligible }.map(\.key))
     }
 
     /// Calls `onChange` for every CustomerInfo update (purchases, renewals, restores).

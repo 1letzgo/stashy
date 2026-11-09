@@ -483,7 +483,10 @@ struct SettingsView: View {
     @ViewBuilder
     private var stashyPlusSubscriptionLegalDisclosure: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text("Subscriptions renew automatically unless canceled at least 24 hours before the end of the current period. Manage or cancel in your App Store account settings.")
+            Text((offersFreeTrial
+                  ? "The free trial is for new subscribers. When it ends, the subscription starts at the price shown unless canceled at least 24 hours before. "
+                  : "")
+                 + "Subscriptions renew automatically unless canceled at least 24 hours before the end of the current period. Manage or cancel in your App Store account settings.")
                 .font(.caption2)
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
@@ -601,6 +604,19 @@ struct SettingsView: View {
                 Spacer(minLength: 8)
                 if storeManager.purchasingProductID == product.id {
                     ProgressView()
+                } else if let trial = freeTrialLength(for: product) {
+                    // The trial leads, the price it turns into sits right below — App Review
+                    // (3.1.2) wants what is charged after the trial as visible as the trial.
+                    VStack(alignment: .trailing, spacing: 2) {
+                        Text("\(trial) free")
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundColor(appearanceManager.tintColor)
+                        Text("then \(product.pricePerPeriod)")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.85)
                 } else {
                     Text(priceLabel(for: product))
                         .font(.subheadline)
@@ -652,6 +668,9 @@ struct SettingsView: View {
            let name = StashyPlusProduct.displayNames[id] {
             if let exp = stashyPlus.subscriptionExpiration {
                 let formatted = exp.formatted(date: .abbreviated, time: .omitted)
+                if stashyPlus.isInTrial {
+                    return "\(name) · free trial until \(formatted)"
+                }
                 return "\(name) · renews or expires \(formatted)"
             }
             return "\(name) plan"
@@ -661,6 +680,16 @@ struct SettingsView: View {
 
     private func priceLabel(for product: StashyStoreProduct) -> String {
         product.displayPrice
+    }
+
+    /// "7 days" when this plan has a free trial and this Apple ID can still take it.
+    private func freeTrialLength(for product: StashyStoreProduct) -> String? {
+        guard storeManager.trialEligibleIDs.contains(product.id) else { return nil }
+        return product.freeTrialLength
+    }
+
+    private var offersFreeTrial: Bool {
+        storeManager.products.contains { freeTrialLength(for: $0) != nil }
     }
 
     private var restoreFailureMessage: String {
@@ -845,6 +874,8 @@ class StoreManager: ObservableObject {
 
     @Published var products: [StashyStoreProduct] = []
     @Published var tipProducts: [StashyStoreProduct] = []
+    /// Plans whose free trial this Apple ID can still take (see `StashyRevenueCat.trialEligibleIDs`).
+    @Published private(set) var trialEligibleIDs: Set<String> = []
     @Published var isLoadingProducts = false
     @Published var lastProductError: String?
     @Published private(set) var purchasingProductID: String?
@@ -897,6 +928,7 @@ class StoreManager: ObservableObject {
             self.tipProducts = loaded.filter { tipIDs.contains($0.id) }.sorted {
                 (StashyPlusProduct.sortOrder[$0.id] ?? 99) < (StashyPlusProduct.sortOrder[$1.id] ?? 99)
             }
+            self.trialEligibleIDs = await StashyRevenueCat.trialEligibleIDs(for: self.products)
             let loadedPlus = Set(self.products.map(\.id))
             let missing = plusIDs.subtracting(loadedPlus).sorted()
             if self.products.isEmpty {
@@ -928,6 +960,8 @@ class StoreManager: ObservableObject {
         }
         StashyPlusManager.shared.clearDebugForceLock()
         await syncUnlockFromStore(customerInfo: customerInfo)
+        // A trial taken is gone for the whole subscription group.
+        trialEligibleIDs = await StashyRevenueCat.trialEligibleIDs(for: products)
         return nil
     }
 
@@ -965,6 +999,7 @@ class StoreManager: ObservableObject {
             hasLifetimePurchase: snapshot.hasLifetimePurchase,
             subscriptionProductID: snapshot.subscriptionProductID,
             subscriptionExpiration: snapshot.subscriptionExpiration,
+            isTrial: snapshot.isTrial,
             legacyPaidApp: legacyPaidApp
         )
 

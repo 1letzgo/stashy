@@ -82,6 +82,35 @@ class StashyStoreProduct(val pkg: Package) {
     val productId: String get() = pkg.product.id.substringBefore(':')
     val name: String get() = pkg.product.name
     val price: String get() = pkg.product.price.formatted
+
+    /**
+     * The free trial of this plan, e.g. "7 days". Play only hands out offers the account can
+     * still take, and RevenueCat's default option picks the trial — so non-null means this
+     * purchase starts with it. iOS: `freeTrialLength` + `trialEligibleIDs`.
+     */
+    val freeTrialLength: String? get() {
+        val period = pkg.product.defaultOption?.freePhase?.billingPeriod ?: return null
+        return when (period.unit) {
+            com.revenuecat.purchases.models.Period.Unit.DAY -> if (period.value == 1) "1 day" else "${period.value} days"
+            com.revenuecat.purchases.models.Period.Unit.WEEK -> "${period.value * 7} days"
+            com.revenuecat.purchases.models.Period.Unit.MONTH -> if (period.value == 1) "1 month" else "${period.value} months"
+            com.revenuecat.purchases.models.Period.Unit.YEAR -> if (period.value == 1) "1 year" else "${period.value} years"
+            else -> null
+        }
+    }
+
+    /** "4,99 €/month" — what the plan costs once the trial is over. */
+    val pricePerPeriod: String get() {
+        val period = pkg.product.period ?: return price
+        val unit = when (period.unit) {
+            com.revenuecat.purchases.models.Period.Unit.DAY -> "day"
+            com.revenuecat.purchases.models.Period.Unit.WEEK -> "week"
+            com.revenuecat.purchases.models.Period.Unit.MONTH -> "month"
+            com.revenuecat.purchases.models.Period.Unit.YEAR -> "year"
+            else -> return price
+        }
+        return if (period.value == 1) "$price/$unit" else "$price/${period.value} ${unit}s"
+    }
 }
 
 /**
@@ -115,6 +144,8 @@ object StashyPlus {
     var source by mutableStateOf(initialSource()); private set
     var isUnlocked by mutableStateOf(source != StashyPlusSource.None); private set
     var activeProductID by mutableStateOf(Prefs.string(ACTIVE_PRODUCT_KEY)); private set
+    /** End of the free trial while the subscription is still in it, else null. */
+    var trialEndsAt by mutableStateOf<java.util.Date?>(null); private set
 
     var products by mutableStateOf<List<StashyStoreProduct>>(emptyList()); private set
     var tipProducts by mutableStateOf<List<StashyStoreProduct>>(emptyList()); private set
@@ -240,6 +271,8 @@ object StashyPlus {
     private fun apply(info: CustomerInfo) {
         val lifetime = info.nonSubscriptionTransactions.any { it.productIdentifier.substringBefore(':') == StashyPlusProduct.LIFETIME }
         val subscription = info.activeSubscriptions.map { it.substringBefore(':') }.firstOrNull { it in StashyPlusProduct.subscriptionIDs }
+        trialEndsAt = if (lifetime || subscription == null) null else info.entitlements.active.values
+            .firstOrNull { it.periodType == com.revenuecat.purchases.PeriodType.TRIAL }?.expirationDate
         when {
             lifetime -> apply(StashyPlusSource.Lifetime, StashyPlusProduct.LIFETIME)
             subscription != null -> apply(StashyPlusSource.Subscription, subscription)

@@ -327,8 +327,10 @@ private fun PurchaseSection() {
 
     if (StashyPlus.shouldOfferPurchases) {
         Column(Modifier.fillMaxWidth().padding(top = 8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            val trialNote = if (StashyPlus.products.any { it.freeTrialLength != null })
+                "The free trial is for new subscribers. When it ends, the subscription starts at the price shown unless canceled before. " else ""
             Text(
-                "Subscriptions renew automatically unless canceled before the end of the current period. Manage or cancel in your Google Play account settings.",
+                trialNote + "Subscriptions renew automatically unless canceled before the end of the current period. Manage or cancel in your Google Play account settings.",
                 style = NativeType.labelSmall, color = p.secondaryText,
             )
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -354,7 +356,12 @@ private fun retryProducts() {
 private fun statusDetailText(): String {
     val id = StashyPlus.activeProductID
     if (StashyPlus.source == StashyPlusSource.Subscription && id != null) {
-        StashyPlusProduct.displayNames[id]?.let { return "$it plan" }
+        val name = StashyPlusProduct.displayNames[id]
+        StashyPlus.trialEndsAt?.let { end ->
+            val date = java.text.DateFormat.getDateInstance(java.text.DateFormat.MEDIUM).format(end)
+            return "${name ?: "stashy+"} · free trial until $date"
+        }
+        name?.let { return "$it plan" }
     }
     if (StashyPlus.source == StashyPlusSource.License) StashyPlus.license?.let { return licenseText(it) }
     return StashyPlus.source.statusDetail
@@ -448,8 +455,17 @@ private fun PurchaseButton(product: StashyStoreProduct) {
         horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         PlusRowLabel(StashyPlusProduct.displayNames[product.productId] ?: product.name, iconFor(product.productId), Modifier.weight(1f))
-        if (purchasing == product.productId) SmallSpinner()
-        else Text(StashyPlus.price(product), style = NativeType.bodyMedium, color = Theme.palette.secondaryText, maxLines = 1)
+        val trial = product.freeTrialLength
+        when {
+            purchasing == product.productId -> SmallSpinner()
+            // The trial leads, the price it turns into right below it (Play policy: what is
+            // charged after the trial must be as clear as the trial).
+            trial != null -> Column(horizontalAlignment = Alignment.End) {
+                Text("$trial free", style = NativeType.bodyMedium, color = Appearance.tint, maxLines = 1)
+                Text("then ${product.pricePerPeriod}", style = NativeType.labelSmall, color = Theme.palette.secondaryText, maxLines = 1)
+            }
+            else -> Text(StashyPlus.price(product), style = NativeType.bodyMedium, color = Theme.palette.secondaryText, maxLines = 1)
+        }
     }
 }
 
