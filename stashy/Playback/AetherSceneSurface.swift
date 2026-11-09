@@ -608,7 +608,8 @@ struct AetherSceneSurface: View {
     /// the button pop into the row seconds after the others. It is therefore in place from the
     /// start, greyed out, and only disappears where the settled route cannot mirror at all.
     private var showsAirPlayButton: Bool {
-        airPlayIsReady || !engine.hasFirstFrame
+        guard !tabManager.hidesPlayerAirPlayButton else { return false }
+        return airPlayIsReady || !engine.hasFirstFrame
     }
 
     @ViewBuilder

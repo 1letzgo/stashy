@@ -316,6 +316,8 @@ struct HomeChannelItemConfig: Codable, Identifiable, Equatable {
     var destination: HomeChannelSourceKind
     var isEnabled: Bool
     var sortOrder: Int
+    /// SF Symbol picked by long-pressing the channel on Home; nil = the category logo.
+    var icon: String? = nil
 
     var id: String { "\(destination.rawValue).\(filterId)" }
 }
@@ -524,6 +526,14 @@ class TabManager: ObservableObject {
         }
     }
 
+    /// Settings › Playback › "Hide AirPlay button". On takes the AirPlay button out of the
+    /// player's top row.
+    @Published var hidesPlayerAirPlayButton: Bool = false {
+        didSet {
+            UserDefaults.standard.set(hidesPlayerAirPlayButton, forKey: hidesPlayerAirPlayButtonKey)
+        }
+    }
+
     /// Settings › Playback › "Count as played after". Seconds of playback before a scene gets a
     /// play count and its progress is written back. 0 counts as soon as playback starts.
     /// Kept separate for the full player and for Feeds, where users skip through quickly.
@@ -723,6 +733,7 @@ class TabManager: ObservableObject {
     private let isMiniPlayerEnabledKey = "isMiniPlayerEnabled"
     private let playerSkipSecondsKey = "playerSkipSeconds"
     private let showsPlayerSkipButtonsKey = "showsPlayerSkipButtons"
+    private let hidesPlayerAirPlayButtonKey = "hidesPlayerAirPlayButton"
     private let playerAutoZoomKey = "playerAutoZoom"
     private let playerDolbyVisionEnabledKey = "player_dolby_vision_enabled"
     private let downloadBatchSizeKey = "download_batch_size"
@@ -790,6 +801,7 @@ class TabManager: ObservableObject {
         let storedSkip = UserDefaults.standard.object(forKey: playerSkipSecondsKey) as? Double ?? 10
         self.playerSkipSeconds = Self.playerSkipOptions.contains(storedSkip) ? storedSkip : 10
         self.showsPlayerSkipButtons = UserDefaults.standard.object(forKey: showsPlayerSkipButtonsKey) as? Bool ?? true
+        self.hidesPlayerAirPlayButton = UserDefaults.standard.bool(forKey: hidesPlayerAirPlayButtonKey)
         self.playerAutoZoom = UserDefaults.standard.object(forKey: playerAutoZoomKey) as? Bool ?? false
         self.tracksPlaybackActivity = Self.isPlaybackActivityTracked
         self.playerAutoRotateFullscreen = Self.isFullscreenAutoRotateOn
@@ -1465,6 +1477,13 @@ class TabManager: ObservableObject {
     func toggleHomeChannelItem(_ id: String) {
         guard let index = homeChannelItems.firstIndex(where: { $0.id == id }) else { return }
         homeChannelItems[index].isEnabled.toggle()
+        saveHomeChannelItems()
+    }
+
+    /// nil restores the category logo (scenes / clips).
+    func setHomeChannelIcon(_ id: String, icon: String?) {
+        guard let index = homeChannelItems.firstIndex(where: { $0.id == id }) else { return }
+        homeChannelItems[index].icon = icon
         saveHomeChannelItems()
     }
 
