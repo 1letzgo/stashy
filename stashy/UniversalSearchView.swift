@@ -58,20 +58,27 @@ struct UniversalSearchView: View {
 
     var body: some View {
         NavigationStack {
+          VStack(spacing: 0) {
+            // A fixed sibling of the content below: it keeps focus when the content switches
+            // between the empty state and the results (first letter, clearing).
+            RegularWidthSearchField(text: $searchText)
             Group {
                 if configManager.activeConfig == nil {
                     // No server configured: the only way forward is Settings.
                     ConnectionErrorView { coordinator.selectedTab = .settings }
-                } else if searchText.isEmpty {
+                } else if searchText.trimmingCharacters(in: .whitespacesAndNewlines).count < 2 {
+                    // The search starts at two characters; one is not "no results".
                     emptySearchView
                 } else {
                     searchResultsView
                 }
             }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+          }
             .navigationTitle("Search")
             .navigationBarTitleDisplayMode(.inline)
             .applyAppBackground()
-            .searchable(text: $searchText, prompt: "Search everything...")
+            .modifier(SystemSearchField(text: $searchText))
             .onChange(of: searchText) { oldValue, newValue in
                 let query = newValue.trimmingCharacters(in: .whitespacesAndNewlines)
                 if query.count < 2 {
@@ -394,6 +401,83 @@ struct UniversalSearchView: View {
         markers = []
     }
 }
+
+/// At regular width (iPad, open iPhone Duo) the system puts a search tab's field beside the
+/// floating tab bar (on narrower windows only a round button), and while it is active it hides
+/// the tab bar with no way back. There the field is the page's own bar above the results
+/// (`RegularWidthSearchField`) and the tab bar stays; compact width keeps the system field.
+private struct SystemSearchField: ViewModifier {
+    @Binding var text: String
+    #if os(iOS)
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+    #endif
+
+    func body(content: Content) -> some View {
+        #if os(iOS)
+        if horizontalSizeClass == .regular {
+            content
+        } else {
+            content.searchable(text: $text, prompt: "Search everything...")
+        }
+        #else
+        content.searchable(text: $text, prompt: "Search everything...")
+        #endif
+    }
+}
+
+/// The page's own search field at regular width; nothing at compact width (system field).
+private struct RegularWidthSearchField: View {
+    @Binding var text: String
+    #if os(iOS)
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+    #endif
+
+    var body: some View {
+        #if os(iOS)
+        if horizontalSizeClass == .regular {
+            InlineSearchField(text: $text)
+                .padding(.horizontal, 16)
+                .padding(.vertical, 8)
+        }
+        #endif
+    }
+}
+
+#if os(iOS)
+private struct InlineSearchField: View {
+    @Binding var text: String
+    @FocusState private var isFocused: Bool
+
+    var body: some View {
+        HStack(spacing: 8) {
+            Image(systemName: "magnifyingglass")
+                .foregroundStyle(.secondary)
+                .accessibilityHidden(true)
+            TextField("Search everything...", text: $text)
+                .focused($isFocused)
+                .textInputAutocapitalization(.never)
+                .autocorrectionDisabled()
+                .submitLabel(.search)
+                .onSubmit { isFocused = false }
+            if !text.isEmpty {
+                Button {
+                    text = ""
+                } label: {
+                    Image(systemName: "xmark.circle.fill")
+                        .foregroundStyle(.secondary)
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Clear search")
+            }
+        }
+        .padding(.horizontal, 14)
+        .frame(minHeight: 44)
+        .stashyGlass(shape: Capsule())
+        .contentShape(Capsule())
+        .onTapGesture { isFocused = true }
+    }
+}
+#endif
 
 // MARK: - Flow Layout for Tags
 
