@@ -73,6 +73,77 @@ enum class RecommendationDiscovery(val raw: String, val title: String, val detai
 enum class RecommendationState { Idle, Loading, Ready, NoHistory, Failed }
 
 /**
+ * iOS `RecommendationAdjustment`: one performer, studio or tag turned up, down or off for For You
+ * (Settings › For You › Adjustments, or the ··· menu below a For You card). Per server, same JSON.
+ */
+@kotlinx.serialization.Serializable
+data class RecommendationAdjustment(val kind: Kind, val itemId: String, val name: String, val factor: Double) {
+    @kotlinx.serialization.Serializable
+    enum class Kind(val title: String) {
+        @kotlinx.serialization.SerialName("performer") Performer("Performers"),
+        @kotlinx.serialization.SerialName("studio") Studio("Studios"),
+        @kotlinx.serialization.SerialName("tag") Tag("Tags"),
+    }
+
+    val id: String get() = "${kind.name.lowercase()}:$itemId"
+    val isHidden: Boolean get() = factor < HIDDEN_BELOW
+
+    companion object {
+        val RANGE = 0.0..3.0
+        const val HIDDEN_BELOW = 0.05
+        const val LESS = 0.5
+        const val MORE = 2.0
+        fun label(factor: Double): String = if (factor < HIDDEN_BELOW) "Hidden" else String.format(java.util.Locale.US, "%.1f×", factor)
+    }
+}
+
+/** iOS `SceneRecommendationEngine.Adjust`: the adjustments as lookups for one build. */
+internal class RecommendationAdjust(list: List<RecommendationAdjustment>) {
+    private val performers = HashMap<String, Double>()
+    private val studios = HashMap<String, Double>()
+    private val tags = HashMap<String, Double>()
+
+    init {
+        list.forEach {
+            when (it.kind) {
+                RecommendationAdjustment.Kind.Performer -> performers[it.itemId] = it.factor
+                RecommendationAdjustment.Kind.Studio -> studios[it.itemId] = it.factor
+                RecommendationAdjustment.Kind.Tag -> tags[it.itemId] = it.factor
+            }
+        }
+    }
+
+    val isEmpty get() = performers.isEmpty() && studios.isEmpty() && tags.isEmpty()
+    fun hidesPerformer(id: String) = (performers[id] ?: 1.0) < RecommendationAdjustment.HIDDEN_BELOW
+    fun hidesStudio(id: String) = (studios[id] ?: 1.0) < RecommendationAdjustment.HIDDEN_BELOW
+    fun hidesTag(id: String) = (tags[id] ?: 1.0) < RecommendationAdjustment.HIDDEN_BELOW
+
+    fun hides(performerIds: List<String>, studioId: String?, tagIds: List<String>): Boolean {
+        if (isEmpty) return false
+        return performerIds.any(::hidesPerformer) || (studioId != null && hidesStudio(studioId)) || tagIds.any(::hidesTag)
+    }
+
+    fun hides(scene: Scene) = hides(scene.performers.map { it.id }, scene.studio?.id, scene.tags.orEmpty().map { it.id })
+
+    /** Every adjusted item on the scene multiplies its score. */
+    fun multiplier(performerIds: List<String>, studioId: String?, tagIds: List<String>): Double {
+        if (isEmpty) return 1.0
+        var value = 1.0
+        performerIds.forEach { value *= performers[it] ?: 1.0 }
+        studioId?.let { value *= studios[it] ?: 1.0 }
+        tagIds.forEach { value *= tags[it] ?: 1.0 }
+        return value.coerceIn(0.05, 8.0)
+    }
+
+    /** Turned up: in the profile even without plays (3× counts like the favourite performer). */
+    fun boost(profilePerformers: HashMap<String, Double>, profileStudios: HashMap<String, Double>, profileTags: HashMap<String, Double>) {
+        performers.forEach { (id, f) -> if (f > 1) profilePerformers[id] = max(profilePerformers[id] ?: 0.0, min(1.0, (f - 1) / 2)) }
+        studios.forEach { (id, f) -> if (f > 1) profileStudios[id] = max(profileStudios[id] ?: 0.0, min(1.0, (f - 1) / 2)) }
+        tags.forEach { (id, f) -> if (f > 1) profileTags[id] = max(profileTags[id] ?: 0.0, 0.25 * min(1.0, (f - 1) / 2)) }
+    }
+}
+
+/**
  * iOS: `SceneRecommendationEngine` (stashy+) — the For You row on Home.
  *
  * 1. Profile from the scenes played in the look-back window (recency, replays, O stamps,
@@ -147,6 +218,58 @@ object SceneRecommendations {
         updateOCount(1f); updateRating(1f); updateSimilar(1f); updateDiscovery(RecommendationDiscovery.Balanced)
     }
 
+    // MARK: Adjustments
+
+    private const val ADJUSTMENTS_PREFIX = "recommendations_adjustments_"
+    private val adjustmentsKey: String? get() = ServerConfigManager.activeConfig?.id?.let { "$ADJUSTMENTS_PREFIX$it" }
+    private val adjustmentsSerializer = ListSerializer(RecommendationAdjustment.serializer())
+
+    /** The user's per-item adjustments for the active server. */
+    var adjustments by mutableStateOf(loadAdjustments()); private set
+
+    private fun loadAdjustments(): List<RecommendationAdjustment> {
+        val raw = adjustmentsKey?.let(Prefs::string) ?: return emptyList()
+        return runCatching { de.letzgo.stashy.data.Json.decodeFromString(adjustmentsSerializer, raw) }.getOrDefault(emptyList())
+    }
+
+    private fun saveAdjustments(list: List<RecommendationAdjustment>) {
+        adjustments = list
+        stale = true
+        prepared = null
+        val key = adjustmentsKey ?: return
+        Prefs.setString(key, if (list.isEmpty()) null else de.letzgo.stashy.data.Json.encodeToString(adjustmentsSerializer, list))
+    }
+
+    fun adjustment(kind: RecommendationAdjustment.Kind, itemId: String) = adjustments.firstOrNull { it.kind == kind && it.itemId == itemId }
+
+    /** Adds or changes one; a new one goes to the top. */
+    fun setAdjustment(kind: RecommendationAdjustment.Kind, itemId: String, name: String, factor: Double) {
+        val value = factor.coerceIn(RecommendationAdjustment.RANGE)
+        val existing = adjustments.indexOfFirst { it.kind == kind && it.itemId == itemId }
+        val entry = RecommendationAdjustment(kind, itemId, name, value)
+        if (existing >= 0) {
+            if (adjustments[existing] == entry) return
+            saveAdjustments(adjustments.toMutableList().also { it[existing] = entry })
+        } else {
+            saveAdjustments(listOf(entry) + adjustments)
+        }
+    }
+
+    fun removeAdjustment(kind: RecommendationAdjustment.Kind, itemId: String) {
+        if (adjustments.none { it.kind == kind && it.itemId == itemId }) return
+        saveAdjustments(adjustments.filterNot { it.kind == kind && it.itemId == itemId })
+    }
+
+    fun removeAllAdjustments() { if (adjustments.isNotEmpty()) saveAdjustments(emptyList()) }
+
+    /** From a card's menu: a hidden item takes its cards off the row at once, then a new list is built. */
+    fun applyAdjustmentsNow() {
+        val adjust = RecommendationAdjust(adjustments)
+        val kept = recommendations.filterNot { adjust.hides(it.scene) }
+        if (kept.size != recommendations.size) recommendations = kept
+        rebuild()
+    }
+
     // MARK: Output
 
     var recommendations by mutableStateOf<List<SceneRecommendation>>(emptyList()); private set
@@ -185,6 +308,8 @@ object SceneRecommendations {
         recommendations = emptyList(); builtAt = null; seedCount = 0
         state = RecommendationState.Idle; failure = null
         totalSceneCount = null
+        // A new server has its own ids, so its own adjustments.
+        adjustments = loadAdjustments()
     }
 
     /** Builds when nothing is there, the list is older than three hours, a setting or the server changed. */
@@ -303,7 +428,7 @@ object SceneRecommendations {
     /** Everything a list depends on besides the library itself. */
     private fun settingsSignature(): String = listOf(
         lookbackDays, count, discovery.raw, performerWeight, studioWeight, tagWeight, oCountWeight, ratingWeight, similarWeight,
-    ).joinToString("|")
+    ).joinToString("|") + "|" + adjustments.map { "${it.id}=${it.factor}" }.sorted().joinToString(",")
 
     private fun preparedFile(): java.io.File? = ServerConfigManager.activeConfig?.id?.let {
         java.io.File(java.io.File(Prefs.appContext.filesDir, "ForYou"), "$it.json")
@@ -437,7 +562,7 @@ object SceneRecommendations {
         if (seeds.isEmpty()) return Result.success(emptyList<SceneRecommendation>() to 0)
         val recentlyPlayed = items.filter { (it.lastPlayedAt ?: Instant.EPOCH) >= windowStart }.map { it.id }.toSet()
 
-        val picks = rank(items, seeds, recentlyPlayed, vocabulary, now)
+        val picks = rank(items, seeds, recentlyPlayed, vocabulary, RecommendationAdjust(adjustments), now)
         val scenes = entries.associate { it.id to it.scene!! }
         val recommendations = picks.mapNotNull { pick ->
             scenes[pick.item.id]?.let { SceneRecommendation(it, pick.reason, pick.item.isUnwatched, pick.score) }
@@ -445,27 +570,34 @@ object SceneRecommendations {
         return Result.success(recommendations to seeds.size)
     }
 
-    private fun makeProfile(seeds: List<Seed>, vocabulary: Vocabulary): Profile {
+    private fun makeProfile(seeds: List<Seed>, vocabulary: Vocabulary, adjust: RecommendationAdjust): Profile {
         val profile = Profile()
         for (seed in seeds) {
-            seed.item.performers.forEach { profile.performers.merge(it.first, seed.weight, Double::plus) }
-            seed.item.studio?.let { profile.studios.merge(it.first, seed.weight, Double::plus) }
+            // A hidden item learns nothing from the history; the rest of its scene still counts.
+            seed.item.performers.forEach { if (!adjust.hidesPerformer(it.first)) profile.performers.merge(it.first, seed.weight, Double::plus) }
+            seed.item.studio?.let { if (!adjust.hidesStudio(it.first)) profile.studios.merge(it.first, seed.weight, Double::plus) }
             seed.item.tagIds.forEach { tagId ->
+                if (adjust.hidesTag(tagId)) return@forEach
                 val r = vocabulary.rarity(tagId)
                 profile.tags.merge(tagId, seed.weight * r * r, Double::plus)
             }
         }
         profile.normalize(seeds.sumOf { it.weight })
+        adjust.boost(profile.performers, profile.studios, profile.tags)
         return profile
     }
 
+    private fun RecommendationAdjust.hides(item: RecItem) = hides(item.performers.map { it.first }, item.studio?.first, item.tagIds)
+    private fun RecommendationAdjust.multiplier(item: RecItem) = multiplier(item.performers.map { it.first }, item.studio?.first, item.tagIds)
+
     /** Scores every candidate, steps back what the last lists showed and picks a diverse list. */
-    private fun rank(candidates: List<RecItem>, seeds: List<Seed>, recentlyPlayed: Set<String>, vocabulary: Vocabulary, now: Instant): List<Scored> {
-        val profile = makeProfile(seeds, vocabulary)
+    private fun rank(candidates: List<RecItem>, seeds: List<Seed>, recentlyPlayed: Set<String>, vocabulary: Vocabulary,
+                     adjust: RecommendationAdjust, now: Instant): List<Scored> {
+        val profile = makeProfile(seeds, vocabulary, adjust)
         if (profile.isEmpty) return emptyList()
         val topTags = profile.top(profile.tags, 10)
         val seenAnchor = HashSet<String>()
-        val anchors = seeds.sortedByDescending { it.weight }.filter { seenAnchor.add(it.item.id) }
+        val anchors = seeds.sortedByDescending { it.weight }.filter { !adjust.hides(it.item) && seenAnchor.add(it.item.id) }
             .take(if (similarWeight > 0) 6 else 0)
             .map { s ->
                 val mass = s.item.tagIds.associateWith { vocabulary.rarity(it) }
@@ -474,7 +606,10 @@ object SceneRecommendations {
         val maxSeedWeight = anchors.firstOrNull()?.weight ?: 1.0
         val related = if (tagWeight > 0) AITagSuggestions.relatedTagWeights(topTags) else emptyMap()
         val scored = candidates.mapNotNull { c ->
-            if (c.id in recentlyPlayed) null else score(c, profile, related, anchors, maxSeedWeight, vocabulary, now)
+            if (c.id in recentlyPlayed || adjust.hides(c)) return@mapNotNull null
+            val scored = score(c, profile, related, anchors, maxSeedWeight, vocabulary, now) ?: return@mapNotNull null
+            val factor = adjust.multiplier(c)
+            if (factor == 1.0) scored else Scored(scored.item, scored.reason, scored.score * factor)
         }
         // What the recent lists showed steps back, so the next one is a new list.
         val recentLists = loadRecentPicks()

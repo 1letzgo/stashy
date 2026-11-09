@@ -42,7 +42,7 @@ struct ForgottenFavoritesSettingsView: View {
                         .multilineTextAlignment(.trailing)
                 }
                 .stashyGroupedSettingsRow()
-                stashyScrollingSectionFooter("Scenes among your favorites that you have not played for a while. Everything is worked out on this device. Move or hide the row in Settings › Home.")
+                stashyScrollingSectionFooter("Favorites you have not played for a while.")
             }
 
             Section {
@@ -56,7 +56,6 @@ struct ForgottenFavoritesSettingsView: View {
                 .labelsHidden()
                 .padding(.vertical, 4)
                 .stashyGroupedSettingsRow()
-                stashyScrollingSectionFooter("A favorite shows up once you have not played it for this long.")
             }
 
             Section {
@@ -87,7 +86,6 @@ struct ForgottenFavoritesSettingsView: View {
                 .padding(.vertical, 4)
                 .stashyGroupedBlockRow(index: 1, count: 2)
 
-                stashyScrollingSectionFooter("\(engine.ranking.detail) Only the top \(engine.pool) of each count.")
             }
 
             Section {

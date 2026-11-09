@@ -102,6 +102,62 @@ enum RecommendationDiscovery: String, CaseIterable, Identifiable {
     }
 }
 
+/// One performer, studio or tag the user turned up, down or off for For You
+/// (Settings › For You › Adjustments, or the ··· menu below a For You card). Ids are the server's,
+/// so the list is kept per server.
+struct RecommendationAdjustment: Codable, Identifiable, Equatable {
+    enum Kind: String, Codable, CaseIterable, Identifiable {
+        case performer
+        case studio
+        case tag
+
+        var id: String { rawValue }
+
+        var title: String {
+            switch self {
+            case .performer: return "Performers"
+            case .studio: return "Studios"
+            case .tag: return "Tags"
+            }
+        }
+
+        var addTitle: String {
+            switch self {
+            case .performer: return "Add performer"
+            case .studio: return "Add studio"
+            case .tag: return "Add tag"
+            }
+        }
+
+        var icon: String {
+            switch self {
+            case .performer: return "person.fill"
+            case .studio: return "building.2.fill"
+            case .tag: return "tag.fill"
+            }
+        }
+    }
+
+    let kind: Kind
+    let itemId: String
+    var name: String
+    /// 0 hides it; below 1 fewer scenes with it, above 1 more.
+    var factor: Double
+
+    var id: String { "\(kind.rawValue):\(itemId)" }
+    var isHidden: Bool { factor < RecommendationAdjustment.hiddenBelow }
+
+    static let range: ClosedRange<Double> = 0...3
+    static let hiddenBelow = 0.05
+    /// The card menu's steps.
+    static let less = 0.5
+    static let more = 2.0
+
+    static func label(_ factor: Double) -> String {
+        factor < hiddenBelow ? "Hidden" : String(format: "%.1f×", factor)
+    }
+}
+
 /// Builds the For You list.
 ///
 /// 1. **Profile** — every scene played in the look-back window is a seed. Its weight grows
@@ -144,6 +200,8 @@ final class SceneRecommendationEngine: ObservableObject {
         static let similarWeight = "recommendations_weight_similar"
         static let discovery = "recommendations_discovery"
         static let enabled = "recommendations_enabled"
+        /// Per server: `recommendations_adjustments_<serverID>`, JSON.
+        static let adjustmentsPrefix = "recommendations_adjustments_"
     }
 
     static let lookbackChoices = [7, 14, 30, 60, 90]
@@ -167,6 +225,71 @@ final class SceneRecommendationEngine: ObservableObject {
     /// The user's own switch for the row (Settings › Recommendations). On by default.
     @Published var isEnabled: Bool {
         didSet { UserDefaults.standard.set(isEnabled, forKey: Keys.enabled) }
+    }
+
+    // MARK: Adjustments
+
+    /// The user's per-item adjustments for the active server.
+    @Published private(set) var adjustments: [RecommendationAdjustment] = []
+
+    func adjustment(_ kind: RecommendationAdjustment.Kind, _ itemId: String) -> RecommendationAdjustment? {
+        adjustments.first { $0.kind == kind && $0.itemId == itemId }
+    }
+
+    /// Adds or changes one; a new one goes to the top of its list.
+    func setAdjustment(_ kind: RecommendationAdjustment.Kind, id itemId: String, name: String, factor: Double) {
+        let value = min(max(factor, RecommendationAdjustment.range.lowerBound), RecommendationAdjustment.range.upperBound)
+        if let index = adjustments.firstIndex(where: { $0.kind == kind && $0.itemId == itemId }) {
+            guard adjustments[index].factor != value || adjustments[index].name != name else { return }
+            adjustments[index].factor = value
+            adjustments[index].name = name
+        } else {
+            adjustments.insert(RecommendationAdjustment(kind: kind, itemId: itemId, name: name, factor: value), at: 0)
+        }
+        saveAdjustments()
+    }
+
+    func removeAdjustment(_ kind: RecommendationAdjustment.Kind, id itemId: String) {
+        let before = adjustments.count
+        adjustments.removeAll { $0.kind == kind && $0.itemId == itemId }
+        if adjustments.count != before { saveAdjustments() }
+    }
+
+    func removeAllAdjustments() {
+        guard !adjustments.isEmpty else { return }
+        adjustments = []
+        saveAdjustments()
+    }
+
+    /// From a card's menu: the change shows now. A hidden item takes its cards off the row at
+    /// once, then a new list is built (the row keeps its cards meanwhile).
+    func applyAdjustmentsNow() {
+        let adjust = Adjust(adjustments)
+        let kept = recommendations.filter { !adjust.hides($0.scene) }
+        if kept.count != recommendations.count { recommendations = kept }
+        rebuild()
+    }
+
+    private static var adjustmentsKey: String? {
+        ServerConfigManager.shared.activeConfig.map { "\(Keys.adjustmentsPrefix)\($0.id)" }
+    }
+
+    private static func loadAdjustments() -> [RecommendationAdjustment] {
+        guard let key = adjustmentsKey, let raw = UserDefaults.standard.string(forKey: key),
+              let data = raw.data(using: .utf8),
+              let list = try? JSONDecoder().decode([RecommendationAdjustment].self, from: data) else { return [] }
+        return list
+    }
+
+    private func saveAdjustments() {
+        isStale = true
+        prepared = nil
+        guard let key = Self.adjustmentsKey else { return }
+        if adjustments.isEmpty {
+            UserDefaults.standard.removeObject(forKey: key)
+        } else if let data = try? JSONEncoder().encode(adjustments), let raw = String(data: data, encoding: .utf8) {
+            UserDefaults.standard.set(raw, forKey: key)
+        }
     }
 
     var hasCustomSettings: Bool {
@@ -241,6 +364,7 @@ final class SceneRecommendationEngine: ObservableObject {
         discovery = RecommendationDiscovery(rawValue: d.string(forKey: Keys.discovery) ?? "") ?? .balanced
 
         isEnabled = d.object(forKey: Keys.enabled) as? Bool ?? true
+        adjustments = Self.loadAdjustments()
         hasStatistics = AITagSuggestionManager.shared.isEnabled || SimilarScenesFinder.shared.isEnabled
         isFeatureOn = hasStatistics && isEnabled
         Self.isFeatureOnNow = isFeatureOn
@@ -311,6 +435,8 @@ final class SceneRecommendationEngine: ObservableObject {
         builtAt = nil
         seedCount = 0
         state = .idle
+        // A new server has its own ids, so its own adjustments.
+        adjustments = Self.loadAdjustments()
     }
 
     /// Within a session the list stays as it is: only an empty row builds one. A new list comes
@@ -440,6 +566,7 @@ final class SceneRecommendationEngine: ObservableObject {
          performerWeight, studioWeight, tagWeight, oCountWeight, ratingWeight, similarWeight]
             .map { "\($0)" }
             .joined(separator: "|")
+            + "|" + adjustments.map { "\($0.id)=\($0.factor)" }.sorted().joined(separator: ",")
     }
 
     private func loadPreparedIfNeeded() {
@@ -621,7 +748,8 @@ final class SceneRecommendationEngine: ObservableObject {
         guard !seeds.isEmpty else { return .success([], seeds: 0) }
         let recentlyPlayed = Set(items.filter { ($0.lastPlayedAt ?? .distantPast) >= windowStart }.map(\.id))
 
-        let picks = rank(items, seeds: seeds, excluding: recentlyPlayed, vocabulary: vocabulary, now: now)
+        let picks = rank(items, seeds: seeds, excluding: recentlyPlayed, vocabulary: vocabulary,
+                         adjust: Adjust(adjustments), now: now)
         let scenes = Dictionary(entries.compactMap { e in e.scene.map { (e.id, $0) } }, uniquingKeysWith: { a, _ in a })
         let recommendations = picks.compactMap { pick -> SceneRecommendation? in
             guard let scene = scenes[pick.item.id] else { return nil }
@@ -632,29 +760,92 @@ final class SceneRecommendationEngine: ObservableObject {
         return .success(recommendations, seeds: seeds.count)
     }
 
-    private func makeProfile(_ seeds: [Seed], vocabulary: Vocabulary) -> Profile {
+    private func makeProfile(_ seeds: [Seed], vocabulary: Vocabulary, adjust: Adjust) -> Profile {
         var profile = Profile()
         for seed in seeds {
-            for performer in seed.item.performers {
+            // A hidden item learns nothing from the history; the rest of its scene still counts.
+            for performer in seed.item.performers where !adjust.hidesPerformer(performer.id) {
                 profile.performers[performer.id, default: 0] += seed.weight
                 profile.performerNames[performer.id] = performer.name
             }
-            if let studio = seed.item.studio {
+            if let studio = seed.item.studio, !adjust.hidesStudio(studio.id) {
                 profile.studios[studio.id, default: 0] += seed.weight
             }
-            for tagId in seed.item.tagIds {
+            for tagId in seed.item.tagIds where !adjust.hidesTag(tagId) {
                 let r = vocabulary.rarity(tagId)
                 profile.tags[tagId, default: 0] += seed.weight * r * r
             }
         }
         profile.normalize(totalWeight: seeds.reduce(0) { $0 + $1.weight })
+        adjust.boost(&profile)
         return profile
+    }
+
+    /// The user's adjustments, as lookups for one build.
+    private struct Adjust {
+        var performers: [String: Double] = [:]
+        var studios: [String: Double] = [:]
+        var tags: [String: Double] = [:]
+
+        init(_ list: [RecommendationAdjustment]) {
+            for entry in list {
+                switch entry.kind {
+                case .performer: performers[entry.itemId] = entry.factor
+                case .studio: studios[entry.itemId] = entry.factor
+                case .tag: tags[entry.itemId] = entry.factor
+                }
+            }
+        }
+
+        var isEmpty: Bool { performers.isEmpty && studios.isEmpty && tags.isEmpty }
+
+        func hidesPerformer(_ id: String) -> Bool { (performers[id] ?? 1) < RecommendationAdjustment.hiddenBelow }
+        func hidesStudio(_ id: String) -> Bool { (studios[id] ?? 1) < RecommendationAdjustment.hiddenBelow }
+        func hidesTag(_ id: String) -> Bool { (tags[id] ?? 1) < RecommendationAdjustment.hiddenBelow }
+
+        func hides(_ item: RecItem) -> Bool {
+            guard !isEmpty else { return false }
+            return item.performers.contains { hidesPerformer($0.id) }
+                || item.studio.map { hidesStudio($0.id) } == true
+                || item.tagIds.contains { hidesTag($0) }
+        }
+
+        func hides(_ scene: Scene) -> Bool {
+            guard !isEmpty else { return false }
+            return scene.performers.contains { hidesPerformer($0.id) }
+                || scene.studio.map { hidesStudio($0.id) } == true
+                || (scene.tags ?? []).contains { hidesTag($0.id) }
+        }
+
+        /// Every adjusted item on the scene multiplies its score.
+        func multiplier(_ item: RecItem) -> Double {
+            guard !isEmpty else { return 1 }
+            var value = 1.0
+            for performer in item.performers { value *= performers[performer.id] ?? 1 }
+            if let studio = item.studio { value *= studios[studio.id] ?? 1 }
+            for tagId in item.tagIds { value *= tags[tagId] ?? 1 }
+            return min(max(value, 0.05), 8)
+        }
+
+        /// Turned up: in the profile even without plays, so scenes with it become candidates
+        /// the history alone would not bring (3× counts like the favourite performer).
+        func boost(_ profile: inout Profile) {
+            for (id, factor) in performers where factor > 1 {
+                profile.performers[id] = max(profile.performers[id] ?? 0, min(1, (factor - 1) / 2))
+            }
+            for (id, factor) in studios where factor > 1 {
+                profile.studios[id] = max(profile.studios[id] ?? 0, min(1, (factor - 1) / 2))
+            }
+            for (id, factor) in tags where factor > 1 {
+                profile.tags[id] = max(profile.tags[id] ?? 0, 0.25 * min(1, (factor - 1) / 2))
+            }
+        }
     }
 
     /// Scores every candidate, steps back what the last lists showed and picks a diverse list.
     private func rank(_ candidates: [RecItem], seeds: [Seed], excluding recentlyPlayed: Set<String>,
-                      vocabulary: Vocabulary, now: Date) -> [Scored] {
-        let profile = makeProfile(seeds, vocabulary: vocabulary)
+                      vocabulary: Vocabulary, adjust: Adjust, now: Date) -> [Scored] {
+        let profile = makeProfile(seeds, vocabulary: vocabulary, adjust: adjust)
         guard !profile.isEmpty else { return [] }
         let topTags = profile.top(profile.tags, 10)
         // The scenes the user engaged with most, one by one: scenes close to any of them get
@@ -662,7 +853,7 @@ final class SceneRecommendationEngine: ObservableObject {
         var seenAnchor = Set<String>()
         let anchors = seeds
             .sorted { $0.weight > $1.weight }
-            .filter { seenAnchor.insert($0.item.id).inserted }
+            .filter { !adjust.hides($0.item) && seenAnchor.insert($0.item.id).inserted }
             .prefix(similarWeight > 0 ? 6 : 0)
             .map { seed -> Anchor in
                 var mass: [String: Double] = [:]
@@ -679,9 +870,11 @@ final class SceneRecommendationEngine: ObservableObject {
         #endif
 
         let scored = candidates.compactMap { candidate -> Scored? in
-            guard !recentlyPlayed.contains(candidate.id) else { return nil }
-            return score(candidate, profile: profile, related: related, anchors: anchors,
-                         maxSeedWeight: maxSeedWeight, vocabulary: vocabulary, now: now)
+            guard !recentlyPlayed.contains(candidate.id), !adjust.hides(candidate) else { return nil }
+            guard let scored = score(candidate, profile: profile, related: related, anchors: anchors,
+                                     maxSeedWeight: maxSeedWeight, vocabulary: vocabulary, now: now) else { return nil }
+            let factor = adjust.multiplier(candidate)
+            return factor == 1 ? scored : Scored(item: scored.item, reason: scored.reason, score: scored.score * factor)
         }
         // What the last lists showed steps back, so the next one is a new list. Not excluded:
         // in a small library a strong match may still come back.

@@ -31,6 +31,7 @@ import de.letzgo.stashy.data.tools.RecommendationDiscovery
 import de.letzgo.stashy.data.tools.RecommendationState
 import de.letzgo.stashy.data.tools.SceneRecommendations
 import de.letzgo.stashy.ui.Appearance
+import de.letzgo.stashy.ui.Nav
 import de.letzgo.stashy.ui.NativeTopBar
 import de.letzgo.stashy.ui.NativeType
 import de.letzgo.stashy.ui.SF
@@ -103,7 +104,7 @@ fun RecommendationSettingsView() {
                         if (engine.isRefreshing) androidx.compose.material3.CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp, color = p.secondaryText)
                     }
                 }
-                SettingsSectionFooter("Suggests scenes on Home from what you played, the O-Counts you gave and your ratings. Each card says why it was picked. Everything is worked out on this device from your own server. Move or hide the row in Settings › Home.")
+                SettingsSectionFooter("Picked on this device from your plays, O-Counts and ratings.")
                 SectionSpacer()
             }
 
@@ -121,7 +122,7 @@ fun RecommendationSettingsView() {
                         StepperRow("Suggestions", engine.count, SceneRecommendations.countRange, enabled = isUnlocked) { engine.updateCount(it) }
                     }
                 }
-                SettingsSectionFooter("Recent plays count more than older ones. Scenes you played in this period are never suggested again. With nothing played in it, your top O-Count and best-rated scenes stand in.")
+                SettingsSectionFooter("Scenes played in this period are not suggested.")
                 SectionSpacer()
             }
 
@@ -157,7 +158,23 @@ fun RecommendationSettingsView() {
                         WeightRow("Ratings", SF.starFill, engine.ratingWeight, isUnlocked) { engine.updateRating(it) }
                     }
                 }
-                SettingsSectionFooter("How much each part of your history steers the picks. Similar to watched finds unplayed scenes close to single scenes you watched a lot. Off leaves a part out. With Tag Suggestions statistics built, tags that often go with your favorite tags count as well.")
+                SettingsSectionFooter("How much each part steers the picks.")
+                SectionSpacer()
+            }
+
+            item {
+                SettingsSectionHeader("Performers, studios and tags")
+                GroupedCard {
+                    SettingsRow("Adjustments", SF.sliderHorizontal3, enabled = isUnlocked, onClick = { Nav.push(RecommendationAdjustmentsScreen()) }) {
+                        val list = engine.adjustments
+                        val hidden = list.count { it.isHidden }
+                        Text(
+                            if (list.isEmpty()) "None" else if (hidden > 0) "${list.size} · $hidden hidden" else "${list.size}",
+                            style = NativeType.bodyMedium, color = p.secondaryText,
+                        )
+                    }
+                }
+                SettingsSectionFooter("Also from the ··· menu below a card.")
                 SectionSpacer()
             }
 

@@ -95,8 +95,8 @@ struct AITagsSettingsView: View {
             .stashyGroupedBlockRow(index: 1, count: 2)
 
             stashyScrollingSectionFooter(forYou.hasStatistics
-                ? "A Home row with scenes picked from what you played, your O-Counts and ratings, each with the reason it was picked. Move it in Settings › Home."
-                : "A Home row with scenes picked from what you played, your O-Counts and ratings. Needs Tag suggestions or Similar scenes.")
+                ? "Scenes picked from your plays, O-Counts and ratings."
+                : "Needs Tag suggestions or Similar scenes.")
         }
     }
 
@@ -123,8 +123,8 @@ struct AITagsSettingsView: View {
             .stashyGroupedBlockRow(index: 1, count: 2)
 
             stashyScrollingSectionFooter(forgotten.hasStatistics
-                ? "A Home row with your most played or most O-Counted scenes that you have not played for a while. Move it in Settings › Home."
-                : "A Home row with your most played or most O-Counted scenes that you have not played for a while. Needs Tag suggestions or Similar scenes.")
+                ? "Top scenes you have not played for a while."
+                : "Needs Tag suggestions or Similar scenes.")
         }
     }
 
@@ -170,7 +170,7 @@ struct AITagsSettingsView: View {
                 .stashyGroupedBlockRow(index: 1, count: 2)
             }
 
-            stashyScrollingSectionFooter("Built automatically when Tag suggestions or Similar scenes is on, refreshed at app start once older than 12 hours, and removed from the device when both are off.")
+            stashyScrollingSectionFooter("Refreshed every 12 hours.")
         }
     }
 

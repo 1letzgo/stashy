@@ -120,7 +120,22 @@ struct HomeRecommendationsRowView: View {
                     .padding(.vertical, 2)
                     .background(Capsule().fill(AppearanceManager.shared.tintColor))
                     .foregroundColor(.onAppTint)
+            } else {
+                Spacer(minLength: 2)
             }
+            // The card's own long press is the preview: adjusting lives in this menu.
+            Menu {
+                RecommendationAdjustMenu(scene: item.scene)
+            } label: {
+                Image(systemName: "ellipsis")
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundColor(isLarge && isFirst && tabManager.showDashboardHeroBackground ? .white.opacity(0.8) : .secondary)
+                    .frame(width: 28, height: 20)
+                    .contentShape(Rectangle())
+            }
+            .menuStyle(.button)
+            .buttonStyle(.plain)
+            .accessibilityLabel("Adjust suggestions")
         }
         .dynamicTypeSize(...DynamicTypeSize.xLarge)
         .padding(.horizontal, 2)

@@ -135,8 +135,8 @@ fun AITagsSettingsView() {
                 }
                 SettingsSectionFooter(
                     if (de.letzgo.stashy.data.tools.SceneRecommendations.hasStatistics)
-                        "A Home row with scenes picked from what you played, your O-Counts and ratings, each with the reason it was picked. Move it in Settings › Home."
-                    else "A Home row with scenes picked from what you played, your O-Counts and ratings. Needs Tag suggestions or Similar scenes."
+                        "Scenes picked from your plays, O-Counts and ratings."
+                    else "Needs Tag suggestions or Similar scenes."
                 )
                 SectionSpacer()
             }
@@ -156,8 +156,8 @@ fun AITagsSettingsView() {
                 }
                 SettingsSectionFooter(
                     if (forgotten.hasStatistics)
-                        "A Home row with your most played or most O-Counted scenes that you have not played for a while. Move it in Settings › Home."
-                    else "A Home row with your most played or most O-Counted scenes that you have not played for a while. Needs Tag suggestions or Similar scenes."
+                        "Top scenes you have not played for a while."
+                    else "Needs Tag suggestions or Similar scenes."
                 )
                 SectionSpacer()
             }
@@ -189,7 +189,7 @@ fun AITagsSettingsView() {
                         )
                     }
                 }
-                SettingsSectionFooter("Built automatically when Tag suggestions or Similar scenes is on, refreshed at app start once older than 12 hours, and removed from the device when both are off.")
+                SettingsSectionFooter("Refreshed every 12 hours.")
                 SectionSpacer()
             }
 

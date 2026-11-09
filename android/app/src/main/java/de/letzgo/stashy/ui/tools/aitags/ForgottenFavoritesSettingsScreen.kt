@@ -74,7 +74,7 @@ fun ForgottenFavoritesSettingsView() {
                         Text(statusText(), style = NativeType.bodyMedium, color = p.secondaryText)
                     }
                 }
-                SettingsSectionFooter("Scenes among your favorites that you have not played for a while. Everything is worked out on this device. Move or hide the row in Settings › Home.")
+                SettingsSectionFooter("Favorites you have not played for a while.")
                 SectionSpacer()
             }
 
@@ -89,7 +89,6 @@ fun ForgottenFavoritesSettingsView() {
                         }
                     }
                 }
-                SettingsSectionFooter("A favorite shows up once you have not played it for this long.")
                 SectionSpacer()
             }
 
@@ -112,7 +111,6 @@ fun ForgottenFavoritesSettingsView() {
                         }
                     }
                 }
-                SettingsSectionFooter("${engine.ranking.detail} Only the top ${engine.pool} of each count.")
                 SectionSpacer()
             }
 

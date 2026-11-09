@@ -664,5 +664,7 @@ private fun RecommendationReasonLine(item: de.letzgo.stashy.data.tools.SceneReco
                 modifier = Modifier.padding(start = 4.dp).background(nativeAccent(), RoundedCornerShape(50)).padding(horizontal = 5.dp, vertical = 1.dp),
             )
         }
+        // The card's own long press is the preview: adjusting lives in this menu.
+        de.letzgo.stashy.ui.tools.aitags.RecommendationAdjustButton(item.scene, if (onHero) Color.White.copy(alpha = 0.8f) else p.secondaryText)
     }
 }
