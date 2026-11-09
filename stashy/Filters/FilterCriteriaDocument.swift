@@ -175,8 +175,6 @@ final class FilterCriteriaDocument: ObservableObject {
         }
     }
 
-    var isMarkerMode: Bool { mode == .sceneMarkers }
-
     /// True while a criterion holds input that cannot be sent (an invalid date, a half-typed
     /// number) — kept in a `*_text` scratch key. Done / Save stay disabled until it is fixed.
     var hasInvalidInput: Bool {
@@ -284,17 +282,10 @@ final class FilterCriteriaDocument: ObservableObject {
         return out
     }
 
-    var presentKeys: Set<String> { Set(objectFilter.keys) }
-
     func load(_ dict: [String: Any]?) {
         // Fremd geladenes Dictionary hat keine Einfüge-Historie — Ordnung neu aufbauen.
         keyOrders = [:]
         objectFilter = Self.sanitize(dict ?? [:], mode: mode)
-    }
-
-    func replaceObjectFilter(_ dict: [String: Any]) {
-        keyOrders = [:]
-        objectFilter = Self.sanitize(dict, mode: mode)
     }
 
     func clear() {
@@ -499,17 +490,10 @@ final class FilterCriteriaDocument: ObservableObject {
         return dict.isEmpty ? nil : dict
     }
 
-    /// Number of criteria currently set — used for "n active" badges.
-    var activeCriterionCount: Int { sanitizedObjectFilter.count }
-
     var isEmpty: Bool { sanitizedObjectFilter.isEmpty }
 
     func dictValue(forKey key: String) -> [String: Any] {
         Self.stringKeyedDict(objectFilter[key]) ?? [:]
-    }
-
-    func setDictCriterion(key: String, dict: [String: Any]) {
-        setCriterion(key: key, value: dict)
     }
 
     // MARK: - Sanitize
