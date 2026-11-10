@@ -89,16 +89,14 @@ struct ServerDetailView: View {
         } message: {
             Text(alertMessage)
         }
-        .sheet(isPresented: $showingEditSheet) {
-            NavigationStack {
-                ServerFormViewNew(configToEdit: server) { updatedConfig in
-                    configManager.addOrUpdateServer(updatedConfig)
-                    if configManager.activeConfig?.id == updatedConfig.id {
-                        configManager.saveConfig(updatedConfig)
-                    }
+        // A pushed page with Back, like the other Settings details, not a sheet.
+        .navigationDestination(isPresented: $showingEditSheet) {
+            ServerFormViewNew(configToEdit: server) { updatedConfig in
+                configManager.addOrUpdateServer(updatedConfig)
+                if configManager.activeConfig?.id == updatedConfig.id {
+                    configManager.saveConfig(updatedConfig)
                 }
             }
-            .presentationDetents([.medium, .large])
         }
     }
 
