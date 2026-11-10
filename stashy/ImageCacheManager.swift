@@ -406,8 +406,11 @@ class ImageCache {
         }
     }
 
-    /// Common `width` query values used for performer thumbnails across the app.
-    private static let performerThumbnailWidths = [200, 320, 640]
+    /// Every `width` query value the app asks for; an invalidation must drop each of them.
+    /// `performerImageWidth` belongs here: without it a changed profile picture kept coming
+    /// from the cache wherever the portrait is shown (Home rows, lists, the performer page),
+    /// because the key ignores the `t` timestamp and the stale entry lived on for days.
+    private static let performerThumbnailWidths = [200, 320, 640, performerImageWidth]
 
     private func invalidateURLStrings(_ urlStrings: [String]) {
         for urlString in urlStrings {
