@@ -771,14 +771,14 @@ object FeedsModel {
                 refetch(ReelsModeType.Scenes)
             }
             link.performer != null || link.tags.isNotEmpty() || link.studio != null -> {
-                // iOS `reelsClearSessionFiltersForDeepLink`: only the handed criteria plus the
-                // mode's Settings default filter and default sort survive.
+                // iOS `reelsClearSessionFiltersForDeepLink`: only the handed criteria and the
+                // default sort survive.
                 filters.clear(); advanced.clear(); criteriaDocs.clear(); presetRows.clear(); sorts.clear()
                 mode = target ?: FeedsConfig.enabledModes.firstOrNull() ?: ReelsModeType.Scenes
                 criteria = FeedCriteria(link.performer, link.tags, link.studio)
-                // iOS: every Feeds view starts from its Settings default filter; the handed
-                // criteria narrow it.
-                ensureLoaded(mode, applyDefaultFilter = true)
+                // A handed performer / tag / studio stands alone (as on iOS): the Settings
+                // default filter would narrow it further and hide that performer's videos.
+                ensureLoaded(mode, applyDefaultFilter = false)
             }
             target != null -> {
                 mode = target
