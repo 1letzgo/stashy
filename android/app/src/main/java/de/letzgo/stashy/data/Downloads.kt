@@ -3,14 +3,17 @@ package de.letzgo.stashy.data
 import android.content.Context
 import android.os.Looper
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import de.letzgo.stashy.data.tools.DownloadsEngine
 import de.letzgo.stashy.data.tools.DownloadsFetch
+import de.letzgo.stashy.data.tools.DownloadsTransfer
 import de.letzgo.stashy.data.tools.DownloadsPendingStore
 import de.letzgo.stashy.data.tools.PendingImage
 import de.letzgo.stashy.data.tools.PendingImageDownload
 import de.letzgo.stashy.data.tools.PendingSceneDownload
+import coil3.SingletonImageLoader
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -273,6 +276,12 @@ object Downloads {
             scenes?.let { setScenes(it) }
             loaded = true
             val appContext = context.applicationContext
+            // A cover changed in the app: renew the offline copy (one collector for every screen).
+            scope.launch {
+                SceneEvents.events.collect { event ->
+                    if (event is SceneEvent.CoverUpdated) refreshThumbnail(event.sceneId, event.updatedAt)
+                }
+            }
             scope.launch {
                 val pending = withContext(Dispatchers.IO) { DownloadsEngine.restore(appContext) }
                 pending.forEach { (id, title, isScene) ->
@@ -328,7 +337,50 @@ object Downloads {
 
     fun localThumbnail(id: String): String? {
         if (!isDownloaded(id)) return null
-        return File(root, "$id/thumbnail.jpg").takeIf { it.exists() }?.let { "file://${it.absolutePath}" }
+        val url = File(root, "$id/thumbnail.jpg").takeIf { it.exists() }?.let { "file://${it.absolutePath}" } ?: return null
+        // Reading the snapshot map recomposes the list; the `v` item makes Coil load the new file.
+        val version = thumbnailVersions[id] ?: return url
+        return "$url?v=$version"
+    }
+
+    /** Per scene: bumped after the offline cover was replaced, so its model URL (and Coil key) changes. */
+    private val thumbnailVersions = mutableStateMapOf<String, Long>()
+    private val thumbnailRefreshes = mutableMapOf<String, kotlinx.coroutines.Job>()
+
+    /**
+     * The scene's cover changed ([stamp] = its new `updatedAt` bust): fetches it like the first
+     * download did (screenshot, width 640, signed) into a temp file and renames it over
+     * `thumbnail.jpg`. A failed request keeps the old file. Posts no event, so it cannot loop.
+     * Main thread.
+     */
+    private fun refreshThumbnail(id: String, stamp: String) {
+        if (!isDownloaded(id)) return
+        val config = ServerConfigManager.activeConfig ?: return
+        val url = Net.signed("${config.baseURL}/scene/$id/screenshot?width=640&t=" + android.net.Uri.encode(stamp)) ?: return
+        thumbnailRefreshes.remove(id)?.cancel()
+        thumbnailRefreshes[id] = scope.launch {
+            val target = File(root, "$id/thumbnail.jpg")
+            val tmp = File(root, "$id/thumbnail.jpg.new")
+            val ok = withContext(Dispatchers.IO) {
+                try {
+                    DownloadsTransfer.download(url, tmp) { _, _ -> }
+                    // rename(2) replaces the target atomically
+                    tmp.length() > 0 && tmp.renameTo(target)
+                } catch (e: kotlinx.coroutines.CancellationException) {
+                    tmp.delete(); throw e
+                } catch (e: Exception) {
+                    tmp.delete(); false
+                }
+            }
+            if (!ok || ServerConfigManager.activeConfig?.id != config.id || !isDownloaded(id)) return@launch
+            // Drop every decoded bitmap of the old file (Coil keys local files by their URL), then new model URL.
+            runCatching {
+                SingletonImageLoader.get(Prefs.appContext).memoryCache?.let { mem ->
+                    mem.keys.filter { it.key.contains("/$id/thumbnail.jpg") }.forEach { mem.remove(it) }
+                }
+            }
+            thumbnailVersions[id] = System.currentTimeMillis()
+        }
     }
 
     fun localVideo(id: String): String? = localVideoFile(id)?.let { "file://${it.absolutePath}" }

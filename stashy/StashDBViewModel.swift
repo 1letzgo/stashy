@@ -11419,6 +11419,46 @@ class DownloadManager: NSObject, ObservableObject {
         ) { [weak self] _ in
             MainActor.assumeIsolated { self?.switchStoreIfNeeded() }
         }
+        // A downloaded scene shows its offline cover everywhere (`Scene.thumbnailURL`), so a
+        // cover change has to renew that copy too.
+        NotificationCenter.default.addObserver(
+            forName: NSNotification.Name("SceneCoverUpdated"), object: nil, queue: .main
+        ) { [weak self] notification in
+            guard notification.userInfo?[Self.offlineCoverRefreshedKey] == nil,
+                  let sceneId = notification.userInfo?["sceneId"] as? String else { return }
+            let updatedAt = notification.userInfo?["updatedAt"] as? String
+            MainActor.assumeIsolated { self?.refreshOfflineCover(sceneId: sceneId, updatedAt: updatedAt) }
+        }
+    }
+
+    /// Marks the second `SceneCoverUpdated`, sent once the offline copy is renewed, so image
+    /// loaders showing that file reload it and this manager does not fetch again.
+    static let offlineCoverRefreshedKey = "offlineCoverRefreshed"
+
+    /// Fetches the scene's new cover and replaces `<sceneID>/thumbnail.jpg`. A failed request
+    /// keeps the old file.
+    private func refreshOfflineCover(sceneId: String, updatedAt: String?) {
+        guard Self.downloadedSceneIDs.contains(sceneId),
+              let config = ServerConfigManager.shared.loadConfig() else { return }
+        var address = "\(config.baseURL)/scene/\(sceneId)/screenshot?width=640"
+        if let updatedAt {
+            address += "&t=\(updatedAt.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? updatedAt)"
+        }
+        guard let url = URL(string: address) else { return }
+        let target = downloadsFolder.appendingPathComponent("\(sceneId)/thumbnail.jpg")
+        let request = stashRequest(to: url, config: config)
+        Task {
+            guard let (data, response) = try? await StashNetworking.session.data(for: request),
+                  (response as? HTTPURLResponse).map({ (200...299).contains($0.statusCode) }) ?? false,
+                  !data.isEmpty,
+                  (try? data.write(to: target, options: .atomic)) != nil else { return }
+            await MainActor.run {
+                ImageCache.shared.removeObject(forKey: target as NSURL)
+                var info: [String: Any] = ["sceneId": sceneId, Self.offlineCoverRefreshedKey: true]
+                if let updatedAt { info["updatedAt"] = updatedAt }
+                NotificationCenter.default.post(name: NSNotification.Name("SceneCoverUpdated"), object: nil, userInfo: info)
+            }
+        }
     }
 
     private static func activeServerKey() -> String {

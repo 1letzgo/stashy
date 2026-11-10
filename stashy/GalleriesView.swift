@@ -1966,12 +1966,11 @@ struct FullScreenImageView: View {
                 .padding(.horizontal, StashyExpandingDock.edgePadding)
             }
         }
-        // Mit Tab-Bar-Slot wie Feeds: 8 pt über der vollen Zeitleiste, 0 neben der eingeklappten
-        // Tab-Bar und bei Fotos. Ohne Slot liefert die Scrubbar darunter den Abstand; bei Fotos
-        // gibt es keine, also hier — wie das Bar-Padding in `IsolatedScrubberBar`.
-        .padding(.bottom, FeedsScrubberAccessory.isAvailable
-            ? (timeBarAccessory.showsBar && !timeBarAccessory.isInline ? 8 : 0)
-            : (isVideo ? 0 : 8))
+        // Mit Tab-Bar-Slot: immer 8 pt bis zu dem, was darunter liegt (volle Zeitleiste bei
+        // Videos, sonst die Tab-Bar). Vorher saßen die Tags bei Fotos und neben der eingeklappten
+        // Tab-Bar ohne Abstand auf, bei Videos mit 8 pt. Ohne Slot liefert die Scrubbar darunter
+        // den Abstand; bei Fotos gibt es keine, also hier — wie das Bar-Padding in `IsolatedScrubberBar`.
+        .padding(.bottom, FeedsScrubberAccessory.isAvailable ? 8 : (isVideo ? 0 : 8))
         .colorScheme(.dark)
         .opacity(showUI ? 1 : 0)
         .animation(.easeInOut(duration: 0.2), value: showUI)
@@ -2315,9 +2314,13 @@ struct FullScreenImageView: View {
             DispatchQueue.main.async {
                 if success {
                     ToastManager.shared.show("Performer image updated", icon: "person.crop.circle.badge.checkmark", style: .success)
-                    let bustedUrl = "\(imageURL)?bust=\(UUID().uuidString)"
-                    // Invalidate first, then notify loaders with a busted path so they
-                    // skip stale cache entries even if URL path stays the same.
+                    // The performer's own image address with a fresh timestamp. The picked
+                    // picture's address plus "?bust=" was handed out before: that address is
+                    // already signed, so the second "?" broke its api key, and every portrait
+                    // on screen (the gallery page's header) swapped to an image that failed.
+                    let base = ServerConfigManager.shared.loadConfig()?.baseURL ?? ""
+                    let bustedUrl = "\(base)/performer/\(performer.id)/image?t=\(Int(Date().timeIntervalSince1970 * 1000))"
+                    // Invalidate first, then notify: loaders refetch, lists take the new path.
                     ImageCache.shared.invalidatePerformerProfileImage(
                         performerId: performer.id,
                         newImagePath: bustedUrl

@@ -159,7 +159,16 @@ class ImageCache {
         // otherwise the cache key explodes and memory/disk churn causes missing
         // thumbnails and crashes after loading many pages.
         if let queryItems = stable.queryItems {
-            let allowedParams = Set(["width", "height", "size", "v"])
+            var allowedParams = Set(["width", "height", "size", "v"])
+            // Scene covers keep their timestamp: it only changes when the scene does, and with
+            // it a cover replaced outside the app (web UI, another device, a server task) shows
+            // on the next list load instead of after the 7-day cleanup. Old entries age out.
+            // Only `/scene/<id>/screenshot`: marker stills (`…/scene_marker/<id>/screenshot`)
+            // are dropped by exact key after generation and must stay timestamp-free.
+            let parts = urlComponents.path.split(separator: "/")
+            if parts.count >= 3, parts.last == "screenshot", parts[parts.count - 3] == "scene" {
+                allowedParams.insert("t")
+            }
             let filteredItems = queryItems.filter { allowedParams.contains($0.name) }
             
             if filteredItems.isEmpty {
@@ -547,13 +556,9 @@ class ImageLoader: ObservableObject {
                             performerId: performerId,
                             newImagePath: newImagePath
                           ) else { return }
-                    // Prefer the busted path when provided so SwiftUI URL identity also changes.
-                    if let newImagePath, let newURL = URL(string: newImagePath),
-                       u.path.contains("/performer/\(performerId)/") || u.path == newURL.path {
-                        self.updateURL(newURL, force: true, bypassCache: true)
-                    } else {
-                        self.updateURL(u, force: true, bypassCache: true)
-                    }
+                    // Reload this loader's own address past the cache. Swapping in the notified
+                    // path dropped its width and signing, and a bad path left the image broken.
+                    self.updateURL(u, force: true, bypassCache: true)
                 }
             },
             NotificationCenter.default.addObserver(
@@ -639,6 +644,8 @@ class ImageLoader: ObservableObject {
         sceneId: String
     ) -> Bool {
         let path = currentURL.path
+        // The offline cover of a downloaded scene (`Downloads/<server>/<sceneID>/thumbnail.jpg`).
+        if currentURL.isFileURL { return path.hasSuffix("/\(sceneId)/thumbnail.jpg") }
         if path.contains("/scene/\(sceneId)/screenshot") { return true }
         if path.contains("/scene/\(sceneId)/") && path.lowercased().contains("screenshot") { return true }
         return currentURL.absoluteString.contains(sceneId) && path.lowercased().contains("screenshot")
