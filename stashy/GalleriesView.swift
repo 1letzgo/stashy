@@ -744,6 +744,15 @@ private struct GalleriesViewContent: View {
             }
         }
 
+        // A custom Home row hands over its saved filter (`HomeRowView.openCustomFilterList`).
+        if host == nil, let injectedFilter = coordinator.activeFilter, injectedFilter.mode == .galleries {
+            coordinator.activeFilter = nil
+            didApplyDefaultFilter = true
+            catalogPresetRowSelection = ListLivePresetTag.serverRow(injectedFilter.id)
+            applyServerGallerySavedFilter(injectedFilter)
+            viewModel.fetchSavedFilters()
+            return
+        }
         if !coordinator.activeSearchText.isEmpty {
             searchText = coordinator.activeSearchText
             isSearchVisible = true

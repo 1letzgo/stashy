@@ -614,6 +614,15 @@ private struct StudiosViewContent: View {
             forceRefresh = true
         }
 
+        // A custom Home row hands over its saved filter (`HomeRowView.openCustomFilterList`).
+        if let injectedFilter = coordinator.activeFilter, injectedFilter.mode == .studios {
+            coordinator.activeFilter = nil
+            didApplyDefaultFilter = true
+            catalogPresetRowSelection = ListLivePresetTag.serverRow(injectedFilter.id)
+            applyServerStudioSavedFilter(injectedFilter)
+            viewModel.fetchSavedFilters()
+            return
+        }
         // Check for search text from navigation
         if !coordinator.activeSearchText.isEmpty {
             searchText = coordinator.activeSearchText

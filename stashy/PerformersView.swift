@@ -676,6 +676,15 @@ private struct PerformersViewContent: View {
             coordinator.activeSortOption = nil
             forceRefresh = true
         }
+        // A custom Home row hands over its saved filter (`HomeRowView.openCustomFilterList`).
+        if let injectedFilter = coordinator.activeFilter, injectedFilter.mode == .performers {
+            coordinator.activeFilter = nil
+            didApplyDefaultFilter = true
+            catalogPresetRowSelection = ListLivePresetTag.serverRow(injectedFilter.id)
+            applyServerPerformerSavedFilter(injectedFilter)
+            viewModel.fetchSavedFilters()
+            return
+        }
         if !coordinator.activeSearchText.isEmpty {
             searchText = coordinator.activeSearchText
             isSearchVisible = true

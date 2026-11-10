@@ -103,6 +103,8 @@ private struct HomeViewContent: View {
                 let firstSceneRowId = activeRows.first(where: {
                     $0.type != .statistics && (!$0.type.requiresStashyPlus || $0.type == .recommendations
                         || $0.type == .forgottenFavorites)
+                        // A custom row takes the hero only when it lists scenes.
+                        && ($0.type != .customFilter || $0.filterMode == .scenes)
                 })?.id
 
                 ForEach(activeRows) { row in
@@ -130,6 +132,8 @@ private struct HomeViewContent: View {
                     }
                 }
             }
+            // Same gap above the tab bar as the catalog lists leave under their last card.
+            .padding(.bottom, 16)
         }
         .collapsesCatalogChrome()
         .scrollContentBackground(.hidden)

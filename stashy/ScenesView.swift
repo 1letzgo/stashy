@@ -1304,7 +1304,7 @@ private struct ScenesViewContent: View {
                 injectedNow = true
             }
             
-            if let injectedFilter = coordinator.activeFilter {
+            if let injectedFilter = coordinator.activeFilter, injectedFilter.mode == .scenes {
                 selectedFilter = injectedFilter
                 coordinator.activeFilter = nil
                 loadSelectedFilterIntoDocument()

@@ -35,13 +35,16 @@ extension HomeRowType {
         case .galleriesHighestImageCount: return "Largest Galleries"
         case .recommendations: return "For You"
         case .forgottenFavorites: return "Forgotten Favorites"
+        case .customFilter: return "Custom Filter"
         }
     }
 
     /// The tvOS Home has no statistics block; the row stays in the shared store but is
     /// neither rendered nor offered here.
-    /// For You is built on iOS and macOS only.
-    var isAvailableOnTV: Bool { self != .statistics && self != .recommendations && self != .forgottenFavorites }
+    /// For You is built on iOS and macOS only, and so are custom filter rows for now.
+    var isAvailableOnTV: Bool {
+        self != .statistics && self != .recommendations && self != .forgottenFavorites && self != .customFilter
+    }
 }
 
 struct TVHomeRowsSettingsView: View {

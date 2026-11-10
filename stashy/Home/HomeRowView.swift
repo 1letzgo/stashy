@@ -40,12 +40,12 @@ let homeSquareCardSide: CGFloat = 125
 
 func homeCardWidth(for config: HomeRowConfig, isLarge: Bool, screenWidth: CGFloat) -> CGFloat {
     if isLarge { return homeHeroCardWidth(screenWidth: screenWidth) }
-    switch config.type {
-    case .newPerformers, .performersHighestSceneCount, .performersHighestOCount, .performersHighestRating:
+    switch config.contentKind {
+    case .performers:
         return 125 * 2 / 3
-    case .newGalleries, .recentlyUpdatedGalleries, .galleriesHighestImageCount:
+    case .galleries:
         return 125
-    case .channels:
+    case .other where config.type == .channels:
         // Channels show a category logo, not a thumbnail — square card.
         return homeSquareCardSide
     default:
@@ -56,23 +56,23 @@ func homeCardWidth(for config: HomeRowConfig, isLarge: Bool, screenWidth: CGFloa
 func homeCardHeight(for config: HomeRowConfig, isLarge: Bool, screenWidth: CGFloat) -> CGFloat {
     let width = homeCardWidth(for: config, isLarge: isLarge, screenWidth: screenWidth)
     if isLarge {
-        switch config.type {
-        case .newPerformers, .performersHighestSceneCount, .performersHighestOCount, .performersHighestRating:
+        switch config.contentKind {
+        case .performers:
             return width * 3 / 2
-        case .newGalleries, .recentlyUpdatedGalleries, .galleriesHighestImageCount:
+        case .galleries:
             return 125
-        case .channels:
+        case .other where config.type == .channels:
             return width
         default:
             return width * 9 / 16
         }
     }
-    switch config.type {
-    case .newPerformers, .performersHighestSceneCount, .performersHighestOCount, .performersHighestRating:
+    switch config.contentKind {
+    case .performers:
         return width * 3 / 2
-    case .newGalleries, .recentlyUpdatedGalleries, .galleriesHighestImageCount:
+    case .galleries:
         return 125
-    case .channels:
+    case .other where config.type == .channels:
         return width
     default:
         return 125
@@ -220,7 +220,7 @@ struct HomeRowView: View {
     init(config: HomeRowConfig, viewModel: StashDBViewModel, isLarge: Bool = false, isFirst: Bool = false) {
         self.config = config
         self.viewModel = viewModel
-        self.store = viewModel.homeRowStore(for: config.type)
+        self.store = viewModel.homeRowStore(for: config)
         self.isLarge = isLarge
         self.isFirst = isFirst
     }
@@ -233,11 +233,11 @@ struct HomeRowView: View {
     private var galleries: [Gallery]  { store.galleries }
 
     private var items: [String] {
-        switch config.type {
-        case .newPerformers, .performersHighestSceneCount, .performersHighestOCount, .performersHighestRating: return performers.map(\.id)
-        case .newStudios, .studiosHighestSceneCount:                                 return studios.map(\.id)
-        case .newGalleries, .recentlyUpdatedGalleries, .galleriesHighestImageCount:  return galleries.map(\.id)
-        default:                                                                     return scenes.map(\.id)
+        switch config.contentKind {
+        case .performers: return performers.map(\.id)
+        case .studios:    return studios.map(\.id)
+        case .galleries:  return galleries.map(\.id)
+        default:          return scenes.map(\.id)
         }
     }
 
@@ -278,6 +278,10 @@ struct HomeRowView: View {
         // so rows below the fold load on demand. Filter / server / live-update listeners
         // live once in `HomeView`, not once per row.
         .onAppear { viewModel.loadHomeRowIfNeeded(config: config) }
+        // A custom row whose filter or kind changed reloads (a new title alone does not).
+        .onChange(of: config) { _, newConfig in
+            if newConfig.type == .customFilter { viewModel.loadHomeRowIfNeeded(config: newConfig) }
+        }
     }
 
     // MARK: - Header
@@ -321,8 +325,36 @@ struct HomeRowView: View {
             coordinator.navigateToGalleries(sort: .updatedAtDesc)
         case .galleriesHighestImageCount:
             coordinator.navigateToGalleries(sort: .imageCountDesc)
+        case .customFilter:
+            openCustomFilterList()
         default:
             coordinator.navigateToScenes(sort: sortOption())
+        }
+    }
+
+    /// A custom row opens its list with the row's saved filter and sort applied
+    /// (`NavigationCoordinator.activeFilter`, taken by the list of the matching mode); a row
+    /// built from a sort opens the list in that order.
+    private func openCustomFilterList() {
+        let filter = config.filterId.flatMap { viewModel.savedFilters[$0] }
+        typealias VM = StashDBViewModel
+        switch config.filterMode {
+        case .performers:
+            let sort = filter.flatMap { VM.savedFilterSortOption($0, VM.PerformerSortOption.self, raw: { VM.PerformerSortOption(rawValue: $0) }, field: { $0.sortField }, direction: { $0.direction }) }
+                ?? config.sortRaw.flatMap { VM.PerformerSortOption(rawValue: $0) }
+            coordinator.navigateToPerformers(sort: sort, filter: filter)
+        case .studios:
+            let sort = filter.flatMap { VM.savedFilterSortOption($0, VM.StudioSortOption.self, raw: { VM.StudioSortOption(rawValue: $0) }, field: { $0.sortField }, direction: { $0.direction }) }
+                ?? config.sortRaw.flatMap { VM.StudioSortOption(rawValue: $0) }
+            coordinator.navigateToStudios(sort: sort, filter: filter)
+        case .galleries:
+            let sort = filter.flatMap { VM.savedFilterSortOption($0, VM.GallerySortOption.self, raw: { VM.GallerySortOption(rawValue: $0) }, field: { $0.sortField }, direction: { $0.direction }) }
+                ?? config.sortRaw.flatMap { VM.GallerySortOption(rawValue: $0) }
+            coordinator.navigateToGalleries(sort: sort, filter: filter)
+        default:
+            let sort = filter.flatMap { VM.savedFilterSortOption($0, VM.SceneSortOption.self, raw: { VM.SceneSortOption(rawValue: $0) }, field: { $0.sortField }, direction: { $0.direction }) }
+                ?? config.sortRaw.flatMap { VM.SceneSortOption(rawValue: $0) }
+            coordinator.navigateToScenes(sort: sort, filter: filter)
         }
     }
 
@@ -347,7 +379,7 @@ struct HomeRowView: View {
 
     @ViewBuilder
     private var emptyState: some View {
-        Text("No content found")
+        Text(store.missingFilter ? "Filter not found" : "No content found")
             .font(.caption)
             .foregroundColor(.secondary)
             .padding(.horizontal, 12)
@@ -368,35 +400,21 @@ struct HomeRowView: View {
 
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: 12) {
-                switch config.type {
-                case .newPerformers, .performersHighestSceneCount:
-                    ForEach(performers) { p in
+                switch config.contentKind {
+                case .performers:
+                    ForEach(shownPerformers) { p in
                         cardLink(destination: PerformerDetailView(performer: p), id: p.id, width: w) {
-                            HomePerformerCardView(performer: p, config: config, badgeType: .sceneCount,
+                            HomePerformerCardView(performer: p, config: config, badgeType: performerBadge,
                                                  isLarge: isLarge, screenWidth: screenWidth)
                         }
                     }
-                case .performersHighestOCount:
-                    ForEach(performers.sorted { ($0.oCounter ?? 0) > ($1.oCounter ?? 0) }.prefix(10)) { p in
-                        cardLink(destination: PerformerDetailView(performer: p), id: p.id, width: w) {
-                            HomePerformerCardView(performer: p, config: config, badgeType: .oCount,
-                                                 isLarge: isLarge, screenWidth: screenWidth)
-                        }
-                    }
-                case .performersHighestRating:
-                    ForEach(performers) { p in
-                        cardLink(destination: PerformerDetailView(performer: p), id: p.id, width: w) {
-                            HomePerformerCardView(performer: p, config: config, badgeType: .rating,
-                                                 isLarge: isLarge, screenWidth: screenWidth)
-                        }
-                    }
-                case .newStudios, .studiosHighestSceneCount:
+                case .studios:
                     ForEach(studios) { s in
                         cardLink(destination: StudioDetailView(studio: s), id: s.id, width: w) {
                             HomeStudioCardView(studio: s, config: config, isLarge: isLarge, screenWidth: screenWidth)
                         }
                     }
-                case .newGalleries, .recentlyUpdatedGalleries, .galleriesHighestImageCount:
+                case .galleries:
                     ForEach(galleries) { g in
                         cardLink(destination: ImagesView(gallery: g), id: g.id, width: w) {
                             GalleryCardView(gallery: g, compactTitle: !isLarge).frame(width: isLarge ? w : 125, height: 125)
@@ -417,6 +435,20 @@ struct HomeRowView: View {
         .homeRowPosition($scrollID, row: config.id.uuidString, ids: items)
         .scrollTargetBehavior(.viewAligned)
         .scrollContentBackground(.hidden)
+    }
+
+    private var performerBadge: PerformerBadgeType {
+        switch config.type {
+        case .performersHighestOCount: return .oCount
+        case .performersHighestRating: return .rating
+        default:                       return .sceneCount
+        }
+    }
+
+    private var shownPerformers: [Performer] {
+        config.type == .performersHighestOCount
+            ? Array(performers.sorted { ($0.oCounter ?? 0) > ($1.oCounter ?? 0) }.prefix(10))
+            : performers
     }
 
     /// `destination` ist eine Autoclosure: die Detailseite entsteht erst beim Push,

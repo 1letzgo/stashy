@@ -233,13 +233,59 @@ struct HomeRowConfig: Codable, Identifiable, Equatable {
     var isEnabled: Bool
     var sortOrder: Int
     var type: HomeRowType
+    /// Only for `.customFilter`: the entity kind (scenes / performers / studios / galleries)
+    /// and the id of the saved Stash filter (per server, like the rows themselves).
+    var filterMode: StashDBViewModel.FilterMode? = nil
+    var filterId: String? = nil
+    /// A custom row built from a sort instead of a saved filter: the raw value of the kind's
+    /// sort option (`SceneSortOption`, `PerformerSortOption`, …). `filterId` is nil then.
+    var sortRaw: String? = nil
     
     static func == (lhs: HomeRowConfig, rhs: HomeRowConfig) -> Bool {
         return lhs.id == rhs.id && 
                lhs.title == rhs.title && 
                lhs.isEnabled == rhs.isEnabled && 
                lhs.sortOrder == rhs.sortOrder && 
-               lhs.type == rhs.type
+               lhs.type == rhs.type &&
+               lhs.filterMode == rhs.filterMode &&
+               lhs.filterId == rhs.filterId &&
+               lhs.sortRaw == rhs.sortRaw
+    }
+}
+
+/// Key of one Home row in the view model's row caches: custom rows are one per row id
+/// (several can coexist), every other type exists once.
+typealias HomeRowKey = String
+
+/// What a Home row shows, which decides its cards.
+enum HomeRowContentKind {
+    case scenes, performers, studios, galleries, other
+}
+
+extension HomeRowConfig {
+    var storeKey: HomeRowKey { type == .customFilter ? id.uuidString : type.rawValue }
+
+    var contentKind: HomeRowContentKind {
+        switch type {
+        case .newPerformers, .performersHighestSceneCount, .performersHighestOCount, .performersHighestRating:
+            return .performers
+        case .newStudios, .studiosHighestSceneCount:
+            return .studios
+        case .newGalleries, .recentlyUpdatedGalleries, .galleriesHighestImageCount:
+            return .galleries
+        case .statistics, .channels:
+            return .other
+        case .customFilter:
+            switch filterMode {
+            case .performers: return .performers
+            case .studios: return .studios
+            case .galleries: return .galleries
+            case .scenes: return .scenes
+            default: return .other
+            }
+        default:
+            return .scenes
+        }
     }
 }
 
@@ -266,6 +312,21 @@ enum HomeRowType: String, Codable {
     case recommendations
     /// stashy+: top played / O-Counted scenes not played for a while.
     case forgottenFavorites
+    /// A row the user added from a saved Stash filter (`HomeRowConfig.filterMode` / `filterId`).
+    case customFilter
+
+    /// Shipped rows that a saved filter plus its sort can express. Stored configs keep
+    /// decoding and an enabled one keeps working; once switched off it is dropped for good.
+    var isRetired: Bool {
+        switch self {
+        case .newest3Min, .mostViewed3Min, .topCounter3Min, .topRating3Min,
+             .performersHighestSceneCount, .studiosHighestSceneCount, .recentlyUpdatedGalleries,
+             .performersHighestOCount, .performersHighestRating, .galleriesHighestImageCount:
+            return true
+        default:
+            return false
+        }
+    }
 
     /// Rows that exist only with stashy+ (hidden from Home and Settings while locked).
     var requiresStashyPlus: Bool { self == .channels || self == .recommendations || self == .forgottenFavorites }
@@ -292,6 +353,7 @@ enum HomeRowType: String, Codable {
         case .channels: return "Channels"
         case .recommendations: return "Scenes - For You"
         case .forgottenFavorites: return "Scenes - Forgotten Favorites"
+        case .customFilter: return "Custom Filter"
         }
     }
 }
@@ -1113,9 +1175,13 @@ class TabManager: ObservableObject {
         
         if let data = data,
            let decoded = try? JSONDecoder().decode([HomeRowConfig].self, from: data) {
-            // Deduplicate by type (keep the first occurrence of each type)
+            // Retired rows that are switched off are dropped; enabled ones stay until the user
+            // switches them off. Deduplicate by type (keep the first occurrence of each type) —
+            // custom filter rows are exempt, several of them can coexist.
             var seenTypes = Set<HomeRowType>()
             let unique = decoded.sorted { $0.sortOrder < $1.sortOrder }.filter { row in
+                if row.type.isRetired && !row.isEnabled { return false }
+                if row.type == .customFilter { return true }
                 if seenTypes.contains(row.type) { return false }
                 seenTypes.insert(row.type)
                 return true
@@ -1125,23 +1191,16 @@ class TabManager: ObservableObject {
             // Re-assign sort orders after dedup
             for i in 0..<self.homeRows.count {
                 self.homeRows[i].sortOrder = i
-                self.homeRows[i].title = self.homeRows[i].type.defaultTitle
+                if self.homeRows[i].type != .customFilter {
+                    self.homeRows[i].title = self.homeRows[i].type.defaultTitle
+                }
             }
             if unique.count != decoded.count { saveHomeRows() }
             ensureStatisticsRow()
             ensureLastPlayedRow()
-            ensureMostViewedRow()
             ensureRandomRow()
-            ensureTopCounterRow()
-            ensureTopRatingRow()
             ensureNewPerformersRow()
-            ensureHighestSceneCountPerformersRow()
             ensureNewStudiosRow()
-            ensureHighestSceneCountStudiosRow()
-            ensureRecentlyUpdatedGalleriesRow()
-            ensurePerformersHighestOCountRow()
-            ensurePerformersHighestRatingRow()
-            ensureGalleriesHighestImageCountRow()
             ensureChannelsRow()
             ensureRecommendationsRow()
             ensureForgottenFavoritesRow()
@@ -1153,20 +1212,10 @@ class TabManager: ObservableObject {
                 HomeRowConfig(id: UUID(), title: HomeRowType.statistics.defaultTitle, isEnabled: true, sortOrder: 1, type: .statistics),
                 HomeRowConfig(id: UUID(), title: HomeRowType.lastAdded3Min.defaultTitle, isEnabled: true, sortOrder: 2, type: .lastAdded3Min),
                 HomeRowConfig(id: UUID(), title: HomeRowType.newPerformers.defaultTitle, isEnabled: true, sortOrder: 3, type: .newPerformers),
-                HomeRowConfig(id: UUID(), title: HomeRowType.performersHighestSceneCount.defaultTitle, isEnabled: true, sortOrder: 4, type: .performersHighestSceneCount),
-                HomeRowConfig(id: UUID(), title: HomeRowType.newStudios.defaultTitle, isEnabled: true, sortOrder: 5, type: .newStudios),
-                HomeRowConfig(id: UUID(), title: HomeRowType.studiosHighestSceneCount.defaultTitle, isEnabled: true, sortOrder: 6, type: .studiosHighestSceneCount),
-                HomeRowConfig(id: UUID(), title: HomeRowType.newGalleries.defaultTitle, isEnabled: true, sortOrder: 7, type: .newGalleries),
-                HomeRowConfig(id: UUID(), title: HomeRowType.recentlyUpdatedGalleries.defaultTitle, isEnabled: true, sortOrder: 8, type: .recentlyUpdatedGalleries),
-                HomeRowConfig(id: UUID(), title: HomeRowType.galleriesHighestImageCount.defaultTitle, isEnabled: true, sortOrder: 9, type: .galleriesHighestImageCount),
-                HomeRowConfig(id: UUID(), title: HomeRowType.newest3Min.defaultTitle, isEnabled: true, sortOrder: 10, type: .newest3Min),
-                HomeRowConfig(id: UUID(), title: HomeRowType.performersHighestOCount.defaultTitle, isEnabled: true, sortOrder: 11, type: .performersHighestOCount),
-                HomeRowConfig(id: UUID(), title: HomeRowType.performersHighestRating.defaultTitle, isEnabled: true, sortOrder: 12, type: .performersHighestRating),
-                HomeRowConfig(id: UUID(), title: HomeRowType.mostViewed3Min.defaultTitle, isEnabled: true, sortOrder: 13, type: .mostViewed3Min),
-                HomeRowConfig(id: UUID(), title: HomeRowType.random.defaultTitle, isEnabled: true, sortOrder: 14, type: .random),
-                HomeRowConfig(id: UUID(), title: HomeRowType.topCounter3Min.defaultTitle, isEnabled: false, sortOrder: 15, type: .topCounter3Min),
-                HomeRowConfig(id: UUID(), title: HomeRowType.topRating3Min.defaultTitle, isEnabled: false, sortOrder: 16, type: .topRating3Min),
-                HomeRowConfig(id: UUID(), title: HomeRowType.channels.defaultTitle, isEnabled: true, sortOrder: 17, type: .channels)
+                HomeRowConfig(id: UUID(), title: HomeRowType.newStudios.defaultTitle, isEnabled: true, sortOrder: 4, type: .newStudios),
+                HomeRowConfig(id: UUID(), title: HomeRowType.newGalleries.defaultTitle, isEnabled: true, sortOrder: 5, type: .newGalleries),
+                HomeRowConfig(id: UUID(), title: HomeRowType.random.defaultTitle, isEnabled: false, sortOrder: 6, type: .random),
+                HomeRowConfig(id: UUID(), title: HomeRowType.channels.defaultTitle, isEnabled: true, sortOrder: 7, type: .channels)
             ]
             ensureRecommendationsRow()
             ensureForgottenFavoritesRow()
@@ -1209,6 +1258,11 @@ class TabManager: ObservableObject {
     #endif
     
     func saveHomeRows() {
+        // A retired row that is switched off is gone for good (it cannot come back).
+        if homeRows.contains(where: { $0.type.isRetired && !$0.isEnabled }) {
+            homeRows.removeAll { $0.type.isRetired && !$0.isEnabled }
+            for i in homeRows.indices { homeRows[i].sortOrder = i }
+        }
         if let encoded = try? JSONEncoder().encode(homeRows) {
             let key = "\(homeRowsKey)\(currentServerSuffix)"
             UserDefaults.standard.set(encoded, forKey: key)
@@ -1257,29 +1311,8 @@ class TabManager: ObservableObject {
          }
     }
     
-    private func ensureMostViewedRow() {
-         if !homeRows.contains(where: { $0.type == .mostViewed3Min }) {
-             let newRow = HomeRowConfig(id: UUID(), title: HomeRowType.mostViewed3Min.defaultTitle, isEnabled: true, sortOrder: homeRows.count, type: .mostViewed3Min)
-             homeRows.append(newRow)
-             saveHomeRows()
-         }
-    }
     
-    private func ensureTopCounterRow() {
-         if !homeRows.contains(where: { $0.type == .topCounter3Min }) {
-             let newRow = HomeRowConfig(id: UUID(), title: HomeRowType.topCounter3Min.defaultTitle, isEnabled: false, sortOrder: homeRows.count, type: .topCounter3Min)
-             homeRows.append(newRow)
-             saveHomeRows()
-         }
-    }
     
-    private func ensureTopRatingRow() {
-         if !homeRows.contains(where: { $0.type == .topRating3Min }) {
-             let newRow = HomeRowConfig(id: UUID(), title: HomeRowType.topRating3Min.defaultTitle, isEnabled: false, sortOrder: homeRows.count, type: .topRating3Min)
-             homeRows.append(newRow)
-             saveHomeRows()
-         }
-    }
     
     private func ensureNewPerformersRow() {
          if !homeRows.contains(where: { $0.type == .newPerformers }) {
@@ -1289,14 +1322,6 @@ class TabManager: ObservableObject {
          }
     }
     
-    private func ensureHighestSceneCountPerformersRow() {
-         if !homeRows.contains(where: { $0.type == .performersHighestSceneCount }) {
-             let newRow = HomeRowConfig(id: UUID(), title: HomeRowType.performersHighestSceneCount.defaultTitle, isEnabled: true, sortOrder: homeRows.count, type: .performersHighestSceneCount)
-             homeRows.append(newRow)
-             saveHomeRows()
-         }
-    }
-
     private func ensureNewStudiosRow() {
          if !homeRows.contains(where: { $0.type == .newStudios }) {
              let newRow = HomeRowConfig(id: UUID(), title: HomeRowType.newStudios.defaultTitle, isEnabled: true, sortOrder: homeRows.count, type: .newStudios)
@@ -1305,13 +1330,6 @@ class TabManager: ObservableObject {
          }
     }
     
-    private func ensureHighestSceneCountStudiosRow() {
-         if !homeRows.contains(where: { $0.type == .studiosHighestSceneCount }) {
-             let newRow = HomeRowConfig(id: UUID(), title: HomeRowType.studiosHighestSceneCount.defaultTitle, isEnabled: true, sortOrder: homeRows.count, type: .studiosHighestSceneCount)
-             homeRows.append(newRow)
-             saveHomeRows()
-         }
-    }
     
     private func ensureNewGalleriesRow() {
          if !homeRows.contains(where: { $0.type == .newGalleries }) {
@@ -1321,38 +1339,7 @@ class TabManager: ObservableObject {
          }
     }
     
-    private func ensureRecentlyUpdatedGalleriesRow() {
-         if !homeRows.contains(where: { $0.type == .recentlyUpdatedGalleries }) {
-             let newRow = HomeRowConfig(id: UUID(), title: HomeRowType.recentlyUpdatedGalleries.defaultTitle, isEnabled: true, sortOrder: homeRows.count, type: .recentlyUpdatedGalleries)
-             homeRows.append(newRow)
-             saveHomeRows()
-         }
-    }
-
-    private func ensurePerformersHighestOCountRow() {
-         if !homeRows.contains(where: { $0.type == .performersHighestOCount }) {
-             let newRow = HomeRowConfig(id: UUID(), title: HomeRowType.performersHighestOCount.defaultTitle, isEnabled: true, sortOrder: homeRows.count, type: .performersHighestOCount)
-             homeRows.append(newRow)
-             saveHomeRows()
-         }
-    }
-
-    private func ensurePerformersHighestRatingRow() {
-         if !homeRows.contains(where: { $0.type == .performersHighestRating }) {
-             let newRow = HomeRowConfig(id: UUID(), title: HomeRowType.performersHighestRating.defaultTitle, isEnabled: true, sortOrder: homeRows.count, type: .performersHighestRating)
-             homeRows.append(newRow)
-             saveHomeRows()
-         }
-    }
     
-    private func ensureGalleriesHighestImageCountRow() {
-         if !homeRows.contains(where: { $0.type == .galleriesHighestImageCount }) {
-             let newRow = HomeRowConfig(id: UUID(), title: HomeRowType.galleriesHighestImageCount.defaultTitle, isEnabled: true, sortOrder: homeRows.count, type: .galleriesHighestImageCount)
-             homeRows.append(newRow)
-             saveHomeRows()
-         }
-    }
-
     /// New rows land at the end; For You goes right below Last Played instead, where it is
     /// seen — it is hidden anyway without stashy+.
     private func ensureRecommendationsRow() {
@@ -1392,6 +1379,21 @@ class TabManager: ObservableObject {
         }
     }
     
+    /// Appends an enabled row for a saved filter of the active server.
+    func addCustomHomeRow(title: String, mode: StashDBViewModel.FilterMode, filterId: String?, sortRaw: String? = nil) {
+        let row = HomeRowConfig(id: UUID(), title: title, isEnabled: true, sortOrder: homeRows.count,
+                                type: .customFilter, filterMode: mode, filterId: filterId, sortRaw: sortRaw)
+        homeRows.append(row)
+        saveHomeRows()
+    }
+
+    /// Only custom rows can be deleted; built-in rows are toggled.
+    func removeCustomHomeRows(ids: Set<UUID>) {
+        homeRows.removeAll { ids.contains($0.id) && $0.type == .customFilter }
+        for i in homeRows.indices { homeRows[i].sortOrder = i }
+        saveHomeRows()
+    }
+
     func moveHomeRow(from source: IndexSet, to destination: Int) {
         homeRows.move(fromOffsets: source, toOffset: destination)
         for i in 0..<homeRows.count {

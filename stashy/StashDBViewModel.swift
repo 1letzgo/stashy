@@ -623,6 +623,9 @@ class StashDBViewModel: ObservableObject {
 
     @Published var savedFilters: [String: SavedFilter] = [:]
     @Published var isLoadingSavedFilters = false
+    /// `true` once a saved-filters request has finished (also a failed one), so Home rows
+    /// built on a saved filter know the lookup is final. Reset with the server.
+    private(set) var savedFiltersSettled = false
     private var isInitializing = false
     
     /// Main entry point for starting/refreshing a server connection
@@ -670,43 +673,44 @@ class StashDBViewModel: ObservableObject {
     // the server reset all write here). Every write is mirrored into the per-row
     // `HomeRowStore`, which is what the dashboard rows observe. Rows therefore only
     // redraw when their own items change, not on every publish of this view model.
-    @Published var homeRowScenes: [HomeRowType: [Scene]] = [:] {
+    @Published var homeRowScenes: [HomeRowKey: [Scene]] = [:] {
         didSet { syncHomeRowStores(oldValue, homeRowScenes) { $0.scenes = $1 ?? [] } }
     }
-    @Published var homeRowPerformers: [HomeRowType: [Performer]] = [:] {
+    @Published var homeRowPerformers: [HomeRowKey: [Performer]] = [:] {
         didSet { syncHomeRowStores(oldValue, homeRowPerformers) { $0.performers = $1 ?? [] } }
     }
-    @Published var homeRowStudios: [HomeRowType: [Studio]] = [:] {
+    @Published var homeRowStudios: [HomeRowKey: [Studio]] = [:] {
         didSet { syncHomeRowStores(oldValue, homeRowStudios) { $0.studios = $1 ?? [] } }
     }
-    @Published var homeRowGalleries: [HomeRowType: [Gallery]] = [:] {
+    @Published var homeRowGalleries: [HomeRowKey: [Gallery]] = [:] {
         didSet { syncHomeRowStores(oldValue, homeRowGalleries) { $0.galleries = $1 ?? [] } }
     }
-    @Published var homeRowLoadingState: [HomeRowType: Bool] = [:] {
+    @Published var homeRowLoadingState: [HomeRowKey: Bool] = [:] {
         didSet { syncHomeRowStores(oldValue, homeRowLoadingState) { $0.isLoading = $1 ?? true } }
     }
-    private var isFetchingHomeRows: Set<HomeRowType> = []
-    private var homeRowStores: [HomeRowType: HomeRowStore] = [:]
+    private var isFetchingHomeRows: Set<HomeRowKey> = []
+    private var homeRowStores: [HomeRowKey: HomeRowStore] = [:]
 
     /// The observable state of one dashboard row. Created on first use and kept for
     /// the lifetime of the view model, so a row keeps its store across remounts.
-    func homeRowStore(for type: HomeRowType) -> HomeRowStore {
-        if let store = homeRowStores[type] { return store }
+    func homeRowStore(for config: HomeRowConfig) -> HomeRowStore {
+        let key = config.storeKey
+        if let store = homeRowStores[key] { return store }
         let store = HomeRowStore()
-        store.scenes = homeRowScenes[type] ?? []
-        store.performers = homeRowPerformers[type] ?? []
-        store.studios = homeRowStudios[type] ?? []
-        store.galleries = homeRowGalleries[type] ?? []
-        store.isLoading = homeRowLoadingState[type] ?? true
-        homeRowStores[type] = store
+        store.scenes = homeRowScenes[key] ?? []
+        store.performers = homeRowPerformers[key] ?? []
+        store.studios = homeRowStudios[key] ?? []
+        store.galleries = homeRowGalleries[key] ?? []
+        store.isLoading = homeRowLoadingState[key] ?? true
+        homeRowStores[key] = store
         return store
     }
 
     /// Pushes changed entries of a home-row dictionary into the matching stores.
     /// Only keys whose value actually changed publish, and only stores that exist.
     private func syncHomeRowStores<Value: Equatable>(
-        _ old: [HomeRowType: Value],
-        _ new: [HomeRowType: Value],
+        _ old: [HomeRowKey: Value],
+        _ new: [HomeRowKey: Value],
         apply: (HomeRowStore, Value?) -> Void
     ) {
         for key in Set(old.keys).union(new.keys) where old[key] != new[key] {
@@ -725,11 +729,16 @@ class StashDBViewModel: ObservableObject {
     /// Honors the default dashboard filter: while saved filters are still loading and
     /// the filter is not known yet, the row waits (the caller re-runs on filter changes).
     func loadHomeRowIfNeeded(config: HomeRowConfig, maxAge: TimeInterval = StashDBViewModel.homeRowFreshness) {
+        // A custom row brings its own saved filter; the default dashboard filter is not its business.
+        if config.type == .customFilter {
+            loadCustomFilterHomeRowIfNeeded(config: config, maxAge: maxAge)
+            return
+        }
         if let filterId = TabManager.shared.getDefaultFilterId(for: .dashboard),
            savedFilters[filterId] == nil, isLoadingSavedFilters {
             return
         }
-        let store = homeRowStore(for: config.type)
+        let store = homeRowStore(for: config)
         if !store.isEmpty, let loadedAt = store.lastLoadedAt,
            Date().timeIntervalSince(loadedAt) < maxAge {
             return
@@ -737,8 +746,8 @@ class StashDBViewModel: ObservableObject {
         refreshHomeRow(config: config, limit: 10)
     }
 
-    private func markHomeRowLoaded(_ type: HomeRowType) {
-        homeRowStore(for: type).lastLoadedAt = Date()
+    private func markHomeRowLoaded(_ config: HomeRowConfig) {
+        homeRowStore(for: config).lastLoadedAt = Date()
     }
 
     // Connection Status
@@ -1911,6 +1920,7 @@ class StashDBViewModel: ObservableObject {
         isInitializing = false // Reset initialization guard
         isLoading = true // Start in loading state
         isLoadingSavedFilters = false // Reset filter loading state
+        savedFiltersSettled = false
         errorMessage = nil
         imageFindListError = nil
         isFetchingStats = false
@@ -2446,6 +2456,7 @@ class StashDBViewModel: ObservableObject {
                 self.isFetchingFilters = false
                 switch result {
                 case .success(let response):
+                    self.savedFiltersSettled = true
                     if let findResult = response.data?.findSavedFilters {
                         self.savedFilters = Dictionary(findResult.map { ($0.id, $0) }, uniquingKeysWith: { (first, second) in second })
                         AppLog.debug("✅ Fetched \(findResult.count) saved filters")
@@ -2459,6 +2470,7 @@ class StashDBViewModel: ObservableObject {
                         completion?(false)
                         return
                     }
+                    self.savedFiltersSettled = true
                     AppLog.error("❌ Error fetching saved filters: \(error.localizedDescription)")
                     self.errorMessage = "Failed to load filters: \(error.localizedDescription)"
                     completion?(false)
@@ -3652,6 +3664,8 @@ class StashDBViewModel: ObservableObject {
     /// Convenience: dispatch to the correct fetch method based on row content type.
     func refreshHomeRow(config: HomeRowConfig, limit: Int = 10) {
         switch config.type {
+        case .customFilter:
+            fetchCustomFilterHomeRow(config: config, limit: limit)
         case .newPerformers, .performersHighestSceneCount, .performersHighestOCount, .performersHighestRating:
             fetchPerformersForHomeRow(config: config, limit: limit, forceRefresh: true) { _ in }
         case .newStudios, .studiosHighestSceneCount:
@@ -3664,7 +3678,7 @@ class StashDBViewModel: ObservableObject {
     }
 
     func fetchScenesForHomeRow(config: HomeRowConfig, limit: Int = 10, forceRefresh: Bool = false, completion: @escaping ([Scene]) -> Void) {
-        let rowType = config.type
+        let rowType = config.storeKey
         
         // Return cached data immediately if available
         if !forceRefresh {
@@ -3722,7 +3736,7 @@ class StashDBViewModel: ObservableObject {
             setSort(.ratingDesc)
         case .random:
             setSort(.random)
-        case .statistics, .channels, .recommendations, .forgottenFavorites, .newPerformers, .performersHighestSceneCount, .performersHighestOCount, .performersHighestRating, .newStudios, .studiosHighestSceneCount, .newGalleries, .recentlyUpdatedGalleries, .galleriesHighestImageCount:
+        case .statistics, .channels, .recommendations, .forgottenFavorites, .customFilter, .newPerformers, .performersHighestSceneCount, .performersHighestOCount, .performersHighestRating, .newStudios, .studiosHighestSceneCount, .newGalleries, .recentlyUpdatedGalleries, .galleriesHighestImageCount:
             homeRowLoadingState[rowType] = false
             completion([])
             return
@@ -3765,14 +3779,14 @@ class StashDBViewModel: ObservableObject {
                 let scenes = response?.data?.findScenes?.scenes ?? []
                 // Cache the result
                 self?.homeRowScenes[rowType] = scenes
-                self?.markHomeRowLoaded(rowType)
+                self?.markHomeRowLoaded(config)
                 completion(scenes)
             }
         }
     }
     
     func fetchPerformersForHomeRow(config: HomeRowConfig, limit: Int = 10, forceRefresh: Bool = false, completion: @escaping ([Performer]) -> Void) {
-        let rowType = config.type
+        let rowType = config.storeKey
         
         // Return cached data immediately if available
         if !forceRefresh {
@@ -3849,14 +3863,14 @@ class StashDBViewModel: ObservableObject {
                 let performers = response?.data?.findPerformers.performers ?? []
                 // Cache the result
                 self?.homeRowPerformers[rowType] = performers
-                self?.markHomeRowLoaded(rowType)
+                self?.markHomeRowLoaded(config)
                 completion(performers)
             }
         }
     }
     
     func fetchStudiosForHomeRow(config: HomeRowConfig, limit: Int = 10, forceRefresh: Bool = false, completion: @escaping ([Studio]) -> Void) {
-        let rowType = config.type
+        let rowType = config.storeKey
         
         // Return cached data immediately if available
         if !forceRefresh {
@@ -3927,14 +3941,14 @@ class StashDBViewModel: ObservableObject {
                 let studios = response?.data?.findStudios.studios ?? []
                 // Cache the result
                 self?.homeRowStudios[rowType] = studios
-                self?.markHomeRowLoaded(rowType)
+                self?.markHomeRowLoaded(config)
                 completion(studios)
             }
         }
     }
     
     func fetchGalleriesForHomeRow(config: HomeRowConfig, limit: Int = 10, forceRefresh: Bool = false, completion: @escaping ([Gallery]) -> Void) {
-        let rowType = config.type
+        let rowType = config.storeKey
         
         // Return cached data immediately if available
         if !forceRefresh {
@@ -4007,12 +4021,212 @@ class StashDBViewModel: ObservableObject {
                 let galleries = response?.data?.findGalleries.galleries ?? []
                 // Cache the result
                 self?.homeRowGalleries[rowType] = galleries
-                self?.markHomeRowLoaded(rowType)
+                self?.markHomeRowLoaded(config)
                 completion(galleries)
             }
         }
     }
     
+    // MARK: - Custom filter rows (Home)
+
+    /// What a custom row shows: kind, filter id and the filter's definition (a changed filter reloads it).
+    private func customHomeRowSignature(_ config: HomeRowConfig) -> String {
+        let hash = config.filterId.flatMap { savedFilters[$0] }?.hashValue ?? 0
+        return "\(config.filterMode?.rawValue ?? "")|\(config.filterId ?? "")|\(hash)|\(config.sortRaw ?? "")"
+    }
+
+    /// Field, direction and display name of a kind's sort option, for a custom row built from a
+    /// sort (`HomeRowConfig.sortRaw`). `nil` when the raw value is not one of the kind's options.
+    static func customRowSortOption(mode: FilterMode?, raw: String?) -> (field: String, direction: String, name: String)? {
+        guard let raw else { return nil }
+        switch mode {
+        case .scenes: return SceneSortOption(rawValue: raw).map { ($0.sortField, $0.direction, $0.displayName) }
+        case .performers: return PerformerSortOption(rawValue: raw).map { ($0.sortField, $0.direction, $0.displayName) }
+        case .studios: return StudioSortOption(rawValue: raw).map { ($0.sortField, $0.direction, $0.displayName) }
+        case .galleries: return GallerySortOption(rawValue: raw).map { ($0.sortField, $0.direction, $0.displayName) }
+        default: return nil
+        }
+    }
+
+    private func loadCustomFilterHomeRowIfNeeded(config: HomeRowConfig, maxAge: TimeInterval) {
+        // A sort row needs no saved filter.
+        let filterKnown = config.filterId == nil && config.sortRaw != nil
+            || config.filterId.flatMap { savedFilters[$0] } != nil
+        // Saved filters are still on their way: the row waits (Home re-runs once they are in).
+        if !filterKnown && !savedFiltersSettled { return }
+        let key = config.storeKey
+        let store = homeRowStore(for: config)
+        let hasResult = homeRowScenes[key] != nil || homeRowPerformers[key] != nil
+            || homeRowStudios[key] != nil || homeRowGalleries[key] != nil
+        if hasResult, store.loadedSignature == customHomeRowSignature(config),
+           let loadedAt = store.lastLoadedAt, Date().timeIntervalSince(loadedAt) < maxAge {
+            return
+        }
+        fetchCustomFilterHomeRow(config: config, limit: 10)
+    }
+
+    /// The sort option a saved filter encodes for one list kind: the stashy `sortRaw`, then the
+    /// filter's own `sortby` / direction matched against the kind's options. `nil` when none fits.
+    static func savedFilterSortOption<S: CaseIterable>(
+        _ filter: SavedFilter, _ type: S.Type,
+        raw: (String) -> S?, field: (S) -> String, direction: (S) -> String
+    ) -> S? {
+        if let stored = filter.stashySortRaw, let option = raw(stored) { return option }
+        guard let pair = filter.encodedSortPair else { return nil }
+        var f = pair.field.lowercased()
+        if f.hasPrefix("random") { return raw("random") }
+        if f == "rating100" { f = "rating" }
+        let d = pair.direction.uppercased()
+        return S.allCases.first { field($0) == f && direction($0) == d }
+    }
+
+    /// Sort field + direction for a custom row. Options that need Stash 0.32 already fall back
+    /// through their `sortField`; a field no option knows is only sent to a 0.32+ server.
+    private func customHomeRowSort<S: CaseIterable>(
+        _ filter: SavedFilter, _ type: S.Type, seed: RandomSeedKind,
+        raw: (String) -> S?, field: (S) -> String, direction: (S) -> String,
+        fallback: (field: String, direction: String)
+    ) -> (field: String, direction: String) {
+        var result = fallback
+        if let option = Self.savedFilterSortOption(filter, type, raw: raw, field: field, direction: direction) {
+            result = (field(option), direction(option))
+        } else if StashServerCapabilities.supports032, let pair = filter.encodedSortPair {
+            result = (pair.field, pair.direction.uppercased())
+        }
+        if result.field == "random" { result.field = randomSort(seed) }
+        return result
+    }
+
+    private func finishCustomHomeRow(_ config: HomeRowConfig, signature: String) {
+        let key = config.storeKey
+        homeRowLoadingState[key] = false
+        isFetchingHomeRows.remove(key)
+        let store = homeRowStore(for: config)
+        store.loadedSignature = signature
+        store.lastLoadedAt = Date()
+    }
+
+    /// First page of a custom row: the saved filter's criteria and its own sort, for scenes,
+    /// performers, studios or galleries. Stored under the row id, not under a row type.
+    func fetchCustomFilterHomeRow(config: HomeRowConfig, limit: Int = 10) {
+        let key = config.storeKey
+        guard !isFetchingHomeRows.contains(key) else { return }
+        let store = homeRowStore(for: config)
+        let signature = customHomeRowSignature(config)
+
+        // Built from a sort: no saved filter, the whole library in that order.
+        let sortOnly = config.filterId == nil
+            ? Self.customRowSortOption(mode: config.filterMode, raw: config.sortRaw) : nil
+        let filter = config.filterId.flatMap { savedFilters[$0] }
+        guard let mode = config.filterMode,
+              sortOnly != nil || (filter != nil && filter?.mode == mode) else {
+            // The filter is gone (deleted on the server): normal empty state with a hint.
+            homeRowScenes[key] = []
+            homeRowPerformers[key] = []
+            homeRowStudios[key] = []
+            homeRowGalleries[key] = []
+            store.missingFilter = true
+            finishCustomHomeRow(config, signature: signature)
+            return
+        }
+        store.missingFilter = false
+
+        var sort: (field: String, direction: String) = (sortOnly?.field ?? "", sortOnly?.direction ?? "")
+        let queryName: String
+        let filterKey: String
+        switch mode {
+        case .scenes:
+            if sort.field == "random" { sort.field = randomSort(.scenes) }
+            if let filter { sort = customHomeRowSort(filter, SceneSortOption.self, seed: .scenes,
+                                     raw: { SceneSortOption(rawValue: $0) }, field: { $0.sortField }, direction: { $0.direction },
+                                     fallback: ("date", "DESC")) }
+            queryName = "findScenes"; filterKey = "scene_filter"
+        case .performers:
+            if sort.field == "random" { sort.field = randomSort(.performers) }
+            if let filter { sort = customHomeRowSort(filter, PerformerSortOption.self, seed: .performers,
+                                     raw: { PerformerSortOption(rawValue: $0) }, field: { $0.sortField }, direction: { $0.direction },
+                                     fallback: ("name", "ASC")) }
+            queryName = "findPerformers"; filterKey = "performer_filter"
+        case .studios:
+            if sort.field == "random" { sort.field = randomSort(.studios) }
+            if let filter { sort = customHomeRowSort(filter, StudioSortOption.self, seed: .studios,
+                                     raw: { StudioSortOption(rawValue: $0) }, field: { $0.sortField }, direction: { $0.direction },
+                                     fallback: ("name", "ASC")) }
+            queryName = "findStudios"; filterKey = "studio_filter"
+        case .galleries:
+            if sort.field == "random" { sort.field = randomSort(.galleries) }
+            if let filter { sort = customHomeRowSort(filter, GallerySortOption.self, seed: .galleries,
+                                     raw: { GallerySortOption(rawValue: $0) }, field: { $0.sortField }, direction: { $0.direction },
+                                     fallback: ("date", "DESC")) }
+            queryName = "findGalleries"; filterKey = "gallery_filter"
+        default:
+            homeRowLoadingState[key] = false
+            return
+        }
+
+        var variables: [String: Any] = [
+            "filter": [
+                "page": 1,
+                "per_page": limit,
+                "sort": sort.field,
+                "direction": sort.direction
+            ]
+        ]
+        // `criteriaObjectFilter()` lives in the filter editor, which tvOS does not build
+        // (custom rows are not offered there).
+        #if os(tvOS)
+        let rawCriteria = (filter?.object_filter?.value as? [String: Any]) ?? filter?.filterDict ?? [:]
+        #else
+        let rawCriteria = filter?.criteriaObjectFilter() ?? [:]
+        #endif
+        let criteria = sanitizeFilter(rawCriteria)
+        if !criteria.isEmpty { variables[filterKey] = criteria }
+
+        let body: [String: Any] = [
+            "query": GraphQLQueries.queryWithFragments(queryName),
+            "variables": variables
+        ]
+        guard let bodyData = try? JSONSerialization.data(withJSONObject: body),
+              let bodyString = String(data: bodyData, encoding: .utf8) else {
+            homeRowLoadingState[key] = false
+            return
+        }
+
+        isFetchingHomeRows.insert(key)
+        homeRowLoadingState[key] = true
+
+        switch mode {
+        case .scenes:
+            performGraphQLQuery(query: bodyString) { [weak self] (response: AltScenesResponse?) in
+                DispatchQueue.main.async {
+                    self?.homeRowScenes[key] = response?.data?.findScenes?.scenes ?? []
+                    self?.finishCustomHomeRow(config, signature: signature)
+                }
+            }
+        case .performers:
+            performGraphQLQuery(query: bodyString) { [weak self] (response: PerformersResponse?) in
+                DispatchQueue.main.async {
+                    self?.homeRowPerformers[key] = response?.data?.findPerformers.performers ?? []
+                    self?.finishCustomHomeRow(config, signature: signature)
+                }
+            }
+        case .studios:
+            performGraphQLQuery(query: bodyString) { [weak self] (response: StudiosResponse?) in
+                DispatchQueue.main.async {
+                    self?.homeRowStudios[key] = response?.data?.findStudios.studios ?? []
+                    self?.finishCustomHomeRow(config, signature: signature)
+                }
+            }
+        default:
+            performGraphQLQuery(query: bodyString) { [weak self] (response: GalleriesResponse?) in
+                DispatchQueue.main.async {
+                    self?.homeRowGalleries[key] = response?.data?.findGalleries.galleries ?? []
+                    self?.finishCustomHomeRow(config, signature: signature)
+                }
+            }
+        }
+    }
+
     func mergeFilterWithCriteria(filter: SavedFilter?, performer: ScenePerformer? = nil, tags: [Tag] = [], studio: SceneStudio? = nil, mode: FilterMode = .scenes) -> SavedFilter {
         var baseDict: [String: Any] = [:]
 
@@ -10340,6 +10554,18 @@ struct StashGroup: Codable, Identifiable, Equatable {
     let front_image_path: String?
     let back_image_path: String?
     let studio: GroupStudio?
+    /// Direct sub-groups (list and detail query) and the groups this one sits in (detail query only).
+    var sub_group_count: Int? = nil
+    var containing_groups: [GroupRelation]? = nil
+
+    struct GroupRelation: Codable, Equatable {
+        struct Ref: Codable, Equatable {
+            let id: String
+            let name: String
+        }
+        let group: Ref
+        let description: String?
+    }
     
     var details: String? { synopsis }
     var favorite: Bool? { nil }
@@ -10347,6 +10573,7 @@ struct StashGroup: Codable, Identifiable, Equatable {
 
     enum CodingKeys: String, CodingKey {
         case id, name, synopsis, date, scene_count, gallery_count, rating100, front_image_path, back_image_path, studio
+        case sub_group_count, containing_groups
         case updatedAt = "updated_at"
     }
     
@@ -13848,8 +14075,12 @@ final class HomeRowStore: ObservableObject {
     @Published var galleries: [Gallery] = []
     /// `true` until the first load finishes, like the old `homeRowLoadingState[type] ?? true`.
     @Published var isLoading = true
+    /// Custom filter rows only: the saved filter is gone from the server.
+    @Published var missingFilter = false
     /// Set when a fetch completes; live patches do not touch it.
     var lastLoadedAt: Date?
+    /// Custom filter rows only: what the loaded items were fetched for (`customHomeRowSignature`).
+    var loadedSignature: String?
 
     var isEmpty: Bool {
         scenes.isEmpty && performers.isEmpty && studios.isEmpty && galleries.isEmpty

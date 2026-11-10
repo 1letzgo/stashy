@@ -165,6 +165,11 @@ class NavigationCoordinator: ObservableObject {
         cataloguePopToken = UUID()
         catalogueSubTab = subTab
         selectedTab = .catalogue
+        #if os(iOS)
+        // Home scrolled its chrome away; the list we jump to must show it at once, not when
+        // Home's scroll view finally disappears after the push.
+        if Thread.isMainThread { MainActor.assumeIsolated { CatalogChromeCollapse.shared.reset() } }
+        #endif
     }
     
     func navigateToScenes(sort: StashDBViewModel.SceneSortOption? = nil, filter: StashDBViewModel.SavedFilter? = nil, search: String = "", noDefaultFilter: Bool = false) {
@@ -175,14 +180,16 @@ class NavigationCoordinator: ObservableObject {
         switchToCatalogue("Scenes")
     }
     
-    func navigateToPerformers(sort: StashDBViewModel.PerformerSortOption? = nil, search: String = "") {
+    func navigateToPerformers(sort: StashDBViewModel.PerformerSortOption? = nil, filter: StashDBViewModel.SavedFilter? = nil, search: String = "") {
         self.activeSortOption = sort?.rawValue
+        self.activeFilter = filter
         self.activeSearchText = search
         switchToCatalogue("Performers")
     }
     
-    func navigateToStudios(sort: StashDBViewModel.StudioSortOption? = nil, search: String = "") {
+    func navigateToStudios(sort: StashDBViewModel.StudioSortOption? = nil, filter: StashDBViewModel.SavedFilter? = nil, search: String = "") {
         self.activeSortOption = sort?.rawValue
+        self.activeFilter = filter
         self.activeSearchText = search
         switchToCatalogue("Studios")
     }
@@ -192,8 +199,9 @@ class NavigationCoordinator: ObservableObject {
         switchToCatalogue("Tags")
     }
     
-    func navigateToGalleries(sort: StashDBViewModel.GallerySortOption? = nil, search: String = "") {
+    func navigateToGalleries(sort: StashDBViewModel.GallerySortOption? = nil, filter: StashDBViewModel.SavedFilter? = nil, search: String = "") {
         self.activeSortOption = sort?.rawValue
+        self.activeFilter = filter
         self.activeSearchText = search
         switchToCatalogue("Galleries")
     }

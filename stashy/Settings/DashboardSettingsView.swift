@@ -18,6 +18,8 @@ struct DashboardSettingsView: View {
     /// Same key as the switch in Settings › stashy+, so either one updates the other.
     @AppStorage(MagazineMode.enabledKey) private var isMagazineEnabled = false
     @StateObject private var viewModel = StashDBViewModel()
+    @State private var showAddRowSheet = false
+    @State private var rowToRemove: HomeRowConfig?
 
     private var catalogTabs: [TabConfig] {
         tabManager.tabs
@@ -56,18 +58,22 @@ struct DashboardSettingsView: View {
             Section {
                 stashyScrollingSectionHeader("Visible Dashboard Rows")
                 ForEach(Array(visibleHomeRows.enumerated()), id: \.element.id) { index, row in
-                    Toggle(isOn: Binding(
-                        get: { row.isEnabled },
-                        set: { _ in tabManager.toggleHomeRow(row.id) }
-                    )) {
-                        Text(row.title)
-                    }
-                    .tint(appearanceManager.tintColor)
-                    .stashyGroupedBlockRow(index: index, count: visibleHomeRows.count)
+                    homeRowToggle(row)
+                        .stashyGroupedBlockRow(index: index, count: visibleHomeRows.count + 1)
                 }
                 .onMove { indices, newOffset in
                     moveVisibleHomeRows(from: indices, to: newOffset)
                 }
+                // Tap gesture instead of a Button: a Button in a themed list row in edit mode
+                // did not reliably register the tap.
+                Label("Add Row", systemImage: "plus.circle.fill")
+                    .foregroundColor(appearanceManager.tintColor)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .contentShape(Rectangle())
+                    .onTapGesture { showAddRowSheet = true }
+                    .accessibilityAddTraits(.isButton)
+                    .moveDisabled(true)
+                .stashyGroupedBlockRow(index: visibleHomeRows.count, count: visibleHomeRows.count + 1)
             }
 
             if stashyPlus.isUnlocked {
@@ -114,6 +120,77 @@ struct DashboardSettingsView: View {
         .onChange(of: viewModel.savedFilters) { _, newValue in
             tabManager.syncHomeChannelItems(with: Array(newValue.values))
         }
+        .sheet(isPresented: $showAddRowSheet) {
+            DashboardAddCustomRowSheet(viewModel: viewModel)
+                .presentationDragIndicator(.visible)
+                .presentationBackground(Color.appBackground)
+        }
+        .alert("Remove Row", isPresented: Binding(
+            get: { rowToRemove != nil },
+            set: { if !$0 { rowToRemove = nil } }
+        )) {
+            Button("Remove", role: .destructive) {
+                if let row = rowToRemove { tabManager.removeCustomHomeRows(ids: [row.id]) }
+                rowToRemove = nil
+            }
+            Button("Cancel", role: .cancel) { rowToRemove = nil }
+        } message: {
+            Text("Removes \"\(rowToRemove?.title ?? "")\" from the dashboard. The saved filter itself stays on the server.")
+        }
+    }
+
+    /// Switch for one dashboard row; a custom row also names its filter and has a remove button.
+    @ViewBuilder
+    private func homeRowToggle(_ row: HomeRowConfig) -> some View {
+        HStack(spacing: 12) {
+            Toggle(isOn: Binding(
+                get: { row.isEnabled },
+                set: { _ in tabManager.toggleHomeRow(row.id) }
+            )) {
+                if row.type == .customFilter {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(row.title)
+                        Text(customRowSubtitle(row))
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                            .lineLimit(1)
+                    }
+                } else {
+                    Text(row.title)
+                }
+            }
+            .tint(appearanceManager.tintColor)
+
+            if row.type == .customFilter {
+                // Tap gesture instead of a Button: a Button inside a themed list row in edit
+                // mode did not reliably register the tap.
+                Image(systemName: "trash")
+                    .foregroundColor(.red)
+                    .frame(width: 32, height: 32)
+                    .contentShape(Rectangle())
+                    .onTapGesture { rowToRemove = row }
+                    .accessibilityLabel("Remove Row")
+                    .accessibilityAddTraits(.isButton)
+            }
+        }
+    }
+
+    private func customRowSubtitle(_ row: HomeRowConfig) -> String {
+        let kind: String
+        switch row.filterMode {
+        case .performers: kind = "Performers"
+        case .studios: kind = "Studios"
+        case .galleries: kind = "Galleries"
+        default: kind = "Scenes"
+        }
+        if let id = row.filterId, let name = viewModel.savedFilters[id]?.name {
+            return "\(kind) · \(name)"
+        }
+        if row.filterId == nil,
+           let sort = StashDBViewModel.customRowSortOption(mode: row.filterMode, raw: row.sortRaw) {
+            return "\(kind) · \(sort.name)"
+        }
+        return kind
     }
 
     /// Dashboard rows offered in Settings; the Channels row (stashy+) is hidden while locked.
@@ -323,6 +400,194 @@ struct DashboardSettingsView: View {
                 .fixedSize(horizontal: true, vertical: false)
         }
         .frame(minHeight: 36)
+    }
+}
+
+/// Add Row sheet: Filter or Sort, the kind, then a saved filter of that kind or one of the
+/// kind's sort options, and an optional title.
+private struct DashboardAddCustomRowSheet: View {
+    @ObservedObject var viewModel: StashDBViewModel
+    @ObservedObject private var appearanceManager = AppearanceManager.shared
+    @Environment(\.dismiss) private var dismiss
+    private enum Source: Hashable { case filter, sort }
+    @State private var source: Source = .filter
+    @State private var mode: StashDBViewModel.FilterMode = .scenes
+    @State private var selectedId: String?
+    @State private var selectedSortRaw: String?
+    @State private var title = ""
+    /// The name last put into `title` automatically; a title the user changed is left alone.
+    @State private var autoTitle = ""
+
+    private static let modes: [(mode: StashDBViewModel.FilterMode, title: String)] = [
+        (.scenes, "Scenes"), (.performers, "Performers"), (.studios, "Studios"), (.galleries, "Galleries")
+    ]
+
+    private var filters: [StashDBViewModel.SavedFilter] {
+        viewModel.savedFilters.values
+            .filter { $0.mode == mode }
+            .sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
+    }
+
+    private var selectedFilter: StashDBViewModel.SavedFilter? {
+        selectedId.flatMap { viewModel.savedFilters[$0] }
+    }
+
+    /// The sort options the kind's own list offers.
+    private var sortOptions: [(raw: String, name: String)] {
+        typealias VM = StashDBViewModel
+        switch mode {
+        case .performers: return VM.PerformerSortOption.allCases.map { ($0.rawValue, $0.displayName) }
+        case .studios: return VM.StudioSortOption.availableCases.map { ($0.rawValue, $0.displayName) }
+        case .galleries: return VM.GallerySortOption.availableCases.map { ($0.rawValue, $0.displayName) }
+        default: return VM.SceneSortOption.generalCases.map { ($0.rawValue, $0.displayName) }
+        }
+    }
+
+    private var canAdd: Bool {
+        source == .filter ? selectedFilter != nil : selectedSortRaw != nil
+    }
+
+    private func checkRow(_ name: String, selected: Bool, index: Int, count: Int, action: @escaping () -> Void) -> some View {
+        // Plain row with a tap gesture: a Button in a themed row did not
+        // reliably register the tap.
+        HStack {
+            Text(name)
+                .lineLimit(1)
+            Spacer(minLength: 8)
+            if selected {
+                Image(systemName: "checkmark")
+                    .foregroundColor(appearanceManager.tintColor)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .contentShape(Rectangle())
+        .onTapGesture(perform: action)
+        .stashyGroupedBlockRow(index: index, count: count)
+    }
+
+    var body: some View {
+        NavigationStack {
+            List {
+                Section {
+                    stashyScrollingSectionHeader("Build From")
+                    Picker("Build From", selection: $source) {
+                        Text("Filter").tag(Source.filter)
+                        Text("Sort").tag(Source.sort)
+                    }
+                    .pickerStyle(.segmented)
+                    .labelsHidden()
+                    .stashyGroupedBlockRow(index: 0, count: 1)
+                }
+
+                Section {
+                    stashyScrollingSectionHeader("Kind")
+                    Picker("Kind", selection: $mode) {
+                        ForEach(Self.modes, id: \.mode) { Text($0.title).tag($0.mode) }
+                    }
+                    .pickerStyle(.segmented)
+                    .labelsHidden()
+                    .stashyGroupedBlockRow(index: 0, count: 1)
+                }
+
+                if source == .filter {
+                    Section {
+                        stashyScrollingSectionHeader("Saved Filter")
+                        let list = filters
+                        if list.isEmpty {
+                            Text(viewModel.isLoadingSavedFilters
+                                 ? "Loading filters…"
+                                 : "No saved filters of this kind yet. Create one in the list's filter sheet with Save.")
+                                .foregroundColor(.secondary)
+                                .stashyGroupedBlockRow(index: 0, count: 1)
+                        } else {
+                            ForEach(Array(list.enumerated()), id: \.element.id) { index, filter in
+                                checkRow(filter.name, selected: selectedId == filter.id,
+                                         index: index, count: list.count) { select(filter) }
+                            }
+                        }
+                    }
+                } else {
+                    Section {
+                        stashyScrollingSectionHeader("Sort")
+                        let list = sortOptions
+                        ForEach(Array(list.enumerated()), id: \.element.raw) { index, option in
+                            checkRow(option.name, selected: selectedSortRaw == option.raw,
+                                     index: index, count: list.count) { select(sort: option) }
+                        }
+                    }
+                }
+
+                Section {
+                    stashyScrollingSectionHeader("Title")
+                    TextField("Title", text: $title)
+                        .stashyGroupedBlockRow(index: 0, count: 1)
+                }
+
+                Section {
+                    Button(action: add) {
+                        Text("Add")
+                            .font(.headline)
+                            .foregroundColor(Color.onAppTint)
+                            .frame(maxWidth: .infinity, minHeight: 48)
+                            .background(appearanceManager.tintColor,
+                                        in: RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.card))
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(!canAdd)
+                    .opacity(canAdd ? 1 : 0.4)
+                    .listRowBackground(Color.clear)
+                    .listRowSeparator(.hidden)
+                    .listRowInsets(EdgeInsets(top: 8, leading: 0, bottom: 8, trailing: 0))
+                }
+            }
+            .stashySettingsList()
+            .applyAppBackground()
+            .stashyModalSheetChrome("Add Row", onBack: { dismiss() })
+        }
+        .onChange(of: mode) { _, _ in clearSelection() }
+        .onChange(of: source) { _, _ in clearSelection() }
+    }
+
+    private func clearSelection() {
+        selectedId = nil
+        selectedSortRaw = nil
+        if title == autoTitle { title = "" }
+        autoTitle = ""
+    }
+
+    private func select(_ filter: StashDBViewModel.SavedFilter) {
+        selectedId = filter.id
+        setAutoTitle(defaultTitle(for: filter.name))
+    }
+
+    private func select(sort option: (raw: String, name: String)) {
+        selectedSortRaw = option.raw
+        setAutoTitle(defaultTitle(for: option.name))
+    }
+
+    private func setAutoTitle(_ name: String) {
+        if title.isEmpty || title == autoTitle { title = name }
+        autoTitle = name
+    }
+
+    /// "Scenes - <filter or sort>", like the shipped rows ("Scenes - Last Played").
+    private func defaultTitle(for name: String) -> String {
+        let kind = Self.modes.first { $0.mode == mode }?.title ?? ""
+        return kind.isEmpty ? name : "\(kind) - \(name)"
+    }
+
+    private func add() {
+        let trimmed = title.trimmingCharacters(in: .whitespacesAndNewlines)
+        if source == .filter {
+            guard let filter = selectedFilter else { return }
+            TabManager.shared.addCustomHomeRow(title: trimmed.isEmpty ? defaultTitle(for: filter.name) : trimmed,
+                                               mode: mode, filterId: filter.id)
+        } else {
+            guard let option = sortOptions.first(where: { $0.raw == selectedSortRaw }) else { return }
+            TabManager.shared.addCustomHomeRow(title: trimmed.isEmpty ? defaultTitle(for: option.name) : trimmed,
+                                               mode: mode, filterId: nil, sortRaw: option.raw)
+        }
+        dismiss()
     }
 }
 
