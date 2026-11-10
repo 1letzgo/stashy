@@ -1274,29 +1274,37 @@ struct FilterCircumcisionCriterionRow: View {
     }
 }
 
+/// `is_missing` takes one of a fixed set of property names per entity, so it is a menu of
+/// those, never free text.
 struct FilterIsMissingRow: View {
     @Binding var value: String
     /// Decides which property names are offered — they differ per entity.
     var mode: StashDBViewModel.FilterMode
     var onChange: () -> Void
-    private var common: [String] { FilterFieldCatalog.isMissingOptions(for: mode) }
+    @ObservedObject private var appearance = AppearanceManager.shared
+
+    /// A stored name that is no longer offered (older filter) stays selectable.
+    private var options: [String] {
+        let known = FilterFieldCatalog.isMissingOptions(for: mode)
+        return value.isEmpty || known.contains(value) ? known : known + [value]
+    }
+
+    private func label(_ property: String) -> String {
+        property == "url" ? "URL" : property.replacingOccurrences(of: "_", with: " ").capitalized
+    }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            TextField("Property name", text: $value)
-                .filterEditorTextFieldChrome()
-                .onSubmit { onChange() }
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 8) {
-                    ForEach(common, id: \.self) { c in
-                        CatalogFilterChip(title: c, isActive: value == c) {
-                            value = c
-                            onChange()
-                        }
-                    }
-                }
+        Picker("Property", selection: $value) {
+            // A new row has no property yet; without this entry the menu would show nothing.
+            if value.isEmpty { Text("Choose property").tag("") }
+            ForEach(options, id: \.self) { property in
+                Text(label(property)).tag(property)
             }
         }
+        .pickerStyle(.menu)
+        .labelsHidden()
+        .tint(appearance.tintColor)
+        .onChange(of: value) { _, _ in onChange() }
     }
 }
 

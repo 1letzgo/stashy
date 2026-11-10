@@ -79,6 +79,15 @@ class FiltersTest {
         assertEquals(2, doc.activeCriterionCount)
     }
 
+    @Test fun valueLessModifiersGetPlaceholderValue() {
+        val doc = CriteriaDocument(FilterMode.Scenes)
+        doc.setCriterion("date", obj("""{"modifier":"NOT_NULL"}"""))
+        doc.setCriterion("title", obj("""{"modifier":"IS_NULL"}"""))
+        val s = doc.sanitizedObjectFilter
+        assertEquals(JsonPrimitive(""), s["date"]!!.jsonObject["value"])
+        assertEquals(JsonPrimitive(""), s["title"]!!.jsonObject["value"])
+    }
+
     @Test fun documentPinsDefaultsFirstAndAppendsNewKeys() {
         val doc = CriteriaDocument(FilterMode.Performers, pinsDefaults = true)
         doc.setCriterion("weight", obj("""{"value":50,"modifier":"GREATER_THAN"}"""))

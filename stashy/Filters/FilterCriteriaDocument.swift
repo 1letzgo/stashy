@@ -227,10 +227,26 @@ final class FilterCriteriaDocument: ObservableObject {
                 continue
             }
             if criterionIsComplete(criterion, kind: field.kind) {
-                out[key] = value
+                out[key] = withPlaceholderValue(criterion, kind: field.kind) ?? value
             }
         }
         return out
+    }
+
+    /// `IS_NULL` / `NOT_NULL` say nothing about a value, but the string, number and date inputs
+    /// declare `value` as non-null: without one the server rejects the whole query and the list
+    /// kept its old content ("Not null" on a date did nothing). Stash ignores the value for
+    /// these modifiers; its own UI sends an empty one as well.
+    private nonisolated static func withPlaceholderValue(_ criterion: [String: Any], kind: FilterCriterionKind) -> [String: Any]? {
+        guard let modifier = (criterion["modifier"] as? String).flatMap(StashCriterionModifier.init(rawValue:)),
+              !modifier.needsValue, criterion["value"] == nil else { return nil }
+        var filled = criterion
+        switch kind {
+        case .string, .date, .timestamp, .phashDistance: filled["value"] = ""
+        case .int, .float, .hierarchicalCount: filled["value"] = 0
+        default: return nil
+        }
+        return filled
     }
 
     private nonisolated static func criterionIsComplete(_ criterion: [String: Any], kind: FilterCriterionKind) -> Bool {

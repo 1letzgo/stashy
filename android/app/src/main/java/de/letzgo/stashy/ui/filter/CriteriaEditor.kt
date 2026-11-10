@@ -722,10 +722,9 @@ private fun CircumcisionRow(value: JsonObject, set: (JsonObject) -> Unit, onChan
 
 @Composable
 private fun IsMissingRow(value: String, set: (String) -> Unit, mode: FilterMode, onChange: () -> Unit) {
-    FilterTextField(value, set, "Property name", onCommit = onChange)
-    ChipScrollRow {
-        FilterFieldCatalog.isMissingOptions(mode).forEach { c -> CatalogFilterChip(c, value == c) { set(c); onChange() } }
-    }
+    // A fixed list per entity, no free text; a stored unknown value stays selectable.
+    val options = FilterFieldCatalog.isMissingOptions(mode).let { if (value.isNotEmpty() && value !in it) it + value else it }
+    MenuPicker(value, options.map { MenuEntry(it, capitalizeWords(it.replace("_", " "))) }, onSelect = { set(it); onChange() })
 }
 
 @Composable

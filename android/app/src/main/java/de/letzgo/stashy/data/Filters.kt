@@ -250,9 +250,25 @@ class CriteriaDocument(mode: FilterMode, objectFilter: JsonObject = JsonObject(e
                 val field = FilterFieldCatalog.field(key, mode)
                 val criterion = value as? JsonObject
                 if (field == null || criterion == null) { out[key] = value; continue }
-                if (criterionIsComplete(criterion, field.kind)) out[key] = value
+                if (criterionIsComplete(criterion, field.kind)) out[key] = withPlaceholderValue(criterion, field.kind) ?: value
             }
             return JsonObject(out)
+        }
+
+        /**
+         * IS_NULL / NOT_NULL say nothing about a value, but Stash's string, number, date and phash
+         * inputs declare `value` as non-null: without one the server rejects the whole query
+         * (a date row with "Not null" and no text did nothing). Stash ignores the value then.
+         * Same as iOS `withPlaceholderValue`.
+         */
+        private fun withPlaceholderValue(c: JsonObject, kind: CriterionKind): JsonObject? {
+            val modifier = CriterionModifier.from(c["modifier"].stringValue) ?: return null
+            if (modifier.needsValue || c["value"] != null) return null
+            return when (kind) {
+                CriterionKind.string, CriterionKind.date, CriterionKind.timestamp, CriterionKind.phashDistance -> c.with("value", JsonPrimitive(""))
+                CriterionKind.int, CriterionKind.float, CriterionKind.hierarchicalCount -> c.with("value", JsonPrimitive(0))
+                else -> null
+            }
         }
 
         private fun criterionIsComplete(c: JsonObject, kind: CriterionKind): Boolean {
