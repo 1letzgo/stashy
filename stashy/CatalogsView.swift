@@ -1018,6 +1018,8 @@ struct GroupDetailView: View {
     
     enum DetailTab: String, CaseIterable {
         case scenes = "Scenes"
+        /// Direct sub-groups, so groups nest like folders.
+        case groups = "Groups"
         case galleries = "Galleries"
         case performers = "Performers"
         case studios = "Studios"
@@ -1027,6 +1029,7 @@ struct GroupDetailView: View {
         var icon: String {
             switch self {
             case .scenes: return "film"
+            case .groups: return "rectangle.stack"
             case .galleries: return "photo.stack"
             case .performers: return "person.fill"
             case .studios: return "building.2"
@@ -1041,7 +1044,9 @@ struct GroupDetailView: View {
         _selectedGroup = State(initialValue: selectedGroup)
         let sc = selectedGroup.scene_count ?? 0
         let gal = selectedGroup.gallery_count ?? 0
-        _selectedDetailTab = State(initialValue: sc > 0 ? .scenes : (gal > 0 ? .galleries : .scenes))
+        let sub = selectedGroup.sub_group_count ?? 0
+        // A folder-like group (only sub-groups) opens on them, not on "No scenes found".
+        _selectedDetailTab = State(initialValue: sc > 0 ? .scenes : (gal > 0 ? .galleries : (sub > 0 ? .groups : .scenes)))
         let gid = selectedGroup.id
         _linkedPerformers = StateObject(wrappedValue: DetailLinkedPerformersFilterModel(scope: .group(gid)))
         _linkedTags = StateObject(wrappedValue: DetailLinkedTagsFilterModel(scope: .group(gid)))
@@ -1069,9 +1074,77 @@ struct GroupDetailView: View {
         max(viewModel.totalGroupGalleries, selectedGroup.gallery_count ?? 0)
     }
 
+    /// Sub-groups load into this page's own `viewModel.groups` (the overview has its own model).
+    private var effectiveSubGroups: Int {
+        max(viewModel.totalGroups, selectedGroup.sub_group_count ?? 0)
+    }
+
+    @State private var subGroupGridWidth: CGFloat = 0
+    @State private var didLoadSubGroups = false
+
+    private func loadSubGroupsIfNeeded() {
+        guard !didLoadSubGroups, (selectedGroup.sub_group_count ?? 0) > 0 else { return }
+        didLoadSubGroups = true
+        viewModel.fetchGroups(sortBy: .nameAsc, liveFilter: [
+            "containing_groups": ["value": [selectedGroup.id], "modifier": "INCLUDES", "depth": 0]
+        ])
+    }
+
+    private var subGroupGrid: some View {
+        LazyVGrid(columns: DesignTokens.Grid.adaptiveColumns(
+            width: subGroupGridWidth,
+            ideal: DesignTokens.Grid.idealPosterCardWidth,
+            minimum: 2,
+            maximum: 8
+        ), spacing: 12) {
+            ForEach(viewModel.groups) { group in
+                NavigationLink(destination: GroupDetailView(selectedGroup: group)) {
+                    GroupCardView(group: group)
+                }
+                .buttonStyle(.plain)
+            }
+            if viewModel.isLoadingMoreGroups || (viewModel.isLoadingGroups && viewModel.groups.isEmpty) {
+                ProgressView().frame(maxWidth: .infinity).padding()
+            } else if viewModel.hasMoreGroups && !viewModel.groups.isEmpty {
+                Color.clear.frame(height: 1).onAppear { viewModel.loadMoreGroups() }
+            }
+        }
+        .measuresGridWidth($subGroupGridWidth)
+        .padding([.horizontal, .bottom], 16)
+    }
+
+    /// "In: <parent>" links under the header, one per group this one sits in.
+    @ViewBuilder
+    private var parentGroupLinks: some View {
+        if let parents = selectedGroup.containing_groups, !parents.isEmpty {
+            VStack(alignment: .leading, spacing: 6) {
+                ForEach(parents, id: \.group.id) { relation in
+                    NavigationLink(destination: GroupDetailView(selectedGroup: StashGroup(
+                        id: relation.group.id, name: relation.group.name, synopsis: nil, date: nil,
+                        scene_count: nil, gallery_count: nil, rating100: nil, updatedAt: nil,
+                        front_image_path: nil, back_image_path: nil, studio: nil))) {
+                        HStack(spacing: 6) {
+                            Image(systemName: "rectangle.stack")
+                            Text("In: \(relation.group.name)").lineLimit(1)
+                            Image(systemName: "chevron.right").font(.caption2.weight(.semibold))
+                        }
+                        .font(.subheadline)
+                        .foregroundColor(appearanceManager.tintColor)
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            // Same inset as the info grid above it.
+            .padding(.horizontal, 16)
+            .padding(.bottom, 10)
+        }
+    }
+
     private var availableTabs: [DetailTab] {
         var tabs: [DetailTab] = []
         if effectiveScenes > 0 { tabs.append(.scenes) }
+        if effectiveSubGroups > 0 { tabs.append(.groups) }
         if effectiveGalleries > 0 { tabs.append(.galleries) }
         if viewModel.totalDetailPerformers > 0 { tabs.append(.performers) }
         if viewModel.totalDetailStudios > 0 { tabs.append(.studios) }
@@ -1088,6 +1161,7 @@ struct GroupDetailView: View {
         let primaryEmpty: Bool = {
             switch selectedDetailTab {
             case .scenes: return viewModel.groupScenes.isEmpty
+            case .groups: return viewModel.groups.isEmpty
             case .galleries: return viewModel.groupGalleries.isEmpty
             case .performers: return viewModel.detailPerformers.isEmpty
             case .studios: return viewModel.detailStudios.isEmpty
@@ -1169,10 +1243,13 @@ struct GroupDetailView: View {
                 CatalogQuickSortMenu(mode: .tags, sort: linkedTags.selectedSortOption) {
                     linkedTags.changeSortOption(to: $0, viewModel: viewModel)
                 }
-            case .scenes:
+            case .scenes, .groups:
                 EmptyView()
             }
-            DetailTopBarSlotButton(slot: sectionFilterSlot)
+            // Sub-groups are a plain list: nothing to filter.
+            if selectedDetailTab != .groups {
+                DetailTopBarSlotButton(slot: sectionFilterSlot)
+            }
         }
     }
 
@@ -1186,6 +1263,7 @@ struct GroupDetailView: View {
         }
         switch selectedDetailTab {
         case .scenes: return slot(active: groupSceneFilterActive) { groupLiveFilterSheetPresented = true }
+        case .groups: return slot(active: false) {}
         case .galleries: return slot(active: linkedGalleries.catalogFilterSortFABActive) { linkedGalleries.showFilterSortSheet = true }
         case .performers: return slot(active: linkedPerformers.catalogFilterSortFABActive) { linkedPerformers.showFilterSortSheet = true }
         case .studios: return slot(active: linkedStudios.catalogFilterSortFABActive) { linkedStudios.showFilterSortSheet = true }
@@ -1213,6 +1291,8 @@ struct GroupDetailView: View {
                     } else {
                         InlineEmptyStateView(icon: "photo.on.rectangle", title: "No galleries found")
                     }
+                } else if selectedDetailTab == .groups {
+                    subGroupGrid
                 } else if selectedDetailTab == .performers {
                     performerGrid
                 } else if selectedDetailTab == .studios {
@@ -1434,9 +1514,16 @@ struct GroupDetailView: View {
                 linkedGalleries.refetchGalleries(viewModel: viewModel, initial: true)
             }
 
+            loadSubGroupsIfNeeded()
             viewModel.fetchGroup(groupId: selectedGroup.id) { updated in
                 if let updated {
                     selectedGroup = updated
+                    // Opened from a link that only knew id and name: the counts arrive here.
+                    loadSubGroupsIfNeeded()
+                    if selectedDetailTab == .scenes, (updated.scene_count ?? 0) == 0,
+                       (updated.gallery_count ?? 0) == 0, (updated.sub_group_count ?? 0) > 0 {
+                        selectedDetailTab = .groups
+                    }
                 }
             }
 
@@ -1794,7 +1881,7 @@ struct GroupDetailView: View {
             backdrop: { groupHeroImage(coverURL, alignment: .center) },
             avatar: { groupHeroImage(coverURL, alignment: .top) },
             accessory: { _ in EmptyView() },
-            footer: { EmptyView() }
+            footer: { parentGroupLinks }
         )
         .padding(.horizontal, 16)
         .fullScreenCover(item: $coverFullscreen) { RemoteHeroImageFullscreen(url: $0.url) }

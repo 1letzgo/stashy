@@ -3,6 +3,15 @@ package de.letzgo.stashy.ui.detail
 import de.letzgo.stashy.data.Downloads
 import de.letzgo.stashy.ui.tools.downloads.SceneBulkDownloadDialog
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.material3.Text
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import de.letzgo.stashy.data.GroupStub
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.lazy.grid.LazyGridState
@@ -41,23 +50,27 @@ class GroupDetailScreen(val groupId: String, val preview: StashGroup? = null) : 
 
     private val catalog = LinkedCatalog(
         scope,
-        order = listOf(DetailTab.Scenes, DetailTab.Galleries, DetailTab.Performers, DetailTab.Studios, DetailTab.Tags, DetailTab.Images),
+        order = listOf(DetailTab.Scenes, DetailTab.Galleries, DetailTab.Groups, DetailTab.Performers, DetailTab.Studios, DetailTab.Tags, DetailTab.Images),
         sceneScope = DetailRepository.scope("groups", groupId),
         galleryScope = DetailRepository.scope("groups", groupId),
         performerScope = DetailRepository.scope("groups", groupId),
         studioScope = DetailRepository.scope("groups", groupId),
         tagScope = DetailRepository.scope("groups", groupId),
         imageScope = DetailRepository.scope("groups", groupId),
+        // Direct sub-groups: the Groups section exists only when there is at least one.
+        groupScope = DetailRepository.subGroupScope(groupId),
         sceneExtraSorts = de.letzgo.stashy.data.GroupSceneSort.options,
         sceneContext = DetailViewContext.Group,
         previewScenes = preview?.sceneCount ?: 0,
     )
 
     private var tab by mutableStateOf(DetailTab.Scenes)
+    private var parents by mutableStateOf<List<GroupStub>>(emptyList())
 
     private fun load() {
         catalog.loadAll(force = true)
         scope.launch { runCatching { DetailRepository.group(groupId) }.getOrNull()?.let { group = it } }
+        scope.launch { runCatching { DetailRepository.containingGroups(groupId) }.getOrNull()?.let { parents = it } }
     }
 
     @Composable
@@ -117,9 +130,26 @@ class GroupDetailScreen(val groupId: String, val preview: StashGroup? = null) : 
                 ) { HeroPicture(thumb, g.name, ContentScale.Crop, rectangleStackIcon(), alignment = HeroPortraitBias) }
             } else DetailHero(DetailHero.Style.Cover, null, Color.Black, "Open cover", null) { HeroPlaceholder(rectangleStackIcon()) },
             collapsedItemCount = 4,
-            footer = null,
+            footer = parents.takeIf { it.isNotEmpty() }?.let { list ->
+                { ParentGroupLinks(list) }
+            },
             footerHasMore = !g.aliases.isNullOrBlank(),
         )
+    }
+
+    /** "In: <parent>" — one tappable row per containing group, opening that group's detail. */
+    @Composable
+    private fun ParentGroupLinks(list: List<GroupStub>) {
+        Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            Text("In", fontSize = 11.sp, color = Theme.palette.secondaryText)
+            list.forEach { parent ->
+                Text(
+                    parent.name, fontSize = 11.sp, fontWeight = FontWeight.Bold, color = de.letzgo.stashy.ui.textAccent(),
+                    maxLines = 1, overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.clickable { Nav.push(GroupDetailScreen(parent.id)) },
+                )
+            }
+        }
     }
 
     /** iOS: `EditGroupSheet`. */

@@ -198,6 +198,10 @@ data class GroupStub(
 @Serializable
 data class SceneGroupEntry(val group: GroupStub, @SerialName("scene_index") val sceneIndex: Int? = null)
 
+/** One `containing_groups { group { id name } }` entry (the parent a group sits in). */
+@Serializable
+data class ContainingGroupEntry(val group: GroupStub)
+
 @Serializable
 data class StashGroup(
     val id: String,
@@ -218,6 +222,8 @@ data class StashGroup(
     @SerialName("scene_count") val sceneCount: Int? = null,
     @SerialName("performer_count") val performerCount: Int? = null,
     @SerialName("sub_group_count") val subGroupCount: Int? = null,
+    /** Parent groups; not in the shared findGroups document, fetched by [de.letzgo.stashy.data.DetailRepository.containingGroups]. */
+    @SerialName("containing_groups") val containingGroups: List<ContainingGroupEntry>? = null,
 ) {
     val frontImageURL: String? get() = Net.signed(frontImagePath)
 }

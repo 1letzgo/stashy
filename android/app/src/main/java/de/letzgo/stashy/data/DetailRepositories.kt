@@ -26,6 +26,29 @@ object DetailRepository {
     fun scope(key: String, id: String): JsonObject = buildJsonObject { put(key, includes(id)) }
 
     /**
+     * Direct sub-groups of [id]: `group_filter.containing_groups` (HierarchicalMultiCriterionInput)
+     * with `depth: 0`, so grandchildren are not listed.
+     */
+    fun subGroupScope(id: String): JsonObject = buildJsonObject {
+        put("containing_groups", buildJsonObject {
+            put("value", JsonArray(listOf(JsonPrimitive(id))))
+            put("modifier", JsonPrimitive("INCLUDES"))
+            put("depth", JsonPrimitive(0))
+        })
+    }
+
+    private const val CONTAINING_GROUPS_QUERY =
+        "query GroupParents(\$ids: [ID!]) { findGroups(ids: \$ids) { groups { id containing_groups { group { id name front_image_path updated_at } } } } }"
+
+    /** Parent groups of [id] (own query: the shared findGroups document stays untouched). */
+    suspend fun containingGroups(id: String): List<GroupStub> {
+        val data = GraphQL.data(CONTAINING_GROUPS_QUERY, vars("ids" to listOf(id)))
+        val groups = data["findGroups"].obj?.get("groups") as? JsonArray ?: return emptyList()
+        val first = groups.firstOrNull() ?: return emptyList()
+        return GraphQL.decode(StashGroup.serializer(), first).containingGroups.orEmpty().map { it.group }
+    }
+
+    /**
      * Older Stash servers reject some iOS scopes (`tag_filter.performers`, `studio_filter.groups` …).
      * Then the same criterion is retried through the entity's `scenes_filter`, which every
      * supported server knows. Only Performers / Studios / Tags / Groups tabs retry, and never the
@@ -34,7 +57,7 @@ object DetailRepository {
      */
     fun sceneFilterFallback(query: CatalogQuery): CatalogQuery? {
         val scope = query.scope?.takeIf { it.isNotEmpty() } ?: return null
-        if (query.mode !in SCENE_FALLBACK_MODES || scope.containsKey("parents")) return null
+        if (query.mode !in SCENE_FALLBACK_MODES || scope.containsKey("parents") || scope.containsKey("containing_groups")) return null
         return query.copy(scope = buildJsonObject { put("scenes_filter", scope) })
     }
 
