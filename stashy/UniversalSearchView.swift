@@ -133,7 +133,8 @@ struct UniversalSearchView: View {
             Spacer()
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(Color.appBackground)
+        // Also under the keyboard: its rounded top corners show what lies behind it.
+        .background { Color.appBackground.ignoresSafeArea() }
     }
     
     // MARK: - Search Results
@@ -164,7 +165,7 @@ struct UniversalSearchView: View {
             }
             .padding(.vertical, 16)
         }
-        .background(Color.appBackground)
+        .background { Color.appBackground.ignoresSafeArea() }
     }
 
     private func isEmpty(_ tab: AppTab) -> Bool {
