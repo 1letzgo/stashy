@@ -270,6 +270,7 @@ private fun sortIcon(field: String): ImageVector = when {
         "play_count" -> Icons.Outlined.PlayCircle
         "scenes_count" -> SF.film
         "images_count" -> SF.photo
+        "galleries_count" -> SF.photoStack
         "name", "title" -> Icons.Filled.SortByAlpha
         "birthdate" -> Icons.Outlined.Cake
         "seconds" -> Icons.Outlined.Timer

@@ -25,13 +25,18 @@ object CatalogQuickSortCatalog {
             f(SortOption.FOR_YOU_FIELD, "For You"),
         )
         FilterMode.Performers -> listOf(
-            f("scenes_count", "Scenes"), f("name", "Name"), f("o_counter", "O Count"), f("rating", "Rating"),
+            f("scenes_count", "Scenes"), f("images_count", "Images"), f("galleries_count", "Galleries"),
+            f("name", "Name"), f("o_counter", "O Count"), f("rating", "Rating"),
             f("created_at", "Added"), f("birthdate", "Birthday"), f("random", "Random"),
         )
         FilterMode.Studios -> listOf(
-            f("scenes_count", "Scenes"), f("name", "Name"), f("rating", "Rating"), f("created_at", "Added"), f("random", "Random"),
+            f("scenes_count", "Scenes"), f("images_count", "Images"), f("galleries_count", "Galleries"),
+            f("name", "Name"), f("rating", "Rating"), f("created_at", "Added"), f("random", "Random"),
         )
-        FilterMode.Tags -> listOf(f("scenes_count", "Scenes"), f("name", "Name"), f("created_at", "Added"), f("random", "Random"))
+        FilterMode.Tags -> listOf(
+            f("scenes_count", "Scenes"), f("images_count", "Images"), f("galleries_count", "Galleries"),
+            f("name", "Name"), f("created_at", "Added"), f("random", "Random"),
+        )
         // iOS lists `image_count` here, but the gallery sort field is `images_count` on both platforms.
         FilterMode.Galleries -> listOf(
             f("date", "Date"), f("created_at", "Added"), f("rating", "Rating"), f("images_count", "Images"),

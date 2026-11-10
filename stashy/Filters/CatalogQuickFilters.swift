@@ -53,16 +53,19 @@ enum CatalogQuickSortCatalog {
                     .init(field: "play_count", label: "Plays"), .init(field: "random", label: "Random")]
                 + (StashDBViewModel.SceneSortOption.isForYouAvailable ? [.init(field: forYouField, label: "For You")] : [])
         case .performers:
-            return [.init(field: "scenes_count", label: "Scenes"), .init(field: "name", label: "Name"),
+            return [.init(field: "scenes_count", label: "Scenes"), .init(field: "images_count", label: "Images"),
+                    .init(field: "galleries_count", label: "Galleries"), .init(field: "name", label: "Name"),
                     .init(field: "o_counter", label: "O Count"), .init(field: "rating", label: "Rating"),
                     .init(field: "created_at", label: "Added"), .init(field: "birthdate", label: "Birthday"),
                     .init(field: "random", label: "Random")]
         case .studios:
-            return [.init(field: "scenes_count", label: "Scenes"), .init(field: "name", label: "Name"),
+            return [.init(field: "scenes_count", label: "Scenes"), .init(field: "images_count", label: "Images"),
+                    .init(field: "galleries_count", label: "Galleries"), .init(field: "name", label: "Name"),
                     .init(field: "rating", label: "Rating"), .init(field: "created_at", label: "Added"),
                     .init(field: "random", label: "Random")]
         case .tags:
-            return [.init(field: "scenes_count", label: "Scenes"), .init(field: "name", label: "Name"),
+            return [.init(field: "scenes_count", label: "Scenes"), .init(field: "images_count", label: "Images"),
+                    .init(field: "galleries_count", label: "Galleries"), .init(field: "name", label: "Name"),
                     .init(field: "created_at", label: "Added"), .init(field: "random", label: "Random")]
         case .galleries:
             return [.init(field: "date", label: "Date"), .init(field: "created_at", label: "Added"),
@@ -105,6 +108,7 @@ enum CatalogQuickSortCatalog {
         case "play_count": return "play.circle"
         case "scenes_count": return "film"
         case "images_count": return "photo"
+        case "galleries_count": return "photo.stack"
         case "name", "title": return "textformat"
         case "birthdate": return "gift"
         case "seconds": return "timer"

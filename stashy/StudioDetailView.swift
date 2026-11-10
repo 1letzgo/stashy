@@ -972,7 +972,7 @@ struct StudioDetailView: View {
         LazyVGrid(columns: galleryColumns, spacing: 12) {
             ForEach(viewModel.detailStudios) { subStudio in
                 NavigationLink(destination: StudioDetailView(studio: subStudio)) {
-                    StudioCardView(studio: subStudio)
+                    StudioCardView(studio: subStudio, badge: CatalogCardBadge(sortField: linkedChildStudios.selectedSortOption.sortField))
                 }
                 .buttonStyle(.plain)
             }
@@ -988,7 +988,7 @@ struct StudioDetailView: View {
         LazyVGrid(columns: galleryColumns, spacing: 12) {
             ForEach(viewModel.detailPerformers) { performer in
                 NavigationLink(destination: PerformerDetailView(performer: performer)) {
-                    PerformerCardView(performer: performer)
+                    PerformerCardView(performer: performer, badgeType: .forSort(linkedPerformers.selectedSortOption))
                 }
                 .buttonStyle(.plain)
             }
@@ -1010,7 +1010,7 @@ struct StudioDetailView: View {
         LazyVGrid(columns: galleryColumns, spacing: 12) {
             ForEach(viewModel.detailTags) { tag in
                 NavigationLink(destination: TagDetailView(selectedTag: tag)) {
-                    TagCardView(tag: tag)
+                    TagCardView(tag: tag, badge: CatalogCardBadge(sortField: linkedTags.selectedSortOption.sortField))
                 }
                 .buttonStyle(.plain)
             }

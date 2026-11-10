@@ -18,7 +18,9 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
+import de.letzgo.stashy.data.CatalogCardBadge
 import de.letzgo.stashy.data.CatalogCardColumnScope
+import de.letzgo.stashy.data.PerformerBadgeType
 import de.letzgo.stashy.data.CatalogPrefs
 import de.letzgo.stashy.data.DetailRepository
 import de.letzgo.stashy.data.FilterMode
@@ -341,16 +343,16 @@ internal fun LazyGridScope.linkedSection(catalog: LinkedCatalog, tab: DetailTab,
             }
         }
         DetailTab.Studios -> catalog.studios?.let { l ->
-            pagedSection(l, { it.id }) { _, s -> DetailStudioCard(s, onClick = { Nav.push(StudioDetailScreen(s.id, s, catalog.opensFilteredOnPerformerId)) }) }
+            pagedSection(l, { it.id }) { _, s -> DetailStudioCard(s, badge = CatalogCardBadge.forSort(catalog.studioController!!.sort), onClick = { Nav.push(StudioDetailScreen(s.id, s, catalog.opensFilteredOnPerformerId)) }) }
         }
         DetailTab.Performers -> catalog.performers?.let { l ->
-            pagedSection(l, { it.id }, "Loading performers...") { _, p -> DetailPerformerCard(p, onClick = { Nav.push(PerformerDetailScreen(p.id, p)) }) }
+            pagedSection(l, { it.id }, "Loading performers...") { _, p -> DetailPerformerCard(p, badgeType = PerformerBadgeType.forSort(catalog.performerController!!.sort), onClick = { Nav.push(PerformerDetailScreen(p.id, p)) }) }
         }
         DetailTab.Tags -> catalog.tags?.let { l ->
-            pagedSection(l, { it.id }) { _, t -> DetailTagCard(t, onClick = { Nav.push(TagDetailScreen(t.id, t, catalog.opensFilteredOnPerformerId)) }) }
+            pagedSection(l, { it.id }) { _, t -> DetailTagCard(t, badge = CatalogCardBadge.forSort(catalog.tagController!!.sort), onClick = { Nav.push(TagDetailScreen(t.id, t, catalog.opensFilteredOnPerformerId)) }) }
         }
         DetailTab.Groups -> catalog.groups?.let { l ->
-            pagedSection(l, { it.id }) { _, g -> DetailGroupCard(g, onClick = { Nav.push(GroupDetailScreen(g.id, g)) }) }
+            pagedSection(l, { it.id }) { _, g -> DetailGroupCard(g, badge = CatalogCardBadge.forSort(catalog.groupController!!.sort), onClick = { Nav.push(GroupDetailScreen(g.id, g)) }) }
         }
         DetailTab.Images -> imageSection(catalog, gridState)
         // Drawn by PerformerDetailScreen (not a catalog list).

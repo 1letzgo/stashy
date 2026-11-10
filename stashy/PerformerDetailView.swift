@@ -24,6 +24,8 @@ struct PerformerDetailView: View {
     @State private var heroFullscreen: HeroImageFullscreenItem?
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @State private var fullPerformer: Performer?
+    /// All links of the performer (`urls`, older servers: `url`), listed in the expanded header.
+    @State private var profileLinks: [String] = []
     @State private var performerLiveFilterSheetPresented = false
     @State private var showingSceneDownloadOptions = false
     @State private var performerSceneFilterActive = false
@@ -919,6 +921,78 @@ struct PerformerDetailView: View {
                  self.isFavorite = p.favorite ?? false
              }
         }
+        loadProfileLinks()
+    }
+
+    /// `urls` is not in the shared list fragment, so it comes with its own small query; servers
+    /// without it fall back to the singular `url`.
+    private func loadProfileLinks() {
+        let performerId = performer.id
+        Task {
+            func fetch(_ field: String) async -> [String]? {
+                let query = "query PerformerLinks($id: ID!) { findPerformer(id: $id) { \(field) } }"
+                guard let data = try? await GraphQLClient.shared.executeRaw(query: query, variables: ["id": performerId]),
+                      let root = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+                      let dataDict = root["data"] as? [String: Any],
+                      let node = dataDict["findPerformer"] as? [String: Any] else { return nil }
+                if let list = node["urls"] as? [String] { return list }
+                if let single = node["url"] as? String { return [single] }
+                return []
+            }
+            var raw = await fetch("urls")
+            if raw == nil { raw = await fetch("url") }
+            var seen = Set<String>()
+            let cleaned = (raw ?? [])
+                .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+                .filter { !$0.isEmpty && seen.insert($0).inserted }
+            profileLinks = cleaned
+        }
+    }
+
+    /// Tappable link list under the stats, only while the header is expanded.
+    @ViewBuilder
+    private var profileLinksFooter: some View {
+        if isHeaderExpanded && !profileLinks.isEmpty {
+            VStack(alignment: .leading, spacing: 6) {
+                Text("Links")
+                    .font(.system(size: 11))
+                    .foregroundColor(.secondary)
+                    .textCase(.uppercase)
+                ForEach(profileLinks, id: \.self) { link in
+                    if let destination = Self.linkDestination(link) {
+                        Link(destination: destination) {
+                            HStack(spacing: 6) {
+                                Image(systemName: "link")
+                                    .font(.system(size: 11, weight: .bold))
+                                Text(Self.linkLabel(link))
+                                    .font(.system(size: 11, weight: .bold))
+                                    .lineLimit(1)
+                                    .truncationMode(.middle)
+                            }
+                            .foregroundColor(appearanceManager.tintColor)
+                            .padding(.vertical, 2)
+                        }
+                    }
+                }
+            }
+            .padding(.horizontal, 16)
+            .padding(.bottom, 10)
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+    }
+
+    private static func linkDestination(_ link: String) -> URL? {
+        let withScheme = link.contains("://") ? link : "https://\(link)"
+        return URL(string: withScheme)
+    }
+
+    /// Host without `www.` plus the path, e.g. `instagram.com/name`.
+    private static func linkLabel(_ link: String) -> String {
+        guard let url = linkDestination(link), var host = url.host else { return link }
+        if host.lowercased().hasPrefix("www.") { host.removeFirst(4) }
+        var path = url.path
+        while path.hasSuffix("/") { path.removeLast() }
+        return host + path
     }
     
     private var galleryGrid: some View {
@@ -945,7 +1019,7 @@ struct PerformerDetailView: View {
         LazyVGrid(columns: galleryColumns, spacing: 12) {
             ForEach(viewModel.detailStudios) { studio in
                 NavigationLink(destination: StudioDetailView(studio: studio, filterPerformerId: performer.id)) {
-                    StudioCardView(studio: studio)
+                    StudioCardView(studio: studio, badge: CatalogCardBadge(sortField: linkedStudios.selectedSortOption.sortField))
                 }
                 .buttonStyle(.plain)
             }
@@ -961,7 +1035,7 @@ struct PerformerDetailView: View {
         LazyVGrid(columns: galleryColumns, spacing: 12) {
             ForEach(viewModel.detailTags) { tag in
                 NavigationLink(destination: TagDetailView(selectedTag: tag, filterPerformerId: performer.id)) {
-                    TagCardView(tag: tag)
+                    TagCardView(tag: tag, badge: CatalogCardBadge(sortField: linkedTags.selectedSortOption.sortField))
                 }
                 .buttonStyle(.plain)
             }
@@ -1119,6 +1193,7 @@ struct PerformerDetailView: View {
             isExpanded: $isHeaderExpanded,
             collapsedItemLimit: 8,
             placeholderSystemImage: "person.fill",
+            footerExpandable: !profileLinks.isEmpty,
             backdrop: { performerHeroImage(imageURL, alignment: .center) },
             avatar: { performerHeroImage(imageURL, alignment: .top) },
             accessory: { onImage in
@@ -1137,7 +1212,7 @@ struct PerformerDetailView: View {
                     }
                 }
             },
-            footer: { EmptyView() }
+            footer: { profileLinksFooter }
         )
         .fullScreenCover(item: $heroFullscreen) { RemoteHeroImageFullscreen(url: $0.url) }
     }

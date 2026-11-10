@@ -35,7 +35,11 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil3.compose.SubcomposeAsyncImage
+import de.letzgo.stashy.data.BadgeCount
+import de.letzgo.stashy.data.CatalogCardBadge
 import de.letzgo.stashy.data.Gallery
+import de.letzgo.stashy.data.PerformerBadgeType
+import de.letzgo.stashy.data.badgeCount
 import de.letzgo.stashy.data.Net
 import de.letzgo.stashy.data.Performer
 import de.letzgo.stashy.data.ServerConfigManager
@@ -104,14 +108,21 @@ private fun CardPill(icon: ImageVector, text: String) = NativeMediaLabel(text, i
 
 /** iOS: `PerformerCardView` (9:12, top-anchored portrait, age + scene-count pills, name). */
 @Composable
-internal fun DetailPerformerCard(performer: Performer, modifier: Modifier = Modifier, onClick: (() -> Unit)? = null) {
+internal fun DetailPerformerCard(performer: Performer, modifier: Modifier = Modifier, badgeType: PerformerBadgeType = PerformerBadgeType.SceneCount, onClick: (() -> Unit)? = null) {
+    val (badgeIcon, badgeText) = when (badgeType) {
+        PerformerBadgeType.SceneCount -> SF.film to "${performer.sceneCount ?: 0}"
+        PerformerBadgeType.ImageCount -> SF.photo to "${performer.imageCount ?: 0}"
+        PerformerBadgeType.GalleryCount -> SF.photoStack to "${performer.galleryCount ?: 0}"
+        PerformerBadgeType.OCount -> de.letzgo.stashy.ui.oCounterIcon(Appearance.oCounterIcon) to "${performer.oCounter ?: 0}"
+        PerformerBadgeType.Rating -> SF.starFill to "${performer.rating100 ?: 0}"
+    }
     CardBox(modifier, 9f / 12f, onClick) {
         CardImage(performerThumbnailURL(performer.id, performer.imagePath), SF.personFill, Alignment.TopCenter)
         BottomGradient(0.55f)
         Row(Modifier.fillMaxWidth().padding(8.dp), verticalAlignment = Alignment.Top) {
             DetailFormatting.age(performer.birthdate)?.let { CardPill(SF.calendar, it) }
             Spacer(Modifier.weight(1f))
-            CardPill(SF.film, "${performer.sceneCount ?: 0}")
+            CardPill(badgeIcon, badgeText)
         }
         Text(
             performer.name, Modifier.align(Alignment.BottomStart).padding(12.dp),
@@ -146,28 +157,24 @@ private fun CountLabel(icon: ImageVector, count: Int) {
     }
 }
 
-/** Logo block (2.2:1, studio header grey) + name/count row (iOS `StudioCardView` / `TagCardView`). */
+/** Logo block (2.2:1, studio header grey) + name row with the one count the list is sorted by (iOS `StudioCardView` / `TagCardView`). */
 @Composable
-private fun LogoCard(modifier: Modifier, onClick: (() -> Unit)?, name: String, scenes: Int?, galleries: Int?, alwaysShowScenes: Boolean, oCount: Int? = null, logo: @Composable BoxScope.() -> Unit) {
+private fun LogoCard(modifier: Modifier, onClick: (() -> Unit)?, name: String, count: BadgeCount?, logo: @Composable BoxScope.() -> Unit) {
     val p = Theme.palette
     NativeCard(modifier.fillMaxWidth(), onClick = onClick) { Column(Modifier.fillMaxWidth()) {
         Box(Modifier.fillMaxWidth().aspectRatio(2.2f).background(p.studioHeader).clip(RoundedCornerShape(0.dp)), content = logo)
         Row(Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
             Text(name, Modifier.weight(1f), style = NativeType.titleSmall, color = p.text, maxLines = scaledMaxLines(), overflow = TextOverflow.Ellipsis)
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                if (alwaysShowScenes || (scenes ?: 0) > 0) CountLabel(SF.film, scenes ?: 0)
-                if ((galleries ?: 0) > 0) CountLabel(SF.photoStack, galleries ?: 0)
-                if ((oCount ?: 0) > 0) CountLabel(de.letzgo.stashy.ui.oCounterIcon(de.letzgo.stashy.ui.Appearance.oCounterIcon, filled = true), oCount ?: 0)
-            }
+            count?.let { (badge, n) -> CountLabel(de.letzgo.stashy.ui.components.badgeIcon(badge), n) }
         }
     } }
 }
 
 /** iOS: `StudioCardView`. */
 @Composable
-internal fun DetailStudioCard(studio: Studio, modifier: Modifier = Modifier, onClick: (() -> Unit)? = null) {
+internal fun DetailStudioCard(studio: Studio, modifier: Modifier = Modifier, badge: CatalogCardBadge = CatalogCardBadge.Scenes, onClick: (() -> Unit)? = null) {
     val counts = de.letzgo.stashy.data.rememberStudioCounts(studio)
-    LogoCard(modifier, onClick, studio.name, counts.scenes, counts.galleries, true, counts.oCount) {
+    LogoCard(modifier, onClick, studio.name, studio.badgeCount(badge, counts)) {
         StudioLogo(studio, Modifier.fillMaxSize().padding(start = 14.dp, end = 14.dp, top = 12.dp))
     }
 }
@@ -190,8 +197,8 @@ internal fun TagImage(tag: Tag, modifier: Modifier = Modifier) {
 
 /** iOS: `TagCardView`. */
 @Composable
-internal fun DetailTagCard(tag: Tag, modifier: Modifier = Modifier, onClick: (() -> Unit)? = null) {
-    LogoCard(modifier, onClick, tag.name, tag.sceneCount, tag.galleryCount, false) {
+internal fun DetailTagCard(tag: Tag, modifier: Modifier = Modifier, badge: CatalogCardBadge = CatalogCardBadge.Scenes, onClick: (() -> Unit)? = null) {
+    LogoCard(modifier, onClick, tag.name, tag.badgeCount(badge)) {
         if (tag.hasImage) TagImage(tag, Modifier.fillMaxSize())
         else Icon(SF.number, null, tint = Appearance.tint, modifier = Modifier.align(Alignment.Center).size(32.dp))
     }
@@ -217,13 +224,13 @@ internal fun DetailGalleryCard(gallery: Gallery, modifier: Modifier = Modifier, 
 
 /** iOS: `GroupCardView` (9:12 front cover, scene count badge, name). */
 @Composable
-internal fun DetailGroupCard(group: StashGroup, modifier: Modifier = Modifier, onClick: (() -> Unit)? = null) {
+internal fun DetailGroupCard(group: StashGroup, modifier: Modifier = Modifier, badge: CatalogCardBadge = CatalogCardBadge.Scenes, onClick: (() -> Unit)? = null) {
     CardBox(modifier, 9f / 12f, onClick) {
         CardImage(groupThumbnailURL(group), SF.rectangleStack, Alignment.TopCenter)
         BottomGradient(0.45f)
         Row(Modifier.fillMaxWidth().padding(8.dp)) {
             Spacer(Modifier.weight(1f))
-            group.sceneCount?.let { CardPill(SF.film, "$it") }
+            group.badgeCount(badge)?.let { (b, n) -> CardPill(de.letzgo.stashy.ui.components.badgeIcon(b), "$n") }
         }
         Text(
             group.name, Modifier.align(Alignment.BottomStart).padding(12.dp),

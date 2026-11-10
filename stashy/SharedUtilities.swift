@@ -99,7 +99,74 @@ enum PerformerBadgeType {
         case .imageCountAsc, .imageCountDesc: return .imageCount
         case .galleryCountAsc, .galleryCountDesc: return .galleryCount
         case .oCountAsc, .oCountDesc: return .oCount
+        case .ratingAsc, .ratingDesc: return .rating
         default: return .sceneCount
+        }
+    }
+
+    func icon(oCounterIcon: String) -> String {
+        switch self {
+        case .sceneCount: return "film"
+        case .imageCount: return "photo"
+        case .galleryCount: return "photo.stack"
+        case .oCount: return oCounterIcon
+        case .rating: return "star.fill"
+        }
+    }
+
+    func value(for performer: Performer) -> Int {
+        switch self {
+        case .sceneCount: return performer.sceneCount
+        case .imageCount: return performer.imageCount ?? 0
+        case .galleryCount: return performer.galleryCount ?? 0
+        case .oCount: return performer.oCounter ?? 0
+        case .rating: return performer.rating100 ?? 0
+        }
+    }
+}
+
+/// The one count a studio, tag or group card shows top right: the count its list is sorted
+/// by, the scene count for every other sort. A count the card does not know falls back to scenes.
+enum CatalogCardBadge: Equatable {
+    case scenes, images, galleries, performers, performersAll, markers, oCount, oCountAll, rating
+
+    /// From a sort option's `sortField`.
+    init(sortField: String) {
+        switch sortField {
+        case "images_count": self = .images
+        case "galleries_count": self = .galleries
+        case "performer_count", "performers_count": self = .performers
+        case "performer_count_all": self = .performersAll
+        case "scene_markers_count": self = .markers
+        case "o_counter": self = .oCount
+        case "o_counter_all": self = .oCountAll
+        case "rating": self = .rating
+        default: self = .scenes
+        }
+    }
+
+    func icon(oCounterIcon: String) -> String {
+        switch self {
+        case .scenes: return "film"
+        case .images: return "photo"
+        case .galleries: return "photo.stack"
+        case .performers, .performersAll: return "person.2"
+        case .markers: return "bookmark"
+        case .oCount, .oCountAll: return oCounterIcon
+        case .rating: return "star.fill"
+        }
+    }
+
+    /// Singular noun for VoiceOver (`CatalogCardCountPill`).
+    var noun: String {
+        switch self {
+        case .scenes: return "scene"
+        case .images: return "image"
+        case .galleries: return "gallery"
+        case .performers, .performersAll: return "performer"
+        case .markers: return "marker"
+        case .oCount, .oCountAll: return "O"
+        case .rating: return "rating"
         }
     }
 }
@@ -3506,5 +3573,101 @@ enum PlaybackFraction {
 
     static func cgFloat(_ value: Double, in total: Double) -> CGFloat {
         CGFloat(of(value, in: total))
+    }
+}
+
+// MARK: - Scene title normalizer
+
+/// Turns a file-name-like scene title ("barbellinaa s pov sex tape.mp4") into a readable one
+/// ("Barbellinaa's POV Sex Tape"). Pure and idempotent; used by the "Normalize" button in the
+/// scene edit sheet (Android twin: `data/SceneTitleNormalizer.kt`, same rules).
+enum SceneTitleNormalizer {
+    private static let extensions = "mp4|m4v|mkv|mov|avi|wmv|webm|flv|ts|mpg|mpeg|jpg|jpeg|png|gif|webp"
+    private static let noiseTokens: Set<String> = [
+        "480p", "720p", "1080p", "2160p", "4k", "uhd", "hd", "hevc", "h264", "h265", "x264", "x265", "webrip"
+    ]
+    private static let acronyms: Set<String> = ["pov", "bbc", "milf", "dp", "joi", "asmr", "vr", "hd"]
+    private static let smallWords: Set<String> = [
+        "a", "an", "the", "and", "or", "of", "in", "on", "with", "to", "for", "at", "by", "her", "his"
+    ]
+    private static let negatable: Set<String> = [
+        "don", "can", "won", "isn", "doesn", "didn", "wasn", "aren", "couldn", "wouldn", "shouldn"
+    ]
+
+    private static func strippingExtension(_ text: String) -> String {
+        text.replacingOccurrences(of: "\\.(\(extensions))$", with: "", options: [.regularExpression, .caseInsensitive])
+    }
+
+    private static func hasKnownExtension(_ text: String) -> Bool {
+        text.range(of: "\\.(\(extensions))$", options: [.regularExpression, .caseInsensitive]) != nil
+    }
+
+    private static func collapsed(_ text: String) -> String {
+        text.replacingOccurrences(of: "[ \\t\\r\\n]+", with: " ", options: .regularExpression)
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    static func normalized(_ input: String) -> String {
+        let trimmed = input.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return trimmed }
+
+        var text = strippingExtension(trimmed).trimmingCharacters(in: .whitespacesAndNewlines)
+        let hadSpaces = text.rangeOfCharacter(from: .whitespacesAndNewlines) != nil
+        let separatorCount = text.filter { $0 == "_" || $0 == "-" || $0 == "+" || $0 == "." }.count
+        text = text.replacingOccurrences(of: "_", with: " ")
+        // Release tags first, before "-" can be taken for a space.
+        text = text.replacingOccurrences(of: "(?i)\\bweb[-_. ]?dl\\b", with: " ", options: .regularExpression)
+        text = text.replacingOccurrences(
+            of: "(?i)[\\[(]\\s*(480p|720p|1080p|2160p|4k|uhd|hd)\\s*[\\])]", with: " ", options: .regularExpression)
+
+        text = text.replacingOccurrences(
+            of: "(?<=\\p{L})\\.(?=[\\p{L}\\p{N}])|(?<=\\p{N})\\.(?=\\p{L})", with: " ", options: .regularExpression)
+        if !hadSpaces && separatorCount >= 2 {
+            text = text.replacingOccurrences(
+                of: "(?<=[\\p{L}\\p{N}])[-+](?=[\\p{L}\\p{N}])", with: " ", options: .regularExpression)
+        }
+
+        var tokens = collapsed(text).split(separator: " ").map(String.init)
+        tokens = tokens.filter { !noiseTokens.contains($0.lowercased()) }
+
+        // Lost apostrophes: "barbellinaa s" -> "barbellinaa's", "don t" -> "don't".
+        var merged: [String] = []
+        for token in tokens {
+            if let last = merged.last, last.last?.isLetter == true {
+                if token == "s" { merged[merged.count - 1] = last + "'s"; continue }
+                if token == "t", negatable.contains(last.lowercased()) { merged[merged.count - 1] = last + "'t"; continue }
+            }
+            merged.append(token)
+        }
+
+        let cased = merged.enumerated().map { index, token in titleCased(token, isFirst: index == 0) }
+        let result = cased.joined(separator: " ")
+        return result.isEmpty ? trimmed : result
+    }
+
+    private static func titleCased(_ token: String, isFirst: Bool) -> String {
+        // Mixed / upper case words (POV, iPhone, Nice) stay as they are.
+        if token.contains(where: { $0.isUppercase }) { return token }
+        let core = token.trimmingCharacters(in: CharacterSet.letters.inverted).lowercased()
+        if acronyms.contains(core) { return token.uppercased() }
+        if !isFirst && smallWords.contains(core) { return token }
+        guard let start = token.firstIndex(where: { $0.isLetter || $0.isNumber }), token[start].isLetter else { return token }
+        return token[..<start] + token[start].uppercased() + token[token.index(after: start)...]
+    }
+
+    /// Lighter rule for the description: trim, drop a file extension when the whole text is one
+    /// file-name-like line, collapse whitespace runs inside lines. Line breaks and casing stay.
+    static func normalizedDescription(_ input: String) -> String {
+        var text = input.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !text.isEmpty else { return text }
+        if !text.contains("\n"), hasKnownExtension(text) {
+            let stripped = strippingExtension(text).trimmingCharacters(in: .whitespacesAndNewlines)
+            if !stripped.isEmpty { text = stripped }
+        }
+        let lines = text.components(separatedBy: "\n").map { line in
+            line.replacingOccurrences(of: "[ \\t\\r]+", with: " ", options: .regularExpression)
+                .trimmingCharacters(in: .whitespaces)
+        }
+        return lines.joined(separator: "\n")
     }
 }

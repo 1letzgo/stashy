@@ -340,13 +340,9 @@ struct HomeRowView: View {
         typealias VM = StashDBViewModel
         switch config.filterMode {
         case .performers:
-            let sort = filter.flatMap { VM.savedFilterSortOption($0, VM.PerformerSortOption.self, raw: { VM.PerformerSortOption(rawValue: $0) }, field: { $0.sortField }, direction: { $0.direction }) }
-                ?? config.sortRaw.flatMap { VM.PerformerSortOption(rawValue: $0) }
-            coordinator.navigateToPerformers(sort: sort, filter: filter)
+            coordinator.navigateToPerformers(sort: customPerformerSort, filter: filter)
         case .studios:
-            let sort = filter.flatMap { VM.savedFilterSortOption($0, VM.StudioSortOption.self, raw: { VM.StudioSortOption(rawValue: $0) }, field: { $0.sortField }, direction: { $0.direction }) }
-                ?? config.sortRaw.flatMap { VM.StudioSortOption(rawValue: $0) }
-            coordinator.navigateToStudios(sort: sort, filter: filter)
+            coordinator.navigateToStudios(sort: customStudioSort, filter: filter)
         case .galleries:
             let sort = filter.flatMap { VM.savedFilterSortOption($0, VM.GallerySortOption.self, raw: { VM.GallerySortOption(rawValue: $0) }, field: { $0.sortField }, direction: { $0.direction }) }
                 ?? config.sortRaw.flatMap { VM.GallerySortOption(rawValue: $0) }
@@ -411,7 +407,7 @@ struct HomeRowView: View {
                 case .studios:
                     ForEach(studios) { s in
                         cardLink(destination: StudioDetailView(studio: s), id: s.id, width: w) {
-                            HomeStudioCardView(studio: s, config: config, isLarge: isLarge, screenWidth: screenWidth)
+                            HomeStudioCardView(studio: s, config: config, badge: studioBadge, isLarge: isLarge, screenWidth: screenWidth)
                         }
                     }
                 case .galleries:
@@ -441,8 +437,30 @@ struct HomeRowView: View {
         switch config.type {
         case .performersHighestOCount: return .oCount
         case .performersHighestRating: return .rating
+        case .customFilter:            return customPerformerSort.map(PerformerBadgeType.forSort) ?? .sceneCount
         default:                       return .sceneCount
         }
+    }
+
+    /// A custom row's order: its saved filter's sort, or the sort the row was built from.
+    private var customPerformerSort: StashDBViewModel.PerformerSortOption? {
+        typealias VM = StashDBViewModel
+        let filter = config.filterId.flatMap { viewModel.savedFilters[$0] }
+        return filter.flatMap { VM.savedFilterSortOption($0, VM.PerformerSortOption.self, raw: { VM.PerformerSortOption(rawValue: $0) }, field: { $0.sortField }, direction: { $0.direction }) }
+            ?? config.sortRaw.flatMap { VM.PerformerSortOption(rawValue: $0) }
+    }
+
+    private var customStudioSort: StashDBViewModel.StudioSortOption? {
+        typealias VM = StashDBViewModel
+        let filter = config.filterId.flatMap { viewModel.savedFilters[$0] }
+        return filter.flatMap { VM.savedFilterSortOption($0, VM.StudioSortOption.self, raw: { VM.StudioSortOption(rawValue: $0) }, field: { $0.sortField }, direction: { $0.direction }) }
+            ?? config.sortRaw.flatMap { VM.StudioSortOption(rawValue: $0) }
+    }
+
+    /// Studio cards of a custom row show the count the row is sorted by.
+    private var studioBadge: CatalogCardBadge {
+        guard config.type == .customFilter, let sort = customStudioSort else { return .scenes }
+        return CatalogCardBadge(sortField: sort.sortField)
     }
 
     private var shownPerformers: [Performer] {
@@ -529,13 +547,9 @@ struct HomePerformerCardView: View {
                 HStack(alignment: .top) {
                     Spacer()
                     HStack(spacing: 2) {
-                        Image(systemName: badgeType == .oCount ? appearanceManager.oCounterIcon : (badgeType == .rating ? "star.fill" : "film"))
+                        Image(systemName: badgeType.icon(oCounterIcon: appearanceManager.oCounterIcon))
                             .font(.system(size: 8, weight: .bold))
-                        Text(
-                            badgeType == .oCount
-                                ? "\(performer.oCounter ?? 0)"
-                                : (badgeType == .rating ? "\(performer.rating100 ?? 0)" : "\(performer.sceneCount)")
-                        )
+                        Text("\(badgeType.value(for: performer))")
                             .font(.system(size: 9, weight: .bold))
                     }
                     .foregroundColor(.white)
@@ -565,6 +579,7 @@ struct HomePerformerCardView: View {
 struct HomeStudioCardView: View {
     let studio: Studio
     let config: HomeRowConfig
+    var badge: CatalogCardBadge = .scenes
     var isLarge: Bool = false
     let screenWidth: CGFloat
 
@@ -572,7 +587,7 @@ struct HomeStudioCardView: View {
 
     /// The Studios list's card (counts as pills, logo centred, name below) at the row's width.
     var body: some View {
-        StudioCardView(studio: studio)
+        StudioCardView(studio: studio, badge: badge)
             .frame(width: cardWidth)
     }
 }

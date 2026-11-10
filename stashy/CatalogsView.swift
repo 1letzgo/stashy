@@ -849,7 +849,7 @@ private struct GroupsViewContent: View {
                 LazyVGrid(columns: columns, spacing: 12) {
                     ForEach(viewModel.groups) { group in
                         NavigationLink(destination: GroupDetailView(selectedGroup: group)) {
-                            GroupCardView(group: group)
+                            GroupCardView(group: group, badge: CatalogCardBadge(sortField: selectedSortOption.sortField))
                         }
                         .buttonStyle(.plain)
                         .id(group.id)
@@ -891,7 +891,23 @@ private struct GroupsViewContent: View {
 
 struct GroupCardView: View {
     let group: StashGroup
+    /// What the list is sorted by; scenes for every sort that is not a count.
+    var badge: CatalogCardBadge = .scenes
     @ObservedObject var appearanceManager = AppearanceManager.shared
+
+    /// The badge's count, or the scene count when the group does not carry that count.
+    private var shownCount: (badge: CatalogCardBadge, count: Int)? {
+        let value: Int?
+        switch badge {
+        case .scenes: value = group.scene_count
+        case .galleries: value = group.gallery_count
+        case .performers, .performersAll: value = group.performer_count
+        case .rating: value = group.rating100
+        case .images, .markers, .oCount, .oCountAll: value = nil
+        }
+        if let value { return (badge, value) }
+        return group.scene_count.map { (.scenes, $0) }
+    }
     
     var body: some View {
         ZStack(alignment: .bottomLeading) {
@@ -934,34 +950,9 @@ struct GroupCardView: View {
             VStack {
                 HStack(spacing: 8) {
                     Spacer()
-                    // Gallery Badge (if available)
-                    if let galleryCount = group.gallery_count, galleryCount > 0 {
-                        HStack(spacing: 3) {
-                            Image(systemName: "photo.stack")
-                                .font(.system(size: 10, weight: .bold))
-                            Text("\(galleryCount)")
-                                .font(.system(size: 11, weight: .bold))
-                        }
-                        .foregroundColor(.white)
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 4)
-                        .stashyGlass(shape: Capsule())
-                        .shadow(color: .black.opacity(0.2), radius: 2)
-                    }
-
-                    // Scenes Badge
-                    if let count = group.scene_count {
-                        HStack(spacing: 3) {
-                            Image(systemName: "film")
-                                .font(.system(size: 10, weight: .bold))
-                            Text("\(count)")
-                                .font(.system(size: 11, weight: .bold))
-                        }
-                        .foregroundColor(.white)
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 4)
-                        .stashyGlass(shape: Capsule())
-                        .shadow(color: .black.opacity(0.2), radius: 2)
+                    if let shown = shownCount {
+                        CatalogCardCountPill(icon: shown.badge.icon(oCounterIcon: appearanceManager.oCounterIcon),
+                                             count: shown.count, noun: shown.badge.noun)
                     }
                 }
                 .padding(8)
@@ -1765,7 +1756,7 @@ struct GroupDetailView: View {
         LazyVGrid(columns: galleryColumns, spacing: 12) {
             ForEach(viewModel.detailPerformers) { performer in
                 NavigationLink(destination: PerformerDetailView(performer: performer)) {
-                    PerformerCardView(performer: performer)
+                    PerformerCardView(performer: performer, badgeType: .forSort(linkedPerformers.selectedSortOption))
                 }
                 .buttonStyle(.plain)
             }
@@ -1783,7 +1774,7 @@ struct GroupDetailView: View {
         LazyVGrid(columns: galleryColumns, spacing: 12) {
             ForEach(viewModel.detailStudios) { subStudio in
                 NavigationLink(destination: StudioDetailView(studio: subStudio)) {
-                    StudioCardView(studio: subStudio)
+                    StudioCardView(studio: subStudio, badge: CatalogCardBadge(sortField: linkedStudios.selectedSortOption.sortField))
                 }
                 .buttonStyle(.plain)
             }
@@ -1801,7 +1792,7 @@ struct GroupDetailView: View {
         LazyVGrid(columns: galleryColumns, spacing: 12) {
             ForEach(viewModel.detailTags) { tag in
                 NavigationLink(destination: TagDetailView(selectedTag: tag)) {
-                    TagCardView(tag: tag)
+                    TagCardView(tag: tag, badge: CatalogCardBadge(sortField: linkedTags.selectedSortOption.sortField))
                 }
                 .buttonStyle(.plain)
             }

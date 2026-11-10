@@ -1432,6 +1432,8 @@ struct DetailHeroCard<Backdrop: View, Avatar: View, Accessory: View, Footer: Vie
     /// Replaces the single avatar circle (and `onHeroTap` on it), e.g. two overlapping
     /// `DetailHeroAvatarCircle`s. Laid out like the circle: centred on the band edge.
     var leadingAvatars: AnyView? = nil
+    /// The footer holds more when expanded (e.g. links), so the chevron shows without a description.
+    var footerExpandable: Bool = false
     @ViewBuilder var backdrop: () -> Backdrop
     @ViewBuilder var avatar: () -> Avatar
     @ViewBuilder var accessory: (_ onImage: Bool) -> Accessory
@@ -1449,7 +1451,7 @@ struct DetailHeroCard<Backdrop: View, Avatar: View, Accessory: View, Footer: Vie
     }
 
     private var hasExpandableContent: Bool {
-        !trimmedDescription.isEmpty || items.count > collapsedItemLimit
+        !trimmedDescription.isEmpty || items.count > collapsedItemLimit || footerExpandable
     }
 
     /// Tap target only when there is an image to open.

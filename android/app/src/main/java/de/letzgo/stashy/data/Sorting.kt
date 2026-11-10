@@ -297,7 +297,62 @@ enum class PerformerBadgeType {
             "imageCountAsc", "imageCountDesc" -> ImageCount
             "galleryCountAsc", "galleryCountDesc" -> GalleryCount
             "oCountAsc", "oCountDesc" -> OCount
+            "ratingAsc", "ratingDesc" -> Rating
             else -> SceneCount
         }
     }
 }
+
+/**
+ * iOS: `CatalogCardBadge` — the one count a studio, tag or group card shows: what its list is
+ * sorted by, the scene count for every other sort. A count the model lacks falls back to scenes.
+ */
+enum class CatalogCardBadge {
+    Scenes, Images, Galleries, Performers, PerformersAll, Markers, OCount, OCountAll, Rating;
+
+    companion object {
+        /** From a sort option's server sort field. */
+        fun forField(field: String): CatalogCardBadge = when (field) {
+            "images_count" -> Images
+            "galleries_count" -> Galleries
+            "performer_count", "performers_count" -> Performers
+            "performer_count_all" -> PerformersAll
+            "scene_markers_count" -> Markers
+            "o_counter" -> OCount
+            "o_counter_all" -> OCountAll
+            "rating" -> Rating
+            else -> Scenes
+        }
+        fun forSort(sort: SortOption): CatalogCardBadge = forField(sort.field)
+    }
+}
+
+/** A card's shown badge and count; null only when even the scene count is unknown. */
+typealias BadgeCount = Pair<CatalogCardBadge, Int>
+
+private fun badgeOrScenes(badge: CatalogCardBadge, value: Int?, scenes: Int?): BadgeCount? =
+    if (value != null) badge to value else scenes?.let { CatalogCardBadge.Scenes to it }
+
+fun Tag.badgeCount(badge: CatalogCardBadge): BadgeCount? = badgeOrScenes(
+    badge,
+    when (badge) {
+        CatalogCardBadge.Scenes -> sceneCount
+        CatalogCardBadge.Images -> imageCount
+        CatalogCardBadge.Galleries -> galleryCount
+        CatalogCardBadge.Performers, CatalogCardBadge.PerformersAll -> performerCount
+        CatalogCardBadge.Markers -> sceneMarkerCount
+        else -> null
+    },
+    sceneCount,
+)
+
+fun StashGroup.badgeCount(badge: CatalogCardBadge): BadgeCount? = badgeOrScenes(
+    badge,
+    when (badge) {
+        CatalogCardBadge.Scenes -> sceneCount
+        CatalogCardBadge.Performers, CatalogCardBadge.PerformersAll -> performerCount
+        CatalogCardBadge.Rating -> rating100
+        else -> null
+    },
+    sceneCount,
+)

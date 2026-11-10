@@ -269,11 +269,13 @@ class PerformerDetailScreen(val performerId: String, val preview: Performer? = n
         val url = p?.let { performerThumbnailURL(it.id, it.imagePath) }
         val disambiguation = p?.disambiguation?.takeIf { it.isNotBlank() }
         val details = profile?.details?.takeIf { it.isNotBlank() }
+        // All links (`urls`, older servers `url`), listed only when expanded like on iOS.
+        val links = profile?.urls.orEmpty().map { it.trim() }.filter { it.isNotEmpty() }.distinct()
         var fullscreen by remember { mutableStateOf<HeroImageFullscreenItem?>(null) }
         fullscreen?.let { HeroImageFullscreen(it) { fullscreen = null } }
         DetailHeroCard(
             title = name,
-            // iOS shows no disambiguation / details in the header (URLs are never shown); they appear only expanded here.
+            // iOS shows no disambiguation / details / links in the header; they appear only expanded.
             subtitle = disambiguation.takeIf { expanded },
             items = items,
             description = details.takeIf { expanded },
@@ -288,8 +290,8 @@ class PerformerDetailScreen(val performerId: String, val preview: Performer? = n
             // iOS: two full rows of the 4-column grid.
             collapsedItemCount = 8,
             titleAccessory = p?.let { perf -> { color -> FeedsPill(color) { DetailFeedsLink.navigate(DetailFeedsLink.Target.Performer(perf.id, perf.name)) } } },
-            footer = null,
-            footerHasMore = disambiguation != null || details != null,
+            footer = links.takeIf { expanded && it.isNotEmpty() }?.let { l -> { HeaderLinks(l) } },
+            footerHasMore = disambiguation != null || details != null || links.isNotEmpty(),
         )
     }
 

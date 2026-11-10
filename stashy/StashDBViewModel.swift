@@ -10690,6 +10690,8 @@ struct StashGroup: Codable, Identifiable, Equatable {
     /// Direct sub-groups (list and detail query) and the groups this one sits in (detail query only).
     var sub_group_count: Int? = nil
     var containing_groups: [GroupRelation]? = nil
+    /// List query only; shown on the card when the list is sorted by it.
+    var performer_count: Int? = nil
 
     struct GroupRelation: Codable, Equatable {
         struct Ref: Codable, Equatable {
@@ -10706,7 +10708,7 @@ struct StashGroup: Codable, Identifiable, Equatable {
 
     enum CodingKeys: String, CodingKey {
         case id, name, synopsis, date, scene_count, gallery_count, rating100, front_image_path, back_image_path, studio
-        case sub_group_count, containing_groups
+        case sub_group_count, containing_groups, performer_count
         case updatedAt = "updated_at"
     }
     

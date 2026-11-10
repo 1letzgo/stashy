@@ -40,7 +40,9 @@ import coil3.compose.AsyncImage
 import de.letzgo.stashy.data.Gallery
 import de.letzgo.stashy.data.Net
 import de.letzgo.stashy.data.Performer
+import de.letzgo.stashy.data.CatalogCardBadge
 import de.letzgo.stashy.data.PerformerBadgeType
+import de.letzgo.stashy.data.badgeCount
 import de.letzgo.stashy.data.SceneMarker
 import de.letzgo.stashy.data.StashGroup
 import de.letzgo.stashy.data.StashImage
@@ -120,20 +122,20 @@ fun PerformerCard(
 
 /**
  * iOS: `StudioCardView` — logo block (16:9 like the scene cards, header grey, logo fitted with
- * 24/16 insets) above a one-line name row with scene and gallery counts.
+ * 24/16 insets) above a one-line name row with the count the list is sorted by.
  */
 @Composable
-fun StudioCard(studio: Studio, modifier: Modifier = Modifier, onClick: (() -> Unit)? = null) {
+fun StudioCard(studio: Studio, modifier: Modifier = Modifier, badge: CatalogCardBadge = CatalogCardBadge.Scenes, onClick: (() -> Unit)? = null) {
     val p = Theme.palette
     val counts = de.letzgo.stashy.data.rememberStudioCounts(studio)
+    val shown = studio.badgeCount(badge, counts)
     NativeCard(modifier.fillMaxWidth(), onClick = onClick) { Column(Modifier.fillMaxWidth()) {
         Box(Modifier.fillMaxWidth().aspectRatio(16f / 9f).background(p.studioHeader), contentAlignment = Alignment.Center) {
             StudioLogo(studio, Modifier.fillMaxSize().padding(horizontal = 24.dp, vertical = 16.dp))
         }
         Row(Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             Text(studio.name, Modifier.weight(1f), style = NativeType.titleSmall, color = p.text, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            CountLabel(SF.film, counts.scenes ?: 0)
-            counts.galleries?.takeIf { it > 0 }?.let { CountLabel(SF.photoStack, it) }
+            CountLabel(badgeIcon(shown.first), shown.second)
         }
     } }
 }
@@ -156,6 +158,18 @@ fun StudioLogo(studio: Studio, modifier: Modifier = Modifier) {
     }
 }
 
+/** Icon of a card's count badge (iOS `CatalogCardBadge.icon`). */
+@Composable
+fun badgeIcon(badge: CatalogCardBadge): ImageVector = when (badge) {
+    CatalogCardBadge.Scenes -> SF.film
+    CatalogCardBadge.Images -> SF.photo
+    CatalogCardBadge.Galleries -> SF.photoStack
+    CatalogCardBadge.Performers, CatalogCardBadge.PerformersAll -> SF.person2
+    CatalogCardBadge.Markers -> SF.bookmark
+    CatalogCardBadge.OCount, CatalogCardBadge.OCountAll -> oCounterIcon(Appearance.oCounterIcon)
+    CatalogCardBadge.Rating -> SF.starFill
+}
+
 @Composable
 private fun CountLabel(icon: ImageVector, count: Int) {
     val p = Theme.palette
@@ -173,7 +187,7 @@ val Tag.hasCustomImage: Boolean get() = imagePath != null && !imagePath.contains
  * header grey, then the one-line name with scene / gallery counts.
  */
 @Composable
-fun TagCard(tag: Tag, modifier: Modifier = Modifier, onClick: (() -> Unit)? = null) {
+fun TagCard(tag: Tag, modifier: Modifier = Modifier, badge: CatalogCardBadge = CatalogCardBadge.Scenes, onClick: (() -> Unit)? = null) {
     val p = Theme.palette
     NativeCard(modifier.fillMaxWidth(), onClick = onClick) { Column(Modifier.fillMaxWidth()) {
         Box(Modifier.fillMaxWidth().aspectRatio(16f / 9f).background(p.studioHeader), contentAlignment = Alignment.Center) {
@@ -190,8 +204,7 @@ fun TagCard(tag: Tag, modifier: Modifier = Modifier, onClick: (() -> Unit)? = nu
         }
         Row(Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             Text(tag.name, Modifier.weight(1f), style = NativeType.titleSmall, color = p.text, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            tag.sceneCount?.takeIf { it > 0 }?.let { CountLabel(SF.film, it) }
-            tag.galleryCount?.takeIf { it > 0 }?.let { CountLabel(SF.photoStack, it) }
+            tag.badgeCount(badge)?.let { (b, n) -> CountLabel(badgeIcon(b), n) }
         }
     } }
 }
@@ -238,7 +251,7 @@ fun GalleryCard(gallery: Gallery, modifier: Modifier = Modifier, aspectRatio: Fl
  * (100 pt) with the name.
  */
 @Composable
-fun GroupCard(group: StashGroup, modifier: Modifier = Modifier, onClick: (() -> Unit)? = null) {
+fun GroupCard(group: StashGroup, modifier: Modifier = Modifier, badge: CatalogCardBadge = CatalogCardBadge.Scenes, onClick: (() -> Unit)? = null) {
     val p = Theme.palette
     NativeCard(modifier.fillMaxWidth().aspectRatio(9f / 12f), onClick = onClick) {
         Box(Modifier.fillMaxSize().background(Color.Gray.copy(alpha = 0.2f)), contentAlignment = Alignment.Center) {
@@ -248,7 +261,7 @@ fun GroupCard(group: StashGroup, modifier: Modifier = Modifier, onClick: (() -> 
         }
         Box(Modifier.align(Alignment.BottomCenter).fillMaxWidth().height(100.dp).background(bottomGradient))
         Row(Modifier.fillMaxWidth().padding(8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End)) {
-            group.sceneCount?.let { CardPill(SF.film, "$it") }
+            group.badgeCount(badge)?.let { (b, n) -> CardPill(badgeIcon(b), "$n") }
         }
         Text(
             group.name, Modifier.align(Alignment.BottomStart).fillMaxWidth().padding(12.dp),

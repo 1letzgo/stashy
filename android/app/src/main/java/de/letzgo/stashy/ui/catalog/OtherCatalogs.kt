@@ -18,6 +18,7 @@ import de.letzgo.stashy.data.CatalogPrefs
 import de.letzgo.stashy.data.FilterMode
 import de.letzgo.stashy.data.Gallery
 import de.letzgo.stashy.data.Performer
+import de.letzgo.stashy.data.CatalogCardBadge
 import de.letzgo.stashy.data.PerformerBadgeType
 import de.letzgo.stashy.data.SceneMarker
 import de.letzgo.stashy.data.StashGroup
@@ -84,7 +85,7 @@ fun StudiosList(c: CatalogController<Studio>, topPadding: androidx.compose.ui.un
         c, CatalogTexts("Loading studios...", SF.building2, "No studios found", "Load Studios"),
         CatalogSlots(), posterColumns, { it.id }, topPadding, gridKey = c.listResetToken,
     ) { _, studio ->
-        StudioCard(studio, onClick = { Nav.push(StudioDetailScreen(studio.id, studio)) })
+        StudioCard(studio, badge = CatalogCardBadge.forSort(c.sort), onClick = { Nav.push(StudioDetailScreen(studio.id, studio)) })
     }
     CatalogFilterSortSheet(c)
 }
@@ -102,7 +103,7 @@ fun TagsList(c: CatalogController<Tag>, topPadding: androidx.compose.ui.unit.Dp 
         c, CatalogTexts("Loading tags...", SF.tag, "No tags found", "Load Tags"),
         CatalogSlots(), posterColumns, { it.id }, topPadding, gridKey = c.listResetToken,
     ) { _, tag ->
-        TagCard(tag, onClick = { Nav.push(TagDetailScreen(tag.id, tag)) })
+        TagCard(tag, badge = CatalogCardBadge.forSort(c.sort), onClick = { Nav.push(TagDetailScreen(tag.id, tag)) })
     }
     CatalogFilterSortSheet(c)
 }
@@ -115,7 +116,7 @@ fun GroupsCatalog() {
         c, CatalogTexts("Loading groups...", SF.rectangleStackFill, "No groups found", "Load Groups"),
         CatalogSlots(), posterColumns, { it.id }, gridKey = c.listResetToken,
     ) { _, group ->
-        GroupCard(group, onClick = { Nav.push(GroupDetailScreen(group.id, group)) })
+        GroupCard(group, badge = CatalogCardBadge.forSort(c.sort), onClick = { Nav.push(GroupDetailScreen(group.id, group)) })
     }
     CatalogFilterSortSheet(c)
 }

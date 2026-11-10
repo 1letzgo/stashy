@@ -74,11 +74,29 @@ object StudioCountsStore {
         }
     }
 
+    fun known(id: String): StudioCounts? = counts[id]
+
     fun display(studio: Studio): StudioDisplayCounts {
         val known = counts[studio.id]
         if (!includeSubStudios || known == null) return StudioDisplayCounts(studio.sceneCount, studio.galleryCount, studio.performerCount, known?.oCount)
         return StudioDisplayCounts(known.sceneCountAll, known.galleryCountAll, known.performerCountAll, known.oCountAll)
     }
+}
+
+/** The badge's count for a studio card; `*_all` sorts use the sub-studio totals once known. */
+fun Studio.badgeCount(badge: CatalogCardBadge, counts: StudioDisplayCounts): BadgeCount {
+    val value: Int? = when (badge) {
+        CatalogCardBadge.Scenes -> counts.scenes
+        CatalogCardBadge.Images -> imageCount
+        CatalogCardBadge.Galleries -> counts.galleries
+        CatalogCardBadge.Performers -> counts.performers
+        CatalogCardBadge.PerformersAll -> StudioCountsStore.known(id)?.performerCountAll ?: counts.performers
+        CatalogCardBadge.OCount -> counts.oCount
+        CatalogCardBadge.OCountAll -> StudioCountsStore.known(id)?.oCountAll ?: counts.oCount
+        CatalogCardBadge.Rating -> rating100
+        CatalogCardBadge.Markers -> null
+    }
+    return if (value != null) badge to value else CatalogCardBadge.Scenes to (counts.scenes ?: 0)
 }
 
 @Composable

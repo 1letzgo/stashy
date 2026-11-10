@@ -737,7 +737,7 @@ private struct StudiosViewContent: View {
                 LazyVGrid(columns: columns, spacing: 12) {
                     ForEach(viewModel.studios) { studio in
                         NavigationLink(destination: StudioDetailView(studio: studio)) {
-                            StudioCardView(studio: studio)
+                            StudioCardView(studio: studio, badge: CatalogCardBadge(sortField: selectedSortOption.sortField))
                         }
                         .buttonStyle(.plain)
                         .id(studio.id)
@@ -914,6 +914,8 @@ struct StudioRowView: View {
 
 struct StudioCardView: View {
     let studio: Studio
+    /// What the list is sorted by; scenes for every sort that is not a count.
+    var badge: CatalogCardBadge = .scenes
     @ObservedObject private var appearance = AppearanceManager.shared
     @ObservedObject private var studioCounts = StudioCountsStore.shared
     @AppStorage(StudioCountsStore.includeSubStudiosKey) private var includeSubStudios = false
@@ -921,12 +923,32 @@ struct StudioCardView: View {
     /// Whether the logo is on the card; nil while it loads. The name is printed only without one.
     @State private var showsLogo: Bool?
 
-    /// Same build as the gallery and performer cards: one surface, counts as glass pills at the
-    /// top (galleries left, scenes right). A logo is never cropped, so it sits centred on the
-    /// studio grey between the pills; it names the studio, so the name is printed over the
-    /// bottom edge only when there is no logo.
+    /// The badge's count, or the scene count when the card does not know that count.
+    private func shownCount(_ counts: StudioDisplayCounts) -> (badge: CatalogCardBadge, count: Int) {
+        let known = studioCounts.counts[studio.id]
+        let value: Int?
+        switch badge {
+        case .scenes: value = counts.scenes
+        case .images: value = studio.imageCount
+        case .galleries: value = counts.galleries
+        case .performers: value = counts.performers
+        case .performersAll: value = known?.performer_count_all ?? counts.performers
+        case .oCount: value = counts.oCount
+        case .oCountAll: value = known?.o_count_all ?? counts.oCount
+        case .rating: value = studio.rating100
+        case .markers: value = nil
+        }
+        if let value { return (badge, value) }
+        return (.scenes, counts.scenes)
+    }
+
+    /// Same build as the gallery and performer cards: one surface, one count as a glass pill top
+    /// right (what the list is sorted by, scenes otherwise). A logo is never cropped, so it sits
+    /// centred on the studio grey; it names the studio, so the name is printed over the bottom
+    /// edge only when there is no logo.
     var body: some View {
         let counts = studioCounts.display(for: studio, includeSubStudios: includeSubStudios)
+        let shown = shownCount(counts)
         Color.studioHeaderGray(for: appearance.currentTheme)
             // 16:9 like the scene cards: the lower studio rows no longer tower over the others.
             .aspectRatio(16 / 9, contentMode: .fit)
@@ -944,14 +966,9 @@ struct StudioCardView: View {
                 .padding(.top, 36)
                 .padding(.bottom, 36)
             )
-            .overlay(alignment: .topLeading) {
-                if let galleryCount = counts.galleries, galleryCount > 0 {
-                    CatalogCardCountPill(icon: "photo.stack", count: galleryCount, noun: "gallery")
-                        .padding(8)
-                }
-            }
             .overlay(alignment: .topTrailing) {
-                CatalogCardCountPill(icon: "film", count: counts.scenes, noun: "scene")
+                CatalogCardCountPill(icon: shown.badge.icon(oCounterIcon: appearance.oCounterIcon),
+                                     count: shown.count, noun: shown.badge.noun)
                     .padding(8)
             }
             .overlay(alignment: .bottomLeading) {
@@ -986,6 +1003,7 @@ struct CatalogCardCountPill: View {
         guard count != 1 else { return "1 \(noun)" }
         if noun.hasSuffix("y") { return "\(count) \(noun.dropLast())ies" }
         if noun == "O" { return "\(count) O" }
+        if noun == "rating" { return "Rating \(count)" }
         return "\(count) \(noun)s"
     }
 

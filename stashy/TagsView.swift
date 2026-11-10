@@ -651,7 +651,7 @@ private struct TagsViewContent: View {
                 LazyVGrid(columns: columns, spacing: 12) {
                     ForEach(viewModel.tags) { tag in
                         NavigationLink(destination: TagDetailView(selectedTag: tag)) {
-                            TagCardView(tag: tag)
+                            TagCardView(tag: tag, badge: CatalogCardBadge(sortField: selectedSortOption.sortField))
                         }
                         .buttonStyle(.plain)
                         .id(tag.id)
@@ -710,7 +710,24 @@ struct TagsView: View {
 
 struct TagCardView: View {
     let tag: Tag
+    /// What the list is sorted by; scenes for every sort that is not a count.
+    var badge: CatalogCardBadge = .scenes
     @ObservedObject var appearanceManager = AppearanceManager.shared
+
+    /// The badge's count, or the scene count when the tag does not carry that count.
+    private var shownCount: (badge: CatalogCardBadge, count: Int) {
+        let value: Int?
+        switch badge {
+        case .scenes: value = tag.sceneCount
+        case .images: value = tag.imageCount
+        case .galleries: value = tag.galleryCount
+        case .performers, .performersAll: value = tag.performerCount
+        case .markers: value = tag.sceneMarkerCount
+        case .oCount, .oCountAll, .rating: value = nil
+        }
+        if let value { return (badge, value) }
+        return (.scenes, tag.sceneCount ?? 0)
+    }
 
     private var hasCustomImage: Bool {
         tag.imagePath != nil && tag.imagePath?.contains("default") != true
@@ -747,15 +764,10 @@ struct TagCardView: View {
                     .allowsHitTesting(false)
             }
             .overlay(alignment: .topTrailing) {
-                HStack(spacing: 4) {
-                    if let sceneCount = tag.sceneCount, sceneCount > 0 {
-                        CatalogCardCountPill(icon: "film", count: sceneCount, noun: "scene")
-                    }
-                    if let galleryCount = tag.galleryCount, galleryCount > 0 {
-                        CatalogCardCountPill(icon: "photo.stack", count: galleryCount, noun: "gallery")
-                    }
-                }
-                .padding(8)
+                let shown = shownCount
+                CatalogCardCountPill(icon: shown.badge.icon(oCounterIcon: appearanceManager.oCounterIcon),
+                                     count: shown.count, noun: shown.badge.noun)
+                    .padding(8)
             }
             .overlay(alignment: .bottomLeading) {
                 Text(tag.name)
@@ -1637,7 +1649,7 @@ struct TagDetailView: View {
         LazyVGrid(columns: columns, spacing: 12) {
             ForEach(viewModel.detailStudios) { studio in
                 NavigationLink(destination: StudioDetailView(studio: studio)) {
-                    StudioCardView(studio: studio)
+                    StudioCardView(studio: studio, badge: CatalogCardBadge(sortField: linkedStudios.selectedSortOption.sortField))
                 }
                 .buttonStyle(.plain)
             }

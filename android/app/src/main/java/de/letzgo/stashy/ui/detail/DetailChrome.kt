@@ -433,6 +433,23 @@ internal fun HeaderLink(url: String) {
     }
 }
 
+/** Header link list (iOS performer header, expanded): "Links" label + one tinted row per URL (host + path, tap opens it). */
+@Composable
+internal fun HeaderLinks(urls: List<String>) {
+    val handler = LocalUriHandler.current
+    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        Text("LINKS", fontSize = 11.sp, color = Theme.palette.secondaryText)
+        urls.forEach { link ->
+            val target = if (link.contains("://")) link else "https://$link"
+            val label = link.substringAfter("://").removePrefix("www.").trimEnd('/')
+            Text(
+                label, fontSize = 11.sp, fontWeight = FontWeight.Bold, color = de.letzgo.stashy.ui.textAccent(), maxLines = 1, overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.fillMaxWidth().clickable { runCatching { handler.openUri(target) } }.padding(vertical = 2.dp),
+            )
+        }
+    }
+}
+
 /**
  * One list action of a detail page (iOS `CatalogChromeSlot`) — an app bar icon of
  * [DetailTopBar], or an overflow menu entry when [inOverflow].

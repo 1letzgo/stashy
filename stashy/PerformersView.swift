@@ -845,24 +845,12 @@ struct PerformerCardView: View {
 
     private var countBadgeIcon: String {
         if sharedCount != nil { return "person.2" }
-        switch badgeType {
-        case .sceneCount: return "film"
-        case .imageCount: return "photo"
-        case .galleryCount: return "photo.stack"
-        case .oCount: return appearanceManager.oCounterIcon
-        case .rating: return "star.fill"
-        }
+        return badgeType.icon(oCounterIcon: appearanceManager.oCounterIcon)
     }
 
     private var countBadgeText: String {
         if let sharedCount { return "\(sharedCount)" }
-        switch badgeType {
-        case .sceneCount: return "\(performer.sceneCount)"
-        case .imageCount: return "\(performer.imageCount ?? 0)"
-        case .galleryCount: return "\(performer.galleryCount ?? 0)"
-        case .oCount: return "\(performer.oCounter ?? 0)"
-        case .rating: return "\(performer.rating100 ?? 0)"
-        }
+        return "\(badgeType.value(for: performer))"
     }
 
     var body: some View {

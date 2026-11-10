@@ -955,12 +955,18 @@ struct EditSceneTitleSheet: View {
             Form {
                 Section(header: Text("Title")) {
                     TextField("Title", text: $title)
+                    if SceneTitleNormalizer.normalized(title) != title {
+                        normalizeButton { title = SceneTitleNormalizer.normalized(title) }
+                    }
                 }
                 .listRowBackground(Color.secondaryAppBackground)
 
                 Section(header: Text("Description")) {
                     TextEditor(text: $details)
                         .frame(minHeight: 120)
+                    if SceneTitleNormalizer.normalizedDescription(details) != details {
+                        normalizeButton { details = SceneTitleNormalizer.normalizedDescription(details) }
+                    }
                 }
                 .listRowBackground(Color.secondaryAppBackground)
 
@@ -983,6 +989,19 @@ struct EditSceneTitleSheet: View {
                 productionDate = currentProductionDate ?? ""
             }
         }
+    }
+
+    private func normalizeButton(_ action: @escaping () -> Void) -> some View {
+        Button {
+            HapticManager.light()
+            action()
+        } label: {
+            Label("Normalize", systemImage: "wand.and.stars")
+                .font(.subheadline.weight(.medium))
+                .foregroundColor(appearanceManager.tintColor)
+        }
+        .buttonStyle(.plain)
+        .dynamicTypeSize(...DynamicTypeSize.xxLarge)
     }
 
     private func save() {

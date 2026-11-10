@@ -51,6 +51,7 @@ import de.letzgo.stashy.data.Scene
 import de.letzgo.stashy.data.SceneEditing
 import de.letzgo.stashy.data.SceneGalleryStub
 import de.letzgo.stashy.data.SceneGroupEntry
+import de.letzgo.stashy.data.SceneTitleNormalizer
 import de.letzgo.stashy.data.Studio
 import de.letzgo.stashy.data.Tag
 import de.letzgo.stashy.ui.Appearance
@@ -133,8 +134,18 @@ fun EditSceneTitleSheet(scene: Scene, onDismiss: () -> Unit, currentProductionDa
             else { saving = false; SceneToast.show("Failed to update scene", PlayerIcons.close, SceneToast.Style.Error) }
         }
     }) {
-        FormSection("Title") { FormTextField(title, { title = it }, "Title", Modifier.fillMaxWidth()) }
-        FormSection("Description") { FormTextField(details, { details = it }, "", Modifier.fillMaxWidth().heightIn(min = 120.dp), singleLine = false) }
+        FormSection("Title") {
+            FormTextField(title, { title = it }, "Title", Modifier.fillMaxWidth())
+            if (SceneTitleNormalizer.normalized(title) != title) {
+                de.letzgo.stashy.ui.NativeTextButton("Normalize", Modifier.padding(start = 4.dp)) { title = SceneTitleNormalizer.normalized(title) }
+            }
+        }
+        FormSection("Description") {
+            FormTextField(details, { details = it }, "", Modifier.fillMaxWidth().heightIn(min = 120.dp), singleLine = false)
+            if (SceneTitleNormalizer.normalizedDescription(details) != details) {
+                de.letzgo.stashy.ui.NativeTextButton("Normalize", Modifier.padding(start = 4.dp)) { details = SceneTitleNormalizer.normalizedDescription(details) }
+            }
+        }
         if (showsProductionDate) FormSection("Production Date") { FormTextField(productionDate, { productionDate = it }, "YYYY-MM-DD", Modifier.fillMaxWidth()) }
     }
 }
