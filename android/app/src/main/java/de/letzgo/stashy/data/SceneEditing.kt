@@ -346,13 +346,17 @@ object SceneEditing {
 
     suspend fun createPerformer(name: String): Performer =
         GraphQL.decode(Performer.serializer(), GraphQL.data(SceneQueries.performerCreate, input("name" to name))["performerCreate"] ?: JsonNull)
+            .also { LibraryEvents.post(LibraryEvent.StatsChanged) }
 
     suspend fun createStudio(name: String): Studio =
         GraphQL.decode(Studio.serializer(), GraphQL.data(SceneQueries.studioCreate, input("name" to name))["studioCreate"] ?: JsonNull)
+            .also { LibraryEvents.post(LibraryEvent.StatsChanged) }
 
     suspend fun createGroup(name: String): StashGroup =
         GraphQL.decode(StashGroup.serializer(), GraphQL.data(SceneQueries.groupCreate, input("name" to name))["groupCreate"] ?: JsonNull)
+            .also { LibraryEvents.post(LibraryEvent.StatsChanged) }
 
     suspend fun createTag(name: String): Tag =
         GraphQL.decode(Tag.serializer(), GraphQL.data(SceneQueries.tagCreate, input("name" to name))["tagCreate"] ?: JsonNull)
+            .also { LibraryEvents.post(LibraryEvent.StatsChanged) }
 }

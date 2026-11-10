@@ -6,6 +6,7 @@ import androidx.compose.runtime.setValue
 import de.letzgo.stashy.data.GraphQL
 import de.letzgo.stashy.data.Prefs
 import de.letzgo.stashy.data.Scene
+import de.letzgo.stashy.data.SceneEvent
 import de.letzgo.stashy.data.ServerConfigManager
 import de.letzgo.stashy.data.StashyPlus
 import de.letzgo.stashy.data.Tag
@@ -298,6 +299,19 @@ object SceneRecommendations {
     private var generation = 0
     private var builtForServer: String? = null
     private var totalSceneCount: Int? = null
+
+    /**
+     * A scene changed elsewhere (progress, play, O count, rating, metadata, cover, delete): the
+     * cards already shown take it in place — no rebuild, no reshuffle; a deleted scene leaves.
+     */
+    fun applySceneEvent(event: SceneEvent) {
+        // The prepared next list drops a deleted scene too (in memory; the file is rewritten with the next list).
+        if (event is SceneEvent.Deleted) prepared = prepared?.let { p -> p.copy(items = p.items.filter { it.id != event.sceneId }) }
+        if (recommendations.none { it.id == event.sceneId }) return
+        recommendations = recommendations.mapNotNull { item ->
+            if (item.id != event.sceneId) item else event.applyTo(item.scene)?.let { item.copy(scene = it) }
+        }
+    }
 
     fun reset() {
         job?.cancel(); job = null

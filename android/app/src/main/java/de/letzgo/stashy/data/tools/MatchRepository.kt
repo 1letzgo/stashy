@@ -17,6 +17,8 @@ import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
+import de.letzgo.stashy.data.LibraryEvent
+import de.letzgo.stashy.data.LibraryEvents
 
 /**
  * iOS: the network side of `HotOrNotViewModel` + `HotOrNotBattleDisplay`
@@ -156,6 +158,7 @@ object MatchRepository {
         val input = MatchElo.buildPerformerUpdate(performer, newRating, won, opponentId, opponentName)
         val data = GraphQL.data(UPDATE_MUTATION.trimIndent(), buildJsonObject { put("input", input) })
         if (data["performerUpdate"] !is JsonObject) throw Exception("Update failed")
+        LibraryEvents.post(LibraryEvent.PerformerPatched(performer.id) { it.copy(rating100 = newRating) })
     }
 
     /** 32:1: one update for an entrant's whole bracket run (`MatchBracket.performerUpdate`). */
@@ -163,6 +166,7 @@ object MatchRepository {
         val input = MatchBracket.performerUpdate(performer, newRating, matches)
         val data = GraphQL.data(UPDATE_MUTATION.trimIndent(), buildJsonObject { put("input", input) })
         if (data["performerUpdate"] !is JsonObject) throw Exception("Update failed")
+        LibraryEvents.post(LibraryEvent.PerformerPatched(performer.id) { it.copy(rating100 = newRating) })
     }
 
     /** Only an explicit "no such performer" counts; a failed lookup says nothing. */

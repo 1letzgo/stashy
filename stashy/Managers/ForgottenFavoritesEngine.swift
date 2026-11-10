@@ -179,6 +179,25 @@ final class ForgottenFavoritesEngine: ObservableObject {
         ) { [weak self] _ in
             Task { @MainActor in self?.reset() }
         }
+
+        SceneLiveChange.observeForever { [weak self] change in self?.applyLive(change) }
+    }
+
+    /// A scene changed elsewhere in the app: the cards already shown follow in place and a
+    /// deleted scene leaves. The row keeps its picks and order until the next rebuild.
+    private func applyLive(_ change: SceneLiveChange) {
+        guard items.contains(where: { $0.scene.id == change.sceneId }) else { return }
+        items = items.compactMap { item in
+            guard item.scene.id == change.sceneId else { return item }
+            guard let scene = change.applied(to: item.scene) else { return nil }
+            var plays = item.plays, oCount = item.oCount, lastPlayed = item.lastPlayed
+            switch change {
+            case .playAdded: plays += 1; lastPlayed = Date()
+            case .oCounter(_, let count): oCount = count
+            default: break
+            }
+            return ForgottenFavorite(scene: scene, lastPlayed: lastPlayed, plays: plays, oCount: oCount)
+        }
     }
 
     func reset() {

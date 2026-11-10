@@ -25,6 +25,7 @@ import kotlinx.serialization.json.jsonObject
 import java.text.Collator
 import java.util.Locale
 import java.util.UUID
+import de.letzgo.stashy.data.ServerTasksRepository
 
 // iOS: `MergeTools.swift` (models, presets, index) + `TagRepository` / `StudioRepository`
 // merge functions. Tools → Merge Tags / Merge Studios.
@@ -347,6 +348,7 @@ object MergeRepository {
 
         val destroyed = GraphQL.named("studiosDestroy", vars("ids" to sourceIds))
         if ((destroyed["studiosDestroy"] as? JsonPrimitive)?.booleanOrNull != true) throw StudioMergeError.DestroyFailed
+        ServerTasksRepository.postDestroyed("studiosDestroy", sourceIds)
     }
 
     /** Paged instead of `per_page: -1`, which does not behave the same on every server version. */

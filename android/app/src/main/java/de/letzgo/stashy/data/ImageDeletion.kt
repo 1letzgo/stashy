@@ -25,6 +25,7 @@ object ImageDeletion {
         }.orEmpty()
         val destroyed = attempt { GraphQL.data(DESTROY, vars("id" to id)).containsKey("imageDestroy") } == true
         if (!destroyed) return false
+        LibraryEvents.post(LibraryEvent.StatsChanged)
         if (fileIds.isNotEmpty()) attempt { GraphQL.data(DELETE_FILES, vars("ids" to fileIds)) }
         return true
     }

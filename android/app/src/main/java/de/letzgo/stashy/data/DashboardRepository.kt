@@ -305,6 +305,17 @@ object ServerTasksRepository {
     /** `tagsDestroy` / `performersDestroy` / `studiosDestroy`. */
     suspend fun destroy(mutation: String, ids: List<String>): Boolean {
         if (ids.isEmpty()) return true
-        return GraphQL.named(mutation, vars("ids" to ids))[mutation].stringOrNull == "true"
+        val ok = GraphQL.named(mutation, vars("ids" to ids))[mutation].stringOrNull == "true"
+        if (ok) postDestroyed(mutation, ids)
+        return ok
+    }
+
+    /** Removes the destroyed items from Home's rows (tags only change the statistics). */
+    fun postDestroyed(mutation: String, ids: List<String>) {
+        when (mutation) {
+            "performersDestroy" -> ids.forEach { LibraryEvents.post(LibraryEvent.PerformerDeleted(it)) }
+            "studiosDestroy" -> ids.forEach { LibraryEvents.post(LibraryEvent.StudioDeleted(it)) }
+        }
+        LibraryEvents.post(LibraryEvent.StatsChanged)
     }
 }

@@ -5,6 +5,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import de.letzgo.stashy.data.Prefs
 import de.letzgo.stashy.data.Scene
+import de.letzgo.stashy.data.SceneEvent
 import de.letzgo.stashy.data.ServerConfigManager
 import de.letzgo.stashy.data.StashyPlus
 import kotlinx.coroutines.CoroutineScope
@@ -87,6 +88,23 @@ object ForgottenFavorites {
     private var job: Job? = null
     private var generation = 0
     private var builtForServer: String? = null
+
+    /**
+     * A scene changed elsewhere: the cards shown take it in place (no rebuild, same order); a
+     * deleted scene leaves. A play or O count also moves the card's own numbers.
+     */
+    fun applySceneEvent(event: SceneEvent) {
+        if (items.none { it.id == event.sceneId }) return
+        items = items.mapNotNull { fav ->
+            if (fav.id != event.sceneId) return@mapNotNull fav
+            val scene = event.applyTo(fav.scene) ?: return@mapNotNull null
+            when (event) {
+                is SceneEvent.PlayAdded -> fav.copy(scene = scene, plays = fav.plays + 1, lastPlayed = System.currentTimeMillis())
+                is SceneEvent.OCounterUpdated -> fav.copy(scene = scene, oCount = event.oCounter)
+                else -> fav.copy(scene = scene)
+            }
+        }
+    }
 
     fun reset() {
         job?.cancel(); job = null

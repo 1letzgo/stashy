@@ -45,7 +45,7 @@ object FeedsRepository {
             "mutation SceneUpdate(\$input: SceneUpdateInput!) { sceneUpdate(input: \$input) { id rating100 } }",
             vars("input" to mapOf("id" to id, "rating100" to rating100)),
         )["sceneUpdate"] is JsonObject
-    }.getOrDefault(false)
+    }.getOrDefault(false).also { if (it) SceneEvents.post(SceneEvent.RatingUpdated(id, rating100)) }
 
     /** iOS: `imageUpdateRatingMutation`. */
     suspend fun updateImageRating(id: String, rating100: Int?): Boolean = runCatching {
@@ -77,7 +77,9 @@ object FeedsRepository {
         val field = prefix + when (mutation) { OMutation.Increment -> "IncrementO"; OMutation.Decrement -> "DecrementO"; OMutation.Reset -> "ResetO" }
         return runCatching {
             (GraphQL.data("mutation OCounterChange(\$id: ID!) { $field(id: \$id) }", vars("id" to id))[field] as? JsonPrimitive)?.intOrNull
-        }.getOrNull()
+        }.getOrNull()?.also {
+            if (isImage) LibraryEvents.post(LibraryEvent.StatsChanged) else SceneEvents.post(SceneEvent.OCounterUpdated(id, it))
+        }
     }
 
     /** iOS: `addScenePlay` (`sceneAddPlay`, `SceneAddPlay.graphql`). */
@@ -85,12 +87,13 @@ object FeedsRepository {
         val data = GraphQL.named("sceneAddPlay", buildJsonObject { put("id", JsonPrimitive(id)); put("times", JsonArray(emptyList())) })
         // For You and Similar Scenes read the device's scene index: the play counts now.
         kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) { de.letzgo.stashy.data.tools.AITagSuggestions.noteLocalPlay(id) }
-        (data["sceneAddPlay"].obj?.get("count") as? JsonPrimitive)?.intOrNull
+        (data["sceneAddPlay"].obj?.get("count") as? JsonPrimitive)?.intOrNull?.also { SceneEvents.post(SceneEvent.PlayAdded(id)) }
     }.getOrNull()
 
     /** iOS: `deleteSceneWithFiles` — destroys the scene, then its files. */
     suspend fun deleteSceneWithFiles(scene: Scene): Boolean = runCatching {
         GraphQL.data("mutation SceneDestroy(\$id: ID!) { sceneDestroy(input: { id: \$id }) }", vars("id" to scene.id))
+        SceneEvents.post(SceneEvent.Deleted(scene.id))
         val fileIds = scene.files?.mapNotNull { it.id }.orEmpty()
         if (fileIds.isNotEmpty()) runCatching {
             GraphQL.data("mutation DeleteFiles(\$ids: [ID!]!) { deleteFiles(ids: \$ids) }", vars("ids" to fileIds))
@@ -101,6 +104,7 @@ object FeedsRepository {
     /** iOS: `deleteImage(imageId:)` (`imageDestroy`). */
     suspend fun deleteImage(id: String): Boolean = runCatching {
         GraphQL.data("mutation ImageDestroy(\$id: ID!) { imageDestroy(input: { id: \$id }) }", vars("id" to id))
+        LibraryEvents.post(LibraryEvent.StatsChanged)
         true
     }.getOrDefault(false)
 }

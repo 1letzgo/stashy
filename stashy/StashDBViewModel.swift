@@ -567,6 +567,22 @@ class StashDBViewModel: ObservableObject {
             entityDeletedObservers.append(token)
         }
 
+        // Edits from the detail pages and edit sheets: Home rows showing the item reload in place.
+        for (notificationName, key) in StashDBViewModel.entityUpdatedNotificationKeys {
+            let token = NotificationCenter.default.addObserver(
+                forName: NSNotification.Name(notificationName),
+                object: nil,
+                queue: .main
+            ) { [weak self] notification in
+                guard let id = notification.userInfo?[key] as? String else { return }
+                let viewModel = self
+                Task { @MainActor in
+                    viewModel?.applyEntityUpdate(notificationName: notificationName, id: id)
+                }
+            }
+            entityDeletedObservers.append(token)
+        }
+
         // Initial connection test if config exists (throttled — many VM instances
         // are created across tabs; the version is stable per session)
         if ServerConfigManager.shared.loadConfig()?.hasValidConfig == true {
@@ -689,6 +705,10 @@ class StashDBViewModel: ObservableObject {
         didSet { syncHomeRowStores(oldValue, homeRowLoadingState) { $0.isLoading = $1 ?? true } }
     }
     private var isFetchingHomeRows: Set<HomeRowKey> = []
+    /// Home rows waiting for their reload after an edit (`applyEntityUpdate`).
+    private var pendingHomeRowReloads: Set<HomeRowKey> = []
+    /// A Home row request is on its way (pull to refresh keeps its spinner while this is true).
+    var isFetchingAnyHomeRow: Bool { !isFetchingHomeRows.isEmpty }
     private var homeRowStores: [HomeRowKey: HomeRowStore] = [:]
 
     /// The observable state of one dashboard row. Created on first use and kept for
@@ -8466,6 +8486,7 @@ struct GenerateData: Codable {
         
         performGraphQLQuery(query: bodyString) { (response: PerformerUpdateResponse?) in
             if let _ = response?.data?.performerUpdate {
+                Self.postEntityUpdated("PerformerUpdated", key: "performerId", id: performerId)
                 completion(true)
             } else {
                 completion(false)
@@ -8487,7 +8508,9 @@ struct GenerateData: Codable {
             return
         }
         performGraphQLQuery(query: bodyString) { (response: PerformerUpdateResponse?) in
-            completion(response?.data?.performerUpdate != nil)
+            let ok = response?.data?.performerUpdate != nil
+            if ok { Self.postEntityUpdated("PerformerUpdated", key: "performerId", id: performerId) }
+            completion(ok)
         }
     }
 
@@ -8578,7 +8601,9 @@ struct GenerateData: Codable {
             return
         }
         performGraphQLQuery(query: bodyString) { (response: PerformerUpdateResponse?) in
-            completion(response?.data?.performerUpdate != nil)
+            let ok = response?.data?.performerUpdate != nil
+            if ok { Self.postEntityUpdated("PerformerUpdated", key: "performerId", id: performerId) }
+            completion(ok)
         }
     }
 
@@ -8600,6 +8625,7 @@ struct GenerateData: Codable {
         
         performGraphQLQuery(query: bodyString) { (response: StudioUpdateResponse?) in
             if let _ = response?.data?.studioUpdate {
+                Self.postEntityUpdated("StudioUpdated", key: "studioId", id: studioId)
                 completion(true)
             } else {
                 completion(false)
@@ -8632,7 +8658,9 @@ struct GenerateData: Codable {
             return
         }
         performGraphQLQuery(query: bodyString) { (response: StudioUpdateResponse?) in
-            completion(response?.data?.studioUpdate != nil)
+            let ok = response?.data?.studioUpdate != nil
+            if ok { Self.postEntityUpdated("StudioUpdated", key: "studioId", id: studioId) }
+            completion(ok)
         }
     }
 
@@ -8709,7 +8737,9 @@ struct GenerateData: Codable {
             completion(false); return
         }
         performGraphQLQuery(query: bodyString) { (response: GalleryUpdateResponse?) in
-            completion(response?.data?.galleryUpdate != nil)
+            let ok = response?.data?.galleryUpdate != nil
+            if ok { Self.postEntityUpdated("GalleryUpdated", key: "galleryId", id: galleryId) }
+            completion(ok)
         }
     }
 
@@ -8722,7 +8752,9 @@ struct GenerateData: Codable {
             completion(false); return
         }
         performGraphQLQuery(query: bodyString) { (response: GalleryUpdateResponse?) in
-            completion(response?.data?.galleryUpdate != nil)
+            let ok = response?.data?.galleryUpdate != nil
+            if ok { Self.postEntityUpdated("GalleryUpdated", key: "galleryId", id: galleryId) }
+            completion(ok)
         }
     }
 
@@ -8749,7 +8781,9 @@ struct GenerateData: Codable {
             return
         }
         performGraphQLQuery(query: bodyString) { (response: GalleryUpdateResponse?) in
-            completion(response?.data?.galleryUpdate != nil)
+            let ok = response?.data?.galleryUpdate != nil
+            if ok { Self.postEntityUpdated("GalleryUpdated", key: "galleryId", id: galleryId) }
+            completion(ok)
         }
     }
 }
@@ -8767,6 +8801,48 @@ extension StashDBViewModel {
         ("GroupDeleted", "groupId"),
         ("GalleryDeleted", "galleryId")
     ]
+
+    /// `<Entity>Updated` notifications: an edit (details, favorite, image) went through.
+    /// Mirrors the `<Entity>Deleted` ones; posted by the mutation functions below.
+    static let entityUpdatedNotificationKeys: [(String, String)] = [
+        ("PerformerUpdated", "performerId"),
+        ("StudioUpdated", "studioId"),
+        ("GalleryUpdated", "galleryId")
+    ]
+
+    static func postEntityUpdated(_ name: String, key: String, id: String) {
+        DispatchQueue.main.async {
+            NotificationCenter.default.post(name: NSNotification.Name(name), object: nil, userInfo: [key: id])
+        }
+    }
+
+    /// An item was edited: every Home row of this view model that shows it reloads in place
+    /// (cards stay, like pull to refresh), a little later so a burst of edits is one request.
+    func applyEntityUpdate(notificationName: String, id: String) {
+        let kind: HomeRowContentKind
+        let shows: (HomeRowKey) -> Bool
+        switch notificationName {
+        case "PerformerUpdated":
+            kind = .performers
+            shows = { [homeRowPerformers] in homeRowPerformers[$0]?.contains { $0.id == id } == true }
+        case "StudioUpdated":
+            kind = .studios
+            shows = { [homeRowStudios] in homeRowStudios[$0]?.contains { $0.id == id } == true }
+        case "GalleryUpdated":
+            kind = .galleries
+            shows = { [homeRowGalleries] in homeRowGalleries[$0]?.contains { $0.id == id } == true }
+        default:
+            return
+        }
+        let rows = TabManager.shared.homeRows.filter { $0.isEnabled && $0.contentKind == kind && shows($0.storeKey) }
+        for row in rows where pendingHomeRowReloads.insert(row.storeKey).inserted {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) { [weak self] in
+                guard let self else { return }
+                self.pendingHomeRowReloads.remove(row.storeKey)
+                self.loadHomeRowIfNeeded(config: row, maxAge: 0)
+            }
+        }
+    }
 
     /// Entfernt eine gelöschte Entity aus allen Listen dieses ViewModels.
     func applyEntityDeletion(notificationName: String, id: String) {

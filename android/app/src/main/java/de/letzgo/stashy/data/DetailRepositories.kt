@@ -128,11 +128,19 @@ object DetailRepository {
     private suspend fun input(query: String, field: String, input: Map<String, Any?>): Boolean =
         runCatching { mutate(query, vars("input" to input), field) != null }.getOrDefault(false)
 
+    /** [input] plus, on success, [onOk] (the live-update post for Home and the lists). */
+    private suspend fun input(query: String, field: String, input: Map<String, Any?>, onOk: () -> Unit): Boolean =
+        input(query, field, input).also { if (it) onOk() }
+
     suspend fun setPerformerFavorite(id: String, favorite: Boolean) =
-        input("mutation PerformerUpdate(\$input: PerformerUpdateInput!) { performerUpdate(input: \$input) { id favorite } }", "performerUpdate", mapOf("id" to id, "favorite" to favorite))
+        input("mutation PerformerUpdate(\$input: PerformerUpdateInput!) { performerUpdate(input: \$input) { id favorite } }", "performerUpdate", mapOf("id" to id, "favorite" to favorite)) {
+            LibraryEvents.post(LibraryEvent.PerformerPatched(id) { it.copy(favorite = favorite) })
+        }
 
     suspend fun setStudioFavorite(id: String, favorite: Boolean) =
-        input("mutation StudioUpdate(\$input: StudioUpdateInput!) { studioUpdate(input: \$input) { id favorite } }", "studioUpdate", mapOf("id" to id, "favorite" to favorite))
+        input("mutation StudioUpdate(\$input: StudioUpdateInput!) { studioUpdate(input: \$input) { id favorite } }", "studioUpdate", mapOf("id" to id, "favorite" to favorite)) {
+            LibraryEvents.post(LibraryEvent.StudioPatched(id) { it.copy(favorite = favorite) })
+        }
 
     suspend fun setTagFavorite(id: String, favorite: Boolean) =
         input("mutation TagUpdate(\$input: TagUpdateInput!) { tagUpdate(input: \$input) { id favorite } }", "tagUpdate", mapOf("id" to id, "favorite" to favorite))
@@ -149,12 +157,21 @@ object DetailRepository {
             "penis_length" to edit.penisLength, "career_length" to edit.careerLength, "tattoos" to edit.tattoos,
             "piercings" to edit.piercings, "alias_list" to edit.aliasList, "rating100" to edit.rating100,
         ),
-    )
+    ) {
+        LibraryEvents.post(LibraryEvent.PerformerPatched(id) {
+            it.copy(
+                name = edit.name, disambiguation = edit.disambiguation, birthdate = edit.birthdate, country = edit.country,
+                gender = edit.gender, ethnicity = edit.ethnicity, rating100 = edit.rating100,
+            )
+        })
+    }
 
     suspend fun updateStudio(id: String, name: String, url: String?, details: String?, rating100: Int?) = input(
         "mutation StudioUpdate(\$input: StudioUpdateInput!) { studioUpdate(input: \$input) { id name url details rating100 } }",
         "studioUpdate", mapOf("id" to id, "name" to name, "url" to url, "details" to details, "rating100" to rating100),
-    )
+    ) {
+        LibraryEvents.post(LibraryEvent.StudioPatched(id) { it.copy(name = name, url = url, details = details, rating100 = rating100) })
+    }
 
     /** [aliases] only goes into `TagUpdateInput` when non-null (a tag loaded without them keeps them). */
     suspend fun updateTag(id: String, name: String, description: String?, aliases: List<String>? = null) = input(
@@ -174,7 +191,9 @@ object DetailRepository {
     suspend fun updateGallery(id: String, title: String, date: String?, details: String?) = input(
         "mutation GalleryUpdate(\$input: GalleryUpdateInput!) { galleryUpdate(input: \$input) { id title date details } }",
         "galleryUpdate", mapOf("id" to id, "title" to title, "date" to date, "details" to details),
-    )
+    ) {
+        LibraryEvents.post(LibraryEvent.GalleryPatched(id) { it.copy(title = title, date = date, details = details) })
+    }
 
     /** `galleryUpdate(performer_ids:)` — the opened gallery's Performers card. Throws on failure (picker shows the error). */
     suspend fun updateGalleryPerformers(id: String, performerIds: List<String>) {
@@ -216,17 +235,33 @@ object DetailRepository {
 
     private suspend fun <T> create(query: String, field: String, name: String, ser: kotlinx.serialization.KSerializer<T>): T? =
         runCatching { mutate(query, vars("input" to mapOf("name" to name)), field)?.let { GraphQL.decode(ser, it) } }.getOrNull()
+            ?.also { LibraryEvents.post(LibraryEvent.StatsChanged) }
 
     // MARK: Delete (iOS `deleteEntity` — throws with the server message)
 
-    suspend fun deletePerformer(id: String) = destroy("mutation PerformerDestroy(\$id: ID!) { performerDestroy(input: { id: \$id }) }", "performerDestroy", vars("id" to id))
-    suspend fun deleteStudio(id: String) = destroy("mutation StudioDestroy(\$id: ID!) { studioDestroy(input: { id: \$id }) }", "studioDestroy", vars("id" to id))
-    suspend fun deleteTag(id: String) = destroy("mutation TagDestroy(\$id: ID!) { tagDestroy(input: { id: \$id }) }", "tagDestroy", vars("id" to id))
-    suspend fun deleteGroup(id: String) = destroy("mutation GroupDestroy(\$id: ID!) { groupDestroy(input: { id: \$id }) }", "groupDestroy", vars("id" to id))
-    suspend fun deleteGallery(id: String) = destroy(
-        "mutation GalleryDestroy(\$ids: [ID!]!, \$deleteFile: Boolean, \$deleteGenerated: Boolean) { galleryDestroy(input: { ids: \$ids, delete_file: \$deleteFile, delete_generated: \$deleteGenerated }) }",
-        "galleryDestroy", vars("ids" to listOf(id), "deleteFile" to false, "deleteGenerated" to true),
-    )
+    suspend fun deletePerformer(id: String) {
+        destroy("mutation PerformerDestroy(\$id: ID!) { performerDestroy(input: { id: \$id }) }", "performerDestroy", vars("id" to id))
+        LibraryEvents.post(LibraryEvent.PerformerDeleted(id))
+    }
+    suspend fun deleteStudio(id: String) {
+        destroy("mutation StudioDestroy(\$id: ID!) { studioDestroy(input: { id: \$id }) }", "studioDestroy", vars("id" to id))
+        LibraryEvents.post(LibraryEvent.StudioDeleted(id))
+    }
+    suspend fun deleteTag(id: String) {
+        destroy("mutation TagDestroy(\$id: ID!) { tagDestroy(input: { id: \$id }) }", "tagDestroy", vars("id" to id))
+        LibraryEvents.post(LibraryEvent.StatsChanged)
+    }
+    suspend fun deleteGroup(id: String) {
+        destroy("mutation GroupDestroy(\$id: ID!) { groupDestroy(input: { id: \$id }) }", "groupDestroy", vars("id" to id))
+        LibraryEvents.post(LibraryEvent.StatsChanged)
+    }
+    suspend fun deleteGallery(id: String) {
+        destroy(
+            "mutation GalleryDestroy(\$ids: [ID!]!, \$deleteFile: Boolean, \$deleteGenerated: Boolean) { galleryDestroy(input: { ids: \$ids, delete_file: \$deleteFile, delete_generated: \$deleteGenerated }) }",
+            "galleryDestroy", vars("ids" to listOf(id), "deleteFile" to false, "deleteGenerated" to true),
+        )
+        LibraryEvents.post(LibraryEvent.GalleryDeleted(id))
+    }
 
     private suspend fun destroy(query: String, field: String, variables: JsonObject) {
         val data = GraphQL.data(query, variables)
@@ -244,7 +279,7 @@ object DetailRepository {
             OCounterMutation.Reset -> "imageResetO"
         }
         GraphQL.data("mutation OCounterChange(\$id: ID!) { $field(id: \$id) }", vars("id" to id))[field]?.jsonPrimitive?.intOrNull
-    }.getOrNull()
+    }.getOrNull()?.also { LibraryEvents.post(LibraryEvent.StatsChanged) }
 
     suspend fun setImageRating(id: String, rating100: Int?): Boolean = input(
         "mutation ImageUpdate(\$input: ImageUpdateInput!) { imageUpdate(input: \$input) { id rating100 } }",

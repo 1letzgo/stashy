@@ -28,6 +28,10 @@ import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
+import de.letzgo.stashy.data.LibraryEvent
+import de.letzgo.stashy.data.LibraryEvents
+import de.letzgo.stashy.data.SceneEvent
+import de.letzgo.stashy.data.SceneEvents
 
 // iOS: the fetch / mutate half of `RateMeViewModel` (`stashy/RateMeToolsView.swift`).
 
@@ -282,15 +286,21 @@ object RateMeRepository {
     suspend fun mutateRating(id: String, mode: RateMeMode, rating100: Int?): Boolean {
         val (doc, field) = if (mode == RateMeMode.Scenes) SCENE_UPDATE to "sceneUpdate" else IMAGE_UPDATE to "imageUpdate"
         val data = GraphQL.data(doc, buildJsonObject { put("input", ratingInput(id, rating100)) })
-        return data[field] is JsonObject
+        return (data[field] is JsonObject).also { if (it && mode == RateMeMode.Scenes) SceneEvents.post(SceneEvent.RatingUpdated(id, rating100)) }
     }
 
     /** iOS: `mutateIncrementO` — returns the new count when the server reports it. */
     suspend fun mutateIncrementO(id: String, mode: RateMeMode): Int? {
         val vars = buildJsonObject { put("id", JsonPrimitive(id)) }
         if (mode == RateMeMode.Images) {
-            return GraphQL.data(IMAGE_INCREMENT_O, vars)["imageIncrementO"].stringOrNull?.toIntOrNull()
+            return GraphQL.data(IMAGE_INCREMENT_O, vars)["imageIncrementO"].stringOrNull?.toIntOrNull().also { LibraryEvents.post(LibraryEvent.StatsChanged) }
         }
+        return incrementSceneO(id, vars).also { count ->
+            if (count != null) SceneEvents.post(SceneEvent.OCounterUpdated(id, count)) else LibraryEvents.post(LibraryEvent.StatsChanged)
+        }
+    }
+
+    private suspend fun incrementSceneO(id: String, vars: JsonObject): Int? {
         return try {
             GraphQL.data(SCENE_INCREMENT_O, vars)["sceneIncrementO"].stringOrNull?.toIntOrNull()
         } catch (e: CancellationException) {
@@ -308,7 +318,9 @@ object RateMeRepository {
     suspend fun mutateDestroy(id: String, mode: RateMeMode): Boolean {
         val (doc, field) = if (mode == RateMeMode.Scenes) SCENE_DESTROY to "sceneDestroy" else IMAGE_DESTROY to "imageDestroy"
         val data = GraphQL.data(doc, buildJsonObject { put("input", destroyInput(id)) })
-        return data[field].stringOrNull == "true"
+        return (data[field].stringOrNull == "true").also { ok ->
+            if (ok) { if (mode == RateMeMode.Scenes) SceneEvents.post(SceneEvent.Deleted(id)); LibraryEvents.post(LibraryEvent.StatsChanged) }
+        }
     }
 }
 

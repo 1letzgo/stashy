@@ -17,6 +17,13 @@ import de.letzgo.stashy.data.SavedFiltersStore
 import de.letzgo.stashy.data.Scene
 import de.letzgo.stashy.data.SceneEvents
 import de.letzgo.stashy.data.PerformerEvents
+import de.letzgo.stashy.data.LibraryEvent
+import de.letzgo.stashy.data.LibraryEvents
+import de.letzgo.stashy.data.SceneEvent
+import de.letzgo.stashy.data.tools.ForgottenFavorites
+import de.letzgo.stashy.data.tools.SceneRecommendations
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import de.letzgo.stashy.data.applyingPerformerEvent
 import de.letzgo.stashy.data.applying
 import de.letzgo.stashy.data.ServerConfigManager
@@ -66,8 +73,15 @@ object DashboardStore {
                 for ((type, state) in rows.toMap()) {
                     state.scenes.applying(event)?.let { rows[type] = state.copy(scenes = it) }
                 }
+                // For You and Forgotten Favorites hold their own cards: patched in place, never rebuilt.
+                SceneRecommendations.applySceneEvent(event)
+                ForgottenFavorites.applySceneEvent(event)
+                // A deleted scene or a new play / O count moves the statistics.
+                if (event is SceneEvent.Deleted || event is SceneEvent.PlayAdded || event is SceneEvent.OCounterUpdated) scheduleStatisticsRefresh()
             }
         }
+        // Performer, studio and gallery edits and deletes patch their rows in place (a deleted item leaves).
+        scope.launch { LibraryEvents.events.collect { handle(it) } }
         // iOS `patchPerformerImageInLists` (`homeRowPerformers`) and the scene rows' performers.
         scope.launch {
             PerformerEvents.events.collect { event ->
@@ -79,6 +93,47 @@ object DashboardStore {
                     }
                 }
             }
+        }
+    }
+
+    private var statsRefreshJob: Job? = null
+
+    /** One quiet statistics fetch after a burst of changes (no skeleton: the old numbers stay until the new ones arrive). */
+    private fun scheduleStatisticsRefresh() {
+        if (statistics == null) return
+        statsRefreshJob?.cancel()
+        statsRefreshJob = scope.launch {
+            delay(1500)
+            while (isLoadingStatistics) delay(300)
+            runCatching { DashboardRepository.statistics() }.onSuccess { statistics = it; lastStatsFetch = System.currentTimeMillis() }
+        }
+    }
+
+    /** Patches (or removes) the one item in every row that shows it; other items and the order stay. */
+    private fun <T> List<T>.patched(id: String, idOf: (T) -> String, patch: ((T) -> T)?): List<T>? {
+        val i = indexOfFirst { idOf(it) == id }
+        if (i < 0) return null
+        val next = patch?.invoke(this[i])
+        if (next == this[i]) return null
+        return toMutableList().apply { if (next == null) removeAt(i) else set(i, next) }
+    }
+
+    private fun handle(event: LibraryEvent) {
+        for ((type, state) in rows.toMap()) {
+            val next = when (event) {
+                is LibraryEvent.PerformerPatched -> state.performers.patched(event.id, { it.id }, event.patch)?.let { state.copy(performers = it) }
+                is LibraryEvent.PerformerDeleted -> state.performers.patched(event.id, { it.id }, null)?.let { state.copy(performers = it) }
+                is LibraryEvent.StudioPatched -> state.studios.patched(event.id, { it.id }, event.patch)?.let { state.copy(studios = it) }
+                is LibraryEvent.StudioDeleted -> state.studios.patched(event.id, { it.id }, null)?.let { state.copy(studios = it) }
+                is LibraryEvent.GalleryPatched -> state.galleries.patched(event.id, { it.id }, event.patch)?.let { state.copy(galleries = it) }
+                is LibraryEvent.GalleryDeleted -> state.galleries.patched(event.id, { it.id }, null)?.let { state.copy(galleries = it) }
+                LibraryEvent.StatsChanged -> null
+            }
+            if (next != null) rows[type] = next
+        }
+        when (event) {
+            is LibraryEvent.PerformerDeleted, is LibraryEvent.StudioDeleted, is LibraryEvent.GalleryDeleted, LibraryEvent.StatsChanged -> scheduleStatisticsRefresh()
+            else -> {}
         }
     }
 

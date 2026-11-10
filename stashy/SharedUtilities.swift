@@ -615,6 +615,85 @@ enum ScenePlayerMute {
 
 /// Keeps scene lists in sync with live updates coming from `SceneDetailView`.
 ///
+/// One live change to a scene, as the app's scene notifications report it. Lists that keep
+/// their own scenes outside `StashDBViewModel` (For You, Forgotten Favorites) apply it to the
+/// cards they already show, without rebuilding or reordering.
+enum SceneLiveChange {
+    case resumeTime(id: String, time: Double)
+    case playAdded(id: String)
+    case deleted(id: String)
+    case updated(Scene)
+    case cover(id: String, updatedAt: String)
+    case oCounter(id: String, count: Int)
+
+    static let notificationNames = [
+        "SceneResumeTimeUpdated", "ScenePlayAdded", "SceneDeleted",
+        "SceneUpdated", "SceneCoverUpdated", "SceneOCounterUpdated"
+    ]
+
+    init?(_ notification: Notification) {
+        let info = notification.userInfo
+        let id = info?["sceneId"] as? String
+        switch notification.name.rawValue {
+        case "SceneResumeTimeUpdated":
+            guard let id, let time = info?["resumeTime"] as? Double else { return nil }
+            self = .resumeTime(id: id, time: time)
+        case "ScenePlayAdded":
+            guard let id else { return nil }
+            self = .playAdded(id: id)
+        case "SceneDeleted":
+            guard let id else { return nil }
+            self = .deleted(id: id)
+        case "SceneUpdated":
+            guard let scene = Scene.fromListMetadataNotification(notification) else { return nil }
+            self = .updated(scene)
+        case "SceneCoverUpdated":
+            guard let id, let updatedAt = info?["updatedAt"] as? String else { return nil }
+            self = .cover(id: id, updatedAt: updatedAt)
+        case "SceneOCounterUpdated":
+            guard let id, let count = info?["oCounter"] as? Int else { return nil }
+            self = .oCounter(id: id, count: count)
+        default:
+            return nil
+        }
+    }
+
+    var sceneId: String {
+        switch self {
+        case .resumeTime(let id, _), .playAdded(let id), .deleted(let id), .cover(let id, _), .oCounter(let id, _):
+            return id
+        case .updated(let scene):
+            return scene.id
+        }
+    }
+
+    /// The scene after this change; `nil` when it was deleted.
+    func applied(to scene: Scene) -> Scene? {
+        guard scene.id == sceneId else { return scene }
+        switch self {
+        case .resumeTime(_, let time): return scene.withResumeTime(time)
+        case .playAdded: return scene.withPlayCount((scene.playCount ?? 0) + 1)
+        case .deleted: return nil
+        case .updated(let other): return scene.mergingListMetadata(from: other)
+        case .cover(_, let updatedAt): return scene.withUpdatedAt(updatedAt)
+        case .oCounter(_, let count): return scene.withOCounter(count)
+        }
+    }
+
+    /// Calls `handler` on the main actor for every scene change, for the app's lifetime
+    /// (used by singletons, which never go away).
+    static func observeForever(_ handler: @escaping @MainActor (SceneLiveChange) -> Void) {
+        for name in notificationNames {
+            NotificationCenter.default.addObserver(
+                forName: NSNotification.Name(name), object: nil, queue: .main
+            ) { notification in
+                guard let change = SceneLiveChange(notification) else { return }
+                Task { @MainActor in handler(change) }
+            }
+        }
+    }
+}
+
 /// `SceneDetailView` publishes changes (resume time, play count, deletions, metadata)
 /// through `NotificationCenter`. Views that display scenes should apply
 /// `sceneLiveUpdates(using:)` so they update in-place when navigating back.

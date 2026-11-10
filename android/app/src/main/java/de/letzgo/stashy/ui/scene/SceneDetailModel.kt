@@ -503,7 +503,7 @@ class SceneDetailModel(
         val rated = scene.copy(rating100 = rating100)
         scene = rated
         scope.launch {
-            if (runCatching { SceneEditing.updateRating(rated.id, rating100) }.isSuccess) SceneEvents.post(SceneEvent.Updated(rated))
+            if (runCatching { SceneEditing.updateRating(rated.id, rating100) }.isSuccess) { SceneEvents.post(SceneEvent.Updated(rated)); SceneEvents.post(SceneEvent.RatingUpdated(rated.id, rating100)) }
             else { scene = original; SceneToast.show("Failed to update rating", PlayerIcons.close, SceneToast.Style.Error) }
         }
     }

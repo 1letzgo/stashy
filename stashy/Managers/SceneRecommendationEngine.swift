@@ -410,6 +410,19 @@ final class SceneRecommendationEngine: ObservableObject {
         ) { [weak self] _ in
             Task { @MainActor in self?.reset() }
         }
+
+        SceneLiveChange.observeForever { [weak self] change in self?.applyLive(change) }
+    }
+
+    /// A scene changed elsewhere in the app: the cards already shown follow in place (progress,
+    /// plays, O count, metadata, cover) and a deleted scene leaves. No rebuild, no new order.
+    private func applyLive(_ change: SceneLiveChange) {
+        guard recommendations.contains(where: { $0.scene.id == change.sceneId }) else { return }
+        recommendations = recommendations.compactMap { item in
+            guard item.scene.id == change.sceneId else { return item }
+            guard let scene = change.applied(to: item.scene) else { return nil }
+            return SceneRecommendation(scene: scene, reason: item.reason, isUnwatched: item.isUnwatched, score: item.score)
+        }
     }
 
     private static func weight(_ defaults: UserDefaults, _ key: String) -> Double {

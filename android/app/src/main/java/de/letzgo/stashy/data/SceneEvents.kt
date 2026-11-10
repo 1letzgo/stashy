@@ -19,6 +19,8 @@ sealed class SceneEvent {
     data class Updated(val scene: Scene) : SceneEvent() { override val sceneId: String get() = scene.id }
     data class CoverUpdated(override val sceneId: String, val updatedAt: String) : SceneEvent()
     data class OCounterUpdated(override val sceneId: String, val oCounter: Int) : SceneEvent()
+    /** Rating set or cleared (null); [Updated] cannot carry a cleared rating. */
+    data class RatingUpdated(override val sceneId: String, val rating100: Int?) : SceneEvent()
 
     /**
      * The list item after this event (iOS `updateSceneResumeTime`, `incrementScenePlayCount`,
@@ -34,6 +36,7 @@ sealed class SceneEvent {
             is Updated -> scene.mergingListMetadata(this.scene)
             is CoverUpdated -> if (scene.updatedAt == updatedAt) scene else scene.copy(updatedAt = updatedAt)
             is OCounterUpdated -> scene.copy(oCounter = oCounter)
+            is RatingUpdated -> scene.copy(rating100 = rating100)
         }
     }
 }
