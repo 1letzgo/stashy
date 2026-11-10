@@ -18,6 +18,9 @@ import de.letzgo.stashy.data.CriteriaDocument
 import de.letzgo.stashy.data.FilterMapper
 import de.letzgo.stashy.data.filterEntity
 import de.letzgo.stashy.data.FilterMode
+import de.letzgo.stashy.data.Gallery
+import de.letzgo.stashy.data.LibraryEvent
+import de.letzgo.stashy.data.LibraryEvents
 import de.letzgo.stashy.data.ListLivePresetTag
 import de.letzgo.stashy.data.LocalFilterPreset
 import de.letzgo.stashy.data.LocalFilterPresetStore
@@ -160,6 +163,15 @@ class CatalogController<T>(
             SceneEvents.events.collect { event ->
                 @Suppress("UNCHECKED_CAST")
                 (list as PagedList<Scene>).applySceneEvent(event)
+            }
+        }
+        // A new gallery cover (`setGalleryCover`) shows in the list without a refresh.
+        if (mode == FilterMode.Galleries) coroutineScope.launch {
+            LibraryEvents.events.collect { event ->
+                if (event is LibraryEvent.GalleryPatched) {
+                    @Suppress("UNCHECKED_CAST")
+                    (list as PagedList<Gallery>).patch { if (it.id == event.id) event.patch(it) else it }
+                }
             }
         }
         // iOS `PerformerImageUpdated` → `patchPerformerImageInLists`.

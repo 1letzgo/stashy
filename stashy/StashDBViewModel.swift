@@ -567,6 +567,15 @@ class StashDBViewModel: ObservableObject {
             entityDeletedObservers.append(token)
         }
 
+        entityDeletedObservers.append(NotificationCenter.default.addObserver(
+            forName: NSNotification.Name("GalleryCoverUpdated"), object: nil, queue: .main
+        ) { [weak self] notification in
+            guard let id = notification.userInfo?["galleryId"] as? String,
+                  let cover = notification.userInfo?["cover"] as? GalleryCover else { return }
+            let viewModel = self
+            Task { @MainActor in viewModel?.patchGalleryCoverInLists(galleryId: id, cover: cover) }
+        })
+
         // Edits from the detail pages and edit sheets: Home rows showing the item reload in place.
         for (notificationName, key) in StashDBViewModel.entityUpdatedNotificationKeys {
             let token = NotificationCenter.default.addObserver(
@@ -8802,6 +8811,54 @@ extension StashDBViewModel {
         ("GalleryDeleted", "galleryId")
     ]
 
+    private struct GallerySetCoverResponse: Decodable {
+        struct Payload: Decodable { let setGalleryCover: Bool? }
+        let data: Payload?
+    }
+
+    /// Makes `image` the cover of one of its galleries. On success every list showing the
+    /// gallery takes the new cover (`GalleryCoverUpdated`) and Home rows reload it.
+    func setGalleryCover(galleryId: String, image: StashImage, completion: @escaping (Bool) -> Void) {
+        let variables: [String: Any] = ["input": ["gallery_id": galleryId, "cover_image_id": image.id]]
+        guard let bodyData = try? JSONSerialization.data(withJSONObject: ["query": GraphQLQueries.gallerySetCoverMutation, "variables": variables]),
+              let bodyString = String(data: bodyData, encoding: .utf8) else {
+            completion(false)
+            return
+        }
+        performGraphQLQuery(query: bodyString) { (response: GallerySetCoverResponse?) in
+            let ok = response?.data?.setGalleryCover == true
+            if ok {
+                let cover = GalleryCover(id: image.id, paths: GalleryCoverPaths(
+                    thumbnail: image.paths?.thumbnail, preview: image.paths?.preview, image: image.paths?.image))
+                DispatchQueue.main.async {
+                    NotificationCenter.default.post(
+                        name: NSNotification.Name("GalleryCoverUpdated"), object: nil,
+                        userInfo: ["galleryId": galleryId, "cover": cover])
+                }
+                Self.postEntityUpdated("GalleryUpdated", key: "galleryId", id: galleryId)
+            }
+            completion(ok)
+        }
+    }
+
+    /// A gallery got a new cover: every gallery list of this view model shows it at once.
+    func patchGalleryCoverInLists(galleryId: String, cover: GalleryCover) {
+        func patch(_ list: inout [Gallery]) {
+            guard let index = list.firstIndex(where: { $0.id == galleryId }), list[index].cover != cover else { return }
+            list[index].cover = cover
+        }
+        patch(&galleries)
+        patch(&performerGalleries)
+        patch(&studioGalleries)
+        patch(&tagGalleries)
+        patch(&groupGalleries)
+        for key in homeRowGalleries.keys {
+            guard var row = homeRowGalleries[key] else { continue }
+            patch(&row)
+            if row != homeRowGalleries[key] { homeRowGalleries[key] = row }
+        }
+    }
+
     /// `<Entity>Updated` notifications: an edit (details, favorite, image) went through.
     /// Mirrors the `<Entity>Deleted` ones; posted by the mutation functions below.
     static let entityUpdatedNotificationKeys: [(String, String)] = [
@@ -10748,7 +10805,7 @@ struct Gallery: Codable, Identifiable, Equatable {
     let updatedAt: String?
     var studio: GalleryStudio?
     var performers: [GalleryPerformer]?
-    let cover: GalleryCover?
+    var cover: GalleryCover?
 
     enum CodingKeys: String, CodingKey {
         case id, title, date, details, imageCount = "image_count", rating100, organized, createdAt = "created_at", updatedAt = "updated_at", studio, performers, cover

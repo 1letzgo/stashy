@@ -195,6 +195,20 @@ object DetailRepository {
         LibraryEvents.post(LibraryEvent.GalleryPatched(id) { it.copy(title = title, date = date, details = details) })
     }
 
+    /**
+     * `setGalleryCover` (Stash 0.28+): [cover] is built from the image's own paths and patched into the
+     * Home rows and lists on success. Throws the server's error on an older Stash (nothing changes).
+     */
+    suspend fun setGalleryCover(galleryId: String, imageId: String, cover: GalleryCover): Boolean {
+        val data = GraphQL.data(
+            "mutation SetGalleryCover(\$input: GallerySetCoverInput!) { setGalleryCover(input: \$input) }",
+            vars("input" to mapOf("gallery_id" to galleryId, "cover_image_id" to imageId)),
+        )
+        val ok = (data["setGalleryCover"] as? kotlinx.serialization.json.JsonPrimitive)?.content != "false"
+        if (ok) LibraryEvents.post(LibraryEvent.GalleryPatched(galleryId) { it.copy(cover = cover) })
+        return ok
+    }
+
     /** `galleryUpdate(performer_ids:)` — the opened gallery's Performers card. Throws on failure (picker shows the error). */
     suspend fun updateGalleryPerformers(id: String, performerIds: List<String>) {
         GraphQL.data(

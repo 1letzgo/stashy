@@ -578,6 +578,13 @@ class GraphQLQueries {
         }
         """
 
+    /// Stash 0.28+. An older server answers with an error and the cover stays as it is.
+    static let gallerySetCoverMutation = """
+        mutation SetGalleryCover($input: GallerySetCoverInput!) {
+            setGalleryCover(input: $input)
+        }
+        """
+
     static let galleryUpdateDetailsMutation = """
         mutation GalleryUpdate($input: GalleryUpdateInput!) {
             galleryUpdate(input: $input) { id title date details }

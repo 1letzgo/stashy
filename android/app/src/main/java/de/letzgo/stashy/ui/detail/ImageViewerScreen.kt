@@ -161,6 +161,8 @@ class ImageViewerScreen(
     private var seeking by mutableStateOf(false)
     private var confirmDelete by mutableStateOf(false)
     private var performerImageTargets by mutableStateOf<List<IdName>>(emptyList())
+    /** Galleries the "Set as gallery cover" alert offers (non-empty = alert shown). */
+    private var galleryCoverTargets by mutableStateOf<List<IdName>>(emptyList())
     /** iOS `tagEditorImage` — the picture whose `AddTagsSheet` is open. */
     private var tagEditorImage by mutableStateOf<StashImage?>(null)
     /** iOS `wasPlayingBeforeTagEditor`. */
@@ -286,6 +288,25 @@ class ImageViewerScreen(
                     if (targets.size == 1) TextButton({ performerImageTargets = emptyList(); scope.launch { setPerformerImage(targets[0]) } }) { Text("Okay") }
                 },
                 dismissButton = { TextButton({ performerImageTargets = emptyList() }) { Text("Cancel") } },
+            )
+        }
+        if (galleryCoverTargets.isNotEmpty()) {
+            val targets = galleryCoverTargets
+            AlertDialog(
+                onDismissRequest = { galleryCoverTargets = emptyList() },
+                title = { Text("Set as Gallery Cover?") },
+                text = {
+                    Column {
+                        Text(if (targets.size == 1) "Use this image as the cover of its gallery." else "Choose which gallery gets this image as its cover.")
+                        if (targets.size > 1) targets.forEach { t ->
+                            TextButton({ galleryCoverTargets = emptyList(); scope.launch { setGalleryCover(t) } }) { Text(t.name?.takeIf { it.isNotBlank() } ?: "Untitled Gallery") }
+                        }
+                    }
+                },
+                confirmButton = {
+                    if (targets.size == 1) TextButton({ galleryCoverTargets = emptyList(); scope.launch { setGalleryCover(targets[0]) } }) { Text("Okay") }
+                },
+                dismissButton = { TextButton({ galleryCoverTargets = emptyList() }) { Text("Cancel") } },
             )
         }
     }
@@ -459,6 +480,9 @@ class ImageViewerScreen(
                 ) { Downloads.downloadImage(image) }
             }
             TopBarAction(SF.trash, "Delete") { confirmDelete = true }
+            if (!image?.galleries.isNullOrEmpty()) {
+                TopBarAction(SF.photoStack, "Set as gallery cover") { galleryCoverTargets = image?.galleries.orEmpty() }
+            }
             if (!image?.performers.isNullOrEmpty()) {
                 TopBarOverflowMenu { dismiss ->
                     OverflowItem("Set as performer image", SF.personCropCircleBadgePlus, dismiss) { performerImageTargets = image?.performers.orEmpty() }
@@ -735,6 +759,15 @@ class ImageViewerScreen(
             de.letzgo.stashy.data.ImageRefresh.performerImageChanged(performer.id, updated.imagePath)
             detailToast("Performer image updated")
         } else detailToast("Failed to update performer image")
+    }
+
+    private suspend fun setGalleryCover(gallery: IdName) {
+        val image = current ?: return
+        val cover = de.letzgo.stashy.data.GalleryCover(image.id, image.paths)
+        // An older Stash (before 0.28) answers with an error: show it, change nothing.
+        val result = runCatching { DetailRepository.setGalleryCover(gallery.id, image.id, cover) }
+        if (result.getOrDefault(false)) detailToast("Gallery cover updated")
+        else detailToast(result.exceptionOrNull()?.message?.takeIf { it.isNotBlank() } ?: "Failed to update gallery cover")
     }
 
     /** iOS `shareCurrentImage` — downloads the original and hands it to the share sheet. */

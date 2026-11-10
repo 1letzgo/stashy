@@ -630,6 +630,12 @@ private struct ImagesViewBody: View {
             gallery: gallery,
             isPresented: $showingGalleryDownloadOptions
         ))
+        // The opened gallery's own header follows a new cover set from the viewer.
+        .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("GalleryCoverUpdated"))) { notification in
+            guard let id = notification.userInfo?["galleryId"] as? String, id == gallery?.id,
+                  let cover = notification.userInfo?["cover"] as? GalleryCover else { return }
+            gallery?.cover = cover
+        }
         .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("ImageDeleted"))) { notification in
             if let imageId = notification.userInfo?["imageId"] as? String {
                 viewModel.removeImage(id: imageId)

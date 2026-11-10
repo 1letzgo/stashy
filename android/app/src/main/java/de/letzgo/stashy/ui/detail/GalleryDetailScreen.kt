@@ -115,6 +115,12 @@ class GalleryDetailScreen(
         images.onAppear()
         // iOS `hydrateOpenedGalleryIfNeeded` — stubs (no cover) get the full row.
         scope.launch { runCatching { DetailRepository.gallery(galleryId) }.getOrNull()?.let { gallery = it } }
+        // A new cover (`setGalleryCover` from the image viewer) shows in the header at once.
+        scope.launch {
+            de.letzgo.stashy.data.LibraryEvents.events.collect { event ->
+                if (event is de.letzgo.stashy.data.LibraryEvent.GalleryPatched && event.id == galleryId) gallery = gallery?.let(event.patch)
+            }
+        }
         scope.launch { linkedScenes = runCatching { DetailRepository.galleryScenes(galleryId) }.getOrDefault(emptyList()) }
     }
 

@@ -1467,6 +1467,8 @@ struct FullScreenImageView: View {
     @State private var shareItems: [Any] = []
     @State private var showingShare = false
     @State private var showingSetPerformerImagePicker = false
+    @State private var showingSetGalleryCoverPicker = false
+    @State private var galleryCoverTargets: [ImageGallery] = []
     @State private var tagEditorImage: StashImage?
     /// Play state to hand back when the tag editor closes.
     @State private var wasPlayingBeforeTagEditor = false
@@ -1659,6 +1661,23 @@ struct FullScreenImageView: View {
                 } else if wasPlayingBeforePerformerEditor {
                     wasPlayingBeforePerformerEditor = false
                     currentItemIsPlaying = true
+                }
+            }
+            .alert("Set as Gallery Cover?", isPresented: $showingSetGalleryCoverPicker) {
+                // One gallery: a plain confirm. Several: one button per gallery to pick from.
+                if galleryCoverTargets.count == 1, let gallery = galleryCoverTargets.first {
+                    Button("Okay") { setGalleryCover(gallery: gallery) }
+                } else {
+                    ForEach(galleryCoverTargets) { gallery in
+                        Button(gallery.title?.isEmpty == false ? gallery.title! : "Untitled Gallery") { setGalleryCover(gallery: gallery) }
+                    }
+                }
+                Button("Cancel", role: .cancel) { }
+            } message: {
+                if galleryCoverTargets.count == 1 {
+                    Text("Use this image as the cover of its gallery.")
+                } else {
+                    Text("Choose which gallery gets this image as its cover.")
                 }
             }
             .alert("Set as Performer Image?", isPresented: $showingSetPerformerImagePicker) {
@@ -2141,6 +2160,21 @@ struct FullScreenImageView: View {
                     .accessibilityLabel("Set as performer image")
                 }
 
+                // Like the performer picture: this image becomes the cover of its gallery.
+                if let galleries = currentImage?.galleries, !galleries.isEmpty {
+                    Button {
+                        galleryCoverTargets = galleries
+                        showingSetGalleryCoverPicker = true
+                    } label: {
+                        Image(systemName: "rectangle.stack.badge.plus")
+                            .font(.system(size: StashyExpandingDock.iconSize, weight: .semibold))
+                            .foregroundColor(.white.opacity(StashyExpandingDock.inactiveIconOpacity))
+                            .modifier(StashyChromePillStyle(height: chromePillHeight, iconOnly: true))
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("Set as gallery cover")
+                }
+
                 Button {
                     showingDeleteConfirmation = true
                 } label: {
@@ -2292,6 +2326,20 @@ struct FullScreenImageView: View {
                     self.goBack()
                 } else if currentIndex + 1 >= self.images.count {
                     self.onLoadMore?()
+                }
+            }
+        }
+    }
+
+    private func setGalleryCover(gallery: ImageGallery) {
+        let targetId = currentVisibleId ?? selectedImageId
+        guard let currentImage = images.first(where: { $0.id == targetId }) else { return }
+        viewModel.setGalleryCover(galleryId: gallery.id, image: currentImage) { success in
+            DispatchQueue.main.async {
+                if success {
+                    ToastManager.shared.show("Gallery cover updated", icon: "rectangle.stack.badge.plus", style: .success)
+                } else {
+                    ToastManager.shared.show("Failed to update gallery cover", icon: "exclamationmark.triangle", style: .error)
                 }
             }
         }
