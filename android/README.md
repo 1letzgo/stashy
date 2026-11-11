@@ -6,7 +6,7 @@ documents in `../graphql` are shared 1:1 (wired in as an assets source dir and l
 runtime with their fragments, like `GraphQLQueries` on iOS).
 
 **Goal: behave and look as close to the iOS app as possible.** Same tabs, same order, same
-labels (English UI like iOS), same defaults, same UserDefaults key strings (`Prefs`), same
+labels (the same localization keys as iOS, `tr(R.string.…)`), same defaults, same UserDefaults key strings (`Prefs`), same
 layouts and spacing (`Tokens` = iOS `DesignTokens`, `IosTypography` = Dynamic Type sizes).
 When porting a screen, read the Swift view first and mirror its structure; name the iOS
 counterpart in the KDoc (`/** iOS: SceneCardView … */`).
@@ -16,9 +16,13 @@ counterpart in the KDoc (`/** iOS: SceneCardView … */`).
 ```bash
 export JAVA_HOME=/opt/homebrew/opt/openjdk@17/libexec/openjdk.jdk/Contents/Home
 export ANDROID_HOME=/opt/homebrew/share/android-commandlinetools
-./gradlew assembleDebug        # APK under ~/Library/Caches/stashy-android/<hash>/app/outputs/apk/debug/
-./gradlew testDebugUnitTest
+./gradlew assembleSideloadDebug   # APK under ~/Library/Caches/stashy-android/<hash>/app/outputs/apk/sideload/debug/
+./gradlew testSideloadDebugUnitTest
+./gradlew testSideloadDebugUnitTest --tests 'de.letzgo.stashy.data.FiltersTest'   # one test class
 ```
+
+Every task names a flavor (`sideload` or `play`, see "Distribution flavors" below): the plain
+`assembleDebug` builds both, and `testDebugUnitTest` does not exist.
 
 Build output lives outside iCloud (`~/Library/Caches/stashy-android/<checkout hash>`), one
 directory per checkout so git worktrees don't collide.
