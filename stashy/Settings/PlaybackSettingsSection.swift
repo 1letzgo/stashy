@@ -42,7 +42,7 @@ struct PlaybackSettingsSection: View {
 
             Picker(selection: $tabManager.playerSkipSeconds) {
                 ForEach(TabManager.playerSkipOptions, id: \.self) { seconds in
-                    Text("\(Int(seconds)) s").tag(seconds)
+                    Text(TabManager.playerSkipLabel(seconds)).tag(seconds)
                 }
             } label: {
                 Label("Skip interval", systemImage: "goforward")

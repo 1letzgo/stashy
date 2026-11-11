@@ -292,6 +292,8 @@ struct SceneDetailView: View {
         GeometryReader { proxy in
         if let fold = proxy.foldRegion, fold.isVertical {
             foldedColumns(proxy: proxy, fold: fold)
+        } else if usesSideInfoColumn(proxy.size) {
+            sideInfoColumns(proxy: proxy)
         } else {
         VStack(spacing: 12) {
             // Pinned only while the player runs: then it keeps its place at the top and the
@@ -353,6 +355,60 @@ struct SceneDetailView: View {
         .animation(nil, value: isPlayerPinned)
         }
         }
+    }
+
+    /// Experiment: an iPhone in landscape gets the same side-by-side page as a wide iPad.
+    /// Off, it keeps the scrolling page with paired card rows.
+    private var phoneLandscapeSideColumn: Bool { true }
+
+    /// A landscape container: there a full-width picture takes the whole page, so the
+    /// player stays on the left and the cards sit beside it. A wide one (iPad held
+    /// sideways) always, a phone in landscape (compact height) as an experiment. From the
+    /// view's own size, never the idiom.
+    private func usesSideInfoColumn(_ size: CGSize) -> Bool {
+        #if os(iOS)
+        guard size.width > size.height else { return false }
+        if verticalSizeClass == .compact { return phoneLandscapeSideColumn && !playerOnly }
+        return size.width >= 900
+        #else
+        return false
+        #endif
+    }
+
+    /// The player stays put on the left; every card sits in a column on the right and
+    /// scrolls there. The column takes about a third of the width; where the height is
+    /// short (phone) the picture is sized to fit it and the column gets the rest.
+    private func sideInfoColumns(proxy: GeometryProxy) -> some View {
+        let spacing: CGFloat = 12
+        let total = max(0, proxy.size.width - 32 - spacing)
+        let third = min(max(320, total / 3), total / 2)
+        // The picture must fit the height (16 pt above and below it).
+        let pictureWidth = max(0, proxy.size.height - 32) * 16 / 9
+        let mainWidth = max(0, min(total - third, pictureWidth))
+        let sideWidth = max(0, total - mainWidth)
+        return HStack(alignment: .top, spacing: spacing) {
+            // Scrolls only when the marker strip under the picture does not fit.
+            ScrollView {
+                playerCardView
+                    .frame(width: mainWidth)
+                    .padding(.vertical, 16)
+            }
+            .scrollBounceBehavior(.basedOnSize)
+            .frame(width: mainWidth)
+
+            ScrollView {
+                VStack(spacing: 12) {
+                    ForEach(renderedCards) { card in
+                        sceneCard(card)
+                    }
+                }
+                .padding(.vertical, 16)
+                .frame(width: sideWidth)
+            }
+            .frame(width: sideWidth)
+        }
+        .padding(.horizontal, 16)
+        .frame(width: proxy.size.width, height: proxy.size.height, alignment: .topLeading)
     }
 
     /// Open iPhone Duo: player and the first card left of the fold, the other cards right of it,

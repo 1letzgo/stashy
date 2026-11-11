@@ -538,7 +538,19 @@ class TabManager: ObservableObject {
             UserDefaults.standard.set(playerSkipSeconds, forKey: playerSkipSecondsKey)
         }
     }
-    static let playerSkipOptions: [Double] = [5, 10, 15, 30]
+    static let playerSkipOptions: [Double] = [5, 10, 15, 30, 60, 180, 300]
+
+    /// "10 s", "3 min" — the picker's wording.
+    static func playerSkipLabel(_ seconds: Double) -> String {
+        let value = Int(seconds.rounded())
+        return value >= 60 && value % 60 == 0 ? "\(value / 60) min" : "\(value) s"
+    }
+
+    /// "10", "3m" — what fits inside the skip button's arrow.
+    static func playerSkipShortLabel(_ seconds: Double) -> String {
+        let value = Int(seconds.rounded())
+        return value >= 60 && value % 60 == 0 ? "\(value / 60)m" : "\(value)"
+    }
 
     /// Settings › Playback › "Autozoom". Landscape fullscreen fills the screen by itself when
     /// filling costs little of the picture — a 16:9 video on a 19.5:9 phone, not a 21:9 film.

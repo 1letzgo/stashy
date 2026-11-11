@@ -9,7 +9,7 @@ import de.letzgo.stashy.data.Prefs
  * the Settings port writes (Int, Float, Long, Double-as-String or Boolean) is picked up here.
  */
 object PlayerSettings {
-    val skipOptions = listOf(5.0, 10.0, 15.0, 30.0)
+    val skipOptions = listOf(5.0, 10.0, 15.0, 30.0, 60.0, 180.0, 300.0)
     val holdSpeedOptions = listOf(1.5, 2.0, 2.5, 3.0, 4.0)
     val playCountThresholdOptions = listOf(0.0, 1.0, 5.0, 10.0, 30.0, 60.0, 120.0)
     /** iOS: `TabManager.autoZoomMaximumCrop`. */

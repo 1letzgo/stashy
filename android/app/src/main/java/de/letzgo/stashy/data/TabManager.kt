@@ -68,7 +68,19 @@ object TabManager {
     private const val REELS_MODES_KEY = "ReelsModesConfig"
     private const val CARD_COLUMNS_KEY = "CatalogCardColumns"
 
-    val playerSkipOptions = listOf(5.0, 10.0, 15.0, 30.0)
+    val playerSkipOptions = listOf(5.0, 10.0, 15.0, 30.0, 60.0, 180.0, 300.0)
+
+    /** "10 s", "3 min" — the picker's wording (iOS `playerSkipLabel`). */
+    fun playerSkipLabel(seconds: Double): String {
+        val value = Math.round(seconds).toInt()
+        return if (value >= 60 && value % 60 == 0) "${value / 60} min" else "$value s"
+    }
+
+    /** "10", "3m" — what fits inside the skip button's arrow (iOS `playerSkipShortLabel`). */
+    fun playerSkipShortLabel(seconds: Double): String {
+        val value = Math.round(seconds).toInt()
+        return if (value >= 60 && value % 60 == 0) "${value / 60}m" else "$value"
+    }
     val playCountThresholdOptions = listOf(0.0, 1.0, 5.0, 10.0, 30.0, 60.0, 120.0)
     val holdSpeedOptions = listOf(1.5, 2.0, 2.5, 3.0, 4.0)
     val downloadBatchSizeOptions = listOf(5, 10, 25, 50, 100, 200)

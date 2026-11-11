@@ -516,15 +516,16 @@ private fun GlassCircle(icon: ImageVector, size: Dp, glyph: Dp, description: Str
 
 @Composable
 private fun SkipButton(forward: Boolean, size: Dp, compact: Boolean, onClick: () -> Unit) {
-    val seconds = PlayerSettings.skipSeconds.toInt()
+    val label = de.letzgo.stashy.data.TabManager.playerSkipLabel(PlayerSettings.skipSeconds)
+    val short = de.letzgo.stashy.data.TabManager.playerSkipShortLabel(PlayerSettings.skipSeconds)
     Box(
         Modifier.size(size).stashyGlass(CircleShape)
             .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null, onClick = onClick),
         contentAlignment = Alignment.Center,
     ) {
-        Icon(PlayerIcons.skip, if (forward) "Forward $seconds seconds" else "Back $seconds seconds", tint = Color.White,
+        Icon(PlayerIcons.skip, if (forward) "Forward $label" else "Back $label", tint = Color.White,
             modifier = Modifier.size(if (compact) 30.dp else 40.dp).scale(scaleX = if (forward) -1f else 1f, scaleY = 1f))
-        Text("$seconds", Modifier.offset(y = 1.dp), color = Color.White, style = TextStyle(fontSize = if (compact) 11.sp else 12.sp, fontWeight = FontWeight.Bold))
+        Text(short, Modifier.offset(y = 1.dp), color = Color.White, style = TextStyle(fontSize = if (compact) 11.sp else 12.sp, fontWeight = FontWeight.Bold))
     }
 }
 

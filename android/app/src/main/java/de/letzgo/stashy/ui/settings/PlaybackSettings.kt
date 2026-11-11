@@ -42,7 +42,7 @@ fun LazyListScope.playbackSections() {
     settingsSection(header = "Player", key = "player") {
         SettingsToggleRow("Picture-in-Picture", TabManager.isPiPEnabled, SFS.pip) { TabManager.isPiPEnabled = it }
         SettingsDivider()
-        SettingsPickerRow("Skip interval", TabManager.playerSkipOptions, TabManager.playerSkipSeconds, { "${it.toInt()} s" }, SFS.goforward) { TabManager.playerSkipSeconds = it }
+        SettingsPickerRow("Skip interval", TabManager.playerSkipOptions, TabManager.playerSkipSeconds, { TabManager.playerSkipLabel(it) }, SFS.goforward) { TabManager.playerSkipSeconds = it }
         SettingsDivider()
         SettingsToggleRow("Skip buttons", TabManager.showsPlayerSkipButtons, SFS.goforward10) { TabManager.showsPlayerSkipButtons = it }
         SettingsDivider()

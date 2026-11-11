@@ -419,7 +419,13 @@ struct AetherSceneSurface: View {
     /// Compact control sizes for the inline card and for fullscreen — the large set was
     /// out of proportion next to the inline player. The regular set stays for big inline
     /// surfaces (iPad).
-    private var isCompact: Bool { isFullscreen || (surfaceHeight > 0 && surfaceHeight < 260) }
+    /// Also for a surface that is tall enough but narrow (the scene page's landscape column
+    /// on a phone): the regular set needs about 600 pt of width and ran off both edges.
+    private var isCompact: Bool {
+        isFullscreen
+            || (surfaceHeight > 0 && surfaceHeight < 260)
+            || (surfaceSize.width > 0 && surfaceSize.width < 600)
+    }
     private var skipButtonSize: CGFloat { isCompact ? 44 : 66 }
     private var playButtonSize: CGFloat { isCompact ? 64 : 96 }
     /// Filling only makes sense where the picture is wider than tall on screen; in portrait it
@@ -763,7 +769,7 @@ struct AetherSceneSurface: View {
             ZStack {
                 Image(systemName: forward ? "arrow.trianglehead.clockwise" : "arrow.trianglehead.counterclockwise")
                     .font(.system(size: isCompact ? 24 : 32, weight: .semibold))
-                Text("\(Int(seconds.rounded()))")
+                Text(TabManager.playerSkipShortLabel(seconds))
                     .font(.system(size: isCompact ? 9 : 12, weight: .bold).monospacedDigit())
                     .offset(y: isCompact ? 1 : 1.5)
             }
@@ -773,7 +779,7 @@ struct AetherSceneSurface: View {
             .contentShape(Circle())
         }
         .buttonStyle(.plain)
-        .accessibilityLabel(forward ? "Forward \(Int(seconds.rounded())) seconds" : "Back \(Int(seconds.rounded())) seconds")
+        .accessibilityLabel(forward ? "Forward \(TabManager.playerSkipLabel(seconds))" : "Back \(TabManager.playerSkipLabel(seconds))")
     }
 
     @ViewBuilder
