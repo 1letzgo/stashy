@@ -28,6 +28,8 @@ struct TVFeedPlayerView: View {
     @FocusState private var isInputFocused: Bool
     @FocusState private var overlayFocus: OverlayFocus?
     @State private var isOverlayOpen = false
+    /// The item the rating picker is open for.
+    @State private var ratingItem: TVFeedItem?
     @State private var showsInfo = true
     @State private var infoHideWork: DispatchWorkItem?
     @State private var seekFeedback: String?
@@ -132,6 +134,18 @@ struct TVFeedPlayerView: View {
         .animation(.easeInOut(duration: 0.2), value: showsInfo)
         .animation(.easeInOut(duration: 0.15), value: seekFeedback)
         .onExitCommand { handleExit() }
+        .confirmationDialog("Rating", isPresented: Binding(
+            get: { ratingItem != nil },
+            set: { if !$0 { ratingItem = nil } }
+        ), titleVisibility: .visible) {
+            ForEach([5, 4, 3, 2, 1, 0], id: \.self) { stars in
+                Button(stars == 0 ? "No Rating" : String(repeating: "★", count: stars)) {
+                    if let item = ratingItem { session.setRating(stars: stars, for: item) }
+                    ratingItem = nil
+                }
+            }
+            Button("Cancel", role: .cancel) { ratingItem = nil }
+        }
         .onPlayPauseCommand { session.togglePlayPause() }
         .onAppear {
             isInputFocused = true
@@ -461,6 +475,17 @@ struct TVFeedPlayerView: View {
                 session.togglePlayPause()
             }
         }
+        if item.ratingTarget != nil {
+            // Same two actions, icons and picker as the scene page.
+            overlayButton("\(session.oCount(for: item))", icon: "heart.circle.fill") {
+                session.addO(for: item)
+            }
+            .accessibilityLabel("O-Counter, \(session.oCount(for: item))")
+            overlayButton(ratingLabel(item), icon: "star.fill") {
+                ratingItem = item
+            }
+            .accessibilityLabel("Rating")
+        }
         overlayButton(session.isMuted ? "Unmute" : "Mute",
                       icon: session.isMuted ? "speaker.slash.fill" : "speaker.wave.2.fill") {
             session.toggleMute()
@@ -475,6 +500,15 @@ struct TVFeedPlayerView: View {
                 onNavigate(.studio(id: studio.id, name: studio.name))
             }
         }
+    }
+
+    private func ratingStars(_ item: TVFeedItem) -> Int {
+        max(0, min(5, Int((Double(session.rating100(for: item)) / 20.0).rounded())))
+    }
+
+    private func ratingLabel(_ item: TVFeedItem) -> String {
+        let stars = ratingStars(item)
+        return stars == 0 ? "Rate" : String(repeating: "★", count: stars)
     }
 
     private func playLabel(_ item: TVFeedItem) -> String {

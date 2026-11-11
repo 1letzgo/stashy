@@ -157,6 +157,38 @@ enum TVFeedItem: Identifiable {
         case .clip, .preview: return nil
         }
     }
+
+    /// What the overlay's O count and rating write to: the scene (also for a marker or a
+    /// preview) or the image of a clip.
+    enum RatingTarget: Hashable {
+        case scene(String)
+        case image(String)
+    }
+
+    var ratingTarget: RatingTarget? {
+        switch self {
+        case .scene(let s), .preview(let s): return .scene(s.id)
+        case .marker(let m): return m.scene.map { .scene($0.id) }
+        case .clip(let c): return .image(c.id)
+        }
+    }
+
+    /// Values as the feed loaded them; `TVFeedSession` layers its own changes on top.
+    var loadedRating100: Int? {
+        switch self {
+        case .scene(let s), .preview(let s): return s.rating100
+        case .marker(let m): return m.scene?.rating100
+        case .clip(let c): return c.rating100
+        }
+    }
+
+    var loadedOCounter: Int? {
+        switch self {
+        case .scene(let s), .preview(let s): return s.oCounter
+        case .marker(let m): return m.scene?.oCounter
+        case .clip(let c): return c.o_counter
+        }
+    }
 }
 
 // MARK: - Modes
@@ -265,6 +297,10 @@ final class TVFeedSession: ObservableObject {
 
     @Published private(set) var mode: ReelsModeType
     @Published private(set) var items: [TVFeedItem] = []
+    /// O counts and ratings set from the overlay. The items are copies of what the feed
+    /// loaded, so the change is kept here by target and read through `oCount` / `rating100`.
+    @Published private var changedOCounts: [TVFeedItem.RatingTarget: Int] = [:]
+    @Published private var changedRatings: [TVFeedItem.RatingTarget: Int] = [:]
     @Published private(set) var index = 0
     /// The one engine of the feed. nil while the feed is off screen.
     @Published private(set) var engine: AetherSceneEngine?
@@ -301,6 +337,60 @@ final class TVFeedSession: ObservableObject {
 
     private static let mutedKey = "tvFeedsMuted"
     private static let seekStep: Double = 10
+
+    // MARK: O count and rating
+
+    func oCount(for item: TVFeedItem) -> Int {
+        item.ratingTarget.flatMap { changedOCounts[$0] } ?? item.loadedOCounter ?? 0
+    }
+
+    /// 0 = no rating.
+    func rating100(for item: TVFeedItem) -> Int {
+        item.ratingTarget.flatMap { changedRatings[$0] } ?? item.loadedRating100 ?? 0
+    }
+
+    /// One more O for the item's scene or image; the server's count is shown once it answers.
+    func addO(for item: TVFeedItem) {
+        guard let target = item.ratingTarget else { return }
+        let finish: (Int?) -> Void = { [weak self] count in
+            guard let count else { return }
+            DispatchQueue.main.async {
+                self?.changedOCounts[target] = count
+                if case .scene(let id) = target {
+                    NotificationCenter.default.post(
+                        name: NSNotification.Name("SceneOCounterUpdated"), object: nil,
+                        userInfo: ["sceneId": id, "oCounter": count]
+                    )
+                }
+            }
+        }
+        switch target {
+        case .scene(let id): catalog.incrementOCounter(sceneId: id, completion: finish)
+        case .image(let id): catalog.incrementImageOCounter(imageId: id, completion: finish)
+        }
+    }
+
+    /// `stars` 0…5, 0 clears the rating.
+    func setRating(stars: Int, for item: TVFeedItem) {
+        guard let target = item.ratingTarget else { return }
+        let value = max(0, min(5, stars)) * 20
+        let finish: (Bool) -> Void = { [weak self] success in
+            guard success else { return }
+            DispatchQueue.main.async {
+                self?.changedRatings[target] = value
+                if case .scene(let id) = target {
+                    NotificationCenter.default.post(
+                        name: NSNotification.Name("SceneRatingUpdated"), object: nil,
+                        userInfo: ["sceneId": id, "rating100": value as Any]
+                    )
+                }
+            }
+        }
+        switch target {
+        case .scene(let id): catalog.updateSceneRating(sceneId: id, rating100: value, completion: finish)
+        case .image(let id): catalog.updateImageRating(imageId: id, rating100: value, completion: finish)
+        }
+    }
 
     var currentItem: TVFeedItem? {
         items.indices.contains(index) ? items[index] : nil
