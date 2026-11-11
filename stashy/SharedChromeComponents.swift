@@ -510,7 +510,7 @@ struct StashySectionChromeBar<Content: View>: View {
 /// (scrolling when they don't fit). A page without tabs has room for its few actions at the right
 /// (`trailingSlots`); tabbed pages keep theirs in the floating bar.
 struct StashyDetailTopBar<Tab: Hashable>: View {
-    var backTitle: String = "Back"
+    var backTitle: String = tr("back")
     var backIcon: String = "chevron.left"
     var onBack: () -> Void
     /// Right-aligned label for pages without tabs (a download's name, "3 / 20").
@@ -606,7 +606,7 @@ struct StashyDetailTopBar<Tab: Hashable>: View {
 extension StashyDetailTopBar where Tab == Never {
     /// A detail page without section tabs: Back only.
     init(
-        backTitle: String = "Back",
+        backTitle: String = tr("back"),
         backIcon: String = "chevron.left",
         title: String? = nil,
         besideBack: [CatalogChromeSlot] = [],
@@ -652,7 +652,7 @@ struct DetailTopBarSlotButton: View {
 
 /// Shared Back pill used by detail / settings chrome bars.
 struct StashyChromeBackButton: View {
-    var title: String = "Back"
+    var title: String = tr("back")
     var systemImage: String = "chevron.left"
     var action: () -> Void
 
@@ -674,7 +674,7 @@ struct StashyChromeBackButton: View {
 
 /// Modal catalog filter/sort sheet chrome (title default “Settings”) — not the system nav bar.
 struct CatalogSettingsSheetChromeBar: View {
-    var title: String = "Settings"
+    var title: String = tr("settings")
     var hasSelectedPreset: Bool
     /// Name der gewählten Vorlage für "Update ‹Name›" im Speichern-Dialog.
     var selectedPresetName: String? = nil
@@ -691,13 +691,13 @@ struct CatalogSettingsSheetChromeBar: View {
         StashySectionChromeBar(isOpaque: true) {
             HStack(spacing: 8) {
                 Button(action: onReset) {
-                    Text("Reset")
+                    Text(tr("action_reset"))
                         .font(.subheadline.weight(.semibold))
                         .foregroundColor(.red)
                         .modifier(StashyChromePillStyle(height: StashyExpandingDock.activeHeight))
                 }
                 .buttonStyle(.plain)
-                .accessibilityLabel("Reset")
+                .accessibilityLabel(tr("action_reset"))
 
                 Text(title)
                     .font(.title3.weight(.semibold))
@@ -710,23 +710,23 @@ struct CatalogSettingsSheetChromeBar: View {
                 Button {
                     showSaveChoice = true
                 } label: {
-                    Text("Save")
+                    Text(tr("action_save"))
                         .font(.subheadline.weight(.semibold))
                         .foregroundColor(.white)
                         .modifier(StashyChromePillStyle(height: StashyExpandingDock.activeHeight))
                 }
                 .buttonStyle(.plain)
-                .accessibilityLabel("Save filter")
-                .alert("Save filter", isPresented: $showSaveChoice) {
+                .accessibilityLabel(tr("action_save_filter"))
+                .alert(tr("action_save_filter"), isPresented: $showSaveChoice) {
                     if hasSelectedPreset {
-                        Button(selectedPresetName.map { "Update \"\($0)\"" } ?? "Update") { onRequestSave() }
+                        Button(selectedPresetName.map { tr("action_update_arg", $0) } ?? tr("action_update")) { onRequestSave() }
                     }
-                    Button("Save as new") { onRequestSaveAs() }
+                    Button(tr("action_save_as_new")) { onRequestSaveAs() }
                     if hasSelectedPreset {
-                        Button("Rename") { onRequestRename() }
-                        Button("Delete", role: .destructive) { onRequestDelete() }
+                        Button(tr("action_rename")) { onRequestRename() }
+                        Button(tr("action_delete"), role: .destructive) { onRequestDelete() }
                     }
-                    Button("Cancel", role: .cancel) {}
+                    Button(tr("action_cancel"), role: .cancel) {}
                 }
 
                 // Closing the sheet was swipe-only, which is awkward right after tapping Done in
@@ -734,13 +734,13 @@ struct CatalogSettingsSheetChromeBar: View {
                 Button {
                     dismiss()
                 } label: {
-                    Text("Done")
+                    Text(tr("action_done"))
                         .font(.subheadline.weight(.semibold))
                         .foregroundColor(.white)
                         .modifier(StashyChromePillStyle(height: StashyExpandingDock.activeHeight))
                 }
                 .buttonStyle(.plain)
-                .accessibilityLabel("Close filters")
+                .accessibilityLabel(tr("action_close_filters"))
             }
             .frame(minHeight: StashyExpandingDock.activeHeight)
             .padding(.horizontal, StashyExpandingDock.edgePadding)
@@ -958,7 +958,7 @@ extension View {
 /// Shared filter/sort control for floating catalog bars (`slider.horizontal.3` + active tint dot).
 struct CatalogFilterFABButton: View {
     var isActive: Bool
-    var accessibilityLabel: String = "Settings"
+    var accessibilityLabel: String = tr("settings")
     let action: () -> Void
 
     var body: some View {
@@ -1250,7 +1250,7 @@ struct ToolsSearchField: View {
                         .foregroundColor(.secondary)
                 }
                 .buttonStyle(.plain)
-                .accessibilityLabel("Clear search")
+                .accessibilityLabel(tr("action_clear_search"))
             }
         }
         .padding(.horizontal, DesignTokens.Spacing.sm)
@@ -1298,28 +1298,28 @@ private struct OCounterRemovalMenu: ViewModifier {
                         HapticManager.light()
                         onRemoveOne()
                     } label: {
-                        Label("Remove one O", systemImage: "minus.circle")
+                        Label(tr("action_remove_one_o"), systemImage: "minus.circle")
                     }
                     if count > 1 {
                         Button(role: .destructive) {
                             confirmingReset = true
                         } label: {
-                            Label("Reset O-Counter (\(count))", systemImage: "arrow.counterclockwise")
+                            Label(tr("action_reset_o_count_arg", count), systemImage: "arrow.counterclockwise")
                         }
                     }
                 } else {
-                    Text("No O recorded")
+                    Text(tr("empty_o_recorded"))
                 }
             }
             // Centered warning alert, not an action sheet: this deletes history on the server.
-            .alert("Reset O-Counter?", isPresented: $confirmingReset) {
-                Button("Remove all \(count)", role: .destructive) {
+            .alert(tr("confirm_reset_o_count"), isPresented: $confirmingReset) {
+                Button(tr("action_remove_all_arg", count), role: .destructive) {
                     HapticManager.light()
                     onReset()
                 }
-                Button("Cancel", role: .cancel) {}
+                Button(tr("action_cancel"), role: .cancel) {}
             } message: {
-                Text("All \(count) recorded O entries and their dates are permanently deleted on the server. This cannot be undone.")
+                Text(tr("hint_all_arg_recorded_o_entries", count))
             }
     }
 }
@@ -1378,7 +1378,7 @@ final class KeyboardDoneAccessory: NSObject {
     /// One bar per field: an input accessory can only live in one view hierarchy at a time.
     private func makeBar() -> UIToolbar {
         let bar = UIToolbar(frame: CGRect(x: 0, y: 0, width: 320, height: 44))
-        let done = UIBarButtonItem(title: "Done", style: .done, target: self, action: #selector(done))
+        let done = UIBarButtonItem(title: tr("action_done"), style: .done, target: self, action: #selector(done))
         bar.items = [UIBarButtonItem(systemItem: .flexibleSpace), done]
         bar.tag = Self.barTag
         bar.sizeToFit()
@@ -1422,7 +1422,7 @@ struct DetailHeroCard<Backdrop: View, Avatar: View, Accessory: View, Footer: Vie
     let items: [DetailHeroItem]
     let description: String?
     let showsHero: Bool
-    var heroAccessibilityLabel: String = "Open image"
+    var heroAccessibilityLabel: String = tr("action_open_image")
     var onHeroTap: (() -> Void)? = nil
     @Binding var isExpanded: Bool
     /// Collapsed cell count; the rest appears when expanded.
@@ -1587,7 +1587,7 @@ struct DetailHeroCard<Backdrop: View, Avatar: View, Accessory: View, Footer: Vie
                         .detailHeroPill(onImage: false)
                 }
                 .buttonStyle(.plain)
-                .accessibilityLabel(isExpanded ? "Show less" : "Show more")
+                .accessibilityLabel(isExpanded ? tr("action_show_less") : tr("action_show_more"))
             }
         }
         .fixedSize()
@@ -1696,7 +1696,7 @@ extension DetailHeroCard where Backdrop == Avatar, Accessory == EmptyView, Foote
         items: [DetailHeroItem],
         description: String?,
         showsHero: Bool,
-        heroAccessibilityLabel: String = "Open image",
+        heroAccessibilityLabel: String = tr("action_open_image"),
         onHeroTap: (() -> Void)? = nil,
         isExpanded: Binding<Bool>,
         placeholderSystemImage: String? = nil,
@@ -1722,13 +1722,13 @@ struct DetailHeroFeedsButton: View {
             HStack(spacing: 4) {
                 Image(systemName: AppTab.reels.icon)
                     .font(.system(size: 12, weight: .bold))
-                Text("Feeds")
+                Text(tr("feeds"))
                     .font(.system(size: 11, weight: .bold))
             }
             .detailHeroPill(onImage: onImage)
         }
         .buttonStyle(.plain)
-        .accessibilityLabel("Open in Feeds")
+        .accessibilityLabel(tr("action_open_in_feeds"))
     }
 }
 
@@ -1850,7 +1850,7 @@ struct DetailHeroFullscreenViewer<Content: View>: View {
             }
             .buttonStyle(.plain)
             .padding(16)
-            .accessibilityLabel("Close")
+            .accessibilityLabel(tr("action_close"))
         }
     }
 }

@@ -41,9 +41,9 @@ struct TVStudiosView: View {
             columnWidth: 410,
             columnCount: 4,
             emptySystemImage: "building.2",
-            emptyTitle: "No Studios Found",
-            loadingText: "Loading studios…",
-            errorTitle: "Error loading studios",
+            emptyTitle: tr("empty_studios_found"),
+            loadingText: tr("loading_studios"),
+            errorTitle: tr("error_loading_studios"),
             focusResetToken: focusResetToken,
             loadMore: { viewModel.loadMoreStudios() },
             reload: { reload() },
@@ -52,7 +52,7 @@ struct TVStudiosView: View {
                 STVHeaderView(
                     sortMenu: {
                         TVOptionPickerButton(
-                            title: "Sort By",
+                            title: tr("action_sort_by"),
                             icon: "arrow.up.arrow.down",
                             options: sortOptions,
                             selection: $sortBy
@@ -123,24 +123,24 @@ struct TVStudiosView: View {
 
     private func label(for option: StashDBViewModel.StudioSortOption) -> String {
         switch option {
-        case .nameAsc: return "Name (A-Z)"
-        case .nameDesc: return "Name (Z-A)"
-        case .sceneCountDesc: return "Most Scenes"
-        case .sceneCountAsc: return "Least Scenes"
-        case .createdAtDesc: return "Recently Added"
-        case .createdAtAsc: return "Oldest Added"
-        case .updatedAtDesc: return "Recently Updated"
-        case .updatedAtAsc: return "Least Recently Updated"
-        case .ratingDesc: return "Highest Rated"
-        case .ratingAsc: return "Lowest Rated"
-        case .performerCountDesc: return "Most Performers"
-        case .performerCountAsc: return "Least Performers"
-        case .galleryCountDesc: return "Most Galleries"
-        case .galleryCountAsc: return "Least Galleries"
-        case .imageCountDesc: return "Most Images"
-        case .imageCountAsc: return "Least Images"
+        case .nameAsc: return tr("name_z")
+        case .nameDesc: return tr("name_z_2")
+        case .sceneCountDesc: return tr("most_scenes")
+        case .sceneCountAsc: return tr("least_scenes")
+        case .createdAtDesc: return tr("recently_added")
+        case .createdAtAsc: return tr("oldest_added")
+        case .updatedAtDesc: return tr("recently_updated")
+        case .updatedAtAsc: return tr("least_recently_updated")
+        case .ratingDesc: return tr("highest_rated")
+        case .ratingAsc: return tr("lowest_rated")
+        case .performerCountDesc: return tr("most_performers")
+        case .performerCountAsc: return tr("least_performers")
+        case .galleryCountDesc: return tr("most_galleries")
+        case .galleryCountAsc: return tr("least_galleries")
+        case .imageCountDesc: return tr("most_images")
+        case .imageCountAsc: return tr("least_images")
         case .oCounterDesc, .oCounterAsc, .oCounterAllDesc, .oCounterAllAsc, .performerCountAllDesc, .performerCountAllAsc, .markerCountDesc, .markerCountAsc: return option.displayName
-        case .random: return "Random"
+        case .random: return tr("random")
         }
     }
 }

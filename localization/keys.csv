@@ -1,0 +1,2061 @@
+key,en,swift_uses,kotlin_uses
+about,About,2,2
+accent_color,Accent Color,1,1
+accept_and_enable,Accept & Enable,1,0
+acknowledgements,Acknowledgements,3,2
+action_add,Add,3,1
+action_add_alias,Add alias,2,2
+action_add_condition,Add condition,1,1
+action_add_custom_field,Add custom field,1,1
+action_add_favorite,Add Favorite,5,1
+action_add_group,Add group,1,1
+action_add_header,Add Header,3,3
+action_add_marker,Add Marker,3,3
+action_add_marker_button,Add Marker button,1,1
+action_add_new_server,Add New Server,1,1
+action_add_performer,Add performer,1,2
+action_add_performers,Add Performers,0,1
+action_add_row,Add Row,2,0
+action_add_server,Add Server,3,3
+action_add_server_in_settings,Add a server in Settings.,4,4
+action_add_studio,Add studio,1,1
+action_add_tag,Add tag,1,2
+action_add_tag_arg,Add tag %1$s,1,1
+action_add_tags,Add tags,3,0
+action_add_to_arg,Add to %1$s,1,1
+action_add_to_watchlist,Add to watchlist,2,2
+action_add_url,Add URL,1,0
+action_apply,Apply,1,1
+action_cancel,Cancel,144,46
+action_cancel_arg,Cancel %1$s,1,1
+action_cancel_download,Cancel download,5,5
+action_change,Change,1,0
+action_change_icon_menu,Change Icon…,2,0
+action_change_passcode,Change Passcode,1,1
+action_change_pin,Change PIN,1,1
+action_choose_arg,Choose %1$s,2,1
+action_choose_property,Choose property,1,0
+action_clear,Clear,3,4
+action_clear_arg,Clear %1$s,1,1
+action_clear_image_cache,Clear Image Cache,2,2
+action_clear_input,Clear input,1,1
+action_clear_rating,Clear Rating,3,3
+action_clear_search,Clear search,4,2
+action_close,Close,6,9
+action_close_filters,Close filters,1,0
+action_close_mini_player,Close mini player,1,1
+action_close_player,Close player,0,1
+action_connect,Connect,2,2
+action_connect_device_first,Connect Device First,1,0
+action_connect_to_server,Connect to Server,1,1
+action_connect_to_stash,Connect to Stash,1,1
+action_create_arg,"Create ""%1$s""",5,1
+action_delete,Delete,58,33
+action_delete_arg,Delete %1$s,1,1
+action_delete_download,Delete Download,2,1
+action_delete_downloaded_language_packs,Delete downloaded language packs,0,1
+action_delete_failed_arg,Delete failed: %1$s,3,4
+action_delete_filter,Delete Filter,4,0
+action_delete_gallery,Delete Gallery,2,2
+action_delete_group,Delete Group,2,2
+action_delete_performer,Delete Performer,2,2
+action_delete_scene,Delete Scene,1,1
+action_delete_server,Delete Server,5,6
+action_delete_studio,Delete Studio,2,2
+action_delete_tag,Delete Tag,2,2
+action_disconnect,Disconnect,1,0
+action_done,Done,7,7
+action_done_selecting,Done selecting,1,0
+action_download,Download,3,6
+action_download_1_arg,Download 1 %1$s,1,1
+action_download_all_arg_arg,Download all %1$s %2$s,1,1
+action_download_arg_language_pack,Download %1$s language pack,1,1
+action_download_arg_speech_model,Download %1$s speech model,1,1
+action_download_cancelled,Download cancelled,1,1
+action_download_failed_http_arg,Download failed (HTTP %1$s).,0,1
+action_download_gallery,Download gallery,1,1
+action_download_images,Download images,1,1
+action_download_no_longer_available,Download no longer available,1,1
+action_download_scene,Download scene,1,0
+action_download_scenes,Download Scenes,3,4
+action_edit,Edit,2,3
+action_edit_configuration,Edit Configuration,1,1
+action_edit_filter,Edit Filter,1,1
+action_edit_galleries,Edit Galleries,2,2
+action_edit_gallery,Edit Gallery,2,2
+action_edit_group,Edit Group,2,2
+action_edit_groups,Edit Groups,1,1
+action_edit_menu,Edit…,1,1
+action_edit_performer,Edit Performer,2,2
+action_edit_performers,Edit Performers,3,2
+action_edit_scene,Edit Scene,1,1
+action_edit_server,Edit Server,2,2
+action_edit_studio,Edit Studio,3,3
+action_edit_tag,Edit Tag,2,2
+action_edit_tags,Edit Tags,2,2
+action_edit_title_and_details,Edit title & details,0,1
+action_enable_editing,Enable Editing,1,1
+action_enable_handy,Enable The Handy,1,0
+action_enable_intiface,Enable Intiface,1,0
+action_enable_love_spouse,Enable Love Spouse,1,0
+action_enable_passcode_lock,Enable Passcode Lock,1,1
+action_enable_pin_lock,Enable PIN Lock,1,1
+action_export_settings,Export Settings,1,1
+action_fetch_api_key,Fetch API key,4,4
+action_filter_and_sort,Filter & sort,0,2
+action_filter_and_sort_2,Filter and sort,4,1
+action_filter_and_sort_settings,Filter and sort settings,1,2
+action_filter_by_arg,Filter by %1$s,2,0
+action_filter_for_arg_is_gone,Filter for %1$s is gone,1,1
+action_filter_not_found,Filter not found,1,0
+action_filter_und_sortierung,Filter und Sortierung,1,0
+action_generate,Generate,3,1
+action_generate_heatmaps_and_speeds,Generate heatmaps and speeds,0,1
+action_generate_started_successfully,Generate started successfully!,2,1
+action_generate_tag_cover,Generate Tag Cover,1,1
+action_go,Go,2,1
+action_go_to_page,Go to page,3,3
+action_go_to_settings,Go to Settings,1,0
+action_hide,Hide,0,1
+action_hide_airplay_button,Hide AirPlay button,1,0
+action_hide_calendar,Hide calendar,1,0
+action_hide_from_home,Hide from Home,1,0
+action_identify,Identify,2,2
+action_identify_finished,Identify finished,2,1
+action_identify_finished_no_match,Identify finished — no match,1,1
+action_identify_job_not_found,Identify job not found,1,1
+action_identify_scene,Identify scene,1,1
+action_identify_started_using_arg,Identify started using: %1$s,2,2
+action_identify_timed_out,Identify timed out,1,1
+action_identify_was_cancelled,Identify was cancelled,1,1
+action_import_settings,Import Settings,1,2
+action_load_groups,Load Groups,1,1
+action_load_markers,Load Markers,1,1
+action_load_performers,Load Performers,1,1
+action_load_scenes,Load Scenes,1,1
+action_load_studios,Load Studios,1,1
+action_load_tags,Load Tags,1,1
+action_manage_subscription,Manage Subscription,1,1
+action_merge,Merge,1,1
+action_merge_all,Merge all,1,1
+action_merge_arg,Merge %1$s,1,1
+action_merge_failed_arg,Merge failed: %1$s,1,1
+action_merge_into,Merge into,2,2
+action_merge_into_menu,Merge into…,1,1
+action_merge_studios,Merge Studios,2,2
+action_merge_tags,Merge Tags,2,2
+action_move_down,Move Down,2,1
+action_move_to_top,Move to Top,1,0
+action_move_up,Move Up,2,1
+action_open,Open,2,1
+action_open_arg,Open %1$s,1,1
+action_open_cover,Open cover,0,2
+action_open_cover_image,Open cover image,1,0
+action_open_image,Open Image,3,7
+action_open_in_feeds,Open in Feeds,1,1
+action_open_logo,Open logo,0,2
+action_open_performer,Open Performer,1,1
+action_open_scene_page,Open the scene page,0,1
+action_open_tag_image,Open tag image,1,0
+action_pause,Pause,6,6
+action_pick_arg_as_rise_starter,Pick %1$s as Rise starter,2,1
+action_pick_date,Pick a date,1,1
+action_play,Play,8,9
+action_play_as_channel,Play as Channel,2,1
+action_play_from_marker,Play from Marker,1,0
+action_play_from_start,Play from Start,1,0
+action_play_next,Play next,1,1
+action_play_now_arg,Play Now · %1$s,1,0
+action_rate,Rate,4,1
+action_rate_arg_stars,Rate %1$s stars,0,1
+action_refresh_suggestions,Refresh suggestions,1,1
+action_reload,Reload,5,5
+action_remove,Remove,4,3
+action_remove_all,Remove all,2,2
+action_remove_all_arg,Remove all %1$s,1,2
+action_remove_arg,Remove %1$s,2,3
+action_remove_arg_group,Remove %1$s group,1,1
+action_remove_download,Remove download,2,2
+action_remove_favorite,Remove favorite,3,1
+action_remove_field,Remove field,1,1
+action_remove_from_watchlist,Remove from watchlist,2,3
+action_remove_header,Remove header,3,3
+action_remove_license,Remove License,0,2
+action_remove_one,Remove one,0,2
+action_remove_one_o,Remove one O,1,2
+action_remove_passcode,Remove Passcode,1,1
+action_remove_pin,Remove PIN,1,1
+action_remove_row,Remove Row,2,0
+action_remove_tag,Remove tag,3,1
+action_remove_unused_performers,Remove Unused Performers,2,2
+action_remove_unused_studios,Remove Unused Studios,2,2
+action_remove_unused_tags,Remove Unused Tags,2,2
+action_remove_url,Remove URL,1,0
+action_rename,Rename,28,4
+action_rename_failed_arg,Rename failed: %1$s,2,3
+action_rename_filter,Rename Filter,6,1
+action_replace,Replace,1,1
+action_reset,Reset,3,3
+action_reset_icon,Reset Icon,2,0
+action_reset_o_count_arg,Reset O Count (%1$s),1,2
+action_reset_position,Reset position,2,2
+action_reset_to_default,Reset to Default,1,1
+action_reset_to_defaults,Reset to defaults,2,2
+action_restore_from_icloud,Restore from iCloud,1,0
+action_restore_purchases,Restore Purchases,2,2
+action_resume,Resume,2,1
+action_resume_from_arg,Resume from %1$s,2,1
+action_retry,Retry,7,5
+action_retry_connection,Retry Connection,2,11
+action_run_all,Run all,1,1
+action_run_all_sync_jobs,Run all sync jobs,1,1
+action_run_all_templates,Run all templates,1,1
+action_run_arg,Run %1$s,0,1
+action_save,Save,75,16
+action_save_as_new,Save as new,31,6
+action_save_failed_arg,Save failed: %1$s,3,3
+action_save_filter,Save filter,3,2
+action_save_filter_as,Save filter as,1,0
+action_save_filter_response_missing_data,Save filter response missing data,3,0
+action_save_job,Save job,1,1
+action_save_scene,Save scene,0,1
+action_save_template,Save template,2,2
+action_scan,Scan,2,0
+action_scan_and_identify,Scan & Identify,0,1
+action_scan_library,Scan Library,0,2
+action_select_all,Select All,0,2
+action_select_images,Select images,1,2
+action_select_menu,Select…,1,1
+action_select_scene,Select a scene,1,0
+action_set_as_gallery_cover,Set as gallery cover,1,1
+action_set_as_performer_image,Set as performer image,1,1
+action_set_on_all_of_gallery,Set on all of gallery,1,1
+action_set_on_all_of_performer,Set on all of performer,1,1
+action_set_passcode,Set a Passcode,1,1
+action_set_pin,Set PIN,1,1
+action_set_scene_language_first,Set scene language first,1,1
+action_set_scene_language_first_2,Set the scene language first.,1,0
+action_set_spoken_language,Set spoken language,1,1
+action_set_studio,Set Studio,1,1
+action_share,Share,2,2
+action_show,Show,1,2
+action_show_activity,Show activity,1,1
+action_show_all,Show all,0,1
+action_show_delete_button,Show Delete Button,1,1
+action_show_feeds_tab,Show Feeds Tab,1,1
+action_show_in_feeds,Show in Feeds,1,0
+action_show_less,Show less,1,1
+action_show_more,Show more,1,1
+action_show_on_home,Show on Home,1,0
+action_show_subtitles_automatically,Show subtitles automatically,2,2
+action_show_tools_tab,Show Tools Tab,1,1
+action_skip,Skip,2,1
+action_skip_30s,Skip 30s,1,1
+action_skip_buttons,Skip buttons,1,1
+action_skip_interval,Skip interval,1,1
+action_sort,Sort,12,4
+action_sort_arg_arg,"Sort, %1$s, %2$s",1,1
+action_sort_by,Sort By,9,1
+action_sort_by_arg,Sort by %1$s,1,1
+action_sort_field,Sort field,2,0
+action_sort_type,Sort type,8,0
+action_start_from_beginning,Start from beginning,3,1
+action_start_mute,Start mute,1,1
+action_start_picture_in_picture,Start Picture in Picture,1,1
+action_start_playback_first,Start playback first,1,1
+action_start_position,Start position,1,1
+action_start_time,Start Time:,1,1
+action_stop,Stop,5,3
+action_stop_picture_in_picture,Stop Picture in Picture,1,0
+action_sync,Sync,1,1
+action_sync_jobs,Sync Jobs,1,1
+action_sync_newest,Sync newest,3,2
+action_sync_newest_arg,Sync newest %1$s,3,2
+action_sync_on,SYNC ON,2,0
+action_sync_with_icloud,Sync with iCloud,1,0
+action_test,Test,1,0
+action_test_again,Test again,1,1
+action_test_connection,Test Connection,3,3
+action_test_local_address,Test Local Address,1,0
+action_try_again,Try again,1,1
+action_turn_off,Turn Off,1,0
+action_turn_on,Turn On,1,0
+action_undo,Undo,2,1
+action_unlock,Unlock,1,1
+action_unlock_stashy_library,Unlock Stashy library,0,1
+action_unlock_stashy_plus,Unlock stashy+,1,1
+action_unlock_with_face_id,Unlock with Face ID,1,0
+action_unlock_with_touch_id,Unlock with Touch ID,1,0
+action_update,Update,1,1
+action_update_api_key,Update API key,1,2
+action_update_arg,"Update ""%1$s""",3,3
+action_update_available,Update Available,0,1
+action_update_server_answered_http_arg,Update server answered HTTP %1$s.,0,1
+action_use_arg,Use %1$s,1,0
+action_use_biometrics,Use Biometrics,0,1
+action_use_frame_as_scene_cover,Use frame as scene cover,1,1
+action_use_frame_as_tag_image,Use frame as tag image,1,1
+action_use_passcode,Use Passcode,0,1
+action_use_yyyy_yyyy_mm_or,"Use YYYY, YYYY-MM or YYYY-MM-DD",1,1
+activate,Activate,0,2
+activate_on_scene,Activate on Scene,1,0
+active_downloads,Active Downloads,1,1
+active_server,Active Server,1,1
+activity,Activity,1,1
+added,Added,8,9
+added_arg,Added #%1$s,1,1
+added_arg_2,Added %1$s,0,2
+added_arg_image_s_from,Added %1$s image(s) from %2$s,1,1
+added_arg_new_image_s,Added %1$s new image(s),2,1
+added_arg_performers,Added %1$s performers,0,2
+added_arg_to_arg_items,Added #%1$s to %2$s items,1,1
+added_to_watchlist,Added to watchlist,1,1
+address,Address,1,1
+adjust_suggestions,Adjust suggestions,1,1
+adjustments,Adjustments,2,2
+advanced_criteria,Advanced criteria,1,1
+age,Age,2,3
+age_18_25,Age 18–25,1,1
+age_26_35,Age 26–35,1,1
+age_36_plus,Age 36+,1,1
+ai_motion,AI Motion,1,0
+ai_motion_controls,AI Motion Controls,2,0
+ai_motion_disclaimer,AI Motion Disclaimer,1,0
+ai_motion_features,AI Motion Features,1,0
+ai_motion_requires_stashy_plus,AI Motion requires stashy+,1,0
+ai_motion_sensitivity,AI Motion Sensitivity,1,0
+ai_motion_status,AI Motion Status,1,0
+ai_subtitles_and_translation,AI Subtitles and translation,2,2
+ai_subtitles_arg,AI Subtitles: %1$s,1,1
+ai_subtitles_stashy_plus,AI Subtitles · stashy+,1,1
+aliases,Aliases,5,8
+aliases_comma_separated,Aliases (comma-separated),1,2
+all,All,1,1
+all_arg,All %1$s,1,1
+all_arg_arg,All %1$s %2$s,1,1
+all_conditions_must_be_true,All conditions must be true.,1,1
+all_galleries,All Galleries,1,1
+all_languages,All Languages,1,1
+all_matching_items,All matching items,1,1
+all_of,All of,1,2
+all_scenes_already_downloaded,All scenes already downloaded,1,1
+already_up_to_date,Already up to date,3,2
+always_visible,Always Visible,1,1
+amber,Amber,1,1
+amount_per_run,Amount per run,1,1
+analysis_sensitivity,Analysis Sensitivity,1,0
+animated_image_previews,Animated image previews,1,1
+any,Any,18,16
+any_age,Any age,1,1
+any_length,Any length,1,1
+any_media,Any media,2,1
+any_of,Any of,1,2
+any_quality,Any quality,1,1
+any_value,Any value,1,1
+api_key,API key,6,6
+app,App,1,2
+app_accent_color,App Accent Color,1,1
+app_lock,App Lock,1,1
+app_only,App only,1,1
+app_theme,App Theme,1,1
+appearance,Appearance,6,6
+appears_with,Appears With,0,1
+apple,Apple,1,1
+arg_arg_o_count,"%1$s, %2$s O Count",1,1
+arg_external,%1$s · External,0,1
+arg_images_in_this_gallery,%1$s images in this gallery,1,1
+arg_match_arg_arg,%1$s · Match %2$s/%3$s,1,1
+arg_scenes,%1$s Scenes,1,0
+arg_selected,%1$s Selected,1,1
+asc,Asc,8,2
+ascending,Ascending,3,2
+asian,Asian,1,1
+auburn,Auburn,1,1
+audio,Audio,3,3
+audio_codec,Audio Codec,1,2
+auth_method,Auth Method,4,0
+authentication,Authentication,4,3
+authentication_required,Authentication Required,1,1
+auto_hide_tab_bar,Auto-hide tab bar,0,1
+auto_lock_on_background,Auto-lock on Background,1,1
+auto_renews_cancel_anytime,Auto-renews · cancel anytime,1,1
+auto_rotate_fullscreen,Auto-rotate fullscreen,1,0
+auto_tag,Auto tag,3,0
+autoplay,Autoplay,2,2
+autozoom,Autozoom,1,1
+avg_resolution,Avg resolution,1,2
+back,Back,12,8
+back_arg,Back %1$s,1,1
+back_cover,Back cover,1,0
+back_to_normal,Back to normal,1,1
+background_box,Background box,2,2
+background_color,Background color,2,2
+backup_and_transfer,Backup & Transfer,1,1
+backup_database,Backup Database,2,0
+balanced,Balanced,1,1
+bald,Bald,1,1
+battle,Battle,1,1
+beginning,Beginning,1,1
+bell,Bell,1,1
+best_plus_arg,Best +%1$s,2,1
+beta,Beta,2,1
+between,Between,1,1
+big_hero,Big Hero,1,0
+biometrics,Biometrics,1,1
+birth_year,Birth Year,1,2
+birthdate,Birthdate,2,3
+birthdate_yyyy_mm_dd,Birthdate (YYYY-MM-DD),1,2
+birthday,Birthday,2,2
+birthday_oldest_first,Birthday (Oldest First),1,1
+birthday_youngest_first,Birthday (Youngest First),1,1
+bitrate,Bit Rate,1,2
+black,Black,4,4
+blonde,Blonde,1,1
+blue,Blue,3,3
+bluetooth,Bluetooth,1,0
+body,Body,1,1
+bolt,Bolt,1,1
+born,Born,0,1
+both,Both,1,1
+brown,Brown,3,3
+brunette,Brunette,1,1
+build,Build,1,1
+build_from,Build From,2,0
+build_statistics,Build statistics,1,1
+by_gallery,By gallery,1,1
+by_gallery_plus_session,By gallery + session,1,1
+cache,Cache,1,1
+cache_cleared,Cache Cleared,1,1
+calculating_ratings_menu,Calculating ratings…,2,1
+cancelled,Cancelled,1,1
+cantonese,Cantonese,1,0
+captions,Captions,3,4
+cards,Cards,1,1
+career,Career,0,1
+career_end,Career End,1,2
+career_length,Career Length,1,2
+career_length_years,Career length (years),0,1
+career_start,Career Start,1,2
+catalogs,Catalogs,1,1
+caucasian,Caucasian,2,1
+champion,Champion,3,1
+channel,Channel,1,2
+channel_options,Channel options,1,0
+channels,Channels,5,4
+chapters,Chapters,0,2
+charts,Charts,1,3
+charts_list,Charts list,1,1
+check_connection,Check Connection,1,0
+check_for_updates,Check for updates,0,2
+check_settings,Check Settings,1,1
+checking_for_updates_menu,Checking for Updates…,0,1
+checking_menu,Checking…,0,1
+checksum,Checksum,3,6
+child_count,Child count,2,4
+children,Children,1,2
+chooses_which_section_to_show,Chooses which section to show,2,0
+circle,Circle,1,1
+circumcised,Circumcised,1,2
+clean,Clean,4,0
+clean_dry_run,Clean (Dry Run),1,0
+clean_generated_files,Clean generated files,2,0
+cleared,Cleared,1,1
+clips,Clips,5,3
+code,Code,3,6
+collapse,Collapse,0,2
+colored_statistics,Colored Statistics,1,1
+combined_output,Combined Output,2,0
+common,Common,1,1
+compact_statistics,Compact Statistics,1,1
+components,Components,1,1
+conditions,Conditions,0,1
+confirm_add_arg,Add #%1$s?,1,1
+confirm_auto_tag_whole_library,Auto Tag the whole library?,1,0
+confirm_clean_generated_files,Clean generated files?,1,0
+confirm_clean_library,Clean the library?,1,0
+confirm_clear_watchlist,Clear watchlist?,1,1
+confirm_connection_timed_out_arg_is,Connection timed out (%1$s) - is server running?,1,0
+confirm_connection_timed_out_is_server,Connection timed out - is server running?,1,1
+confirm_delete_arg,"Delete ""%1$s""?",1,1
+confirm_delete_arg_from_server,Delete “%1$s” from the server?,2,2
+confirm_delete_arg_images,Delete %1$s images?,1,1
+confirm_delete_filter,Delete filter?,26,4
+confirm_delete_image,Delete image?,1,1
+confirm_delete_job,Delete job?,1,1
+confirm_delete_language_packs,Delete language packs?,0,1
+confirm_delete_scene,Delete scene?,1,1
+confirm_delete_template,Delete template?,1,1
+confirm_delete_this_download,Delete this download?,1,3
+confirm_download_speech_model,Download speech model?,1,1
+confirm_end_tournament,End tournament?,2,1
+confirm_include_api_keys,Include API keys?,1,1
+confirm_merge_arg,Merge %1$s?,1,1
+confirm_passcode,Confirm Passcode,1,1
+confirm_pin,Confirm PIN,1,1
+confirm_really_delete_image,Really delete image?,1,1
+confirm_really_delete_image_and_files,Really delete image and files?,1,1
+confirm_really_delete_scene_and_files,Really delete scene and files?,2,2
+confirm_remove_all_adjustments,Remove all adjustments?,1,1
+confirm_remove_license,Remove License?,0,1
+confirm_remove_unused_arg,Remove unused %1$s?,1,1
+confirm_replace_scene_cover,Replace Scene Cover?,1,1
+confirm_reset_o_count,Reset O Count?,1,2
+confirm_run_all_jobs,Run all jobs?,1,1
+confirm_run_all_templates,Run all templates?,1,1
+confirm_set_as_gallery_cover,Set as Gallery Cover?,1,1
+confirm_set_as_performer_image,Set as Performer Image?,1,1
+confirm_sync_with_icloud,Sync with iCloud?,1,0
+confirm_turn_off_icloud_sync,Turn off iCloud sync?,1,0
+connected,Connected,3,1
+connected_devices,Connected Devices,1,0
+connected_v_arg,Connected (v%1$s),0,1
+connected_version_arg,Connected - Version: %1$s,1,0
+connection,Connection,1,1
+connection_key,Connection Key,1,0
+connection_status,Connection Status,1,0
+connection_successful,Connection successful!,1,1
+connection_timed_out,Connection timed out.,1,1
+containing_group_count,Containing Group Count,1,2
+containing_groups,Containing Groups,1,2
+content,Content,1,1
+content_and_tabs,Content & Tabs,1,1
+continue_watching,Continue Watching,1,1
+continuous,Continuous,2,2
+continuous_play,Continuous Play,1,0
+controls,Controls,1,1
+count_as_played,Count As Played,4,4
+count_as_played_scenes,Count as played · Scenes,1,1
+count_as_played_verticals,Count as played · Verticals,1,1
+count_this_playback,Count this playback,1,1
+counter_high_low,Counter (High-Low),1,3
+counter_low_high,Counter (Low-High),1,3
+counting_menu,Counting…,1,1
+country,Country,3,6
+counts_incl_sub_studios,Counts incl. Sub-Studios,1,1
+cover,Cover,2,1
+covers,Covers,2,0
+created,Created,16,25
+created_newest,Created (Newest),2,4
+created_newest_first,Created (Newest First),6,9
+created_oldest,Created (Oldest),2,4
+created_oldest_first,Created (Oldest First),6,9
+crown,Crown,1,1
+current,Current,0,1
+current_arg,Current %1$s,1,1
+current_arg_arg,Current %1$s%2$s,1,0
+custom_app_icons,Custom App Icons,2,2
+custom_color,Custom Color,1,1
+custom_fields,Custom Fields,7,14
+custom_filter,Custom Filter,2,0
+custom_headers,Custom Headers,3,3
+cyan,Cyan,1,1
+dark,Dark,1,0
+dark_blue,Dark Blue,1,0
+dark_grey,Dark grey,1,1
+dashboard,Dashboard,8,7
+date,Date,15,21
+date_newest,Date (Newest),2,4
+date_newest_first,Date (Newest First),2,4
+date_oldest,Date (Oldest),2,4
+date_oldest_first,Date (Oldest First),2,4
+date_yyyy_mm_dd,Date (YYYY-MM-DD),2,2
+death_date,Death Date,1,2
+death_year,Death Year,1,2
+decrease,Decrease,0,1
+decrement,Decrement,0,1
+default_filter,Default Filter,6,5
+default_filters,Default Filters,2,2
+default_label,Default,1,1
+default_sort,Default Sort,3,2
+default_sorting,Default Sorting,2,2
+defaults,Defaults,1,1
+demo,Demo,1,1
+desc,Desc,8,2
+descending,Descending,3,2
+description,Description,4,7
+design,Design,0,1
+details,Details,10,16
+device,Device,1,0
+device_offline,Device Offline,1,0
+device_synchronization,Device Synchronization,1,0
+device_type,Device Type,1,0
+devices,Devices,1,0
+diamond,Diamond,1,1
+director,Director,3,5
+disambiguation,Disambiguation,2,4
+disconnected,Disconnected,1,0
+discord,Discord,1,1
+discover,Discover,3,1
+discovered_devices,Discovered Devices,1,0
+display,Display,1,1
+distance,Distance,1,1
+dolby_vision,Dolby Vision,2,0
+double_tap_jumps_to_markers,Double tap jumps to markers,1,1
+downloaded,Downloaded,4,5
+downloaded_arg_image_s,Downloaded %1$s image(s),2,1
+downloading,Downloading,2,3
+downloading_arg_language_pack_menu,Downloading %1$s language pack…,0,1
+downloading_arg_scene_s_from,Downloading %1$s scene(s) from %2$s,1,1
+downloading_update_menu,Downloading Update…,0,1
+downloads,Downloads,5,6
+draw,Draw,2,1
+drop,Drop,1,1
+dry_run,Dry Run,1,0
+duels,Duels,2,1
+duplicated,Duplicated,3,4
+duration,Duration,3,4
+duration_h_mm_ss,Duration (h:mm:ss),1,0
+duration_longest_first,Duration (Longest First),1,3
+duration_s,Duration (s),3,6
+duration_shortest_first,Duration (Shortest First),1,3
+editing,Editing,2,2
+empty_active_server,No active server,2,2
+empty_arg_s_match_arg,No %1$ss match '%2$s',1,1
+empty_authentication_will_be_used,No authentication will be used.,1,1
+empty_biometrics_enrolled_on_this_device,No biometrics enrolled on this device,0,1
+empty_body,Empty body,0,1
+empty_channels_enabled,No channels enabled,1,1
+empty_clips_found,No clips found,1,1
+empty_conditions_yet_use_add_below,No conditions yet — use Add below.,1,1
+empty_connection_key,No connection key,1,0
+empty_content_found,No content found,1,1
+empty_criteria,No criteria,1,1
+empty_data,No data,1,1
+empty_data_received_from_server,No data received from server,2,0
+empty_direct_conditions,No direct conditions.,1,1
+empty_downloads_yet,No Downloads yet,1,1
+empty_filter,No Filter,4,2
+empty_filters,No filters,1,1
+empty_filters_found,No filters found,8,2
+empty_filters_match_your_search,No filters match your search.,1,1
+empty_galleries_for_linked_performers,No galleries for linked performers,1,1
+empty_galleries_found,No galleries found,7,3
+empty_groups_assigned,No groups assigned,1,1
+empty_groups_found,No groups found,2,2
+empty_heatmap,No Heatmap,1,1
+empty_images,No images,2,1
+empty_images_for_this_filter,No images for this filter,1,1
+empty_images_for_this_tag,No images for this tag,1,1
+empty_images_found,No images found,3,7
+empty_images_in_this_gallery,No images in this gallery,1,1
+empty_install_request_status_arg_reserved,"No install request (status: %1$s, reserved: %2$s/%3$s)",1,0
+empty_internet_connection,No internet connection,2,0
+empty_jobs_running,No jobs running,1,1
+empty_markers_found,No markers found,3,2
+empty_matches,No matches,3,3
+empty_matching_activity_for_selected_filters,No matching activity for the selected filters.,1,1
+empty_matching_galleries,No matching galleries,1,1
+empty_matching_performer_galleries,No matching performer galleries,1,1
+empty_metadata_assigned,No metadata assigned,1,1
+empty_o,No O,1,1
+empty_o_count,No O Count,1,1
+empty_o_recorded,No O recorded,1,2
+empty_pages,No pages,1,1
+empty_performers,No performers,1,0
+empty_performers_found,No performers found,2,2
+empty_performers_match_filter,No performers match the filter,0,1
+empty_performers_match_this_filter,No performers match this filter,1,0
+empty_performers_yet,No performers yet.,1,1
+empty_permission_to_read_video,No permission to read the video.,0,1
+empty_playable_source,No playable source,3,1
+empty_plays_yet,No plays yet,1,1
+empty_previews_found,No previews found,1,1
+empty_previous_purchase_found,No previous purchase found.,0,1
+empty_rating,No Rating,3,1
+empty_response_from_server,No response from the server.,1,0
+empty_results_for_arg,"No results for ""%1$s""",2,2
+empty_saved_scene_or_image_filters,No saved scene or image filters,2,2
+empty_scenes,No scenes,2,2
+empty_scenes_for_arg,No scenes for %1$s,1,1
+empty_scenes_found,No scenes found,5,6
+empty_scenes_in_this_channel,No scenes in this channel,0,1
+empty_scenes_to_show_yet,No scenes to show yet,1,1
+empty_scenes_yet,No scenes yet.,1,1
+empty_server_configured,No server configured,2,2
+empty_shared_scenes_galleries_or_images,"No shared scenes, galleries or images",1,1
+empty_starters,No starters,2,1
+empty_stash_box_endpoints_configured_on,No Stash-Box endpoints configured on this server.,1,1
+empty_stashy_plus_products_available,No stashy+ products available.,1,0
+empty_stats,No stats,0,1
+empty_stream,No Stream,1,1
+empty_studios_found,No studios found,2,2
+empty_studios_yet,No studios yet.,1,1
+empty_supported_images_in_this_gallery,No supported images in this gallery,1,1
+empty_tag_suggestions,No tag suggestions,1,1
+empty_tagged_scenes_or_images_found,No tagged scenes or images found,1,1
+empty_tags_assigned,No tags assigned,1,1
+empty_tags_available,No tags available,1,1
+empty_tags_found,No tags found,2,2
+empty_tags_found_on_server,No tags found on server,1,1
+empty_tags_match_arg,No tags match '%1$s',2,2
+empty_tags_yet,No tags yet.,1,1
+empty_thanks,No thanks,1,0
+empty_unrated_arg_left_in_arg,No unrated %1$s left in %2$s.,1,1
+empty_unused_arg_found,No unused %1$s found.,1,1
+empty_url_provided,No URL provided,1,0
+end,End,2,1
+end_legend_run,End Legend run,1,1
+end_of_channel,End of channel,0,1
+end_rise_run,End Rise run,1,1
+end_time_optional,End Time (optional):,1,1
+end_tournament,End tournament,2,1
+endpoint_optional,Endpoint (optional),1,1
+english,English,1,1
+enter_api_key,Enter API key,1,1
+enter_header_name,Enter a header name.,1,1
+enter_license_key,Enter a license key.,0,1
+enter_passcode,Enter Passcode,1,1
+enter_pin,Enter PIN,1,1
+enter_pin_to_unlock,Enter PIN to unlock,1,1
+enter_value,Enter a value.,1,1
+enter_your_stash_server_information,Enter your Stash server information,1,1
+equals,Equals,1,1
+error_add_performers,Could not add performers,0,1
+error_add_tag,Could not add tag,1,1
+error_apply_tag,Could not apply tag,1,1
+error_arg,Error: %1$s,1,0
+error_audio_output,The audio output failed.,0,1
+error_build_configuration_request,Failed to build configuration request.,1,0
+error_build_generate_request,Failed to build generate request.,1,0
+error_build_identify_request,Failed to build identify request.,1,0
+error_build_scan_request,Failed to build scan request.,1,0
+error_build_your_list,Could not build your list,0,1
+error_capture_video_frame,Could not capture video frame,2,2
+error_connect_check_address_and_port,Cannot connect — check the address and port.,1,1
+error_connection,Connection failed,4,1
+error_counter_update,Counter update failed,4,3
+error_create_group,Failed to create group,1,1
+error_create_performer,Failed to create performer,1,1
+error_create_studio,Failed to create studio,1,1
+error_create_tag,Failed to create tag,2,2
+error_decode_artwork,Could not decode artwork,0,1
+error_decode_response_arg,Failed to decode response: %1$s,1,1
+error_delete,Delete failed,0,1
+error_delete_arg,Could not delete the %1$s.,1,1
+error_delete_arg_2,Failed to delete %1$s,1,1
+error_delete_image,Failed to delete image,2,2
+error_delete_saved_filter,Could not delete saved filter,1,0
+error_delete_scene,Failed to delete scene,2,2
+error_download,Download failed,4,5
+error_download_speech_model_check_your,Could not download the speech model. Check your connection and try again.,1,0
+error_export,Export failed.,0,1
+error_generic,Error,2,0
+error_generic_2,Failed,1,2
+error_identify,Identify failed,1,2
+error_import,Import failed.,0,1
+error_install_speech_model,Could not install speech model,0,1
+error_language_pack_download,Language pack download failed,0,1
+error_load_all_group_fields,Couldn't load all group fields,1,0
+error_load_arg,Failed to load %1$s,1,1
+error_load_arg_list,Could not load the %1$s list.,1,1
+error_load_clips,Could not load clips,2,0
+error_load_filters_arg,Failed to load filters: %1$s,1,1
+error_load_galleries,Could not load galleries,1,0
+error_load_image,Failed to load image,1,1
+error_load_images,Could not load images,6,0
+error_load_images_2,Failed to load images,1,0
+error_load_markers,Could not load markers,1,0
+error_load_pages,Could not load pages,1,1
+error_load_performers,Could not load performers,3,0
+error_load_performers_2,Couldn't load performers,1,1
+error_load_play_history_from_this,Could not load play history from this server.,1,1
+error_load_scene_details,Failed to load scene details,1,1
+error_load_tag_scenes,Could not load tag scenes,1,0
+error_load_this_image,Couldn't load this image,0,1
+error_loading_galleries,Error loading galleries,1,1
+error_loading_groups,Error loading groups,1,1
+error_loading_images,Error loading images,1,1
+error_loading_markers,Error loading markers,1,0
+error_loading_performers,Error loading performers,1,1
+error_loading_scenes,Error loading scenes,1,1
+error_loading_studios,Error loading studios,1,1
+error_loading_tags,Error loading tags,1,1
+error_login,Login failed,0,1
+error_move_file,Could not move file,0,1
+error_play_scenes_in_this_channel,Unable to play scenes in this channel,0,1
+error_play_this_scene,Unable to play this scene,1,1
+error_playback,Playback failed.,0,1
+error_process_server_response,Could not process server response,1,0
+error_processing_server_response,Error processing server response,1,0
+error_reach_arg_check_address_port,"Could not reach %1$s. Check address, port and protocol.",1,1
+error_reach_server,Could not reach the server.,0,1
+error_read_tag_list,Could not read the tag list,1,1
+error_read_that_image,Couldn't read that image,1,0
+error_remove_tag,Could not remove tag,3,2
+error_save_language,Failed to save language,1,1
+error_save_rating,Failed to save rating,6,5
+error_speech_model_download,Speech model download failed,0,2
+error_start_generate_please_check_your,Failed to start generate. Please check your server configuration.,1,1
+error_start_identify_please_check_your,Failed to start identify. Please check your server configuration.,1,2
+error_start_library_scan_please_check,Failed to start library scan. Please check your server configuration.,1,2
+error_sync,Sync Failed,1,0
+error_update,Update failed,1,3
+error_update_check,Update check failed.,0,1
+error_update_favorite,Failed to update favorite,3,3
+error_update_galleries,Failed to update galleries,1,1
+error_update_gallery,Failed to update gallery,1,1
+error_update_gallery_cover,Failed to update gallery cover,1,1
+error_update_group,Failed to update group,1,1
+error_update_groups,Failed to update groups,1,1
+error_update_o_count,Failed to update O Count,4,2
+error_update_performer,Failed to update performer,1,1
+error_update_performer_image,Failed to update performer image,1,1
+error_update_performers,Failed to update performers,1,1
+error_update_rating,Failed to update rating,1,1
+error_update_scene,Failed to update scene,1,1
+error_update_scene_cover,Failed to update scene cover,1,1
+error_update_studio,Failed to update studio,2,2
+error_update_tag,Failed to update tag,1,1
+error_update_tag_image,Failed to update tag image,1,1
+error_update_tags,Failed to update tags,2,2
+error_upload,Upload Failed,1,0
+error_view_count_update,View count update failed,1,0
+ethnicity,Ethnicity,3,6
+every_arg,Every %1$s,1,0
+example_performer,Example Performer,1,0
+example_studio,Example Studio,1,0
+excludes,Excludes,1,1
+expand,Expand,0,2
+extra_large,Extra large,1,1
+eye,Eye,1,1
+eye_color,Eye Color,1,2
+fake,Fake,1,1
+fake_tits,Fake Tits,1,2
+favorites,Favorites,5,4
+favourite,Favorite,9,9
+features,Features,1,1
+feed,Feed,1,0
+feed_settings,Feed Settings,1,0
+feeds,Feeds,8,6
+female,Female,4,2
+field,Field,1,1
+file_count,File Count,3,6
+file_missing,File missing,1,2
+files_filter,Files filter,3,6
+fill_screen,Fill screen,1,1
+filter,Filter,34,5
+filter_name,Filter name,1,1
+filters,Filters,3,3
+final_label,Final,1,1
+finalist,Finalist,1,1
+finish,Finish,1,1
+finished,Finished,1,1
+first_marker,First Marker,1,1
+fit_to_screen,Fit to screen,1,1
+flame,Flame,1,1
+flow_arg,Flow: %1$s,1,0
+folder,Folder,3,3
+font,Font,2,2
+for_you,For You,7,6
+for_you_on_home,For You on Home,1,1
+for_you_requires_stashy_plus,For You requires stashy+,1,1
+for_you_settings,For You settings,1,1
+forced, · Forced,0,1
+forgotten_favorites,Forgotten Favorites,4,3
+forgotten_favorites_on_home,Forgotten Favorites on Home,1,1
+forgotten_favorites_requires_stashy_plus,Forgotten Favorites requires stashy+,1,1
+forgotten_favorites_settings,Forgotten Favorites settings,1,1
+forward_arg,Forward %1$s,1,1
+framerate,Frame Rate,1,2
+fri,Fri,1,0
+from,From,1,1
+from_scene_performers,From Scene Performers,1,1
+from_yyyy_mm_dd,From (YYYY-MM-DD),1,1
+front,Front,1,2
+front_cover,Front cover,1,0
+full_screen,Full screen,1,1
+funscript_heatmap,Funscript Heatmap,1,0
+galleries,Galleries,25,28
+galleries_and_images,Galleries & Images,1,1
+galleries_filter,Galleries filter,5,10
+galleries_from_scene_performers,Galleries from Scene Performers,1,1
+galleries_image_count,Galleries - Image Count,1,1
+galleries_new,Galleries - New,1,1
+galleries_recently_updated,Galleries - Recently Updated,1,1
+gallery,Gallery,4,5
+gallery_count,Gallery Count,7,10
+gallery_count_high_low,Gallery Count (High-Low),4,4
+gallery_count_low_high,Gallery Count (Low-High),4,4
+gallery_cover_updated,Gallery cover updated,1,1
+gallery_deleted,Gallery deleted,1,1
+gallery_details,Gallery details,1,1
+gallery_has_no_images,Gallery has no images,1,1
+gallery_images,Gallery Images,1,2
+gallery_updated,Gallery updated,1,1
+game,Game,0,1
+gender,Gender,4,7
+genders_in_pool,Genders in pool,2,1
+general,General,1,1
+germany,Germany,1,0
+glass,Glass,1,1
+glass_preview,Glass preview,1,0
+goes_with_your_tags_arg,Goes with your tags: %1$s,1,1
+gold,Gold,1,1
+google_play_is_not_available,Google Play is not available.,0,2
+grab_lifetime,Grab Lifetime,1,0
+graphql_error_arg,GraphQL error: %1$s,1,1
+gray,Gray,1,1
+greater_than,Greater than,1,1
+green,Green,3,3
+grey,Grey,2,2
+group,Group,1,1
+group_count,Group Count,2,4
+group_cover,Group cover,1,0
+group_deleted,Group deleted,1,1
+group_into_sets,Group into sets,1,1
+group_scenes,Group Scenes,1,2
+group_updated,Group updated,1,1
+groups,Groups,16,17
+groups_filter,Groups filter,3,6
+hair_color,Hair Color,1,2
+handy,Handy,1,0
+handy_2,The Handy,1,0
+handy_connection,Handy Connection,1,0
+has_chapters,Has chapters,1,2
+has_markers,Has markers,1,2
+has_scenes,Has scenes,2,2
+hazel,Hazel,1,1
+head_neck,Head / Neck,2,0
+header_name,Header name,3,3
+heart,Heart,1,1
+heatmap,Heatmap,0,1
+height,Height,0,1
+height_cm,Height (cm),2,4
+hero_autoplay,Hero Autoplay,1,0
+hero_background,Hero Background,1,1
+hidden,Hidden,1,1
+high,High,1,1
+highest_rated,Highest Rated,6,5
+hint_add_scenes_with_plus_on,Add scenes with + on a playing scene or the watchlist button on a scene page. They play here one after another.,1,1
+hint_add_stash_servers_and_switch,Add Stash servers and switch between them. Hold Select on a server to edit it or remove a saved one.,1,1
+hint_add_stash_servers_switch_between,"Add Stash servers, switch between them, and edit or remove saved ones.",1,1
+hint_added_to_servers_job_queue,Added to the server's job queue.,1,0
+hint_adds_magazin_view_on_home,Adds a Magazin view on Home that shows your galleries as covers. They open like a magazine and remember the page you stopped on.,1,1
+hint_ai_captions_are_part_of,AI captions are part of stashy+,0,1
+hint_ai_captions_are_part_of_stashy,AI captions are part of stashy+ — unlock in Settings,1,0
+hint_ai_motion_is_part_of,AI Motion is part of stashy+ — unlock in Settings,1,0
+hint_ai_motion_uses_real_time,"AI Motion uses real-time on-device video analysis to synchronize your devices. This process is CPU-intensive and can lead to increased battery drain and device heating. By enabling this feature, you acknowledge that you use AI Motion and any controlled hardware devices at your own risk. Any potential damage or injury resulting from the use of connected hardware is your sole responsibility.",1,0
+hint_ai_subtitles_are_part_of,AI subtitles are part of stashy+,0,1
+hint_ai_subtitles_are_part_of_stashy,AI subtitles are part of stashy+ — unlock in Settings,1,0
+hint_all_arg_already_have_rating,All %1$s already have a rating.,2,1
+hint_all_arg_recorded_o_entries,All %1$s recorded O entries and their dates are permanently deleted on the server. This cannot be undone.,1,2
+hint_all_conditions_below_must_be,All conditions below must be true.,1,1
+hint_all_home_rows_are_turned,All Home rows are turned off,1,0
+hint_all_scenes_are_removed_from,All scenes are removed from the watchlist. What plays keeps playing.,1,1
+hint_allow_stashy_to_install_apps,"
+
+Allow stashy to install apps once, then tap Install again.",0,1
+hint_also_from_menu_below_card,Also from the ··· menu below a card.,1,1
+hint_analyzes_playing_video_live_on,Analyzes the playing video live on your device and moves your connected hardware in sync with it. Uses a lot of CPU and battery.,1,0
+hint_api_key_is_invalid_or,API key is invalid or expired,1,1
+hint_api_key_not_found_in,API key not found in server configuration,1,1
+hint_app_asks_for_your_pin,The app asks for your PIN each time it opens and whenever it returns from the background.,1,1
+hint_app_will_automatically_lock_whenever,The app will automatically lock whenever it is moved to the background.,1,1
+hint_are_you_sure_you_want,"Are you sure you want to delete ""%1$s""? This action cannot be undone.",1,0
+hint_are_you_sure_you_want_to,Are you sure you want to delete this server configuration? This action cannot be undone.,2,3
+hint_arg_and_all_associated_files,‘%1$s’ and all associated files will be permanently deleted. This action cannot be undone.,1,1
+hint_arg_arg_are_not_used,%1$s %2$s are not used anywhere: %3$s%4$s. Deleting them cannot be undone.,1,1
+hint_arg_arg_nothing_to_do, %1$s %2$s nothing to do right now and will be skipped.,1,1
+hint_arg_arg_will_be_merged,"%1$s %2$s will be merged into their destinations, one template after another.",1,1
+hint_arg_is_managed_by_app,%1$s is managed by the app and can't be set.,1,1
+hint_arg_items_could_not_be,%1$s items could not be moved — nothing was deleted,1,1
+hint_arg_of_arg_arg_on,%1$s of %2$s %3$s on the server,1,1
+hint_arg_of_arg_ratings_not,%1$s of %2$s ratings not saved. %3$s,1,1
+hint_arg_of_arg_templates_have,%1$s of %2$s templates have something to merge: ,1,1
+hint_arg_will_be_merged_into,%1$s will be merged into %2$s and then deleted. This cannot be undone.,1,1
+hint_arg_will_be_removed_from,"""%1$s"" will be removed from this device.",1,1
+hint_arg_wins_cleared_ladder,%1$s wins · cleared the ladder,2,1
+hint_at_least_one_gender_stays,At least one gender stays selected. Performers without an image are left out.,1,0
+hint_audio_could_not_be_prepared,Audio could not be prepared for transcription.,1,0
+hint_authentication_failed_check_api_key,Authentication failed — check the API key and custom headers.,1,1
+hint_authentication_required_your_api_key,"Authentication Required
+Your API key is invalid or expired. Please check your server configuration.",0,1
+hint_backup_is_in_servers_backup,The backup is in the server's backup folder.,1,0
+hint_browse_pause_click_speed_menu,◀ ▶ Browse · ⏯ Pause · Click: Speed · Menu: Exit,1,0
+hint_browse_seek_hold_to_scan,▲ ▼ Browse   ◀ ▶ Seek (hold to scan)   Swipe to scrub   Click for info,1,0
+hint_changes_stashy_app_icon_on,Changes the stashy app icon on iPhone and iPad. The Mac app keeps its own icon.,1,0
+hint_changes_stashy_app_icon_to,Changes the stashy app icon to the color you pick.,1,1
+hint_choose_appearance_of_app,Choose the appearance of the app.,1,1
+hint_choose_rows_on_home_and,"Choose the rows on Home and their order. Select a row to show or hide it, or to move it up or down. Each server keeps its own setup.",1,0
+hint_choose_which_gallery_gets_this,Choose which gallery gets this image as its cover.,1,1
+hint_choose_which_icon_to_display,Choose which icon to display for the O Count throughout the app.,1,1
+hint_choose_which_rows_home_shows,"Choose which rows Home shows — scenes, performers, studios, galleries, Channels — and their order.",1,0
+hint_choose_whose_profile_picture_this,Choose whose profile picture this image becomes.,1,0
+hint_chooses_saved_filter_or_preset,Chooses a saved filter or preset,1,0
+hint_chooses_which_feed_mode_to,Chooses which feed mode to show,1,0
+hint_chooses_which_settings_section_to,Chooses which settings section to show,1,0
+hint_clear_cached_artwork_for_active,Clear the cached artwork for the active server. Images are re-downloaded as they are shown again.,1,1
+hint_click_to_switch_modes_or,Click to switch modes or reload,1,0
+hint_connect_to_stash_server_to,Connect to a Stash server to manage your saved filters.,0,1
+hint_connect_to_stash_server_to_merge,Connect to a Stash server to merge %1$s.,0,1
+hint_connect_to_stash_server_to_see,Connect to a Stash server to see your charts.,0,1
+hint_connection_timed_out_after_30,Connection timed out after 30 seconds.,1,0
+hint_connection_timed_out_check_address,"Connection timed out. Check address, port and protocol.",1,0
+hint_content_settings_require_active_server,Content settings require an active server.,1,1
+hint_create_filter_or_sync_from,Create a filter or sync from your Stash server.,1,1
+hint_creates_new_marker_filter_on,Creates a new marker filter on your Stash server.,1,1
+hint_creates_new_saved_marker_filter,Creates a new saved marker filter on your Stash server (visible in Stash and other clients).,1,0
+hint_creates_new_saved_scene_filter,Creates a new saved scene filter on your Stash server (visible in Stash and other clients).,1,0
+hint_creates_new_scene_filter_on,Creates a new scene filter on your Stash server.,1,1
+hint_creates_subtitles_from_scenes_speech,Creates subtitles from a scene's speech on your device and translates them into your subtitle language. Turn them on in the player's AI Subtitles menu.,1,1
+hint_current_video_frame_will_replace,The current video frame will replace this scene’s cover image. This cannot be undone from the app.,1,1
+hint_custom_app_icons_are_part,Custom app icons are part of stashy+. Unlock in Settings,1,1
+hint_delete_arg_this_cannot_be,Delete '%1$s'? This cannot be undone.,5,1
+hint_deletes_covers_previews_sprites_transcodes,"Deletes covers, previews, sprites, transcodes, marker files and thumbnails that no longer belong to anything in the database.",1,0
+hint_deletes_this_item_and_its,Deletes this item and its files after confirmation,1,0
+hint_double_tap_jumps_to_markers,Double tap jumps to markers: in Feeds › Scenes a double tap on the left or right goes to the previous or next marker of a scene that has markers. Without a marker in that direction it skips seconds as usual.,1,1
+hint_download_arg_speech_model_to,Download the %1$s speech model to enable live captions.,1,0
+hint_download_is_managed_by_ios,The download is managed by iOS and can be several hundred megabytes.,1,0
+hint_downloaded_file_is_not_valid,The downloaded file is not a valid app package.,0,1
+hint_downloaded_images_are_removed_from,The downloaded images are removed from this device.,0,2
+hint_downloaded_scenes_will_appear_here,Downloaded scenes will appear here for offline viewing.,1,1
+hint_downloading_arg_speech_model_arg,Downloading %1$s speech model… %2$s %%,0,1
+hint_downloads_are_part_of_stashy,Downloads are part of stashy+ — unlock in Settings,2,1
+hint_downloads_newest_scenes_or_all,"Downloads the newest scenes, or all of them",1,0
+hint_drag_to_reorder_cards_below,"Drag to reorder the cards below the video player; switch a card off to hide it. In landscape, Groups and Tags share a row when they sit next to each other.",0,1
+hint_drag_to_reorder_cards_below_video,"Drag to reorder the cards below the video player; switch a card off to hide it. In landscape, Groups and Tags sit side by side when they are next to each other. Cards that have nothing to show stay hidden either way.",1,0
+hint_dynamically_linked_so_library_can,"Dynamically linked, so the library can be replaced by a modified version.",1,0
+hint_dynamically_linked_so_relinking_with,"Dynamically linked, so relinking with a modified FFmpeg is possible.",1,0
+hint_each_job_downloads_its_configured,Each job downloads its configured number of newest items. Items already downloaded are skipped.,1,1
+hint_enter_address_e_g_timeout,Enter address (e.g. timeout.com:9999 or example.com/stash),1,1
+hint_enter_valid_date_as_yyyy,Enter a valid date as YYYY-MM-DD,1,1
+hint_enter_your_stash_api_key,Enter your Stash API key directly.,1,1
+hint_enter_your_stash_server_details,Enter your Stash server details to get started.,1,1
+hint_every_condition_in_it_must,Every condition in it must match,1,1
+hint_excludes_everything_matching_conditions_below,Excludes everything matching the conditions below.,1,1
+hint_favorites_are_your_most_played,Favorites are your most played scenes.,1,1
+hint_favorites_are_your_most_played_scenes,Favorites are your most played scenes and those with the highest O Count.,1,1
+hint_favorites_are_your_scenes_with,Favorites are your scenes with the highest O Count.,1,1
+hint_favorites_you_have_not_played,Favorites you have not played for a while.,1,1
+hint_feed_paused_after_repeated_loading,Feed paused after repeated loading failures. Reopen or change filters to retry.,1,0
+hint_files_container_cant_be_read,The file's container can't be read on this device.,0,1
+hint_find_scenes_images_performers_studios,"Find scenes, images, performers, studios, tags, galleries, groups and markers",1,1
+hint_for_you_is_off_turn,For You is off. Turn it on in Recommendations to show it on Home.,1,1
+hint_forgotten_favorites_is_off_turn,Forgotten Favorites is off. Turn it on in Recommendations to show it on Home.,1,1
+hint_free_trial_is_for_new,"The free trial is for new subscribers. When it ends, the subscription starts at the price shown unless canceled at least 24 hours before. ",1,0
+hint_free_trial_is_for_new_subscribers,"The free trial is for new subscribers. When it ends, the subscription starts at the price shown unless canceled before. ",0,1
+hint_full_screen_one_after_another,"Full-screen, one after another. ▲ ▼ browse, ◀ ▶ seek, click for info and modes.",1,0
+hint_generate_heatmaps_and_speeds_for,Generate heatmaps and speeds for interactive scenes,0,1
+hint_getting_your_library_ready_on,Getting your library ready on this device…,1,1
+hint_handy_uses_hamp_protocol_oh,The Handy uses HAMP protocol. The Oh. uses HVP protocol.,1,0
+hint_header_names_may_only_contain,"Header names may only contain letters, digits and - _ . ! # $ %% & ' * + ^ ` | ~",1,1
+hint_hidden_never_shows_it_above,Hidden never shows it. Above 1× also brings new scenes.,0,1
+hint_hidden_never_shows_it_above_1,Hidden never shows it. Above 1× also brings new scenes. Swipe to remove.,1,0
+hint_hide_sections_you_do_not,Hide sections you do not use. They disappear from the sidebar.,1,1
+hint_host_answered_but_not_as,"The host answered, but not as Stash. Check the address, subpath and custom headers.",1,1
+hint_host_answered_with_web_page,"The host answered with a web page, not Stash — likely a login or proxy page. Check the address and custom headers.",1,1
+hint_how_long_scene_has_to,How long a scene has to play before it counts as played and its position is saved.,2,2
+hint_how_much_each_part_steers,How much each part steers the picks.,1,1
+hint_how_much_of_content_shows,"How much of the content shows through buttons, pills and bars. Applies to all glass chrome.",1,0
+hint_how_much_of_content_shows_through,"How much of the content shows through the glass buttons, pills and bars drawn over videos and images.",0,1
+hint_icloud_storage_for_settings_is,iCloud storage for settings is full. Some settings are not synced.,2,0
+hint_identify_started_for_arg_scenes,Identify started for %1$s scenes using: %2$s,1,0
+hint_identify_started_for_this_scene,Identify started for this scene using: %1$s,1,1
+hint_image_is_removed_from_server,The image is removed from the server. This cannot be undone.,1,1
+hint_images_will_be_reloaded_from,Images will be reloaded from the server.,1,1
+hint_imported_arg_server_s_and,Imported %1$s server(s) and %2$s setting(s). Restart stashy to apply every setting.,1,1
+hint_included_because_you_bought_stashy,Included because you bought stashy at full price before 3.0.,1,0
+hint_keeps_scene_playing_in_small,Keeps a scene playing in a small bar when you leave its page. Add scenes to your watchlist on the scene page and they play one after another; the watchlist button on the Dashboard opens the list.,1,1
+hint_keeps_servers_api_keys_and,"Keeps servers, API keys and settings the same on your iPhone, iPad and Mac. Turn it on per device. The active server stays each device's own choice.",1,0
+hint_language_scenes_subtitles_start_with,"The language a scene's subtitles start with. ""Any"" takes the first ordinary track in the file.",1,1
+hint_leaves_out_what_group_matches,Leaves out what the group matches,1,1
+hint_legend_run_performer_is_no,Legend run performer is no longer in this pool. Run reset.,1,1
+hint_lets_you_create_edit_rename,"Lets you create, edit, rename and delete the filters saved on your server, under Settings › Server.",1,1
+hint_lgpl_3_0_with_app,"LGPL-3.0, with an App Store / DRM exception",1,0
+hint_library_arg_arg_play_arg,Library %1$s  ·  Ø %2$s/play  ·  %3$s unplayed,1,1
+hint_license_arg_issued_arg_key,License %1$s · issued %2$s. The key is stored on this device only.,0,1
+hint_license_arg_key_is_stored,License %1$s. The key is stored on this device only.,0,1
+hint_license_key_contains_invalid_characters,The license key contains invalid characters.,0,1
+hint_license_keys_are_not_used,License keys are not used in this version of stashy.,0,1
+hint_lists_your_scene_plays_o,"Lists your scene plays, O Counts and markers over time in Tools.",1,1
+hint_live_captions_need_on_device,Live captions need the on-device %1$s speech model. ,1,0
+hint_live_captions_need_on_device_arg,Live captions need the on-device %1$s speech model%2$s. It is downloaded once and stays on this device; captions are recognized offline.,0,1
+hint_live_cc_has_no_speech,Live CC has no speech model for %1$s,0,1
+hint_live_cc_has_no_speechtranscriber,Live CC has no SpeechTranscriber language for %1$s,1,0
+hint_login_failed_graphql_request_failed,Login failed: GraphQL request failed: %1$s,0,1
+hint_login_failed_server_returned_status,Login failed: Server returned status code %1$s,0,1
+hint_login_with_your_stash_credentials,Login with your Stash credentials to retrieve the API key.,1,1
+hint_love_spouse_2_4g_toys,Love Spouse 2.4g toys use BLE advertising. Ensure Bluetooth is enabled and the toy is in pairing/scan mode. Both toys in range will react simultaneously.,1,0
+hint_match_and_rateme_are_part,Match and RateMe are part of stashy+.,1,0
+hint_matches_performer_studio_and_tag,"Matches performer, studio and tag names against file paths and adds them to scenes, images and galleries. Short names can match by mistake.",1,0
+hint_matches_when_at_least_one,Matches when at least one condition below is true.,1,1
+hint_mini_player_arg_opens_player,Mini player: %1$s. Opens the player,0,1
+hint_missing_from_store_offering_arg,Missing from the store offering: %1$s,1,1
+hint_monthly_yearly_or_lifetime_bought,"Monthly, Yearly, or Lifetime. Bought stashy+ before with this Google account, or reinstalled? Tap Restore Purchases.",0,1
+hint_monthly_yearly_or_lifetime_if,"Monthly, Yearly, or Lifetime. If you bought stashy as a paid app before 3.0, or just switched from TestFlight, tap Restore Purchases.",1,0
+hint_need_at_least_arg_performers,Need at least %1$s performers with images for the selected genders.,1,1
+hint_needs_tag_suggestions_or_similar,Needs Tag suggestions or Similar scenes.,2,2
+hint_new_pair_not_available_in,"New pair, not available in Rise",1,1
+hint_no_performers_to_pick_as,No performers to pick as a Rise starter.,1,1
+hint_no_plays_o_counts_or,"No plays, O Counts, or markers in the last 24 hours.",1,1
+hint_no_readable_audio_from_player,No readable audio from the player. Start playback and try again.,1,0
+hint_no_readable_audio_from_server,No readable audio from the server transcode. Try again later.,0,1
+hint_no_saved_filters_of_this,No saved filters of this kind yet. Create one in the list's filter sheet with Save.,1,0
+hint_no_scene_or_image_filters,No scene or image filters on this server,1,1
+hint_no_scenes_with_previews_found,No scenes with previews found in the first %1$s scenes.,1,0
+hint_no_stashy_plus_products_returned,No stashy+ products returned. Check the current RevenueCat offering.,1,0
+hint_no_stashy_plus_products_returned_install,No stashy+ products returned. Install from the Play Store (internal testing) to load products.,0,1
+hint_no_stashy_plus_subscription_or,No stashy+ subscription or Lifetime purchase on this Apple ID. Pre-3.0 paid-app buyers get Lifetime via Restore Purchases.,1,0
+hint_no_translation_arg_arg_showing,No translation %1$s → %2$s — showing captions in the scene language,1,1
+hint_no_translation_from_arg_showing,No translation from %1$s — showing captions in the scene language,1,1
+hint_no_translation_to_arg_on,No translation to %1$s on this device — showing captions in the scene language,1,1
+hint_not_enough_performers_with_images,Not enough performers with images for the selected genders.,2,1
+hint_not_on_this_server_kept,Not on this server (kept in template): %1$s%2$s,1,1
+hint_not_played_in_long_time,Not played in a long time,1,1
+hint_nothing_new_matches_your_taste,Nothing new matches your taste right now. Try another setting in For You.,1,1
+hint_o_count_arg_select_to,"O Count %1$s, select to increment",1,0
+hint_o_count_arg_tap_to,"O Count %1$s, tap to add one, long-press for options",0,1
+hint_o_count_arg_tap_to_increment,"O Count %1$s, tap to increment",1,1
+hint_only_scenes_you_have_never,Only scenes you have never played.,1,1
+hint_only_unsupported_or_animated_formats,Only unsupported or animated formats (e.g. GIF) were found.,1,1
+hint_opens_this_image_back_returns,Opens this image; Back returns to RateMe,1,0
+hint_opens_this_scene_back_returns,Opens this scene; Back returns to RateMe,1,0
+hint_optional_used_instead_of_address,"Optional. Used instead of the address above whenever it answers, for example on your home network. Falls back automatically.",1,2
+hint_original_could_not_be_played,Original could not be played — using the server transcode,1,1
+hint_other_names_for_this_tag,Other names for this tag. Swipe left to remove one.,1,1
+hint_payment_is_charged_to_your,Payment is charged to your Apple ID. Subscriptions renew automatically unless cancelled at least 24 hours before the period ends. Manage or cancel anytime in your App Store settings.,1,0
+hint_payment_is_charged_to_your_google,Payment is charged to your Google Play account. Subscriptions renew automatically unless cancelled. Manage or cancel anytime in the Play Store.,0,1
+hint_pick_accent_color_used_for,Pick the accent color used for focus highlights and icons throughout the app.,0,2
+hint_pick_app_theme_and_accent,Pick the app theme and the accent color used for focus highlights and icons throughout the app.,2,0
+hint_pick_performer_to_start_rise,Pick a performer to start the Rise run,1,0
+hint_picked_on_this_device_from,"Picked on this device from your plays, O Counts and ratings.",1,1
+hint_play_count_history_resume_point,"Play count, history, resume point and watch time on the server. The player menu can pause it for one scene.",1,1
+hint_plays_scenes_back_to_back,"Plays scenes back to back from a row on Home: recently released, recently added or your saved scene filters. Performer, studio, tag and group pages get their own channel.",1,0
+hint_please_configure_your_stash_server,Please configure your Stash server to get started.,1,0
+hint_please_enable_dashboard_performers_studios,"Please enable Dashboard, Performers, Studios, Tags, Groups or Markers in Settings",1,0
+hint_premium_features_including_channels_continuous,"Premium features, including Channels — continuous playback of a performer, studio, tag or saved filter.",1,1
+hint_purchase_pending_it_unlocks_once,Purchase pending — it unlocks once payment completes.,0,1
+hint_puts_performers_against_each_other,Puts performers against each other in Tools. You pick the winner and their ratings update on your server.,1,1
+hint_puts_performers_against_each_other_under,Puts performers against each other under Discover. You pick the winner and their ratings update on your server.,1,0
+hint_ranks_your_top_scenes_performers,"Ranks your top scenes, performers, studios and tags in Tools, by measures like O Count or rating.",1,1
+hint_ratings_that_were_not_saved,Ratings that were not saved are lost.,2,1
+hint_remove_arg_from_stash_other,Remove “%1$s” from Stash? Other devices will lose this saved filter.,12,2
+hint_remove_arg_from_this_device,Remove “%1$s” from this device? This cannot be undone.,12,2
+hint_remove_this_filter_this_cannot,Remove this filter? This cannot be undone.,12,2
+hint_removes_arg_from_dashboard_saved,"Removes ""%1$s"" from the dashboard. The saved filter itself stays on the server.",1,0
+hint_removes_cached_artwork_for_active,Removes the cached artwork for the active server. Images are downloaded again as they appear.,1,1
+hint_removes_downloaded_speech_models_and,Removes the downloaded speech models and translation packs. AI subtitles download them again when needed.,0,1
+hint_removes_scenes_images_and_galleries,"Removes scenes, images and galleries whose files no longer exist, with their generated files. This cannot be undone. A dry run only writes to the server log.",1,0
+hint_rename_this_preset_or_saved,Rename this preset or saved filter.,23,1
+hint_renames_selected_stash_saved_filter,Renames the selected Stash saved filter or on-device filter.,4,1
+hint_require_pin_before_app_opens,Require a PIN before the app opens.,1,1
+hint_route_arg_source_arg_codec,"route %1$s
+source %2$s
+codec %3$s
+decoder %4$s
+phase %5$s",1,0
+hint_save_current_sort_filter_and,"Save the current sort, filter, and live criteria as a new Stash saved filter.",23,1
+hint_saved_filter_from_your_stash,"A saved filter from your Stash server, applied automatically when a section opens.",1,1
+hint_saved_server_filter_to_apply,A saved server filter to apply automatically when a section opens.,1,1
+hint_saves_scenes_to_your_device,Saves scenes to your device so you can watch them offline. They are listed in Tools.,1,1
+hint_saves_sort_filters_and_live,"Saves sort, filters and live criteria as a new image filter on your Stash server.",1,1
+hint_scene_and_its_files_are,The scene and its files are removed from the server. This cannot be undone.,1,1
+hint_scene_arg_and_all_associated,The scene '%1$s' and all associated files will be permanently deleted. This action cannot be undone.,1,1
+hint_scenes_picked_from_your_plays,"Scenes picked from your plays, O Counts and ratings.",1,1
+hint_scenes_played_in_this_period,Scenes played in this period are not suggested.,1,1
+hint_scenes_with_o_counts_or,Scenes with O Counts or high ratings you have not played in a while.,1,1
+hint_sections_you_turn_off_disappear,"Sections you turn off disappear from the sidebar. Home, Search and Settings always stay.",1,1
+hint_secure_connection_failed_check_http,Secure connection failed — check HTTP/HTTPS.,1,1
+hint_select_server_first_to_use,Select a server first to use Match.,0,1
+hint_select_server_first_to_use_rateme,Select a server first to use RateMe.,0,1
+hint_select_server_first_to_use_server,Select a server first to use server tasks.,1,0
+hint_select_server_in_settings_to,Select a server in Settings to view statistics.,1,1
+hint_select_server_under_main_first,Select a server under Main first.,1,1
+hint_selected_tags_image_will_be,The selected tag’s image will be replaced with this video frame.,1,1
+hint_sent_with_every_request_to,"Sent with every request to this server, e.g. for SSO or a reverse proxy that needs its own token.",2,2
+hint_sent_with_every_request_to_this,"Sent with every request to this server, e.g. for SSO or a reverse proxy that needs its own token. Stored encrypted on this device.",0,1
+hint_sent_with_every_request_to_this_server,"Sent with every request to this server, e.g. for SSO or a reverse proxy that needs its own token. Stored in the Keychain.",1,0
+hint_server_address_e_g_192,Server Address (e.g. 192.168.1.100 or stash.example.com),1,1
+hint_server_configuration_is_missing_or,Server configuration is missing or incomplete,3,1
+hint_server_did_not_start_task,The server did not start the task.,1,0
+hint_server_has_no_playable_file,The server has no playable file for this scene (no stream path).,0,1
+hint_server_log_lists_what_would,The server log lists what would be removed.,1,0
+hint_server_not_reachable_arg_check,Server not reachable (%1$s) - check IP/Port/SSL,1,0
+hint_server_not_reachable_check_ip,Server not reachable - check IP/Port/SSL,1,1
+hint_servers_and_settings_exported_from,"Servers and settings exported from stashy on another device (iPhone, iPad, Mac or Android).",0,1
+hint_servers_api_keys_and_settings,"Servers, API keys and settings stay on this device either way.",1,0
+hint_servers_settings_default_filters_dashboard,"Servers, settings, default filters, dashboard and tabs as one JSON file — imports on iPhone, iPad, Mac and Android.",1,1
+hint_settings_already_in_icloud_replace,"Settings already in iCloud replace the ones on this device. API keys are end-to-end encrypted through iCloud Keychain, which must be on for them to sync.",1,0
+hint_show_edit_buttons_on_scene,"Show edit buttons on scene detail cards (performers, studio, groups, galleries, tags, title, description) and on performer / studio / tag / group / gallery detail.",1,1
+hint_shows_all_arg_matching_search,Shows all %1$s matching the search,1,0
+hint_shows_o_counts_of_your,Shows the O Counts of your scenes and images as a month calendar in Tools.,1,1
+hint_shows_similar_scenes_on_scene,"Shows similar scenes on the scene page. When a scene ends, a similar one is offered as Up Next.",1,0
+hint_shows_unrated_scenes_or_images,"Shows unrated scenes or images one at a time in Tools, so you can rate them with stars.",1,1
+hint_shows_unrated_scenes_or_images_one,"Shows unrated scenes or images one at a time under Discover, so you can rate them with stars.",1,0
+hint_shows_your_library_at_glance,"Shows your library at a glance in Tools: playback, catalog counts and storage.",1,1
+hint_sign_in_to_icloud_on,Sign in to iCloud on this device to sync.,1,0
+hint_slides_tab_bar_away_while,Slides the tab bar away while you scroll down a list and brings it back when you scroll up. In Feeds (except Pics) the top bar hides with it.,0,1
+hint_sort_order_each_section_opens,The sort order each section opens with.,2,2
+hint_speech_model_download_failed_http,Speech model download failed (HTTP %1$s),0,1
+hint_speech_recognition_is_not_allowed,Speech recognition is not allowed. Enable it in Settings → Privacy & Security → Speech Recognition.,1,0
+hint_speech_recognition_is_not_available,Speech recognition is not available for this language on this device.,1,1
+hint_speech_recognition_is_not_available_on,Speech recognition is not available on this device.,0,1
+hint_spoken_language_from_file_arg,Spoken language from the file: %1$s,1,1
+hint_stash_refuses_public_ips_while,"Stash refuses public IPs while it has no credentials. Set a username and password in Stash, or allow this IP with public_whitelist.",1,1
+hint_stash_rejected_reverse_proxy_in,Stash rejected the reverse proxy in front of it. Add the proxy's IP to trusted_proxies in Stash's config.,1,1
+hint_stashy_arg_is_latest_version,stashy %1$s is the latest version.,0,1
+hint_stashy_connects_to_intiface_desktop,Stashy connects to Intiface Desktop or Intiface Central via WebSockets. Ensure 'Enable Remote Network Access' is turned on in Intiface settings.,1,0
+hint_stashy_now_automatically_uploads_local,Stashy now automatically uploads local funscripts to Handy Cloud. The Public URL is only needed for advanced setups.,1,0
+hint_stashy_plus_unlocks_premium_features,stashy+ unlocks premium features across stashy for iPhone and Apple TV with one purchase.,1,0
+hint_stashy_plus_unlocks_premium_features_across,"stashy+ unlocks premium features across stashy for phone, tablet and Android TV with one purchase.",0,1
+hint_stashy_plus_will_be_locked,stashy+ will be locked on this device until you enter the key again.,0,1
+hint_stashy_uses_components_above_their,stashy uses the components above. Their licenses apply in addition to stashy's own terms.,1,1
+hint_subscribe_or_buy_lifetime_to,Subscribe or buy Lifetime to unlock premium features.,1,1
+hint_subscriptions_renew_automatically_unless_canceled,Subscriptions renew automatically unless canceled at least 24 hours before the end of the current period. Manage or cancel in your App Store account settings.,1,0
+hint_subscriptions_renew_automatically_unless_canceled_before,Subscriptions renew automatically unless canceled before the end of the current period. Manage or cancel in your Google Play account settings.,0,1
+hint_subtitles_start_on_preferred_language,Subtitles start on the preferred language as soon as a scene's tracks are known. The look applies to every player on this Apple TV.,1,0
+hint_subtitles_start_on_preferred_language_as,Subtitles start on the preferred language as soon as a scene's tracks are known. The look applies to every player on this TV.,0,1
+hint_suggests_tags_based_on_how,"Suggests tags based on how your library is already tagged, shows scenes with the same performers, studio or tags on the scene page, and adds For You and Forgotten Favorites rows on Home: scenes picked from what you played, your O Counts and ratings, and favorites you have not played for a while. No outside service is involved.",1,1
+hint_support_stashy_tips_do_not,Support stashy. Tips do not unlock stashy+.,1,1
+hint_szenen_der_gruppe_konnten_nicht,Szenen der Gruppe konnten nicht geladen werden,1,0
+hint_szenen_des_schauspielers_konnten_nicht,Szenen des Schauspielers konnten nicht geladen werden,1,0
+hint_szenen_des_studios_konnten_nicht,Szenen des Studios konnten nicht geladen werden,1,0
+hint_tag_is_added_to_arg,The tag is added to %1$s of %2$s. Items that already have it stay unchanged.,1,1
+hint_teleprompter_requires_ios_26_or,Teleprompter requires iOS 26 or newer.,2,0
+hint_teleprompter_requires_ios_26_plus,Teleprompter requires iOS 26+ and supported hardware,1,0
+hint_terms_follow_stashs_own_interface,"Terms follow Stash's own interface, and its community translations (Weblate) serve as the reference for each language.",1,1
+hint_thank_you_for_your_support,Thank you for your support! ❤️,0,1
+hint_these_images_will_be_permanently,These images will be permanently deleted. This action cannot be undone.,1,1
+hint_this_color_will_be_applied,"This color will be applied to the tab bar, navigation bar buttons, and other interactive elements throughout the app.",1,1
+hint_this_device_cannot_change_app,This device cannot change the app icon,1,1
+hint_this_device_cant_decode_video,This device can't decode the video.,0,1
+hint_this_file_was_made_by,This file was made by a newer stashy (format %1$s). Update the app first.,1,1
+hint_this_image_will_be_permanently,This image will be permanently deleted. This action cannot be undone.,1,1
+hint_this_install_is_still_testflight,This install is still TestFlight/Sandbox. Open the App Store version and tap Restore Purchases again.,1,0
+hint_this_is_not_stashy_license,This is not a stashy license key.,0,1
+hint_this_is_not_stashy_settings,This is not a stashy settings file.,1,2
+hint_this_is_sample_studio_description,This is a sample studio description that might span multiple lines.,1,0
+hint_this_level_already_has_group,This level already has a group. Add the next one inside it.,1,0
+hint_this_level_or_group_must,This level or the group must match,1,1
+hint_this_license_key_expired_on,This license key expired on %1$s.,0,1
+hint_this_license_key_is_not,This license key is not valid.,0,1
+hint_this_scene_language_is_not,This scene language is not supported by Apple’s SpeechTranscriber (e.g. Czech is not on the list).,1,0
+hint_this_server_has_no_arg,This server has no %1$s yet.,1,1
+hint_this_version_of_stashy_unlocks,This version of stashy unlocks stashy+ with a license key. It works offline and stays on this device.,0,1
+hint_this_version_of_stashy_unlocks_stashy,This version of stashy unlocks stashy+ with a license key. Paste the key you received — it works offline and stays on this device.,0,1
+hint_timed_out_while_ios_reported,Timed out while iOS reported %1$s for %2$s,1,0
+hint_toggles_device_sync_for_current,Toggles device sync for the current feed,1,0
+hint_too_many_attempts_try_again,Too many attempts. Try again in %1$ss,2,2
+hint_tools_are_grouped_on_tools,Tools are grouped on the Tools page.,1,1
+hint_top_scenes_you_have_not,Top scenes you have not played for a while.,1,1
+hint_turn_off_and_remove_from,Turn Off and Remove from iCloud,1,0
+hint_turn_off_if_dolby_vision,"Turn off if a Dolby Vision scene shows green or purple colors. It then plays as HDR10, which your TV still shows in HDR.",1,0
+hint_turn_on_tag_suggestions_or,Turn on Tag suggestions or Similar scenes to show For You on Home.,1,1
+hint_turn_on_tag_suggestions_or_similar,Turn on Tag suggestions or Similar scenes to show Forgotten Favorites on Home.,1,1
+hint_turn_rows_on_in_settings,Turn rows on in Settings › Home Rows.,1,0
+hint_turn_subtitles_on_automatically_choose,"Turn subtitles on automatically, choose the language a scene should start with, and set how the cues look.",1,1
+hint_type_at_least_two_characters,Type at least two characters. Remote or dictation supported.,1,0
+hint_type_at_least_two_characters_remote,Type at least two characters. Remote or voice input supported.,0,1
+hint_unlock_stashy_plus_to_use,Unlock stashy+ to use this feature.,2,1
+hint_unlocked_automatically_because_app_was,Unlocked automatically because the app was launched from Xcode. Not active in any distributed build.,1,0
+hint_unlocked_automatically_because_this_is,Unlocked automatically because this is a debug build. Not active in any distributed build.,0,1
+hint_unlocked_forever_on_this_apple,Unlocked forever on this Apple ID.,1,0
+hint_unlocked_forever_on_this_google,Unlocked forever on this Google account.,0,1
+hint_unplayed_scenes_and_scenes_you,"Unplayed scenes and scenes you have not played in this period, weighed the same.",1,1
+hint_update_profile_picture_for_selected,Update the profile picture for the selected performer.,0,1
+hint_use_this_image_as_cover,Use this image as the cover of its gallery.,1,1
+hint_use_this_image_as_profile,Use this image as the profile picture of %1$s.,1,0
+hint_used_instead_of_address_above,"Used instead of the address above whenever it answers, for example on your home network. Falls back automatically.",1,0
+hint_using_arg_speech_recognition_scene,Using %1$s speech recognition (scene language not installed).,1,0
+hint_version_and_build_number_of,Version and build number of this app.,1,1
+hint_video_file_is_removed_from,The video file is removed from this device.,1,1
+hint_video_file_was_not_found,The video file was not found.,0,1
+hint_video_player_could_not_be,The video player could not be started: %1$s,0,1
+hint_watch_few_scenes_and_stashy,Watch a few scenes and stashy will suggest more like them here.,1,1
+hint_were_checking_if_your_server,We're checking if your server is reachable,1,1
+hint_with_api_keys_file_gives,With API keys the file gives full access to your servers. Keep it private.,1,1
+hint_you_bought_stashy_before_it,"You bought stashy before it moved to subscriptions, so stashy+ stays yours for life. Since then the app has grown massively. If you'd like to support its development, a tip is a kind gesture, entirely optional.",1,0
+hint_your_api_key_is_invalid,Your API key is invalid or expired. Please check your server configuration.,1,1
+hint_your_license_key_expired_on,Your license key expired on %1$s.,0,2
+hint_your_server_configuration_is_missing,Your server configuration is missing some details.,1,1
+hint_your_subscription_is_active_buying,"Your subscription is active. Buying Lifetime keeps stashy+ forever, even after cancelling.",1,1
+hip_body,Hip / Body,2,0
+hold_next,Hold ▼ Next,1,1
+hold_prev,Hold ▲ Prev,1,1
+hold_to_speed_up,Hold to speed up,2,2
+home,Home,3,4
+home_rows,Home Rows,2,0
+home_tabs,Home Tabs,1,1
+horizontal,Horizontal,2,0
+host_not_found,Host not found,1,2
+identifying,Identifying,1,0
+identity,Identity,5,5
+ignore_auto_tag,Ignore auto tag,3,6
+ignore_tag,Ignore Tag,1,1
+ignored_tags,Ignored tags,1,1
+image,Image,4,6
+image_arg,Image %1$s,1,0
+image_arg_of_arg,Image %1$s of %2$s,1,0
+image_clip_previews,Image clip previews,1,1
+image_count,Image Count,8,12
+image_count_high_low,Image Count (High-Low),4,4
+image_count_low_high,Image Count (Low-High),4,4
+image_deleted,Image deleted,2,2
+image_downloaded,Image downloaded,1,1
+image_perceptual_hashes,Image perceptual hashes,1,1
+image_performers_not_loaded,Image performers not loaded,0,1
+image_thumbnails,Image thumbnails,1,1
+image_updated_for_arg,Image updated for %1$s,1,1
+images,Images,27,25
+images_filter,Images filter,4,8
+images_sort,Images Sort,1,2
+immediately,Immediately,1,1
+immersive,Immersive,2,2
+implants,Implants,1,2
+in_arg,In: %1$s,1,0
+in_label,In,0,1
+include_sub_folders,Include sub-folders,1,1
+include_sub_groups,Include sub-groups,1,1
+include_sub_studios,Include sub-studios,1,1
+include_sub_tags,Include sub-tags,2,2
+included_with_stashy_plus,Included with stashy+,1,1
+included_with_your_app_purchase,Included with your app purchase,1,0
+includes,Includes,1,1
+includes_all,Includes all,1,1
+incomplete_setup,Incomplete Setup,1,1
+increase,Increase,0,1
+increment,Increment,0,1
+indian,Indian,1,1
+influence,Influence,1,1
+insights,Insights,1,1
+install,Install,0,1
+install_update,Install Update,0,1
+interactive,Interactive,2,3
+interactive_heatmaps_and_speeds,Interactive Heatmaps & Speeds,1,0
+interactive_scenes_with_funscript,Interactive scenes with a funscript,1,0
+interactive_speed,Interactive Speed,1,2
+intersex,Intersex,2,1
+intiface,Intiface,5,0
+intiface_server,Intiface Server,1,0
+invalid_image_data,Invalid image data,1,0
+invalid_license_key,Invalid license key.,0,1
+invalid_regex,Invalid regex,1,1
+invalid_server_url,Invalid server URL,3,0
+invalid_stashjsonvalue,Invalid StashJSONValue,1,0
+invalid_text_encoding,Invalid text encoding,1,0
+invalid_update_information,Invalid update information.,0,2
+invalid_url,Invalid URL,3,0
+invalid_url_arg,Invalid URL: %1$s,1,0
+is_missing,Is Missing,7,14
+is_null,Is null,1,1
+is_zip,Is zip,1,2
+jane_doe,Jane Doe,1,0
+job_arg,Job %1$s,1,1
+jobs,Jobs,1,1
+kind,Kind,2,0
+landscape,Landscape,1,1
+lang,Lang,2,0
+language_set_to_arg,Language set to %1$s,1,1
+large,Large,2,2
+largest_galleries,Largest Galleries,1,0
+last_played,Last Played,3,4
+last_played_arg_days_ago,Last played %1$s days ago,1,1
+last_played_arg_months_ago,Last played %1$s months ago,1,1
+last_played_arg_years_ago,Last played %1$s years ago,1,1
+last_played_newest_first,Last Played (Newest First),1,3
+last_played_oldest_first,Last Played (Oldest First),1,3
+later,Later,0,2
+latin,Latin,1,1
+leaf,Leaf,1,1
+least_galleries,Least Galleries,3,0
+least_images,Least Images,3,1
+least_performers,Least Performers,2,0
+least_recently_played,Least Recently Played,1,1
+least_recently_updated,Least Recently Updated,6,6
+least_scenes,Least Scenes,4,4
+least_viewed,Least Viewed,2,4
+least_watch_time,Least Watch Time,1,0
+legend,Legend,1,1
+legend_2,Legend!,2,1
+less,Less,1,1
+less_like_this,Less like this,1,1
+less_of_arg,Less of %1$s,1,1
+less_than,Less than,1,1
+lgpl_2_1_or_later,LGPL-2.1 or later,1,0
+library,Library,3,2
+library_cleanup,Library Cleanup,1,1
+library_scan,Library Scan,1,0
+library_scan_started_successfully,Library scan started successfully!,1,1
+license,License,0,1
+license_key,License key,0,1
+license_key_is_incomplete,The license key is incomplete.,0,3
+license_key_stashy,License key (STASHY-…),0,1
+licensed_to_arg,Licensed to %1$s,0,2
+lifetime,Lifetime,1,1
+light,Light,2,1
+like_arg,Like “%1$s”,1,1
+links,Links,2,1
+live_captions_stopped,Live captions stopped.,0,1
+live_signal_analysis,Live Signal Analysis,1,0
+loading,Loading,4,3
+loading_channels,Loading channels…,1,1
+loading_charts,Loading charts…,2,1
+loading_feeds,Loading feeds…,2,2
+loading_filters,Loading filters…,3,2
+loading_galleries,Loading galleries…,7,3
+loading_groups,Loading groups…,2,2
+loading_images,Loading images…,2,6
+loading_jobs,Loading jobs…,1,1
+loading_languages,Loading languages…,1,0
+loading_markers,Loading markers…,2,1
+loading_more,Loading more…,2,2
+loading_more_arg,Loading more %1$s,0,1
+loading_more_galleries,Loading more galleries…,3,0
+loading_more_images,Loading more images…,0,1
+loading_more_performers,Loading more performers…,1,0
+loading_o_count,Loading O Count…,1,1
+loading_pair,Loading pair…,2,1
+loading_performers,Loading performers…,3,4
+loading_scenes,Loading scenes…,2,3
+loading_script,Loading Script…,2,0
+loading_starters,Loading starters…,2,1
+loading_stashy_plus_options,Loading stashy+ options…,1,1
+loading_statistics,Loading statistics…,1,1
+loading_studios,Loading studios…,2,2
+loading_tags,Loading tags…,4,4
+loading_timeline,Loading timeline…,1,1
+loading_tips,Loading tips…,1,1
+loading_top_performers,Loading top performers…,1,1
+loading_top_scenes,Loading top scenes…,1,1
+loading_top_studios,Loading top studios…,1,1
+loading_top_tags,Loading top tags…,1,1
+local,Local,1,0
+local_address,Local Address,1,2
+local_address_e_g_192,Local Address (e.g. 192.168.1.100:9999),0,1
+local_address_optional_e_g,"Local Address (optional, e.g. 192.168.1.100:9999)",1,0
+local_arg,Local: %1$s,1,1
+logging_in_menu,Logging in…,2,1
+login_failed_arg,Login failed: %1$s,1,0
+longest_first,Longest First,1,1
+look_back,Look back,2,1
+looking_menu,Looking…,3,3
+love_spouse,Love Spouse,3,0
+low,Low,1,1
+lowest_rated,Lowest Rated,6,5
+magazin,Magazin,4,4
+magazin_ereader,Magazin eReader,1,1
+maintenance,Maintenance,3,2
+male,Male,3,2
+marker,Marker,4,2
+marker_animated_image_previews,Marker animated image previews,1,1
+marker_at_arg,Marker at %1$s,2,1
+marker_count,Marker Count,4,6
+marker_count_high_low,Marker Count (High-Low),2,2
+marker_count_low_high,Marker Count (Low-High),2,2
+marker_created,Marker created,1,1
+marker_details,Marker Details,1,1
+marker_length,Marker Length,2,1
+marker_previews,Marker previews,1,1
+marker_screenshots,Marker screenshots,1,1
+markers,Markers,16,13
+markers_filter,Markers filter,3,6
+match,Match,3,2
+match_mode,Match mode,0,1
+match_mode_arg,"Match mode, %1$s",1,0
+matches_regex,Matches regex,1,1
+max,Max,1,1
+max_intensity,Max Intensity,1,0
+max_set_size,Max set size,1,1
+max_velocity,Max Velocity,1,0
+measurements,Measurements,2,5
+media,Media,5,2
+medium,Medium,2,2
+merged_filter,Merged Filter,1,0
+metadata,Metadata,2,2
+middle_eastern,Middle Eastern,1,1
+minimize,Minimize,1,1
+minimum_rating,Minimum rating,1,1
+miniplayer_and_watchlist,Miniplayer & Watchlist,3,3
+mixed,Mixed,1,1
+mode,Mode,2,0
+mode_error,Mode Error,1,0
+modes,Modes,1,1
+modifier,Modifier,1,0
+mon,Mon,1,0
+monospaced,Monospaced,1,1
+monthly,Monthly,1,1
+mood,Mood,1,0
+moon,Moon,1,1
+more,More,1,1
+more_from_arg,More from %1$s,1,1
+more_like_this,More like this,1,1
+more_of_arg,More of %1$s,1,1
+more_options,More options,3,2
+more_with_arg,More with %1$s,1,1
+most_galleries,Most Galleries,3,0
+most_images,Most Images,3,1
+most_performers,Most Performers,2,0
+most_played,Most played,1,1
+most_scenes,Most Scenes,4,4
+most_shared,Most shared,1,0
+most_shared_high_low,Most shared (High-Low),0,1
+most_shared_low_high,Most shared (Low-High),0,1
+most_viewed,Most Viewed,3,4
+most_watch_time,Most Watch Time,1,0
+motion_analysis,Motion Analysis,1,0
+motion_sensitivity,Motion Sensitivity,1,0
+movies,Movies,1,2
+movies_filter,Movies filter,1,2
+mute,Mute,3,4
+my_language,My language,1,1
+my_stash,My Stash,6,6
+my_subtitle_language,My subtitle language,1,1
+n192_168_1_100_9999,192.168.1.100:9999 or stash.example.com,1,1
+n192_168_1_100_9999_or,192.168.1.100:9999 or stash.example.com/stash,1,1
+name,Name,77,27
+name_is_empty,Name is empty,3,0
+name_or_regex,Name or regex,2,1
+name_z,Name (A-Z),9,9
+name_z_2,Name (Z-A),9,9
+natural,Natural,1,1
+nature,Nature,1,0
+navel,Navel,1,0
+network_error,Network Error,1,0
+network_error_arg,Network error: %1$s,3,1
+network_error_arg_arg,Network Error: %1$s (%2$s),1,0
+never_played,Never played,1,1
+never_suggest,Never suggest,1,1
+new_filter,New Filter,2,2
+new_galleries,New Galleries,1,0
+new_only,New only,1,1
+new_pair,New pair,3,2
+new_performers,New Performers,1,0
+new_releases,New Releases,1,1
+new_run,New run,2,1
+new_studios,New Studios,1,0
+new_suggestions_on_home,New suggestions on Home,1,1
+new_sync_job,New sync job,2,2
+new_tournament,New tournament,2,1
+newest,Newest,1,1
+newest_arg,Newest %1$s,1,1
+newest_arg_arg,Newest %1$s %2$s,1,1
+newest_batch_images,Newest batch — Images,1,1
+newest_batch_scenes,Newest batch — Scenes,1,1
+newest_first,Newest First,3,3
+next,Next,3,3
+next_marker,Next marker,1,1
+next_month,Next month,1,1
+nicht_verbunden,Nicht verbunden,1,0
+no,No,5,4
+none,None,30,18
+none_of,None of,1,2
+normal,Normal,1,1
+normalize,Normalize,1,2
+not_between,Not between,1,1
+not_built,Not built,1,1
+not_built_yet,Not built yet,2,2
+not_configured,Not Configured,1,0
+not_connected,Not Connected,3,4
+not_connected_timeout,Not connected (Timeout),1,0
+not_equals,Not equals,1,1
+not_favorite,Not favorite,2,2
+not_matches_regex,Not matches regex,1,1
+not_now,Not now,1,1
+not_null,Not null,1,1
+not_organized,Not organized,2,2
+not_played_for,Not played for,2,1
+not_reached_yet,Not reached yet,1,1
+not_selected,Not selected,0,1
+not_set,Not set,2,2
+not_unlocked,Not unlocked,1,1
+not_valid_json_object,Not a valid JSON object,1,1
+nothing_found,Nothing found,1,1
+nothing_is_playing,Nothing is playing.,1,0
+nothing_to_play_in_arg,Nothing to play in %1$s.,1,0
+nothing_to_rate,Nothing to rate,2,1
+nothing_to_tag,Nothing to tag,1,1
+now_playing,Now Playing,1,2
+o_count,O Count,27,29
+o_count_arg,"O Count, %1$s",1,0
+o_count_high_low,O Count (High-Low),4,4
+o_count_incl_sub_studios,O Count incl. sub-studios,1,1
+o_count_incl_sub_studios_high,O Count incl. Sub-Studios (High-Low),1,1
+o_count_incl_sub_studios_low,O Count incl. Sub-Studios (Low-High),1,1
+o_count_low_high,O Count (Low-High),4,4
+o_counts,O Counts,1,1
+off,Off,11,10
+offline,Offline,3,0
+oh,The Oh.,1,0
+ok,OK,5,8
+okay,Okay,2,2
+oldest_added,Oldest Added,7,7
+oldest_first,Oldest First,5,5
+on,On,3,2
+on_this_scene,On this scene,1,1
+one_card_per_row,One card per row,1,1
+one_of_your_favorites,One of your favorites,1,1
+one_time_purchase,One-time purchase,1,1
+only,Only,1,1
+opened_gallery,Opened Gallery,1,1
+opens_cover_full_screen,Opens the cover full screen,1,0
+opens_page,Opens the page,1,0
+opens_scene,Opens the scene,1,0
+opens_this_arg,Opens this %1$s.,1,1
+optical_flow_smoothing,Optical Flow Smoothing,2,0
+optimize_database,Optimize Database,2,0
+options,Options,2,2
+orange,Orange,1,1
+order,Order,1,0
+organized,Organized,7,12
+orientation,Orientation,3,5
+other,Other,3,3
+other_arg,Other (%1$s),7,1
+other_galleries,Other Galleries,1,1
+over_30_min,Over 30 min,1,1
+overview,Overview,1,2
+page_1_arg,Page (1–%1$s),1,1
+page_arg,Page %1$s,2,2
+page_arg_arg,Page %1$s / %2$s,1,1
+page_arg_arg_arg,Page %1$s–%2$s / %3$s,1,1
+pages,Pages,0,2
+parent_count,Parent count,1,2
+parents,Parents,2,4
+passcode,Passcode,1,1
+passcodes_do_not_match,Passcodes do not match,1,1
+password,Password,4,3
+paste,Paste,0,1
+path,Path,3,6
+paused,Paused,1,0
+pelvis,Pelvis,2,0
+penis,Penis,2,1
+penis_length,Penis Length,1,2
+penis_length_cm,Penis Length (cm),1,2
+people,People,1,0
+per_row,Per row,1,1
+performer,Performer,2,3
+performer_age,Performer Age,5,8
+performer_age_oldest_first,Performer Age (Oldest First),2,2
+performer_age_youngest_first,Performer Age (Youngest First),2,2
+performer_count,Performer Count,7,11
+performer_count_high_low,Performer Count (High-Low),3,3
+performer_count_incl_sub_studios,Performer count incl. sub-studios,1,1
+performer_count_incl_sub_studios_high,Performer Count incl. Sub-Studios (High-Low),1,1
+performer_count_incl_sub_studios_low,Performer Count incl. Sub-Studios (Low-High),1,1
+performer_count_low_high,Performer Count (Low-High),3,3
+performer_deleted,Performer deleted,1,1
+performer_favorite,Performer favorite,3,6
+performer_image,Performer Image,1,0
+performer_image_updated,Performer image updated,1,1
+performer_match,Performer Match,1,1
+performer_scenes,Performer Scenes,1,2
+performer_tags,Performer Tags,3,6
+performer_updated,Performer updated,1,1
+performers,Performers,29,31
+performers_by_o_count,Performers by O Count,1,0
+performers_counter,Performers - Counter,1,1
+performers_filter,Performers filter,4,8
+performers_new,Performers - New,1,1
+performers_rating,Performers - Rating,1,1
+performers_studios_and_tags,"Performers, studios and tags",1,1
+performers_top,Performers - Top,1,1
+performers_updated,Performers updated,3,0
+phash_distance,PHash distance,2,4
+phash_distance_optional,PHash distance (optional),1,1
+photographer,Photographer,2,4
+pics,Pics,3,1
+picture_in_picture,Picture-in-Picture,1,1
+piercings,Piercings,2,5
+pink,Pink,2,2
+pins_do_not_match,PINs do not match,1,1
+placeholder_search,Search …,1,0
+placeholder_search_2,Search…,2,0
+placeholder_search_everything,Search everything…,3,1
+placeholder_search_galleries,Search galleries…,1,0
+placeholder_search_groups,Search groups…,1,0
+placeholder_search_images,Search images…,1,0
+placeholder_search_markers,Search markers…,1,0
+placeholder_search_performers,Search performers…,1,0
+placeholder_search_scenes,Search scenes…,1,0
+placeholder_search_studios,Search studios…,1,0
+placeholder_search_tags,Search Tags…,3,2
+places,Places,1,0
+play_count,Play Count,8,10
+play_duration,Play Duration,1,2
+playback,Playback,2,2
+playback_activity,Playback activity,1,1
+playback_engine_unavailable,Playback engine unavailable,4,0
+playback_speed,Playback Speed,1,1
+playback_speed_arg,Playback Speed (%1$s),1,1
+played_share,Played Share,1,1
+player,Player,1,1
+playing,Playing,1,0
+port,Port,1,1
+port_optional,Port (optional),2,1
+portrait,Portrait,1,1
+preferred_language,Preferred Language,3,3
+presets,Presets,1,0
+press_select_to_retry,Press Select to retry,0,1
+previews,Previews,1,2
+previous,Previous,2,2
+previous_marker,Previous marker,1,1
+previous_month,Previous month,1,1
+primary_tag,Primary Tag,1,1
+privacy_policy,Privacy Policy,1,1
+produced_arg,Produced %1$s,1,1
+production_date,Production Date,3,4
+production_date_newest_first,Production Date (Newest First),1,1
+production_date_oldest_first,Production Date (Oldest First),1,1
+profile,Profile,2,1
+progress_of_offline_downloads,Progress of offline downloads,0,1
+property,Property,1,0
+protocol,Protocol,7,3
+public_url_override_optional,Public URL Override (Optional),1,0
+purchase_cancelled,Purchase cancelled,2,0
+purchase_failed_arg,Purchase failed: %1$s,0,1
+purchase_pending_approval,Purchase pending approval,1,0
+purchased,Purchased,1,0
+purchases_restored,Purchases restored,1,1
+purple,Purple,2,2
+quality,Quality,1,1
+quarterfinal,Quarterfinal,2,2
+queued,Queued,3,3
+quick_filter,Quick filter,1,0
+radio_off,Radio Off,1,0
+rainbow,Rainbow,1,1
+random,Random,34,35
+random_picks,Random Picks,1,1
+rank_by,Rank by,1,0
+rank_by_arg,"Rank by, %1$s",1,1
+ranked_by,Ranked by,2,1
+rateme_section,RateMe section,1,1
+rating,Rating,36,41
+rating_0_100,Rating (0–100),3,4
+rating_arg,Rating %1$s,2,0
+rating_arg_of_5_stars,Rating: %1$s of 5 stars,0,1
+rating_high_low,Rating (High-Low),6,10
+rating_low_high,Rating (Low-High),6,10
+ratings,Ratings,1,1
+ready,Ready,3,0
+rebuild_statistics,Rebuild statistics,1,1
+recently_added,Recently Added,9,9
+recently_played,Recently Played,1,1
+recently_released,Recently Released,2,2
+recently_updated,Recently Updated,6,6
+recently_updated_galleries,Recently Updated Galleries,1,0
+recommendations,Recommendations,4,4
+recommendations_require_stashy_plus,Recommendations require stashy+,1,1
+red,Red,2,2
+rediscover,Rediscover,2,1
+refine_search,Refine Search,1,1
+refreshed_every_12_hours,Refreshed every 12 hours.,1,1
+remote,Remote,1,0
+remote_2,Remote: ,0,1
+remote_arg,Remote: %1$s,1,0
+removed_arg,Removed #%1$s,3,2
+removed_from_watchlist,Removed from watchlist,1,1
+reorder,Reorder,0,2
+request_timed_out,Request timed out,1,0
+reshuffle,Reshuffle,1,0
+resolution,Resolution,2,4
+restart,Restart,1,1
+resume_time,Resume Time,1,2
+rise,Rise,1,1
+rotate,Rotate,1,1
+round,Round,1,0
+round_of_16,Round of 16,1,1
+round_of_32,Round of 32,1,1
+round_of_arg,Round of %1$s,1,1
+rounded,Rounded,1,1
+sample_subtitle,Sample subtitle,2,2
+sat,Sat,1,0
+saved_arg,Saved “%1$s”,0,1
+saved_filter,Saved Filter,3,1
+saved_filters,Saved Filters,1,0
+saving_ratings_arg_arg,Saving ratings %1$s/%2$s,2,1
+scene,Scene,5,3
+scene_count,Scene Count,8,12
+scene_count_high_low,Scene Count (High-Low),4,4
+scene_count_low_high,Scene Count (Low-High),4,4
+scene_cover_updated,Scene cover updated,1,1
+scene_covers,Scene covers,0,1
+scene_created,Scene created,1,2
+scene_date,Scene date,1,2
+scene_deleted,Scene deleted,2,2
+scene_details,Scene Details,1,0
+scene_filter,Scene filter,1,2
+scene_identified,Scene identified,1,1
+scene_no,Scene No.,1,0
+scene_no_ascending,Scene No. (Ascending),1,1
+scene_no_descending,Scene No. (Descending),1,1
+scene_scrubber_sprites,Scene scrubber sprites,0,1
+scene_tags,Scene Tags,2,3
+scene_updated,Scene updated,1,2
+scene_view,Scene View,2,2
+scene_you_watched,a scene you watched,1,1
+scenes,Scenes,45,44
+scenes_already_downloaded_are_skipped,Scenes already downloaded are skipped.,1,1
+scenes_filter,Scenes filter,5,10
+scenes_for_you,Scenes - For You,1,1
+scenes_forgotten_favorites,Scenes - Forgotten Favorites,1,1
+scenes_last_played,Scenes - Last Played,1,1
+scenes_most_viewed,Scenes - Most Viewed,1,1
+scenes_new,Scenes - New,1,1
+scenes_performers_menu,"Scenes, Performers …",1,1
+scenes_random,Scenes - Random,1,1
+scenes_recently_added,Scenes - Recently Added,1,1
+scenes_sort,Scenes Sort,1,2
+scenes_start_at,Scenes Start At,1,0
+scenes_top_counter,Scenes - Top Counter,1,1
+scenes_top_rated,Scenes - Top Rated,1,1
+score,Score,1,1
+screenawake_is_main_thread_only,ScreenAwake is main-thread only,0,1
+script_empty,Script Empty,1,0
+script_error_arg,Script Error (%1$s),1,0
+script_loaded,Script Loaded,2,0
+scrubber_sprites,Scrubber Sprites,1,0
+search,Search,9,6
+search_arg,Search %1$s,3,2
+search_arg_s,Search %1$ss,1,1
+search_downloads,Search downloads,1,1
+search_filters,Search filters,2,2
+search_galleries,Search Galleries,1,1
+search_groups,Search Groups,1,1
+search_performers,Search Performers,1,1
+search_studio,Search Studio,1,1
+search_tags,Search Tags,2,2
+search_to_find_arg,Search to find %1$s.,1,1
+search_your_library,Search Your Library,1,1
+search_your_stash_library,Search your Stash library,1,1
+searching_menu,Searching …,1,1
+seconds_or_mm_ss,Seconds or MM:SS,1,1
+section,Section,5,1
+security,Security,5,5
+see_all,See All,1,2
+seg_arg,Seg: %1$s,1,0
+selected,Selected,1,4
+semifinal,Semifinal,2,2
+sensitivity,Sensitivity,1,0
+serif,Serif,1,1
+server,Server,2,2
+server_address,Server Address,4,2
+server_answered_http_arg_arg,The server answered HTTP %1$s%2$s.,0,1
+server_configuration,Server Configuration,1,1
+server_details,Server Details,2,3
+server_error_arg,Server error: %1$s,1,0
+server_error_arg_arg,Server error (%1$s): %2$s,1,1
+server_error_http_arg,Server error: HTTP %1$s.,1,1
+server_information,Server Information,1,1
+server_name,Server Name,4,3
+server_not_reachable,Server not reachable,9,11
+server_refused_video,The server refused the video.,0,1
+server_rejected_deletion,The server rejected the deletion.,1,1
+server_rejected_task,The server rejected the task.,1,0
+server_returned_error_arg,Server returned error: %1$s,1,0
+server_returned_no_data,Server returned no data,1,1
+server_setup,Server Setup,1,1
+servers,Servers,3,3
+session_gap,Session gap,1,1
+settings,Settings,8,10
+settings_menu,Settings…,1,0
+settings_section,Settings section,1,0
+shapes,Shapes,1,0
+shared_galleries,SHARED GALLERIES,1,1
+shared_images,SHARED IMAGES,1,1
+shared_scenes,SHARED SCENES,1,1
+sharing_is_not_available,Sharing is not available,0,2
+shortest_first,Shortest First,1,1
+shows_current_month,Shows the current month.,1,1
+similar_scenes,Similar Scenes,5,4
+similar_scenes_and_up_next,Similar Scenes & Up Next,1,0
+similar_to_watched,Similar to watched,1,1
+single_image,Single image,0,1
+size,Size,2,2
+slideshow,Slideshow,2,0
+small,Small,2,2
+small_hero,Small Hero,1,0
+smoothing,Smoothing,2,0
+sort_name,Sort Name,1,2
+sources_could_not_be_deleted,Sources could not be deleted,1,1
+speech_model_download_failed_arg,Speech model download failed: %1$s,1,0
+speed,Speed,1,0
+spoken_arg,Spoken: %1$s,2,1
+spoken_in_this_scene,Spoken in this scene,1,1
+square,Square,1,1
+star,Star,1,1
+stash_arg,Stash %1$s,0,1
+stash_id,Stash ID,5,5
+stash_id_count,Stash ID Count,1,2
+stash_id_legacy,Stash ID (legacy),0,2
+stash_ids,Stash IDs,4,8
+stash_rejected_request_arg,Stash rejected the request: %1$s,1,1
+stashy_brown,Stashy Brown,1,1
+stashy_for_apple_tv,stashy for Apple TV,1,0
+stashy_has_grown_lot,stashy has grown a lot,1,0
+stashy_plus_unlocked_thank_you,stashy+ unlocked — thank you!,1,0
+statistics,Statistics,4,3
+statistics_could_not_be_loaded,Statistics could not be loaded,1,2
+stats_unavailable,Stats unavailable,1,1
+status,Status,6,4
+still_duration,Still Duration,1,1
+stopping_menu,Stopping…,1,1
+storage,Storage,1,1
+stroke_length,Stroke Length,1,0
+studio,Studio,12,6
+studio_and_tags,Studio & Tags,1,0
+studio_count,Studio Count,1,2
+studio_counts_include_sub_studios,Studio counts include sub-studios,1,1
+studio_deleted,Studio deleted,1,1
+studio_logo,Studio logo,1,0
+studio_logos,Studio Logos,1,1
+studio_scenes,Studio Scenes,1,2
+studio_updated,Studio updated,1,1
+studios,Studios,25,24
+studios_filter,Studios filter,5,10
+studios_konnten_nicht_geladen_werden,Studios konnten nicht geladen werden,1,0
+studios_new,Studios - New,1,1
+studios_top,Studios - Top,1,1
+sub_group_count,Sub-Group Count,1,2
+subtitle_preview,Subtitle preview,2,0
+subtitles,Subtitles,4,5
+subtitles_arg,Subtitles: %1$s,1,1
+suggestions,Suggestions,1,1
+sun,Sun,1,0
+switch_server,Switch Server,1,1
+synced_and_ready,Synced & Ready,1,0
+synopsis,Synopsis,2,4
+system,System,2,1
+tab,Tab,2,2
+tab_bar,Tab Bar,0,1
+tag,Tag,4,4
+tag_count,Tag Count,6,12
+tag_deleted,Tag deleted,1,1
+tag_images,Tag images,1,1
+tag_scenes,Tag Scenes,1,2
+tag_suggestion_needs_statistics_first,Tag Suggestion needs statistics first,1,1
+tag_suggestions,Tag suggestions,1,1
+tag_updated,Tag updated,1,1
+tags,Tags,37,36
+tags_filter,Tags filter,4,8
+tags_per_item,Tags per item,1,1
+tattoos,Tattoos,2,5
+template_saved,Template saved,1,1
+template_updated,Template updated,1,1
+terms_of_use,Terms of Use,0,1
+terms_of_use_eula,Terms of Use (EULA),1,0
+text_color,Text color,2,2
+thank_you_for_tip,Thank you for the tip!,2,0
+thanks_for_supporting_stashy,Thanks for supporting stashy.,1,1
+theme,Theme,4,2
+things,Things,1,0
+this_cannot_be_undone, This cannot be undone.,1,1
+thu,Thu,1,0
+thumbs_up,Thumbs Up,1,1
+time,Time,2,2
+time_end,Time (End),1,2
+time_start,Time (Start),1,2
+timeline,Timeline,1,2
+tip_arg,Tip %1$s,1,0
+tips,Tips,1,1
+tips_unavailable,Tips unavailable.,1,1
+title,Title,15,16
+title_z,Title (A-Z),6,11
+title_z_2,Title (Z-A),6,11
+tits,Tits,2,1
+to,To,1,1
+to_yyyy_mm_dd,To (YYYY-MM-DD),1,1
+tool,Tool,1,1
+tools,Tools,6,6
+top,Top,2,1
+top_o_count,Top O Count,1,0
+top_performers,Top Performers,1,0
+top_rated,Top Rated,1,1
+top_rated_performers,Top Rated Performers,1,0
+top_studios,Top Studios,1,0
+total,Total,1,1
+touch_id,Touch ID,1,0
+trans_female,Trans female,1,1
+trans_male,Trans male,1,1
+transcode,Transcode,3,2
+transcodes,Transcodes,1,1
+transgender_female,Transgender (female),2,1
+transgender_male,Transgender (male),2,1
+translations,Translations,2,1
+translations_are_managed_with_tolgee,Translations are managed with Tolgee.,1,1
+transparency,Transparency,1,1
+trophy,Trophy,1,1
+tue,Tue,1,0
+tuning,Tuning,1,1
+two_cards_per_row,Two cards per row,1,1
+type,Type,1,1
+type_more_to_refine_menu,Type more to refine…,7,3
+type_more_to_refine_search_menu,Type more to refine search…,2,2
+type_to_search_menu,Type to search…,1,1
+under_10_min,Under 10 min,1,1
+unexpected_release_tag_arg,"Unexpected release tag ""%1$s"".",0,1
+unique,Unique,2,2
+unknown,Unknown,3,1
+unknown_error,Unknown error,0,5
+unknown_gallery,Unknown Gallery,1,1
+unknown_marker,Unknown Marker,0,1
+unknown_scene,Unknown Scene,3,3
+unknown_title,Unknown Title,6,2
+unknown_url,Unknown URL,1,0
+unlocked_with_license_key,Unlocked with a license key.,0,1
+unmute,Unmute,3,4
+unreadable_server_response,Unreadable server response.,1,0
+untitled,Untitled,5,7
+untitled_gallery,Untitled Gallery,3,2
+untitled_image,Untitled image,2,2
+untitled_marker,Untitled Marker,1,1
+untitled_scene,Untitled Scene,11,3
+untitled_tag,Untitled tag,1,1
+unused,Unused,2,2
+unwatched,Unwatched,2,2
+up_next_similar_scene,Up Next · Similar Scene,1,0
+updated,Updated,15,24
+updated_arg,Updated “%1$s”,0,1
+updated_newest,Updated (Newest),2,4
+updated_newest_first,Updated (Newest First),5,6
+updated_oldest,Updated (Oldest),2,4
+updated_oldest_first,Updated (Oldest First),5,6
+uploading_script_menu,Uploading script…,1,0
+username,Username,4,3
+value,Value,6,6
+value_2,Value 2,1,1
+various,Various,1,1
+version,Version,1,1
+version_and_build_number,Version and build number.,1,0
+version_build_number_and_updates,"Version, build number and updates.",0,1
+verticals,Verticals,2,1
+video,Video,2,3
+video_codec,Video Codec,1,2
+video_not_available,Video not available,1,1
+video_perceptual_hashes,Video perceptual hashes,1,1
+video_previews,Video Previews,1,0
+videos,Videos,2,1
+visible_dashboard_rows,Visible Dashboard Rows,1,1
+visible_tabs,Visible Tabs,2,2
+volume,Volume,1,0
+waiting_for_icloud_menu,Waiting for iCloud…,1,0
+waiting_for_statistics,Waiting for statistics,1,1
+watch,Watch,4,3
+watch_history,Watch history,1,1
+watch_scene,Watch Scene,1,1
+watch_time,Watch Time,3,3
+watch_time_high_low,Watch Time (High-Low),1,3
+watch_time_low_high,Watch Time (Low-High),1,3
+watched,Watched,3,3
+watchlist,Watchlist,2,2
+watchlist_is_empty,Watchlist is empty,1,1
+wed,Wed,1,0
+weight,Weight,1,3
+weight_kg,Weight (kg),1,2
+welcome_to_stashy,Welcome to stashy,1,0
+what_to_suggest,What to suggest,2,1
+while_ai_motion_is_syncing,While AI Motion is syncing,1,0
+white,White,3,3
+with_api_keys_and_headers,With API keys and headers,1,1
+without_api_keys,Without API keys,1,1
+worst_arg,Worst %1$s,2,1
+wrist_arm,Wrist / Arm,2,0
+wrong_passcode,Wrong Passcode,1,1
+wrong_pin,Wrong PIN,1,1
+yearly,Yearly,1,1
+yellow,Yellow,1,1
+yes,Yes,4,4
+you_already_own_this,You already own this.,0,1
+you_like_arg,You like %1$s,1,1
+youngest_first,Youngest First,1,1
+your_stash_server_was_found,Your Stash server was found,1,1
+youre_up_to_date,You're Up to Date,0,1
+zero_kb,Zero KB,0,2

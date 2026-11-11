@@ -1,5 +1,7 @@
 package de.letzgo.stashy.ui.scene
 
+import de.letzgo.stashy.R
+import de.letzgo.stashy.tr
 import android.graphics.Bitmap
 import android.os.SystemClock
 import android.util.Base64
@@ -352,7 +354,7 @@ class SceneDetailModel(
         p.onTranscodeFallback = {
             if (!didAnnounceTranscodeFallback) {
                 didAnnounceTranscodeFallback = true
-                SceneToast.show("Original could not be played — using the server transcode", PlayerIcons.reset, SceneToast.Style.Error)
+                SceneToast.show(tr(R.string.hint_original_could_not_be_played), PlayerIcons.reset, SceneToast.Style.Error)
             }
         }
     }
@@ -370,7 +372,7 @@ class SceneDetailModel(
         scene.captions.orEmpty().forEach { caption ->
             val url = captionURL(caption, scene) ?: return@forEach
             val code = caption.languageCode?.takeIf { it.isNotEmpty() && it != "00" }
-            val name = code?.let { Locale(it).getDisplayLanguage(Locale.ENGLISH).takeIf { n -> n.isNotEmpty() && n != it } ?: it.uppercase() } ?: "Captions"
+            val name = code?.let { Locale(it).getDisplayLanguage(Locale.ENGLISH).takeIf { n -> n.isNotEmpty() && n != it } ?: it.uppercase() } ?: tr(R.string.captions)
             p.addExternalSubtitleTrack(url, name, code)
         }
     }
@@ -495,7 +497,7 @@ class SceneDetailModel(
                 SceneEvents.post(SceneEvent.OCounterUpdated(id, count))
             } else {
                 scene = scene.copy(oCounter = original)
-                SceneToast.show("Counter update failed", PlayerIcons.close, SceneToast.Style.Error)
+                SceneToast.show(tr(R.string.error_counter_update), PlayerIcons.close, SceneToast.Style.Error)
             }
         }
     }
@@ -506,7 +508,7 @@ class SceneDetailModel(
         scene = rated
         scope.launch {
             if (runCatching { SceneEditing.updateRating(rated.id, rating100) }.isSuccess) { SceneEvents.post(SceneEvent.Updated(rated)); SceneEvents.post(SceneEvent.RatingUpdated(rated.id, rating100)) }
-            else { scene = original; SceneToast.show("Failed to update rating", PlayerIcons.close, SceneToast.Style.Error) }
+            else { scene = original; SceneToast.show(tr(R.string.error_update_rating), PlayerIcons.close, SceneToast.Style.Error) }
         }
     }
 
@@ -515,7 +517,7 @@ class SceneDetailModel(
     fun captureTagImage() {
         if (isCapturing) return
         val bitmap = player?.captureFrame()
-        if (bitmap == null) { SceneToast.show("Could not capture video frame", PlayerIcons.close, SceneToast.Style.Error); return }
+        if (bitmap == null) { SceneToast.show(tr(R.string.error_capture_video_frame), PlayerIcons.close, SceneToast.Style.Error); return }
         isCapturing = true
         scope.launch {
             tagImageDataURL = withContext(Dispatchers.Default) { bitmap.toDataURL() }
@@ -526,7 +528,7 @@ class SceneDetailModel(
     fun captureAndSetSceneCover() {
         if (isCapturing) return
         val bitmap = player?.captureFrame()
-        if (bitmap == null) { SceneToast.show("Could not capture video frame", PlayerIcons.close, SceneToast.Style.Error); return }
+        if (bitmap == null) { SceneToast.show(tr(R.string.error_capture_video_frame), PlayerIcons.close, SceneToast.Style.Error); return }
         isCapturing = true
         val current = scene
         scope.launch {
@@ -537,8 +539,8 @@ class SceneDetailModel(
                 // Drops the cached cover everywhere, then patches every list (iOS `SceneCoverUpdated`).
                 val bust = ImageRefresh.sceneCoverChanged(current.id, listOf(current.thumbnailURL))
                 scene = scene.copy(updatedAt = bust)
-                SceneToast.show("Scene cover updated", PlayerIcons.photo, SceneToast.Style.Success)
-            } else SceneToast.show("Failed to update scene cover", PlayerIcons.close, SceneToast.Style.Error)
+                SceneToast.show(tr(R.string.scene_cover_updated), PlayerIcons.photo, SceneToast.Style.Success)
+            } else SceneToast.show(tr(R.string.error_update_scene_cover), PlayerIcons.close, SceneToast.Style.Error)
         }
     }
 
@@ -552,7 +554,7 @@ class SceneDetailModel(
             val started = runCatching { SceneEditing.identify(listOf(scene.id)) }
             val (message, jobId) = started.getOrElse {
                 isIdentifying = false
-                SceneToast.show(it.message?.removePrefix("GraphQL error: ") ?: "Identify failed", PlayerIcons.close, SceneToast.Style.Error)
+                SceneToast.show(it.message?.removePrefix("GraphQL error: ") ?: tr(R.string.error_identify), PlayerIcons.close, SceneToast.Style.Error)
                 return@launch
             }
             if (jobId == null) {
@@ -576,8 +578,8 @@ class SceneDetailModel(
             isIdentifying = false
             when {
                 !ok -> SceneToast.show(jobMessage, PlayerIcons.close, SceneToast.Style.Error)
-                scene.hasStashID -> SceneToast.show("Scene identified", PlayerIcons.checkCircle, SceneToast.Style.Success)
-                else -> SceneToast.show("Identify finished — no match", null, SceneToast.Style.Info)
+                scene.hasStashID -> SceneToast.show(tr(R.string.scene_identified), PlayerIcons.checkCircle, SceneToast.Style.Success)
+                else -> SceneToast.show(tr(R.string.action_identify_finished_no_match), null, SceneToast.Style.Info)
             }
         }
     }
@@ -590,12 +592,12 @@ class SceneDetailModel(
         scope.launch {
             if (runCatching { SceneEditing.deleteSceneWithFiles(s) }.isSuccess) {
                 SceneEvents.post(SceneEvent.Deleted(s.id))
-                SceneToast.show("Scene deleted", PlayerIcons.trash, SceneToast.Style.Success)
+                SceneToast.show(tr(R.string.scene_deleted), PlayerIcons.trash, SceneToast.Style.Success)
                 player?.release(); player = null
                 onDeleted()
             } else {
                 isDeleting = false
-                SceneToast.show("Failed to delete scene", PlayerIcons.close, SceneToast.Style.Error)
+                SceneToast.show(tr(R.string.error_delete_scene), PlayerIcons.close, SceneToast.Style.Error)
             }
         }
     }

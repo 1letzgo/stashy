@@ -16,20 +16,20 @@ struct ContentSettingsSection: View {
     var body: some View {
         let rowCount = stashyPlus.isUnlocked ? 3 : 2
         Section {
-            stashyScrollingSectionHeader("Content & Tabs")
+            stashyScrollingSectionHeader(tr("content_and_tabs"))
             NavigationLink(destination: DashboardSettingsView()) {
-                Label("Dashboard", systemImage: "uiwindow.split.2x1")
+                Label(tr("dashboard"), systemImage: "uiwindow.split.2x1")
             }
             .stashyGroupedBlockRow(index: 0, count: rowCount)
 
             NavigationLink(destination: ReelsModeSettingsView()) {
-                Label("Feeds", systemImage: "play.rectangle.on.rectangle")
+                Label(tr("feeds"), systemImage: "play.rectangle.on.rectangle")
             }
             .stashyGroupedBlockRow(index: 1, count: rowCount)
 
             if stashyPlus.isUnlocked {
                 NavigationLink(destination: ToolsSettingsView()) {
-                    Label("Tools", systemImage: "cube.box")
+                    Label(tr("tools"), systemImage: "cube.box")
                 }
                 .stashyGroupedBlockRow(index: 2, count: rowCount)
             }
@@ -48,25 +48,25 @@ struct ToolsSettingsView: View {
     var body: some View {
         List {
             Section {
-                stashyScrollingSectionHeader("Tab")
+                stashyScrollingSectionHeader(tr("tab"))
                 Toggle(isOn: Binding(
                     get: { toolsTabIsVisible },
                     set: { _ in tabManager.toggle(.tools) }
                 )) {
-                    Label("Show Tools Tab", systemImage: "cube.box")
+                    Label(tr("action_show_tools_tab"), systemImage: "cube.box")
                 }
                 .tint(appearanceManager.tintColor)
                 .stashyGroupedSettingsRow()
 
                 // Order and per-tool visibility used to live here. The Tools landing groups the
                 // tools into fixed categories, so their order is part of that layout now.
-                stashyScrollingSectionFooter("Tools are grouped on the Tools page.")
+                stashyScrollingSectionFooter(tr("hint_tools_are_grouped_on_tools"))
             }
 
         }
         .stashySettingsList()
         .applyAppBackground()
-        .stashySettingsDetailChrome("Tools")
+        .stashySettingsDetailChrome(tr("tools"))
         .onAppear {
             tabManager.repairMissingToolsIfNeeded()
         }

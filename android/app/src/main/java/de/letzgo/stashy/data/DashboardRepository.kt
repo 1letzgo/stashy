@@ -1,5 +1,7 @@
 package de.letzgo.stashy.data
 
+import de.letzgo.stashy.R
+import de.letzgo.stashy.tr
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.builtins.ListSerializer
@@ -179,20 +181,20 @@ object ServerTasksRepository {
             val job = GraphQL.named("metadataScan", vars("input" to options))["metadataScan"].stringOrNull
             if (!job.isNullOrEmpty()) {
                 val enabled = options.values.count { it }
-                true to ("Library scan started successfully!" + if (options.isEmpty()) "" else " ($enabled server options applied)")
-            } else false to "Failed to start library scan. Please check your server configuration."
+                true to (tr(R.string.library_scan_started_successfully) + if (options.isEmpty()) "" else " ($enabled server options applied)")
+            } else false to tr(R.string.error_start_library_scan_please_check)
         } catch (e: Exception) {
-            false to "Failed to start library scan. Please check your server configuration."
+            false to tr(R.string.error_start_library_scan_please_check)
         }
     }
 
     /** iOS `triggerIdentify` (library-wide, server defaults). */
     suspend fun identify(): Pair<Boolean, String> {
         val config = try { GraphQL.named("configuration")["configuration"].obj } catch (e: Exception) {
-            return false to "Failed to start identify. Please check your server configuration."
+            return false to tr(R.string.error_start_identify_please_check_your)
         }
         val boxes = config?.get("general").obj?.get("stashBoxes").arr.orEmpty().mapNotNull { it.obj }
-        if (boxes.isEmpty()) return false to "No Stash-Box endpoints configured on this server."
+        if (boxes.isEmpty()) return false to tr(R.string.empty_stash_box_endpoints_configured_on)
         val identify = config?.get("defaults").obj?.get("identify").obj
         val defaultSources = identify?.get("sources").arr.orEmpty().mapNotNull { it.obj }
         val sources: List<Map<String, Any?>> = if (defaultSources.isNotEmpty()) {
@@ -217,9 +219,9 @@ object ServerTasksRepository {
         val names = boxes.joinToString(", ") { it["name"].stringOrNull ?: it["endpoint"].stringOrNull.orEmpty() }
         return try {
             GraphQL.named("metadataIdentify", vars("input" to mapOf("sources" to sources, "options" to options, "paths" to emptyList<String>())))
-            true to "Identify started using: $names"
+            true to tr(R.string.action_identify_started_using_arg, names)
         } catch (e: Exception) {
-            false to "Failed to start identify. Please check your server configuration."
+            false to tr(R.string.error_start_identify_please_check_your)
         }
     }
 
@@ -245,9 +247,9 @@ object ServerTasksRepository {
     /** iOS `triggerGenerate` — [flags] are `GenerateMetadataInput` booleans set to true. */
     suspend fun generate(vararg flags: String): Pair<Boolean, String> = try {
         GraphQL.named("metadataGenerate", vars("input" to flags.associateWith { true }))
-        true to "Generate started successfully!"
+        true to tr(R.string.action_generate_started_successfully)
     } catch (e: Exception) {
-        false to "Failed to start generate. Please check your server configuration."
+        false to tr(R.string.error_start_generate_please_check_your)
     }
 
     /** Running first, then stopping, queued, finished (iOS `fetchJobQueue`). */

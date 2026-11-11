@@ -21,7 +21,7 @@ struct ServerListSection: View {
 
     var body: some View {
         Section {
-            stashyScrollingSectionHeader("Servers")
+            stashyScrollingSectionHeader(tr("servers"))
             ForEach(Array(configManager.savedServers.enumerated()), id: \.element.id) { index, server in
                 ServerListRow(
                     server: server,
@@ -52,22 +52,22 @@ struct ServerListSection: View {
             Button(action: {
                 showingAddServerSheet = true
             }) {
-                Label("Add New Server", systemImage: "plus")
+                Label(tr("action_add_new_server"), systemImage: "plus")
             }
             .stashyGroupedBlockRow(index: configManager.savedServers.count, count: configManager.savedServers.count + 1)
-            .alert("Delete Server", isPresented: Binding(
+            .alert(tr("action_delete_server"), isPresented: Binding(
                 get: { pendingDelete != nil },
                 set: { if !$0 { pendingDelete = nil } }
             )) {
-                Button("Cancel", role: .cancel) { pendingDelete = nil }
-                Button("Delete", role: .destructive) {
+                Button(tr("action_cancel"), role: .cancel) { pendingDelete = nil }
+                Button(tr("action_delete"), role: .destructive) {
                     if let server = pendingDelete {
                         configManager.deleteServer(id: server.id)
                     }
                     pendingDelete = nil
                 }
             } message: {
-                Text("Are you sure you want to delete \"\(pendingDelete?.name ?? "this server")\"? This action cannot be undone.")
+                Text(tr("hint_are_you_sure_you_want", pendingDelete?.name ?? "this server"))
             }
         }
     }
@@ -107,8 +107,8 @@ struct ServerListRow: View {
 
                         if let local = server.localBaseURL {
                             let usesLocal = configManager.usesLocalAddress
-                            addressLine("Remote: \(server.externalBaseURL)", inUse: isActive && !usesLocal)
-                            addressLine("Local: \(local)", inUse: isActive && usesLocal)
+                            addressLine(tr("remote_arg", server.externalBaseURL), inUse: isActive && !usesLocal)
+                            addressLine(tr("local_arg", local), inUse: isActive && usesLocal)
                         } else {
                             Text(server.externalBaseURL)
                                 .font(.caption)

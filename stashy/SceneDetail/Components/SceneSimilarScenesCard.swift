@@ -29,7 +29,7 @@ struct SceneSimilarScenesCard: View {
     private var content: some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack {
-                Text("Similar Scenes")
+                Text(tr("similar_scenes"))
                     .font(.title3)
                     .fontWeight(.semibold)
                 Spacer()

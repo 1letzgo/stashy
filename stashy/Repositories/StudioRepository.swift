@@ -244,9 +244,9 @@ enum StudioMergeError: LocalizedError {
 
     var errorDescription: String? {
         switch self {
-        case .noData: return "Server returned no data"
-        case .incomplete(let n): return "\(n) items could not be moved — nothing was deleted"
-        case .destroyFailed: return "Sources could not be deleted"
+        case .noData: return tr("server_returned_no_data")
+        case .incomplete(let n): return tr("hint_arg_items_could_not_be", n)
+        case .destroyFailed: return tr("sources_could_not_be_deleted")
         }
     }
 }

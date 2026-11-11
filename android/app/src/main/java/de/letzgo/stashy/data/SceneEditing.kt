@@ -1,5 +1,7 @@
 package de.letzgo.stashy.data
 
+import de.letzgo.stashy.R
+import de.letzgo.stashy.tr
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.delay
 import kotlinx.serialization.builtins.ListSerializer
@@ -219,7 +221,7 @@ object SceneEditing {
     }
 
     /** iOS: `waitForJob` — `(success, message)`; a job that vanished after it was seen counts as finished. */
-    suspend fun waitForJob(id: String, timeoutSeconds: Int = 180, finishedText: String = "Identify finished"): Pair<Boolean, String> {
+    suspend fun waitForJob(id: String, timeoutSeconds: Int = 180, finishedText: String = tr(R.string.action_identify_finished)): Pair<Boolean, String> {
         val deadline = System.currentTimeMillis() + timeoutSeconds * 1000L
         var sawJob = false
         while (true) {
@@ -228,13 +230,13 @@ object SceneEditing {
                 sawJob = true
                 when (job.status.uppercase()) {
                     "FINISHED" -> return true to (job.description ?: finishedText)
-                    "FAILED" -> return false to (job.error ?: "Identify failed")
-                    "CANCELLED" -> return false to "Identify was cancelled"
+                    "FAILED" -> return false to (job.error ?: tr(R.string.error_identify))
+                    "CANCELLED" -> return false to tr(R.string.action_identify_was_cancelled)
                 }
-                if (System.currentTimeMillis() > deadline) return false to "Identify timed out"
+                if (System.currentTimeMillis() > deadline) return false to tr(R.string.action_identify_timed_out)
             } else {
                 if (sawJob) return true to finishedText
-                if (System.currentTimeMillis() > deadline) return false to "Identify job not found"
+                if (System.currentTimeMillis() > deadline) return false to tr(R.string.action_identify_job_not_found)
             }
             delay(1000)
         }
@@ -271,7 +273,7 @@ object SceneEditing {
         val input = mapOf("sources" to sources, "options" to options, "sceneIDs" to sceneIds)
         val jobId = GraphQL.named("metadataIdentify", vars("input" to input))["metadataIdentify"].stringOrNull
         val names = boxes.joinToString(", ") { it["name"].stringOrNull ?: it["endpoint"].stringOrNull.orEmpty() }
-        val message = if (sceneIds.size == 1) "Identify started for this scene using: $names" else "Identify started using: $names"
+        val message = if (sceneIds.size == 1) tr(R.string.hint_identify_started_for_this_scene, names) else tr(R.string.action_identify_started_using_arg, names)
         return message to jobId?.takeIf { it.isNotEmpty() }
     }
 

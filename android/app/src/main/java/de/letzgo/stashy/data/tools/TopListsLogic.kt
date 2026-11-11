@@ -1,5 +1,7 @@
 package de.letzgo.stashy.data.tools
 
+import de.letzgo.stashy.R
+import de.letzgo.stashy.tr
 import de.letzgo.stashy.data.Performer
 import de.letzgo.stashy.data.Scene
 import java.text.NumberFormat
@@ -22,35 +24,35 @@ interface TopListsMetric {
 
 /** iOS: `SceneTopMetric` (raw values identical). */
 enum class TopListsSceneMetric(val raw: String, override val label: String, override val sortField: String) : TopListsMetric {
-    Views("views", "Views", "play_count"),
-    OCount("oCount", "O-Count", "o_counter"),
-    WatchTime("watchTime", "Watch Time", "play_duration"),
-    Rating("rating", "Rating", "rating"),
+    Views("views", tr(R.string.play_count), "play_count"),
+    OCount("oCount", tr(R.string.o_count), "o_counter"),
+    WatchTime("watchTime", tr(R.string.watch_time), "play_duration"),
+    Rating("rating", tr(R.string.rating), "rating"),
 }
 
 /** iOS: `PerformerTopMetric`. */
 enum class TopListsPerformerMetric(val raw: String, override val label: String, override val sortField: String) : TopListsMetric {
-    OCount("oCount", "O-Count", "o_counter"),
-    Scenes("scenes", "Scenes", "scenes_count"),
-    Rating("rating", "Rating", "rating"),
-    Images("images", "Images", "images_count"),
-    Galleries("galleries", "Galleries", "galleries_count"),
+    OCount("oCount", tr(R.string.o_count), "o_counter"),
+    Scenes("scenes", tr(R.string.scenes), "scenes_count"),
+    Rating("rating", tr(R.string.rating), "rating"),
+    Images("images", tr(R.string.images), "images_count"),
+    Galleries("galleries", tr(R.string.galleries), "galleries_count"),
 }
 
 /** iOS: `StudioTopMetric`. */
 enum class TopListsStudioMetric(val raw: String, override val label: String, override val sortField: String) : TopListsMetric {
-    Scenes("scenes", "Scenes", "scenes_count"),
-    Galleries("galleries", "Galleries", "galleries_count"),
-    Rating("rating", "Rating", "rating"),
-    Images("images", "Images", "images_count"),
+    Scenes("scenes", tr(R.string.scenes), "scenes_count"),
+    Galleries("galleries", tr(R.string.galleries), "galleries_count"),
+    Rating("rating", tr(R.string.rating), "rating"),
+    Images("images", tr(R.string.images), "images_count"),
 }
 
 /** iOS: `TagTopMetric`. */
 enum class TopListsTagMetric(val raw: String, override val label: String, override val sortField: String) : TopListsMetric {
-    Scenes("scenes", "Scenes", "scenes_count"),
-    Images("images", "Images", "images_count"),
-    Galleries("galleries", "Galleries", "galleries_count"),
-    Markers("markers", "Markers", "scene_markers_count"),
+    Scenes("scenes", tr(R.string.scenes), "scenes_count"),
+    Images("images", tr(R.string.images), "images_count"),
+    Galleries("galleries", tr(R.string.galleries), "galleries_count"),
+    Markers("markers", tr(R.string.markers), "scene_markers_count"),
 }
 
 /** iOS: `TopListPage` — paging cursor of one ranking. */

@@ -7,6 +7,12 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		L10N0000000000000000B001 /* Localization.swift in Sources */ = {isa = PBXBuildFile; fileRef = L10N0000000000000000A001 /* Localization.swift */; };
+		L10N0000000000000000B002 /* Localization.swift in Sources */ = {isa = PBXBuildFile; fileRef = L10N0000000000000000A001 /* Localization.swift */; };
+		L10N0000000000000000B003 /* Localization.swift in Sources */ = {isa = PBXBuildFile; fileRef = L10N0000000000000000A001 /* Localization.swift */; };
+		L10N0000000000000000C001 /* Localizable.xcstrings in Resources */ = {isa = PBXBuildFile; fileRef = L10N0000000000000000A002 /* Localizable.xcstrings */; };
+		L10N0000000000000000C002 /* Localizable.xcstrings in Resources */ = {isa = PBXBuildFile; fileRef = L10N0000000000000000A002 /* Localizable.xcstrings */; };
+		L10N0000000000000000C003 /* Localizable.xcstrings in Resources */ = {isa = PBXBuildFile; fileRef = L10N0000000000000000A002 /* Localizable.xcstrings */; };
 		F0A30000000000000000000B /* RecommendationSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F0A30000000000000000000A /* RecommendationSettingsView.swift */; };
 		F0A30000000000000000000C /* RecommendationSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F0A30000000000000000000A /* RecommendationSettingsView.swift */; };
 		F0A20000000000000000000B /* HomeRecommendationsRowView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F0A20000000000000000000A /* HomeRecommendationsRowView.swift */; };
@@ -402,6 +408,8 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+		L10N0000000000000000A001 /* Localization.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Localization.swift; sourceTree = "<group>"; };
+		L10N0000000000000000A002 /* Localizable.xcstrings */ = {isa = PBXFileReference; lastKnownFileType = text.json.xcstrings; path = Localizable.xcstrings; sourceTree = "<group>"; };
 		F0A60000000000000000000A /* ForgottenFavoritesSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ForgottenFavoritesSettingsView.swift; sourceTree = "<group>"; };
 		F0A30000000000000000000A /* RecommendationSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecommendationSettingsView.swift; sourceTree = "<group>"; };
 		F0A50000000000000000000A /* HomeForgottenFavoritesRowView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeForgottenFavoritesRowView.swift; sourceTree = "<group>"; };
@@ -617,6 +625,8 @@
 				AE7E0000000000000000C001 /* Playback */,
 				DF22BB142F167223007C2090 /* CatalogsView.swift */,
 				DFUI000022F3AUDIT002 /* DesignTokens.swift */,
+				L10N0000000000000000A002 /* Localizable.xcstrings */,
+				L10N0000000000000000A001 /* Localization.swift */,
 				DF22BB172F16743C007C2090 /* DownloadsView.swift */,
 				SYNCJOB02000000000000002 /* DownloadSyncJobs.swift */,
 				DF22BB182F16743C007C2090 /* GalleriesView.swift */,
@@ -943,6 +953,18 @@
 			knownRegions = (
 				en,
 				Base,
+				de,
+				fr,
+				nl,
+				sv,
+				da,
+				nb,
+				pl,
+				ja,
+				"pt-BR",
+				"zh-Hans",
+				"zh-Hant",
+				ar,
 			);
 			mainGroup = 08FB778CFE84155DC02AAC07;
 			packageReferences = (
@@ -966,6 +988,7 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				L10N0000000000000000C001 /* Localizable.xcstrings in Resources */,
 				AA0000012E8A9C0000000001 /* Assets.xcassets in Resources */,
 				DFGQGRAPHQLBUILD001 /* graphql in Resources */,
 			);
@@ -975,6 +998,7 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				L10N0000000000000000C002 /* Localizable.xcstrings in Resources */,
 				37D3E3262F39444C00AB8FAD /* Assets.xcassets in Resources */,
 				CD4CA6C2CB694838903FF516 /* graphql in Resources */,
 			);
@@ -984,6 +1008,7 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				L10N0000000000000000C003 /* Localizable.xcstrings in Resources */,
 				MAC00000000000000000008C /* Assets.xcassets in Resources */,
 				MAC00000000000000000008D /* graphql in Resources */,
 			);
@@ -1017,6 +1042,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				L10N0000000000000000B001 /* Localization.swift in Sources */,
 				F0A30000000000000000000B /* RecommendationSettingsView.swift in Sources */,
 				F0A60000000000000000000B /* ForgottenFavoritesSettingsView.swift in Sources */,
 				F0A20000000000000000000B /* HomeRecommendationsRowView.swift in Sources */,
@@ -1165,6 +1191,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				L10N0000000000000000B002 /* Localization.swift in Sources */,
 				AE7E0000000000000000B013 /* AetherSceneEngine.swift in Sources */,
 				AE7E0000000000000000B023 /* Scene+AetherPlayback.swift in Sources */,
 				AE7E0000000000000000B043 /* AetherSceneSurface.swift in Sources */,
@@ -1244,6 +1271,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				L10N0000000000000000B003 /* Localization.swift in Sources */,
 				F0A30000000000000000000C /* RecommendationSettingsView.swift in Sources */,
 				F0A60000000000000000000C /* ForgottenFavoritesSettingsView.swift in Sources */,
 				F0A20000000000000000000C /* HomeRecommendationsRowView.swift in Sources */,
@@ -1538,7 +1566,7 @@
 				PROVISIONING_PROFILE_SPECIFIER = "";
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
 				SUPPORTS_MACCATALYST = NO;
-				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_EMIT_LOC_STRINGS = NO;
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
 			};
@@ -1569,7 +1597,7 @@
 				PROVISIONING_PROFILE_SPECIFIER = "";
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
 				SUPPORTS_MACCATALYST = NO;
-				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_EMIT_LOC_STRINGS = NO;
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
 			};
@@ -1608,7 +1636,7 @@
 				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG $(inherited)";
 				SWIFT_APPROACHABLE_CONCURRENCY = YES;
 				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
-				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_EMIT_LOC_STRINGS = NO;
 				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = 3;
@@ -1649,7 +1677,7 @@
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SWIFT_APPROACHABLE_CONCURRENCY = YES;
 				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
-				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_EMIT_LOC_STRINGS = NO;
 				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = 3;
@@ -1683,7 +1711,7 @@
 				PROVISIONING_PROFILE_SPECIFIER = "";
 				SDKROOT = macosx;
 				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG $(inherited)";
-				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_EMIT_LOC_STRINGS = NO;
 				SWIFT_VERSION = 5.0;
 			};
 			name = Debug;
@@ -1713,7 +1741,7 @@
 				PRODUCT_NAME = stashy;
 				PROVISIONING_PROFILE_SPECIFIER = "";
 				SDKROOT = macosx;
-				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_EMIT_LOC_STRINGS = NO;
 				SWIFT_VERSION = 5.0;
 			};
 			name = Release;

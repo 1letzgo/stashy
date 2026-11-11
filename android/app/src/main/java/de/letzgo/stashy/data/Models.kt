@@ -1,5 +1,7 @@
 package de.letzgo.stashy.data
 
+import de.letzgo.stashy.R
+import de.letzgo.stashy.tr
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonElement
@@ -146,7 +148,7 @@ data class Gallery(
     val tags: List<IdName>? = null,
     val cover: GalleryCover? = null,
 ) {
-    val displayTitle: String get() = title?.takeIf { it.isNotBlank() } ?: "Untitled"
+    val displayTitle: String get() = title?.takeIf { it.isNotBlank() } ?: tr(R.string.untitled)
     val coverURL: String? get() = Net.signed(cover?.paths?.thumbnail)
 }
 
@@ -241,7 +243,7 @@ data class SceneMarker(
     val tags: List<IdName>? = null,
     val scene: Scene? = null,
 ) {
-    val displayTitle: String get() = title?.takeIf { it.isNotBlank() } ?: primaryTag?.name ?: "Marker"
+    val displayTitle: String get() = title?.takeIf { it.isNotBlank() } ?: primaryTag?.name ?: tr(R.string.marker)
 
     /**
      * iOS: `SceneMarker.thumbnailURL` — the signed screenshot. Its URL never changes, so a new
@@ -296,7 +298,7 @@ data class Scene(
     /** iOS: `displayTitle` — title, else the file name without extension. */
     val displayTitle: String get() = title?.takeIf { it.isNotBlank() }
         ?: files?.firstOrNull()?.path?.substringAfterLast('/')?.substringBeforeLast('.')
-        ?: "Unknown Title"
+        ?: tr(R.string.unknown_title)
 
     val isPortrait: Boolean get() = files?.firstOrNull()?.let { (it.height ?: 0) > (it.width ?: 0) } ?: false
 

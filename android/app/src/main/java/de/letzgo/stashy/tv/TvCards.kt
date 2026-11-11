@@ -1,5 +1,7 @@
 package de.letzgo.stashy.tv
 
+import de.letzgo.stashy.R
+import de.letzgo.stashy.tr
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -242,7 +244,7 @@ fun TvSeeAllCard(onClick: () -> Unit, width: Dp, height: Dp, modifier: Modifier 
         ) {
             Icon(TvIcons.arrowRightCircle, null, Modifier.size(pt(60)), tint = Color.White.copy(alpha = 0.8f))
             Spacer(Modifier.height(pt(20)))
-            Text("See All", style = TvType.headline.copy(fontWeight = FontWeight.Bold), color = Color.White)
+            Text(tr(R.string.see_all), style = TvType.headline.copy(fontWeight = FontWeight.Bold), color = Color.White)
         }
     }
 }

@@ -65,298 +65,312 @@ enum FilterFieldCatalog {
 
     // MARK: - Scenes
 
-    private static let sceneFields: [FilterFieldDescriptor] = boolOps() + [
+    private static var sceneFields: [FilterFieldDescriptor] {
+boolOps() + [
         .init(key: "id", label: "ID", kind: .int),
-        .init(key: "title", label: "Title", kind: .string),
-        .init(key: "code", label: "Code", kind: .string),
-        .init(key: "details", label: "Details", kind: .string),
-        .init(key: "director", label: "Director", kind: .string),
+        .init(key: "title", label: tr("title"), kind: .string),
+        .init(key: "code", label: tr("code"), kind: .string),
+        .init(key: "details", label: tr("details"), kind: .string),
+        .init(key: "director", label: tr("director"), kind: .string),
         .init(key: "oshash", label: "OSHash", kind: .string),
-        .init(key: "checksum", label: "Checksum", kind: .string),
-        .init(key: "phash_distance", label: "PHash distance", kind: .phashDistance),
-        .init(key: "path", label: "Path", kind: .string),
-        .init(key: "file_count", label: "File count", kind: .int),
-        .init(key: "rating100", label: "Rating", kind: .int),
-        .init(key: "organized", label: "Organized", kind: .boolean),
-        .init(key: "o_counter", label: "O-Count", kind: .int),
-        .init(key: "duplicated", label: "Duplicated", kind: .duplication),
-        .init(key: "resolution", label: "Resolution", kind: .resolution),
-        .init(key: "orientation", label: "Orientation", kind: .orientation),
-        .init(key: "framerate", label: "Framerate", kind: .int),
-        .init(key: "bitrate", label: "Bitrate", kind: .int),
-        .init(key: "video_codec", label: "Video codec", kind: .string),
-        .init(key: "audio_codec", label: "Audio codec", kind: .string),
-        .init(key: "duration", label: "Duration (s)", kind: .int),
-        .init(key: "has_markers", label: "Has markers", kind: .hasMarkers),
-        .init(key: "is_missing", label: "Is missing", kind: .isMissing),
-        .init(key: "studios", label: "Studios", kind: .hierarchicalMulti),
-        .init(key: "groups", label: "Groups", kind: .hierarchicalMulti),
-        .init(key: "galleries", label: "Galleries", kind: .multi),
-        .init(key: "tags", label: "Tags", kind: .hierarchicalMulti),
-        .init(key: "tag_count", label: "Tag count", kind: .int),
-        .init(key: "performer_tags", label: "Performer tags", kind: .hierarchicalMulti),
-        .init(key: "performer_favorite", label: "Performer favorite", kind: .boolean),
-        .init(key: "performer_age", label: "Performer age", kind: .int),
-        .init(key: "performers", label: "Performers", kind: .multi),
-        .init(key: "performer_count", label: "Performer count", kind: .int),
-        .init(key: "stash_ids_endpoint", label: "Stash IDs", kind: .stashIDs),
-        .init(key: "stash_id_count", label: "Stash ID count", kind: .int),
+        .init(key: "checksum", label: tr("checksum"), kind: .string),
+        .init(key: "phash_distance", label: tr("phash_distance"), kind: .phashDistance),
+        .init(key: "path", label: tr("path"), kind: .string),
+        .init(key: "file_count", label: tr("file_count"), kind: .int),
+        .init(key: "rating100", label: tr("rating"), kind: .int),
+        .init(key: "organized", label: tr("organized"), kind: .boolean),
+        .init(key: "o_counter", label: tr("o_count"), kind: .int),
+        .init(key: "duplicated", label: tr("duplicated"), kind: .duplication),
+        .init(key: "resolution", label: tr("resolution"), kind: .resolution),
+        .init(key: "orientation", label: tr("orientation"), kind: .orientation),
+        .init(key: "framerate", label: tr("framerate"), kind: .int),
+        .init(key: "bitrate", label: tr("bitrate"), kind: .int),
+        .init(key: "video_codec", label: tr("video_codec"), kind: .string),
+        .init(key: "audio_codec", label: tr("audio_codec"), kind: .string),
+        .init(key: "duration", label: tr("duration_s"), kind: .int),
+        .init(key: "has_markers", label: tr("has_markers"), kind: .hasMarkers),
+        .init(key: "is_missing", label: tr("is_missing"), kind: .isMissing),
+        .init(key: "studios", label: tr("studios"), kind: .hierarchicalMulti),
+        .init(key: "groups", label: tr("groups"), kind: .hierarchicalMulti),
+        .init(key: "galleries", label: tr("galleries"), kind: .multi),
+        .init(key: "tags", label: tr("tags"), kind: .hierarchicalMulti),
+        .init(key: "tag_count", label: tr("tag_count"), kind: .int),
+        .init(key: "performer_tags", label: tr("performer_tags"), kind: .hierarchicalMulti),
+        .init(key: "performer_favorite", label: tr("performer_favorite"), kind: .boolean),
+        .init(key: "performer_age", label: tr("performer_age"), kind: .int),
+        .init(key: "performers", label: tr("performers"), kind: .multi),
+        .init(key: "performer_count", label: tr("performer_count"), kind: .int),
+        .init(key: "stash_ids_endpoint", label: tr("stash_ids"), kind: .stashIDs),
+        .init(key: "stash_id_count", label: tr("stash_id_count"), kind: .int),
         .init(key: "url", label: "URL", kind: .string),
-        .init(key: "interactive", label: "Interactive", kind: .boolean),
-        .init(key: "interactive_speed", label: "Interactive speed", kind: .int),
-        .init(key: "captions", label: "Captions", kind: .string),
-        .init(key: "resume_time", label: "Resume time", kind: .int),
-        .init(key: "play_count", label: "Play count", kind: .int),
-        .init(key: "play_duration", label: "Play duration", kind: .int),
-        .init(key: "last_played_at", label: "Last played", kind: .timestamp),
-        .init(key: "date", label: "Date", kind: .date),
-        .init(key: "production_date", label: "Production date", kind: .date),
-        .init(key: "created_at", label: "Created", kind: .timestamp),
-        .init(key: "updated_at", label: "Updated", kind: .timestamp),
-        .init(key: "galleries_filter", label: "Galleries filter", kind: .nestedFilter, nestedMode: .galleries),
-        .init(key: "performers_filter", label: "Performers filter", kind: .nestedFilter, nestedMode: .performers),
-        .init(key: "studios_filter", label: "Studios filter", kind: .nestedFilter, nestedMode: .studios),
-        .init(key: "tags_filter", label: "Tags filter", kind: .nestedFilter, nestedMode: .tags),
-        .init(key: "groups_filter", label: "Groups filter", kind: .nestedFilter, nestedMode: .groups),
-        .init(key: "markers_filter", label: "Markers filter", kind: .nestedFilter, nestedMode: .sceneMarkers),
-        .init(key: "folder", label: "Folder", kind: .hierarchicalMulti),
-        .init(key: "files_filter", label: "Files filter", kind: .raw),
-        .init(key: "custom_fields", label: "Custom fields", kind: .customFields),
-        .init(key: "movies", label: "Movies", kind: .multi, isDeprecated: true),
+        .init(key: "interactive", label: tr("interactive"), kind: .boolean),
+        .init(key: "interactive_speed", label: tr("interactive_speed"), kind: .int),
+        .init(key: "captions", label: tr("captions"), kind: .string),
+        .init(key: "resume_time", label: tr("resume_time"), kind: .int),
+        .init(key: "play_count", label: tr("play_count"), kind: .int),
+        .init(key: "play_duration", label: tr("play_duration"), kind: .int),
+        .init(key: "last_played_at", label: tr("last_played"), kind: .timestamp),
+        .init(key: "date", label: tr("date"), kind: .date),
+        .init(key: "production_date", label: tr("production_date"), kind: .date),
+        .init(key: "created_at", label: tr("created"), kind: .timestamp),
+        .init(key: "updated_at", label: tr("updated"), kind: .timestamp),
+        .init(key: "galleries_filter", label: tr("galleries_filter"), kind: .nestedFilter, nestedMode: .galleries),
+        .init(key: "performers_filter", label: tr("performers_filter"), kind: .nestedFilter, nestedMode: .performers),
+        .init(key: "studios_filter", label: tr("studios_filter"), kind: .nestedFilter, nestedMode: .studios),
+        .init(key: "tags_filter", label: tr("tags_filter"), kind: .nestedFilter, nestedMode: .tags),
+        .init(key: "groups_filter", label: tr("groups_filter"), kind: .nestedFilter, nestedMode: .groups),
+        .init(key: "markers_filter", label: tr("markers_filter"), kind: .nestedFilter, nestedMode: .sceneMarkers),
+        .init(key: "folder", label: tr("folder"), kind: .hierarchicalMulti),
+        .init(key: "files_filter", label: tr("files_filter"), kind: .raw),
+        .init(key: "custom_fields", label: tr("custom_fields"), kind: .customFields),
+        .init(key: "movies", label: tr("movies"), kind: .multi, isDeprecated: true),
         .init(key: "phash", label: "PHash", kind: .string, isDeprecated: true),
-        .init(key: "stash_id_endpoint", label: "Stash ID", kind: .stashID),
-        .init(key: "movies_filter", label: "Movies filter", kind: .nestedFilter, nestedMode: .groups, isDeprecated: true)
+        .init(key: "stash_id_endpoint", label: tr("stash_id"), kind: .stashID),
+        .init(key: "movies_filter", label: tr("movies_filter"), kind: .nestedFilter, nestedMode: .groups, isDeprecated: true)
     ]
+    }
 
     // MARK: - Performers
 
-    private static let performerFields: [FilterFieldDescriptor] = boolOps() + [
-        .init(key: "name", label: "Name", kind: .string),
-        .init(key: "disambiguation", label: "Disambiguation", kind: .string),
-        .init(key: "details", label: "Details", kind: .string),
-        .init(key: "filter_favorites", label: "Favorite", kind: .boolean),
-        .init(key: "birth_year", label: "Birth year", kind: .int),
-        .init(key: "age", label: "Age", kind: .int),
-        .init(key: "ethnicity", label: "Ethnicity", kind: .string),
-        .init(key: "country", label: "Country", kind: .string),
-        .init(key: "eye_color", label: "Eye color", kind: .string),
-        .init(key: "height_cm", label: "Height (cm)", kind: .int),
-        .init(key: "measurements", label: "Measurements", kind: .string),
-        .init(key: "fake_tits", label: "Implants", kind: .string),
-        .init(key: "penis_length", label: "Penis length", kind: .float),
-        .init(key: "circumcised", label: "Circumcised", kind: .circumcision),
-        .init(key: "career_start", label: "Career start", kind: .date),
-        .init(key: "career_end", label: "Career end", kind: .date),
-        .init(key: "tattoos", label: "Tattoos", kind: .string),
-        .init(key: "piercings", label: "Piercings", kind: .string),
-        .init(key: "aliases", label: "Aliases", kind: .string),
-        .init(key: "gender", label: "Gender", kind: .gender),
-        .init(key: "is_missing", label: "Is missing", kind: .isMissing),
-        .init(key: "tags", label: "Tags", kind: .hierarchicalMulti),
-        .init(key: "tag_count", label: "Tag count", kind: .int),
-        .init(key: "scene_count", label: "Scene count", kind: .int),
-        .init(key: "marker_count", label: "Marker count", kind: .int),
-        .init(key: "image_count", label: "Image count", kind: .int),
-        .init(key: "gallery_count", label: "Gallery count", kind: .int),
-        .init(key: "play_count", label: "Play count", kind: .int),
-        .init(key: "o_counter", label: "O-Count", kind: .int),
-        .init(key: "stash_ids_endpoint", label: "Stash IDs", kind: .stashIDs),
-        .init(key: "rating100", label: "Rating", kind: .int),
+    private static var performerFields: [FilterFieldDescriptor] {
+boolOps() + [
+        .init(key: "name", label: tr("name"), kind: .string),
+        .init(key: "disambiguation", label: tr("disambiguation"), kind: .string),
+        .init(key: "details", label: tr("details"), kind: .string),
+        .init(key: "filter_favorites", label: tr("favourite"), kind: .boolean),
+        .init(key: "birth_year", label: tr("birth_year"), kind: .int),
+        .init(key: "age", label: tr("age"), kind: .int),
+        .init(key: "ethnicity", label: tr("ethnicity"), kind: .string),
+        .init(key: "country", label: tr("country"), kind: .string),
+        .init(key: "eye_color", label: tr("eye_color"), kind: .string),
+        .init(key: "height_cm", label: tr("height_cm"), kind: .int),
+        .init(key: "measurements", label: tr("measurements"), kind: .string),
+        .init(key: "fake_tits", label: tr("implants"), kind: .string),
+        .init(key: "penis_length", label: tr("penis_length"), kind: .float),
+        .init(key: "circumcised", label: tr("circumcised"), kind: .circumcision),
+        .init(key: "career_start", label: tr("career_start"), kind: .date),
+        .init(key: "career_end", label: tr("career_end"), kind: .date),
+        .init(key: "tattoos", label: tr("tattoos"), kind: .string),
+        .init(key: "piercings", label: tr("piercings"), kind: .string),
+        .init(key: "aliases", label: tr("aliases"), kind: .string),
+        .init(key: "gender", label: tr("gender"), kind: .gender),
+        .init(key: "is_missing", label: tr("is_missing"), kind: .isMissing),
+        .init(key: "tags", label: tr("tags"), kind: .hierarchicalMulti),
+        .init(key: "tag_count", label: tr("tag_count"), kind: .int),
+        .init(key: "scene_count", label: tr("scene_count"), kind: .int),
+        .init(key: "marker_count", label: tr("marker_count"), kind: .int),
+        .init(key: "image_count", label: tr("image_count"), kind: .int),
+        .init(key: "gallery_count", label: tr("gallery_count"), kind: .int),
+        .init(key: "play_count", label: tr("play_count"), kind: .int),
+        .init(key: "o_counter", label: tr("o_count"), kind: .int),
+        .init(key: "stash_ids_endpoint", label: tr("stash_ids"), kind: .stashIDs),
+        .init(key: "rating100", label: tr("rating"), kind: .int),
         .init(key: "url", label: "URL", kind: .string),
-        .init(key: "hair_color", label: "Hair color", kind: .string),
-        .init(key: "weight", label: "Weight", kind: .int),
-        .init(key: "death_year", label: "Death year", kind: .int),
-        .init(key: "studios", label: "Studios", kind: .hierarchicalMulti),
-        .init(key: "groups", label: "Groups", kind: .hierarchicalMulti),
-        .init(key: "performers", label: "Performers", kind: .multi),
-        .init(key: "ignore_auto_tag", label: "Ignore auto-tag", kind: .boolean),
-        .init(key: "birthdate", label: "Birthdate", kind: .date),
-        .init(key: "death_date", label: "Death date", kind: .date),
-        .init(key: "scenes_filter", label: "Scenes filter", kind: .nestedFilter, nestedMode: .scenes),
-        .init(key: "images_filter", label: "Images filter", kind: .nestedFilter, nestedMode: .images),
-        .init(key: "galleries_filter", label: "Galleries filter", kind: .nestedFilter, nestedMode: .galleries),
-        .init(key: "tags_filter", label: "Tags filter", kind: .nestedFilter, nestedMode: .tags),
-        .init(key: "markers_filter", label: "Markers filter", kind: .nestedFilter, nestedMode: .sceneMarkers),
-        .init(key: "created_at", label: "Created", kind: .timestamp),
-        .init(key: "updated_at", label: "Updated", kind: .timestamp),
-        .init(key: "custom_fields", label: "Custom fields", kind: .customFields),
-        .init(key: "stash_id_endpoint", label: "Stash ID", kind: .stashID)
+        .init(key: "hair_color", label: tr("hair_color"), kind: .string),
+        .init(key: "weight", label: tr("weight"), kind: .int),
+        .init(key: "death_year", label: tr("death_year"), kind: .int),
+        .init(key: "studios", label: tr("studios"), kind: .hierarchicalMulti),
+        .init(key: "groups", label: tr("groups"), kind: .hierarchicalMulti),
+        .init(key: "performers", label: tr("performers"), kind: .multi),
+        .init(key: "ignore_auto_tag", label: tr("ignore_auto_tag"), kind: .boolean),
+        .init(key: "birthdate", label: tr("birthdate"), kind: .date),
+        .init(key: "death_date", label: tr("death_date"), kind: .date),
+        .init(key: "scenes_filter", label: tr("scenes_filter"), kind: .nestedFilter, nestedMode: .scenes),
+        .init(key: "images_filter", label: tr("images_filter"), kind: .nestedFilter, nestedMode: .images),
+        .init(key: "galleries_filter", label: tr("galleries_filter"), kind: .nestedFilter, nestedMode: .galleries),
+        .init(key: "tags_filter", label: tr("tags_filter"), kind: .nestedFilter, nestedMode: .tags),
+        .init(key: "markers_filter", label: tr("markers_filter"), kind: .nestedFilter, nestedMode: .sceneMarkers),
+        .init(key: "created_at", label: tr("created"), kind: .timestamp),
+        .init(key: "updated_at", label: tr("updated"), kind: .timestamp),
+        .init(key: "custom_fields", label: tr("custom_fields"), kind: .customFields),
+        .init(key: "stash_id_endpoint", label: tr("stash_id"), kind: .stashID)
     ]
+    }
 
     // MARK: - Studios
 
-    private static let studioFields: [FilterFieldDescriptor] = boolOps() + [
-        .init(key: "name", label: "Name", kind: .string),
-        .init(key: "details", label: "Details", kind: .string),
-        .init(key: "parents", label: "Parents", kind: .multi),
-        .init(key: "stash_ids_endpoint", label: "Stash IDs", kind: .stashIDs),
-        .init(key: "stash_id_endpoint", label: "Stash ID", kind: .stashID),
-        .init(key: "tags", label: "Tags", kind: .hierarchicalMulti),
-        .init(key: "is_missing", label: "Is missing", kind: .isMissing),
-        .init(key: "rating100", label: "Rating", kind: .int),
-        .init(key: "favorite", label: "Favorite", kind: .boolean),
-        .init(key: "scene_count", label: "Scene count", kind: .int),
-        .init(key: "image_count", label: "Image count", kind: .int),
-        .init(key: "gallery_count", label: "Gallery count", kind: .int),
-        .init(key: "group_count", label: "Group count", kind: .int),
-        .init(key: "tag_count", label: "Tag count", kind: .int),
+    private static var studioFields: [FilterFieldDescriptor] {
+boolOps() + [
+        .init(key: "name", label: tr("name"), kind: .string),
+        .init(key: "details", label: tr("details"), kind: .string),
+        .init(key: "parents", label: tr("parents"), kind: .multi),
+        .init(key: "stash_ids_endpoint", label: tr("stash_ids"), kind: .stashIDs),
+        .init(key: "stash_id_endpoint", label: tr("stash_id"), kind: .stashID),
+        .init(key: "tags", label: tr("tags"), kind: .hierarchicalMulti),
+        .init(key: "is_missing", label: tr("is_missing"), kind: .isMissing),
+        .init(key: "rating100", label: tr("rating"), kind: .int),
+        .init(key: "favorite", label: tr("favourite"), kind: .boolean),
+        .init(key: "scene_count", label: tr("scene_count"), kind: .int),
+        .init(key: "image_count", label: tr("image_count"), kind: .int),
+        .init(key: "gallery_count", label: tr("gallery_count"), kind: .int),
+        .init(key: "group_count", label: tr("group_count"), kind: .int),
+        .init(key: "tag_count", label: tr("tag_count"), kind: .int),
         .init(key: "url", label: "URL", kind: .string),
-        .init(key: "aliases", label: "Aliases", kind: .string),
-        .init(key: "child_count", label: "Child count", kind: .int),
-        .init(key: "ignore_auto_tag", label: "Ignore auto-tag", kind: .boolean),
-        .init(key: "organized", label: "Organized", kind: .boolean),
-        .init(key: "scenes_filter", label: "Scenes filter", kind: .nestedFilter, nestedMode: .scenes),
-        .init(key: "images_filter", label: "Images filter", kind: .nestedFilter, nestedMode: .images),
-        .init(key: "galleries_filter", label: "Galleries filter", kind: .nestedFilter, nestedMode: .galleries),
-        .init(key: "groups_filter", label: "Groups filter", kind: .nestedFilter, nestedMode: .groups),
-        .init(key: "created_at", label: "Created", kind: .timestamp),
-        .init(key: "updated_at", label: "Updated", kind: .timestamp),
-        .init(key: "custom_fields", label: "Custom fields", kind: .customFields)
+        .init(key: "aliases", label: tr("aliases"), kind: .string),
+        .init(key: "child_count", label: tr("child_count"), kind: .int),
+        .init(key: "ignore_auto_tag", label: tr("ignore_auto_tag"), kind: .boolean),
+        .init(key: "organized", label: tr("organized"), kind: .boolean),
+        .init(key: "scenes_filter", label: tr("scenes_filter"), kind: .nestedFilter, nestedMode: .scenes),
+        .init(key: "images_filter", label: tr("images_filter"), kind: .nestedFilter, nestedMode: .images),
+        .init(key: "galleries_filter", label: tr("galleries_filter"), kind: .nestedFilter, nestedMode: .galleries),
+        .init(key: "groups_filter", label: tr("groups_filter"), kind: .nestedFilter, nestedMode: .groups),
+        .init(key: "created_at", label: tr("created"), kind: .timestamp),
+        .init(key: "updated_at", label: tr("updated"), kind: .timestamp),
+        .init(key: "custom_fields", label: tr("custom_fields"), kind: .customFields)
     ]
+    }
 
     // MARK: - Galleries
 
-    private static let galleryFields: [FilterFieldDescriptor] = boolOps() + [
+    private static var galleryFields: [FilterFieldDescriptor] {
+boolOps() + [
         .init(key: "id", label: "ID", kind: .int),
-        .init(key: "title", label: "Title", kind: .string),
-        .init(key: "details", label: "Details", kind: .string),
-        .init(key: "checksum", label: "Checksum", kind: .string),
-        .init(key: "path", label: "Path", kind: .string),
-        .init(key: "file_count", label: "File count", kind: .int),
-        .init(key: "is_missing", label: "Is missing", kind: .isMissing),
-        .init(key: "is_zip", label: "Is zip", kind: .boolean),
-        .init(key: "rating100", label: "Rating", kind: .int),
-        .init(key: "organized", label: "Organized", kind: .boolean),
-        .init(key: "average_resolution", label: "Avg resolution", kind: .resolution),
-        .init(key: "has_chapters", label: "Has chapters", kind: .hasChapters),
-        .init(key: "scenes", label: "Scenes", kind: .multi),
-        .init(key: "studios", label: "Studios", kind: .hierarchicalMulti),
-        .init(key: "tags", label: "Tags", kind: .hierarchicalMulti),
-        .init(key: "tag_count", label: "Tag count", kind: .int),
-        .init(key: "performer_tags", label: "Performer tags", kind: .hierarchicalMulti),
-        .init(key: "performers", label: "Performers", kind: .multi),
-        .init(key: "performer_count", label: "Performer count", kind: .int),
-        .init(key: "performer_favorite", label: "Performer favorite", kind: .boolean),
-        .init(key: "performer_age", label: "Performer age", kind: .int),
-        .init(key: "image_count", label: "Image count", kind: .int),
+        .init(key: "title", label: tr("title"), kind: .string),
+        .init(key: "details", label: tr("details"), kind: .string),
+        .init(key: "checksum", label: tr("checksum"), kind: .string),
+        .init(key: "path", label: tr("path"), kind: .string),
+        .init(key: "file_count", label: tr("file_count"), kind: .int),
+        .init(key: "is_missing", label: tr("is_missing"), kind: .isMissing),
+        .init(key: "is_zip", label: tr("is_zip"), kind: .boolean),
+        .init(key: "rating100", label: tr("rating"), kind: .int),
+        .init(key: "organized", label: tr("organized"), kind: .boolean),
+        .init(key: "average_resolution", label: tr("avg_resolution"), kind: .resolution),
+        .init(key: "has_chapters", label: tr("has_chapters"), kind: .hasChapters),
+        .init(key: "scenes", label: tr("scenes"), kind: .multi),
+        .init(key: "studios", label: tr("studios"), kind: .hierarchicalMulti),
+        .init(key: "tags", label: tr("tags"), kind: .hierarchicalMulti),
+        .init(key: "tag_count", label: tr("tag_count"), kind: .int),
+        .init(key: "performer_tags", label: tr("performer_tags"), kind: .hierarchicalMulti),
+        .init(key: "performers", label: tr("performers"), kind: .multi),
+        .init(key: "performer_count", label: tr("performer_count"), kind: .int),
+        .init(key: "performer_favorite", label: tr("performer_favorite"), kind: .boolean),
+        .init(key: "performer_age", label: tr("performer_age"), kind: .int),
+        .init(key: "image_count", label: tr("image_count"), kind: .int),
         .init(key: "url", label: "URL", kind: .string),
-        .init(key: "date", label: "Date", kind: .date),
-        .init(key: "created_at", label: "Created", kind: .timestamp),
-        .init(key: "updated_at", label: "Updated", kind: .timestamp),
-        .init(key: "code", label: "Code", kind: .string),
-        .init(key: "photographer", label: "Photographer", kind: .string),
-        .init(key: "scenes_filter", label: "Scenes filter", kind: .nestedFilter, nestedMode: .scenes),
-        .init(key: "images_filter", label: "Images filter", kind: .nestedFilter, nestedMode: .images),
-        .init(key: "performers_filter", label: "Performers filter", kind: .nestedFilter, nestedMode: .performers),
-        .init(key: "studios_filter", label: "Studios filter", kind: .nestedFilter, nestedMode: .studios),
-        .init(key: "tags_filter", label: "Tags filter", kind: .nestedFilter, nestedMode: .tags),
-        .init(key: "parent_folder", label: "Folder", kind: .hierarchicalMulti),
-        .init(key: "files_filter", label: "Files filter", kind: .raw),
-        .init(key: "custom_fields", label: "Custom fields", kind: .customFields)
+        .init(key: "date", label: tr("date"), kind: .date),
+        .init(key: "created_at", label: tr("created"), kind: .timestamp),
+        .init(key: "updated_at", label: tr("updated"), kind: .timestamp),
+        .init(key: "code", label: tr("code"), kind: .string),
+        .init(key: "photographer", label: tr("photographer"), kind: .string),
+        .init(key: "scenes_filter", label: tr("scenes_filter"), kind: .nestedFilter, nestedMode: .scenes),
+        .init(key: "images_filter", label: tr("images_filter"), kind: .nestedFilter, nestedMode: .images),
+        .init(key: "performers_filter", label: tr("performers_filter"), kind: .nestedFilter, nestedMode: .performers),
+        .init(key: "studios_filter", label: tr("studios_filter"), kind: .nestedFilter, nestedMode: .studios),
+        .init(key: "tags_filter", label: tr("tags_filter"), kind: .nestedFilter, nestedMode: .tags),
+        .init(key: "parent_folder", label: tr("folder"), kind: .hierarchicalMulti),
+        .init(key: "files_filter", label: tr("files_filter"), kind: .raw),
+        .init(key: "custom_fields", label: tr("custom_fields"), kind: .customFields)
     ]
+    }
 
     // MARK: - Images
 
-    private static let imageFields: [FilterFieldDescriptor] = boolOps() + [
-        .init(key: "title", label: "Title", kind: .string),
-        .init(key: "details", label: "Details", kind: .string),
+    private static var imageFields: [FilterFieldDescriptor] {
+boolOps() + [
+        .init(key: "title", label: tr("title"), kind: .string),
+        .init(key: "details", label: tr("details"), kind: .string),
         .init(key: "id", label: "ID", kind: .int),
-        .init(key: "checksum", label: "Checksum", kind: .string),
-        .init(key: "phash_distance", label: "PHash distance", kind: .phashDistance),
-        .init(key: "path", label: "Path", kind: .string),
-        .init(key: "file_count", label: "File count", kind: .int),
-        .init(key: "rating100", label: "Rating", kind: .int),
-        .init(key: "date", label: "Date", kind: .date),
+        .init(key: "checksum", label: tr("checksum"), kind: .string),
+        .init(key: "phash_distance", label: tr("phash_distance"), kind: .phashDistance),
+        .init(key: "path", label: tr("path"), kind: .string),
+        .init(key: "file_count", label: tr("file_count"), kind: .int),
+        .init(key: "rating100", label: tr("rating"), kind: .int),
+        .init(key: "date", label: tr("date"), kind: .date),
         .init(key: "url", label: "URL", kind: .string),
-        .init(key: "organized", label: "Organized", kind: .boolean),
-        .init(key: "o_counter", label: "O-Count", kind: .int),
-        .init(key: "resolution", label: "Resolution", kind: .resolution),
-        .init(key: "orientation", label: "Orientation", kind: .orientation),
-        .init(key: "is_missing", label: "Is missing", kind: .isMissing),
-        .init(key: "studios", label: "Studios", kind: .hierarchicalMulti),
-        .init(key: "tags", label: "Tags", kind: .hierarchicalMulti),
-        .init(key: "tag_count", label: "Tag count", kind: .int),
-        .init(key: "performer_tags", label: "Performer tags", kind: .hierarchicalMulti),
-        .init(key: "performers", label: "Performers", kind: .multi),
-        .init(key: "performer_count", label: "Performer count", kind: .int),
-        .init(key: "performer_favorite", label: "Performer favorite", kind: .boolean),
-        .init(key: "performer_age", label: "Performer age", kind: .int),
-        .init(key: "galleries", label: "Galleries", kind: .multi),
-        .init(key: "created_at", label: "Created", kind: .timestamp),
-        .init(key: "updated_at", label: "Updated", kind: .timestamp),
-        .init(key: "code", label: "Code", kind: .string),
-        .init(key: "photographer", label: "Photographer", kind: .string),
-        .init(key: "galleries_filter", label: "Galleries filter", kind: .nestedFilter, nestedMode: .galleries),
-        .init(key: "performers_filter", label: "Performers filter", kind: .nestedFilter, nestedMode: .performers),
-        .init(key: "studios_filter", label: "Studios filter", kind: .nestedFilter, nestedMode: .studios),
-        .init(key: "tags_filter", label: "Tags filter", kind: .nestedFilter, nestedMode: .tags),
-        .init(key: "folder", label: "Folder", kind: .hierarchicalMulti),
-        .init(key: "files_filter", label: "Files filter", kind: .raw),
-        .init(key: "custom_fields", label: "Custom fields", kind: .customFields)
+        .init(key: "organized", label: tr("organized"), kind: .boolean),
+        .init(key: "o_counter", label: tr("o_count"), kind: .int),
+        .init(key: "resolution", label: tr("resolution"), kind: .resolution),
+        .init(key: "orientation", label: tr("orientation"), kind: .orientation),
+        .init(key: "is_missing", label: tr("is_missing"), kind: .isMissing),
+        .init(key: "studios", label: tr("studios"), kind: .hierarchicalMulti),
+        .init(key: "tags", label: tr("tags"), kind: .hierarchicalMulti),
+        .init(key: "tag_count", label: tr("tag_count"), kind: .int),
+        .init(key: "performer_tags", label: tr("performer_tags"), kind: .hierarchicalMulti),
+        .init(key: "performers", label: tr("performers"), kind: .multi),
+        .init(key: "performer_count", label: tr("performer_count"), kind: .int),
+        .init(key: "performer_favorite", label: tr("performer_favorite"), kind: .boolean),
+        .init(key: "performer_age", label: tr("performer_age"), kind: .int),
+        .init(key: "galleries", label: tr("galleries"), kind: .multi),
+        .init(key: "created_at", label: tr("created"), kind: .timestamp),
+        .init(key: "updated_at", label: tr("updated"), kind: .timestamp),
+        .init(key: "code", label: tr("code"), kind: .string),
+        .init(key: "photographer", label: tr("photographer"), kind: .string),
+        .init(key: "galleries_filter", label: tr("galleries_filter"), kind: .nestedFilter, nestedMode: .galleries),
+        .init(key: "performers_filter", label: tr("performers_filter"), kind: .nestedFilter, nestedMode: .performers),
+        .init(key: "studios_filter", label: tr("studios_filter"), kind: .nestedFilter, nestedMode: .studios),
+        .init(key: "tags_filter", label: tr("tags_filter"), kind: .nestedFilter, nestedMode: .tags),
+        .init(key: "folder", label: tr("folder"), kind: .hierarchicalMulti),
+        .init(key: "files_filter", label: tr("files_filter"), kind: .raw),
+        .init(key: "custom_fields", label: tr("custom_fields"), kind: .customFields)
     ]
+    }
 
     // MARK: - Tags
 
-    private static let tagFields: [FilterFieldDescriptor] = boolOps() + [
-        .init(key: "name", label: "Name", kind: .string),
-        .init(key: "sort_name", label: "Sort name", kind: .string),
-        .init(key: "aliases", label: "Aliases", kind: .string),
-        .init(key: "favorite", label: "Favorite", kind: .boolean),
-        .init(key: "description", label: "Description", kind: .string),
-        .init(key: "is_missing", label: "Is missing", kind: .isMissing),
-        .init(key: "scene_count", label: "Scene count", kind: .hierarchicalCount),
-        .init(key: "image_count", label: "Image count", kind: .hierarchicalCount),
-        .init(key: "gallery_count", label: "Gallery count", kind: .hierarchicalCount),
-        .init(key: "performer_count", label: "Performer count", kind: .hierarchicalCount),
-        .init(key: "studio_count", label: "Studio count", kind: .hierarchicalCount),
-        .init(key: "group_count", label: "Group count", kind: .hierarchicalCount),
-        .init(key: "marker_count", label: "Marker count", kind: .hierarchicalCount),
-        .init(key: "parents", label: "Parents", kind: .hierarchicalMulti),
-        .init(key: "children", label: "Children", kind: .hierarchicalMulti),
-        .init(key: "parent_count", label: "Parent count", kind: .int),
-        .init(key: "child_count", label: "Child count", kind: .int),
-        .init(key: "ignore_auto_tag", label: "Ignore auto-tag", kind: .boolean),
-        .init(key: "stash_ids_endpoint", label: "Stash IDs", kind: .stashIDs),
-        .init(key: "stash_id_endpoint", label: "Stash ID", kind: .stashID),
-        .init(key: "scenes_filter", label: "Scenes filter", kind: .nestedFilter, nestedMode: .scenes),
-        .init(key: "images_filter", label: "Images filter", kind: .nestedFilter, nestedMode: .images),
-        .init(key: "galleries_filter", label: "Galleries filter", kind: .nestedFilter, nestedMode: .galleries),
-        .init(key: "groups_filter", label: "Groups filter", kind: .nestedFilter, nestedMode: .groups),
-        .init(key: "performers_filter", label: "Performers filter", kind: .nestedFilter, nestedMode: .performers),
-        .init(key: "studios_filter", label: "Studios filter", kind: .nestedFilter, nestedMode: .studios),
-        .init(key: "markers_filter", label: "Markers filter", kind: .nestedFilter, nestedMode: .sceneMarkers),
-        .init(key: "created_at", label: "Created", kind: .timestamp),
-        .init(key: "updated_at", label: "Updated", kind: .timestamp),
-        .init(key: "custom_fields", label: "Custom fields", kind: .customFields)
+    private static var tagFields: [FilterFieldDescriptor] {
+boolOps() + [
+        .init(key: "name", label: tr("name"), kind: .string),
+        .init(key: "sort_name", label: tr("sort_name"), kind: .string),
+        .init(key: "aliases", label: tr("aliases"), kind: .string),
+        .init(key: "favorite", label: tr("favourite"), kind: .boolean),
+        .init(key: "description", label: tr("description"), kind: .string),
+        .init(key: "is_missing", label: tr("is_missing"), kind: .isMissing),
+        .init(key: "scene_count", label: tr("scene_count"), kind: .hierarchicalCount),
+        .init(key: "image_count", label: tr("image_count"), kind: .hierarchicalCount),
+        .init(key: "gallery_count", label: tr("gallery_count"), kind: .hierarchicalCount),
+        .init(key: "performer_count", label: tr("performer_count"), kind: .hierarchicalCount),
+        .init(key: "studio_count", label: tr("studio_count"), kind: .hierarchicalCount),
+        .init(key: "group_count", label: tr("group_count"), kind: .hierarchicalCount),
+        .init(key: "marker_count", label: tr("marker_count"), kind: .hierarchicalCount),
+        .init(key: "parents", label: tr("parents"), kind: .hierarchicalMulti),
+        .init(key: "children", label: tr("children"), kind: .hierarchicalMulti),
+        .init(key: "parent_count", label: tr("parent_count"), kind: .int),
+        .init(key: "child_count", label: tr("child_count"), kind: .int),
+        .init(key: "ignore_auto_tag", label: tr("ignore_auto_tag"), kind: .boolean),
+        .init(key: "stash_ids_endpoint", label: tr("stash_ids"), kind: .stashIDs),
+        .init(key: "stash_id_endpoint", label: tr("stash_id"), kind: .stashID),
+        .init(key: "scenes_filter", label: tr("scenes_filter"), kind: .nestedFilter, nestedMode: .scenes),
+        .init(key: "images_filter", label: tr("images_filter"), kind: .nestedFilter, nestedMode: .images),
+        .init(key: "galleries_filter", label: tr("galleries_filter"), kind: .nestedFilter, nestedMode: .galleries),
+        .init(key: "groups_filter", label: tr("groups_filter"), kind: .nestedFilter, nestedMode: .groups),
+        .init(key: "performers_filter", label: tr("performers_filter"), kind: .nestedFilter, nestedMode: .performers),
+        .init(key: "studios_filter", label: tr("studios_filter"), kind: .nestedFilter, nestedMode: .studios),
+        .init(key: "markers_filter", label: tr("markers_filter"), kind: .nestedFilter, nestedMode: .sceneMarkers),
+        .init(key: "created_at", label: tr("created"), kind: .timestamp),
+        .init(key: "updated_at", label: tr("updated"), kind: .timestamp),
+        .init(key: "custom_fields", label: tr("custom_fields"), kind: .customFields)
     ]
+    }
 
     // MARK: - Groups
 
-    private static let groupFields: [FilterFieldDescriptor] = boolOps() + [
-        .init(key: "name", label: "Name", kind: .string),
-        .init(key: "director", label: "Director", kind: .string),
-        .init(key: "synopsis", label: "Synopsis", kind: .string),
-        .init(key: "duration", label: "Duration (s)", kind: .int),
-        .init(key: "rating100", label: "Rating", kind: .int),
-        .init(key: "studios", label: "Studios", kind: .hierarchicalMulti),
-        .init(key: "is_missing", label: "Is missing", kind: .isMissing),
+    private static var groupFields: [FilterFieldDescriptor] {
+boolOps() + [
+        .init(key: "name", label: tr("name"), kind: .string),
+        .init(key: "director", label: tr("director"), kind: .string),
+        .init(key: "synopsis", label: tr("synopsis"), kind: .string),
+        .init(key: "duration", label: tr("duration_s"), kind: .int),
+        .init(key: "rating100", label: tr("rating"), kind: .int),
+        .init(key: "studios", label: tr("studios"), kind: .hierarchicalMulti),
+        .init(key: "is_missing", label: tr("is_missing"), kind: .isMissing),
         .init(key: "url", label: "URL", kind: .string),
-        .init(key: "performers", label: "Performers", kind: .multi),
-        .init(key: "tags", label: "Tags", kind: .hierarchicalMulti),
-        .init(key: "tag_count", label: "Tag count", kind: .int),
-        .init(key: "date", label: "Date", kind: .date),
-        .init(key: "created_at", label: "Created", kind: .timestamp),
-        .init(key: "updated_at", label: "Updated", kind: .timestamp),
-        .init(key: "o_counter", label: "O-Count", kind: .int),
-        .init(key: "containing_groups", label: "Containing groups", kind: .hierarchicalMulti),
-        .init(key: "sub_groups", label: "Sub groups", kind: .hierarchicalMulti),
-        .init(key: "containing_group_count", label: "Containing group count", kind: .int),
-        .init(key: "sub_group_count", label: "Sub group count", kind: .int),
-        .init(key: "scene_count", label: "Scene count", kind: .int),
-        .init(key: "scenes_filter", label: "Scenes filter", kind: .nestedFilter, nestedMode: .scenes),
-        .init(key: "studios_filter", label: "Studios filter", kind: .nestedFilter, nestedMode: .studios),
-        .init(key: "custom_fields", label: "Custom fields", kind: .customFields)
+        .init(key: "performers", label: tr("performers"), kind: .multi),
+        .init(key: "tags", label: tr("tags"), kind: .hierarchicalMulti),
+        .init(key: "tag_count", label: tr("tag_count"), kind: .int),
+        .init(key: "date", label: tr("date"), kind: .date),
+        .init(key: "created_at", label: tr("created"), kind: .timestamp),
+        .init(key: "updated_at", label: tr("updated"), kind: .timestamp),
+        .init(key: "o_counter", label: tr("o_count"), kind: .int),
+        .init(key: "containing_groups", label: tr("containing_groups"), kind: .hierarchicalMulti),
+        .init(key: "sub_groups", label: "Sub-Groups", kind: .hierarchicalMulti),
+        .init(key: "containing_group_count", label: tr("containing_group_count"), kind: .int),
+        .init(key: "sub_group_count", label: tr("sub_group_count"), kind: .int),
+        .init(key: "scene_count", label: tr("scene_count"), kind: .int),
+        .init(key: "scenes_filter", label: tr("scenes_filter"), kind: .nestedFilter, nestedMode: .scenes),
+        .init(key: "studios_filter", label: tr("studios_filter"), kind: .nestedFilter, nestedMode: .studios),
+        .init(key: "custom_fields", label: tr("custom_fields"), kind: .customFields)
     ]
+    }
 
     // MARK: - Value suggestions
 
@@ -447,19 +461,21 @@ enum FilterFieldCatalog {
 
     // MARK: - Markers
 
-    private static let markerFields: [FilterFieldDescriptor] = [
-        .init(key: "tags", label: "Tags", kind: .hierarchicalMulti),
-        .init(key: "scene_tags", label: "Scene tags", kind: .hierarchicalMulti),
-        .init(key: "performers", label: "Performers", kind: .multi),
-        .init(key: "scenes", label: "Scenes", kind: .multi),
-        .init(key: "duration", label: "Duration (s)", kind: .float),
-        .init(key: "created_at", label: "Created", kind: .timestamp),
-        .init(key: "updated_at", label: "Updated", kind: .timestamp),
-        .init(key: "scene_date", label: "Scene date", kind: .date),
-        .init(key: "scene_created_at", label: "Scene created", kind: .timestamp),
-        .init(key: "scene_updated_at", label: "Scene updated", kind: .timestamp),
-        .init(key: "scene_filter", label: "Scene filter", kind: .nestedFilter, nestedMode: .scenes)
+    private static var markerFields: [FilterFieldDescriptor] {
+[
+        .init(key: "tags", label: tr("tags"), kind: .hierarchicalMulti),
+        .init(key: "scene_tags", label: tr("scene_tags"), kind: .hierarchicalMulti),
+        .init(key: "performers", label: tr("performers"), kind: .multi),
+        .init(key: "scenes", label: tr("scenes"), kind: .multi),
+        .init(key: "duration", label: tr("duration_s"), kind: .float),
+        .init(key: "created_at", label: tr("created"), kind: .timestamp),
+        .init(key: "updated_at", label: tr("updated"), kind: .timestamp),
+        .init(key: "scene_date", label: tr("scene_date"), kind: .date),
+        .init(key: "scene_created_at", label: tr("scene_created"), kind: .timestamp),
+        .init(key: "scene_updated_at", label: tr("scene_updated"), kind: .timestamp),
+        .init(key: "scene_filter", label: tr("scene_filter"), kind: .nestedFilter, nestedMode: .scenes)
     ]
+    }
 }
 
 // MARK: - Sort catalog
@@ -573,18 +589,18 @@ extension FilterFieldCatalog {
 
 /// Einzeiler für eingeklappte Kriterien-Karten ("≥ 5", "3 selected", "Female").
 enum FilterCriterionSummary {
-    static let anyText = "Any"
+    static var anyText: String { tr("any") }
 
     static func text(for field: FilterFieldDescriptor, value: Any?) -> String {
         guard let value else { return anyText }
         switch field.kind {
         case .boolean:
             guard let b = value as? Bool else { return anyText }
-            return b ? "Yes" : "No"
+            return b ? tr("yes") : tr("no")
         case .isMissing, .hasMarkers, .hasChapters:
             guard let s = value as? String, !s.isEmpty else { return anyText }
             if field.kind == .isMissing { return s.replacingOccurrences(of: "_", with: " ").capitalized }
-            return s == "true" ? "Yes" : "No"
+            return s == "true" ? tr("yes") : tr("no")
         case .booleanGroup:
             return anyText
         case .nestedFilter, .raw:
@@ -602,8 +618,8 @@ enum FilterCriterionSummary {
     private static func dictSummary(field: FilterFieldDescriptor, dict: [String: Any]) -> String {
         let modifierRaw = (dict["modifier"] as? String) ?? ""
         let modifier = StashCriterionModifier(rawValue: modifierRaw)
-        if modifier == .isNull { return "Not set" }
-        if modifier == .notNull { return "Any value" }
+        if modifier == .isNull { return tr("not_set") }
+        if modifier == .notNull { return tr("any_value") }
 
         switch field.kind {
         case .hierarchicalMulti, .multi:
@@ -624,7 +640,7 @@ enum FilterCriterionSummary {
             return list.isEmpty ? anyText : list.map(prettify).joined(separator: ", ")
         case .duplication:
             guard let dup = dict["duplicated"] as? Bool else { return anyText }
-            return dup ? "Duplicated" : "Unique"
+            return dup ? tr("duplicated") : tr("unique")
         case .stashID, .stashIDs:
             return modifier?.label ?? anyText
         default:

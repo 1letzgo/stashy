@@ -42,26 +42,26 @@ struct TVStudioDetailView: View {
             infoGrid: { studio in
                 let counts = studioCounts.display(for: studio, includeSubStudios: includeSubStudios)
                 LazyVGrid(columns: TVGridSpec.infoColumns, alignment: .leading, spacing: 12) {
-                    Text("Scenes").font(.title3).foregroundStyle(.secondary)
+                    Text(tr("scenes")).font(.title3).foregroundStyle(.secondary)
                     Text("\(counts.scenes)").font(.title3).foregroundColor(.white)
 
                     if let oCount = counts.oCount, oCount > 0 {
-                        Text("O Count").font(.title3).foregroundStyle(.secondary)
+                        Text(tr("o_count")).font(.title3).foregroundStyle(.secondary)
                         Text("\(oCount)").font(.title3).foregroundColor(.white)
                     }
 
                     if let performerCount = counts.performers, performerCount > 0 {
-                        Text("Performers").font(.title3).foregroundStyle(.secondary)
+                        Text(tr("performers")).font(.title3).foregroundStyle(.secondary)
                         Text("\(performerCount)").font(.title3).foregroundColor(.white)
                     }
 
                     if let galleryCount = counts.galleries, galleryCount > 0 {
-                        Text("Galleries").font(.title3).foregroundStyle(.secondary)
+                        Text(tr("galleries")).font(.title3).foregroundStyle(.secondary)
                         Text("\(galleryCount)").font(.title3).foregroundColor(.white)
                     }
 
                     if let rating = studio.rating100 {
-                        Text("Rating").font(.title3).foregroundStyle(.secondary)
+                        Text(tr("rating")).font(.title3).foregroundStyle(.secondary)
                         HStack(spacing: 5) {
                             Image(systemName: "star.fill").foregroundColor(.yellow)
                             Text(String(format: "%.1f", Double(rating) / 20.0)).font(.title3).foregroundColor(.white)
@@ -69,7 +69,7 @@ struct TVStudioDetailView: View {
                     }
 
                     if studio.favorite == true {
-                        Text("Favorite").font(.title3).foregroundStyle(.secondary)
+                        Text(tr("favourite")).font(.title3).foregroundStyle(.secondary)
                         Image(systemName: "heart.fill").foregroundColor(.red).font(.title3)
                     }
 
@@ -106,7 +106,7 @@ struct TVStudioDetailView: View {
             TVDetailHeaderAction(
                 id: "favorite",
                 icon: isFavorite ? "heart.fill" : "heart",
-                title: isFavorite ? "Favorite" : "Add Favorite",
+                title: isFavorite ? tr("favourite") : tr("action_add_favorite"),
                 perform: toggleFavorite
             ),
             TVDetailHeaderAction(
@@ -163,6 +163,6 @@ struct TVStudioDetailView: View {
 
 #Preview {
     NavigationStack {
-        TVStudioDetailView(studioId: "1", studioName: "Example Studio")
+        TVStudioDetailView(studioId: "1", studioName: tr("example_studio"))
     }
 }

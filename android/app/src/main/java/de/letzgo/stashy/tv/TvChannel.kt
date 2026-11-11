@@ -1,5 +1,7 @@
 package de.letzgo.stashy.tv
 
+import de.letzgo.stashy.R
+import de.letzgo.stashy.tr
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateListOf
@@ -25,7 +27,7 @@ import kotlinx.serialization.json.buildJsonObject
 
 /** iOS: `TVChannel.Scope` — entity-scoped channels, keyed by the scene-filter field. */
 enum class TvChannelScope(val raw: String, val label: String) {
-    Performer("performers", "Performer"), Studio("studios", "Studio"), Tag("tags", "Tag"), Group("groups", "Group");
+    Performer("performers", tr(R.string.performer)), Studio("studios", tr(R.string.studio)), Tag("tags", tr(R.string.tag)), Group("groups", tr(R.string.group));
 
     /** Everything but `performers` is a `HierarchicalMultiCriterionInput` (needs `depth`). */
     val isHierarchical: Boolean get() = this != Performer
@@ -58,9 +60,9 @@ data class TvChannel(
     }
 
     val subtitle: String get() = when (kind) {
-        Kind.SavedFilter -> "Saved filter"
-        Kind.Scoped -> scope?.label ?: "Channel"
-        else -> "Channel"
+        Kind.SavedFilter -> tr(R.string.saved_filter)
+        Kind.Scoped -> scope?.label ?: tr(R.string.channel)
+        else -> tr(R.string.channel)
     }
 
     /** Ad-hoc scene filter of an entity channel (it has no counterpart on the server). */
@@ -84,8 +86,8 @@ data class TvChannel(
     )
 
     companion object {
-        val recentlyReleased = TvChannel(Kind.RecentlyReleased, "Recently Released")
-        val recentlyAdded = TvChannel(Kind.RecentlyAdded, "Recently Added")
+        val recentlyReleased = TvChannel(Kind.RecentlyReleased, tr(R.string.recently_released))
+        val recentlyAdded = TvChannel(Kind.RecentlyAdded, tr(R.string.recently_added))
         fun savedFilter(filter: SavedFilter) = TvChannel(Kind.SavedFilter, filter.name, savedFilter = filter)
         fun performer(id: String, name: String) = TvChannel(Kind.Scoped, name, scope = TvChannelScope.Performer, entityId = id)
         fun studio(id: String, name: String) = TvChannel(Kind.Scoped, name, scope = TvChannelScope.Studio, entityId = id)
@@ -146,7 +148,7 @@ class TvChannelSession(val channel: TvChannel) {
             page?.let { scenes.addAll(it.items); totalCount = it.count }
             currentPage = 1
             isLoading = false
-            if (scenes.isEmpty()) errorMessage = "No scenes in this channel" else play(0)
+            if (scenes.isEmpty()) errorMessage = tr(R.string.empty_scenes_in_this_channel) else play(0)
         }
     }
 
@@ -186,7 +188,7 @@ class TvChannelSession(val channel: TvChannel) {
 
     private fun handleMissingStream() {
         skipFailures++
-        if (skipFailures >= maxSkipFailures) { errorMessage = "Unable to play scenes in this channel"; return }
+        if (skipFailures >= maxSkipFailures) { errorMessage = tr(R.string.error_play_scenes_in_this_channel); return }
         playNext()
     }
 

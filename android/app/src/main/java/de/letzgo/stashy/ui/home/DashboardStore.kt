@@ -1,5 +1,7 @@
 package de.letzgo.stashy.ui.home
 
+import de.letzgo.stashy.R
+import de.letzgo.stashy.tr
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
@@ -159,7 +161,7 @@ object DashboardStore {
             try {
                 statistics = DashboardRepository.statistics()
             } catch (e: Exception) {
-                errorMessage = e.message ?: "Statistics could not be loaded"
+                errorMessage = e.message ?: tr(R.string.statistics_could_not_be_loaded)
             } finally {
                 lastStatsFetch = System.currentTimeMillis()
                 isLoadingStatistics = false

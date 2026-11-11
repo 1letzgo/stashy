@@ -93,7 +93,7 @@ struct TVMatchView: View {
 
     private var header: some View {
         HStack(alignment: .center, spacing: 24) {
-            Text("Match")
+            Text(tr("match"))
                 .font(.largeTitle)
                 .fontWeight(.bold)
 
@@ -108,14 +108,14 @@ struct TVMatchView: View {
 
             if model.section == .battle {
                 TVOptionPickerButton(
-                    title: "Mode",
+                    title: tr("mode"),
                     icon: "flame.fill",
                     options: modeOptions,
                     selection: $model.duelMode
                 )
             }
             TVOptionPickerButton(
-                title: "Section",
+                title: tr("section"),
                 icon: "square.grid.2x2",
                 options: sectionOptions,
                 selection: $model.section
@@ -160,7 +160,7 @@ struct TVMatchView: View {
         } else if model.duelMode == .bracket, model.bracket?.isFinished == true {
             bracketResults
         } else if model.isLoadingPair && model.left == nil {
-            loadingBox("Loading pair…")
+            loadingBox(tr("loading_pair"))
         } else if let l = model.left, let r = model.right {
             VStack(alignment: .leading, spacing: 32) {
                 HStack(alignment: .top, spacing: Self.columnSpacing) {
@@ -198,12 +198,12 @@ struct TVMatchView: View {
             }
             .buttonStyle(.card)
             .focused($focusedCard, equals: leftWins)
-            .accessibilityLabel("Choose \(performer.displayName)")
+            .accessibilityLabel(tr("action_choose_arg", performer.displayName))
 
             Button {
                 path?.wrappedValue.append(TVPerformerLink(id: performer.id, name: performer.name))
             } label: {
-                TVMatchActionLabel(icon: "person.crop.rectangle", title: "Profile")
+                TVMatchActionLabel(icon: "person.crop.rectangle", title: tr("profile"))
             }
             .buttonStyle(.card)
         }
@@ -214,15 +214,15 @@ struct TVMatchView: View {
     private var duelActions: some View {
         HStack(spacing: 24) {
             if model.duelMode == .bracket {
-                actionButton("Undo", icon: "arrow.uturn.backward") {
+                actionButton(tr("action_undo"), icon: "arrow.uturn.backward") {
                     model.undoBracketPick()
                 }
             } else if model.duelMode == .champion {
-                actionButton("Stop", icon: "stop.circle") {
+                actionButton(tr("action_stop"), icon: "stop.circle") {
                     model.startNewClimbRun()
                 }
             } else {
-                actionButton("Draw", icon: "equal.circle") {
+                actionButton(tr("draw"), icon: "equal.circle") {
                     Task { await model.skipDraw() }
                 }
             }
@@ -230,11 +230,11 @@ struct TVMatchView: View {
             if model.duelMode == .bracket {
                 EmptyView()
             } else if model.duelMode == .placement {
-                actionButton("Stop", icon: "stop.circle") {
+                actionButton(tr("action_stop"), icon: "stop.circle") {
                     model.startNewClimbRun()
                 }
             } else {
-                actionButton("New pair", icon: "arrow.triangle.2.circlepath") {
+                actionButton(tr("new_pair"), icon: "arrow.triangle.2.circlepath") {
                     guard !model.isLoadingPair else { return }
                     Task { await model.loadDuelPair() }
                 }
@@ -259,18 +259,18 @@ struct TVMatchView: View {
                 .clipShape(RoundedRectangle(cornerRadius: 16))
 
             VStack(alignment: .leading, spacing: 20) {
-                Text("Legend!")
+                Text(tr("legend_2"))
                     .font(.largeTitle)
                     .fontWeight(.bold)
                 Text(victor.displayName)
                     .font(.title2)
-                Text("\(model.climbWins) wins · cleared the ladder")
+                Text(tr("hint_arg_wins_cleared_ladder", model.climbWins))
                     .font(.headline)
                     .foregroundStyle(.secondary)
                 Button {
                     model.startNewClimbRun()
                 } label: {
-                    TVMatchActionLabel(icon: "arrow.clockwise", title: "New run")
+                    TVMatchActionLabel(icon: "arrow.clockwise", title: tr("new_run"))
                 }
                 .buttonStyle(.card)
                 .padding(.top, 12)
@@ -288,7 +288,7 @@ struct TVMatchView: View {
                         .frame(width: 240, height: 320)
                         .clipShape(RoundedRectangle(cornerRadius: 16))
                     VStack(alignment: .leading, spacing: 12) {
-                        Text("Champion")
+                        Text(tr("champion"))
                             .font(.headline)
                             .foregroundStyle(.secondary)
                         Text(champ.displayName)
@@ -300,32 +300,32 @@ struct TVMatchView: View {
 
             HStack(spacing: 24) {
                 if model.bracketIsApplied {
-                    actionButton("New tournament", icon: "arrow.triangle.2.circlepath") {
+                    actionButton(tr("new_tournament"), icon: "arrow.triangle.2.circlepath") {
                         model.newBracket()
                     }
                 } else if model.isApplyingBracket || model.isLoadingBracketResults {
-                    Text("Saving ratings \(model.bracketAppliedCount)/\(model.bracketProposals.count)")
+                    Text(tr("saving_ratings_arg_arg", model.bracketAppliedCount, model.bracketProposals.count))
                         .font(.headline)
                         .foregroundStyle(.secondary)
                 } else {
-                    actionButton("Retry", icon: "arrow.clockwise") {
+                    actionButton(tr("action_retry"), icon: "arrow.clockwise") {
                         Task { await model.retryBracketSave() }
                     }
-                    actionButton("End", icon: "xmark") {
+                    actionButton(tr("end"), icon: "xmark") {
                         confirmEndBracket = true
                     }
                 }
             }
             .focusSection()
-            .alert("End tournament?", isPresented: $confirmEndBracket) {
-                Button("End tournament", role: .destructive) { model.newBracket() }
-                Button("Cancel", role: .cancel) {}
+            .alert(tr("confirm_end_tournament"), isPresented: $confirmEndBracket) {
+                Button(tr("end_tournament"), role: .destructive) { model.newBracket() }
+                Button(tr("action_cancel"), role: .cancel) {}
             } message: {
-                Text("Ratings that were not saved are lost.")
+                Text(tr("hint_ratings_that_were_not_saved"))
             }
 
             if model.isLoadingBracketResults && model.bracketProposals.isEmpty {
-                loadingBox("Calculating ratings…")
+                loadingBox(tr("calculating_ratings_menu"))
             } else {
                 LazyVGrid(
                     columns: [GridItem(.adaptive(minimum: 520), spacing: 40)],
@@ -363,16 +363,16 @@ struct TVMatchView: View {
     @ViewBuilder
     private var placementStarters: some View {
         if model.isLoadingPlacementStarters && model.placementStarters.isEmpty {
-            loadingBox("Loading starters…")
+            loadingBox(tr("loading_starters"))
         } else if model.placementStarters.isEmpty {
             ContentUnavailableView(
-                "No starters",
+                tr("empty_starters"),
                 systemImage: "person.2.slash",
                 description: Text(model.errorMessage ?? "")
             )
         } else {
             VStack(alignment: .leading, spacing: 24) {
-                Text("Pick a performer to start the Rise run")
+                Text(tr("hint_pick_performer_to_start_rise"))
                     .font(.title3)
                     .foregroundStyle(.secondary)
                 HStack(alignment: .top, spacing: 32) {
@@ -389,7 +389,7 @@ struct TVMatchView: View {
                                     Text(p.displayName)
                                         .font(.headline)
                                         .lineLimit(1)
-                                    Text("Rating \(p.rating100 ?? 50)")
+                                    Text(tr("rating_arg", p.rating100 ?? 50))
                                         .font(.caption)
                                         .foregroundStyle(.secondary)
                                         .monospacedDigit()
@@ -400,7 +400,7 @@ struct TVMatchView: View {
                             .background(TVThemeFill(role: .secondary))
                         }
                         .buttonStyle(.card)
-                        .accessibilityLabel("Pick \(p.displayName) as Rise starter")
+                        .accessibilityLabel(tr("action_pick_arg_as_rise_starter", p.displayName))
                     }
                 }
                 .focusSection()
@@ -413,9 +413,9 @@ struct TVMatchView: View {
     @ViewBuilder
     private var leaderboardContent: some View {
         if model.isLoadingBoard && model.leaderboard.isEmpty {
-            loadingBox("Loading charts…")
+            loadingBox(tr("loading_charts"))
         } else if model.leaderboard.isEmpty {
-            ContentUnavailableView("No performers", systemImage: "list.number")
+            ContentUnavailableView(tr("empty_performers"), systemImage: "list.number")
         } else {
             LazyVGrid(
                 columns: [GridItem(.adaptive(minimum: 520), spacing: 40)],
@@ -451,18 +451,20 @@ struct TVMatchView: View {
 
     // MARK: - Settings
 
-    private static let genderRows: [(code: String, label: String)] = [
-        ("FEMALE", "Female"),
-        ("MALE", "Male"),
-        ("TRANSGENDER_FEMALE", "Transgender (female)"),
-        ("TRANSGENDER_MALE", "Transgender (male)"),
-        ("NON_BINARY", "Non-binary"),
-        ("INTERSEX", "Intersex")
+    private static var genderRows: [(code: String, label: String)] {
+[
+        ("FEMALE", tr("female")),
+        ("MALE", tr("male")),
+        ("TRANSGENDER_FEMALE", tr("transgender_female")),
+        ("TRANSGENDER_MALE", tr("transgender_male")),
+        ("NON_BINARY", "Non-Binary"),
+        ("INTERSEX", tr("intersex"))
     ]
+    }
 
     private var settingsContent: some View {
         VStack(alignment: .leading, spacing: 16) {
-            Text("Genders in pool")
+            Text(tr("genders_in_pool"))
                 .font(.title3)
                 .fontWeight(.semibold)
             ForEach(Self.genderRows, id: \.code) { row in
@@ -483,7 +485,7 @@ struct TVMatchView: View {
                 }
                 .buttonStyle(.card)
             }
-            Text("At least one gender stays selected. Performers without an image are left out.")
+            Text(tr("hint_at_least_one_gender_stays"))
                 .font(.caption)
                 .foregroundStyle(.secondary)
         }
@@ -638,9 +640,9 @@ private struct TVMatchLeaderboardRow: View {
 
     private var streakLine: String? {
         let parts: [String] = [
-            s.current_streak != 0 ? "Current \(s.current_streak > 0 ? "+" : "")\(s.current_streak)" : nil,
-            s.best_streak > 0 ? "Best +\(s.best_streak)" : nil,
-            s.worst_streak < 0 ? "Worst \(s.worst_streak)" : nil
+            s.current_streak != 0 ? tr("current_arg_arg", s.current_streak > 0 ? "+" : "", s.current_streak) : nil,
+            s.best_streak > 0 ? tr("best_plus_arg", s.best_streak) : nil,
+            s.worst_streak < 0 ? tr("worst_arg", s.worst_streak) : nil
         ].compactMap { $0 }
         return parts.isEmpty ? nil : parts.joined(separator: " · ")
     }
@@ -656,8 +658,8 @@ private struct TVMatchLeaderboardRow: View {
                     .font(.headline)
                     .lineLimit(1)
                 HStack(spacing: 16) {
-                    stat("Rating", "\(performer.rating100 ?? 50)")
-                    stat("Duels", "\(s.total_matches)")
+                    stat(tr("rating"), "\(performer.rating100 ?? 50)")
+                    stat(tr("duels"), "\(s.total_matches)")
                     stat("W", "\(s.wins)")
                     stat("L", "\(s.losses)")
                     stat("D", "\(s.draws)")

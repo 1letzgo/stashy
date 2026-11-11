@@ -1,5 +1,7 @@
 package de.letzgo.stashy.ui.player
 
+import de.letzgo.stashy.R
+import de.letzgo.stashy.tr
 import android.app.Activity
 import android.os.Looper
 import android.view.WindowManager
@@ -55,7 +57,7 @@ object ScreenAwake {
     val keepOn: StateFlow<Boolean> = state.asStateFlow()
 
     fun update(holder: Any, wantsAwake: Boolean) {
-        check(Looper.myLooper() == Looper.getMainLooper()) { "ScreenAwake is main-thread only" }
+        check(Looper.myLooper() == Looper.getMainLooper()) { tr(R.string.screenawake_is_main_thread_only) }
         state.value = registry.update(holder, wantsAwake)
     }
 

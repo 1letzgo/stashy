@@ -38,30 +38,30 @@ struct TVPerformerDetailView: View {
             infoGrid: { performer in
                 LazyVGrid(columns: TVGridSpec.infoColumns, alignment: .leading, spacing: 12) {
                     if let gender = performer.gender, !gender.isEmpty {
-                        Text("Gender").font(.title3).foregroundStyle(.secondary)
+                        Text(tr("gender")).font(.title3).foregroundStyle(.secondary)
                         Text(gender.capitalized).font(.title3).foregroundColor(.white)
                     }
 
                     if let country = performer.country, !country.isEmpty {
-                        Text("Country").font(.title3).foregroundStyle(.secondary)
+                        Text(tr("country")).font(.title3).foregroundStyle(.secondary)
                         Text(country).font(.title3).foregroundColor(.white)
                     }
 
                     if let ethnicity = performer.ethnicity, !ethnicity.isEmpty {
-                        Text("Ethnicity").font(.title3).foregroundStyle(.secondary)
+                        Text(tr("ethnicity")).font(.title3).foregroundStyle(.secondary)
                         Text(ethnicity.capitalized).font(.title3).foregroundColor(.white)
                     }
 
                     if let birthdate = performer.birthdate, !birthdate.isEmpty {
-                        Text("Birthdate").font(.title3).foregroundStyle(.secondary)
+                        Text(tr("birthdate")).font(.title3).foregroundStyle(.secondary)
                         Text(birthdate).font(.title3).foregroundColor(.white)
                     }
 
-                    Text("Scenes").font(.title3).foregroundStyle(.secondary)
+                    Text(tr("scenes")).font(.title3).foregroundStyle(.secondary)
                     Text("\(performer.sceneCount)").font(.title3).foregroundColor(.white)
 
                     if let rating = performer.rating100 {
-                        Text("Rating").font(.title3).foregroundStyle(.secondary)
+                        Text(tr("rating")).font(.title3).foregroundStyle(.secondary)
                         HStack(spacing: 5) {
                             Image(systemName: "star.fill").foregroundColor(.yellow)
                             Text(String(format: "%.1f", Double(rating) / 20.0)).font(.title3).foregroundColor(.white)
@@ -71,7 +71,7 @@ struct TVPerformerDetailView: View {
                     // Summed over the performer's scenes by Stash — read-only, the
                     // counter itself lives on the scenes.
                     if let oCounter = performer.oCounter, oCounter > 0 {
-                        Text("O-Count").font(.title3).foregroundStyle(.secondary)
+                        Text(tr("o_count")).font(.title3).foregroundStyle(.secondary)
                         HStack(spacing: 5) {
                             Image(systemName: "heart.circle").foregroundColor(AppearanceManager.shared.tintColor)
                             Text("\(oCounter)").font(.title3).foregroundColor(.white)
@@ -79,12 +79,12 @@ struct TVPerformerDetailView: View {
                     }
 
                     if performer.favorite == true {
-                        Text("Favorite").font(.title3).foregroundStyle(.secondary)
+                        Text(tr("favourite")).font(.title3).foregroundStyle(.secondary)
                         Image(systemName: "heart.fill").foregroundColor(.red).font(.title3)
                     }
 
                     if let battleLine {
-                        Text("Battle").font(.title3).foregroundStyle(.secondary)
+                        Text(tr("battle")).font(.title3).foregroundStyle(.secondary)
                         Text(battleLine).font(.title3).foregroundColor(.white)
                     }
                 }
@@ -115,7 +115,7 @@ struct TVPerformerDetailView: View {
             TVDetailHeaderAction(
                 id: "favorite",
                 icon: isFavorite ? "heart.fill" : "heart",
-                title: isFavorite ? "Favorite" : "Add Favorite",
+                title: isFavorite ? tr("favourite") : tr("action_add_favorite"),
                 perform: toggleFavorite
             ),
             TVDetailHeaderAction(
@@ -187,6 +187,6 @@ private extension Performer {
 
 #Preview {
     NavigationStack {
-        TVPerformerDetailView(performerId: "1", performerName: "Example Performer")
+        TVPerformerDetailView(performerId: "1", performerName: tr("example_performer"))
     }
 }

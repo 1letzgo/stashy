@@ -1,5 +1,7 @@
 package de.letzgo.stashy.ui
 
+import de.letzgo.stashy.R
+import de.letzgo.stashy.tr
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
@@ -26,8 +28,8 @@ enum class MainTab { Home, Feeds, Tools, Settings, Search }
 
 /** iOS: `CatalogsView.CatalogsTab` (order and icons identical). */
 enum class CatalogTab(val title: String) {
-    Dashboard("Dashboard"), Scenes("Scenes"), Images("Images"), Galleries("Galleries"),
-    Performers("Performers"), Studios("Studios"), Tags("Tags"), Groups("Groups"), Markers("Markers"), Magazine("Magazin");
+    Dashboard(tr(R.string.dashboard)), Scenes(tr(R.string.scenes)), Images(tr(R.string.images)), Galleries(tr(R.string.galleries)),
+    Performers(tr(R.string.performers)), Studios(tr(R.string.studios)), Tags(tr(R.string.tags)), Groups(tr(R.string.groups)), Markers(tr(R.string.markers)), Magazine(tr(R.string.magazin));
 
     val icon get() = when (this) {
         Dashboard -> SF.houseFill; Scenes -> SF.film; Images -> SF.photo; Galleries -> SF.photoStack

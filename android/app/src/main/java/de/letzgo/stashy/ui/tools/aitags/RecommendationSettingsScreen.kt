@@ -1,5 +1,7 @@
 package de.letzgo.stashy.ui.tools.aitags
 
+import de.letzgo.stashy.R
+import de.letzgo.stashy.tr
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -71,7 +73,7 @@ fun RecommendationSettingsView() {
     val firstBuiltAt = androidx.compose.runtime.remember { builtAt }
     androidx.compose.runtime.LaunchedEffect(builtAt) {
         if (builtAt != null && firstBuiltAt != null && builtAt != firstBuiltAt && engine.state == RecommendationState.Ready) {
-            de.letzgo.stashy.ui.tools.showToast("New suggestions on Home")
+            de.letzgo.stashy.ui.tools.showToast(tr(R.string.new_suggestions_on_home))
         }
     }
 
@@ -82,7 +84,7 @@ fun RecommendationSettingsView() {
                 item {
                     GroupedCard {
                         SettingsRow(
-                            if (!isUnlocked) "For You requires stashy+" else if (engine.hasStatistics) "For You is off. Turn it on in Recommendations to show it on Home." else "Turn on Tag suggestions or Similar scenes to show For You on Home.",
+                            if (!isUnlocked) tr(R.string.for_you_requires_stashy_plus) else if (engine.hasStatistics) tr(R.string.hint_for_you_is_off_turn) else tr(R.string.hint_turn_on_tag_suggestions_or),
                             icon = if (!isUnlocked) SF.lock else Icons.Outlined.Info, iconTint = p.secondaryText, titleColor = p.secondaryText,
                         )
                     }
@@ -91,43 +93,43 @@ fun RecommendationSettingsView() {
             }
 
             item {
-                SettingsSectionHeader("For You", isBeta = true)
+                SettingsSectionHeader(tr(R.string.for_you), isBeta = true)
                 GroupedCard {
-                    SettingsRow("Status", icon = SF.sparkles) {
+                    SettingsRow(tr(R.string.status), icon = SF.sparkles) {
                         Text(statusText(), style = NativeType.bodyMedium, color = p.secondaryText)
                     }
                     RowDivider()
                     SettingsRow(
-                        "Refresh suggestions", icon = Icons.Filled.Sync, titleColor = Appearance.tint,
+                        tr(R.string.action_refresh_suggestions), icon = Icons.Filled.Sync, titleColor = Appearance.tint,
                         enabled = isUnlocked && !engine.isRefreshing, onClick = { engine.rebuild() },
                     ) {
                         if (engine.isRefreshing) androidx.compose.material3.CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp, color = p.secondaryText)
                     }
                 }
-                SettingsSectionFooter("Picked on this device from your plays, O-Counts and ratings.")
+                SettingsSectionFooter(tr(R.string.hint_picked_on_this_device_from))
                 SectionSpacer()
             }
 
             item {
-                SettingsSectionHeader("Watch history")
+                SettingsSectionHeader(tr(R.string.watch_history))
                 Box(Modifier.alpha(if (isUnlocked) 1f else 0.5f)) {
                     GroupedCard {
                         Column(Modifier.padding(horizontal = 16.dp, vertical = 12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                            Text("Look back", style = NativeType.bodyLarge, color = p.text)
+                            Text(tr(R.string.look_back), style = NativeType.bodyLarge, color = p.text)
                             Segmented(SceneRecommendations.lookbackChoices, engine.lookbackDays, { "${it}d" }) {
                                 if (isUnlocked) engine.updateLookback(it)
                             }
                         }
                         RowDivider(16.dp)
-                        StepperRow("Suggestions", engine.count, SceneRecommendations.countRange, enabled = isUnlocked) { engine.updateCount(it) }
+                        StepperRow(tr(R.string.suggestions), engine.count, SceneRecommendations.countRange, enabled = isUnlocked) { engine.updateCount(it) }
                     }
                 }
-                SettingsSectionFooter("Scenes played in this period are not suggested.")
+                SettingsSectionFooter(tr(R.string.hint_scenes_played_in_this_period))
                 SectionSpacer()
             }
 
             item {
-                SettingsSectionHeader("What to suggest")
+                SettingsSectionHeader(tr(R.string.what_to_suggest))
                 Box(Modifier.alpha(if (isUnlocked) 1f else 0.5f)) {
                     GroupedCard {
                         Box(Modifier.padding(horizontal = 16.dp, vertical = 12.dp)) {
@@ -142,46 +144,46 @@ fun RecommendationSettingsView() {
             }
 
             item {
-                SettingsSectionHeader("Influence")
+                SettingsSectionHeader(tr(R.string.influence))
                 Box(Modifier.alpha(if (isUnlocked) 1f else 0.5f)) {
                     GroupedCard {
-                        WeightRow("Similar to watched", Icons.Outlined.Layers, engine.similarWeight, isUnlocked) { engine.updateSimilar(it) }
+                        WeightRow(tr(R.string.similar_to_watched), Icons.Outlined.Layers, engine.similarWeight, isUnlocked) { engine.updateSimilar(it) }
                         RowDivider(16.dp)
-                        WeightRow("Performers", SF.personFill, engine.performerWeight, isUnlocked) { engine.updatePerformer(it) }
+                        WeightRow(tr(R.string.performers), SF.personFill, engine.performerWeight, isUnlocked) { engine.updatePerformer(it) }
                         RowDivider(16.dp)
-                        WeightRow("Studios", SF.building2, engine.studioWeight, isUnlocked) { engine.updateStudio(it) }
+                        WeightRow(tr(R.string.studios), SF.building2, engine.studioWeight, isUnlocked) { engine.updateStudio(it) }
                         RowDivider(16.dp)
-                        WeightRow("Tags", SF.tag, engine.tagWeight, isUnlocked) { engine.updateTag(it) }
+                        WeightRow(tr(R.string.tags), SF.tag, engine.tagWeight, isUnlocked) { engine.updateTag(it) }
                         RowDivider(16.dp)
-                        WeightRow("O-Counts", SF.heartFill, engine.oCountWeight, isUnlocked) { engine.updateOCount(it) }
+                        WeightRow(tr(R.string.o_counts), SF.heartFill, engine.oCountWeight, isUnlocked) { engine.updateOCount(it) }
                         RowDivider(16.dp)
-                        WeightRow("Ratings", SF.starFill, engine.ratingWeight, isUnlocked) { engine.updateRating(it) }
+                        WeightRow(tr(R.string.ratings), SF.starFill, engine.ratingWeight, isUnlocked) { engine.updateRating(it) }
                     }
                 }
-                SettingsSectionFooter("How much each part steers the picks.")
+                SettingsSectionFooter(tr(R.string.hint_how_much_each_part_steers))
                 SectionSpacer()
             }
 
             item {
-                SettingsSectionHeader("Performers, studios and tags")
+                SettingsSectionHeader(tr(R.string.performers_studios_and_tags))
                 GroupedCard {
-                    SettingsRow("Adjustments", SF.sliderHorizontal3, enabled = isUnlocked, onClick = { Nav.push(RecommendationAdjustmentsScreen()) }) {
+                    SettingsRow(tr(R.string.adjustments), SF.sliderHorizontal3, enabled = isUnlocked, onClick = { Nav.push(RecommendationAdjustmentsScreen()) }) {
                         val list = engine.adjustments
                         val hidden = list.count { it.isHidden }
                         Text(
-                            if (list.isEmpty()) "None" else if (hidden > 0) "${list.size} · $hidden hidden" else "${list.size}",
+                            if (list.isEmpty()) tr(R.string.none) else if (hidden > 0) "${list.size} · $hidden hidden" else "${list.size}",
                             style = NativeType.bodyMedium, color = p.secondaryText,
                         )
                     }
                 }
-                SettingsSectionFooter("Also from the ··· menu below a card.")
+                SettingsSectionFooter(tr(R.string.hint_also_from_menu_below_card))
                 SectionSpacer()
             }
 
             item {
                 GroupedCard {
                     SettingsRow(
-                        "Reset to defaults", icon = Icons.AutoMirrored.Filled.Undo,
+                        tr(R.string.action_reset_to_defaults), icon = Icons.AutoMirrored.Filled.Undo,
                         iconTint = if (engine.hasCustomSettings) StashyColors.systemRed else p.secondaryText,
                         titleColor = if (engine.hasCustomSettings) StashyColors.systemRed else p.secondaryText,
                         enabled = isUnlocked && engine.hasCustomSettings, onClick = { engine.resetSettings() },
@@ -190,18 +192,18 @@ fun RecommendationSettingsView() {
             }
         }
 
-        NativeTopBar("For You")
+        NativeTopBar(tr(R.string.for_you))
     }
 }
 
 private fun statusText(): String {
     val engine = SceneRecommendations
     return when (engine.state) {
-        RecommendationState.Idle -> "Not built yet"
-        RecommendationState.Loading -> "Looking…"
-        RecommendationState.NoHistory -> "No plays yet"
-        RecommendationState.Failed -> engine.failure ?: "Failed"
-        RecommendationState.Ready -> if (engine.isRefreshing) "Looking…" else {
+        RecommendationState.Idle -> tr(R.string.not_built_yet)
+        RecommendationState.Loading -> tr(R.string.looking_menu)
+        RecommendationState.NoHistory -> tr(R.string.empty_plays_yet)
+        RecommendationState.Failed -> engine.failure ?: tr(R.string.error_generic_2)
+        RecommendationState.Ready -> if (engine.isRefreshing) tr(R.string.looking_menu) else {
             val picks = "${engine.recommendations.size} scenes from ${engine.seedCount} watched"
             engine.builtAt?.let { "$picks · ${DateFormat.getTimeInstance(DateFormat.SHORT).format(Date(it))}" } ?: picks
         }
@@ -209,11 +211,11 @@ private fun statusText(): String {
 }
 
 private fun weightLabel(value: Float): String = when {
-    value < 0.01f -> "Off"
-    value < 0.75f -> "Low"
-    value < 1.26f -> "Normal"
-    value < 1.76f -> "High"
-    else -> "Max"
+    value < 0.01f -> tr(R.string.off)
+    value < 0.75f -> tr(R.string.low)
+    value < 1.26f -> tr(R.string.normal)
+    value < 1.76f -> tr(R.string.high)
+    else -> tr(R.string.max)
 }
 
 /** iOS `weightRow`: label + value, slider 0…2 in quarter steps. */

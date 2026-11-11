@@ -1,5 +1,7 @@
 package de.letzgo.stashy.data
 
+import de.letzgo.stashy.R
+import de.letzgo.stashy.tr
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
 import kotlinx.coroutines.Dispatchers
@@ -41,29 +43,29 @@ object ServerConnection {
                 val text = r.body?.string().orEmpty()
                 // Stash 0.32+ refuses these before authentication, so "check the API key" would mislead.
                 val body = text.lowercase()
-                if (r.code == 403 && "public ip" in body) return@withContext Outcome.Failure("Stash refuses public IPs while it has no credentials. Set a username and password in Stash, or allow this IP with public_whitelist.")
-                if (r.code == 400 && "invalid ip" in body) return@withContext Outcome.Failure("Stash rejected the reverse proxy in front of it. Add the proxy's IP to trusted_proxies in Stash's config.")
-                if (r.code == 401 || r.code == 403) return@withContext Outcome.Failure("Authentication failed — check the API key and custom headers.")
+                if (r.code == 403 && "public ip" in body) return@withContext Outcome.Failure(tr(R.string.hint_stash_refuses_public_ips_while))
+                if (r.code == 400 && "invalid ip" in body) return@withContext Outcome.Failure(tr(R.string.hint_stash_rejected_reverse_proxy_in))
+                if (r.code == 401 || r.code == 403) return@withContext Outcome.Failure(tr(R.string.hint_authentication_failed_check_api_key))
                 val root = runCatching { Json.parseToJsonElement(text).obj }.getOrNull()
                 val version = root?.get("data").obj?.get("version").obj?.get("version").stringOrNull
                 if (!version.isNullOrEmpty()) return@withContext Outcome.Stash(version)
                 val err = root?.get("errors").arr?.firstOrNull().obj?.get("message").stringOrNull
-                if (!err.isNullOrEmpty()) return@withContext Outcome.Failure("Stash rejected the request: $err")
-                if (r.code !in 200..299) return@withContext Outcome.Failure("Server error: HTTP ${r.code}.")
+                if (!err.isNullOrEmpty()) return@withContext Outcome.Failure(tr(R.string.stash_rejected_request_arg, err))
+                if (r.code !in 200..299) return@withContext Outcome.Failure(tr(R.string.server_error_http_arg, r.code))
                 if (r.header("Content-Type").orEmpty().lowercase().contains("html"))
-                    return@withContext Outcome.Failure("The host answered with a web page, not Stash — likely a login or proxy page. Check the address and custom headers.")
-                Outcome.Failure("The host answered, but not as Stash. Check the address, subpath and custom headers.")
+                    return@withContext Outcome.Failure(tr(R.string.hint_host_answered_with_web_page))
+                Outcome.Failure(tr(R.string.hint_host_answered_but_not_as))
             }
         } catch (e: java.net.ConnectException) {
-            Outcome.Failure("Cannot connect — check the address and port.")
+            Outcome.Failure(tr(R.string.error_connect_check_address_and_port))
         } catch (e: java.net.SocketTimeoutException) {
-            Outcome.Failure("Connection timed out.")
+            Outcome.Failure(tr(R.string.connection_timed_out))
         } catch (e: java.net.UnknownHostException) {
-            Outcome.Failure("Host not found.")
+            Outcome.Failure(tr(R.string.host_not_found))
         } catch (e: javax.net.ssl.SSLException) {
-            Outcome.Failure("Secure connection failed — check HTTP/HTTPS.")
+            Outcome.Failure(tr(R.string.hint_secure_connection_failed_check_http))
         } catch (e: Exception) {
-            Outcome.Failure(e.message ?: "Unknown error")
+            Outcome.Failure(e.message ?: tr(R.string.unknown_error))
         }
     }
 
@@ -75,14 +77,14 @@ object ServerConnection {
         fun Request.Builder.custom() = apply { headers.filter { it.isUsable }.forEach { header(it.name.trim(), it.value.trim()) } }
         val login = Request.Builder().url("$baseURL/login").tag(Net.NoRewrite::class.java, Net.NoRewrite).custom()
             .post(FormBody.Builder().add("username", username).add("password", password).build()).build()
-        client.newCall(login).execute().use { if (it.code != 200) throw Exception("Login failed: Server returned status code ${it.code}") }
+        client.newCall(login).execute().use { if (it.code != 200) throw Exception(tr(R.string.hint_login_failed_server_returned_status, it.code)) }
         val gql = Request.Builder().url("$baseURL/graphql").tag(Net.NoRewrite::class.java, Net.NoRewrite).custom()
             .post("""{"query": "{ configuration { general { apiKey } } }"}""".toRequestBody("application/json".toMediaType())).build()
         client.newCall(gql).execute().use { r ->
-            if (r.code != 200) throw Exception("Login failed: GraphQL request failed: ${r.code}")
+            if (r.code != 200) throw Exception(tr(R.string.hint_login_failed_graphql_request_failed, r.code))
             val key = Json.parseToJsonElement(r.body?.string().orEmpty()).obj?.get("data").obj?.get("configuration").obj
                 ?.get("general").obj?.get("apiKey").stringOrNull
-            if (key.isNullOrEmpty()) throw Exception("API Key not found in server configuration")
+            if (key.isNullOrEmpty()) throw Exception(tr(R.string.hint_api_key_not_found_in))
             key
         }
     }

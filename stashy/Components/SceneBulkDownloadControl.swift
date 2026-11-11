@@ -24,12 +24,12 @@ enum DownloadBatchOptions {
     ) -> some View {
         let known = count.flatMap { $0 > 0 ? $0 : nil }
         if known == 1 {
-            Button("Download 1 \(singular)") { download(nil) }
+            Button(tr("action_download_1_arg", singular)) { download(nil) }
         } else if let known, known <= batch {
-            Button("Download all \(known) \(plural)") { download(nil) }
+            Button(tr("action_download_all_arg_arg", known, plural)) { download(nil) }
         } else {
-            Button("Newest \(batch) \(plural)") { download(batch) }
-            Button(known.map { "All \($0) \(plural)" } ?? "All \(plural)") { download(nil) }
+            Button(tr("newest_arg_arg", batch, plural)) { download(batch) }
+            Button(known.map { tr("all_arg_arg", $0, plural) } ?? tr("all_arg", plural)) { download(nil) }
         }
     }
 }
@@ -47,13 +47,13 @@ extension View {
     ) -> some View {
         let batch = DownloadManager.sceneNewestBatchSize
         // Alert, not a confirmation dialog — the gallery and tag image downloads ask this way.
-        return alert("Download scenes", isPresented: isPresented) {
+        return alert(tr("action_download_scenes"), isPresented: isPresented) {
             DownloadBatchOptions.buttons(count: sceneCount, batch: batch, singular: "scene", plural: "scenes") { limit in
                 downloadManager.downloadScenes(for: scope, limit: limit, scopeName: scopeName)
             }
-            Button("Cancel", role: .cancel) {}
+            Button(tr("action_cancel"), role: .cancel) {}
         } message: {
-            Text("Scenes already downloaded are skipped.")
+            Text(tr("scenes_already_downloaded_are_skipped"))
         }
     }
 }
@@ -63,8 +63,8 @@ enum SceneBulkDownloadChrome {
     static func slot(action: @escaping () -> Void) -> CatalogChromeSlot {
         CatalogChromeSlot(
             systemImage: "arrow.down.doc",
-            accessibilityLabel: "Download scenes",
-            accessibilityHint: "Downloads the newest scenes, or all of them"
+            accessibilityLabel: tr("action_download_scenes"),
+            accessibilityHint: tr("hint_downloads_newest_scenes_or_all")
         ) {
             HapticManager.light()
             action()

@@ -112,9 +112,9 @@ enum TimelineKind: String, CaseIterable, Identifiable, Hashable {
 
     var label: String {
         switch self {
-        case .watch: return "Watch"
-        case .oCount: return "O-Count"
-        case .marker: return "Markers"
+        case .watch: return tr("watch")
+        case .oCount: return tr("o_count")
+        case .marker: return tr("markers")
         }
     }
 

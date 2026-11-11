@@ -52,10 +52,10 @@ enum SceneTopMetric: String, CaseIterable, Identifiable, TopListsMetricLabel {
 
     var label: String {
         switch self {
-        case .views: return "Views"
-        case .oCount: return "O-Count"
-        case .watchTime: return "Watch Time"
-        case .rating: return "Rating"
+        case .views: return tr("play_count")
+        case .oCount: return tr("o_count")
+        case .watchTime: return tr("watch_time")
+        case .rating: return tr("rating")
         }
     }
 
@@ -80,11 +80,11 @@ enum PerformerTopMetric: String, CaseIterable, Identifiable, TopListsMetricLabel
 
     var label: String {
         switch self {
-        case .oCount: return "O-Count"
-        case .scenes: return "Scenes"
-        case .rating: return "Rating"
-        case .images: return "Images"
-        case .galleries: return "Galleries"
+        case .oCount: return tr("o_count")
+        case .scenes: return tr("scenes")
+        case .rating: return tr("rating")
+        case .images: return tr("images")
+        case .galleries: return tr("galleries")
         }
     }
 
@@ -109,10 +109,10 @@ enum StudioTopMetric: String, CaseIterable, Identifiable, TopListsMetricLabel {
 
     var label: String {
         switch self {
-        case .scenes: return "Scenes"
-        case .galleries: return "Galleries"
-        case .rating: return "Rating"
-        case .images: return "Images"
+        case .scenes: return tr("scenes")
+        case .galleries: return tr("galleries")
+        case .rating: return tr("rating")
+        case .images: return tr("images")
         }
     }
 
@@ -136,10 +136,10 @@ enum TagTopMetric: String, CaseIterable, Identifiable, TopListsMetricLabel {
 
     var label: String {
         switch self {
-        case .scenes: return "Scenes"
-        case .images: return "Images"
-        case .galleries: return "Galleries"
-        case .markers: return "Markers"
+        case .scenes: return tr("scenes")
+        case .images: return tr("images")
+        case .galleries: return tr("galleries")
+        case .markers: return tr("markers")
         }
     }
 
@@ -762,10 +762,10 @@ struct TopListsToolsContainerView: View {
 
         var title: String {
             switch self {
-            case .scenes: return "Scenes"
-            case .performers: return "Performers"
-            case .studios: return "Studios"
-            case .tags: return "Tags"
+            case .scenes: return tr("scenes")
+            case .performers: return tr("performers")
+            case .studios: return tr("studios")
+            case .tags: return tr("tags")
             }
         }
 
@@ -806,7 +806,7 @@ struct TopListsToolsContainerView: View {
         // The list (Scenes, Performers, …) is the crumb after "Charts", its metric sits right.
         .toolsBreadcrumbChrome(toolsBreadcrumb, crumb: {
             ToolsCrumbPickerMenu(
-                title: "Charts list",
+                title: tr("charts_list"),
                 options: Section.allCases.map { ToolsRowMenuOption(value: $0, title: $0.title, systemImage: $0.icon) },
                 selection: $section
             )
@@ -843,7 +843,7 @@ struct TopScenesToolsView: View {
                     Task { await viewModel.reloadScenes() }
                 }
             } else if viewModel.isLoadingScenes && !viewModel.hasScenesContent {
-                StandardLoadingView(message: "Loading top scenes...")
+                StandardLoadingView(message: tr("loading_top_scenes"))
             } else if viewModel.didFailScenes && !viewModel.hasScenesContent {
                 ConnectionErrorView {
                     Task { await viewModel.reloadScenes() }
@@ -868,7 +868,7 @@ struct TopScenesToolsView: View {
             VStack(alignment: .leading, spacing: 12) {
                 let scenes = viewModel.scenesForSelectedMetric
                 if scenes.isEmpty {
-                    Text("No scenes yet.")
+                    Text(tr("empty_scenes_yet"))
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
                         .frame(maxWidth: .infinity)
@@ -909,7 +909,7 @@ struct TopPerformersToolsView: View {
                     Task { await viewModel.reloadPerformers() }
                 }
             } else if viewModel.isLoadingPerformers && !viewModel.hasPerformersContent {
-                StandardLoadingView(message: "Loading top performers...")
+                StandardLoadingView(message: tr("loading_top_performers"))
             } else if viewModel.didFailPerformers && !viewModel.hasPerformersContent {
                 ConnectionErrorView {
                     Task { await viewModel.reloadPerformers() }
@@ -934,7 +934,7 @@ struct TopPerformersToolsView: View {
             VStack(alignment: .leading, spacing: 12) {
                 let performers = viewModel.performersForSelectedMetric
                 if performers.isEmpty {
-                    Text("No performers yet.")
+                    Text(tr("empty_performers_yet"))
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
                         .frame(maxWidth: .infinity)
@@ -975,7 +975,7 @@ struct TopStudiosToolsView: View {
                     Task { await viewModel.reloadStudios() }
                 }
             } else if viewModel.isLoadingStudios && !viewModel.hasStudiosContent {
-                StandardLoadingView(message: "Loading top studios...")
+                StandardLoadingView(message: tr("loading_top_studios"))
             } else if viewModel.didFailStudios && !viewModel.hasStudiosContent {
                 ConnectionErrorView {
                     Task { await viewModel.reloadStudios() }
@@ -1000,7 +1000,7 @@ struct TopStudiosToolsView: View {
             VStack(alignment: .leading, spacing: 12) {
                 let studios = viewModel.studiosForSelectedMetric
                 if studios.isEmpty {
-                    Text("No studios yet.")
+                    Text(tr("empty_studios_yet"))
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
                         .frame(maxWidth: .infinity)
@@ -1041,7 +1041,7 @@ struct TopTagsToolsView: View {
                     Task { await viewModel.reloadTags() }
                 }
             } else if viewModel.isLoadingTags && !viewModel.hasTagsContent {
-                StandardLoadingView(message: "Loading top tags...")
+                StandardLoadingView(message: tr("loading_top_tags"))
             } else if viewModel.didFailTags && !viewModel.hasTagsContent {
                 ConnectionErrorView {
                     Task { await viewModel.reloadTags() }
@@ -1075,7 +1075,7 @@ struct TopTagsToolsView: View {
             VStack(alignment: .leading, spacing: 12) {
                 let tags = viewModel.tagsForSelectedMetric
                 if tags.isEmpty {
-                    Text("No tags yet.")
+                    Text(tr("empty_tags_yet"))
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
                         .frame(maxWidth: .infinity)
@@ -1158,7 +1158,7 @@ where Metric.RawValue == String {
 
     var body: some View {
         Menu {
-            Picker("Rank by", selection: Binding(
+            Picker(tr("rank_by"), selection: Binding(
                 get: { selection },
                 set: { HapticManager.selection(); selection = $0 }
             )) {
@@ -1179,7 +1179,7 @@ where Metric.RawValue == String {
         .menuIndicator(.hidden)
         .stashyNeutralMenuItems()
         .fixedSize()
-        .accessibilityLabel("Rank by, \(selection.label)")
+        .accessibilityLabel(tr("rank_by_arg", selection.label))
     }
 }
 
@@ -1194,7 +1194,7 @@ private struct TopListsSceneCard: View {
 
     var body: some View {
         TopListsLeaderboardCard(
-            title: scene.title ?? "Untitled",
+            title: scene.title ?? tr("untitled"),
             place: place,
             thumbWidth: Self.thumbWidth,
             thumbAspectRatio: 16 / 9,
@@ -1204,22 +1204,22 @@ private struct TopListsSceneCard: View {
         ) {
             HStack(alignment: .top, spacing: 4) {
                 TopListsStatColumn(
-                    title: "Views",
+                    title: tr("play_count"),
                     value: TopListsFormat.count(scene.playCount ?? 0),
                     emphasized: metric == .views
                 )
                 TopListsStatColumn(
-                    title: "O-Count",
+                    title: tr("o_count"),
                     value: TopListsFormat.count(scene.oCounter ?? 0),
                     emphasized: metric == .oCount
                 )
                 TopListsStatColumn(
-                    title: "Watch",
+                    title: tr("watch"),
                     value: TopListsFormat.duration(scene.playDuration ?? 0),
                     emphasized: metric == .watchTime
                 )
                 TopListsStatColumn(
-                    title: "Rating",
+                    title: tr("rating"),
                     value: scene.rating100.map { "\($0)" } ?? "—",
                     emphasized: metric == .rating
                 )
@@ -1246,27 +1246,27 @@ private struct TopListsPerformerCard: View {
         ) {
             HStack(alignment: .top, spacing: 4) {
                 TopListsStatColumn(
-                    title: "O-Count",
+                    title: tr("o_count"),
                     value: TopListsFormat.count(performer.oCounter ?? 0),
                     emphasized: metric == .oCount
                 )
                 TopListsStatColumn(
-                    title: "Scenes",
+                    title: tr("scenes"),
                     value: TopListsFormat.count(performer.sceneCount),
                     emphasized: metric == .scenes
                 )
                 TopListsStatColumn(
-                    title: "Rating",
+                    title: tr("rating"),
                     value: performer.rating100.map { "\($0)" } ?? "—",
                     emphasized: metric == .rating
                 )
                 TopListsStatColumn(
-                    title: "Images",
+                    title: tr("images"),
                     value: TopListsFormat.count(performer.imageCount ?? 0),
                     emphasized: metric == .images
                 )
                 TopListsStatColumn(
-                    title: "Galleries",
+                    title: tr("galleries"),
                     value: TopListsFormat.count(performer.galleryCount ?? 0),
                     emphasized: metric == .galleries
                 )
@@ -1294,22 +1294,22 @@ private struct TopListsStudioCard: View {
         ) {
             HStack(alignment: .top, spacing: 4) {
                 TopListsStatColumn(
-                    title: "Scenes",
+                    title: tr("scenes"),
                     value: TopListsFormat.count(studio.sceneCount),
                     emphasized: metric == .scenes
                 )
                 TopListsStatColumn(
-                    title: "Galleries",
+                    title: tr("galleries"),
                     value: TopListsFormat.count(studio.galleryCount ?? 0),
                     emphasized: metric == .galleries
                 )
                 TopListsStatColumn(
-                    title: "Rating",
+                    title: tr("rating"),
                     value: studio.rating100.map { "\($0)" } ?? "—",
                     emphasized: metric == .rating
                 )
                 TopListsStatColumn(
-                    title: "Images",
+                    title: tr("images"),
                     value: TopListsFormat.count(studio.imageCount ?? 0),
                     emphasized: metric == .images
                 )
@@ -1336,22 +1336,22 @@ private struct TopListsTagCard: View {
         ) {
             HStack(alignment: .top, spacing: 4) {
                 TopListsStatColumn(
-                    title: "Scenes",
+                    title: tr("scenes"),
                     value: TopListsFormat.count(tag.sceneCount ?? 0),
                     emphasized: metric == .scenes
                 )
                 TopListsStatColumn(
-                    title: "Images",
+                    title: tr("images"),
                     value: TopListsFormat.count(tag.imageCount ?? 0),
                     emphasized: metric == .images
                 )
                 TopListsStatColumn(
-                    title: "Galleries",
+                    title: tr("galleries"),
                     value: TopListsFormat.count(tag.galleryCount ?? 0),
                     emphasized: metric == .galleries
                 )
                 TopListsStatColumn(
-                    title: "Markers",
+                    title: tr("markers"),
                     value: TopListsFormat.count(tag.sceneMarkerCount ?? 0),
                     emphasized: metric == .markers
                 )

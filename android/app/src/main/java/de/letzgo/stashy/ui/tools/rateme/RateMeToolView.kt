@@ -1,5 +1,7 @@
 package de.letzgo.stashy.ui.tools.rateme
 
+import de.letzgo.stashy.R
+import de.letzgo.stashy.tr
 import android.os.Build
 import android.view.HapticFeedbackConstants
 import android.view.View
@@ -149,7 +151,7 @@ fun RateMeToolView() {
     val config = ServerConfigManager.activeConfig
     if (config == null) {
         Box(Modifier.fillMaxSize()) {
-            NoServerPlaceholder(SF.starFill, "Select a server first to use RateMe.")
+            NoServerPlaceholder(SF.starFill, tr(R.string.hint_select_server_first_to_use_rateme))
             ToolsBreadcrumbChrome()
         }
         return
@@ -202,7 +204,7 @@ fun RateMeToolView() {
         ToolsBreadcrumbChrome(
             crumb = {
                 ToolsCrumbPickerMenu(
-                    title = "RateMe section",
+                    title = tr(R.string.rateme_section),
                     options = RateMeMode.entries.map { ToolsRowMenuOption(it, it.label, ModeIcons.getValue(it)) },
                     selection = model.mode,
                     label = model.mode.label,
@@ -232,9 +234,9 @@ fun RateMeToolView() {
             title = RateMeLogic.deleteConfirmationTitle(model.mode),
             message = RateMeLogic.deleteConfirmationMessage(model.mode, model.item?.title),
             onDismiss = { showDeleteConfirmation = false },
-            confirmLabel = "Delete",
+            confirmLabel = tr(R.string.action_delete),
             destructive = true,
-            dismissLabel = "Cancel",
+            dismissLabel = tr(R.string.action_cancel),
             onConfirm = {
                 showDeleteConfirmation = false
                 model.deleteCurrentAsync()
@@ -260,7 +262,7 @@ private fun ThemeMenu(model: RateMeViewModel, onPick: (RateMeThemePickerKind) ->
         isActive = model.mode == RateMeMode.Images && model.imageMediaKind != RateMeImageMediaKind.All,
         enabled = !model.isSubmitting,
     ) { dismiss ->
-        ToolsMenuSectionHeader("Theme")
+        ToolsMenuSectionHeader(tr(R.string.theme))
         model.availableFixedThemes.forEach { theme ->
             ToolsMenuItem(theme.label, themeIcon(theme), checked = model.theme == theme) {
                 dismiss()
@@ -269,7 +271,7 @@ private fun ThemeMenu(model: RateMeViewModel, onPick: (RateMeThemePickerKind) ->
             }
         }
         HorizontalDivider()
-        ToolsMenuSectionHeader("Only")
+        ToolsMenuSectionHeader(tr(R.string.only))
         RateMeThemePickerKind.entries.forEach { kind ->
             val picked = kind.picked(model.theme)
             ToolsMenuItem(picked?.label ?: "${kind.title}…", pickerIcon(kind), checked = picked != null) {
@@ -280,7 +282,7 @@ private fun ThemeMenu(model: RateMeViewModel, onPick: (RateMeThemePickerKind) ->
         }
         if (model.mode == RateMeMode.Images) {
             HorizontalDivider()
-            ToolsMenuSectionHeader("Media")
+            ToolsMenuSectionHeader(tr(R.string.media))
             RateMeImageMediaKind.entries.forEach { kind ->
                 ToolsMenuItem(kind.title, null, checked = kind == model.imageMediaKind) {
                     dismiss()
@@ -326,15 +328,15 @@ private fun Content(model: RateMeViewModel, hPad: Dp, isRegular: Boolean, bottom
     ) {
         val item = model.item
         when {
-            model.isLoading && item == null -> MatchLoadingView("Loading…", Modifier.fillMaxWidth().heightIn(min = 320.dp))
+            model.isLoading && item == null -> MatchLoadingView(tr(R.string.loading), Modifier.fillMaxWidth().heightIn(min = 320.dp))
             item != null -> ItemCard(
                 model, item,
                 Modifier.fillMaxWidth().weight(1f, fill = false).let { if (isRegular) it.widthIn(max = 720.dp) else it },
                 onDelete,
             )
             else -> MatchUnavailableView(
-                "Nothing to rate", ModeIcons.getValue(model.mode),
-                "All ${model.mode.label.lowercase()} already have a rating.",
+                tr(R.string.nothing_to_rate), ModeIcons.getValue(model.mode),
+                tr(R.string.hint_all_arg_already_have_rating, model.mode.label.lowercase()),
                 Modifier.fillMaxWidth().heightIn(min = 320.dp),
             )
         }
@@ -469,7 +471,7 @@ private fun RatingRow(model: RateMeViewModel, item: RateMeItem, onDelete: () -> 
         ) {
             Icon(
                 oCounterIcon(Appearance.oCounterIcon, filled = item.oCounter > 0),
-                "O-Counter ${item.oCounter}, tap to increment",
+                tr(R.string.hint_o_count_arg_tap_to_increment, item.oCounter),
                 tint = if (item.oCounter > 0) tint else p.secondaryText,
                 modifier = Modifier.size(20.dp),
             )
@@ -486,7 +488,7 @@ private fun RatingRow(model: RateMeViewModel, item: RateMeItem, onDelete: () -> 
             },
             enabled = !model.isSubmitting && !model.isDeleting && !model.isLoading,
         ) {
-            Icon(Icons.Filled.Delete, "Delete", tint = StashyColors.systemRed, modifier = Modifier.size(22.dp))
+            Icon(Icons.Filled.Delete, tr(R.string.action_delete), tint = StashyColors.systemRed, modifier = Modifier.size(22.dp))
         }
     }
 }
@@ -497,19 +499,19 @@ private fun ActionRow(model: RateMeViewModel, item: RateMeItem, hPad: Dp) {
     val view = LocalView.current
     val enabled = !model.isSubmitting && !model.isLoading
     Row(Modifier.fillMaxWidth().padding(horizontal = hPad).padding(bottom = 6.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-        MatchActionButton("Skip", Icons.Filled.FastForward, prominent = false, enabled = enabled, modifier = Modifier.weight(1f)) {
+        MatchActionButton(tr(R.string.action_skip), Icons.Filled.FastForward, prominent = false, enabled = enabled, modifier = Modifier.weight(1f)) {
             view.performRateMeHaptic(RateMeHaptic.Light)
             model.skipAsync()
         }
         if (item.mode == RateMeMode.Scenes) {
-            MatchActionButton("Watch", SF.playFill, prominent = true, enabled = enabled, modifier = Modifier.weight(1f), accessibilityLabel = "Watch Scene") {
+            MatchActionButton(tr(R.string.watch), SF.playFill, prominent = true, enabled = enabled, modifier = Modifier.weight(1f), accessibilityLabel = tr(R.string.watch_scene)) {
                 view.performRateMeHaptic(RateMeHaptic.Light)
                 // Minimal Scene; the detail screen loads the full scene.
                 Nav.push(SceneDetailScreen(item.id, Scene(id = item.id, title = item.title, oCounter = item.oCounter)))
             }
         } else {
             item.openableImage?.let { image ->
-                MatchActionButton("Open", Icons.Filled.OpenInFull, prominent = true, enabled = enabled, modifier = Modifier.weight(1f), accessibilityLabel = "Open Image") {
+                MatchActionButton(tr(R.string.action_open), Icons.Filled.OpenInFull, prominent = true, enabled = enabled, modifier = Modifier.weight(1f), accessibilityLabel = tr(R.string.action_open_image)) {
                     view.performRateMeHaptic(RateMeHaptic.Light)
                     Nav.push(ImageViewerScreen(listOf(image), 0))
                 }
@@ -565,7 +567,7 @@ private fun ThemePickerSheet(
             ) {
                 item {
                     NativeSearchField(
-                        query, { query = it }, "Search ${kind.title}s",
+                        query, { query = it }, tr(R.string.search_arg_s, kind.title),
                         Modifier.padding(bottom = 12.dp),
                         loading = RateMePickerOptions.isSearching(storeKind),
                     )
@@ -579,7 +581,7 @@ private fun ThemePickerSheet(
                             })
                         } else if (options.isEmpty()) {
                             if (query.isNotEmpty() && !RateMePickerOptions.isSearching(storeKind)) {
-                                NativeListItem("No ${kind.title.lowercase()}s match '$query'", headlineColor = p.secondaryText)
+                                NativeListItem(tr(R.string.empty_arg_s_match_arg, kind.title.lowercase(), query), headlineColor = p.secondaryText)
                             }
                         } else {
                             options.take(50).forEachIndexed { index, option ->
@@ -592,7 +594,7 @@ private fun ThemePickerSheet(
                         }
                     }
                 }
-                if (options.size > 50) item { NativeSectionFooter("Type more to refine...") }
+                if (options.size > 50) item { NativeSectionFooter(tr(R.string.type_more_to_refine_menu)) }
             }
         }
     }

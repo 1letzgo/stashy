@@ -55,7 +55,7 @@ struct AddTagsSheet: View {
     var body: some View {
         NavigationView {
             Form {
-                Section(header: Text("Search Tags")) {
+                Section(header: Text(tr("search_tags"))) {
                     TextField("Search...", text: $searchText)
 
                     if isLoading {
@@ -83,7 +83,7 @@ struct AddTagsSheet: View {
                         }
 
                         if filtered.count > 30 {
-                            Text("Type more to refine...").font(.caption).foregroundColor(.secondary)
+                            Text(tr("type_more_to_refine_menu")).font(.caption).foregroundColor(.secondary)
                         }
 
                         if !searchText.isEmpty && filtered.isEmpty
@@ -93,7 +93,7 @@ struct AddTagsSheet: View {
                             } label: {
                                 HStack {
                                     Image(systemName: "plus.circle.fill")
-                                    Text("Create \"\(searchText)\"")
+                                    Text(tr("action_create_arg", searchText))
                                 }
                                 .foregroundColor(appearanceManager.tintColor)
                             }
@@ -105,8 +105,8 @@ struct AddTagsSheet: View {
             }
             .applyAppBackground()
             .scrollContentBackground(.hidden)
-            .stashyModalSheetChrome("Edit Tags", onBack: { dismiss() }) {
-                StashyChromeTrailingTextButton(title: "Save", enabled: !isSaving, isBusy: isSaving) { save() }
+            .stashyModalSheetChrome(tr("action_edit_tags"), onBack: { dismiss() }) {
+                StashyChromeTrailingTextButton(title: tr("action_save"), enabled: !isSaving, isBusy: isSaving) { save() }
             }
             .onAppear {
                 selectedIds = Set(currentTags.map(\.id))
@@ -163,7 +163,7 @@ struct AddTagsSheet: View {
             DispatchQueue.main.async {
                 isCreating = false
                 guard let tag = created else {
-                    ToastManager.shared.show("Failed to create tag", icon: "exclamationmark.triangle", style: .error)
+                    ToastManager.shared.show(tr("error_create_tag"), icon: "exclamationmark.triangle", style: .error)
                     return
                 }
                 allTags.append(tag)
@@ -198,7 +198,7 @@ struct AddTagsSheet: View {
             let success = await AITagSuggestionManager.shared.write(tags: updated, to: target)
             isSaving = false
             guard success else {
-                ToastManager.shared.show("Failed to update tags", icon: "exclamationmark.triangle", style: .error)
+                ToastManager.shared.show(tr("error_update_tags"), icon: "exclamationmark.triangle", style: .error)
                 return
             }
             onComplete(updated)

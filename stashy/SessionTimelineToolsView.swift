@@ -43,7 +43,7 @@ struct SessionTimelineToolsView: View {
     /// Several can be on; the last one stays.
     private var kindMenu: some View {
         Menu {
-            Section("Show") {
+            Section(tr("action_show")) {
                 ForEach(TimelineKind.allCases) { kind in
                     Toggle(isOn: Binding(
                         get: { enabledKinds.contains(kind) },
@@ -75,7 +75,7 @@ struct SessionTimelineToolsView: View {
         .menuActionDismissBehavior(.disabled)
         #endif
         .fixedSize()
-        .accessibilityLabel("Show activity")
+        .accessibilityLabel(tr("action_show_activity"))
     }
 
     private func icon(for kind: TimelineKind) -> String {
@@ -95,19 +95,19 @@ struct SessionTimelineToolsView: View {
             VStack(spacing: 0) {
                 LazyVStack(alignment: horizontalSizeClass == .regular ? .center : .leading, spacing: 28) {
                     if loader.isLoading && loader.sessions.isEmpty {
-                        StandardLoadingView(message: "Loading timeline...")
+                        StandardLoadingView(message: tr("loading_timeline"))
                             .frame(maxWidth: .infinity)
                             .padding(.top, 40)
                     } else if loader.didFail && loader.sessions.isEmpty {
-                        Text("Could not load play history from this server.")
+                        Text(tr("error_load_play_history_from_this"))
                             .font(.subheadline)
                             .foregroundStyle(.secondary)
                             .frame(maxWidth: .infinity)
                             .padding(.top, 40)
                     } else if visibleDays.isEmpty {
                         Text(loader.sessions.isEmpty
-                             ? "No plays, O-counts, or markers in the last 24 hours."
-                             : "No matching activity for the selected filters.")
+                             ? tr("hint_no_plays_o_counts_or")
+                             : tr("empty_matching_activity_for_selected_filters"))
                             .font(.subheadline)
                             .foregroundStyle(.secondary)
                             .frame(maxWidth: .infinity)
@@ -468,7 +468,7 @@ private struct TimelineVisitCard: View {
             .padding(.horizontal, 8)
             .padding(.vertical, 6)
             .allowsHitTesting(false)
-            .accessibilityLabel("Marker created")
+            .accessibilityLabel(tr("marker_created"))
     }
 
     private var oCountBadge: some View {

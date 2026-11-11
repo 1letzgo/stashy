@@ -1,5 +1,7 @@
 package de.letzgo.stashy.ui.tools.charts
 
+import de.letzgo.stashy.R
+import de.letzgo.stashy.tr
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
@@ -216,7 +218,7 @@ class TopListsViewModel {
 
 /** iOS: `TopListsToolsContainerView.Section`. */
 enum class ChartsSection(val title: String, val icon: ImageVector) {
-    Scenes("Scenes", SF.film), Performers("Performers", SF.person2), Studios("Studios", SF.building2), Tags("Tags", SF.tag),
+    Scenes(tr(R.string.scenes), SF.film), Performers(tr(R.string.performers), SF.person2), Studios(tr(R.string.studios), SF.building2), Tags(tr(R.string.tags), SF.tag),
 }
 
 /** Process-wide state of Tools › Charts (survives switching tools). */

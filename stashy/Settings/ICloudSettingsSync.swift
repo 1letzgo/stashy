@@ -87,7 +87,7 @@ final class ICloudSettingsSync: ObservableObject {
         on(NSUbiquitousKeyValueStore.didChangeExternallyNotification, object: store) { sync, note in
             let reason = note.userInfo?[NSUbiquitousKeyValueStoreChangeReasonKey] as? Int
             sync.problem = reason == NSUbiquitousKeyValueStoreQuotaViolationChange
-                ? "iCloud storage for settings is full. Some settings are not synced." : nil
+                ? tr("hint_icloud_storage_for_settings_is") : nil
             sync.reconcile()
             sync.refreshSecrets()
         }
@@ -134,7 +134,7 @@ final class ICloudSettingsSync: ObservableObject {
     private func reconcile() {
         guard isEnabled else { return }
         if FileManager.default.ubiquityIdentityToken == nil {
-            problem = "Sign in to iCloud on this device to sync."
+            problem = tr("hint_sign_in_to_icloud_on")
             return
         }
         let local = localEntries()
@@ -215,7 +215,7 @@ final class ICloudSettingsSync: ObservableObject {
 
         if base != oldBase { saveBase(base) }
         if skippedForSpace {
-            problem = "iCloud storage for settings is full. Some settings are not synced."
+            problem = tr("hint_icloud_storage_for_settings_is")
         }
         if appliedSettings {
             AppearanceManager.shared.reload()
@@ -315,22 +315,22 @@ struct ICloudSettingsSyncRow: View {
                 if on { confirmsEnable = true } else { confirmsDisable = true }
             }
         )) {
-            Label("Sync with iCloud", systemImage: "icloud")
+            Label(tr("action_sync_with_icloud"), systemImage: "icloud")
         }
         .tint(appearance.tintColor)
         .stashyGroupedBlockRow(index: 0, count: sync.problem == nil ? 1 : 2)
-        .alert("Sync with iCloud?", isPresented: $confirmsEnable) {
-            Button("Turn On") { sync.enable() }
-            Button("Cancel", role: .cancel) {}
+        .alert(tr("confirm_sync_with_icloud"), isPresented: $confirmsEnable) {
+            Button(tr("action_turn_on")) { sync.enable() }
+            Button(tr("action_cancel"), role: .cancel) {}
         } message: {
-            Text("Settings already in iCloud replace the ones on this device. API keys are end-to-end encrypted through iCloud Keychain, which must be on for them to sync.")
+            Text(tr("hint_settings_already_in_icloud_replace"))
         }
-        .alert("Turn off iCloud sync?", isPresented: $confirmsDisable) {
-            Button("Turn Off") { sync.disable(removingCloudData: false) }
-            Button("Turn Off and Remove from iCloud", role: .destructive) { sync.disable(removingCloudData: true) }
-            Button("Cancel", role: .cancel) {}
+        .alert(tr("confirm_turn_off_icloud_sync"), isPresented: $confirmsDisable) {
+            Button(tr("action_turn_off")) { sync.disable(removingCloudData: false) }
+            Button(tr("hint_turn_off_and_remove_from"), role: .destructive) { sync.disable(removingCloudData: true) }
+            Button(tr("action_cancel"), role: .cancel) {}
         } message: {
-            Text("Servers, API keys and settings stay on this device either way.")
+            Text(tr("hint_servers_api_keys_and_settings"))
         }
 
         if let problem = sync.problem {

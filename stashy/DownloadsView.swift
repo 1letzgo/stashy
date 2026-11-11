@@ -47,11 +47,11 @@ struct DownloadsView: View {
                         .font(.system(size: 64))
                         .foregroundColor(appearanceManager.tintColor)
                     
-                    Text("No Downloads yet")
+                    Text(tr("empty_downloads_yet"))
                         .font(.title3)
                         .fontWeight(.bold)
                     
-                    Text("Downloaded scenes will appear here for offline viewing.")
+                    Text(tr("hint_downloaded_scenes_will_appear_here"))
                         .foregroundColor(.secondary)
                         .multilineTextAlignment(.center)
                         .padding(.horizontal, DesignTokens.Tools.contentPadding)
@@ -71,7 +71,7 @@ struct DownloadsView: View {
 
                         if !active.isEmpty {
                             VStack(alignment: .leading, spacing: 8) {
-                                downloadsSectionHeading("Active Downloads")
+                                downloadsSectionHeading(tr("active_downloads"))
                                 VStack(spacing: 12) {
                                     ForEach(active, id: \.id) { download in
                                         activeDownloadRow(download)
@@ -83,7 +83,7 @@ struct DownloadsView: View {
 
                         if !queued.isEmpty {
                             VStack(alignment: .leading, spacing: 8) {
-                                downloadsSectionHeading("Queued")
+                                downloadsSectionHeading(tr("queued"))
                                 VStack(spacing: 12) {
                                     ForEach(queued, id: \.id) { download in
                                         queuedDownloadRow(download)
@@ -96,7 +96,7 @@ struct DownloadsView: View {
                         // Completed Downloads Section
                         if !filteredSceneDownloads.isEmpty {
                             VStack(alignment: .leading, spacing: 8) {
-                                downloadsSectionHeading("Scenes")
+                                downloadsSectionHeading(tr("scenes"))
                                 
                                 LazyVGrid(columns: columns, spacing: 12) {
                                     ForEach(filteredSceneDownloads) { downloaded in
@@ -105,7 +105,7 @@ struct DownloadsView: View {
                                         }
                                         .buttonStyle(.plain)
                                         .stashySwipeActions([
-                                            StashySwipeAction(title: "Delete", systemImage: "trash", tint: AppearanceManager.shared.tintColor, isDestructive: true) {
+                                            StashySwipeAction(title: tr("action_delete"), systemImage: "trash", tint: AppearanceManager.shared.tintColor, isDestructive: true) {
                                                 downloadManager.deleteDownload(id: downloaded.id)
                                             }
                                         ])
@@ -120,10 +120,10 @@ struct DownloadsView: View {
                         let tagEntries = filteredGalleryDownloads.filter { $0.resolvedKind == .tag }
 
                         if !galleryEntries.isEmpty {
-                            downloadSection("Galleries & Images", entries: galleryEntries)
+                            downloadSection(tr("galleries_and_images"), entries: galleryEntries)
                         }
                         if !tagEntries.isEmpty {
-                            downloadSection("Tags", entries: tagEntries)
+                            downloadSection(tr("tags"), entries: tagEntries)
                         }
                     }
                     .padding(.top, DesignTokens.Tools.menuTopPadding)
@@ -142,20 +142,20 @@ struct DownloadsView: View {
                 jobStore.add(job)
             }
         }
-        .alert("Run all jobs?", isPresented: $showingRunAllConfirmation) {
-            Button("Run all") {
+        .alert(tr("confirm_run_all_jobs"), isPresented: $showingRunAllConfirmation) {
+            Button(tr("action_run_all")) {
                 DownloadSyncJobRunner.runAll(jobStore.jobs, filters: viewModel.savedFilters, viewModel: viewModel)
             }
-            Button("Cancel", role: .cancel) {}
+            Button(tr("action_cancel"), role: .cancel) {}
         } message: {
-            Text("Each job downloads its configured number of newest items. Items already downloaded are skipped.")
+            Text(tr("hint_each_job_downloads_its_configured"))
         }
-        .alert("Delete job?", isPresented: Binding(get: { jobToDelete != nil }, set: { if !$0 { jobToDelete = nil } })) {
-            Button("Delete", role: .destructive) {
+        .alert(tr("confirm_delete_job"), isPresented: Binding(get: { jobToDelete != nil }, set: { if !$0 { jobToDelete = nil } })) {
+            Button(tr("action_delete"), role: .destructive) {
                 if let job = jobToDelete { jobStore.remove(job) }
                 jobToDelete = nil
             }
-            Button("Cancel", role: .cancel) { jobToDelete = nil }
+            Button(tr("action_cancel"), role: .cancel) { jobToDelete = nil }
         } message: {
             Text(jobToDelete.map { "\($0.filterName) stays on the server; only the job goes away." } ?? "")
         }
@@ -211,7 +211,7 @@ struct DownloadsView: View {
                 .foregroundStyle(.secondary)
         }
         .buttonStyle(.plain)
-        .accessibilityLabel("Cancel download")
+        .accessibilityLabel(tr("action_cancel_download"))
     }
 
     /// Waiting for one of the two transfer slots.
@@ -224,7 +224,7 @@ struct DownloadsView: View {
                 .font(.subheadline.weight(.medium))
                 .lineLimit(1)
             Spacer(minLength: 0)
-            Text("Queued")
+            Text(tr("queued"))
                 .font(.caption2)
                 .foregroundColor(.secondary)
             cancelButton(for: download)
@@ -260,14 +260,14 @@ struct DownloadsView: View {
     /// Search field plus the round "+" for a new sync job — the chrome Tools › Filters has.
     private var searchChrome: some View {
         HStack(spacing: DesignTokens.Spacing.sm) {
-            ToolsSearchField(prompt: "Search downloads", text: $searchText)
+            ToolsSearchField(prompt: tr("search_downloads"), text: $searchText)
             Button {
                 showingJobSheet = true
             } label: {
                 ToolsAddButtonLabel()
             }
             .buttonStyle(.plain)
-            .accessibilityLabel("New sync job")
+            .accessibilityLabel(tr("new_sync_job"))
         }
         .padding(.horizontal, DesignTokens.Tools.contentPadding)
         .padding(.top, DesignTokens.Tools.menuTopPadding)
@@ -280,7 +280,7 @@ struct DownloadsView: View {
     @ViewBuilder
     private var syncJobRow: some View {
         VStack(alignment: .leading, spacing: 12) {
-        downloadsSectionHeading("Sync Jobs")
+        downloadsSectionHeading(tr("action_sync_jobs"))
         HStack(spacing: DesignTokens.Spacing.xs) {
             Button {
                 showingRunAllConfirmation = true
@@ -294,7 +294,7 @@ struct DownloadsView: View {
             }
             .buttonStyle(.plain)
             .disabled(jobStore.jobs.isEmpty)
-            .accessibilityLabel("Run all sync jobs")
+            .accessibilityLabel(tr("action_run_all_sync_jobs"))
 
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: DesignTokens.Spacing.xs) {
@@ -365,11 +365,11 @@ private struct DownloadSyncJobSheet: View {
         NavigationView {
             List {
                 Section {
-                    ToolsSearchField(prompt: "Search filters", text: $search)
+                    ToolsSearchField(prompt: tr("search_filters"), text: $search)
                         .listRowInsets(EdgeInsets())
                         .listRowBackground(Color.clear)
                 } header: {
-                    sectionHeader("Search …")
+                    sectionHeader(tr("placeholder_search"))
                 }
 
                 Section {
@@ -394,27 +394,27 @@ private struct DownloadSyncJobSheet: View {
                         .listRowSeparatorTint(Color.primary.opacity(0.15))
                     }
                     if usableFilters.isEmpty {
-                        Text("No scene or image filters on this server")
+                        Text(tr("hint_no_scene_or_image_filters"))
                             .foregroundStyle(.secondary)
                             .listRowBackground(Color.secondaryAppBackground(for: appearance.currentTheme))
                     }
                 } header: {
-                    sectionHeader("Filter")
+                    sectionHeader(tr("filter"))
                 }
 
                 Section {
                     Toggle(isOn: $downloadsEverything) {
-                        Text("All matching items")
+                        Text(tr("all_matching_items"))
                     }
                     .tint(appearance.tintColor)
                     .listRowBackground(Color.secondaryAppBackground(for: appearance.currentTheme))
 
                     if !downloadsEverything {
-                        Stepper("Newest \(amount)", value: $amount, in: 1...500, step: amount < 20 ? 1 : 10)
+                        Stepper(tr("newest_arg", amount), value: $amount, in: 1...500, step: amount < 20 ? 1 : 10)
                             .listRowBackground(Color.secondaryAppBackground(for: appearance.currentTheme))
                     }
                 } header: {
-                    sectionHeader("Amount per run")
+                    sectionHeader(tr("amount_per_run"))
                 }
             }
             .listStyle(.insetGrouped)
@@ -424,7 +424,7 @@ private struct DownloadSyncJobSheet: View {
             .background(Color.appBackground(for: appearance.currentTheme))
             // Room for the pinned save button below the form.
             .contentMargins(.bottom, 12, for: .scrollContent)
-            .stashyModalSheetChrome("New sync job", onBack: { dismiss() })
+            .stashyModalSheetChrome(tr("new_sync_job"), onBack: { dismiss() })
             .safeAreaInset(edge: .bottom) {
                 Button {
                     guard let id = selectedFilterId, let filter = savedFilters[id] else { return }
@@ -436,7 +436,7 @@ private struct DownloadSyncJobSheet: View {
                     ))
                     dismiss()
                 } label: {
-                    Text("Save job")
+                    Text(tr("action_save_job"))
                         .font(.subheadline.weight(.semibold))
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 14)
@@ -525,7 +525,7 @@ struct DownloadedSceneCard: View {
             
             // Content on the right
             VStack(alignment: .leading, spacing: 4) {
-                Text(downloaded.title ?? "Unknown Title")
+                Text(downloaded.title ?? tr("unknown_title"))
                     .font(.subheadline)
                     .fontWeight(.bold)
                     .lineLimit(2)
@@ -626,7 +626,7 @@ struct DownloadDetailView: View {
         var slots = CatalogSlotSet(visibility: CatalogFloatingChromeState(
             hasActiveServerConfig: true, primaryListIsEmpty: false, errorMessage: nil, imageFindListError: nil
         ))
-        slots.entityActions = [CatalogChromeSlot(systemImage: "square.and.arrow.up", accessibilityLabel: "Share") {
+        slots.entityActions = [CatalogChromeSlot(systemImage: "square.and.arrow.up", accessibilityLabel: tr("action_share")) {
             HapticManager.light()
             shareVideo(url: downloadManager.getLocalVideoURL(for: downloaded))
         }]
@@ -683,7 +683,7 @@ struct DownloadDetailView: View {
                                     } label: {
                                         HStack(spacing: 8) {
                                             Image(systemName: "clock.arrow.circlepath")
-                                            Text("Resume from \(formatDuration(resume))")
+                                            Text(tr("action_resume_from_arg", formatDuration(resume)))
                                                 .fontWeight(.bold)
                                         }
                                         .padding(.horizontal, 20)
@@ -697,7 +697,7 @@ struct DownloadDetailView: View {
                                     Button {
                                         startPlayback(resume: false)
                                     } label: {
-                                        Text("Start from beginning")
+                                        Text(tr("action_start_from_beginning"))
                                             .font(.caption)
                                             .fontWeight(.medium)
                                             .foregroundColor(Color.onAppTint)
@@ -752,7 +752,7 @@ struct DownloadDetailView: View {
                 // Info Card
                 VStack(alignment: .leading, spacing: 10) {
                     // Title
-                    Text(downloaded.title ?? "Unknown Title")
+                    Text(downloaded.title ?? tr("unknown_title"))
                         .font(.title2)
                         .fontWeight(.bold)
                         .foregroundColor(.primary)
@@ -823,7 +823,7 @@ struct DownloadDetailView: View {
                     VStack(alignment: .leading, spacing: 12) {
                         if let studio = downloaded.studioName {
                             VStack(alignment: .leading, spacing: 8) {
-                                Text("Studio")
+                                Text(tr("studio"))
                                     .font(.subheadline)
                                     .fontWeight(.bold)
                                     .foregroundColor(.secondary)
@@ -845,7 +845,7 @@ struct DownloadDetailView: View {
                         
                         if !downloaded.performerNames.isEmpty {
                             VStack(alignment: .leading, spacing: 8) {
-                                Text("Performers")
+                                Text(tr("performers"))
                                     .font(.subheadline)
                                     .fontWeight(.bold)
                                     .foregroundColor(.secondary)
@@ -882,7 +882,7 @@ struct DownloadDetailView: View {
                 } label: {
                     HStack {
                         Image(systemName: "trash")
-                        Text("Delete Download")
+                        Text(tr("action_delete_download"))
                     }
                     .frame(maxWidth: .infinity)
                     .padding()
@@ -895,14 +895,14 @@ struct DownloadDetailView: View {
             .padding(16)
         }
         .applyAppBackground()
-        .alert("Delete this download?", isPresented: $confirmingDelete) {
-            Button("Delete Download", role: .destructive) {
+        .alert(tr("confirm_delete_this_download"), isPresented: $confirmingDelete) {
+            Button(tr("action_delete_download"), role: .destructive) {
                 downloadManager.deleteDownload(id: downloaded.id)
                 dismiss()
             }
-            Button("Cancel", role: .cancel) {}
+            Button(tr("action_cancel"), role: .cancel) {}
         } message: {
-            Text("The video file is removed from this device.")
+            Text(tr("hint_video_file_is_removed_from"))
         }
         .stashyDetailChrome(downloadDetailChromeConfig) {
             downloadDetailNavBar
@@ -957,7 +957,7 @@ struct DownloadDetailView: View {
             guard let created = try? AetherSceneEngine() else {
                 AppLog.error("DownloadDetailView: playback engine could not be created")
                 ToastManager.shared.show(
-                    "Playback engine unavailable",
+                    tr("playback_engine_unavailable"),
                     icon: "exclamationmark.triangle",
                     style: .error
                 )
@@ -1125,7 +1125,7 @@ extension DownloadsView {
     private func swipeActions(for entry: DownloadedGallery) -> [StashySwipeAction] {
         var actions: [StashySwipeAction] = []
         if !entry.isSingleImage {
-            actions.append(StashySwipeAction(title: "Sync", systemImage: "arrow.triangle.2.circlepath", tint: .gray) {
+            actions.append(StashySwipeAction(title: tr("action_sync"), systemImage: "arrow.triangle.2.circlepath", tint: .gray) {
                 if entry.resolvedKind == .tag {
                     downloadManager.syncTagImages(entryId: entry.id, limit: nil)
                 } else {
@@ -1133,7 +1133,7 @@ extension DownloadsView {
                 }
             })
         }
-        actions.append(StashySwipeAction(title: "Delete", systemImage: "trash", tint: AppearanceManager.shared.tintColor, isDestructive: true) {
+        actions.append(StashySwipeAction(title: tr("action_delete"), systemImage: "trash", tint: AppearanceManager.shared.tintColor, isDestructive: true) {
             downloadManager.deleteGalleryDownload(id: entry.id)
         })
         return actions
@@ -1183,7 +1183,7 @@ struct DownloadedGalleryCard: View {
                 }
                 .buttonStyle(.plain)
                 .padding(.trailing, DesignTokens.Spacing.sm)
-                .accessibilityLabel("Cancel download")
+                .accessibilityLabel(tr("action_cancel_download"))
             }
             // No "more" button: the row's actions live behind a swipe to the left.
         }
@@ -1290,7 +1290,7 @@ struct DownloadedGalleryDetailView: View {
                     Image(systemName: "photo.on.rectangle.angled")
                         .font(.system(size: 40))
                         .foregroundColor(.secondary)
-                    Text("Download no longer available")
+                    Text(tr("action_download_no_longer_available"))
                         .font(.subheadline)
                         .foregroundColor(.secondary)
                 }
@@ -1307,7 +1307,7 @@ struct DownloadedGalleryDetailView: View {
     /// Custom top chrome: Back · title · Sync newest / Sync newest 50 / Delete.
     @ViewBuilder
     private var galleryDetailNavBar: some View {
-        StashyDetailTopBar(title: entry?.displayTitle ?? "Download", onBack: { dismiss() })
+        StashyDetailTopBar(title: entry?.displayTitle ?? tr("action_download"), onBack: { dismiss() })
     }
 
     /// Sync / Cancel / Delete sit in the floating bar like every page action.
@@ -1317,13 +1317,13 @@ struct DownloadedGalleryDetailView: View {
         ))
         var actions: [CatalogChromeSlot] = []
         if isSyncing {
-            actions.append(CatalogChromeSlot(systemImage: "stop.circle", accessibilityLabel: "Cancel download", tint: .red) {
+            actions.append(CatalogChromeSlot(systemImage: "stop.circle", accessibilityLabel: tr("action_cancel_download"), tint: .red) {
                 HapticManager.light()
                 downloadManager.cancelGalleryDownload(id: entryId)
             })
         } else {
             if entry?.isSingleImage == false {
-                actions.append(CatalogChromeSlot(systemImage: "arrow.triangle.2.circlepath", accessibilityLabel: "Sync newest") {
+                actions.append(CatalogChromeSlot(systemImage: "arrow.triangle.2.circlepath", accessibilityLabel: tr("action_sync_newest")) {
                     HapticManager.light()
                     sync(limit: nil)
                 })
@@ -1333,14 +1333,14 @@ struct DownloadedGalleryDetailView: View {
                 ) {
                     actions.append(CatalogChromeSlot(
                         systemImage: "arrow.down.to.line",
-                        accessibilityLabel: "Sync newest \(DownloadManager.galleryNewestBatchSize)"
+                        accessibilityLabel: tr("action_sync_newest_arg", DownloadManager.galleryNewestBatchSize)
                     ) {
                         HapticManager.light()
                         sync(limit: DownloadManager.galleryNewestBatchSize)
                     })
                 }
             }
-            actions.append(CatalogChromeSlot(systemImage: "trash", accessibilityLabel: "Delete", tint: .red) {
+            actions.append(CatalogChromeSlot(systemImage: "trash", accessibilityLabel: tr("action_delete"), tint: .red) {
                 HapticManager.light()
                 downloadManager.deleteGalleryDownload(id: entryId)
                 dismiss()
@@ -1741,7 +1741,7 @@ struct DownloadedGalleryItemView: View {
         } else {
             VStack(spacing: 12) {
                 Image(systemName: "exclamationmark.triangle")
-                Text("File missing")
+                Text(tr("file_missing"))
             }
             .foregroundColor(.white)
         }

@@ -1,5 +1,7 @@
 package de.letzgo.stashy.ui.settings
 
+import de.letzgo.stashy.R
+import de.letzgo.stashy.tr
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.VolumeOff
@@ -39,78 +41,78 @@ import java.util.Locale
  */
 fun LazyListScope.playbackSections() {
     // The scene player (scene detail, fullscreen, PiP).
-    settingsSection(header = "Player", key = "player") {
-        SettingsToggleRow("Picture-in-Picture", TabManager.isPiPEnabled, SFS.pip) { TabManager.isPiPEnabled = it }
+    settingsSection(header = tr(R.string.player), key = "player") {
+        SettingsToggleRow(tr(R.string.picture_in_picture), TabManager.isPiPEnabled, SFS.pip) { TabManager.isPiPEnabled = it }
         SettingsDivider()
-        SettingsPickerRow("Skip interval", TabManager.playerSkipOptions, TabManager.playerSkipSeconds, { TabManager.playerSkipLabel(it) }, SFS.goforward) { TabManager.playerSkipSeconds = it }
+        SettingsPickerRow(tr(R.string.action_skip_interval), TabManager.playerSkipOptions, TabManager.playerSkipSeconds, { TabManager.playerSkipLabel(it) }, SFS.goforward) { TabManager.playerSkipSeconds = it }
         SettingsDivider()
-        SettingsToggleRow("Skip buttons", TabManager.showsPlayerSkipButtons, SFS.goforward10) { TabManager.showsPlayerSkipButtons = it }
+        SettingsToggleRow(tr(R.string.action_skip_buttons), TabManager.showsPlayerSkipButtons, SFS.goforward10) { TabManager.showsPlayerSkipButtons = it }
         SettingsDivider()
-        SettingsToggleRow("Autozoom", TabManager.playerAutoZoom, SFS.arrowUpLeftDownRight) { TabManager.playerAutoZoom = it }
+        SettingsToggleRow(tr(R.string.autozoom), TabManager.playerAutoZoom, SFS.arrowUpLeftDownRight) { TabManager.playerAutoZoom = it }
         SettingsDivider()
         // Scene player, Feeds and image-viewer videos (card previews stay muted regardless).
-        SettingsToggleRow("Start mute", TabManager.playbackStartMuted, Icons.Outlined.VolumeOff) {
+        SettingsToggleRow(tr(R.string.action_start_mute), TabManager.playbackStartMuted, Icons.Outlined.VolumeOff) {
             TabManager.playbackStartMuted = it
             de.letzgo.stashy.ui.player.PlayerMute.forgetSessionChoice()
         }
         SettingsDivider()
-        SettingsPickerRow("Hold to speed up", TabManager.holdSpeedOptions, TabManager.holdSpeedPlayer, TabConfigLogic::holdSpeedLabel, SFS.forwardFill) { TabManager.holdSpeedPlayer = it }
+        SettingsPickerRow(tr(R.string.hold_to_speed_up), TabManager.holdSpeedOptions, TabManager.holdSpeedPlayer, TabConfigLogic::holdSpeedLabel, SFS.forwardFill) { TabManager.holdSpeedPlayer = it }
         SettingsDivider()
-        SettingsPickerRow("Count as played", TabManager.playCountThresholdOptions, TabManager.playCountPlayerSeconds, TabConfigLogic::playCountThresholdLabel, SFS.playCircle) { TabManager.playCountPlayerSeconds = it }
+        SettingsPickerRow(tr(R.string.count_as_played), TabManager.playCountThresholdOptions, TabManager.playCountPlayerSeconds, TabConfigLogic::playCountThresholdLabel, SFS.playCircle) { TabManager.playCountPlayerSeconds = it }
     }
     // Feeds playback (Scenes / Markers rows).
     settingsSection(
-        header = "Feeds", key = "feeds-playback",
-        footer = "Double tap jumps to markers: in Feeds › Scenes a double tap on the left or right goes to the previous or next marker of a scene that has markers. Without a marker in that direction it skips seconds as usual.",
+        header = tr(R.string.feeds), key = "feeds-playback",
+        footer = tr(R.string.hint_double_tap_jumps_to_markers),
     ) {
         // Feeds › Scenes only: skip studio intros (beginning / first marker / 30 s / random in the first half).
-        SettingsPickerRow("Start position", FeedsSceneStartPosition.entries, TabManager.feedsSceneStartPosition, { it.label }, SFS.goforward) { TabManager.feedsSceneStartPosition = it }
+        SettingsPickerRow(tr(R.string.action_start_position), FeedsSceneStartPosition.entries, TabManager.feedsSceneStartPosition, { it.label }, SFS.goforward) { TabManager.feedsSceneStartPosition = it }
         SettingsDivider()
         // Feeds › Markers: length of a marker without an end time.
-        SettingsPickerRow("Marker length", TabManager.feedsMarkerLengthOptions, TabManager.feedsMarkerDefaultSeconds, { "${it.toInt()} s" }, SFS.goforward10) { TabManager.feedsMarkerDefaultSeconds = it }
+        SettingsPickerRow(tr(R.string.marker_length), TabManager.feedsMarkerLengthOptions, TabManager.feedsMarkerDefaultSeconds, { "${it.toInt()} s" }, SFS.goforward10) { TabManager.feedsMarkerDefaultSeconds = it }
         SettingsDivider()
-        SettingsPickerRow("Hold to speed up", TabManager.holdSpeedOptions, TabManager.holdSpeedFeeds, TabConfigLogic::holdSpeedLabel, SFS.forwardFrameFill) { TabManager.holdSpeedFeeds = it }
+        SettingsPickerRow(tr(R.string.hold_to_speed_up), TabManager.holdSpeedOptions, TabManager.holdSpeedFeeds, TabConfigLogic::holdSpeedLabel, SFS.forwardFrameFill) { TabManager.holdSpeedFeeds = it }
         SettingsDivider()
         val verticals = de.letzgo.stashy.data.ReelsModeType.Verticals in TabManager.enabledReelsModes
-        SettingsPickerRow(if (verticals) "Count as played · Scenes" else "Count as played", TabManager.playCountThresholdOptions, TabManager.playCountFeedsSeconds, TabConfigLogic::playCountThresholdLabel, SFS.rectangleStackBadgePlay) { TabManager.playCountFeedsSeconds = it }
+        SettingsPickerRow(if (verticals) tr(R.string.count_as_played_scenes) else tr(R.string.count_as_played), TabManager.playCountThresholdOptions, TabManager.playCountFeedsSeconds, TabConfigLogic::playCountThresholdLabel, SFS.rectangleStackBadgePlay) { TabManager.playCountFeedsSeconds = it }
         if (verticals) {
             SettingsDivider()
-            SettingsPickerRow("Count as played · Verticals", TabManager.playCountThresholdOptions, TabManager.playCountVerticalsSeconds, TabConfigLogic::playCountThresholdLabel, SFS.rectangleStackBadgePlay) { TabManager.playCountVerticalsSeconds = it }
+            SettingsPickerRow(tr(R.string.count_as_played_verticals), TabManager.playCountThresholdOptions, TabManager.playCountVerticalsSeconds, TabConfigLogic::playCountThresholdLabel, SFS.rectangleStackBadgePlay) { TabManager.playCountVerticalsSeconds = it }
         }
         SettingsDivider()
         // Feeds › Scenes: a marker at the current position, beside the rating.
-        SettingsToggleRow("Add Marker button", de.letzgo.stashy.data.FeedsConfig.showsAddMarkerButton, de.letzgo.stashy.ui.player.PlayerIcons.addMarker) { de.letzgo.stashy.data.FeedsConfig.updateShowsAddMarkerButton(it) }
+        SettingsToggleRow(tr(R.string.action_add_marker_button), de.letzgo.stashy.data.FeedsConfig.showsAddMarkerButton, de.letzgo.stashy.ui.player.PlayerIcons.addMarker) { de.letzgo.stashy.data.FeedsConfig.updateShowsAddMarkerButton(it) }
         SettingsDivider()
-        SettingsToggleRow("Double tap jumps to markers", de.letzgo.stashy.data.FeedsConfig.doubleTapJumpsToMarkers, de.letzgo.stashy.ui.player.PlayerIcons.bookmark) { de.letzgo.stashy.data.FeedsConfig.updateDoubleTapJumpsToMarkers(it) }
+        SettingsToggleRow(tr(R.string.double_tap_jumps_to_markers), de.letzgo.stashy.data.FeedsConfig.doubleTapJumpsToMarkers, de.letzgo.stashy.ui.player.PlayerIcons.bookmark) { de.letzgo.stashy.data.FeedsConfig.updateDoubleTapJumpsToMarkers(it) }
     }
     // Stash web "Track activity": play count, history, resume point, watch time.
     settingsSection(
-        header = "Activity", key = "activity",
-        footer = "Play count, history, resume point and watch time on the server. The player menu can pause it for one scene.",
+        header = tr(R.string.activity), key = "activity",
+        footer = tr(R.string.hint_play_count_history_resume_point),
     ) {
-        SettingsToggleRow("Playback activity", TabManager.tracksPlaybackActivity, Icons.Outlined.History) { TabManager.tracksPlaybackActivity = it }
+        SettingsToggleRow(tr(R.string.playback_activity), TabManager.tracksPlaybackActivity, Icons.Outlined.History) { TabManager.tracksPlaybackActivity = it }
     }
-    settingsSection(header = "Downloads", key = "downloads") {
-        SettingsPickerRow("Newest batch — Images", TabManager.downloadBatchSizeOptions, TabManager.downloadBatchSize, { "$it" }, SF.photoStack) { TabManager.downloadBatchSize = it }
+    settingsSection(header = tr(R.string.downloads), key = "downloads") {
+        SettingsPickerRow(tr(R.string.newest_batch_images), TabManager.downloadBatchSizeOptions, TabManager.downloadBatchSize, { "$it" }, SF.photoStack) { TabManager.downloadBatchSize = it }
         SettingsDivider()
-        SettingsPickerRow("Newest batch — Scenes", TabManager.downloadBatchSizeOptions, TabManager.sceneDownloadBatchSize, { "$it" }, SF.film) { TabManager.sceneDownloadBatchSize = it }
+        SettingsPickerRow(tr(R.string.newest_batch_scenes), TabManager.downloadBatchSizeOptions, TabManager.sceneDownloadBatchSize, { "$it" }, SF.film) { TabManager.sceneDownloadBatchSize = it }
     }
-    settingsSection(header = "Subtitles", key = "subtitles") {
-        SettingsToggleRow("Show subtitles automatically", TabManager.subtitlesAutoEnabled, SFS.captionsBubble) { TabManager.subtitlesAutoEnabled = it }
+    settingsSection(header = tr(R.string.subtitles), key = "subtitles") {
+        SettingsToggleRow(tr(R.string.action_show_subtitles_automatically), TabManager.subtitlesAutoEnabled, SFS.captionsBubble) { TabManager.subtitlesAutoEnabled = it }
         SettingsDivider()
         val langs = subtitleLanguageOptions()
-        SettingsPickerRow("Preferred language", langs.map { it.first }, TabManager.subtitlePreferredLanguage.takeIf { c -> langs.any { it.first == c } } ?: "any",
+        SettingsPickerRow(tr(R.string.preferred_language), langs.map { it.first }, TabManager.subtitlePreferredLanguage.takeIf { c -> langs.any { it.first == c } } ?: "any",
             { id -> langs.firstOrNull { it.first == id }?.second ?: id }, SFS.globe) { TabManager.subtitlePreferredLanguage = it }
         SettingsDivider()
-        SettingsPickerRow("Size", SubtitleFontSize.entries, TabManager.subtitleFontSize, { it.label }, SFS.textformatSize) { TabManager.subtitleFontSize = it }
+        SettingsPickerRow(tr(R.string.size), SubtitleFontSize.entries, TabManager.subtitleFontSize, { it.label }, SFS.textformatSize) { TabManager.subtitleFontSize = it }
         SettingsDivider()
-        SettingsPickerRow("Font", SubtitleFontFamily.entries, TabManager.subtitleFontFamily, { it.label }, SFS.textformat) { TabManager.subtitleFontFamily = it }
+        SettingsPickerRow(tr(R.string.font), SubtitleFontFamily.entries, TabManager.subtitleFontFamily, { it.label }, SFS.textformat) { TabManager.subtitleFontFamily = it }
         SettingsDivider()
-        SettingsPickerRow("Text color", SubtitleTextColorChoice.entries, TabManager.subtitleTextColor, { it.label }, SFS.paintpalette) { TabManager.subtitleTextColor = it }
+        SettingsPickerRow(tr(R.string.text_color), SubtitleTextColorChoice.entries, TabManager.subtitleTextColor, { it.label }, SFS.paintpalette) { TabManager.subtitleTextColor = it }
         SettingsDivider()
-        SettingsToggleRow("Background box", TabManager.subtitleBoxEnabled, SFS.rectangleFill) { TabManager.subtitleBoxEnabled = it }
+        SettingsToggleRow(tr(R.string.background_box), TabManager.subtitleBoxEnabled, SFS.rectangleFill) { TabManager.subtitleBoxEnabled = it }
         SettingsDivider()
-        SettingsPickerRow("Background color", SubtitleBackgroundChoice.entries, TabManager.subtitleBackgroundColor, { it.label }, SFS.squareFillOnSquare, enabled = TabManager.subtitleBoxEnabled) { TabManager.subtitleBackgroundColor = it }
+        SettingsPickerRow(tr(R.string.background_color), SubtitleBackgroundChoice.entries, TabManager.subtitleBackgroundColor, { it.label }, SFS.squareFillOnSquare, enabled = TabManager.subtitleBoxEnabled) { TabManager.subtitleBackgroundColor = it }
         SettingsDivider()
         SubtitlePreview()
     }
@@ -121,7 +123,7 @@ fun subtitleLanguageOptions(): List<Pair<String, String>> {
     val common = listOf("en", "de", "es", "fr", "it", "pt", "nl", "ru", "ja", "zh", "ko")
     fun name(code: String) = Locale(code).getDisplayLanguage(Locale.ENGLISH).ifEmpty { code }
     val rest = Locale.getISOLanguages().filter { it !in common }.map { it to name(it) }.sortedBy { it.second }
-    return listOf("any" to "Any") + common.map { it to name(it) } + rest
+    return listOf("any" to tr(R.string.any)) + common.map { it to name(it) } + rest
 }
 
 /** iOS `subtitlePreview` — the cue as the player draws it, over a dark stand-in for the picture. */
@@ -137,7 +139,7 @@ private fun SubtitlePreview() {
     ) {
         // Same capped font scale as the player draws its subtitles with (CappedFontScale on the surface).
         de.letzgo.stashy.ui.CappedFontScale { Text(
-            "Sample subtitle",
+            tr(R.string.sample_subtitle),
             color = Color(TabManager.subtitleTextColor.argb), fontSize = size.sp, fontFamily = family, fontWeight = FontWeight.SemiBold,
             style = if (box == null) androidx.compose.ui.text.TextStyle(shadow = Shadow(Color.Black, blurRadius = 4f)) else androidx.compose.ui.text.TextStyle.Default,
             modifier = Modifier.padding(top = 10.dp, bottom = 10.dp).let { if (box != null) it.background(box, RoundedCornerShape(4.dp)).padding(horizontal = 6.dp, vertical = 2.dp) else it },

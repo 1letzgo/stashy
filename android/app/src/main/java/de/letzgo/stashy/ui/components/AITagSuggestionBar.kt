@@ -1,5 +1,7 @@
 package de.letzgo.stashy.ui.components
 
+import de.letzgo.stashy.R
+import de.letzgo.stashy.tr
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
@@ -91,11 +93,11 @@ fun AITagSuggestionBar(
             val newTags = AITagSuggestions.accept(suggestion, target)
             acceptingTagId = null
             if (newTags == null) {
-                showToast("Could not add tag")
+                showToast(tr(R.string.error_add_tag))
                 return@launch
             }
             suggestions.removeAll { it.tag.id == suggestion.tag.id }
-            showToast("Added #${suggestion.tag.name}")
+            showToast(tr(R.string.added_arg, suggestion.tag.name))
             onTagsChanged(newTags)
         }
     }
@@ -107,7 +109,7 @@ fun AITagSuggestionBar(
         scope.launch {
             val plan = AITagSuggestions.planBulkApply(tag, bulkScope, target)
             isPlanningBulk = false
-            if (plan == null) showToast("Nothing to tag") else pendingBulk = plan
+            if (plan == null) showToast(tr(R.string.nothing_to_tag)) else pendingBulk = plan
         }
     }
 
@@ -115,10 +117,10 @@ fun AITagSuggestionBar(
         scope.launch {
             val success = AITagSuggestions.applyBulk(plan, target)
             if (!success) {
-                showToast("Could not apply tag")
+                showToast(tr(R.string.error_apply_tag))
                 return@launch
             }
-            showToast("Added #${plan.tag.name} to ${plan.total} items")
+            showToast(tr(R.string.added_arg_to_arg_items, plan.tag.name, plan.total))
             // The item itself is part of the batch, so its own row has to follow.
             if (target.tags.none { it.id == plan.tag.id }) onTagsChanged(target.tags + plan.tag)
             suggestions.removeAll { it.tag.id == plan.tag.id }
@@ -130,7 +132,7 @@ fun AITagSuggestionBar(
             // Only worth saying on an untagged item.
             if (didRun && target.tags.isEmpty()) {
                 TagRowHint(
-                    if (AITagSuggestions.hasModel) "No tag suggestions" else "Tag Suggestion needs statistics first",
+                    if (AITagSuggestions.hasModel) tr(R.string.empty_tag_suggestions) else tr(R.string.tag_suggestion_needs_statistics_first),
                     style,
                 )
             }
@@ -138,7 +140,7 @@ fun AITagSuggestionBar(
             suggestions.forEach { suggestion ->
                 val tagId = suggestion.tag.id
                 key(tagId) {
-                    Box(Modifier.semantics { contentDescription = "Add tag ${suggestion.tag.name}" }) {
+                    Box(Modifier.semantics { contentDescription = tr(R.string.action_add_tag_arg, suggestion.tag.name) }) {
                         TagSuggestionChip(
                             name = suggestion.tag.name,
                             detail = "${Math.round(suggestion.confidence * 100)}%",
@@ -159,7 +161,7 @@ fun AITagSuggestionBar(
                             containerColor = p.secondaryBackground,
                         ) {
                             DropdownMenuItem(
-                                text = { Text("Ignore Tag", color = StashyColors.systemRed) },
+                                text = { Text(tr(R.string.ignore_tag), color = StashyColors.systemRed) },
                                 leadingIcon = { Icon(SF.xmark, null, tint = StashyColors.systemRed) },
                                 onClick = {
                                     menuFor = null
@@ -168,12 +170,12 @@ fun AITagSuggestionBar(
                                 },
                             )
                             if (target.galleryIds.isNotEmpty()) DropdownMenuItem(
-                                text = { Text("Set on all of gallery", color = p.text) },
+                                text = { Text(tr(R.string.action_set_on_all_of_gallery), color = p.text) },
                                 leadingIcon = { Icon(SF.photoStack, null, tint = p.text) },
                                 onClick = { menuFor = null; planBulk(suggestion.tag, AITagBulkScope.Gallery) },
                             )
                             if (target.performerIds.isNotEmpty()) DropdownMenuItem(
-                                text = { Text("Set on all of performer", color = p.text) },
+                                text = { Text(tr(R.string.action_set_on_all_of_performer), color = p.text) },
                                 leadingIcon = { Icon(Icons.Outlined.AssignmentInd, null, tint = p.text) },
                                 onClick = { menuFor = null; planBulk(suggestion.tag, AITagBulkScope.Performer) },
                             )
@@ -191,11 +193,11 @@ fun AITagSuggestionBar(
             if (plan.sceneIds.isNotEmpty()) add("${plan.sceneIds.size} scenes")
         }
         StashyAlert(
-            title = "Add #${plan.tag.name}?",
-            message = "The tag is added to ${parts.joinToString(" and ")} of $scopeText. Items that already have it stay unchanged.",
+            title = tr(R.string.confirm_add_arg, plan.tag.name),
+            message = tr(R.string.hint_tag_is_added_to_arg, parts.joinToString(" and "), scopeText),
             onDismiss = { pendingBulk = null },
-            confirmLabel = "Add to ${plan.total}",
-            dismissLabel = "Cancel",
+            confirmLabel = tr(R.string.action_add_to_arg, plan.total),
+            dismissLabel = tr(R.string.action_cancel),
             onConfirm = { pendingBulk = null; applyBulk(plan) },
         )
     }

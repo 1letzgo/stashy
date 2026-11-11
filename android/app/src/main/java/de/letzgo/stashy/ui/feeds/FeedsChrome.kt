@@ -1,5 +1,7 @@
 package de.letzgo.stashy.ui.feeds
 
+import de.letzgo.stashy.R
+import de.letzgo.stashy.tr
 import androidx.compose.foundation.layout.sizeIn
 import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.Spring
@@ -144,9 +146,9 @@ fun FeedsTopBar(
             ) {
                 Box(Modifier.weight(1f)) { FeedModeMenu(modes, selected, onSelect) }
                 Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
-                    onDelete?.let { ChromePillIcon(SF.trash, "Delete", it) }
+                    onDelete?.let { ChromePillIcon(SF.trash, tr(R.string.action_delete), it) }
                     FeedsSortMenu(sort)
-                    ChromePillIcon(SF.sliderHorizontal3, "Filter and sort", onFilterSort)
+                    ChromePillIcon(SF.sliderHorizontal3, tr(R.string.action_filter_and_sort_2), onFilterSort)
                 }
             }
             HorizontalDivider(color = Color.White.copy(alpha = 0.15f))
@@ -198,7 +200,7 @@ private fun FeedModeMenu(modes: List<ReelsModeType>, selected: ReelsModeType, on
                 DropdownMenuItem(
                     text = { Text(m.title) },
                     leadingIcon = { Icon(m.icon, null) },
-                    trailingIcon = { if (m == selected) Icon(SF.checkmark, "Selected") },
+                    trailingIcon = { if (m == selected) Icon(SF.checkmark, tr(R.string.selected)) },
                     colors = colors,
                     // Same as tapping a mode pill did; the open feed again is a no-op.
                     onClick = { open = false; if (m != selected) onSelect(m) },
@@ -241,7 +243,7 @@ private fun CriterionChip(label: String, onClick: () -> Unit) {
         selected = false,
         onClick = onClick,
         label = { Text(label, style = androidx.compose.material3.MaterialTheme.typography.labelLarge, maxLines = 1) },
-        trailingIcon = { Icon(SF.xmark, "Remove", Modifier.size(androidx.compose.material3.InputChipDefaults.IconSize)) },
+        trailingIcon = { Icon(SF.xmark, tr(R.string.action_remove), Modifier.size(androidx.compose.material3.InputChipDefaults.IconSize)) },
         colors = androidx.compose.material3.InputChipDefaults.inputChipColors(
             containerColor = Color.Black.copy(alpha = 0.45f),
             labelColor = Color.White,
@@ -287,8 +289,8 @@ fun FeedsRateChrome(item: FeedItem, onOCounter: (FeedsRepository.OMutation) -> U
             )
             // iOS `oCounterRemovalMenu`.
             DropdownMenu(oMenu, onDismissRequest = { oMenu = false }) {
-                DropdownMenuItem(text = { Text("Remove one") }, onClick = { oMenu = false; onOCounter(FeedsRepository.OMutation.Decrement) })
-                DropdownMenuItem(text = { Text("Reset") }, onClick = { oMenu = false; onOCounter(FeedsRepository.OMutation.Reset) })
+                DropdownMenuItem(text = { Text(tr(R.string.action_remove_one)) }, onClick = { oMenu = false; onOCounter(FeedsRepository.OMutation.Decrement) })
+                DropdownMenuItem(text = { Text(tr(R.string.action_reset)) }, onClick = { oMenu = false; onOCounter(FeedsRepository.OMutation.Reset) })
             }
         }
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -296,7 +298,7 @@ fun FeedsRateChrome(item: FeedItem, onOCounter: (FeedsRepository.OMutation) -> U
             StackedPill(SF.starFill, "$stars", stars > 0, Modifier.noIndicationClick { ratingMenu = true })
             DropdownMenu(ratingMenu, onDismissRequest = { ratingMenu = false }) {
                 DropdownMenuItem(
-                    text = { Text("Clear Rating") },
+                    text = { Text(tr(R.string.action_clear_rating)) },
                     trailingIcon = { if (stars == 0) Icon(SF.checkmark, null) },
                     onClick = { ratingMenu = false; onRating(0) },
                 )
@@ -309,7 +311,7 @@ fun FeedsRateChrome(item: FeedItem, onOCounter: (FeedsRepository.OMutation) -> U
             }
         }
         // Optional (Settings › Feeds): a marker at the current position of a whole scene.
-        if (onAddMarker != null) ChromePillIconButton(de.letzgo.stashy.ui.player.PlayerIcons.addMarker, "Add Marker", onClick = onAddMarker)
+        if (onAddMarker != null) ChromePillIconButton(de.letzgo.stashy.ui.player.PlayerIcons.addMarker, tr(R.string.action_add_marker), onClick = onAddMarker)
         }
     }
 }
@@ -410,11 +412,11 @@ private fun FeedsInfoOverlayContent(
             Spacer(Modifier.width(8.dp))
             Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 if (mode != ReelsModeType.Pics) FeedsRateChrome(item, onOCounter, onRating, onAddMarker)
-                ChromePillIconButton(if (isMuted) SF.speakerSlashFill else SF.speakerWave2Fill, if (isMuted) "Unmute" else "Mute", enabled = item.isVideo, onClick = onToggleMute)
+                ChromePillIconButton(if (isMuted) SF.speakerSlashFill else SF.speakerWave2Fill, if (isMuted) tr(R.string.unmute) else tr(R.string.mute), enabled = item.isVideo, onClick = onToggleMute)
                 // Videos play and pause from the time bar ([FeedsScrubber]); only an animated clip,
                 // which has no time bar, keeps a button here (iOS parity).
                 if (!item.isVideo && pausesAdvance) {
-                    ChromePillIconButton(if (isPlaying) SF.pauseFill else SF.playFill, if (isPlaying) "Pause" else "Play", onClick = onTogglePlay)
+                    ChromePillIconButton(if (isPlaying) SF.pauseFill else SF.playFill, if (isPlaying) tr(R.string.action_pause) else tr(R.string.action_play), onClick = onTogglePlay)
                 }
             }
         }
@@ -502,7 +504,7 @@ fun AddPerformerButton(leading: Boolean, onClick: () -> Unit) {
         contentAlignment = Alignment.Center,
     ) {
         Box(Modifier.size(visual).stashyGlass(CircleShape), contentAlignment = Alignment.Center) {
-            Icon(SF.plus, "Add performer", tint = Color.White, modifier = Modifier.size(16.dp))
+            Icon(SF.plus, tr(R.string.action_add_performer), tint = Color.White, modifier = Modifier.size(16.dp))
         }
     }
 }

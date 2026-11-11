@@ -20,19 +20,19 @@ enum StashCriterionModifier: String, CaseIterable, Identifiable, Hashable {
 
     var label: String {
         switch self {
-        case .equals: return "Equals"
-        case .notEquals: return "Not equals"
-        case .greaterThan: return "Greater than"
-        case .lessThan: return "Less than"
-        case .isNull: return "Is null"
-        case .notNull: return "Not null"
-        case .includesAll: return "Includes all"
-        case .includes: return "Includes"
-        case .excludes: return "Excludes"
-        case .matchesRegex: return "Matches regex"
-        case .notMatchesRegex: return "Not matches regex"
-        case .between: return "Between"
-        case .notBetween: return "Not between"
+        case .equals: return tr("equals")
+        case .notEquals: return tr("not_equals")
+        case .greaterThan: return tr("greater_than")
+        case .lessThan: return tr("less_than")
+        case .isNull: return tr("is_null")
+        case .notNull: return tr("not_null")
+        case .includesAll: return tr("includes_all")
+        case .includes: return tr("includes")
+        case .excludes: return tr("excludes")
+        case .matchesRegex: return tr("matches_regex")
+        case .notMatchesRegex: return tr("not_matches_regex")
+        case .between: return tr("between")
+        case .notBetween: return tr("not_between")
         }
     }
 
@@ -202,9 +202,9 @@ enum StashOrientationOption: String, CaseIterable, Identifiable {
     var id: String { rawValue }
     var label: String {
         switch self {
-        case .landscape: return "Landscape"
-        case .portrait: return "Portrait"
-        case .square: return "Square"
+        case .landscape: return tr("landscape")
+        case .portrait: return tr("portrait")
+        case .square: return tr("square")
         }
     }
 }

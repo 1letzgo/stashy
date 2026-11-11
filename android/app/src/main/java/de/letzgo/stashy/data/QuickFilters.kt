@@ -1,5 +1,7 @@
 package de.letzgo.stashy.data
 
+import de.letzgo.stashy.R
+import de.letzgo.stashy.tr
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonNull
@@ -20,37 +22,37 @@ object CatalogQuickSortCatalog {
     /** Curated chips per catalog; everything else stays in the sheet. */
     fun fields(mode: FilterMode): List<Field> = when (mode) {
         FilterMode.Scenes -> listOf(
-            f("date", "Date"), f("created_at", "Added"), f("rating", "Rating"), f("o_counter", "O Count"),
-            f("duration", "Duration"), f("last_played_at", "Last played"), f("play_count", "Plays"), f("random", "Random"),
-            f(SortOption.FOR_YOU_FIELD, "For You"),
+            f("date", tr(R.string.date)), f("created_at", tr(R.string.added)), f("rating", tr(R.string.rating)), f("o_counter", tr(R.string.o_count)),
+            f("duration", tr(R.string.duration)), f("last_played_at", tr(R.string.last_played)), f("play_count", tr(R.string.play_count)), f("random", tr(R.string.random)),
+            f(SortOption.FOR_YOU_FIELD, tr(R.string.for_you)),
         )
         FilterMode.Performers -> listOf(
-            f("scenes_count", "Scenes"), f("images_count", "Images"), f("galleries_count", "Galleries"),
-            f("name", "Name"), f("o_counter", "O Count"), f("rating", "Rating"),
-            f("created_at", "Added"), f("birthdate", "Birthday"), f("random", "Random"),
+            f("scenes_count", tr(R.string.scenes)), f("images_count", tr(R.string.images)), f("galleries_count", tr(R.string.galleries)),
+            f("name", tr(R.string.name)), f("o_counter", tr(R.string.o_count)), f("rating", tr(R.string.rating)),
+            f("created_at", tr(R.string.added)), f("birthdate", tr(R.string.birthday)), f("random", tr(R.string.random)),
         )
         FilterMode.Studios -> listOf(
-            f("scenes_count", "Scenes"), f("images_count", "Images"), f("galleries_count", "Galleries"),
-            f("name", "Name"), f("rating", "Rating"), f("created_at", "Added"), f("random", "Random"),
+            f("scenes_count", tr(R.string.scenes)), f("images_count", tr(R.string.images)), f("galleries_count", tr(R.string.galleries)),
+            f("name", tr(R.string.name)), f("rating", tr(R.string.rating)), f("created_at", tr(R.string.added)), f("random", tr(R.string.random)),
         )
         FilterMode.Tags -> listOf(
-            f("scenes_count", "Scenes"), f("images_count", "Images"), f("galleries_count", "Galleries"),
-            f("name", "Name"), f("created_at", "Added"), f("random", "Random"),
+            f("scenes_count", tr(R.string.scenes)), f("images_count", tr(R.string.images)), f("galleries_count", tr(R.string.galleries)),
+            f("name", tr(R.string.name)), f("created_at", tr(R.string.added)), f("random", tr(R.string.random)),
         )
         // iOS lists `image_count` here, but the gallery sort field is `images_count` on both platforms.
         FilterMode.Galleries -> listOf(
-            f("date", "Date"), f("created_at", "Added"), f("rating", "Rating"), f("images_count", "Images"),
-            f("title", "Title"), f("random", "Random"),
+            f("date", tr(R.string.date)), f("created_at", tr(R.string.added)), f("rating", tr(R.string.rating)), f("images_count", tr(R.string.images)),
+            f("title", tr(R.string.title)), f("random", tr(R.string.random)),
         )
         FilterMode.Images -> listOf(
-            f("date", "Date"), f("created_at", "Added"), f("rating", "Rating"), f("o_counter", "O Count"),
-            f("title", "Title"), f("random", "Random"),
+            f("date", tr(R.string.date)), f("created_at", tr(R.string.added)), f("rating", tr(R.string.rating)), f("o_counter", tr(R.string.o_count)),
+            f("title", tr(R.string.title)), f("random", tr(R.string.random)),
         )
         FilterMode.Groups -> listOf(
-            f("name", "Name"), f("date", "Date"), f("rating", "Rating"), f("scenes_count", "Scenes"),
-            f("created_at", "Added"), f("random", "Random"),
+            f("name", tr(R.string.name)), f("date", tr(R.string.date)), f("rating", tr(R.string.rating)), f("scenes_count", tr(R.string.scenes)),
+            f("created_at", tr(R.string.added)), f("random", tr(R.string.random)),
         )
-        FilterMode.SceneMarkers -> listOf(f("created_at", "Added"), f("title", "Title"), f("seconds", "Time"), f("random", "Random"))
+        FilterMode.SceneMarkers -> listOf(f("created_at", tr(R.string.added)), f("title", tr(R.string.title)), f("seconds", tr(R.string.time)), f("random", tr(R.string.random)))
         FilterMode.Unknown -> emptyList()
     }
 
@@ -109,7 +111,7 @@ sealed class QuickFilterSection {
 /** iOS: `QuickFilterCatalog`. */
 object QuickFilterCatalog {
     fun sections(mode: FilterMode): List<QuickFilterSection> {
-        val tags = QuickFilterSection.Entities("tags", "Tags")
+        val tags = QuickFilterSection.Entities("tags", tr(R.string.tags))
         val all: List<QuickFilterSection> = when (mode) {
             FilterMode.Scenes -> listOf(tags, rating, sceneDuration, resolution, orientation, organized, watched, oCount)
             FilterMode.Performers -> listOf(gender, favorite("filter_favorites"), rating, age, oCount, tags)
@@ -177,24 +179,24 @@ object QuickFilterCatalog {
 
     // Stash stores ratings as 0–100; n stars = rating100 > n·20 − 1.
     private val rating = QuickFilterSection.Choices(
-        "rating100", "Minimum rating", "Any",
+        "rating100", tr(R.string.minimum_rating), tr(R.string.any),
         (1..5).map { stars ->
             QuickFilterChoice("r$stars", "$stars★", "$stars★+", obj("modifier" to "GREATER_THAN", "value" to stars * 20 - 1))
         },
     )
 
     private val sceneDuration = QuickFilterSection.Choices(
-        "duration", "Duration", "Any length",
+        "duration", tr(R.string.duration), tr(R.string.any_length),
         listOf(
-            QuickFilterChoice("short", "Under 10 min", "< 10 min", obj("modifier" to "LESS_THAN", "value" to 600)),
+            QuickFilterChoice("short", tr(R.string.under_10_min), "< 10 min", obj("modifier" to "LESS_THAN", "value" to 600)),
             QuickFilterChoice("mid", "10–30 min", "10–30 min", obj("modifier" to "BETWEEN", "value" to 600, "value2" to 1800)),
-            QuickFilterChoice("long", "Over 30 min", "> 30 min", obj("modifier" to "GREATER_THAN", "value" to 1800)),
+            QuickFilterChoice("long", tr(R.string.over_30_min), "> 30 min", obj("modifier" to "GREATER_THAN", "value" to 1800)),
         ),
     )
 
     // `GREATER_THAN` a resolution class means "above that class", so 720p+ is "> 540p".
     private val resolution = QuickFilterSection.Choices(
-        "resolution", "Quality", "Any quality",
+        "resolution", tr(R.string.quality), tr(R.string.any_quality),
         listOf(
             QuickFilterChoice("720", "720p+", "720p+", obj("modifier" to "GREATER_THAN", "value" to ResolutionOption.WebHD.raw)),
             QuickFilterChoice("1080", "1080p+", "1080p+", obj("modifier" to "GREATER_THAN", "value" to ResolutionOption.StandardHD.raw)),
@@ -203,23 +205,23 @@ object QuickFilterCatalog {
     )
 
     private val organized = QuickFilterSection.Choices(
-        "organized", "Organized", "Any",
+        "organized", tr(R.string.organized), tr(R.string.any),
         listOf(
-            QuickFilterChoice("yes", "Organized", "Organized", JsonPrimitive(true)),
-            QuickFilterChoice("no", "Not organized", "Not organized", JsonPrimitive(false)),
+            QuickFilterChoice("yes", tr(R.string.organized), tr(R.string.organized), JsonPrimitive(true)),
+            QuickFilterChoice("no", tr(R.string.not_organized), tr(R.string.not_organized), JsonPrimitive(false)),
         ),
     )
 
     private val watched = QuickFilterSection.Choices(
-        "play_count", "Watched", "Any",
+        "play_count", tr(R.string.watched), tr(R.string.any),
         listOf(
-            QuickFilterChoice("unwatched", "Unwatched", "Unwatched", obj("modifier" to "EQUALS", "value" to 0)),
-            QuickFilterChoice("watched", "Watched", "Watched", obj("modifier" to "GREATER_THAN", "value" to 0)),
+            QuickFilterChoice("unwatched", tr(R.string.unwatched), tr(R.string.unwatched), obj("modifier" to "EQUALS", "value" to 0)),
+            QuickFilterChoice("watched", tr(R.string.watched), tr(R.string.watched), obj("modifier" to "GREATER_THAN", "value" to 0)),
         ),
     )
 
     private val orientation = QuickFilterSection.Choices(
-        "orientation", "Orientation", "Any",
+        "orientation", tr(R.string.orientation), tr(R.string.any),
         OrientationOption.entries.map { o ->
             QuickFilterChoice(o.raw, o.label, o.label, kotlinx.serialization.json.buildJsonObject {
                 put("value", JsonArray(listOf(JsonPrimitive(o.raw))))
@@ -228,9 +230,9 @@ object QuickFilterCatalog {
     )
 
     private val oCount = QuickFilterSection.Choices(
-        "o_counter", "O-Count", "Any",
+        "o_counter", tr(R.string.o_count), tr(R.string.any),
         listOf(
-            QuickFilterChoice("o0", "None", "No O", obj("modifier" to "EQUALS", "value" to 0)),
+            QuickFilterChoice("o0", tr(R.string.none), tr(R.string.empty_o), obj("modifier" to "EQUALS", "value" to 0)),
             QuickFilterChoice("o1", "1+", "O 1+", obj("modifier" to "GREATER_THAN", "value" to 0)),
             QuickFilterChoice("o5", "5+", "O 5+", obj("modifier" to "GREATER_THAN", "value" to 4)),
             QuickFilterChoice("o10", "10+", "O 10+", obj("modifier" to "GREATER_THAN", "value" to 9)),
@@ -238,37 +240,37 @@ object QuickFilterCatalog {
     )
 
     private val gender = QuickFilterSection.Choices(
-        "gender", "Gender", "Any",
+        "gender", tr(R.string.gender), tr(R.string.any),
         listOf(
-            "FEMALE" to "Female", "MALE" to "Male", "TRANSGENDER_FEMALE" to "Trans female",
-            "TRANSGENDER_MALE" to "Trans male", "NON_BINARY" to "Non-binary",
+            "FEMALE" to tr(R.string.female), "MALE" to tr(R.string.male), "TRANSGENDER_FEMALE" to tr(R.string.trans_female),
+            "TRANSGENDER_MALE" to tr(R.string.trans_male), "NON_BINARY" to "Non-Binary",
         ).map { (raw, label) ->
             QuickFilterChoice(raw, label, label, obj("modifier" to "INCLUDES", "value_list" to listOf(raw)))
         },
     )
 
     private val age = QuickFilterSection.Choices(
-        "age", "Age", "Any age",
+        "age", tr(R.string.age), tr(R.string.any_age),
         listOf(
-            QuickFilterChoice("18", "18–25", "Age 18–25", obj("modifier" to "BETWEEN", "value" to 18, "value2" to 25)),
-            QuickFilterChoice("26", "26–35", "Age 26–35", obj("modifier" to "BETWEEN", "value" to 26, "value2" to 35)),
-            QuickFilterChoice("36", "36+", "Age 36+", obj("modifier" to "GREATER_THAN", "value" to 35)),
+            QuickFilterChoice("18", "18–25", tr(R.string.age_18_25), obj("modifier" to "BETWEEN", "value" to 18, "value2" to 25)),
+            QuickFilterChoice("26", "26–35", tr(R.string.age_26_35), obj("modifier" to "BETWEEN", "value" to 26, "value2" to 35)),
+            QuickFilterChoice("36", "36+", tr(R.string.age_36_plus), obj("modifier" to "GREATER_THAN", "value" to 35)),
         ),
     )
 
     private val hasScenes = QuickFilterSection.Choices(
-        "scene_count", "Scenes", "Any",
+        "scene_count", tr(R.string.scenes), tr(R.string.any),
         listOf(
-            QuickFilterChoice("has", "Has scenes", "Has scenes", obj("modifier" to "GREATER_THAN", "value" to 0)),
-            QuickFilterChoice("none", "No scenes", "No scenes", obj("modifier" to "EQUALS", "value" to 0)),
+            QuickFilterChoice("has", tr(R.string.has_scenes), tr(R.string.has_scenes), obj("modifier" to "GREATER_THAN", "value" to 0)),
+            QuickFilterChoice("none", tr(R.string.empty_scenes), tr(R.string.empty_scenes), obj("modifier" to "EQUALS", "value" to 0)),
         ),
     )
 
     private fun favorite(key: String) = QuickFilterSection.Choices(
-        key, "Favorite", "Any",
+        key, tr(R.string.favourite), tr(R.string.any),
         listOf(
-            QuickFilterChoice("yes", "Favorites", "Favorites", JsonPrimitive(true)),
-            QuickFilterChoice("no", "Not favorite", "Not favorite", JsonPrimitive(false)),
+            QuickFilterChoice("yes", tr(R.string.favorites), tr(R.string.favorites), JsonPrimitive(true)),
+            QuickFilterChoice("no", tr(R.string.not_favorite), tr(R.string.not_favorite), JsonPrimitive(false)),
         ),
     )
 
@@ -278,7 +280,7 @@ object QuickFilterCatalog {
      */
     fun chipLabel(key: String, value: JsonElement, mode: FilterMode, names: Map<String, String>): String {
         activeLabel(key, value, mode)?.let { return it }
-        if (CriteriaDocument.isGroupKey(key)) return when (key) { "AND" -> "All of"; "OR" -> "Any of"; else -> "None of" }
+        if (CriteriaDocument.isGroupKey(key)) return when (key) { "AND" -> tr(R.string.all_of); "OR" -> tr(R.string.any_of); else -> tr(R.string.none_of) }
         val field = FilterFieldCatalog.field(key, mode) ?: return capitalizeWords(key.replace("_", " "))
         val dict = value as? JsonObject
         if ((field.kind == CriterionKind.hierarchicalMulti || field.kind == CriterionKind.multi) && dict != null) {

@@ -15,27 +15,27 @@ extension HomeRowType {
     /// labels; the TV keeps the streaming-app wording its fixed rows had.
     var tvTitle: String {
         switch self {
-        case .lastPlayed: return "Continue Watching"
-        case .channels: return "Channels"
-        case .newest3Min: return "New Releases"
-        case .lastAdded3Min: return "Recently Added"
-        case .mostViewed3Min: return "Most Viewed"
-        case .topCounter3Min: return "Top O-Count"
-        case .topRating3Min: return "Top Rated"
-        case .random: return "Random Picks"
-        case .statistics: return "Statistics"
-        case .newPerformers: return "New Performers"
-        case .performersHighestSceneCount: return "Top Performers"
-        case .performersHighestOCount: return "Performers by O-Count"
-        case .performersHighestRating: return "Top Rated Performers"
-        case .newStudios: return "New Studios"
-        case .studiosHighestSceneCount: return "Top Studios"
-        case .newGalleries: return "New Galleries"
-        case .recentlyUpdatedGalleries: return "Recently Updated Galleries"
-        case .galleriesHighestImageCount: return "Largest Galleries"
-        case .recommendations: return "For You"
-        case .forgottenFavorites: return "Forgotten Favorites"
-        case .customFilter: return "Custom Filter"
+        case .lastPlayed: return tr("continue_watching")
+        case .channels: return tr("channels")
+        case .newest3Min: return tr("new_releases")
+        case .lastAdded3Min: return tr("recently_added")
+        case .mostViewed3Min: return tr("most_viewed")
+        case .topCounter3Min: return tr("top_o_count")
+        case .topRating3Min: return tr("top_rated")
+        case .random: return tr("random_picks")
+        case .statistics: return tr("statistics")
+        case .newPerformers: return tr("new_performers")
+        case .performersHighestSceneCount: return tr("top_performers")
+        case .performersHighestOCount: return tr("performers_by_o_count")
+        case .performersHighestRating: return tr("top_rated_performers")
+        case .newStudios: return tr("new_studios")
+        case .studiosHighestSceneCount: return tr("top_studios")
+        case .newGalleries: return tr("new_galleries")
+        case .recentlyUpdatedGalleries: return tr("recently_updated_galleries")
+        case .galleriesHighestImageCount: return tr("largest_galleries")
+        case .recommendations: return tr("for_you")
+        case .forgottenFavorites: return tr("forgotten_favorites")
+        case .customFilter: return tr("custom_filter")
         }
     }
 
@@ -73,7 +73,7 @@ struct TVHomeRowsSettingsView: View {
                             Text(title(for: row))
                                 .opacity(row.isEnabled ? 1 : 0.5)
                             Spacer()
-                            Text(row.isEnabled ? "On" : "Off")
+                            Text(row.isEnabled ? tr("on") : tr("off"))
                                 .foregroundStyle(row.isEnabled ? appearanceManager.tintColor : .secondary)
                         }
                     }
@@ -91,21 +91,21 @@ struct TVHomeRowsSettingsView: View {
             presenting: editingRow
         ) { row in
             let current = rows.first(where: { $0.id == row.id }) ?? row
-            Button(current.isEnabled ? "Hide from Home" : "Show on Home") {
+            Button(current.isEnabled ? tr("action_hide_from_home") : tr("action_show_on_home")) {
                 tabManager.toggleHomeRow(current.id)
             }
             if canMove(current.id, by: -1) {
-                Button("Move Up") { move(current.id, by: -1) }
-                Button("Move to Top") { moveToTop(current.id) }
+                Button(tr("action_move_up")) { move(current.id, by: -1) }
+                Button(tr("action_move_to_top")) { moveToTop(current.id) }
             }
             if canMove(current.id, by: 1) {
-                Button("Move Down") { move(current.id, by: 1) }
+                Button(tr("action_move_down")) { move(current.id, by: 1) }
             }
-            Button("Cancel", role: .cancel) {}
+            Button(tr("action_cancel"), role: .cancel) {}
         }
         .tvSettingsPage(
-            "Home Rows",
-            description: "Choose the rows on Home and their order. Select a row to show or hide it, or to move it up or down. Each server keeps its own setup."
+            tr("home_rows"),
+            description: tr("hint_choose_rows_on_home_and")
         )
     }
 

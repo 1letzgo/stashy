@@ -1,5 +1,7 @@
 package de.letzgo.stashy.ui.settings
 
+import de.letzgo.stashy.R
+import de.letzgo.stashy.tr
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Delete
 
@@ -31,7 +33,7 @@ fun AiSubtitlesSettingsRows() {
     val scope = rememberCoroutineScope()
     var language by remember { mutableStateOf(SubtitleTargetLanguage.load()) }
     val options = remember { SubtitleTargetLanguage.pickerOptions() }
-    SettingsPickerRow("My subtitle language", options.map { it.first }, language, { id -> options.firstOrNull { it.first == id }?.second ?: id }, de.letzgo.stashy.ui.SFS.captionsBubble) {
+    SettingsPickerRow(tr(R.string.my_subtitle_language), options.map { it.first }, language, { id -> options.firstOrNull { it.first == id }?.second ?: id }, de.letzgo.stashy.ui.SFS.captionsBubble) {
         language = it
         SubtitleTargetLanguage.persist(it)
     }
@@ -40,14 +42,14 @@ fun AiSubtitlesSettingsRows() {
     var confirm by remember { mutableStateOf(false) }
     LaunchedEffect(Unit) { bytes = withContext(Dispatchers.IO) { SpeechModelStore.installedBytes(context) } }
     SettingsNavRow(
-        "Delete downloaded language packs", Icons.Outlined.Delete,
+        tr(R.string.action_delete_downloaded_language_packs), Icons.Outlined.Delete,
         trailing = if (bytes > 0) "${bytes / 1_000_000} MB" else null,
     ) { confirm = true }
     if (confirm) de.letzgo.stashy.ui.NativeConfirmDialog(
-        "Delete language packs?",
-        "Removes the downloaded speech models and translation packs. AI subtitles download them again when needed.",
+        tr(R.string.confirm_delete_language_packs),
+        tr(R.string.hint_removes_downloaded_speech_models_and),
         onDismiss = { confirm = false },
-        confirmLabel = "Delete", destructive = true,
+        confirmLabel = tr(R.string.action_delete), destructive = true,
     ) {
         confirm = false
         scope.launch {

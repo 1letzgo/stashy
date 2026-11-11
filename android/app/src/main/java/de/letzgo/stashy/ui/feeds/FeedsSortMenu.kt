@@ -1,5 +1,7 @@
 package de.letzgo.stashy.ui.feeds
 
+import de.letzgo.stashy.R
+import de.letzgo.stashy.tr
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
@@ -165,18 +167,18 @@ fun FeedsSortMenu(state: FeedsSortMenuState) {
                 DropdownMenuItem(
                     text = { Text(field.label) },
                     leadingIcon = { Icon(feedsSortIcon(field.field), null) },
-                    trailingIcon = { if (state.isActive(field.field)) Icon(SF.checkmark, "Selected") },
+                    trailingIcon = { if (state.isActive(field.field)) Icon(SF.checkmark, tr(R.string.selected)) },
                     colors = colors,
                     onClick = { open = false; state.onField(field.field) },
                 )
             }
             if (!state.isRandom) {
                 HorizontalDivider()
-                listOf(true to "Ascending", false to "Descending").forEach { (ascending, label) ->
+                listOf(true to tr(R.string.ascending), false to tr(R.string.descending)).forEach { (ascending, label) ->
                     DropdownMenuItem(
                         text = { Text(label) },
                         leadingIcon = { Icon(if (ascending) SF.arrowUp else SF.arrowDown, null) },
-                        trailingIcon = { if (state.isAscending == ascending) Icon(SF.checkmark, "Selected") },
+                        trailingIcon = { if (state.isAscending == ascending) Icon(SF.checkmark, tr(R.string.selected)) },
                         colors = colors,
                         onClick = { open = false; state.onDirection(ascending) },
                     )

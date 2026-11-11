@@ -1,5 +1,7 @@
 package de.letzgo.stashy.ui
 
+import de.letzgo.stashy.R
+import de.letzgo.stashy.tr
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -31,24 +33,24 @@ fun AppUpdateDialog() {
     }
 
     val (title, body, confirm, dismiss) = when (state) {
-        AppUpdate.State.Checking -> Quad("Checking for Updates…", null, null, action("Cancel") { AppUpdate.dismiss() })
+        AppUpdate.State.Checking -> Quad(tr(R.string.checking_for_updates_menu), null, null, action(tr(R.string.action_cancel)) { AppUpdate.dismiss() })
         is AppUpdate.State.Available -> Quad(
-            "Update Available",
+            tr(R.string.action_update_available),
             "stashy " + listOfNotNull(state.versionName, state.versionCode?.let { "($it)" }).joinToString(" ").ifEmpty { "" } +
                 " is available" + (state.bytes?.let { " (%.1f MB)".format(it / 1_048_576f) } ?: "") + ".",
-            action("Download") { scope.launch { AppUpdate.download(context) } },
-            action("Later") { AppUpdate.dismiss() },
+            action(tr(R.string.action_download)) { scope.launch { AppUpdate.download(context) } },
+            action(tr(R.string.later)) { AppUpdate.dismiss() },
         )
-        is AppUpdate.State.Downloading -> Quad("Downloading Update…", null, null, null)
+        is AppUpdate.State.Downloading -> Quad(tr(R.string.downloading_update_menu), null, null, null)
         is AppUpdate.State.ReadyToInstall -> Quad(
-            "Install Update",
+            tr(R.string.install_update),
             "stashy ${state.versionName ?: ""} (${state.versionCode}) is ready." +
-                if (AppUpdate.needsInstallPermission(context)) "\n\nAllow stashy to install apps once, then tap Install again." else "",
-            action("Install") { AppUpdate.install(context) },
-            action("Later") { AppUpdate.dismiss() },
+                if (AppUpdate.needsInstallPermission(context)) tr(R.string.hint_allow_stashy_to_install_apps) else "",
+            action(tr(R.string.install)) { AppUpdate.install(context) },
+            action(tr(R.string.later)) { AppUpdate.dismiss() },
         )
-        AppUpdate.State.UpToDate -> Quad("You're Up to Date", "stashy ${AppUpdate.currentVersionName(context)} is the latest version.", action("OK") { AppUpdate.dismiss() }, null)
-        is AppUpdate.State.Failed -> Quad("Update Failed", state.message, action("OK") { AppUpdate.dismiss() }, null)
+        AppUpdate.State.UpToDate -> Quad(tr(R.string.youre_up_to_date), tr(R.string.hint_stashy_arg_is_latest_version, AppUpdate.currentVersionName(context)), action(tr(R.string.ok)) { AppUpdate.dismiss() }, null)
+        is AppUpdate.State.Failed -> Quad(tr(R.string.error_update), state.message, action(tr(R.string.ok)) { AppUpdate.dismiss() }, null)
         AppUpdate.State.Idle -> return
     }
 

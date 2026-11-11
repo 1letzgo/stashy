@@ -1,5 +1,7 @@
 package de.letzgo.stashy.data
 
+import de.letzgo.stashy.R
+import de.letzgo.stashy.tr
 import android.content.Context
 import android.os.Looper
 import androidx.compose.runtime.getValue
@@ -95,9 +97,9 @@ data class DownloadedGallery(
         val trimmed = title?.trim().orEmpty()
         if (trimmed.isNotEmpty()) return trimmed
         return when (resolvedKind) {
-            Kind.Image -> "Untitled image"
-            Kind.Tag -> "Untitled tag"
-            Kind.Gallery -> "Untitled gallery"
+            Kind.Image -> tr(R.string.untitled_image)
+            Kind.Tag -> tr(R.string.untitled_tag)
+            Kind.Gallery -> tr(R.string.untitled_gallery)
         }
     }
 
@@ -422,7 +424,7 @@ object Downloads {
             if (!requireDownloadEntitlement()) return@onMain
             sceneQueue.addLast(scene)
             queuedSceneIds = queuedSceneIds + id
-            activeDownloads = activeDownloads + (id to ActiveDownload(id, scene.title ?: "Unknown Scene", 0.0))
+            activeDownloads = activeDownloads + (id to ActiveDownload(id, scene.title ?: tr(R.string.unknown_scene), 0.0))
             startNextQueuedScenesIfPossible()
         }
     }
@@ -438,7 +440,7 @@ object Downloads {
 
     private fun startDownload(scene: Scene) {
         val id = scene.id
-        val title = scene.title ?: "Unknown Scene"
+        val title = scene.title ?: tr(R.string.unknown_scene)
         activeDownloads = activeDownloads + (id to ActiveDownload(id, title, 0.05))
         val ext = DownloadsMetadataCodec.sceneFileExtension(scene.files?.firstOrNull()?.format, scene.paths?.stream)
         val videoURL = Net.signed(scene.paths?.stream ?: ServerConfigManager.activeConfig?.let { "${it.baseURL}/scene/$id/stream" })
@@ -501,10 +503,10 @@ object Downloads {
                 val scenes = DownloadsFetch.scenes(scope.sceneFilter, limit)
                 val pending = scenes.filter { !isDownloaded(it.id) && activeDownloads[it.id] == null }
                 if (pending.isEmpty()) {
-                    notify(if (scenes.isEmpty()) "No scenes for $scopeName" else "All scenes already downloaded")
+                    notify(if (scenes.isEmpty()) tr(R.string.empty_scenes_for_arg, scopeName) else tr(R.string.all_scenes_already_downloaded))
                     return@launch
                 }
-                notify("Downloading ${pending.size} scene(s) from $scopeName")
+                notify(tr(R.string.downloading_arg_scene_s_from, pending.size, scopeName))
                 pending.forEach { downloadScene(it) }
             }
         }
@@ -580,7 +582,7 @@ object Downloads {
             DownloadsEngine.cancel(Prefs.appContext, DownloadsPendingStore.entryKey(id))
             activeDownloads = activeDownloads - id
             if (!isGalleryDownloaded(id)) scope.launch(Dispatchers.IO) { File(root, galleryFolderName(id)).deleteRecursively() }
-            notify("Download cancelled")
+            notify(tr(R.string.action_download_cancelled))
         }
     }
 
@@ -594,12 +596,12 @@ object Downloads {
             val entryId = "image-${image.id}"
             if (isGalleryDownloaded(entryId) || activeDownloads[entryId] != null) return@onMain
             val fileTitle = image.downloadTitle
-            val title = fileTitle ?: "Image"
+            val title = fileTitle ?: tr(R.string.image)
             activeDownloads = activeDownloads + (entryId to ActiveDownload(entryId, title, 0.05))
             enqueueImages(
                 PendingImageDownload(
                     entryId = entryId, title = title, entryTitle = fileTitle, mode = PendingImageDownload.MODE_IMAGE,
-                    images = listOf(pendingImage(image) ?: run { activeDownloads = activeDownloads - entryId; notify("Download failed"); return@onMain }),
+                    images = listOf(pendingImage(image) ?: run { activeDownloads = activeDownloads - entryId; notify(tr(R.string.error_download)); return@onMain }),
                     studioName = image.studio?.name, performerNames = image.performers.orEmpty().mapNotNull { it.name },
                     serverImageCount = 1, sourceKind = DownloadedGallery.Kind.Image.raw,
                 ),
@@ -614,9 +616,9 @@ object Downloads {
             if (!requireDownloadEntitlement()) return@onMain
             val id = gallery.id
             if (isGalleryDownloaded(id) || activeDownloads[id] != null) return@onMain
-            val title = gallery.title?.takeIf { it.isNotEmpty() } ?: "Gallery"
+            val title = gallery.title?.takeIf { it.isNotEmpty() } ?: tr(R.string.gallery)
             activeDownloads = activeDownloads + (id to ActiveDownload(id, title, 0.02))
-            fetchThenEnqueue(id, onEmpty = "Gallery has no images", isError = true, fetch = { DownloadsFetch.galleryImages(id, limit) }) { images, total ->
+            fetchThenEnqueue(id, onEmpty = tr(R.string.gallery_has_no_images), isError = true, fetch = { DownloadsFetch.galleryImages(id, limit) }) { images, total ->
                 PendingImageDownload(
                     entryId = id, title = title, entryTitle = gallery.title, mode = PendingImageDownload.MODE_NEW,
                     images = images, studioName = gallery.studio?.name, performerNames = gallery.performers.orEmpty().map { it.name },
@@ -634,7 +636,7 @@ object Downloads {
             val entryId = "tag-$tagId"
             if (isGalleryDownloaded(entryId) || activeDownloads[entryId] != null) return@onMain
             activeDownloads = activeDownloads + (entryId to ActiveDownload(entryId, tagName, 0.02))
-            fetchThenEnqueue(entryId, onEmpty = "No images for this tag", isError = true, fetch = { DownloadsFetch.tagImages(tagId, limit) }) { images, total ->
+            fetchThenEnqueue(entryId, onEmpty = tr(R.string.empty_images_for_this_tag), isError = true, fetch = { DownloadsFetch.tagImages(tagId, limit) }) { images, total ->
                 PendingImageDownload(
                     entryId = entryId, title = tagName, entryTitle = tagName, mode = PendingImageDownload.MODE_NEW,
                     images = images, serverImageCount = total, sourceKind = DownloadedGallery.Kind.Tag.raw,
@@ -667,7 +669,7 @@ object Downloads {
                 if (fresh.isEmpty()) {
                     activeDownloads = activeDownloads - id
                     updateGallery(id) { it.copy(serverImageCount = total) }
-                    notify("Already up to date")
+                    notify(tr(R.string.already_up_to_date))
                     return@launch
                 }
                 enqueueImages(PendingImageDownload(
@@ -694,7 +696,7 @@ object Downloads {
                 val fresh = images.filter { it.id !in known }
                 if (fresh.isEmpty()) {
                     activeDownloads = activeDownloads - entryId
-                    notify(if (images.isEmpty()) "No images for this filter" else "Already up to date")
+                    notify(if (images.isEmpty()) tr(R.string.empty_images_for_this_filter) else tr(R.string.already_up_to_date))
                     return@launch
                 }
                 enqueueImages(PendingImageDownload(
@@ -844,12 +846,12 @@ object Downloads {
             PendingImageDownload.MODE_SYNC -> {
                 if (galleryDownloads.none { it.id == id }) return
                 updateGallery(id) { it.copy(images = stored + it.images, downloadDate = AppleDate.now(), serverImageCount = p.serverImageCount) }
-                notify("Added ${stored.size} new image(s)")
+                notify(tr(R.string.added_arg_new_image_s, stored.size))
             }
             PendingImageDownload.MODE_FILTER -> {
                 if (stored.isEmpty()) {
                     if (!isGalleryDownloaded(id)) File(root, galleryFolderName(id)).deleteRecursively()
-                    notify("Download failed", true); return
+                    notify(tr(R.string.error_download), true); return
                 }
                 if (isGalleryDownloaded(id)) {
                     updateGallery(id) { it.copy(images = stored + it.images, downloadDate = AppleDate.now(), serverImageCount = p.serverImageCount) }
@@ -861,12 +863,12 @@ object Downloads {
                     )) + galleryDownloads
                     saveGalleryMetadata()
                 }
-                notify("Added ${stored.size} image(s) from ${p.title}")
+                notify(tr(R.string.added_arg_image_s_from, stored.size, p.title))
             }
             else -> {
                 if (stored.isEmpty()) {
                     File(root, galleryFolderName(id)).deleteRecursively()
-                    notify("Download failed", true); return
+                    notify(tr(R.string.error_download), true); return
                 }
                 val single = p.mode == PendingImageDownload.MODE_IMAGE
                 galleryDownloads = galleryDownloads.filter { it.id != id } + DownloadedGallery(
@@ -875,7 +877,7 @@ object Downloads {
                     images = stored, isSingleImage = single, sourceKind = p.sourceKind, serverImageCount = p.serverImageCount,
                 )
                 saveGalleryMetadata()
-                notify(if (single) "Image downloaded" else "Downloaded ${stored.size} image(s)")
+                notify(if (single) tr(R.string.image_downloaded) else tr(R.string.downloaded_arg_image_s, stored.size))
             }
         }
     }
@@ -891,7 +893,7 @@ object Downloads {
     /** iOS: `requireDownloadEntitlement()` — stashy+ gate with toast and paywall. */
     fun requireDownloadEntitlement(): Boolean {
         if (StashyPlus.isUnlocked) return true
-        de.letzgo.stashy.ui.tools.showToast("Downloads are part of stashy+ — unlock in Settings")
+        de.letzgo.stashy.ui.tools.showToast(tr(R.string.hint_downloads_are_part_of_stashy))
         runCatching { de.letzgo.stashy.ui.tools.openStashyPlusPaywall() }
         return false
     }

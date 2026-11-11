@@ -17,7 +17,7 @@ class TopListsLogicTest {
 
     @Test fun sceneMetricsSortFields() {
         assertEquals(listOf("play_count", "o_counter", "play_duration", "rating"), TopListsSceneMetric.entries.map { it.sortField })
-        assertEquals(listOf("Views", "O-Count", "Watch Time", "Rating"), TopListsSceneMetric.entries.map { it.label })
+        assertEquals(listOf("Play Count", "O Count", "Watch Time", "Rating"), TopListsSceneMetric.entries.map { it.label })
         assertTrue(TopListsSceneMetric.entries.all { it.direction == "DESC" })
     }
 

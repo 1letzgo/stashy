@@ -794,9 +794,9 @@ enum CustomAsyncImageError: LocalizedError {
     
     var errorDescription: String? {
         switch self {
-        case .noURL: return "No URL provided"
-        case .invalidImageData: return "Invalid image data"
-        case .serverError(let statusCode): return "Server returned error: \(statusCode)"
+        case .noURL: return tr("empty_url_provided")
+        case .invalidImageData: return tr("invalid_image_data")
+        case .serverError(let statusCode): return tr("server_returned_error_arg", statusCode)
         }
     }
 }

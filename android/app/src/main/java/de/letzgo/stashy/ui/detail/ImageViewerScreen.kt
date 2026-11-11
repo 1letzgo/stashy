@@ -1,5 +1,7 @@
 package de.letzgo.stashy.ui.detail
 
+import de.letzgo.stashy.R
+import de.letzgo.stashy.tr
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.outlined.ArrowCircleDown
@@ -265,48 +267,48 @@ class ImageViewerScreen(
         if (confirmDelete) {
             AlertDialog(
                 onDismissRequest = { confirmDelete = false },
-                title = { Text("Really delete image?") },
-                text = { Text("This image will be permanently deleted. This action cannot be undone.") },
-                confirmButton = { TextButton({ confirmDelete = false; scope.launch { deleteCurrent(pager) } }) { Text("Delete", color = StashyColors.systemRed) } },
-                dismissButton = { TextButton({ confirmDelete = false }) { Text("Cancel") } },
+                title = { Text(tr(R.string.confirm_really_delete_image)) },
+                text = { Text(tr(R.string.hint_this_image_will_be_permanently)) },
+                confirmButton = { TextButton({ confirmDelete = false; scope.launch { deleteCurrent(pager) } }) { Text(tr(R.string.action_delete), color = StashyColors.systemRed) } },
+                dismissButton = { TextButton({ confirmDelete = false }) { Text(tr(R.string.action_cancel)) } },
             )
         }
         if (performerImageTargets.isNotEmpty()) {
             val targets = performerImageTargets
             AlertDialog(
                 onDismissRequest = { performerImageTargets = emptyList() },
-                title = { Text("Set as Performer Image?") },
+                title = { Text(tr(R.string.confirm_set_as_performer_image)) },
                 text = {
                     Column {
-                        Text("Update the profile picture for the selected performer.")
+                        Text(tr(R.string.hint_update_profile_picture_for_selected))
                         if (targets.size > 1) targets.forEach { t ->
-                            TextButton({ performerImageTargets = emptyList(); scope.launch { setPerformerImage(t) } }) { Text(t.name ?: "Performer") }
+                            TextButton({ performerImageTargets = emptyList(); scope.launch { setPerformerImage(t) } }) { Text(t.name ?: tr(R.string.performer)) }
                         }
                     }
                 },
                 confirmButton = {
-                    if (targets.size == 1) TextButton({ performerImageTargets = emptyList(); scope.launch { setPerformerImage(targets[0]) } }) { Text("Okay") }
+                    if (targets.size == 1) TextButton({ performerImageTargets = emptyList(); scope.launch { setPerformerImage(targets[0]) } }) { Text(tr(R.string.okay)) }
                 },
-                dismissButton = { TextButton({ performerImageTargets = emptyList() }) { Text("Cancel") } },
+                dismissButton = { TextButton({ performerImageTargets = emptyList() }) { Text(tr(R.string.action_cancel)) } },
             )
         }
         if (galleryCoverTargets.isNotEmpty()) {
             val targets = galleryCoverTargets
             AlertDialog(
                 onDismissRequest = { galleryCoverTargets = emptyList() },
-                title = { Text("Set as Gallery Cover?") },
+                title = { Text(tr(R.string.confirm_set_as_gallery_cover)) },
                 text = {
                     Column {
-                        Text(if (targets.size == 1) "Use this image as the cover of its gallery." else "Choose which gallery gets this image as its cover.")
+                        Text(if (targets.size == 1) tr(R.string.hint_use_this_image_as_cover) else tr(R.string.hint_choose_which_gallery_gets_this))
                         if (targets.size > 1) targets.forEach { t ->
-                            TextButton({ galleryCoverTargets = emptyList(); scope.launch { setGalleryCover(t) } }) { Text(t.name?.takeIf { it.isNotBlank() } ?: "Untitled Gallery") }
+                            TextButton({ galleryCoverTargets = emptyList(); scope.launch { setGalleryCover(t) } }) { Text(t.name?.takeIf { it.isNotBlank() } ?: tr(R.string.untitled_gallery)) }
                         }
                     }
                 },
                 confirmButton = {
-                    if (targets.size == 1) TextButton({ galleryCoverTargets = emptyList(); scope.launch { setGalleryCover(targets[0]) } }) { Text("Okay") }
+                    if (targets.size == 1) TextButton({ galleryCoverTargets = emptyList(); scope.launch { setGalleryCover(targets[0]) } }) { Text(tr(R.string.okay)) }
                 },
-                dismissButton = { TextButton({ galleryCoverTargets = emptyList() }) { Text("Cancel") } },
+                dismissButton = { TextButton({ galleryCoverTargets = emptyList() }) { Text(tr(R.string.action_cancel)) } },
             )
         }
     }
@@ -344,7 +346,7 @@ class ImageViewerScreen(
                     error = {
                         Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(12.dp, Alignment.CenterVertically), horizontalAlignment = Alignment.CenterHorizontally) {
                             Icon(SF.exclamationTriangle, null, tint = Color.White, modifier = Modifier.size(40.dp))
-                            Text("Failed to load image", color = Color.White)
+                            Text(tr(R.string.error_load_image), color = Color.White)
                         }
                     },
                 )
@@ -457,7 +459,7 @@ class ImageViewerScreen(
         val image = current
         val scope = rememberCoroutineScope()
         NativeTopBar("", transparent = true) {
-            TopBarAction(SF.squareAndArrowUp, "Share") { image?.let { scope.launch { share(context, it) } } }
+            TopBarAction(SF.squareAndArrowUp, tr(R.string.action_share)) { image?.let { scope.launch { share(context, it) } } }
             // iOS: per-image download (`downloadManager.downloadImage`, entry `image-<id>`) — check in the
             // accent when stored, arrow while downloading (both disabled), else the download glyph.
             if (image != null) {
@@ -471,21 +473,21 @@ class ImageViewerScreen(
                         else -> DownloadGlyph
                     },
                     when {
-                        isDownloaded -> "Downloaded"
-                        isDownloading -> "Downloading"
-                        else -> "Download"
+                        isDownloaded -> tr(R.string.downloaded)
+                        isDownloading -> tr(R.string.downloading)
+                        else -> tr(R.string.action_download)
                     },
                     tint = if (isDownloaded) Appearance.tint else null,
                     enabled = !isDownloaded && !isDownloading,
                 ) { Downloads.downloadImage(image) }
             }
-            TopBarAction(SF.trash, "Delete") { confirmDelete = true }
+            TopBarAction(SF.trash, tr(R.string.action_delete)) { confirmDelete = true }
             if (!image?.galleries.isNullOrEmpty()) {
-                TopBarAction(SF.photoStack, "Set as gallery cover") { galleryCoverTargets = image?.galleries.orEmpty() }
+                TopBarAction(SF.photoStack, tr(R.string.action_set_as_gallery_cover)) { galleryCoverTargets = image?.galleries.orEmpty() }
             }
             if (!image?.performers.isNullOrEmpty()) {
                 TopBarOverflowMenu { dismiss ->
-                    OverflowItem("Set as performer image", SF.personCropCircleBadgePlus, dismiss) { performerImageTargets = image?.performers.orEmpty() }
+                    OverflowItem(tr(R.string.action_set_as_performer_image), SF.personCropCircleBadgePlus, dismiss) { performerImageTargets = image?.performers.orEmpty() }
                 }
             }
         }
@@ -520,9 +522,9 @@ class ImageViewerScreen(
                             Text(title, fontSize = 15.sp, fontWeight = FontWeight.Medium, color = Color.White.copy(alpha = 0.85f), maxLines = 1, overflow = TextOverflow.Ellipsis)
                         } else if (gallery != null) {
                             Text(
-                                gallery.title ?: "Unknown Gallery", fontSize = 15.sp, fontWeight = FontWeight.Medium, color = Color.White.copy(alpha = 0.85f), maxLines = 1,
+                                gallery.title ?: tr(R.string.unknown_gallery), fontSize = 15.sp, fontWeight = FontWeight.Medium, color = Color.White.copy(alpha = 0.85f), maxLines = 1,
                                 overflow = TextOverflow.Ellipsis,
-                                modifier = Modifier.clickable { Nav.push(GalleryDetailScreen(gallery.id, Gallery(gallery.id, title = gallery.title ?: "Gallery"))) },
+                                modifier = Modifier.clickable { Nav.push(GalleryDetailScreen(gallery.id, Gallery(gallery.id, title = gallery.title ?: tr(R.string.gallery)))) },
                             )
                         }
                     }
@@ -532,10 +534,10 @@ class ImageViewerScreen(
                     OCounterButton(image)
                     RatingButton(image)
                     // Same buttons as the Feeds control stack ([FeedsInfoOverlay]).
-                    ChromePillIconButton(if (isMuted) SF.speakerSlashFill else SF.speakerWave2Fill, if (isMuted) "Unmute" else "Mute", enabled = isVideo) {
+                    ChromePillIconButton(if (isMuted) SF.speakerSlashFill else SF.speakerWave2Fill, if (isMuted) tr(R.string.unmute) else tr(R.string.mute), enabled = isVideo) {
                         isMuted = !isMuted; de.letzgo.stashy.ui.player.PlayerMute.remember(isMuted)
                     }
-                    ChromePillIconButton(if (isPlaying) SF.pauseFill else SF.playFill, if (isPlaying) "Pause" else "Play", enabled = isVideo || continuousPlay) {
+                    ChromePillIconButton(if (isPlaying) SF.pauseFill else SF.playFill, if (isPlaying) tr(R.string.action_pause) else tr(R.string.action_play), enabled = isVideo || continuousPlay) {
                         isPlaying = !isPlaying
                     }
                 }
@@ -575,7 +577,7 @@ class ImageViewerScreen(
                 icon = oCounterIcon(Appearance.oCounterIcon, filled = count > 0),
                 value = "$count",
                 active = count > 0,
-                contentDescription = "O-Counter",
+                contentDescription = tr(R.string.o_count),
                 modifier = Modifier.combinedClickable(
                     interactionSource = remember { MutableInteractionSource() }, indication = null,
                     onClick = { scope.launch { changeOCounter(image.id, OCounterMutation.Increment) } },
@@ -584,24 +586,24 @@ class ImageViewerScreen(
             )
             DropdownMenu(menu, { menu = false }) {
                 if (count > 0) {
-                    DropdownMenuItem({ Text("Remove one O") }, leadingIcon = { Icon(SF.minusCircle, null) }, onClick = {
+                    DropdownMenuItem({ Text(tr(R.string.action_remove_one_o)) }, leadingIcon = { Icon(SF.minusCircle, null) }, onClick = {
                         menu = false; scope.launch { changeOCounter(image.id, OCounterMutation.Decrement) }
                     })
-                    if (count > 1) DropdownMenuItem({ Text("Reset O-Counter ($count)", color = StashyColors.systemRed) }, leadingIcon = { Icon(SF.arrowCounterclockwise, null, tint = StashyColors.systemRed) }, onClick = {
+                    if (count > 1) DropdownMenuItem({ Text(tr(R.string.action_reset_o_count_arg, count), color = StashyColors.systemRed) }, leadingIcon = { Icon(SF.arrowCounterclockwise, null, tint = StashyColors.systemRed) }, onClick = {
                         menu = false; confirmReset = true
                     })
                 } else {
-                    DropdownMenuItem({ Text("No O recorded") }, enabled = false, onClick = {})
+                    DropdownMenuItem({ Text(tr(R.string.empty_o_recorded)) }, enabled = false, onClick = {})
                 }
             }
         }
         if (confirmReset) {
             AlertDialog(
                 onDismissRequest = { confirmReset = false },
-                title = { Text("Reset O-Counter?") },
-                text = { Text("All $count recorded O entries and their dates are permanently deleted on the server. This cannot be undone.") },
-                confirmButton = { TextButton({ confirmReset = false; scope.launch { changeOCounter(image.id, OCounterMutation.Reset) } }) { Text("Remove all $count", color = StashyColors.systemRed) } },
-                dismissButton = { TextButton({ confirmReset = false }) { Text("Cancel") } },
+                title = { Text(tr(R.string.confirm_reset_o_count)) },
+                text = { Text(tr(R.string.hint_all_arg_recorded_o_entries, count)) },
+                confirmButton = { TextButton({ confirmReset = false; scope.launch { changeOCounter(image.id, OCounterMutation.Reset) } }) { Text(tr(R.string.action_remove_all_arg, count), color = StashyColors.systemRed) } },
+                dismissButton = { TextButton({ confirmReset = false }) { Text(tr(R.string.action_cancel)) } },
             )
         }
     }
@@ -613,9 +615,9 @@ class ImageViewerScreen(
         val scope = rememberCoroutineScope()
         var menu by remember { mutableStateOf(false) }
         Box {
-            StackedPill(SF.starFill, "$stars", stars > 0, Modifier.noIndicationClick { menu = true }, contentDescription = "Rating")
+            StackedPill(SF.starFill, "$stars", stars > 0, Modifier.noIndicationClick { menu = true }, contentDescription = tr(R.string.rating))
             DropdownMenu(menu, { menu = false }) {
-                DropdownMenuItem({ Text("Clear Rating") }, trailingIcon = { if (stars == 0) Icon(SF.checkmark, null) }, onClick = {
+                DropdownMenuItem({ Text(tr(R.string.action_clear_rating)) }, trailingIcon = { if (stars == 0) Icon(SF.checkmark, null) }, onClick = {
                     menu = false; scope.launch { setRating(image.id, 0) }
                 })
                 HorizontalDivider()
@@ -713,7 +715,7 @@ class ImageViewerScreen(
         replace(id) { it.copy(oCounter = optimistic) }
         val result = DetailRepository.imageOCounter(id, mutation)
         replace(id) { it.copy(oCounter = result ?: original) }
-        if (result == null) detailToast("Failed to update O-Counter")
+        if (result == null) detailToast(tr(R.string.error_update_o_count))
     }
 
     private suspend fun setRating(id: String, rating: Int) {
@@ -722,7 +724,7 @@ class ImageViewerScreen(
         replace(id) { it.copy(rating100 = value) }
         if (!DetailRepository.setImageRating(id, value)) {
             replace(id) { it.copy(rating100 = original) }
-            detailToast("Failed to save rating")
+            detailToast(tr(R.string.error_save_rating))
         }
     }
 
@@ -730,18 +732,18 @@ class ImageViewerScreen(
         val remaining = image.tags.orEmpty().filter { it.id != tag.id }
         if (DetailRepository.setImageTags(image.id, remaining.map { it.id })) {
             replace(image.id) { it.copy(tags = remaining) }
-            detailToast("Removed #${tag.name}")
-        } else detailToast("Could not remove tag")
+            detailToast(tr(R.string.removed_arg, tag.name))
+        } else detailToast(tr(R.string.error_remove_tag))
     }
 
     private suspend fun deleteCurrent(pager: PagerState) {
         val index = pager.currentPage
         val image = items.getOrNull(index) ?: return
         if (!DetailRepository.deleteImage(image.id)) {
-            detailToast("Failed to delete image")
+            detailToast(tr(R.string.error_delete_image))
             return
         }
-        detailToast("Image deleted")
+        detailToast(tr(R.string.image_deleted))
         items.removeAll { it.id == image.id }
         // An emptied list pops via the `items.isEmpty()` branch in Content.
         if (items.isNotEmpty() && index >= items.size - 1) onLoadMore?.invoke()
@@ -757,8 +759,8 @@ class ImageViewerScreen(
             // iOS: `invalidatePerformerProfileImage` + `PerformerImageUpdated` — every list,
             // header and card showing this performer reloads its image.
             de.letzgo.stashy.data.ImageRefresh.performerImageChanged(performer.id, updated.imagePath)
-            detailToast("Performer image updated")
-        } else detailToast("Failed to update performer image")
+            detailToast(tr(R.string.performer_image_updated))
+        } else detailToast(tr(R.string.error_update_performer_image))
     }
 
     private suspend fun setGalleryCover(gallery: IdName) {
@@ -766,8 +768,8 @@ class ImageViewerScreen(
         val cover = de.letzgo.stashy.data.GalleryCover(image.id, image.paths)
         // An older Stash (before 0.28) answers with an error: show it, change nothing.
         val result = runCatching { DetailRepository.setGalleryCover(gallery.id, image.id, cover) }
-        if (result.getOrDefault(false)) detailToast("Gallery cover updated")
-        else detailToast(result.exceptionOrNull()?.message?.takeIf { it.isNotBlank() } ?: "Failed to update gallery cover")
+        if (result.getOrDefault(false)) detailToast(tr(R.string.gallery_cover_updated))
+        else detailToast(result.exceptionOrNull()?.message?.takeIf { it.isNotBlank() } ?: tr(R.string.error_update_gallery_cover))
     }
 
     /** iOS `shareCurrentImage` — downloads the original and hands it to the share sheet. */

@@ -1,5 +1,7 @@
 package de.letzgo.stashy.data.tools
 
+import de.letzgo.stashy.R
+import de.letzgo.stashy.tr
 import de.letzgo.stashy.data.Performer
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
@@ -63,8 +65,8 @@ enum class MatchDuelMode(val raw: String, val label: String, val ascensionMode: 
     HeadToHead("headToHead", "1 vs. 1", "swiss"),
     /** 32:1 bracket (`MatchBracket`); [ascensionMode] unused — no per-pick Elo. */
     Bracket("bracket", "32:1", "bracket"),
-    Placement("placement", "Rise", "gauntlet"),
-    Champion("champion", "Legend", "champion");
+    Placement("placement", tr(R.string.rise), "gauntlet"),
+    Champion("champion", tr(R.string.legend), "champion");
 
     companion object {
         /** iOS: `duelMode(migratingPersistedRaw:)` — legacy `swiss` / `gauntlet` values. */
@@ -561,9 +563,9 @@ object MatchElo {
     fun streakSummaryLine(s: MatchStats): String? {
         fun signed(n: Int) = if (n > 0) "+$n" else "$n"
         val parts = listOfNotNull(
-            if (s.currentStreak != 0) "Current ${signed(s.currentStreak)}" else null,
-            if (s.bestStreak > 0) "Best +${s.bestStreak}" else null,
-            if (s.worstStreak < 0) "Worst ${s.worstStreak}" else null,
+            if (s.currentStreak != 0) tr(R.string.current_arg, signed(s.currentStreak)) else null,
+            if (s.bestStreak > 0) tr(R.string.best_plus_arg, s.bestStreak) else null,
+            if (s.worstStreak < 0) tr(R.string.worst_arg, s.worstStreak) else null,
         )
         return if (parts.isEmpty()) null else parts.joinToString(" · ")
     }

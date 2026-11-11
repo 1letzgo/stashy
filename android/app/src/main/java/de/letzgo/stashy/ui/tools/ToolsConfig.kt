@@ -1,5 +1,7 @@
 package de.letzgo.stashy.ui.tools
 
+import de.letzgo.stashy.R
+import de.letzgo.stashy.tr
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -13,18 +15,18 @@ import kotlinx.serialization.builtins.ListSerializer
 /** iOS: `ToolsItem` (raw values identical — persisted in `ToolsConfig_<serverID>`). */
 @Serializable
 enum class ToolsItem(val title: String) {
-    @SerialName("server") Server("Server"),
-    @SerialName("downloads") Downloads("Downloads"),
-    @SerialName("statistics") Statistics("Overview"),
-    @SerialName("oCount") OCount("O-Count"),
-    @SerialName("timeline") Timeline("Timeline"),
-    @SerialName("topLists") TopLists("Charts"),
-    @SerialName("filters") Filters("Filters"),
-    @SerialName("hotOrNot") HotOrNot("Match"),
+    @SerialName("server") Server(tr(R.string.server)),
+    @SerialName("downloads") Downloads(tr(R.string.downloads)),
+    @SerialName("statistics") Statistics(tr(R.string.overview)),
+    @SerialName("oCount") OCount(tr(R.string.o_count)),
+    @SerialName("timeline") Timeline(tr(R.string.timeline)),
+    @SerialName("topLists") TopLists(tr(R.string.charts)),
+    @SerialName("filters") Filters(tr(R.string.filters)),
+    @SerialName("hotOrNot") HotOrNot(tr(R.string.match)),
     @SerialName("rateMe") RateMe("RateMe");
 
     /** Name used in stashy+ settings / paywall lists. */
-    val plusFeatureTitle: String get() = if (this == HotOrNot) "Performer Match" else title
+    val plusFeatureTitle: String get() = if (this == HotOrNot) tr(R.string.performer_match) else title
 }
 
 /** iOS: `ToolsItemConfig`. */

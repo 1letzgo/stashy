@@ -1,5 +1,7 @@
 package de.letzgo.stashy.ui.scene
 
+import de.letzgo.stashy.R
+import de.letzgo.stashy.tr
 import de.letzgo.stashy.ui.bottomBarContentPadding
 import androidx.compose.material.icons.outlined.History
 import android.content.res.Configuration
@@ -174,19 +176,19 @@ private fun SceneDetailContent(model: SceneDetailModel, openedFromMiniPlayer: Bo
 
     val extraMenuItems: () -> List<PlayerMenuItem> = {
         buildList {
-            add(PlayerMenuItem.Separator("extras.section.scene", "Scene"))
+            add(PlayerMenuItem.Separator("extras.section.scene", tr(R.string.scene)))
             // Watch without it counting (play count, history, resume point, watch time) — only
             // while Settings › Playback activity is on; the pause lasts until the app restarts.
             if (de.letzgo.stashy.data.TabManager.tracksPlaybackActivity) {
                 val sceneId = model.scene.id
                 val counts = sceneId !in de.letzgo.stashy.data.TabManager.activityPausedSceneIds
-                add(PlayerMenuItem.Action("extras.countPlayback", "Count this playback", androidx.compose.material.icons.Icons.Outlined.History, isChecked = counts) {
+                add(PlayerMenuItem.Action("extras.countPlayback", tr(R.string.count_this_playback), androidx.compose.material.icons.Icons.Outlined.History, isChecked = counts) {
                     if (counts) de.letzgo.stashy.data.TabManager.activityPausedSceneIds.add(sceneId)
                     else de.letzgo.stashy.data.TabManager.activityPausedSceneIds.remove(sceneId)
                 })
             }
-            add(PlayerMenuItem.Action("extras.sceneCover", "Use frame as scene cover", PlayerIcons.photo, isDisabled = model.isCapturing) { model.showReplaceCoverConfirm = true })
-            add(PlayerMenuItem.Action("extras.tagImage", "Use frame as tag image", PlayerIcons.tag, isDisabled = model.isCapturing) { model.captureTagImage() })
+            add(PlayerMenuItem.Action("extras.sceneCover", tr(R.string.action_use_frame_as_scene_cover), PlayerIcons.photo, isDisabled = model.isCapturing) { model.showReplaceCoverConfirm = true })
+            add(PlayerMenuItem.Action("extras.tagImage", tr(R.string.action_use_frame_as_tag_image), PlayerIcons.tag, isDisabled = model.isCapturing) { model.captureTagImage() })
             de.letzgo.stashy.ui.player.PlaybackFormat.resolutionLabel(model.scene.files?.firstOrNull()?.height)?.let {
                 add(PlayerMenuItem.Separator("extras.section.info"))
                 add(PlayerMenuItem.Info("extras.resolution", it, PlayerIcons.video))
@@ -344,17 +346,17 @@ private fun SceneDetailContent(model: SceneDetailModel, openedFromMiniPlayer: Bo
     model.tagImageDataURL?.let { url -> SetTagImageFromFrameSheet(url, scene.tags.orEmpty()) { model.tagImageDataURL = null } }
     if (model.showReplaceCoverConfirm) AlertDialog(
         onDismissRequest = { model.showReplaceCoverConfirm = false },
-        title = { Text("Replace Scene Cover?") },
-        text = { Text("The current video frame will replace this scene’s cover image. This cannot be undone from the app.") },
-        confirmButton = { TextButton({ model.showReplaceCoverConfirm = false; model.captureAndSetSceneCover() }) { Text("Replace", color = StashyColors.systemRed) } },
-        dismissButton = { TextButton({ model.showReplaceCoverConfirm = false }) { Text("Cancel") } },
+        title = { Text(tr(R.string.confirm_replace_scene_cover)) },
+        text = { Text(tr(R.string.hint_current_video_frame_will_replace)) },
+        confirmButton = { TextButton({ model.showReplaceCoverConfirm = false; model.captureAndSetSceneCover() }) { Text(tr(R.string.action_replace), color = StashyColors.systemRed) } },
+        dismissButton = { TextButton({ model.showReplaceCoverConfirm = false }) { Text(tr(R.string.action_cancel)) } },
     )
     if (model.showDeleteConfirmation) AlertDialog(
         onDismissRequest = { model.showDeleteConfirmation = false },
-        title = { Text("Really delete scene and files?") },
-        text = { Text("The scene '${scene.displayTitle}' and all associated files will be permanently deleted. This action cannot be undone.") },
-        confirmButton = { TextButton({ model.showDeleteConfirmation = false; model.deleteSceneWithFiles { Nav.pop() } }) { Text("Delete", color = StashyColors.systemRed) } },
-        dismissButton = { TextButton({ model.showDeleteConfirmation = false }) { Text("Cancel") } },
+        title = { Text(tr(R.string.confirm_really_delete_scene_and_files)) },
+        text = { Text(tr(R.string.hint_scene_arg_and_all_associated, scene.displayTitle)) },
+        confirmButton = { TextButton({ model.showDeleteConfirmation = false; model.deleteSceneWithFiles { Nav.pop() } }) { Text(tr(R.string.action_delete), color = StashyColors.systemRed) } },
+        dismissButton = { TextButton({ model.showDeleteConfirmation = false }) { Text(tr(R.string.action_cancel)) } },
     )
 }
 
@@ -368,21 +370,21 @@ private fun SceneDetailContent(model: SceneDetailModel, openedFromMiniPlayer: Bo
 private fun SceneDetailNavBar(model: SceneDetailModel, openedFromMiniPlayer: Boolean, onEditTitle: () -> Unit) {
     NativeTopBar(model.scene.displayTitle) {
         // iOS: the cover's "chevron.down" — leaving hands a playing video back to the mini player.
-        if (openedFromMiniPlayer) TopBarAction(de.letzgo.stashy.ui.SF.chevronDown, "Minimize") { Nav.pop() }
+        if (openedFromMiniPlayer) TopBarAction(de.letzgo.stashy.ui.SF.chevronDown, tr(R.string.minimize)) { Nav.pop() }
         if (!model.scene.hasStashID) {
-            TopBarAction(PlayerIcons.identify, "Identify scene", busy = model.isIdentifying) { model.identify() }
+            TopBarAction(PlayerIcons.identify, tr(R.string.action_identify_scene), busy = model.isIdentifying) { model.identify() }
         }
         // stashy+ and switched on: the watchlist belongs to the mini player.
         if (de.letzgo.stashy.ui.player.MiniPlayerStore.isEnabled) {
             val listed = de.letzgo.stashy.data.WatchlistStore.contains(model.scene.id)
             TopBarAction(
                 if (listed) de.letzgo.stashy.ui.player.WatchlistIcons.listed else de.letzgo.stashy.ui.player.WatchlistIcons.add,
-                if (listed) "Remove from watchlist" else "Add to watchlist",
+                if (listed) tr(R.string.action_remove_from_watchlist) else tr(R.string.action_add_to_watchlist),
                 tint = if (listed) Appearance.tint else null,
             ) {
                 de.letzgo.stashy.data.WatchlistStore.toggle(model.scene)
                 SceneToast.show(
-                    if (listed) "Removed from watchlist" else "Added to watchlist",
+                    if (listed) tr(R.string.removed_from_watchlist) else tr(R.string.added_to_watchlist),
                     if (listed) de.letzgo.stashy.ui.player.WatchlistIcons.removed else de.letzgo.stashy.ui.player.WatchlistIcons.listed,
                     SceneToast.Style.Success,
                 )
@@ -391,9 +393,9 @@ private fun SceneDetailNavBar(model: SceneDetailModel, openedFromMiniPlayer: Boo
         // iOS `sceneDownloadNavButton`: green check · progress ring · "Save scene" (stashy+ gate on tap).
         SceneDownloadNavButton(model.scene)
         // iOS `sceneActionSlots`: Delete sits in the bar itself (opens the confirmation).
-        TopBarAction(PlayerIcons.trash, "Delete scene") { model.showDeleteConfirmation = true }
+        TopBarAction(PlayerIcons.trash, tr(R.string.action_delete_scene)) { model.showDeleteConfirmation = true }
         if (Appearance.isEditModeEnabled) TopBarOverflowMenu { dismiss ->
-            OverflowItem("Edit title & details", de.letzgo.stashy.ui.SF.pencil, dismiss, onClick = onEditTitle)
+            OverflowItem(tr(R.string.action_edit_title_and_details), de.letzgo.stashy.ui.SF.pencil, dismiss, onClick = onEditTitle)
         }
     }
 }

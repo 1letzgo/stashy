@@ -11,8 +11,8 @@ struct SecuritySettingsView: View {
     private var biometryName: String {
         switch securityManager.biometryType {
         case .faceID: return "FaceID"
-        case .touchID: return "Touch ID"
-        default: return "Biometrics"
+        case .touchID: return tr("touch_id")
+        default: return tr("biometrics")
         }
     }
 
@@ -23,25 +23,25 @@ struct SecuritySettingsView: View {
     var body: some View {
         List {
             Section {
-                stashyScrollingSectionHeader("App Lock")
+                stashyScrollingSectionHeader(tr("app_lock"))
                 if securityManager.isPasscodeSet {
-                    Button("Change Passcode") {
+                    Button(tr("action_change_passcode")) {
                         resetSetPasscode()
                         showingSetPasscode = true
                     }
                     .stashyGroupedBlockRow(index: 0, count: 3)
 
-                    Button("Remove Passcode", role: .destructive) {
+                    Button(tr("action_remove_passcode"), role: .destructive) {
                         securityManager.removePasscode()
                     }
                     .stashyGroupedBlockRow(index: 1, count: 3)
 
-                    Toggle("Use \(biometryName)", isOn: $securityManager.isBiometricsEnabled)
+                    Toggle(tr("action_use_arg", biometryName), isOn: $securityManager.isBiometricsEnabled)
                         .tint(appearanceManager.tintColor)
                         .disabled(!securityManager.isPasscodeSet)
                         .stashyGroupedBlockRow(index: 2, count: 3)
                 } else {
-                    Button("Enable Passcode Lock") {
+                    Button(tr("action_enable_passcode_lock")) {
                         resetSetPasscode()
                         showingSetPasscode = true
                     }
@@ -51,17 +51,17 @@ struct SecuritySettingsView: View {
 
             if securityManager.isPasscodeSet {
                 Section {
-                    stashyScrollingSectionHeader("Options")
-                    Toggle("Auto-lock on Background", isOn: $securityManager.autoLockOnBackground)
+                    stashyScrollingSectionHeader(tr("options"))
+                    Toggle(tr("auto_lock_on_background"), isOn: $securityManager.autoLockOnBackground)
                         .tint(appearanceManager.tintColor)
                         .stashyGroupedSettingsRow()
-                    stashyScrollingSectionFooter("The app will automatically lock whenever it is moved to the background.")
+                    stashyScrollingSectionFooter(tr("hint_app_will_automatically_lock_whenever"))
                 }
             }
         }
         .stashySettingsList()
         .applyAppBackground()
-        .stashySettingsDetailChrome("Security")
+        .stashySettingsDetailChrome(tr("security"))
         .sheet(isPresented: $showingSetPasscode) {
             PasscodeSetupView(isPresented: $showingSetPasscode)
         }
@@ -88,7 +88,7 @@ struct PasscodeSetupView: View {
         NavigationStack {
             VStack(spacing: 40) {
                 VStack(spacing: 12) {
-                    Text(step == 1 ? "Set a Passcode" : "Confirm Passcode")
+                    Text(step == 1 ? tr("action_set_passcode") : tr("confirm_passcode"))
                         .font(.title2)
                         .fontWeight(.semibold)
                     
@@ -141,7 +141,7 @@ struct PasscodeSetupView: View {
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .padding()
             .background(Color.appBackground.ignoresSafeArea())
-            .stashyModalSheetChrome("Passcode", onBack: { isPresented = false })
+            .stashyModalSheetChrome(tr("passcode"), onBack: { isPresented = false })
             .onChange(of: passcode) { _, newValue in
                 if step == 1 && newValue.count == 4 {
                     step = 2
@@ -153,7 +153,7 @@ struct PasscodeSetupView: View {
                         securityManager.setPasscode(passcode)
                         isPresented = false
                     } else {
-                        errorMessage = "Passcodes do not match"
+                        errorMessage = tr("passcodes_do_not_match")
                         shakeTrigger.toggle()
                         DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
                             confirmPasscode = ""

@@ -14,7 +14,7 @@ struct ServerFormViewNew: View {
     @ObservedObject var appearanceManager = AppearanceManager.shared
     
     // Form State
-    @State private var name: String = "My Stash"
+    @State private var name: String = tr("my_stash")
     @State private var serverAddress: String = ""
     @State private var serverProtocol: ServerProtocol = .https
     /// Optional second address of the same server, used while it answers (home network).
@@ -68,11 +68,11 @@ struct ServerFormViewNew: View {
     private var authFooterText: String {
         switch authMethod {
         case .none:
-            return "No authentication will be used."
+            return tr("empty_authentication_will_be_used")
         case .login:
-            return "Login with your Stash credentials to retrieve the API key."
+            return tr("hint_login_with_your_stash_credentials")
         case .apiKey:
-            return "Enter your Stash API key directly."
+            return tr("hint_enter_your_stash_api_key")
         }
     }
     
@@ -111,12 +111,12 @@ struct ServerFormViewNew: View {
 
         List {
             Section {
-                stashyScrollingSectionHeader("Server Details")
-                TextField("Server Name", text: $name)
+                stashyScrollingSectionHeader(tr("server_details"))
+                TextField(tr("server_name"), text: $name)
                     .textContentType(.organizationName)
                     .stashyGroupedBlockRow(index: 0, count: 3)
 
-                Picker("Protocol", selection: $serverProtocol) {
+                Picker(tr("protocol"), selection: $serverProtocol) {
                     ForEach(ServerProtocol.allCases, id: \.self) { proto in
                         Text(proto.displayName).tag(proto)
                     }
@@ -126,10 +126,10 @@ struct ServerFormViewNew: View {
                 .stashyGroupedBlockRow(index: 1, count: 3)
 
                 VStack(alignment: .leading, spacing: 4) {
-                    Text("Server Address")
+                    Text(tr("server_address"))
                         .font(.caption)
                         .foregroundColor(.secondary)
-                    TextField("192.168.1.100:9999 or stash.example.com", text: $serverAddress)
+                    TextField(tr("n192_168_1_100_9999"), text: $serverAddress)
                         .keyboardType(.URL)
                         .autocapitalization(.none)
                         .autocorrectionDisabled()
@@ -153,7 +153,7 @@ struct ServerFormViewNew: View {
             }
 
             Section {
-                stashyScrollingSectionHeader("Local Address")
+                stashyScrollingSectionHeader(tr("local_address"))
                 TextField("192.168.1.100:9999", text: $localAddress)
                     .keyboardType(.URL)
                     .autocapitalization(.none)
@@ -173,7 +173,7 @@ struct ServerFormViewNew: View {
                                 Image(systemName: icon(for: localTestResult))
                                     .foregroundColor(color(for: localTestResult))
                             }
-                            Text(isTestingLocal ? "Testing..." : "Test Local Address")
+                            Text(isTestingLocal ? "Testing..." : tr("action_test_local_address"))
                                 .foregroundColor(.primary)
                             Spacer()
                             if !localTestMessage.isEmpty {
@@ -187,14 +187,14 @@ struct ServerFormViewNew: View {
                     .disabled(isTestingLocal)
                     .stashyGroupedBlockRow(index: 1, count: 2)
                 }
-                stashyScrollingSectionFooter("Optional. Used instead of the address above whenever it answers, for example on your home network. Falls back automatically.")
+                stashyScrollingSectionFooter(tr("hint_optional_used_instead_of_address"))
             }
 
             Section {
-                stashyScrollingSectionHeader("Authentication")
-                Picker("Auth Method", selection: $authMethod) {
+                stashyScrollingSectionHeader(tr("authentication"))
+                Picker(tr("auth_method"), selection: $authMethod) {
                     ForEach(AuthMethod.allCases, id: \.self) { method in
-                        Text(method.rawValue).tag(method)
+                        Text(method.displayName).tag(method)
                     }
                 }
                 .pickerStyle(.segmented)
@@ -202,13 +202,13 @@ struct ServerFormViewNew: View {
                 .stashyGroupedBlockRow(index: 0, count: authCount)
 
                 if authMethod == .login {
-                    TextField("Username", text: $username)
+                    TextField(tr("username"), text: $username)
                         .textContentType(.username)
                         .autocapitalization(.none)
                         .disableAutocorrection(true)
                         .stashyGroupedBlockRow(index: 1, count: authCount)
 
-                    SecureField("Password", text: $password)
+                    SecureField(tr("password"), text: $password)
                         .textContentType(.password)
                         .stashyGroupedBlockRow(index: 2, count: authCount)
 
@@ -219,7 +219,7 @@ struct ServerFormViewNew: View {
                                     .scaleEffect(0.8)
                                     .padding(.trailing, 4)
                             }
-                            Text("Fetch API Key")
+                            Text(tr("action_fetch_api_key"))
                                 .fontWeight(.bold)
                         }
                         .frame(maxWidth: .infinity)
@@ -242,7 +242,7 @@ struct ServerFormViewNew: View {
                     HStack {
                         Image(systemName: "key.fill")
                             .foregroundColor(.secondary)
-                        SecureField("API Key", text: $apiKey)
+                        SecureField(tr("api_key"), text: $apiKey)
                             .autocapitalization(.none)
                             .autocorrectionDisabled()
                     }
@@ -254,12 +254,12 @@ struct ServerFormViewNew: View {
             }
 
             Section {
-                stashyScrollingSectionHeader("Custom Headers")
+                stashyScrollingSectionHeader(tr("custom_headers"))
                 ServerCustomHeadersEditor(headers: $customHeaders)
             }
 
             Section {
-                stashyScrollingSectionHeader("Connection")
+                stashyScrollingSectionHeader(tr("connection"))
                 Button(action: {
                     let detection = ServerConfig.detectProtocol(from: serverAddress)
                     if let proto = detection.protocol {
@@ -277,7 +277,7 @@ struct ServerFormViewNew: View {
                                 .foregroundColor(testResultColor)
                         }
 
-                        Text(isTesting ? "Testing..." : "Test Connection")
+                        Text(isTesting ? "Testing..." : tr("action_test_connection"))
                             .foregroundColor(.primary)
 
                         Spacer()
@@ -313,7 +313,7 @@ struct ServerFormViewNew: View {
                     Button(role: .destructive, action: { showingDeleteAlert = true }) {
                         HStack {
                             Spacer()
-                            Label("Delete Server", systemImage: "trash")
+                            Label(tr("action_delete_server"), systemImage: "trash")
                                 .foregroundColor(appearanceManager.tintColor)
                             Spacer()
                         }
@@ -324,10 +324,10 @@ struct ServerFormViewNew: View {
         }
         .stashySettingsList()
         .applyAppBackground()
-        .stashyModalSheetChrome(configToEdit == nil ? "Add Server" : "Edit Server", onBack: {
+        .stashyModalSheetChrome(configToEdit == nil ? tr("action_add_server") : tr("action_edit_server"), onBack: {
             presentationMode.wrappedValue.dismiss()
         }) {
-            StashyChromeTrailingTextButton(title: "Save", enabled: isConfigValid) {
+            StashyChromeTrailingTextButton(title: tr("action_save"), enabled: isConfigValid) {
                 // Clean address before saving
                 let detection = ServerConfig.detectProtocol(from: serverAddress)
                 if let proto = detection.protocol {
@@ -371,9 +371,9 @@ struct ServerFormViewNew: View {
                 }
             }
         }
-        .alert("Delete Server", isPresented: $showingDeleteAlert) {
-            Button("Cancel", role: .cancel) { }
-            Button("Delete", role: .destructive) {
+        .alert(tr("action_delete_server"), isPresented: $showingDeleteAlert) {
+            Button(tr("action_cancel"), role: .cancel) { }
+            Button(tr("action_delete"), role: .destructive) {
                 if let config = configToEdit {
                     KeychainManager.shared.deleteAPIKey(forServerID: config.id)
                     KeychainManager.shared.deleteCustomHeaders(forServerID: config.id)
@@ -382,7 +382,7 @@ struct ServerFormViewNew: View {
                 presentationMode.wrappedValue.dismiss()
             }
         } message: {
-            Text("Are you sure you want to delete this server configuration? This action cannot be undone.")
+            Text(tr("hint_are_you_sure_you_want_to"))
         }
     }
     
@@ -431,7 +431,7 @@ struct ServerFormViewNew: View {
         if local { isTestingLocal = true } else { isTesting = true }
 
         guard let url = URL(string: "\(local ? (localURL ?? "") : currentBaseURL)/graphql"), url.host != nil else {
-            finish(.failure, "Invalid URL")
+            finish(.failure, tr("invalid_url"))
             return
         }
         
@@ -561,7 +561,7 @@ struct ServerCustomHeadersEditor: View {
         ForEach(Array(headers.enumerated()), id: \.element.id) { index, header in
             VStack(alignment: .leading, spacing: 6) {
                 HStack(spacing: 10) {
-                    TextField("Header name", text: binding(for: header.id, \.name))
+                    TextField(tr("header_name"), text: binding(for: header.id, \.name))
                         .textInputAutocapitalization(.never)
                         .autocorrectionDisabled()
                         .font(.body.monospaced())
@@ -572,9 +572,9 @@ struct ServerCustomHeadersEditor: View {
                             .foregroundColor(.red)
                     }
                     .buttonStyle(.borderless)
-                    .accessibilityLabel("Remove header")
+                    .accessibilityLabel(tr("action_remove_header"))
                 }
-                SecureField("Value", text: binding(for: header.id, \.value))
+                SecureField(tr("value"), text: binding(for: header.id, \.value))
                     .textInputAutocapitalization(.never)
                     .autocorrectionDisabled()
                 if let problem = problem(for: header) {
@@ -590,13 +590,13 @@ struct ServerCustomHeadersEditor: View {
         Button {
             headers.append(ServerHTTPHeader(name: "", value: ""))
         } label: {
-            Label("Add Header", systemImage: "plus.circle.fill")
+            Label(tr("action_add_header"), systemImage: "plus.circle.fill")
                 .foregroundColor(appearanceManager.tintColor)
         }
         .buttonStyle(.borderless)
         .stashyGroupedBlockRow(index: headers.count, count: rowCount)
 
-        stashyScrollingSectionFooter("Sent with every request to this server, e.g. for SSO or a reverse proxy that needs its own token. Stored in the Keychain.")
+        stashyScrollingSectionFooter(tr("hint_sent_with_every_request_to_this_server"))
     }
 
     private func binding(for id: UUID, _ keyPath: WritableKeyPath<ServerHTTPHeader, String>) -> Binding<String> {
@@ -613,10 +613,10 @@ struct ServerCustomHeadersEditor: View {
     private func problem(for header: ServerHTTPHeader) -> String? {
         let name = header.trimmedName
         guard !name.isEmpty || !header.trimmedValue.isEmpty else { return nil }
-        if name.isEmpty { return "Enter a header name." }
-        if ServerHTTPHeader.reservedNames.contains(name.lowercased()) { return "\(name) is managed by the app and can't be set." }
-        if header.trimmedValue.isEmpty { return "Enter a value." }
-        if !header.isUsable { return "Header names may only contain letters, digits and - _ . ! # $ % & ' * + ^ ` | ~" }
+        if name.isEmpty { return tr("enter_header_name") }
+        if ServerHTTPHeader.reservedNames.contains(name.lowercased()) { return tr("hint_arg_is_managed_by_app", name) }
+        if header.trimmedValue.isEmpty { return tr("enter_value") }
+        if !header.isUsable { return tr("hint_header_names_may_only_contain") }
         return nil
     }
 }

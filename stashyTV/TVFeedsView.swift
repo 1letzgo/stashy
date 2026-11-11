@@ -33,10 +33,10 @@ struct TVFeedsView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 50) {
                 VStack(alignment: .leading, spacing: 10) {
-                    Text("Feeds")
+                    Text(tr("feeds"))
                         .font(.largeTitle)
                         .fontWeight(.bold)
-                    Text("Full-screen, one after another. ▲ ▼ browse, ◀ ▶ seek, click for info and modes.")
+                    Text(tr("hint_full_screen_one_after_another"))
                         .font(.title3)
                         .foregroundStyle(.secondary)
                 }
@@ -133,9 +133,9 @@ struct TVFeedsView: View {
     }
 
     private func modeSummary(_ mode: ReelsModeType) -> String {
-        let sort = mode.sortChoices.first(where: { $0.raw == mode.defaultSortRaw })?.label ?? "Random"
+        let sort = mode.sortChoices.first(where: { $0.raw == mode.defaultSortRaw })?.label ?? tr("random")
         if let filterId = mode.defaultFilterId {
-            let name = session.catalog.savedFilters[filterId]?.name ?? filterName(for: mode) ?? "Saved filter"
+            let name = session.catalog.savedFilters[filterId]?.name ?? filterName(for: mode) ?? tr("saved_filter")
             return "\(sort) · \(name)"
         }
         return sort
@@ -155,21 +155,21 @@ struct TVFeedsView: View {
 
     private var settingsSection: some View {
         VStack(alignment: .leading, spacing: 20) {
-            Text("Feed Settings")
+            Text(tr("feed_settings"))
                 .font(.title2)
                 .fontWeight(.semibold)
 
             VStack(spacing: 12) {
                 Toggle(isOn: $tabManager.reelsContinuousPlay) {
-                    Text("Continuous Play")
+                    Text(tr("continuous_play"))
                 }
                 TVSettingsPickerRow(
-                    title: "Scenes Start At",
+                    title: tr("scenes_start_at"),
                     options: TabManager.FeedsSceneStartPosition.allCases.map { TVPickerOption($0, $0.label) },
                     selection: $tabManager.feedsSceneStartPosition
                 )
                 TVSettingsPickerRow(
-                    title: "Marker Length",
+                    title: tr("marker_length"),
                     options: TabManager.feedsMarkerLengthOptions.map { TVPickerOption($0, "\(Int($0)) s") },
                     selection: $tabManager.feedsMarkerDefaultSeconds
                 )
@@ -197,12 +197,12 @@ struct TVFeedsView: View {
                 get: { isEnabled },
                 set: { _ in tabManager.toggleReelsMode(mode) }
             )) {
-                Text("Show in Feeds")
+                Text(tr("action_show_in_feeds"))
             }
 
             if isEnabled {
                 TVSettingsPickerRow(
-                    title: "Default Sort",
+                    title: tr("default_sort"),
                     options: mode.sortChoices.map { TVPickerOption($0.raw, $0.label) },
                     selection: Binding(
                         get: { mode.defaultSortRaw },
@@ -220,8 +220,8 @@ struct TVFeedsView: View {
             .filter { $0.mode == mode.savedFilterMode }
             .sorted { $0.name < $1.name }
         return TVSettingsPickerRow(
-            title: "Default Filter",
-            options: [TVPickerOption("", "None")] + filters.map { TVPickerOption($0.id, $0.name) },
+            title: tr("default_filter"),
+            options: [TVPickerOption("", tr("none"))] + filters.map { TVPickerOption($0.id, $0.name) },
             selection: Binding(
                 get: { mode.defaultFilterId ?? "" },
                 set: { newId in

@@ -1,5 +1,7 @@
 package de.letzgo.stashy.data
 
+import de.letzgo.stashy.R
+import de.letzgo.stashy.tr
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -36,7 +38,7 @@ data class ServerHTTPHeader(val id: String = UUID.randomUUID().toString().upperc
 @Serializable
 data class ServerConfig(
     val id: String = UUID.randomUUID().toString().uppercase(),
-    val name: String = "My Stash",
+    val name: String = tr(R.string.my_stash),
     val serverAddress: String,
     val port: String? = null,
     val serverProtocol: ServerProtocol = ServerProtocol.HTTPS,

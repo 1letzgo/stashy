@@ -8,8 +8,8 @@ enum HomeChannelDestination: String {
 
     var label: String {
         switch self {
-        case .scenes: return "Scenes"
-        case .clips: return "Clips"
+        case .scenes: return tr("scenes")
+        case .clips: return tr("clips")
         }
     }
 
@@ -119,9 +119,9 @@ struct HomeChannelsRowView: View {
     }
 
     private var emptyMessage: String {
-        if viewModel.isLoadingSavedFilters { return "Loading channels…" }
-        if tabManager.homeChannelItems.isEmpty { return "No saved scene or image filters" }
-        return "No channels enabled"
+        if viewModel.isLoadingSavedFilters { return tr("loading_channels") }
+        if tabManager.homeChannelItems.isEmpty { return tr("empty_saved_scene_or_image_filters") }
+        return tr("empty_channels_enabled")
     }
 
     @ViewBuilder
@@ -170,7 +170,7 @@ struct HomeChannelsRowView: View {
                         .buttonStyle(.plain)
                         .padding(.trailing, 4)
                         .padding(.bottom, 4)
-                        .accessibilityLabel("Channel options")
+                        .accessibilityLabel(tr("channel_options"))
                     }
                     .frame(width: cardWidth)
                     .id(channel.id)
@@ -188,13 +188,13 @@ struct HomeChannelsRowView: View {
         Button {
             iconPickerChannel = channel
         } label: {
-            Label("Change Icon…", systemImage: "square.grid.2x2")
+            Label(tr("action_change_icon_menu"), systemImage: "square.grid.2x2")
         }
         if channel.customIcon != nil {
             Button {
                 tabManager.setHomeChannelIcon(channel.itemId, icon: nil)
             } label: {
-                Label("Reset Icon", systemImage: "arrow.uturn.backward")
+                Label(tr("action_reset_icon"), systemImage: "arrow.uturn.backward")
             }
         }
     }
@@ -202,7 +202,7 @@ struct HomeChannelsRowView: View {
     /// The long-press popup: the same rows as the ··· menu.
     private func channelMenu(_ channel: HomeChannel) -> some View {
         VStack(alignment: .leading, spacing: 0) {
-            menuRow("Change Icon…", systemImage: "square.grid.2x2") {
+            menuRow(tr("action_change_icon_menu"), systemImage: "square.grid.2x2") {
                 menuChannelId = nil
                 // The sheet waits until the popup is gone, or it never shows.
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) {
@@ -211,7 +211,7 @@ struct HomeChannelsRowView: View {
             }
             if channel.customIcon != nil {
                 Divider()
-                menuRow("Reset Icon", systemImage: "arrow.uturn.backward") {
+                menuRow(tr("action_reset_icon"), systemImage: "arrow.uturn.backward") {
                     menuChannelId = nil
                     tabManager.setHomeChannelIcon(channel.itemId, icon: nil)
                 }
@@ -353,16 +353,18 @@ private struct HomeChannelIconPicker: View {
     @ObservedObject var appearanceManager = AppearanceManager.shared
 
     /// SF Symbols by theme; every name checked against the system symbol set.
-    static let groups: [(title: String, symbols: [String])] = [
-        ("Media", ["film", "film.stack", "play.rectangle.on.rectangle.fill", "play.circle.fill", "play.square.stack.fill", "tv.fill", "video.fill", "camera.fill", "camera.aperture", "photo.fill", "photo.stack.fill", "photo.on.rectangle.angled", "rectangle.stack.fill", "square.stack.3d.up.fill", "popcorn.fill", "movieclapper.fill", "ticket.fill", "sparkles.tv.fill", "livephoto", "camera.macro", "viewfinder"]),
-        ("Favorites", ["star.fill", "heart.fill", "heart.circle.fill", "suit.heart.fill", "bolt.heart.fill", "flame.fill", "sparkles", "crown.fill", "trophy.fill", "rosette", "medal.fill", "hand.thumbsup.fill", "bookmark.fill", "tag.fill", "flag.fill", "pin.fill", "diamond.fill", "seal.fill", "checkmark.seal.fill", "star.circle.fill"]),
-        ("Mood", ["face.smiling", "face.smiling.inverse", "eyes", "eye.fill", "mouth.fill", "nose.fill", "ear.fill", "hand.raised.fill", "hands.clap.fill", "hand.wave.fill", "theatermasks.fill", "wand.and.stars", "moon.zzz.fill", "bubbles.and.sparkles.fill", "heart.text.square.fill"]),
-        ("Nature", ["sun.max.fill", "moon.stars.fill", "cloud.fill", "cloud.rain.fill", "snowflake", "drop.fill", "leaf.fill", "tree.fill", "flame", "tornado", "rainbow", "sunset.fill", "water.waves", "mountain.2.fill", "globe.europe.africa.fill", "pawprint.fill", "bird.fill", "fish.fill", "ladybug.fill", "tortoise.fill", "hare.fill", "cat.fill", "dog.fill"]),
-        ("People", ["person.fill", "person.2.fill", "person.3.fill", "figure.stand", "figure.dance", "figure.walk", "figure.run", "figure.yoga", "figure.pool.swim", "figure.strengthtraining.traditional", "figure.2.arms.open", "figure.and.child.holdinghands", "person.crop.circle.fill", "person.badge.plus", "figure.socialdance", "figure.mind.and.body"]),
-        ("Places", ["house.fill", "bed.double.fill", "sofa.fill", "shower.fill", "bathtub.fill", "car.fill", "airplane", "tram.fill", "sailboat.fill", "beach.umbrella.fill", "tent.fill", "building.2.fill", "building.columns.fill", "fork.knife", "cup.and.saucer.fill", "wineglass.fill", "party.popper.fill", "balloon.2.fill"]),
-        ("Things", ["music.note", "headphones", "mic.fill", "gamecontroller.fill", "lock.fill", "key.fill", "gift.fill", "clock.fill", "calendar", "hourglass", "shuffle", "repeat", "infinity", "bell.fill", "envelope.fill", "paperplane.fill", "lightbulb.fill", "dice.fill", "puzzlepiece.fill", "paintbrush.fill", "scissors", "gym.bag.fill", "dumbbell.fill", "tshirt.fill", "shoe.fill", "eyeglasses", "sunglasses.fill", "crown", "gift"]),
-        ("Shapes", ["circle.fill", "square.fill", "triangle.fill", "hexagon.fill", "octagon.fill", "capsule.fill", "seal", "circle.hexagongrid.fill", "square.grid.2x2.fill", "circle.grid.3x3.fill", "staroflife.fill", "burst.fill", "atom", "number", "questionmark", "exclamationmark.triangle.fill"])
+    static var groups: [(title: String, symbols: [String])] {
+[
+        (tr("media"), ["film", "film.stack", "play.rectangle.on.rectangle.fill", "play.circle.fill", "play.square.stack.fill", "tv.fill", "video.fill", "camera.fill", "camera.aperture", "photo.fill", "photo.stack.fill", "photo.on.rectangle.angled", "rectangle.stack.fill", "square.stack.3d.up.fill", "popcorn.fill", "movieclapper.fill", "ticket.fill", "sparkles.tv.fill", "livephoto", "camera.macro", "viewfinder"]),
+        (tr("favorites"), ["star.fill", "heart.fill", "heart.circle.fill", "suit.heart.fill", "bolt.heart.fill", "flame.fill", "sparkles", "crown.fill", "trophy.fill", "rosette", "medal.fill", "hand.thumbsup.fill", "bookmark.fill", "tag.fill", "flag.fill", "pin.fill", "diamond.fill", "seal.fill", "checkmark.seal.fill", "star.circle.fill"]),
+        (tr("mood"), ["face.smiling", "face.smiling.inverse", "eyes", "eye.fill", "mouth.fill", "nose.fill", "ear.fill", "hand.raised.fill", "hands.clap.fill", "hand.wave.fill", "theatermasks.fill", "wand.and.stars", "moon.zzz.fill", "bubbles.and.sparkles.fill", "heart.text.square.fill"]),
+        (tr("nature"), ["sun.max.fill", "moon.stars.fill", "cloud.fill", "cloud.rain.fill", "snowflake", "drop.fill", "leaf.fill", "tree.fill", "flame", "tornado", "rainbow", "sunset.fill", "water.waves", "mountain.2.fill", "globe.europe.africa.fill", "pawprint.fill", "bird.fill", "fish.fill", "ladybug.fill", "tortoise.fill", "hare.fill", "cat.fill", "dog.fill"]),
+        (tr("people"), ["person.fill", "person.2.fill", "person.3.fill", "figure.stand", "figure.dance", "figure.walk", "figure.run", "figure.yoga", "figure.pool.swim", "figure.strengthtraining.traditional", "figure.2.arms.open", "figure.and.child.holdinghands", "person.crop.circle.fill", "person.badge.plus", "figure.socialdance", "figure.mind.and.body"]),
+        (tr("places"), ["house.fill", "bed.double.fill", "sofa.fill", "shower.fill", "bathtub.fill", "car.fill", "airplane", "tram.fill", "sailboat.fill", "beach.umbrella.fill", "tent.fill", "building.2.fill", "building.columns.fill", "fork.knife", "cup.and.saucer.fill", "wineglass.fill", "party.popper.fill", "balloon.2.fill"]),
+        (tr("things"), ["music.note", "headphones", "mic.fill", "gamecontroller.fill", "lock.fill", "key.fill", "gift.fill", "clock.fill", "calendar", "hourglass", "shuffle", "repeat", "infinity", "bell.fill", "envelope.fill", "paperplane.fill", "lightbulb.fill", "dice.fill", "puzzlepiece.fill", "paintbrush.fill", "scissors", "gym.bag.fill", "dumbbell.fill", "tshirt.fill", "shoe.fill", "eyeglasses", "sunglasses.fill", "crown", "gift"]),
+        (tr("shapes"), ["circle.fill", "square.fill", "triangle.fill", "hexagon.fill", "octagon.fill", "capsule.fill", "seal", "circle.hexagongrid.fill", "square.grid.2x2.fill", "circle.grid.3x3.fill", "staroflife.fill", "burst.fill", "atom", "number", "questionmark", "exclamationmark.triangle.fill"])
     ]
+    }
 
     private var current: String { channel.logoIcon }
 
@@ -410,11 +412,11 @@ private struct HomeChannelIconPicker: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") { dismiss() }
+                    Button(tr("action_cancel")) { dismiss() }
                 }
                 if channel.customIcon != nil {
                     ToolbarItem(placement: .confirmationAction) {
-                        Button("Reset") {
+                        Button(tr("action_reset")) {
                             onPick(nil)
                             dismiss()
                         }

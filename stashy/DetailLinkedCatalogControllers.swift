@@ -275,20 +275,20 @@ final class DetailLinkedPerformersFilterModel: ObservableObject {
     func deletePresetConfirmationText(viewModel: StashDBViewModel) -> String {
         if let sid = ListLivePresetTag.parseServerId(catalogPresetRowSelection),
            let f = viewModel.savedFilters[sid] {
-            return "Remove “\(f.name)” from Stash? Other devices will lose this saved filter."
+            return tr("hint_remove_arg_from_stash_other", f.name)
         }
         if let ls = ListLivePresetTag.parseLocalUUIDString(catalogPresetRowSelection),
            let uuid = UUID(uuidString: ls),
            let p = localCatalogPresets.first(where: { $0.id == uuid }) {
-            return "Remove “\(p.name)” from this device? This cannot be undone."
+            return tr("hint_remove_arg_from_this_device", p.name)
         }
-        return "Remove this filter? This cannot be undone."
+        return tr("hint_remove_this_filter_this_cannot")
     }
 
     func savePresetOverwrite(viewModel: StashDBViewModel) {
         let sel = catalogPresetRowSelection
         if let sid = ListLivePresetTag.parseServerId(sel) {
-            let name = viewModel.savedFilters[sid]?.name ?? "Filter"
+            let name = viewModel.savedFilters[sid]?.name ?? tr("filter")
             viewModel.saveCatalogSavedFilter(
                 mode: .performers,
                 randomSeedKind: .performers,
@@ -602,20 +602,20 @@ final class DetailLinkedTagsFilterModel: ObservableObject {
     func deletePresetConfirmationText(viewModel: StashDBViewModel) -> String {
         if let sid = ListLivePresetTag.parseServerId(catalogPresetRowSelection),
            let f = viewModel.savedFilters[sid] {
-            return "Remove “\(f.name)” from Stash? Other devices will lose this saved filter."
+            return tr("hint_remove_arg_from_stash_other", f.name)
         }
         if let ls = ListLivePresetTag.parseLocalUUIDString(catalogPresetRowSelection),
            let uuid = UUID(uuidString: ls),
            let p = localCatalogPresets.first(where: { $0.id == uuid }) {
-            return "Remove “\(p.name)” from this device? This cannot be undone."
+            return tr("hint_remove_arg_from_this_device", p.name)
         }
-        return "Remove this filter? This cannot be undone."
+        return tr("hint_remove_this_filter_this_cannot")
     }
 
     func savePresetOverwrite(viewModel: StashDBViewModel) {
         let sel = catalogPresetRowSelection
         if let sid = ListLivePresetTag.parseServerId(sel) {
-            let name = viewModel.savedFilters[sid]?.name ?? "Filter"
+            let name = viewModel.savedFilters[sid]?.name ?? tr("filter")
             viewModel.saveCatalogSavedFilter(
                 mode: .tags,
                 randomSeedKind: .tags,
@@ -932,20 +932,20 @@ final class DetailLinkedStudiosFilterModel: ObservableObject {
     func deletePresetConfirmationText(viewModel: StashDBViewModel) -> String {
         if let sid = ListLivePresetTag.parseServerId(catalogPresetRowSelection),
            let f = viewModel.savedFilters[sid] {
-            return "Remove “\(f.name)” from Stash? Other devices will lose this saved filter."
+            return tr("hint_remove_arg_from_stash_other", f.name)
         }
         if let ls = ListLivePresetTag.parseLocalUUIDString(catalogPresetRowSelection),
            let uuid = UUID(uuidString: ls),
            let p = localCatalogPresets.first(where: { $0.id == uuid }) {
-            return "Remove “\(p.name)” from this device? This cannot be undone."
+            return tr("hint_remove_arg_from_this_device", p.name)
         }
-        return "Remove this filter? This cannot be undone."
+        return tr("hint_remove_this_filter_this_cannot")
     }
 
     func savePresetOverwrite(viewModel: StashDBViewModel) {
         let sel = catalogPresetRowSelection
         if let sid = ListLivePresetTag.parseServerId(sel) {
-            let name = viewModel.savedFilters[sid]?.name ?? "Filter"
+            let name = viewModel.savedFilters[sid]?.name ?? tr("filter")
             viewModel.saveCatalogSavedFilter(
                 mode: .studios,
                 randomSeedKind: .studios,
@@ -1287,20 +1287,20 @@ final class DetailLinkedGalleriesFilterModel: ObservableObject {
     func deletePresetConfirmationText(viewModel: StashDBViewModel) -> String {
         if let sid = ListLivePresetTag.parseServerId(catalogPresetRowSelection),
            let f = viewModel.savedFilters[sid] {
-            return "Remove “\(f.name)” from Stash? Other devices will lose this saved filter."
+            return tr("hint_remove_arg_from_stash_other", f.name)
         }
         if let ls = ListLivePresetTag.parseLocalUUIDString(catalogPresetRowSelection),
            let uuid = UUID(uuidString: ls),
            let p = localCatalogPresets.first(where: { $0.id == uuid }) {
-            return "Remove “\(p.name)” from this device? This cannot be undone."
+            return tr("hint_remove_arg_from_this_device", p.name)
         }
-        return "Remove this filter? This cannot be undone."
+        return tr("hint_remove_this_filter_this_cannot")
     }
 
     func savePresetOverwrite(viewModel: StashDBViewModel) {
         let sel = catalogPresetRowSelection
         if let sid = ListLivePresetTag.parseServerId(sel) {
-            let name = viewModel.savedFilters[sid]?.name ?? "Filter"
+            let name = viewModel.savedFilters[sid]?.name ?? tr("filter")
             viewModel.saveCatalogSavedFilter(
                 mode: .galleries,
                 randomSeedKind: .galleries,
@@ -1908,20 +1908,20 @@ final class DetailLinkedImagesFilterModel: ObservableObject {
     func deletePresetConfirmationText(viewModel: StashDBViewModel) -> String {
         if let sid = ListLivePresetTag.parseServerId(catalogPresetRowSelection),
            let f = viewModel.savedFilters[sid] {
-            return "Remove “\(f.name)” from Stash? Other devices will lose this saved filter."
+            return tr("hint_remove_arg_from_stash_other", f.name)
         }
         if let ls = ListLivePresetTag.parseLocalUUIDString(catalogPresetRowSelection),
            let uuid = UUID(uuidString: ls),
            let p = localCatalogPresets.first(where: { $0.id == uuid }) {
-            return "Remove “\(p.name)” from this device? This cannot be undone."
+            return tr("hint_remove_arg_from_this_device", p.name)
         }
-        return "Remove this filter? This cannot be undone."
+        return tr("hint_remove_this_filter_this_cannot")
     }
 
     func savePresetOverwrite(viewModel: StashDBViewModel) {
         let sel = catalogPresetRowSelection
         if let sid = ListLivePresetTag.parseServerId(sel) {
-            let name = viewModel.savedFilters[sid]?.name ?? "Filter"
+            let name = viewModel.savedFilters[sid]?.name ?? tr("filter")
             viewModel.saveCatalogSavedFilter(
                 mode: .images,
                 randomSeedKind: .images,

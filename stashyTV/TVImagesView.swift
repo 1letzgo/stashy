@@ -49,9 +49,9 @@ struct TVImagesView: View {
             columnCount: 5,
             columnSpacing: 30,
             emptySystemImage: "photo",
-            emptyTitle: "No Images Found",
-            loadingText: "Loading images…",
-            errorTitle: "Error loading images",
+            emptyTitle: tr("empty_images_found"),
+            loadingText: tr("loading_images"),
+            errorTitle: tr("error_loading_images"),
             focusResetToken: focusResetToken,
             loadMore: { viewModel.loadMoreImages() },
             reload: { reload() },
@@ -60,7 +60,7 @@ struct TVImagesView: View {
                 STVHeaderView(
                     sortMenu: {
                         TVOptionPickerButton(
-                            title: "Sort By",
+                            title: tr("action_sort_by"),
                             icon: "arrow.up.arrow.down",
                             options: sortOptions,
                             selection: $sortBy
@@ -79,7 +79,7 @@ struct TVImagesView: View {
                     Button {
                         presentedImage = TVImageLink(
                             id: image.id,
-                            title: image.displayTitle ?? "Untitled"
+                            title: image.displayTitle ?? tr("untitled")
                         )
                     } label: {
                         TVImageCardView(image: image)
@@ -166,18 +166,18 @@ struct TVImagesView: View {
 
     private func label(for option: StashDBViewModel.ImageSortOption) -> String {
         switch option {
-        case .titleAsc: return "Title (A-Z)"
-        case .titleDesc: return "Title (Z-A)"
-        case .dateDesc: return "Newest First"
-        case .dateAsc: return "Oldest First"
-        case .ratingDesc: return "Highest Rated"
-        case .ratingAsc: return "Lowest Rated"
-        case .createdAtDesc: return "Recently Added"
-        case .createdAtAsc: return "Oldest Added"
-        case .updatedAtDesc: return "Recently Updated"
-        case .updatedAtAsc: return "Least Recently Updated"
+        case .titleAsc: return tr("title_z")
+        case .titleDesc: return tr("title_z_2")
+        case .dateDesc: return tr("newest_first")
+        case .dateAsc: return tr("oldest_first")
+        case .ratingDesc: return tr("highest_rated")
+        case .ratingAsc: return tr("lowest_rated")
+        case .createdAtDesc: return tr("recently_added")
+        case .createdAtAsc: return tr("oldest_added")
+        case .updatedAtDesc: return tr("recently_updated")
+        case .updatedAtAsc: return tr("least_recently_updated")
         case .performerAgeDesc, .performerAgeAsc: return option.displayName
-        case .random: return "Random"
+        case .random: return tr("random")
         }
     }
 }

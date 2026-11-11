@@ -33,9 +33,9 @@ struct PlaybackSettingsSection: View {
     /// The scene player (scene detail, fullscreen, PiP).
     private var playerSection: some View {
         Section {
-            stashyScrollingSectionHeader("Player")
+            stashyScrollingSectionHeader(tr("player"))
             Toggle(isOn: $tabManager.isPiPEnabled) {
-                Label("Picture-in-Picture", systemImage: "pip")
+                Label(tr("picture_in_picture"), systemImage: "pip")
             }
             .tint(appearanceManager.tintColor)
             .stashyGroupedBlockRow(index: 0, count: 10)
@@ -45,38 +45,38 @@ struct PlaybackSettingsSection: View {
                     Text(TabManager.playerSkipLabel(seconds)).tag(seconds)
                 }
             } label: {
-                Label("Skip interval", systemImage: "goforward")
+                Label(tr("action_skip_interval"), systemImage: "goforward")
             }
             .stashyGroupedBlockRow(index: 1, count: 10)
 
             Toggle(isOn: $tabManager.showsPlayerSkipButtons) {
-                Label("Skip buttons", systemImage: "goforward.10")
+                Label(tr("action_skip_buttons"), systemImage: "goforward.10")
             }
             .tint(appearanceManager.tintColor)
             .stashyGroupedBlockRow(index: 2, count: 10)
 
             Toggle(isOn: $tabManager.hidesPlayerAirPlayButton) {
-                Label("Hide AirPlay button", systemImage: "airplayvideo")
+                Label(tr("action_hide_airplay_button"), systemImage: "airplayvideo")
             }
             .tint(appearanceManager.tintColor)
             .stashyGroupedBlockRow(index: 3, count: 10)
 
             // Fullscreen turns to landscape for landscape videos.
             Toggle(isOn: $tabManager.playerAutoRotateFullscreen) {
-                Label("Auto-rotate fullscreen", systemImage: "rotate.right")
+                Label(tr("auto_rotate_fullscreen"), systemImage: "rotate.right")
             }
             .tint(appearanceManager.tintColor)
             .stashyGroupedBlockRow(index: 4, count: 10)
 
             // Landscape fullscreen fills by itself when little of the picture is lost.
             Toggle(isOn: $tabManager.playerAutoZoom) {
-                Label("Autozoom", systemImage: "arrow.up.left.and.arrow.down.right")
+                Label(tr("autozoom"), systemImage: "arrow.up.left.and.arrow.down.right")
             }
             .tint(appearanceManager.tintColor)
             .stashyGroupedBlockRow(index: 5, count: 10)
 
             Toggle(isOn: $tabManager.playerDolbyVisionEnabled) {
-                Label("Dolby Vision", systemImage: "sparkles.tv")
+                Label(tr("dolby_vision"), systemImage: "sparkles.tv")
             }
             .tint(appearanceManager.tintColor)
             .stashyGroupedBlockRow(index: 6, count: 10)
@@ -86,7 +86,7 @@ struct PlaybackSettingsSection: View {
                     Text(TabManager.holdSpeedLabel(rate)).tag(rate)
                 }
             } label: {
-                Label("Hold to speed up", systemImage: "forward.fill")
+                Label(tr("hold_to_speed_up"), systemImage: "forward.fill")
             }
             .stashyGroupedBlockRow(index: 7, count: 10)
 
@@ -95,13 +95,13 @@ struct PlaybackSettingsSection: View {
                     Text(TabManager.playCountThresholdLabel(seconds)).tag(seconds)
                 }
             } label: {
-                Label("Count as played", systemImage: "play.circle")
+                Label(tr("count_as_played"), systemImage: "play.circle")
             }
             .stashyGroupedBlockRow(index: 8, count: 10)
 
             // Applies to the player, Feeds and image-viewer videos; card previews stay muted.
             Toggle(isOn: $tabManager.playbackStartMuted) {
-                Label("Start mute", systemImage: "speaker.slash")
+                Label(tr("action_start_mute"), systemImage: "speaker.slash")
             }
             .tint(appearanceManager.tintColor)
             .stashyGroupedBlockRow(index: 9, count: 10)
@@ -111,14 +111,14 @@ struct PlaybackSettingsSection: View {
     /// Feeds playback (Scenes / Markers rows).
     private var feedsSection: some View {
         Section {
-            stashyScrollingSectionHeader("Feeds")
+            stashyScrollingSectionHeader(tr("feeds"))
             // Feeds › Scenes: where a scene row starts, past the studio intro.
             Picker(selection: $tabManager.feedsSceneStartPosition) {
                 ForEach(TabManager.FeedsSceneStartPosition.allCases) { position in
                     Text(position.label).tag(position)
                 }
             } label: {
-                Label("Start position", systemImage: "forward.end")
+                Label(tr("action_start_position"), systemImage: "forward.end")
             }
             .stashyGroupedBlockRow(index: 0, count: verticalsAvailable ? 7 : 6)
 
@@ -128,7 +128,7 @@ struct PlaybackSettingsSection: View {
                     Text("\(Int(seconds)) s").tag(seconds)
                 }
             } label: {
-                Label("Marker length", systemImage: "bookmark")
+                Label(tr("marker_length"), systemImage: "bookmark")
             }
             .stashyGroupedBlockRow(index: 1, count: verticalsAvailable ? 7 : 6)
 
@@ -137,7 +137,7 @@ struct PlaybackSettingsSection: View {
                     Text(TabManager.holdSpeedLabel(rate)).tag(rate)
                 }
             } label: {
-                Label("Hold to speed up", systemImage: "forward.frame.fill")
+                Label(tr("hold_to_speed_up"), systemImage: "forward.frame.fill")
             }
             .stashyGroupedBlockRow(index: 2, count: verticalsAvailable ? 7 : 6)
 
@@ -146,7 +146,7 @@ struct PlaybackSettingsSection: View {
                     Text(TabManager.playCountThresholdLabel(seconds)).tag(seconds)
                 }
             } label: {
-                Label(verticalsAvailable ? "Count as played · Scenes" : "Count as played", systemImage: "rectangle.stack.badge.play")
+                Label(verticalsAvailable ? tr("count_as_played_scenes") : tr("count_as_played"), systemImage: "rectangle.stack.badge.play")
             }
             .stashyGroupedBlockRow(index: 3, count: verticalsAvailable ? 7 : 6)
 
@@ -156,38 +156,38 @@ struct PlaybackSettingsSection: View {
                         Text(TabManager.playCountThresholdLabel(seconds)).tag(seconds)
                     }
                 } label: {
-                    Label("Count as played · Verticals", systemImage: "rectangle.portrait")
+                    Label(tr("count_as_played_verticals"), systemImage: "rectangle.portrait")
                 }
                 .stashyGroupedBlockRow(index: 4, count: 7)
             }
 
             // Feeds › Scenes: a marker at the current position, beside the rating.
             Toggle(isOn: $tabManager.feedsAddMarkerButton) {
-                Label("Add Marker button", systemImage: "plus.square.fill.on.square.fill")
+                Label(tr("action_add_marker_button"), systemImage: "plus.square.fill.on.square.fill")
             }
             .tint(appearanceManager.tintColor)
             .stashyGroupedBlockRow(index: verticalsAvailable ? 5 : 4, count: verticalsAvailable ? 7 : 6)
 
             // Feeds › Scenes: double tap left / right goes to the previous / next marker.
             Toggle(isOn: $tabManager.feedsDoubleTapMarkers) {
-                Label("Double tap jumps to markers", systemImage: "bookmark")
+                Label(tr("double_tap_jumps_to_markers"), systemImage: "bookmark")
             }
             .tint(appearanceManager.tintColor)
             .stashyGroupedBlockRow(index: verticalsAvailable ? 6 : 5, count: verticalsAvailable ? 7 : 6)
-            stashyScrollingSectionFooter("Double tap jumps to markers: in Feeds › Scenes a double tap on the left or right goes to the previous or next marker of a scene that has markers. Without a marker in that direction it skips seconds as usual.")
+            stashyScrollingSectionFooter(tr("hint_double_tap_jumps_to_markers"))
         }
     }
 
     /// Stash web "Track activity": play count, history, resume point, watch time.
     private var activitySection: some View {
         Section {
-            stashyScrollingSectionHeader("Activity")
+            stashyScrollingSectionHeader(tr("activity"))
             Toggle(isOn: $tabManager.tracksPlaybackActivity) {
-                Label("Playback activity", systemImage: "clock.arrow.circlepath")
+                Label(tr("playback_activity"), systemImage: "clock.arrow.circlepath")
             }
             .tint(appearanceManager.tintColor)
             .stashyGroupedBlockRow(index: 0, count: 1)
-            stashyScrollingSectionFooter("Play count, history, resume point and watch time on the server. The player menu can pause it for one scene.")
+            stashyScrollingSectionFooter(tr("hint_play_count_history_resume_point"))
         }
     }
 
@@ -195,14 +195,14 @@ struct PlaybackSettingsSection: View {
     /// performer, studio, tag or group.
     private var downloadsSection: some View {
         Section {
-            stashyScrollingSectionHeader("Downloads")
+            stashyScrollingSectionHeader(tr("downloads"))
 
             Picker(selection: $tabManager.downloadBatchSize) {
                 ForEach(TabManager.downloadBatchSizeOptions, id: \.self) { size in
                     Text("\(size)").tag(size)
                 }
             } label: {
-                Label("Newest batch — Images", systemImage: "photo.stack")
+                Label(tr("newest_batch_images"), systemImage: "photo.stack")
             }
             .stashyGroupedBlockRow(index: 0, count: 2)
 
@@ -211,7 +211,7 @@ struct PlaybackSettingsSection: View {
                     Text("\(size)").tag(size)
                 }
             } label: {
-                Label("Newest batch — Scenes", systemImage: "film")
+                Label(tr("newest_batch_scenes"), systemImage: "film")
             }
             .stashyGroupedBlockRow(index: 1, count: 2)
         }
@@ -220,10 +220,10 @@ struct PlaybackSettingsSection: View {
     /// Subtitle defaults and look. Shared by every player overlay (scene detail, downloads, tvOS).
     private var subtitlesSection: some View {
         Section {
-            stashyScrollingSectionHeader("Subtitles")
+            stashyScrollingSectionHeader(tr("subtitles"))
 
             Toggle(isOn: $tabManager.subtitlesAutoEnabled) {
-                Label("Show subtitles automatically", systemImage: "captions.bubble")
+                Label(tr("action_show_subtitles_automatically"), systemImage: "captions.bubble")
             }
             .tint(appearanceManager.tintColor)
             .stashyGroupedBlockRow(index: 0, count: 8)
@@ -233,7 +233,7 @@ struct PlaybackSettingsSection: View {
                     Text(option.label).tag(option.id)
                 }
             } label: {
-                Label("Preferred language", systemImage: "globe")
+                Label(tr("preferred_language"), systemImage: "globe")
             }
             .stashyGroupedBlockRow(index: 1, count: 8)
 
@@ -242,7 +242,7 @@ struct PlaybackSettingsSection: View {
                     Text(size.label).tag(size)
                 }
             } label: {
-                Label("Size", systemImage: "textformat.size")
+                Label(tr("size"), systemImage: "textformat.size")
             }
             .stashyGroupedBlockRow(index: 2, count: 8)
 
@@ -251,7 +251,7 @@ struct PlaybackSettingsSection: View {
                     Text(family.label).tag(family)
                 }
             } label: {
-                Label("Font", systemImage: "textformat")
+                Label(tr("font"), systemImage: "textformat")
             }
             .stashyGroupedBlockRow(index: 3, count: 8)
 
@@ -260,12 +260,12 @@ struct PlaybackSettingsSection: View {
                     Text(choice.label).tag(choice)
                 }
             } label: {
-                Label("Text color", systemImage: "paintpalette")
+                Label(tr("text_color"), systemImage: "paintpalette")
             }
             .stashyGroupedBlockRow(index: 4, count: 8)
 
             Toggle(isOn: $tabManager.subtitleBoxEnabled) {
-                Label("Background box", systemImage: "rectangle.fill")
+                Label(tr("background_box"), systemImage: "rectangle.fill")
             }
             .tint(appearanceManager.tintColor)
             .stashyGroupedBlockRow(index: 5, count: 8)
@@ -275,7 +275,7 @@ struct PlaybackSettingsSection: View {
                     Text(choice.label).tag(choice)
                 }
             } label: {
-                Label("Background color", systemImage: "square.fill.on.square.fill")
+                Label(tr("background_color"), systemImage: "square.fill.on.square.fill")
             }
             .disabled(!tabManager.subtitleBoxEnabled)
             .stashyGroupedBlockRow(index: 6, count: 8)
@@ -290,7 +290,7 @@ struct PlaybackSettingsSection: View {
         ZStack {
             LinearGradient(colors: [Color(white: 0.22), Color(white: 0.06)],
                            startPoint: .topLeading, endPoint: .bottomTrailing)
-            StashySubtitleText(text: "Sample subtitle",
+            StashySubtitleText(text: tr("sample_subtitle"),
                                scale: 1,
                                lineLimit: 2,
                                style: tabManager.subtitleStyle)
@@ -302,7 +302,7 @@ struct PlaybackSettingsSection: View {
         .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
         .padding(.vertical, 4)
         .allowsHitTesting(false)
-        .accessibilityLabel("Subtitle preview")
+        .accessibilityLabel(tr("subtitle_preview"))
     }
     #endif
 }
@@ -327,7 +327,7 @@ struct StashyPlusAISubtitlesSettings: View {
                 Text(option.label).tag(option.id)
             }
         } label: {
-            Label("My subtitle language", systemImage: "captions.bubble")
+            Label(tr("my_subtitle_language"), systemImage: "captions.bubble")
         }
         .stashyGroupedBlockRow(index: 0, count: 1)
     }

@@ -1,5 +1,7 @@
 package de.letzgo.stashy.tv
 
+import de.letzgo.stashy.R
+import de.letzgo.stashy.tr
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
@@ -362,7 +364,7 @@ fun TvListRow(
 /** tvOS `Toggle` in a List: the row shows "On" / "Off" on the right. */
 @Composable
 fun TvToggleRow(title: String, checked: Boolean, onChange: (Boolean) -> Unit, modifier: Modifier = Modifier, leading: ImageVector? = null, enabled: Boolean = true, onFocus: (() -> Unit)? = null) {
-    TvListRow(title, { onChange(!checked) }, modifier, value = if (checked) "On" else "Off", leading = leading, leadingTint = TvColors.tint, enabled = enabled, onFocus = onFocus)
+    TvListRow(title, { onChange(!checked) }, modifier, value = if (checked) tr(R.string.on) else tr(R.string.off), leading = leading, leadingTint = TvColors.tint, enabled = enabled, onFocus = onFocus)
 }
 
 /** List section header (small grey caption above the rows). */
@@ -417,7 +419,7 @@ fun <T> TvOptionDialog(title: String, options: List<TvOption<T>>, selected: T?, 
                     }
                     item {
                         TvButton(onDismiss, Modifier.fillMaxWidth().padding(top = pt(12)), focusedScale = 1.03f) {
-                            Text("Cancel", Modifier.fillMaxWidth(), style = TvType.headline.copy(fontWeight = FontWeight.Bold), textAlign = TextAlign.Center)
+                            Text(tr(R.string.action_cancel), Modifier.fillMaxWidth(), style = TvType.headline.copy(fontWeight = FontWeight.Bold), textAlign = TextAlign.Center)
                         }
                     }
                 }
@@ -445,12 +447,12 @@ fun <T> TvPickerRow(title: String, options: List<TvOption<T>>, selection: T, onS
 
 /** iOS: `TVConnectionErrorView`. */
 @Composable
-fun TvConnectionError(title: String = "Server not reachable", subtitle: String? = null, modifier: Modifier = Modifier, focus: FocusRequester? = null, onRetry: () -> Unit) {
+fun TvConnectionError(title: String = tr(R.string.server_not_reachable), subtitle: String? = null, modifier: Modifier = Modifier, focus: FocusRequester? = null, onRetry: () -> Unit) {
     Column(modifier.fillMaxWidth().padding(vertical = pt(120)), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(pt(32))) {
         Icon(TvIcons.server, null, Modifier.size(pt(80)), tint = TvColors.tint)
         Text(title, style = TvType.title, textAlign = TextAlign.Center)
         if (!subtitle.isNullOrEmpty()) Text(subtitle, Modifier.padding(horizontal = pt(80)), style = TvType.title3, color = TvColors.secondary, textAlign = TextAlign.Center)
-        TvButton(onRetry, if (focus != null) Modifier.focusRequester(focus) else Modifier) { Text("Retry Connection", style = TvType.title3) }
+        TvButton(onRetry, if (focus != null) Modifier.focusRequester(focus) else Modifier) { Text(tr(R.string.action_retry_connection), style = TvType.title3) }
     }
 }
 

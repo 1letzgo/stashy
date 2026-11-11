@@ -1,5 +1,7 @@
 package de.letzgo.stashy.tv
 
+import de.letzgo.stashy.R
+import de.letzgo.stashy.tr
 import android.app.Activity
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
@@ -77,17 +79,17 @@ import kotlinx.coroutines.launch
 
 /** iOS: `TVSettingsEntry` — one entry of the Settings overview (title, icon, right-column text). */
 enum class TvSettingsEntry(val title: String, val summary: String) {
-    Servers("Servers", "Add Stash servers, switch between them, and edit or remove saved ones."),
-    Appearance("Appearance", "Pick the accent color used for focus highlights and icons throughout the app."),
-    Security("Security", "Require a PIN before the app opens."),
-    StashyPlus("stashy+", "Premium features, including Channels — continuous playback of a performer, studio, tag or saved filter."),
-    DefaultSort("Default Sorting", "The sort order each section opens with."),
-    DefaultFilters("Default Filters", "A saved server filter to apply automatically when a section opens."),
-    VisibleTabs("Visible Tabs", "Hide sections you do not use. They disappear from the sidebar."),
-    Subtitles("Subtitles", "Turn subtitles on automatically, choose the language a scene should start with, and set how the cues look."),
-    PlayCount("Count As Played", "How long a scene has to play before it counts as played and its position is saved."),
-    Maintenance("Maintenance", "Clear the cached artwork for the active server. Images are re-downloaded as they are shown again."),
-    About("About", "Version, build number and updates.");
+    Servers(tr(R.string.servers), tr(R.string.hint_add_stash_servers_switch_between)),
+    Appearance(tr(R.string.appearance), tr(R.string.hint_pick_accent_color_used_for)),
+    Security(tr(R.string.security), tr(R.string.hint_require_pin_before_app_opens)),
+    StashyPlus("stashy+", tr(R.string.hint_premium_features_including_channels_continuous)),
+    DefaultSort(tr(R.string.default_sorting), tr(R.string.hint_sort_order_each_section_opens)),
+    DefaultFilters(tr(R.string.default_filters), tr(R.string.hint_saved_server_filter_to_apply)),
+    VisibleTabs(tr(R.string.visible_tabs), tr(R.string.hint_hide_sections_you_do_not)),
+    Subtitles(tr(R.string.subtitles), tr(R.string.hint_turn_subtitles_on_automatically_choose)),
+    PlayCount(tr(R.string.count_as_played), tr(R.string.hint_how_long_scene_has_to)),
+    Maintenance(tr(R.string.maintenance), tr(R.string.hint_clear_cached_artwork_for_active)),
+    About(tr(R.string.about), tr(R.string.version_build_number_and_updates));
 
     val icon: ImageVector get() = when (this) {
         Servers -> TvIcons.server
@@ -118,16 +120,16 @@ class TvSettingsModel {
 fun TvSettings(model: TvSettingsModel) {
     Row(Modifier.fillMaxSize().background(TvColors.background).padding(end = pt(80)), horizontalArrangement = Arrangement.spacedBy(pt(80))) {
         LazyColumn(Modifier.width(pt(720)).fillMaxHeight(), contentPadding = PaddingValues(start = pt(40), top = pt(40), bottom = pt(160)), verticalArrangement = Arrangement.spacedBy(pt(12))) {
-            item { TvSectionHeader("General") }
+            item { TvSectionHeader(tr(R.string.general)) }
             item { EntryRow(model, TvSettingsEntry.Servers) }
             item { EntryRow(model, TvSettingsEntry.Appearance) }
             item { EntryRow(model, TvSettingsEntry.Security) }
             item { EntryRow(model, TvSettingsEntry.StashyPlus) }
-            item { TvSectionHeader("Content") }
+            item { TvSectionHeader(tr(R.string.content)) }
             item { EntryRow(model, TvSettingsEntry.DefaultSort) }
             item { EntryRow(model, TvSettingsEntry.DefaultFilters) }
             item { EntryRow(model, TvSettingsEntry.VisibleTabs) }
-            item { TvSectionHeader("Playback") }
+            item { TvSectionHeader(tr(R.string.playback)) }
             item { EntryRow(model, TvSettingsEntry.Subtitles) }
             item { EntryRow(model, TvSettingsEntry.PlayCount, TabConfigLogic.playCountThresholdLabel(TabManager.playCountPlayerSeconds)) }
             item { Spacer(Modifier.height(pt(28))) }
@@ -201,8 +203,8 @@ private fun ServersPage(memory: TvFocusMemory) {
     val others = ServerConfigManager.savedServers.filter { it.id != active?.id }
     var actionsFor by remember { mutableStateOf<ServerConfig?>(null) }
     var deleting by remember { mutableStateOf<ServerConfig?>(null) }
-    TvSettingsPage("Servers", "Add Stash servers and switch between them. Hold Select on a server to edit it or remove a saved one.", firstFocus = first) {
-        item { TvSectionHeader("Active Server") }
+    TvSettingsPage(tr(R.string.servers), tr(R.string.hint_add_stash_servers_and_switch), firstFocus = first) {
+        item { TvSectionHeader(tr(R.string.active_server)) }
         item {
             if (active != null) {
                 TvListRow(
@@ -211,25 +213,25 @@ private fun ServersPage(memory: TvFocusMemory) {
                     onLongClick = { TvNav.push(TvServerFormRoute(active)) },
                 )
             } else {
-                TvListRow("No server configured", {}, Modifier.focusRequester(first), leading = TvIcons.warning, leadingTint = TvColors.yellow)
+                TvListRow(tr(R.string.empty_server_configured), {}, Modifier.focusRequester(first), leading = TvIcons.warning, leadingTint = TvColors.yellow)
             }
         }
         if (others.isNotEmpty()) {
-            item { TvSectionHeader("Switch Server") }
+            item { TvSectionHeader(tr(R.string.switch_server)) }
             items(others, key = { it.id }) { server ->
                 TvListRow(server.name, { ServerConfigManager.activate(server) }, Modifier.tvFocusMemory(memory, server.id), subtitle = server.baseURL, onLongClick = { actionsFor = server })
             }
         }
         item { Spacer(Modifier.height(pt(28))) }
-        item { TvListRow("Add Server", { TvNav.push(TvServerFormRoute(null)) }, Modifier.tvFocusMemory(memory, "add"), leading = TvIcons.plus, leadingTint = TvColors.tint) }
+        item { TvListRow(tr(R.string.action_add_server), { TvNav.push(TvServerFormRoute(null)) }, Modifier.tvFocusMemory(memory, "add"), leading = TvIcons.plus, leadingTint = TvColors.tint) }
     }
     actionsFor?.let { server ->
-        TvOptionDialog(server.name, listOf(TvOption("edit", "Edit"), TvOption("delete", "Delete")), null, { action ->
+        TvOptionDialog(server.name, listOf(TvOption("edit", tr(R.string.action_edit)), TvOption("delete", tr(R.string.action_delete))), null, { action ->
             if (action == "edit") TvNav.push(TvServerFormRoute(server)) else deleting = server
         }, { actionsFor = null })
     }
     deleting?.let { server ->
-        TvConfirmDialog("Delete \"${server.name}\"?", "Delete", { ServerConfigManager.delete(server) }) { deleting = null }
+        TvConfirmDialog(tr(R.string.confirm_delete_arg, server.name), tr(R.string.action_delete), { ServerConfigManager.delete(server) }) { deleting = null }
     }
 }
 
@@ -238,7 +240,7 @@ class TvServerDetailRoute : TvRoute {
     override val key = "serverDetail.${System.nanoTime()}"
     override val focus = TvFocusMemory()
     private var connected by mutableStateOf<Boolean?>(null)
-    private var status by mutableStateOf("Checking…")
+    private var status by mutableStateOf(tr(R.string.checking_menu))
     private var testing by mutableStateOf(false)
 
     @Composable
@@ -252,7 +254,7 @@ class TvServerDetailRoute : TvRoute {
             testing = true
             scope.launch {
                 when (val r = ServerConnection.probe(c.baseURL, c.apiKey, c.customHeaders)) {
-                    is ServerConnection.Outcome.Stash -> { connected = true; status = "Stash ${r.version}" }
+                    is ServerConnection.Outcome.Stash -> { connected = true; status = tr(R.string.stash_arg, r.version) }
                     is ServerConnection.Outcome.Failure -> { connected = false; status = r.message }
                 }
                 testing = false
@@ -265,7 +267,7 @@ class TvServerDetailRoute : TvRoute {
             verticalArrangement = Arrangement.spacedBy(pt(32)),
         ) {
             if (config == null) {
-                item { Text("No server configured.", style = TvType.title3, color = TvColors.secondary) }
+                item { Text(tr(R.string.empty_server_configured), style = TvType.title3, color = TvColors.secondary) }
                 return@LazyColumn
             }
             item {
@@ -285,7 +287,7 @@ class TvServerDetailRoute : TvRoute {
                     val ok = connected == true
                     Icon(if (ok) TvIcons.checkCircle else TvIcons.warning, null, Modifier.size(pt(48)), tint = if (ok) TvColors.green else TvColors.yellow)
                     Column(Modifier.weight(1f)) {
-                        Text(if (ok) "Connected" else "Not connected", style = TvType.title3.copy(fontWeight = FontWeight.SemiBold), color = Color.White)
+                        Text(if (ok) tr(R.string.connected) else tr(R.string.not_connected), style = TvType.title3.copy(fontWeight = FontWeight.SemiBold), color = Color.White)
                         Text(status, style = TvType.callout, color = Color.White.copy(alpha = 0.6f))
                     }
                     if (testing) TvSpinner(pt(40))
@@ -295,7 +297,7 @@ class TvServerDetailRoute : TvRoute {
                 // Never disabled: it is the only focusable element (Back must have a target).
                 TvButton({ test() }, Modifier.focusRequester(button)) {
                     if (testing) TvSpinner(pt(30)) else Icon(TvIcons.retry, null, Modifier.size(pt(30)))
-                    Text("Test Connection", style = TvType.headline)
+                    Text(tr(R.string.action_test_connection), style = TvType.headline)
                 }
             }
             item {
@@ -303,10 +305,10 @@ class TvServerDetailRoute : TvRoute {
                     Modifier.fillMaxWidth().clip(RoundedCornerShape(pt(14))).background(Color.White.copy(alpha = 0.05f)).padding(pt(20)),
                     verticalArrangement = Arrangement.spacedBy(pt(16)),
                 ) {
-                    DetailLine("Protocol", config.serverProtocol.name)
-                    DetailLine("Address", config.serverAddress)
-                    config.port?.takeIf { it.isNotEmpty() }?.let { DetailLine("Port", it) }
-                    DetailLine("API Key", if (!config.apiKey.isNullOrEmpty()) "•••• configured" else "Not set")
+                    DetailLine(tr(R.string.protocol), config.serverProtocol.name)
+                    DetailLine(tr(R.string.address), config.serverAddress)
+                    config.port?.takeIf { it.isNotEmpty() }?.let { DetailLine(tr(R.string.port), it) }
+                    DetailLine(tr(R.string.api_key), if (!config.apiKey.isNullOrEmpty()) "•••• configured" else tr(R.string.not_set))
                 }
             }
         }
@@ -328,10 +330,10 @@ class TvServerDetailRoute : TvRoute {
 @Composable
 private fun AppearancePage() {
     val first = remember { FocusRequester() }
-    TvSettingsPage("Appearance", "Pick the accent color used for focus highlights and icons throughout the app.", firstFocus = first) {
+    TvSettingsPage(tr(R.string.appearance), tr(R.string.hint_pick_accent_color_used_for), firstFocus = first) {
         item {
             Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(pt(14))).background(Color.White.copy(alpha = 0.06f)).padding(pt(28)), verticalArrangement = Arrangement.spacedBy(pt(16))) {
-                Text("Accent Color", style = TvType.headline, color = Color.White)
+                Text(tr(R.string.accent_color), style = TvType.headline, color = Color.White)
                 LazyRow(horizontalArrangement = Arrangement.spacedBy(pt(20)), contentPadding = PaddingValues(vertical = pt(8))) {
                     items(Appearance.presets.size) { i ->
                         val (name, color) = Appearance.presets[i]
@@ -373,17 +375,17 @@ private fun ColorPreset(name: String, color: Color, selected: Boolean, modifier:
 @Composable
 private fun SecurityPage() {
     val first = remember { FocusRequester() }
-    TvSettingsPage("Security", "The app asks for your PIN each time it opens and whenever it returns from the background.", firstFocus = first) {
+    TvSettingsPage(tr(R.string.security), tr(R.string.hint_app_asks_for_your_pin), firstFocus = first) {
         item {
-            TvToggleRow("Enable PIN Lock", TvSecurity.isPinLockEnabled && TvSecurity.isPinSet, { enabled ->
+            TvToggleRow(tr(R.string.action_enable_pin_lock), TvSecurity.isPinLockEnabled && TvSecurity.isPinSet, { enabled ->
                 if (enabled) {
                     if (!TvSecurity.isPinSet) TvNav.push(TvPasscodeSetupRoute()) else TvSecurity.setLockEnabled(true)
                 } else TvSecurity.setLockEnabled(false)
             }, Modifier.focusRequester(first))
         }
         if (TvSecurity.isPinSet) {
-            item { TvListRow("Change PIN", { TvNav.push(TvPasscodeSetupRoute()) }) }
-            item { TvListRow("Remove PIN", { TvSecurity.removePin() }, destructive = true) }
+            item { TvListRow(tr(R.string.action_change_pin), { TvNav.push(TvPasscodeSetupRoute()) }) }
+            item { TvListRow(tr(R.string.action_remove_pin), { TvSecurity.removePin() }, destructive = true) }
         }
     }
 }
@@ -412,33 +414,33 @@ private fun StashyPlusPage() {
     val source = StashyPlus.source
     val busy = StashyPlus.purchasingProductID != null || StashyPlus.isRestoringPurchases
     var licenseInput by remember { mutableStateOf("") }
-    var licenseError by remember { mutableStateOf(StashyPlus.expiredLicense?.let { "Your license key expired on ${it.expiresText}." }) }
+    var licenseError by remember { mutableStateOf(StashyPlus.expiredLicense?.let { tr(R.string.hint_your_license_key_expired_on, it.expiresText) }) }
     TvSettingsPage("stashy+", null, firstFocus = first) {
         val license = StashyPlus.license
         item {
             TvListRow(
                 source.statusTitle, {}, Modifier.focusRequester(first),
-                subtitle = license?.let { l -> "Licensed to ${l.name}" + (l.expiresText?.let { " · valid until $it" } ?: "") } ?: source.statusDetail,
+                subtitle = license?.let { l -> tr(R.string.licensed_to_arg, l.name) + (l.expiresText?.let { " · valid until $it" } ?: "") } ?: source.statusDetail,
                 leading = if (StashyPlus.isUnlocked) TvIcons.checkSeal else TvIcons.lock, leadingTint = if (StashyPlus.isUnlocked) TvColors.green else TvColors.tint,
             )
         }
-        item { TvListRow("Channels", {}, leading = TvIcons.sparklesTv, leadingTint = TvColors.tint) }
+        item { TvListRow(tr(R.string.channels), {}, leading = TvIcons.sparklesTv, leadingTint = TvColors.tint) }
         if (StashyPlus.usesLicenseKeys) {
             // Sideload flavor: offline license key instead of Google Play.
-            item { TvSectionHeader("License") }
+            item { TvSectionHeader(tr(R.string.license)) }
             if (license != null) {
-                item { TvListRow("Remove License", { StashyPlus.removeLicense() }, destructive = true) }
-                item { TvSectionFooter("License ${license.id}. The key is stored on this device only.") }
+                item { TvListRow(tr(R.string.action_remove_license), { StashyPlus.removeLicense() }, destructive = true) }
+                item { TvSectionFooter(tr(R.string.hint_license_arg_key_is_stored, license.id)) }
             } else {
-                item { TvTextField("License key (STASHY-…)", licenseInput, { licenseInput = it; licenseError = null }, onSubmit = { licenseError = StashyPlus.activateLicense(licenseInput) }) }
-                item { TvListRow("Activate", { licenseError = StashyPlus.activateLicense(licenseInput) }, enabled = licenseInput.isNotBlank()) }
-                item { TvSectionFooter(licenseError ?: "This version of stashy unlocks stashy+ with a license key. It works offline and stays on this device.") }
+                item { TvTextField(tr(R.string.license_key_stashy), licenseInput, { licenseInput = it; licenseError = null }, onSubmit = { licenseError = StashyPlus.activateLicense(licenseInput) }) }
+                item { TvListRow(tr(R.string.activate), { licenseError = StashyPlus.activateLicense(licenseInput) }, enabled = licenseInput.isNotBlank()) }
+                item { TvSectionFooter(licenseError ?: tr(R.string.hint_this_version_of_stashy_unlocks)) }
             }
         } else {
-            item { TvSectionFooter("stashy+ unlocks premium features across stashy for phone, tablet and Android TV with one purchase.") }
+            item { TvSectionFooter(tr(R.string.hint_stashy_plus_unlocks_premium_features_across)) }
         }
         if (StashyPlus.shouldOfferPurchases) {
-            item { TvSectionHeader("Unlock") }
+            item { TvSectionHeader(tr(R.string.action_unlock)) }
             if (StashyPlus.isLoadingProducts && StashyPlus.products.isEmpty()) {
                 item { TvLoading() }
             } else {
@@ -447,7 +449,7 @@ private fun StashyPlusPage() {
                     TvListRow(
                         StashyPlusProduct.displayNames[product.productId] ?: product.name,
                         { (context as? Activity ?: TvActivity.current)?.let { StashyPlus.purchase(it, product) } },
-                        subtitle = if (product.productId in StashyPlusProduct.subscriptionIDs) "Auto-renews · cancel anytime" else "One-time purchase",
+                        subtitle = if (product.productId in StashyPlusProduct.subscriptionIDs) tr(R.string.auto_renews_cancel_anytime) else tr(R.string.one_time_purchase),
                         value = if (purchasing) "…" else StashyPlus.price(product),
                         enabled = !busy,
                     )
@@ -456,12 +458,12 @@ private fun StashyPlusPage() {
             }
             item {
                 TvSectionFooter(
-                    if (source == StashyPlusSource.Subscription) "Your subscription is active. Buying Lifetime keeps stashy+ forever, even after cancelling."
-                    else "Payment is charged to your Google Play account. Subscriptions renew automatically unless cancelled. Manage or cancel anytime in the Play Store.",
+                    if (source == StashyPlusSource.Subscription) tr(R.string.hint_your_subscription_is_active_buying)
+                    else tr(R.string.hint_payment_is_charged_to_your_google),
                 )
             }
             item { Spacer(Modifier.height(pt(28))) }
-            item { TvListRow("Restore Purchases", { StashyPlus.restore() }, value = if (StashyPlus.isRestoringPurchases) "…" else null, enabled = !busy) }
+            item { TvListRow(tr(R.string.action_restore_purchases), { StashyPlus.restore() }, value = if (StashyPlus.isRestoringPurchases) "…" else null, enabled = !busy) }
         }
         StashyPlus.message?.let { item { TvSectionFooter(it) } }
     }
@@ -469,12 +471,12 @@ private fun StashyPlusPage() {
 
 // MARK: - Default sorting / filters / tabs
 
-private val contentTabs = listOf(AppTab.Scenes to "Scenes", AppTab.Performers to "Performers", AppTab.Studios to "Studios", AppTab.Tags to "Tags", AppTab.Groups to "Groups")
+private val contentTabs = listOf(AppTab.Scenes to tr(R.string.scenes), AppTab.Performers to tr(R.string.performers), AppTab.Studios to tr(R.string.studios), AppTab.Tags to tr(R.string.tags), AppTab.Groups to tr(R.string.groups))
 
 @Composable
 private fun DefaultSortPage() {
     val first = remember { FocusRequester() }
-    TvSettingsPage("Default Sorting", "The sort order each section opens with.", firstFocus = first) {
+    TvSettingsPage(tr(R.string.default_sorting), tr(R.string.hint_sort_order_each_section_opens), firstFocus = first) {
         contentTabs.forEachIndexed { i, (tab, label) ->
             item {
                 val mode = tab.filterMode!!
@@ -484,7 +486,7 @@ private fun DefaultSortPage() {
             }
         }
         if (de.letzgo.stashy.data.ServerCapabilities.supports032) item {
-            TvToggleRow("Studio counts include sub-studios", de.letzgo.stashy.data.StudioCountsStore.includeSubStudios, { de.letzgo.stashy.data.StudioCountsStore.includeSubStudios = it })
+            TvToggleRow(tr(R.string.studio_counts_include_sub_studios), de.letzgo.stashy.data.StudioCountsStore.includeSubStudios, { de.letzgo.stashy.data.StudioCountsStore.includeSubStudios = it })
         }
     }
 }
@@ -494,13 +496,13 @@ private fun DefaultFiltersPage() {
     val first = remember { FocusRequester() }
     LaunchedEffect(Unit) { SavedFiltersStore.load(force = true) }
     val none = "\u0000none"
-    TvSettingsPage("Default Filters", "A saved filter from your Stash server, applied automatically when a section opens.", firstFocus = first) {
+    TvSettingsPage(tr(R.string.default_filters), tr(R.string.hint_saved_filter_from_your_stash), firstFocus = first) {
         contentTabs.forEachIndexed { i, (tab, label) ->
             item {
                 SavedFiltersStore.version
                 val filters = SavedFiltersStore.forMode(tab.filterMode ?: FilterMode.Unknown)
                 TvPickerRow(
-                    label, listOf(TvOption(none, "None")) + filters.map { TvOption(it.id, it.name) }, TabManager.getDefaultFilterId(tab) ?: none,
+                    label, listOf(TvOption(none, tr(R.string.none))) + filters.map { TvOption(it.id, it.name) }, TabManager.getDefaultFilterId(tab) ?: none,
                     { id -> if (id == none) TabManager.setDefaultFilter(tab, null, null) else TabManager.setDefaultFilter(tab, id, filters.firstOrNull { it.id == id }?.name) },
                     if (i == 0) Modifier.focusRequester(first) else Modifier,
                 )
@@ -513,11 +515,11 @@ private fun DefaultFiltersPage() {
 private fun VisibleTabsPage() {
     val first = remember { FocusRequester() }
     val rows = listOf(
-        Triple(AppTab.Scenes, "Scenes", TvIcons.film), Triple(AppTab.Performers, "Performers", TvIcons.person3), Triple(AppTab.Studios, "Studios", TvIcons.building),
-        Triple(AppTab.Tags, "Tags", TvIcons.tag), Triple(AppTab.Groups, "Groups", TvIcons.stack), Triple(AppTab.Galleries, "Galleries", TvIcons.photoStack),
-        Triple(AppTab.Images, "Images", TvIcons.photo),
+        Triple(AppTab.Scenes, tr(R.string.scenes), TvIcons.film), Triple(AppTab.Performers, tr(R.string.performers), TvIcons.person3), Triple(AppTab.Studios, tr(R.string.studios), TvIcons.building),
+        Triple(AppTab.Tags, tr(R.string.tags), TvIcons.tag), Triple(AppTab.Groups, tr(R.string.groups), TvIcons.stack), Triple(AppTab.Galleries, tr(R.string.galleries), TvIcons.photoStack),
+        Triple(AppTab.Images, tr(R.string.images), TvIcons.photo),
     )
-    TvSettingsPage("Visible Tabs", "Sections you turn off disappear from the sidebar. Home, Search and Settings always stay.", firstFocus = first) {
+    TvSettingsPage(tr(R.string.visible_tabs), tr(R.string.hint_sections_you_turn_off_disappear), firstFocus = first) {
         rows.forEachIndexed { i, (tab, label, icon) ->
             item { TvToggleRow(label, TabManager.isVisible(tab), { TabManager.toggle(tab) }, if (i == 0) Modifier.focusRequester(first) else Modifier, leading = icon) }
         }
@@ -530,22 +532,22 @@ private fun VisibleTabsPage() {
 private fun SubtitlesPage() {
     val first = remember { FocusRequester() }
     val languages = remember { subtitleLanguageOptions() }
-    val languageLabel = languages.firstOrNull { it.first == TabManager.subtitlePreferredLanguage }?.second ?: "Any"
+    val languageLabel = languages.firstOrNull { it.first == TabManager.subtitlePreferredLanguage }?.second ?: tr(R.string.any)
     TvSettingsPage(
-        "Subtitles",
-        "Subtitles start on the preferred language as soon as a scene's tracks are known. The look applies to every player on this TV.",
+        tr(R.string.subtitles),
+        tr(R.string.hint_subtitles_start_on_preferred_language_as),
         detail = { SubtitlePreview() }, firstFocus = first,
     ) {
-        item { TvSectionHeader("Defaults") }
-        item { TvToggleRow("Show subtitles automatically", TabManager.subtitlesAutoEnabled, { TabManager.subtitlesAutoEnabled = it }, Modifier.focusRequester(first)) }
-        item { TvListRow("Preferred language", { TvNav.push(TvLanguagePickerRoute()) }, value = languageLabel) }
-        item { TvSectionHeader("Appearance") }
-        item { TvPickerRow("Size", SubtitleFontSize.entries.map { TvOption(it, it.label) }, TabManager.subtitleFontSize, { TabManager.subtitleFontSize = it }) }
-        item { TvPickerRow("Font", SubtitleFontFamily.entries.map { TvOption(it, it.label) }, TabManager.subtitleFontFamily, { TabManager.subtitleFontFamily = it }) }
-        item { TvPickerRow("Text color", SubtitleTextColorChoice.entries.map { TvOption(it, it.label) }, TabManager.subtitleTextColor, { TabManager.subtitleTextColor = it }) }
-        item { TvToggleRow("Background box", TabManager.subtitleBoxEnabled, { TabManager.subtitleBoxEnabled = it }) }
+        item { TvSectionHeader(tr(R.string.defaults)) }
+        item { TvToggleRow(tr(R.string.action_show_subtitles_automatically), TabManager.subtitlesAutoEnabled, { TabManager.subtitlesAutoEnabled = it }, Modifier.focusRequester(first)) }
+        item { TvListRow(tr(R.string.preferred_language), { TvNav.push(TvLanguagePickerRoute()) }, value = languageLabel) }
+        item { TvSectionHeader(tr(R.string.appearance)) }
+        item { TvPickerRow(tr(R.string.size), SubtitleFontSize.entries.map { TvOption(it, it.label) }, TabManager.subtitleFontSize, { TabManager.subtitleFontSize = it }) }
+        item { TvPickerRow(tr(R.string.font), SubtitleFontFamily.entries.map { TvOption(it, it.label) }, TabManager.subtitleFontFamily, { TabManager.subtitleFontFamily = it }) }
+        item { TvPickerRow(tr(R.string.text_color), SubtitleTextColorChoice.entries.map { TvOption(it, it.label) }, TabManager.subtitleTextColor, { TabManager.subtitleTextColor = it }) }
+        item { TvToggleRow(tr(R.string.background_box), TabManager.subtitleBoxEnabled, { TabManager.subtitleBoxEnabled = it }) }
         item {
-            TvPickerRow("Background color", SubtitleBackgroundChoice.entries.map { TvOption(it, it.label) }, TabManager.subtitleBackgroundColor,
+            TvPickerRow(tr(R.string.background_color), SubtitleBackgroundChoice.entries.map { TvOption(it, it.label) }, TabManager.subtitleBackgroundColor,
                 { TabManager.subtitleBackgroundColor = it }, enabled = TabManager.subtitleBoxEnabled)
         }
     }
@@ -562,7 +564,7 @@ private fun SubtitlePreview() {
         contentAlignment = Alignment.BottomCenter,
     ) {
         Text(
-            "Sample subtitle",
+            tr(R.string.sample_subtitle),
             Modifier.padding(bottom = pt(24)).then(if (box != null) Modifier.clip(RoundedCornerShape(pt(8))).background(box).padding(horizontal = pt(16), vertical = pt(6)) else Modifier),
             style = androidx.compose.ui.text.TextStyle(
                 fontSize = (size * 0.85f).sp, fontFamily = family, fontWeight = FontWeight.SemiBold,
@@ -585,10 +587,10 @@ class TvLanguagePickerRoute : TvRoute {
         val common = setOf("any", "en", "de", "es", "fr", "it", "pt", "nl", "ru", "ja", "zh", "ko")
         val selectedFocus = remember { FocusRequester() }
         BackHandler { TvNav.pop() }
-        TvSettingsPage("Preferred Language", "The language a scene's subtitles start with. \"Any\" takes the first ordinary track in the file.", firstFocus = selectedFocus) {
-            item { TvSectionHeader("Common") }
+        TvSettingsPage(tr(R.string.preferred_language), tr(R.string.hint_language_scenes_subtitles_start_with), firstFocus = selectedFocus) {
+            item { TvSectionHeader(tr(R.string.common)) }
             items(options.filter { it.first in common }, key = { "c.${it.first}" }) { option -> LanguageRow(option, selectedFocus) }
-            item { TvSectionHeader("All Languages") }
+            item { TvSectionHeader(tr(R.string.all_languages)) }
             items(options.filter { it.first !in common }, key = { "a.${it.first}" }) { option -> LanguageRow(option, selectedFocus) }
         }
     }
@@ -609,7 +611,7 @@ class TvLanguagePickerRoute : TvRoute {
 @Composable
 private fun PlayCountPage() {
     val first = remember { FocusRequester() }
-    TvSettingsPage("Count As Played", "How long a scene has to play before it counts as played and its position is saved.", firstFocus = first) {
+    TvSettingsPage(tr(R.string.count_as_played), tr(R.string.hint_how_long_scene_has_to), firstFocus = first) {
         items(TabManager.playCountThresholdOptions) { seconds ->
             val selected = TabManager.playCountPlayerSeconds == seconds
             TvListRow(
@@ -626,13 +628,13 @@ private fun MaintenancePage() {
     val context = LocalContext.current
     val scope = androidx.compose.runtime.rememberCoroutineScope()
     var cleared by remember { mutableStateOf(false) }
-    TvSettingsPage("Maintenance", "Removes the cached artwork for the active server. Images are downloaded again as they appear.", firstFocus = first) {
+    TvSettingsPage(tr(R.string.maintenance), tr(R.string.hint_removes_cached_artwork_for_active), firstFocus = first) {
         item {
             // Never disabled: it is the page's only button. iOS `clearCurrentServerCache()`.
-            TvListRow("Clear Image Cache", {
+            TvListRow(tr(R.string.action_clear_image_cache), {
                 if (ServerConfigManager.activeConfig == null) return@TvListRow
                 scope.launch { cleared = de.letzgo.stashy.data.ServerImageCache.clearActiveServer(context) }
-            }, Modifier.focusRequester(first), value = if (cleared) "Cleared" else null)
+            }, Modifier.focusRequester(first), value = if (cleared) tr(R.string.cleared) else null)
         }
     }
 }
@@ -640,14 +642,14 @@ private fun MaintenancePage() {
 @Composable
 private fun AboutPage() {
     val first = remember { FocusRequester() }
-    TvSettingsPage("About", "Version and build number of this app.", firstFocus = first) {
-        item { TvListRow("App", {}, Modifier.focusRequester(first), value = "stashy for Android TV") }
-        item { TvListRow("Version", {}, value = BuildConfig.VERSION_NAME) }
-        item { TvListRow("Build", {}, value = "${BuildConfig.VERSION_CODE}") }
+    TvSettingsPage(tr(R.string.about), tr(R.string.hint_version_and_build_number_of), firstFocus = first) {
+        item { TvListRow(tr(R.string.app), {}, Modifier.focusRequester(first), value = "stashy for Android TV") }
+        item { TvListRow(tr(R.string.version), {}, value = BuildConfig.VERSION_NAME) }
+        item { TvListRow(tr(R.string.build), {}, value = "${BuildConfig.VERSION_CODE}") }
         if (de.letzgo.stashy.data.AppUpdate.isEnabled) item {
             val context = LocalContext.current
             val scope = androidx.compose.runtime.rememberCoroutineScope()
-            TvListRow("Check for Updates", { scope.launch { de.letzgo.stashy.data.AppUpdate.check(context, manual = true) } })
+            TvListRow(tr(R.string.check_for_updates), { scope.launch { de.letzgo.stashy.data.AppUpdate.check(context, manual = true) } })
         }
     }
 }

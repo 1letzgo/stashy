@@ -33,7 +33,7 @@ extension Tag: MergeableItem {
         MergeUsage.append(&parts, galleryCount, "gallery", plural: "galleries")
         MergeUsage.append(&parts, performerCount, "performer")
         MergeUsage.append(&parts, sceneMarkerCount, "marker")
-        return parts.isEmpty ? "Unused" : parts.joined(separator: " · ")
+        return parts.isEmpty ? tr("unused") : parts.joined(separator: " · ")
     }
 }
 
@@ -47,7 +47,7 @@ extension Studio: MergeableItem {
         MergeUsage.append(&parts, imageCount, "image")
         MergeUsage.append(&parts, galleryCount, "gallery", plural: "galleries")
         MergeUsage.append(&parts, performerCount, "performer")
-        return parts.isEmpty ? "Unused" : parts.joined(separator: " · ")
+        return parts.isEmpty ? tr("unused") : parts.joined(separator: " · ")
     }
 }
 
@@ -360,7 +360,7 @@ struct MergeToolsView<Item: MergeableItem>: View {
             visibleCount = MergeToolsLayout.pageSize
         }
         .sheet(isPresented: $showingDestinationPicker) {
-            MergeDestinationSheet(items: allItems, excludedIds: sources, sectionTitle: "Search \(nounTitle)") { picked in
+            MergeDestinationSheet(items: allItems, excludedIds: sources, sectionTitle: tr("search_arg", nounTitle)) { picked in
                 destination = picked
                 sources.remove(picked.id)
                 showingDestinationPicker = false
@@ -368,45 +368,45 @@ struct MergeToolsView<Item: MergeableItem>: View {
                 showingDestinationPicker = false
             }
         }
-        .alert("Merge \(config.nounPlural)?", isPresented: $showingConfirmation) {
-            Button("Merge", role: .destructive) { merge() }
-            Button("Cancel", role: .cancel) {}
+        .alert(tr("confirm_merge_arg", config.nounPlural), isPresented: $showingConfirmation) {
+            Button(tr("action_merge"), role: .destructive) { merge() }
+            Button(tr("action_cancel"), role: .cancel) {}
         } message: {
             Text(confirmationMessage)
         }
-        .alert("Run all templates?", isPresented: $showingRunAllConfirmation) {
-            Button("Merge all", role: .destructive) { runAllPresets() }
-            Button("Cancel", role: .cancel) {}
+        .alert(tr("confirm_run_all_templates"), isPresented: $showingRunAllConfirmation) {
+            Button(tr("action_merge_all"), role: .destructive) { runAllPresets() }
+            Button(tr("action_cancel"), role: .cancel) {}
         } message: {
             Text(runAllConfirmationMessage)
         }
-        .alert("Save template", isPresented: $showingSavePrompt) {
-            TextField("Name", text: $presetName)
-            Button("Save") { savePreset() }
-            Button("Cancel", role: .cancel) {}
+        .alert(tr("action_save_template"), isPresented: $showingSavePrompt) {
+            TextField(tr("name"), text: $presetName)
+            Button(tr("action_save")) { savePreset() }
+            Button(tr("action_cancel"), role: .cancel) {}
         }
         .alert(
-            "Delete template?",
+            tr("confirm_delete_template"),
             isPresented: Binding(get: { presetToDelete != nil }, set: { if !$0 { presetToDelete = nil } }),
             presenting: presetToDelete
         ) { preset in
-            Button("Delete", role: .destructive) {
+            Button(tr("action_delete"), role: .destructive) {
                 presets.delete(preset)
                 if activePreset?.id == preset.id { activePreset = nil }
             }
-            Button("Cancel", role: .cancel) {}
+            Button(tr("action_cancel"), role: .cancel) {}
         } message: { preset in
-            Text("\"\(preset.name)\" will be removed from this device.")
+            Text(tr("hint_arg_will_be_removed_from", preset.name))
         }
-        .alert("Save template", isPresented: $showingSaveChoice) {
+        .alert(tr("action_save_template"), isPresented: $showingSaveChoice) {
             if let activePreset {
-                Button("Update \"\(activePreset.name)\"") { updateActivePreset() }
+                Button(tr("action_update_arg", activePreset.name)) { updateActivePreset() }
             }
-            Button("Save as new") {
+            Button(tr("action_save_as_new")) {
                 presetName = destination?.name ?? ""
                 showingSavePrompt = true
             }
-            Button("Cancel", role: .cancel) {}
+            Button(tr("action_cancel"), role: .cancel) {}
         }
     }
 
@@ -424,7 +424,7 @@ struct MergeToolsView<Item: MergeableItem>: View {
                 HStack(spacing: DesignTokens.Spacing.sm) {
                     if let destination {
                         VStack(alignment: .leading, spacing: 2) {
-                            Text("Merge into")
+                            Text(tr("action_merge_into"))
                                 .font(.caption)
                                 .foregroundColor(.secondary)
                             Text(destination.name)
@@ -434,7 +434,7 @@ struct MergeToolsView<Item: MergeableItem>: View {
                                 .foregroundColor(.secondary)
                         }
                     } else {
-                        Text("Merge into…")
+                        Text(tr("action_merge_into_menu"))
                             .foregroundColor(.secondary)
                     }
 
@@ -500,7 +500,7 @@ struct MergeToolsView<Item: MergeableItem>: View {
         }
         .buttonStyle(.plain)
         .disabled(runnable == 0 || isMerging)
-        .accessibilityLabel("Run all templates")
+        .accessibilityLabel(tr("action_run_all_templates"))
     }
 
     private var presetPills: some View {
@@ -558,7 +558,7 @@ struct MergeToolsView<Item: MergeableItem>: View {
                 HStack(spacing: DesignTokens.Spacing.xs) {
                     Image(systemName: "magnifyingglass")
                         .foregroundColor(.secondary)
-                    TextField("Search \(config.nounPlural)", text: $searchText)
+                    TextField(tr("search_arg", config.nounPlural), text: $searchText)
                         .textInputAutocapitalization(.never)
                         .disableAutocorrection(true)
                     if !searchText.isEmpty {
@@ -569,7 +569,7 @@ struct MergeToolsView<Item: MergeableItem>: View {
                                 .foregroundColor(.secondary)
                         }
                         .buttonStyle(.plain)
-                        .accessibilityLabel("Clear search")
+                        .accessibilityLabel(tr("action_clear_search"))
                     }
                 }
                 .padding(.horizontal, DesignTokens.Spacing.md)
@@ -580,7 +580,7 @@ struct MergeToolsView<Item: MergeableItem>: View {
                     HStack { Spacer(); ProgressView("Loading..."); Spacer() }
                         .padding(.vertical, DesignTokens.Spacing.lg)
                 } else if filtered.isEmpty {
-                    Text(allItems.isEmpty ? "This server has no \(config.nounPlural) yet." : "No matches")
+                    Text(allItems.isEmpty ? tr("hint_this_server_has_no_arg", config.nounPlural) : tr("empty_matches"))
                         .font(.callout)
                         .foregroundColor(.secondary)
                         .frame(maxWidth: .infinity, alignment: .leading)
@@ -609,7 +609,7 @@ struct MergeToolsView<Item: MergeableItem>: View {
                             .padding(.leading, DesignTokens.Spacing.md)
                         HStack(spacing: DesignTokens.Spacing.xs) {
                             InlineSpinner()
-                            Text("Loading more...")
+                            Text(tr("loading_more"))
                                 .font(.caption)
                                 .foregroundColor(.secondary)
                         }
@@ -667,14 +667,14 @@ struct MergeToolsView<Item: MergeableItem>: View {
                 } label: {
                     HStack(spacing: DesignTokens.Spacing.xs) {
                         if isMerging { InlineSpinner() }
-                        Text(isMerging ? "Merging..." : "Merge \(nounTitle)")
+                        Text(isMerging ? "Merging..." : tr("action_merge_arg", nounTitle))
                     }
                     .frame(maxWidth: .infinity)
                 }
                 .buttonStyle(PrimaryFilledButtonStyle())
                 .disabled(!canMerge)
 
-                secondaryButton("Save", enabled: canSavePreset) {
+                secondaryButton(tr("action_save"), enabled: canSavePreset) {
                     if let activePreset, presets.presets.contains(where: { $0.id == activePreset.id }) {
                         showingSaveChoice = true
                     } else {
@@ -683,7 +683,7 @@ struct MergeToolsView<Item: MergeableItem>: View {
                     }
                 }
 
-                secondaryButton("Clear", enabled: hasSelection && !isMerging) {
+                secondaryButton(tr("action_clear"), enabled: hasSelection && !isMerging) {
                     clearSelection()
                 }
             }
@@ -739,7 +739,7 @@ struct MergeToolsView<Item: MergeableItem>: View {
         // Vor dem Laden ist nichts aufgelöst — dann nur die Gesamtzahl. Danach immer
         // "K of N", auch wenn alle da sind, damit die Pill ihre Form nicht wechselt.
         if allItems.isEmpty { return "\(total) \(noun)" }
-        return "\(total - missing) of \(total) \(noun) on the server"
+        return tr("hint_arg_of_arg_arg_on", total - missing, total, noun)
     }
 
     /// Vorlagen, für die es gerade etwas zu tun gibt: Ziel vorhanden und mindestens
@@ -757,12 +757,12 @@ struct MergeToolsView<Item: MergeableItem>: View {
         let runnable = runnablePresets
         let sourceCount = runnable.reduce(0) { $0 + $1.sources.count }
         let skipped = presets.presets.count - runnable.count
-        var text = "\(runnable.count) of \(presets.presets.count) templates have something to merge: "
-            + "\(sourceCount) \(sourceCount == 1 ? config.noun : config.nounPlural) will be merged into their destinations, one template after another."
+        var text = tr("hint_arg_of_arg_templates_have", runnable.count, presets.presets.count)
+            + tr("hint_arg_arg_will_be_merged", sourceCount, sourceCount == 1 ? config.noun : config.nounPlural)
         if skipped > 0 {
-            text += " \(skipped) \(skipped == 1 ? "template has" : "templates have") nothing to do right now and will be skipped."
+            text += tr("hint_arg_arg_nothing_to_do", skipped, skipped == 1 ? "template has" : "templates have")
         }
-        return text + " This cannot be undone."
+        return text + tr("this_cannot_be_undone")
     }
 
     /// Führt alle Vorlagen nacheinander aus. Nach jeder wird der Index aktualisiert,
@@ -844,7 +844,7 @@ struct MergeToolsView<Item: MergeableItem>: View {
             let shown = missingNames.prefix(3).joined(separator: ", ")
             let rest = missingNames.count - min(3, missingNames.count)
             ToastManager.shared.show(
-                "Not on this server (kept in template): \(shown)\(rest > 0 ? " +\(rest) more" : "")",
+                tr("hint_not_on_this_server_kept", shown, rest > 0 ? " +\(rest) more" : ""),
                 icon: "info.circle",
                 style: .info
             )
@@ -863,7 +863,7 @@ struct MergeToolsView<Item: MergeableItem>: View {
         presets.save(preset)
         activePreset = preset
         HapticManager.light()
-        ToastManager.shared.show("Template saved", icon: "bookmark.fill", style: .success)
+        ToastManager.shared.show(tr("template_saved"), icon: "bookmark.fill", style: .success)
     }
 
     private func updateActivePreset() {
@@ -877,7 +877,7 @@ struct MergeToolsView<Item: MergeableItem>: View {
         )
         self.activePreset = presets.presets.first { $0.id == activePreset.id }
         HapticManager.light()
-        ToastManager.shared.show("Template updated", icon: "bookmark.fill", style: .success)
+        ToastManager.shared.show(tr("template_updated"), icon: "bookmark.fill", style: .success)
     }
 
     // MARK: Helpers
@@ -901,7 +901,7 @@ struct MergeToolsView<Item: MergeableItem>: View {
     private var confirmationMessage: String {
         guard let destination else { return "" }
         let names = selectedSources.map(\.name).joined(separator: ", ")
-        return "\(names) will be merged into \(destination.name) and then deleted. This cannot be undone."
+        return tr("hint_arg_will_be_merged_into", names, destination.name)
     }
 
     private func load() {
@@ -919,7 +919,7 @@ struct MergeToolsView<Item: MergeableItem>: View {
                 AppLog.error("❌ Loading \(config.nounPlural) failed: \(error.localizedDescription)")
                 await MainActor.run {
                     isLoading = false
-                    ToastManager.shared.show("Failed to load \(config.nounPlural)", icon: "exclamationmark.triangle", style: .error)
+                    ToastManager.shared.show(tr("error_load_arg", config.nounPlural), icon: "exclamationmark.triangle", style: .error)
                 }
             }
         }
@@ -952,7 +952,7 @@ struct MergeToolsView<Item: MergeableItem>: View {
                 AppLog.error("❌ \(config.kind) merge failed: \(error.localizedDescription)")
                 await MainActor.run {
                     isMerging = false
-                    ToastManager.shared.show("Merge failed: \(error.localizedDescription)", icon: "exclamationmark.triangle", style: .error)
+                    ToastManager.shared.show(tr("action_merge_failed_arg", error.localizedDescription), icon: "exclamationmark.triangle", style: .error)
                 }
             }
         }
@@ -1015,7 +1015,7 @@ private struct MergeDestinationSheet<Item: MergeableItem>: View {
                 if visibleCount < filtered.count {
                     HStack(spacing: DesignTokens.Spacing.xs) {
                         InlineSpinner()
-                        Text("Loading more...")
+                        Text(tr("loading_more"))
                             .font(.caption)
                             .foregroundColor(.secondary)
                     }
@@ -1025,7 +1025,7 @@ private struct MergeDestinationSheet<Item: MergeableItem>: View {
         }
         .applyAppBackground()
         .scrollContentBackground(.hidden)
-        .stashyModalSheetChrome("Merge into", onBack: onCancel)
+        .stashyModalSheetChrome(tr("action_merge_into"), onBack: onCancel)
         .onChange(of: searchText) { _, _ in
             visibleCount = MergeToolsLayout.pageSize
         }
@@ -1040,7 +1040,7 @@ private struct MergeSearchField: View {
     @Binding var text: String
 
     var body: some View {
-        ToolsSearchField(prompt: "Search…", text: $text)
+        ToolsSearchField(prompt: tr("placeholder_search_2"), text: $text)
     }
 }
 

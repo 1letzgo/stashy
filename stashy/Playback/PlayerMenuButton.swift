@@ -235,7 +235,7 @@ struct PlayerMenuButton: UIViewRepresentable {
     var onWillPresent: () -> Void
     /// Wird beim Schließen gerufen — der Host startet den Auto-Hide-Timer neu.
     var onDidDismiss: () -> Void
-    var accessibilityTitle: String = "More options"
+    var accessibilityTitle: String = tr("more_options")
 
     func makeCoordinator() -> Coordinator { Coordinator(self) }
 
@@ -364,7 +364,7 @@ struct PlayerMenuButton: NSViewRepresentable {
     var items: [PlayerMenuItem]
     var onWillPresent: () -> Void
     var onDidDismiss: () -> Void
-    var accessibilityTitle: String = "More options"
+    var accessibilityTitle: String = tr("more_options")
 
     func makeNSView(context: Context) -> MenuHostView {
         let view = MenuHostView()

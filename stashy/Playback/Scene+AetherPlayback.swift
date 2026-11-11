@@ -51,7 +51,7 @@ extension AetherSceneEngine {
             let language = caption.languageCode.isEmpty || caption.languageCode == "00" ? nil : caption.languageCode
             let name = language.flatMap { Locale.current.localizedString(forIdentifier: $0) }
                 ?? language?.uppercased()
-                ?? "Captions"
+                ?? tr("captions")
             _ = addExternalSubtitleTrack(url: url, name: name, language: language, formatHint: caption.captionType)
         }
     }

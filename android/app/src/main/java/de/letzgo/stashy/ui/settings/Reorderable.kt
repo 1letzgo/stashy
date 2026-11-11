@@ -1,5 +1,7 @@
 package de.letzgo.stashy.ui.settings
 
+import de.letzgo.stashy.R
+import de.letzgo.stashy.tr
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -82,6 +84,6 @@ fun <T> ReorderableColumn(
 /** The ≡ drag handle shown at the trailing edge of movable rows. */
 @Composable
 fun DragHandle(modifier: Modifier) {
-    Icon(SFS.dragHandle, "Reorder", tint = Theme.palette.secondaryText, modifier = modifier.size(24.dp))
+    Icon(SFS.dragHandle, tr(R.string.reorder), tint = Theme.palette.secondaryText, modifier = modifier.size(24.dp))
 }
 

@@ -1,5 +1,7 @@
 package de.letzgo.stashy.data
 
+import de.letzgo.stashy.R
+import de.letzgo.stashy.tr
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
@@ -74,7 +76,7 @@ object AppUpdate {
                 state = if (manual) State.UpToDate else State.Idle
             }
         } catch (e: Exception) {
-            state = if (manual) State.Failed(e.message ?: "Update check failed.") else State.Idle
+            state = if (manual) State.Failed(e.message ?: tr(R.string.error_update_check)) else State.Idle
         }
     }
 
@@ -87,10 +89,10 @@ object AppUpdate {
         val request = Request.Builder().url(BuildConfig.UPDATE_API)
             .header("Accept", "application/vnd.github+json").build()
         Net.client.newCall(request).execute().use { r ->
-            if (!r.isSuccessful) throw Exception("Update server answered HTTP ${r.code}.")
-            val json = Json.parseToJsonElement(r.body?.string().orEmpty()).obj ?: throw Exception("Invalid update information.")
-            val tag = json["tag_name"].stringOrNull ?: throw Exception("Invalid update information.")
-            val parsed = parseTag(tag) ?: throw Exception("Unexpected release tag \"$tag\".")
+            if (!r.isSuccessful) throw Exception(tr(R.string.action_update_server_answered_http_arg, r.code))
+            val json = Json.parseToJsonElement(r.body?.string().orEmpty()).obj ?: throw Exception(tr(R.string.invalid_update_information))
+            val tag = json["tag_name"].stringOrNull ?: throw Exception(tr(R.string.invalid_update_information))
+            val parsed = parseTag(tag) ?: throw Exception(tr(R.string.unexpected_release_tag_arg, tag))
             val asset = json["assets"].arr?.mapNotNull { it.obj }?.firstOrNull { it["name"].stringOrNull == "stashy.apk" }
             return Release(
                 versionCode = parsed.second,
@@ -117,8 +119,8 @@ object AppUpdate {
             val file = File(dir, "stashy.apk")
             withContext(Dispatchers.IO) {
                 Net.client.newCall(Request.Builder().url(downloadUrl).build()).execute().use { r ->
-                    if (!r.isSuccessful) throw Exception("Download failed (HTTP ${r.code}).")
-                    val body = r.body ?: throw Exception("Download failed.")
+                    if (!r.isSuccessful) throw Exception(tr(R.string.action_download_failed_http_arg, r.code))
+                    val body = r.body ?: throw Exception(tr(R.string.error_download))
                     val total = body.contentLength().takeIf { it > 0 }
                     file.outputStream().use { out ->
                         body.byteStream().use { input ->
@@ -141,7 +143,7 @@ object AppUpdate {
                 }
             }
             val pm = context.packageManager
-            val info = pm.getPackageArchiveInfo(file.absolutePath, 0) ?: throw Exception("The downloaded file is not a valid app package.")
+            val info = pm.getPackageArchiveInfo(file.absolutePath, 0) ?: throw Exception(tr(R.string.hint_downloaded_file_is_not_valid))
             val newCode = if (Build.VERSION.SDK_INT >= 28) info.longVersionCode else @Suppress("DEPRECATION") info.versionCode.toLong()
             val ownCode = currentVersionCode(context)
             if (info.packageName != context.packageName || newCode <= ownCode) {
@@ -151,7 +153,7 @@ object AppUpdate {
                 state = State.ReadyToInstall(file, info.versionName, newCode)
             }
         } catch (e: Exception) {
-            state = State.Failed(e.message ?: "Download failed.")
+            state = State.Failed(e.message ?: tr(R.string.error_download))
         }
     }
 

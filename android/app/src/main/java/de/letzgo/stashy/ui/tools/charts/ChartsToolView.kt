@@ -1,5 +1,7 @@
 package de.letzgo.stashy.ui.tools.charts
 
+import de.letzgo.stashy.R
+import de.letzgo.stashy.tr
 import de.letzgo.stashy.ui.bottomBarContentPadding
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.foundation.layout.heightIn
@@ -123,7 +125,7 @@ fun ChartsToolView() {
         ToolsBreadcrumbChrome(
             crumb = {
                 ToolsCrumbPickerMenu(
-                    title = "Charts list",
+                    title = tr(R.string.charts_list),
                     options = ChartsSection.entries.map { ToolsRowMenuOption(it, it.title, it.icon) },
                     selection = section,
                     label = section.title,
@@ -156,7 +158,7 @@ private fun <M : TopListsMetric> TopListsMetricMenu(state: TopListsSectionState<
     val selection = state.metric
     ToolsRowMenu(
         icon = metricIcon(selection),
-        accessibilityLabel = "Rank by, ${selection.label}",
+        accessibilityLabel = tr(R.string.rank_by_arg, selection.label),
         secondaryIcon = SF.arrowDown,
     ) { dismiss ->
         state.metrics.forEach { metric ->
@@ -187,43 +189,43 @@ private fun metricIcon(metric: TopListsMetric): ImageVector = when (metric.sortF
 /** iOS: `TopScenesToolsView`. */
 @Composable
 private fun TopScenesList(vm: TopListsViewModel) = TopListSection(
-    vm, vm.scenes, "Loading top scenes...", "No scenes yet.", Scene::id,
+    vm, vm.scenes, tr(R.string.loading_top_scenes), tr(R.string.empty_scenes_yet), Scene::id,
     onTap = { Nav.push(SceneDetailScreen(it.id, it)) },
 ) { index, scene, metric ->
     LeaderboardCard(
-        title = scene.title ?: "Untitled", place = index + 1, thumbWidth = 128.dp, thumbAspectRatio = 16f / 9f,
+        title = scene.title ?: tr(R.string.untitled), place = index + 1, thumbWidth = 128.dp, thumbAspectRatio = 16f / 9f,
         titleMaxLines = 1,
         thumbnail = { ThumbImage(scene.thumbnailURL, SF.film) },
     ) {
-        StatColumn("Views", TopListsLogic.formatCount(scene.playCount ?: 0), metric == TopListsSceneMetric.Views)
-        StatColumn("O-Count", TopListsLogic.formatCount(scene.oCounter ?: 0), metric == TopListsSceneMetric.OCount)
-        StatColumn("Watch", TopListsLogic.formatDuration(scene.playDuration ?: 0.0), metric == TopListsSceneMetric.WatchTime)
-        StatColumn("Rating", TopListsLogic.formatRating(scene.rating100), metric == TopListsSceneMetric.Rating)
+        StatColumn(tr(R.string.play_count), TopListsLogic.formatCount(scene.playCount ?: 0), metric == TopListsSceneMetric.Views)
+        StatColumn(tr(R.string.o_count), TopListsLogic.formatCount(scene.oCounter ?: 0), metric == TopListsSceneMetric.OCount)
+        StatColumn(tr(R.string.watch), TopListsLogic.formatDuration(scene.playDuration ?: 0.0), metric == TopListsSceneMetric.WatchTime)
+        StatColumn(tr(R.string.rating), TopListsLogic.formatRating(scene.rating100), metric == TopListsSceneMetric.Rating)
     }
 }
 
 /** iOS: `TopPerformersToolsView`. */
 @Composable
 private fun TopPerformersList(vm: TopListsViewModel) = TopListSection(
-    vm, vm.performers, "Loading top performers...", "No performers yet.", Performer::id,
+    vm, vm.performers, tr(R.string.loading_top_performers), tr(R.string.empty_performers_yet), Performer::id,
     onTap = { Nav.push(PerformerDetailScreen(it.id, it)) },
 ) { index, performer, metric ->
     LeaderboardCard(
         title = performer.name, place = index + 1, thumbWidth = 68.dp, thumbAspectRatio = null,
         thumbnail = { ThumbImage(performer.imageURL, SF.personFill, Alignment.TopCenter) },
     ) {
-        StatColumn("O-Count", TopListsLogic.formatCount(performer.oCounter ?: 0), metric == TopListsPerformerMetric.OCount)
-        StatColumn("Scenes", TopListsLogic.formatCount(performer.sceneCount ?: 0), metric == TopListsPerformerMetric.Scenes)
-        StatColumn("Rating", TopListsLogic.formatRating(performer.rating100), metric == TopListsPerformerMetric.Rating)
-        StatColumn("Images", TopListsLogic.formatCount(performer.imageCount ?: 0), metric == TopListsPerformerMetric.Images)
-        StatColumn("Galleries", TopListsLogic.formatCount(performer.galleryCount ?: 0), metric == TopListsPerformerMetric.Galleries)
+        StatColumn(tr(R.string.o_count), TopListsLogic.formatCount(performer.oCounter ?: 0), metric == TopListsPerformerMetric.OCount)
+        StatColumn(tr(R.string.scenes), TopListsLogic.formatCount(performer.sceneCount ?: 0), metric == TopListsPerformerMetric.Scenes)
+        StatColumn(tr(R.string.rating), TopListsLogic.formatRating(performer.rating100), metric == TopListsPerformerMetric.Rating)
+        StatColumn(tr(R.string.images), TopListsLogic.formatCount(performer.imageCount ?: 0), metric == TopListsPerformerMetric.Images)
+        StatColumn(tr(R.string.galleries), TopListsLogic.formatCount(performer.galleryCount ?: 0), metric == TopListsPerformerMetric.Galleries)
     }
 }
 
 /** iOS: `TopStudiosToolsView`. */
 @Composable
 private fun TopStudiosList(vm: TopListsViewModel) = TopListSection(
-    vm, vm.studios, "Loading top studios...", "No studios yet.", Studio::id,
+    vm, vm.studios, tr(R.string.loading_top_studios), tr(R.string.empty_studios_yet), Studio::id,
     onTap = { Nav.push(StudioDetailScreen(it.id, it)) },
 ) { index, studio, metric ->
     LeaderboardCard(
@@ -238,10 +240,10 @@ private fun TopStudiosList(vm: TopListsViewModel) = TopListSection(
             }
         },
     ) {
-        StatColumn("Scenes", TopListsLogic.formatCount(studio.sceneCount ?: 0), metric == TopListsStudioMetric.Scenes)
-        StatColumn("Galleries", TopListsLogic.formatCount(studio.galleryCount ?: 0), metric == TopListsStudioMetric.Galleries)
-        StatColumn("Rating", TopListsLogic.formatRating(studio.rating100), metric == TopListsStudioMetric.Rating)
-        StatColumn("Images", TopListsLogic.formatCount(studio.imageCount ?: 0), metric == TopListsStudioMetric.Images)
+        StatColumn(tr(R.string.scenes), TopListsLogic.formatCount(studio.sceneCount ?: 0), metric == TopListsStudioMetric.Scenes)
+        StatColumn(tr(R.string.galleries), TopListsLogic.formatCount(studio.galleryCount ?: 0), metric == TopListsStudioMetric.Galleries)
+        StatColumn(tr(R.string.rating), TopListsLogic.formatRating(studio.rating100), metric == TopListsStudioMetric.Rating)
+        StatColumn(tr(R.string.images), TopListsLogic.formatCount(studio.imageCount ?: 0), metric == TopListsStudioMetric.Images)
     }
 }
 
@@ -251,17 +253,17 @@ private fun TopStudiosList(vm: TopListsViewModel) = TopListSection(
  */
 @Composable
 private fun TopTagsList(vm: TopListsViewModel) = TopListSection(
-    vm, vm.tags, "Loading top tags...", "No tags yet.", Tag::id,
+    vm, vm.tags, tr(R.string.loading_top_tags), tr(R.string.empty_tags_yet), Tag::id,
     onTap = { Nav.push(TagDetailScreen(it.id, it)) },
 ) { index, tag, metric ->
     LeaderboardCard(
         title = tag.name, place = index + 1, thumbWidth = 128.dp, thumbAspectRatio = 16f / 9f,
         thumbnail = { ThumbImage(tag.imageURL, SF.tag) },
     ) {
-        StatColumn("Scenes", TopListsLogic.formatCount(tag.sceneCount ?: 0), metric == TopListsTagMetric.Scenes)
-        StatColumn("Images", TopListsLogic.formatCount(tag.imageCount ?: 0), metric == TopListsTagMetric.Images)
-        StatColumn("Galleries", TopListsLogic.formatCount(tag.galleryCount ?: 0), metric == TopListsTagMetric.Galleries)
-        StatColumn("Markers", TopListsLogic.formatCount(tag.sceneMarkerCount ?: 0), metric == TopListsTagMetric.Markers)
+        StatColumn(tr(R.string.scenes), TopListsLogic.formatCount(tag.sceneCount ?: 0), metric == TopListsTagMetric.Scenes)
+        StatColumn(tr(R.string.images), TopListsLogic.formatCount(tag.imageCount ?: 0), metric == TopListsTagMetric.Images)
+        StatColumn(tr(R.string.galleries), TopListsLogic.formatCount(tag.galleryCount ?: 0), metric == TopListsTagMetric.Galleries)
+        StatColumn(tr(R.string.markers), TopListsLogic.formatCount(tag.sceneMarkerCount ?: 0), metric == TopListsTagMetric.Markers)
     }
 }
 
@@ -287,7 +289,7 @@ private fun <M : TopListsMetric, T> TopListSection(
         if (serverId != null) state.reload()
     }
     when {
-        serverId == null -> NoServerPlaceholder(SF.chartBar, "Connect to a Stash server to see your charts.")
+        serverId == null -> NoServerPlaceholder(SF.chartBar, tr(R.string.hint_connect_to_stash_server_to_see))
         state.isLoading && !state.hasContent -> ChartsLoadingView(loadingMessage)
         state.didFail && !state.hasContent -> ChartsConnectionError { vm.scope.launch { state.reload() } }
         else -> {
@@ -481,12 +483,12 @@ private fun ChartsConnectionError(onRetry: () -> Unit) {
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         Icon(SF.server, null, tint = p.secondaryText, modifier = Modifier.size(56.dp))
-        Text("Server not reachable", style = IosTypography.title3, color = p.text, textAlign = TextAlign.Center)
+        Text(tr(R.string.server_not_reachable), style = IosTypography.title3, color = p.text, textAlign = TextAlign.Center)
         TextButton(
             onClick = onRetry,
             modifier = Modifier.background(Appearance.tint, RoundedCornerShape(Tokens.Radius.button)),
         ) {
-            Text("Retry Connection", style = IosTypography.headline, color = Color.White)
+            Text(tr(R.string.action_retry_connection), style = IosTypography.headline, color = Color.White)
         }
     }
 }

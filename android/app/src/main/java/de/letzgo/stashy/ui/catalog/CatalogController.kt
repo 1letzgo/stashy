@@ -1,5 +1,7 @@
 package de.letzgo.stashy.ui.catalog
 
+import de.letzgo.stashy.R
+import de.letzgo.stashy.tr
 import android.widget.Toast
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -453,7 +455,7 @@ class CatalogController<T>(
             } catch (e: kotlinx.coroutines.CancellationException) {
                 throw e
             } catch (e: Exception) {
-                showToast("Save failed: ${e.message}")
+                showToast(tr(R.string.action_save_failed_arg, e.message))
             }
         }
     }
@@ -477,7 +479,7 @@ class CatalogController<T>(
                 } catch (e: kotlinx.coroutines.CancellationException) {
                     throw e
                 } catch (e: Exception) {
-                    showToast("Rename failed: ${e.message}")
+                    showToast(tr(R.string.action_rename_failed_arg, e.message))
                 }
             }
             return
@@ -502,7 +504,7 @@ class CatalogController<T>(
                 } catch (e: kotlinx.coroutines.CancellationException) {
                     throw e
                 } catch (e: Exception) {
-                    showToast("Delete failed: ${e.message}")
+                    showToast(tr(R.string.action_delete_failed_arg, e.message))
                 }
             }
             return
@@ -516,12 +518,12 @@ class CatalogController<T>(
     /** iOS `delete…ConfirmationText`. */
     val deleteConfirmationText: String get() {
         ListLivePresetTag.parseServerId(presetRow)?.let { sid ->
-            SavedFiltersStore.byId[sid]?.let { return "Remove “${it.name}” from Stash? Other devices will lose this saved filter." }
+            SavedFiltersStore.byId[sid]?.let { return tr(R.string.hint_remove_arg_from_stash_other, it.name) }
         }
         ListLivePresetTag.parseLocalId(presetRow)?.let { lid ->
-            localPresets.firstOrNull { it.id == lid }?.let { return "Remove “${it.name}” from this device? This cannot be undone." }
+            localPresets.firstOrNull { it.id == lid }?.let { return tr(R.string.hint_remove_arg_from_this_device, it.name) }
         }
-        return "Remove this filter? This cannot be undone."
+        return tr(R.string.hint_remove_this_filter_this_cannot)
     }
 
     /** Current name for the rename dialog. */

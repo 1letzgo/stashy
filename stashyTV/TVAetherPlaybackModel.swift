@@ -200,7 +200,7 @@ final class TVAetherPlaybackModel: ObservableObject {
         let generation = nowPlayingGeneration
 
         var info: [String: Any] = [:]
-        info[MPMediaItemPropertyTitle] = title ?? "Untitled Scene"
+        info[MPMediaItemPropertyTitle] = title ?? tr("untitled_scene")
         if let subtitle, !subtitle.isEmpty {
             info[MPMediaItemPropertyArtist] = subtitle
         }

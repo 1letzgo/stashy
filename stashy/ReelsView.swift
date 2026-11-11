@@ -1043,14 +1043,14 @@ struct ReelsViewBody: View {
         let sel = reelsActiveSheetPresetIdForRead
         if let sid = SceneLivePresetTag.parseServerId(sel),
            let f = viewModel.savedFilters[sid] {
-            return "Remove “\(f.name)” from Stash? Other devices will lose this saved filter."
+            return tr("hint_remove_arg_from_stash_other", f.name)
         }
         if let ls = SceneLivePresetTag.parseLocalUUIDString(sel),
            let uuid = UUID(uuidString: ls),
            let p = reelsSceneLivePresets.first(where: { $0.id == uuid }) {
-            return "Remove “\(p.name)” from this device? This cannot be undone."
+            return tr("hint_remove_arg_from_this_device", p.name)
         }
-        return "Remove this filter? This cannot be undone."
+        return tr("hint_remove_this_filter_this_cannot")
     }
 
     private func reelsSetPrimarySceneishSavedFilter(_ f: StashDBViewModel.SavedFilter?) {
@@ -1174,7 +1174,7 @@ struct ReelsViewBody: View {
         let sel = reelsActiveSheetPresetIdForRead
         let liveDict = reelsActivePresetLiveFragment()
         if let sid = SceneLivePresetTag.parseServerId(sel) {
-            let currentName = viewModel.savedFilters[sid]?.name ?? "Filter"
+            let currentName = viewModel.savedFilters[sid]?.name ?? tr("filter")
             viewModel.saveSceneSavedFilter(
                 existingId: sid,
                 name: currentName,
@@ -1901,10 +1901,10 @@ struct ReelsViewBody: View {
             let success = await AITagSuggestionManager.shared.write(tags: remaining, to: target)
             if success {
                 HapticManager.success()
-                ToastManager.shared.show("Removed #\(tag.name)")
+                ToastManager.shared.show(tr("removed_arg", tag.name))
             } else {
                 HapticManager.error()
-                ToastManager.shared.show("Could not remove tag", icon: "exclamationmark.triangle.fill", style: .error)
+                ToastManager.shared.show(tr("error_remove_tag"), icon: "exclamationmark.triangle.fill", style: .error)
             }
         }
     }
@@ -1925,7 +1925,7 @@ struct ReelsViewBody: View {
         let isClip: Bool = { if case .clip = item { return true }; return false }()
         guard knownPerformers(of: item) != nil, isClip || item.sceneID != nil else {
             HapticManager.error()
-            ToastManager.shared.show("Could not load performers", icon: "exclamationmark.triangle.fill", style: .error)
+            ToastManager.shared.show(tr("error_load_performers"), icon: "exclamationmark.triangle.fill", style: .error)
             return
         }
         performerPickerItem = item
@@ -1942,7 +1942,7 @@ struct ReelsViewBody: View {
             patchScenePerformers(sceneId: sceneId, performers: performers)
         }
         HapticManager.success()
-        ToastManager.shared.show("Performers updated")
+        ToastManager.shared.show(tr("performers_updated"))
     }
 
     /// Clips are images: their editor writes `imageUpdate` instead of the scene mutation.
@@ -2540,7 +2540,7 @@ struct ReelsViewBody: View {
                         if let revertIndex = viewModel.previews.firstIndex(where: { $0.id == sceneId }) {
                             viewModel.previews[revertIndex] = viewModel.previews[revertIndex].withRating(originalRating)
                         }
-                        ToastManager.shared.show("Failed to save rating", icon: "exclamationmark.triangle", style: .error)
+                        ToastManager.shared.show(tr("error_save_rating"), icon: "exclamationmark.triangle", style: .error)
                     }
                 }
             }
@@ -2581,7 +2581,7 @@ struct ReelsViewBody: View {
                                     .withScene(markerScene.withRating(entry.rating))
                             }
                         }
-                        ToastManager.shared.show("Failed to save rating", icon: "exclamationmark.triangle", style: .error)
+                        ToastManager.shared.show(tr("error_save_rating"), icon: "exclamationmark.triangle", style: .error)
                     }
                 }
             }
@@ -2597,7 +2597,7 @@ struct ReelsViewBody: View {
                         if let revertIndex = viewModel.clips.firstIndex(where: { $0.id == imageId }) {
                             viewModel.clips[revertIndex] = viewModel.clips[revertIndex].withRating(originalRating)
                         }
-                        ToastManager.shared.show("Failed to save rating", icon: "exclamationmark.triangle", style: .error)
+                        ToastManager.shared.show(tr("error_save_rating"), icon: "exclamationmark.triangle", style: .error)
                     }
                 }
             }
@@ -2626,7 +2626,7 @@ struct ReelsViewBody: View {
                            viewModel.previews[idx].oCounter == newCount {
                             viewModel.previews[idx] = viewModel.previews[idx].withOCounter(originalCount)
                         }
-                        ToastManager.shared.show("Counter update failed", icon: "exclamationmark.triangle", style: .error)
+                        ToastManager.shared.show(tr("error_counter_update"), icon: "exclamationmark.triangle", style: .error)
                     }
                 }
             }
@@ -2682,7 +2682,7 @@ struct ReelsViewBody: View {
                                     .withScene(markerScene.withOCounter(entry.count))
                             }
                         }
-                        ToastManager.shared.show("Counter update failed", icon: "exclamationmark.triangle", style: .error)
+                        ToastManager.shared.show(tr("error_counter_update"), icon: "exclamationmark.triangle", style: .error)
                     }
                 }
             }
@@ -2703,7 +2703,7 @@ struct ReelsViewBody: View {
                            viewModel.clips[revertIndex].o_counter == newCount {
                             viewModel.clips[revertIndex] = viewModel.clips[revertIndex].withOCounter(originalCount)
                         }
-                        ToastManager.shared.show("Counter update failed", icon: "exclamationmark.triangle", style: .error)
+                        ToastManager.shared.show(tr("error_counter_update"), icon: "exclamationmark.triangle", style: .error)
                     }
                 }
             }
@@ -2757,7 +2757,7 @@ struct ReelsViewBody: View {
                                     .withScene(markerScene.withPlayCount(entry.count))
                             }
                         }
-                        ToastManager.shared.show("View count update failed", icon: "exclamationmark.triangle", style: .error)
+                        ToastManager.shared.show(tr("error_view_count_update"), icon: "exclamationmark.triangle", style: .error)
                     }
                 }
             }
@@ -3070,30 +3070,30 @@ struct ReelsViewBody: View {
 
     private func applyPremiumClipAlerts<V: View>(_ content: V) -> some View {
         content
-            .alert("Save as new", isPresented: $reelsClipImageFilters.showSaveAsCatalogPresetAlert) {
-                TextField("Name", text: $reelsClipImageFilters.catalogPresetNameInput)
-                Button("Save") {
+            .alert(tr("action_save_as_new"), isPresented: $reelsClipImageFilters.showSaveAsCatalogPresetAlert) {
+                TextField(tr("name"), text: $reelsClipImageFilters.catalogPresetNameInput)
+                Button(tr("action_save")) {
                     reelsClipImageFilters.savePresetAs(name: reelsClipImageFilters.catalogPresetNameInput, viewModel: viewModel)
                 }
-                Button("Cancel", role: .cancel) {}
+                Button(tr("action_cancel"), role: .cancel) {}
             } message: {
-                Text("Saves sort, filters and live criteria as a new image filter on your Stash server.")
+                Text(tr("hint_saves_sort_filters_and_live"))
             }
-            .alert("Rename Filter", isPresented: $reelsClipImageFilters.showRenameCatalogPresetAlert) {
-                TextField("Name", text: $reelsClipImageFilters.renameCatalogPresetInput)
-                Button("Save") {
+            .alert(tr("action_rename_filter"), isPresented: $reelsClipImageFilters.showRenameCatalogPresetAlert) {
+                TextField(tr("name"), text: $reelsClipImageFilters.renameCatalogPresetInput)
+                Button(tr("action_save")) {
                     reelsClipImageFilters.renamePreset(to: reelsClipImageFilters.renameCatalogPresetInput, viewModel: viewModel)
                 }
-                Button("Cancel", role: .cancel) {}
+                Button(tr("action_cancel"), role: .cancel) {}
             } message: {
-                Text("Renames the selected Stash saved filter or on-device filter.")
+                Text(tr("hint_renames_selected_stash_saved_filter"))
             }
-            .alert("Delete Filter", isPresented: $reelsClipImageFilters.showDeleteCatalogPresetAlert) {
-                Button("Delete", role: .destructive) {
+            .alert(tr("action_delete_filter"), isPresented: $reelsClipImageFilters.showDeleteCatalogPresetAlert) {
+                Button(tr("action_delete"), role: .destructive) {
                     reelsClipImageFilters.deletePreset(viewModel: viewModel)
                     refetchReelsClipsFromModel(viewModel)
                 }
-                Button("Cancel", role: .cancel) {}
+                Button(tr("action_cancel"), role: .cancel) {}
             } message: {
                 Text(reelsClipImageFilters.deletePresetConfirmationText(viewModel: viewModel))
             }
@@ -3101,31 +3101,31 @@ struct ReelsViewBody: View {
 
     private func applyPremiumSceneAlerts<V: View>(_ content: V) -> some View {
         content
-            .alert("Save as new", isPresented: $showReelsSceneSaveAsAlert) {
-                TextField("Name", text: $reelsScenePresetNameInput)
-                Button("Save") { reelsSaveSceneLivePresetAs(name: reelsScenePresetNameInput) }
-                Button("Cancel", role: .cancel) {}
+            .alert(tr("action_save_as_new"), isPresented: $showReelsSceneSaveAsAlert) {
+                TextField(tr("name"), text: $reelsScenePresetNameInput)
+                Button(tr("action_save")) { reelsSaveSceneLivePresetAs(name: reelsScenePresetNameInput) }
+                Button(tr("action_cancel"), role: .cancel) {}
             } message: {
                 Text(reelsMode == .markers
-                     ? "Creates a new marker filter on your Stash server."
-                     : "Creates a new scene filter on your Stash server.")
+                     ? tr("hint_creates_new_marker_filter_on")
+                     : tr("hint_creates_new_scene_filter_on"))
             }
-            .alert("Rename Filter", isPresented: $showReelsSceneRenameAlert) {
-                TextField("Name", text: $reelsScenePresetNameInput)
-                Button("Save") { reelsRenameSceneLivePreset(to: reelsScenePresetNameInput) }
-                Button("Cancel", role: .cancel) {}
+            .alert(tr("action_rename_filter"), isPresented: $showReelsSceneRenameAlert) {
+                TextField(tr("name"), text: $reelsScenePresetNameInput)
+                Button(tr("action_save")) { reelsRenameSceneLivePreset(to: reelsScenePresetNameInput) }
+                Button(tr("action_cancel"), role: .cancel) {}
             } message: {
-                Text("Renames the selected Stash saved filter or on-device filter.")
+                Text(tr("hint_renames_selected_stash_saved_filter"))
             }
-            .alert("Delete Filter", isPresented: $showReelsSceneDeleteAlert) {
-                Button("Delete", role: .destructive) { reelsDeleteSceneLivePreset() }
-                Button("Cancel", role: .cancel) {}
+            .alert(tr("action_delete_filter"), isPresented: $showReelsSceneDeleteAlert) {
+                Button(tr("action_delete"), role: .destructive) { reelsDeleteSceneLivePreset() }
+                Button(tr("action_cancel"), role: .cancel) {}
             } message: {
                 Text(reelsSceneDeletePresetConfirmationText)
             }
             .alert(reelsDeleteConfirmationTitle, isPresented: $showDeleteConfirmation, presenting: reelsItemToDelete) { item in
-                Button("Delete", role: .destructive) { reelsDeleteItem(item) }
-                Button("Cancel", role: .cancel) { reelsItemToDelete = nil }
+                Button(tr("action_delete"), role: .destructive) { reelsDeleteItem(item) }
+                Button(tr("action_cancel"), role: .cancel) { reelsItemToDelete = nil }
             } message: { item in
                 Text(reelsDeleteConfirmationMessage(for: item))
             }
@@ -3134,16 +3134,16 @@ struct ReelsViewBody: View {
     // MARK: - Overlay delete button
 
     private var reelsDeleteConfirmationTitle: String {
-        if case .clip = reelsItemToDelete { return "Delete image?" }
-        return "Delete scene?"
+        if case .clip = reelsItemToDelete { return tr("confirm_delete_image") }
+        return tr("confirm_delete_scene")
     }
 
     private func reelsDeleteConfirmationMessage(for item: ReelItemData) -> String {
         switch item {
         case .clip:
-            return "The image is removed from the server. This cannot be undone."
+            return tr("hint_image_is_removed_from_server")
         case .scene, .preview:
-            return "The scene and its files are removed from the server. This cannot be undone."
+            return tr("hint_scene_and_its_files_are")
         case .marker:
             return ""
         }
@@ -3181,7 +3181,7 @@ struct ReelsViewBody: View {
             DispatchQueue.main.async {
                 guard success else {
                     self.currentVisibleSceneId = item.id
-                    ToastManager.shared.show("Failed to delete \(label)", icon: "exclamationmark.triangle", style: .error)
+                    ToastManager.shared.show(tr("error_delete_arg_2", label), icon: "exclamationmark.triangle", style: .error)
                     return
                 }
                 ToastManager.shared.show("\(label.capitalized) deleted", icon: "trash", style: .success)
@@ -3365,7 +3365,7 @@ struct ReelsViewBody: View {
                 // No engine handed over: the row owns it. The marker gets its still from the server.
                 AddMarkerSheet(
                     sceneId: draft.scene.id,
-                    sceneTitle: draft.scene.displayTitle ?? "Unknown Title",
+                    sceneTitle: draft.scene.displayTitle ?? tr("unknown_title"),
                     sceneTagIds: Set((draft.scene.tags ?? []).map(\.id)),
                     seconds: draft.seconds,
                     videoURL: draft.scene.aetherVideoURL,
@@ -3502,7 +3502,7 @@ struct ReelsViewBody: View {
                         applyPerformerFilter(performer.toScenePerformer())
                     }
                 } else {
-                    StandardLoadingView(message: "Loading feeds...")
+                    StandardLoadingView(message: tr("loading_feeds"))
                 }
             } else if showsBlockingFeedLoad {
                 loadingStateView
@@ -4391,7 +4391,7 @@ struct ReelsViewBody: View {
 
     @ViewBuilder
     private var loadingStateView: some View {
-        StandardLoadingView(message: "Loading feeds...")
+        StandardLoadingView(message: tr("loading_feeds"))
     }
 
     @ViewBuilder
@@ -4399,7 +4399,7 @@ struct ReelsViewBody: View {
         SharedEmptyStateView(
             icon: emptyStateIcon,
             title: emptyStateTitle,
-            buttonText: "Reload",
+            buttonText: tr("action_reload"),
             onRetry: retryCurrentFeedFetch
         )
         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -4417,11 +4417,11 @@ struct ReelsViewBody: View {
 
     private var emptyStateTitle: String {
         switch reelsMode {
-        case .scenes: return "No scenes found"
-        case .markers: return "No markers found"
-        case .clips: return "No clips found"
-        case .previews: return "No previews found"
-        case .pics: return "No images found"
+        case .scenes: return tr("empty_scenes_found")
+        case .markers: return tr("empty_markers_found")
+        case .clips: return tr("empty_clips_found")
+        case .previews: return tr("empty_previews_found")
+        case .pics: return tr("empty_images_found")
         }
     }
 
@@ -4962,7 +4962,7 @@ struct ReelsViewBody: View {
         let items = reelsModeItems
         let current = items.first { $0.id == reelsModeSelectionID }
         Menu {
-            Picker("Feed", selection: Binding(
+            Picker(tr("feed"), selection: Binding(
                 get: { reelsModeSelectionID },
                 set: { selectReelsDockEntry($0) }
             )) {
@@ -4994,7 +4994,7 @@ struct ReelsViewBody: View {
         .stashyNeutralMenuItems()
         .fixedSize()
         .accessibilityLabel("Feed, \(current?.title ?? reelsMode.rawValue)")
-        .accessibilityHint("Chooses which feed mode to show")
+        .accessibilityHint(tr("hint_chooses_which_feed_mode_to"))
     }
 
     private static let verticalsDockID = "Verticals"
@@ -5156,7 +5156,7 @@ struct ReelsViewBody: View {
                 .lineLimit(1)
         }
         .buttonStyle(.plain)
-        .accessibilityLabel("Filter by \(performer.name)")
+        .accessibilityLabel(tr("action_filter_by_arg", performer.name))
     }
 
     /// Overlapping avatars for every performer (same stacking as the Pics header).
@@ -5246,7 +5246,7 @@ struct ReelsViewBody: View {
             }
             .buttonStyle(.plain)
             .disabled(currentItem == nil)
-            .accessibilityLabel("O-Counter")
+            .accessibilityLabel(tr("o_count"))
             .oCounterRemovalMenu(
                 count: oCounter,
                 onRemoveOne: {
@@ -5268,7 +5268,7 @@ struct ReelsViewBody: View {
                             handleRatingChange(item: item, newRating: 0)
                         } label: {
                             HStack {
-                                Text("Clear Rating")
+                                Text(tr("action_clear_rating"))
                                 if stars == 0 { Image(systemName: "checkmark") }
                             }
                         }
@@ -5306,7 +5306,7 @@ struct ReelsViewBody: View {
                     .modifier(StashyChromePillStyle(height: StashyExpandingDock.stackedButtonSize, width: StashyExpandingDock.stackedButtonSize, hashtagColors: true))
                 }
             }
-            .accessibilityLabel("Rating")
+            .accessibilityLabel(tr("rating"))
 
             // Optional (Settings › Feeds): a marker at the current position of a whole scene.
             if tabManager.feedsAddMarkerButton, reelsMode == .scenes,
@@ -5322,7 +5322,7 @@ struct ReelsViewBody: View {
                         .modifier(StashyChromePillStyle(height: StashyExpandingDock.stackedButtonSize, width: StashyExpandingDock.stackedButtonSize, hashtagColors: true))
                 }
                 .buttonStyle(.plain)
-                .accessibilityLabel("Add Marker")
+                .accessibilityLabel(tr("action_add_marker"))
             }
         }
         .fixedSize()
@@ -5395,7 +5395,7 @@ struct ReelsViewBody: View {
                             ChromePillIconButton(
                                 systemImage: currentItemIsPlaying ? "pause.fill" : "play.fill",
                                 enabled: true,
-                                accessibilityLabel: currentItemIsPlaying ? "Pause" : "Play"
+                                accessibilityLabel: currentItemIsPlaying ? tr("action_pause") : tr("action_play")
                             ) {
                                 currentItemIsPlaying.toggle()
                             }
@@ -5432,7 +5432,7 @@ struct ReelsViewBody: View {
                                         .stashyGlass(shape: Capsule())
                                 }
                                 .buttonStyle(.plain)
-                                .accessibilityLabel("Add tags")
+                                .accessibilityLabel(tr("action_add_tags"))
                             }
                             ScrollView(.horizontal, showsIndicators: false) {
                                 HStack(spacing: 6) {
@@ -5461,7 +5461,7 @@ struct ReelsViewBody: View {
                                                 Button(role: .destructive) {
                                                     removeTag(tag, from: target)
                                                 } label: {
-                                                    Label("Remove tag", systemImage: "trash")
+                                                    Label(tr("action_remove_tag"), systemImage: "trash")
                                                 }
                                             }
                                         }
@@ -5556,7 +5556,7 @@ struct ReelsViewBody: View {
                 applyReelsQuickFilterSelection("")
             } label: {
                 HStack {
-                    Text("No Filter")
+                    Text(tr("empty_filter"))
                     if selection.isEmpty && filtersModel.selectedFilter == nil {
                         Image(systemName: "checkmark")
                     }
@@ -5564,7 +5564,7 @@ struct ReelsViewBody: View {
             }
 
             if !serverFilters.isEmpty {
-                Section("Saved Filters") {
+                Section(tr("saved_filters")) {
                     ForEach(serverFilters) { filter in
                         Button {
                             applyReelsQuickFilterSelection(ListLivePresetTag.serverRow(filter.id))
@@ -5582,7 +5582,7 @@ struct ReelsViewBody: View {
             }
 
             if !filtersModel.localCatalogPresets.isEmpty {
-                Section("Presets") {
+                Section(tr("presets")) {
                     ForEach(filtersModel.localCatalogPresets) { preset in
                         Button {
                             applyReelsQuickFilterSelection(ListLivePresetTag.localRow(preset.id))
@@ -5609,8 +5609,8 @@ struct ReelsViewBody: View {
                 .modifier(StashyChromePillStyle(height: reelsTopChromePillHeight, iconOnly: true))
         }
         .buttonStyle(.plain)
-        .accessibilityLabel("Filter")
-        .accessibilityHint("Chooses a saved filter or preset")
+        .accessibilityLabel(tr("filter"))
+        .accessibilityHint(tr("hint_chooses_saved_filter_or_preset"))
     }
 
     private func applyReelsQuickFilterSelection(_ rowId: String) {
@@ -5669,7 +5669,7 @@ struct ReelsViewBody: View {
                 .modifier(StashyChromePillStyle(height: reelsTopChromePillHeight, iconOnly: true))
         }
         .buttonStyle(.plain)
-        .accessibilityLabel("Delete")
+        .accessibilityLabel(tr("action_delete"))
     }
 
     private var reelsFilterSortPill: some View {
@@ -5699,7 +5699,7 @@ struct ReelsViewBody: View {
                 .modifier(StashyChromePillStyle(height: reelsTopChromePillHeight, iconOnly: true))
         }
         .buttonStyle(.plain)
-        .accessibilityLabel("Filter und Sortierung")
+        .accessibilityLabel(tr("action_filter_and_sort_2"))
     }
 }
 
@@ -5748,8 +5748,8 @@ private struct ReelsAIMotionPill: View {
             }
             .buttonStyle(.plain)
             .accessibilityLabel(AIMotionCopy.name)
-            .accessibilityValue(isActive ? "On" : "Off")
-            .accessibilityHint("Toggles device sync for the current feed")
+            .accessibilityValue(isActive ? tr("on") : tr("off"))
+            .accessibilityHint(tr("hint_toggles_device_sync_for_current"))
         }
     }
 }
@@ -6588,7 +6588,7 @@ extension ReelItemView {
             guard await ReelsViewBody.generatedFileIsMissing(at: url) else { return }
             guard self.isActive, !self.hasUsableMedia else { return }
             AppLog.error("🎬 Reel: the server has no file for this row's media — skipping it")
-            self.engineErrorMessage = "No playable source"
+            self.engineErrorMessage = tr("empty_playable_source")
             self.onPlaybackUnavailable()
         }
     }
@@ -6678,7 +6678,7 @@ extension ReelItemView {
                 }
                 guard self.isActive, !self.isPlaybackMoving, !self.hasUsableMedia else { return }
                 AppLog.error("🎬 Reel watchdog: no playable media for this row — skipping it")
-                self.engineErrorMessage = "No playable source"
+                self.engineErrorMessage = tr("empty_playable_source")
                 self.onPlaybackUnavailable()
             }
         }
@@ -6721,14 +6721,14 @@ extension ReelItemView {
 
         guard let url = item.videoURL else {
             AppLog.error("🎬 Reel: no playable source for this row")
-            engineErrorMessage = "No playable source"
+            engineErrorMessage = tr("empty_playable_source")
             onPlaybackUnavailable()
             return
         }
 
         guard let aether = try? AetherSceneEngine() else {
             AppLog.error("🎬 Reel: playback engine could not be created")
-            engineErrorMessage = "Playback engine unavailable"
+            engineErrorMessage = tr("playback_engine_unavailable")
             return
         }
 

@@ -9,6 +9,8 @@
 import SwiftUI
 
 struct ServerSetupWizardView: View {
+    /// Re-renders every text when the language is switched in step 1.
+    @ObservedObject private var languageStore = AppLanguageStore.shared
     @Environment(\.stashyDismiss) private var dismiss
     @ObservedObject var appearanceManager = AppearanceManager.shared
     
@@ -24,7 +26,14 @@ struct ServerSetupWizardView: View {
     /// Custom HTTP headers (SSO / reverse proxy); a server behind one can't pass the test without them.
     @State private var customHeaders: [ServerHTTPHeader] = []
     @State private var showsCustomHeaders = false
-    @State private var serverName = "My Stash"
+    @State private var serverName = tr("my_stash")
+    /// Every language's preset server name ("My Stash", "Mein Stash" …), to tell it from a typed one.
+    private static var presetNames: Set<String> {
+        Set(AppLanguage.options.compactMap { option in
+            Bundle.main.path(forResource: option.code, ofType: "lproj").flatMap(Bundle.init(path:))?
+                .localizedString(forKey: "my_stash", value: nil, table: nil)
+        })
+    }
     
     // Auth State
     @State private var authMethod: AuthMethod = .none
@@ -87,7 +96,7 @@ struct ServerSetupWizardView: View {
                         waitsForICloud = true
                         ICloudSettingsSync.shared.enable()
                     } label: {
-                        Label(waitsForICloud ? "Waiting for iCloud…" : "Restore from iCloud", systemImage: "icloud.and.arrow.down")
+                        Label(waitsForICloud ? tr("waiting_for_icloud_menu") : tr("action_restore_from_icloud"), systemImage: "icloud.and.arrow.down")
                     }
                     .disabled(waitsForICloud)
                     .buttonStyle(.borderless)
@@ -103,7 +112,7 @@ struct ServerSetupWizardView: View {
                     .padding(.bottom, 32)
             }
             .applyAppBackground()
-            .stashyModalSheetChrome("Server Setup", onBack: { dismiss() })
+            .stashyModalSheetChrome(tr("server_setup"), onBack: { dismiss() })
         }
     }
     
@@ -129,10 +138,10 @@ struct ServerSetupWizardView: View {
                         .font(.system(size: 50))
                         .foregroundColor(appearanceManager.tintColor)
                     
-                    Text("Server Details")
+                    Text(tr("server_details"))
                         .font(.title2.bold())
                     
-                    Text("Enter your Stash server information")
+                    Text(tr("enter_your_stash_server_information"))
                         .font(.body)
                         .foregroundColor(.secondary)
                         .multilineTextAlignment(.center)
@@ -140,13 +149,35 @@ struct ServerSetupWizardView: View {
                 .padding(.top, 32)
                 
                 VStack(spacing: 16) {
+                    // App language (beta): preset to the device language on a fresh install
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text(tr("app_language"))
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+
+                        HStack {
+                            Label(tr("language"), systemImage: "globe")
+                            Spacer()
+                            AppLanguageMenu()
+                        }
+                        .padding()
+                        .background(Color.secondaryAppBackground)
+                        .cornerRadius(DesignTokens.CornerRadius.card)
+                    }
+
                     // Server Name
                     VStack(alignment: .leading, spacing: 8) {
-                        Text("Server Name")
+                        Text(tr("server_name"))
                             .font(.caption)
                             .foregroundColor(.secondary)
                         
-                        TextField("My Stash", text: $serverName)
+                        TextField(tr("my_stash"), text: $serverName)
+                            // The preset name follows a language switch until the user types one.
+                            .onChange(of: languageStore.revision) { _, _ in
+                                if Self.presetNames.contains(serverName) {
+                                    serverName = tr("my_stash")
+                                }
+                            }
                             .padding()
                             .background(Color.secondaryAppBackground)
                             .cornerRadius(DesignTokens.CornerRadius.card)
@@ -154,11 +185,11 @@ struct ServerSetupWizardView: View {
                     
                     // Protocol Picker
                     VStack(alignment: .leading, spacing: 8) {
-                        Text("Protocol")
+                        Text(tr("protocol"))
                             .font(.caption)
                             .foregroundColor(.secondary)
                         
-                        Picker("Protocol", selection: $serverProtocol) {
+                        Picker(tr("protocol"), selection: $serverProtocol) {
                             ForEach(ServerProtocol.allCases, id: \.self) { proto in
                                 Text(proto.displayName).tag(proto)
                             }
@@ -171,11 +202,11 @@ struct ServerSetupWizardView: View {
                     
                     // Server Address
                     VStack(alignment: .leading, spacing: 8) {
-                        Text("Server Address")
+                        Text(tr("server_address"))
                             .font(.caption)
                             .foregroundColor(.secondary)
                         
-                        TextField("192.168.1.100:9999 or stash.example.com/stash", text: $serverAddress)
+                        TextField(tr("n192_168_1_100_9999_or"), text: $serverAddress)
                             .keyboardType(.URL)
                             .autocapitalization(.none)
                             .autocorrectionDisabled()
@@ -197,7 +228,7 @@ struct ServerSetupWizardView: View {
                                 }
                             }
                         
-                        Text("Enter address (e.g. timeout.com:9999 or example.com/stash)")
+                        Text(tr("hint_enter_address_e_g_timeout"))
                             .font(.caption2)
                             .foregroundColor(.secondary.opacity(0.8))
                     }
@@ -205,13 +236,13 @@ struct ServerSetupWizardView: View {
                     // Authentication Section Card
                     VStack(alignment: .leading, spacing: 16) {
                         VStack(alignment: .leading, spacing: 8) {
-                            Text("Authentication")
+                            Text(tr("authentication"))
                                 .font(.caption)
                                 .foregroundColor(.secondary)
                             
-                            Picker("Auth Method", selection: $authMethod) {
+                            Picker(tr("auth_method"), selection: $authMethod) {
                                 ForEach(AuthMethod.allCases, id: \.self) { method in
-                                    Text(method.rawValue).tag(method)
+                                    Text(method.displayName).tag(method)
                                 }
                             }
                             .pickerStyle(.segmented)
@@ -219,7 +250,7 @@ struct ServerSetupWizardView: View {
                         
                         if authMethod == .login {
                             VStack(spacing: 12) {
-                                TextField("Username", text: $username)
+                                TextField(tr("username"), text: $username)
                                     .textContentType(.username)
                                     .autocapitalization(.none)
                                     .disableAutocorrection(true)
@@ -227,7 +258,7 @@ struct ServerSetupWizardView: View {
                                     .background(Color.appBackground.opacity(0.3))
                                     .cornerRadius(DesignTokens.CornerRadius.button)
                                 
-                                SecureField("Password", text: $password)
+                                SecureField(tr("password"), text: $password)
                                     .textContentType(.password)
                                     .padding()
                                     .background(Color.appBackground.opacity(0.3))
@@ -239,7 +270,7 @@ struct ServerSetupWizardView: View {
                                             InlineSpinner(scale: .medium)
                                                 .padding(.trailing, 4)
                                         }
-                                        Text("Fetch API Key")
+                                        Text(tr("action_fetch_api_key"))
                                     }
                                 }
                                 .buttonStyle(PrimaryFilledButtonStyle())
@@ -254,11 +285,11 @@ struct ServerSetupWizardView: View {
                             }
                         } else if authMethod == .apiKey {
                             VStack(alignment: .leading, spacing: 8) {
-                                Text("API Key")
+                                Text(tr("api_key"))
                                     .font(.caption)
                                     .foregroundColor(.secondary)
                                 
-                                SecureField("Enter API Key", text: $apiKey)
+                                SecureField(tr("enter_api_key"), text: $apiKey)
                                     .autocapitalization(.none)
                                     .autocorrectionDisabled()
                                     .padding()
@@ -287,7 +318,7 @@ struct ServerSetupWizardView: View {
                 withAnimation { showsCustomHeaders.toggle() }
             } label: {
                 HStack {
-                    Text("Custom Headers")
+                    Text(tr("custom_headers"))
                         .font(.caption)
                         .foregroundColor(.secondary)
                     if !ServerHTTPHeader.sanitized(customHeaders).isEmpty {
@@ -307,14 +338,14 @@ struct ServerSetupWizardView: View {
                 ForEach($customHeaders) { $header in
                     HStack(spacing: 8) {
                         VStack(spacing: 8) {
-                            TextField("Header name", text: $header.name)
+                            TextField(tr("header_name"), text: $header.name)
                                 .textInputAutocapitalization(.never)
                                 .autocorrectionDisabled()
                                 .font(.body.monospaced())
                                 .padding(10)
                                 .background(Color.appBackground.opacity(0.3))
                                 .cornerRadius(DesignTokens.CornerRadius.button)
-                            SecureField("Value", text: $header.value)
+                            SecureField(tr("value"), text: $header.value)
                                 .textInputAutocapitalization(.never)
                                 .autocorrectionDisabled()
                                 .padding(10)
@@ -327,18 +358,18 @@ struct ServerSetupWizardView: View {
                             Image(systemName: "minus.circle.fill").foregroundColor(.red)
                         }
                         .buttonStyle(.plain)
-                        .accessibilityLabel("Remove header")
+                        .accessibilityLabel(tr("action_remove_header"))
                     }
                 }
                 Button {
                     customHeaders.append(ServerHTTPHeader(name: "", value: ""))
                 } label: {
-                    Label("Add Header", systemImage: "plus.circle.fill")
+                    Label(tr("action_add_header"), systemImage: "plus.circle.fill")
                 }
                 .buttonStyle(.plain)
                 .foregroundColor(AppearanceManager.shared.tintColor)
 
-                Text("Sent with every request to this server, e.g. for SSO or a reverse proxy that needs its own token.")
+                Text(tr("hint_sent_with_every_request_to"))
                     .font(.caption2)
                     .foregroundColor(.secondary)
             }
@@ -366,10 +397,10 @@ struct ServerSetupWizardView: View {
                             .foregroundColor(appearanceManager.tintColor)
                     }
                     
-                    Text(connectionTestResult == .testing ? "Connecting..." : "Test Connection")
+                    Text(connectionTestResult == .testing ? "Connecting..." : tr("action_test_connection"))
                         .font(.title2.bold())
                     
-                    Text("We're checking if your server is reachable")
+                    Text(tr("hint_were_checking_if_your_server"))
                         .font(.body)
                         .foregroundColor(.secondary)
                         .multilineTextAlignment(.center)
@@ -382,10 +413,10 @@ struct ServerSetupWizardView: View {
                         .font(.system(size: 80))
                         .foregroundColor(.green)
                     
-                    Text("Connection successful!")
+                    Text(tr("connection_successful"))
                         .font(.title2.bold())
                     
-                    Text("Your Stash server was found")
+                    Text(tr("your_stash_server_was_found"))
                         .font(.body)
                         .foregroundColor(.secondary)
                 }
@@ -396,7 +427,7 @@ struct ServerSetupWizardView: View {
                         .font(.system(size: 80))
                         .foregroundColor(.red)
                     
-                    Text("Connection failed")
+                    Text(tr("error_connection"))
                         .font(.title2.bold())
                     
                     Text(message)
@@ -405,7 +436,7 @@ struct ServerSetupWizardView: View {
                         .multilineTextAlignment(.center)
                         .padding(.horizontal, 32)
                     
-                    Button("Test again") {
+                    Button(tr("action_test_again")) {
                         testConnection()
                     }
                     .buttonStyle(.bordered)
@@ -434,7 +465,7 @@ struct ServerSetupWizardView: View {
                 }) {
                     HStack {
                         Image(systemName: "chevron.left")
-                        Text("Back")
+                        Text(tr("back"))
                     }
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 16)
@@ -459,7 +490,7 @@ struct ServerSetupWizardView: View {
                 }
             }) {
                 HStack {
-                    Text(currentStep == totalSteps ? "Finish" : "Next")
+                    Text(currentStep == totalSteps ? tr("finish") : tr("next"))
                     if currentStep < totalSteps {
                         Image(systemName: "chevron.right")
                     } else {
@@ -499,7 +530,7 @@ struct ServerSetupWizardView: View {
         
         let config = buildConfig()
         guard let url = URL(string: config.baseURL + "/graphql") else {
-            connectionTestResult = .failure("Invalid URL")
+            connectionTestResult = .failure(tr("invalid_url"))
             return
         }
         

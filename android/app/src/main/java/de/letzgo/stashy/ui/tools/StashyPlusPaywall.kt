@@ -1,5 +1,7 @@
 package de.letzgo.stashy.ui.tools
 
+import de.letzgo.stashy.R
+import de.letzgo.stashy.tr
 import android.content.Intent
 import android.net.Uri
 import androidx.compose.foundation.background
@@ -130,25 +132,25 @@ fun PlusMessageToasts() {
 private object StashyPlusFeatureCopy {
     class Feature(val title: String, val detail: String, val isBeta: Boolean = false)
 
-    const val APP_ICONS = "Changes the stashy app icon to the color you pick."
-    const val DOWNLOADS = "Saves scenes to your device so you can watch them offline. They are listed in Tools."
-    const val MINI_PLAYER = "Keeps a scene playing in a small bar when you leave its page. Add scenes to your watchlist on the scene page and they play one after another; the watchlist button on the Dashboard opens the list."
-    const val MAGAZINE = "Adds a Magazin view on Home that shows your galleries as covers. They open like a magazine and remember the page you stopped on."
-    const val AI_SUBTITLES = "Creates subtitles from a scene's speech on your device and translates them into your subtitle language. Turn them on in the player's AI Subtitles menu."
-    const val TAG_SUGGESTIONS = "Suggests tags based on how your library is already tagged, shows scenes with the same performers, studio or tags on the scene page, and adds For You and Forgotten Favorites rows on Home: scenes picked from what you played, your O-Counts and ratings, and favorites you have not played for a while. No outside service is involved."
-    const val OVERVIEW = "Shows your library at a glance in Tools: playback, catalog counts and storage."
-    const val O_COUNT = "Shows the O-Counts of your scenes and images as a month calendar in Tools."
-    const val TIMELINE = "Lists your scene plays, O-Counts and markers over time in Tools."
-    const val CHARTS = "Ranks your top scenes, performers, studios and tags in Tools, by measures like O-Count or rating."
-    const val FILTERS = "Lets you create, edit, rename and delete the filters saved on your server, under Settings › Server."
-    const val MATCH = "Puts performers against each other in Tools. You pick the winner and their ratings update on your server."
-    const val RATE_ME = "Shows unrated scenes or images one at a time in Tools, so you can rate them with stars."
+    val APP_ICONS = tr(R.string.hint_changes_stashy_app_icon_to)
+    val DOWNLOADS = tr(R.string.hint_saves_scenes_to_your_device)
+    val MINI_PLAYER = tr(R.string.hint_keeps_scene_playing_in_small)
+    val MAGAZINE = tr(R.string.hint_adds_magazin_view_on_home)
+    val AI_SUBTITLES = tr(R.string.hint_creates_subtitles_from_scenes_speech)
+    val TAG_SUGGESTIONS = tr(R.string.hint_suggests_tags_based_on_how)
+    val OVERVIEW = tr(R.string.hint_shows_your_library_at_glance)
+    val O_COUNT = tr(R.string.hint_shows_o_counts_of_your)
+    val TIMELINE = tr(R.string.hint_lists_your_scene_plays_o)
+    val CHARTS = tr(R.string.hint_ranks_your_top_scenes_performers)
+    val FILTERS = tr(R.string.hint_lets_you_create_edit_rename)
+    val MATCH = tr(R.string.hint_puts_performers_against_each_other)
+    val RATE_ME = tr(R.string.hint_shows_unrated_scenes_or_images)
 
     val locked = listOf(
-        Feature("Custom App Icons", APP_ICONS),
-        Feature("Download Scenes", DOWNLOADS),
-        Feature("Miniplayer & Watchlist", MINI_PLAYER),
-        Feature("AI Subtitles and translation", AI_SUBTITLES, isBeta = true),
+        Feature(tr(R.string.custom_app_icons), APP_ICONS),
+        Feature(tr(R.string.action_download_scenes), DOWNLOADS),
+        Feature(tr(R.string.miniplayer_and_watchlist), MINI_PLAYER),
+        Feature(tr(R.string.ai_subtitles_and_translation), AI_SUBTITLES, isBeta = true),
         Feature(ToolsItem.Statistics.plusFeatureTitle, OVERVIEW),
         Feature(ToolsItem.OCount.plusFeatureTitle, O_COUNT),
         Feature(ToolsItem.Timeline.plusFeatureTitle, TIMELINE),
@@ -156,8 +158,8 @@ private object StashyPlusFeatureCopy {
         Feature(ToolsItem.Filters.plusFeatureTitle, FILTERS),
         Feature(ToolsItem.HotOrNot.plusFeatureTitle, MATCH),
         Feature(ToolsItem.RateMe.title, RATE_ME),
-        Feature("Magazin", MAGAZINE),
-        Feature("Recommendations", TAG_SUGGESTIONS, isBeta = true),
+        Feature(tr(R.string.magazin), MAGAZINE),
+        Feature(tr(R.string.recommendations), TAG_SUGGESTIONS, isBeta = true),
     )
 }
 
@@ -177,10 +179,10 @@ fun LazyListScope.stashyPlusSettingsItems() {
     }
     if (StashyPlus.isUnlocked) {
         item(key = "plus-mini-player") {
-            SettingsSectionHeader("Miniplayer & Watchlist")
+            SettingsSectionHeader(tr(R.string.miniplayer_and_watchlist))
             GroupedCard {
                 de.letzgo.stashy.ui.settings.SettingsToggleRow(
-                    "Miniplayer & Watchlist", de.letzgo.stashy.data.TabManager.isMiniPlayerEnabled, de.letzgo.stashy.ui.SFS.miniPlayer,
+                    tr(R.string.miniplayer_and_watchlist), de.letzgo.stashy.data.TabManager.isMiniPlayerEnabled, de.letzgo.stashy.ui.SFS.miniPlayer,
                 ) { de.letzgo.stashy.data.TabManager.isMiniPlayerEnabled = it }
             }
             SettingsSectionFooter(StashyPlusFeatureCopy.MINI_PLAYER)
@@ -189,13 +191,13 @@ fun LazyListScope.stashyPlusSettingsItems() {
         item(key = "plus-magazine") {
             val mode = de.letzgo.stashy.data.tools.MagazineMode
             LaunchedEffect(mode.isEnabled) { if (mode.isEnabled) de.letzgo.stashy.data.SavedFiltersStore.load() }
-            SettingsSectionHeader("Magazin")
+            SettingsSectionHeader(tr(R.string.magazin))
             GroupedCard {
-                de.letzgo.stashy.ui.settings.SettingsToggleRow("Magazin eReader", mode.isEnabled, SF.magazine) { mode.isEnabled = it }
+                de.letzgo.stashy.ui.settings.SettingsToggleRow(tr(R.string.magazin_ereader), mode.isEnabled, SF.magazine) { mode.isEnabled = it }
                 if (mode.isEnabled) {
                     RowDivider()
                     Box(Modifier.padding(horizontal = 16.dp)) {
-                        de.letzgo.stashy.ui.settings.CardSettingRow("Default Filter") { de.letzgo.stashy.ui.settings.MagazineDefaultFilterMenu() }
+                        de.letzgo.stashy.ui.settings.CardSettingRow(tr(R.string.default_filter)) { de.letzgo.stashy.ui.settings.MagazineDefaultFilterMenu() }
                     }
                 }
             }
@@ -203,22 +205,22 @@ fun LazyListScope.stashyPlusSettingsItems() {
             SectionSpacer()
         }
         item(key = "plus-app-icons") {
-            SettingsSectionHeader("Custom App Icons")
+            SettingsSectionHeader(tr(R.string.custom_app_icons))
             GroupedCard { Box(Modifier.padding(horizontal = 16.dp)) { AppIconPicker() } }
             SettingsSectionFooter(StashyPlusFeatureCopy.APP_ICONS)
             SectionSpacer()
         }
         item(key = "plus-ai-subtitles") {
-            SettingsSectionHeader("AI Subtitles and translation", isBeta = true)
+            SettingsSectionHeader(tr(R.string.ai_subtitles_and_translation), isBeta = true)
             // iOS: `StashyPlusAISubtitlesSettings` (Android adds the pack cleanup as last row).
             GroupedCard { de.letzgo.stashy.ui.settings.AiSubtitlesSettingsRows() }
             SettingsSectionFooter(StashyPlusFeatureCopy.AI_SUBTITLES)
             SectionSpacer()
         }
         item(key = "plus-ai-tags") {
-            SettingsSectionHeader("Recommendations", isBeta = true)
+            SettingsSectionHeader(tr(R.string.recommendations), isBeta = true)
             GroupedCard {
-                SettingsRow("Recommendations", SF.sparkles, onClick = {
+                SettingsRow(tr(R.string.recommendations), SF.sparkles, onClick = {
                     Nav.push(de.letzgo.stashy.ui.tools.aitags.AITagsSettingsScreen())
                 })
             }
@@ -227,7 +229,7 @@ fun LazyListScope.stashyPlusSettingsItems() {
         }
     } else {
         item(key = "plus-included") {
-            SettingsSectionHeader("Included with stashy+")
+            SettingsSectionHeader(tr(R.string.included_with_stashy_plus))
             // iOS `lockedPlusFeature` list without AI Motion.
             val features = StashyPlusFeatureCopy.locked
             GroupedCard {
@@ -255,7 +257,7 @@ private fun PurchaseSection() {
     val p = Theme.palette
     val context = LocalContext.current
     val unlocked = StashyPlus.isUnlocked
-    SettingsSectionHeader(if (unlocked) "stashy+" else "Unlock stashy+")
+    SettingsSectionHeader(if (unlocked) "stashy+" else tr(R.string.action_unlock_stashy_plus))
 
     if (unlocked) {
         GroupedCard {
@@ -282,12 +284,12 @@ private fun PurchaseSection() {
                 if (StashyPlus.isLoadingProducts) {
                     Row(Modifier.fillMaxWidth().padding(16.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         SmallSpinner()
-                        Text("Loading stashy+ options…", style = NativeType.bodyLarge, color = p.secondaryText)
+                        Text(tr(R.string.loading_stashy_plus_options), style = NativeType.bodyLarge, color = p.secondaryText)
                     }
                 } else {
                     Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         Text(StashyPlus.lastProductError ?: "stashy+ products unavailable.", style = NativeType.bodyMedium, color = p.secondaryText)
-                        NativeTonalButton("Retry", leading = SF.arrowClockwise) { retryProducts() }
+                        NativeTonalButton(tr(R.string.action_retry), leading = SF.arrowClockwise) { retryProducts() }
                     }
                 }
             }
@@ -317,25 +319,25 @@ private fun PurchaseSection() {
 
     if (StashyPlus.source == StashyPlusSource.Subscription) {
         GroupedCard(Modifier.padding(vertical = 4.dp)) {
-            SecondaryButton("Manage Subscription", SF.creditcard, showsProgress = false) { StashyPlus.manageSubscriptions(context) }
+            SecondaryButton(tr(R.string.action_manage_subscription), SF.creditcard, showsProgress = false) { StashyPlus.manageSubscriptions(context) }
         }
     }
 
     if (!unlocked) {
-        SettingsSectionFooter("Monthly, Yearly, or Lifetime. Bought stashy+ before with this Google account, or reinstalled? Tap Restore Purchases.")
+        SettingsSectionFooter(tr(R.string.hint_monthly_yearly_or_lifetime_bought))
     }
 
     if (StashyPlus.shouldOfferPurchases) {
         Column(Modifier.fillMaxWidth().padding(top = 8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             val trialNote = if (StashyPlus.products.any { it.freeTrialLength != null })
-                "The free trial is for new subscribers. When it ends, the subscription starts at the price shown unless canceled before. " else ""
+                tr(R.string.hint_free_trial_is_for_new_subscribers) else ""
             Text(
-                trialNote + "Subscriptions renew automatically unless canceled before the end of the current period. Manage or cancel in your Google Play account settings.",
+                trialNote + tr(R.string.hint_subscriptions_renew_automatically_unless_canceled_before),
                 style = NativeType.labelSmall, color = p.secondaryText,
             )
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                NativeTextButton("Terms of Use") { openUrl(context, StashyLegalLinks.TERMS_OF_USE) }
-                NativeTextButton("Privacy Policy") { openUrl(context, StashyLegalLinks.PRIVACY_POLICY) }
+                NativeTextButton(tr(R.string.terms_of_use)) { openUrl(context, StashyLegalLinks.TERMS_OF_USE) }
+                NativeTextButton(tr(R.string.privacy_policy)) { openUrl(context, StashyLegalLinks.PRIVACY_POLICY) }
             }
         }
     }
@@ -368,7 +370,7 @@ private fun statusDetailText(): String {
 }
 
 private fun licenseText(license: de.letzgo.stashy.data.License): String =
-    "Licensed to ${license.name}" + (license.expiresText?.let { " · valid until $it" } ?: "")
+    tr(R.string.licensed_to_arg, license.name) + (license.expiresText?.let { " · valid until $it" } ?: "")
 
 /**
  * Sideload flavor: enter / remove the offline license key ([StashyPlus.activateLicense]).
@@ -380,19 +382,19 @@ private fun LicenseKeySection() {
     if (license != null) {
         var confirmRemove by remember { mutableStateOf(false) }
         GroupedCard(Modifier.padding(vertical = 4.dp)) {
-            SecondaryButton("Remove License", Icons.Outlined.Delete, showsProgress = false) { confirmRemove = true }
+            SecondaryButton(tr(R.string.action_remove_license), Icons.Outlined.Delete, showsProgress = false) { confirmRemove = true }
         }
-        SettingsSectionFooter("License ${license.id} · issued ${de.letzgo.stashy.data.License.formatDay(license.issuedDay)}. The key is stored on this device only.")
+        SettingsSectionFooter(tr(R.string.hint_license_arg_issued_arg_key, license.id, de.letzgo.stashy.data.License.formatDay(license.issuedDay)))
         if (confirmRemove) {
             de.letzgo.stashy.ui.NativeConfirmDialog(
-                "Remove License?", "stashy+ will be locked on this device until you enter the key again.",
-                onDismiss = { confirmRemove = false }, confirmLabel = "Remove", destructive = true,
+                tr(R.string.confirm_remove_license), tr(R.string.hint_stashy_plus_will_be_locked),
+                onDismiss = { confirmRemove = false }, confirmLabel = tr(R.string.action_remove), destructive = true,
             ) { confirmRemove = false; StashyPlus.removeLicense() }
         }
         return
     }
     var input by rememberSaveable { mutableStateOf("") }
-    var error by rememberSaveable { mutableStateOf<String?>(StashyPlus.expiredLicense?.let { "Your license key expired on ${it.expiresText}." }) }
+    var error by rememberSaveable { mutableStateOf<String?>(StashyPlus.expiredLicense?.let { tr(R.string.hint_your_license_key_expired_on, it.expiresText) }) }
     val clipboard = LocalClipboardManager.current
     val focus = LocalFocusManager.current
     fun activate() {
@@ -402,7 +404,7 @@ private fun LicenseKeySection() {
     GroupedCard {
         Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             de.letzgo.stashy.ui.NativeTextField(
-                input, { input = it.replace("\n", " "); error = null }, "License key",
+                input, { input = it.replace("\n", " "); error = null }, tr(R.string.license_key),
                 placeholder = "STASHY-XXXXX-XXXXX-…",
                 monospaced = true, singleLine = false, minLines = 2,
                 isError = error != null, supportingText = error,
@@ -412,14 +414,14 @@ private fun LicenseKeySection() {
                 keyboardActions = KeyboardActions(onDone = { if (input.isNotBlank()) activate() }),
                 trailing = {
                     IconButton({ clipboard.getText()?.text?.let { input = it.trim(); error = null } }) {
-                        Icon(Icons.Outlined.ContentPaste, "Paste")
+                        Icon(Icons.Outlined.ContentPaste, tr(R.string.paste))
                     }
                 },
             )
-            NativeTonalButton("Activate", Modifier.fillMaxWidth(), enabled = input.isNotBlank(), leading = SF.checkmarkSealFill) { activate() }
+            NativeTonalButton(tr(R.string.activate), Modifier.fillMaxWidth(), enabled = input.isNotBlank(), leading = SF.checkmarkSealFill) { activate() }
         }
     }
-    SettingsSectionFooter("This version of stashy unlocks stashy+ with a license key. Paste the key you received — it works offline and stays on this device.")
+    SettingsSectionFooter(tr(R.string.hint_this_version_of_stashy_unlocks_stashy))
 
 }
 
@@ -470,14 +472,14 @@ private fun PurchaseButton(product: StashyStoreProduct) {
 }
 
 private fun purchase(product: StashyStoreProduct) {
-    val activity = MainActivity.current ?: run { showToast("Google Play is not available."); return }
+    val activity = MainActivity.current ?: run { showToast(tr(R.string.google_play_is_not_available)); return }
     StashyPlus.purchase(activity, product)
 }
 
 @Composable
 private fun RestoreButton() {
     SecondaryButton(
-        "Restore Purchases", SF.arrowClockwise,
+        tr(R.string.action_restore_purchases), SF.arrowClockwise,
         showsProgress = StashyPlus.isRestoringPurchases,
         enabled = StashyPlus.purchasingProductID == null && !StashyPlus.isRestoringPurchases,
     ) { StashyPlus.restore() }
@@ -506,19 +508,19 @@ fun StashyTipsSection(modifier: Modifier = Modifier) {
     PlusMessageToasts()
     LaunchedEffect(Unit) { if (StashyPlus.tipProducts.isEmpty()) StashyPlus.fetchProducts() }
     Column(modifier.fillMaxWidth()) {
-        SettingsSectionHeader("Tips")
+        SettingsSectionHeader(tr(R.string.tips))
         val tips = StashyPlus.tipProducts
         GroupedCard {
             if (tips.isEmpty()) {
                 if (StashyPlus.isLoadingProducts) {
                     Row(Modifier.fillMaxWidth().padding(16.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         SmallSpinner()
-                        Text("Loading tips…", style = NativeType.bodyLarge, color = p.secondaryText)
+                        Text(tr(R.string.loading_tips), style = NativeType.bodyLarge, color = p.secondaryText)
                     }
                 } else {
                     Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Text("Tips unavailable.", style = NativeType.bodyMedium, color = p.secondaryText)
-                        NativeTonalButton("Retry", leading = SF.arrowClockwise) { retryProducts() }
+                        Text(tr(R.string.tips_unavailable), style = NativeType.bodyMedium, color = p.secondaryText)
+                        NativeTonalButton(tr(R.string.action_retry), leading = SF.arrowClockwise) { retryProducts() }
                     }
                 }
             } else {
@@ -538,6 +540,6 @@ fun StashyTipsSection(modifier: Modifier = Modifier) {
                 }
             }
         }
-        SettingsSectionFooter("Support stashy. Tips do not unlock stashy+.")
+        SettingsSectionFooter(tr(R.string.hint_support_stashy_tips_do_not))
     }
 }

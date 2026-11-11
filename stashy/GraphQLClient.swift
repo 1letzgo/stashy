@@ -20,33 +20,33 @@ enum GraphQLNetworkError: LocalizedError {
     var errorDescription: String? {
         switch self {
         case .noServerConfig:
-            return "Server configuration is missing or incomplete"
+            return tr("hint_server_configuration_is_missing_or")
         case .invalidURL:
-            return "Invalid server URL"
+            return tr("invalid_server_url")
         case .unauthorized:
-            return "API key is invalid or expired"
+            return tr("hint_api_key_is_invalid_or")
         case .serverError(let code, let message):
-            return "Server error (\(code)): \(message ?? "Unknown")"
+            return tr("server_error_arg_arg", code, message ?? "Unknown")
         case .graphQLError(let message):
-            return "GraphQL error: \(message)"
+            return tr("graphql_error_arg", message)
         case .decodingError(let error):
-            return "Failed to decode response: \(error.localizedDescription)"
+            return tr("error_decode_response_arg", error.localizedDescription)
         case .networkError(let error):
             if let urlError = error as? URLError {
                 switch urlError.code {
                 case .notConnectedToInternet:
-                    return "No internet connection"
+                    return tr("empty_internet_connection")
                 case .cannotConnectToHost:
-                    return "Server not reachable - check IP/Port/SSL"
+                    return tr("hint_server_not_reachable_check_ip")
                 case .timedOut:
-                    return "Connection timed out - is server running?"
+                    return tr("confirm_connection_timed_out_is_server")
                 default:
-                    return "Network error: \(urlError.localizedDescription)"
+                    return tr("network_error_arg", urlError.localizedDescription)
                 }
             }
-            return "Network error: \(error.localizedDescription)"
+            return tr("network_error_arg", error.localizedDescription)
         case .timeout:
-            return "Request timed out"
+            return tr("request_timed_out")
         }
     }
 }

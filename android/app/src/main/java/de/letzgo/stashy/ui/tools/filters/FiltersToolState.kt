@@ -1,5 +1,7 @@
 package de.letzgo.stashy.ui.tools.filters
 
+import de.letzgo.stashy.R
+import de.letzgo.stashy.tr
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
@@ -41,7 +43,7 @@ object FiltersToolState {
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
-                errorMessage = "Failed to load filters: ${e.message}"
+                errorMessage = tr(R.string.error_load_filters_arg, e.message)
             } finally {
                 isFetching = false
                 isLoading = false

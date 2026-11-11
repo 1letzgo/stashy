@@ -1,5 +1,7 @@
 package de.letzgo.stashy.ui.settings
 
+import de.letzgo.stashy.R
+import de.letzgo.stashy.tr
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.Animatable
@@ -124,7 +126,7 @@ fun PasscodeEntryView() {
         if (passcode.length == 4) {
             if (SecurityManager.verifyPasscode(passcode)) SecurityManager.unlock()
             else {
-                error = if (SecurityManager.lockoutRemainingSeconds > 0) "Too many attempts. Try again in ${SecurityManager.lockoutRemainingSeconds}s" else "Wrong Passcode"
+                error = if (SecurityManager.lockoutRemainingSeconds > 0) tr(R.string.hint_too_many_attempts_try_again, SecurityManager.lockoutRemainingSeconds) else tr(R.string.wrong_passcode)
                 shake++
                 delay(300)
                 passcode = ""
@@ -141,8 +143,8 @@ fun PasscodeEntryView() {
         Spacer(Modifier.height(80.dp))
         Icon(SFS.lockFill, null, tint = Appearance.tint, modifier = Modifier.size(40.dp))
         Spacer(Modifier.height(12.dp))
-        Text("Enter Passcode", style = NativeType.headlineSmall, color = p.text)
-        val message = if (lockedOut) "Too many attempts. Try again in ${SecurityManager.lockoutRemainingSeconds}s" else error
+        Text(tr(R.string.enter_passcode), style = NativeType.headlineSmall, color = p.text)
+        val message = if (lockedOut) tr(R.string.hint_too_many_attempts_try_again, SecurityManager.lockoutRemainingSeconds) else error
         if (message != null) Text(message, style = NativeType.bodySmall, color = Color(0xFFFF453A), textAlign = TextAlign.Center, modifier = Modifier.padding(top = 12.dp))
         PasscodeDots(passcode.length, shake, Modifier.padding(top = 20.dp))
         Spacer(Modifier.weight(1f))
@@ -151,7 +153,7 @@ fun PasscodeEntryView() {
             onDigit = { if (passcode.length < 4) passcode += it },
             onDelete = { passcode = passcode.dropLast(1) },
             leftKey = if (SecurityManager.isBiometricsEnabled && !lockedOut) {
-                { Icon(SFS.touchid, "Biometrics", tint = p.text, modifier = Modifier.size(30.dp).clickable { promptBiometrics() }) }
+                { Icon(SFS.touchid, tr(R.string.biometrics), tint = p.text, modifier = Modifier.size(30.dp).clickable { promptBiometrics() }) }
             } else null,
             modifier = Modifier.padding(bottom = 30.dp),
         )
@@ -189,7 +191,7 @@ private fun Keypad(enabled: Boolean, onDigit: (String) -> Unit, onDelete: () -> 
             Box(Modifier.weight(1f).height(70.dp), contentAlignment = Alignment.Center) { leftKey?.invoke() }
             key("0", Modifier.weight(1f))
             Box(Modifier.weight(1f).height(70.dp).clickable(enabled = enabled) { onDelete() }, contentAlignment = Alignment.Center) {
-                Icon(SFS.deleteLeft, "Delete", tint = p.text.copy(alpha = if (enabled) 1f else 0.4f), modifier = Modifier.size(28.dp))
+                Icon(SFS.deleteLeft, tr(R.string.action_delete), tint = p.text.copy(alpha = if (enabled) 1f else 0.4f), modifier = Modifier.size(28.dp))
             }
         }
     }
@@ -201,26 +203,26 @@ class SecuritySettingsScreen : Screen {
 
     @Composable override fun Content() {
         val context = LocalContext.current
-        val bioLabel = "Use Biometrics"
-        SettingsDetailScaffold("Security") { top ->
+        val bioLabel = tr(R.string.action_use_biometrics)
+        SettingsDetailScaffold(tr(R.string.security)) { top ->
             SettingsList(top) {
-                settingsSection(header = "App Lock", key = "lock") {
+                settingsSection(header = tr(R.string.app_lock), key = "lock") {
                     if (SecurityManager.isPasscodeSet) {
-                        NativeListItem("Change Passcode", icon = SFS.lockShield, onClick = { Nav.push(PasscodeSetupScreen()) })
+                        NativeListItem(tr(R.string.action_change_passcode), icon = SFS.lockShield, onClick = { Nav.push(PasscodeSetupScreen()) })
                         SettingsDivider()
-                        NativeListItem("Remove Passcode", icon = SFS.lockFill, iconTint = StashyColors.systemRed, headlineColor = StashyColors.systemRed, onClick = { SecurityManager.removePasscode() })
+                        NativeListItem(tr(R.string.action_remove_passcode), icon = SFS.lockFill, iconTint = StashyColors.systemRed, headlineColor = StashyColors.systemRed, onClick = { SecurityManager.removePasscode() })
                         SettingsDivider()
                         SettingsToggleRow(
                             bioLabel, SecurityManager.isBiometricsEnabled,
-                            subtitle = if (!SecurityManager.canUseBiometrics(context)) "No biometrics enrolled on this device" else null,
+                            subtitle = if (!SecurityManager.canUseBiometrics(context)) tr(R.string.empty_biometrics_enrolled_on_this_device) else null,
                             enabled = SecurityManager.isPasscodeSet,
                         ) { SecurityManager.updateBiometrics(it) }
                     } else {
-                        NativeListItem("Enable Passcode Lock", icon = SFS.lockShield, onClick = { Nav.push(PasscodeSetupScreen()) })
+                        NativeListItem(tr(R.string.action_enable_passcode_lock), icon = SFS.lockShield, onClick = { Nav.push(PasscodeSetupScreen()) })
                     }
                 }
-                if (SecurityManager.isPasscodeSet) settingsSection(header = "Options", footer = "The app will automatically lock whenever it is moved to the background.", key = "options") {
-                    SettingsToggleRow("Auto-lock on Background", SecurityManager.autoLockOnBackground) { SecurityManager.updateAutoLock(it) }
+                if (SecurityManager.isPasscodeSet) settingsSection(header = tr(R.string.options), footer = tr(R.string.hint_app_will_automatically_lock_whenever), key = "options") {
+                    SettingsToggleRow(tr(R.string.auto_lock_on_background), SecurityManager.autoLockOnBackground) { SecurityManager.updateAutoLock(it) }
                 }
             }
         }
@@ -245,15 +247,15 @@ class PasscodeSetupScreen : Screen {
             if (step == 2 && confirm.length == 4) {
                 if (passcode == confirm) { SecurityManager.setPasscode(passcode); Nav.pop() }
                 else {
-                    error = "Passcodes do not match"; shake++
+                    error = tr(R.string.passcodes_do_not_match); shake++
                     delay(500)
                     confirm = ""; passcode = ""; step = 1; error = null
                 }
             }
         }
-        SettingsDetailScaffold("Passcode") { top ->
+        SettingsDetailScaffold(tr(R.string.passcode)) { top ->
             Column(Modifier.fillMaxSize().padding(top = top + 16.dp, bottom = 16.dp).navigationBarsPadding(), horizontalAlignment = Alignment.CenterHorizontally) {
-                Text(if (step == 1) "Set a Passcode" else "Confirm Passcode", style = NativeType.headlineSmall, color = p.text)
+                Text(if (step == 1) tr(R.string.action_set_passcode) else tr(R.string.confirm_passcode), style = NativeType.headlineSmall, color = p.text)
                 error?.let { Text(it, style = NativeType.bodySmall, color = Color(0xFFFF453A), modifier = Modifier.padding(top = 12.dp)) }
                 PasscodeDots(if (step == 1) passcode.length else confirm.length, shake, Modifier.padding(top = 40.dp))
                 Spacer(Modifier.height(40.dp))

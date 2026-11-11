@@ -286,23 +286,23 @@ private struct ImagesViewBody: View {
             .onChange(of: imageListFilters.catalogPresetRowSelection) { _, newId in
                 imageListFilters.handlePresetSelection(newId, viewModel: viewModel)
             }
-            .alert("Save as new", isPresented: $imageListFilters.showSaveAsCatalogPresetAlert) {
-                TextField("Name", text: $imageListFilters.catalogPresetNameInput)
-                Button("Save") { imageListFilters.savePresetAs(name: imageListFilters.catalogPresetNameInput, viewModel: viewModel) }
-                Button("Cancel", role: .cancel) {}
+            .alert(tr("action_save_as_new"), isPresented: $imageListFilters.showSaveAsCatalogPresetAlert) {
+                TextField(tr("name"), text: $imageListFilters.catalogPresetNameInput)
+                Button(tr("action_save")) { imageListFilters.savePresetAs(name: imageListFilters.catalogPresetNameInput, viewModel: viewModel) }
+                Button(tr("action_cancel"), role: .cancel) {}
             } message: {
-                Text("Save the current sort, filter, and live criteria as a new Stash saved filter.")
+                Text(tr("hint_save_current_sort_filter_and"))
             }
-            .alert("Rename", isPresented: $imageListFilters.showRenameCatalogPresetAlert) {
-                TextField("Name", text: $imageListFilters.renameCatalogPresetInput)
-                Button("Save") { imageListFilters.renamePreset(to: imageListFilters.renameCatalogPresetInput, viewModel: viewModel) }
-                Button("Cancel", role: .cancel) {}
+            .alert(tr("action_rename"), isPresented: $imageListFilters.showRenameCatalogPresetAlert) {
+                TextField(tr("name"), text: $imageListFilters.renameCatalogPresetInput)
+                Button(tr("action_save")) { imageListFilters.renamePreset(to: imageListFilters.renameCatalogPresetInput, viewModel: viewModel) }
+                Button(tr("action_cancel"), role: .cancel) {}
             } message: {
-                Text("Rename this preset or saved filter.")
+                Text(tr("hint_rename_this_preset_or_saved"))
             }
-            .alert("Delete filter?", isPresented: $imageListFilters.showDeleteCatalogPresetAlert) {
-                Button("Delete", role: .destructive) { imageListFilters.deletePreset(viewModel: viewModel) }
-                Button("Cancel", role: .cancel) {}
+            .alert(tr("confirm_delete_filter"), isPresented: $imageListFilters.showDeleteCatalogPresetAlert) {
+                Button(tr("action_delete"), role: .destructive) { imageListFilters.deletePreset(viewModel: viewModel) }
+                Button(tr("action_cancel"), role: .cancel) {}
             } message: {
                 Text(imageListFilters.deletePresetConfirmationText(viewModel: viewModel))
             }
@@ -321,11 +321,11 @@ private struct ImagesViewBody: View {
                             .padding(16)
                     }
                     if showsQuickBar { quickBar }
-                    StandardLoadingView(message: "Loading images...")
+                    StandardLoadingView(message: tr("loading_images"))
                 }
             } else if imagesListShowsConnectionError {
                 // Show what actually failed — a timeout and a rejected query need different fixes.
-                ConnectionErrorView(title: viewModel.imageFindListError ?? "Server not reachable") {
+                ConnectionErrorView(title: viewModel.imageFindListError ?? tr("server_not_reachable")) {
                     imageListFilters.refetchImages(viewModel: viewModel, initial: true)
                 }
             } else if displayedImages.isEmpty {
@@ -339,8 +339,8 @@ private struct ImagesViewBody: View {
                     }
                     SharedEmptyStateView(
                         icon: "camera.fill",
-                        title: "No images found",
-                        buttonText: "Reload",
+                        title: tr("empty_images_found"),
+                        buttonText: tr("action_reload"),
                         onRetry: {
                             imageListFilters.refetchImages(viewModel: viewModel, initial: true)
                         }
@@ -432,13 +432,13 @@ private struct ImagesViewBody: View {
                 floatingDeleteBar
             }
         }
-        .alert("Delete \(selectedImageIds.count) images?", isPresented: $showDeleteConfirmation) {
-            Button("Cancel", role: .cancel) { }
-            Button("Delete", role: .destructive) {
+        .alert(tr("confirm_delete_arg_images", selectedImageIds.count), isPresented: $showDeleteConfirmation) {
+            Button(tr("action_cancel"), role: .cancel) { }
+            Button(tr("action_delete"), role: .destructive) {
                 deleteSelectedImages()
             }
         } message: {
-            Text("These images will be permanently deleted. This action cannot be undone.")
+            Text(tr("hint_these_images_will_be_permanently"))
         }
         .modifier(OpenedGalleryDetailChrome(
             isOpenedGallery: isOpenedGallery,
@@ -662,7 +662,7 @@ private struct ImagesViewBody: View {
 
     private var openedGalleryCrumb: DetailBreadcrumb {
         DetailBreadcrumb(
-            sections: [.init(id: "images", title: "Images", systemImage: "photo")],
+            sections: [.init(id: "images", title: tr("images"), systemImage: "photo")],
             selectionID: "images",
             onSelect: { _ in },
             onBack: { dismiss() }
@@ -672,7 +672,7 @@ private struct ImagesViewBody: View {
     private var openedGalleryActions: [CatalogChromeSlot] {
         var actions: [CatalogChromeSlot] = []
         if appearanceManager.isEditModeEnabled {
-            actions.append(CatalogChromeSlot(systemImage: "pencil", accessibilityLabel: "Edit gallery") {
+            actions.append(CatalogChromeSlot(systemImage: "pencil", accessibilityLabel: tr("action_edit_gallery")) {
                 HapticManager.light()
                 showingEditGallerySheet = true
             })
@@ -686,7 +686,7 @@ private struct ImagesViewBody: View {
     private var selectImagesSlot: CatalogChromeSlot {
         CatalogChromeSlot(
             systemImage: "checkmark.circle",
-            accessibilityLabel: "Select images",
+            accessibilityLabel: tr("action_select_images"),
             action: {
                 withAnimation(DesignTokens.Animation.quick) { isSelectionMode = true }
             }
@@ -733,7 +733,7 @@ private struct ImagesViewBody: View {
             items: getGalleryHeaderDetails(gallery).map { DetailHeroItem(label: $0.label, value: $0.value) },
             description: gallery.details,
             showsHero: heroURL != nil,
-            heroAccessibilityLabel: "Open cover image",
+            heroAccessibilityLabel: tr("action_open_cover_image"),
             onHeroTap: heroImageId.map { id in { fullscreenImageId = id } },
             isExpanded: $isHeaderExpanded,
             placeholderSystemImage: AppTab.galleries.icon
@@ -849,7 +849,7 @@ private struct ImagesViewBody: View {
             return CatalogChromeSlot(
                 systemImage: "stop.circle",
                 isActive: true,
-                accessibilityLabel: "Cancel download",
+                accessibilityLabel: tr("action_cancel_download"),
                 action: {
                     HapticManager.light()
                     downloadManager.cancelGalleryDownload(id: gallery.id)
@@ -859,7 +859,7 @@ private struct ImagesViewBody: View {
         return CatalogChromeSlot(
             systemImage: stored == nil ? "arrow.down.doc" : "checkmark.circle.fill",
             isActive: stored != nil,
-            accessibilityLabel: stored == nil ? "Download gallery" : "Downloaded",
+            accessibilityLabel: stored == nil ? tr("action_download_gallery") : tr("downloaded"),
             action: {
                 HapticManager.light()
                 showingGalleryDownloadOptions = true
@@ -871,7 +871,7 @@ private struct ImagesViewBody: View {
     private var imagesChromeConfig: CatalogChromeConfig {
         let ownsNavBar = !isOpenedGallery && !feedsEmbedded
         return CatalogChromeConfig(
-            title: "Images",
+            title: tr("images"),
             ownsNavigationBar: ownsNavBar,
             visibility: CatalogFloatingChromeState(
                 hasActiveServerConfig: configManager.activeConfig != nil,
@@ -883,7 +883,7 @@ private struct ImagesViewBody: View {
             filterSort: showsQuickBar ? nil : CatalogChromeSlot(
                 systemImage: "slider.horizontal.3",
                 isActive: catalogFilterSortFABActive,
-                accessibilityLabel: "Settings",
+                accessibilityLabel: tr("settings"),
                 action: { imageListFilters.showFilterSortSheet = true }
             ),
             // An opened gallery has Select in its top bar, a Home list in the Home row; only the
@@ -903,7 +903,7 @@ private struct ImagesViewBody: View {
             search: ownsNavBar ? CatalogSearchChrome(
                 text: $searchText,
                 isVisible: $isSearchVisible,
-                prompt: "Search images...",
+                prompt: tr("placeholder_search_images"),
                 onClear: {
                     viewModel.currentImageSearchQuery = ""
                     imageListFilters.refetchImages(viewModel: viewModel, initial: true)
@@ -1128,7 +1128,7 @@ private struct ImagesViewBody: View {
                 Button {
                     toggleSelection(for: image.id)
                 } label: {
-                    ImageThumbnailCard(image: image, aspectRatio: imageCardAspectRatio)
+                    ImageThumbnailCard(image: image, aspectRatio: imageCardAspectRatio, prefersTitle: gallery != nil)
                         .overlay(
                             ZStack {
                                 if selectedImageIds.contains(image.id) {
@@ -1153,7 +1153,7 @@ private struct ImagesViewBody: View {
                 Button {
                     openFullscreen(id: image.id)
                 } label: {
-                    ImageThumbnailCard(image: image, aspectRatio: imageCardAspectRatio)
+                    ImageThumbnailCard(image: image, aspectRatio: imageCardAspectRatio, prefersTitle: gallery != nil)
                 }
                 .buttonStyle(.plain)
                 .id(image.id)
@@ -1223,7 +1223,7 @@ private struct ImagesViewBody: View {
     
     private var floatingDeleteBar: some View {
         HStack(spacing: DesignTokens.Spacing.md) {
-            Text("\(selectedImageIds.count) Selected")
+            Text(tr("arg_selected", selectedImageIds.count))
                 .font(.subheadline)
                 .fontWeight(.bold)
                 .foregroundColor(.primary)
@@ -1375,7 +1375,7 @@ struct ImageGroupCatalogCell: View {
                             .foregroundColor(.white)
                             .modifier(StashyChromePillStyle(height: StashyExpandingDock.stackedButtonSize, hashtagColors: true))
                             .allowsHitTesting(false)
-                            .accessibilityLabel("Image \(visibleIndex + 1) of \(images.count)")
+                            .accessibilityLabel(tr("image_arg_of_arg", visibleIndex + 1, images.count))
                     }
                     Spacer(minLength: 0)
                     if viewModel != nil {
@@ -1451,7 +1451,7 @@ struct ImageGroupCatalogCell: View {
                     onImageUpdated?(patched)
                     StashImage.postPerformersUpdated(imageId: image.id, performers: performers)
                     HapticManager.success()
-                    ToastManager.shared.show("Performers updated")
+                    ToastManager.shared.show(tr("performers_updated"))
                 }
             }
         }
@@ -1464,7 +1464,7 @@ extension ImageGroupCatalogCell {
     fileprivate func openPerformerEditor(for image: StashImage) {
         guard image.performers != nil else {
             HapticManager.error()
-            ToastManager.shared.show("Could not load performers", icon: "exclamationmark.triangle.fill", style: .error)
+            ToastManager.shared.show(tr("error_load_performers"), icon: "exclamationmark.triangle.fill", style: .error)
             return
         }
         performerEditorImage = image
@@ -1492,7 +1492,7 @@ extension ImageGroupCatalogCell {
                             .stashyGlass(shape: Capsule())
                     }
                     .buttonStyle(.plain)
-                    .accessibilityLabel("Add tags")
+                    .accessibilityLabel(tr("action_add_tags"))
                 }
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 6) {
@@ -1508,7 +1508,7 @@ extension ImageGroupCatalogCell {
                                         Button(role: .destructive) {
                                             removeTag(tag, from: image)
                                         } label: {
-                                            Label("Remove tag", systemImage: "trash")
+                                            Label(tr("action_remove_tag"), systemImage: "trash")
                                         }
                                     }
                                 }
@@ -1537,10 +1537,10 @@ extension ImageGroupCatalogCell {
             if success {
                 onImageUpdated?(image.withTags(remaining))
                 HapticManager.success()
-                ToastManager.shared.show("Removed #\(tag.name)")
+                ToastManager.shared.show(tr("removed_arg", tag.name))
             } else {
                 HapticManager.error()
-                ToastManager.shared.show("Could not remove tag", icon: "exclamationmark.triangle.fill", style: .error)
+                ToastManager.shared.show(tr("error_remove_tag"), icon: "exclamationmark.triangle.fill", style: .error)
             }
         }
     }
@@ -1581,7 +1581,7 @@ extension ImageGroupCatalogCell {
                     setRating(of: image, stars: 0)
                 } label: {
                     HStack {
-                        Text("Clear Rating")
+                        Text(tr("action_clear_rating"))
                         if stars == 0 { Image(systemName: "checkmark") }
                     }
                 }
@@ -1608,7 +1608,7 @@ extension ImageGroupCatalogCell {
                 .modifier(StashyChromePillStyle(height: StashyExpandingDock.stackedButtonSize, width: StashyExpandingDock.stackedButtonSize, hashtagColors: true))
             }
             .buttonStyle(.plain)
-            .accessibilityLabel("Rating")
+            .accessibilityLabel(tr("rating"))
             Button {
                 incrementOCounter(of: image)
             } label: {
@@ -1623,7 +1623,7 @@ extension ImageGroupCatalogCell {
                 .modifier(StashyChromePillStyle(height: StashyExpandingDock.stackedButtonSize, width: StashyExpandingDock.stackedButtonSize, hashtagColors: true))
             }
             .buttonStyle(.plain)
-            .accessibilityLabel("O-Counter")
+            .accessibilityLabel(tr("o_count"))
             .oCounterRemovalMenu(
                 count: oCounter,
                 onRemoveOne: { changeOCounter(of: image, .decrement) },
@@ -1643,7 +1643,7 @@ extension ImageGroupCatalogCell {
                 onImageUpdated?(image.withOCounter(count))
             } else {
                 onImageUpdated?(image.withOCounter(original))
-                ToastManager.shared.show("Failed to update O-Counter", icon: "exclamationmark.triangle", style: .error)
+                ToastManager.shared.show(tr("error_update_o_count"), icon: "exclamationmark.triangle", style: .error)
             }
         }
     }
@@ -1659,7 +1659,7 @@ extension ImageGroupCatalogCell {
                     onImageUpdated?(image.withOCounter(count))
                 } else {
                     onImageUpdated?(image.withOCounter(original))
-                    ToastManager.shared.show("Failed to update O-Counter", icon: "exclamationmark.triangle", style: .error)
+                    ToastManager.shared.show(tr("error_update_o_count"), icon: "exclamationmark.triangle", style: .error)
                 }
             }
         }
@@ -1674,7 +1674,7 @@ extension ImageGroupCatalogCell {
             if !success {
                 DispatchQueue.main.async {
                     onImageUpdated?(image.withRating(original))
-                    ToastManager.shared.show("Failed to save rating", icon: "exclamationmark.triangle", style: .error)
+                    ToastManager.shared.show(tr("error_save_rating"), icon: "exclamationmark.triangle", style: .error)
                 }
             }
         }
@@ -1720,7 +1720,7 @@ struct ImageCatalogFeedHeader: View {
         guard let g = linkedGallery else { return nil }
         return Gallery(
             id: g.id,
-            title: g.title ?? "Gallery",
+            title: g.title ?? tr("gallery"),
             date: nil,
             details: nil,
             imageCount: nil,
@@ -1814,7 +1814,7 @@ struct ImageCatalogFeedHeader: View {
     @ViewBuilder
     private var nameLine: some View {
         if performers.isEmpty {
-            Text(image.title ?? "Unknown")
+            Text(image.title ?? tr("unknown"))
                 .font(.subheadline).fontWeight(.semibold)
                 .foregroundColor(.white)
                 .lineLimit(1)
@@ -1846,7 +1846,7 @@ struct ImageCatalogFeedHeader: View {
         if let onPerformerTap {
             Button { onPerformerTap(performer) } label: { label }
                 .buttonStyle(.plain)
-                .accessibilityLabel("Filter by \(performer.name)")
+                .accessibilityLabel(tr("action_filter_by_arg", performer.name))
         } else {
             NavigationLink(destination: PerformerDetailView(performer: performer.toPerformer(), initialTab: .images)) {
                 label
@@ -1960,10 +1960,19 @@ struct ImageThumbnailCard: View {
     /// Show the whole media letterboxed instead of cropping it to the frame (a wide image in a
     /// set whose frame follows its tallest image).
     var fitsMedia: Bool = false
+    /// Inside a gallery the performer already stands in the gallery's own card: the image's
+    /// title comes first there, the performer only for an untitled image.
+    var prefersTitle: Bool = false
     @ObservedObject var appearanceManager = AppearanceManager.shared
     @StateObject private var previewPlayer = AetherPreviewPlayer()
     @State private var isPreviewing = false
     @State private var autoplayTask: Task<Void, Never>?
+
+    private var cardLabel: String {
+        let title = image.title.flatMap { $0.isEmpty ? nil : $0 }
+        let performer = image.performers?.first?.name
+        return (prefersTitle ? title ?? performer : performer ?? title) ?? tr("image")
+    }
 
     /// 1/row Feeds/Images crops from the top; multi-column grids stay centered.
     private var mediaFillAlignment: Alignment {
@@ -2096,7 +2105,7 @@ struct ImageThumbnailCard: View {
 
                 VStack(alignment: .leading, spacing: 4) {
                     HStack(alignment: .bottom, spacing: 8) {
-                        Text(image.performers?.first?.name ?? image.title ?? "Image")
+                        Text(cardLabel)
                             .font(.headline)
                             .fontWeight(.medium)
                             .lineLimit(2)
@@ -2198,18 +2207,18 @@ private struct GalleryDownloadOptionsAlert: ViewModifier {
     func body(content: Content) -> some View {
         let stored = gallery.flatMap { downloadManager.downloadedGallery(id: $0.id) }
         let batch = DownloadManager.galleryNewestBatchSize
-        return content.alert("Gallery", isPresented: $isPresented) {
+        return content.alert(tr("gallery"), isPresented: $isPresented) {
             if let gallery {
                 if let stored {
-                    Button("Sync newest") {
+                    Button(tr("action_sync_newest")) {
                         downloadManager.syncGallery(id: gallery.id)
                     }
                     if DownloadManager.showsSyncNewestBatch(count: gallery.imageCount ?? stored.serverImageCount, batch: batch) {
-                        Button("Sync newest \(batch)") {
+                        Button(tr("action_sync_newest_arg", batch)) {
                             downloadManager.syncGallery(id: gallery.id, limit: batch)
                         }
                     }
-                    Button("Remove download", role: .destructive) {
+                    Button(tr("action_remove_download"), role: .destructive) {
                         downloadManager.deleteGalleryDownload(id: gallery.id)
                     }
                 } else {
@@ -2218,12 +2227,12 @@ private struct GalleryDownloadOptionsAlert: ViewModifier {
                     }
                 }
             }
-            Button("Cancel", role: .cancel) {}
+            Button(tr("action_cancel"), role: .cancel) {}
         } message: {
             if let stored, let total = stored.serverImageCount {
                 Text("\(stored.images.count) of \(total) downloaded")
             } else if let count = gallery?.imageCount {
-                Text("\(count) images in this gallery")
+                Text(tr("arg_images_in_this_gallery", count))
             }
         }
     }
@@ -2267,13 +2276,13 @@ struct EditGallerySheet: View {
     var body: some View {
         NavigationView {
             Form {
-                Section("Identity") {
-                    TextField("Title", text: $title)
-                    StashDateField(placeholder: "Date (YYYY-MM-DD)", text: $date)
+                Section(tr("identity")) {
+                    TextField(tr("title"), text: $title)
+                    StashDateField(placeholder: tr("date_yyyy_mm_dd"), text: $date)
                 }
                 .listRowBackground(Color.secondaryAppBackground)
 
-                Section("Details") {
+                Section(tr("details")) {
                     TextEditor(text: $details)
                         .frame(minHeight: 120)
                 }
@@ -2288,7 +2297,7 @@ struct EditGallerySheet: View {
                             if isDeleting {
                                 InlineSpinner(tint: .red)
                             } else {
-                                Label("Delete Gallery", systemImage: "trash")
+                                Label(tr("action_delete_gallery"), systemImage: "trash")
                                     .foregroundStyle(.red)
                             }
                             Spacer()
@@ -2301,9 +2310,9 @@ struct EditGallerySheet: View {
             }
             .applyAppBackground()
             .scrollContentBackground(.hidden)
-            .stashyModalSheetChrome("Edit Gallery", onBack: { dismiss() }) {
+            .stashyModalSheetChrome(tr("action_edit_gallery"), onBack: { dismiss() }) {
                 StashyChromeTrailingTextButton(
-                    title: "Save",
+                    title: tr("action_save"),
                     enabled: !title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && StashDateInput.isAcceptable(date),
                     isBusy: isSaving
                 ) { save() }
@@ -2313,11 +2322,11 @@ struct EditGallerySheet: View {
                 date = gallery.date ?? ""
                 details = gallery.details ?? ""
             }
-            .alert("Delete Gallery", isPresented: $showingDeleteConfirmation) {
-                Button("Cancel", role: .cancel) { }
-                Button("Delete", role: .destructive) { performDelete() }
+            .alert(tr("action_delete_gallery"), isPresented: $showingDeleteConfirmation) {
+                Button(tr("action_cancel"), role: .cancel) { }
+                Button(tr("action_delete"), role: .destructive) { performDelete() }
             } message: {
-                Text("Delete '\(gallery.title)'? This cannot be undone.")
+                Text(tr("hint_delete_arg_this_cannot_be", gallery.title))
             }
         }
     }
@@ -2329,7 +2338,7 @@ struct EditGallerySheet: View {
                 isDeleting = false
                 switch result {
                 case .success:
-                    ToastManager.shared.show("Gallery deleted", icon: "trash", style: .success)
+                    ToastManager.shared.show(tr("gallery_deleted"), icon: "trash", style: .success)
                     dismiss()
                     // Pop the detail only once the sheet is gone — both in one runloop
                     // leaves the navigation stack inconsistent.
@@ -2365,10 +2374,10 @@ struct EditGallerySheet: View {
                     updated.date = optionalTrimmed(date)
                     updated.details = optionalTrimmed(details)
                     onComplete(updated)
-                    ToastManager.shared.show("Gallery updated", icon: "checkmark.circle", style: .success)
+                    ToastManager.shared.show(tr("gallery_updated"), icon: "checkmark.circle", style: .success)
                     dismiss()
                 } else {
-                    ToastManager.shared.show("Failed to update gallery", icon: "exclamationmark.triangle", style: .error)
+                    ToastManager.shared.show(tr("error_update_gallery"), icon: "exclamationmark.triangle", style: .error)
                 }
             }
         }

@@ -1,5 +1,7 @@
 package de.letzgo.stashy.data.tools
 
+import de.letzgo.stashy.R
+import de.letzgo.stashy.tr
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -72,7 +74,7 @@ data class MergeTag(
         MergeUsage.append(parts, galleryCount, "gallery", plural = "galleries")
         MergeUsage.append(parts, performerCount, "performer")
         MergeUsage.append(parts, sceneMarkerCount, "marker")
-        return if (parts.isEmpty()) "Unused" else parts.joinToString(" · ")
+        return if (parts.isEmpty()) tr(R.string.unused) else parts.joinToString(" · ")
     }
 }
 
@@ -96,7 +98,7 @@ data class MergeStudio(
         MergeUsage.append(parts, imageCount, "image")
         MergeUsage.append(parts, galleryCount, "gallery", plural = "galleries")
         MergeUsage.append(parts, performerCount, "performer")
-        return if (parts.isEmpty()) "Unused" else parts.joinToString(" · ")
+        return if (parts.isEmpty()) tr(R.string.unused) else parts.joinToString(" · ")
     }
 }
 
@@ -268,9 +270,9 @@ class MergePresetStore(val kind: String) {
 
 /** iOS: `StudioMergeError`. */
 sealed class StudioMergeError(message: String) : Exception(message) {
-    object NoData : StudioMergeError("Server returned no data")
-    class Incomplete(n: Int) : StudioMergeError("$n items could not be moved — nothing was deleted")
-    object DestroyFailed : StudioMergeError("Sources could not be deleted")
+    object NoData : StudioMergeError(tr(R.string.server_returned_no_data))
+    class Incomplete(n: Int) : StudioMergeError(tr(R.string.hint_arg_items_could_not_be, n))
+    object DestroyFailed : StudioMergeError(tr(R.string.sources_could_not_be_deleted))
 }
 
 /** iOS: merge parts of `TagRepository` and `StudioRepository`. */

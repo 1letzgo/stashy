@@ -1,5 +1,7 @@
 package de.letzgo.stashy.data.tools
 
+import de.letzgo.stashy.R
+import de.letzgo.stashy.tr
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -684,7 +686,7 @@ object AITagSuggestions {
         } catch (e: CancellationException) {
             state = restingState(); throw e
         } catch (e: Exception) {
-            state = AITagModelState.Failed("Could not read the tag list")
+            state = AITagModelState.Failed(tr(R.string.error_read_tag_list))
             return
         }
         val builder = AITagStatsBuilder()
@@ -717,7 +719,7 @@ object AITagSuggestions {
             state = restingState(); throw e
         }
         if (processed <= 0) {
-            state = AITagModelState.Failed("No tagged scenes or images found")
+            state = AITagModelState.Failed(tr(R.string.empty_tagged_scenes_or_images_found))
             return
         }
         val built = builder.build(tags, processed, AITagStatsMath.nowReferenceSeconds())

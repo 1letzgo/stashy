@@ -35,7 +35,7 @@ struct AddGalleryToSceneSheet: View {
     var body: some View {
         NavigationView {
             Form {
-                Section(header: Text("Search Galleries")) {
+                Section(header: Text(tr("search_galleries"))) {
                     TextField("Search...", text: $searchText)
                         .onChange(of: searchText) { _, newValue in
                             if !newValue.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
@@ -52,9 +52,9 @@ struct AddGalleryToSceneSheet: View {
                     .listRowBackground(Color.secondaryAppBackground)
                 } else {
                     if !performerIds.isEmpty {
-                        Section(header: Text(showingSearchResults ? "From Scene Performers" : "Galleries from Scene Performers")) {
+                        Section(header: Text(showingSearchResults ? tr("from_scene_performers") : tr("galleries_from_scene_performers"))) {
                             if filteredPerformerGalleries.isEmpty {
-                                Text(showingSearchResults ? "No matching performer galleries" : "No galleries for linked performers")
+                                Text(showingSearchResults ? tr("empty_matching_performer_galleries") : tr("empty_galleries_for_linked_performers"))
                                     .font(.caption)
                                     .foregroundColor(.secondary)
                             } else {
@@ -67,11 +67,11 @@ struct AddGalleryToSceneSheet: View {
                     }
 
                     if showingSearchResults {
-                        Section(header: Text(performerIds.isEmpty ? "Galleries" : "Other Galleries")) {
+                        Section(header: Text(performerIds.isEmpty ? tr("galleries") : tr("other_galleries"))) {
                             if !didLoadAll && isLoading {
                                 HStack { Spacer(); ProgressView(); Spacer() }
                             } else if filteredOtherGalleries.isEmpty {
-                                Text("No matching galleries")
+                                Text(tr("empty_matching_galleries"))
                                     .font(.caption)
                                     .foregroundColor(.secondary)
                             } else {
@@ -79,7 +79,7 @@ struct AddGalleryToSceneSheet: View {
                                     galleryRow(gallery)
                                 }
                                 if filteredOtherGalleries.count > 30 {
-                                    Text("Type more to refine...")
+                                    Text(tr("type_more_to_refine_menu"))
                                         .font(.caption)
                                         .foregroundColor(.secondary)
                                 }
@@ -87,7 +87,7 @@ struct AddGalleryToSceneSheet: View {
                         }
                         .listRowBackground(Color.secondaryAppBackground)
                     } else if performerIds.isEmpty {
-                        Section(header: Text("All Galleries")) {
+                        Section(header: Text(tr("all_galleries"))) {
                             if allGalleries.isEmpty && isLoading {
                                 HStack { Spacer(); ProgressView(); Spacer() }
                             } else {
@@ -95,7 +95,7 @@ struct AddGalleryToSceneSheet: View {
                                     galleryRow(gallery)
                                 }
                                 if allGalleries.count > 30 {
-                                    Text("Type to search...")
+                                    Text(tr("type_to_search_menu"))
                                         .font(.caption)
                                         .foregroundColor(.secondary)
                                 }
@@ -107,8 +107,8 @@ struct AddGalleryToSceneSheet: View {
             }
             .applyAppBackground()
             .scrollContentBackground(.hidden)
-            .stashyModalSheetChrome("Edit Galleries", onBack: { dismiss() }) {
-                StashyChromeTrailingTextButton(title: "Save", enabled: !isSaving, isBusy: isSaving) { save() }
+            .stashyModalSheetChrome(tr("action_edit_galleries"), onBack: { dismiss() }) {
+                StashyChromeTrailingTextButton(title: tr("action_save"), enabled: !isSaving, isBusy: isSaving) { save() }
             }
             .onAppear {
                 selectedIds = Set(currentGalleries.map { $0.id })
@@ -240,7 +240,7 @@ struct AddGalleryToSceneSheet: View {
                     onComplete(updated)
                     dismiss()
                 } else {
-                    ToastManager.shared.show("Failed to update galleries", icon: "exclamationmark.triangle", style: .error)
+                    ToastManager.shared.show(tr("error_update_galleries"), icon: "exclamationmark.triangle", style: .error)
                 }
             }
         }

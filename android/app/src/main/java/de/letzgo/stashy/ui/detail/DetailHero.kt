@@ -1,5 +1,7 @@
 package de.letzgo.stashy.ui.detail
 
+import de.letzgo.stashy.R
+import de.letzgo.stashy.tr
 import android.net.Uri
 import android.os.Build
 import android.view.ViewGroup
@@ -462,10 +464,10 @@ internal fun DetailHeroFullscreenViewer(
         Box(
             Modifier.align(Alignment.TopEnd).statusBarsPadding().padding(16.dp).size(36.dp)
                 .clip(CircleShape).background(Color.Black.copy(alpha = 0.5f))
-                .clickable(onClickLabel = "Close", onClick = onDismiss),
+                .clickable(onClickLabel = tr(R.string.action_close), onClick = onDismiss),
             contentAlignment = Alignment.Center,
         ) {
-            Icon(de.letzgo.stashy.ui.SF.xmark, "Close", tint = Color.White, modifier = Modifier.size(18.dp))
+            Icon(de.letzgo.stashy.ui.SF.xmark, tr(R.string.action_close), tint = Color.White, modifier = Modifier.size(18.dp))
         }
     }
 }

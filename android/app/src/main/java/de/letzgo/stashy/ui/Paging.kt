@@ -1,5 +1,7 @@
 package de.letzgo.stashy.ui
 
+import de.letzgo.stashy.R
+import de.letzgo.stashy.tr
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
@@ -76,7 +78,7 @@ class PagedList<T>(
             } catch (e: kotlinx.coroutines.CancellationException) {
                 throw e
             } catch (e: Exception) {
-                error = e.message ?: "Unknown error"
+                error = e.message ?: tr(R.string.unknown_error)
             } finally {
                 loadedOnce = true
                 isLoading = false

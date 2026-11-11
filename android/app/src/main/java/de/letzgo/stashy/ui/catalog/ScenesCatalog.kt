@@ -1,5 +1,7 @@
 package de.letzgo.stashy.ui.catalog
 
+import de.letzgo.stashy.R
+import de.letzgo.stashy.tr
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import de.letzgo.stashy.data.CatalogCardColumns
@@ -34,7 +36,7 @@ fun ScenesCatalog() {
 fun ScenesList(controller: CatalogController<Scene>, topPadding: androidx.compose.ui.unit.Dp = catalogTopPadding(), showsFloatingBar: Boolean = true) {
     CatalogScaffold(
         controller,
-        CatalogTexts("Loading scenes...", SF.film, "No scenes found", "Load Scenes"),
+        CatalogTexts(tr(R.string.loading_scenes), SF.film, tr(R.string.empty_scenes_found), tr(R.string.action_load_scenes)),
         CatalogSlots(),
         columns = { CatalogCardColumns.One.columnCount(it) },
         itemKey = { it.id },

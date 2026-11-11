@@ -46,7 +46,7 @@ struct ServerStatisticsView: View {
                     .frame(maxWidth: .infinity)
                 }
             } else if !hasAttemptedLoad || (!didFailLoad && viewModel.errorMessage == nil) {
-                StandardLoadingView(message: "Loading statistics...")
+                StandardLoadingView(message: tr("loading_statistics"))
             } else {
                 ConnectionErrorView { reload() }
             }
@@ -64,7 +64,7 @@ struct ServerStatisticsView: View {
             ? stats.totalPlayDuration / Double(stats.totalPlayCount)
             : 0
 
-        statsCard(title: "Playback") {
+        statsCard(title: tr("playback")) {
             LazyVGrid(
                 columns: DesignTokens.Tools.rankedColumns(for: horizontalSizeClass, compact: 2, regular: 4),
                 spacing: 16
@@ -72,28 +72,28 @@ struct ServerStatisticsView: View {
                 heroStat(
                     icon: "clock.fill",
                     value: formatDuration(stats.totalPlayDuration),
-                    label: "Watch Time"
+                    label: tr("watch_time")
                 )
                 heroStat(
                     icon: appearance.oCounterIconFilled,
                     value: formatCount(stats.totalOCount),
-                    label: "O-Count"
+                    label: tr("o_count")
                 )
                 heroStat(
                     icon: "play.fill",
                     value: formatCount(stats.totalPlayCount),
-                    label: "Play Count"
+                    label: tr("play_count")
                 )
                 heroStat(
                     icon: "chart.pie.fill",
                     value: formatPlayedShare(played: stats.scenesPlayed, total: stats.sceneCount),
-                    label: "Played Share"
+                    label: tr("played_share")
                 )
             }
             .padding(.horizontal, 12)
             .padding(.top, 4)
 
-            Text("Library \(formatDuration(stats.scenesDuration))  ·  Ø \(formatDuration(avgWatch))/play  ·  \(formatCount(unplayed)) unplayed")
+            Text(tr("hint_library_arg_arg_play_arg", formatDuration(stats.scenesDuration), formatDuration(avgWatch), formatCount(unplayed)))
                 .font(.caption)
                 .foregroundStyle(.secondary)
                 .padding(.horizontal, 12)
@@ -125,7 +125,7 @@ struct ServerStatisticsView: View {
 
     @ViewBuilder
     private func catalogsCard(_ stats: Statistics) -> some View {
-        statsCard(title: "Catalogs") {
+        statsCard(title: tr("catalogs")) {
             LazyVGrid(
                 columns: DesignTokens.Tools.rankedColumns(for: horizontalSizeClass, compact: 2, regular: 4),
                 spacing: 8
@@ -172,13 +172,13 @@ struct ServerStatisticsView: View {
 
     @ViewBuilder
     private func storageCard(_ stats: Statistics) -> some View {
-        statsCard(title: "Storage") {
+        statsCard(title: tr("storage")) {
             VStack(spacing: 0) {
-                statRow("Scenes", value: formatBytes(stats.scenesSize))
+                statRow(tr("scenes"), value: formatBytes(stats.scenesSize))
                 Divider().padding(.leading, 12)
-                statRow("Images", value: formatBytes(stats.imagesSize))
+                statRow(tr("images"), value: formatBytes(stats.imagesSize))
                 Divider().padding(.leading, 12)
-                statRow("Total", value: formatBytes(stats.scenesSize + stats.imagesSize), emphasize: true)
+                statRow(tr("total"), value: formatBytes(stats.scenesSize + stats.imagesSize), emphasize: true)
             }
         }
     }
@@ -207,14 +207,14 @@ struct ServerStatisticsView: View {
 
     private func catalogEntries(from stats: Statistics) -> [CatalogStatEntry] {
         [
-            .init(title: "Scenes", value: stats.sceneCount, icon: "film") { $0.navigateToScenes() },
-            .init(title: "Performers", value: stats.performerCount, icon: "person.2") { $0.navigateToPerformers() },
-            .init(title: "Galleries", value: stats.galleryCount, icon: "photo.stack") { $0.navigateToGalleries() },
-            .init(title: "Images", value: stats.imageCount, icon: "photo") { $0.navigateToImages() },
-            .init(title: "Markers", value: stats.sceneMarkerCount ?? 0, icon: "bookmark.fill") { $0.navigateToMarkers() },
-            .init(title: "Studios", value: stats.studioCount, icon: "building.2") { $0.navigateToStudios() },
-            .init(title: "Groups", value: stats.groupCount, icon: "rectangle.stack.fill") { $0.navigateToGroups() },
-            .init(title: "Tags", value: stats.tagCount, icon: "tag") { $0.navigateToTags() },
+            .init(title: tr("scenes"), value: stats.sceneCount, icon: "film") { $0.navigateToScenes() },
+            .init(title: tr("performers"), value: stats.performerCount, icon: "person.2") { $0.navigateToPerformers() },
+            .init(title: tr("galleries"), value: stats.galleryCount, icon: "photo.stack") { $0.navigateToGalleries() },
+            .init(title: tr("images"), value: stats.imageCount, icon: "photo") { $0.navigateToImages() },
+            .init(title: tr("markers"), value: stats.sceneMarkerCount ?? 0, icon: "bookmark.fill") { $0.navigateToMarkers() },
+            .init(title: tr("studios"), value: stats.studioCount, icon: "building.2") { $0.navigateToStudios() },
+            .init(title: tr("groups"), value: stats.groupCount, icon: "rectangle.stack.fill") { $0.navigateToGroups() },
+            .init(title: tr("tags"), value: stats.tagCount, icon: "tag") { $0.navigateToTags() },
         ]
     }
 

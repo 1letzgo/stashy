@@ -16,9 +16,9 @@ enum StashImageGroupMode: String, CaseIterable {
 
     var displayName: String {
         switch self {
-        case .off: return "Off"
-        case .gallery: return "By gallery"
-        case .gallerySession: return "By gallery + session"
+        case .off: return tr("off")
+        case .gallery: return tr("by_gallery")
+        case .gallerySession: return tr("by_gallery_plus_session")
         }
     }
 }

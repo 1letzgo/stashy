@@ -1,5 +1,7 @@
 package de.letzgo.stashy.ui.detail
 
+import de.letzgo.stashy.R
+import de.letzgo.stashy.tr
 import de.letzgo.stashy.data.Downloads
 import de.letzgo.stashy.ui.tools.downloads.SceneBulkDownloadDialog
 import androidx.compose.foundation.background
@@ -87,7 +89,7 @@ class GroupDetailScreen(val groupId: String, val preview: StashGroup? = null) : 
                 else -> emptyList()
             }
             DetailTopBar(group?.name ?: "", catalog.available, tab, { tab = it }, extra,
-                settings = catalog.settingsSlot(tab), sort = catalog.controller(tab), onEdit = { editing = true }, editLabel = "Edit group")
+                settings = catalog.settingsSlot(tab), sort = catalog.controller(tab), onEdit = { editing = true }, editLabel = tr(R.string.action_edit_group))
         }
         LinkedSettingsSheets(catalog)
         val g = group
@@ -108,8 +110,8 @@ class GroupDetailScreen(val groupId: String, val preview: StashGroup? = null) : 
     private fun Header(g: StashGroup) {
         // iOS shows the loaded scene total here (`viewModel.totalGroupScenes`).
         val items = DetailFormatting.group(g, catalog.scenes?.totalCount ?: 0, catalog.effectiveGalleries).toMutableList()
-        g.director?.takeIf { it.isNotBlank() }?.let { items += DetailItem("Director", it) }
-        de.letzgo.stashy.ui.components.formatDuration(g.duration?.toDouble())?.let { items += DetailItem("Duration", it) }
+        g.director?.takeIf { it.isNotBlank() }?.let { items += DetailItem(tr(R.string.director), it) }
+        de.letzgo.stashy.ui.components.formatDuration(g.duration?.toDouble())?.let { items += DetailItem(tr(R.string.duration), it) }
         g.subGroupCount?.takeIf { it > 0 }?.let { items += DetailItem("SUB-GROUPS", "$it") }
         val thumb = groupThumbnailURL(g)?.takeIf { g.frontImagePath?.contains("default=true") != true }
         val full = g.frontImageURL
@@ -125,10 +127,10 @@ class GroupDetailScreen(val groupId: String, val preview: StashGroup? = null) : 
             onToggle = { expanded = !expanded },
             hero = if (thumb != null && full != null) {
                 DetailHero(
-                    DetailHero.Style.Cover, thumb, Color.Black, "Open cover", { fullscreen = HeroImageFullscreenItem(full, g.name) },
+                    DetailHero.Style.Cover, thumb, Color.Black, tr(R.string.action_open_cover), { fullscreen = HeroImageFullscreenItem(full, g.name) },
                     backdropAlignment = HeroPortraitBias,
                 ) { HeroPicture(thumb, g.name, ContentScale.Crop, rectangleStackIcon(), alignment = HeroPortraitBias) }
-            } else DetailHero(DetailHero.Style.Cover, null, Color.Black, "Open cover", null) { HeroPlaceholder(rectangleStackIcon()) },
+            } else DetailHero(DetailHero.Style.Cover, null, Color.Black, tr(R.string.action_open_cover), null) { HeroPlaceholder(rectangleStackIcon()) },
             collapsedItemCount = 4,
             footer = parents.takeIf { it.isNotEmpty() }?.let { list ->
                 { ParentGroupLinks(list) }
@@ -141,7 +143,7 @@ class GroupDetailScreen(val groupId: String, val preview: StashGroup? = null) : 
     @Composable
     private fun ParentGroupLinks(list: List<GroupStub>) {
         Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-            Text("In", fontSize = 11.sp, color = Theme.palette.secondaryText)
+            Text(tr(R.string.in_label), fontSize = 11.sp, color = Theme.palette.secondaryText)
             list.forEach { parent ->
                 Text(
                     parent.name, fontSize = 11.sp, fontWeight = FontWeight.Bold, color = de.letzgo.stashy.ui.textAccent(),
@@ -157,32 +159,32 @@ class GroupDetailScreen(val groupId: String, val preview: StashGroup? = null) : 
     private fun EditGroupSheet(group: StashGroup, onDismiss: () -> Unit, onSaved: (StashGroup) -> Unit) {
         val sections = remember(group.id) {
             listOf(
-                EditSection("Identity", listOf(
-                    EditField("Name", group.name),
-                    EditField("Date (YYYY-MM-DD)", group.date ?: "", KeyboardType.Ascii, isDate = true),
-                    EditField("Rating (0–100)", group.rating100?.toString() ?: "", KeyboardType.Number),
+                EditSection(tr(R.string.identity), listOf(
+                    EditField(tr(R.string.name), group.name),
+                    EditField(tr(R.string.date_yyyy_mm_dd), group.date ?: "", KeyboardType.Ascii, isDate = true),
+                    EditField(tr(R.string.rating_0_100), group.rating100?.toString() ?: "", KeyboardType.Number),
                 )),
-                EditSection("Synopsis", listOf(EditField("Synopsis", group.synopsis ?: "", multiline = true))),
+                EditSection(tr(R.string.synopsis), listOf(EditField(tr(R.string.synopsis), group.synopsis ?: "", multiline = true))),
             )
         }
         val (name, date, rating) = sections[0].fields
         val synopsis = sections[1].fields[0]
         EditEntitySheet(
-            title = "Edit Group", sections = sections,
-            deleteLabel = "Delete Group", deleteTitle = "Delete Group", entityName = group.name,
+            title = tr(R.string.action_edit_group), sections = sections,
+            deleteLabel = tr(R.string.action_delete_group), deleteTitle = tr(R.string.action_delete_group), entityName = group.name,
             onDismiss = onDismiss,
             onSave = {
                 val r = EditParsing.rating(rating.value)
                 val ok = DetailRepository.updateGroup(group.id, name.trimmed, date.optional, synopsis.optional, r)
                 if (ok) {
                     onSaved(group.copy(name = name.trimmed, date = date.optional, synopsis = synopsis.optional, rating100 = r))
-                    detailToast("Group updated")
-                } else detailToast("Failed to update group")
+                    detailToast(tr(R.string.group_updated))
+                } else detailToast(tr(R.string.error_update_group))
                 ok
             },
             onDelete = {
                 DetailRepository.deleteGroup(group.id)
-                detailToast("Group deleted")
+                detailToast(tr(R.string.group_deleted))
                 Nav.pop()
             },
         )

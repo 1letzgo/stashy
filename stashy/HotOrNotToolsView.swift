@@ -586,7 +586,7 @@ private struct HotOrNotProfileLinkCard: View {
                 Image(systemName: "person.3")
                     .font(.system(size: 15, weight: .semibold))
                     .foregroundStyle(.primary)
-                Text("Profile")
+                Text(tr("profile"))
                     .font(.subheadline.weight(.semibold))
                     .foregroundStyle(.primary)
             }
@@ -647,7 +647,7 @@ private struct HotOrNotBattleColumn: View {
                             .monospacedDigit()
                             .foregroundStyle(.white)
                             .shadow(color: .black.opacity(0.35), radius: 2, y: 1)
-                        Text("Score")
+                        Text(tr("score"))
                             .font(.system(size: 11, weight: .semibold))
                             .foregroundStyle(.white.opacity(0.92))
                             .textCase(.uppercase)
@@ -665,7 +665,7 @@ private struct HotOrNotBattleColumn: View {
         .buttonStyle(.plain)
         .disabled(model.isSubmitting)
         .frame(maxWidth: .infinity)
-        .accessibilityLabel("Choose \(performer.displayName)")
+        .accessibilityLabel(tr("action_choose_arg", performer.displayName))
     }
 
     private func voteTint(for delta100: Int) -> Color {
@@ -797,7 +797,7 @@ private struct HotOrNotGauntletStarterPickCard: View {
         .buttonStyle(.plain)
         .disabled(model.isSubmitting)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-        .accessibilityLabel("Pick \(performer.displayName) as Rise starter")
+        .accessibilityLabel(tr("action_pick_arg_as_rise_starter", performer.displayName))
     }
 
     private var photoStack: some View {
@@ -1003,8 +1003,8 @@ final class HotOrNotViewModel: ObservableObject {
         var label: String {
             switch self {
             case .headToHead: return "1 vs. 1"
-            case .placement: return "Rise"
-            case .champion: return "Legend"
+            case .placement: return tr("rise")
+            case .champion: return tr("legend")
             case .bracket: return "32:1"
             }
         }
@@ -1179,7 +1179,7 @@ final class HotOrNotViewModel: ObservableObject {
             let list = pool.list
             poolCount = pool.count
             guard list.count >= 2 else {
-                errorMessage = "Not enough performers with images for the selected genders."
+                errorMessage = tr("hint_not_enough_performers_with_images")
                 left = nil
                 right = nil
                 rankLeft = nil
@@ -1275,7 +1275,7 @@ final class HotOrNotViewModel: ObservableObject {
             let list = pool.list
             poolCount = pool.count
             guard list.count >= 2 else {
-                errorMessage = "Not enough performers with images for the selected genders."
+                errorMessage = tr("hint_not_enough_performers_with_images")
                 left = nil
                 right = nil
                 rankLeft = nil
@@ -1326,7 +1326,7 @@ final class HotOrNotViewModel: ObservableObject {
 
             guard let champ = climbChampion else { return }
             guard let champIdx = ranked.firstIndex(where: { $0.id == champ.id }) else {
-                errorMessage = "Legend run performer is no longer in this pool. Run reset."
+                errorMessage = tr("hint_legend_run_performer_is_no")
                 resetClimbStatePreservingMode()
                 await loadDuelPair()
                 return
@@ -1394,7 +1394,7 @@ final class HotOrNotViewModel: ObservableObject {
             let list = res.data?.findPerformers.performers ?? []
             placementStarters = Array(list.shuffled().prefix(6))
             if placementStarters.isEmpty {
-                errorMessage = "No performers to pick as a Rise starter."
+                errorMessage = tr("hint_no_performers_to_pick_as")
             }
         } catch {
             errorMessage = error.localizedDescription
@@ -1534,7 +1534,7 @@ final class HotOrNotViewModel: ObservableObject {
                     pool: pool.list,
                     recentIds: HotOrNotBracketStore.recentIds()
                 ) else {
-                    errorMessage = "Need at least \(HotOrNotBracketMath.size) performers with images for the selected genders."
+                    errorMessage = tr("hint_need_at_least_arg_performers", HotOrNotBracketMath.size)
                     left = nil
                     right = nil
                     return
@@ -1677,7 +1677,7 @@ final class HotOrNotViewModel: ObservableObject {
             }
         }
         if let firstFailure {
-            errorMessage = "\(failedCount) of \(bracketProposals.count) ratings not saved. \(firstFailure)"
+            errorMessage = tr("hint_arg_of_arg_ratings_not", failedCount, bracketProposals.count, firstFailure)
         } else {
             #if !os(tvOS)
             HapticManager.success()
@@ -1710,7 +1710,7 @@ final class HotOrNotViewModel: ObservableObject {
     var bracketStatusLine: String? {
         guard let state = bracket, let m = state.currentMatch else { return nil }
         let roundSize = state.rounds[m.round].count
-        return "\(HotOrNotBracketMath.roundTitle(round: m.round, roundCount: state.roundCount)) · Match \(m.index + 1)/\(roundSize)"
+        return tr("arg_match_arg_arg", HotOrNotBracketMath.roundTitle(round: m.round, roundCount: state.roundCount), m.index + 1, roundSize)
     }
 
     func choose(leftWins: Bool) async {
@@ -1931,7 +1931,7 @@ final class HotOrNotViewModel: ObservableObject {
             variables: ["input": input]
         )
         if res.data?.performerUpdate == nil {
-            throw NSError(domain: "HotOrNot", code: 1, userInfo: [NSLocalizedDescriptionKey: res.errors?.first?.message ?? "Update failed"])
+            throw NSError(domain: "HotOrNot", code: 1, userInfo: [NSLocalizedDescriptionKey: res.errors?.first?.message ?? tr("error_update")])
         }
         applyPushedUpdateToDuelPool(id: performer.id, rating: newRating, statsJson: statsJson, recordJson: recordJson)
     }
@@ -1956,7 +1956,7 @@ struct HotOrNotToolsView: View {
     /// from Charts or Settings to the game.
     private var modeCrumb: some View {
         Menu {
-            Picker("Mode", selection: Binding(
+            Picker(tr("mode"), selection: Binding(
                 get: { model.duelMode },
                 set: { mode in
                     guard !model.isSubmitting else { return }
@@ -1993,7 +1993,7 @@ struct HotOrNotToolsView: View {
         .stashyNeutralMenuItems()
         .fixedSize()
         .disabled(model.isSubmitting)
-        .accessibilityLabel("Match mode, \(model.duelMode.label)")
+        .accessibilityLabel(tr("match_mode_arg", model.duelMode.label))
     }
 
     /// Charts / Settings as a button at the right of the Tools row: highlighted while its
@@ -2124,7 +2124,7 @@ struct HotOrNotToolsView: View {
                     HapticManager.light()
                     model.undoBracketPick()
                 } label: {
-                    Label("Undo", systemImage: "arrow.uturn.backward")
+                    Label(tr("action_undo"), systemImage: "arrow.uturn.backward")
                         .font(.subheadline.weight(.semibold))
                         .frame(maxWidth: .infinity)
                 }
@@ -2144,18 +2144,18 @@ struct HotOrNotToolsView: View {
                     HapticManager.light()
                     model.startNewClimbRun()
                 } label: {
-                    Label("Stop", systemImage: "stop.circle")
+                    Label(tr("action_stop"), systemImage: "stop.circle")
                         .font(.subheadline.weight(.semibold))
                         .frame(maxWidth: .infinity)
                 }
                 .buttonStyle(.bordered)
                 .disabled(model.isSubmitting)
-                .accessibilityLabel("End Legend run")
+                .accessibilityLabel(tr("end_legend_run"))
             } else {
                 Button {
                     Task { await model.skipDraw() }
                 } label: {
-                    Label("Draw", systemImage: "equal.circle")
+                    Label(tr("draw"), systemImage: "equal.circle")
                         .font(.subheadline.weight(.semibold))
                         .frame(maxWidth: .infinity)
                 }
@@ -2167,31 +2167,31 @@ struct HotOrNotToolsView: View {
                 EmptyView()
             } else if model.duelMode == .placement {
                 Button(action: {}) {
-                    Label("New pair", systemImage: "arrow.triangle.2.circlepath")
+                    Label(tr("new_pair"), systemImage: "arrow.triangle.2.circlepath")
                         .font(.subheadline.weight(.semibold))
                         .frame(maxWidth: .infinity)
                 }
                 .buttonStyle(.bordered)
                 .disabled(true)
-                .accessibilityLabel("New pair, not available in Rise")
+                .accessibilityLabel(tr("hint_new_pair_not_available_in"))
 
                 Button {
                     HapticManager.light()
                     model.startNewClimbRun()
                 } label: {
-                    Label("Stop", systemImage: "stop.circle")
+                    Label(tr("action_stop"), systemImage: "stop.circle")
                         .font(.subheadline.weight(.semibold))
                         .frame(maxWidth: .infinity)
                 }
                 .buttonStyle(.borderedProminent)
                 .tint(appearance.tintColor)
                 .disabled(model.isSubmitting)
-                .accessibilityLabel("End Rise run")
+                .accessibilityLabel(tr("end_rise_run"))
             } else {
                 Button {
                     Task { await model.loadDuelPair() }
                 } label: {
-                    Label("New pair", systemImage: "arrow.triangle.2.circlepath")
+                    Label(tr("new_pair"), systemImage: "arrow.triangle.2.circlepath")
                         .font(.subheadline.weight(.semibold))
                         .frame(maxWidth: .infinity)
                 }
@@ -2206,11 +2206,11 @@ struct HotOrNotToolsView: View {
     private var placementStarterInline: some View {
         VStack(spacing: 10) {
             if model.isLoadingPlacementStarters && model.placementStarters.isEmpty {
-                StandardLoadingView(message: "Loading starters...")
+                StandardLoadingView(message: tr("loading_starters"))
                     .frame(minHeight: 220)
             } else if model.placementStarters.isEmpty {
                 ContentUnavailableView(
-                    "No starters",
+                    tr("empty_starters"),
                     systemImage: "person.2.slash",
                     description: Text(model.errorMessage ?? "")
                 )
@@ -2236,19 +2236,19 @@ struct HotOrNotToolsView: View {
             VStack(spacing: 16) {
                 if let victor = model.climbVictory {
                     VStack(spacing: 12) {
-                        Text("Legend!")
+                        Text(tr("legend_2"))
                             .font(.title2.weight(.bold))
                         Text(victor.displayName)
                             .font(.headline)
                             .multilineTextAlignment(.center)
-                        Text("\(model.climbWins) wins · cleared the ladder")
+                        Text(tr("hint_arg_wins_cleared_ladder", model.climbWins))
                             .font(.caption)
                             .foregroundStyle(.secondary)
                             .multilineTextAlignment(.center)
                         Button {
                             model.startNewClimbRun()
                         } label: {
-                            Text("New run")
+                            Text(tr("new_run"))
                                 .font(.subheadline.weight(.semibold))
                                 .frame(maxWidth: .infinity)
                         }
@@ -2272,7 +2272,7 @@ struct HotOrNotToolsView: View {
                         showTree: { showBracketTree = true }
                     )
                 } else if model.isLoadingPair && model.left == nil {
-                    StandardLoadingView(message: "Loading pair...")
+                    StandardLoadingView(message: tr("loading_pair"))
                         .frame(minHeight: 320)
                 } else if let l = model.left, let r = model.right {
                     HStack(alignment: .top, spacing: isRegular ? 20 : 10) {
@@ -2319,7 +2319,7 @@ struct HotOrNotToolsView: View {
     private var leaderboardContent: some View {
         Group {
             if model.isLoadingBoard && model.leaderboard.isEmpty {
-                StandardLoadingView(message: "Loading charts...")
+                StandardLoadingView(message: tr("loading_charts"))
             } else {
                 ScrollView {
                     VStack(spacing: 12) {
@@ -2368,7 +2368,7 @@ private struct HotOrNotBracketResultsCard: View {
                     Image(systemName: "trophy.fill")
                         .font(.title)
                         .foregroundStyle(appearance.tintColor)
-                    Text("Champion")
+                    Text(tr("champion"))
                         .font(.caption.weight(.semibold))
                         .foregroundStyle(.secondary)
                         .textCase(.uppercase)
@@ -2379,11 +2379,11 @@ private struct HotOrNotBracketResultsCard: View {
             }
 
             if model.isLoadingBracketResults && model.bracketProposals.isEmpty {
-                StandardLoadingView(message: "Calculating ratings...")
+                StandardLoadingView(message: tr("calculating_ratings_menu"))
                     .frame(minHeight: 160)
             } else {
                 if model.isApplyingBracket {
-                    Text("Saving ratings \(model.bracketAppliedCount)/\(model.bracketProposals.count)")
+                    Text(tr("saving_ratings_arg_arg", model.bracketAppliedCount, model.bracketProposals.count))
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
@@ -2409,7 +2409,7 @@ private struct HotOrNotBracketResultsCard: View {
                     Button {
                         model.newBracket()
                     } label: {
-                        Text("New tournament")
+                        Text(tr("new_tournament"))
                             .font(.subheadline.weight(.semibold))
                             .frame(maxWidth: .infinity)
                     }
@@ -2421,7 +2421,7 @@ private struct HotOrNotBracketResultsCard: View {
                     Button {
                         Task { await model.retryBracketSave() }
                     } label: {
-                        Label("Retry", systemImage: "arrow.clockwise")
+                        Label(tr("action_retry"), systemImage: "arrow.clockwise")
                             .font(.subheadline.weight(.semibold))
                             .frame(maxWidth: .infinity)
                     }
@@ -2431,18 +2431,18 @@ private struct HotOrNotBracketResultsCard: View {
                     Button(role: .destructive) {
                         confirmEnd = true
                     } label: {
-                        Text("End")
+                        Text(tr("end"))
                             .font(.subheadline.weight(.semibold))
                             .frame(maxWidth: .infinity)
                     }
                     .buttonStyle(.bordered)
                 }
             }
-            .alert("End tournament?", isPresented: $confirmEnd) {
-                Button("End tournament", role: .destructive) { model.newBracket() }
-                Button("Cancel", role: .cancel) {}
+            .alert(tr("confirm_end_tournament"), isPresented: $confirmEnd) {
+                Button(tr("end_tournament"), role: .destructive) { model.newBracket() }
+                Button(tr("action_cancel"), role: .cancel) {}
             } message: {
-                Text("Ratings that were not saved are lost.")
+                Text(tr("hint_ratings_that_were_not_saved"))
             }
         }
         .padding(16)
@@ -2501,7 +2501,7 @@ private struct HotOrNotBracketTreeSheet: View {
     var body: some View {
         NavigationStack {
             VStack(spacing: 0) {
-                Picker("Round", selection: $round) {
+                Picker(tr("round"), selection: $round) {
                     ForEach(0..<state.roundCount, id: \.self) { r in
                         Text(shortTitle(r)).tag(r)
                     }
@@ -2517,7 +2517,7 @@ private struct HotOrNotBracketTreeSheet: View {
                                 matchCell(m)
                             }
                         } else {
-                            Text("Not reached yet")
+                            Text(tr("not_reached_yet"))
                                 .font(.subheadline)
                                 .foregroundStyle(.secondary)
                                 .padding(.top, 40)
@@ -2538,7 +2538,7 @@ private struct HotOrNotBracketTreeSheet: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("Done") { dismiss() }
+                    Button(tr("action_done")) { dismiss() }
                 }
             }
         }
@@ -2599,9 +2599,9 @@ private struct HotOrNotLeaderboardCard: View {
 
     private var streakSummaryLine: String? {
         let parts: [String] = [
-            s.current_streak != 0 ? "Current \(streakSigned(s.current_streak))" : nil,
-            s.best_streak > 0 ? "Best +\(s.best_streak)" : nil,
-            s.worst_streak < 0 ? "Worst \(s.worst_streak)" : nil
+            s.current_streak != 0 ? tr("current_arg", streakSigned(s.current_streak)) : nil,
+            s.best_streak > 0 ? tr("best_plus_arg", s.best_streak) : nil,
+            s.worst_streak < 0 ? tr("worst_arg", s.worst_streak) : nil
         ].compactMap { $0 }
         guard !parts.isEmpty else { return nil }
         return parts.joined(separator: " · ")
@@ -2678,8 +2678,8 @@ private struct HotOrNotLeaderboardCard: View {
     private var hotOrNotStatsBlock: some View {
         VStack(alignment: .leading, spacing: 4) {
             HStack(alignment: .top, spacing: 4) {
-                leaderboardStatColumn(title: "Rating", value: ratingDisplay)
-                leaderboardStatColumn(title: "Duels", value: "\(s.total_matches)")
+                leaderboardStatColumn(title: tr("rating"), value: ratingDisplay)
+                leaderboardStatColumn(title: tr("duels"), value: "\(s.total_matches)")
                 leaderboardStatColumn(title: "W", value: "\(s.wins)")
                 leaderboardStatColumn(title: "L", value: "\(s.losses)")
                 leaderboardStatColumn(title: "D", value: "\(s.draws)")
@@ -2750,19 +2750,21 @@ private struct HotOrNotPoolSettingsView: View {
     @ObservedObject private var appearance = AppearanceManager.shared
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
 
-    private static let genderRows: [(code: String, label: String)] = [
-        ("FEMALE", "Female"),
-        ("MALE", "Male"),
-        ("TRANSGENDER_FEMALE", "Transgender (female)"),
-        ("TRANSGENDER_MALE", "Transgender (male)"),
-        ("NON_BINARY", "Non-binary"),
-        ("INTERSEX", "Intersex")
+    private static var genderRows: [(code: String, label: String)] {
+[
+        ("FEMALE", tr("female")),
+        ("MALE", tr("male")),
+        ("TRANSGENDER_FEMALE", tr("transgender_female")),
+        ("TRANSGENDER_MALE", tr("transgender_male")),
+        ("NON_BINARY", "Non-Binary"),
+        ("INTERSEX", tr("intersex"))
     ]
+    }
 
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 8) {
-                Text("Genders in pool")
+                Text(tr("genders_in_pool"))
                     .font(.title3)
                     .fontWeight(.semibold)
                     .padding(.horizontal, 12)

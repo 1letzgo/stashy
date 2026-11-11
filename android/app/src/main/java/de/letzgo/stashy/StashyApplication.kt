@@ -22,6 +22,7 @@ class StashyApplication : Application(), SingletonImageLoader.Factory {
     override fun onCreate() {
         super.onCreate()
         Prefs.init(this)
+        Localization.init(this) // reads the chosen app language from Prefs
         Net.watchNetworkChanges(this)
         ServerConfigManager.init()
         // Local address of the active server: probe at start; requests wait for it (settle()).

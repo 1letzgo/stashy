@@ -34,7 +34,7 @@ struct SceneHeatmapCard: View {
         VStack(alignment: .leading, spacing: 12) {
             HStack(alignment: .center) {
                 VStack(alignment: .leading, spacing: 2) {
-                    Text("Interactive")
+                    Text(tr("interactive"))
                         .font(.title3)
                         .fontWeight(.semibold)
                 }
@@ -55,7 +55,7 @@ struct SceneHeatmapCard: View {
                             } label: {
                                 HStack(spacing: 4) {
                                     Image(systemName: handyManager.isSyncing ? "hand.tap.fill" : "hand.tap")
-                                    Text(handyManager.isSyncing ? "Ready" : "TheHandy")
+                                    Text(handyManager.isSyncing ? tr("ready") : "TheHandy")
                                 }
                                 .font(.caption)
                                 .fontWeight(.bold)
@@ -79,7 +79,7 @@ struct SceneHeatmapCard: View {
                             } label: {
                                 HStack(spacing: 4) {
                                     Image(systemName: buttplugManager.isSyncing ? "cable.connector.fill" : "cable.connector")
-                                    Text(buttplugManager.isSyncing ? "Ready" : "Intiface")
+                                    Text(buttplugManager.isSyncing ? tr("ready") : tr("intiface"))
                                 }
                                 .font(.caption)
                                 .fontWeight(.bold)
@@ -104,7 +104,7 @@ struct SceneHeatmapCard: View {
                                 let isSyncing = loveSpouseManager.isSyncing
                                 HStack(spacing: 4) {
                                     Image(systemName: isSyncing ? "antenna.radiowaves.left.and.right.circle.fill" : "antenna.radiowaves.left.and.right")
-                                    Text(isSyncing ? "SYNC ON" : "Love Spouse")
+                                    Text(isSyncing ? tr("action_sync_on") : tr("love_spouse"))
                                 }
                                 .font(.caption)
                                 .fontWeight(.bold)
@@ -226,7 +226,7 @@ struct SceneHeatmapCard: View {
             // Placeholder when no heatmap is available
             ZStack {
                 Rectangle().fill(Color.gray.opacity(0.1))
-                Text("No Heatmap")
+                Text(tr("empty_heatmap"))
                     .font(.caption2)
                     .foregroundColor(.secondary)
             }

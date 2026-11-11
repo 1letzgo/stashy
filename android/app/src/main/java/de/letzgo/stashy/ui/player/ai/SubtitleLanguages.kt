@@ -1,5 +1,7 @@
 package de.letzgo.stashy.ui.player.ai
 
+import de.letzgo.stashy.R
+import de.letzgo.stashy.tr
 import de.letzgo.stashy.data.Prefs
 import de.letzgo.stashy.data.Scene
 import de.letzgo.stashy.ui.player.PlayerTrack
@@ -136,7 +138,7 @@ object SubtitleTargetLanguage {
 enum class SceneTeleprompterMode(val raw: String) {
     Off("off"), English("english"), UserLanguage("userLanguage");
 
-    val title: String get() = when (this) { Off -> "Off"; English -> "English"; UserLanguage -> "My language" }
+    val title: String get() = when (this) { Off -> tr(R.string.off); English -> tr(R.string.english); UserLanguage -> tr(R.string.my_language) }
 
     /** Language the captions are shown in (iOS `captionTargetCode`). */
     fun captionTargetCode(userLanguage: String = SubtitleTargetLanguage.load()): String? = when (this) {

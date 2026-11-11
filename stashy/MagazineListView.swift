@@ -30,7 +30,7 @@ struct MagazineListView: View {
         GalleriesView(
             filterMemory: filterMemory,
             host: GalleryListHost(
-                title: "Magazin",
+                title: tr("magazin"),
                 onOpen: { openedGallery = $0 },
                 card: { AnyView(card(for: $0)) },
                 gridItems: Self.gridItems(width:),
@@ -80,7 +80,7 @@ struct MagazineListView: View {
             }
             .contextMenu {
                 if page > 1 {
-                    Button("Reset position", systemImage: "arrow.counterclockwise") {
+                    Button(tr("action_reset_position"), systemImage: "arrow.counterclockwise") {
                         readingStore.resetPosition(galleryId: gallery.id)
                     }
                 }

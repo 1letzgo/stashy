@@ -24,17 +24,19 @@ struct TVTagsView: View {
         _sortBy = State(initialValue: defaultSort)
     }
 
-    private static let sortOptions: [TVPickerOption<StashDBViewModel.TagSortOption>] = [
-        .init(.random, "Random"),
-        .init(.nameAsc, "Name (A-Z)"),
-        .init(.nameDesc, "Name (Z-A)"),
-        .init(.sceneCountDesc, "Most Scenes"),
-        .init(.sceneCountAsc, "Least Scenes"),
-        .init(.createdAtDesc, "Recently Added"),
-        .init(.createdAtAsc, "Oldest Added"),
-        .init(.updatedAtDesc, "Recently Updated"),
-        .init(.updatedAtAsc, "Least Recently Updated")
+    private static var sortOptions: [TVPickerOption<StashDBViewModel.TagSortOption>] {
+[
+        .init(.random, tr("random")),
+        .init(.nameAsc, tr("name_z")),
+        .init(.nameDesc, tr("name_z_2")),
+        .init(.sceneCountDesc, tr("most_scenes")),
+        .init(.sceneCountAsc, tr("least_scenes")),
+        .init(.createdAtDesc, tr("recently_added")),
+        .init(.createdAtAsc, tr("oldest_added")),
+        .init(.updatedAtDesc, tr("recently_updated")),
+        .init(.updatedAtAsc, tr("least_recently_updated"))
     ]
+    }
 
     var body: some View {
         TVCatalogGrid(
@@ -46,9 +48,9 @@ struct TVTagsView: View {
             hasMore: viewModel.hasMoreTags,
             columnWidth: 400,
             emptySystemImage: "tag",
-            emptyTitle: "No Tags Found",
-            loadingText: "Loading tags…",
-            errorTitle: "Error loading tags",
+            emptyTitle: tr("empty_tags_found"),
+            loadingText: tr("loading_tags"),
+            errorTitle: tr("error_loading_tags"),
             focusResetToken: focusResetToken,
             loadMore: { viewModel.loadMoreTags() },
             reload: { reload() },
@@ -57,7 +59,7 @@ struct TVTagsView: View {
                 STVHeaderView(
                     sortMenu: {
                         TVOptionPickerButton(
-                            title: "Sort By",
+                            title: tr("action_sort_by"),
                             icon: "arrow.up.arrow.down",
                             options: Self.sortOptions,
                             selection: $sortBy
@@ -165,7 +167,7 @@ struct TVTagDetailView: View {
             infoGrid: { _ in
                 LazyVGrid(columns: TVGridSpec.infoColumns, alignment: .leading, spacing: 12) {
                     if viewModel.totalTagScenes > 0 {
-                        Text("Scenes").font(.title3).foregroundStyle(.secondary)
+                        Text(tr("scenes")).font(.title3).foregroundStyle(.secondary)
                         Text("\(viewModel.totalTagScenes)").font(.title3).foregroundColor(.white)
                     }
                 }

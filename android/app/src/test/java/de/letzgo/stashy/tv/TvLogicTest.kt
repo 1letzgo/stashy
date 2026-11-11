@@ -205,7 +205,7 @@ class TvLogicTest {
         )
         val channel = TvChannel.savedFilter(filter)
         assertEquals("channel.filter.f1", channel.id)
-        assertEquals("Saved filter", channel.subtitle)
+        assertEquals("Saved Filter", channel.subtitle)
         assertEquals("createdAtDesc", channel.sortRaw)
         val query = channel.query()
         assertEquals(filter, query.base)

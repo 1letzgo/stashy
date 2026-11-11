@@ -1,5 +1,7 @@
 package de.letzgo.stashy.ui.tools.stats
 
+import de.letzgo.stashy.R
+import de.letzgo.stashy.tr
 import de.letzgo.stashy.ui.bottomBarContentPadding
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.background
@@ -136,10 +138,10 @@ private fun TimelineKindMenu(enabled: Set<TimelineKind>, onChange: (Set<Timeline
     val haptics = androidx.compose.ui.platform.LocalHapticFeedback.current
     ToolsRowMenu(
         icon = SF.line3HorizontalDecrease,
-        accessibilityLabel = "Show activity",
+        accessibilityLabel = tr(R.string.action_show_activity),
         isActive = enabled.size < TimelineKind.entries.size,
     ) { _ ->
-        ToolsMenuSectionHeader("Show")
+        ToolsMenuSectionHeader(tr(R.string.action_show))
         TimelineKind.entries.forEach { kind ->
             val on = kind in enabled
             ToolsMenuItem(kind.label, kindIcon(kind), checked = on) {
@@ -184,15 +186,15 @@ private fun TimelineList(enabledKinds: Set<TimelineKind>, top: androidx.compose.
     ) {
         when {
             loader.isLoading && loader.sessions.isEmpty() -> item(key = "loading") {
-                InsightsLoading("Loading timeline...", Modifier.fillMaxWidth().padding(top = 40.dp))
+                InsightsLoading(tr(R.string.loading_timeline), Modifier.fillMaxWidth().padding(top = 40.dp))
             }
             loader.didFail && loader.sessions.isEmpty() -> item(key = "failed") {
-                CenteredNote("Could not load play history from this server.")
+                CenteredNote(tr(R.string.error_load_play_history_from_this))
             }
             visibleDays.isEmpty() -> item(key = "empty") {
                 CenteredNote(
-                    if (loader.sessions.isEmpty()) "No plays, O-counts, or markers in the last 24 hours."
-                    else "No matching activity for the selected filters.",
+                    if (loader.sessions.isEmpty()) tr(R.string.hint_no_plays_o_counts_or)
+                    else tr(R.string.empty_matching_activity_for_selected_filters),
                 )
             }
             else -> visibleDays.forEachIndexed { index, day ->
@@ -387,7 +389,7 @@ private fun TimelineVisitCard(visit: TimelineVisit, modifier: Modifier = Modifie
         }
         Row(Modifier.align(Alignment.BottomEnd), horizontalArrangement = Arrangement.spacedBy(2.dp), verticalAlignment = Alignment.CenterVertically) {
             when {
-                visit.isMarkerAction -> BadgeIcon(SF.bookmarkFill, tint, "Marker created")
+                visit.isMarkerAction -> BadgeIcon(SF.bookmarkFill, tint, tr(R.string.marker_created))
                 visit.isPlayback -> {
                     if (visit.oCount > 0) OCountBadge(visit.oCount)
                     BadgeIcon(SF.playFill, p.secondaryText)

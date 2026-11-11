@@ -69,7 +69,7 @@ struct DirectorDetailView: View {
         )
         // Same row as the other detail pages: Back · Scenes, the list's sort and settings right.
         .environment(\.detailBreadcrumb, DetailBreadcrumb(
-            sections: [.init(id: "scenes", title: "Scenes", systemImage: "film")],
+            sections: [.init(id: "scenes", title: tr("scenes"), systemImage: "film")],
             selectionID: "scenes",
             onSelect: { _ in },
             onBack: { dismiss() }
@@ -104,7 +104,7 @@ struct DirectorDetailView: View {
 
                 LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], alignment: .leading, spacing: 6) {
                     VStack(alignment: .leading, spacing: 0) {
-                        Text("Scenes")
+                        Text(tr("scenes"))
                             .font(.system(size: 11))
                             .foregroundColor(.secondary)
                             .textCase(.uppercase)

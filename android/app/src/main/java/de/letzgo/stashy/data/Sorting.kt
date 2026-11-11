@@ -1,5 +1,7 @@
 package de.letzgo.stashy.data
 
+import de.letzgo.stashy.R
+import de.letzgo.stashy.tr
 import kotlin.random.Random
 
 /**
@@ -26,8 +28,8 @@ data class SortFieldKind(val field: String, val menuLabel: String)
 /** iOS `SceneSortOption.sceneNumber*`: a scene's number inside a group, only on a group's scenes. */
 object GroupSceneSort {
     const val FIELD = "group_scene_number"
-    val Asc = SortOption("sceneNumberAsc", "Scene No. (Ascending)", FIELD, "ASC")
-    val Desc = SortOption("sceneNumberDesc", "Scene No. (Descending)", FIELD, "DESC")
+    val Asc = SortOption("sceneNumberAsc", tr(R.string.scene_no_ascending), FIELD, "ASC")
+    val Desc = SortOption("sceneNumberDesc", tr(R.string.scene_no_descending), FIELD, "DESC")
     val options = listOf(Asc, Desc)
 }
 
@@ -35,100 +37,100 @@ object SortCatalog {
     private fun o(raw: String, label: String, field: String, dir: String) = SortOption(raw, label, field, dir)
 
     val scenes = listOf(
-        o("random", "Random", "random", "DESC"),
-        o("forYou", "For You", SortOption.FOR_YOU_FIELD, "DESC"),
-        o("dateDesc", "Date (Newest First)", "date", "DESC"), o("dateAsc", "Date (Oldest First)", "date", "ASC"),
-        o("productionDateDesc", "Production Date (Newest First)", "production_date", "DESC"), o("productionDateAsc", "Production Date (Oldest First)", "production_date", "ASC"),
-        o("createdAtDesc", "Created (Newest First)", "created_at", "DESC"), o("createdAtAsc", "Created (Oldest First)", "created_at", "ASC"),
-        o("titleAsc", "Title (A-Z)", "title", "ASC"), o("titleDesc", "Title (Z-A)", "title", "DESC"),
-        o("durationDesc", "Duration (Longest First)", "duration", "DESC"), o("durationAsc", "Duration (Shortest First)", "duration", "ASC"),
-        o("lastPlayedAtDesc", "Last Played (Newest First)", "last_played_at", "DESC"), o("lastPlayedAtAsc", "Last Played (Oldest First)", "last_played_at", "ASC"),
-        o("playCountDesc", "Most Viewed", "play_count", "DESC"), o("playCountAsc", "Least Viewed", "play_count", "ASC"),
-        o("playDurationDesc", "Watch Time (High-Low)", "play_duration", "DESC"), o("playDurationAsc", "Watch Time (Low-High)", "play_duration", "ASC"),
-        o("oCounterDesc", "Counter (High-Low)", "o_counter", "DESC"), o("oCounterAsc", "Counter (Low-High)", "o_counter", "ASC"),
-        o("ratingDesc", "Rating (High-Low)", "rating", "DESC"), o("ratingAsc", "Rating (Low-High)", "rating", "ASC"),
+        o("random", tr(R.string.random), "random", "DESC"),
+        o("forYou", tr(R.string.for_you), SortOption.FOR_YOU_FIELD, "DESC"),
+        o("dateDesc", tr(R.string.date_newest_first), "date", "DESC"), o("dateAsc", tr(R.string.date_oldest_first), "date", "ASC"),
+        o("productionDateDesc", tr(R.string.production_date_newest_first), "production_date", "DESC"), o("productionDateAsc", tr(R.string.production_date_oldest_first), "production_date", "ASC"),
+        o("createdAtDesc", tr(R.string.created_newest_first), "created_at", "DESC"), o("createdAtAsc", tr(R.string.created_oldest_first), "created_at", "ASC"),
+        o("titleAsc", tr(R.string.title_z), "title", "ASC"), o("titleDesc", tr(R.string.title_z_2), "title", "DESC"),
+        o("durationDesc", tr(R.string.duration_longest_first), "duration", "DESC"), o("durationAsc", tr(R.string.duration_shortest_first), "duration", "ASC"),
+        o("lastPlayedAtDesc", tr(R.string.last_played_newest_first), "last_played_at", "DESC"), o("lastPlayedAtAsc", tr(R.string.last_played_oldest_first), "last_played_at", "ASC"),
+        o("playCountDesc", tr(R.string.most_viewed), "play_count", "DESC"), o("playCountAsc", tr(R.string.least_viewed), "play_count", "ASC"),
+        o("playDurationDesc", tr(R.string.watch_time_high_low), "play_duration", "DESC"), o("playDurationAsc", tr(R.string.watch_time_low_high), "play_duration", "ASC"),
+        o("oCounterDesc", tr(R.string.counter_high_low), "o_counter", "DESC"), o("oCounterAsc", tr(R.string.counter_low_high), "o_counter", "ASC"),
+        o("ratingDesc", tr(R.string.rating_high_low), "rating", "DESC"), o("ratingAsc", tr(R.string.rating_low_high), "rating", "ASC"),
     )
 
     val markers = listOf(
-        o("random", "Random", "random", "DESC"),
-        o("createdAtDesc", "Created (Newest First)", "created_at", "DESC"), o("createdAtAsc", "Created (Oldest First)", "created_at", "ASC"),
-        o("updatedAtDesc", "Updated (Newest First)", "updated_at", "DESC"), o("updatedAtAsc", "Updated (Oldest First)", "updated_at", "ASC"),
-        o("titleAsc", "Title (A-Z)", "title", "ASC"), o("titleDesc", "Title (Z-A)", "title", "DESC"),
-        o("secondsAsc", "Time (Start)", "seconds", "ASC"), o("secondsDesc", "Time (End)", "seconds", "DESC"),
+        o("random", tr(R.string.random), "random", "DESC"),
+        o("createdAtDesc", tr(R.string.created_newest_first), "created_at", "DESC"), o("createdAtAsc", tr(R.string.created_oldest_first), "created_at", "ASC"),
+        o("updatedAtDesc", tr(R.string.updated_newest_first), "updated_at", "DESC"), o("updatedAtAsc", tr(R.string.updated_oldest_first), "updated_at", "ASC"),
+        o("titleAsc", tr(R.string.title_z), "title", "ASC"), o("titleDesc", tr(R.string.title_z_2), "title", "DESC"),
+        o("secondsAsc", tr(R.string.time_start), "seconds", "ASC"), o("secondsDesc", tr(R.string.time_end), "seconds", "DESC"),
     )
 
     val images = listOf(
-        o("titleAsc", "Title (A-Z)", "title", "ASC"), o("titleDesc", "Title (Z-A)", "title", "DESC"),
-        o("dateDesc", "Date (Newest)", "date", "DESC"), o("dateAsc", "Date (Oldest)", "date", "ASC"),
-        o("ratingDesc", "Rating (High-Low)", "rating", "DESC"), o("ratingAsc", "Rating (Low-High)", "rating", "ASC"),
-        o("createdAtDesc", "Created (Newest)", "created_at", "DESC"), o("createdAtAsc", "Created (Oldest)", "created_at", "ASC"),
-        o("updatedAtDesc", "Updated (Newest)", "updated_at", "DESC"), o("updatedAtAsc", "Updated (Oldest)", "updated_at", "ASC"),
-        o("performerAgeDesc", "Performer Age (Oldest First)", "performer_age", "DESC"), o("performerAgeAsc", "Performer Age (Youngest First)", "performer_age", "ASC"),
-        o("random", "Random", "random", "DESC"),
+        o("titleAsc", tr(R.string.title_z), "title", "ASC"), o("titleDesc", tr(R.string.title_z_2), "title", "DESC"),
+        o("dateDesc", tr(R.string.date_newest), "date", "DESC"), o("dateAsc", tr(R.string.date_oldest), "date", "ASC"),
+        o("ratingDesc", tr(R.string.rating_high_low), "rating", "DESC"), o("ratingAsc", tr(R.string.rating_low_high), "rating", "ASC"),
+        o("createdAtDesc", tr(R.string.created_newest), "created_at", "DESC"), o("createdAtAsc", tr(R.string.created_oldest), "created_at", "ASC"),
+        o("updatedAtDesc", tr(R.string.updated_newest), "updated_at", "DESC"), o("updatedAtAsc", tr(R.string.updated_oldest), "updated_at", "ASC"),
+        o("performerAgeDesc", tr(R.string.performer_age_oldest_first), "performer_age", "DESC"), o("performerAgeAsc", tr(R.string.performer_age_youngest_first), "performer_age", "ASC"),
+        o("random", tr(R.string.random), "random", "DESC"),
     )
 
     val galleries = listOf(
-        o("titleAsc", "Name (A-Z)", "title", "ASC"), o("titleDesc", "Name (Z-A)", "title", "DESC"),
-        o("dateDesc", "Date (Newest)", "date", "DESC"), o("dateAsc", "Date (Oldest)", "date", "ASC"),
-        o("ratingDesc", "Rating (High-Low)", "rating", "DESC"), o("ratingAsc", "Rating (Low-High)", "rating", "ASC"),
-        o("createdAtDesc", "Created (Newest)", "created_at", "DESC"), o("createdAtAsc", "Created (Oldest)", "created_at", "ASC"),
-        o("updatedAtDesc", "Updated (Newest)", "updated_at", "DESC"), o("updatedAtAsc", "Updated (Oldest)", "updated_at", "ASC"),
-        o("imageCountDesc", "Image Count (High-Low)", "images_count", "DESC"), o("imageCountAsc", "Image Count (Low-High)", "images_count", "ASC"),
-        o("performerAgeDesc", "Performer Age (Oldest First)", "performer_age", "DESC"), o("performerAgeAsc", "Performer Age (Youngest First)", "performer_age", "ASC"),
-        o("random", "Random", "random", "DESC"),
+        o("titleAsc", tr(R.string.name_z), "title", "ASC"), o("titleDesc", tr(R.string.name_z_2), "title", "DESC"),
+        o("dateDesc", tr(R.string.date_newest), "date", "DESC"), o("dateAsc", tr(R.string.date_oldest), "date", "ASC"),
+        o("ratingDesc", tr(R.string.rating_high_low), "rating", "DESC"), o("ratingAsc", tr(R.string.rating_low_high), "rating", "ASC"),
+        o("createdAtDesc", tr(R.string.created_newest), "created_at", "DESC"), o("createdAtAsc", tr(R.string.created_oldest), "created_at", "ASC"),
+        o("updatedAtDesc", tr(R.string.updated_newest), "updated_at", "DESC"), o("updatedAtAsc", tr(R.string.updated_oldest), "updated_at", "ASC"),
+        o("imageCountDesc", tr(R.string.image_count_high_low), "images_count", "DESC"), o("imageCountAsc", tr(R.string.image_count_low_high), "images_count", "ASC"),
+        o("performerAgeDesc", tr(R.string.performer_age_oldest_first), "performer_age", "DESC"), o("performerAgeAsc", tr(R.string.performer_age_youngest_first), "performer_age", "ASC"),
+        o("random", tr(R.string.random), "random", "DESC"),
     )
 
     val performers = listOf(
-        o("random", "Random", "random", "DESC"),
-        o("nameAsc", "Name (A-Z)", "name", "ASC"), o("nameDesc", "Name (Z-A)", "name", "DESC"),
-        o("sceneCountDesc", "Scene Count (High-Low)", "scenes_count", "DESC"), o("sceneCountAsc", "Scene Count (Low-High)", "scenes_count", "ASC"),
-        o("imageCountDesc", "Image Count (High-Low)", "images_count", "DESC"), o("imageCountAsc", "Image Count (Low-High)", "images_count", "ASC"),
-        o("galleryCountDesc", "Gallery Count (High-Low)", "galleries_count", "DESC"), o("galleryCountAsc", "Gallery Count (Low-High)", "galleries_count", "ASC"),
-        o("birthdateDesc", "Birthday (Youngest First)", "birthdate", "DESC"), o("birthdateAsc", "Birthday (Oldest First)", "birthdate", "ASC"),
-        o("updatedAtDesc", "Updated (Newest First)", "updated_at", "DESC"), o("updatedAtAsc", "Updated (Oldest First)", "updated_at", "ASC"),
-        o("createdAtDesc", "Created (Newest First)", "created_at", "DESC"), o("createdAtAsc", "Created (Oldest First)", "created_at", "ASC"),
-        o("oCountDesc", "O Count (High-Low)", "o_counter", "DESC"), o("oCountAsc", "O Count (Low-High)", "o_counter", "ASC"),
-        o("ratingDesc", "Rating (High-Low)", "rating", "DESC"), o("ratingAsc", "Rating (Low-High)", "rating", "ASC"),
+        o("random", tr(R.string.random), "random", "DESC"),
+        o("nameAsc", tr(R.string.name_z), "name", "ASC"), o("nameDesc", tr(R.string.name_z_2), "name", "DESC"),
+        o("sceneCountDesc", tr(R.string.scene_count_high_low), "scenes_count", "DESC"), o("sceneCountAsc", tr(R.string.scene_count_low_high), "scenes_count", "ASC"),
+        o("imageCountDesc", tr(R.string.image_count_high_low), "images_count", "DESC"), o("imageCountAsc", tr(R.string.image_count_low_high), "images_count", "ASC"),
+        o("galleryCountDesc", tr(R.string.gallery_count_high_low), "galleries_count", "DESC"), o("galleryCountAsc", tr(R.string.gallery_count_low_high), "galleries_count", "ASC"),
+        o("birthdateDesc", tr(R.string.birthday_youngest_first), "birthdate", "DESC"), o("birthdateAsc", tr(R.string.birthday_oldest_first), "birthdate", "ASC"),
+        o("updatedAtDesc", tr(R.string.updated_newest_first), "updated_at", "DESC"), o("updatedAtAsc", tr(R.string.updated_oldest_first), "updated_at", "ASC"),
+        o("createdAtDesc", tr(R.string.created_newest_first), "created_at", "DESC"), o("createdAtAsc", tr(R.string.created_oldest_first), "created_at", "ASC"),
+        o("oCountDesc", tr(R.string.o_count_high_low), "o_counter", "DESC"), o("oCountAsc", tr(R.string.o_count_low_high), "o_counter", "ASC"),
+        o("ratingDesc", tr(R.string.rating_high_low), "rating", "DESC"), o("ratingAsc", tr(R.string.rating_low_high), "rating", "ASC"),
     )
 
     val studios = listOf(
-        o("random", "Random", "random", "DESC"),
-        o("nameAsc", "Name (A-Z)", "name", "ASC"), o("nameDesc", "Name (Z-A)", "name", "DESC"),
-        o("sceneCountDesc", "Scene Count (High-Low)", "scenes_count", "DESC"), o("sceneCountAsc", "Scene Count (Low-High)", "scenes_count", "ASC"),
-        o("updatedAtDesc", "Updated (Newest First)", "updated_at", "DESC"), o("updatedAtAsc", "Updated (Oldest First)", "updated_at", "ASC"),
-        o("createdAtDesc", "Created (Newest First)", "created_at", "DESC"), o("createdAtAsc", "Created (Oldest First)", "created_at", "ASC"),
-        o("ratingDesc", "Rating (High-Low)", "rating", "DESC"), o("ratingAsc", "Rating (Low-High)", "rating", "ASC"),
-        o("performerCountDesc", "Performer Count (High-Low)", "performer_count", "DESC"), o("performerCountAsc", "Performer Count (Low-High)", "performer_count", "ASC"),
-        o("galleryCountDesc", "Gallery Count (High-Low)", "galleries_count", "DESC"), o("galleryCountAsc", "Gallery Count (Low-High)", "galleries_count", "ASC"),
-        o("imageCountDesc", "Image Count (High-Low)", "images_count", "DESC"), o("imageCountAsc", "Image Count (Low-High)", "images_count", "ASC"),
-        o("oCounterDesc", "O Count (High-Low)", "o_counter", "DESC"), o("oCounterAsc", "O Count (Low-High)", "o_counter", "ASC"),
-        o("oCounterAllDesc", "O Count incl. Sub-Studios (High-Low)", "o_counter_all", "DESC"), o("oCounterAllAsc", "O Count incl. Sub-Studios (Low-High)", "o_counter_all", "ASC"),
-        o("performerCountAllDesc", "Performer Count incl. Sub-Studios (High-Low)", "performer_count_all", "DESC"), o("performerCountAllAsc", "Performer Count incl. Sub-Studios (Low-High)", "performer_count_all", "ASC"),
-        o("markerCountDesc", "Marker Count (High-Low)", "scene_markers_count", "DESC"), o("markerCountAsc", "Marker Count (Low-High)", "scene_markers_count", "ASC"),
+        o("random", tr(R.string.random), "random", "DESC"),
+        o("nameAsc", tr(R.string.name_z), "name", "ASC"), o("nameDesc", tr(R.string.name_z_2), "name", "DESC"),
+        o("sceneCountDesc", tr(R.string.scene_count_high_low), "scenes_count", "DESC"), o("sceneCountAsc", tr(R.string.scene_count_low_high), "scenes_count", "ASC"),
+        o("updatedAtDesc", tr(R.string.updated_newest_first), "updated_at", "DESC"), o("updatedAtAsc", tr(R.string.updated_oldest_first), "updated_at", "ASC"),
+        o("createdAtDesc", tr(R.string.created_newest_first), "created_at", "DESC"), o("createdAtAsc", tr(R.string.created_oldest_first), "created_at", "ASC"),
+        o("ratingDesc", tr(R.string.rating_high_low), "rating", "DESC"), o("ratingAsc", tr(R.string.rating_low_high), "rating", "ASC"),
+        o("performerCountDesc", tr(R.string.performer_count_high_low), "performer_count", "DESC"), o("performerCountAsc", tr(R.string.performer_count_low_high), "performer_count", "ASC"),
+        o("galleryCountDesc", tr(R.string.gallery_count_high_low), "galleries_count", "DESC"), o("galleryCountAsc", tr(R.string.gallery_count_low_high), "galleries_count", "ASC"),
+        o("imageCountDesc", tr(R.string.image_count_high_low), "images_count", "DESC"), o("imageCountAsc", tr(R.string.image_count_low_high), "images_count", "ASC"),
+        o("oCounterDesc", tr(R.string.o_count_high_low), "o_counter", "DESC"), o("oCounterAsc", tr(R.string.o_count_low_high), "o_counter", "ASC"),
+        o("oCounterAllDesc", tr(R.string.o_count_incl_sub_studios_high), "o_counter_all", "DESC"), o("oCounterAllAsc", tr(R.string.o_count_incl_sub_studios_low), "o_counter_all", "ASC"),
+        o("performerCountAllDesc", tr(R.string.performer_count_incl_sub_studios_high), "performer_count_all", "DESC"), o("performerCountAllAsc", tr(R.string.performer_count_incl_sub_studios_low), "performer_count_all", "ASC"),
+        o("markerCountDesc", tr(R.string.marker_count_high_low), "scene_markers_count", "DESC"), o("markerCountAsc", tr(R.string.marker_count_low_high), "scene_markers_count", "ASC"),
     )
 
     val tags = listOf(
-        o("random", "Random", "random", "DESC"),
-        o("nameAsc", "Name (A-Z)", "name", "ASC"), o("nameDesc", "Name (Z-A)", "name", "DESC"),
-        o("sceneCountDesc", "Scene Count (High-Low)", "scenes_count", "DESC"), o("sceneCountAsc", "Scene Count (Low-High)", "scenes_count", "ASC"),
-        o("imageCountDesc", "Image Count (High-Low)", "images_count", "DESC"), o("imageCountAsc", "Image Count (Low-High)", "images_count", "ASC"),
-        o("galleryCountDesc", "Gallery Count (High-Low)", "galleries_count", "DESC"), o("galleryCountAsc", "Gallery Count (Low-High)", "galleries_count", "ASC"),
-        o("markerCountDesc", "Marker Count (High-Low)", "scene_markers_count", "DESC"), o("markerCountAsc", "Marker Count (Low-High)", "scene_markers_count", "ASC"),
-        o("performerCountDesc", "Performer Count (High-Low)", "performers_count", "DESC"), o("performerCountAsc", "Performer Count (Low-High)", "performers_count", "ASC"),
-        o("updatedAtDesc", "Updated (Newest First)", "updated_at", "DESC"), o("updatedAtAsc", "Updated (Oldest First)", "updated_at", "ASC"),
-        o("createdAtDesc", "Created (Newest First)", "created_at", "DESC"), o("createdAtAsc", "Created (Oldest First)", "created_at", "ASC"),
+        o("random", tr(R.string.random), "random", "DESC"),
+        o("nameAsc", tr(R.string.name_z), "name", "ASC"), o("nameDesc", tr(R.string.name_z_2), "name", "DESC"),
+        o("sceneCountDesc", tr(R.string.scene_count_high_low), "scenes_count", "DESC"), o("sceneCountAsc", tr(R.string.scene_count_low_high), "scenes_count", "ASC"),
+        o("imageCountDesc", tr(R.string.image_count_high_low), "images_count", "DESC"), o("imageCountAsc", tr(R.string.image_count_low_high), "images_count", "ASC"),
+        o("galleryCountDesc", tr(R.string.gallery_count_high_low), "galleries_count", "DESC"), o("galleryCountAsc", tr(R.string.gallery_count_low_high), "galleries_count", "ASC"),
+        o("markerCountDesc", tr(R.string.marker_count_high_low), "scene_markers_count", "DESC"), o("markerCountAsc", tr(R.string.marker_count_low_high), "scene_markers_count", "ASC"),
+        o("performerCountDesc", tr(R.string.performer_count_high_low), "performers_count", "DESC"), o("performerCountAsc", tr(R.string.performer_count_low_high), "performers_count", "ASC"),
+        o("updatedAtDesc", tr(R.string.updated_newest_first), "updated_at", "DESC"), o("updatedAtAsc", tr(R.string.updated_oldest_first), "updated_at", "ASC"),
+        o("createdAtDesc", tr(R.string.created_newest_first), "created_at", "DESC"), o("createdAtAsc", tr(R.string.created_oldest_first), "created_at", "ASC"),
     )
 
     val groups = listOf(
-        o("random", "Random", "random", "DESC"),
-        o("nameAsc", "Name (A-Z)", "name", "ASC"), o("nameDesc", "Name (Z-A)", "name", "DESC"),
-        o("sceneCountDesc", "Scene Count (High-Low)", "scenes_count", "DESC"), o("sceneCountAsc", "Scene Count (Low-High)", "scenes_count", "ASC"),
-        o("galleryCountDesc", "Gallery Count (High-Low)", "galleries_count", "DESC"), o("galleryCountAsc", "Gallery Count (Low-High)", "galleries_count", "ASC"),
-        o("performerCountDesc", "Performer Count (High-Low)", "performer_count", "DESC"), o("performerCountAsc", "Performer Count (Low-High)", "performer_count", "ASC"),
-        o("dateDesc", "Date (Newest First)", "date", "DESC"), o("dateAsc", "Date (Oldest First)", "date", "ASC"),
-        o("ratingDesc", "Rating (High-Low)", "rating", "DESC"), o("ratingAsc", "Rating (Low-High)", "rating", "ASC"),
-        o("updatedAtDesc", "Updated (Newest First)", "updated_at", "DESC"), o("updatedAtAsc", "Updated (Oldest First)", "updated_at", "ASC"),
-        o("createdAtDesc", "Created (Newest First)", "created_at", "DESC"), o("createdAtAsc", "Created (Oldest First)", "created_at", "ASC"),
+        o("random", tr(R.string.random), "random", "DESC"),
+        o("nameAsc", tr(R.string.name_z), "name", "ASC"), o("nameDesc", tr(R.string.name_z_2), "name", "DESC"),
+        o("sceneCountDesc", tr(R.string.scene_count_high_low), "scenes_count", "DESC"), o("sceneCountAsc", tr(R.string.scene_count_low_high), "scenes_count", "ASC"),
+        o("galleryCountDesc", tr(R.string.gallery_count_high_low), "galleries_count", "DESC"), o("galleryCountAsc", tr(R.string.gallery_count_low_high), "galleries_count", "ASC"),
+        o("performerCountDesc", tr(R.string.performer_count_high_low), "performer_count", "DESC"), o("performerCountAsc", tr(R.string.performer_count_low_high), "performer_count", "ASC"),
+        o("dateDesc", tr(R.string.date_newest_first), "date", "DESC"), o("dateAsc", tr(R.string.date_oldest_first), "date", "ASC"),
+        o("ratingDesc", tr(R.string.rating_high_low), "rating", "DESC"), o("ratingAsc", tr(R.string.rating_low_high), "rating", "ASC"),
+        o("updatedAtDesc", tr(R.string.updated_newest_first), "updated_at", "DESC"), o("updatedAtAsc", tr(R.string.updated_oldest_first), "updated_at", "ASC"),
+        o("createdAtDesc", tr(R.string.created_newest_first), "created_at", "DESC"), o("createdAtAsc", tr(R.string.created_oldest_first), "created_at", "ASC"),
     )
 
     /** Sort fields older servers reject as invalid (iOS: `requiresStash032`). */
@@ -197,47 +199,47 @@ object SortCatalog {
 
     private fun allFieldKinds(mode: FilterMode): List<SortFieldKind> = when (mode) {
         FilterMode.Scenes -> listOf(
-            SortFieldKind("date", "Date"), SortFieldKind("production_date", "Production date"), SortFieldKind("created_at", "Created"), SortFieldKind("title", "Title"),
-            SortFieldKind("duration", "Duration"), SortFieldKind("last_played_at", "Last played"), SortFieldKind("play_count", "Play count"),
-            SortFieldKind("play_duration", "Watch time"), SortFieldKind("o_counter", "O Count"), SortFieldKind("rating", "Rating"),
-            SortFieldKind("random", "Random"), SortFieldKind(SortOption.FOR_YOU_FIELD, "For You"),
+            SortFieldKind("date", tr(R.string.date)), SortFieldKind("production_date", tr(R.string.production_date)), SortFieldKind("created_at", tr(R.string.created)), SortFieldKind("title", tr(R.string.title)),
+            SortFieldKind("duration", tr(R.string.duration)), SortFieldKind("last_played_at", tr(R.string.last_played)), SortFieldKind("play_count", tr(R.string.play_count)),
+            SortFieldKind("play_duration", tr(R.string.watch_time)), SortFieldKind("o_counter", tr(R.string.o_count)), SortFieldKind("rating", tr(R.string.rating)),
+            SortFieldKind("random", tr(R.string.random)), SortFieldKind(SortOption.FOR_YOU_FIELD, tr(R.string.for_you)),
         )
         FilterMode.SceneMarkers -> listOf(
-            SortFieldKind("created_at", "Created"), SortFieldKind("updated_at", "Updated"), SortFieldKind("title", "Title"),
-            SortFieldKind("seconds", "Time"), SortFieldKind("random", "Random"),
+            SortFieldKind("created_at", tr(R.string.created)), SortFieldKind("updated_at", tr(R.string.updated)), SortFieldKind("title", tr(R.string.title)),
+            SortFieldKind("seconds", tr(R.string.time)), SortFieldKind("random", tr(R.string.random)),
         )
         FilterMode.Performers -> listOf(
-            SortFieldKind("name", "Name"), SortFieldKind("scenes_count", "Scene count"), SortFieldKind("images_count", "Image count"),
-            SortFieldKind("galleries_count", "Gallery count"), SortFieldKind("birthdate", "Birthday"), SortFieldKind("updated_at", "Updated"),
-            SortFieldKind("created_at", "Created"), SortFieldKind("o_counter", "O Count"), SortFieldKind("rating", "Rating"),
-            SortFieldKind("random", "Random"),
+            SortFieldKind("name", tr(R.string.name)), SortFieldKind("scenes_count", tr(R.string.scene_count)), SortFieldKind("images_count", tr(R.string.image_count)),
+            SortFieldKind("galleries_count", tr(R.string.gallery_count)), SortFieldKind("birthdate", tr(R.string.birthday)), SortFieldKind("updated_at", tr(R.string.updated)),
+            SortFieldKind("created_at", tr(R.string.created)), SortFieldKind("o_counter", tr(R.string.o_count)), SortFieldKind("rating", tr(R.string.rating)),
+            SortFieldKind("random", tr(R.string.random)),
         )
         FilterMode.Tags -> listOf(
-            SortFieldKind("name", "Name"), SortFieldKind("scenes_count", "Scene count"), SortFieldKind("images_count", "Image count"),
-            SortFieldKind("galleries_count", "Gallery count"), SortFieldKind("scene_markers_count", "Marker count"),
-            SortFieldKind("performers_count", "Performer count"), SortFieldKind("updated_at", "Updated"), SortFieldKind("created_at", "Created"),
-            SortFieldKind("random", "Random"),
+            SortFieldKind("name", tr(R.string.name)), SortFieldKind("scenes_count", tr(R.string.scene_count)), SortFieldKind("images_count", tr(R.string.image_count)),
+            SortFieldKind("galleries_count", tr(R.string.gallery_count)), SortFieldKind("scene_markers_count", tr(R.string.marker_count)),
+            SortFieldKind("performers_count", tr(R.string.performer_count)), SortFieldKind("updated_at", tr(R.string.updated)), SortFieldKind("created_at", tr(R.string.created)),
+            SortFieldKind("random", tr(R.string.random)),
         )
         FilterMode.Studios -> listOf(
-            SortFieldKind("name", "Name"), SortFieldKind("scenes_count", "Scene count"), SortFieldKind("rating", "Rating"),
-            SortFieldKind("performer_count", "Performer count"), SortFieldKind("performer_count_all", "Performer count incl. sub-studios"),
-            SortFieldKind("o_counter", "O Count"), SortFieldKind("o_counter_all", "O Count incl. sub-studios"), SortFieldKind("scene_markers_count", "Marker count"),
-            SortFieldKind("galleries_count", "Gallery count"), SortFieldKind("images_count", "Image count"), SortFieldKind("updated_at", "Updated"), SortFieldKind("created_at", "Created"),
-            SortFieldKind("random", "Random"),
+            SortFieldKind("name", tr(R.string.name)), SortFieldKind("scenes_count", tr(R.string.scene_count)), SortFieldKind("rating", tr(R.string.rating)),
+            SortFieldKind("performer_count", tr(R.string.performer_count)), SortFieldKind("performer_count_all", tr(R.string.performer_count_incl_sub_studios)),
+            SortFieldKind("o_counter", tr(R.string.o_count)), SortFieldKind("o_counter_all", tr(R.string.o_count_incl_sub_studios)), SortFieldKind("scene_markers_count", tr(R.string.marker_count)),
+            SortFieldKind("galleries_count", tr(R.string.gallery_count)), SortFieldKind("images_count", tr(R.string.image_count)), SortFieldKind("updated_at", tr(R.string.updated)), SortFieldKind("created_at", tr(R.string.created)),
+            SortFieldKind("random", tr(R.string.random)),
         )
         FilterMode.Galleries -> listOf(
-            SortFieldKind("title", "Title"), SortFieldKind("date", "Date"), SortFieldKind("rating", "Rating"),
-            SortFieldKind("created_at", "Created"), SortFieldKind("updated_at", "Updated"), SortFieldKind("images_count", "Image count"),
-            SortFieldKind("performer_age", "Performer age"), SortFieldKind("random", "Random"),
+            SortFieldKind("title", tr(R.string.title)), SortFieldKind("date", tr(R.string.date)), SortFieldKind("rating", tr(R.string.rating)),
+            SortFieldKind("created_at", tr(R.string.created)), SortFieldKind("updated_at", tr(R.string.updated)), SortFieldKind("images_count", tr(R.string.image_count)),
+            SortFieldKind("performer_age", tr(R.string.performer_age)), SortFieldKind("random", tr(R.string.random)),
         )
         FilterMode.Images -> listOf(
-            SortFieldKind("title", "Title"), SortFieldKind("date", "Date"), SortFieldKind("rating", "Rating"),
-            SortFieldKind("created_at", "Created"), SortFieldKind("updated_at", "Updated"), SortFieldKind("performer_age", "Performer age"), SortFieldKind("random", "Random"),
+            SortFieldKind("title", tr(R.string.title)), SortFieldKind("date", tr(R.string.date)), SortFieldKind("rating", tr(R.string.rating)),
+            SortFieldKind("created_at", tr(R.string.created)), SortFieldKind("updated_at", tr(R.string.updated)), SortFieldKind("performer_age", tr(R.string.performer_age)), SortFieldKind("random", tr(R.string.random)),
         )
         FilterMode.Groups -> listOf(
-            SortFieldKind("name", "Name"), SortFieldKind("scenes_count", "Scene count"), SortFieldKind("galleries_count", "Gallery count"),
-            SortFieldKind("performer_count", "Performer count"), SortFieldKind("date", "Date"), SortFieldKind("rating", "Rating"),
-            SortFieldKind("updated_at", "Updated"), SortFieldKind("created_at", "Created"), SortFieldKind("random", "Random"),
+            SortFieldKind("name", tr(R.string.name)), SortFieldKind("scenes_count", tr(R.string.scene_count)), SortFieldKind("galleries_count", tr(R.string.gallery_count)),
+            SortFieldKind("performer_count", tr(R.string.performer_count)), SortFieldKind("date", tr(R.string.date)), SortFieldKind("rating", tr(R.string.rating)),
+            SortFieldKind("updated_at", tr(R.string.updated)), SortFieldKind("created_at", tr(R.string.created)), SortFieldKind("random", tr(R.string.random)),
         )
         FilterMode.Unknown -> emptyList()
     }

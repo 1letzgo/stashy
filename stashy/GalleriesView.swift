@@ -235,20 +235,20 @@ private struct GalleriesViewContent: View {
     private var deleteGalleryCatalogPresetConfirmationText: String {
         if let sid = ListLivePresetTag.parseServerId(catalogPresetRowSelection),
            let f = viewModel.savedFilters[sid] {
-            return "Remove “\(f.name)” from Stash? Other devices will lose this saved filter."
+            return tr("hint_remove_arg_from_stash_other", f.name)
         }
         if let ls = ListLivePresetTag.parseLocalUUIDString(catalogPresetRowSelection),
            let uuid = UUID(uuidString: ls),
            let p = localCatalogPresets.first(where: { $0.id == uuid }) {
-            return "Remove “\(p.name)” from this device? This cannot be undone."
+            return tr("hint_remove_arg_from_this_device", p.name)
         }
-        return "Remove this filter? This cannot be undone."
+        return tr("hint_remove_this_filter_this_cannot")
     }
 
     private func saveGalleryCatalogPresetOverwrite() {
         let sel = catalogPresetRowSelection
         if let sid = ListLivePresetTag.parseServerId(sel) {
-            let name = viewModel.savedFilters[sid]?.name ?? "Filter"
+            let name = viewModel.savedFilters[sid]?.name ?? tr("filter")
             viewModel.saveCatalogSavedFilter(
                 mode: .galleries,
                 randomSeedKind: .galleries,
@@ -463,23 +463,23 @@ private struct GalleriesViewContent: View {
             .onChange(of: catalogPresetRowSelection) { _, newId in
                 handleGalleryCatalogPresetSelectionChange(newId)
             }
-            .alert("Save as new", isPresented: $showSaveAsCatalogPresetAlert) {
-                TextField("Name", text: $catalogPresetNameInput)
-                Button("Save") { saveGalleryCatalogPresetAs(name: catalogPresetNameInput) }
-                Button("Cancel", role: .cancel) {}
+            .alert(tr("action_save_as_new"), isPresented: $showSaveAsCatalogPresetAlert) {
+                TextField(tr("name"), text: $catalogPresetNameInput)
+                Button(tr("action_save")) { saveGalleryCatalogPresetAs(name: catalogPresetNameInput) }
+                Button(tr("action_cancel"), role: .cancel) {}
             } message: {
-                Text("Save the current sort, filter, and live criteria as a new Stash saved filter.")
+                Text(tr("hint_save_current_sort_filter_and"))
             }
-            .alert("Rename", isPresented: $showRenameCatalogPresetAlert) {
-                TextField("Name", text: $renameCatalogPresetInput)
-                Button("Save") { renameGalleryCatalogPreset(to: renameCatalogPresetInput) }
-                Button("Cancel", role: .cancel) {}
+            .alert(tr("action_rename"), isPresented: $showRenameCatalogPresetAlert) {
+                TextField(tr("name"), text: $renameCatalogPresetInput)
+                Button(tr("action_save")) { renameGalleryCatalogPreset(to: renameCatalogPresetInput) }
+                Button(tr("action_cancel"), role: .cancel) {}
             } message: {
-                Text("Rename this preset or saved filter.")
+                Text(tr("hint_rename_this_preset_or_saved"))
             }
-            .alert("Delete filter?", isPresented: $showDeleteCatalogPresetAlert) {
-                Button("Delete", role: .destructive) { deleteGalleryCatalogPreset() }
-                Button("Cancel", role: .cancel) {}
+            .alert(tr("confirm_delete_filter"), isPresented: $showDeleteCatalogPresetAlert) {
+                Button(tr("action_delete"), role: .destructive) { deleteGalleryCatalogPreset() }
+                Button(tr("action_cancel"), role: .cancel) {}
             } message: {
                 Text(deleteGalleryCatalogPresetConfirmationText)
             }
@@ -493,7 +493,7 @@ private struct GalleriesViewContent: View {
             // Keep the bar while a sort/filter change refetches, so it does not jump away.
             VStack(spacing: 0) {
                 quickBar
-                StandardLoadingView(message: "Loading galleries...")
+                StandardLoadingView(message: tr("loading_galleries"))
             }
         } else if viewModel.galleries.isEmpty && viewModel.errorMessage != nil {
             ConnectionErrorView { performSearch() }
@@ -502,8 +502,8 @@ private struct GalleriesViewContent: View {
                 if !criteriaDocument.isEmpty || activePresetName != nil { quickBar }
                 SharedEmptyStateView(
                     icon: "photo.stack",
-                    title: "No galleries found",
-                    buttonText: "Reload",
+                    title: tr("empty_galleries_found"),
+                    buttonText: tr("action_reload"),
                     onRetry: { performSearch() }
                 )
             }
@@ -613,7 +613,7 @@ private struct GalleriesViewContent: View {
     /// Single source for nav bar + slot chrome. The legacy/native branch lives in `stashyCatalogChrome`.
     private var catalogChromeConfig: CatalogChromeConfig {
         CatalogChromeConfig(
-            title: host?.title ?? "Galleries",
+            title: host?.title ?? tr("galleries"),
             ownsNavigationBar: !hideTitle,
             visibility: galleriesFloatingBarChrome,
             isPresented: true,
@@ -621,7 +621,7 @@ private struct GalleriesViewContent: View {
             search: hideTitle ? nil : CatalogSearchChrome(
                 text: $searchText,
                 isVisible: $isSearchVisible,
-                prompt: "Search galleries...",
+                prompt: tr("placeholder_search_galleries"),
                 onClear: { performSearch() }
             )
         )
@@ -1119,7 +1119,7 @@ struct GalleryItemView: View {
                                     Image(systemName: "exclamationmark.triangle")
                                         .font(.largeTitle)
                                         .foregroundColor(.white)
-                                    Text("Failed to load image")
+                                    Text(tr("error_load_image"))
                                         .foregroundColor(.white)
                                 }
                             }
@@ -1663,47 +1663,47 @@ struct FullScreenImageView: View {
                     currentItemIsPlaying = true
                 }
             }
-            .alert("Set as Gallery Cover?", isPresented: $showingSetGalleryCoverPicker) {
+            .alert(tr("confirm_set_as_gallery_cover"), isPresented: $showingSetGalleryCoverPicker) {
                 // One gallery: a plain confirm. Several: one button per gallery to pick from.
                 if galleryCoverTargets.count == 1, let gallery = galleryCoverTargets.first {
-                    Button("Okay") { setGalleryCover(gallery: gallery) }
+                    Button(tr("okay")) { setGalleryCover(gallery: gallery) }
                 } else {
                     ForEach(galleryCoverTargets) { gallery in
-                        Button(gallery.title?.isEmpty == false ? gallery.title! : "Untitled Gallery") { setGalleryCover(gallery: gallery) }
+                        Button(gallery.title?.isEmpty == false ? gallery.title! : tr("untitled_gallery")) { setGalleryCover(gallery: gallery) }
                     }
                 }
-                Button("Cancel", role: .cancel) { }
+                Button(tr("action_cancel"), role: .cancel) { }
             } message: {
                 if galleryCoverTargets.count == 1 {
-                    Text("Use this image as the cover of its gallery.")
+                    Text(tr("hint_use_this_image_as_cover"))
                 } else {
-                    Text("Choose which gallery gets this image as its cover.")
+                    Text(tr("hint_choose_which_gallery_gets_this"))
                 }
             }
-            .alert("Set as Performer Image?", isPresented: $showingSetPerformerImagePicker) {
+            .alert(tr("confirm_set_as_performer_image"), isPresented: $showingSetPerformerImagePicker) {
                 // One performer: a plain confirm. Several: one button per name to pick from.
                 if performerImageTargetPerformers.count == 1, let performer = performerImageTargetPerformers.first {
-                    Button("Okay") { setPerformerImage(performer: performer) }
+                    Button(tr("okay")) { setPerformerImage(performer: performer) }
                 } else {
                     ForEach(performerImageTargetPerformers) { performer in
                         Button(performer.name) { setPerformerImage(performer: performer) }
                     }
                 }
-                Button("Cancel", role: .cancel) { }
+                Button(tr("action_cancel"), role: .cancel) { }
             } message: {
                 if performerImageTargetPerformers.count == 1, let performer = performerImageTargetPerformers.first {
-                    Text("Use this image as the profile picture of \(performer.name).")
+                    Text(tr("hint_use_this_image_as_profile", performer.name))
                 } else {
-                    Text("Choose whose profile picture this image becomes.")
+                    Text(tr("hint_choose_whose_profile_picture_this"))
                 }
             }
-            .alert("Really delete image?", isPresented: $showingDeleteConfirmation) {
-                Button("Cancel", role: .cancel) { }
-                Button("Delete", role: .destructive) {
+            .alert(tr("confirm_really_delete_image"), isPresented: $showingDeleteConfirmation) {
+                Button(tr("action_cancel"), role: .cancel) { }
+                Button(tr("action_delete"), role: .destructive) {
                     deleteCurrentImage()
                 }
             } message: {
-                Text("This image will be permanently deleted. This action cannot be undone.")
+                Text(tr("hint_this_image_will_be_permanently"))
             }
         }
     }
@@ -1759,7 +1759,7 @@ struct FullScreenImageView: View {
     private func openPerformerEditor(for image: StashImage) {
         guard image.performers != nil else {
             HapticManager.error()
-            ToastManager.shared.show("Could not load performers", icon: "exclamationmark.triangle.fill", style: .error)
+            ToastManager.shared.show(tr("error_load_performers"), icon: "exclamationmark.triangle.fill", style: .error)
             return
         }
         performerEditorImage = image
@@ -1775,7 +1775,7 @@ struct FullScreenImageView: View {
         }
         StashImage.postPerformersUpdated(imageId: imageId, performers: performers)
         HapticManager.success()
-        ToastManager.shared.show("Performers updated")
+        ToastManager.shared.show(tr("performers_updated"))
     }
 
     @ViewBuilder
@@ -1788,12 +1788,12 @@ struct FullScreenImageView: View {
         } else if let gallery = image.galleries?.first {
             let galleryObj = Gallery(
                 id: gallery.id,
-                title: gallery.title ?? "Gallery",
+                title: gallery.title ?? tr("gallery"),
                 date: nil, details: nil, imageCount: nil, organized: nil,
                 createdAt: nil, updatedAt: nil, studio: nil, performers: nil, cover: nil
             )
             NavigationLink(destination: ImagesView(gallery: galleryObj)) {
-                Text(gallery.title ?? "Unknown Gallery")
+                Text(gallery.title ?? tr("unknown_gallery"))
                     .font(.system(size: 15, weight: .medium))
                     .foregroundColor(.white.opacity(0.85))
                     .lineLimit(1)
@@ -1826,7 +1826,7 @@ struct FullScreenImageView: View {
                 .modifier(StashyChromePillStyle(height: StashyExpandingDock.stackedButtonSize, width: StashyExpandingDock.stackedButtonSize, hashtagColors: true))
             }
             .buttonStyle(.plain)
-            .accessibilityLabel("O-Counter")
+            .accessibilityLabel(tr("o_count"))
             .oCounterRemovalMenu(
                 count: oCounter,
                 onRemoveOne: { changeCurrentOCounter(.decrement) },
@@ -1838,7 +1838,7 @@ struct FullScreenImageView: View {
                     updateCurrentRating(0)
                 } label: {
                     HStack {
-                        Text("Clear Rating")
+                        Text(tr("action_clear_rating"))
                         if stars == 0 { Image(systemName: "checkmark") }
                     }
                 }
@@ -1865,7 +1865,7 @@ struct FullScreenImageView: View {
                 .modifier(StashyChromePillStyle(height: StashyExpandingDock.stackedButtonSize, width: StashyExpandingDock.stackedButtonSize, hashtagColors: true))
             }
             .buttonStyle(.plain)
-            .accessibilityLabel("Rating")
+            .accessibilityLabel(tr("rating"))
         }
         .fixedSize()
     }
@@ -1905,7 +1905,7 @@ struct FullScreenImageView: View {
                             ChromePillIconButton(
                                 systemImage: currentItemIsPlaying ? "pause.fill" : "play.fill",
                                 enabled: true,
-                                accessibilityLabel: currentItemIsPlaying ? "Pause" : "Play"
+                                accessibilityLabel: currentItemIsPlaying ? tr("action_pause") : tr("action_play")
                             ) {
                                 currentItemIsPlaying.toggle()
                             }
@@ -1942,7 +1942,7 @@ struct FullScreenImageView: View {
                                         .stashyGlass(shape: Capsule())
                                 }
                                 .buttonStyle(.plain)
-                                .accessibilityLabel("Add tags")
+                                .accessibilityLabel(tr("action_add_tags"))
                             }
                             ScrollView(.horizontal, showsIndicators: false) {
                                 HStack(spacing: 6) {
@@ -1958,7 +1958,7 @@ struct FullScreenImageView: View {
                                                     Button(role: .destructive) {
                                                         removeTag(tag, from: image)
                                                     } label: {
-                                                        Label("Remove tag", systemImage: "trash")
+                                                        Label(tr("action_remove_tag"), systemImage: "trash")
                                                     }
                                                 }
                                             }
@@ -2004,10 +2004,10 @@ struct FullScreenImageView: View {
                     images[position] = images[position].withTags(remaining)
                 }
                 HapticManager.success()
-                ToastManager.shared.show("Removed #\(tag.name)")
+                ToastManager.shared.show(tr("removed_arg", tag.name))
             } else {
                 HapticManager.error()
-                ToastManager.shared.show("Could not remove tag", icon: "exclamationmark.triangle.fill", style: .error)
+                ToastManager.shared.show(tr("error_remove_tag"), icon: "exclamationmark.triangle.fill", style: .error)
             }
         }
     }
@@ -2106,7 +2106,7 @@ struct FullScreenImageView: View {
                     HStack(spacing: StashyExpandingDock.iconLabelSpacing) {
                         Image(systemName: "chevron.left")
                             .font(.system(size: StashyExpandingDock.iconSize, weight: .semibold))
-                        Text("Back")
+                        Text(tr("back"))
                             .font(.subheadline.weight(.semibold))
                     }
                     .fixedSize()
@@ -2114,7 +2114,7 @@ struct FullScreenImageView: View {
                     .modifier(StashyChromePillStyle(height: chromePillHeight, accent: true))
                 }
                 .buttonStyle(.plain)
-                .accessibilityLabel("Back")
+                .accessibilityLabel(tr("back"))
 
                 Spacer(minLength: 8)
 
@@ -2127,7 +2127,7 @@ struct FullScreenImageView: View {
                         .modifier(StashyChromePillStyle(height: chromePillHeight, iconOnly: true))
                 }
                 .buttonStyle(.plain)
-                .accessibilityLabel("Share")
+                .accessibilityLabel(tr("action_share"))
 
                 if let image = currentImage {
                     let entryId = "image-" + image.id
@@ -2143,7 +2143,7 @@ struct FullScreenImageView: View {
                     }
                     .buttonStyle(.plain)
                     .disabled(isDownloaded || isDownloading)
-                    .accessibilityLabel(isDownloaded ? "Downloaded" : (isDownloading ? "Downloading" : "Download"))
+                    .accessibilityLabel(isDownloaded ? tr("downloaded") : (isDownloading ? tr("downloading") : tr("action_download")))
                 }
 
                 if !performers.isEmpty {
@@ -2157,7 +2157,7 @@ struct FullScreenImageView: View {
                             .modifier(StashyChromePillStyle(height: chromePillHeight, iconOnly: true))
                     }
                     .buttonStyle(.plain)
-                    .accessibilityLabel("Set as performer image")
+                    .accessibilityLabel(tr("action_set_as_performer_image"))
                 }
 
                 // Like the performer picture: this image becomes the cover of its gallery.
@@ -2172,7 +2172,7 @@ struct FullScreenImageView: View {
                             .modifier(StashyChromePillStyle(height: chromePillHeight, iconOnly: true))
                     }
                     .buttonStyle(.plain)
-                    .accessibilityLabel("Set as gallery cover")
+                    .accessibilityLabel(tr("action_set_as_gallery_cover"))
                 }
 
                 Button {
@@ -2184,7 +2184,7 @@ struct FullScreenImageView: View {
                         .modifier(StashyChromePillStyle(height: chromePillHeight, iconOnly: true))
                 }
                 .buttonStyle(.plain)
-                .accessibilityLabel("Delete")
+                .accessibilityLabel(tr("action_delete"))
             }
             .frame(height: chromePillHeight)
             .padding(.horizontal, StashyExpandingDock.edgePadding)
@@ -2205,7 +2205,7 @@ struct FullScreenImageView: View {
                     if let revertIndex = images.firstIndex(where: { $0.id == imageId }) {
                         images[revertIndex] = images[revertIndex].withRating(original)
                     }
-                    ToastManager.shared.show("Failed to save rating", icon: "exclamationmark.triangle", style: .error)
+                    ToastManager.shared.show(tr("error_save_rating"), icon: "exclamationmark.triangle", style: .error)
                 }
             }
         }
@@ -2224,7 +2224,7 @@ struct FullScreenImageView: View {
                 images[idx] = images[idx].withOCounter(count)
             } else {
                 images[idx] = images[idx].withOCounter(originalCount)
-                ToastManager.shared.show("Failed to update O-Counter", icon: "exclamationmark.triangle", style: .error)
+                ToastManager.shared.show(tr("error_update_o_count"), icon: "exclamationmark.triangle", style: .error)
             }
         }
     }
@@ -2243,7 +2243,7 @@ struct FullScreenImageView: View {
                     images[revertIndex] = images[revertIndex].withOCounter(count)
                 } else {
                     images[revertIndex] = images[revertIndex].withOCounter(originalCount)
-                    ToastManager.shared.show("Failed to update O-Counter", icon: "exclamationmark.triangle", style: .error)
+                    ToastManager.shared.show(tr("error_update_o_count"), icon: "exclamationmark.triangle", style: .error)
                 }
             }
         }
@@ -2311,10 +2311,10 @@ struct FullScreenImageView: View {
             DispatchQueue.main.async {
                 guard success else {
                     self.currentVisibleId = targetId
-                    ToastManager.shared.show("Failed to delete image", icon: "exclamationmark.triangle", style: .error)
+                    ToastManager.shared.show(tr("error_delete_image"), icon: "exclamationmark.triangle", style: .error)
                     return
                 }
-                ToastManager.shared.show("Image deleted", icon: "trash", style: .success)
+                ToastManager.shared.show(tr("image_deleted"), icon: "trash", style: .success)
 
                 // Usually already pruned via "ImageDeleted"; this covers the bindings that don't
                 // observe it (detail grids, StashLine).
@@ -2338,9 +2338,9 @@ struct FullScreenImageView: View {
         viewModel.setGalleryCover(galleryId: gallery.id, image: currentImage) { success in
             DispatchQueue.main.async {
                 if success {
-                    ToastManager.shared.show("Gallery cover updated", icon: "rectangle.stack.badge.plus", style: .success)
+                    ToastManager.shared.show(tr("gallery_cover_updated"), icon: "rectangle.stack.badge.plus", style: .success)
                 } else {
-                    ToastManager.shared.show("Failed to update gallery cover", icon: "exclamationmark.triangle", style: .error)
+                    ToastManager.shared.show(tr("error_update_gallery_cover"), icon: "exclamationmark.triangle", style: .error)
                 }
             }
         }
@@ -2362,7 +2362,7 @@ struct FullScreenImageView: View {
         viewModel.setPerformerImage(performerId: performer.id, imageURL: imageURL) { success in
             DispatchQueue.main.async {
                 if success {
-                    ToastManager.shared.show("Performer image updated", icon: "person.crop.circle.badge.checkmark", style: .success)
+                    ToastManager.shared.show(tr("performer_image_updated"), icon: "person.crop.circle.badge.checkmark", style: .success)
                     // The performer's own image address with a fresh timestamp. The picked
                     // picture's address plus "?bust=" was handed out before: that address is
                     // already signed, so the second "?" broke its api key, and every portrait
@@ -2383,7 +2383,7 @@ struct FullScreenImageView: View {
                         ]
                     )
                 } else {
-                    ToastManager.shared.show("Failed to update performer image", icon: "exclamationmark.triangle", style: .error)
+                    ToastManager.shared.show(tr("error_update_performer_image"), icon: "exclamationmark.triangle", style: .error)
                 }
             }
         }

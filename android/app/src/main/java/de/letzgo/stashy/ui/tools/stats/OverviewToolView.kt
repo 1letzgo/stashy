@@ -1,5 +1,7 @@
 package de.letzgo.stashy.ui.tools.stats
 
+import de.letzgo.stashy.R
+import de.letzgo.stashy.tr
 import de.letzgo.stashy.ui.bottomBarContentPadding
 import de.letzgo.stashy.ui.scaledMaxLines
 import de.letzgo.stashy.ui.scaledIconSize
@@ -71,7 +73,7 @@ import kotlin.math.roundToLong
 fun OverviewToolView() {
     val config = ServerConfigManager.activeConfig
     if (config == null) {
-        NoServerPlaceholder(Icons.Filled.BarChart, "Select a server in Settings to view statistics.")
+        NoServerPlaceholder(Icons.Filled.BarChart, tr(R.string.hint_select_server_in_settings_to))
         return
     }
     ServerStatisticsContent(config.id)
@@ -109,7 +111,7 @@ private fun ServerStatisticsContent(serverID: String) {
                 StorageCard(stats)
             }
             !hasAttemptedLoad || (!didFailLoad && repo.errorMessage == null) ->
-                InsightsLoading("Loading statistics...", Modifier.fillMaxSize())
+                InsightsLoading(tr(R.string.loading_statistics), Modifier.fillMaxSize())
             else -> InsightsConnectionError(onRetry = { reload() })
         }
     }
@@ -122,12 +124,12 @@ private fun HeroCard(stats: OverviewStatistics) {
     val unplayed = maxOf(0, stats.sceneCount - stats.scenesPlayed)
     val avgWatch = if (stats.totalPlayCount > 0) stats.totalPlayDuration / stats.totalPlayCount else 0.0
 
-    StatsCard("Playback") {
+    StatsCard(tr(R.string.playback)) {
         val entries = listOf(
-            Triple(Icons.Filled.Schedule, statDuration(stats.totalPlayDuration), "Watch Time"),
-            Triple(oCounterIcon(Appearance.oCounterIcon, filled = true), statCount(stats.totalOCount), "O-Count"),
-            Triple(SF.playFill, statCount(stats.totalPlayCount), "Play Count"),
-            Triple(Icons.Filled.PieChart, playedShare(stats.scenesPlayed, stats.sceneCount), "Played Share"),
+            Triple(Icons.Filled.Schedule, statDuration(stats.totalPlayDuration), tr(R.string.watch_time)),
+            Triple(oCounterIcon(Appearance.oCounterIcon, filled = true), statCount(stats.totalOCount), tr(R.string.o_count)),
+            Triple(SF.playFill, statCount(stats.totalPlayCount), tr(R.string.play_count)),
+            Triple(Icons.Filled.PieChart, playedShare(stats.scenesPlayed, stats.sceneCount), tr(R.string.played_share)),
         )
         Column(
             Modifier.padding(horizontal = 16.dp).padding(top = 8.dp),
@@ -140,7 +142,7 @@ private fun HeroCard(stats: OverviewStatistics) {
             }
         }
         Text(
-            "Library ${statDuration(stats.scenesDuration)}  ·  Ø ${statDuration(avgWatch)}/play  ·  ${statCount(unplayed)} unplayed",
+            tr(R.string.hint_library_arg_arg_play_arg, statDuration(stats.scenesDuration), statDuration(avgWatch), statCount(unplayed)),
             style = NativeType.bodySmall,
             color = Theme.palette.secondaryText,
             modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp).padding(top = 6.dp, bottom = 12.dp),
@@ -169,16 +171,16 @@ private data class CatalogStatEntry(val title: String, val value: Int, val icon:
 @Composable
 private fun CatalogsCard(stats: OverviewStatistics) {
     val entries = listOf(
-        CatalogStatEntry("Scenes", stats.sceneCount, SF.film, CatalogTab.Scenes),
-        CatalogStatEntry("Performers", stats.performerCount, SF.person2, CatalogTab.Performers),
-        CatalogStatEntry("Galleries", stats.galleryCount, SF.photoStack, CatalogTab.Galleries),
-        CatalogStatEntry("Images", stats.imageCount, SF.photo, CatalogTab.Images),
-        CatalogStatEntry("Markers", stats.sceneMarkerCount ?: 0, SF.bookmarkFill, CatalogTab.Markers),
-        CatalogStatEntry("Studios", stats.studioCount, SF.building2, CatalogTab.Studios),
-        CatalogStatEntry("Groups", stats.groupCount, SF.rectangleStackFill, CatalogTab.Groups),
-        CatalogStatEntry("Tags", stats.tagCount, SF.tag, CatalogTab.Tags),
+        CatalogStatEntry(tr(R.string.scenes), stats.sceneCount, SF.film, CatalogTab.Scenes),
+        CatalogStatEntry(tr(R.string.performers), stats.performerCount, SF.person2, CatalogTab.Performers),
+        CatalogStatEntry(tr(R.string.galleries), stats.galleryCount, SF.photoStack, CatalogTab.Galleries),
+        CatalogStatEntry(tr(R.string.images), stats.imageCount, SF.photo, CatalogTab.Images),
+        CatalogStatEntry(tr(R.string.markers), stats.sceneMarkerCount ?: 0, SF.bookmarkFill, CatalogTab.Markers),
+        CatalogStatEntry(tr(R.string.studios), stats.studioCount, SF.building2, CatalogTab.Studios),
+        CatalogStatEntry(tr(R.string.groups), stats.groupCount, SF.rectangleStackFill, CatalogTab.Groups),
+        CatalogStatEntry(tr(R.string.tags), stats.tagCount, SF.tag, CatalogTab.Tags),
     )
-    StatsCard("Catalogs") {
+    StatsCard(tr(R.string.catalogs)) {
         entries.forEachIndexed { index, entry ->
             if (index > 0) NativeDivider()
             NativeListItem(entry.title, icon = entry.icon, onClick = { Nav.openCatalog(entry.tab) }) {
@@ -192,12 +194,12 @@ private fun CatalogsCard(stats: OverviewStatistics) {
 
 @Composable
 private fun StorageCard(stats: OverviewStatistics) {
-    StatsCard("Storage") {
-        StatRow("Scenes", formatBytes(stats.scenesSize))
+    StatsCard(tr(R.string.storage)) {
+        StatRow(tr(R.string.scenes), formatBytes(stats.scenesSize))
         NativeDivider()
-        StatRow("Images", formatBytes(stats.imagesSize))
+        StatRow(tr(R.string.images), formatBytes(stats.imagesSize))
         NativeDivider()
-        StatRow("Total", formatBytes(stats.scenesSize + stats.imagesSize), emphasize = true)
+        StatRow(tr(R.string.total), formatBytes(stats.scenesSize + stats.imagesSize), emphasize = true)
     }
 }
 
@@ -236,7 +238,7 @@ private fun playedShare(played: Int, total: Int): String =
 
 /** iOS `ByteCountFormatter` (file style, GB/MB/KB, decimal units). */
 private fun formatBytes(bytes: Double): String {
-    if (bytes <= 0) return "Zero KB"
+    if (bytes <= 0) return tr(R.string.zero_kb)
     fun fmt(value: Double, digits: Int) = (DecimalFormat.getInstance() as DecimalFormat).apply {
         maximumFractionDigits = digits
         minimumFractionDigits = 0

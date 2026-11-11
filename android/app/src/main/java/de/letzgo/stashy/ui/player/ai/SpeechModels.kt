@@ -1,5 +1,7 @@
 package de.letzgo.stashy.ui.player.ai
 
+import de.letzgo.stashy.R
+import de.letzgo.stashy.tr
 import android.content.Context
 import de.letzgo.stashy.data.Net
 import de.letzgo.stashy.data.await
@@ -128,8 +130,8 @@ object SpeechModelStore {
             staging.deleteRecursively(); staging.mkdirs()
             try {
                 Net.client.newCall(Request.Builder().url(entry.url).build()).await().use { response ->
-                    if (!response.isSuccessful) throw IllegalStateException("Speech model download failed (HTTP ${response.code})")
-                    val body = response.body ?: throw IllegalStateException("Speech model download failed")
+                    if (!response.isSuccessful) throw IllegalStateException(tr(R.string.hint_speech_model_download_failed_http, response.code))
+                    val body = response.body ?: throw IllegalStateException(tr(R.string.error_speech_model_download))
                     val total = body.contentLength().takeIf { it > 0 } ?: (entry.megabytes * 1_000_000L)
                     val counting = CountingStream(body.byteStream()) { read -> progress((read.toDouble() / total).coerceIn(0.0, 0.99)) }
                     ZipInputStream(counting.buffered()).use { zip ->
@@ -148,7 +150,7 @@ object SpeechModelStore {
                 }
                 File(staging, ".complete").writeText(entry.modelName)
                 target.deleteRecursively()
-                if (!staging.renameTo(target)) throw IllegalStateException("Could not install speech model")
+                if (!staging.renameTo(target)) throw IllegalStateException(tr(R.string.error_install_speech_model))
                 progress(1.0)
             } finally {
                 staging.deleteRecursively()

@@ -1,5 +1,7 @@
 package de.letzgo.stashy.ui.tools.downloads
 
+import de.letzgo.stashy.R
+import de.letzgo.stashy.tr
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -59,7 +61,7 @@ fun DownloadOptionsAlert(title: String, message: String?, options: List<Download
                         )
                     }
                 }
-                TextButton(onClick = onDismiss) { Text("Cancel", color = de.letzgo.stashy.ui.textAccent()) }
+                TextButton(onClick = onDismiss) { Text(tr(R.string.action_cancel), color = de.letzgo.stashy.ui.textAccent()) }
             }
         },
     )
@@ -74,19 +76,19 @@ fun DownloadOptionsAlert(title: String, message: String?, options: List<Download
 internal fun newestOrAllOptions(count: Int?, batch: Int, singular: String, plural: String, download: (limit: Int?) -> Unit): List<DownloadOption> {
     val known = count?.takeIf { it > 0 }
     return when {
-        known == 1 -> listOf(DownloadOption("Download 1 $singular") { download(null) })
-        known != null && known <= batch -> listOf(DownloadOption("Download all $known $plural") { download(null) })
+        known == 1 -> listOf(DownloadOption(tr(R.string.action_download_1_arg, singular)) { download(null) })
+        known != null && known <= batch -> listOf(DownloadOption(tr(R.string.action_download_all_arg_arg, known, plural)) { download(null) })
         else -> listOf(
-            DownloadOption("Newest $batch $plural") { download(batch) },
-            DownloadOption(if (known != null) "All $known $plural" else "All $plural") { download(null) },
+            DownloadOption(tr(R.string.newest_arg_arg, batch, plural)) { download(batch) },
+            DownloadOption(if (known != null) tr(R.string.all_arg_arg, known, plural) else tr(R.string.all_arg, plural)) { download(null) },
         )
     }
 }
 
 /** "Sync newest" (all) plus "Sync newest {batch}" — the latter only when the set is larger than [batch]. */
 internal fun syncNewestOptions(count: Int?, batch: Int, sync: (limit: Int?) -> Unit): List<DownloadOption> = buildList {
-    add(DownloadOption("Sync newest") { sync(null) })
-    if (showsSyncNewestBatch(count, batch)) add(DownloadOption("Sync newest $batch") { sync(batch) })
+    add(DownloadOption(tr(R.string.action_sync_newest)) { sync(null) })
+    if (showsSyncNewestBatch(count, batch)) add(DownloadOption(tr(R.string.action_sync_newest_arg, batch)) { sync(batch) })
 }
 
 /** True unless the set is known to hold no more than [batch] items. */
@@ -101,8 +103,8 @@ internal fun showsSyncNewestBatch(count: Int?, batch: Int): Boolean = count == n
 @Composable
 fun SceneBulkDownloadDialog(scope: Downloads.SceneDownloadScope, scopeName: String, sceneCount: Int? = null, onDismiss: () -> Unit) {
     DownloadOptionsAlert(
-        title = "Download scenes",
-        message = "Scenes already downloaded are skipped.",
+        title = tr(R.string.action_download_scenes),
+        message = tr(R.string.scenes_already_downloaded_are_skipped),
         options = newestOrAllOptions(sceneCount, Downloads.sceneNewestBatchSize, "scene", "scenes") { limit ->
             Downloads.downloadScenes(scope, limit, scopeName)
         },
@@ -113,7 +115,7 @@ fun SceneBulkDownloadDialog(scope: Downloads.SceneDownloadScope, scopeName: Stri
 /** iOS: `SceneBulkDownloadChrome.slot` — Material icon button that opens [SceneBulkDownloadDialog]. */
 @Composable
 fun SceneBulkDownloadButton(onClick: () -> Unit, modifier: Modifier = Modifier, size: Dp = DownloadsCircleSize) {
-    IconButton(onClick, modifier.size(size)) { Icon(DownloadGlyph, "Download scenes") }
+    IconButton(onClick, modifier.size(size)) { Icon(DownloadGlyph, tr(R.string.action_download_scenes)) }
 }
 
 /**
@@ -127,7 +129,7 @@ fun SceneDownloadNavButton(scene: Scene, modifier: Modifier = Modifier) {
     val active = Downloads.activeDownloads[scene.id]
     when {
         downloaded -> Box(modifier.size(48.dp), contentAlignment = Alignment.Center) {
-            Icon(Icons.Filled.CheckCircle, "Downloaded", tint = StashyColors.systemGreen)
+            Icon(Icons.Filled.CheckCircle, tr(R.string.downloaded), tint = StashyColors.systemGreen)
         }
         active != null -> Box(modifier.size(48.dp), contentAlignment = Alignment.Center) {
             if (active.totalSize > 0) {
@@ -143,7 +145,7 @@ fun SceneDownloadNavButton(scene: Scene, modifier: Modifier = Modifier) {
                 )
             }
         }
-        else -> de.letzgo.stashy.ui.TopBarAction(DownloadGlyph, "Save scene", modifier) { Downloads.downloadScene(scene) }
+        else -> de.letzgo.stashy.ui.TopBarAction(DownloadGlyph, tr(R.string.action_save_scene), modifier) { Downloads.downloadScene(scene) }
     }
 }
 
@@ -157,17 +159,17 @@ fun GalleryDownloadOptionsDialog(gallery: Gallery, onDismiss: () -> Unit) {
     val batch = Downloads.galleryNewestBatchSize
     val message = when {
         stored != null && stored.serverImageCount != null -> "${stored.images.size} of ${stored.serverImageCount} downloaded"
-        gallery.imageCount != null -> "${gallery.imageCount} images in this gallery"
+        gallery.imageCount != null -> tr(R.string.arg_images_in_this_gallery, gallery.imageCount)
         else -> null
     }
     val count = gallery.imageCount ?: stored?.serverImageCount
     val options = if (stored != null) {
         syncNewestOptions(count, batch) { Downloads.syncGallery(gallery.id, it) } +
-            DownloadOption("Remove download", destructive = true) { Downloads.deleteGalleryDownload(gallery.id) }
+            DownloadOption(tr(R.string.action_remove_download), destructive = true) { Downloads.deleteGalleryDownload(gallery.id) }
     } else {
         newestOrAllOptions(gallery.imageCount, batch, "image", "images") { Downloads.downloadGallery(gallery, it) }
     }
-    DownloadOptionsAlert("Gallery", message, options, onDismiss)
+    DownloadOptionsAlert(tr(R.string.gallery), message, options, onDismiss)
 }
 
 /**
@@ -181,11 +183,11 @@ fun TagImagesDownloadDialog(tagId: String, tagName: String, imageCount: Int? = n
     val batch = Downloads.galleryNewestBatchSize
     val options = if (stored != null) {
         syncNewestOptions(imageCount ?: stored.serverImageCount, batch) { Downloads.syncTagImages(entryId, it) } +
-            DownloadOption("Remove download", destructive = true) { Downloads.deleteGalleryDownload(entryId) }
+            DownloadOption(tr(R.string.action_remove_download), destructive = true) { Downloads.deleteGalleryDownload(entryId) }
     } else {
         newestOrAllOptions(imageCount, batch, "image", "images") { Downloads.downloadTagImages(tagId, tagName, it) }
     }
-    DownloadOptionsAlert("Tag images", null, options, onDismiss)
+    DownloadOptionsAlert(tr(R.string.tag_images), null, options, onDismiss)
 }
 
 /**
@@ -198,9 +200,9 @@ fun ImageSetDownloadButton(entryId: String, onShowOptions: () -> Unit, modifier:
     val stored = Downloads.galleryDownloads.any { it.id == entryId }
     when {
         downloading -> IconButton({ Downloads.cancelGalleryDownload(entryId) }, modifier.size(size)) {
-            Icon(Icons.Outlined.StopCircle, "Cancel download", tint = StashyColors.systemRed)
+            Icon(Icons.Outlined.StopCircle, tr(R.string.action_cancel_download), tint = StashyColors.systemRed)
         }
-        stored -> IconButton(onShowOptions, modifier.size(size)) { Icon(Icons.Filled.CheckCircle, "Downloaded", tint = Appearance.tint) }
-        else -> IconButton(onShowOptions, modifier.size(size)) { Icon(DownloadGlyph, "Download") }
+        stored -> IconButton(onShowOptions, modifier.size(size)) { Icon(Icons.Filled.CheckCircle, tr(R.string.downloaded), tint = Appearance.tint) }
+        else -> IconButton(onShowOptions, modifier.size(size)) { Icon(DownloadGlyph, tr(R.string.action_download)) }
     }
 }

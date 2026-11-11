@@ -45,7 +45,7 @@ struct TVMainTabView: View {
         if let raw = UserDefaults.standard.string(forKey: "stashyDebugTVOpenStudio"), !raw.isEmpty {
             let parts = raw.split(separator: "|", maxSplits: 1).map(String.init)
             let store = TVNavigationStore()
-            store.binding(for: .studios).wrappedValue.append(TVStudioLink(id: parts[0], name: parts.count > 1 ? parts[1] : "Studio"))
+            store.binding(for: .studios).wrappedValue.append(TVStudioLink(id: parts[0], name: parts.count > 1 ? parts[1] : tr("studio")))
             _navigationStore = State(initialValue: store)
             _selectedTab = State(initialValue: .studios)
         }
@@ -54,19 +54,19 @@ struct TVMainTabView: View {
 
     /// Home ist ein eigener Eintrag über der Library-Sektion.
     private let homeTab = TVContentTab(
-        id: .home, appTab: .catalogue, title: "Home", systemImage: "house.fill"
+        id: .home, appTab: .catalogue, title: tr("home"), systemImage: "house.fill"
     )
 
     /// Inhaltliche Bereiche, gruppiert unter „Library".
     private let libraryTabs: [TVContentTab] = [
-        TVContentTab(id: .scenes, appTab: .scenes, title: "Scenes", systemImage: "film.fill"),
-        TVContentTab(id: .performers, appTab: .performers, title: "Performers", systemImage: "person.3.fill"),
-        TVContentTab(id: .studios, appTab: .studios, title: "Studios", systemImage: "building.2.fill"),
-        TVContentTab(id: .tags, appTab: .tags, title: "Tags", systemImage: "tag.fill"),
-        TVContentTab(id: .groups, appTab: .groups, title: "Groups", systemImage: "rectangle.stack.fill"),
-        TVContentTab(id: .galleries, appTab: .galleries, title: "Galleries", systemImage: "photo.stack.fill"),
-        TVContentTab(id: .images, appTab: .images, title: "Images", systemImage: "photo.fill"),
-        TVContentTab(id: .markers, appTab: .markers, title: "Markers", systemImage: "bookmark.fill")
+        TVContentTab(id: .scenes, appTab: .scenes, title: tr("scenes"), systemImage: "film.fill"),
+        TVContentTab(id: .performers, appTab: .performers, title: tr("performers"), systemImage: "person.3.fill"),
+        TVContentTab(id: .studios, appTab: .studios, title: tr("studios"), systemImage: "building.2.fill"),
+        TVContentTab(id: .tags, appTab: .tags, title: tr("tags"), systemImage: "tag.fill"),
+        TVContentTab(id: .groups, appTab: .groups, title: tr("groups"), systemImage: "rectangle.stack.fill"),
+        TVContentTab(id: .galleries, appTab: .galleries, title: tr("galleries"), systemImage: "photo.stack.fill"),
+        TVContentTab(id: .images, appTab: .images, title: tr("images"), systemImage: "photo.fill"),
+        TVContentTab(id: .markers, appTab: .markers, title: tr("markers"), systemImage: "bookmark.fill")
     ]
 
     private func isVisible(_ tab: AppTab) -> Bool {
@@ -117,7 +117,7 @@ struct TVMainTabView: View {
             // Reihenfolge trotzdem oben. Der frühere Zwang, Settings *vor*
             // Search zu deklarieren, galt nur für die obere Leiste, wo die
             // Rolle an den rechten Rand gepinnt wurde.
-            Tab("Search", systemImage: "magnifyingglass", value: TVRootTab.search, role: .search) {
+            Tab(tr("search"), systemImage: "magnifyingglass", value: TVRootTab.search, role: .search) {
                 TVTabStack(tab: .search) { TVSearchView() }
             }
 
@@ -127,7 +127,7 @@ struct TVMainTabView: View {
 
             // Feeds (iOS: own tab) — directly under Home, hideable like the iOS tab.
             if isVisible(.reels) {
-                Tab("Feeds", systemImage: AppTab.reels.icon, value: TVRootTab.feeds) {
+                Tab(tr("feeds"), systemImage: AppTab.reels.icon, value: TVRootTab.feeds) {
                     TVTabStack(tab: .feeds) { TVFeedsView() }
                 }
             }
@@ -135,7 +135,7 @@ struct TVMainTabView: View {
             // Ohne die Prüfung entstünde bei komplett ausgeblendeter Library
             // eine Sektion mit Überschrift und ohne Zeilen.
             if !visibleLibraryTabs.isEmpty {
-                TabSection("Library") {
+                TabSection(tr("library")) {
                     ForEach(visibleLibraryTabs) { item in
                         Tab(item.title, systemImage: item.systemImage, value: item.id) {
                             tabContent(item.id)
@@ -146,14 +146,14 @@ struct TVMainTabView: View {
 
             // Match + RateMe (stashy+). Bleibt auch gesperrt sichtbar: die Kacheln
             // tragen dann ein Schloss und führen zur stashy+-Seite.
-            Tab("Discover", systemImage: "sparkles", value: TVRootTab.discover) {
+            Tab(tr("discover"), systemImage: "sparkles", value: TVRootTab.discover) {
                 TVTabStack(tab: .discover) { TVDiscoverView() }
             }
 
             // Settings zuletzt. Einen Footer-Slot gibt es auf tvOS nicht
             // (`tabViewSidebarFooter` ist dort nicht verfügbar), die
             // Deklarationsreihenfolge ist der einzige Hebel.
-            Tab("Settings", systemImage: "gear", value: TVRootTab.settings) {
+            Tab(tr("settings"), systemImage: "gear", value: TVRootTab.settings) {
                 TVTabStack(tab: .settings) { TVSettingsView() }
             }
         }

@@ -41,9 +41,9 @@ struct TVPerformersView: View {
             columnWidth: 260,
             columnCount: 6,
             emptySystemImage: "person.3",
-            emptyTitle: "No Performers Found",
-            loadingText: "Loading performers…",
-            errorTitle: "Error loading performers",
+            emptyTitle: tr("empty_performers_found"),
+            loadingText: tr("loading_performers"),
+            errorTitle: tr("error_loading_performers"),
             focusResetToken: focusResetToken,
             loadMore: { viewModel.loadMorePerformers() },
             reload: { reload() },
@@ -52,7 +52,7 @@ struct TVPerformersView: View {
                 STVHeaderView(
                     sortMenu: {
                         TVOptionPickerButton(
-                            title: "Sort By",
+                            title: tr("action_sort_by"),
                             icon: "arrow.up.arrow.down",
                             options: sortOptions,
                             selection: $sortBy
@@ -123,25 +123,25 @@ struct TVPerformersView: View {
 
     private func label(for option: StashDBViewModel.PerformerSortOption) -> String {
         switch option {
-        case .nameAsc: return "Name (A-Z)"
-        case .nameDesc: return "Name (Z-A)"
-        case .sceneCountDesc: return "Most Scenes"
-        case .sceneCountAsc: return "Least Scenes"
-        case .imageCountDesc: return "Most Images"
-        case .imageCountAsc: return "Least Images"
-        case .galleryCountDesc: return "Most Galleries"
-        case .galleryCountAsc: return "Least Galleries"
-        case .birthdateDesc: return "Youngest First"
-        case .birthdateAsc: return "Oldest First"
-        case .createdAtDesc: return "Recently Added"
-        case .createdAtAsc: return "Oldest Added"
-        case .updatedAtDesc: return "Recently Updated"
-        case .updatedAtAsc: return "Least Recently Updated"
-        case .oCountDesc: return "O Count (High-Low)"
-        case .oCountAsc: return "O Count (Low-High)"
-        case .ratingDesc: return "Highest Rated"
-        case .ratingAsc: return "Lowest Rated"
-        case .random: return "Random"
+        case .nameAsc: return tr("name_z")
+        case .nameDesc: return tr("name_z_2")
+        case .sceneCountDesc: return tr("most_scenes")
+        case .sceneCountAsc: return tr("least_scenes")
+        case .imageCountDesc: return tr("most_images")
+        case .imageCountAsc: return tr("least_images")
+        case .galleryCountDesc: return tr("most_galleries")
+        case .galleryCountAsc: return tr("least_galleries")
+        case .birthdateDesc: return tr("youngest_first")
+        case .birthdateAsc: return tr("oldest_first")
+        case .createdAtDesc: return tr("recently_added")
+        case .createdAtAsc: return tr("oldest_added")
+        case .updatedAtDesc: return tr("recently_updated")
+        case .updatedAtAsc: return tr("least_recently_updated")
+        case .oCountDesc: return tr("o_count_high_low")
+        case .oCountAsc: return tr("o_count_low_high")
+        case .ratingDesc: return tr("highest_rated")
+        case .ratingAsc: return tr("lowest_rated")
+        case .random: return tr("random")
         }
     }
 }

@@ -1,5 +1,7 @@
 package de.letzgo.stashy.ui.settings
 
+import de.letzgo.stashy.R
+import de.letzgo.stashy.tr
 import androidx.compose.material.icons.outlined.VerticalAlignBottom
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.foundation.layout.widthIn
@@ -60,27 +62,27 @@ class AppearanceSettingsScreen : Screen {
     override val key = "settings-appearance"
 
     @OptIn(ExperimentalLayoutApi::class)
-    @Composable override fun Content() = SettingsDetailScaffold("Appearance") { top ->
+    @Composable override fun Content() = SettingsDetailScaffold(tr(R.string.appearance)) { top ->
         SettingsList(top) {
-            settingsSection(header = "App Theme", footer = "Choose the appearance of the app.", key = "theme") {
-                SettingsPickerRow("Theme", AppTheme.entries, Appearance.theme, { it.raw }, SFS.circleLeftHalf) { Appearance.updateTheme(it) }
+            settingsSection(header = tr(R.string.app_theme), footer = tr(R.string.hint_choose_appearance_of_app), key = "theme") {
+                SettingsPickerRow(tr(R.string.theme), AppTheme.entries, Appearance.theme, { it.raw }, SFS.circleLeftHalf) { Appearance.updateTheme(it) }
             }
             settingsSection(
-                header = "Tab Bar", key = "tabbar",
-                footer = "Slides the tab bar away while you scroll down a list and brings it back when you scroll up. In Feeds (except Pics) the top bar hides with it.",
+                header = tr(R.string.tab_bar), key = "tabbar",
+                footer = tr(R.string.hint_slides_tab_bar_away_while),
             ) {
-                SettingsToggleRow("Auto-hide tab bar", de.letzgo.stashy.ui.TabBarAutoHide.enabled, androidx.compose.material.icons.Icons.Outlined.VerticalAlignBottom) {
+                SettingsToggleRow(tr(R.string.auto_hide_tab_bar), de.letzgo.stashy.ui.TabBarAutoHide.enabled, androidx.compose.material.icons.Icons.Outlined.VerticalAlignBottom) {
                     de.letzgo.stashy.ui.TabBarAutoHide.enabled = it
                 }
             }
             settingsSection(
-                header = "App Accent Color", key = "accent",
-                footer = "This color will be applied to the tab bar, navigation bar buttons, and other interactive elements throughout the app.",
+                header = tr(R.string.app_accent_color), key = "accent",
+                footer = tr(R.string.hint_this_color_will_be_applied),
             ) {
                 // iOS ColorPicker → hue slider (Android has no system colour picker).
                 Column(Modifier.padding(horizontal = 16.dp, vertical = 12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text("Custom Color", style = NativeType.bodyLarge, color = Theme.palette.text, modifier = Modifier.weight(1f))
+                        Text(tr(R.string.custom_color), style = NativeType.bodyLarge, color = Theme.palette.text, modifier = Modifier.weight(1f))
                         Box(Modifier.size(28.dp).background(Appearance.tint, CircleShape).border(1.dp, Theme.palette.text.copy(alpha = 0.3f), CircleShape))
                     }
                     val hsv = FloatArray(3).also { android.graphics.Color.colorToHSV(Appearance.tint.toArgb(), it) }
@@ -103,11 +105,11 @@ class AppearanceSettingsScreen : Screen {
                     }
                 }
             }
-            settingsSection(header = "Glass", footer = "How much of the content shows through the glass buttons, pills and bars drawn over videos and images.", key = "glass") {
+            settingsSection(header = tr(R.string.glass), footer = tr(R.string.hint_how_much_of_content_shows_through), key = "glass") {
                 Column(Modifier.padding(horizontal = 16.dp, vertical = 12.dp)) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Icon(SFS.circleLeftHalf, null, tint = Appearance.tint, modifier = Modifier.size(24.dp))
-                        Text("Transparency", style = NativeType.bodyLarge, color = Theme.palette.text, modifier = Modifier.padding(start = 16.dp).weight(1f))
+                        Text(tr(R.string.transparency), style = NativeType.bodyLarge, color = Theme.palette.text, modifier = Modifier.padding(start = 16.dp).weight(1f))
                         Text("${Math.round(Appearance.glassTransparency * 100)} %", style = NativeType.bodyLarge, color = Theme.palette.secondaryText)
                     }
                     Slider(
@@ -119,7 +121,7 @@ class AppearanceSettingsScreen : Screen {
                 SettingsDivider()
                 GlassDemo()
             }
-            settingsSection(header = "O Counter", footer = "Choose which icon to display for the O Counter throughout the app.", key = "ocounter") {
+            settingsSection(header = tr(R.string.o_count), footer = tr(R.string.hint_choose_which_icon_to_display), key = "ocounter") {
                 FlowRow(Modifier.fillMaxWidth().padding(16.dp), horizontalArrangement = Arrangement.spacedBy(12.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     oCounterPresets.forEach { (icon, label) ->
                         val selected = Appearance.oCounterIcon == icon
@@ -141,9 +143,9 @@ class AppearanceSettingsScreen : Screen {
 
 /** iOS `oCounterIconPresets`. */
 val oCounterPresets = listOf(
-    "heart" to "Heart", "star" to "Star", "flame" to "Flame", "bolt" to "Bolt", "hand.thumbsup" to "Thumbs Up",
-    "circle" to "Circle", "diamond" to "Diamond", "crown" to "Crown", "trophy" to "Trophy", "moon" to "Moon",
-    "drop" to "Drop", "leaf" to "Leaf", "bell" to "Bell", "tag" to "Tag", "eye" to "Eye",
+    "heart" to tr(R.string.heart), "star" to tr(R.string.star), "flame" to tr(R.string.flame), "bolt" to tr(R.string.bolt), "hand.thumbsup" to tr(R.string.thumbs_up),
+    "circle" to tr(R.string.circle), "diamond" to tr(R.string.diamond), "crown" to tr(R.string.crown), "trophy" to tr(R.string.trophy), "moon" to tr(R.string.moon),
+    "drop" to tr(R.string.drop), "leaf" to tr(R.string.leaf), "bell" to tr(R.string.bell), "tag" to tr(R.string.tag), "eye" to tr(R.string.eye),
 )
 
 /**
@@ -153,11 +155,11 @@ val oCounterPresets = listOf(
 class SceneViewSettingsScreen : Screen {
     override val key = "settings-scene-view"
 
-    @Composable override fun Content() = SettingsDetailScaffold("Scene View") { top ->
+    @Composable override fun Content() = SettingsDetailScaffold(tr(R.string.scene_view)) { top ->
         SettingsList(top) {
             item(key = "cards") {
                 Column(Modifier.fillMaxWidth().padding(bottom = 20.dp)) {
-                    SectionHeaderText("Cards")
+                    SectionHeaderText(tr(R.string.cards))
                     val cards = SceneDetailLayout.order
                     val hidden = SceneDetailLayout.hidden
                     SettingsGroup {
@@ -172,13 +174,13 @@ class SceneViewSettingsScreen : Screen {
                             }
                         }
                     }
-                    SectionFooterText("Drag to reorder the cards below the video player; switch a card off to hide it. In landscape, Groups and Tags share a row when they sit next to each other.")
+                    SectionFooterText(tr(R.string.hint_drag_to_reorder_cards_below))
                 }
             }
             settingsSection(key = "reset") {
                 val isDefault = SceneDetailLayout.isDefault
                 SettingsRow(onClick = { SceneDetailLayout.reset() }, enabled = !isDefault) {
-                    Text("Reset to Default", style = NativeType.bodyLarge, color = if (isDefault) Theme.palette.tertiaryText else nativeAccent())
+                    Text(tr(R.string.action_reset_to_default), style = NativeType.bodyLarge, color = if (isDefault) Theme.palette.tertiaryText else nativeAccent())
                 }
             }
         }
@@ -205,9 +207,9 @@ private fun GlassDemo() {
         Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
             DemoGlassCapsule(tint = Appearance.tint) {
                 Icon(SFS.chevronLeft, null, tint = Color.White, modifier = Modifier.size(16.dp))
-                Text("Back", style = NativeType.bodyMedium.copy(fontWeight = FontWeight.SemiBold), color = Color.White)
+                Text(tr(R.string.back), style = NativeType.bodyMedium.copy(fontWeight = FontWeight.SemiBold), color = Color.White)
             }
-            DemoGlassCapsule { Text("Demo", style = NativeType.bodyMedium.copy(fontWeight = FontWeight.SemiBold), color = Color.White) }
+            DemoGlassCapsule { Text(tr(R.string.demo), style = NativeType.bodyMedium.copy(fontWeight = FontWeight.SemiBold), color = Color.White) }
             Box(Modifier.size(42.dp).floatingShadow().stashyGlass(CircleShape), contentAlignment = Alignment.Center) {
                 Icon(SF.line3HorizontalDecrease, null, tint = Color.White, modifier = Modifier.size(19.dp))
             }
@@ -232,12 +234,12 @@ private fun DemoGlassCapsule(tint: Color? = null, content: @Composable RowScope.
 /** iOS: `EditModeSettingsView`. */
 class EditModeSettingsScreen : Screen {
     override val key = "settings-editing"
-    @Composable override fun Content() = SettingsDetailScaffold("Editing") { top ->
+    @Composable override fun Content() = SettingsDetailScaffold(tr(R.string.editing)) { top ->
         SettingsList(top) {
             settingsSection(
                 key = "edit",
-                footer = "Show edit buttons on scene detail cards (performers, studio, groups, galleries, tags, title, description) and on performer / studio / tag / group / gallery detail.",
-            ) { SettingsToggleRow("Enable Editing", Appearance.isEditModeEnabled) { Appearance.updateEditMode(it) } }
+                footer = tr(R.string.hint_show_edit_buttons_on_scene),
+            ) { SettingsToggleRow(tr(R.string.action_enable_editing), Appearance.isEditModeEnabled) { Appearance.updateEditMode(it) } }
         }
     }
 }
@@ -245,11 +247,11 @@ class EditModeSettingsScreen : Screen {
 /** iOS: `ToolsSettingsView`. */
 class ToolsSettingsScreen : Screen {
     override val key = "settings-tools"
-    @Composable override fun Content() = SettingsDetailScaffold("Tools") { top ->
+    @Composable override fun Content() = SettingsDetailScaffold(tr(R.string.tools)) { top ->
         androidx.compose.runtime.LaunchedEffect(Unit) { de.letzgo.stashy.data.SavedFiltersStore.load(force = true) }
         SettingsList(top) {
-            settingsSection(header = "Tab", footer = "Tools are grouped on the Tools page.", key = "tab") {
-                SettingsToggleRow("Show Tools Tab", TabManager.isVisible(AppTab.Tools), SF.cubeBox) { TabManager.toggle(AppTab.Tools) }
+            settingsSection(header = tr(R.string.tab), footer = tr(R.string.hint_tools_are_grouped_on_tools), key = "tab") {
+                SettingsToggleRow(tr(R.string.action_show_tools_tab), TabManager.isVisible(AppTab.Tools), SF.cubeBox) { TabManager.toggle(AppTab.Tools) }
             }
         }
     }
@@ -269,22 +271,39 @@ class AcknowledgementsScreen : Screen {
         Entry("kotlinx.serialization / kotlinx.coroutines", "Apache-2.0", null, "https://github.com/Kotlin/kotlinx.serialization"),
     )
 
-    @Composable override fun Content() = SettingsDetailScaffold("Acknowledgements") { top ->
+    /** Where the app's wording and translations come from (iOS: `translationEntries`). */
+    private val translationEntries = listOf(
+        Entry("Stash", "AGPL-3.0", tr(R.string.hint_terms_follow_stashs_own_interface), "https://github.com/stashapp/stash"),
+        Entry("Tolgee", "Apache-2.0", tr(R.string.translations_are_managed_with_tolgee), "https://tolgee.io"),
+    )
+
+    @Composable override fun Content() = SettingsDetailScaffold(tr(R.string.acknowledgements)) { top ->
         val context = LocalContext.current
         SettingsList(top) {
-            settingsSection(header = "Components", footer = "stashy uses the components above. Their licenses apply in addition to stashy's own terms.", key = "components") {
+            settingsSection(header = tr(R.string.components), footer = tr(R.string.hint_stashy_uses_components_above_their), key = "components") {
                 entries.forEachIndexed { i, e ->
-                    Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                        Text(e.name, style = NativeType.titleMedium, color = Theme.palette.text)
-                        Text(e.license, style = NativeType.bodyMedium, color = Theme.palette.secondaryText)
-                        e.note?.let { Text(it, style = NativeType.bodySmall, color = Theme.palette.secondaryText) }
-                        Text(e.url, style = NativeType.bodySmall, color = de.letzgo.stashy.ui.textAccent(), modifier = Modifier.clickable {
-                            runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(e.url))) }
-                        })
-                    }
+                    EntryRow(e, context)
                     if (i < entries.lastIndex) SettingsDivider()
                 }
             }
+            settingsSection(header = tr(R.string.translations), key = "translations") {
+                translationEntries.forEachIndexed { i, e ->
+                    EntryRow(e, context)
+                    if (i < translationEntries.lastIndex) SettingsDivider()
+                }
+            }
+        }
+    }
+
+    @Composable
+    private fun EntryRow(e: Entry, context: android.content.Context) {
+        Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Text(e.name, style = NativeType.titleMedium, color = Theme.palette.text)
+            Text(e.license, style = NativeType.bodyMedium, color = Theme.palette.secondaryText)
+            e.note?.let { Text(it, style = NativeType.bodySmall, color = Theme.palette.secondaryText) }
+            Text(e.url, style = NativeType.bodySmall, color = de.letzgo.stashy.ui.textAccent(), modifier = Modifier.clickable {
+                runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(e.url))) }
+            })
         }
     }
 }

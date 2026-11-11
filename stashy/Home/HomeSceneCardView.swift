@@ -115,7 +115,7 @@ struct HomeSceneCardView: View {
                 }
                 Spacer()
                 HStack(alignment: .bottom, spacing: 8) {
-                    Text(scene.displayTitle ?? "Untitled Scene")
+                    Text(scene.displayTitle ?? tr("untitled_scene"))
                         // Small cards match the Channels card titles (12pt bold); the hero row
                         // keeps its larger type.
                         .font(isLarge ? .subheadline : .system(size: 12, weight: .bold))
@@ -161,11 +161,11 @@ struct HomeSceneCardView: View {
         HStack(spacing: 8) {
             heroIconButton(
                 systemImage: "play.fill",
-                label: hasResumePoint ? "Start from beginning" : "Play",
+                label: hasResumePoint ? tr("action_start_from_beginning") : tr("action_play"),
                 fromStart: true
             )
             if hasResumePoint {
-                heroIconButton(systemImage: "clock.arrow.circlepath", label: "Resume", fromStart: false)
+                heroIconButton(systemImage: "clock.arrow.circlepath", label: tr("action_resume"), fromStart: false)
             }
         }
         .fixedSize()

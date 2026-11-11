@@ -1,5 +1,7 @@
 package de.letzgo.stashy.ui.search
 
+import de.letzgo.stashy.R
+import de.letzgo.stashy.tr
 import de.letzgo.stashy.ui.tabBarHeight
 import de.letzgo.stashy.ui.bottomBarContentPadding
 import androidx.compose.foundation.background
@@ -168,12 +170,12 @@ fun SearchScreen() {
 
     Box(Modifier.fillMaxSize().background(p.background)) {
         Column(Modifier.fillMaxSize().statusBarsPadding().imePadding()) {
-            Text("Search", style = IosTypography.headline, color = p.text, modifier = Modifier.align(Alignment.CenterHorizontally).padding(top = 12.dp))
+            Text(tr(R.string.search), style = IosTypography.headline, color = p.text, modifier = Modifier.align(Alignment.CenterHorizontally).padding(top = 12.dp))
             // iOS `.searchable(prompt: "Search everything...")`
-            NativeSearchField(text, { text = it }, "Search everything...", Modifier.padding(horizontal = 16.dp, vertical = 10.dp))
+            NativeSearchField(text, { text = it }, tr(R.string.placeholder_search_everything), Modifier.padding(horizontal = 16.dp, vertical = 10.dp))
             when {
-                ServerConfigManager.activeConfig == null -> Placeholder(SFS.serverRack, "Server not reachable", null) { Nav.select(MainTab.Settings) }
-                query.isEmpty() -> Placeholder(SF.magnifyingglass, "Search Your Library", "Find scenes, images, performers, studios, tags, galleries, groups and markers")
+                ServerConfigManager.activeConfig == null -> Placeholder(SFS.serverRack, tr(R.string.server_not_reachable), null) { Nav.select(MainTab.Settings) }
+                query.isEmpty() -> Placeholder(SF.magnifyingglass, tr(R.string.search_your_library), tr(R.string.hint_find_scenes_images_performers_studios))
                 else -> Results(query, searching)
             }
         }
@@ -189,7 +191,7 @@ private fun Placeholder(icon: ImageVector, title: String, message: String?, onRe
             Text(title, style = IosTypography.title2.copy(fontWeight = FontWeight.Bold), color = p.text)
             message?.let { Text(it, style = IosTypography.body, color = p.secondaryText, textAlign = TextAlign.Center, modifier = Modifier.padding(horizontal = 40.dp)) }
             onRetry?.let {
-                Text("Retry Connection", style = IosTypography.headline, color = Color.White,
+                Text(tr(R.string.action_retry_connection), style = IosTypography.headline, color = Color.White,
                     modifier = Modifier.background(Appearance.tint, RoundedCornerShape(Tokens.Radius.button)).clickable(onClick = it).padding(horizontal = 20.dp, vertical = 12.dp))
             }
         }
@@ -217,58 +219,58 @@ private fun Results(query: String, searching: Boolean) {
         sections.forEach { section ->
             when (section) {
                 AppTab.Performers -> if (r.performers.isNotEmpty()) item("performers") {
-                    Section("Performers", r.performers.size, PERFORMERS_LIMIT, { Nav.openCatalog(CatalogTab.Performers, search = query) }) {
+                    Section(tr(R.string.performers), r.performers.size, PERFORMERS_LIMIT, { Nav.openCatalog(CatalogTab.Performers, search = query) }) {
                         LazyRow(contentPadding = PaddingValues(start = 12.dp, end = 12.dp, bottom = 8.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                             items(r.performers, key = { it.id }) { PerformerBubble(it) }
                         }
                     }
                 }
                 AppTab.Studios -> if (r.studios.isNotEmpty()) item("studios") {
-                    Section("Studios", r.studios.size, STUDIOS_LIMIT, { Nav.openCatalog(CatalogTab.Studios, search = query) }) {
+                    Section(tr(R.string.studios), r.studios.size, STUDIOS_LIMIT, { Nav.openCatalog(CatalogTab.Studios, search = query) }) {
                         LazyRow(contentPadding = PaddingValues(start = 12.dp, end = 12.dp, bottom = 8.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                             items(r.studios, key = { it.id }) { StudioTile(it) }
                         }
                     }
                 }
                 AppTab.Tags -> if (r.tags.isNotEmpty()) item("tags") {
-                    Section("Tags", r.tags.size, TAGS_LIMIT, { Nav.openCatalog(CatalogTab.Tags, search = query) }) {
+                    Section(tr(R.string.tags), r.tags.size, TAGS_LIMIT, { Nav.openCatalog(CatalogTab.Tags, search = query) }) {
                         FlowRow(Modifier.padding(horizontal = 12.dp), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                             r.tags.forEach { t -> ActionChip("${t.name} (${t.sceneCount ?: 0})", { DetailLinks.tag(t) }, icon = SFS.tagFill) }
                         }
                     }
                 }
                 AppTab.Scenes -> if (r.scenes.isNotEmpty()) item("scenes") {
-                    Section("Scenes", r.scenes.size, SCENES_LIMIT, { Nav.openCatalog(CatalogTab.Scenes, search = query, noDefaultFilter = true) }) {
+                    Section(tr(R.string.scenes), r.scenes.size, SCENES_LIMIT, { Nav.openCatalog(CatalogTab.Scenes, search = query, noDefaultFilter = true) }) {
                         LazyRow(contentPadding = PaddingValues(horizontal = 12.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                             items(r.scenes, key = { it.id }) { DashboardSceneCard(it, false, 125.dp * 16 / 9, 125.dp, onClick = { DetailLinks.scene(it) }) }
                         }
                     }
                 }
                 AppTab.Images -> if (r.images.isNotEmpty()) item("images") {
-                    Section("Images", r.images.size, IMAGES_LIMIT, { Nav.openCatalog(CatalogTab.Images, search = query) }) {
+                    Section(tr(R.string.images), r.images.size, IMAGES_LIMIT, { Nav.openCatalog(CatalogTab.Images, search = query) }) {
                         LazyRow(contentPadding = PaddingValues(start = 12.dp, end = 12.dp, bottom = 8.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                             items(r.images, key = { it.id }) { img ->
-                                PillTile(img.thumbnailURL, 140, 140, if (img.isVideo) SFS.playRectangle else SF.photo, img.title ?: "Image", SF.photo) { DetailLinks.image(r.images, img) }
+                                PillTile(img.thumbnailURL, 140, 140, if (img.isVideo) SFS.playRectangle else SF.photo, img.title ?: tr(R.string.image), SF.photo) { DetailLinks.image(r.images, img) }
                             }
                         }
                     }
                 }
                 AppTab.Galleries -> if (r.galleries.isNotEmpty()) item("galleries") {
-                    Section("Galleries", r.galleries.size, GALLERIES_LIMIT, { Nav.openCatalog(CatalogTab.Galleries, search = query) }) {
+                    Section(tr(R.string.galleries), r.galleries.size, GALLERIES_LIMIT, { Nav.openCatalog(CatalogTab.Galleries, search = query) }) {
                         LazyRow(contentPadding = PaddingValues(start = 12.dp, end = 12.dp, bottom = 8.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                             items(r.galleries, key = { it.id }) { g -> PillTile(g.coverURL, 140, 100, SF.photoStack, g.displayTitle, SF.photoStack) { DetailLinks.gallery(g) } }
                         }
                     }
                 }
                 AppTab.Groups -> if (r.groups.isNotEmpty()) item("groups") {
-                    Section("Groups", r.groups.size, GROUPS_LIMIT, { Nav.openCatalog(CatalogTab.Groups, search = query) }) {
+                    Section(tr(R.string.groups), r.groups.size, GROUPS_LIMIT, { Nav.openCatalog(CatalogTab.Groups, search = query) }) {
                         LazyRow(contentPadding = PaddingValues(start = 12.dp, end = 12.dp, bottom = 8.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                             items(r.groups, key = { it.id }) { g -> PillTile(g.frontImageURL, 100, 133, SF.rectangleStackFill, g.name, SF.rectangleStackFill) { DetailLinks.group(g) } }
                         }
                     }
                 }
                 AppTab.Markers -> if (r.markers.isNotEmpty()) item("markers") {
-                    Section("Markers", r.markers.size, MARKERS_LIMIT, { Nav.openCatalog(CatalogTab.Markers, search = query) }) {
+                    Section(tr(R.string.markers), r.markers.size, MARKERS_LIMIT, { Nav.openCatalog(CatalogTab.Markers, search = query) }) {
                         LazyRow(contentPadding = PaddingValues(horizontal = 12.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                             items(r.markers.filter { it.scene != null }, key = { it.id }) { MarkerCard(it) }
                         }
@@ -280,7 +282,7 @@ private fun Results(query: String, searching: Boolean) {
         if (r.isEmpty && SearchState.resultsFor == query) item("none") {
             Column(Modifier.fillMaxWidth().padding(top = 60.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(16.dp)) {
                 Icon(SFS.docMagnifyingglass, null, tint = p.secondaryText, modifier = Modifier.size(50.dp))
-                Text("No results for \"$query\"", style = IosTypography.body, color = p.secondaryText)
+                Text(tr(R.string.empty_results_for_arg, query), style = IosTypography.body, color = p.secondaryText)
             }
         }
     }
@@ -296,7 +298,7 @@ private fun Section(title: String, count: Int, limit: Int, onShowAll: () -> Unit
             Text(" ($count)", style = IosTypography.subheadline, color = p.secondaryText)
             Spacer(Modifier.weight(1f))
             if (count >= limit) {
-                Text("Show All", style = IosTypography.subheadline, color = de.letzgo.stashy.ui.textAccent())
+                Text(tr(R.string.action_show_all), style = IosTypography.subheadline, color = de.letzgo.stashy.ui.textAccent())
                 Icon(SFS.chevronRight, null, tint = Appearance.tint, modifier = Modifier.padding(start = 4.dp).size(12.dp))
             }
         }
@@ -359,7 +361,7 @@ private fun MarkerCard(marker: SceneMarker) {
                 modifier = Modifier.align(Alignment.BottomEnd).padding(4.dp).background(Color.Black.copy(alpha = 0.7f), RoundedCornerShape(4.dp)).padding(horizontal = 4.dp, vertical = 2.dp))
         }
         Column(Modifier.padding(horizontal = 4.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-            Text(marker.title?.takeIf { it.isNotBlank() } ?: marker.scene?.title ?: "Unknown Marker", style = IosTypography.caption.copy(fontWeight = FontWeight.Bold), color = p.text, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(marker.title?.takeIf { it.isNotBlank() } ?: marker.scene?.title ?: tr(R.string.unknown_marker), style = IosTypography.caption.copy(fontWeight = FontWeight.Bold), color = p.text, maxLines = 1, overflow = TextOverflow.Ellipsis)
             marker.primaryTag?.name?.let {
                 Text(it, fontSize = 11.sp, fontWeight = FontWeight.Medium, color = de.letzgo.stashy.ui.textAccent(),
                     modifier = Modifier.background(Appearance.tint.copy(alpha = 0.1f), RoundedCornerShape(4.dp)).padding(horizontal = 4.dp, vertical = 1.dp))

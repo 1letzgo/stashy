@@ -41,9 +41,9 @@ struct TVGroupsView: View {
             columnWidth: 260,
             columnCount: 6,
             emptySystemImage: "rectangle.stack",
-            emptyTitle: "No Groups Found",
-            loadingText: "Loading groups…",
-            errorTitle: "Error loading groups",
+            emptyTitle: tr("empty_groups_found"),
+            loadingText: tr("loading_groups"),
+            errorTitle: tr("error_loading_groups"),
             focusResetToken: focusResetToken,
             loadMore: { viewModel.loadMoreGroups() },
             reload: { reload() },
@@ -52,7 +52,7 @@ struct TVGroupsView: View {
                 STVHeaderView(
                     sortMenu: {
                         TVOptionPickerButton(
-                            title: "Sort By",
+                            title: tr("action_sort_by"),
                             icon: "arrow.up.arrow.down",
                             options: sortOptions,
                             selection: $sortBy
@@ -123,23 +123,23 @@ struct TVGroupsView: View {
 
     private func label(for option: StashDBViewModel.GroupSortOption) -> String {
         switch option {
-        case .nameAsc: return "Name (A-Z)"
-        case .nameDesc: return "Name (Z-A)"
-        case .sceneCountDesc: return "Most Scenes"
-        case .sceneCountAsc: return "Least Scenes"
-        case .galleryCountDesc: return "Most Galleries"
-        case .galleryCountAsc: return "Least Galleries"
-        case .performerCountDesc: return "Most Performers"
-        case .performerCountAsc: return "Least Performers"
-        case .dateDesc: return "Newest First"
-        case .dateAsc: return "Oldest First"
-        case .ratingDesc: return "Highest Rated"
-        case .ratingAsc: return "Lowest Rated"
-        case .createdAtDesc: return "Recently Added"
-        case .createdAtAsc: return "Oldest Added"
-        case .updatedAtDesc: return "Recently Updated"
-        case .updatedAtAsc: return "Least Recently Updated"
-        case .random: return "Random"
+        case .nameAsc: return tr("name_z")
+        case .nameDesc: return tr("name_z_2")
+        case .sceneCountDesc: return tr("most_scenes")
+        case .sceneCountAsc: return tr("least_scenes")
+        case .galleryCountDesc: return tr("most_galleries")
+        case .galleryCountAsc: return tr("least_galleries")
+        case .performerCountDesc: return tr("most_performers")
+        case .performerCountAsc: return tr("least_performers")
+        case .dateDesc: return tr("newest_first")
+        case .dateAsc: return tr("oldest_first")
+        case .ratingDesc: return tr("highest_rated")
+        case .ratingAsc: return tr("lowest_rated")
+        case .createdAtDesc: return tr("recently_added")
+        case .createdAtAsc: return tr("oldest_added")
+        case .updatedAtDesc: return tr("recently_updated")
+        case .updatedAtAsc: return tr("least_recently_updated")
+        case .random: return tr("random")
         }
     }
 }
@@ -189,7 +189,7 @@ struct TVGroupDetailView: View {
             infoGrid: { _ in
                 LazyVGrid(columns: TVGridSpec.infoColumns, alignment: .leading, spacing: 12) {
                     if groupDetail != nil {
-                        Text("Cover").font(.title3).foregroundStyle(.secondary)
+                        Text(tr("cover")).font(.title3).foregroundStyle(.secondary)
                         HStack(spacing: 14) {
                             ForEach(CoverSide.allCases, id: \.self) { side in
                                 Button {
@@ -205,7 +205,7 @@ struct TVGroupDetailView: View {
                         }
                     }
                     if viewModel.totalGroupScenes > 0 {
-                        Text("Scenes").font(.title3).foregroundStyle(.secondary)
+                        Text(tr("scenes")).font(.title3).foregroundStyle(.secondary)
                         Text("\(viewModel.totalGroupScenes)").font(.title3).foregroundColor(.white)
                     }
                 }

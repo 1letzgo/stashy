@@ -1,5 +1,7 @@
 package de.letzgo.stashy.ui.catalog
 
+import de.letzgo.stashy.R
+import de.letzgo.stashy.tr
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -83,7 +85,7 @@ internal fun HomeBreadcrumbStrip(tabs: List<CatalogTab>) {
             // Without a visible dashboard (Settings › Home Tabs) there is no Home to go back to.
             if (CatalogTab.Dashboard in tabs) {
                 IconButton(onClick = { Nav.catalogTab = CatalogTab.Dashboard }) {
-                    Icon(SF.houseFill, "Home", tint = if (onDashboard) nativeAccent() else p.secondaryText)
+                    Icon(SF.houseFill, tr(R.string.home), tint = if (onDashboard) nativeAccent() else p.secondaryText)
                 }
                 Icon(Icons.Chevron, null, tint = p.tertiaryText, modifier = Modifier.size(18.dp))
             }
@@ -92,7 +94,7 @@ internal fun HomeBreadcrumbStrip(tabs: List<CatalogTab>) {
                 current = Nav.catalogTab.takeUnless { onDashboard },
                 items = views, title = { it.title }, icon = { it.icon },
                 onSelect = { Nav.catalogTab = it },
-                accessibilityPrefix = "Library", neutralTitle = "Dashboard",
+                accessibilityPrefix = tr(R.string.library), neutralTitle = tr(R.string.dashboard),
             )
             Spacer(Modifier.weight(1f))
             val selection = actions?.selection?.takeIf { it.isActive }
@@ -111,13 +113,13 @@ internal fun HomeBreadcrumbStrip(tabs: List<CatalogTab>) {
             // iOS `dashboardWatchlistButton`: left of Downloads; stashy+ and Miniplayer & Watchlist on.
             if (onDashboard && de.letzgo.stashy.ui.player.MiniPlayerStore.isEnabled) {
                 IconButton(onClick = { de.letzgo.stashy.ui.player.MiniPlayerStore.openWatchlist() }) {
-                    Icon(de.letzgo.stashy.ui.player.WatchlistIcons.listed, "Watchlist", tint = p.secondaryText)
+                    Icon(de.letzgo.stashy.ui.player.WatchlistIcons.listed, tr(R.string.watchlist), tint = p.secondaryText)
                 }
             }
             // iOS `HomeDownloadsButton`: dashboard only, stashy+ only, right edge.
             if (onDashboard && de.letzgo.stashy.data.StashyPlus.isUnlocked) {
                 IconButton(onClick = { Nav.push(de.letzgo.stashy.ui.tools.downloads.DownloadsScreen()) }) {
-                    Icon(SF.squareAndArrowDown, "Downloads", tint = p.secondaryText)
+                    Icon(SF.squareAndArrowDown, tr(R.string.downloads), tint = p.secondaryText)
                 }
             }
             Spacer(Modifier.width(4.dp))
@@ -138,7 +140,7 @@ internal fun <T> BreadcrumbSectionMenu(
     icon: (T) -> ImageVector,
     onSelect: (T) -> Unit,
     modifier: Modifier = Modifier,
-    accessibilityPrefix: String = "Section",
+    accessibilityPrefix: String = tr(R.string.section),
     /** Shown when [current] is null: the pill turns neutral (no accent) and lists every item unchecked. */
     neutralTitle: String = "",
 ) {
@@ -200,7 +202,7 @@ internal fun SortMenu(controller: CatalogController<*>, offersForYou: Boolean = 
             Modifier.heightIn(min = 40.dp).clip(RoundedCornerShape(12.dp)).clickable { open = true }
                 .padding(horizontal = 8.dp)
                 .semantics(mergeDescendants = true) {
-                    contentDescription = "Sort, ${active?.label ?: "custom"}, ${if (sort.isAscending) "ascending" else "descending"}"
+                    contentDescription = tr(R.string.action_sort_arg_arg, active?.label ?: "custom", if (sort.isAscending) "ascending" else "descending")
                 },
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(2.dp),
@@ -221,7 +223,7 @@ internal fun SortMenu(controller: CatalogController<*>, offersForYou: Boolean = 
             }
             if (!sort.isRandom) {
                 HorizontalDivider()
-                listOf(true to "Ascending", false to "Descending").forEach { (ascending, label) ->
+                listOf(true to tr(R.string.ascending), false to tr(R.string.descending)).forEach { (ascending, label) ->
                     DropdownMenuItem(
                         text = { Text(label) },
                         leadingIcon = { Icon(if (ascending) SF.arrowUp else SF.arrowDown, null) },
@@ -247,7 +249,7 @@ private fun SettingsButton(controller: CatalogController<*>) {
     val active = controller.isFilterActive
     IconButton(onClick = { controller.isSheetPresented = true }) {
         BadgedBox(badge = { if (active) Badge(containerColor = accent) }) {
-            Icon(SF.sliderHorizontal3, "Filter and sort settings", tint = Theme.palette.text)
+            Icon(SF.sliderHorizontal3, tr(R.string.action_filter_and_sort_settings), tint = Theme.palette.text)
         }
     }
 }

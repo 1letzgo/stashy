@@ -245,20 +245,20 @@ private struct TagsViewContent: View {
     private var deleteCatalogPresetConfirmationText: String {
         if let sid = ListLivePresetTag.parseServerId(catalogPresetRowSelection),
            let f = viewModel.savedFilters[sid] {
-            return "Remove “\(f.name)” from Stash? Other devices will lose this saved filter."
+            return tr("hint_remove_arg_from_stash_other", f.name)
         }
         if let ls = ListLivePresetTag.parseLocalUUIDString(catalogPresetRowSelection),
            let uuid = UUID(uuidString: ls),
            let p = localCatalogPresets.first(where: { $0.id == uuid }) {
-            return "Remove “\(p.name)” from this device? This cannot be undone."
+            return tr("hint_remove_arg_from_this_device", p.name)
         }
-        return "Remove this filter? This cannot be undone."
+        return tr("hint_remove_this_filter_this_cannot")
     }
 
     private func saveTagCatalogPresetOverwrite() {
         let sel = catalogPresetRowSelection
         if let sid = ListLivePresetTag.parseServerId(sel) {
-            let name = viewModel.savedFilters[sid]?.name ?? "Filter"
+            let name = viewModel.savedFilters[sid]?.name ?? tr("filter")
             viewModel.saveCatalogSavedFilter(
                 mode: .tags,
                 randomSeedKind: .tags,
@@ -368,23 +368,23 @@ private struct TagsViewContent: View {
             .onChange(of: catalogPresetRowSelection) { _, newId in
                 handleTagCatalogPresetSelectionChange(newId)
             }
-            .alert("Save as new", isPresented: $showSaveAsCatalogPresetAlert) {
-                TextField("Name", text: $catalogPresetNameInput)
-                Button("Save") { saveTagCatalogPresetAs(name: catalogPresetNameInput) }
-                Button("Cancel", role: .cancel) {}
+            .alert(tr("action_save_as_new"), isPresented: $showSaveAsCatalogPresetAlert) {
+                TextField(tr("name"), text: $catalogPresetNameInput)
+                Button(tr("action_save")) { saveTagCatalogPresetAs(name: catalogPresetNameInput) }
+                Button(tr("action_cancel"), role: .cancel) {}
             } message: {
-                Text("Save the current sort, filter, and live criteria as a new Stash saved filter.")
+                Text(tr("hint_save_current_sort_filter_and"))
             }
-            .alert("Rename", isPresented: $showRenameCatalogPresetAlert) {
-                TextField("Name", text: $renameCatalogPresetInput)
-                Button("Save") { renameTagCatalogPreset(to: renameCatalogPresetInput) }
-                Button("Cancel", role: .cancel) {}
+            .alert(tr("action_rename"), isPresented: $showRenameCatalogPresetAlert) {
+                TextField(tr("name"), text: $renameCatalogPresetInput)
+                Button(tr("action_save")) { renameTagCatalogPreset(to: renameCatalogPresetInput) }
+                Button(tr("action_cancel"), role: .cancel) {}
             } message: {
-                Text("Rename this preset or saved filter.")
+                Text(tr("hint_rename_this_preset_or_saved"))
             }
-            .alert("Delete filter?", isPresented: $showDeleteCatalogPresetAlert) {
-                Button("Delete", role: .destructive) { deleteTagCatalogPreset() }
-                Button("Cancel", role: .cancel) {}
+            .alert(tr("confirm_delete_filter"), isPresented: $showDeleteCatalogPresetAlert) {
+                Button(tr("action_delete"), role: .destructive) { deleteTagCatalogPreset() }
+                Button(tr("action_cancel"), role: .cancel) {}
             } message: {
                 Text(deleteCatalogPresetConfirmationText)
             }
@@ -447,7 +447,7 @@ private struct TagsViewContent: View {
                 // Keep the bar while a sort/filter change refetches, so it does not jump away.
                 VStack(spacing: 0) {
                     quickBar
-                    StandardLoadingView(message: "Loading tags...")
+                    StandardLoadingView(message: tr("loading_tags"))
                 }
             } else if viewModel.tags.isEmpty && viewModel.errorMessage != nil {
                 ConnectionErrorView { performSearch() }
@@ -476,7 +476,7 @@ private struct TagsViewContent: View {
 
     private var catalogChromeConfig: CatalogChromeConfig {
         CatalogChromeConfig(
-            title: "Tags",
+            title: tr("tags"),
             ownsNavigationBar: !hideTitle,
             visibility: CatalogFloatingChromeState(
                 hasActiveServerConfig: configManager.activeConfig != nil,
@@ -487,7 +487,7 @@ private struct TagsViewContent: View {
             search: CatalogSearchChrome(
                 text: $searchText,
                 isVisible: $isSearchVisible,
-                prompt: "Search tags...",
+                prompt: tr("placeholder_search_tags"),
                 onClear: { performSearch() }
             )
         )
@@ -596,8 +596,8 @@ private struct TagsViewContent: View {
     private var emptyStateView: some View {
         SharedEmptyStateView(
             icon: "tag.fill",
-            title: "No tags found",
-            buttonText: "Load Tags",
+            title: tr("empty_tags_found"),
+            buttonText: tr("action_load_tags"),
             onRetry: { performSearch() }
         )
     }
@@ -1035,7 +1035,7 @@ struct TagDetailView: View {
     /// The shown section's filter and sort sheet (Groups has none yet).
     private var sectionFilterSlot: CatalogChromeSlot? {
         func slot(active: Bool, open: @escaping () -> Void) -> CatalogChromeSlot {
-            CatalogChromeSlot(systemImage: "slider.horizontal.3", isActive: active, accessibilityLabel: "Filter and sort") {
+            CatalogChromeSlot(systemImage: "slider.horizontal.3", isActive: active, accessibilityLabel: tr("action_filter_and_sort_2")) {
                 HapticManager.light()
                 open()
             }
@@ -1060,7 +1060,7 @@ struct TagDetailView: View {
             DispatchQueue.main.async {
                 if !success {
                     isFavorite = !newState
-                    ToastManager.shared.show("Failed to update favorite", icon: "exclamationmark.triangle", style: .error)
+                    ToastManager.shared.show(tr("error_update_favorite"), icon: "exclamationmark.triangle", style: .error)
                 } else {
                     selectedTag.favorite = newState
                 }
@@ -1081,10 +1081,10 @@ struct TagDetailView: View {
                     } else if viewModel.isLoadingTagGalleries {
                         VStack {
                             InlineSpinner()
-                            Text("Loading galleries...").font(.caption).foregroundColor(.secondary)
+                            Text(tr("loading_galleries")).font(.caption).foregroundColor(.secondary)
                         }.padding(.top, 40)
                     } else {
-                        InlineEmptyStateView(icon: "photo.on.rectangle", title: "No galleries found")
+                        InlineEmptyStateView(icon: "photo.on.rectangle", title: tr("empty_galleries_found"))
                     }
                 } else if selectedDetailTab == .studios {
                     studioGrid
@@ -1117,23 +1117,23 @@ struct TagDetailView: View {
             .onChange(of: linkedGalleries.catalogPresetRowSelection) { _, newId in
                 linkedGalleries.handlePresetSelection(newId, viewModel: viewModel)
             }
-            .alert("Save as new", isPresented: $linkedGalleries.showSaveAsCatalogPresetAlert) {
-                TextField("Name", text: $linkedGalleries.catalogPresetNameInput)
-                Button("Save") { linkedGalleries.savePresetAs(name: linkedGalleries.catalogPresetNameInput, viewModel: viewModel) }
-                Button("Cancel", role: .cancel) {}
+            .alert(tr("action_save_as_new"), isPresented: $linkedGalleries.showSaveAsCatalogPresetAlert) {
+                TextField(tr("name"), text: $linkedGalleries.catalogPresetNameInput)
+                Button(tr("action_save")) { linkedGalleries.savePresetAs(name: linkedGalleries.catalogPresetNameInput, viewModel: viewModel) }
+                Button(tr("action_cancel"), role: .cancel) {}
             } message: {
-                Text("Save the current sort, filter, and live criteria as a new Stash saved filter.")
+                Text(tr("hint_save_current_sort_filter_and"))
             }
-            .alert("Rename", isPresented: $linkedGalleries.showRenameCatalogPresetAlert) {
-                TextField("Name", text: $linkedGalleries.renameCatalogPresetInput)
-                Button("Save") { linkedGalleries.renamePreset(to: linkedGalleries.renameCatalogPresetInput, viewModel: viewModel) }
-                Button("Cancel", role: .cancel) {}
+            .alert(tr("action_rename"), isPresented: $linkedGalleries.showRenameCatalogPresetAlert) {
+                TextField(tr("name"), text: $linkedGalleries.renameCatalogPresetInput)
+                Button(tr("action_save")) { linkedGalleries.renamePreset(to: linkedGalleries.renameCatalogPresetInput, viewModel: viewModel) }
+                Button(tr("action_cancel"), role: .cancel) {}
             } message: {
-                Text("Rename this preset or saved filter.")
+                Text(tr("hint_rename_this_preset_or_saved"))
             }
-            .alert("Delete filter?", isPresented: $linkedGalleries.showDeleteCatalogPresetAlert) {
-                Button("Delete", role: .destructive) { linkedGalleries.deletePreset(viewModel: viewModel) }
-                Button("Cancel", role: .cancel) {}
+            .alert(tr("confirm_delete_filter"), isPresented: $linkedGalleries.showDeleteCatalogPresetAlert) {
+                Button(tr("action_delete"), role: .destructive) { linkedGalleries.deletePreset(viewModel: viewModel) }
+                Button(tr("action_cancel"), role: .cancel) {}
             } message: {
                 Text(linkedGalleries.deletePresetConfirmationText(viewModel: viewModel))
             }
@@ -1143,23 +1143,23 @@ struct TagDetailView: View {
             .onChange(of: linkedImages.catalogPresetRowSelection) { _, newId in
                 linkedImages.handlePresetSelection(newId, viewModel: viewModel)
             }
-            .alert("Save as new", isPresented: $linkedImages.showSaveAsCatalogPresetAlert) {
-                TextField("Name", text: $linkedImages.catalogPresetNameInput)
-                Button("Save") { linkedImages.savePresetAs(name: linkedImages.catalogPresetNameInput, viewModel: viewModel) }
-                Button("Cancel", role: .cancel) {}
+            .alert(tr("action_save_as_new"), isPresented: $linkedImages.showSaveAsCatalogPresetAlert) {
+                TextField(tr("name"), text: $linkedImages.catalogPresetNameInput)
+                Button(tr("action_save")) { linkedImages.savePresetAs(name: linkedImages.catalogPresetNameInput, viewModel: viewModel) }
+                Button(tr("action_cancel"), role: .cancel) {}
             } message: {
-                Text("Save the current sort, filter, and live criteria as a new Stash saved filter.")
+                Text(tr("hint_save_current_sort_filter_and"))
             }
-            .alert("Rename", isPresented: $linkedImages.showRenameCatalogPresetAlert) {
-                TextField("Name", text: $linkedImages.renameCatalogPresetInput)
-                Button("Save") { linkedImages.renamePreset(to: linkedImages.renameCatalogPresetInput, viewModel: viewModel) }
-                Button("Cancel", role: .cancel) {}
+            .alert(tr("action_rename"), isPresented: $linkedImages.showRenameCatalogPresetAlert) {
+                TextField(tr("name"), text: $linkedImages.renameCatalogPresetInput)
+                Button(tr("action_save")) { linkedImages.renamePreset(to: linkedImages.renameCatalogPresetInput, viewModel: viewModel) }
+                Button(tr("action_cancel"), role: .cancel) {}
             } message: {
-                Text("Rename this preset or saved filter.")
+                Text(tr("hint_rename_this_preset_or_saved"))
             }
-            .alert("Delete filter?", isPresented: $linkedImages.showDeleteCatalogPresetAlert) {
-                Button("Delete", role: .destructive) { linkedImages.deletePreset(viewModel: viewModel) }
-                Button("Cancel", role: .cancel) {}
+            .alert(tr("confirm_delete_filter"), isPresented: $linkedImages.showDeleteCatalogPresetAlert) {
+                Button(tr("action_delete"), role: .destructive) { linkedImages.deletePreset(viewModel: viewModel) }
+                Button(tr("action_cancel"), role: .cancel) {}
             } message: {
                 Text(linkedImages.deletePresetConfirmationText(viewModel: viewModel))
             }
@@ -1173,23 +1173,23 @@ struct TagDetailView: View {
             .onChange(of: linkedStudios.catalogPresetRowSelection) { _, newId in
                 linkedStudios.handlePresetSelection(newId, viewModel: viewModel)
             }
-            .alert("Save as new", isPresented: $linkedStudios.showSaveAsCatalogPresetAlert) {
-                TextField("Name", text: $linkedStudios.catalogPresetNameInput)
-                Button("Save") { linkedStudios.savePresetAs(name: linkedStudios.catalogPresetNameInput, viewModel: viewModel) }
-                Button("Cancel", role: .cancel) {}
+            .alert(tr("action_save_as_new"), isPresented: $linkedStudios.showSaveAsCatalogPresetAlert) {
+                TextField(tr("name"), text: $linkedStudios.catalogPresetNameInput)
+                Button(tr("action_save")) { linkedStudios.savePresetAs(name: linkedStudios.catalogPresetNameInput, viewModel: viewModel) }
+                Button(tr("action_cancel"), role: .cancel) {}
             } message: {
-                Text("Save the current sort, filter, and live criteria as a new Stash saved filter.")
+                Text(tr("hint_save_current_sort_filter_and"))
             }
-            .alert("Rename", isPresented: $linkedStudios.showRenameCatalogPresetAlert) {
-                TextField("Name", text: $linkedStudios.renameCatalogPresetInput)
-                Button("Save") { linkedStudios.renamePreset(to: linkedStudios.renameCatalogPresetInput, viewModel: viewModel) }
-                Button("Cancel", role: .cancel) {}
+            .alert(tr("action_rename"), isPresented: $linkedStudios.showRenameCatalogPresetAlert) {
+                TextField(tr("name"), text: $linkedStudios.renameCatalogPresetInput)
+                Button(tr("action_save")) { linkedStudios.renamePreset(to: linkedStudios.renameCatalogPresetInput, viewModel: viewModel) }
+                Button(tr("action_cancel"), role: .cancel) {}
             } message: {
-                Text("Rename this preset or saved filter.")
+                Text(tr("hint_rename_this_preset_or_saved"))
             }
-            .alert("Delete filter?", isPresented: $linkedStudios.showDeleteCatalogPresetAlert) {
-                Button("Delete", role: .destructive) { linkedStudios.deletePreset(viewModel: viewModel) }
-                Button("Cancel", role: .cancel) {}
+            .alert(tr("confirm_delete_filter"), isPresented: $linkedStudios.showDeleteCatalogPresetAlert) {
+                Button(tr("action_delete"), role: .destructive) { linkedStudios.deletePreset(viewModel: viewModel) }
+                Button(tr("action_cancel"), role: .cancel) {}
             } message: {
                 Text(linkedStudios.deletePresetConfirmationText(viewModel: viewModel))
             }
@@ -1260,20 +1260,20 @@ struct TagDetailView: View {
                 selectedTag = updated
             }
         }
-        .alert("Tag images", isPresented: $showingTagDownloadOptions) {
+        .alert(tr("tag_images"), isPresented: $showingTagDownloadOptions) {
             let entryId = "tag-" + selectedTag.id
             let batch = DownloadManager.galleryNewestBatchSize
             // `image_count` is depth 0, like the download's tag criterion.
             if let stored = downloadManager.downloadedGallery(id: entryId) {
-                Button("Sync newest") {
+                Button(tr("action_sync_newest")) {
                     downloadManager.syncTagImages(entryId: entryId)
                 }
                 if DownloadManager.showsSyncNewestBatch(count: selectedTag.imageCount ?? stored.serverImageCount, batch: batch) {
-                    Button("Sync newest \(batch)") {
+                    Button(tr("action_sync_newest_arg", batch)) {
                         downloadManager.syncTagImages(entryId: entryId, limit: batch)
                     }
                 }
-                Button("Remove download", role: .destructive) {
+                Button(tr("action_remove_download"), role: .destructive) {
                     downloadManager.deleteGalleryDownload(id: entryId)
                 }
             } else {
@@ -1281,7 +1281,7 @@ struct TagDetailView: View {
                     downloadManager.downloadTagImages(tagId: selectedTag.id, tagName: selectedTag.name, limit: limit)
                 }
             }
-            Button("Cancel", role: .cancel) {}
+            Button(tr("action_cancel"), role: .cancel) {}
         }
     }
 
@@ -1291,14 +1291,14 @@ struct TagDetailView: View {
     private var entityActionSlots: [CatalogChromeSlot] {
         var actions = [CatalogChromeSlot(
             systemImage: isFavorite ? "heart.fill" : "heart",
-            accessibilityLabel: isFavorite ? "Remove favorite" : "Add favorite",
+            accessibilityLabel: isFavorite ? tr("action_remove_favorite") : tr("action_add_favorite"),
             tint: isFavorite ? .red : nil
         ) {
             guard !isUpdatingFavorite else { return }
             toggleFavorite()
         }]
         if appearanceManager.isEditModeEnabled {
-            actions.append(CatalogChromeSlot(systemImage: "pencil", accessibilityLabel: "Edit tag") {
+            actions.append(CatalogChromeSlot(systemImage: "pencil", accessibilityLabel: tr("action_edit_tag")) {
                 HapticManager.light()
                 showingEditTagSheet = true
             })
@@ -1338,7 +1338,7 @@ struct TagDetailView: View {
             return CatalogChromeSlot(
                 systemImage: "stop.circle",
                 isActive: true,
-                accessibilityLabel: "Cancel download"
+                accessibilityLabel: tr("action_cancel_download")
             ) {
                 HapticManager.light()
                 downloadManager.cancelGalleryDownload(id: entryId)
@@ -1347,7 +1347,7 @@ struct TagDetailView: View {
             return CatalogChromeSlot(
                 systemImage: "checkmark.circle.fill",
                 isActive: true,
-                accessibilityLabel: "Downloaded"
+                accessibilityLabel: tr("downloaded")
             ) {
                 HapticManager.light()
                 showingTagDownloadOptions = true
@@ -1355,7 +1355,7 @@ struct TagDetailView: View {
         } else {
             return CatalogChromeSlot(
                 systemImage: "arrow.down.doc",
-                accessibilityLabel: "Download images"
+                accessibilityLabel: tr("action_download_images")
             ) {
                 HapticManager.light()
                 showingTagDownloadOptions = true
@@ -1545,7 +1545,7 @@ struct TagDetailView: View {
             items: getTagDetails(selectedTag).map { DetailHeroItem(label: $0.label, value: $0.value) },
             description: selectedTag.description,
             showsHero: tagHasCustomImage,
-            heroAccessibilityLabel: "Open tag image",
+            heroAccessibilityLabel: tr("action_open_tag_image"),
             onHeroTap: { showingTagImageFullscreen = true },
             isExpanded: $isHeaderExpanded,
             placeholderSystemImage: AppTab.tags.icon,
@@ -1714,12 +1714,12 @@ struct EditTagSheet: View {
     var body: some View {
         NavigationView {
             Form {
-                Section("Identity") {
-                    TextField("Name", text: $name)
+                Section(tr("identity")) {
+                    TextField(tr("name"), text: $name)
                 }
                 .listRowBackground(Color.secondaryAppBackground)
 
-                Section("Description") {
+                Section(tr("description")) {
                     TextEditor(text: $descriptionText)
                         .frame(minHeight: 120)
                 }
@@ -1734,7 +1734,7 @@ struct EditTagSheet: View {
                         }
                         .onDelete { aliases.remove(atOffsets: $0) }
                         HStack {
-                            TextField("Add alias", text: $newAlias)
+                            TextField(tr("action_add_alias"), text: $newAlias)
                                 .textInputAutocapitalization(.never)
                                 .autocorrectionDisabled()
                                 .onSubmit(addAlias)
@@ -1744,12 +1744,12 @@ struct EditTagSheet: View {
                             }
                             .buttonStyle(.plain)
                             .disabled(newAlias.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-                            .accessibilityLabel("Add alias")
+                            .accessibilityLabel(tr("action_add_alias"))
                         }
                     } header: {
-                        Text("Aliases")
+                        Text(tr("aliases"))
                     } footer: {
-                        Text("Other names for this tag. Swipe left to remove one.")
+                        Text(tr("hint_other_names_for_this_tag"))
                     }
                     .listRowBackground(Color.secondaryAppBackground)
                 }
@@ -1763,7 +1763,7 @@ struct EditTagSheet: View {
                             if isDeleting {
                                 InlineSpinner(tint: .red)
                             } else {
-                                Label("Delete Tag", systemImage: "trash")
+                                Label(tr("action_delete_tag"), systemImage: "trash")
                                     .foregroundStyle(.red)
                             }
                             Spacer()
@@ -1776,9 +1776,9 @@ struct EditTagSheet: View {
             }
             .applyAppBackground()
             .scrollContentBackground(.hidden)
-            .stashyModalSheetChrome("Edit Tag", onBack: { dismiss() }) {
+            .stashyModalSheetChrome(tr("action_edit_tag"), onBack: { dismiss() }) {
                 StashyChromeTrailingTextButton(
-                    title: "Save",
+                    title: tr("action_save"),
                     enabled: !name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
                     isBusy: isSaving
                 ) { save() }
@@ -1788,11 +1788,11 @@ struct EditTagSheet: View {
                 descriptionText = tag.description ?? ""
                 aliases = tag.aliases ?? []
             }
-            .alert("Delete Tag", isPresented: $showingDeleteConfirmation) {
-                Button("Cancel", role: .cancel) { }
-                Button("Delete", role: .destructive) { performDelete() }
+            .alert(tr("action_delete_tag"), isPresented: $showingDeleteConfirmation) {
+                Button(tr("action_cancel"), role: .cancel) { }
+                Button(tr("action_delete"), role: .destructive) { performDelete() }
             } message: {
-                Text("Delete '\(tag.name)'? This cannot be undone.")
+                Text(tr("hint_delete_arg_this_cannot_be", tag.name))
             }
         }
     }
@@ -1804,7 +1804,7 @@ struct EditTagSheet: View {
                 isDeleting = false
                 switch result {
                 case .success:
-                    ToastManager.shared.show("Tag deleted", icon: "trash", style: .success)
+                    ToastManager.shared.show(tr("tag_deleted"), icon: "trash", style: .success)
                     dismiss()
                     // Pop the detail only once the sheet is gone — both in one runloop
                     // leaves the navigation stack inconsistent.
@@ -1849,10 +1849,10 @@ struct EditTagSheet: View {
                     updated.description = descriptionValue
                     if let aliasesValue { updated.aliases = aliasesValue }
                     onComplete(updated)
-                    ToastManager.shared.show("Tag updated", icon: "checkmark.circle", style: .success)
+                    ToastManager.shared.show(tr("tag_updated"), icon: "checkmark.circle", style: .success)
                     dismiss()
                 } else {
-                    ToastManager.shared.show("Failed to update tag", icon: "exclamationmark.triangle", style: .error)
+                    ToastManager.shared.show(tr("error_update_tag"), icon: "exclamationmark.triangle", style: .error)
                 }
             }
         }

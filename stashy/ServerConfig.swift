@@ -35,6 +35,15 @@ enum AuthMethod: String, Codable, CaseIterable {
     case none = "None"
     case login = "Login"
     case apiKey = "API Key"
+
+    /// Shown in the pickers; the raw value is stored in `ServerConfig` and must not change.
+    var displayName: String {
+        switch self {
+        case .none: return tr("none")
+        case .login: return "Login"
+        case .apiKey: return tr("api_key")
+        }
+    }
 }
 
 // Legacy enum for backward compatibility
@@ -103,27 +112,27 @@ enum StashConnectionProbe {
         if let error {
             let code = (error as NSError).code
             switch code {
-            case NSURLErrorCannotConnectToHost: return .failure("Cannot connect — check the address and port.")
-            case NSURLErrorTimedOut: return .failure("Connection timed out.")
-            case NSURLErrorCannotFindHost, NSURLErrorDNSLookupFailed: return .failure("Host not found.")
+            case NSURLErrorCannotConnectToHost: return .failure(tr("error_connect_check_address_and_port"))
+            case NSURLErrorTimedOut: return .failure(tr("connection_timed_out"))
+            case NSURLErrorCannotFindHost, NSURLErrorDNSLookupFailed: return .failure(tr("host_not_found"))
             case NSURLErrorServerCertificateUntrusted, NSURLErrorSecureConnectionFailed:
-                return .failure("Secure connection failed — check HTTP/HTTPS.")
+                return .failure(tr("hint_secure_connection_failed_check_http"))
             default: return .failure(error.localizedDescription)
             }
         }
         guard let http = response as? HTTPURLResponse else {
-            return .failure("No response from the server.")
+            return .failure(tr("empty_response_from_server"))
         }
         // Stash 0.32+ refuses these before authentication, so "check the API key" would mislead.
         let body = data.flatMap { String(data: $0, encoding: .utf8) }?.lowercased() ?? ""
         if http.statusCode == 403, body.contains("public ip") {
-            return .failure("Stash refuses public IPs while it has no credentials. Set a username and password in Stash, or allow this IP with public_whitelist.")
+            return .failure(tr("hint_stash_refuses_public_ips_while"))
         }
         if http.statusCode == 400, body.contains("invalid ip") {
-            return .failure("Stash rejected the reverse proxy in front of it. Add the proxy's IP to trusted_proxies in Stash's config.")
+            return .failure(tr("hint_stash_rejected_reverse_proxy_in"))
         }
         if http.statusCode == 401 || http.statusCode == 403 {
-            return .failure("Authentication failed — check the API key and custom headers.")
+            return .failure(tr("hint_authentication_failed_check_api_key"))
         }
 
         let json = data.flatMap { try? JSONSerialization.jsonObject(with: $0) as? [String: Any] }
@@ -134,16 +143,16 @@ enum StashConnectionProbe {
         // Stash answered, but refused (e.g. "not authorized" as a GraphQL error).
         if let errors = json?["errors"] as? [[String: Any]],
            let message = errors.first?["message"] as? String, !message.isEmpty {
-            return .failure("Stash rejected the request: \(message)")
+            return .failure(tr("stash_rejected_request_arg", message))
         }
         guard (200...299).contains(http.statusCode) else {
-            return .failure("Server error: HTTP \(http.statusCode).")
+            return .failure(tr("server_error_http_arg", http.statusCode))
         }
         let contentType = (http.value(forHTTPHeaderField: "Content-Type") ?? "").lowercased()
         if contentType.contains("html") {
-            return .failure("The host answered with a web page, not Stash — likely a login or proxy page. Check the address and custom headers.")
+            return .failure(tr("hint_host_answered_with_web_page"))
         }
-        return .failure("The host answered, but not as Stash. Check the address, subpath and custom headers.")
+        return .failure(tr("hint_host_answered_but_not_as"))
     }
 }
 

@@ -1,5 +1,7 @@
 package de.letzgo.stashy.data
 
+import de.letzgo.stashy.R
+import de.letzgo.stashy.tr
 import de.letzgo.stashy.BuildConfig
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonArray
@@ -181,9 +183,9 @@ object SettingsTransfer {
     /** Parses and checks a file: right format, not newer than this app understands. */
     fun parse(text: String): SettingsTransferFile {
         val file = runCatching { json.decodeFromString(SettingsTransferFile.serializer(), text) }
-            .getOrElse { throw SettingsTransferException("This is not a stashy settings file.") }
-        if (file.format != FORMAT) throw SettingsTransferException("This is not a stashy settings file.")
-        if (file.version > VERSION) throw SettingsTransferException("This file was made by a newer stashy (format ${file.version}). Update the app first.")
+            .getOrElse { throw SettingsTransferException(tr(R.string.hint_this_is_not_stashy_settings)) }
+        if (file.format != FORMAT) throw SettingsTransferException(tr(R.string.hint_this_is_not_stashy_settings))
+        if (file.version > VERSION) throw SettingsTransferException(tr(R.string.hint_this_file_was_made_by, file.version))
         return file
     }
 

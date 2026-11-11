@@ -98,7 +98,7 @@ class RateMeLogicTest {
         assertEquals(1f, RateMeLogic.imageAspect(0, 0, false), 0f)
         assertEquals("Jane, Joe", RateMeLogic.joinedNames(listOf(" Jane ", null, "", "Joe")))
         assertNull(RateMeLogic.joinedNames(listOf(null, "  ")))
-        assertEquals("Untitled scene", RateMeLogic.displayTitle("  ", RateMeMode.Scenes))
+        assertEquals("Untitled Scene", RateMeLogic.displayTitle("  ", RateMeMode.Scenes))
         assertEquals("Untitled image", RateMeLogic.displayTitle(null, RateMeMode.Images))
         assertEquals("Beach", RateMeLogic.displayTitle(" Beach ", RateMeMode.Images))
     }

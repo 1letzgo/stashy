@@ -1,5 +1,7 @@
 package de.letzgo.stashy.data.tools
 
+import de.letzgo.stashy.R
+import de.letzgo.stashy.tr
 import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
@@ -207,7 +209,7 @@ object DownloadsEngine {
             }
             val isScene = DownloadsPendingStore.isSceneKey(key)
             val title = if (isScene) DownloadsPendingStore.readScene(context, key)?.title else DownloadsPendingStore.readImages(context, key)?.title
-            RestoredDownload(DownloadsPendingStore.idForKey(key), title ?: "Download", isScene)
+            RestoredDownload(DownloadsPendingStore.idForKey(key), title ?: tr(R.string.action_download), isScene)
         }
     }
 }
@@ -228,7 +230,7 @@ object DownloadsTransfer {
                     val response = call.await()
                     response.use { r ->
                         if (!r.isSuccessful) throw IOException("HTTP ${r.code}")
-                        val body = r.body ?: throw IOException("Empty body")
+                        val body = r.body ?: throw IOException(tr(R.string.empty_body))
                         val total = body.contentLength()
                         destination.parentFile?.mkdirs()
                         val part = File(destination.path + ".part")
@@ -247,7 +249,7 @@ object DownloadsTransfer {
                             }
                         }
                         if (destination.exists()) destination.delete()
-                        if (!part.renameTo(destination)) throw IOException("Could not move file")
+                        if (!part.renameTo(destination)) throw IOException(tr(R.string.error_move_file))
                     }
                 } catch (e: IOException) {
                     coroutineContext.ensureActive()
@@ -321,8 +323,8 @@ object DownloadsNotifications {
         val manager = context.getSystemService(NotificationManager::class.java) ?: return
         if (manager.getNotificationChannel(CHANNEL_ID) != null) return
         manager.createNotificationChannel(
-            NotificationChannel(CHANNEL_ID, "Downloads", NotificationManager.IMPORTANCE_LOW).apply {
-                description = "Progress of offline downloads"
+            NotificationChannel(CHANNEL_ID, tr(R.string.downloads), NotificationManager.IMPORTANCE_LOW).apply {
+                description = tr(R.string.progress_of_offline_downloads)
                 setShowBadge(false)
             },
         )
@@ -336,7 +338,7 @@ object DownloadsNotifications {
         return NotificationCompat.Builder(context, CHANNEL_ID)
             .setSmallIcon(android.R.drawable.stat_sys_download)
             .setContentTitle(title)
-            .setContentText(detail ?: "Downloading")
+            .setContentText(detail ?: tr(R.string.downloading))
             .setOngoing(true)
             .setOnlyAlertOnce(true)
             .setSilent(true)
@@ -368,7 +370,7 @@ class DownloadsWorker(context: Context, params: WorkerParameters) : CoroutineWor
     private var lastNotification = 0L
 
     override suspend fun getForegroundInfo(): ForegroundInfo =
-        DownloadsNotifications.foregroundInfo(applicationContext, notificationId, "Downloading", null, null)
+        DownloadsNotifications.foregroundInfo(applicationContext, notificationId, tr(R.string.downloading), null, null)
 
     override suspend fun doWork(): Result {
         if (key.isEmpty()) return Result.failure()

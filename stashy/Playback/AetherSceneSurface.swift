@@ -593,7 +593,7 @@ struct AetherSceneSurface: View {
                         diameter: chromeButtonSize)
         }
         .buttonStyle(.plain)
-        .accessibilityLabel(isFullscreen ? "Close" : "Full screen")
+        .accessibilityLabel(isFullscreen ? tr("action_close") : tr("full_screen"))
     }
 
     /// The layer the PiP controller may bind to — nil while PiP is switched off in Settings.
@@ -693,7 +693,7 @@ struct AetherSceneSurface: View {
             )
         }
         .frame(height: 22)
-        .accessibilityLabel("Volume")
+        .accessibilityLabel(tr("volume"))
     }
 
     /// iOS: the system output volume (the slider drives it). macOS has no app-settable system
@@ -753,7 +753,7 @@ struct AetherSceneSurface: View {
         }
         .buttonStyle(.plain)
         .disabled(target == nil)
-        .accessibilityLabel(forward ? "Next marker" : "Previous marker")
+        .accessibilityLabel(forward ? tr("next_marker") : tr("previous_marker"))
     }
 
     /// ±`playerSkipSeconds` as a button, with the configured seconds inside the arrow — the
@@ -779,7 +779,7 @@ struct AetherSceneSurface: View {
             .contentShape(Circle())
         }
         .buttonStyle(.plain)
-        .accessibilityLabel(forward ? "Forward \(TabManager.playerSkipLabel(seconds))" : "Back \(TabManager.playerSkipLabel(seconds))")
+        .accessibilityLabel(forward ? tr("forward_arg", TabManager.playerSkipLabel(seconds)) : tr("back_arg", TabManager.playerSkipLabel(seconds)))
     }
 
     @ViewBuilder
@@ -792,7 +792,7 @@ struct AetherSceneSurface: View {
             glassCircle(systemName: "plus.square.fill.on.square.fill", diameter: chromeButtonSize)
         }
         .buttonStyle(.plain)
-        .accessibilityLabel("Add marker")
+        .accessibilityLabel(tr("action_add_marker"))
     }
 
     /// Fullscreen only: flips the interface between portrait and landscape through the window
@@ -836,7 +836,7 @@ struct AetherSceneSurface: View {
             glassCircle(systemName: "rotate.right", diameter: chromeButtonSize)
         }
         .buttonStyle(.plain)
-        .accessibilityLabel("Rotate")
+        .accessibilityLabel(tr("rotate"))
     }
 
     private func toggleInterfaceOrientation() {
@@ -964,7 +964,7 @@ struct AetherSceneSurface: View {
     /// Non-interactive marker: this session is not playing the original file.
     @ViewBuilder
     private var transcodeTag: some View {
-        Text("Transcode")
+        Text(tr("transcode"))
             .font(.system(size: 11, weight: .semibold))
             .foregroundStyle(.white)
             .padding(.horizontal, 10)
@@ -986,8 +986,8 @@ struct AetherSceneSurface: View {
         items.append(.submenu(
             id: "player.speed",
             title: abs(playbackRate - 1) > 0.001
-                ? "Playback Speed (\(Self.speedLabel(playbackRate)))"
-                : "Playback Speed",
+                ? tr("playback_speed_arg", Self.speedLabel(playbackRate))
+                : tr("playback_speed"),
             systemImage: "gauge.with.dots.needle.67percent",
             items: availableSpeedOptions.map { option in
                 .action(
@@ -1005,7 +1005,7 @@ struct AetherSceneSurface: View {
         if engine.audioTracks.count > 1 {
             items.append(.submenu(
                 id: "player.audio",
-                title: "Audio",
+                title: tr("audio"),
                 systemImage: "waveform",
                 items: engine.audioTracks.map { track in
                     .action(
@@ -1025,7 +1025,7 @@ struct AetherSceneSurface: View {
             var subtitleItems: [PlayerMenuItem] = [
                 .action(
                     id: "player.subtitle.off",
-                    title: "Off",
+                    title: tr("off"),
                     isChecked: engine.activeSubtitleTrackIndex == nil
                 ) {
                     engine.clearSubtitle()
@@ -1045,10 +1045,10 @@ struct AetherSceneSurface: View {
             })
             let current = engine.activeSubtitleTrackIndex
                 .flatMap { index in engine.subtitleTracks.first(where: { $0.id == index }) }
-                .map(AetherTrackLabel.subtitle) ?? "Off"
+                .map(AetherTrackLabel.subtitle) ?? tr("off")
             items.append(.submenu(
                 id: "player.subtitles",
-                title: "Subtitles: \(current)",
+                title: tr("subtitles_arg", current),
                 systemImage: "captions.bubble",
                 items: subtitleItems
             ))
@@ -1092,7 +1092,7 @@ struct AetherSceneSurface: View {
             .frame(width: chromeButtonSize, height: chromeButtonSize)
         }
         .frame(width: chromeButtonSize, height: chromeButtonSize)
-        .accessibilityLabel("More options")
+        .accessibilityLabel(tr("more_options"))
     }
 
     private static func speedLabel(_ rate: Float) -> String {
@@ -1128,7 +1128,7 @@ struct AetherSceneSurface: View {
             glyph(isMuted ? "speaker.slash.fill" : "speaker.wave.2.fill")
         }
         .buttonStyle(.plain)
-        .accessibilityLabel(isMuted ? "Unmute" : "Mute")
+        .accessibilityLabel(isMuted ? tr("unmute") : tr("mute"))
     }
 
     /// One third of the surface. Single tap toggles the controls everywhere; the outer thirds
@@ -1313,7 +1313,7 @@ struct AetherSceneSurface: View {
                         glyphSize: isCompact ? 26 : 38)
         }
         .buttonStyle(.plain)
-        .accessibilityLabel(showsAsPlaying ? "Pause" : "Play")
+        .accessibilityLabel(showsAsPlaying ? tr("action_pause") : tr("action_play"))
     }
 
     @ViewBuilder
@@ -1329,7 +1329,7 @@ struct AetherSceneSurface: View {
                         diameter: chromeButtonSize)
         }
         .buttonStyle(.plain)
-        .accessibilityLabel(fillsScreen ? "Fit to screen" : "Fill screen")
+        .accessibilityLabel(fillsScreen ? tr("fit_to_screen") : tr("fill_screen"))
     }
 
 
@@ -1343,7 +1343,7 @@ struct AetherSceneSurface: View {
             glyph(pip.isActive ? "pip.exit" : "pip.enter")
         }
         .buttonStyle(.plain)
-        .accessibilityLabel(pip.isActive ? "Stop Picture in Picture" : "Start Picture in Picture")
+        .accessibilityLabel(pip.isActive ? tr("action_stop_picture_in_picture") : tr("action_start_picture_in_picture"))
     }
 
     /// Full-width glass bar: elapsed on the left, the scrub track in the middle, the remaining
@@ -1438,7 +1438,7 @@ struct AetherSceneSurface: View {
         let decoder = underlying.activeVideoDecoder ?? "—"
         let phase = String(describing: underlying.playbackPhase)
         let source = engine.activeSourceKind.rawValue
-        return "route \(route)\nsource \(source)\ncodec \(codec)\ndecoder \(decoder)\nphase \(phase)"
+        return tr("hint_route_arg_source_arg_codec", route, source, codec, decoder, phase)
     }
     #endif
 
@@ -1517,7 +1517,7 @@ enum AetherTrackLabel {
         }
         if !track.codec.isEmpty { parts.append(track.codec.uppercased()) }
         if track.channels > 0 { parts.append("\(track.channels)ch") }
-        return parts.isEmpty ? "Audio" : parts.joined(separator: " · ")
+        return parts.isEmpty ? tr("audio") : parts.joined(separator: " · ")
     }
 
     static func subtitle(_ track: TrackInfo) -> String {
@@ -1537,7 +1537,7 @@ enum AetherTrackLabel {
     static func short(_ track: TrackInfo) -> String {
         if let language = track.language, !language.isEmpty { return language.uppercased() }
         if !track.name.isEmpty { return track.name }
-        return "Audio"
+        return tr("audio")
     }
 }
 

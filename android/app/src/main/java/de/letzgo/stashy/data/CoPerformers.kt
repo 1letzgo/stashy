@@ -1,5 +1,7 @@
 package de.letzgo.stashy.data
 
+import de.letzgo.stashy.R
+import de.letzgo.stashy.tr
 import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
@@ -114,8 +116,8 @@ object CoPerformersRepository {
  */
 object CoPerformerSort {
     const val FIELD = "shared_scenes"
-    val Desc = SortOption("sharedScenesDesc", "Most shared (High-Low)", FIELD, "DESC")
-    val Asc = SortOption("sharedScenesAsc", "Most shared (Low-High)", FIELD, "ASC")
+    val Desc = SortOption("sharedScenesDesc", tr(R.string.most_shared_high_low), FIELD, "DESC")
+    val Asc = SortOption("sharedScenesAsc", tr(R.string.most_shared_low_high), FIELD, "ASC")
     val Default = Desc
     val options = listOf(Desc, Asc)
 

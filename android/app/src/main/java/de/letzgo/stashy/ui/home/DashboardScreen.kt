@@ -1,5 +1,7 @@
 package de.letzgo.stashy.ui.home
 
+import de.letzgo.stashy.R
+import de.letzgo.stashy.tr
 import de.letzgo.stashy.ui.bottomBarContentPadding
 import de.letzgo.stashy.ui.cappedFontScale
 import de.letzgo.stashy.ui.scaledIconSize
@@ -170,8 +172,8 @@ private fun ConnectionErrorView(onRetry: () -> Unit) {
     val p = Theme.palette
     Column(Modifier.fillMaxSize().padding(32.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(16.dp, Alignment.CenterVertically)) {
         Icon(SFS.serverRack, null, tint = p.secondaryText, modifier = Modifier.size(56.dp))
-        Text("Server not reachable", style = NativeType.titleLarge, color = p.text, textAlign = TextAlign.Center)
-        NativeButton("Retry Connection", onClick = onRetry)
+        Text(tr(R.string.server_not_reachable), style = NativeType.titleLarge, color = p.text, textAlign = TextAlign.Center)
+        NativeButton(tr(R.string.action_retry_connection), onClick = onRetry)
     }
 }
 
@@ -261,7 +263,7 @@ private fun HomeRow(config: HomeRowConfig, isLarge: Boolean, isFirst: Boolean) {
                         }
                     }
                 }
-                state.isEmpty -> Text("No content found", style = NativeType.bodyMedium, color = p.secondaryText, modifier = Modifier.padding(horizontal = RowMargin))
+                state.isEmpty -> Text(tr(R.string.empty_content_found), style = NativeType.bodyMedium, color = p.secondaryText, modifier = Modifier.padding(horizontal = RowMargin))
                 else -> LazyRow(
                     state = listState, flingBehavior = rememberSnapFlingBehavior(listState),
                     contentPadding = PaddingValues(horizontal = RowMargin), horizontalArrangement = Arrangement.spacedBy(RowGap),
@@ -307,7 +309,7 @@ private fun DashboardSectionHeader(title: String, modifier: Modifier = Modifier,
             maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
         )
         if (onSeeAll != null) TextButton(onClick = onSeeAll) {
-            Text("See all", style = NativeType.labelLarge, color = if (onHero) Color.White else nativeAccent())
+            Text(tr(R.string.see_all), style = NativeType.labelLarge, color = if (onHero) Color.White else nativeAccent())
         }
     }
 }
@@ -373,14 +375,14 @@ private fun statItems(stats: StashStatistics): List<StatItem> {
     val order = setOf(AppTab.Scenes, AppTab.Galleries, AppTab.Images, AppTab.Performers, AppTab.Studios, AppTab.Tags, AppTab.Groups, AppTab.Markers)
     return TabManager.tabs.filter { it.id in order && it.isVisible }.sortedBy { it.sortOrder }.mapNotNull { t ->
         when (t.id) {
-            AppTab.Scenes -> StatItem(t.id, "Scenes", stats.sceneCount, SF.film, c(StashyColors.systemBlue))
-            AppTab.Galleries -> StatItem(t.id, "Galleries", stats.galleryCount, SF.photoStack, c(StashyColors.systemGreen))
-            AppTab.Images -> StatItem(t.id, "Images", stats.imageCount, SF.photo, c(StashyColors.systemTeal))
-            AppTab.Performers -> StatItem(t.id, "Performers", stats.performerCount, SF.person2, c(StashyColors.systemPurple))
-            AppTab.Studios -> StatItem(t.id, "Studios", stats.studioCount, SF.building2, c(StashyColors.systemOrange))
-            AppTab.Tags -> StatItem(t.id, "Tags", stats.tagCount, SF.tag, c(StashyColors.systemPink))
-            AppTab.Groups -> StatItem(t.id, "Groups", stats.groupCount, SF.rectangleStackFill, c(Color(0.1f, 0.7f, 0.9f)))
-            AppTab.Markers -> StatItem(t.id, "Markers", stats.sceneMarkerCount ?: 0, SF.bookmarkFill, c(StashyColors.systemRed))
+            AppTab.Scenes -> StatItem(t.id, tr(R.string.scenes), stats.sceneCount, SF.film, c(StashyColors.systemBlue))
+            AppTab.Galleries -> StatItem(t.id, tr(R.string.galleries), stats.galleryCount, SF.photoStack, c(StashyColors.systemGreen))
+            AppTab.Images -> StatItem(t.id, tr(R.string.images), stats.imageCount, SF.photo, c(StashyColors.systemTeal))
+            AppTab.Performers -> StatItem(t.id, tr(R.string.performers), stats.performerCount, SF.person2, c(StashyColors.systemPurple))
+            AppTab.Studios -> StatItem(t.id, tr(R.string.studios), stats.studioCount, SF.building2, c(StashyColors.systemOrange))
+            AppTab.Tags -> StatItem(t.id, tr(R.string.tags), stats.tagCount, SF.tag, c(StashyColors.systemPink))
+            AppTab.Groups -> StatItem(t.id, tr(R.string.groups), stats.groupCount, SF.rectangleStackFill, c(Color(0.1f, 0.7f, 0.9f)))
+            AppTab.Markers -> StatItem(t.id, tr(R.string.markers), stats.sceneMarkerCount ?: 0, SF.bookmarkFill, c(StashyColors.systemRed))
             else -> null
         }
     }
@@ -393,7 +395,7 @@ private fun StatisticsRow(isFirst: Boolean) {
     val p = Theme.palette
     val stats = DashboardStore.statistics
     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-        DashboardSectionHeader("Statistics", Modifier.padding(top = if (isFirst) 12.dp else 0.dp))
+        DashboardSectionHeader(tr(R.string.statistics), Modifier.padding(top = if (isFirst) 12.dp else 0.dp))
         when {
             stats != null -> {
                 val items = statItems(stats)
@@ -415,7 +417,7 @@ private fun StatisticsRow(isFirst: Boolean) {
             }
             else -> Row(Modifier.padding(horizontal = RowMargin), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 Icon(SF.exclamationTriangle, null, tint = p.secondaryText, modifier = Modifier.size(16.dp))
-                Text("Stats unavailable", style = NativeType.bodyMedium, color = p.secondaryText)
+                Text(tr(R.string.stats_unavailable), style = NativeType.bodyMedium, color = p.secondaryText)
             }
         }
     }
@@ -488,9 +490,9 @@ private fun ChannelsRow(config: HomeRowConfig, isFirst: Boolean) {
         DashboardSectionHeader(config.title, Modifier.padding(top = if (isFirst) 12.dp else 0.dp))
         if (channels.isEmpty()) {
             val msg = when {
-                SavedFiltersStore.isLoading -> "Loading channels…"
-                TabManager.homeChannelItems.isEmpty() -> "No saved scene or image filters"
-                else -> "No channels enabled"
+                SavedFiltersStore.isLoading -> tr(R.string.loading_channels)
+                TabManager.homeChannelItems.isEmpty() -> tr(R.string.empty_saved_scene_or_image_filters)
+                else -> tr(R.string.empty_channels_enabled)
             }
             Text(msg, style = NativeType.bodyMedium, color = p.secondaryText, modifier = Modifier.padding(horizontal = RowMargin))
         } else LazyRow(contentPadding = PaddingValues(horizontal = RowMargin), horizontalArrangement = Arrangement.spacedBy(RowGap)) {
@@ -552,9 +554,9 @@ private fun RecommendationsRow(config: HomeRowConfig, isLarge: Boolean, isFirst:
         val items = engine.homeItems
         val message = when {
             items.isNotEmpty() -> null
-            engine.state == de.letzgo.stashy.data.tools.RecommendationState.NoHistory -> "Watch a few scenes and stashy will suggest more like them here."
+            engine.state == de.letzgo.stashy.data.tools.RecommendationState.NoHistory -> tr(R.string.hint_watch_few_scenes_and_stashy)
             engine.state == de.letzgo.stashy.data.tools.RecommendationState.Failed -> engine.failure
-            engine.state == de.letzgo.stashy.data.tools.RecommendationState.Ready -> "Nothing new matches your taste right now. Try another setting in For You."
+            engine.state == de.letzgo.stashy.data.tools.RecommendationState.Ready -> tr(R.string.hint_nothing_new_matches_your_taste)
             else -> null
         }
         when {

@@ -1,5 +1,7 @@
 package de.letzgo.stashy.ui.components
 
+import de.letzgo.stashy.R
+import de.letzgo.stashy.tr
 import de.letzgo.stashy.ui.scaledIconSize
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -304,7 +306,7 @@ fun ImageCard(image: StashImage, modifier: Modifier = Modifier, aspectRatio: Flo
         Box(Modifier.align(Alignment.BottomCenter).fillMaxWidth().height(100.dp).background(bottomGradient))
         Row(Modifier.align(Alignment.BottomStart).fillMaxWidth().padding(12.dp), verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             Text(
-                image.performers?.firstOrNull()?.name ?: image.title ?: "Image", Modifier.weight(1f),
+                image.performers?.firstOrNull()?.name ?: image.title ?: tr(R.string.image), Modifier.weight(1f),
                 style = NativeType.titleMedium, color = Color.White, maxLines = 2, overflow = TextOverflow.Ellipsis,
             )
             image.fileExtension?.let { CaptionPill(it, small = true) }
@@ -331,11 +333,11 @@ fun MarkerCard(marker: SceneMarker, modifier: Modifier = Modifier, onClick: (() 
         Box(Modifier.align(Alignment.BottomCenter).fillMaxWidth().height(60.dp).background(bottomGradient))
         Column(Modifier.fillMaxSize().padding(8.dp)) {
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.Top) {
-                NativeMediaLabel(marker.title ?: "Marker", Modifier.weight(1f, fill = false), small = true)
+                NativeMediaLabel(marker.title ?: tr(R.string.marker), Modifier.weight(1f, fill = false), small = true)
             }
             Spacer(Modifier.weight(1f))
             Text(
-                marker.scene?.title ?: "Unknown Scene", Modifier.fillMaxWidth(),
+                marker.scene?.title ?: tr(R.string.unknown_scene), Modifier.fillMaxWidth(),
                 style = NativeType.titleSmall, color = Color.White, maxLines = 2, overflow = TextOverflow.Ellipsis,
             )
         }

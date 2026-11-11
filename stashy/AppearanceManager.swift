@@ -214,34 +214,34 @@ class AppearanceManager: ObservableObject {
     
     // Counter Icon Presets
     let oCounterIconPresets: [IconOption] = [
-        IconOption(icon: "heart", label: "Heart"),
-        IconOption(icon: "star", label: "Star"),
-        IconOption(icon: "flame", label: "Flame"),
-        IconOption(icon: "bolt", label: "Bolt"),
-        IconOption(icon: "hand.thumbsup", label: "Thumbs Up"),
-        IconOption(icon: "circle", label: "Circle"),
-        IconOption(icon: "diamond", label: "Diamond"),
-        IconOption(icon: "crown", label: "Crown"),
-        IconOption(icon: "trophy", label: "Trophy"),
-        IconOption(icon: "moon", label: "Moon"),
-        IconOption(icon: "drop", label: "Drop"),
-        IconOption(icon: "leaf", label: "Leaf"),
-        IconOption(icon: "bell", label: "Bell"),
-        IconOption(icon: "tag", label: "Tag"),
-        IconOption(icon: "eye", label: "Eye"),
+        IconOption(icon: "heart", label: tr("heart")),
+        IconOption(icon: "star", label: tr("star")),
+        IconOption(icon: "flame", label: tr("flame")),
+        IconOption(icon: "bolt", label: tr("bolt")),
+        IconOption(icon: "hand.thumbsup", label: tr("thumbs_up")),
+        IconOption(icon: "circle", label: tr("circle")),
+        IconOption(icon: "diamond", label: tr("diamond")),
+        IconOption(icon: "crown", label: tr("crown")),
+        IconOption(icon: "trophy", label: tr("trophy")),
+        IconOption(icon: "moon", label: tr("moon")),
+        IconOption(icon: "drop", label: tr("drop")),
+        IconOption(icon: "leaf", label: tr("leaf")),
+        IconOption(icon: "bell", label: tr("bell")),
+        IconOption(icon: "tag", label: tr("tag")),
+        IconOption(icon: "eye", label: tr("eye")),
     ]
 
     // Preset Colors
-    let presets: [ColorOption] = [
-        ColorOption(nameKey: "Stashy Brown", color: .appAccent),
-        ColorOption(nameKey: "Blue", color: .blue),
-        ColorOption(nameKey: "Red", color: .red),
-        ColorOption(nameKey: "Orange", color: .orange),
-        ColorOption(nameKey: "Green", color: .green),
-        ColorOption(nameKey: "Purple", color: .purple),
-        ColorOption(nameKey: "Pink", color: .pink),
-        ColorOption(nameKey: "Gray", color: .gray)
-    ]
+    var presets: [ColorOption] { [
+        ColorOption(nameKey: tr("stashy_brown"), color: .appAccent),
+        ColorOption(nameKey: tr("blue"), color: .blue),
+        ColorOption(nameKey: tr("red"), color: .red),
+        ColorOption(nameKey: tr("orange"), color: .orange),
+        ColorOption(nameKey: tr("green"), color: .green),
+        ColorOption(nameKey: tr("purple"), color: .purple),
+        ColorOption(nameKey: tr("pink"), color: .pink),
+        ColorOption(nameKey: tr("gray"), color: .gray)
+    ] }
 }
 
 struct IconOption: Identifiable, Hashable {

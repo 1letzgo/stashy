@@ -21,14 +21,14 @@ enum StashyAppIcon: String, CaseIterable, Identifiable {
 
     var label: String {
         switch self {
-        case .systemDefault: return "Default"
-        case .light: return "Light"
-        case .brown: return "Brown"
-        case .blue: return "Blue"
-        case .purple: return "Purple"
-        case .pink: return "Pink"
-        case .rainbow: return "Rainbow"
-        case .gold: return "Gold"
+        case .systemDefault: return tr("default_label")
+        case .light: return tr("light")
+        case .brown: return tr("brown")
+        case .blue: return tr("blue")
+        case .purple: return tr("purple")
+        case .pink: return tr("pink")
+        case .rainbow: return tr("rainbow")
+        case .gold: return tr("gold")
         }
     }
 
@@ -87,7 +87,7 @@ final class AppIconManager: ObservableObject {
     func select(_ icon: StashyAppIcon) {
         guard StashyPlusManager.isUnlockedNow else {
             ToastManager.shared.show(
-                "Custom app icons are part of stashy+. Unlock in Settings",
+                tr("hint_custom_app_icons_are_part"),
                 icon: "sparkles",
                 style: .error
             )
@@ -108,7 +108,7 @@ final class AppIconManager: ObservableObject {
             return
         }
         guard UIApplication.shared.supportsAlternateIcons else {
-            ToastManager.shared.show("This device cannot change the app icon", icon: "info.circle", style: .info)
+            ToastManager.shared.show(tr("hint_this_device_cannot_change_app"), icon: "info.circle", style: .info)
             return
         }
         // Hop off the SwiftUI Form/chrome presenter so Apple's confirmation

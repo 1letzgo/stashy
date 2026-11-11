@@ -1,5 +1,7 @@
 package de.letzgo.stashy.ui.player.ai
 
+import de.letzgo.stashy.R
+import de.letzgo.stashy.tr
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -119,7 +121,7 @@ class CaptionTranslator {
         isDownloadingLanguagePack = true
         needsLanguageDownload = false
         val ok = runCatching { client.downloadModelIfNeeded(DownloadConditions.Builder().build()).awaitTask() }
-            .onFailure { statusMessage = it.localizedMessage ?: "Language pack download failed" }.isSuccess
+            .onFailure { statusMessage = it.localizedMessage ?: tr(R.string.error_language_pack_download) }.isSuccess
         isDownloadingLanguagePack = false
         ready = ok
         if (!ok) needsLanguageDownload = true

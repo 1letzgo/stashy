@@ -1,5 +1,7 @@
 package de.letzgo.stashy.ui
 
+import de.letzgo.stashy.R
+import de.letzgo.stashy.tr
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.darkColorScheme
@@ -58,10 +60,10 @@ object Appearance {
 
     /** iOS: `presets` (Stashy Brown, Blue, Red …) with the iOS system colours. */
     val presets = listOf(
-        "Stashy Brown" to StashyColors.appAccent,
-        "Blue" to Color(0xFF0A84FF), "Red" to Color(0xFFFF453A), "Orange" to Color(0xFFFF9F0A),
-        "Green" to Color(0xFF30D158), "Purple" to Color(0xFFBF5AF2), "Pink" to Color(0xFFFF375F),
-        "Gray" to StashyColors.defaultTint,
+        tr(R.string.stashy_brown) to StashyColors.appAccent,
+        tr(R.string.blue) to Color(0xFF0A84FF), tr(R.string.red) to Color(0xFFFF453A), tr(R.string.orange) to Color(0xFFFF9F0A),
+        tr(R.string.green) to Color(0xFF30D158), tr(R.string.purple) to Color(0xFFBF5AF2), tr(R.string.pink) to Color(0xFFFF375F),
+        tr(R.string.gray) to StashyColors.defaultTint,
     )
 }
 

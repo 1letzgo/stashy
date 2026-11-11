@@ -33,9 +33,9 @@ struct AITagSuggestionBar: View {
                 .task(id: target.id) { await prepare() }
                 .alert(item: $pendingBulk) { plan in
                     Alert(
-                        title: Text("Add #\(plan.tag.name)?"),
+                        title: Text(tr("confirm_add_arg", plan.tag.name)),
                         message: Text(bulkMessage(for: plan)),
-                        primaryButton: .default(Text("Add to \(plan.total)")) {
+                        primaryButton: .default(Text(tr("action_add_to_arg", plan.total))) {
                             applyBulk(plan)
                         },
                         secondaryButton: .cancel()
@@ -51,7 +51,7 @@ struct AITagSuggestionBar: View {
                 // Only worth saying on an untagged item — where a missing suggestion is the
                 // whole story. On an already tagged one it is just noise under the tag row.
                 if didRun, target.tags.isEmpty {
-                    Text(manager.hasModel ? "No tag suggestions" : "Tag Suggestion needs statistics first")
+                    Text(manager.hasModel ? tr("empty_tag_suggestions") : tr("tag_suggestion_needs_statistics_first"))
                         .font(.system(size: 11, weight: .semibold))
                         .foregroundColor(.white.opacity(0.45))
                 }
@@ -101,14 +101,14 @@ struct AITagSuggestionBar: View {
                 HapticManager.light()
                 withAnimation { suggestions.removeAll { $0.id == suggestion.id } }
             } label: {
-                Label("Ignore Tag", systemImage: "xmark")
+                Label(tr("ignore_tag"), systemImage: "xmark")
             }
 
             if !target.galleryIds.isEmpty {
                 Button {
                     planBulk(suggestion.tag, scope: .gallery)
                 } label: {
-                    Label("Set on all of gallery", systemImage: "photo.stack")
+                    Label(tr("action_set_on_all_of_gallery"), systemImage: "photo.stack")
                 }
             }
 
@@ -116,11 +116,11 @@ struct AITagSuggestionBar: View {
                 Button {
                     planBulk(suggestion.tag, scope: .performer)
                 } label: {
-                    Label("Set on all of performer", systemImage: "person.text.rectangle")
+                    Label(tr("action_set_on_all_of_performer"), systemImage: "person.text.rectangle")
                 }
             }
         }
-        .accessibilityLabel("Add tag \(suggestion.tag.name)")
+        .accessibilityLabel(tr("action_add_tag_arg", suggestion.tag.name))
     }
 
     // MARK: - Actions
@@ -154,7 +154,7 @@ struct AITagSuggestionBar: View {
         var parts: [String] = []
         if !plan.imageIds.isEmpty { parts.append("\(plan.imageIds.count) images") }
         if !plan.sceneIds.isEmpty { parts.append("\(plan.sceneIds.count) scenes") }
-        return "The tag is added to \(parts.joined(separator: " and ")) of \(scope). Items that already have it stay unchanged."
+        return tr("hint_tag_is_added_to_arg", parts.joined(separator: " and "), scope)
     }
 
     /// Counts first, asks second: a bulk write can touch hundreds of items, and undoing
@@ -166,7 +166,7 @@ struct AITagSuggestionBar: View {
             let plan = await manager.planBulkApply(tag, scope: scope, target: target)
             isPlanningBulk = false
             guard let plan else {
-                ToastManager.shared.show("Nothing to tag", icon: "info.circle", style: .info)
+                ToastManager.shared.show(tr("nothing_to_tag"), icon: "info.circle", style: .info)
                 return
             }
             pendingBulk = plan
@@ -178,11 +178,11 @@ struct AITagSuggestionBar: View {
             let success = await manager.applyBulk(plan, target: target)
             guard success else {
                 HapticManager.error()
-                ToastManager.shared.show("Could not apply tag", icon: "exclamationmark.triangle.fill", style: .error)
+                ToastManager.shared.show(tr("error_apply_tag"), icon: "exclamationmark.triangle.fill", style: .error)
                 return
             }
             HapticManager.success()
-            ToastManager.shared.show("Added #\(plan.tag.name) to \(plan.total) items")
+            ToastManager.shared.show(tr("added_arg_to_arg_items", plan.tag.name, plan.total))
             // The item itself is part of the batch, so its own row has to follow.
             if !target.tags.contains(where: { $0.id == plan.tag.id }) {
                 onTagsChanged(target.tags + [plan.tag])
@@ -200,14 +200,14 @@ struct AITagSuggestionBar: View {
             acceptingTagId = nil
             guard let newTags else {
                 HapticManager.error()
-                ToastManager.shared.show("Could not add tag", icon: "exclamationmark.triangle.fill", style: .error)
+                ToastManager.shared.show(tr("error_add_tag"), icon: "exclamationmark.triangle.fill", style: .error)
                 return
             }
             withAnimation(.easeInOut(duration: 0.2)) {
                 suggestions.removeAll { $0.tag.id == suggestion.tag.id }
             }
             HapticManager.success()
-            ToastManager.shared.show("Added #\(suggestion.tag.name)")
+            ToastManager.shared.show(tr("added_arg", suggestion.tag.name))
             onTagsChanged(newTags)
         }
     }

@@ -258,7 +258,7 @@ struct SceneVideoPlayerCard: View {
             Button(action: { onStartPlayback(true) }) {
                 HStack(spacing: 8) {
                     Image(systemName: "clock.arrow.circlepath")
-                    Text("Resume from \(formatTime(activeScene.resumeTime ?? 0))")
+                    Text(tr("action_resume_from_arg", formatTime(activeScene.resumeTime ?? 0)))
                         .fontWeight(.bold)
                         .lineLimit(1)
                         .minimumScaleFactor(0.8)
@@ -272,7 +272,7 @@ struct SceneVideoPlayerCard: View {
             }
             
             Button(action: { onStartPlayback(false) }) {
-                Text("Start from beginning")
+                Text(tr("action_start_from_beginning"))
                     .font(.caption)
                     .fontWeight(.medium)
                     .foregroundColor(Color.onAppTint)
@@ -323,7 +323,7 @@ struct SceneVideoPlayerCard: View {
                     Image(systemName: "film")
                         .font(.largeTitle)
                         .foregroundColor(.secondary)
-                    Text("Video not available")
+                    Text(tr("video_not_available"))
                         .foregroundColor(.secondary)
                 }
             )
@@ -394,7 +394,7 @@ struct SceneVideoPlayerCard: View {
             .clipShape(RoundedRectangle(cornerRadius: 4))
             
             // Marker Title
-            Text(marker.title ?? "Marker at \(formatTime(marker.seconds))")
+            Text(marker.title ?? tr("marker_at_arg", formatTime(marker.seconds)))
                 .font(.system(size: 11))
                 .fontWeight(.medium)
                 .lineLimit(1)
@@ -464,7 +464,7 @@ struct SceneDetailMetadataCard: View {
         VStack(alignment: .leading, spacing: 12) {
             VStack(alignment: .leading, spacing: 4) {
                 HStack(alignment: .top) {
-                    Text(activeScene.displayTitle ?? "Unbekannter Titel")
+                    Text(activeScene.displayTitle ?? tr("unknown_title"))
                         .font(.title2)
                         .fontWeight(.bold)
                         .foregroundColor(.primary)
@@ -557,7 +557,7 @@ struct SceneDetailMetadataCard: View {
             .dynamicTypeSize(...DynamicTypeSize.accessibility1)
 
             if let productionDate, !productionDate.isEmpty {
-                Text("Produced \(productionDate)")
+                Text(tr("produced_arg", productionDate))
                     .font(.caption)
                     .foregroundColor(.secondary)
             }
@@ -610,7 +610,7 @@ struct SceneDetailMetadataCard: View {
                 activeScene = activeScene.withOCounter(count)
             } else {
                 activeScene = activeScene.withOCounter(original)
-                ToastManager.shared.show("Counter update failed", icon: "exclamationmark.triangle", style: .error)
+                ToastManager.shared.show(tr("error_counter_update"), icon: "exclamationmark.triangle", style: .error)
             }
         }
     }
@@ -636,7 +636,7 @@ struct SceneDetailMetadataCard: View {
                         } else {
                             DispatchQueue.main.async {
                                 activeScene = originalScene
-                                ToastManager.shared.show("Failed to update rating", icon: "exclamationmark.triangle", style: .error)
+                                ToastManager.shared.show(tr("error_update_rating"), icon: "exclamationmark.triangle", style: .error)
                             }
                         }
                     }
@@ -762,17 +762,17 @@ struct SetTagImageFromFrameSheet: View {
 
                 Form {
                     Section {
-                        TextField("Search Tags...", text: $searchText)
+                        TextField(tr("placeholder_search_tags"), text: $searchText)
 
                         if isLoadingTags && allTags.isEmpty {
                             HStack {
                                 Spacer()
-                                ProgressView("Loading tags...")
+                                ProgressView(tr("loading_tags"))
                                 Spacer()
                             }
                             .padding(.vertical, 8)
                         } else if selectableTags.isEmpty {
-                            Text(searchText.isEmpty ? "No tags available" : "No tags match '\(searchText)'")
+                            Text(searchText.isEmpty ? tr("empty_tags_available") : tr("empty_tags_match_arg", searchText))
                                 .foregroundColor(.secondary)
                         } else {
                             ForEach(selectableTags.prefix(40), id: \.id) { tag in
@@ -785,7 +785,7 @@ struct SetTagImageFromFrameSheet: View {
                                             Text(tag.name)
                                                 .foregroundColor(.primary)
                                             if sceneTags.contains(where: { $0.id == tag.id }) {
-                                                Text("On this scene")
+                                                Text(tr("on_this_scene"))
                                                     .font(.caption2)
                                                     .foregroundColor(.secondary)
                                             }
@@ -802,24 +802,24 @@ struct SetTagImageFromFrameSheet: View {
                             }
 
                             if selectableTags.count > 40 {
-                                Text("Type more to refine search...")
+                                Text(tr("type_more_to_refine_search_menu"))
                                     .font(.caption)
                                     .foregroundColor(.secondary)
                             }
                         }
                     } header: {
-                        Text(searchText.isEmpty && !sceneTags.isEmpty ? "Scene Tags" : "Tags")
+                        Text(searchText.isEmpty && !sceneTags.isEmpty ? tr("scene_tags") : tr("tags"))
                     } footer: {
-                        Text("The selected tag’s image will be replaced with this video frame.")
+                        Text(tr("hint_selected_tags_image_will_be"))
                     }
                     .listRowBackground(Color.secondaryAppBackground)
                 }
             }
             .applyAppBackground()
             .scrollContentBackground(.hidden)
-            .stashyModalSheetChrome("Generate Tag Cover", onBack: { dismiss() }) {
+            .stashyModalSheetChrome(tr("action_generate_tag_cover"), onBack: { dismiss() }) {
                 StashyChromeTrailingTextButton(
-                    title: "Apply",
+                    title: tr("action_apply"),
                     enabled: selectedTagId != nil,
                     isBusy: isSaving
                 ) {
@@ -885,7 +885,7 @@ struct SetTagImageFromFrameSheet: View {
             DispatchQueue.main.async {
                 isSaving = false
                 if success {
-                    let tagName = (sceneTags + allTags).first(where: { $0.id == tagId })?.name ?? "Tag"
+                    let tagName = (sceneTags + allTags).first(where: { $0.id == tagId })?.name ?? tr("tag")
                     let bust = UUID().uuidString
                     let config = ServerConfigManager.shared.activeConfig ?? ServerConfigManager.shared.loadConfig()
                     let newImagePath: String = {
@@ -896,7 +896,7 @@ struct SetTagImageFromFrameSheet: View {
                     }()
                     let updatedAt = ISO8601DateFormatter().string(from: Date())
                     ToastManager.shared.show(
-                        "Image updated for \(tagName)",
+                        tr("image_updated_for_arg", tagName),
                         icon: "tag.circle.fill",
                         style: .success
                     )
@@ -912,7 +912,7 @@ struct SetTagImageFromFrameSheet: View {
                     dismiss()
                 } else {
                     ToastManager.shared.show(
-                        "Failed to update tag image",
+                        tr("error_update_tag_image"),
                         icon: "exclamationmark.triangle",
                         style: .error
                     )
@@ -942,15 +942,15 @@ struct EditSceneTitleSheet: View {
     var body: some View {
         NavigationView {
             Form {
-                Section(header: Text("Title")) {
-                    TextField("Title", text: $title)
+                Section(header: Text(tr("title"))) {
+                    TextField(tr("title"), text: $title)
                     if SceneTitleNormalizer.normalized(title) != title {
                         normalizeButton { title = SceneTitleNormalizer.normalized(title) }
                     }
                 }
                 .listRowBackground(Color.secondaryAppBackground)
 
-                Section(header: Text("Description")) {
+                Section(header: Text(tr("description"))) {
                     TextEditor(text: $details)
                         .frame(minHeight: 120)
                     if SceneTitleNormalizer.normalizedDescription(details) != details {
@@ -960,7 +960,7 @@ struct EditSceneTitleSheet: View {
                 .listRowBackground(Color.secondaryAppBackground)
 
                 if showsProductionDate {
-                    Section(header: Text("Production Date")) {
+                    Section(header: Text(tr("production_date"))) {
                         TextField("YYYY-MM-DD", text: $productionDate)
                             .keyboardType(.numbersAndPunctuation)
                     }
@@ -969,8 +969,8 @@ struct EditSceneTitleSheet: View {
             }
             .applyAppBackground()
             .scrollContentBackground(.hidden)
-            .stashyModalSheetChrome("Edit Scene", onBack: { dismiss() }) {
-                StashyChromeTrailingTextButton(title: "Save", enabled: !isSaving, isBusy: isSaving) { save() }
+            .stashyModalSheetChrome(tr("action_edit_scene"), onBack: { dismiss() }) {
+                StashyChromeTrailingTextButton(title: tr("action_save"), enabled: !isSaving, isBusy: isSaving) { save() }
             }
             .onAppear {
                 title = currentTitle ?? ""
@@ -985,7 +985,7 @@ struct EditSceneTitleSheet: View {
             HapticManager.light()
             action()
         } label: {
-            Label("Normalize", systemImage: "wand.and.stars")
+            Label(tr("normalize"), systemImage: "wand.and.stars")
                 .font(.subheadline.weight(.medium))
                 .foregroundColor(appearanceManager.tintColor)
         }
@@ -996,7 +996,7 @@ struct EditSceneTitleSheet: View {
     private func save() {
         let newDate = productionDate.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !showsProductionDate || SceneProductionDate.isValid(newDate) else {
-            ToastManager.shared.show("Use YYYY, YYYY-MM or YYYY-MM-DD", icon: "exclamationmark.triangle", style: .error)
+            ToastManager.shared.show(tr("action_use_yyyy_yyyy_mm_or"), icon: "exclamationmark.triangle", style: .error)
             return
         }
         isSaving = true
@@ -1014,7 +1014,7 @@ struct EditSceneTitleSheet: View {
                     onComplete(newTitle, newDetails)
                     dismiss()
                 } else {
-                    ToastManager.shared.show("Failed to update scene", icon: "exclamationmark.triangle", style: .error)
+                    ToastManager.shared.show(tr("error_update_scene"), icon: "exclamationmark.triangle", style: .error)
                 }
             }
         }

@@ -48,7 +48,7 @@ struct TVDashboardView: View {
     var body: some View {
         Group {
             if !hasValidConfig {
-                TVConnectionErrorView(title: "Server not reachable", subtitle: "Add a server in Settings.") { loadData() }
+                TVConnectionErrorView(title: tr("server_not_reachable"), subtitle: tr("action_add_server_in_settings")) { loadData() }
             } else {
                 ScrollView([.vertical], showsIndicators: false) {
                     VStack(alignment: .leading, spacing: 0) {
@@ -232,15 +232,15 @@ struct TVDashboardView: View {
                     Image(systemName: "film.stack")
                         .font(.largeTitle)
                         .foregroundStyle(.secondary)
-                    Text(enabledRows.isEmpty ? "All Home rows are turned off" : "No scenes to show yet")
+                    Text(enabledRows.isEmpty ? tr("hint_all_home_rows_are_turned") : tr("empty_scenes_to_show_yet"))
                         .font(.title2)
                         .foregroundStyle(.secondary)
                     if enabledRows.isEmpty {
-                        Text("Turn rows on in Settings › Home Rows.")
+                        Text(tr("hint_turn_rows_on_in_settings"))
                             .font(.title3)
                             .foregroundStyle(.secondary)
                     }
-                    Button("Reload") { loadData(forceRefresh: true) }
+                    Button(tr("action_reload")) { loadData(forceRefresh: true) }
                         .font(.title3)
                 }
                 .frame(maxWidth: .infinity)
@@ -448,7 +448,7 @@ struct TVDashboardView: View {
         let cardHeight: CGFloat = 225
 
         VStack(alignment: .leading, spacing: 18) {
-            Text("Channels")
+            Text(tr("channels"))
                 .font(.headline)
                 .fontWeight(.semibold)
                 .foregroundColor(.white.opacity(0.6))
@@ -547,7 +547,7 @@ struct TVDashboardView: View {
                                 .font(.system(size: 60))
                                 .foregroundColor(.white.opacity(0.8))
                             
-                            Text("See All")
+                            Text(tr("see_all"))
                                 .font(.headline)
                                 .fontWeight(.bold)
                         }

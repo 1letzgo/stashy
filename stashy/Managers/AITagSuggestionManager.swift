@@ -465,7 +465,7 @@ final class AITagSuggestionManager: ObservableObject {
             tags = try await fetchAllTags()
         } catch {
             AppLog.error("AITags: tag list failed — \(error.localizedDescription)")
-            state = .failed("Could not read the tag list")
+            state = .failed(tr("error_read_tag_list"))
             return
         }
 
@@ -569,7 +569,7 @@ final class AITagSuggestionManager: ObservableObject {
             return
         }
         guard processed > 0 else {
-            state = .failed("No tagged scenes or images found")
+            state = .failed(tr("empty_tagged_scenes_or_images_found"))
             return
         }
 

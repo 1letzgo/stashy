@@ -7,15 +7,15 @@ struct EditModeSettingsView: View {
     var body: some View {
         List {
             Section {
-                Toggle("Enable Editing", isOn: $appearanceManager.isEditModeEnabled)
+                Toggle(tr("action_enable_editing"), isOn: $appearanceManager.isEditModeEnabled)
                     .tint(appearanceManager.tintColor)
                     .stashyGroupedSettingsRow()
-                stashyScrollingSectionFooter("Show edit buttons on scene detail cards (performers, studio, groups, galleries, tags, title, description) and on performer / studio / tag / group / gallery detail.")
+                stashyScrollingSectionFooter(tr("hint_show_edit_buttons_on_scene"))
             }
         }
         .stashySettingsList()
         .applyAppBackground()
-        .stashySettingsDetailChrome("Editing")
+        .stashySettingsDetailChrome(tr("editing"))
     }
 }
 #endif

@@ -26,13 +26,13 @@ struct SceneRecommendation: Identifiable, Equatable, Codable {
 
         var label: String {
             switch self {
-            case .similarTo(let title): return "Like \u{201C}\(title)\u{201D}"
-            case .performer(let name): return "More with \(name)"
-            case .studio(let name): return "More from \(name)"
-            case .tag(let name): return "You like \(name)"
-            case .relatedTag(let name): return "Goes with your tags: \(name)"
-            case .rediscover: return "Rediscover"
-            case .favorite: return "One of your favorites"
+            case .similarTo(let title): return tr("like_arg", title)
+            case .performer(let name): return tr("more_with_arg", name)
+            case .studio(let name): return tr("more_from_arg", name)
+            case .tag(let name): return tr("you_like_arg", name)
+            case .relatedTag(let name): return tr("goes_with_your_tags_arg", name)
+            case .rediscover: return tr("rediscover")
+            case .favorite: return tr("one_of_your_favorites")
             }
         }
 
@@ -42,8 +42,8 @@ struct SceneRecommendation: Identifiable, Equatable, Codable {
             case .studio(let name): return name
             case .tag(let name): return name
             case .relatedTag(let name): return name
-            case .rediscover: return "Rediscover"
-            case .favorite: return "Favorite"
+            case .rediscover: return tr("rediscover")
+            case .favorite: return tr("favourite")
             case .similarTo(let title): return title
             }
         }
@@ -87,17 +87,17 @@ enum RecommendationDiscovery: String, CaseIterable, Identifiable {
 
     var title: String {
         switch self {
-        case .fresh: return "New only"
-        case .balanced: return "Balanced"
-        case .favorites: return "Favorites"
+        case .fresh: return tr("new_only")
+        case .balanced: return tr("balanced")
+        case .favorites: return tr("favorites")
         }
     }
 
     var detail: String {
         switch self {
-        case .fresh: return "Only scenes you have never played."
-        case .balanced: return "Unplayed scenes and scenes you have not played in this period, weighed the same."
-        case .favorites: return "Scenes with O-Counts or high ratings you have not played in a while."
+        case .fresh: return tr("hint_only_scenes_you_have_never")
+        case .balanced: return tr("hint_unplayed_scenes_and_scenes_you")
+        case .favorites: return tr("hint_scenes_with_o_counts_or")
         }
     }
 }
@@ -115,17 +115,17 @@ struct RecommendationAdjustment: Codable, Identifiable, Equatable {
 
         var title: String {
             switch self {
-            case .performer: return "Performers"
-            case .studio: return "Studios"
-            case .tag: return "Tags"
+            case .performer: return tr("performers")
+            case .studio: return tr("studios")
+            case .tag: return tr("tags")
             }
         }
 
         var addTitle: String {
             switch self {
-            case .performer: return "Add performer"
-            case .studio: return "Add studio"
-            case .tag: return "Add tag"
+            case .performer: return tr("action_add_performer")
+            case .studio: return tr("action_add_studio")
+            case .tag: return tr("action_add_tag")
             }
         }
 
@@ -154,7 +154,7 @@ struct RecommendationAdjustment: Codable, Identifiable, Equatable {
     static let more = 2.0
 
     static func label(_ factor: Double) -> String {
-        factor < hiddenBelow ? "Hidden" : String(format: "%.1f×", factor)
+        factor < hiddenBelow ? tr("hidden") : String(format: "%.1f×", factor)
     }
 }
 
@@ -786,7 +786,7 @@ final class SceneRecommendationEngine: ObservableObject {
     }
 
     /// Shown until the first statistics build on this device is done.
-    static let preparingMessage = "Getting your library ready on this device…"
+    static var preparingMessage: String { tr("hint_getting_your_library_ready_on") }
 
     /// The whole library from the device's scene index — no server request.
     nonisolated private static func buildLocal(_ index: LocalSceneIndex, _ cfg: BuildConfig) -> Outcome {
@@ -1110,7 +1110,7 @@ final class SceneRecommendationEngine: ObservableObject {
             (studioScore, candidate.studio.map { .studio($0.name) }),
             (tagScore, tagHits.first.map { .tag(tagName($0.0)) }),
             (relatedScore, bestRelated.map { .relatedTag(tagName($0.tagId)) }),
-            (similarScore, similarAnchor.map { .similarTo($0.title ?? "a scene you watched") }),
+            (similarScore, similarAnchor.map { .similarTo($0.title ?? tr("scene_you_watched")) }),
         ]
         let strongest = factors.filter { $0.1 != nil && $0.0 > 0 }.max { $0.0 < $1.0 }
         let reason: SceneRecommendation.Reason

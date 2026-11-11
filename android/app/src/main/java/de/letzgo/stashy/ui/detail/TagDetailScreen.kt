@@ -1,5 +1,7 @@
 package de.letzgo.stashy.ui.detail
 
+import de.letzgo.stashy.R
+import de.letzgo.stashy.tr
 import de.letzgo.stashy.ui.tools.downloads.TagImagesDownloadDialog
 import de.letzgo.stashy.data.Downloads
 import de.letzgo.stashy.ui.tools.downloads.SceneBulkDownloadDialog
@@ -111,7 +113,7 @@ class TagDetailScreen(val tagId: String, val preview: Tag? = null, private val f
         scope.launch {
             if (!DetailRepository.setTagFavorite(tagId, new)) {
                 isFavorite = !new
-                detailToast("Failed to update favorite")
+                detailToast(tr(R.string.error_update_favorite))
             } else tag = tag?.copy(favorite = new)
             favoriteBusy = false
         }
@@ -129,14 +131,14 @@ class TagDetailScreen(val tagId: String, val preview: Tag? = null, private val f
             val extra = when (tab) {
                 DetailTab.Scenes -> listOf(sceneBulkDownloadSlot { showSceneDownloadOptions = true })
                 // iOS `tagImagesDownloadSlot`.
-                DetailTab.Images -> listOf(imageSetDownloadSlot("tag-$tagId", "Download images") { showTagImagesOptions = true })
+                DetailTab.Images -> listOf(imageSetDownloadSlot("tag-$tagId", tr(R.string.action_download_images)) { showTagImagesOptions = true })
                 else -> emptyList()
             }
             DetailTopBar(
                 tag?.name ?: "", catalog.available, tab, { tab = it }, extra,
                 settings = catalog.settingsSlot(tab), sort = catalog.controller(tab),
                 isFavorite = isFavorite, favoriteBusy = favoriteBusy, onFavorite = ::toggleFavorite,
-                onEdit = { editing = true }, editLabel = "Edit tag",
+                onEdit = { editing = true }, editLabel = tr(R.string.action_edit_tag),
             )
         }
         LinkedSettingsSheets(catalog)
@@ -168,10 +170,10 @@ class TagDetailScreen(val tagId: String, val preview: Tag? = null, private val f
             expanded = expanded,
             onToggle = { expanded = !expanded },
             hero = url?.let {
-                DetailHero(DetailHero.Style.Cover, it, Color.Black, "Open image", { fullscreen = HeroImageFullscreenItem(it, t.name) }) {
+                DetailHero(DetailHero.Style.Cover, it, Color.Black, tr(R.string.action_open_image), { fullscreen = HeroImageFullscreenItem(it, t.name) }) {
                     HeroPicture(it, t.name, ContentScale.Crop, SF.number)
                 }
-            } ?: DetailHero(DetailHero.Style.Cover, null, Color.Black, "Open image", null) { HeroPlaceholder(SF.number) },
+            } ?: DetailHero(DetailHero.Style.Cover, null, Color.Black, tr(R.string.action_open_image), null) { HeroPlaceholder(SF.number) },
             collapsedItemCount = 4,
             titleAccessory = { color -> FeedsPill(color) { DetailFeedsLink.navigate(DetailFeedsLink.Target.Tag(t.id, t.name)) } },
         )
@@ -186,8 +188,8 @@ class TagDetailScreen(val tagId: String, val preview: Tag? = null, private val f
     private fun EditTagSheet(tag: Tag, onDismiss: () -> Unit, onSaved: (Tag) -> Unit) {
         val sections = remember(tag.id) {
             listOf(
-                EditSection("Identity", listOf(EditField("Name", tag.name))),
-                EditSection("Description", listOf(EditField("Description", tag.description ?: "", multiline = true))),
+                EditSection(tr(R.string.identity), listOf(EditField(tr(R.string.name), tag.name))),
+                EditSection(tr(R.string.description), listOf(EditField(tr(R.string.description), tag.description ?: "", multiline = true))),
             )
         }
         val name = sections[0].fields[0]
@@ -200,8 +202,8 @@ class TagDetailScreen(val tagId: String, val preview: Tag? = null, private val f
             newAlias = ""
         }
         EditEntitySheet(
-            title = "Edit Tag", sections = sections,
-            deleteLabel = "Delete Tag", deleteTitle = "Delete Tag", entityName = tag.name,
+            title = tr(R.string.action_edit_tag), sections = sections,
+            deleteLabel = tr(R.string.action_delete_tag), deleteTitle = tr(R.string.action_delete_tag), entityName = tag.name,
             onDismiss = onDismiss,
             onSave = {
                 // A typed but not yet added alias counts too.
@@ -210,19 +212,19 @@ class TagDetailScreen(val tagId: String, val preview: Tag? = null, private val f
                 val ok = DetailRepository.updateTag(tag.id, name.trimmed, description.optional, aliasesValue)
                 if (ok) {
                     onSaved(tag.copy(name = name.trimmed, description = description.optional, aliases = aliasesValue ?: tag.aliases))
-                    detailToast("Tag updated")
-                } else detailToast("Failed to update tag")
+                    detailToast(tr(R.string.tag_updated))
+                } else detailToast(tr(R.string.error_update_tag))
                 ok
             },
             onDelete = {
                 DetailRepository.deleteTag(tag.id)
-                detailToast("Tag deleted")
+                detailToast(tr(R.string.tag_deleted))
                 Nav.pop()
             },
             extraSections = {
                 if (loadedAliases != null) {
                     Spacer(Modifier.height(20.dp))
-                    NativeSectionHeader("Aliases")
+                    NativeSectionHeader(tr(R.string.aliases))
                     NativeGroup {
                         aliases.forEachIndexed { index, alias ->
                             key(alias) {
@@ -235,18 +237,18 @@ class TagDetailScreen(val tagId: String, val preview: Tag? = null, private val f
                         if (aliases.isNotEmpty()) NativeDivider()
                         Column(Modifier.padding(horizontal = 4.dp, vertical = 4.dp)) {
                             NativeTextField(
-                                newAlias, { newAlias = it }, "Add alias",
+                                newAlias, { newAlias = it }, tr(R.string.action_add_alias),
                                 imeAction = ImeAction.Done,
                                 keyboardActions = KeyboardActions(onDone = { addAlias() }),
                                 trailing = {
                                     IconButton(::addAlias, enabled = newAlias.isNotBlank()) {
-                                        Icon(SF.plusCircleFill, "Add alias", tint = if (newAlias.isNotBlank()) Appearance.tint else Theme.palette.secondaryText)
+                                        Icon(SF.plusCircleFill, tr(R.string.action_add_alias), tint = if (newAlias.isNotBlank()) Appearance.tint else Theme.palette.secondaryText)
                                     }
                                 },
                             )
                         }
                     }
-                    NativeSectionFooter("Other names for this tag. Swipe left to remove one.")
+                    NativeSectionFooter(tr(R.string.hint_other_names_for_this_tag))
                 }
             },
         )
@@ -265,7 +267,7 @@ private fun SwipeToRemoveAlias(label: String, onRemove: () -> Unit, content: @Co
         enableDismissFromStartToEnd = false,
         backgroundContent = {
             Box(Modifier.fillMaxSize().background(StashyColors.systemRed).padding(end = 20.dp), contentAlignment = Alignment.CenterEnd) {
-                Icon(SF.trash, "Remove $label", tint = Color.White)
+                Icon(SF.trash, tr(R.string.action_remove_arg, label), tint = Color.White)
             }
         },
     ) { content() }

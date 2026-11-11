@@ -1,5 +1,7 @@
 package de.letzgo.stashy.ui.tools.rateme
 
+import de.letzgo.stashy.R
+import de.letzgo.stashy.tr
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -43,7 +45,7 @@ class RateMeViewModel : ViewModel() {
     private var didRunInitialLoad = false
 
     private fun haptic(kind: RateMeHaptic) { haptic?.invoke(kind) }
-    private fun errorText(e: Throwable) = e.message ?: "Unknown error"
+    private fun errorText(e: Throwable) = e.message ?: tr(R.string.unknown_error)
 
     /** Themes that make sense for the current mode. */
     val availableFixedThemes: List<RateMeTheme> get() = RateMeLogic.availableFixedThemes(mode)
@@ -132,7 +134,7 @@ class RateMeViewModel : ViewModel() {
         try {
             val ok = RateMeRepository.mutateRating(current.id, current.mode, rating100)
             if (!ok) {
-                errorMessage = "Failed to save rating."
+                errorMessage = tr(R.string.error_save_rating)
                 draftRating100 = null
                 return
             }
@@ -179,11 +181,11 @@ class RateMeViewModel : ViewModel() {
         try {
             val ok = RateMeRepository.mutateDestroy(current.id, current.mode)
             if (!ok) {
-                errorMessage = if (current.mode == RateMeMode.Scenes) "Failed to delete scene." else "Failed to delete image."
+                errorMessage = if (current.mode == RateMeMode.Scenes) tr(R.string.error_delete_scene) else tr(R.string.error_delete_image)
                 return
             }
             haptic(RateMeHaptic.Success)
-            showToast(if (current.mode == RateMeMode.Scenes) "Scene deleted" else "Image deleted")
+            showToast(if (current.mode == RateMeMode.Scenes) tr(R.string.scene_deleted) else tr(R.string.image_deleted))
             skipIDs -= current.id
             loadNext()
         } catch (e: CancellationException) {

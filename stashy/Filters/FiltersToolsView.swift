@@ -38,7 +38,7 @@ struct FiltersToolsView: View {
     var body: some View {
         Group {
             if viewModel.isLoadingSavedFilters && viewModel.savedFilters.isEmpty {
-                StandardLoadingView(message: "Loading filters…")
+                StandardLoadingView(message: tr("loading_filters"))
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                     .background(Color.appBackground(for: appearance.currentTheme))
             } else if grouped.isEmpty {
@@ -82,28 +82,28 @@ struct FiltersToolsView: View {
                 onDismiss: { isCreating = false }
             )
         }
-        .alert("Rename filter", isPresented: Binding(
+        .alert(tr("action_rename_filter"), isPresented: Binding(
             get: { renameTarget != nil },
             set: { if !$0 { renameTarget = nil } }
         )) {
-            TextField("Name", text: $renameText)
-            Button("Save") {
+            TextField(tr("name"), text: $renameText)
+            Button(tr("action_save")) {
                 guard let target = renameTarget else { return }
                 rename(filter: target, to: renameText)
             }
-            Button("Cancel", role: .cancel) { renameTarget = nil }
+            Button(tr("action_cancel"), role: .cancel) { renameTarget = nil }
         }
-        .alert("Delete filter?", isPresented: Binding(
+        .alert(tr("confirm_delete_filter"), isPresented: Binding(
             get: { deleteTarget != nil },
             set: { if !$0 { deleteTarget = nil } }
         )) {
-            Button("Delete", role: .destructive) {
+            Button(tr("action_delete"), role: .destructive) {
                 guard let target = deleteTarget else { return }
                 delete(filter: target)
             }
-            Button("Cancel", role: .cancel) { deleteTarget = nil }
+            Button(tr("action_cancel"), role: .cancel) { deleteTarget = nil }
         } message: {
-            Text(deleteTarget.map { "Delete “\($0.name)” from the server?" } ?? "")
+            Text(deleteTarget.map { tr("confirm_delete_arg_from_server", $0.name) } ?? "")
         }
     }
 
@@ -120,11 +120,11 @@ struct FiltersToolsView: View {
 
     private var emptyState: some View {
         ContentUnavailableView(
-            searchText.isEmpty ? "No filters" : "No matches",
+            searchText.isEmpty ? tr("empty_filters") : tr("empty_matches"),
             systemImage: searchText.isEmpty ? "line.3.horizontal.decrease.circle" : "magnifyingglass",
             description: Text(searchText.isEmpty
-                              ? "Create a filter or sync from your Stash server."
-                              : "No filters match your search.")
+                              ? tr("hint_create_filter_or_sync_from")
+                              : tr("empty_filters_match_your_search"))
         )
     }
 
@@ -145,13 +145,13 @@ struct FiltersToolsView: View {
                             Button(role: .destructive) {
                                 deleteTarget = filter
                             } label: {
-                                Label("Delete", systemImage: "trash")
+                                Label(tr("action_delete"), systemImage: "trash")
                             }
                             Button {
                                 renameTarget = filter
                                 renameText = filter.name
                             } label: {
-                                Label("Rename", systemImage: "pencil")
+                                Label(tr("action_rename"), systemImage: "pencil")
                             }
                             .tint(.gray)
                         }
@@ -160,12 +160,12 @@ struct FiltersToolsView: View {
                                 renameTarget = filter
                                 renameText = filter.name
                             } label: {
-                                Label("Rename", systemImage: "pencil")
+                                Label(tr("action_rename"), systemImage: "pencil")
                             }
                             Button(role: .destructive) {
                                 deleteTarget = filter
                             } label: {
-                                Label("Delete", systemImage: "trash")
+                                Label(tr("action_delete"), systemImage: "trash")
                             }
                         }
                         // List rows default to system colors and would ignore the app theme.
@@ -218,22 +218,22 @@ struct FiltersToolsView: View {
 
     static func modeTitle(_ mode: StashDBViewModel.FilterMode) -> String {
         switch mode {
-        case .scenes: return "Scenes"
-        case .sceneMarkers: return "Markers"
-        case .performers: return "Performers"
-        case .studios: return "Studios"
-        case .tags: return "Tags"
-        case .galleries: return "Galleries"
-        case .images: return "Images"
-        case .groups: return "Groups"
-        case .unknown: return "Other"
+        case .scenes: return tr("scenes")
+        case .sceneMarkers: return tr("markers")
+        case .performers: return tr("performers")
+        case .studios: return tr("studios")
+        case .tags: return tr("tags")
+        case .galleries: return tr("galleries")
+        case .images: return tr("images")
+        case .groups: return tr("groups")
+        case .unknown: return tr("other")
         }
     }
 
     /// Human-readable criteria list ("Tags, Rating, Studio"), not raw GraphQL keys.
     private func criteriaSummary(_ filter: StashDBViewModel.SavedFilter) -> String {
         let keys = filter.criteriaObjectFilter().keys.sorted()
-        if keys.isEmpty { return "No criteria" }
+        if keys.isEmpty { return tr("empty_criteria") }
         let labels = keys.map { key in
             FilterFieldCatalog.field(key: key, mode: filter.mode)?.label ?? key
         }
@@ -250,7 +250,7 @@ struct FiltersToolsView: View {
                 HapticManager.success()
                 viewModel.fetchSavedFilters()
             case .failure(let error):
-                ToastManager.shared.show("Rename failed: \(error.localizedDescription)", icon: "exclamationmark.triangle.fill", style: .error)
+                ToastManager.shared.show(tr("action_rename_failed_arg", error.localizedDescription), icon: "exclamationmark.triangle.fill", style: .error)
             }
         }
     }
@@ -263,7 +263,7 @@ struct FiltersToolsView: View {
                 HapticManager.success()
                 viewModel.fetchSavedFilters()
             case .failure(let error):
-                ToastManager.shared.show("Delete failed: \(error.localizedDescription)", icon: "exclamationmark.triangle.fill", style: .error)
+                ToastManager.shared.show(tr("action_delete_failed_arg", error.localizedDescription), icon: "exclamationmark.triangle.fill", style: .error)
             }
         }
     }
@@ -280,13 +280,13 @@ private struct FiltersToolsSearchChromeModifier<MenuItems: View>: ViewModifier {
         content
             .safeAreaInset(edge: .top, spacing: 0) {
                 HStack(spacing: DesignTokens.Spacing.sm) {
-                    ToolsSearchField(prompt: "Search filters", text: $searchText)
+                    ToolsSearchField(prompt: tr("search_filters"), text: $searchText)
                     Menu {
                         addMenuItems()
                     } label: {
                         ToolsAddButtonLabel()
                     }
-                    .accessibilityLabel("New filter")
+                    .accessibilityLabel(tr("new_filter"))
                 }
                 .padding(.horizontal, DesignTokens.Tools.contentPadding)
                 .padding(.top, DesignTokens.Tools.menuTopPadding)
@@ -356,11 +356,11 @@ private struct FiltersToolsEditorSheet: View {
         ScrollView {
             VStack(alignment: .leading, spacing: DesignTokens.Spacing.md) {
                 HStack(alignment: .center, spacing: DesignTokens.Spacing.sm) {
-                    Text("Name")
+                    Text(tr("name"))
                         .font(.subheadline.weight(.semibold))
                         .foregroundColor(.secondary)
                         .frame(width: CatalogFilterSortSheetLayout.labelColumnWidth, alignment: .leading)
-                    TextField("Filter name", text: $name)
+                    TextField(tr("filter_name"), text: $name)
                         .textFieldStyle(.plain)
                         .multilineTextAlignment(.trailing)
                 }
@@ -368,7 +368,7 @@ private struct FiltersToolsEditorSheet: View {
 
                 if !sortChoices.isEmpty {
                     HStack(alignment: .center, spacing: DesignTokens.Spacing.sm) {
-                        Text("Sort")
+                        Text(tr("action_sort"))
                             .font(.subheadline.weight(.semibold))
                             .foregroundColor(.secondary)
                             .frame(width: CatalogFilterSortSheetLayout.labelColumnWidth, alignment: .leading)
@@ -387,7 +387,7 @@ private struct FiltersToolsEditorSheet: View {
                             }
                         } label: {
                             HStack(spacing: DesignTokens.Spacing.xxs) {
-                                Text(selectedSortChoice?.label ?? "Select…")
+                                Text(selectedSortChoice?.label ?? tr("action_select_menu"))
                                     .lineLimit(1)
                                 Image(systemName: "chevron.up.chevron.down")
                                     .font(.caption2)
@@ -408,7 +408,7 @@ private struct FiltersToolsEditorSheet: View {
             .padding(.bottom, DesignTokens.Spacing.xl)
         }
         .background(Color.appBackground.ignoresSafeArea())
-        .stashyModalSheetChrome(isExisting ? "Edit filter" : "New filter", onBack: onDismiss) {
+        .stashyModalSheetChrome(isExisting ? tr("action_edit_filter") : tr("new_filter"), onBack: onDismiss) {
             HStack(spacing: DesignTokens.Spacing.xs) {
                 if isSaving {
                     ProgressView()
@@ -417,7 +417,7 @@ private struct FiltersToolsEditorSheet: View {
                     Button {
                         showSaveChoice = true
                     } label: {
-                        Text("Save")
+                        Text(tr("action_save"))
                             .font(.subheadline.weight(.semibold))
                             .foregroundColor(trimmedName.isEmpty || document.hasInvalidInput ? .white.opacity(0.4) : .white)
                             .modifier(StashyChromePillStyle(height: StashyExpandingDock.activeHeight))
@@ -426,24 +426,24 @@ private struct FiltersToolsEditorSheet: View {
                     // An invalid date / half-typed number would be dropped silently on save.
                     .disabled((trimmedName.isEmpty && !isExisting) || document.hasInvalidInput)
                     // Gleicher Speichern-Dialog wie in den Filter-Sheets und bei Merge Tags/Studios.
-                    .alert("Save filter", isPresented: $showSaveChoice) {
+                    .alert(tr("action_save_filter"), isPresented: $showSaveChoice) {
                         if isExisting {
-                            Button("Update \"\(filter?.name ?? trimmedName)\"") {
+                            Button(tr("action_update_arg", filter?.name ?? trimmedName)) {
                                 save(existingId: filter?.id, saveName: trimmedName)
                             }
                             .disabled(trimmedName.isEmpty)
                         } else {
-                            Button("Save") { save(existingId: nil, saveName: trimmedName) }
+                            Button(tr("action_save")) { save(existingId: nil, saveName: trimmedName) }
                                 .disabled(trimmedName.isEmpty)
                         }
-                        Button("Save as new") {
+                        Button(tr("action_save_as_new")) {
                             saveAsName = trimmedName.isEmpty ? "" : trimmedName + " copy"
                             showSaveAs = true
                         }
                         if isExisting {
-                            Button("Delete", role: .destructive) { showDelete = true }
+                            Button(tr("action_delete"), role: .destructive) { showDelete = true }
                         }
-                        Button("Cancel", role: .cancel) {}
+                        Button(tr("action_cancel"), role: .cancel) {}
                     }
                 }
             }
@@ -451,13 +451,13 @@ private struct FiltersToolsEditorSheet: View {
         .presentationDetents([.large])
         .presentationDragIndicator(.visible)
         .presentationBackground(Color.appBackground)
-        .alert("Save as new", isPresented: $showSaveAs) {
-            TextField("Name", text: $saveAsName)
-            Button("Save") { save(existingId: nil, saveName: saveAsName) }
-            Button("Cancel", role: .cancel) {}
+        .alert(tr("action_save_as_new"), isPresented: $showSaveAs) {
+            TextField(tr("name"), text: $saveAsName)
+            Button(tr("action_save")) { save(existingId: nil, saveName: saveAsName) }
+            Button(tr("action_cancel"), role: .cancel) {}
         }
-        .alert("Delete filter?", isPresented: $showDelete) {
-            Button("Delete", role: .destructive) {
+        .alert(tr("confirm_delete_filter"), isPresented: $showDelete) {
+            Button(tr("action_delete"), role: .destructive) {
                 guard let id = filter?.id else { return }
                 viewModel.destroySavedSceneFilter(id: id) { result in
                     switch result {
@@ -466,13 +466,13 @@ private struct FiltersToolsEditorSheet: View {
                         viewModel.fetchSavedFilters()
                         onDismiss()
                     case .failure(let error):
-                        ToastManager.shared.show("Delete failed: \(error.localizedDescription)", icon: "exclamationmark.triangle.fill", style: .error)
+                        ToastManager.shared.show(tr("action_delete_failed_arg", error.localizedDescription), icon: "exclamationmark.triangle.fill", style: .error)
                     }
                 }
             }
-            Button("Cancel", role: .cancel) {}
+            Button(tr("action_cancel"), role: .cancel) {}
         } message: {
-            Text(filter.map { "Delete “\($0.name)” from the server?" } ?? "")
+            Text(filter.map { tr("confirm_delete_arg_from_server", $0.name) } ?? "")
         }
     }
 
@@ -505,7 +505,7 @@ private struct FiltersToolsEditorSheet: View {
                     onDismiss()
                 }
             case .failure(let error):
-                ToastManager.shared.show("Save failed: \(error.localizedDescription)", icon: "exclamationmark.triangle.fill", style: .error)
+                ToastManager.shared.show(tr("action_save_failed_arg", error.localizedDescription), icon: "exclamationmark.triangle.fill", style: .error)
             }
         }
     }

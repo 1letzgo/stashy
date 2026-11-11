@@ -27,7 +27,7 @@ struct TVServerDetailView: View {
                     actionsSection(config: config)
                     detailsSection(config: config)
                 } else {
-                    Text("No server configured.")
+                    Text(tr("empty_server_configured"))
                         .font(.title3)
                         .foregroundStyle(.secondary)
                         .padding(.top, 60)
@@ -39,7 +39,7 @@ struct TVServerDetailView: View {
             .padding(.top, 40)
         }
         .background(TVThemeFill())
-        .navigationTitle(config?.name ?? "Server")
+        .navigationTitle(config?.name ?? tr("server"))
         // `force`: diese Seite hat eine frische VM — ein gedrosselter Check (andere
         // VMs haben schon getestet) liesse Status und Spinner für immer hängen.
         .onAppear {
@@ -80,7 +80,7 @@ struct TVServerDetailView: View {
                 .font(.title)
 
             VStack(alignment: .leading, spacing: 4) {
-                Text(isConnected ? "Connected" : "Not connected")
+                Text(isConnected ? tr("connected") : tr("not_connected"))
                     .font(.title3).fontWeight(.semibold)
                 Text(viewModel.serverStatus)
                     .font(.callout)
@@ -113,7 +113,7 @@ struct TVServerDetailView: View {
             } label: {
                 HStack(spacing: 10) {
                     if isTesting { ProgressView() } else { Image(systemName: "arrow.clockwise") }
-                    Text("Test Connection")
+                    Text(tr("action_test_connection"))
                 }
                 .padding(.horizontal, 18)
                 .padding(.vertical, 8)
@@ -124,12 +124,12 @@ struct TVServerDetailView: View {
 
     private func detailsSection(config: ServerConfig) -> some View {
         VStack(alignment: .leading, spacing: 16) {
-            row(label: "Protocol", value: config.serverProtocol.displayName)
-            row(label: "Address", value: config.serverAddress)
+            row(label: tr("protocol"), value: config.serverProtocol.displayName)
+            row(label: tr("address"), value: config.serverAddress)
             if let port = config.port, !port.isEmpty {
-                row(label: "Port", value: port)
+                row(label: tr("port"), value: port)
             }
-            row(label: "API Key", value: (config.secureApiKey?.isEmpty == false) ? "•••• configured" : "Not set")
+            row(label: tr("api_key"), value: (config.secureApiKey?.isEmpty == false) ? "•••• configured" : tr("not_set"))
         }
         .padding(20)
         .background(Color.white.opacity(0.05))

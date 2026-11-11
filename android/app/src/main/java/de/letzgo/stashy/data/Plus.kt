@@ -1,5 +1,7 @@
 package de.letzgo.stashy.data
 
+import de.letzgo.stashy.R
+import de.letzgo.stashy.tr
 import android.app.Activity
 import android.content.Context
 import android.content.Intent
@@ -42,8 +44,8 @@ object StashyPlusProduct {
     val tipIDs = listOf(TIP_SMALL, TIP_MEDIUM, TIP_LARGE)
 
     val displayNames = mapOf(
-        MONTHLY to "Monthly", YEARLY to "Yearly", LIFETIME to "Lifetime",
-        TIP_SMALL to "Small", TIP_MEDIUM to "Medium", TIP_LARGE to "Large",
+        MONTHLY to tr(R.string.monthly), YEARLY to tr(R.string.yearly), LIFETIME to tr(R.string.lifetime),
+        TIP_SMALL to tr(R.string.small), TIP_MEDIUM to tr(R.string.medium), TIP_LARGE to tr(R.string.large),
     )
     val sortOrder = mapOf(MONTHLY to 0, YEARLY to 1, LIFETIME to 2, TIP_SMALL to 0, TIP_MEDIUM to 1, TIP_LARGE to 2)
 }
@@ -55,7 +57,7 @@ enum class StashyPlusSource(val raw: String) {
     License("license");
 
     val statusTitle: String get() = when (this) {
-        None -> "Not unlocked"
+        None -> tr(R.string.not_unlocked)
         LocalDevelopment -> "stashy+ (Local Build)"
         License -> "stashy+ licensed"
         Subscription -> "stashy+ active"
@@ -63,11 +65,11 @@ enum class StashyPlusSource(val raw: String) {
     }
 
     val statusDetail: String get() = when (this) {
-        None -> "Subscribe or buy Lifetime to unlock premium features."
-        LocalDevelopment -> "Unlocked automatically because this is a debug build. Not active in any distributed build."
-        License -> "Unlocked with a license key."
-        Subscription -> "Thanks for supporting stashy."
-        Lifetime -> "Unlocked forever on this Google account."
+        None -> tr(R.string.hint_subscribe_or_buy_lifetime_to)
+        LocalDevelopment -> tr(R.string.hint_unlocked_automatically_because_this_is)
+        License -> tr(R.string.unlocked_with_license_key)
+        Subscription -> tr(R.string.thanks_for_supporting_stashy)
+        Lifetime -> tr(R.string.hint_unlocked_forever_on_this_google)
     }
 
     companion object { fun from(raw: String?) = entries.firstOrNull { it.raw == raw } ?: None }
@@ -192,16 +194,16 @@ object StashyPlus {
      * for the input field (the previous license, if any, stays active).
      */
     fun activateLicense(input: String): String? {
-        if (!BuildConfig.LICENSE_KEYS) return "License keys are not used in this version of stashy."
+        if (!BuildConfig.LICENSE_KEYS) return tr(R.string.hint_license_keys_are_not_used)
         return when (val result = LicenseKey.verify(input, System.currentTimeMillis())) {
             is LicenseKey.Result.Valid -> {
                 Prefs.commitString(LICENSE_KEY, input.trim())
                 license = result.license
                 recompute()
-                message = "stashy+ unlocked. Thank you!"
+                message = tr(R.string.stashy_plus_unlocked_thank_you)
                 null
             }
-            is LicenseKey.Result.Expired -> "This license key expired on ${result.license.expiresText}."
+            is LicenseKey.Result.Expired -> tr(R.string.hint_this_license_key_expired_on, result.license.expiresText)
             is LicenseKey.Result.Invalid -> result.reason
         }
     }
@@ -247,8 +249,8 @@ object StashyPlus {
             tipProducts = all.filter { it.productId in StashyPlusProduct.tipIDs }.sortedBy { StashyPlusProduct.sortOrder[it.productId] ?: 99 }
             val missing = StashyPlusProduct.allIDs - products.map { it.productId }.toSet()
             lastProductError = when {
-                products.isEmpty() -> "No stashy+ products returned. Install from the Play Store (internal testing) to load products."
-                missing.isNotEmpty() -> "Missing from the store offering: ${missing.sorted().joinToString(", ")}"
+                products.isEmpty() -> tr(R.string.hint_no_stashy_plus_products_returned_install)
+                missing.isNotEmpty() -> tr(R.string.hint_missing_from_store_offering_arg, missing.sorted().joinToString(", "))
                 else -> null
             }
         } catch (e: PurchasesException) {
@@ -296,23 +298,23 @@ object StashyPlus {
 
     /** Starts the Play purchase sheet (iOS: `StoreManager.purchase`). */
     fun purchase(activity: Activity, product: StashyStoreProduct) {
-        if (!Purchases.isConfigured) { message = "Google Play is not available."; return }
+        if (!Purchases.isConfigured) { message = tr(R.string.google_play_is_not_available); return }
         purchasingProductID = product.productId
         scope.launch {
             try {
                 val result = Purchases.sharedInstance.awaitPurchase(PurchaseParams.Builder(activity, product.pkg).build())
                 if (product.productId in StashyPlusProduct.tipIDs) {
                     Prefs.setInt(TIPS_COUNT_KEY, tipsCount + 1)
-                    message = "Thank you for your support! ❤️"
+                    message = tr(R.string.hint_thank_you_for_your_support)
                 } else {
                     apply(result.customerInfo)
-                    message = "stashy+ unlocked. Thank you!"
+                    message = tr(R.string.stashy_plus_unlocked_thank_you)
                 }
             } catch (e: PurchasesTransactionException) {
                 if (!e.userCancelled) message = when (e.code) {
-                    PurchasesErrorCode.PaymentPendingError -> "Purchase pending — it unlocks once payment completes."
-                    PurchasesErrorCode.ProductAlreadyPurchasedError -> { syncUnlockFromStore(); "You already own this." }
-                    else -> "Purchase failed: ${e.message}"
+                    PurchasesErrorCode.PaymentPendingError -> tr(R.string.hint_purchase_pending_it_unlocks_once)
+                    PurchasesErrorCode.ProductAlreadyPurchasedError -> { syncUnlockFromStore(); tr(R.string.you_already_own_this) }
+                    else -> tr(R.string.purchase_failed_arg, e.message)
                 }
             } finally {
                 purchasingProductID = null
@@ -330,7 +332,7 @@ object StashyPlus {
             } catch (_: PurchasesException) {
             }
             isRestoringPurchases = false
-            message = if (source == StashyPlusSource.Subscription || source == StashyPlusSource.Lifetime) "Purchases restored." else "No previous purchase found."
+            message = if (source == StashyPlusSource.Subscription || source == StashyPlusSource.Lifetime) tr(R.string.purchases_restored) else tr(R.string.empty_previous_purchase_found)
         }
     }
 

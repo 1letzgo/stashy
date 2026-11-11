@@ -27,12 +27,12 @@ struct HomeRecommendationsRowView: View {
             case .idle, .loading where engine.recommendations.isEmpty:
                 placeholder
             case .noHistory:
-                message("Watch a few scenes and stashy will suggest more like them here.")
+                message(tr("hint_watch_few_scenes_and_stashy"))
             case .failed(let text) where engine.recommendations.isEmpty:
                 message(text)
             default:
                 if engine.recommendations.isEmpty {
-                    message("Nothing new matches your taste right now. Try another setting in For You.")
+                    message(tr("hint_nothing_new_matches_your_taste"))
                 } else {
                     cards
                 }
@@ -134,7 +134,7 @@ struct HomeRecommendationsRowView: View {
             }
             .menuStyle(.button)
             .buttonStyle(.plain)
-            .accessibilityLabel("Adjust suggestions")
+            .accessibilityLabel(tr("adjust_suggestions"))
         }
         .dynamicTypeSize(...DynamicTypeSize.xLarge)
         .padding(.horizontal, 2)

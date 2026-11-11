@@ -1,5 +1,7 @@
 package de.letzgo.stashy.ui.player
 
+import de.letzgo.stashy.R
+import de.letzgo.stashy.tr
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -119,14 +121,14 @@ private fun NowPlayingContent(initial: Scene, onOpen: (de.letzgo.stashy.ui.Scree
     LaunchedEffect(Unit) { WatchlistStore.checkAgainstServer() }
     if (confirmClear) AlertDialog(
         onDismissRequest = { confirmClear = false },
-        title = { Text("Clear watchlist?") },
-        text = { Text("All scenes are removed from the watchlist. What plays keeps playing.") },
+        title = { Text(tr(R.string.confirm_clear_watchlist)) },
+        text = { Text(tr(R.string.hint_all_scenes_are_removed_from)) },
         confirmButton = {
             TextButton({ confirmClear = false; sorting = false; WatchlistStore.clear() }) {
-                Text("Clear", color = StashyColors.systemRed)
+                Text(tr(R.string.action_clear), color = StashyColors.systemRed)
             }
         },
-        dismissButton = { TextButton({ confirmClear = false }) { Text("Cancel") } },
+        dismissButton = { TextButton({ confirmClear = false }) { Text(tr(R.string.action_cancel)) } },
         containerColor = p.secondaryBackground, titleContentColor = p.text, textContentColor = p.secondaryText,
     )
     // Pinned to the sheet's width: nothing (a long title or description) may widen the content.
@@ -136,7 +138,7 @@ private fun NowPlayingContent(initial: Scene, onOpen: (de.letzgo.stashy.ui.Scree
             // minimizing is the sheet's swipe down (or system back).
             Row(Modifier.fillMaxWidth().padding(start = 4.dp, end = NowPlayingMargin), verticalAlignment = Alignment.CenterVertically) {
                 IconButton(onClick = { MiniPlayerStore.closeNowPlaying() }) {
-                    Icon(SF.xmark, "Close player", tint = p.text)
+                    Icon(SF.xmark, tr(R.string.action_close_player), tint = p.text)
                 }
                 Box(Modifier.weight(1f))
                 DetailsPill { onOpen(de.letzgo.stashy.ui.scene.SceneDetailScreen(scene.id, scene, openedFromMiniPlayer = true)) }
@@ -152,25 +154,25 @@ private fun NowPlayingContent(initial: Scene, onOpen: (de.letzgo.stashy.ui.Scree
                 // row, next, the bar) — never a separately kept list that could drift.
                 item(key = "playing-header") {
                     Row(Modifier.fillMaxWidth().height(48.dp).padding(start = NowPlayingMargin, top = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-                        Text("Now Playing", Modifier.weight(1f), style = IosTypography.headline, color = p.text)
+                        Text(tr(R.string.now_playing), Modifier.weight(1f), style = IosTypography.headline, color = p.text)
                     }
                 }
                 playingRows(listOf(scene), scene.id, NowPlayingMargin) { MiniPlayerStore.showInNowPlaying(it) }
                 item(key = "header") {
                     // Plain list header on the sheet background: "Watchlist" + red Clear + Sort / Done.
                     Row(Modifier.fillMaxWidth().heightIn(min = 48.dp).padding(start = NowPlayingMargin, top = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-                        Text("Watchlist", Modifier.weight(1f), style = IosTypography.headline, color = p.text)
+                        Text(tr(R.string.watchlist), Modifier.weight(1f), style = IosTypography.headline, color = p.text)
                         if (watchlist.isNotEmpty()) TextButton(onClick = { confirmClear = true }) {
-                            Text("Clear", color = StashyColors.systemRed, fontWeight = FontWeight.SemiBold)
+                            Text(tr(R.string.action_clear), color = StashyColors.systemRed, fontWeight = FontWeight.SemiBold)
                         }
                         if (watchlist.isNotEmpty()) TextButton(onClick = { sorting = !sorting }) {
-                            Text(if (sorting) "Done" else "Sort", color = de.letzgo.stashy.ui.textAccent(), fontWeight = FontWeight.SemiBold)
+                            Text(if (sorting) tr(R.string.action_done) else tr(R.string.action_sort), color = de.letzgo.stashy.ui.textAccent(), fontWeight = FontWeight.SemiBold)
                         }
                     }
                 }
                 if (watchlist.isEmpty()) item(key = "empty") {
                     Text(
-                        "Add scenes with + on a playing scene or the watchlist button on a scene page. They play here one after another.",
+                        tr(R.string.hint_add_scenes_with_plus_on),
                         Modifier.padding(horizontal = NowPlayingMargin, vertical = 8.dp), fontSize = 13.sp, color = p.secondaryText,
                     )
                 } else watchlistRows(watchlist.toList(), scene.id, drag, NowPlayingMargin, sorting) { MiniPlayerStore.showInNowPlaying(it) }
@@ -209,10 +211,10 @@ private fun InfoRow(scene: Scene, onOpen: (de.letzgo.stashy.ui.Screen) -> Unit) 
             }
         }
         MiniPlayerStore.previousScene(scene.id)?.let { previous ->
-            CircleAction(Icons.Filled.SkipPrevious, "Previous") { MiniPlayerStore.showInNowPlaying(previous) }
+            CircleAction(Icons.Filled.SkipPrevious, tr(R.string.previous)) { MiniPlayerStore.showInNowPlaying(previous) }
         }
         MiniPlayerStore.nextScene(scene.id)?.let { next ->
-            CircleAction(Icons.Filled.SkipNext, "Next") { MiniPlayerStore.showInNowPlaying(next) }
+            CircleAction(Icons.Filled.SkipNext, tr(R.string.next)) { MiniPlayerStore.showInNowPlaying(next) }
         }
     }
 }
@@ -222,12 +224,12 @@ private fun InfoRow(scene: Scene, onOpen: (de.letzgo.stashy.ui.Screen) -> Unit) 
 private fun DetailsPill(onClick: () -> Unit) {
     Row(
         Modifier.height(32.dp).clip(RoundedCornerShape(50)).background(Appearance.tint.copy(alpha = 0.15f))
-            .clickable(onClickLabel = "Open the scene page", onClick = onClick).padding(horizontal = 12.dp),
+            .clickable(onClickLabel = tr(R.string.action_open_scene_page), onClick = onClick).padding(horizontal = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(5.dp),
     ) {
         Icon(Icons.Outlined.Info, null, tint = Appearance.tint, modifier = Modifier.size(16.dp))
-        Text("Details", fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = de.letzgo.stashy.ui.textAccent(), maxLines = 1)
+        Text(tr(R.string.details), fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = de.letzgo.stashy.ui.textAccent(), maxLines = 1)
     }
 }
 

@@ -1,5 +1,7 @@
 package de.letzgo.stashy.ui.settings
 
+import de.letzgo.stashy.R
+import de.letzgo.stashy.tr
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Column
@@ -57,7 +59,7 @@ fun rememberSettingsTransfer(onImported: () -> Unit = {}): Pair<SettingsTransfer
                         ?: error("Could not write the file.")
                 }
                 null
-            }.getOrElse { it.message ?: "Export failed." }
+            }.getOrElse { it.message ?: tr(R.string.error_export) }
         }
     }
     val importer = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
@@ -70,8 +72,8 @@ fun rememberSettingsTransfer(onImported: () -> Unit = {}): Pair<SettingsTransfer
                 val summary = SettingsTransfer.importFile(text)
                 Appearance.reload()
                 onImported()
-                "Imported ${summary.servers} server(s) and ${summary.settings} setting(s). Restart stashy to apply every setting."
-            }.getOrElse { it.message ?: "Import failed." }
+                tr(R.string.hint_imported_arg_server_s_and, summary.servers, summary.settings)
+            }.getOrElse { it.message ?: tr(R.string.error_import) }
         }
     }
     return state to SettingsTransferLaunchers(
@@ -89,36 +91,36 @@ fun SettingsTransferDialogs(state: SettingsTransferState, launchers: SettingsTra
     if (state.showsSecretsChoice) AlertDialog(
         onDismissRequest = { state.showsSecretsChoice = false },
         containerColor = p.secondaryBackground, titleContentColor = p.text, textContentColor = p.secondaryText,
-        title = { Text("Include API keys?", style = NativeType.headlineSmall) },
+        title = { Text(tr(R.string.confirm_include_api_keys), style = NativeType.headlineSmall) },
         text = {
             Column(Modifier.fillMaxWidth()) {
-                Text("With API keys the file gives full access to your servers. Keep it private.", style = NativeType.bodyMedium)
+                Text(tr(R.string.hint_with_api_keys_file_gives), style = NativeType.bodyMedium)
                 TextButton({ state.showsSecretsChoice = false; launchers.export(false) }) {
-                    Text("Without API keys", color = de.letzgo.stashy.ui.textAccent(), style = NativeType.labelLarge)
+                    Text(tr(R.string.without_api_keys), color = de.letzgo.stashy.ui.textAccent(), style = NativeType.labelLarge)
                 }
                 TextButton({ state.showsSecretsChoice = false; launchers.export(true) }) {
-                    Text("With API keys and headers", color = de.letzgo.stashy.ui.textAccent(), style = NativeType.labelLarge)
+                    Text(tr(R.string.with_api_keys_and_headers), color = de.letzgo.stashy.ui.textAccent(), style = NativeType.labelLarge)
                 }
             }
         },
         confirmButton = {},
-        dismissButton = { TextButton({ state.showsSecretsChoice = false }) { Text("Cancel", color = de.letzgo.stashy.ui.textAccent(), style = NativeType.labelLarge) } },
+        dismissButton = { TextButton({ state.showsSecretsChoice = false }) { Text(tr(R.string.action_cancel), color = de.letzgo.stashy.ui.textAccent(), style = NativeType.labelLarge) } },
     )
     state.resultMessage?.let { message ->
-        NativeConfirmDialog("Settings", message, onDismiss = { state.resultMessage = null }, dismissLabel = null)
+        NativeConfirmDialog(tr(R.string.settings), message, onDismiss = { state.resultMessage = null }, dismissLabel = null)
     }
 }
 
 /** Settings main page: "Backup & Transfer" section. */
 fun androidx.compose.foundation.lazy.LazyListScope.settingsTransferSection() {
     settingsSection(
-        header = "Backup & Transfer", key = "settings-transfer",
-        footer = "Servers, settings, default filters, dashboard and tabs as one JSON file — imports on iPhone, iPad, Mac and Android.",
+        header = tr(R.string.backup_and_transfer), key = "settings-transfer",
+        footer = tr(R.string.hint_servers_settings_default_filters_dashboard),
     ) {
         val (state, launchers) = rememberSettingsTransfer()
-        NativeListItem("Export Settings", icon = Icons.Outlined.FileUpload, onClick = { state.showsSecretsChoice = true })
+        NativeListItem(tr(R.string.action_export_settings), icon = Icons.Outlined.FileUpload, onClick = { state.showsSecretsChoice = true })
         SettingsDivider()
-        NativeListItem("Import Settings", icon = Icons.Outlined.FileDownload, onClick = launchers.import)
+        NativeListItem(tr(R.string.action_import_settings), icon = Icons.Outlined.FileDownload, onClick = launchers.import)
         SettingsTransferDialogs(state, launchers)
     }
 }

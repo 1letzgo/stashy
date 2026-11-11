@@ -1,5 +1,7 @@
 package de.letzgo.stashy.ui.tools.magazine
 
+import de.letzgo.stashy.R
+import de.letzgo.stashy.tr
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -62,7 +64,7 @@ import de.letzgo.stashy.ui.SF
 import de.letzgo.stashy.ui.Theme
 import de.letzgo.stashy.ui.components.SelectChip
 
-private enum class PagePickerMode(val title: String) { Chapters("Chapters"), Pages("Pages") }
+private enum class PagePickerMode(val title: String) { Chapters(tr(R.string.chapters)), Pages(tr(R.string.pages)) }
 
 /** iOS: `MagazinePagePickerSheet` — by number, from the page list, or by chapter when there are any. */
 @OptIn(ExperimentalMaterial3Api::class)
@@ -85,7 +87,7 @@ internal fun MagazinePagePickerSheet(
     }
     ModalBottomSheet(onDismissRequest = onDismiss, containerColor = p.background) {
         Column(Modifier.fillMaxHeight().navigationBarsPadding().imePadding()) {
-            NativeSheetTopBar("Go to page", onDismiss)
+            NativeSheetTopBar(tr(R.string.action_go_to_page), onDismiss)
             Row(
                 Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -93,10 +95,10 @@ internal fun MagazinePagePickerSheet(
             ) {
                 NativeTextField(
                     input, { value -> input = value.filter(Char::isDigit) }, null, Modifier.weight(1f),
-                    placeholder = "Page (1–${pages.size})", keyboard = KeyboardType.Number, leadingIcon = SF.number,
+                    placeholder = tr(R.string.page_1_arg, pages.size), keyboard = KeyboardType.Number, leadingIcon = SF.number,
                     imeAction = ImeAction.Go, keyboardActions = KeyboardActions(onGo = { entered?.let(::select) }),
                 )
-                NativeTonalButton("Go", enabled = entered != null) { entered?.let(::select) }
+                NativeTonalButton(tr(R.string.action_go), enabled = entered != null) { entered?.let(::select) }
             }
             if (chapters.isNotEmpty()) {
                 Row(Modifier.padding(horizontal = 16.dp, vertical = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -121,7 +123,7 @@ internal fun MagazinePagePickerSheet(
                             val page = MagazineLogic.chapterPage(chapter, pages.size)
                             PickerRow(chapter.id == currentChapterId, { select(page) }) {
                                 Text(chapter.title, Modifier.weight(1f), style = NativeType.bodyMedium, color = p.text, maxLines = 2, overflow = TextOverflow.Ellipsis)
-                                Text("Page ${page + 1}", style = NativeType.bodySmall, color = p.secondaryText)
+                                Text(tr(R.string.page_arg, page + 1), style = NativeType.bodySmall, color = p.secondaryText)
                             }
                         }
                         PagePickerMode.Pages -> itemsIndexed(pages, key = { _, it -> it.id }) { index, image ->
@@ -131,7 +133,7 @@ internal fun MagazinePagePickerSheet(
                                     Modifier.size(width = 36.dp, height = 50.dp).clip(RoundedCornerShape(4.dp)).background(Color.Gray.copy(alpha = 0.2f)),
                                     contentScale = ContentScale.Crop,
                                 )
-                                Text("Page ${index + 1}", Modifier.weight(1f), style = NativeType.bodyMedium, color = p.text)
+                                Text(tr(R.string.page_arg, index + 1), Modifier.weight(1f), style = NativeType.bodyMedium, color = p.text)
                             }
                         }
                     }
@@ -151,7 +153,7 @@ private fun PickerRow(isCurrent: Boolean, onClick: () -> Unit, content: @Composa
         verticalAlignment = Alignment.CenterVertically,
     ) {
         content()
-        if (isCurrent) Icon(SF.checkmark, "Current", Modifier.size(16.dp), tint = Appearance.tint)
+        if (isCurrent) Icon(SF.checkmark, tr(R.string.current), Modifier.size(16.dp), tint = Appearance.tint)
         else Spacer(Modifier.size(16.dp))
     }
 }
@@ -163,26 +165,26 @@ internal fun MagazineDetailsSheet(gallery: Gallery, tags: List<IdName>, pageCoun
     val p = Theme.palette
     ModalBottomSheet(onDismissRequest = onDismiss, containerColor = p.background) {
         Column(Modifier.navigationBarsPadding()) {
-            NativeSheetTopBar("Details", onDismiss)
+            NativeSheetTopBar(tr(R.string.details), onDismiss)
             Column(
                 Modifier.verticalScroll(rememberScrollState()).padding(start = 16.dp, end = 16.dp, top = 4.dp, bottom = 16.dp),
                 verticalArrangement = Arrangement.spacedBy(16.dp),
             ) {
                 DetailsCard {
                     Text(gallery.displayTitle, style = NativeType.titleMedium, color = p.text)
-                    Fact("Pages", "$pageCount")
-                    if (chapterCount > 0) Fact("Chapters", "$chapterCount")
-                    gallery.studio?.name?.takeIf { it.isNotEmpty() }?.let { Fact("Studio", it) }
-                    gallery.date?.takeIf { it.isNotEmpty() }?.let { Fact("Date", it) }
-                    gallery.rating100?.let { Fact("Rating", MagazineLogic.ratingLabel(it)) }
+                    Fact(tr(R.string.pages), "$pageCount")
+                    if (chapterCount > 0) Fact(tr(R.string.chapters), "$chapterCount")
+                    gallery.studio?.name?.takeIf { it.isNotEmpty() }?.let { Fact(tr(R.string.studio), it) }
+                    gallery.date?.takeIf { it.isNotEmpty() }?.let { Fact(tr(R.string.date), it) }
+                    gallery.rating100?.let { Fact(tr(R.string.rating), MagazineLogic.ratingLabel(it)) }
                 }
                 gallery.performers?.takeIf { it.isNotEmpty() }?.let { performers ->
-                    DetailsSection("Performers") {
+                    DetailsSection(tr(R.string.performers)) {
                         Text(performers.joinToString(", ") { it.name }, style = NativeType.bodyMedium, color = p.text)
                     }
                 }
                 if (tags.isNotEmpty()) {
-                    DetailsSection("Tags") {
+                    DetailsSection(tr(R.string.tags)) {
                         FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                             tags.forEach { tag ->
                                 Box(Modifier.clip(CircleShape).background(p.background).padding(horizontal = 10.dp, vertical = 5.dp)) {
@@ -193,7 +195,7 @@ internal fun MagazineDetailsSheet(gallery: Gallery, tags: List<IdName>, pageCoun
                     }
                 }
                 gallery.details?.takeIf { it.isNotEmpty() }?.let { details ->
-                    DetailsSection("Details") { Text(details, style = NativeType.bodyMedium, color = p.text) }
+                    DetailsSection(tr(R.string.details)) { Text(details, style = NativeType.bodyMedium, color = p.text) }
                 }
             }
         }

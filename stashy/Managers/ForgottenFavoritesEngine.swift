@@ -22,17 +22,17 @@ enum ForgottenFavoritesRanking: String, CaseIterable, Identifiable {
 
     var title: String {
         switch self {
-        case .plays: return "Plays"
-        case .oCount: return "O-Count"
-        case .both: return "Both"
+        case .plays: return tr("play_count")
+        case .oCount: return tr("o_count")
+        case .both: return tr("both")
         }
     }
 
     var detail: String {
         switch self {
-        case .plays: return "Favorites are your most played scenes."
-        case .oCount: return "Favorites are your scenes with the highest O-Count."
-        case .both: return "Favorites are your most played scenes and those with the highest O-Count."
+        case .plays: return tr("hint_favorites_are_your_most_played")
+        case .oCount: return tr("hint_favorites_are_your_scenes_with")
+        case .both: return tr("hint_favorites_are_your_most_played_scenes")
         }
     }
 }
@@ -52,12 +52,12 @@ struct ForgottenFavorite: Identifiable, Equatable {
 
     /// Below the card: how long it has been.
     var label: String {
-        guard let lastPlayed else { return plays == 0 ? "Never played" : "Not played in a long time" }
+        guard let lastPlayed else { return plays == 0 ? tr("never_played") : tr("hint_not_played_in_long_time") }
         let days = max(0, Calendar.current.dateComponents([.day], from: lastPlayed, to: Date()).day ?? 0)
         switch days {
-        case ..<60: return "Last played \(days) days ago"
-        case ..<730: return "Last played \(days / 30) months ago"
-        default: return "Last played \(days / 365) years ago"
+        case ..<60: return tr("last_played_arg_days_ago", days)
+        case ..<730: return tr("last_played_arg_months_ago", days / 30)
+        default: return tr("last_played_arg_years_ago", days / 365)
         }
     }
 }

@@ -1,5 +1,7 @@
 package de.letzgo.stashy.data
 
+import de.letzgo.stashy.R
+import de.letzgo.stashy.tr
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonArray
@@ -13,25 +15,25 @@ import java.util.UUID
 /** iOS: `AppTab` (raw values identical). */
 @Serializable
 enum class AppTab(val title: String) {
-    @SerialName("dashboard") Dashboard("Dashboard"),
-    @SerialName("studios") Studios("Studios"),
-    @SerialName("performers") Performers("Performers"),
-    @SerialName("scenes") Scenes("Scenes"),
-    @SerialName("galleries") Galleries("Galleries"),
-    @SerialName("tags") Tags("Tags"),
-    @SerialName("media") Media("Media"),
-    @SerialName("catalogue") Catalogue("Home"),
-    @SerialName("downloads") Downloads("Downloads"),
-    @SerialName("tools") Tools("Tools"),
+    @SerialName("dashboard") Dashboard(tr(R.string.dashboard)),
+    @SerialName("studios") Studios(tr(R.string.studios)),
+    @SerialName("performers") Performers(tr(R.string.performers)),
+    @SerialName("scenes") Scenes(tr(R.string.scenes)),
+    @SerialName("galleries") Galleries(tr(R.string.galleries)),
+    @SerialName("tags") Tags(tr(R.string.tags)),
+    @SerialName("media") Media(tr(R.string.media)),
+    @SerialName("catalogue") Catalogue(tr(R.string.home)),
+    @SerialName("downloads") Downloads(tr(R.string.downloads)),
+    @SerialName("tools") Tools(tr(R.string.tools)),
     @SerialName("stashyPlus") StashyPlus("stashy+"),
-    @SerialName("reels") Reels("Feeds"),
-    @SerialName("search") Search("Search"),
-    @SerialName("settings") Settings("Settings"),
-    @SerialName("images") Images("Images"),
-    @SerialName("groups") Groups("Groups"),
-    @SerialName("markers") Markers("Markers"),
+    @SerialName("reels") Reels(tr(R.string.feeds)),
+    @SerialName("search") Search(tr(R.string.search)),
+    @SerialName("settings") Settings(tr(R.string.settings)),
+    @SerialName("images") Images(tr(R.string.images)),
+    @SerialName("groups") Groups(tr(R.string.groups)),
+    @SerialName("markers") Markers(tr(R.string.markers)),
     @SerialName("stashline") Stashline("StashLine"),
-    @SerialName("magazine") Magazine("Magazin");
+    @SerialName("magazine") Magazine(tr(R.string.magazin));
 
     /** Raw value as stored by iOS. */
     val raw: String get() = name.replaceFirstChar { it.lowercase() }.let { if (this == StashyPlus) "stashyPlus" else it }
@@ -74,28 +76,28 @@ data class TabConfig(
 /** iOS: `HomeRowType` (raw values and default titles identical). */
 @Serializable
 enum class HomeRowType(val defaultTitle: String) {
-    @SerialName("lastPlayed") LastPlayed("Scenes - Last Played"),
-    @SerialName("lastAdded3Min") LastAdded3Min("Scenes - Recently Added"),
-    @SerialName("newest3Min") Newest3Min("Scenes - New"),
-    @SerialName("mostViewed3Min") MostViewed3Min("Scenes - Most Viewed"),
-    @SerialName("topCounter3Min") TopCounter3Min("Scenes - Top Counter"),
-    @SerialName("topRating3Min") TopRating3Min("Scenes - Top Rated"),
-    @SerialName("random") Random("Scenes - Random"),
-    @SerialName("statistics") Statistics("Statistics"),
-    @SerialName("newPerformers") NewPerformers("Performers - New"),
-    @SerialName("performersHighestSceneCount") PerformersHighestSceneCount("Performers - Top"),
-    @SerialName("newStudios") NewStudios("Studios - New"),
-    @SerialName("studiosHighestSceneCount") StudiosHighestSceneCount("Studios - Top"),
-    @SerialName("newGalleries") NewGalleries("Galleries - New"),
-    @SerialName("recentlyUpdatedGalleries") RecentlyUpdatedGalleries("Galleries - Recently Updated"),
-    @SerialName("performersHighestOCount") PerformersHighestOCount("Performers - Counter"),
-    @SerialName("performersHighestRating") PerformersHighestRating("Performers - Rating"),
-    @SerialName("galleriesHighestImageCount") GalleriesHighestImageCount("Galleries - Image Count"),
-    @SerialName("channels") Channels("Channels"),
+    @SerialName("lastPlayed") LastPlayed(tr(R.string.scenes_last_played)),
+    @SerialName("lastAdded3Min") LastAdded3Min(tr(R.string.scenes_recently_added)),
+    @SerialName("newest3Min") Newest3Min(tr(R.string.scenes_new)),
+    @SerialName("mostViewed3Min") MostViewed3Min(tr(R.string.scenes_most_viewed)),
+    @SerialName("topCounter3Min") TopCounter3Min(tr(R.string.scenes_top_counter)),
+    @SerialName("topRating3Min") TopRating3Min(tr(R.string.scenes_top_rated)),
+    @SerialName("random") Random(tr(R.string.scenes_random)),
+    @SerialName("statistics") Statistics(tr(R.string.statistics)),
+    @SerialName("newPerformers") NewPerformers(tr(R.string.performers_new)),
+    @SerialName("performersHighestSceneCount") PerformersHighestSceneCount(tr(R.string.performers_top)),
+    @SerialName("newStudios") NewStudios(tr(R.string.studios_new)),
+    @SerialName("studiosHighestSceneCount") StudiosHighestSceneCount(tr(R.string.studios_top)),
+    @SerialName("newGalleries") NewGalleries(tr(R.string.galleries_new)),
+    @SerialName("recentlyUpdatedGalleries") RecentlyUpdatedGalleries(tr(R.string.galleries_recently_updated)),
+    @SerialName("performersHighestOCount") PerformersHighestOCount(tr(R.string.performers_counter)),
+    @SerialName("performersHighestRating") PerformersHighestRating(tr(R.string.performers_rating)),
+    @SerialName("galleriesHighestImageCount") GalleriesHighestImageCount(tr(R.string.galleries_image_count)),
+    @SerialName("channels") Channels(tr(R.string.channels)),
     /** stashy+: "For You" — scenes picked from the user's own watch history (iOS `.recommendations`). */
-    @SerialName("recommendations") Recommendations("Scenes - For You"),
+    @SerialName("recommendations") Recommendations(tr(R.string.scenes_for_you)),
     /** stashy+: top played / O-Counted scenes not played for a while (iOS `.forgottenFavorites`). */
-    @SerialName("forgottenFavorites") ForgottenFavorites("Scenes - Forgotten Favorites");
+    @SerialName("forgottenFavorites") ForgottenFavorites(tr(R.string.scenes_forgotten_favorites));
 
     /** iOS `requiresStashyPlus`: rows hidden from Home and Settings while locked. */
     val requiresStashyPlus get() = this == Channels || this == Recommendations || this == ForgottenFavorites
@@ -119,8 +121,8 @@ data class HomeRowConfig(
 /** iOS: `HomeChannelSourceKind`. */
 @Serializable
 enum class HomeChannelSourceKind(val title: String) {
-    @SerialName("scenes") Scenes("Scenes"),
-    @SerialName("clips") Clips("Clips");
+    @SerialName("scenes") Scenes(tr(R.string.scenes)),
+    @SerialName("clips") Clips(tr(R.string.clips));
     val raw get() = name.lowercase()
 }
 
@@ -138,13 +140,13 @@ data class HomeChannelItemConfig(
 /** iOS: `ReelsModeType`. */
 @Serializable
 enum class ReelsModeType(val defaultTitle: String) {
-    @SerialName("scenes") Scenes("Scenes"),
-    @SerialName("markers") Markers("Markers"),
-    @SerialName("clips") Clips("Clips"),
-    @SerialName("previews") Previews("Previews"),
-    @SerialName("pics") Pics("Pics"),
+    @SerialName("scenes") Scenes(tr(R.string.scenes)),
+    @SerialName("markers") Markers(tr(R.string.markers)),
+    @SerialName("clips") Clips(tr(R.string.clips)),
+    @SerialName("previews") Previews(tr(R.string.previews)),
+    @SerialName("pics") Pics(tr(R.string.pics)),
     /** stashy+: the Scenes feed with its filter preset to portrait videos (iOS `.verticals`). */
-    @SerialName("verticals") Verticals("Verticals");
+    @SerialName("verticals") Verticals(tr(R.string.verticals));
 
     /** Feed modes behind stashy+. */
     val requiresStashyPlus: Boolean get() = this == Verticals
@@ -173,13 +175,13 @@ data class ReelsModeConfig(
 
 /** iOS: `DetailViewContext` (raw values are the persisted key parts). */
 enum class DetailViewContext(val raw: String, val title: String) {
-    Performer("performer_detail", "Performer Scenes"),
-    Studio("studio_detail", "Studio Scenes"),
-    Tag("tag_detail", "Tag Scenes"),
-    Gallery("gallery_detail", "Gallery Images"),
-    Group("group_detail", "Group Scenes");
+    Performer("performer_detail", tr(R.string.performer_scenes)),
+    Studio("studio_detail", tr(R.string.studio_scenes)),
+    Tag("tag_detail", tr(R.string.tag_scenes)),
+    Gallery("gallery_detail", tr(R.string.gallery_images)),
+    Group("group_detail", tr(R.string.group_scenes));
 
-    val settingsRowTitle: String get() = if (this == Gallery) "Images Sort" else "Scenes Sort"
+    val settingsRowTitle: String get() = if (this == Gallery) tr(R.string.images_sort) else tr(R.string.scenes_sort)
 
     companion object {
         fun fromRaw(raw: String?): DetailViewContext? = entries.firstOrNull { it.raw == raw }
@@ -380,7 +382,7 @@ object TabConfigLogic {
 
     /** iOS `TabManager.playCountThresholdLabel`. */
     fun playCountThresholdLabel(seconds: Double): String = when {
-        seconds == 0.0 -> "Immediately"
+        seconds == 0.0 -> tr(R.string.immediately)
         seconds < 60 -> "${seconds.toInt()} s"
         else -> "${(seconds / 60).toInt()} min"
     }

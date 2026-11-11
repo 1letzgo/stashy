@@ -23,6 +23,8 @@ struct MainTabView: View {
     @State private var showConfigWarning = false
     @State private var showOnboarding = false
     @State private var warningType: ConfigWarningType = .none
+    /// A language change rebuilds the tab content (not the sheets: the setup wizard stays open).
+    @ObservedObject private var languageStore = AppLanguageStore.shared
 
     enum ConfigWarningType {
         case none
@@ -88,7 +90,7 @@ struct MainTabView: View {
                     }
                 }
 
-                Tab("Search", systemImage: "magnifyingglass", value: AppTab.search, role: .search) {
+                Tab(tr("search"), systemImage: "magnifyingglass", value: AppTab.search, role: .search) {
                     UniversalSearchView()
                         .applyAppBackground()
                         .tint(appearanceManager.tintColor)
@@ -104,6 +106,7 @@ struct MainTabView: View {
             // Collapsing the tab bar is decided there: only with something in the accessory slot.
             .modifier(MiniPlayerHost(hidden: coordinator.selectedTab == .reels, selectedTab: coordinator.selectedTab))
             #endif
+            .id(languageStore.revision)
             .onAppear {
                 ServerConfigManager.shared.scrubPlaintextAPIKeysFromDisk()
                 checkConfiguration()
@@ -173,30 +176,30 @@ struct MainTabView: View {
             switch warningType {
             case .noServer:
                 return Alert(
-                    title: Text("Welcome to stashy"),
-                    message: Text("Please configure your Stash server to get started."),
-                    dismissButton: .default(Text("Go to Settings")) {
+                    title: Text(tr("welcome_to_stashy")),
+                    message: Text(tr("hint_please_configure_your_stash_server")),
+                    dismissButton: .default(Text(tr("action_go_to_settings"))) {
                         coordinator.selectedTab = .settings
                     }
                 )
             case .invalidConfig:
                 return Alert(
-                    title: Text("Incomplete Setup"),
-                    message: Text("Your server configuration is missing some details."),
-                    dismissButton: .default(Text("Check Settings")) {
+                    title: Text(tr("incomplete_setup")),
+                    message: Text(tr("hint_your_server_configuration_is_missing")),
+                    dismissButton: .default(Text(tr("check_settings"))) {
                         coordinator.selectedTab = .settings
                     }
                 )
             case .authExpired:
                 return Alert(
-                    title: Text("Authentication Required"),
-                    message: Text("Your API key is invalid or expired. Please check your server configuration."),
-                    dismissButton: .default(Text("Update API Key")) {
+                    title: Text(tr("authentication_required")),
+                    message: Text(tr("hint_your_api_key_is_invalid")),
+                    dismissButton: .default(Text(tr("action_update_api_key"))) {
                         coordinator.selectedTab = .settings
                     }
                 )
             default:
-                return Alert(title: Text("Error"))
+                return Alert(title: Text(tr("error_generic")))
             }
         }
         .preferredColorScheme(appearanceManager.preferredTheme.colorScheme)
@@ -334,7 +337,7 @@ struct ToolsView: View {
 
     enum ToolsTab: String, CaseIterable {
         case overview = "Overview"
-        case oCount = "O-Count"
+        case oCount = "O Count"
         case timeline = "Timeline"
         case topLists = "Charts"
         case hotOrNot = "Match"
@@ -355,11 +358,13 @@ struct ToolsView: View {
     /// Fixed grouping and order. Previously this came from the user's Tools settings, but a
     /// hand-sorted flat list stopped being a good way in once Tools grew — the grid needs stable
     /// categories, so the order is part of the design now rather than a setting.
-    static let toolGroups: [(title: String, tools: [ToolsTab])] = [
+    static var toolGroups: [(title: String, tools: [ToolsTab])] {
+[
         // Downloads and the watchlist are not tools any more: the Dashboard row opens them.
-        ("Insights", [.overview, .topLists, .oCount, .timeline]),
-        ("Discover", [.hotOrNot, .rateMe])
+        (tr("insights"), [.overview, .topLists, .oCount, .timeline]),
+        (tr("discover"), [.hotOrNot, .rateMe])
     ]
+    }
 
     private var visibleToolGroups: [(title: String, tools: [ToolsTab])] { Self.toolGroups }
 
@@ -530,7 +535,7 @@ struct ToolsBreadcrumbRow<Trailing: View>: View {
                 .contentShape(Circle())
         }
         .buttonStyle(.plain)
-        .accessibilityLabel("Tools")
+        .accessibilityLabel(tr("tools"))
         .accessibilityAddTraits(onRoot ? .isSelected : [])
     }
 
@@ -539,7 +544,7 @@ struct ToolsBreadcrumbRow<Trailing: View>: View {
     private func toolMenu(_ current: ToolsView.ToolsTab?) -> some View {
         Menu {
             if let current {
-                Picker("Tool", selection: Binding(get: { current }, set: { onSelect($0) })) {
+                Picker(tr("tool"), selection: Binding(get: { current }, set: { onSelect($0) })) {
                     ForEach(tools, id: \.self) { tool in
                         Label(tool.rawValue, systemImage: tool.icon).tag(tool)
                     }
@@ -556,7 +561,7 @@ struct ToolsBreadcrumbRow<Trailing: View>: View {
             }
         } label: {
             HStack(spacing: 6) {
-                Text(current?.rawValue ?? "Tools")
+                Text(current?.rawValue ?? tr("tools"))
                     .font(.subheadline.weight(.semibold))
                     .lineLimit(1)
                     .minimumScaleFactor(0.8)
@@ -574,7 +579,7 @@ struct ToolsBreadcrumbRow<Trailing: View>: View {
         .menuIndicator(.hidden)
         .stashyNeutralMenuItems()
         .fixedSize()
-        .accessibilityLabel(current.map { "Tool, \($0.rawValue)" } ?? "Tools")
+        .accessibilityLabel(current.map { "Tool, \($0.rawValue)" } ?? tr("tools"))
     }
 }
 
@@ -865,23 +870,23 @@ struct ToolsServerView: View {
 
     private var generateOptions: [GenerateOption] {
         var options: [GenerateOption] = [
-            .init(id: "covers", label: "Covers", icon: "photo.fill") { $0.triggerGenerate(covers: true, completion: $1) },
-            .init(id: "previews", label: "Video Previews", icon: "play.rectangle.fill") { $0.triggerGenerate(previews: true, completion: $1) },
+            .init(id: "covers", label: tr("covers"), icon: "photo.fill") { $0.triggerGenerate(covers: true, completion: $1) },
+            .init(id: "previews", label: tr("video_previews"), icon: "play.rectangle.fill") { $0.triggerGenerate(previews: true, completion: $1) },
             // Stash only renders these inside the video preview task (see triggerGenerate).
-            .init(id: "imagePreviews", label: "Animated Image Previews", icon: "photo.on.rectangle.angled") { $0.triggerGenerate(imagePreviews: true, completion: $1) },
-            .init(id: "sprites", label: "Scrubber Sprites", icon: "square.grid.3x3.fill") { $0.triggerGenerate(sprites: true, completion: $1) },
-            .init(id: "markers", label: "Marker Previews", icon: "mappin.and.ellipse") { $0.triggerGenerate(markers: true, completion: $1) },
-            .init(id: "markerImagePreviews", label: "Marker Animated Image Previews", icon: "mappin.and.ellipse.circle.fill") { $0.triggerGenerate(markerImagePreviews: true, completion: $1) },
-            .init(id: "markerScreenshots", label: "Marker Screenshots", icon: "camera.fill") { $0.triggerGenerate(markerScreenshots: true, completion: $1) },
-            .init(id: "transcodes", label: "Transcodes", icon: "film.stack") { $0.triggerGenerate(transcodes: true, completion: $1) },
-            .init(id: "phashes", label: "Video Perceptual Hashes", icon: "number.square.fill") { $0.triggerGenerate(phashes: true, completion: $1) },
-            .init(id: "heatmaps", label: "Interactive Heatmaps & Speeds", icon: "waveform.path.ecg") { $0.triggerGenerate(interactiveHeatmapsSpeeds: true, completion: $1) },
-            .init(id: "clipPreviews", label: "Image Clip Previews", icon: "play.rectangle.on.rectangle.fill") { $0.triggerGenerate(clipPreviews: true, completion: $1) },
-            .init(id: "imageThumbnails", label: "Image Thumbnails", icon: "photo.on.rectangle") { $0.triggerGenerate(imageThumbnails: true, completion: $1) },
+            .init(id: "imagePreviews", label: tr("animated_image_previews"), icon: "photo.on.rectangle.angled") { $0.triggerGenerate(imagePreviews: true, completion: $1) },
+            .init(id: "sprites", label: tr("scrubber_sprites"), icon: "square.grid.3x3.fill") { $0.triggerGenerate(sprites: true, completion: $1) },
+            .init(id: "markers", label: tr("marker_previews"), icon: "mappin.and.ellipse") { $0.triggerGenerate(markers: true, completion: $1) },
+            .init(id: "markerImagePreviews", label: tr("marker_animated_image_previews"), icon: "mappin.and.ellipse.circle.fill") { $0.triggerGenerate(markerImagePreviews: true, completion: $1) },
+            .init(id: "markerScreenshots", label: tr("marker_screenshots"), icon: "camera.fill") { $0.triggerGenerate(markerScreenshots: true, completion: $1) },
+            .init(id: "transcodes", label: tr("transcodes"), icon: "film.stack") { $0.triggerGenerate(transcodes: true, completion: $1) },
+            .init(id: "phashes", label: tr("video_perceptual_hashes"), icon: "number.square.fill") { $0.triggerGenerate(phashes: true, completion: $1) },
+            .init(id: "heatmaps", label: tr("interactive_heatmaps_and_speeds"), icon: "waveform.path.ecg") { $0.triggerGenerate(interactiveHeatmapsSpeeds: true, completion: $1) },
+            .init(id: "clipPreviews", label: tr("image_clip_previews"), icon: "play.rectangle.on.rectangle.fill") { $0.triggerGenerate(clipPreviews: true, completion: $1) },
+            .init(id: "imageThumbnails", label: tr("image_thumbnails"), icon: "photo.on.rectangle") { $0.triggerGenerate(imageThumbnails: true, completion: $1) },
         ]
         // Image phashes arrived with Stash 0.31; older servers reject the whole job.
         if StashServerCapabilities.supports031 {
-            options.append(.init(id: "imagePhashes", label: "Image Perceptual Hashes", icon: "number.circle.fill") { $0.triggerGenerate(imagePhashes: true, completion: $1) })
+            options.append(.init(id: "imagePhashes", label: tr("image_perceptual_hashes"), icon: "number.circle.fill") { $0.triggerGenerate(imagePhashes: true, completion: $1) })
         }
         return options
     }
@@ -894,9 +899,9 @@ struct ToolsServerView: View {
 
         var title: String {
             switch self {
-            case .tags: return "Remove Unused Tags"
-            case .performers: return "Remove Unused Performers"
-            case .studios: return "Remove Unused Studios"
+            case .tags: return tr("action_remove_unused_tags")
+            case .performers: return tr("action_remove_unused_performers")
+            case .studios: return tr("action_remove_unused_studios")
             }
         }
         var noun: String {
@@ -915,32 +920,32 @@ struct ToolsServerView: View {
             if activeServer != nil {
                 List {
                     Section {
-                        stashyScrollingSectionHeader("Jobs")
+                        stashyScrollingSectionHeader(tr("jobs"))
                         jobsBlock
                     }
 
                     // Same tasks and order as the Tasks page of the Stash web UI.
                     Section {
-                        stashyScrollingSectionHeader("Library")
-                        taskRow(label: "Scan", icon: "arrow.triangle.2.circlepath", taskId: "scan", index: 0, count: 3) {
+                        stashyScrollingSectionHeader(tr("library"))
+                        taskRow(label: tr("action_scan"), icon: "arrow.triangle.2.circlepath", taskId: "scan", index: 0, count: 3) {
                             viewModel.triggerLibraryScan { _, message in
-                                showResult(title: "Scan", message: message)
+                                showResult(title: tr("action_scan"), message: message)
                             }
                         }
-                        taskRow(label: "Identify", icon: "person.crop.square.filled.and.at.rectangle", taskId: "identify", index: 1, count: 3) {
+                        taskRow(label: tr("action_identify"), icon: "person.crop.square.filled.and.at.rectangle", taskId: "identify", index: 1, count: 3) {
                             viewModel.triggerIdentify { _, message, _ in
-                                showResult(title: "Identify", message: message)
+                                showResult(title: tr("action_identify"), message: message)
                             }
                         }
-                        taskRow(label: "Auto Tag", icon: "tag", taskId: "autotag", index: 2, count: 3, starts: false) {
+                        taskRow(label: tr("auto_tag"), icon: "tag", taskId: "autotag", index: 2, count: 3, starts: false) {
                             showAutoTagConfirmation = true
                         }
                     }
 
                     Section {
-                        stashyScrollingSectionHeader("Generate")
-                        taskRow(label: "Generate", icon: "wand.and.stars", taskId: "gen_defaults", index: 0, count: generateOptions.count + 1) {
-                            runServerTask("Generate", taskId: "gen_defaults", queued: true) { await viewModel.triggerGenerateWithServerDefaults() }
+                        stashyScrollingSectionHeader(tr("action_generate"))
+                        taskRow(label: tr("action_generate"), icon: "wand.and.stars", taskId: "gen_defaults", index: 0, count: generateOptions.count + 1) {
+                            runServerTask(tr("action_generate"), taskId: "gen_defaults", queued: true) { await viewModel.triggerGenerateWithServerDefaults() }
                         }
                         ForEach(Array(generateOptions.enumerated()), id: \.element.id) { index, option in
                             taskRow(label: option.label, icon: option.icon, taskId: "gen_\(option.id)", index: index + 1, count: generateOptions.count + 1) {
@@ -952,30 +957,30 @@ struct ToolsServerView: View {
                     }
 
                     Section {
-                        stashyScrollingSectionHeader("Maintenance")
-                        taskRow(label: "Clean", icon: "trash.slash", taskId: "clean", index: 0, count: 4, starts: false) {
+                        stashyScrollingSectionHeader(tr("maintenance"))
+                        taskRow(label: tr("clean"), icon: "trash.slash", taskId: "clean", index: 0, count: 4, starts: false) {
                             showCleanConfirmation = true
                         }
-                        taskRow(label: "Clean Generated Files", icon: "folder.badge.minus", taskId: "clean_generated", index: 1, count: 4, starts: false) {
+                        taskRow(label: tr("clean_generated_files"), icon: "folder.badge.minus", taskId: "clean_generated", index: 1, count: 4, starts: false) {
                             showCleanGeneratedConfirmation = true
                         }
-                        taskRow(label: "Optimise Database", icon: "cylinder.split.1x2", taskId: "optimise", index: 2, count: 4) {
-                            runServerTask("Optimise Database", taskId: "optimise", queued: true) { await viewModel.triggerOptimiseDatabase() }
+                        taskRow(label: tr("optimize_database"), icon: "cylinder.split.1x2", taskId: "optimise", index: 2, count: 4) {
+                            runServerTask(tr("optimize_database"), taskId: "optimise", queued: true) { await viewModel.triggerOptimiseDatabase() }
                         }
-                        taskRow(label: "Backup Database", icon: "externaldrive.badge.timemachine", taskId: "backup", index: 3, count: 4) {
-                            runServerTask("Backup Database", taskId: "backup", queued: false, note: "The backup is in the server's backup folder.") { await viewModel.triggerBackupDatabase() }
+                        taskRow(label: tr("backup_database"), icon: "externaldrive.badge.timemachine", taskId: "backup", index: 3, count: 4) {
+                            runServerTask(tr("backup_database"), taskId: "backup", queued: false, note: tr("hint_backup_is_in_servers_backup")) { await viewModel.triggerBackupDatabase() }
                         }
                     }
 
                     Section {
-                        stashyScrollingSectionHeader("Library Cleanup")
-                        taskRow(label: "Remove Unused Tags", icon: "tag.slash", taskId: "tags_unused", index: 0, count: 3) {
+                        stashyScrollingSectionHeader(tr("library_cleanup"))
+                        taskRow(label: tr("action_remove_unused_tags"), icon: "tag.slash", taskId: "tags_unused", index: 0, count: 3) {
                             findUnused(.tags)
                         }
-                        taskRow(label: "Remove Unused Performers", icon: "person.slash", taskId: "performers_unused", index: 1, count: 3) {
+                        taskRow(label: tr("action_remove_unused_performers"), icon: "person.slash", taskId: "performers_unused", index: 1, count: 3) {
                             findUnused(.performers)
                         }
-                        taskRow(label: "Remove Unused Studios", icon: "building.2.crop.circle", taskId: "studios_unused", index: 2, count: 3) {
+                        taskRow(label: tr("action_remove_unused_studios"), icon: "building.2.crop.circle", taskId: "studios_unused", index: 2, count: 3) {
                             findUnused(.studios)
                         }
                     }
@@ -984,26 +989,26 @@ struct ToolsServerView: View {
                     if stashyPlus.isUnlocked {
                         Section {
                             stashyScrollingSectionHeader("stashy+")
-                            NavigationLink(destination: FiltersToolsView().stashySettingsDetailChrome("Filters")) {
-                                Label("Filters", systemImage: "line.3.horizontal.decrease.circle")
+                            NavigationLink(destination: FiltersToolsView().stashySettingsDetailChrome(tr("filters"))) {
+                                Label(tr("filters"), systemImage: "line.3.horizontal.decrease.circle")
                             }
                             .stashyGroupedBlockRow(index: 0, count: 3)
-                            NavigationLink(destination: TagMergeToolsView().stashySettingsDetailChrome("Merge Tags")) {
-                                Label("Merge Tags", systemImage: "arrow.triangle.merge")
+                            NavigationLink(destination: TagMergeToolsView().stashySettingsDetailChrome(tr("action_merge_tags"))) {
+                                Label(tr("action_merge_tags"), systemImage: "arrow.triangle.merge")
                             }
                             .stashyGroupedBlockRow(index: 1, count: 3)
-                            NavigationLink(destination: StudioMergeToolsView().stashySettingsDetailChrome("Merge Studios")) {
-                                Label("Merge Studios", systemImage: "building.2")
+                            NavigationLink(destination: StudioMergeToolsView().stashySettingsDetailChrome(tr("action_merge_studios"))) {
+                                Label(tr("action_merge_studios"), systemImage: "building.2")
                             }
                             .stashyGroupedBlockRow(index: 2, count: 3)
                         }
                     }
 
                     Section {
-                        stashyScrollingSectionHeader("Cache")
-                        taskRow(label: "Clear Image Cache", icon: "internaldrive", taskId: "cache_clear", index: 0, count: 1) {
+                        stashyScrollingSectionHeader(tr("cache"))
+                        taskRow(label: tr("action_clear_image_cache"), icon: "internaldrive", taskId: "cache_clear", index: 0, count: 1) {
                             ImageCache.shared.clearCurrentServerCache()
-                            showResult(title: "Cache Cleared", message: "Images will be reloaded from the server.")
+                            showResult(title: tr("cache_cleared"), message: tr("hint_images_will_be_reloaded_from"))
                         }
                     }
                 }
@@ -1015,12 +1020,12 @@ struct ToolsServerView: View {
                     Image(systemName: "server.rack")
                         .font(.system(size: 64))
                         .foregroundColor(appearanceManager.tintColor)
-                    Text("No active server")
+                    Text(tr("empty_active_server"))
                         .font(.title3)
                         .fontWeight(.bold)
                     Text(embedded
-                          ? "Select a server under Main first."
-                          : "Select a server first to use server tasks.")
+                          ? tr("hint_select_server_under_main_first")
+                          : tr("hint_select_server_first_to_use_server"))
                         .foregroundColor(.secondary)
                         .multilineTextAlignment(.center)
                         .padding(.horizontal)
@@ -1031,42 +1036,42 @@ struct ToolsServerView: View {
         }
         .modifier(ToolsServerChromeModifier(embedded: embedded))
         .alert(alertTitle, isPresented: $showAlert) {
-            Button("OK", role: .cancel) { }
+            Button(tr("ok"), role: .cancel) { }
         } message: {
             Text(alertMessage)
         }
-        .alert("Auto Tag the whole library?", isPresented: $showAutoTagConfirmation) {
-            Button("Auto Tag") {
-                runServerTask("Auto Tag", taskId: "autotag", queued: true) { await viewModel.triggerAutoTag() }
+        .alert(tr("confirm_auto_tag_whole_library"), isPresented: $showAutoTagConfirmation) {
+            Button(tr("auto_tag")) {
+                runServerTask(tr("auto_tag"), taskId: "autotag", queued: true) { await viewModel.triggerAutoTag() }
             }
-            Button("Cancel", role: .cancel) { }
+            Button(tr("action_cancel"), role: .cancel) { }
         } message: {
-            Text("Matches performer, studio and tag names against file paths and adds them to scenes, images and galleries. Short names can match by mistake.")
+            Text(tr("hint_matches_performer_studio_and_tag"))
         }
-        .alert("Clean the library?", isPresented: $showCleanConfirmation) {
-            Button("Dry Run") {
-                runServerTask("Clean (Dry Run)", taskId: "clean", queued: true, note: "The server log lists what would be removed.") {
+        .alert(tr("confirm_clean_library"), isPresented: $showCleanConfirmation) {
+            Button(tr("dry_run")) {
+                runServerTask(tr("clean_dry_run"), taskId: "clean", queued: true, note: tr("hint_server_log_lists_what_would")) {
                     await viewModel.triggerClean(dryRun: true)
                 }
             }
-            Button("Clean", role: .destructive) {
-                runServerTask("Clean", taskId: "clean", queued: true) { await viewModel.triggerClean(dryRun: false) }
+            Button(tr("clean"), role: .destructive) {
+                runServerTask(tr("clean"), taskId: "clean", queued: true) { await viewModel.triggerClean(dryRun: false) }
             }
-            Button("Cancel", role: .cancel) { }
+            Button(tr("action_cancel"), role: .cancel) { }
         } message: {
-            Text("Removes scenes, images and galleries whose files no longer exist, with their generated files. This cannot be undone. A dry run only writes to the server log.")
+            Text(tr("hint_removes_scenes_images_and_galleries"))
         }
-        .alert("Clean generated files?", isPresented: $showCleanGeneratedConfirmation) {
-            Button("Clean", role: .destructive) {
-                runServerTask("Clean Generated Files", taskId: "clean_generated", queued: true) { await viewModel.triggerCleanGenerated() }
+        .alert(tr("confirm_clean_generated_files"), isPresented: $showCleanGeneratedConfirmation) {
+            Button(tr("clean"), role: .destructive) {
+                runServerTask(tr("clean_generated_files"), taskId: "clean_generated", queued: true) { await viewModel.triggerCleanGenerated() }
             }
-            Button("Cancel", role: .cancel) { }
+            Button(tr("action_cancel"), role: .cancel) { }
         } message: {
-            Text("Deletes covers, previews, sprites, transcodes, marker files and thumbnails that no longer belong to anything in the database.")
+            Text(tr("hint_deletes_covers_previews_sprites_transcodes"))
         }
-        .alert("Remove unused \(cleanupKind.noun)?", isPresented: $showCleanupConfirmation) {
-            Button("Delete \(cleanupCandidates.count)", role: .destructive) { deleteUnused() }
-            Button("Cancel", role: .cancel) { runningTask = nil }
+        .alert(tr("confirm_remove_unused_arg", cleanupKind.noun), isPresented: $showCleanupConfirmation) {
+            Button(tr("action_delete_arg", cleanupCandidates.count), role: .destructive) { deleteUnused() }
+            Button(tr("action_cancel"), role: .cancel) { runningTask = nil }
         } message: {
             Text(cleanupConfirmationMessage)
         }
@@ -1092,7 +1097,7 @@ struct ToolsServerView: View {
         if jobs.isEmpty {
             HStack {
                 Label {
-                    Text(jobsLoaded ? "No jobs running" : "Loading jobs…")
+                    Text(jobsLoaded ? tr("empty_jobs_running") : tr("loading_jobs"))
                         .foregroundColor(.secondary)
                 } icon: {
                     Image(systemName: "tray")
@@ -1115,7 +1120,7 @@ struct ToolsServerView: View {
                 .frame(width: 24, alignment: .center)
 
             VStack(alignment: .leading, spacing: 4) {
-                Text(job.description ?? "Job \(job.id)")
+                Text(job.description ?? tr("job_arg", job.id))
                     .foregroundColor(.primary)
                     .lineLimit(2)
                 if let detail = jobDetailLine(job) {
@@ -1151,7 +1156,7 @@ struct ToolsServerView: View {
                             .font(.title2)
                     }
                     .buttonStyle(.borderless)
-                    .accessibilityLabel("Cancel \(job.description ?? "job")")
+                    .accessibilityLabel(tr("action_cancel_arg", job.description ?? "job"))
                 }
             }
         }
@@ -1185,11 +1190,11 @@ struct ToolsServerView: View {
         if let error = job.error, !error.isEmpty { return error }
         if job.isRunning, let sub = job.subTasks?.first, !sub.isEmpty { return sub }
         switch job.status {
-        case "READY": return "Queued"
-        case "STOPPING": return "Stopping…"
-        case "FINISHED": return "Finished"
-        case "CANCELLED": return "Cancelled"
-        case "FAILED": return "Failed"
+        case "READY": return tr("queued")
+        case "STOPPING": return tr("stopping_menu")
+        case "FINISHED": return tr("finished")
+        case "CANCELLED": return tr("cancelled")
+        case "FAILED": return tr("error_generic_2")
         default: return nil
         }
     }
@@ -1225,10 +1230,10 @@ struct ToolsServerView: View {
             await refreshJobs()
             let message: String
             if result.ok {
-                message = [queued ? "Added to the server's job queue." : "Done.", note]
+                message = [queued ? tr("hint_added_to_servers_job_queue") : "Done.", note]
                     .compactMap { $0 }.joined(separator: " ")
             } else {
-                message = result.error ?? "The server did not start the task."
+                message = result.error ?? tr("hint_server_did_not_start_task")
             }
             showResult(title: title, message: message)
         }
@@ -1281,7 +1286,7 @@ struct ToolsServerView: View {
         // Ein paar Namen zeigen, damit die Zahl nachvollziehbar ist.
         let preview = cleanupCandidates.prefix(8).map(\.name).joined(separator: ", ")
         let rest = cleanupCandidates.count > 8 ? " and \(cleanupCandidates.count - 8) more" : ""
-        return "\(cleanupCandidates.count) \(cleanupKind.noun) are not used anywhere: \(preview)\(rest). Deleting them cannot be undone."
+        return tr("hint_arg_arg_are_not_used", cleanupCandidates.count, cleanupKind.noun, preview, rest)
     }
 
     /// Zählt ein Tag nirgends, ist es ungenutzt. Alle fünf Zähler kommen aus `TagFields`.
@@ -1309,7 +1314,7 @@ struct ToolsServerView: View {
                 }
                 await MainActor.run {
                     guard !unused.isEmpty else {
-                        showResult(title: kind.title, message: "No unused \(kind.noun) found.")
+                        showResult(title: kind.title, message: tr("empty_unused_arg_found", kind.noun))
                         return
                     }
                     cleanupCandidates = unused
@@ -1318,7 +1323,7 @@ struct ToolsServerView: View {
             } catch {
                 AppLog.error("❌ Scanning \(kind.noun) failed: \(error.localizedDescription)")
                 await MainActor.run {
-                    showResult(title: kind.title, message: "Could not load the \(kind.noun) list.")
+                    showResult(title: kind.title, message: tr("error_load_arg_list", kind.noun))
                 }
             }
         }
@@ -1342,14 +1347,14 @@ struct ToolsServerView: View {
                     FilterPickerOptionsStore.shared.invalidate()
                     showResult(
                         title: kind.title,
-                        message: ok ? "\(count) unused \(kind.noun) deleted." : "The server rejected the deletion."
+                        message: ok ? "\(count) unused \(kind.noun) deleted." : tr("server_rejected_deletion")
                     )
                 }
             } catch {
                 AppLog.error("❌ Deleting unused \(kind.noun) failed: \(error.localizedDescription)")
                 await MainActor.run {
                     cleanupCandidates = []
-                    showResult(title: kind.title, message: "Could not delete the \(kind.noun).")
+                    showResult(title: kind.title, message: tr("error_delete_arg", kind.noun))
                 }
             }
         }
@@ -1394,10 +1399,10 @@ private struct ToolsStatisticsView: View {
                     Image(systemName: "chart.bar.fill")
                         .font(.system(size: 64))
                         .foregroundColor(appearanceManager.tintColor)
-                    Text("No active server")
+                    Text(tr("empty_active_server"))
                         .font(.title3)
                         .fontWeight(.bold)
-                    Text("Select a server in Settings to view statistics.")
+                    Text(tr("hint_select_server_in_settings_to"))
                         .foregroundColor(.secondary)
                         .multilineTextAlignment(.center)
                         .padding(.horizontal)

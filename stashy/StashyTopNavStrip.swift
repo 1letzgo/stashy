@@ -15,8 +15,8 @@ struct StashyTopNavNameDropdownRow: View {
     let items: [StashyNavMenuItem]
     let selectionID: String
     var titleColor: Color = .primary
-    var menuAccessibilityLabel: String = "Section"
-    var menuAccessibilityHint: String = "Chooses which section to show"
+    var menuAccessibilityLabel: String = tr("section")
+    var menuAccessibilityHint: String = tr("chooses_which_section_to_show")
     /// Bleibt links stehen statt mitzuscrollen (z. B. der Weg zurück zur Übersicht).
     var pinnedItemID: String? = nil
     let onSelect: (String) -> Void
@@ -149,8 +149,8 @@ enum StashyExpandingDockPalette {
 struct StashyExpandingDockBrowseStrip: View {
     let items: [StashyNavMenuItem]
     let selectionID: String
-    var accessibilityLabel: String = "Section"
-    var accessibilityHint: String = "Chooses which section to show"
+    var accessibilityLabel: String = tr("section")
+    var accessibilityHint: String = tr("chooses_which_section_to_show")
     var palette: StashyExpandingDockPalette = .chrome
     /// Dieses Item steht fest am linken Rand, der Rest scrollt daran vorbei.
     var pinnedItemID: String? = nil
@@ -339,7 +339,7 @@ struct ToolsPillMenuRow: View {
 
     let items: [Item]
     let selectionID: String
-    var accessibilityLabel: String = "Section"
+    var accessibilityLabel: String = tr("section")
     let onSelect: (String) -> Void
 
     @ObservedObject private var appearance = AppearanceManager.shared

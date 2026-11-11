@@ -1,5 +1,7 @@
 package de.letzgo.stashy.ui.tools.stats
 
+import de.letzgo.stashy.R
+import de.letzgo.stashy.tr
 import de.letzgo.stashy.ui.bottomBarContentPadding
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -154,8 +156,11 @@ private data class HeatmapLayout(val blockSize: Dp, val columnGap: Dp, val gridW
     }
 }
 
-/** Monday-first two-letter weekday labels (iOS `shortWeekdaySymbols.prefix(2)`, en_US). */
-private val weekdayLabels = listOf("Mo", "Tu", "We", "Th", "Fr", "Sa", "Su")
+/** Monday-first short weekday labels in the app's language (iOS: `shortWeekdaySymbols`). */
+private val weekdayLabels: List<String> by lazy {
+    val locale = de.letzgo.stashy.AppLanguage.locale
+    java.time.DayOfWeek.entries.map { it.getDisplayName(java.time.format.TextStyle.SHORT_STANDALONE, locale) }
+}
 
 /**
  * iOS: `OCountHeatmapCard` — month calendar of scene + image O-Count, a summary card and the
@@ -240,7 +245,7 @@ private fun CalendarCard(
         BoxWithConstraints(Modifier.fillMaxWidth()) {
             val width = maxWidth
             if (isLoadingEmpty) {
-                InsightsLoading("Loading O-Count...", Modifier.fillMaxWidth().height(HeatmapLayout.estimatedHeight(320.dp, 6)))
+                InsightsLoading(tr(R.string.loading_o_count), Modifier.fillMaxWidth().height(HeatmapLayout.estimatedHeight(320.dp, 6)))
             } else {
                 CalendarContent(heatmap, HeatmapLayout.make(width), selectedDayKey, onSelectDay)
             }
@@ -265,7 +270,7 @@ private fun MonthTitleRow(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        ChevronButton(Icons.AutoMirrored.Filled.KeyboardArrowLeft, "Previous month", canGoBack, onBack)
+        ChevronButton(Icons.AutoMirrored.Filled.KeyboardArrowLeft, tr(R.string.previous_month), canGoBack, onBack)
         Box(Modifier.weight(1f), contentAlignment = Alignment.Center) {
             Text(
                 title,
@@ -274,11 +279,11 @@ private fun MonthTitleRow(
                 // iOS: button labelled with the title + hint "Shows the current month.", else a header.
                 modifier = if (showsJumpToCurrent) Modifier.clickable(
                     interactionSource = remember { MutableInteractionSource() }, indication = null,
-                    onClickLabel = "Shows the current month.", role = Role.Button, onClick = onJumpToCurrent,
+                    onClickLabel = tr(R.string.shows_current_month), role = Role.Button, onClick = onJumpToCurrent,
                 ) else Modifier.semantics { heading() },
             )
         }
-        ChevronButton(Icons.AutoMirrored.Filled.KeyboardArrowRight, "Next month", canGoForward, onForward)
+        ChevronButton(Icons.AutoMirrored.Filled.KeyboardArrowRight, tr(R.string.next_month), canGoForward, onForward)
     }
 }
 
@@ -372,7 +377,7 @@ private fun DayCell(cell: OCountMonthHeatmap.Cell?, blockSize: Dp, isSelected: B
             .let { if (isSelected) it.border(2.dp, accent, CircleShape) else it }
             .let { m -> if (inMonth && cell != null) m.clickable { onSelect(cell.id) } else m }
             .semantics {
-                contentDescription = cell?.accessibilityLabel ?: "No data"
+                contentDescription = cell?.accessibilityLabel ?: tr(R.string.empty_data)
                 if (inMonth && cell != null) selected = isSelected
             },
         contentAlignment = Alignment.Center,
@@ -402,11 +407,11 @@ private fun Legend(blockSize: Dp) {
         horizontalArrangement = Arrangement.spacedBy(3.dp, Alignment.CenterHorizontally),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Text("Less", style = IosTypography.caption2, color = p.secondaryText)
+        Text(tr(R.string.less), style = IosTypography.caption2, color = p.secondaryText)
         for (level in 0 until 5) {
             Box(Modifier.size(dot).background(heatFill(level), CircleShape).border(0.5.dp, heatOutline(level), CircleShape))
         }
-        Text("More", style = IosTypography.caption2, color = p.secondaryText)
+        Text(tr(R.string.more), style = IosTypography.caption2, color = p.secondaryText)
     }
 }
 
@@ -415,13 +420,13 @@ private val selectedDayFormatter = DateTimeFormatter.ofPattern("EEE, MMM d", Loc
 @Composable
 private fun SummaryCard(heatmap: OCountMonthHeatmap, selectedDayKey: String?) {
     val p = Theme.palette
-    fun countLabel(count: Int) = if (count > 0) "$count" else "No O-Count"
+    fun countLabel(count: Int) = if (count > 0) "$count" else tr(R.string.empty_o_count)
     val selectedCell = selectedDayKey?.let { key -> heatmap.cells.firstOrNull { it.id == key && it.isInDisplayedMonth } }
     val (title, value) = if (selectedCell != null) {
         val date = OCountHeatmapBucketing.parseDayKey(selectedCell.id)
         (date?.let { selectedDayFormatter.format(it) } ?: selectedCell.id) to countLabel(selectedCell.count)
     } else {
-        "O-Count" to countLabel(heatmap.totalInMonth)
+        tr(R.string.o_count) to countLabel(heatmap.totalInMonth)
     }
     // iOS `summaryContent(heatmap:).accessibility`.
     val accessibility = if (selectedCell != null) "$title, $value"
@@ -441,8 +446,8 @@ private fun DayItemsList(items: List<OCountHeatmapItem>) {
     val scenes = items.filter { it.kind == OCountHeatmapItem.Kind.Scene }
     val images = items.filter { it.kind == OCountHeatmapItem.Kind.Image }
     Column(verticalArrangement = Arrangement.spacedBy(20.dp)) {
-        if (scenes.isNotEmpty()) DayItemsSection("Scenes", scenes)
-        if (images.isNotEmpty()) DayItemsSection("Images", images)
+        if (scenes.isNotEmpty()) DayItemsSection(tr(R.string.scenes), scenes)
+        if (images.isNotEmpty()) DayItemsSection(tr(R.string.images), images)
     }
 }
 
@@ -477,7 +482,7 @@ private fun DayItemRow(item: OCountHeatmapItem, onClick: () -> Unit) {
         Modifier.fillMaxWidth().heightIn(min = 72.dp)
             // iOS `OCountDayItemRow` accessibility label + hint "Opens this scene/image."
             .semantics { contentDescription = item.accessibilityLabel }
-            .clickable(onClickLabel = "Opens this ${item.kindTitle.lowercase()}.", onClick = onClick)
+            .clickable(onClickLabel = tr(R.string.opens_this_arg, item.kindTitle.lowercase()), onClick = onClick)
             .padding(horizontal = 16.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(16.dp),

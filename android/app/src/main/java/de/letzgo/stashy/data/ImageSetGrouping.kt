@@ -1,5 +1,7 @@
 package de.letzgo.stashy.data
 
+import de.letzgo.stashy.R
+import de.letzgo.stashy.tr
 import kotlin.math.abs
 
 /**
@@ -7,9 +9,9 @@ import kotlin.math.abs
  * the iOS ones (`stashline_group_mode`).
  */
 enum class ImageGroupMode(val raw: String, val displayName: String) {
-    Off("off", "Off"),
-    Gallery("gallery", "By gallery"),
-    GallerySession("gallerySession", "By gallery + session");
+    Off("off", tr(R.string.off)),
+    Gallery("gallery", tr(R.string.by_gallery)),
+    GallerySession("gallerySession", tr(R.string.by_gallery_plus_session));
 
     companion object {
         fun from(raw: String?): ImageGroupMode = entries.firstOrNull { it.raw == raw } ?: GallerySession

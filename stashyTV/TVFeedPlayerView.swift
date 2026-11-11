@@ -134,17 +134,17 @@ struct TVFeedPlayerView: View {
         .animation(.easeInOut(duration: 0.2), value: showsInfo)
         .animation(.easeInOut(duration: 0.15), value: seekFeedback)
         .onExitCommand { handleExit() }
-        .confirmationDialog("Rating", isPresented: Binding(
+        .confirmationDialog(tr("rating"), isPresented: Binding(
             get: { ratingItem != nil },
             set: { if !$0 { ratingItem = nil } }
         ), titleVisibility: .visible) {
             ForEach([5, 4, 3, 2, 1, 0], id: \.self) { stars in
-                Button(stars == 0 ? "No Rating" : String(repeating: "★", count: stars)) {
+                Button(stars == 0 ? tr("empty_rating") : String(repeating: "★", count: stars)) {
                     if let item = ratingItem { session.setRating(stars: stars, for: item) }
                     ratingItem = nil
                 }
             }
-            Button("Cancel", role: .cancel) { ratingItem = nil }
+            Button(tr("action_cancel"), role: .cancel) { ratingItem = nil }
         }
         .onPlayPauseCommand { session.togglePlayPause() }
         .onAppear {
@@ -174,7 +174,7 @@ struct TVFeedPlayerView: View {
         }) {
             TVAetherPlayerView(
                 model: fullPlayer,
-                title: session.currentItem?.underlyingScene?.displayTitle ?? "Untitled Scene",
+                title: session.currentItem?.underlyingScene?.displayTitle ?? tr("untitled_scene"),
                 subtitle: session.currentItem?.studio?.name ?? "",
                 posterURL: session.currentItem?.posterURL,
                 onDisappear: { fullPlayer.saveProgress() }
@@ -362,7 +362,7 @@ struct TVFeedPlayerView: View {
                         .foregroundStyle(.white.opacity(0.8))
                         .lineLimit(1)
                 }
-                Text("▲ ▼ Browse   ◀ ▶ Seek (hold to scan)   Swipe to scrub   Click for info")
+                Text(("▲ ▼ " + tr("hint_browse_seek_hold_to_scan")))
                     .font(.system(size: 20))
                     .foregroundStyle(.white.opacity(0.5))
                     .padding(.top, 6)
@@ -444,7 +444,7 @@ struct TVFeedPlayerView: View {
             Spacer()
             VStack(alignment: .leading, spacing: 24) {
                 HStack(spacing: 24) {
-                    overlayButton("Reload", icon: "arrow.clockwise", focus: .primary) {
+                    overlayButton(tr("action_reload"), icon: "arrow.clockwise", focus: .primary) {
                         isOverlayOpen = false
                         session.reload()
                     }
@@ -465,11 +465,11 @@ struct TVFeedPlayerView: View {
             overlayButton(playLabel(item), icon: "play.fill", focus: .primary) {
                 playInFullPlayer(item: item, scene: scene)
             }
-            overlayButton("Scene Details", icon: "info.circle") {
+            overlayButton(tr("scene_details"), icon: "info.circle") {
                 onNavigate(.scene(id: scene.id))
             }
         } else {
-            overlayButton(session.engine?.isPlaying == true ? "Pause" : "Play",
+            overlayButton(session.engine?.isPlaying == true ? tr("action_pause") : tr("action_play"),
                           icon: session.engine?.isPlaying == true ? "pause.fill" : "play.fill",
                           focus: .primary) {
                 session.togglePlayPause()
@@ -480,13 +480,13 @@ struct TVFeedPlayerView: View {
             overlayButton("\(session.oCount(for: item))", icon: "heart.circle.fill") {
                 session.addO(for: item)
             }
-            .accessibilityLabel("O-Counter, \(session.oCount(for: item))")
+            .accessibilityLabel(tr("o_count_arg", session.oCount(for: item)))
             overlayButton(ratingLabel(item), icon: "star.fill") {
                 ratingItem = item
             }
-            .accessibilityLabel("Rating")
+            .accessibilityLabel(tr("rating"))
         }
-        overlayButton(session.isMuted ? "Unmute" : "Mute",
+        overlayButton(session.isMuted ? tr("unmute") : tr("mute"),
                       icon: session.isMuted ? "speaker.slash.fill" : "speaker.wave.2.fill") {
             session.toggleMute()
         }
@@ -508,12 +508,12 @@ struct TVFeedPlayerView: View {
 
     private func ratingLabel(_ item: TVFeedItem) -> String {
         let stars = ratingStars(item)
-        return stars == 0 ? "Rate" : String(repeating: "★", count: stars)
+        return stars == 0 ? tr("action_rate") : String(repeating: "★", count: stars)
     }
 
     private func playLabel(_ item: TVFeedItem) -> String {
-        if case .marker = item { return "Play from Marker" }
-        return "Play from Start"
+        if case .marker = item { return tr("action_play_from_marker") }
+        return tr("action_play_from_start")
     }
 
     private var modeRow: some View {
@@ -534,7 +534,7 @@ struct TVFeedPlayerView: View {
                 isOverlayOpen = false
                 session.reload()
             } label: {
-                Label("Reshuffle", systemImage: "shuffle")
+                Label(tr("reshuffle"), systemImage: "shuffle")
                     .font(.system(size: 24))
             }
             .buttonStyle(.bordered)
@@ -588,7 +588,7 @@ struct TVFeedPlayerView: View {
                 .font(.title2)
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
-            Text("Click to switch modes or reload")
+            Text(tr("hint_click_to_switch_modes_or"))
                 .font(.title3)
                 .foregroundStyle(.tertiary)
         }

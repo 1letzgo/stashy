@@ -11,7 +11,7 @@ struct HomeStatisticsRowView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("Statistics")
+            Text(tr("statistics"))
                 .font(.headline)
                 .foregroundColor(.primary)
                 .padding(.horizontal, 12)
@@ -47,7 +47,7 @@ struct HomeStatisticsRowView: View {
             } else {
                 HStack {
                     Image(systemName: "exclamationmark.triangle").foregroundColor(.secondary)
-                    Text("Stats unavailable").font(.caption).foregroundColor(.secondary)
+                    Text(tr("stats_unavailable")).font(.caption).foregroundColor(.secondary)
                 }
                 .padding(.horizontal, 12)
             }
@@ -60,28 +60,28 @@ struct HomeStatisticsRowView: View {
     private func statCard(for tab: TabConfig, stats: Statistics) -> some View {
         switch tab.id {
         case .scenes:
-            StatCard(title: "Scenes", value: formatCount(stats.sceneCount), icon: "film", color: tabManager.useColoredStatistics ? .blue : appearanceManager.tintColor)
+            StatCard(title: tr("scenes"), value: formatCount(stats.sceneCount), icon: "film", color: tabManager.useColoredStatistics ? .blue : appearanceManager.tintColor)
                 .onTapGesture { coordinator.navigateToScenes() }
         case .galleries:
-            StatCard(title: "Galleries", value: formatCount(stats.galleryCount), icon: "photo.stack", color: tabManager.useColoredStatistics ? .green : appearanceManager.tintColor)
+            StatCard(title: tr("galleries"), value: formatCount(stats.galleryCount), icon: "photo.stack", color: tabManager.useColoredStatistics ? .green : appearanceManager.tintColor)
                 .onTapGesture { coordinator.navigateToGalleries() }
         case .images:
-            StatCard(title: "Images", value: formatCount(stats.imageCount), icon: "photo", color: tabManager.useColoredStatistics ? .teal : appearanceManager.tintColor)
+            StatCard(title: tr("images"), value: formatCount(stats.imageCount), icon: "photo", color: tabManager.useColoredStatistics ? .teal : appearanceManager.tintColor)
                 .onTapGesture { coordinator.navigateToImages() }
         case .performers:
-            StatCard(title: "Performers", value: formatCount(stats.performerCount), icon: "person.2", color: tabManager.useColoredStatistics ? .purple : appearanceManager.tintColor)
+            StatCard(title: tr("performers"), value: formatCount(stats.performerCount), icon: "person.2", color: tabManager.useColoredStatistics ? .purple : appearanceManager.tintColor)
                 .onTapGesture { coordinator.navigateToPerformers() }
         case .studios:
-            StatCard(title: "Studios", value: formatCount(stats.studioCount), icon: "building.2", color: tabManager.useColoredStatistics ? .orange : appearanceManager.tintColor)
+            StatCard(title: tr("studios"), value: formatCount(stats.studioCount), icon: "building.2", color: tabManager.useColoredStatistics ? .orange : appearanceManager.tintColor)
                 .onTapGesture { coordinator.navigateToStudios() }
         case .tags:
-            StatCard(title: "Tags", value: formatCount(stats.tagCount), icon: "tag", color: tabManager.useColoredStatistics ? .pink : appearanceManager.tintColor)
+            StatCard(title: tr("tags"), value: formatCount(stats.tagCount), icon: "tag", color: tabManager.useColoredStatistics ? .pink : appearanceManager.tintColor)
                 .onTapGesture { coordinator.navigateToTags() }
         case .groups:
-            StatCard(title: "Groups", value: formatCount(stats.groupCount), icon: "rectangle.stack.fill", color: tabManager.useColoredStatistics ? Color(red: 0.1, green: 0.7, blue: 0.9) : appearanceManager.tintColor)
+            StatCard(title: tr("groups"), value: formatCount(stats.groupCount), icon: "rectangle.stack.fill", color: tabManager.useColoredStatistics ? Color(red: 0.1, green: 0.7, blue: 0.9) : appearanceManager.tintColor)
                 .onTapGesture { coordinator.navigateToGroups() }
         case .markers:
-            StatCard(title: "Markers", value: formatCount(stats.sceneMarkerCount ?? 0), icon: "bookmark.fill", color: tabManager.useColoredStatistics ? .red : appearanceManager.tintColor)
+            StatCard(title: tr("markers"), value: formatCount(stats.sceneMarkerCount ?? 0), icon: "bookmark.fill", color: tabManager.useColoredStatistics ? .red : appearanceManager.tintColor)
                 .onTapGesture { coordinator.navigateToMarkers() }
         default:
             EmptyView()
@@ -92,28 +92,28 @@ struct HomeStatisticsRowView: View {
     private func compactRow(for tab: TabConfig, stats: Statistics) -> some View {
         switch tab.id {
         case .scenes:
-            compactStatRow(title: "Scenes", value: formatCount(stats.sceneCount), icon: "film", color: tabManager.useColoredStatistics ? .blue : appearanceManager.tintColor)
+            compactStatRow(title: tr("scenes"), value: formatCount(stats.sceneCount), icon: "film", color: tabManager.useColoredStatistics ? .blue : appearanceManager.tintColor)
                 .onTapGesture { coordinator.navigateToScenes() }
         case .galleries:
-            compactStatRow(title: "Galleries", value: formatCount(stats.galleryCount), icon: "photo.stack", color: tabManager.useColoredStatistics ? .green : appearanceManager.tintColor)
+            compactStatRow(title: tr("galleries"), value: formatCount(stats.galleryCount), icon: "photo.stack", color: tabManager.useColoredStatistics ? .green : appearanceManager.tintColor)
                 .onTapGesture { coordinator.navigateToGalleries() }
         case .images:
-            compactStatRow(title: "Images", value: formatCount(stats.imageCount), icon: "photo", color: tabManager.useColoredStatistics ? .teal : appearanceManager.tintColor)
+            compactStatRow(title: tr("images"), value: formatCount(stats.imageCount), icon: "photo", color: tabManager.useColoredStatistics ? .teal : appearanceManager.tintColor)
                 .onTapGesture { coordinator.navigateToImages() }
         case .performers:
-            compactStatRow(title: "Performers", value: formatCount(stats.performerCount), icon: "person.2", color: tabManager.useColoredStatistics ? .purple : appearanceManager.tintColor)
+            compactStatRow(title: tr("performers"), value: formatCount(stats.performerCount), icon: "person.2", color: tabManager.useColoredStatistics ? .purple : appearanceManager.tintColor)
                 .onTapGesture { coordinator.navigateToPerformers() }
         case .studios:
-            compactStatRow(title: "Studios", value: formatCount(stats.studioCount), icon: "building.2", color: tabManager.useColoredStatistics ? .orange : appearanceManager.tintColor)
+            compactStatRow(title: tr("studios"), value: formatCount(stats.studioCount), icon: "building.2", color: tabManager.useColoredStatistics ? .orange : appearanceManager.tintColor)
                 .onTapGesture { coordinator.navigateToStudios() }
         case .tags:
-            compactStatRow(title: "Tags", value: formatCount(stats.tagCount), icon: "tag", color: tabManager.useColoredStatistics ? .pink : appearanceManager.tintColor)
+            compactStatRow(title: tr("tags"), value: formatCount(stats.tagCount), icon: "tag", color: tabManager.useColoredStatistics ? .pink : appearanceManager.tintColor)
                 .onTapGesture { coordinator.navigateToTags() }
         case .groups:
-            compactStatRow(title: "Groups", value: formatCount(stats.groupCount), icon: "rectangle.stack.fill", color: tabManager.useColoredStatistics ? Color(red: 0.1, green: 0.7, blue: 0.9) : appearanceManager.tintColor)
+            compactStatRow(title: tr("groups"), value: formatCount(stats.groupCount), icon: "rectangle.stack.fill", color: tabManager.useColoredStatistics ? Color(red: 0.1, green: 0.7, blue: 0.9) : appearanceManager.tintColor)
                 .onTapGesture { coordinator.navigateToGroups() }
         case .markers:
-            compactStatRow(title: "Markers", value: formatCount(stats.sceneMarkerCount ?? 0), icon: "bookmark.fill", color: tabManager.useColoredStatistics ? .red : appearanceManager.tintColor)
+            compactStatRow(title: tr("markers"), value: formatCount(stats.sceneMarkerCount ?? 0), icon: "bookmark.fill", color: tabManager.useColoredStatistics ? .red : appearanceManager.tintColor)
                 .onTapGesture { coordinator.navigateToMarkers() }
         default:
             EmptyView()

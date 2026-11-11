@@ -144,7 +144,7 @@ struct OCountHeatmapCard: View {
 
             Group {
                 if loader.isLoading && loader.countsByDay.isEmpty {
-                    StandardLoadingView(message: "Loading O-Count...")
+                    StandardLoadingView(message: tr("loading_o_count"))
                         .frame(maxWidth: .infinity)
                         .frame(height: OCountMonthHeatmapLayout.estimatedCalendarCardHeight(containerWidth: 320, rowCount: 6))
                 } else if cardWidth > 1 {
@@ -213,10 +213,10 @@ struct OCountHeatmapCard: View {
         } else {
             VStack(alignment: .leading, spacing: 12) {
                 if !scenes.isEmpty {
-                    dayItemsSection(title: "Scenes", items: scenes)
+                    dayItemsSection(title: tr("scenes"), items: scenes)
                 }
                 if !images.isEmpty {
-                    dayItemsSection(title: "Images", items: images)
+                    dayItemsSection(title: tr("images"), items: images)
                 }
             }
         }
@@ -328,7 +328,7 @@ struct OCountHeatmapCard: View {
                 .accessibilityAddTraits(isSelected ? .isSelected : [])
             } else {
                 dayContent
-                    .accessibilityLabel(cell?.accessibilityLabel ?? "No data")
+                    .accessibilityLabel(cell?.accessibilityLabel ?? tr("empty_data"))
             }
         }
     }
@@ -336,7 +336,7 @@ struct OCountHeatmapCard: View {
     private func legend(blockSize: CGFloat) -> some View {
         let dot = min(9, max(5, blockSize * 0.45))
         return HStack(spacing: 3) {
-            Text("Less")
+            Text(tr("less"))
                 .font(.caption2)
                 .foregroundStyle(.secondary)
             ForEach(0..<5, id: \.self) { level in
@@ -347,7 +347,7 @@ struct OCountHeatmapCard: View {
                     }
                     .frame(width: dot, height: dot)
             }
-            Text("More")
+            Text(tr("more"))
                 .font(.caption2)
                 .foregroundStyle(.secondary)
         }
@@ -365,7 +365,7 @@ struct OCountHeatmapCard: View {
             )
         }
         return (
-            "O-Count",
+            tr("o_count"),
             countLabel(heatmap.totalInMonth),
             "\(heatmap.monthTitle), \(heatmap.daysWithOCount) days, \(countLabel(heatmap.totalInMonth))"
         )
@@ -380,7 +380,7 @@ struct OCountHeatmapCard: View {
     }
 
     private func countLabel(_ count: Int) -> String {
-        count > 0 ? "\(count)" : "No O-Count"
+        count > 0 ? "\(count)" : tr("empty_o_count")
     }
 
     private func autoJumpToLatestMonthIfNeeded() {
@@ -459,7 +459,7 @@ private struct OCountMonthTitleView: View {
             }
             .buttonStyle(.plain)
             .disabled(!canGoBack)
-            .accessibilityLabel("Previous month")
+            .accessibilityLabel(tr("previous_month"))
 
             titleLabel
                 .frame(maxWidth: .infinity)
@@ -472,7 +472,7 @@ private struct OCountMonthTitleView: View {
             }
             .buttonStyle(.plain)
             .disabled(!canGoForward)
-            .accessibilityLabel("Next month")
+            .accessibilityLabel(tr("next_month"))
         }
         .padding(.horizontal, 12)
         .padding(.top, 8)
@@ -492,7 +492,7 @@ private struct OCountMonthTitleView: View {
             }
             .buttonStyle(.plain)
             .accessibilityLabel(title)
-            .accessibilityHint("Shows the current month.")
+            .accessibilityHint(tr("shows_current_month"))
         } else {
             label.accessibilityAddTraits(.isHeader)
         }
@@ -533,9 +533,10 @@ private struct OCountMonthHeatmapLayout {
         let rowGap = OCountHeatmapMetrics.rowGap
         let gridWidth = n * block + max(0, n - 1) * columnGap
 
+        cal.locale = AppLanguage.locale // weekday names in the app's language, not the device's
         let allSymbols = cal.shortWeekdaySymbols.count == 7
             ? cal.shortWeekdaySymbols
-            : ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]
+            : [tr("sun"), tr("mon"), tr("tue"), tr("wed"), tr("thu"), tr("fri"), tr("sat")]
         let firstIdx = cal.firstWeekday - 1
         let weekdays = (0..<7).map { allSymbols[(firstIdx + $0) % 7] }
 
@@ -631,7 +632,7 @@ private struct OCountDayItemRow: View {
         .contentShape(Rectangle())
         .accessibilityElement(children: .combine)
         .accessibilityLabel("\(item.kindTitle), \(item.displayTitle)\(item.rowSubtitle == item.kindTitle ? "" : ", \(item.rowSubtitle)")\(item.performerNamesLine.isEmpty ? "" : ", \(item.performerNamesLine)"), \(item.countOnDay)")
-        .accessibilityHint("Opens this \(item.kindTitle.lowercased()).")
+        .accessibilityHint(tr("opens_this_arg", item.kindTitle.lowercased()))
     }
 
     private var thumbnail: some View {

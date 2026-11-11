@@ -1,5 +1,7 @@
 package de.letzgo.stashy.tv
 
+import de.letzgo.stashy.R
+import de.letzgo.stashy.tr
 import android.view.KeyEvent as AndroidKeyEvent
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
@@ -89,11 +91,11 @@ class TvImageViewerRoute(
                 // iOS: "No images" with Retry / Close — without them the remote had nothing to focus.
                 Column(Modifier.align(Alignment.Center), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(pt(24))) {
                     Icon(TvIcons.photo, null, Modifier.size(pt(64)), tint = TvColors.secondary)
-                    Text("No images", style = TvType.title2, color = TvColors.secondary)
+                    Text(tr(R.string.empty_images), style = TvType.title2, color = TvColors.secondary)
                     if (title.isNotEmpty()) Text(title, Modifier.padding(horizontal = pt(80)), style = TvType.title3, color = TvColors.tertiary, maxLines = 2, textAlign = TextAlign.Center)
                     val canRetry = hasMore()
-                    if (canRetry) TvButton({ loadMore() }, Modifier.focusRequester(emptyFocus)) { Text("Retry", style = TvType.title3) }
-                    TvButton({ TvNav.pop() }, if (canRetry) Modifier else Modifier.focusRequester(emptyFocus)) { Text("Close", style = TvType.title3) }
+                    if (canRetry) TvButton({ loadMore() }, Modifier.focusRequester(emptyFocus)) { Text(tr(R.string.action_retry), style = TvType.title3) }
+                    TvButton({ TvNav.pop() }, if (canRetry) Modifier else Modifier.focusRequester(emptyFocus)) { Text(tr(R.string.action_close), style = TvType.title3) }
                 }
                 TvRequestFocus(emptyFocus, "imageViewer.empty")
             } else {
@@ -112,8 +114,8 @@ class TvImageViewerRoute(
                     // iOS `TVImageDetailView`: the photo glyph instead of a blank screen.
                     Column(Modifier.align(Alignment.Center), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(pt(16))) {
                         Icon(TvIcons.warning, null, Modifier.size(pt(64)), tint = TvColors.secondary)
-                        Text("Couldn't load this image", style = TvType.title3, color = TvColors.secondary)
-                        if (url != null) Text("Press Select to retry", style = TvType.callout, color = TvColors.tertiary)
+                        Text(tr(R.string.error_load_this_image), style = TvType.title3, color = TvColors.secondary)
+                        if (url != null) Text(tr(R.string.press_select_to_retry), style = TvType.callout, color = TvColors.tertiary)
                     }
                 } else if (loading) Box(Modifier.align(Alignment.Center)) { TvSpinner(pt(64)) }
                 Text(

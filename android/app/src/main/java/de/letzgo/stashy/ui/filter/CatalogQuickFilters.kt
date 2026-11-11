@@ -1,5 +1,7 @@
 package de.letzgo.stashy.ui.filter
 
+import de.letzgo.stashy.R
+import de.letzgo.stashy.tr
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
@@ -171,7 +173,7 @@ private val QuickPillHeight = FeedsDock.activeHeight
  */
 @Composable
 private fun FiltersButton(isActive: Boolean, modifier: Modifier = Modifier, onClick: () -> Unit) {
-    Box(modifier.size(FeedsDock.circleSize).semantics(mergeDescendants = true) { contentDescription = "Filter and sort settings" }) {
+    Box(modifier.size(FeedsDock.circleSize).semantics(mergeDescendants = true) { contentDescription = tr(R.string.action_filter_and_sort_settings) }) {
         Box(
             Modifier.matchParentSize().stashyGlass(CircleShape).clickable(onClick = onClick),
             contentAlignment = Alignment.Center,
@@ -195,7 +197,7 @@ private fun SortChip(label: String, active: Boolean, icon: ImageVector?, onClick
         Modifier.height(QuickPillHeight)
             .let { if (active) it.stashyGlass(shape, Appearance.tint) else it.stashyGlass(shape) }
             .clickable(onClick = onClick).padding(horizontal = FeedsDock.activeHorizontalPadding)
-            .semantics { contentDescription = "Sort by $label" },
+            .semantics { contentDescription = tr(R.string.action_sort_by_arg, label) },
         horizontalArrangement = Arrangement.spacedBy(4.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -210,7 +212,7 @@ private fun RemovableChip(icon: ImageVector?, text: String, onRemove: () -> Unit
     Row(
         Modifier.height(26.dp).clip(RoundedCornerShape(50)).background(tint.copy(alpha = 0.15f))
             .clickable(onClick = onRemove).padding(horizontal = 10.dp)
-            .semantics { contentDescription = "Remove $text" },
+            .semantics { contentDescription = tr(R.string.action_remove_arg, text) },
         horizontalArrangement = Arrangement.spacedBy(5.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -257,7 +259,7 @@ private fun AdvancedHeader(expanded: Boolean, count: Int, onToggle: () -> Unit) 
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         Icon(SF.sliderHorizontal3, null, tint = p.secondaryText, modifier = Modifier.size(20.dp))
-        Text("Advanced criteria", style = IosTypography.subheadline.copy(fontWeight = FontWeight.SemiBold), color = p.text)
+        Text(tr(R.string.advanced_criteria), style = IosTypography.subheadline.copy(fontWeight = FontWeight.SemiBold), color = p.text)
         if (count > 0) Text(
             "$count",
             Modifier.clip(RoundedCornerShape(50)).background(p.secondaryText.copy(alpha = 0.2f)).padding(horizontal = 7.dp, vertical = 2.dp),
@@ -353,7 +355,7 @@ private fun QuickEntityFilterSection(document: CriteriaDocument, key: String, ti
             if (selectedIds.size > 1) {
                 Segmented(
                     listOf(CriterionModifier.IncludesAll.raw, CriterionModifier.Includes.raw), modifier,
-                    { if (it == CriterionModifier.IncludesAll.raw) "All" else "Any" },
+                    { if (it == CriterionModifier.IncludesAll.raw) tr(R.string.all) else tr(R.string.any) },
                     Modifier.width(140.dp),
                 ) { raw ->
                     if (raw != modifier) {
@@ -364,7 +366,7 @@ private fun QuickEntityFilterSection(document: CriteriaDocument, key: String, ti
             }
         }
         if (kind != null) NativeSearchField(
-            query, { query = it; FilterPickerOptionsStore.search(kind, it) }, "Search ${title.lowercase()}",
+            query, { query = it; FilterPickerOptionsStore.search(kind, it) }, tr(R.string.search_arg, title.lowercase()),
             loading = FilterPickerOptionsStore.isSearching(kind),
         )
         QuickChipRow {
@@ -376,7 +378,7 @@ private fun QuickEntityFilterSection(document: CriteriaDocument, key: String, ti
             kind != null && FilterPickerOptionsStore.isLoading(kind) ->
                 CircularProgressIndicator(Modifier.size(16.dp), strokeWidth = 2.dp, color = p.secondaryText)
             visible.isEmpty() -> Text(
-                if (query.isEmpty()) "Search to find ${title.lowercase()}." else "No matches.",
+                if (query.isEmpty()) tr(R.string.search_to_find_arg, title.lowercase()) else tr(R.string.empty_matches),
                 style = IosTypography.caption, color = p.secondaryText,
             )
         }

@@ -1,5 +1,7 @@
 package de.letzgo.stashy.ui.detail
 
+import de.letzgo.stashy.R
+import de.letzgo.stashy.tr
 import de.letzgo.stashy.data.Prefs
 import kotlin.math.roundToInt
 
@@ -18,40 +20,40 @@ interface SortChoice {
 
 object DetailSort {
     enum class Scene(override val raw: String, override val label: String, override val field: String, override val direction: String) : SortChoice {
-        Random("random", "Random", "random", "DESC"),
-        DateDesc("dateDesc", "Date (Newest First)", "date", "DESC"),
-        DateAsc("dateAsc", "Date (Oldest First)", "date", "ASC"),
-        CreatedAtDesc("createdAtDesc", "Created (Newest First)", "created_at", "DESC"),
-        CreatedAtAsc("createdAtAsc", "Created (Oldest First)", "created_at", "ASC"),
-        TitleAsc("titleAsc", "Title (A-Z)", "title", "ASC"),
-        TitleDesc("titleDesc", "Title (Z-A)", "title", "DESC"),
-        DurationDesc("durationDesc", "Duration (Longest First)", "duration", "DESC"),
-        DurationAsc("durationAsc", "Duration (Shortest First)", "duration", "ASC"),
-        LastPlayedAtDesc("lastPlayedAtDesc", "Last Played (Newest First)", "last_played_at", "DESC"),
-        LastPlayedAtAsc("lastPlayedAtAsc", "Last Played (Oldest First)", "last_played_at", "ASC"),
-        PlayCountDesc("playCountDesc", "Most Viewed", "play_count", "DESC"),
-        PlayCountAsc("playCountAsc", "Least Viewed", "play_count", "ASC"),
-        PlayDurationDesc("playDurationDesc", "Watch Time (High-Low)", "play_duration", "DESC"),
-        PlayDurationAsc("playDurationAsc", "Watch Time (Low-High)", "play_duration", "ASC"),
-        OCounterDesc("oCounterDesc", "Counter (High-Low)", "o_counter", "DESC"),
-        OCounterAsc("oCounterAsc", "Counter (Low-High)", "o_counter", "ASC"),
-        RatingDesc("ratingDesc", "Rating (High-Low)", "rating", "DESC"),
-        RatingAsc("ratingAsc", "Rating (Low-High)", "rating", "ASC");
+        Random("random", tr(R.string.random), "random", "DESC"),
+        DateDesc("dateDesc", tr(R.string.date_newest_first), "date", "DESC"),
+        DateAsc("dateAsc", tr(R.string.date_oldest_first), "date", "ASC"),
+        CreatedAtDesc("createdAtDesc", tr(R.string.created_newest_first), "created_at", "DESC"),
+        CreatedAtAsc("createdAtAsc", tr(R.string.created_oldest_first), "created_at", "ASC"),
+        TitleAsc("titleAsc", tr(R.string.title_z), "title", "ASC"),
+        TitleDesc("titleDesc", tr(R.string.title_z_2), "title", "DESC"),
+        DurationDesc("durationDesc", tr(R.string.duration_longest_first), "duration", "DESC"),
+        DurationAsc("durationAsc", tr(R.string.duration_shortest_first), "duration", "ASC"),
+        LastPlayedAtDesc("lastPlayedAtDesc", tr(R.string.last_played_newest_first), "last_played_at", "DESC"),
+        LastPlayedAtAsc("lastPlayedAtAsc", tr(R.string.last_played_oldest_first), "last_played_at", "ASC"),
+        PlayCountDesc("playCountDesc", tr(R.string.most_viewed), "play_count", "DESC"),
+        PlayCountAsc("playCountAsc", tr(R.string.least_viewed), "play_count", "ASC"),
+        PlayDurationDesc("playDurationDesc", tr(R.string.watch_time_high_low), "play_duration", "DESC"),
+        PlayDurationAsc("playDurationAsc", tr(R.string.watch_time_low_high), "play_duration", "ASC"),
+        OCounterDesc("oCounterDesc", tr(R.string.counter_high_low), "o_counter", "DESC"),
+        OCounterAsc("oCounterAsc", tr(R.string.counter_low_high), "o_counter", "ASC"),
+        RatingDesc("ratingDesc", tr(R.string.rating_high_low), "rating", "DESC"),
+        RatingAsc("ratingAsc", tr(R.string.rating_low_high), "rating", "ASC");
         companion object { fun from(raw: String?) = entries.firstOrNull { it.raw == raw } }
     }
 
     enum class Image(override val raw: String, override val label: String, override val field: String, override val direction: String) : SortChoice {
-        TitleAsc("titleAsc", "Title (A-Z)", "title", "ASC"),
-        TitleDesc("titleDesc", "Title (Z-A)", "title", "DESC"),
-        DateDesc("dateDesc", "Date (Newest)", "date", "DESC"),
-        DateAsc("dateAsc", "Date (Oldest)", "date", "ASC"),
-        RatingDesc("ratingDesc", "Rating (High-Low)", "rating", "DESC"),
-        RatingAsc("ratingAsc", "Rating (Low-High)", "rating", "ASC"),
-        CreatedAtDesc("createdAtDesc", "Created (Newest)", "created_at", "DESC"),
-        CreatedAtAsc("createdAtAsc", "Created (Oldest)", "created_at", "ASC"),
-        UpdatedAtDesc("updatedAtDesc", "Updated (Newest)", "updated_at", "DESC"),
-        UpdatedAtAsc("updatedAtAsc", "Updated (Oldest)", "updated_at", "ASC"),
-        Random("random", "Random", "random", "DESC");
+        TitleAsc("titleAsc", tr(R.string.title_z), "title", "ASC"),
+        TitleDesc("titleDesc", tr(R.string.title_z_2), "title", "DESC"),
+        DateDesc("dateDesc", tr(R.string.date_newest), "date", "DESC"),
+        DateAsc("dateAsc", tr(R.string.date_oldest), "date", "ASC"),
+        RatingDesc("ratingDesc", tr(R.string.rating_high_low), "rating", "DESC"),
+        RatingAsc("ratingAsc", tr(R.string.rating_low_high), "rating", "ASC"),
+        CreatedAtDesc("createdAtDesc", tr(R.string.created_newest), "created_at", "DESC"),
+        CreatedAtAsc("createdAtAsc", tr(R.string.created_oldest), "created_at", "ASC"),
+        UpdatedAtDesc("updatedAtDesc", tr(R.string.updated_newest), "updated_at", "DESC"),
+        UpdatedAtAsc("updatedAtAsc", tr(R.string.updated_oldest), "updated_at", "ASC"),
+        Random("random", tr(R.string.random), "random", "DESC");
         companion object { fun from(raw: String?) = entries.firstOrNull { it.raw == raw } }
     }
 
@@ -59,14 +61,14 @@ object DetailSort {
 
 /** iOS: `DetailViewContext` (rawValues are the persisted keys). */
 enum class DetailViewContext(val raw: String, val title: String) {
-    Performer("performer_detail", "Performer Scenes"),
-    Studio("studio_detail", "Studio Scenes"),
-    Tag("tag_detail", "Tag Scenes"),
-    Gallery("gallery_detail", "Gallery Images"),
-    Group("group_detail", "Group Scenes");
+    Performer("performer_detail", tr(R.string.performer_scenes)),
+    Studio("studio_detail", tr(R.string.studio_scenes)),
+    Tag("tag_detail", tr(R.string.tag_scenes)),
+    Gallery("gallery_detail", tr(R.string.gallery_images)),
+    Group("group_detail", tr(R.string.group_scenes));
 
     /** iOS `settingsRowTitle`. */
-    val settingsRowTitle: String get() = if (this == Gallery) "Images Sort" else "Scenes Sort"
+    val settingsRowTitle: String get() = if (this == Gallery) tr(R.string.images_sort) else tr(R.string.scenes_sort)
 }
 
 /**

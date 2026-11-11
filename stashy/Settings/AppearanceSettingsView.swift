@@ -20,29 +20,29 @@ struct AppearanceSettingsView: View {
         }
         .stashySettingsList()
         .applyAppBackground()
-        .stashySettingsDetailChrome("Appearance")
+        .stashySettingsDetailChrome(tr("appearance"))
     }
 
     private var themeSection: some View {
         Section {
-            stashyScrollingSectionHeader("App Theme")
-            Picker("Theme", selection: $appearanceManager.preferredTheme) {
+            stashyScrollingSectionHeader(tr("app_theme"))
+            Picker(tr("theme"), selection: $appearanceManager.preferredTheme) {
                 ForEach(AppTheme.allCases) { theme in
                     Text(theme.rawValue).tag(theme)
                 }
             }
             .pickerStyle(.segmented)
             .stashyGroupedSettingsRow()
-            stashyScrollingSectionFooter("Choose the appearance of the app.")
+            stashyScrollingSectionFooter(tr("hint_choose_appearance_of_app"))
         }
     }
 
     private var glassSection: some View {
         Section {
-            stashyScrollingSectionHeader("Glass")
+            stashyScrollingSectionHeader(tr("glass"))
             VStack(alignment: .leading, spacing: 8) {
                 HStack {
-                    Label("Transparency", systemImage: "circle.lefthalf.filled")
+                    Label(tr("transparency"), systemImage: "circle.lefthalf.filled")
                     Spacer()
                     Text("\(Int((appearanceManager.glassTransparency * 100).rounded())) %")
                         .foregroundColor(.secondary)
@@ -55,7 +55,7 @@ struct AppearanceSettingsView: View {
 
             glassDemo
                 .stashyGroupedBlockRow(index: 1, count: 2)
-            stashyScrollingSectionFooter("How much of the content shows through buttons, pills and bars. Applies to all glass chrome.")
+            stashyScrollingSectionFooter(tr("hint_how_much_of_content_shows"))
         }
     }
 
@@ -84,14 +84,14 @@ struct AppearanceSettingsView: View {
                     HStack(spacing: StashyExpandingDock.iconLabelSpacing) {
                         Image(systemName: "chevron.left")
                             .font(.system(size: StashyExpandingDock.iconSize, weight: .semibold))
-                        Text("Back")
+                        Text(tr("back"))
                             .font(.subheadline.weight(.semibold))
                     }
                     .foregroundColor(Color.onAppTint)
                     .modifier(StashyChromePillStyle(height: StashyExpandingDock.activeHeight, accent: true))
                 }
                 Button {} label: {
-                    Text("Demo")
+                    Text(tr("demo"))
                         .font(.subheadline.weight(.semibold))
                         .foregroundColor(.white)
                         .modifier(StashyChromePillStyle(height: StashyExpandingDock.activeHeight))
@@ -111,13 +111,13 @@ struct AppearanceSettingsView: View {
         .frame(height: 96)
         .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
         .padding(.vertical, 4)
-        .accessibilityLabel("Glass preview")
+        .accessibilityLabel(tr("glass_preview"))
     }
 
     private var accentColorSection: some View {
         Section {
-            stashyScrollingSectionHeader("App Accent Color")
-            ColorPicker("Custom Color", selection: $appearanceManager.tintColor, supportsOpacity: false)
+            stashyScrollingSectionHeader(tr("app_accent_color"))
+            ColorPicker(tr("custom_color"), selection: $appearanceManager.tintColor, supportsOpacity: false)
                 .stashyGroupedBlockRow(index: 0, count: 2)
 
             LazyVGrid(columns: [GridItem(.adaptive(minimum: 44))], spacing: 10) {
@@ -143,13 +143,13 @@ struct AppearanceSettingsView: View {
             }
             .padding(.vertical, 8)
             .stashyGroupedBlockRow(index: 1, count: 2)
-            stashyScrollingSectionFooter("This color will be applied to the tab bar, navigation bar buttons, and other interactive elements throughout the app.")
+            stashyScrollingSectionFooter(tr("hint_this_color_will_be_applied"))
         }
     }
 
     private var counterIconSection: some View {
         Section {
-            stashyScrollingSectionHeader("O Counter")
+            stashyScrollingSectionHeader(tr("o_count"))
             LazyVGrid(columns: [GridItem(.adaptive(minimum: 56))], spacing: 12) {
                 ForEach(appearanceManager.oCounterIconPresets) { option in
                     counterIconItem(for: option)
@@ -157,7 +157,7 @@ struct AppearanceSettingsView: View {
             }
             .padding(.vertical, 8)
             .stashyGroupedSettingsRow()
-            stashyScrollingSectionFooter("Choose which icon to display for the O Counter throughout the app.")
+            stashyScrollingSectionFooter(tr("hint_choose_which_icon_to_display"))
         }
     }
 

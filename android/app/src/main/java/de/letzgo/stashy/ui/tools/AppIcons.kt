@@ -1,5 +1,6 @@
 package de.letzgo.stashy.ui.tools
 
+import de.letzgo.stashy.tr
 import android.content.ComponentName
 import android.content.Context
 import android.content.pm.PackageManager
@@ -43,14 +44,14 @@ import de.letzgo.stashy.ui.Theme
  * between `activity-alias`es in the manifest (`.Launcher<Name>`), one per icon.
  */
 enum class StashyAppIcon(val raw: String, val label: String, val aliasName: String, @DrawableRes val preview: Int) {
-    SystemDefault("systemDefault", "Default", "LauncherDefault", R.drawable.app_icon_choice_default),
-    Light("light", "Light", "LauncherLight", R.drawable.app_icon_choice_light),
-    Brown("brown", "Brown", "LauncherBrown", R.drawable.app_icon_choice_brown),
-    Blue("blue", "Blue", "LauncherBlue", R.drawable.app_icon_choice_blue),
-    Purple("purple", "Purple", "LauncherPurple", R.drawable.app_icon_choice_purple),
-    Pink("pink", "Pink", "LauncherPink", R.drawable.app_icon_choice_pink),
-    Rainbow("rainbow", "Rainbow", "LauncherRainbow", R.drawable.app_icon_choice_rainbow),
-    Gold("gold", "Gold", "LauncherGold", R.drawable.app_icon_choice_gold);
+    SystemDefault("systemDefault", tr(R.string.default_label), "LauncherDefault", R.drawable.app_icon_choice_default),
+    Light("light", tr(R.string.light), "LauncherLight", R.drawable.app_icon_choice_light),
+    Brown("brown", tr(R.string.brown), "LauncherBrown", R.drawable.app_icon_choice_brown),
+    Blue("blue", tr(R.string.blue), "LauncherBlue", R.drawable.app_icon_choice_blue),
+    Purple("purple", tr(R.string.purple), "LauncherPurple", R.drawable.app_icon_choice_purple),
+    Pink("pink", tr(R.string.pink), "LauncherPink", R.drawable.app_icon_choice_pink),
+    Rainbow("rainbow", tr(R.string.rainbow), "LauncherRainbow", R.drawable.app_icon_choice_rainbow),
+    Gold("gold", tr(R.string.gold), "LauncherGold", R.drawable.app_icon_choice_gold);
 
     companion object { fun from(raw: String?) = entries.firstOrNull { it.raw == raw } ?: SystemDefault }
 }
@@ -69,7 +70,7 @@ object AppIcons {
     /** iOS: `select(_:)` — refuses without stashy+ (toast like iOS). */
     fun select(icon: StashyAppIcon, context: Context = Prefs.appContext) {
         if (!StashyPlus.isUnlocked) {
-            showToast("Custom app icons are part of stashy+. Unlock in Settings")
+            showToast(tr(R.string.hint_custom_app_icons_are_part))
             return
         }
         set(icon, context)
@@ -87,7 +88,7 @@ object AppIcons {
             }
             current = icon
             Prefs.setString(PREF_KEY, icon.raw)
-        }.onFailure { showToast(it.message ?: "This device cannot change the app icon") }
+        }.onFailure { showToast(it.message ?: tr(R.string.hint_this_device_cannot_change_app)) }
     }
 
     /** iOS: `revertToDefaultIfNeeded()` — called when stashy+ is no longer active. */

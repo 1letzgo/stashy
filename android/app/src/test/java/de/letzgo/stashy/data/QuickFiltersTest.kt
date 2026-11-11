@@ -64,7 +64,7 @@ class QuickFiltersTest {
         val tags = obj("""{"value":["1"],"excludes":["2"],"modifier":"INCLUDES","depth":0}""")
         assertEquals("#Blonde, −#Solo", QuickFilterCatalog.chipLabel("tags", tags, FilterMode.Scenes, mapOf("1" to "Blonde", "2" to "Solo")))
         assertEquals("Tags: 1 selected, 1 excluded", QuickFilterCatalog.chipLabel("tags", tags, FilterMode.Scenes, emptyMap()))
-        assertEquals("O-Count: > 2", QuickFilterCatalog.chipLabel("o_counter", obj("""{"value":2,"modifier":"GREATER_THAN"}"""), FilterMode.Scenes, emptyMap()))
+        assertEquals("O Count: > 2", QuickFilterCatalog.chipLabel("o_counter", obj("""{"value":2,"modifier":"GREATER_THAN"}"""), FilterMode.Scenes, emptyMap()))
     }
 
     @Test fun toggledEntityCriterionKeepsExcludesAndDefaultsToAll() {

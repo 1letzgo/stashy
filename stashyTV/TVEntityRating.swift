@@ -59,7 +59,7 @@ enum TVEntityRating {
 
     static func buttonTitle(_ rating100: Int?) -> String {
         let value = stars(rating100)
-        return value == 0 ? "Rate" : "\(value)/5"
+        return value == 0 ? tr("action_rate") : "\(value)/5"
     }
 }
 
@@ -68,15 +68,15 @@ extension View {
     func tvRatingDialog(isPresented: Binding<Bool>,
                         current rating100: Int?,
                         onPick: @escaping (Int?) -> Void) -> some View {
-        confirmationDialog("Rating", isPresented: isPresented, titleVisibility: .visible) {
+        confirmationDialog(tr("rating"), isPresented: isPresented, titleVisibility: .visible) {
             let current = TVEntityRating.stars(rating100)
             ForEach((0...5).reversed(), id: \.self) { stars in
-                let label = stars == 0 ? "No Rating" : String(repeating: "★", count: stars)
+                let label = stars == 0 ? tr("empty_rating") : String(repeating: "★", count: stars)
                 Button(stars == current ? "✓ \(label)" : label) {
                     onPick(stars == 0 ? nil : stars * 20)
                 }
             }
-            Button("Cancel", role: .cancel) {}
+            Button(tr("action_cancel"), role: .cancel) {}
         }
     }
 }

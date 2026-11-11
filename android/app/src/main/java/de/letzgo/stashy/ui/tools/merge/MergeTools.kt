@@ -1,5 +1,7 @@
 package de.letzgo.stashy.ui.tools.merge
 
+import de.letzgo.stashy.R
+import de.letzgo.stashy.tr
 import de.letzgo.stashy.ui.bottomBarContentPadding
 import de.letzgo.stashy.ui.scaledIconSize
 import androidx.compose.foundation.ExperimentalFoundationApi
@@ -153,7 +155,7 @@ fun StudioMergeToolView(topPadding: Dp = toolsTopPadding()) {
 fun <T : MergeableItem> MergeToolsView(config: MergeToolsConfig<T>, topPadding: Dp = toolsTopPadding()) {
     val nounTitle = config.nounPlural.replaceFirstChar { it.uppercase() }
     if (ServerConfigManager.activeConfig == null) {
-        NoServerPlaceholder(Icons.Filled.MergeType, "Connect to a Stash server to merge $nounTitle.")
+        NoServerPlaceholder(Icons.Filled.MergeType, tr(R.string.hint_connect_to_stash_server_to_merge, nounTitle))
         return
     }
     // Each server has its own list and templates.
@@ -242,7 +244,7 @@ private fun <T : MergeableItem> MergeToolsContent(config: MergeToolsConfig<T>, n
         val total = preset.sources.size
         val noun = if (total == 1) "source" else "sources"
         if (allItems.isEmpty()) return "$total $noun"
-        return "${total - missing} of $total $noun on the server"
+        return tr(R.string.hint_arg_of_arg_arg_on, total - missing, total, noun)
     }
 
     fun nounFor(count: Int) = if (count == 1) config.noun else config.nounPlural
@@ -259,7 +261,7 @@ private fun <T : MergeableItem> MergeToolsContent(config: MergeToolsConfig<T>, n
                 throw e
             } catch (e: Exception) {
                 isLoading = false
-                showToast("Failed to load ${config.nounPlural}")
+                showToast(tr(R.string.error_load_arg, config.nounPlural))
             }
         }
     }
@@ -286,7 +288,7 @@ private fun <T : MergeableItem> MergeToolsContent(config: MergeToolsConfig<T>, n
         if (missingNames.isNotEmpty()) {
             val shown = missingNames.take(3).joinToString(", ")
             val rest = missingNames.size - minOf(3, missingNames.size)
-            showToast("Not on this server (kept in template): $shown${if (rest > 0) " +$rest more" else ""}", long = true)
+            showToast(tr(R.string.hint_not_on_this_server_kept, shown, if (rest > 0) " +$rest more" else ""), long = true)
         }
     }
 
@@ -298,7 +300,7 @@ private fun <T : MergeableItem> MergeToolsContent(config: MergeToolsConfig<T>, n
         val preset = MergePreset(name = name, destination = entry(dest), sources = selectedSources.map { entry(it) } + missingPresetSources())
         presets.save(preset)
         activePreset = preset
-        showToast("Template saved")
+        showToast(tr(R.string.template_saved))
     }
 
     fun updateActivePreset() {
@@ -308,7 +310,7 @@ private fun <T : MergeableItem> MergeToolsContent(config: MergeToolsConfig<T>, n
         val destEntry = destination?.let { entry(it) } ?: active.destination
         presets.update(active.id, destEntry, selectedSources.map { entry(it) } + missingPresetSources())
         activePreset = presets.presets.firstOrNull { it.id == active.id }
-        showToast("Template updated")
+        showToast(tr(R.string.template_updated))
     }
 
     fun clearSelection() {
@@ -341,7 +343,7 @@ private fun <T : MergeableItem> MergeToolsContent(config: MergeToolsConfig<T>, n
                 throw e
             } catch (e: Exception) {
                 isMerging = false
-                showToast("Merge failed: ${e.message}", long = true)
+                showToast(tr(R.string.action_merge_failed_arg, e.message), long = true)
             }
         }
     }
@@ -413,7 +415,7 @@ private fun <T : MergeableItem> MergeToolsContent(config: MergeToolsConfig<T>, n
                         contentAlignment = Alignment.Center,
                     ) {
                         Icon(
-                            Icons.AutoMirrored.Filled.PlaylistPlay, "Run all templates",
+                            Icons.AutoMirrored.Filled.PlaylistPlay, tr(R.string.action_run_all_templates),
                             tint = if (runnable > 0) tint else p.secondaryText, modifier = Modifier.size(20.dp),
                         )
                     }
@@ -451,7 +453,7 @@ private fun <T : MergeableItem> MergeToolsContent(config: MergeToolsConfig<T>, n
                 }
             }
 
-            NativeSearchField(searchText, { searchText = it }, "Search ${config.nounPlural}", Modifier.padding(top = Tokens.Spacing.sm))
+            NativeSearchField(searchText, { searchText = it }, tr(R.string.search_arg, config.nounPlural), Modifier.padding(top = Tokens.Spacing.sm))
 
             // Category heading over the list, Settings style.
             NativeSectionHeader(nounTitle, Modifier.padding(top = 12.dp))
@@ -477,7 +479,7 @@ private fun <T : MergeableItem> MergeToolsContent(config: MergeToolsConfig<T>, n
                 }
                 filtered.isEmpty() -> item(key = "empty") {
                     Text(
-                        if (allItems.isEmpty()) "This server has no ${config.nounPlural} yet." else "No matches",
+                        if (allItems.isEmpty()) tr(R.string.hint_this_server_has_no_arg, config.nounPlural) else tr(R.string.empty_matches),
                         style = NativeType.bodyMedium, color = p.secondaryText,
                         modifier = Modifier.fillMaxWidth().background(p.secondaryBackground, cardShape(true, true)).padding(16.dp),
                     )
@@ -498,7 +500,7 @@ private fun <T : MergeableItem> MergeToolsContent(config: MergeToolsConfig<T>, n
                     if (showsMoreFooter) item(key = "more") {
                         Column(Modifier.fillMaxWidth().background(p.secondaryBackground, cardShape(false, true))) {
                             NativeDivider()
-                            NativeListItem("Loading more...", headlineColor = p.secondaryText, leading = { SmallSpinner() })
+                            NativeListItem(tr(R.string.loading_more), headlineColor = p.secondaryText, leading = { SmallSpinner() })
                         }
                     }
                 }
@@ -529,9 +531,9 @@ private fun <T : MergeableItem> MergeToolsContent(config: MergeToolsConfig<T>, n
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     if (isMerging) SmallSpinner(Color.White)
-                    Text(if (isMerging) "Merging..." else "Merge $nounTitle", style = IosTypography.body.copy(fontWeight = FontWeight.SemiBold), color = Color.White)
+                    Text(if (isMerging) "Merging..." else tr(R.string.action_merge_arg, nounTitle), style = IosTypography.body.copy(fontWeight = FontWeight.SemiBold), color = Color.White)
                 }
-                MergeSecondaryButton("Save", canSavePreset) {
+                MergeSecondaryButton(tr(R.string.action_save), canSavePreset) {
                     val active = activePreset
                     if (active != null && presets.presets.any { it.id == active.id }) {
                         showingSaveChoice = true
@@ -540,7 +542,7 @@ private fun <T : MergeableItem> MergeToolsContent(config: MergeToolsConfig<T>, n
                         showingSavePrompt = true
                     }
                 }
-                MergeSecondaryButton("Clear", hasSelection && !isMerging) { clearSelection() }
+                MergeSecondaryButton(tr(R.string.action_clear), hasSelection && !isMerging) { clearSelection() }
             }
         }
     }
@@ -564,10 +566,10 @@ private fun <T : MergeableItem> MergeToolsContent(config: MergeToolsConfig<T>, n
     if (showingConfirmation) {
         val dest = destination
         StashyAlert(
-            title = "Merge ${config.nounPlural}?",
-            message = dest?.let { "${selectedSources.joinToString(", ") { s -> s.name }} will be merged into ${it.name} and then deleted. This cannot be undone." } ?: "",
+            title = tr(R.string.confirm_merge_arg, config.nounPlural),
+            message = dest?.let { tr(R.string.hint_arg_will_be_merged_into, selectedSources.joinToString(", ") { s -> s.name }, it.name) } ?: "",
             onDismiss = { showingConfirmation = false },
-            confirmLabel = "Merge", destructive = true, dismissLabel = "Cancel",
+            confirmLabel = tr(R.string.action_merge), destructive = true, dismissLabel = tr(R.string.action_cancel),
             onConfirm = { showingConfirmation = false; merge() },
         )
     }
@@ -576,14 +578,14 @@ private fun <T : MergeableItem> MergeToolsContent(config: MergeToolsConfig<T>, n
         val runnable = runnablePresets()
         val sourceCount = runnable.sumOf { it.sources.size }
         val skipped = presets.presets.size - runnable.size
-        var text = "${runnable.size} of ${presets.presets.size} templates have something to merge: " +
-            "$sourceCount ${nounFor(sourceCount)} will be merged into their destinations, one template after another."
-        if (skipped > 0) text += " $skipped ${if (skipped == 1) "template has" else "templates have"} nothing to do right now and will be skipped."
-        text += " This cannot be undone."
+        var text = tr(R.string.hint_arg_of_arg_templates_have, runnable.size, presets.presets.size) +
+            tr(R.string.hint_arg_arg_will_be_merged, sourceCount, nounFor(sourceCount))
+        if (skipped > 0) text += tr(R.string.hint_arg_arg_nothing_to_do, skipped, if (skipped == 1) "template has" else "templates have")
+        text += tr(R.string.this_cannot_be_undone)
         StashyAlert(
-            title = "Run all templates?", message = text,
+            title = tr(R.string.confirm_run_all_templates), message = text,
             onDismiss = { showingRunAllConfirmation = false },
-            confirmLabel = "Merge all", destructive = true, dismissLabel = "Cancel",
+            confirmLabel = tr(R.string.action_merge_all), destructive = true, dismissLabel = tr(R.string.action_cancel),
             onConfirm = { showingRunAllConfirmation = false; runAllPresets() },
         )
     }
@@ -599,10 +601,10 @@ private fun <T : MergeableItem> MergeToolsContent(config: MergeToolsConfig<T>, n
 
     presetToDelete?.let { preset ->
         StashyAlert(
-            title = "Delete template?",
-            message = "\"${preset.name}\" will be removed from this device.",
+            title = tr(R.string.confirm_delete_template),
+            message = tr(R.string.hint_arg_will_be_removed_from, preset.name),
             onDismiss = { presetToDelete = null },
-            confirmLabel = "Delete", destructive = true, dismissLabel = "Cancel",
+            confirmLabel = tr(R.string.action_delete), destructive = true, dismissLabel = tr(R.string.action_cancel),
             onConfirm = {
                 presets.delete(preset)
                 if (activePreset?.id == preset.id) activePreset = null
@@ -614,14 +616,14 @@ private fun <T : MergeableItem> MergeToolsContent(config: MergeToolsConfig<T>, n
     if (showingSaveChoice) {
         val active = activePreset
         val actions = buildList<Pair<String, () -> Unit>> {
-            if (active != null) add("Update \"${active.name}\"" to { showingSaveChoice = false; updateActivePreset() })
-            add("Save as new" to {
+            if (active != null) add(tr(R.string.action_update_arg, active.name) to { showingSaveChoice = false; updateActivePreset() })
+            add(tr(R.string.action_save_as_new) to {
                 showingSaveChoice = false
                 presetName = destination?.name ?: ""
                 showingSavePrompt = true
             })
         }
-        MergeChoiceDialog("Save template", actions) { showingSaveChoice = false }
+        MergeChoiceDialog(tr(R.string.action_save_template), actions) { showingSaveChoice = false }
     }
 }
 
@@ -641,12 +643,12 @@ private fun DestinationField(name: String?, summary: String?, onClick: () -> Uni
         if (name != null) {
             NativeListItem(
                 name,
-                supporting = listOfNotNull("Merge into", summary).joinToString(" · "),
+                supporting = listOfNotNull(tr(R.string.action_merge_into), summary).joinToString(" · "),
                 icon = SF.arrowTriangleMerge,
                 onClick = onClick,
             )
         } else {
-            NativeListItem("Merge into…", icon = SF.arrowTriangleMerge, headlineColor = Theme.palette.secondaryText, onClick = onClick)
+            NativeListItem(tr(R.string.action_merge_into_menu), icon = SF.arrowTriangleMerge, headlineColor = Theme.palette.secondaryText, onClick = onClick)
         }
     }
 }
@@ -684,12 +686,12 @@ private fun MergeSavePrompt(name: String, onNameChange: (String) -> Unit, onSave
         onDismissRequest = onCancel,
         containerColor = p.secondaryBackground,
         titleContentColor = p.text,
-        title = { Text("Save template", style = IosTypography.headline) },
+        title = { Text(tr(R.string.action_save_template), style = IosTypography.headline) },
         text = {
-            NativeTextField(name, onNameChange, label = null, placeholder = "Name", autoCorrect = true)
+            NativeTextField(name, onNameChange, label = null, placeholder = tr(R.string.name), autoCorrect = true)
         },
-        confirmButton = { TextButton(onClick = onSave) { Text("Save", color = tint, fontWeight = FontWeight.SemiBold) } },
-        dismissButton = { TextButton(onClick = onCancel) { Text("Cancel", color = tint) } },
+        confirmButton = { TextButton(onClick = onSave) { Text(tr(R.string.action_save), color = tint, fontWeight = FontWeight.SemiBold) } },
+        dismissButton = { TextButton(onClick = onCancel) { Text(tr(R.string.action_cancel), color = tint) } },
     )
 }
 
@@ -708,7 +710,7 @@ private fun MergeChoiceDialog(title: String, actions: List<Pair<String, () -> Un
                 actions.forEach { (label, action) ->
                     TextButton(onClick = action) { Text(label, color = tint, fontWeight = FontWeight.SemiBold) }
                 }
-                TextButton(onClick = onCancel) { Text("Cancel", color = tint) }
+                TextButton(onClick = onCancel) { Text(tr(R.string.action_cancel), color = tint) }
             }
         },
     )
@@ -740,7 +742,7 @@ private fun <T : MergeableItem> MergeDestinationSheet(
     ModalBottomSheet(onDismissRequest = onCancel, sheetState = state, containerColor = p.background) {
         Column(Modifier.fillMaxSize().statusBarsPadding()) {
             // iOS: `stashyModalSheetChrome("Merge into", onBack:)` → Material sheet top bar.
-            de.letzgo.stashy.ui.NativeSheetTopBar("Merge into", onClose = onCancel, closeDescription = "Cancel")
+            de.letzgo.stashy.ui.NativeSheetTopBar(tr(R.string.action_merge_into), onClose = onCancel, closeDescription = tr(R.string.action_cancel))
             LazyColumn(Modifier.weight(1f).fillMaxWidth(), contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp)) {
                 item(key = "search") {
                     NativeSearchField(searchText, { searchText = it }, "Search...", Modifier.padding(bottom = 12.dp))
@@ -761,7 +763,7 @@ private fun <T : MergeableItem> MergeDestinationSheet(
                 if (more) item(key = "more") {
                     Column(Modifier.fillMaxWidth().background(p.secondaryBackground, cardShape(shown.isEmpty(), true))) {
                         if (shown.isNotEmpty()) NativeDivider()
-                        NativeListItem("Loading more...", headlineColor = p.secondaryText, leading = { SmallSpinner() })
+                        NativeListItem(tr(R.string.loading_more), headlineColor = p.secondaryText, leading = { SmallSpinner() })
                     }
                 }
                 item { Spacer(Modifier.height(32.dp)) }

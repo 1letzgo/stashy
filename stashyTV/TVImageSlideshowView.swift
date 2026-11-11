@@ -37,7 +37,7 @@ struct TVSlideshowButton: View {
         Button(action: action) {
             HStack(spacing: 12) {
                 Image(systemName: "play.rectangle.on.rectangle")
-                Text("Slideshow")
+                Text(tr("slideshow"))
             }
             .font(.headline)
             .padding(.horizontal, 24)
@@ -100,7 +100,7 @@ struct TVImageSlideshowView: View {
                 VStack(spacing: 20) {
                     Image(systemName: "photo")
                         .font(.system(size: 64))
-                    Text("No images")
+                    Text(tr("empty_images"))
                         .font(.title2)
                 }
                 .foregroundStyle(.secondary)
@@ -164,11 +164,11 @@ struct TVImageSlideshowView: View {
             Spacer()
 
             HStack(spacing: 28) {
-                Label(isPaused ? "Paused" : "Playing", systemImage: isPaused ? "pause.fill" : "play.fill")
+                Label(isPaused ? tr("paused") : tr("playing"), systemImage: isPaused ? "pause.fill" : "play.fill")
                     .foregroundStyle(.white)
-                Text("Every \(TVSlideshowSettings.label(for: interval))")
+                Text(tr("every_arg", TVSlideshowSettings.label(for: interval)))
                     .foregroundStyle(.white.opacity(0.85))
-                Text("◀ ▶ Browse · ⏯ Pause · Click: Speed · Menu: Exit")
+                Text(("◀ ▶ " + tr("hint_browse_pause_click_speed_menu")))
                     .foregroundStyle(.white.opacity(0.55))
             }
             .font(.system(size: 24, weight: .medium))

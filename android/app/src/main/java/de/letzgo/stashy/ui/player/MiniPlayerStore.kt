@@ -1,5 +1,7 @@
 package de.letzgo.stashy.ui.player
 
+import de.letzgo.stashy.R
+import de.letzgo.stashy.tr
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -272,7 +274,7 @@ object MiniPlayerStore {
             nowPlayingAutoPlays = false
             nowPlayingScene = first
             showsNowPlaying = true
-        } else de.letzgo.stashy.ui.tools.showToast("Watchlist is empty")
+        } else de.letzgo.stashy.ui.tools.showToast(tr(R.string.watchlist_is_empty))
     }
 
     /** Now Playing reached the end of [currentId]: on to what comes next, if anything. */
@@ -560,7 +562,7 @@ private fun MiniPlayerBarContent(session: MiniPlayerStore.Session) {
                 ) { change, amount -> change.consume(); dragX += amount.x; dragY += amount.y }
             }
             .clickable { MiniPlayerStore.expand() }
-            .semantics { contentDescription = "Mini player: ${scene.displayTitle}. Opens the player" },
+            .semantics { contentDescription = tr(R.string.hint_mini_player_arg_opens_player, scene.displayTitle) },
     ) {
         Row(
             Modifier.fillMaxWidth().fillMaxHeight().padding(start = 8.dp, end = 6.dp),
@@ -578,10 +580,10 @@ private fun MiniPlayerBarContent(session: MiniPlayerStore.Session) {
                 if (subtitle.isNotEmpty()) Text(subtitle, fontSize = 12.sp, color = p.secondaryText, maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
             IconButton(onClick = { MiniPlayerStore.togglePlayPause() }, modifier = Modifier.size(40.dp)) {
-                Icon(if (playing) SF.pauseFill else SF.playFill, if (playing) "Pause" else "Play", tint = p.text)
+                Icon(if (playing) SF.pauseFill else SF.playFill, if (playing) tr(R.string.action_pause) else tr(R.string.action_play), tint = p.text)
             }
             IconButton(onClick = { MiniPlayerStore.close() }, modifier = Modifier.size(36.dp)) {
-                Icon(SF.xmark, "Close mini player", tint = p.text, modifier = Modifier.size(20.dp))
+                Icon(SF.xmark, tr(R.string.action_close_mini_player), tint = p.text, modifier = Modifier.size(20.dp))
             }
         }
         MiniPlayerProgressLine(player, Modifier.align(Alignment.BottomStart).padding(horizontal = 12.dp).fillMaxWidth().height(2.dp))

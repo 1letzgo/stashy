@@ -1,5 +1,7 @@
 package de.letzgo.stashy.data
 
+import de.letzgo.stashy.R
+import de.letzgo.stashy.tr
 /*
  * Sort options used by the Feeds tab. Raw values (enum names), labels, GraphQL fields and
  * directions are identical to iOS (`StashDBViewModel.SceneSortOption`,
@@ -19,24 +21,24 @@ interface FeedSort {
 /** iOS: `StashDBViewModel.SceneSortOption`. */
 enum class SceneSortOption(override val displayName: String, override val sortField: String, override val direction: String) : FeedSort {
     random("Random", "random", "DESC"),
-    dateDesc("Date (Newest First)", "date", "DESC"),
-    dateAsc("Date (Oldest First)", "date", "ASC"),
-    createdAtDesc("Created (Newest First)", "created_at", "DESC"),
-    createdAtAsc("Created (Oldest First)", "created_at", "ASC"),
-    titleAsc("Title (A-Z)", "title", "ASC"),
-    titleDesc("Title (Z-A)", "title", "DESC"),
-    durationDesc("Duration (Longest First)", "duration", "DESC"),
-    durationAsc("Duration (Shortest First)", "duration", "ASC"),
-    lastPlayedAtDesc("Last Played (Newest First)", "last_played_at", "DESC"),
-    lastPlayedAtAsc("Last Played (Oldest First)", "last_played_at", "ASC"),
-    playCountDesc("Most Viewed", "play_count", "DESC"),
-    playCountAsc("Least Viewed", "play_count", "ASC"),
-    playDurationDesc("Watch Time (High-Low)", "play_duration", "DESC"),
-    playDurationAsc("Watch Time (Low-High)", "play_duration", "ASC"),
-    oCounterDesc("Counter (High-Low)", "o_counter", "DESC"),
-    oCounterAsc("Counter (Low-High)", "o_counter", "ASC"),
-    ratingDesc("Rating (High-Low)", "rating", "DESC"),
-    ratingAsc("Rating (Low-High)", "rating", "ASC");
+    dateDesc(tr(R.string.date_newest_first), "date", "DESC"),
+    dateAsc(tr(R.string.date_oldest_first), "date", "ASC"),
+    createdAtDesc(tr(R.string.created_newest_first), "created_at", "DESC"),
+    createdAtAsc(tr(R.string.created_oldest_first), "created_at", "ASC"),
+    titleAsc(tr(R.string.title_z), "title", "ASC"),
+    titleDesc(tr(R.string.title_z_2), "title", "DESC"),
+    durationDesc(tr(R.string.duration_longest_first), "duration", "DESC"),
+    durationAsc(tr(R.string.duration_shortest_first), "duration", "ASC"),
+    lastPlayedAtDesc(tr(R.string.last_played_newest_first), "last_played_at", "DESC"),
+    lastPlayedAtAsc(tr(R.string.last_played_oldest_first), "last_played_at", "ASC"),
+    playCountDesc(tr(R.string.most_viewed), "play_count", "DESC"),
+    playCountAsc(tr(R.string.least_viewed), "play_count", "ASC"),
+    playDurationDesc(tr(R.string.watch_time_high_low), "play_duration", "DESC"),
+    playDurationAsc(tr(R.string.watch_time_low_high), "play_duration", "ASC"),
+    oCounterDesc(tr(R.string.counter_high_low), "o_counter", "DESC"),
+    oCounterAsc(tr(R.string.counter_low_high), "o_counter", "ASC"),
+    ratingDesc(tr(R.string.rating_high_low), "rating", "DESC"),
+    ratingAsc(tr(R.string.rating_low_high), "rating", "ASC");
 
     override val raw: String get() = name
 
@@ -58,14 +60,14 @@ enum class SceneSortOption(override val displayName: String, override val sortFi
 /** iOS: `StashDBViewModel.SceneMarkerSortOption`. */
 enum class SceneMarkerSortOption(override val displayName: String, override val sortField: String, override val direction: String) : FeedSort {
     random("Random", "random", "DESC"),
-    createdAtDesc("Created (Newest First)", "created_at", "DESC"),
-    createdAtAsc("Created (Oldest First)", "created_at", "ASC"),
-    updatedAtDesc("Updated (Newest First)", "updated_at", "DESC"),
-    updatedAtAsc("Updated (Oldest First)", "updated_at", "ASC"),
-    titleAsc("Title (A-Z)", "title", "ASC"),
-    titleDesc("Title (Z-A)", "title", "DESC"),
-    secondsAsc("Time (Start)", "seconds", "ASC"),
-    secondsDesc("Time (End)", "seconds", "DESC");
+    createdAtDesc(tr(R.string.created_newest_first), "created_at", "DESC"),
+    createdAtAsc(tr(R.string.created_oldest_first), "created_at", "ASC"),
+    updatedAtDesc(tr(R.string.updated_newest_first), "updated_at", "DESC"),
+    updatedAtAsc(tr(R.string.updated_oldest_first), "updated_at", "ASC"),
+    titleAsc(tr(R.string.title_z), "title", "ASC"),
+    titleDesc(tr(R.string.title_z_2), "title", "DESC"),
+    secondsAsc(tr(R.string.time_start), "seconds", "ASC"),
+    secondsDesc(tr(R.string.time_end), "seconds", "DESC");
 
     override val raw: String get() = name
 
@@ -76,16 +78,16 @@ enum class SceneMarkerSortOption(override val displayName: String, override val 
 
 /** iOS: `StashDBViewModel.ImageSortOption` (Clips, Pics). */
 enum class ImageSortOption(override val displayName: String, override val sortField: String, override val direction: String) : FeedSort {
-    titleAsc("Title (A-Z)", "title", "ASC"),
-    titleDesc("Title (Z-A)", "title", "DESC"),
-    dateDesc("Date (Newest)", "date", "DESC"),
-    dateAsc("Date (Oldest)", "date", "ASC"),
-    ratingDesc("Rating (High-Low)", "rating", "DESC"),
-    ratingAsc("Rating (Low-High)", "rating", "ASC"),
-    createdAtDesc("Created (Newest)", "created_at", "DESC"),
-    createdAtAsc("Created (Oldest)", "created_at", "ASC"),
-    updatedAtDesc("Updated (Newest)", "updated_at", "DESC"),
-    updatedAtAsc("Updated (Oldest)", "updated_at", "ASC"),
+    titleAsc(tr(R.string.title_z), "title", "ASC"),
+    titleDesc(tr(R.string.title_z_2), "title", "DESC"),
+    dateDesc(tr(R.string.date_newest), "date", "DESC"),
+    dateAsc(tr(R.string.date_oldest), "date", "ASC"),
+    ratingDesc(tr(R.string.rating_high_low), "rating", "DESC"),
+    ratingAsc(tr(R.string.rating_low_high), "rating", "ASC"),
+    createdAtDesc(tr(R.string.created_newest), "created_at", "DESC"),
+    createdAtAsc(tr(R.string.created_oldest), "created_at", "ASC"),
+    updatedAtDesc(tr(R.string.updated_newest), "updated_at", "DESC"),
+    updatedAtAsc(tr(R.string.updated_oldest), "updated_at", "ASC"),
     random("Random", "random", "DESC");
 
     override val raw: String get() = name
@@ -112,8 +114,8 @@ enum class ImageSortOption(override val displayName: String, override val sortFi
 object FeedSortKinds {
     val scene = listOf(
         SortFieldKind("date", "Date"), SortFieldKind("created_at", "Created"), SortFieldKind("title", "Title"),
-        SortFieldKind("duration", "Duration"), SortFieldKind("last_played_at", "Last played"),
-        SortFieldKind("play_count", "Play count"), SortFieldKind("play_duration", "Watch time"),
+        SortFieldKind("duration", "Duration"), SortFieldKind("last_played_at", "Last Played"),
+        SortFieldKind("play_count", "Play Count"), SortFieldKind("play_duration", "Watch time"),
         SortFieldKind("o_counter", "O Count"), SortFieldKind("rating", "Rating"), SortFieldKind("random", "Random"),
     )
     val marker = listOf(

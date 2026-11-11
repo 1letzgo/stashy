@@ -1,5 +1,7 @@
 package de.letzgo.stashy.ui.components
 
+import de.letzgo.stashy.R
+import de.letzgo.stashy.tr
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.horizontalScroll
@@ -127,7 +129,7 @@ fun TagChipRow(
 fun AddTagChip(style: TagChipStyle, onClick: () -> Unit) {
     AssistChip(
         onClick = onClick,
-        label = { Text("Add tag", style = MaterialTheme.typography.labelLarge, maxLines = 1) },
+        label = { Text(tr(R.string.action_add_tag), style = MaterialTheme.typography.labelLarge, maxLines = 1) },
         leadingIcon = { Icon(SF.plus, null, Modifier.size(AssistChipDefaults.IconSize)) },
         colors = tagChipColors(style),
         border = tagChipBorder(style),
@@ -152,7 +154,7 @@ fun TagChip(tag: IdName, style: TagChipStyle, onClick: () -> Unit, onRemove: (()
         )
         DropdownMenu(menu, { menu = false }, containerColor = Theme.palette.secondaryBackground) {
             DropdownMenuItem(
-                { Text("Remove tag", color = StashyColors.systemRed) },
+                { Text(tr(R.string.action_remove_tag), color = StashyColors.systemRed) },
                 leadingIcon = { Icon(SF.trash, null, tint = StashyColors.systemRed) },
                 onClick = { menu = false; onRemove?.invoke() },
             )

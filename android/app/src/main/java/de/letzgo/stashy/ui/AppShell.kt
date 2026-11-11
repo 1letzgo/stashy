@@ -1,5 +1,7 @@
 package de.letzgo.stashy.ui
 
+import de.letzgo.stashy.R
+import de.letzgo.stashy.tr
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
@@ -271,12 +273,12 @@ private fun ShellAlerts() {
     }
     when (alert) {
         ShellAlert.IncompleteSetup -> NativeConfirmDialog(
-            "Incomplete Setup", "Your server configuration is missing some details.",
-            onDismiss = ::dismiss, confirmLabel = "Check Settings", dismissLabel = null, onConfirm = ::openServerSettings,
+            tr(R.string.incomplete_setup), tr(R.string.hint_your_server_configuration_is_missing),
+            onDismiss = ::dismiss, confirmLabel = tr(R.string.check_settings), dismissLabel = null, onConfirm = ::openServerSettings,
         )
         ShellAlert.AuthExpired -> NativeConfirmDialog(
-            "Authentication Required", "Your API key is invalid or expired. Please check your server configuration.",
-            onDismiss = ::dismiss, confirmLabel = "Update API Key", dismissLabel = null, onConfirm = ::openServerSettings,
+            tr(R.string.authentication_required), tr(R.string.hint_your_api_key_is_invalid),
+            onDismiss = ::dismiss, confirmLabel = tr(R.string.action_update_api_key), dismissLabel = null, onConfirm = ::openServerSettings,
         )
     }
 }
@@ -303,11 +305,11 @@ private fun FloatingTabBar(modifier: Modifier = Modifier) {
     val p = Theme.palette
     val items = listOf(
         // Material convention: outlined when inactive, filled when selected.
-        TabItem(MainTab.Home, "Home", androidx.compose.material.icons.Icons.Outlined.Home, androidx.compose.material.icons.Icons.Filled.Home),
-        TabItem(MainTab.Feeds, "Feeds", androidx.compose.material.icons.Icons.Outlined.VideoLibrary, androidx.compose.material.icons.Icons.Filled.VideoLibrary),
+        TabItem(MainTab.Home, tr(R.string.home), androidx.compose.material.icons.Icons.Outlined.Home, androidx.compose.material.icons.Icons.Filled.Home),
+        TabItem(MainTab.Feeds, tr(R.string.feeds), androidx.compose.material.icons.Icons.Outlined.VideoLibrary, androidx.compose.material.icons.Icons.Filled.VideoLibrary),
         ToolsTab.item(),
-        TabItem(MainTab.Settings, "Settings", androidx.compose.material.icons.Icons.Outlined.Settings, androidx.compose.material.icons.Icons.Filled.Settings),
-        TabItem(MainTab.Search, "Search", androidx.compose.material.icons.Icons.Outlined.Search, androidx.compose.material.icons.Icons.Filled.Search),
+        TabItem(MainTab.Settings, tr(R.string.settings), androidx.compose.material.icons.Icons.Outlined.Settings, androidx.compose.material.icons.Icons.Filled.Settings),
+        TabItem(MainTab.Search, tr(R.string.search), androidx.compose.material.icons.Icons.Outlined.Search, androidx.compose.material.icons.Icons.Filled.Search),
     )
     val density = androidx.compose.ui.platform.LocalDensity.current
     val navInset = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
@@ -344,6 +346,6 @@ private fun FloatingTabBar(modifier: Modifier = Modifier) {
 /** The Tools slot shows "stashy+" while locked (iOS `TabManager.visibleTabs`). */
 private object ToolsTab {
     fun item(): TabItem =
-        if (de.letzgo.stashy.data.StashyPlus.isUnlocked) TabItem(MainTab.Tools, "Tools", androidx.compose.material.icons.Icons.Outlined.Inventory2, androidx.compose.material.icons.Icons.Filled.Inventory2)
+        if (de.letzgo.stashy.data.StashyPlus.isUnlocked) TabItem(MainTab.Tools, tr(R.string.tools), androidx.compose.material.icons.Icons.Outlined.Inventory2, androidx.compose.material.icons.Icons.Filled.Inventory2)
         else TabItem(MainTab.Tools, "stashy+", androidx.compose.material.icons.Icons.Outlined.AutoAwesome, androidx.compose.material.icons.Icons.Filled.AutoAwesome)
 }

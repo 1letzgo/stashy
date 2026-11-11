@@ -23,26 +23,26 @@ enum SceneLiveTranscriptionError: LocalizedError {
     var errorDescription: String? {
         switch self {
         case .noActivePlayback:
-            return "Nothing is playing."
+            return tr("nothing_is_playing")
         case .speechRecognitionDenied:
-            return "Speech recognition is not allowed. Enable it in Settings → Privacy & Security → Speech Recognition."
+            return tr("hint_speech_recognition_is_not_allowed")
         case .localeNotSupported:
-            return "This scene language is not supported by Apple’s SpeechTranscriber (e.g. Czech is not on the list)."
+            return tr("hint_this_scene_language_is_not")
         case .modelDownloadFailed(let reason):
             if let reason, !reason.isEmpty {
-                return "Speech model download failed: \(reason)"
+                return tr("speech_model_download_failed_arg", reason)
             }
-            return "Could not download the speech model. Check your connection and try again."
+            return tr("error_download_speech_model_check_your")
         case .speechModelNeedsDownload(let name):
-            return "Download the \(name) speech model to enable live captions."
+            return tr("hint_download_arg_speech_model_to", name)
         case .conversionFailed:
-            return "Audio could not be prepared for transcription."
+            return tr("hint_audio_could_not_be_prepared")
         case .audioSourceUnavailable:
-            return "No readable audio from the player. Start playback and try again."
+            return tr("hint_no_readable_audio_from_player")
         case .missingSceneLanguage:
-            return "Set the scene language first."
+            return tr("action_set_scene_language_first_2")
         case .requiresNewerOS:
-            return "Teleprompter requires iOS 26 or newer."
+            return tr("hint_teleprompter_requires_ios_26_or")
         }
     }
 }
@@ -832,7 +832,7 @@ final class SceneLiveTranscriptionController: ObservableObject {
             let code = speechLocale.language.languageCode?.identifier
                 ?? speechLocale.identifier(.bcp47)
             let name = Locale.current.localizedString(forLanguageCode: code) ?? code
-            localeFallbackNotice = "Using \(name) speech recognition (scene language not installed)."
+            localeFallbackNotice = tr("hint_using_arg_speech_recognition_scene", name)
         } else {
             localeFallbackNotice = nil
         }
@@ -1664,7 +1664,7 @@ final class SceneLiveTranscriptionController: ObservableObject {
             let status = await AssetInventory.status(forModules: [transcriber])
             let reservedCount = await AssetInventory.reservedLocales.count
             throw SceneLiveTranscriptionError.modelDownloadFailed(
-                "No install request (status: \(status), reserved: \(reservedCount)/\(AssetInventory.maximumReservedLocales))"
+                tr("empty_install_request_status_arg_reserved", status, reservedCount, AssetInventory.maximumReservedLocales)
             )
         }
 
@@ -1718,7 +1718,7 @@ final class SceneLiveTranscriptionController: ObservableObject {
         }
 
         throw SceneLiveTranscriptionError.modelDownloadFailed(
-            "Timed out while iOS reported \(speechAssetStatusText ?? "unknown") for \(languageName)"
+            tr("hint_timed_out_while_ios_reported", speechAssetStatusText ?? "unknown", languageName)
         )
     }
 

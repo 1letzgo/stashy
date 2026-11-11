@@ -22,8 +22,8 @@ enum CatalogCardColumns: Int, CaseIterable, Codable, Hashable {
 
     var accessibilityLabel: String {
         switch self {
-        case .one: return "One card per row"
-        case .two: return "Two cards per row"
+        case .one: return tr("one_card_per_row")
+        case .two: return tr("two_cards_per_row")
         }
     }
 
@@ -107,25 +107,25 @@ enum AppTab: String, CaseIterable, Codable, Identifiable {
 
     var title: String {
         switch self {
-        case .dashboard: return "Dashboard"
-        case .studios: return "Studios"
-        case .performers: return "Performers"
-        case .scenes: return "Scenes"
-        case .galleries: return "Galleries"
-        case .images: return "Images"
-        case .tags: return "Tags"
-        case .media: return "Media"
-        case .catalogue: return "Home"
-        case .downloads: return "Downloads"
-        case .tools: return "Tools"
+        case .dashboard: return tr("dashboard")
+        case .studios: return tr("studios")
+        case .performers: return tr("performers")
+        case .scenes: return tr("scenes")
+        case .galleries: return tr("galleries")
+        case .images: return tr("images")
+        case .tags: return tr("tags")
+        case .media: return tr("media")
+        case .catalogue: return tr("home")
+        case .downloads: return tr("downloads")
+        case .tools: return tr("tools")
         case .stashyPlus: return "stashy+"
-        case .reels: return "Feeds"
-        case .search: return "Search"
-        case .settings: return "Settings"
-        case .groups: return "Groups"
-        case .markers: return "Markers"
+        case .reels: return tr("feeds")
+        case .search: return tr("search")
+        case .settings: return tr("settings")
+        case .groups: return tr("groups")
+        case .markers: return tr("markers")
         case .stashline: return "StashLine"
-        case .magazine: return "Magazin"
+        case .magazine: return tr("magazin")
         }
     }
 
@@ -166,11 +166,11 @@ enum DetailViewContext: String, CaseIterable, Codable, Identifiable {
     
     var title: String {
         switch self {
-        case .performer: return "Performer Scenes"
-        case .studio: return "Studio Scenes"
-        case .tag: return "Tag Scenes"
-        case .gallery: return "Gallery Images"
-        case .group: return "Group Scenes"
+        case .performer: return tr("performer_scenes")
+        case .studio: return tr("studio_scenes")
+        case .tag: return tr("tag_scenes")
+        case .gallery: return tr("gallery_images")
+        case .group: return tr("group_scenes")
         }
     }
     
@@ -187,8 +187,8 @@ enum DetailViewContext: String, CaseIterable, Codable, Identifiable {
     /// Label used inside a catalog-tab settings card (e.g. Performers → Scenes Sort).
     var settingsRowTitle: String {
         switch self {
-        case .gallery: return "Images Sort"
-        default: return "Scenes Sort"
+        case .gallery: return tr("images_sort")
+        default: return tr("scenes_sort")
         }
     }
 }
@@ -333,27 +333,27 @@ enum HomeRowType: String, Codable {
     
     var defaultTitle: String {
         switch self {
-        case .lastPlayed: return "Scenes - Last Played"
-        case .lastAdded3Min: return "Scenes - Recently Added"
-        case .newest3Min: return "Scenes - New"
-        case .mostViewed3Min: return "Scenes - Most Viewed"
-        case .topCounter3Min: return "Scenes - Top Counter"
-        case .topRating3Min: return "Scenes - Top Rated"
-        case .random: return "Scenes - Random"
-        case .statistics: return "Statistics"
-        case .newPerformers: return "Performers - New"
-        case .performersHighestSceneCount: return "Performers - Top"
-        case .newStudios: return "Studios - New"
-        case .studiosHighestSceneCount: return "Studios - Top"
-        case .newGalleries: return "Galleries - New"
-        case .recentlyUpdatedGalleries: return "Galleries - Recently Updated"
-        case .performersHighestOCount: return "Performers - Counter"
-        case .performersHighestRating: return "Performers - Rating"
-        case .galleriesHighestImageCount: return "Galleries - Image Count"
-        case .channels: return "Channels"
-        case .recommendations: return "Scenes - For You"
-        case .forgottenFavorites: return "Scenes - Forgotten Favorites"
-        case .customFilter: return "Custom Filter"
+        case .lastPlayed: return tr("scenes_last_played")
+        case .lastAdded3Min: return tr("scenes_recently_added")
+        case .newest3Min: return tr("scenes_new")
+        case .mostViewed3Min: return tr("scenes_most_viewed")
+        case .topCounter3Min: return tr("scenes_top_counter")
+        case .topRating3Min: return tr("scenes_top_rated")
+        case .random: return tr("scenes_random")
+        case .statistics: return tr("statistics")
+        case .newPerformers: return tr("performers_new")
+        case .performersHighestSceneCount: return tr("performers_top")
+        case .newStudios: return tr("studios_new")
+        case .studiosHighestSceneCount: return tr("studios_top")
+        case .newGalleries: return tr("galleries_new")
+        case .recentlyUpdatedGalleries: return tr("galleries_recently_updated")
+        case .performersHighestOCount: return tr("performers_counter")
+        case .performersHighestRating: return tr("performers_rating")
+        case .galleriesHighestImageCount: return tr("galleries_image_count")
+        case .channels: return tr("channels")
+        case .recommendations: return tr("scenes_for_you")
+        case .forgottenFavorites: return tr("scenes_forgotten_favorites")
+        case .customFilter: return tr("custom_filter")
         }
     }
 }
@@ -366,8 +366,8 @@ enum HomeChannelSourceKind: String, Codable, CaseIterable, Identifiable {
 
     var title: String {
         switch self {
-        case .scenes: return "Scenes"
-        case .clips: return "Clips"
+        case .scenes: return tr("scenes")
+        case .clips: return tr("clips")
         }
     }
 }
@@ -390,8 +390,8 @@ enum DashboardHeroSize: String, Codable, CaseIterable {
     
     var title: String {
         switch self {
-        case .big: return "Big Hero"
-        case .small: return "Small Hero"
+        case .big: return tr("big_hero")
+        case .small: return tr("small_hero")
         }
     }
 }
@@ -411,12 +411,12 @@ enum ReelsModeType: String, Codable, CaseIterable {
     
     var defaultTitle: String {
         switch self {
-        case .scenes: return "Scenes"
-        case .markers: return "Markers"
-        case .clips: return "Clips"
-        case .previews: return "Previews"
-        case .pics: return "Pics"
-        case .verticals: return "Verticals"
+        case .scenes: return tr("scenes")
+        case .markers: return tr("markers")
+        case .clips: return tr("clips")
+        case .previews: return tr("previews")
+        case .pics: return tr("pics")
+        case .verticals: return tr("verticals")
         }
     }
     
@@ -457,14 +457,14 @@ enum ToolsItem: String, Codable, CaseIterable, Identifiable {
     
     var title: String {
         switch self {
-        case .server: return "Server"
-        case .downloads: return "Downloads"
-        case .statistics: return "Overview"
-        case .oCount: return "O-Count"
-        case .timeline: return "Timeline"
-        case .topLists: return "Charts"
-        case .filters: return "Filters"
-        case .hotOrNot: return "Match"
+        case .server: return tr("server")
+        case .downloads: return tr("downloads")
+        case .statistics: return tr("overview")
+        case .oCount: return tr("o_count")
+        case .timeline: return tr("timeline")
+        case .topLists: return tr("charts")
+        case .filters: return tr("filters")
+        case .hotOrNot: return tr("match")
         case .rateMe: return "RateMe"
         }
     }
@@ -472,7 +472,7 @@ enum ToolsItem: String, Codable, CaseIterable, Identifiable {
     /// Name used in stashy+ settings / paywall lists.
     var plusFeatureTitle: String {
         switch self {
-        case .hotOrNot: return "Performer Match"
+        case .hotOrNot: return tr("performer_match")
         default: return title
         }
     }
@@ -658,10 +658,10 @@ class TabManager: ObservableObject {
 
         var label: String {
             switch self {
-            case .beginning: return "Beginning"
-            case .firstMarker: return "First Marker"
-            case .skip30: return "Skip 30s"
-            case .random: return "Random"
+            case .beginning: return tr("beginning")
+            case .firstMarker: return tr("first_marker")
+            case .skip30: return tr("action_skip_30s")
+            case .random: return tr("random")
             }
         }
     }
@@ -699,7 +699,7 @@ class TabManager: ObservableObject {
 
     static func playCountThresholdLabel(_ seconds: Double) -> String {
         switch seconds {
-        case 0: return "Immediately"
+        case 0: return tr("immediately")
         case ..<60: return "\(Int(seconds)) s"
         default: return "\(Int(seconds / 60)) min"
         }

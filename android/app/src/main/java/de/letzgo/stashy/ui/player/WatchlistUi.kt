@@ -1,5 +1,7 @@
 package de.letzgo.stashy.ui.player
 
+import de.letzgo.stashy.R
+import de.letzgo.stashy.tr
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -82,7 +84,7 @@ fun LazyListScope.watchlistRows(
 ) {
     itemsIndexed(scenes, key = { _, s -> "w-${s.id}" }) { index, scene ->
         Column {
-            SwipeToRemove("Remove from watchlist", { WatchlistStore.remove(scene.id) }) {
+            SwipeToRemove(tr(R.string.action_remove_from_watchlist), { WatchlistStore.remove(scene.id) }) {
                 WatchlistSceneRow(scene, index, scenes.size, isCurrent = scene.id == currentId, currentId, drag, margin, sorting, onOpen)
             }
             if (index < scenes.lastIndex) HorizontalDivider(Modifier.padding(start = margin), color = Theme.palette.text.copy(alpha = 0.08f))
@@ -124,7 +126,7 @@ private fun PlayingSceneRow(scene: Scene, isCurrent: Boolean, margin: Dp, onOpen
         if (!WatchlistStore.contains(scene.id)) Box(
             Modifier.size(40.dp).clip(CircleShape).clickable { MiniPlayerStore.addToWatchlist(scene) },
             contentAlignment = Alignment.Center,
-        ) { Icon(SF.plusCircleFill, "Add to watchlist", tint = Appearance.tint, modifier = Modifier.size(26.dp)) }
+        ) { Icon(SF.plusCircleFill, tr(R.string.action_add_to_watchlist), tint = Appearance.tint, modifier = Modifier.size(26.dp)) }
     }
 }
 
@@ -137,7 +139,7 @@ private fun SceneRowLabel(scene: Scene, isCurrent: Boolean, modifier: Modifier) 
         Box(Modifier.size(width = 80.dp, height = 45.dp).clip(RoundedCornerShape(6.dp)).background(Color.Black.copy(alpha = 0.3f)), contentAlignment = Alignment.Center) {
             AsyncImage(scene.thumbnailURL, null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
             if (isCurrent) Box(Modifier.clip(CircleShape).background(Color.Black.copy(alpha = 0.5f)).padding(6.dp)) {
-                Icon(SF.speakerWave2Fill, "Now playing", tint = Color.White, modifier = Modifier.size(14.dp))
+                Icon(SF.speakerWave2Fill, tr(R.string.now_playing), tint = Color.White, modifier = Modifier.size(14.dp))
             }
         }
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
@@ -216,26 +218,26 @@ private fun WatchlistSceneRow(
                     }
                 },
                 contentAlignment = Alignment.Center,
-            ) { Icon(Icons.Filled.DragHandle, "Reorder", tint = p.secondaryText) }
+            ) { Icon(Icons.Filled.DragHandle, tr(R.string.reorder), tint = p.secondaryText) }
         }
         DropdownMenu(menu, { menu = false }, containerColor = p.secondaryBackground) {
             if (currentId != null && !isCurrent) DropdownMenuItem(
-                text = { Text("Play next", color = p.text) },
+                text = { Text(tr(R.string.action_play_next), color = p.text) },
                 leadingIcon = { Icon(WatchlistIcons.list, null, tint = p.text) },
                 onClick = { menu = false; WatchlistStore.moveAfter(scene.id, currentId) },
             )
             if (index > 0) DropdownMenuItem(
-                text = { Text("Move up", color = p.text) },
+                text = { Text(tr(R.string.action_move_up), color = p.text) },
                 leadingIcon = { Icon(Icons.Filled.ArrowUpward, null, tint = p.text) },
                 onClick = { menu = false; WatchlistStore.shift(scene.id, -1) },
             )
             if (index < count - 1) DropdownMenuItem(
-                text = { Text("Move down", color = p.text) },
+                text = { Text(tr(R.string.action_move_down), color = p.text) },
                 leadingIcon = { Icon(Icons.Filled.ArrowDownward, null, tint = p.text) },
                 onClick = { menu = false; WatchlistStore.shift(scene.id, 1) },
             )
             DropdownMenuItem(
-                text = { Text("Remove from watchlist", color = StashyColors.systemRed) },
+                text = { Text(tr(R.string.action_remove_from_watchlist), color = StashyColors.systemRed) },
                 leadingIcon = { Icon(Icons.Filled.Delete, null, tint = StashyColors.systemRed) },
                 onClick = { menu = false; WatchlistStore.remove(scene.id) },
             )

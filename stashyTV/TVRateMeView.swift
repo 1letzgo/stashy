@@ -45,9 +45,9 @@ struct TVRateMeView: View {
     private var mediaKindOptions: [TVPickerOption<ImageListMediaKind>] {
         ImageListMediaKind.allCases.map { kind in
             switch kind {
-            case .all: return TVPickerOption(kind, "Any media")
-            case .stillImage: return TVPickerOption(kind, "Images")
-            case .video: return TVPickerOption(kind, "Videos")
+            case .all: return TVPickerOption(kind, tr("any_media"))
+            case .stillImage: return TVPickerOption(kind, tr("images"))
+            case .video: return TVPickerOption(kind, tr("videos"))
             }
         }
     }
@@ -80,7 +80,7 @@ struct TVRateMeView: View {
         .fullScreenCover(item: $presentedImage) { image in
             TVImageDetailView(
                 imageId: image.id,
-                imageTitle: image.title ?? "Untitled",
+                imageTitle: image.title ?? tr("untitled"),
                 initialImages: [image]
             )
         }
@@ -104,21 +104,21 @@ struct TVRateMeView: View {
             Spacer(minLength: 0)
 
             TVOptionPickerButton(
-                title: "Rate",
+                title: tr("action_rate"),
                 icon: model.mode.emptyIcon,
                 options: modeOptions,
                 selection: $model.mode
             )
             if model.mode == .images {
                 TVOptionPickerButton(
-                    title: "Media",
+                    title: tr("media"),
                     icon: "photo.on.rectangle",
                     options: mediaKindOptions,
                     selection: $model.imageMediaKind
                 )
             }
             TVOptionPickerButton(
-                title: "Theme",
+                title: tr("theme"),
                 icon: model.theme.icon,
                 options: themeOptions,
                 selection: themeBinding
@@ -139,7 +139,7 @@ struct TVRateMeView: View {
         if model.isLoading && model.item == nil {
             VStack(spacing: 20) {
                 ProgressView()
-                Text("Loading…")
+                Text(tr("loading"))
                     .font(.headline)
                     .foregroundStyle(.secondary)
             }
@@ -157,9 +157,9 @@ struct TVRateMeView: View {
             }
         } else {
             ContentUnavailableView(
-                "Nothing to rate",
+                tr("nothing_to_rate"),
                 systemImage: model.mode.emptyIcon,
-                description: Text(model.errorMessage ?? "All \(model.mode.label.lowercased()) already have a rating.")
+                description: Text(model.errorMessage ?? tr("hint_all_arg_already_have_rating", model.mode.label.lowercased()))
             )
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
@@ -199,13 +199,13 @@ struct TVRateMeView: View {
                     )
                 }
                 .buttonStyle(.card)
-                .accessibilityLabel("O-Counter \(item.oCounter), select to increment")
+                .accessibilityLabel(tr("hint_o_count_arg_select_to", item.oCounter))
 
                 Button {
                     guard !model.isSubmitting, !model.isLoading else { return }
                     Task { await model.skip() }
                 } label: {
-                    TVMatchActionLabel(icon: "forward.fill", title: "Skip")
+                    TVMatchActionLabel(icon: "forward.fill", title: tr("action_skip"))
                 }
                 .buttonStyle(.card)
 
@@ -260,7 +260,7 @@ struct TVRateMeView: View {
             Button {
                 path?.wrappedValue.append(TVSceneLink(sceneId: item.id))
             } label: {
-                TVMatchActionLabel(icon: "play.fill", title: "Watch")
+                TVMatchActionLabel(icon: "play.fill", title: tr("watch"))
             }
             .buttonStyle(.card)
         case .images:
@@ -269,7 +269,7 @@ struct TVRateMeView: View {
                 Button {
                     presentedImage = image
                 } label: {
-                    TVMatchActionLabel(icon: "arrow.up.left.and.arrow.down.right", title: "Open")
+                    TVMatchActionLabel(icon: "arrow.up.left.and.arrow.down.right", title: tr("action_open"))
                 }
                 .buttonStyle(.card)
             }

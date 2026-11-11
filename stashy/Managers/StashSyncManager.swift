@@ -6,9 +6,9 @@ import SwiftUI
 /// User-facing copy for video-reactive device sync (internal type remains StashSync).
 enum AIMotionCopy {
     static let name = "AI Motion"
-    static let requiresPlus = "AI Motion requires stashy+"
-    static let plusLockedToast = "AI Motion is part of stashy+ — unlock in Settings"
-    static let disclaimer = "AI Motion uses real-time on-device video analysis to synchronize your devices. This process is CPU-intensive and can lead to increased battery drain and device heating. By enabling this feature, you acknowledge that you use AI Motion and any controlled hardware devices at your own risk. Any potential damage or injury resulting from the use of connected hardware is your sole responsibility."
+    static var requiresPlus: String { tr("ai_motion_requires_stashy_plus") }
+    static var plusLockedToast: String { tr("hint_ai_motion_is_part_of") }
+    static var disclaimer: String { tr("hint_ai_motion_uses_real_time") }
 }
 
 class StashSyncManager: ObservableObject {

@@ -49,7 +49,7 @@ struct TVSearchView: View {
     var body: some View {
         Group {
             if !hasValidConfig {
-                TVConnectionErrorView(title: "Server not reachable", subtitle: "Add a server in Settings.") {
+                TVConnectionErrorView(title: tr("server_not_reachable"), subtitle: tr("action_add_server_in_settings")) {
                     viewModel.testConnection()
                 }
             } else {
@@ -103,7 +103,7 @@ struct TVSearchView: View {
                 .font(.title2)
                 .foregroundStyle(.secondary)
 
-            TextField("Scenes, Performers …", text: $searchQuery)
+            TextField(tr("scenes_performers_menu"), text: $searchQuery)
                 .font(.title3)
                 .foregroundStyle(.primary)
                 .focused($isSearchFieldFocused)
@@ -123,7 +123,7 @@ struct TVSearchView: View {
                         .foregroundStyle(.secondary)
                 }
                 .buttonStyle(.borderless)
-                .accessibilityLabel("Clear input")
+                .accessibilityLabel(tr("action_clear_input"))
             }
         }
         .padding(.vertical, 22)
@@ -138,7 +138,7 @@ struct TVSearchView: View {
             VStack(spacing: 16) {
                 ProgressView()
                     .scaleEffect(1.5)
-                Text("Searching …")
+                Text(tr("searching_menu"))
                     .font(.title3)
                     .foregroundStyle(.secondary)
             }
@@ -154,10 +154,10 @@ struct TVSearchView: View {
                 Image(systemName: "magnifyingglass")
                     .font(.system(size: 56))
                     .foregroundColor(.secondary)
-                Text("No results for \"\(searchQuery)\"")
+                Text(tr("empty_results_for_arg", searchQuery))
                     .font(.title3)
                     .foregroundStyle(.secondary)
-                Button("Refine Search") {
+                Button(tr("refine_search")) {
                     isSearchFieldFocused = true
                 }
                 .buttonStyle(.bordered)
@@ -174,10 +174,10 @@ struct TVSearchView: View {
                 Image(systemName: "magnifyingglass")
                     .font(.system(size: 56))
                     .foregroundColor(.secondary)
-                Text("Search your Stash library")
+                Text(tr("search_your_stash_library"))
                     .font(.title3)
                     .foregroundStyle(.secondary)
-                Text("Type at least two characters. Remote or dictation supported.")
+                Text(tr("hint_type_at_least_two_characters"))
                     .font(.callout)
                     .foregroundStyle(.secondary)
                     .multilineTextAlignment(.center)
@@ -247,7 +247,7 @@ struct TVSearchView: View {
                 Image(systemName: "film.fill")
                     .font(.title3)
                     .foregroundColor(AppearanceManager.shared.tintColor)
-                Text("Scenes")
+                Text(tr("scenes"))
                     .font(.title2)
                     .fontWeight(.bold)
                     .foregroundColor(.white)
@@ -279,7 +279,7 @@ struct TVSearchView: View {
     // MARK: - Studios / Tags / Groups / Galleries Results
 
     private var studiosResultSection: some View {
-        resultSection(title: "Studios", systemImage: "building.2.fill", count: viewModel.studios.count) {
+        resultSection(title: tr("studios"), systemImage: "building.2.fill", count: viewModel.studios.count) {
             ForEach(viewModel.studios) { studio in
                 TVNavButton(value: TVStudioLink(id: studio.id, name: studio.name)) {
                     TVStudioCardView(studio: studio)
@@ -289,7 +289,7 @@ struct TVSearchView: View {
     }
 
     private var tagsResultSection: some View {
-        resultSection(title: "Tags", systemImage: "tag.fill", count: viewModel.tags.count) {
+        resultSection(title: tr("tags"), systemImage: "tag.fill", count: viewModel.tags.count) {
             ForEach(viewModel.tags) { tag in
                 TVNavButton(value: TVTagLink(id: tag.id, name: tag.name)) {
                     TVTagCardView(tag: tag)
@@ -299,7 +299,7 @@ struct TVSearchView: View {
     }
 
     private var groupsResultSection: some View {
-        resultSection(title: "Groups", systemImage: "rectangle.stack.fill", count: viewModel.groups.count) {
+        resultSection(title: tr("groups"), systemImage: "rectangle.stack.fill", count: viewModel.groups.count) {
             ForEach(viewModel.groups) { group in
                 TVNavButton(value: TVGroupLink(id: group.id, name: group.name)) {
                     TVGroupCardView(group: group)
@@ -340,7 +340,7 @@ struct TVSearchView: View {
                 Image(systemName: "person.2.fill")
                     .font(.title3)
                     .foregroundColor(AppearanceManager.shared.tintColor)
-                Text("Performers")
+                Text(tr("performers"))
                     .font(.title2)
                     .fontWeight(.bold)
                     .foregroundColor(.white)

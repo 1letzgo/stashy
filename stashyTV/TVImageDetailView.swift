@@ -41,7 +41,7 @@ struct TVImageDetailView: View {
                     Image(systemName: "photo")
                         .font(.title)
                         .foregroundStyle(.secondary)
-                    Text(loadFailed ? "Failed to load images" : "No images")
+                    Text(loadFailed ? tr("error_load_images_2") : tr("empty_images"))
                         .font(.title2)
                         .foregroundStyle(.secondary)
                     if !imageTitle.isEmpty {
@@ -52,13 +52,13 @@ struct TVImageDetailView: View {
                             .multilineTextAlignment(.center)
                             .padding(.horizontal, 80)
                     }
-                    Button("Retry") {
+                    Button(tr("action_retry")) {
                         hasLoaded = false
                         loadFailed = false
                         loadImages()
                     }
                     .font(.title3)
-                    Button("Close") { dismiss() }
+                    Button(tr("action_close")) { dismiss() }
                         .font(.title3)
                 }
             } else {
@@ -157,7 +157,7 @@ struct TVImageDetailView: View {
                 if images.count > 1 {
                     HStack(spacing: 24) {
                         Text("\(currentIndex + 1) / \(images.count)")
-                        Label("Slideshow", systemImage: "playpause.fill")
+                        Label(tr("slideshow"), systemImage: "playpause.fill")
                             .foregroundStyle(.tertiary)
                     }
                     .font(.title3)

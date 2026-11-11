@@ -1,5 +1,7 @@
 package de.letzgo.stashy.tv
 
+import de.letzgo.stashy.R
+import de.letzgo.stashy.tr
 import de.letzgo.stashy.data.FilterMode
 import kotlin.math.floor
 import kotlin.math.roundToInt
@@ -125,7 +127,7 @@ object TvFormat {
     fun stars(rating100: Int?): Int = if (rating100 == null || rating100 <= 0) 0 else (rating100 / 20.0).roundToInt()
 
     /** iOS: `ratingLabel(for:)` — "Rate" or "3/5". */
-    fun ratingLabel(rating100: Int?): String = stars(rating100).let { if (it == 0) "Rate" else "$it/5" }
+    fun ratingLabel(rating100: Int?): String = stars(rating100).let { if (it == 0) tr(R.string.action_rate) else "$it/5" }
 
     /** Card badge rating like tvOS: `rating100 / 20` with one decimal. */
     fun ratingValue(rating100: Int): String = String.format(java.util.Locale.US, "%.1f", rating100 / 20.0)
@@ -153,58 +155,58 @@ fun activeMarkerIndex(starts: List<Double>, currentTime: Double): Int? {
 /** iOS: the per-catalog sort pickers of `TVScenesView`, `TVPerformersView` … (order and labels). */
 object TvSortLabels {
     val scenes = listOf(
-        "random" to "Random", "dateDesc" to "Recently Released", "dateAsc" to "Oldest First",
-        "createdAtDesc" to "Recently Added", "createdAtAsc" to "Oldest Added",
-        "lastPlayedAtDesc" to "Recently Played", "lastPlayedAtAsc" to "Least Recently Played",
-        "titleAsc" to "Title (A-Z)", "titleDesc" to "Title (Z-A)",
-        "durationDesc" to "Longest First", "durationAsc" to "Shortest First",
-        "playCountDesc" to "Most Viewed", "playCountAsc" to "Least Viewed",
-        "oCounterDesc" to "O Count (High-Low)", "oCounterAsc" to "O Count (Low-High)",
-        "ratingDesc" to "Highest Rated", "ratingAsc" to "Lowest Rated",
+        "random" to tr(R.string.random), "dateDesc" to tr(R.string.recently_released), "dateAsc" to tr(R.string.oldest_first),
+        "createdAtDesc" to tr(R.string.recently_added), "createdAtAsc" to tr(R.string.oldest_added),
+        "lastPlayedAtDesc" to tr(R.string.recently_played), "lastPlayedAtAsc" to tr(R.string.least_recently_played),
+        "titleAsc" to tr(R.string.title_z), "titleDesc" to tr(R.string.title_z_2),
+        "durationDesc" to tr(R.string.longest_first), "durationAsc" to tr(R.string.shortest_first),
+        "playCountDesc" to tr(R.string.most_viewed), "playCountAsc" to tr(R.string.least_viewed),
+        "oCounterDesc" to tr(R.string.o_count_high_low), "oCounterAsc" to tr(R.string.o_count_low_high),
+        "ratingDesc" to tr(R.string.highest_rated), "ratingAsc" to tr(R.string.lowest_rated),
     )
     val performers = listOf(
-        "random" to "Random", "nameAsc" to "Name (A-Z)", "nameDesc" to "Name (Z-A)",
-        "sceneCountDesc" to "Most Scenes", "sceneCountAsc" to "Least Scenes",
-        "birthdateDesc" to "Youngest First", "birthdateAsc" to "Oldest First",
-        "oCountDesc" to "O Count (High-Low)", "oCountAsc" to "O Count (Low-High)",
-        "ratingDesc" to "Highest Rated", "ratingAsc" to "Lowest Rated",
-        "createdAtDesc" to "Recently Added", "createdAtAsc" to "Oldest Added",
-        "updatedAtDesc" to "Recently Updated", "updatedAtAsc" to "Least Recently Updated",
+        "random" to tr(R.string.random), "nameAsc" to tr(R.string.name_z), "nameDesc" to tr(R.string.name_z_2),
+        "sceneCountDesc" to tr(R.string.most_scenes), "sceneCountAsc" to tr(R.string.least_scenes),
+        "birthdateDesc" to tr(R.string.youngest_first), "birthdateAsc" to tr(R.string.oldest_first),
+        "oCountDesc" to tr(R.string.o_count_high_low), "oCountAsc" to tr(R.string.o_count_low_high),
+        "ratingDesc" to tr(R.string.highest_rated), "ratingAsc" to tr(R.string.lowest_rated),
+        "createdAtDesc" to tr(R.string.recently_added), "createdAtAsc" to tr(R.string.oldest_added),
+        "updatedAtDesc" to tr(R.string.recently_updated), "updatedAtAsc" to tr(R.string.least_recently_updated),
     )
     val studios = listOf(
-        "random" to "Random", "nameAsc" to "Name (A-Z)", "nameDesc" to "Name (Z-A)",
-        "sceneCountDesc" to "Most Scenes", "sceneCountAsc" to "Least Scenes",
-        "createdAtDesc" to "Recently Added", "createdAtAsc" to "Oldest Added",
-        "updatedAtDesc" to "Recently Updated", "updatedAtAsc" to "Least Recently Updated",
+        "random" to tr(R.string.random), "nameAsc" to tr(R.string.name_z), "nameDesc" to tr(R.string.name_z_2),
+        "sceneCountDesc" to tr(R.string.most_scenes), "sceneCountAsc" to tr(R.string.least_scenes),
+        "createdAtDesc" to tr(R.string.recently_added), "createdAtAsc" to tr(R.string.oldest_added),
+        "updatedAtDesc" to tr(R.string.recently_updated), "updatedAtAsc" to tr(R.string.least_recently_updated),
     )
     val tags = listOf(
-        "random" to "Random", "nameAsc" to "Name (A-Z)", "nameDesc" to "Name (Z-A)",
-        "sceneCountDesc" to "Most Scenes", "sceneCountAsc" to "Least Scenes",
-        "createdAtDesc" to "Recently Added", "createdAtAsc" to "Oldest Added",
-        "updatedAtDesc" to "Recently Updated", "updatedAtAsc" to "Least Recently Updated",
+        "random" to tr(R.string.random), "nameAsc" to tr(R.string.name_z), "nameDesc" to tr(R.string.name_z_2),
+        "sceneCountDesc" to tr(R.string.most_scenes), "sceneCountAsc" to tr(R.string.least_scenes),
+        "createdAtDesc" to tr(R.string.recently_added), "createdAtAsc" to tr(R.string.oldest_added),
+        "updatedAtDesc" to tr(R.string.recently_updated), "updatedAtAsc" to tr(R.string.least_recently_updated),
     )
     val groups = listOf(
-        "random" to "Random", "nameAsc" to "Name (A-Z)", "nameDesc" to "Name (Z-A)",
-        "sceneCountDesc" to "Most Scenes", "sceneCountAsc" to "Least Scenes",
-        "dateDesc" to "Newest First", "dateAsc" to "Oldest First",
-        "ratingDesc" to "Highest Rated", "ratingAsc" to "Lowest Rated",
-        "createdAtDesc" to "Recently Added", "createdAtAsc" to "Oldest Added",
-        "updatedAtDesc" to "Recently Updated", "updatedAtAsc" to "Least Recently Updated",
+        "random" to tr(R.string.random), "nameAsc" to tr(R.string.name_z), "nameDesc" to tr(R.string.name_z_2),
+        "sceneCountDesc" to tr(R.string.most_scenes), "sceneCountAsc" to tr(R.string.least_scenes),
+        "dateDesc" to tr(R.string.newest_first), "dateAsc" to tr(R.string.oldest_first),
+        "ratingDesc" to tr(R.string.highest_rated), "ratingAsc" to tr(R.string.lowest_rated),
+        "createdAtDesc" to tr(R.string.recently_added), "createdAtAsc" to tr(R.string.oldest_added),
+        "updatedAtDesc" to tr(R.string.recently_updated), "updatedAtAsc" to tr(R.string.least_recently_updated),
     )
     val galleries = listOf(
-        "random" to "Random", "titleAsc" to "Title (A-Z)", "titleDesc" to "Title (Z-A)",
-        "dateDesc" to "Newest First", "dateAsc" to "Oldest First",
-        "imageCountDesc" to "Most Images", "imageCountAsc" to "Least Images",
-        "ratingDesc" to "Highest Rated", "ratingAsc" to "Lowest Rated",
-        "createdAtDesc" to "Recently Added", "createdAtAsc" to "Oldest Added",
-        "updatedAtDesc" to "Recently Updated", "updatedAtAsc" to "Least Recently Updated",
+        "random" to tr(R.string.random), "titleAsc" to tr(R.string.title_z), "titleDesc" to tr(R.string.title_z_2),
+        "dateDesc" to tr(R.string.newest_first), "dateAsc" to tr(R.string.oldest_first),
+        "imageCountDesc" to tr(R.string.most_images), "imageCountAsc" to tr(R.string.least_images),
+        "ratingDesc" to tr(R.string.highest_rated), "ratingAsc" to tr(R.string.lowest_rated),
+        "createdAtDesc" to tr(R.string.recently_added), "createdAtAsc" to tr(R.string.oldest_added),
+        "updatedAtDesc" to tr(R.string.recently_updated), "updatedAtAsc" to tr(R.string.least_recently_updated),
     )
     val images = listOf(
-        "random" to "Random", "titleAsc" to "Title (A-Z)", "titleDesc" to "Title (Z-A)",
-        "dateDesc" to "Newest First", "dateAsc" to "Oldest First",
-        "ratingDesc" to "Highest Rated", "ratingAsc" to "Lowest Rated",
-        "createdAtDesc" to "Recently Added", "createdAtAsc" to "Oldest Added",
-        "updatedAtDesc" to "Recently Updated", "updatedAtAsc" to "Least Recently Updated",
+        "random" to tr(R.string.random), "titleAsc" to tr(R.string.title_z), "titleDesc" to tr(R.string.title_z_2),
+        "dateDesc" to tr(R.string.newest_first), "dateAsc" to tr(R.string.oldest_first),
+        "ratingDesc" to tr(R.string.highest_rated), "ratingAsc" to tr(R.string.lowest_rated),
+        "createdAtDesc" to tr(R.string.recently_added), "createdAtAsc" to tr(R.string.oldest_added),
+        "updatedAtDesc" to tr(R.string.recently_updated), "updatedAtAsc" to tr(R.string.least_recently_updated),
     )
 
     fun options(mode: FilterMode): List<Pair<String, String>> = when (mode) {
@@ -273,10 +275,10 @@ class TvStacks<R>(private val roots: Set<TvRootTab>) {
 
 /** iOS: `TVRootTab` — the sidebar entries. */
 enum class TvRootTab(val title: String) {
-    Search("Search"), Home("Home"),
-    Scenes("Scenes"), Performers("Performers"), Studios("Studios"), Tags("Tags"),
-    Groups("Groups"), Galleries("Galleries"), Images("Images"),
-    Settings("Settings");
+    Search(tr(R.string.search)), Home(tr(R.string.home)),
+    Scenes(tr(R.string.scenes)), Performers(tr(R.string.performers)), Studios(tr(R.string.studios)), Tags(tr(R.string.tags)),
+    Groups(tr(R.string.groups)), Galleries(tr(R.string.galleries)), Images(tr(R.string.images)),
+    Settings(tr(R.string.settings));
 
     val isLibrary: Boolean get() = this !in setOf(Search, Home, Settings)
 

@@ -136,8 +136,8 @@ final class RateMeViewModel: ObservableObject {
 
         var label: String {
             switch self {
-            case .scenes: return "Scenes"
-            case .images: return "Images"
+            case .scenes: return tr("scenes")
+            case .images: return tr("images")
             }
         }
 
@@ -199,9 +199,9 @@ final class RateMeViewModel: ObservableObject {
 
         var label: String {
             switch self {
-            case .random: return "Random"
-            case .newest: return "Newest"
-            case .mostPlayed: return "Most played"
+            case .random: return tr("random")
+            case .newest: return tr("newest")
+            case .mostPlayed: return tr("most_played")
             case .performer(let o), .studio(let o), .tag(let o): return o.name
             }
         }
@@ -286,7 +286,7 @@ final class RateMeViewModel: ObservableObject {
                 item = try await fetchUnratedImage()
             }
             if item == nil {
-                errorMessage = "No unrated \(mode.label.lowercased()) left in \(theme.label)."
+                errorMessage = tr("empty_unrated_arg_left_in_arg", mode.label.lowercased(), theme.label)
             }
         } catch {
             item = nil
@@ -312,7 +312,7 @@ final class RateMeViewModel: ObservableObject {
         do {
             let ok = try await mutateRating(id: current.id, mode: current.mode, rating100: rating100)
             guard ok else {
-                errorMessage = "Failed to save rating."
+                errorMessage = tr("error_save_rating")
                 draftRating100 = nil
                 return
             }
@@ -408,13 +408,13 @@ final class RateMeViewModel: ObservableObject {
         do {
             let ok = try await mutateDestroy(id: current.id, mode: current.mode)
             guard ok else {
-                errorMessage = current.mode == .scenes ? "Failed to delete scene." : "Failed to delete image."
+                errorMessage = current.mode == .scenes ? tr("error_delete_scene") : tr("error_delete_image")
                 return
             }
             #if !os(tvOS)
             HapticManager.success()
             ToastManager.shared.show(
-                current.mode == .scenes ? "Scene deleted" : "Image deleted",
+                current.mode == .scenes ? tr("scene_deleted") : tr("image_deleted"),
                 icon: "trash",
                 style: .success
             )
@@ -500,7 +500,7 @@ final class RateMeViewModel: ObservableObject {
                 .joined(separator: ", ")
             return Item(
                 id: scene.id,
-                title: scene.title?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty ?? "Untitled scene",
+                title: scene.title?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty ?? tr("untitled_scene"),
                 thumbnailURL: signedMediaURL(scene.paths?.screenshot),
                 previewURL: preview,
                 videoURL: nil,
@@ -583,7 +583,7 @@ final class RateMeViewModel: ObservableObject {
             )
             return Item(
                 id: image.id,
-                title: image.title?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty ?? "Untitled image",
+                title: image.title?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty ?? tr("untitled_image"),
                 thumbnailURL: thumb ?? media,
                 previewURL: nil,
                 videoURL: isVideo ? media : nil,
@@ -837,9 +837,9 @@ struct RateMeToolsView: View {
         var id: String { rawValue }
         var title: String {
             switch self {
-            case .performer: return "Performer"
-            case .studio: return "Studio"
-            case .tag: return "Tag"
+            case .performer: return tr("performer")
+            case .studio: return tr("studio")
+            case .tag: return tr("tag")
             }
         }
         var icon: String {
@@ -872,7 +872,7 @@ struct RateMeToolsView: View {
         // What is rated (Scenes, Images, …) is the crumb after "RateMe", the theme sits right.
         .toolsBreadcrumbChrome(toolsBreadcrumb, crumb: {
             ToolsCrumbPickerMenu(
-                title: "RateMe section",
+                title: tr("rateme_section"),
                 options: RateMeViewModel.Mode.allCases.map {
                     ToolsRowMenuOption(value: $0, title: $0.label, systemImage: $0.emptyIcon)
                 },
@@ -920,8 +920,8 @@ struct RateMeToolsView: View {
             }
         }
         .alert(deleteConfirmationTitle, isPresented: $showDeleteConfirmation) {
-            Button("Cancel", role: .cancel) { }
-            Button("Delete", role: .destructive) {
+            Button(tr("action_cancel"), role: .cancel) { }
+            Button(tr("action_delete"), role: .destructive) {
                 Task { await model.deleteCurrent() }
             }
         } message: {
@@ -930,18 +930,18 @@ struct RateMeToolsView: View {
     }
 
     private var deleteConfirmationTitle: String {
-        model.mode == .scenes ? "Really delete scene and files?" : "Really delete image and files?"
+        model.mode == .scenes ? tr("confirm_really_delete_scene_and_files") : tr("confirm_really_delete_image_and_files")
     }
 
     private var deleteConfirmationMessage: String {
         let name = model.item?.title ?? (model.mode == .scenes ? "this scene" : "this image")
-        return "‘\(name)’ and all associated files will be permanently deleted. This action cannot be undone."
+        return tr("hint_arg_and_all_associated_files", name)
     }
 
     @ViewBuilder
     private var content: some View {
         if model.isLoading && model.item == nil {
-            StandardLoadingView(message: "Loading…")
+            StandardLoadingView(message: tr("loading"))
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
         } else if let item = model.item {
             // No scroll view: the media shrinks to the height left above the action row, so
@@ -956,10 +956,10 @@ struct RateMeToolsView: View {
             .padding(.bottom, DesignTokens.Tools.menuBottomPadding)
         } else {
             ContentUnavailableView(
-                "Nothing to rate",
+                tr("nothing_to_rate"),
                 systemImage: model.mode.emptyIcon,
                 // An error already shows in red above the pills.
-                description: Text("All \(model.mode.label.lowercased()) already have a rating.")
+                description: Text(tr("hint_all_arg_already_have_rating", model.mode.label.lowercased()))
             )
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
@@ -971,7 +971,7 @@ struct RateMeToolsView: View {
     /// row; it was a chip row above the card. Performer / Studio / Tag open their picker sheet.
     private var themeMenu: some View {
         Menu {
-            Section("Theme") {
+            Section(tr("theme")) {
                 ForEach(model.availableFixedThemes) { theme in
                     Toggle(isOn: Binding(
                         get: { model.theme == theme },
@@ -984,7 +984,7 @@ struct RateMeToolsView: View {
                     }
                 }
             }
-            Section("Only") {
+            Section(tr("only")) {
                 ForEach([ThemePickerKind.performer, .studio, .tag]) { kind in
                     let picked = pickedTheme(for: kind)
                     Toggle(isOn: Binding(
@@ -996,8 +996,8 @@ struct RateMeToolsView: View {
                 }
             }
             if model.mode == .images {
-                Section("Media") {
-                    Picker("Media", selection: $model.imageMediaKind) {
+                Section(tr("media")) {
+                    Picker(tr("media"), selection: $model.imageMediaKind) {
                         ForEach(ImageListMediaKind.allCases) { kind in
                             Text(Self.mediaKindTitle(kind)).tag(kind)
                         }
@@ -1029,9 +1029,9 @@ struct RateMeToolsView: View {
 
     private static func mediaKindTitle(_ kind: ImageListMediaKind) -> String {
         switch kind {
-        case .all: return "Any media"
-        case .stillImage: return "Images"
-        case .video: return "Videos"
+        case .all: return tr("any_media")
+        case .stillImage: return tr("images")
+        case .video: return tr("videos")
         }
     }
 
@@ -1106,7 +1106,7 @@ struct RateMeToolsView: View {
             }
             .buttonStyle(.plain)
             .disabled(model.isSubmitting || model.isIncrementingO || model.isDeleting)
-            .accessibilityLabel("O-Counter \(item.oCounter), tap to increment")
+            .accessibilityLabel(tr("hint_o_count_arg_tap_to_increment", item.oCounter))
 
             Button {
                 HapticManager.light()
@@ -1120,8 +1120,8 @@ struct RateMeToolsView: View {
             }
             .buttonStyle(.plain)
             .disabled(model.isSubmitting || model.isDeleting || model.isLoading)
-            .accessibilityLabel("Delete")
-            .accessibilityHint("Deletes this item and its files after confirmation")
+            .accessibilityLabel(tr("action_delete"))
+            .accessibilityHint(tr("hint_deletes_this_item_and_its"))
         }
     }
 
@@ -1134,7 +1134,7 @@ struct RateMeToolsView: View {
                 HapticManager.light()
                 Task { await model.skip() }
             } label: {
-                Label("Skip", systemImage: "forward.fill")
+                Label(tr("action_skip"), systemImage: "forward.fill")
                     .font(.subheadline.weight(.semibold))
                     .frame(maxWidth: .infinity)
             }
@@ -1145,7 +1145,7 @@ struct RateMeToolsView: View {
                 NavigationLink {
                     SceneDetailView(scene: Self.stubScene(from: item))
                 } label: {
-                    Label("Watch", systemImage: "play.fill")
+                    Label(tr("watch"), systemImage: "play.fill")
                         .font(.subheadline.weight(.semibold))
                         .frame(maxWidth: .infinity)
                 }
@@ -1153,13 +1153,13 @@ struct RateMeToolsView: View {
                 .tint(appearance.tintColor)
                 .simultaneousGesture(TapGesture().onEnded { HapticManager.light() })
                 .disabled(model.isSubmitting || model.isLoading)
-                .accessibilityLabel("Watch Scene")
-                .accessibilityHint("Opens this scene; Back returns to RateMe")
+                .accessibilityLabel(tr("watch_scene"))
+                .accessibilityHint(tr("hint_opens_this_scene_back_returns"))
             } else if let image = item.openableImage {
                 NavigationLink {
                     FullScreenImageView(images: .constant([image]), selectedImageId: image.id)
                 } label: {
-                    Label("Open", systemImage: "arrow.up.left.and.arrow.down.right")
+                    Label(tr("action_open"), systemImage: "arrow.up.left.and.arrow.down.right")
                         .font(.subheadline.weight(.semibold))
                         .frame(maxWidth: .infinity)
                 }
@@ -1167,8 +1167,8 @@ struct RateMeToolsView: View {
                 .tint(appearance.tintColor)
                 .simultaneousGesture(TapGesture().onEnded { HapticManager.light() })
                 .disabled(model.isSubmitting || model.isLoading)
-                .accessibilityLabel("Open Image")
-                .accessibilityHint("Opens this image; Back returns to RateMe")
+                .accessibilityLabel(tr("action_open_image"))
+                .accessibilityHint(tr("hint_opens_this_image_back_returns"))
             }
         }
     }
@@ -1235,7 +1235,7 @@ private struct RateMeThemePickerSheet: View {
         // chrome with Back, a "Search …" section holding the text field and the list below it.
         NavigationView {
             Form {
-                Section(header: Text("Search \(kind.title)s")) {
+                Section(header: Text(tr("search_arg_s", kind.title))) {
                     TextField("Search...", text: $query)
                         .textInputAutocapitalization(.never)
                         .autocorrectionDisabled()
@@ -1254,12 +1254,12 @@ private struct RateMeThemePickerSheet: View {
                             }
                         }
                         if options.count > 50 {
-                            Text("Type more to refine...").font(.caption).foregroundColor(.secondary)
+                            Text(tr("type_more_to_refine_menu")).font(.caption).foregroundColor(.secondary)
                         }
                         if store.isSearching(storeKind) {
                             HStack { Spacer(); ProgressView(); Spacer() }
                         } else if !query.isEmpty && options.isEmpty {
-                            Text("No \(kind.title.lowercased())s match '\(query)'")
+                            Text(tr("empty_arg_s_match_arg", kind.title.lowercased(), query))
                                 .foregroundColor(.secondary)
                         }
                     }

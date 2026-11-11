@@ -18,6 +18,8 @@ struct TVApp: App {
     @State private var lastScenePhase: ScenePhase = .active
 
     init() {
+        // English by default (beta); a language picked on iPhone / Mac applies from the next start.
+        AppLanguage.applyPreferredLanguages()
         #if canImport(AetherEngine)
         // TLS-Policy und Logging der Playback-Engine einmalig verdrahten.
         AetherPlaybackBootstrap.installOnce()
@@ -191,7 +193,7 @@ struct TVPasscodeEntryView: View {
                         .font(.system(size: 52))
                         .foregroundStyle(.primary)
 
-                    Text("Enter PIN")
+                    Text(tr("enter_pin"))
                         .font(.largeTitle)
                         .fontWeight(.semibold)
 
@@ -237,7 +239,7 @@ struct TVPasscodeEntryView: View {
         .onExitCommand {
             // Menu/Back-Taste darf die PIN-Sperre NICHT umgehen.
             // Fehler-Feedback statt dismiss.
-            errorMessage = "Enter PIN to unlock"
+            errorMessage = tr("enter_pin_to_unlock")
             shakeTrigger.toggle()
         }
         .onAppear {
@@ -252,7 +254,7 @@ struct TVPasscodeEntryView: View {
             pin = ""
             securityManager.unlock()
         } else {
-            errorMessage = "Wrong PIN"
+            errorMessage = tr("wrong_pin")
             shakeTrigger.toggle()
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
                 pin = ""
@@ -284,7 +286,7 @@ struct TVPasscodeSetupView: View {
                         .font(.system(size: 52))
                         .foregroundStyle(.primary)
 
-                    Text(step == 1 ? "Set PIN" : "Confirm PIN")
+                    Text(step == 1 ? tr("action_set_pin") : tr("confirm_pin"))
                         .font(.largeTitle)
                         .fontWeight(.semibold)
 
@@ -343,7 +345,7 @@ struct TVPasscodeSetupView: View {
                     securityManager.setPin(pin)
                     isPresented = false
                 } else {
-                    errorMessage = "PINs do not match"
+                    errorMessage = tr("pins_do_not_match")
                     shakeTrigger.toggle()
                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
                         pin = ""
@@ -385,7 +387,7 @@ private struct TVPinPad: View {
             HStack(spacing: 18) {
                 if let onCancel {
                     Button(action: onCancel) {
-                        Text("Cancel")
+                        Text(tr("action_cancel"))
                             .font(.title3)
                             .frame(width: 140, height: 80)
                     }
@@ -432,7 +434,7 @@ private struct TVPinPad: View {
 struct TVServerSetupView: View {
     @ObservedObject private var configManager = ServerConfigManager.shared
 
-    @State private var serverName: String = "My Stash"
+    @State private var serverName: String = tr("my_stash")
     @State private var serverAddress: String = ""
     @State private var port: String = ""
     @State private var selectedProtocol: ServerProtocol = .https
@@ -466,11 +468,11 @@ struct TVServerSetupView: View {
                             .font(.system(size: 80))
                             .foregroundStyle(.secondary)
 
-                        Text("Connect to Stash")
+                        Text(tr("action_connect_to_stash"))
                             .font(.largeTitle)
                             .fontWeight(.bold)
 
-                        Text("Enter your Stash server details to get started.")
+                        Text(tr("hint_enter_your_stash_server_details"))
                             .font(.title3)
                             .foregroundStyle(.secondary)
                             .multilineTextAlignment(.center)
@@ -479,11 +481,11 @@ struct TVServerSetupView: View {
 
                     // Form
                     VStack(spacing: 24) {
-                        TextField("Server Name", text: $serverName)
+                        TextField(tr("server_name"), text: $serverName)
                             .focused($focusedField, equals: .name)
                             .textContentType(.name)
 
-                        TextField("Server Address (e.g. 192.168.1.100 or stash.example.com)", text: $serverAddress)
+                        TextField(tr("hint_server_address_e_g_192"), text: $serverAddress)
                             .focused($focusedField, equals: .address)
                             .textContentType(.URL)
                             .autocorrectionDisabled()
@@ -497,14 +499,14 @@ struct TVServerSetupView: View {
                             }
 
                         HStack(spacing: 24) {
-                            TextField("Port (optional)", text: $port)
+                            TextField(tr("port_optional"), text: $port)
                                 .focused($focusedField, equals: .port)
                                 .frame(maxWidth: 300)
                             #if swift(>=5.9)
                                 .keyboardType(.numberPad)
                             #endif
 
-                            Picker("Protocol", selection: $selectedProtocol) {
+                            Picker(tr("protocol"), selection: $selectedProtocol) {
                                 ForEach(ServerProtocol.allCases, id: \.self) { proto in
                                     Text(proto.displayName).tag(proto)
                                 }
@@ -515,24 +517,24 @@ struct TVServerSetupView: View {
 
                         // Authentication Section
                         VStack(alignment: .leading, spacing: 24) {
-                            Text("Authentication")
+                            Text(tr("authentication"))
                                 .font(.headline)
                                 .foregroundColor(.secondary)
                             
-                            Picker("Auth Method", selection: $authMethod) {
+                            Picker(tr("auth_method"), selection: $authMethod) {
                                 ForEach(AuthMethod.allCases, id: \.self) { method in
-                                    Text(method.rawValue).tag(method)
+                                    Text(method.displayName).tag(method)
                                 }
                             }
                             .pickerStyle(.segmented)
                             
                             if authMethod == .login {
                                 VStack(spacing: 24) {
-                                    TextField("Username", text: $username)
+                                    TextField(tr("username"), text: $username)
                                         .textContentType(.username)
                                         .textInputAutocapitalization(.never)
                                     
-                                    SecureField("Password", text: $password)
+                                    SecureField(tr("password"), text: $password)
                                         .textContentType(.password)
                                     
                                     Button {
@@ -542,7 +544,7 @@ struct TVServerSetupView: View {
                                             if isFetchingKey {
                                                 ProgressView()
                                             }
-                                            Text(isFetchingKey ? "Logging in..." : "Fetch API Key")
+                                            Text(isFetchingKey ? tr("logging_in_menu") : tr("action_fetch_api_key"))
                                         }
                                         .frame(minWidth: 300)
                                     }
@@ -555,7 +557,7 @@ struct TVServerSetupView: View {
                                     }
                                 }
                             } else if authMethod == .apiKey {
-                                TextField("API Key", text: $apiKey)
+                                TextField(tr("api_key"), text: $apiKey)
                                     .focused($focusedField, equals: .apiKey)
                                     .autocorrectionDisabled()
                                     .textInputAutocapitalization(.never)
@@ -583,7 +585,7 @@ struct TVServerSetupView: View {
                             if isTesting {
                                 ProgressView()
                             }
-                            Text(isTesting ? "Connecting..." : "Connect")
+                            Text(isTesting ? "Connecting..." : tr("action_connect"))
                                 .font(.title3)
                                 .fontWeight(.semibold)
                         }
@@ -603,7 +605,7 @@ struct TVServerSetupView: View {
         let finalPort = !port.isEmpty ? port : parsed.port
 
         let config = ServerConfig(
-            name: serverName.isEmpty ? "My Stash" : serverName,
+            name: serverName.isEmpty ? tr("my_stash") : serverName,
             serverAddress: finalAddress,
             port: finalPort,
             serverProtocol: selectedProtocol,
@@ -633,13 +635,13 @@ struct TVServerSetupView: View {
                 configManager.saveConfig(config)
             } else {
                 errorMessage = testVM.errorMessage
-                    ?? "Could not reach \(config.baseURL). Check address, port and protocol."
+                    ?? tr("error_reach_arg_check_address_port", config.baseURL)
             }
             return
         }
         if Date() >= deadline {
             isTesting = false
-            errorMessage = "Connection timed out. Check address, port and protocol."
+            errorMessage = tr("hint_connection_timed_out_check_address")
             return
         }
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {

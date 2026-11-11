@@ -1,5 +1,7 @@
 package de.letzgo.stashy.data
 
+import de.letzgo.stashy.R
+import de.letzgo.stashy.tr
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -11,12 +13,12 @@ import androidx.compose.runtime.setValue
  * adjacent half-width card in landscape.
  */
 enum class SceneDetailCard(val id: String, val title: String, val isHalfWidth: Boolean = false) {
-    Details("details", "Details"),
-    Heatmap("heatmap", "Heatmap"),
-    SimilarScenes("similarScenes", "Similar Scenes"),
-    PerformersStudio("performersStudio", "Metadata"),
-    Groups("groups", "Groups", isHalfWidth = true),
-    Tags("tags", "Tags", isHalfWidth = true);
+    Details("details", tr(R.string.details)),
+    Heatmap("heatmap", tr(R.string.heatmap)),
+    SimilarScenes("similarScenes", tr(R.string.similar_scenes)),
+    PerformersStudio("performersStudio", tr(R.string.metadata)),
+    Groups("groups", tr(R.string.groups), isHalfWidth = true),
+    Tags("tags", tr(R.string.tags), isHalfWidth = true);
 
     companion object {
         val defaultOrder: List<SceneDetailCard> get() = entries

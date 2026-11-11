@@ -57,8 +57,8 @@ struct FeedsPlaybackSettingsCard: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
-            CatalogFilterSortToggleRow(label: "Immersive", isOn: $tabManager.reelsFillHeight)
-            CatalogFilterSortToggleRow(label: "Continuous", isOn: $tabManager.reelsContinuousPlay)
+            CatalogFilterSortToggleRow(label: tr("immersive"), isOn: $tabManager.reelsFillHeight)
+            CatalogFilterSortToggleRow(label: tr("continuous"), isOn: $tabManager.reelsContinuousPlay)
             // "Delete button" lives in Settings → Feeds (app UI, not a per-feed filter option).
         }
     }
@@ -76,8 +76,8 @@ struct ImagesFeedAutoplaySettingsCard: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
-            CatalogFilterSortToggleRow(label: "Autoplay", isOn: $videoAutoplay)
-            CatalogFilterSortToggleRow(label: "Immersive", isOn: $fullscreenImmersive)
+            CatalogFilterSortToggleRow(label: tr("autoplay"), isOn: $videoAutoplay)
+            CatalogFilterSortToggleRow(label: tr("immersive"), isOn: $fullscreenImmersive)
             continuousCard
         }
     }
@@ -85,7 +85,7 @@ struct ImagesFeedAutoplaySettingsCard: View {
     private var continuousCard: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack(alignment: .center, spacing: 12) {
-                Text("Continuous")
+                Text(tr("continuous"))
                     .font(.subheadline.weight(.semibold))
                     .foregroundColor(.secondary)
                     .lineLimit(2)
@@ -98,7 +98,7 @@ struct ImagesFeedAutoplaySettingsCard: View {
 
             if fullscreenContinuous {
                 HStack(alignment: .center, spacing: 12) {
-                    Text("Still Duration")
+                    Text(tr("still_duration"))
                         .font(.subheadline.weight(.semibold))
                         .foregroundColor(.secondary)
                         .lineLimit(1)
@@ -205,7 +205,7 @@ struct CatalogNameRegexSearchCard: View {
                     Image(systemName: "magnifyingglass")
                         .font(.subheadline.weight(.semibold))
                         .foregroundColor(.secondary)
-                    TextField("Name or regex", text: $text, prompt: Text("Name or regex").foregroundColor(Color.primary.opacity(0.7)))
+                    TextField(tr("name_or_regex"), text: $text, prompt: Text(tr("name_or_regex")).foregroundColor(Color.primary.opacity(0.7)))
                         .font(.subheadline)
                         .textInputAutocapitalization(.never)
                         .autocorrectionDisabled()
@@ -221,11 +221,11 @@ struct CatalogNameRegexSearchCard: View {
                                 .foregroundColor(.secondary)
                         }
                         .buttonStyle(.plain)
-                        .accessibilityLabel("Clear search")
+                        .accessibilityLabel(tr("action_clear_search"))
                     }
                 }
                 if showsInvalidHint {
-                    Text("Invalid regex")
+                    Text(tr("invalid_regex"))
                         .font(.caption)
                         .foregroundColor(.red)
                 }
@@ -287,7 +287,7 @@ struct CatalogStudioLiveFilterPickerRow: View {
 
     var body: some View {
         HStack(alignment: .center, spacing: 12) {
-            Text("Studio")
+            Text(tr("studio"))
                 .font(.subheadline.weight(.semibold))
                 .foregroundColor(.secondary)
                 .frame(width: CatalogFilterSortSheetLayout.labelColumnWidth, alignment: .leading)
@@ -295,7 +295,7 @@ struct CatalogStudioLiveFilterPickerRow: View {
                 ProgressView()
                     .frame(maxWidth: .infinity, alignment: .trailing)
             } else {
-                Picker("Studio", selection: Binding(
+                Picker(tr("studio"), selection: Binding(
                     get: { selectedStudioId ?? "" },
                     set: { new in
                         let next = new.isEmpty ? nil : new
@@ -304,9 +304,9 @@ struct CatalogStudioLiveFilterPickerRow: View {
                         onSelectionChange()
                     }
                 )) {
-                    Text("Any").tag("")
+                    Text(tr("any")).tag("")
                     // Counterpart to "Any", same meaning as the multi-picker's None row.
-                    Text("None").tag(CatalogLiveChipFilterSupport.noneChipValue)
+                    Text(tr("none")).tag(CatalogLiveChipFilterSupport.noneChipValue)
                     ForEach(studios) { s in
                         Text(s.name).tag(s.id)
                     }
@@ -354,8 +354,8 @@ struct CatalogNamedEntityLiveFilterPickerRow<Item: Identifiable & Equatable>: Vi
                         onSelectionChange()
                     }
                 )) {
-                    Text("Any").tag("")
-                    Text("None").tag(CatalogLiveChipFilterSupport.noneChipValue)
+                    Text(tr("any")).tag("")
+                    Text(tr("none")).tag(CatalogLiveChipFilterSupport.noneChipValue)
                     ForEach(items) { item in
                         Text(displayName(item)).tag(item.id)
                     }
@@ -467,8 +467,8 @@ struct CatalogNamedEntityLiveFilterMultiPickerRow<Item: Identifiable & Equatable
     }
 
     private var selectedSummary: String {
-        if isNoneSelected { return "None" }
-        guard !selectedIds.isEmpty || !excluded.isEmpty else { return "Any" }
+        if isNoneSelected { return tr("none") }
+        guard !selectedIds.isEmpty || !excluded.isEmpty else { return tr("any") }
         let names = entries.filter { selectedIds.contains($0.id) }.map(\.name)
         var summary: String
         if names.isEmpty {
@@ -546,7 +546,7 @@ struct CatalogNamedEntityLiveFilterMultiPickerRow<Item: Identifiable & Equatable
                         onSelectionChange()
                     } label: {
                         multiPickerOptionRow(
-                            title: "Any",
+                            title: tr("any"),
                             state: selectedIds.isEmpty && excluded.isEmpty && !isNoneSelected ? .included : .none
                         )
                     }
@@ -562,7 +562,7 @@ struct CatalogNamedEntityLiveFilterMultiPickerRow<Item: Identifiable & Equatable
                             matchMode?.wrappedValue = StashCriterionModifier.isNull.rawValue
                             onSelectionChange()
                         } label: {
-                            multiPickerOptionRow(title: "None", state: isNoneSelected ? .included : .none)
+                            multiPickerOptionRow(title: tr("none"), state: isNoneSelected ? .included : .none)
                         }
                         .buttonStyle(.plain)
                     }
@@ -590,7 +590,7 @@ struct CatalogNamedEntityLiveFilterMultiPickerRow<Item: Identifiable & Equatable
             Image(systemName: "magnifyingglass")
                 .font(.caption)
                 .foregroundColor(.secondary)
-            TextField("Search", text: $searchText)
+            TextField(tr("search"), text: $searchText)
                 .textFieldStyle(.plain)
                 .autocorrectionDisabled()
                 .textInputAutocapitalization(.never)
@@ -766,16 +766,16 @@ private enum PerformerCatalogSortFieldKind: String, CaseIterable, Identifiable {
 
     var menuLabel: String {
         switch self {
-        case .name: return "Name"
-        case .scenes_count: return "Scene count"
-        case .images_count: return "Image count"
-        case .galleries_count: return "Gallery count"
-        case .birthdate: return "Birthday"
-        case .updated_at: return "Updated"
-        case .created_at: return "Created"
-        case .o_counter: return "O Count"
-        case .rating: return "Rating"
-        case .random: return "Random"
+        case .name: return tr("name")
+        case .scenes_count: return tr("scene_count")
+        case .images_count: return tr("image_count")
+        case .galleries_count: return tr("gallery_count")
+        case .birthdate: return tr("birthday")
+        case .updated_at: return tr("updated")
+        case .created_at: return tr("created")
+        case .o_counter: return tr("o_count")
+        case .rating: return tr("rating")
+        case .random: return tr("random")
         }
     }
 
@@ -850,15 +850,15 @@ private enum TagCatalogSortFieldKind: String, CaseIterable, Identifiable {
 
     var menuLabel: String {
         switch self {
-        case .name: return "Name"
-        case .scenes_count: return "Scene count"
-        case .images_count: return "Image count"
-        case .galleries_count: return "Gallery count"
-        case .scene_markers_count: return "Marker count"
-        case .performers_count: return "Performer count"
-        case .updated_at: return "Updated"
-        case .created_at: return "Created"
-        case .random: return "Random"
+        case .name: return tr("name")
+        case .scenes_count: return tr("scene_count")
+        case .images_count: return tr("image_count")
+        case .galleries_count: return tr("gallery_count")
+        case .scene_markers_count: return tr("marker_count")
+        case .performers_count: return tr("performer_count")
+        case .updated_at: return tr("updated")
+        case .created_at: return tr("created")
+        case .random: return tr("random")
         }
     }
 
@@ -925,15 +925,15 @@ private enum GroupCatalogSortFieldKind: String, CaseIterable, Identifiable {
 
     var menuLabel: String {
         switch self {
-        case .name: return "Name"
-        case .scenes_count: return "Scene count"
-        case .galleries_count: return "Gallery count"
-        case .performer_count: return "Performer count"
-        case .date: return "Date"
-        case .rating: return "Rating"
-        case .updated_at: return "Updated"
-        case .created_at: return "Created"
-        case .random: return "Random"
+        case .name: return tr("name")
+        case .scenes_count: return tr("scene_count")
+        case .galleries_count: return tr("gallery_count")
+        case .performer_count: return tr("performer_count")
+        case .date: return tr("date")
+        case .rating: return tr("rating")
+        case .updated_at: return tr("updated")
+        case .created_at: return tr("created")
+        case .random: return tr("random")
         }
     }
 
@@ -978,19 +978,19 @@ private enum StudioCatalogSortFieldKind: String, CaseIterable, Identifiable {
 
     var menuLabel: String {
         switch self {
-        case .name: return "Name"
-        case .scenes_count: return "Scene count"
-        case .rating: return "Rating"
-        case .performer_count: return "Performer count"
-        case .performer_count_all: return "Performer count incl. sub-studios"
-        case .o_counter: return "O Count"
-        case .o_counter_all: return "O Count incl. sub-studios"
-        case .scene_markers_count: return "Marker count"
-        case .galleries_count: return "Gallery count"
-        case .images_count: return "Image count"
-        case .updated_at: return "Updated"
-        case .created_at: return "Created"
-        case .random: return "Random"
+        case .name: return tr("name")
+        case .scenes_count: return tr("scene_count")
+        case .rating: return tr("rating")
+        case .performer_count: return tr("performer_count")
+        case .performer_count_all: return tr("performer_count_incl_sub_studios")
+        case .o_counter: return tr("o_count")
+        case .o_counter_all: return tr("o_count_incl_sub_studios")
+        case .scene_markers_count: return tr("marker_count")
+        case .galleries_count: return tr("gallery_count")
+        case .images_count: return tr("image_count")
+        case .updated_at: return tr("updated")
+        case .created_at: return tr("created")
+        case .random: return tr("random")
         }
     }
 
@@ -1115,12 +1115,12 @@ struct PerformersCatalogFilterSortSheet: View {
 
     private var filterPickerCard: some View {
         HStack(alignment: .center, spacing: 12) {
-            Text("Filter")
+            Text(tr("filter"))
                 .font(.subheadline.weight(.semibold))
                 .foregroundColor(.secondary)
                 .frame(width: CatalogFilterSortSheetLayout.labelColumnWidth, alignment: .leading)
-            Picker("Filter", selection: $selectedPresetRowId) {
-                Text("None").tag("")
+            Picker(tr("filter"), selection: $selectedPresetRowId) {
+                Text(tr("none")).tag("")
                 if !serverFilters.isEmpty {
                     Section {
                         ForEach(serverFilters) { f in
@@ -1138,7 +1138,7 @@ struct PerformersCatalogFilterSortSheet: View {
             }
             .pickerStyle(.menu)
             .labelsHidden()
-            .accessibilityLabel("Filter")
+            .accessibilityLabel(tr("filter"))
             .tint(appearance.tintColor)
             .frame(maxWidth: .infinity, alignment: .trailing)
         }
@@ -1153,18 +1153,18 @@ struct PerformersCatalogFilterSortSheet: View {
         let orderDisabled = randomMode || unmappedMode || pickerValue.isSharedScenes
 
         return HStack(alignment: .center, spacing: 12) {
-            Text("Sort")
+            Text(tr("action_sort"))
                 .font(.subheadline.weight(.semibold))
                 .foregroundColor(.secondary)
                 // Gives way to a long sort name instead of widening the sheet.
                 .frame(minWidth: 44, idealWidth: CatalogFilterSortSheetLayout.labelColumnWidth, maxWidth: CatalogFilterSortSheetLayout.labelColumnWidth, alignment: .leading)
                 .layoutPriority(1)
             HStack(spacing: 6) {
-                CatalogFilterChip(title: "Asc", isActive: ascending && !orderDisabled) {
+                CatalogFilterChip(title: tr("asc"), isActive: ascending && !orderDisabled) {
                     guard let k = pickerValue.knownKind, !orderDisabled else { return }
                     onSortChange(k.performerSortOption(ascending: true))
                 }
-                CatalogFilterChip(title: "Desc", isActive: !ascending && !orderDisabled) {
+                CatalogFilterChip(title: tr("desc"), isActive: !ascending && !orderDisabled) {
                     guard let k = pickerValue.knownKind, !orderDisabled else { return }
                     onSortChange(k.performerSortOption(ascending: false))
                 }
@@ -1173,7 +1173,7 @@ struct PerformersCatalogFilterSortSheet: View {
             .opacity(orderDisabled ? 0.4 : 1)
             .allowsHitTesting(!orderDisabled)
             Spacer(minLength: 8)
-            Picker("Sort type", selection: Binding(
+            Picker(tr("action_sort_type"), selection: Binding(
                 get: { currentSortPickerValue },
                 set: { newVal in
                     switch newVal {
@@ -1196,10 +1196,10 @@ struct PerformersCatalogFilterSortSheet: View {
                 }
             )) {
                 if sharedScenesSortSelected != nil {
-                    Text("Most shared").tag(PerformerCatalogSortPickerValue.sharedScenes)
+                    Text(tr("most_shared")).tag(PerformerCatalogSortPickerValue.sharedScenes)
                 }
                 if case .unmapped(let f) = pickerValue {
-                    Text("Other (\(f))").tag(PerformerCatalogSortPickerValue.unmapped(sortField: f))
+                    Text(tr("other_arg", f)).tag(PerformerCatalogSortPickerValue.unmapped(sortField: f))
                 }
                 ForEach(PerformerCatalogSortFieldKind.allCases) { k in
                     Text(k.menuLabel).tag(PerformerCatalogSortPickerValue.known(k))
@@ -1274,12 +1274,12 @@ struct TagsCatalogFilterSortSheet: View {
 
     private var filterPickerCard: some View {
         HStack(alignment: .center, spacing: 12) {
-            Text("Filter")
+            Text(tr("filter"))
                 .font(.subheadline.weight(.semibold))
                 .foregroundColor(.secondary)
                 .frame(width: CatalogFilterSortSheetLayout.labelColumnWidth, alignment: .leading)
-            Picker("Filter", selection: $selectedPresetRowId) {
-                Text("None").tag("")
+            Picker(tr("filter"), selection: $selectedPresetRowId) {
+                Text(tr("none")).tag("")
                 if !serverFilters.isEmpty {
                     Section {
                         ForEach(serverFilters) { f in
@@ -1308,18 +1308,18 @@ struct TagsCatalogFilterSortSheet: View {
         let ascending = sortOption.direction == "ASC"
         let orderDisabled = pickerValue.isRandom || pickerValue.isUnmapped
         return HStack(alignment: .center, spacing: 12) {
-            Text("Sort")
+            Text(tr("action_sort"))
                 .font(.subheadline.weight(.semibold))
                 .foregroundColor(.secondary)
                 // Gives way to a long sort name instead of widening the sheet.
                 .frame(minWidth: 44, idealWidth: CatalogFilterSortSheetLayout.labelColumnWidth, maxWidth: CatalogFilterSortSheetLayout.labelColumnWidth, alignment: .leading)
                 .layoutPriority(1)
             HStack(spacing: 6) {
-                CatalogFilterChip(title: "Asc", isActive: ascending && !orderDisabled) {
+                CatalogFilterChip(title: tr("asc"), isActive: ascending && !orderDisabled) {
                     guard let k = pickerValue.knownKind, !orderDisabled else { return }
                     onSortChange(k.tagSortOption(ascending: true))
                 }
-                CatalogFilterChip(title: "Desc", isActive: !ascending && !orderDisabled) {
+                CatalogFilterChip(title: tr("desc"), isActive: !ascending && !orderDisabled) {
                     guard let k = pickerValue.knownKind, !orderDisabled else { return }
                     onSortChange(k.tagSortOption(ascending: false))
                 }
@@ -1327,7 +1327,7 @@ struct TagsCatalogFilterSortSheet: View {
             .opacity(orderDisabled ? 0.4 : 1)
             .allowsHitTesting(!orderDisabled)
             Spacer(minLength: 8)
-            Picker("Sort type", selection: Binding(
+            Picker(tr("action_sort_type"), selection: Binding(
                 get: { TagCatalogSortPickerValue.from(sortOption) },
                 set: { newVal in
                     switch newVal {
@@ -1345,7 +1345,7 @@ struct TagsCatalogFilterSortSheet: View {
                 }
             )) {
                 if case .unmapped(let f) = pickerValue {
-                    Text("Other (\(f))").tag(TagCatalogSortPickerValue.unmapped(sortField: f))
+                    Text(tr("other_arg", f)).tag(TagCatalogSortPickerValue.unmapped(sortField: f))
                 }
                 ForEach(TagCatalogSortFieldKind.allCases) { k in
                     Text(k.menuLabel).tag(TagCatalogSortPickerValue.known(k))
@@ -1420,12 +1420,12 @@ struct StudiosCatalogFilterSortSheet: View {
 
     private var filterPickerCard: some View {
         HStack(alignment: .center, spacing: 12) {
-            Text("Filter")
+            Text(tr("filter"))
                 .font(.subheadline.weight(.semibold))
                 .foregroundColor(.secondary)
                 .frame(width: CatalogFilterSortSheetLayout.labelColumnWidth, alignment: .leading)
-            Picker("Filter", selection: $selectedPresetRowId) {
-                Text("None").tag("")
+            Picker(tr("filter"), selection: $selectedPresetRowId) {
+                Text(tr("none")).tag("")
                 if !serverFilters.isEmpty {
                     Section {
                         ForEach(serverFilters) { f in
@@ -1454,18 +1454,18 @@ struct StudiosCatalogFilterSortSheet: View {
         let ascending = sortOption.direction == "ASC"
         let orderDisabled = pickerValue.isRandom || pickerValue.isUnmapped
         return HStack(alignment: .center, spacing: 12) {
-            Text("Sort")
+            Text(tr("action_sort"))
                 .font(.subheadline.weight(.semibold))
                 .foregroundColor(.secondary)
                 // Gives way to a long sort name instead of widening the sheet.
                 .frame(minWidth: 44, idealWidth: CatalogFilterSortSheetLayout.labelColumnWidth, maxWidth: CatalogFilterSortSheetLayout.labelColumnWidth, alignment: .leading)
                 .layoutPriority(1)
             HStack(spacing: 6) {
-                CatalogFilterChip(title: "Asc", isActive: ascending && !orderDisabled) {
+                CatalogFilterChip(title: tr("asc"), isActive: ascending && !orderDisabled) {
                     guard let k = pickerValue.knownKind, !orderDisabled else { return }
                     onSortChange(k.studioSortOption(ascending: true))
                 }
-                CatalogFilterChip(title: "Desc", isActive: !ascending && !orderDisabled) {
+                CatalogFilterChip(title: tr("desc"), isActive: !ascending && !orderDisabled) {
                     guard let k = pickerValue.knownKind, !orderDisabled else { return }
                     onSortChange(k.studioSortOption(ascending: false))
                 }
@@ -1473,7 +1473,7 @@ struct StudiosCatalogFilterSortSheet: View {
             .opacity(orderDisabled ? 0.4 : 1)
             .allowsHitTesting(!orderDisabled)
             Spacer(minLength: 8)
-            Picker("Sort type", selection: Binding(
+            Picker(tr("action_sort_type"), selection: Binding(
                 get: { StudioCatalogSortPickerValue.from(sortOption) },
                 set: { newVal in
                     switch newVal {
@@ -1491,7 +1491,7 @@ struct StudiosCatalogFilterSortSheet: View {
                 }
             )) {
                 if case .unmapped(let f) = pickerValue {
-                    Text("Other (\(f))").tag(StudioCatalogSortPickerValue.unmapped(sortField: f))
+                    Text(tr("other_arg", f)).tag(StudioCatalogSortPickerValue.unmapped(sortField: f))
                 }
                 ForEach(StudioCatalogSortFieldKind.allCases.filter { $0.studioSortOption(ascending: false).isAvailableOnServer }) { k in
                     Text(k.menuLabel).tag(StudioCatalogSortPickerValue.known(k))
@@ -1524,14 +1524,14 @@ private enum GalleryCatalogSortFieldKind: String, CaseIterable, Identifiable {
 
     var menuLabel: String {
         switch self {
-        case .title: return "Title"
-        case .date: return "Date"
-        case .rating: return "Rating"
-        case .created_at: return "Created"
-        case .updated_at: return "Updated"
-        case .images_count: return "Image count"
-        case .performer_age: return "Performer age"
-        case .random: return "Random"
+        case .title: return tr("title")
+        case .date: return tr("date")
+        case .rating: return tr("rating")
+        case .created_at: return tr("created")
+        case .updated_at: return tr("updated")
+        case .images_count: return tr("image_count")
+        case .performer_age: return tr("performer_age")
+        case .random: return tr("random")
         }
     }
 
@@ -1638,12 +1638,12 @@ struct GalleriesCatalogFilterSortSheet: View {
 
     private var filterPickerCard: some View {
         HStack(alignment: .center, spacing: 12) {
-            Text("Filter")
+            Text(tr("filter"))
                 .font(.subheadline.weight(.semibold))
                 .foregroundColor(.secondary)
                 .frame(width: CatalogFilterSortSheetLayout.labelColumnWidth, alignment: .leading)
-            Picker("Filter", selection: $selectedPresetRowId) {
-                Text("None").tag("")
+            Picker(tr("filter"), selection: $selectedPresetRowId) {
+                Text(tr("none")).tag("")
                 if !serverFilters.isEmpty {
                     Section {
                         ForEach(serverFilters) { f in
@@ -1672,18 +1672,18 @@ struct GalleriesCatalogFilterSortSheet: View {
         let ascending = sortOption.direction == "ASC"
         let orderDisabled = pickerValue.isRandom || pickerValue.isUnmapped
         return HStack(alignment: .center, spacing: 12) {
-            Text("Sort")
+            Text(tr("action_sort"))
                 .font(.subheadline.weight(.semibold))
                 .foregroundColor(.secondary)
                 // Gives way to a long sort name instead of widening the sheet.
                 .frame(minWidth: 44, idealWidth: CatalogFilterSortSheetLayout.labelColumnWidth, maxWidth: CatalogFilterSortSheetLayout.labelColumnWidth, alignment: .leading)
                 .layoutPriority(1)
             HStack(spacing: 6) {
-                CatalogFilterChip(title: "Asc", isActive: ascending && !orderDisabled) {
+                CatalogFilterChip(title: tr("asc"), isActive: ascending && !orderDisabled) {
                     guard let k = pickerValue.knownKind, !orderDisabled else { return }
                     onSortChange(k.gallerySortOption(ascending: true))
                 }
-                CatalogFilterChip(title: "Desc", isActive: !ascending && !orderDisabled) {
+                CatalogFilterChip(title: tr("desc"), isActive: !ascending && !orderDisabled) {
                     guard let k = pickerValue.knownKind, !orderDisabled else { return }
                     onSortChange(k.gallerySortOption(ascending: false))
                 }
@@ -1691,7 +1691,7 @@ struct GalleriesCatalogFilterSortSheet: View {
             .opacity(orderDisabled ? 0.4 : 1)
             .allowsHitTesting(!orderDisabled)
             Spacer(minLength: 8)
-            Picker("Sort type", selection: Binding(
+            Picker(tr("action_sort_type"), selection: Binding(
                 get: { GalleryCatalogSortPickerValue.from(sortOption) },
                 set: { newVal in
                     switch newVal {
@@ -1709,7 +1709,7 @@ struct GalleriesCatalogFilterSortSheet: View {
                 }
             )) {
                 if case .unmapped(let f) = pickerValue {
-                    Text("Other (\(f))").tag(GalleryCatalogSortPickerValue.unmapped(sortField: f))
+                    Text(tr("other_arg", f)).tag(GalleryCatalogSortPickerValue.unmapped(sortField: f))
                 }
                 ForEach(GalleryCatalogSortFieldKind.allCases.filter { $0.gallerySortOption(ascending: false).isAvailableOnServer }) { k in
                     Text(k.menuLabel).tag(GalleryCatalogSortPickerValue.known(k))
@@ -1741,13 +1741,13 @@ private enum ImageCatalogSortFieldKind: String, CaseIterable, Identifiable {
 
     var menuLabel: String {
         switch self {
-        case .title: return "Title"
-        case .date: return "Date"
-        case .rating: return "Rating"
-        case .created_at: return "Created"
-        case .updated_at: return "Updated"
-        case .performer_age: return "Performer age"
-        case .random: return "Random"
+        case .title: return tr("title")
+        case .date: return tr("date")
+        case .rating: return tr("rating")
+        case .created_at: return tr("created")
+        case .updated_at: return tr("updated")
+        case .performer_age: return tr("performer_age")
+        case .random: return tr("random")
         }
     }
 
@@ -1839,7 +1839,7 @@ struct ImagesCatalogFilterSortSheet: View {
     }
 
     private var filterMenuCollapsedTitle: String {
-        if selectedPresetRowId.isEmpty { return "None" }
+        if selectedPresetRowId.isEmpty { return tr("none") }
         if let sid = ListLivePresetTag.parseServerId(selectedPresetRowId),
            let f = serverFilters.first(where: { $0.id == sid }) {
             return f.name
@@ -1852,7 +1852,7 @@ struct ImagesCatalogFilterSortSheet: View {
         if let fb = filterMenuTitleFallback?.trimmingCharacters(in: .whitespacesAndNewlines), !fb.isEmpty {
             return fb
         }
-        return "None"
+        return tr("none")
     }
 
     var body: some View {
@@ -1897,12 +1897,12 @@ struct ImagesCatalogFilterSortSheet: View {
 
     private var filterPickerCard: some View {
         HStack(alignment: .center, spacing: 12) {
-            Text("Filter")
+            Text(tr("filter"))
                 .font(.subheadline.weight(.semibold))
                 .foregroundColor(.secondary)
                 .frame(width: CatalogFilterSortSheetLayout.labelColumnWidth, alignment: .leading)
-            Picker("Filter", selection: $selectedPresetRowId) {
-                Text("None").tag("")
+            Picker(tr("filter"), selection: $selectedPresetRowId) {
+                Text(tr("none")).tag("")
                 if selectedPresetRowId.isEmpty == false,
                    serverFilters.contains(where: { ListLivePresetTag.serverRow($0.id) == selectedPresetRowId }) == false,
                    localPresets.contains(where: { ListLivePresetTag.localRow($0.id) == selectedPresetRowId }) == false {
@@ -1925,7 +1925,7 @@ struct ImagesCatalogFilterSortSheet: View {
             }
             .pickerStyle(.menu)
             .labelsHidden()
-            .accessibilityLabel("Filter")
+            .accessibilityLabel(tr("filter"))
             .tint(appearance.tintColor)
             .frame(maxWidth: .infinity, alignment: .trailing)
         }
@@ -1937,18 +1937,18 @@ struct ImagesCatalogFilterSortSheet: View {
         let ascending = sortOption.direction == "ASC"
         let orderDisabled = pickerValue.isRandom || pickerValue.isUnmapped
         return HStack(alignment: .center, spacing: 12) {
-            Text("Sort")
+            Text(tr("action_sort"))
                 .font(.subheadline.weight(.semibold))
                 .foregroundColor(.secondary)
                 // Gives way to a long sort name instead of widening the sheet.
                 .frame(minWidth: 44, idealWidth: CatalogFilterSortSheetLayout.labelColumnWidth, maxWidth: CatalogFilterSortSheetLayout.labelColumnWidth, alignment: .leading)
                 .layoutPriority(1)
             HStack(spacing: 6) {
-                CatalogFilterChip(title: "Asc", isActive: ascending && !orderDisabled) {
+                CatalogFilterChip(title: tr("asc"), isActive: ascending && !orderDisabled) {
                     guard let k = pickerValue.knownKind, !orderDisabled else { return }
                     onSortChange(k.imageSortOption(ascending: true))
                 }
-                CatalogFilterChip(title: "Desc", isActive: !ascending && !orderDisabled) {
+                CatalogFilterChip(title: tr("desc"), isActive: !ascending && !orderDisabled) {
                     guard let k = pickerValue.knownKind, !orderDisabled else { return }
                     onSortChange(k.imageSortOption(ascending: false))
                 }
@@ -1956,7 +1956,7 @@ struct ImagesCatalogFilterSortSheet: View {
             .opacity(orderDisabled ? 0.4 : 1)
             .allowsHitTesting(!orderDisabled)
             Spacer(minLength: 8)
-            Picker("Sort type", selection: Binding(
+            Picker(tr("action_sort_type"), selection: Binding(
                 get: { ImageCatalogSortPickerValue.from(sortOption) },
                 set: { newVal in
                     switch newVal {
@@ -1974,7 +1974,7 @@ struct ImagesCatalogFilterSortSheet: View {
                 }
             )) {
                 if case .unmapped(let f) = pickerValue {
-                    Text("Other (\(f))").tag(ImageCatalogSortPickerValue.unmapped(sortField: f))
+                    Text(tr("other_arg", f)).tag(ImageCatalogSortPickerValue.unmapped(sortField: f))
                 }
                 ForEach(ImageCatalogSortFieldKind.allCases.filter { $0.imageSortOption(ascending: false).isAvailableOnServer }) { k in
                     Text(k.menuLabel).tag(ImageCatalogSortPickerValue.known(k))
@@ -1999,7 +1999,7 @@ struct ImagesCatalogFilterSortSheet: View {
             }
         }
         return HStack(alignment: .center, spacing: 12) {
-            Text("Per row")
+            Text(tr("per_row"))
                 .font(.subheadline.weight(.semibold))
                 .foregroundColor(.secondary)
                 .frame(width: CatalogFilterSortSheetLayout.labelColumnWidth, alignment: .leading)
@@ -2014,14 +2014,14 @@ struct ImagesCatalogFilterSortSheet: View {
 
     private var imageMediaTypeCard: some View {
         HStack(alignment: .center, spacing: 12) {
-            Text("Type")
+            Text(tr("type"))
                 .font(.subheadline.weight(.semibold))
                 .foregroundColor(.secondary)
                 .frame(width: CatalogFilterSortSheetLayout.labelColumnWidth, alignment: .leading)
             HStack(spacing: 6) {
-                CatalogFilterChip(title: "Any", isActive: liveMediaKind == .all) { liveMediaKind = .all; onApply() }
-                CatalogFilterChip(title: "Image", isActive: liveMediaKind == .stillImage) { liveMediaKind = .stillImage; onApply() }
-                CatalogFilterChip(title: "Video", isActive: liveMediaKind == .video) { liveMediaKind = .video; onApply() }
+                CatalogFilterChip(title: tr("any"), isActive: liveMediaKind == .all) { liveMediaKind = .all; onApply() }
+                CatalogFilterChip(title: tr("image"), isActive: liveMediaKind == .stillImage) { liveMediaKind = .stillImage; onApply() }
+                CatalogFilterChip(title: tr("video"), isActive: liveMediaKind == .video) { liveMediaKind = .video; onApply() }
             }
             Spacer(minLength: 0)
         }
@@ -2277,12 +2277,12 @@ struct GroupsCatalogFilterSortSheet: View {
                 VStack(alignment: .leading, spacing: 16) {
                     CatalogNameRegexSearchCard(document: criteriaDocument, onApply: onApply)
                     HStack(alignment: .center, spacing: 12) {
-                        Text("Filter")
+                        Text(tr("filter"))
                             .font(.subheadline.weight(.semibold))
                             .foregroundColor(.secondary)
                             .frame(width: CatalogFilterSortSheetLayout.labelColumnWidth, alignment: .leading)
-                        Picker("Filter", selection: $selectedPresetRowId) {
-                            Text("None").tag("")
+                        Picker(tr("filter"), selection: $selectedPresetRowId) {
+                            Text(tr("none")).tag("")
                             ForEach(serverFilters) { f in
                                 Text(f.name).tag(ListLivePresetTag.serverRow(f.id))
                             }
@@ -2322,18 +2322,18 @@ struct GroupsCatalogFilterSortSheet: View {
         let ascending = sortOption.direction == "ASC"
         let orderDisabled = kind == .random
         return HStack(alignment: .center, spacing: 12) {
-            Text("Sort")
+            Text(tr("action_sort"))
                 .font(.subheadline.weight(.semibold))
                 .foregroundColor(.secondary)
                 // Gives way to a long sort name instead of widening the sheet.
                 .frame(minWidth: 44, idealWidth: CatalogFilterSortSheetLayout.labelColumnWidth, maxWidth: CatalogFilterSortSheetLayout.labelColumnWidth, alignment: .leading)
                 .layoutPriority(1)
             HStack(spacing: 6) {
-                CatalogFilterChip(title: "Asc", isActive: ascending && !orderDisabled) {
+                CatalogFilterChip(title: tr("asc"), isActive: ascending && !orderDisabled) {
                     guard !orderDisabled else { return }
                     onSortChange(kind.groupSortOption(ascending: true))
                 }
-                CatalogFilterChip(title: "Desc", isActive: !ascending && !orderDisabled) {
+                CatalogFilterChip(title: tr("desc"), isActive: !ascending && !orderDisabled) {
                     guard !orderDisabled else { return }
                     onSortChange(kind.groupSortOption(ascending: false))
                 }
@@ -2342,7 +2342,7 @@ struct GroupsCatalogFilterSortSheet: View {
             .opacity(orderDisabled ? 0.4 : 1)
             .allowsHitTesting(!orderDisabled)
             Spacer(minLength: 8)
-            Picker("Sort type", selection: Binding(
+            Picker(tr("action_sort_type"), selection: Binding(
                 get: { GroupCatalogSortFieldKind.from(sortOption) },
                 set: { newKind in
                     if newKind == .random {

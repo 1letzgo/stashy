@@ -1,5 +1,7 @@
 package de.letzgo.stashy.ui.detail
 
+import de.letzgo.stashy.R
+import de.letzgo.stashy.tr
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
@@ -93,7 +95,7 @@ class SharedAppearancesScreen(
     private fun avatar(id: String, name: String, p: Performer?): DetailHero {
         val url = performerThumbnailURL(id, p?.imagePath)
         return DetailHero(
-            DetailHero.Style.Cover, url, Color.Black, "Open $name",
+            DetailHero.Style.Cover, url, Color.Black, tr(R.string.action_open_arg, name),
             { Nav.push(PerformerDetailScreen(id, p)) },
             backdropAlignment = HeroPortraitBias,
         ) {
@@ -110,9 +112,9 @@ class SharedAppearancesScreen(
             galleries = catalog.list(DetailTab.Galleries)?.totalCount ?: 0,
         )
         val items = buildList {
-            if (counts.scenes > 0) add(DetailItem("Shared scenes", counts.scenes.toString()))
-            if (counts.galleries > 0) add(DetailItem("Shared galleries", counts.galleries.toString()))
-            if (counts.images > 0) add(DetailItem("Shared images", counts.images.toString()))
+            if (counts.scenes > 0) add(DetailItem(tr(R.string.shared_scenes), counts.scenes.toString()))
+            if (counts.galleries > 0) add(DetailItem(tr(R.string.shared_galleries), counts.galleries.toString()))
+            if (counts.images > 0) add(DetailItem(tr(R.string.shared_images), counts.images.toString()))
         }
         DetailHeroCard(
             title = title,

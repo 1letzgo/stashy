@@ -137,7 +137,7 @@ final class ScenePlayerExtrasController: ObservableObject {
     func menuItems() -> [PlayerMenuItem] {
         // AI subtitles are their own submenu next to the video's Subtitles — see `aiSubtitleMenuItems()`.
         // Here only the scene tools, as one group.
-        var items: [PlayerMenuItem] = [.separator(id: "extras.section.scene", title: "Scene")]
+        var items: [PlayerMenuItem] = [.separator(id: "extras.section.scene", title: tr("scene"))]
 
         #if canImport(AetherEngine)
         // AI Motion braucht ein echtes Player-Item zum Abtasten (`.loopback` /
@@ -147,7 +147,7 @@ final class ScenePlayerExtrasController: ObservableObject {
             let isSyncing = sync.isSyncing
             items.append(.action(
                 id: "extras.aiMotion",
-                title: "AI Motion",
+                title: tr("ai_motion"),
                 systemImage: isSyncing ? "bolt.horizontal.fill" : "bolt.horizontal",
                 isChecked: isSyncing
             ) {
@@ -163,7 +163,7 @@ final class ScenePlayerExtrasController: ObservableObject {
             let counts = !TabManager.activityPausedSceneIds.contains(sceneId)
             items.append(.action(
                 id: "extras.countPlayback",
-                title: "Count this playback",
+                title: tr("count_this_playback"),
                 systemImage: "clock.arrow.circlepath",
                 isChecked: counts,
                 keepsMenuOpen: true
@@ -180,7 +180,7 @@ final class ScenePlayerExtrasController: ObservableObject {
 
         items.append(.action(
             id: "extras.sceneCover",
-            title: "Use frame as scene cover",
+            title: tr("action_use_frame_as_scene_cover"),
             systemImage: "photo",
             isDisabled: isBusyCapturing
         ) { [weak self] in
@@ -188,7 +188,7 @@ final class ScenePlayerExtrasController: ObservableObject {
         })
         items.append(.action(
             id: "extras.tagImage",
-            title: "Use frame as tag image",
+            title: tr("action_use_frame_as_tag_image"),
             systemImage: "tag",
             isDisabled: isBusyCapturing
         ) { [weak self] in
@@ -227,10 +227,10 @@ final class ScenePlayerExtrasController: ObservableObject {
         guard StashyPlusManager.shared.isUnlocked else {
             return [.action(
                 id: "extras.aiSubtitles.locked",
-                title: "AI Subtitles · stashy+",
+                title: tr("ai_subtitles_stashy_plus"),
                 systemImage: "lock"
             ) {
-                ToastManager.shared.show("AI subtitles are part of stashy+ — unlock in Settings", icon: "sparkles", style: .error)
+                ToastManager.shared.show(tr("hint_ai_subtitles_are_part_of_stashy"), icon: "sparkles", style: .error)
             }]
         }
         let translator = captionTranslator
@@ -248,7 +248,7 @@ final class ScenePlayerExtrasController: ObservableObject {
         var rows: [PlayerMenuItem] = [
             .action(
                 id: "extras.captions.off",
-                title: "Off",
+                title: tr("off"),
                 isChecked: !aiOn
             ) { [weak self] in self?.setTeleprompterMode(.off) }
         ]
@@ -268,19 +268,19 @@ final class ScenePlayerExtrasController: ObservableObject {
             let name = transcription.downloadingModelLanguage ?? "speech"
             rows.append(.action(
                 id: "extras.captions.downloadSpeechModel",
-                title: "Download \(name) speech model",
+                title: tr("action_download_arg_speech_model", name),
                 systemImage: "arrow.down.circle"
             ) { transcription.approveSpeechModelDownload() })
         }
         if translator?.needsLanguageDownload == true {
             rows.append(.action(
                 id: "extras.captions.downloadPack",
-                title: "Download \(userLanguage.uppercased()) language pack",
+                title: tr("action_download_arg_language_pack", userLanguage.uppercased()),
                 systemImage: "arrow.down.circle"
             ) { translator?.approveDownload() })
         }
 
-        rows.append(.separator(id: "extras.section.spoken", title: "Spoken in this scene"))
+        rows.append(.separator(id: "extras.section.spoken", title: tr("spoken_in_this_scene")))
         // Spoken language: one row with the current language (or "Set spoken language"). Tapping
         // it unfolds the list right here, picking folds it again — the menu stays open, so the
         // new language shows immediately.
@@ -291,13 +291,13 @@ final class ScenePlayerExtrasController: ObservableObject {
         if languageOptions.isEmpty {
             rows.append(.info(
                 id: "extras.language",
-                title: hasLanguage ? "Spoken: \(languageLabel)" : "Loading languages…",
+                title: hasLanguage ? tr("spoken_arg", languageLabel) : tr("loading_languages"),
                 systemImage: "globe"
             ))
         } else {
             rows.append(.action(
                 id: "extras.language",
-                title: hasLanguage ? "Spoken: \(languageLabel)" : "Set spoken language",
+                title: hasLanguage ? tr("spoken_arg", languageLabel) : tr("action_set_spoken_language"),
                 systemImage: isPickingSpokenLanguage ? "chevron.up" : "globe",
                 keepsMenuOpen: true
             ) { [weak self] in self?.isPickingSpokenLanguage.toggle() })
@@ -318,16 +318,16 @@ final class ScenePlayerExtrasController: ObservableObject {
         }
 
         let current: String = {
-            guard aiOn else { return "Off" }
+            guard aiOn else { return tr("off") }
             switch mode {
-            case .off: return "On"
+            case .off: return tr("on")
             case .english, .sceneLanguage: return SceneTeleprompterMode.english.title
             case .userLanguage: return SubtitleTargetLanguage.displayName(for: userLanguage)
             }
         }()
         return [.submenu(
             id: "extras.aiSubtitles",
-            title: "AI Subtitles: \(current)",
+            title: tr("ai_subtitles_arg", current),
             systemImage: aiOn ? "sparkles.rectangle.stack.fill" : "sparkles.rectangle.stack",
             items: rows
         )]
@@ -369,7 +369,7 @@ final class ScenePlayerExtrasController: ObservableObject {
             isCapturingTagFrame = false
             guard let dataURL else {
                 ToastManager.shared.show(
-                    "Could not capture video frame",
+                    tr("error_capture_video_frame"),
                     icon: "exclamationmark.triangle",
                     style: .error
                 )
@@ -396,7 +396,7 @@ final class ScenePlayerExtrasController: ObservableObject {
             guard let dataURL else {
                 isSettingSceneCover = false
                 ToastManager.shared.show(
-                    "Could not capture video frame",
+                    tr("error_capture_video_frame"),
                     icon: "exclamationmark.triangle",
                     style: .error
                 )
@@ -421,10 +421,10 @@ final class ScenePlayerExtrasController: ObservableObject {
                             ]
                         )
                         updated.postListMetadataUpdated()
-                        ToastManager.shared.show("Scene cover updated", icon: "photo", style: .success)
+                        ToastManager.shared.show(tr("scene_cover_updated"), icon: "photo", style: .success)
                     } else {
                         ToastManager.shared.show(
-                            "Failed to update scene cover",
+                            tr("error_update_scene_cover"),
                             icon: "exclamationmark.triangle",
                             style: .error
                         )
@@ -470,14 +470,14 @@ final class ScenePlayerExtrasController: ObservableObject {
                 if success {
                     if detected {
                         let name = Locale.current.localizedString(forIdentifier: code) ?? code.uppercased()
-                        ToastManager.shared.show("Spoken language from the file: \(name)", icon: "globe", style: .success)
+                        ToastManager.shared.show(tr("hint_spoken_language_from_file_arg", name), icon: "globe", style: .success)
                     } else {
-                        ToastManager.shared.show("Language set to \(code.uppercased())", icon: "globe", style: .success)
+                        ToastManager.shared.show(tr("language_set_to_arg", code.uppercased()), icon: "globe", style: .success)
                     }
                 } else {
                     self?.pickedSpokenLanguage = nil
                     self?.updateScene(previous)
-                    ToastManager.shared.show("Failed to save language", icon: "exclamationmark.triangle", style: .error)
+                    ToastManager.shared.show(tr("error_save_language"), icon: "exclamationmark.triangle", style: .error)
                 }
             }
         }
@@ -571,13 +571,13 @@ final class ScenePlayerExtrasController: ObservableObject {
         #endif
         guard StashyPlusManager.shared.isUnlocked else {
             if userInitiated {
-                ToastManager.shared.show("AI captions are part of stashy+ — unlock in Settings", icon: "sparkles", style: .error)
+                ToastManager.shared.show(tr("hint_ai_captions_are_part_of_stashy"), icon: "sparkles", style: .error)
             }
             return
         }
         guard transcriptionController.isReadAlongAvailable else {
             if userInitiated {
-                ToastManager.shared.show("Teleprompter requires iOS 26+ and supported hardware", icon: "text.viewfinder", style: .error)
+                ToastManager.shared.show(tr("hint_teleprompter_requires_ios_26_plus"), icon: "text.viewfinder", style: .error)
             }
             return
         }
@@ -588,7 +588,7 @@ final class ScenePlayerExtrasController: ObservableObject {
         #endif
         guard engineURL != nil else {
             if userInitiated {
-                ToastManager.shared.show("Start playback first", icon: "play.circle", style: .error)
+                ToastManager.shared.show(tr("action_start_playback_first"), icon: "play.circle", style: .error)
             }
             return
         }
@@ -602,7 +602,7 @@ final class ScenePlayerExtrasController: ObservableObject {
         }
         guard let sceneLanguage = resolvedLanguage else {
             if userInitiated {
-                ToastManager.shared.show("Set scene language first", icon: "globe", style: .error)
+                ToastManager.shared.show(tr("action_set_scene_language_first"), icon: "globe", style: .error)
             }
             return
         }
@@ -625,7 +625,7 @@ final class ScenePlayerExtrasController: ObservableObject {
                 break
             case .unsupported(let name):
                 ToastManager.shared.show(
-                    "Live CC has no SpeechTranscriber language for \(name)",
+                    tr("hint_live_cc_has_no_speechtranscriber", name),
                     icon: "captions.bubble",
                     style: .error
                 )
@@ -647,19 +647,19 @@ final class ScenePlayerExtrasController: ObservableObject {
                     translates = true
                 case .sourceUnsupported(let code):
                     ToastManager.shared.show(
-                        "No translation from \(code) — showing captions in the scene language",
+                        tr("hint_no_translation_from_arg_showing", code),
                         icon: "character.bubble",
                         style: .info
                     )
                 case .targetUnsupported(let code):
                     ToastManager.shared.show(
-                        "No translation to \(code) on this device — showing captions in the scene language",
+                        tr("hint_no_translation_to_arg_on", code),
                         icon: "character.bubble",
                         style: .info
                     )
                 case .pairUnsupported(let source, let target):
                     ToastManager.shared.show(
-                        "No translation \(source) → \(target) — showing captions in the scene language",
+                        tr("hint_no_translation_arg_arg_showing", source, target),
                         icon: "character.bubble",
                         style: .info
                     )
@@ -785,24 +785,24 @@ struct ScenePlayerExtrasSheetsModifier: ViewModifier {
                     )
                 }
             }
-            .alert("Replace Scene Cover?", isPresented: scoped(\.showingSetSceneCoverConfirm)) {
-                Button("Cancel", role: .cancel) {}
-                Button("Replace", role: .destructive) {
+            .alert(tr("confirm_replace_scene_cover"), isPresented: scoped(\.showingSetSceneCoverConfirm)) {
+                Button(tr("action_cancel"), role: .cancel) {}
+                Button(tr("action_replace"), role: .destructive) {
                     controller.captureAndSetSceneCover()
                 }
             } message: {
-                Text("The current video frame will replace this scene’s cover image. This cannot be undone from the app.")
+                Text(tr("hint_current_video_frame_will_replace"))
             }
-            .alert("Download speech model?", isPresented: scoped(\.showSpeechModelDownloadOffer)) {
-                Button("Download") {
+            .alert(tr("confirm_download_speech_model"), isPresented: scoped(\.showSpeechModelDownloadOffer)) {
+                Button(tr("action_download")) {
                     controller.transcriptionController?.approveSpeechModelDownload()
                 }
-                Button("Not now", role: .cancel) {}
+                Button(tr("not_now"), role: .cancel) {}
             } message: {
                 let name = controller.transcriptionController?.downloadingModelLanguage ?? "this language"
                 Text(
-                    "Live captions need the on-device \(name) speech model. "
-                    + "The download is managed by iOS and can be several hundred megabytes."
+                    tr("hint_live_captions_need_on_device", name)
+                    + tr("hint_download_is_managed_by_ios")
                 )
             }
     }

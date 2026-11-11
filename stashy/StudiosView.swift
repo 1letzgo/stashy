@@ -214,20 +214,20 @@ private struct StudiosViewContent: View {
     private var deleteCatalogPresetConfirmationText: String {
         if let sid = ListLivePresetTag.parseServerId(catalogPresetRowSelection),
            let f = viewModel.savedFilters[sid] {
-            return "Remove “\(f.name)” from Stash? Other devices will lose this saved filter."
+            return tr("hint_remove_arg_from_stash_other", f.name)
         }
         if let ls = ListLivePresetTag.parseLocalUUIDString(catalogPresetRowSelection),
            let uuid = UUID(uuidString: ls),
            let p = localCatalogPresets.first(where: { $0.id == uuid }) {
-            return "Remove “\(p.name)” from this device? This cannot be undone."
+            return tr("hint_remove_arg_from_this_device", p.name)
         }
-        return "Remove this filter? This cannot be undone."
+        return tr("hint_remove_this_filter_this_cannot")
     }
 
     private func saveStudioCatalogPresetOverwrite() {
         let sel = catalogPresetRowSelection
         if let sid = ListLivePresetTag.parseServerId(sel) {
-            let name = viewModel.savedFilters[sid]?.name ?? "Filter"
+            let name = viewModel.savedFilters[sid]?.name ?? tr("filter")
             viewModel.saveCatalogSavedFilter(
                 mode: .studios,
                 randomSeedKind: .studios,
@@ -412,23 +412,23 @@ private struct StudiosViewContent: View {
             .onChange(of: catalogPresetRowSelection) { _, newId in
                 handleCatalogPresetSelectionChange(newId)
             }
-            .alert("Save as new", isPresented: $showSaveAsCatalogPresetAlert) {
-                TextField("Name", text: $catalogPresetNameInput)
-                Button("Save") { saveStudioCatalogPresetAs(name: catalogPresetNameInput) }
-                Button("Cancel", role: .cancel) {}
+            .alert(tr("action_save_as_new"), isPresented: $showSaveAsCatalogPresetAlert) {
+                TextField(tr("name"), text: $catalogPresetNameInput)
+                Button(tr("action_save")) { saveStudioCatalogPresetAs(name: catalogPresetNameInput) }
+                Button(tr("action_cancel"), role: .cancel) {}
             } message: {
-                Text("Save the current sort, filter, and live criteria as a new Stash saved filter.")
+                Text(tr("hint_save_current_sort_filter_and"))
             }
-            .alert("Rename", isPresented: $showRenameCatalogPresetAlert) {
-                TextField("Name", text: $renameCatalogPresetInput)
-                Button("Save") { renameStudioCatalogPreset(to: renameCatalogPresetInput) }
-                Button("Cancel", role: .cancel) {}
+            .alert(tr("action_rename"), isPresented: $showRenameCatalogPresetAlert) {
+                TextField(tr("name"), text: $renameCatalogPresetInput)
+                Button(tr("action_save")) { renameStudioCatalogPreset(to: renameCatalogPresetInput) }
+                Button(tr("action_cancel"), role: .cancel) {}
             } message: {
-                Text("Rename this preset or saved filter.")
+                Text(tr("hint_rename_this_preset_or_saved"))
             }
-            .alert("Delete filter?", isPresented: $showDeleteCatalogPresetAlert) {
-                Button("Delete", role: .destructive) { deleteStudioCatalogPreset() }
-                Button("Cancel", role: .cancel) {}
+            .alert(tr("confirm_delete_filter"), isPresented: $showDeleteCatalogPresetAlert) {
+                Button(tr("action_delete"), role: .destructive) { deleteStudioCatalogPreset() }
+                Button(tr("action_cancel"), role: .cancel) {}
             } message: {
                 Text(deleteCatalogPresetConfirmationText)
             }
@@ -500,7 +500,7 @@ private struct StudiosViewContent: View {
                 // Keep the bar while a sort/filter change refetches, so it does not jump away.
                 VStack(spacing: 0) {
                     quickBar
-                    StandardLoadingView(message: "Loading studios...")
+                    StandardLoadingView(message: tr("loading_studios"))
                 }
             } else if viewModel.studios.isEmpty && viewModel.errorMessage != nil {
                 ConnectionErrorView { performSearch() }
@@ -522,7 +522,7 @@ private struct StudiosViewContent: View {
 
     private var catalogChromeConfig: CatalogChromeConfig {
         CatalogChromeConfig(
-            title: "Studios",
+            title: tr("studios"),
             ownsNavigationBar: !hideTitle,
             visibility: CatalogFloatingChromeState(
                 hasActiveServerConfig: configManager.activeConfig != nil,
@@ -533,7 +533,7 @@ private struct StudiosViewContent: View {
             search: CatalogSearchChrome(
                 text: $searchText,
                 isVisible: $isSearchVisible,
-                prompt: "Search studios...",
+                prompt: tr("placeholder_search_studios"),
                 onClear: { performSearch() }
             )
         )
@@ -669,8 +669,8 @@ private struct StudiosViewContent: View {
     private var emptyStateView: some View {
         SharedEmptyStateView(
             icon: "building.2",
-            title: "No studios found",
-            buttonText: "Load Studios",
+            title: tr("empty_studios_found"),
+            buttonText: tr("action_load_studios"),
             onRetry: { performSearch() }
         )
     }
@@ -894,7 +894,7 @@ struct StudioRowView: View {
                 HStack(spacing: 4) {
                     Image(systemName: "film")
                         .font(.caption2)
-                    Text("\(studioCounts.display(for: studio, includeSubStudios: includeSubStudios).scenes) Scenes")
+                    Text(tr("arg_scenes", studioCounts.display(for: studio, includeSubStudios: includeSubStudios).scenes))
                         .font(.caption)
                 }
                 .foregroundColor(.appAccent)
@@ -1003,7 +1003,7 @@ struct CatalogCardCountPill: View {
         guard count != 1 else { return "1 \(noun)" }
         if noun.hasSuffix("y") { return "\(count) \(noun.dropLast())ies" }
         if noun == "O" { return "\(count) O" }
-        if noun == "rating" { return "Rating \(count)" }
+        if noun == "rating" { return tr("rating_arg", count) }
         return "\(count) \(noun)s"
     }
 

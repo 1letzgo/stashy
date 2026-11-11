@@ -103,7 +103,7 @@ struct TVGenericDetailView<Item: TVDetailItem, Info: View, Content: View>: View 
                                     Button {
                                         playingChannel = channel
                                     } label: {
-                                        Label("Play as Channel", systemImage: "play.tv.fill")
+                                        Label(tr("action_play_as_channel"), systemImage: "play.tv.fill")
                                     }
                                     .focused($headerFocus)
                                 }
@@ -122,7 +122,7 @@ struct TVGenericDetailView<Item: TVDetailItem, Info: View, Content: View>: View 
                             Button {
                                 playingChannel = channel
                             } label: {
-                                Label("Play as Channel", systemImage: "play.tv.fill")
+                                Label(tr("action_play_as_channel"), systemImage: "play.tv.fill")
                             }
                             .focused($headerFocus)
                         } else {
@@ -175,7 +175,7 @@ struct TVGenericDetailView<Item: TVDetailItem, Info: View, Content: View>: View 
                         Image(systemName: "film.fill")
                             .font(.title3)
                             .foregroundColor(AppearanceManager.shared.tintColor)
-                        Text("Scenes")
+                        Text(tr("scenes"))
                             .font(.title2)
                             .fontWeight(.bold)
                             .foregroundColor(.white)
@@ -211,7 +211,7 @@ struct TVGenericDetailView<Item: TVDetailItem, Info: View, Content: View>: View 
                                 Image(systemName: "film")
                                     .font(.system(size: 48))
                                     .foregroundColor(.secondary)
-                                Text("No scenes found")
+                                Text(tr("empty_scenes_found"))
                                     .font(.title3)
                                     .foregroundStyle(.secondary)
 
@@ -221,7 +221,7 @@ struct TVGenericDetailView<Item: TVDetailItem, Info: View, Content: View>: View 
                                 // `tvExitDismissable` nicht und man kommt nicht
                                 // mehr heraus. Gleiches Muster wie in
                                 // `TVGalleryDetailView`.
-                                Button("Back") { dismiss() }
+                                Button(tr("back")) { dismiss() }
                                     .font(.title3)
                                     .focused($emptyFocus)
                                     .padding(.top, 8)

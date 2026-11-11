@@ -1,5 +1,7 @@
 package de.letzgo.stashy.ui.tools.filters
 
+import de.letzgo.stashy.R
+import de.letzgo.stashy.tr
 import de.letzgo.stashy.ui.bottomBarContentPadding
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
@@ -116,14 +118,14 @@ fun FiltersToolView(topPadding: Dp = toolsTopPadding()) {
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(Tokens.Spacing.sm),
         ) {
-            NativeSearchField(searchText, { searchText = it }, "Search filters", Modifier.weight(1f))
+            NativeSearchField(searchText, { searchText = it }, tr(R.string.search_filters), Modifier.weight(1f))
             FiltersAddMenu { mode -> createMode = mode }
         }
 
         Box(Modifier.weight(1f).fillMaxWidth()) {
             when {
-                serverId == null -> NoServerPlaceholder(SF.line3HorizontalDecrease, "Connect to a Stash server to manage your saved filters.")
-                state.isLoading && state.filters.isEmpty() -> FiltersLoadingView("Loading filters…")
+                serverId == null -> NoServerPlaceholder(SF.line3HorizontalDecrease, tr(R.string.hint_connect_to_stash_server_to))
+                state.isLoading && state.filters.isEmpty() -> FiltersLoadingView(tr(R.string.loading_filters))
                 grouped.isEmpty() -> FiltersEmptyState(searchText.isEmpty())
                 else -> PullToRefreshBox(
                     isRefreshing = pulled && state.isLoading,
@@ -185,7 +187,7 @@ fun FiltersToolView(topPadding: Dp = toolsTopPadding()) {
                     state.rename(target, renameText) { result ->
                         renameTarget = null
                         result.onSuccess { haptics.performHapticFeedback(HapticFeedbackType.LongPress) }
-                            .onFailure { showToast("Rename failed: ${it.message}", long = true) }
+                            .onFailure { showToast(tr(R.string.action_rename_failed_arg, it.message), long = true) }
                     }
                 }
                 renameTarget = null
@@ -195,17 +197,17 @@ fun FiltersToolView(topPadding: Dp = toolsTopPadding()) {
 
     deleteTarget?.let { target ->
         StashyAlert(
-            title = "Delete filter?",
-            message = "Delete “${target.filter.name}” from the server?",
+            title = tr(R.string.confirm_delete_filter),
+            message = tr(R.string.confirm_delete_arg_from_server, target.filter.name),
             onDismiss = { deleteTarget = null },
-            confirmLabel = "Delete",
+            confirmLabel = tr(R.string.action_delete),
             destructive = true,
-            dismissLabel = "Cancel",
+            dismissLabel = tr(R.string.action_cancel),
             onConfirm = {
                 deleteTarget = null
                 state.delete(target) { result ->
                     result.onSuccess { haptics.performHapticFeedback(HapticFeedbackType.LongPress) }
-                        .onFailure { showToast("Delete failed: ${it.message}", long = true) }
+                        .onFailure { showToast(tr(R.string.action_delete_failed_arg, it.message), long = true) }
                 }
             },
         )
@@ -239,12 +241,12 @@ private fun FilterRow(
         )
         DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }, containerColor = p.secondaryBackground) {
             DropdownMenuItem(
-                text = { Text("Rename", color = p.text) },
+                text = { Text(tr(R.string.action_rename), color = p.text) },
                 leadingIcon = { Icon(SF.pencil, null, tint = p.text) },
                 onClick = { menuOpen = false; onRename() },
             )
             DropdownMenuItem(
-                text = { Text("Delete", color = StashyColors.systemRed) },
+                text = { Text(tr(R.string.action_delete), color = StashyColors.systemRed) },
                 leadingIcon = { Icon(SF.trash, null, tint = StashyColors.systemRed) },
                 onClick = { menuOpen = false; onDelete() },
             )
@@ -262,7 +264,7 @@ private fun FiltersAddMenu(onSelect: (mode: String) -> Unit) {
             Modifier.size(AddButtonSize).clip(CircleShape).background(Appearance.tint).clickable { open = true },
             contentAlignment = Alignment.Center,
         ) {
-            Icon(SF.plus, "New filter", tint = Color.White, modifier = Modifier.size(AddIconSize))
+            Icon(SF.plus, tr(R.string.new_filter), tint = Color.White, modifier = Modifier.size(AddIconSize))
         }
         DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
             FiltersLogic.listedModes.forEach { mode ->
@@ -285,15 +287,15 @@ private fun RenameFilterDialog(text: String, onTextChange: (String) -> Unit, onD
         containerColor = p.secondaryBackground,
         titleContentColor = p.text,
         textContentColor = p.text,
-        title = { Text("Rename filter", style = IosTypography.headline) },
+        title = { Text(tr(R.string.action_rename_filter), style = IosTypography.headline) },
         text = {
-            NativeTextField(text, onTextChange, label = null, placeholder = "Name", autoCorrect = true)
+            NativeTextField(text, onTextChange, label = null, placeholder = tr(R.string.name), autoCorrect = true)
         },
         confirmButton = {
-            TextButton(onClick = onSave) { Text("Save", color = tint, fontWeight = FontWeight.SemiBold) }
+            TextButton(onClick = onSave) { Text(tr(R.string.action_save), color = tint, fontWeight = FontWeight.SemiBold) }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) { Text("Cancel", color = tint) }
+            TextButton(onClick = onDismiss) { Text(tr(R.string.action_cancel), color = tint) }
         },
     )
 }
@@ -325,11 +327,11 @@ private fun FiltersEmptyState(noSearch: Boolean) {
         Icon(icon, null, tint = p.secondaryText, modifier = Modifier.size(48.dp))
         Spacer(Modifier.width(0.dp).height(4.dp))
         Text(
-            if (noSearch) "No filters" else "No matches",
+            if (noSearch) tr(R.string.empty_filters) else tr(R.string.empty_matches),
             style = IosTypography.title2.copy(fontWeight = FontWeight.Bold), color = p.text, textAlign = TextAlign.Center,
         )
         Text(
-            if (noSearch) "Create a filter or sync from your Stash server." else "No filters match your search.",
+            if (noSearch) tr(R.string.hint_create_filter_or_sync_from) else tr(R.string.empty_filters_match_your_search),
             style = IosTypography.subheadline, color = p.secondaryText, textAlign = TextAlign.Center,
         )
     }

@@ -1,5 +1,7 @@
 package de.letzgo.stashy.data.tools
 
+import de.letzgo.stashy.R
+import de.letzgo.stashy.tr
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -71,7 +73,7 @@ object OverviewStatsRepository {
         errorMessage = null
         return try {
             val data = GraphQL.data(STATS_QUERY)
-            val stats = Json.decodeFromJsonElement(OverviewStatistics.serializer(), data["stats"] ?: throw IllegalStateException("No stats"))
+            val stats = Json.decodeFromJsonElement(OverviewStatistics.serializer(), data["stats"] ?: throw IllegalStateException(tr(R.string.empty_stats)))
             val cached = Prefs.int(cachedMarkerCountKey)
             statistics = if (cached > 0) stats.copy(sceneMarkerCount = cached) else stats
             loadedServerID = serverID
@@ -86,7 +88,7 @@ object OverviewStatsRepository {
         } catch (e: Exception) {
             lastFetchAt = System.currentTimeMillis()
             isFetching = false
-            errorMessage = "Statistics could not be loaded"
+            errorMessage = tr(R.string.statistics_could_not_be_loaded)
             false
         }
     }

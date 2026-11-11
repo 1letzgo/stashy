@@ -40,9 +40,9 @@ struct TVScenesView: View {
             hasMore: viewModel.hasMoreScenes,
             columnWidth: 410,
             emptySystemImage: "film",
-            emptyTitle: "No scenes found",
-            loadingText: "Loading scenes…",
-            errorTitle: "Error loading scenes",
+            emptyTitle: tr("empty_scenes_found"),
+            loadingText: tr("loading_scenes"),
+            errorTitle: tr("error_loading_scenes"),
             focusResetToken: focusResetToken,
             loadMore: { viewModel.loadMoreScenes() },
             reload: { reload() },
@@ -51,7 +51,7 @@ struct TVScenesView: View {
                 STVHeaderView(
                     sortMenu: {
                         TVOptionPickerButton(
-                            title: "Sort By",
+                            title: tr("action_sort_by"),
                             icon: "arrow.up.arrow.down",
                             options: sortOptions,
                             selection: $sortBy
@@ -125,25 +125,25 @@ struct TVScenesView: View {
 
     private func label(for option: StashDBViewModel.SceneSortOption) -> String {
         switch option {
-        case .dateDesc: return "Recently Released"
-        case .dateAsc: return "Oldest First"
-        case .createdAtDesc: return "Recently Added"
-        case .createdAtAsc: return "Oldest Added"
-        case .lastPlayedAtDesc: return "Recently Played"
-        case .lastPlayedAtAsc: return "Least Recently Played"
-        case .titleAsc: return "Title (A-Z)"
-        case .titleDesc: return "Title (Z-A)"
-        case .durationDesc: return "Longest First"
-        case .durationAsc: return "Shortest First"
-        case .playCountDesc: return "Most Viewed"
-        case .playCountAsc: return "Least Viewed"
-        case .playDurationDesc: return "Most Watch Time"
-        case .playDurationAsc: return "Least Watch Time"
-        case .oCounterDesc: return "O Count (High-Low)"
-        case .oCounterAsc: return "O Count (Low-High)"
-        case .ratingDesc: return "Highest Rated"
-        case .ratingAsc: return "Lowest Rated"
-        case .random: return "Random"
+        case .dateDesc: return tr("recently_released")
+        case .dateAsc: return tr("oldest_first")
+        case .createdAtDesc: return tr("recently_added")
+        case .createdAtAsc: return tr("oldest_added")
+        case .lastPlayedAtDesc: return tr("recently_played")
+        case .lastPlayedAtAsc: return tr("least_recently_played")
+        case .titleAsc: return tr("title_z")
+        case .titleDesc: return tr("title_z_2")
+        case .durationDesc: return tr("longest_first")
+        case .durationAsc: return tr("shortest_first")
+        case .playCountDesc: return tr("most_viewed")
+        case .playCountAsc: return tr("least_viewed")
+        case .playDurationDesc: return tr("most_watch_time")
+        case .playDurationAsc: return tr("least_watch_time")
+        case .oCounterDesc: return tr("o_count_high_low")
+        case .oCounterAsc: return tr("o_count_low_high")
+        case .ratingDesc: return tr("highest_rated")
+        case .ratingAsc: return tr("lowest_rated")
+        case .random: return tr("random")
         case .sceneNumberAsc, .sceneNumberDesc, .productionDateDesc, .productionDateAsc, .forYou: return option.displayName
         }
     }

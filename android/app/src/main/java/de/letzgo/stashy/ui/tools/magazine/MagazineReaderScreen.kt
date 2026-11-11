@@ -1,5 +1,7 @@
 package de.letzgo.stashy.ui.tools.magazine
 
+import de.letzgo.stashy.R
+import de.letzgo.stashy.tr
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -131,7 +133,7 @@ class MagazineReaderScreen(private val gallery: Gallery) : Screen {
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
-            error = e.message ?: "Could not load pages"
+            error = e.message ?: tr(R.string.error_load_pages)
         }
         isLoading = false
     }
@@ -224,14 +226,14 @@ class MagazineReaderScreen(private val gallery: Gallery) : Screen {
     @Composable
     private fun TopBar() {
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-            CircleIcon(SF.xmark, "Close") { Nav.pop() }
+            CircleIcon(SF.xmark, tr(R.string.action_close)) { Nav.pop() }
             Column(Modifier.weight(1f).heightIn(min = 48.dp).clickable { showsDetails = true }, verticalArrangement = Arrangement.Center) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(
                         gallery.displayTitle, Modifier.weight(1f, fill = false), color = Color.White, fontSize = 14.sp,
                         maxLines = 1, overflow = TextOverflow.Ellipsis,
                     )
-                    Icon(Icons.Outlined.Info, "Gallery details", Modifier.padding(start = 4.dp).size(14.dp), tint = Color.White.copy(alpha = 0.7f))
+                    Icon(Icons.Outlined.Info, tr(R.string.gallery_details), Modifier.padding(start = 4.dp).size(14.dp), tint = Color.White.copy(alpha = 0.7f))
                 }
                 currentChapter?.let { chapter ->
                     Text(chapter.title, color = Color.White.copy(alpha = 0.7f), fontSize = 11.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
@@ -245,14 +247,14 @@ class MagazineReaderScreen(private val gallery: Gallery) : Screen {
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Text(
-                        if (first == last) "Page $first / ${pages.size}" else "Page $first–$last / ${pages.size}",
+                        if (first == last) tr(R.string.page_arg_arg, first, pages.size) else tr(R.string.page_arg_arg_arg, first, last, pages.size),
                         color = Color.White.copy(alpha = 0.7f), fontSize = 12.sp,
                     )
-                    Icon(SF.chevronDown, "Go to page", Modifier.size(16.dp), tint = Color.White.copy(alpha = 0.7f))
+                    Icon(SF.chevronDown, tr(R.string.action_go_to_page), Modifier.size(16.dp), tint = Color.White.copy(alpha = 0.7f))
                 }
             }
             if (spreadIndex > 0) {
-                CircleIcon(SF.counterclockwise, "Reset position") {
+                CircleIcon(SF.counterclockwise, tr(R.string.action_reset_position)) {
                     spreadIndex = 0
                     MagazineReadingStore.resetPosition(gallery.id)
                 }
@@ -267,9 +269,9 @@ class MagazineReaderScreen(private val gallery: Gallery) : Screen {
             isLoading -> CircularProgressIndicator(color = Color.White)
             message != null -> Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 Text(message, color = Color.White, modifier = Modifier.padding(16.dp))
-                TextButton(onClick = { loadAttempt++ }) { Text("Try again") }
+                TextButton(onClick = { loadAttempt++ }) { Text(tr(R.string.action_try_again)) }
             }
-            pages.isEmpty() -> Text("No pages", color = Color.White)
+            pages.isEmpty() -> Text(tr(R.string.empty_pages), color = Color.White)
             else -> Spreads()
         }
     }
@@ -350,7 +352,7 @@ class MagazineReaderScreen(private val gallery: Gallery) : Screen {
                     Modifier.fillMaxWidth().safeDrawingPadding().padding(PaddingValues(horizontal = 4.dp)),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    CircleIcon(SF.xmark, "Close", background = true) { closeFullscreen() }
+                    CircleIcon(SF.xmark, tr(R.string.action_close), background = true) { closeFullscreen() }
                     Spacer(Modifier.weight(1f))
                     Row(
                         Modifier.clip(CircleShape).background(Color.Black.copy(alpha = 0.45f))
@@ -358,7 +360,7 @@ class MagazineReaderScreen(private val gallery: Gallery) : Screen {
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         Text("${fullscreenPage + 1} / ${pages.size}", color = Color.White, fontSize = 12.sp)
-                        Icon(SF.chevronDown, "Go to page", Modifier.size(16.dp), tint = Color.White)
+                        Icon(SF.chevronDown, tr(R.string.action_go_to_page), Modifier.size(16.dp), tint = Color.White)
                     }
                 }
             }

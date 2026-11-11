@@ -1,5 +1,7 @@
 package de.letzgo.stashy.tv
 
+import de.letzgo.stashy.R
+import de.letzgo.stashy.tr
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -43,12 +45,12 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 /** iOS: `AuthMethod` (raw values = labels). */
-enum class TvAuthMethod(val label: String) { None("None"), Login("Login"), ApiKey("API Key") }
+enum class TvAuthMethod(val label: String) { None(tr(R.string.none)), Login("Login"), ApiKey(tr(R.string.api_key)) }
 
 /** Editable state of the server form (iOS: the `@State`s of `TVServerSetupView` / `TVServerFormView`). */
 class TvServerFormState(server: ServerConfig?) {
     val id: String? = server?.id
-    var name by mutableStateOf(server?.name ?: "My Stash")
+    var name by mutableStateOf(server?.name ?: tr(R.string.my_stash))
     var address by mutableStateOf(server?.let { ServerAddress.display(it) } ?: "")
     var localAddress by mutableStateOf(server?.localURL ?: "")
     var port by mutableStateOf("")
@@ -71,7 +73,7 @@ class TvServerFormState(server: ServerConfig?) {
         val parsed = ServerAddress.parse(address)
         return ServerConfig(
             id = id ?: java.util.UUID.randomUUID().toString().uppercase(),
-            name = name.ifBlank { "My Stash" },
+            name = name.ifBlank { tr(R.string.my_stash) },
             serverAddress = parsed.host,
             port = port.trim().ifEmpty { parsed.port },
             serverProtocol = protocol,
@@ -91,7 +93,7 @@ class TvServerFormState(server: ServerConfig?) {
             apiKey = ServerConnection.fetchAPIKey(config().baseURL, username, password, usableHeaders)
             true
         } catch (e: Exception) {
-            loginError = e.message ?: "Login failed"
+            loginError = e.message ?: tr(R.string.error_login)
             false
         } finally {
             isFetchingKey = false
@@ -104,36 +106,36 @@ class TvServerFormState(server: ServerConfig?) {
 fun TvServerFields(state: TvServerFormState, firstFocus: FocusRequester? = null, showLocalAddress: Boolean = false) {
     val scope = rememberCoroutineScope()
     Column(verticalArrangement = Arrangement.spacedBy(pt(24))) {
-        TvTextField("Server Name", state.name, { state.name = it }, if (firstFocus != null) Modifier.focusRequester(firstFocus) else Modifier)
-        TvTextField("Server Address (e.g. 192.168.1.100 or stash.example.com)", state.address, { state.updateAddress(it) }, keyboardType = KeyboardType.Uri)
+        TvTextField(tr(R.string.server_name), state.name, { state.name = it }, if (firstFocus != null) Modifier.focusRequester(firstFocus) else Modifier)
+        TvTextField(tr(R.string.hint_server_address_e_g_192), state.address, { state.updateAddress(it) }, keyboardType = KeyboardType.Uri)
         Row(horizontalArrangement = Arrangement.spacedBy(pt(24)), verticalAlignment = Alignment.CenterVertically) {
-            TvTextField("Port (optional)", state.port, { v -> state.port = v.filter { it.isDigit() } }, Modifier.width(pt(300)), keyboardType = KeyboardType.Number)
+            TvTextField(tr(R.string.port_optional), state.port, { v -> state.port = v.filter { it.isDigit() } }, Modifier.width(pt(300)), keyboardType = KeyboardType.Number)
             TvSegmented(listOf(TvOption(ServerProtocol.HTTP, "HTTP"), TvOption(ServerProtocol.HTTPS, "HTTPS")), state.protocol, { state.protocol = it })
         }
         if (showLocalAddress) {
-            TvTextField("Local Address (e.g. 192.168.1.100:9999)", state.localAddress, { state.localAddress = it }, keyboardType = KeyboardType.Uri)
-            Text("Optional. Used instead of the address above whenever it answers, for example on your home network. Falls back automatically.", style = TvType.caption, color = TvColors.secondary)
+            TvTextField(tr(R.string.local_address_e_g_192), state.localAddress, { state.localAddress = it }, keyboardType = KeyboardType.Uri)
+            Text(tr(R.string.hint_optional_used_instead_of_address), style = TvType.caption, color = TvColors.secondary)
         }
         Column(
             Modifier.fillMaxWidth().clip(RoundedCornerShape(pt(20))).background(Color.White.copy(alpha = 0.05f)).padding(pt(32)),
             verticalArrangement = Arrangement.spacedBy(pt(24)),
         ) {
-            Text("Authentication", style = TvType.headline, color = TvColors.secondary)
+            Text(tr(R.string.authentication), style = TvType.headline, color = TvColors.secondary)
             TvSegmented(TvAuthMethod.entries.map { TvOption(it, it.label) }, state.authMethod, { state.authMethod = it })
             when (state.authMethod) {
                 TvAuthMethod.Login -> {
-                    TvTextField("Username", state.username, { state.username = it })
-                    TvTextField("Password", state.password, { state.password = it }, secure = true)
+                    TvTextField(tr(R.string.username), state.username, { state.username = it })
+                    TvTextField(tr(R.string.password), state.password, { state.password = it }, secure = true)
                     TvButton(
                         { scope.launch { state.fetchKey() } },
                         enabled = state.username.isNotEmpty() && state.password.isNotEmpty() && !state.isFetchingKey,
                     ) {
                         if (state.isFetchingKey) TvSpinner(pt(30))
-                        Text(if (state.isFetchingKey) "Logging in..." else if (state.apiKey.isNotEmpty()) "Fetch API Key ✓" else "Fetch API Key", style = TvType.headline)
+                        Text(if (state.isFetchingKey) tr(R.string.logging_in_menu) else if (state.apiKey.isNotEmpty()) (tr(R.string.action_fetch_api_key) + " ✓") else tr(R.string.action_fetch_api_key), style = TvType.headline)
                     }
                     state.loginError?.let { Text(it, style = TvType.callout, color = TvColors.red) }
                 }
-                TvAuthMethod.ApiKey -> TvTextField("API Key", state.apiKey, { state.apiKey = it }, secure = true)
+                TvAuthMethod.ApiKey -> TvTextField(tr(R.string.api_key), state.apiKey, { state.apiKey = it }, secure = true)
                 TvAuthMethod.None -> {}
             }
         }
@@ -148,21 +150,21 @@ fun TvCustomHeadersCard(state: TvServerFormState) {
         Modifier.fillMaxWidth().clip(RoundedCornerShape(pt(20))).background(Color.White.copy(alpha = 0.05f)).padding(pt(32)),
         verticalArrangement = Arrangement.spacedBy(pt(20)),
     ) {
-        Text("Custom Headers", style = TvType.headline, color = TvColors.secondary)
+        Text(tr(R.string.custom_headers), style = TvType.headline, color = TvColors.secondary)
         state.headers.forEachIndexed { index, header ->
             Column(verticalArrangement = Arrangement.spacedBy(pt(12))) {
-                TvTextField("Header name", header.name, { state.headers[index] = header.copy(name = it) })
+                TvTextField(tr(R.string.header_name), header.name, { state.headers[index] = header.copy(name = it) })
                 Row(horizontalArrangement = Arrangement.spacedBy(pt(16)), verticalAlignment = Alignment.CenterVertically) {
-                    TvTextField("Value", header.value, { state.headers[index] = header.copy(value = it) }, Modifier.weight(1f), secure = true)
-                    TvButton({ state.headers.removeAt(index) }) { Icon(TvIcons.minusCircle, "Remove header", Modifier.size(pt(36))) }
+                    TvTextField(tr(R.string.value), header.value, { state.headers[index] = header.copy(value = it) }, Modifier.weight(1f), secure = true)
+                    TvButton({ state.headers.removeAt(index) }) { Icon(TvIcons.minusCircle, tr(R.string.action_remove_header), Modifier.size(pt(36))) }
                 }
             }
         }
         TvButton({ state.headers.add(ServerHTTPHeader(name = "", value = "")) }) {
             Icon(TvIcons.plusCircle, null, Modifier.size(pt(32)))
-            Text("Add Header", style = TvType.headline)
+            Text(tr(R.string.action_add_header), style = TvType.headline)
         }
-        Text("Sent with every request to this server, e.g. for SSO or a reverse proxy that needs its own token.", style = TvType.caption, color = TvColors.secondary)
+        Text(tr(R.string.hint_sent_with_every_request_to), style = TvType.caption, color = TvColors.secondary)
     }
 }
 
@@ -188,7 +190,7 @@ fun TvServerSetup() {
                     ServerConfigManager.save(config, state.effectiveKey, state.usableHeaders)
                     ServerConfigManager.activate(config)
                 }
-                is ServerConnection.Outcome.Failure -> error = outcome.message.ifEmpty { "Could not reach ${config.baseURL}. Check address, port and protocol." }
+                is ServerConnection.Outcome.Failure -> error = outcome.message.ifEmpty { tr(R.string.error_reach_arg_check_address_port, config.baseURL) }
             }
             isTesting = false
         }
@@ -204,8 +206,8 @@ fun TvServerSetup() {
             item {
                 Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(pt(16))) {
                     Icon(TvIcons.server, null, Modifier.size(pt(80)), tint = TvColors.secondary)
-                    Text("Connect to Stash", style = TvType.largeTitle, color = Color.White)
-                    Text("Enter your Stash server details to get started.", style = TvType.title3, color = TvColors.secondary, textAlign = TextAlign.Center)
+                    Text(tr(R.string.action_connect_to_stash), style = TvType.largeTitle, color = Color.White)
+                    Text(tr(R.string.hint_enter_your_stash_server_details), style = TvType.title3, color = TvColors.secondary, textAlign = TextAlign.Center)
                 }
             }
             item { Box(Modifier.width(pt(800))) { TvServerFields(state, first) } }
@@ -213,7 +215,7 @@ fun TvServerSetup() {
             item {
                 TvButton({ if (!isTesting) connect() }, enabled = state.address.isNotEmpty(), contentPadding = PaddingValues(horizontal = pt(60), vertical = pt(16))) {
                     if (isTesting) TvSpinner(pt(30))
-                    Text(if (isTesting) "Connecting..." else "Connect", style = TvType.title3.copy(fontWeight = FontWeight.SemiBold))
+                    Text(if (isTesting) "Connecting..." else tr(R.string.action_connect), style = TvType.title3.copy(fontWeight = FontWeight.SemiBold))
                 }
             }
         }
@@ -253,12 +255,12 @@ class TvServerFormRoute(private val server: ServerConfig?) : TvRoute {
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(pt(40)),
         ) {
-            item { Text(if (server == null) "Add Server" else "Edit Server", style = TvType.largeTitle, color = Color.White) }
+            item { Text(if (server == null) tr(R.string.action_add_server) else tr(R.string.action_edit_server), style = TvType.largeTitle, color = Color.White) }
             item { Box(Modifier.width(pt(800))) { TvServerFields(state, first, showLocalAddress = true) } }
             item {
                 Row(horizontalArrangement = Arrangement.spacedBy(pt(40))) {
-                    TvButton({ TvNav.pop() }) { Text("Cancel", style = TvType.title3) }
-                    TvButton({ save() }, enabled = state.address.isNotEmpty()) { Text("Save", style = TvType.title3.copy(fontWeight = FontWeight.SemiBold)) }
+                    TvButton({ TvNav.pop() }) { Text(tr(R.string.action_cancel), style = TvType.title3) }
+                    TvButton({ save() }, enabled = state.address.isNotEmpty()) { Text(tr(R.string.action_save), style = TvType.title3.copy(fontWeight = FontWeight.SemiBold)) }
                 }
             }
         }

@@ -1,5 +1,7 @@
 package de.letzgo.stashy.tv
 
+import de.letzgo.stashy.R
+import de.letzgo.stashy.tr
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.background
@@ -153,8 +155,8 @@ private fun TvAuthAlert() {
     val active = ServerConfigManager.activeConfig ?: return
     if (de.letzgo.stashy.data.AuthEvents.pendingServerId != active.id) return
     TvOptionDialog(
-        "Authentication Required\nYour API key is invalid or expired. Please check your server configuration.",
-        listOf(TvOption(true, "Update API Key")), null,
+        tr(R.string.hint_authentication_required_your_api_key),
+        listOf(TvOption(true, tr(R.string.action_update_api_key))), null,
         onSelect = {
             de.letzgo.stashy.data.AuthEvents.consume()
             TvNav.dismissFullScreen()
@@ -294,7 +296,7 @@ private fun Sidebar(
                     SidebarRow(TvRootTab.Search, TvIcons.search, selected, expanded, focusable, requesters)
                     SidebarRow(TvRootTab.Home, TvIcons.home, selected, expanded, focusable, requesters)
                     if (library.isNotEmpty()) {
-                        if (expanded) Text("Library", Modifier.padding(start = pt(20), top = pt(24), bottom = pt(6)), style = TvType.caption.copy(fontWeight = FontWeight.SemiBold), color = TvColors.secondary)
+                        if (expanded) Text(tr(R.string.library), Modifier.padding(start = pt(20), top = pt(24), bottom = pt(6)), style = TvType.caption.copy(fontWeight = FontWeight.SemiBold), color = TvColors.secondary)
                         else Spacer(Modifier.height(pt(24)))
                         library.forEach { SidebarRow(it.tab, it.icon, selected, expanded, focusable, requesters) }
                     }

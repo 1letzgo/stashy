@@ -148,6 +148,13 @@ The `stashy` target uses classic Xcode groups — update `project.pbxproj` in 4 
 - Per-server: `"<key>_<serverID>"` (dashboard rows, tab visibility, …)
 - Tint: `kTintColorRed`, `kTintColorGreen`, `kTintColorBlue`, `kTintColorAlpha`
 
+## Localization
+Every UI text has one key shared by iOS / tvOS / macOS and Android: Swift `tr("play_count")`, Kotlin `tr(R.string.play_count)`, values as extra arguments (`tr("arg_scenes", count)`, always formatted as text). English lives in `android/app/src/main/res/values/strings.xml`; `tools/l10n/sync_en.py` copies it into `stashy/Localizable.xcstrings`. Translations come from Tolgee (https://tolgee.shelf.am, project "stashy", id 2) via `tools/l10n/tolgee.sh push|pull` (needs `TOLGEE_API_KEY`). Details: `tools/l10n/README.md`.
+- A new UI text gets a key in `values/strings.xml` and `tr(...)` on both platforms; then `sync_en.py`. Never a bare literal in `Text(...)` for UI. Key names follow the role prefixes in `tools/l10n/README.md` (`action_`, `confirm_`, `error_`, `loading_`, `empty_`, `placeholder_`, `hint_`; Stash terms keep Stash's key). Reuse the key when the English is the same; never compose a text from several keys; symbols and upper-casing go in code.
+- Never `tr()` for data: UserDefaults keys, raw values, ids, comparisons, file names, HTTP bodies, GraphQL, logs. Enums whose `rawValue` is persisted stay literal and get a separate display property that calls `tr`.
+- Wording follows Stash's own UI (US spelling): `localization/glossary.csv`. "O Count", "Play Count", "Groups", "API key" …
+- `SWIFT_EMIT_LOC_STRINGS = NO`: Xcode must not add extracted literals to the catalog; the catalog only holds Tolgee keys.
+
 ## Server Versions
 `StashServerCapabilities` (`ServerConfig.swift`; Android `ServerCapabilities` in `ServerConnection.kt`) stores the Stash version per server. Stash rejects a whole query over one unknown field or sort, so anything newer than the oldest supported server stays behind `supports032` (or a later check): give it its own `.graphql` query instead of extending a shared fragment, and mark sort options with `requiresStash032` (their `sortField` then falls back on older servers; menus use `availableCases`). Unknown version = off. Stash 0.32+ extras living apart from the fragments: `SceneProductionDate` and `StudioCountsStore` (one batched query for all visible studios).
 

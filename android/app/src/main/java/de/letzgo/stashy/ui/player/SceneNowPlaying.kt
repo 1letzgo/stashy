@@ -2,6 +2,8 @@
 
 package de.letzgo.stashy.ui.player
 
+import de.letzgo.stashy.R
+import de.letzgo.stashy.tr
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
@@ -109,7 +111,7 @@ class StashArtworkBitmapLoader(context: Context) : BitmapLoader {
                 var sample = 1
                 while (maxOf(bounds.outWidth, bounds.outHeight) / (sample * 2) >= MAX_ARTWORK_PX) sample *= 2
                 BitmapFactory.decodeByteArray(data, 0, data.size, BitmapFactory.Options().apply { inSampleSize = sample })
-                    ?: throw IOException("Could not decode artwork")
+                    ?: throw IOException(tr(R.string.error_decode_artwork))
             }.fold({ future.set(it) }, { future.setException(it) })
         }
         return future

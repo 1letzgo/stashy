@@ -245,7 +245,7 @@ struct CatalogsView: View {
                     Image(systemName: "square.grid.2x2")
                         .font(.system(size: 64))
                         .foregroundColor(.secondary)
-                    Text("Please enable Dashboard, Performers, Studios, Tags, Groups or Markers in Settings")
+                    Text(tr("hint_please_enable_dashboard_performers_studios"))
                         .foregroundColor(.secondary)
                     Spacer()
                 }
@@ -274,11 +274,11 @@ struct CatalogsView: View {
         if stashyPlus.isUnlocked {
             HStack(spacing: 6) {
                 if tabManager.isMiniPlayerEnabled {
-                    HomeRowIconButton(systemImage: "text.badge.checkmark", label: "Watchlist") {
+                    HomeRowIconButton(systemImage: "text.badge.checkmark", label: tr("watchlist")) {
                         MiniPlayerStore.shared.openWatchlist()
                     }
                 }
-                HomeRowIconButton(systemImage: "square.and.arrow.down", label: "Downloads") {
+                HomeRowIconButton(systemImage: "square.and.arrow.down", label: tr("downloads")) {
                     showsDownloads = true
                 }
             }
@@ -293,7 +293,7 @@ struct CatalogsView: View {
             .applyAppBackground()
             .stashySectionChrome {
                 DetailBreadcrumbRow(crumb: DetailBreadcrumb(
-                    sections: [.init(id: "downloads", title: "Downloads", systemImage: "square.and.arrow.down")],
+                    sections: [.init(id: "downloads", title: tr("downloads"), systemImage: "square.and.arrow.down")],
                     selectionID: "downloads",
                     onSelect: { _ in },
                     onBack: { showsDownloads = false }
@@ -555,7 +555,7 @@ private struct GroupsViewContent: View {
                 HapticManager.success()
                 viewModel.fetchSavedFilters()
             case .failure(let error):
-                ToastManager.shared.show("Save failed: \(error.localizedDescription)", icon: "exclamationmark.triangle.fill", style: .error)
+                ToastManager.shared.show(tr("action_save_failed_arg", error.localizedDescription), icon: "exclamationmark.triangle.fill", style: .error)
             }
         }
     }
@@ -580,7 +580,7 @@ private struct GroupsViewContent: View {
                 selectedFilter = saved
                 viewModel.fetchSavedFilters()
             case .failure(let error):
-                ToastManager.shared.show("Save failed: \(error.localizedDescription)", icon: "exclamationmark.triangle.fill", style: .error)
+                ToastManager.shared.show(tr("action_save_failed_arg", error.localizedDescription), icon: "exclamationmark.triangle.fill", style: .error)
             }
         }
     }
@@ -596,7 +596,7 @@ private struct GroupsViewContent: View {
                 HapticManager.success()
                 viewModel.fetchSavedFilters()
             case .failure(let error):
-                ToastManager.shared.show("Rename failed: \(error.localizedDescription)", icon: "exclamationmark.triangle.fill", style: .error)
+                ToastManager.shared.show(tr("action_rename_failed_arg", error.localizedDescription), icon: "exclamationmark.triangle.fill", style: .error)
             }
         }
     }
@@ -613,7 +613,7 @@ private struct GroupsViewContent: View {
                 viewModel.fetchSavedFilters()
                 performSearch()
             case .failure(let error):
-                ToastManager.shared.show("Delete failed: \(error.localizedDescription)", icon: "exclamationmark.triangle.fill", style: .error)
+                ToastManager.shared.show(tr("action_delete_failed_arg", error.localizedDescription), icon: "exclamationmark.triangle.fill", style: .error)
             }
         }
     }
@@ -679,7 +679,7 @@ private struct GroupsViewContent: View {
             search: CatalogSearchChrome(
                 text: $searchText,
                 isVisible: $isSearchVisible,
-                prompt: "Search groups...",
+                prompt: tr("placeholder_search_groups"),
                 onClear: { performSearch() }
             )
         )
@@ -693,7 +693,7 @@ private struct GroupsViewContent: View {
                 // Keep the bar while a sort/filter change refetches, so it does not jump away.
                 VStack(spacing: 0) {
                     quickBar
-                    StandardLoadingView(message: "Loading groups...")
+                    StandardLoadingView(message: tr("loading_groups"))
                 }
             } else if viewModel.groups.isEmpty && viewModel.errorMessage != nil {
                 ConnectionErrorView { performSearch() }
@@ -737,19 +737,19 @@ private struct GroupsViewContent: View {
             )
             .environmentObject(viewModel)
         }
-        .alert("Save filter as", isPresented: $showGroupsSaveAsAlert) {
-            TextField("Name", text: $groupsFilterNameInput)
-            Button("Save") { saveGroupsFilterAs(name: groupsFilterNameInput) }
-            Button("Cancel", role: .cancel) {}
+        .alert(tr("action_save_filter_as"), isPresented: $showGroupsSaveAsAlert) {
+            TextField(tr("name"), text: $groupsFilterNameInput)
+            Button(tr("action_save")) { saveGroupsFilterAs(name: groupsFilterNameInput) }
+            Button(tr("action_cancel"), role: .cancel) {}
         }
-        .alert("Rename filter", isPresented: $showGroupsRenameAlert) {
-            TextField("Name", text: $groupsFilterNameInput)
-            Button("Save") { renameGroupsFilter(to: groupsFilterNameInput) }
-            Button("Cancel", role: .cancel) {}
+        .alert(tr("action_rename_filter"), isPresented: $showGroupsRenameAlert) {
+            TextField(tr("name"), text: $groupsFilterNameInput)
+            Button(tr("action_save")) { renameGroupsFilter(to: groupsFilterNameInput) }
+            Button(tr("action_cancel"), role: .cancel) {}
         }
-        .alert("Delete filter?", isPresented: $showGroupsDeleteAlert) {
-            Button("Delete", role: .destructive) { deleteGroupsFilter() }
-            Button("Cancel", role: .cancel) {}
+        .alert(tr("confirm_delete_filter"), isPresented: $showGroupsDeleteAlert) {
+            Button(tr("action_delete"), role: .destructive) { deleteGroupsFilter() }
+            Button(tr("action_cancel"), role: .cancel) {}
         }
         .onAppear {
             viewModel.fetchSavedFilters()
@@ -822,8 +822,8 @@ private struct GroupsViewContent: View {
     private var emptyStateView: some View {
         SharedEmptyStateView(
             icon: "rectangle.stack.fill",
-            title: "No groups found",
-            buttonText: "Load Groups",
+            title: tr("empty_groups_found"),
+            buttonText: tr("action_load_groups"),
             onRetry: { performSearch() }
         )
     }
@@ -1158,7 +1158,7 @@ struct GroupDetailView: View {
                         front_image_path: nil, back_image_path: nil, studio: nil))) {
                         HStack(spacing: 6) {
                             Image(systemName: "rectangle.stack")
-                            Text("In: \(relation.group.name)").lineLimit(1)
+                            Text(tr("in_arg", relation.group.name)).lineLimit(1)
                             Image(systemName: "chevron.right").font(.caption2.weight(.semibold))
                         }
                         .font(.subheadline)
@@ -1289,7 +1289,7 @@ struct GroupDetailView: View {
     /// The shown section's filter and sort sheet.
     private var sectionFilterSlot: CatalogChromeSlot {
         func slot(active: Bool, open: @escaping () -> Void) -> CatalogChromeSlot {
-            CatalogChromeSlot(systemImage: "slider.horizontal.3", isActive: active, accessibilityLabel: "Filter and sort") {
+            CatalogChromeSlot(systemImage: "slider.horizontal.3", isActive: active, accessibilityLabel: tr("action_filter_and_sort_2")) {
                 HapticManager.light()
                 open()
             }
@@ -1319,10 +1319,10 @@ struct GroupDetailView: View {
                     } else if viewModel.isLoadingGroupGalleries {
                         VStack {
                             InlineSpinner()
-                            Text("Loading galleries...").font(.caption).foregroundColor(.secondary)
+                            Text(tr("loading_galleries")).font(.caption).foregroundColor(.secondary)
                         }.padding(.top, 40)
                     } else {
-                        InlineEmptyStateView(icon: "photo.on.rectangle", title: "No galleries found")
+                        InlineEmptyStateView(icon: "photo.on.rectangle", title: tr("empty_galleries_found"))
                     }
                 } else if selectedDetailTab == .groups {
                     subGroupGrid
@@ -1352,23 +1352,23 @@ struct GroupDetailView: View {
             .onChange(of: linkedPerformers.catalogPresetRowSelection) { _, newId in
                 linkedPerformers.handlePresetSelection(newId, viewModel: viewModel)
             }
-            .alert("Save as new", isPresented: $linkedPerformers.showSaveAsCatalogPresetAlert) {
-                TextField("Name", text: $linkedPerformers.catalogPresetNameInput)
-                Button("Save") { linkedPerformers.savePresetAs(name: linkedPerformers.catalogPresetNameInput, viewModel: viewModel) }
-                Button("Cancel", role: .cancel) {}
+            .alert(tr("action_save_as_new"), isPresented: $linkedPerformers.showSaveAsCatalogPresetAlert) {
+                TextField(tr("name"), text: $linkedPerformers.catalogPresetNameInput)
+                Button(tr("action_save")) { linkedPerformers.savePresetAs(name: linkedPerformers.catalogPresetNameInput, viewModel: viewModel) }
+                Button(tr("action_cancel"), role: .cancel) {}
             } message: {
-                Text("Save the current sort, filter, and live criteria as a new Stash saved filter.")
+                Text(tr("hint_save_current_sort_filter_and"))
             }
-            .alert("Rename", isPresented: $linkedPerformers.showRenameCatalogPresetAlert) {
-                TextField("Name", text: $linkedPerformers.renameCatalogPresetInput)
-                Button("Save") { linkedPerformers.renamePreset(to: linkedPerformers.renameCatalogPresetInput, viewModel: viewModel) }
-                Button("Cancel", role: .cancel) {}
+            .alert(tr("action_rename"), isPresented: $linkedPerformers.showRenameCatalogPresetAlert) {
+                TextField(tr("name"), text: $linkedPerformers.renameCatalogPresetInput)
+                Button(tr("action_save")) { linkedPerformers.renamePreset(to: linkedPerformers.renameCatalogPresetInput, viewModel: viewModel) }
+                Button(tr("action_cancel"), role: .cancel) {}
             } message: {
-                Text("Rename this preset or saved filter.")
+                Text(tr("hint_rename_this_preset_or_saved"))
             }
-            .alert("Delete filter?", isPresented: $linkedPerformers.showDeleteCatalogPresetAlert) {
-                Button("Delete", role: .destructive) { linkedPerformers.deletePreset(viewModel: viewModel) }
-                Button("Cancel", role: .cancel) {}
+            .alert(tr("confirm_delete_filter"), isPresented: $linkedPerformers.showDeleteCatalogPresetAlert) {
+                Button(tr("action_delete"), role: .destructive) { linkedPerformers.deletePreset(viewModel: viewModel) }
+                Button(tr("action_cancel"), role: .cancel) {}
             } message: {
                 Text(linkedPerformers.deletePresetConfirmationText(viewModel: viewModel))
             }
@@ -1382,23 +1382,23 @@ struct GroupDetailView: View {
             .onChange(of: linkedTags.catalogPresetRowSelection) { _, newId in
                 linkedTags.handlePresetSelection(newId, viewModel: viewModel)
             }
-            .alert("Save as new", isPresented: $linkedTags.showSaveAsCatalogPresetAlert) {
-                TextField("Name", text: $linkedTags.catalogPresetNameInput)
-                Button("Save") { linkedTags.savePresetAs(name: linkedTags.catalogPresetNameInput, viewModel: viewModel) }
-                Button("Cancel", role: .cancel) {}
+            .alert(tr("action_save_as_new"), isPresented: $linkedTags.showSaveAsCatalogPresetAlert) {
+                TextField(tr("name"), text: $linkedTags.catalogPresetNameInput)
+                Button(tr("action_save")) { linkedTags.savePresetAs(name: linkedTags.catalogPresetNameInput, viewModel: viewModel) }
+                Button(tr("action_cancel"), role: .cancel) {}
             } message: {
-                Text("Save the current sort, filter, and live criteria as a new Stash saved filter.")
+                Text(tr("hint_save_current_sort_filter_and"))
             }
-            .alert("Rename", isPresented: $linkedTags.showRenameCatalogPresetAlert) {
-                TextField("Name", text: $linkedTags.renameCatalogPresetInput)
-                Button("Save") { linkedTags.renamePreset(to: linkedTags.renameCatalogPresetInput, viewModel: viewModel) }
-                Button("Cancel", role: .cancel) {}
+            .alert(tr("action_rename"), isPresented: $linkedTags.showRenameCatalogPresetAlert) {
+                TextField(tr("name"), text: $linkedTags.renameCatalogPresetInput)
+                Button(tr("action_save")) { linkedTags.renamePreset(to: linkedTags.renameCatalogPresetInput, viewModel: viewModel) }
+                Button(tr("action_cancel"), role: .cancel) {}
             } message: {
-                Text("Rename this preset or saved filter.")
+                Text(tr("hint_rename_this_preset_or_saved"))
             }
-            .alert("Delete filter?", isPresented: $linkedTags.showDeleteCatalogPresetAlert) {
-                Button("Delete", role: .destructive) { linkedTags.deletePreset(viewModel: viewModel) }
-                Button("Cancel", role: .cancel) {}
+            .alert(tr("confirm_delete_filter"), isPresented: $linkedTags.showDeleteCatalogPresetAlert) {
+                Button(tr("action_delete"), role: .destructive) { linkedTags.deletePreset(viewModel: viewModel) }
+                Button(tr("action_cancel"), role: .cancel) {}
             } message: {
                 Text(linkedTags.deletePresetConfirmationText(viewModel: viewModel))
             }
@@ -1412,23 +1412,23 @@ struct GroupDetailView: View {
             .onChange(of: linkedStudios.catalogPresetRowSelection) { _, newId in
                 linkedStudios.handlePresetSelection(newId, viewModel: viewModel)
             }
-            .alert("Save as new", isPresented: $linkedStudios.showSaveAsCatalogPresetAlert) {
-                TextField("Name", text: $linkedStudios.catalogPresetNameInput)
-                Button("Save") { linkedStudios.savePresetAs(name: linkedStudios.catalogPresetNameInput, viewModel: viewModel) }
-                Button("Cancel", role: .cancel) {}
+            .alert(tr("action_save_as_new"), isPresented: $linkedStudios.showSaveAsCatalogPresetAlert) {
+                TextField(tr("name"), text: $linkedStudios.catalogPresetNameInput)
+                Button(tr("action_save")) { linkedStudios.savePresetAs(name: linkedStudios.catalogPresetNameInput, viewModel: viewModel) }
+                Button(tr("action_cancel"), role: .cancel) {}
             } message: {
-                Text("Save the current sort, filter, and live criteria as a new Stash saved filter.")
+                Text(tr("hint_save_current_sort_filter_and"))
             }
-            .alert("Rename", isPresented: $linkedStudios.showRenameCatalogPresetAlert) {
-                TextField("Name", text: $linkedStudios.renameCatalogPresetInput)
-                Button("Save") { linkedStudios.renamePreset(to: linkedStudios.renameCatalogPresetInput, viewModel: viewModel) }
-                Button("Cancel", role: .cancel) {}
+            .alert(tr("action_rename"), isPresented: $linkedStudios.showRenameCatalogPresetAlert) {
+                TextField(tr("name"), text: $linkedStudios.renameCatalogPresetInput)
+                Button(tr("action_save")) { linkedStudios.renamePreset(to: linkedStudios.renameCatalogPresetInput, viewModel: viewModel) }
+                Button(tr("action_cancel"), role: .cancel) {}
             } message: {
-                Text("Rename this preset or saved filter.")
+                Text(tr("hint_rename_this_preset_or_saved"))
             }
-            .alert("Delete filter?", isPresented: $linkedStudios.showDeleteCatalogPresetAlert) {
-                Button("Delete", role: .destructive) { linkedStudios.deletePreset(viewModel: viewModel) }
-                Button("Cancel", role: .cancel) {}
+            .alert(tr("confirm_delete_filter"), isPresented: $linkedStudios.showDeleteCatalogPresetAlert) {
+                Button(tr("action_delete"), role: .destructive) { linkedStudios.deletePreset(viewModel: viewModel) }
+                Button(tr("action_cancel"), role: .cancel) {}
             } message: {
                 Text(linkedStudios.deletePresetConfirmationText(viewModel: viewModel))
             }
@@ -1442,23 +1442,23 @@ struct GroupDetailView: View {
             .onChange(of: linkedGalleries.catalogPresetRowSelection) { _, newId in
                 linkedGalleries.handlePresetSelection(newId, viewModel: viewModel)
             }
-            .alert("Save as new", isPresented: $linkedGalleries.showSaveAsCatalogPresetAlert) {
-                TextField("Name", text: $linkedGalleries.catalogPresetNameInput)
-                Button("Save") { linkedGalleries.savePresetAs(name: linkedGalleries.catalogPresetNameInput, viewModel: viewModel) }
-                Button("Cancel", role: .cancel) {}
+            .alert(tr("action_save_as_new"), isPresented: $linkedGalleries.showSaveAsCatalogPresetAlert) {
+                TextField(tr("name"), text: $linkedGalleries.catalogPresetNameInput)
+                Button(tr("action_save")) { linkedGalleries.savePresetAs(name: linkedGalleries.catalogPresetNameInput, viewModel: viewModel) }
+                Button(tr("action_cancel"), role: .cancel) {}
             } message: {
-                Text("Save the current sort, filter, and live criteria as a new Stash saved filter.")
+                Text(tr("hint_save_current_sort_filter_and"))
             }
-            .alert("Rename", isPresented: $linkedGalleries.showRenameCatalogPresetAlert) {
-                TextField("Name", text: $linkedGalleries.renameCatalogPresetInput)
-                Button("Save") { linkedGalleries.renamePreset(to: linkedGalleries.renameCatalogPresetInput, viewModel: viewModel) }
-                Button("Cancel", role: .cancel) {}
+            .alert(tr("action_rename"), isPresented: $linkedGalleries.showRenameCatalogPresetAlert) {
+                TextField(tr("name"), text: $linkedGalleries.renameCatalogPresetInput)
+                Button(tr("action_save")) { linkedGalleries.renamePreset(to: linkedGalleries.renameCatalogPresetInput, viewModel: viewModel) }
+                Button(tr("action_cancel"), role: .cancel) {}
             } message: {
-                Text("Rename this preset or saved filter.")
+                Text(tr("hint_rename_this_preset_or_saved"))
             }
-            .alert("Delete filter?", isPresented: $linkedGalleries.showDeleteCatalogPresetAlert) {
-                Button("Delete", role: .destructive) { linkedGalleries.deletePreset(viewModel: viewModel) }
-                Button("Cancel", role: .cancel) {}
+            .alert(tr("confirm_delete_filter"), isPresented: $linkedGalleries.showDeleteCatalogPresetAlert) {
+                Button(tr("action_delete"), role: .destructive) { linkedGalleries.deletePreset(viewModel: viewModel) }
+                Button(tr("action_cancel"), role: .cancel) {}
             } message: {
                 Text(linkedGalleries.deletePresetConfirmationText(viewModel: viewModel))
             }
@@ -1468,23 +1468,23 @@ struct GroupDetailView: View {
             .onChange(of: linkedImages.catalogPresetRowSelection) { _, newId in
                 linkedImages.handlePresetSelection(newId, viewModel: viewModel)
             }
-            .alert("Save as new", isPresented: $linkedImages.showSaveAsCatalogPresetAlert) {
-                TextField("Name", text: $linkedImages.catalogPresetNameInput)
-                Button("Save") { linkedImages.savePresetAs(name: linkedImages.catalogPresetNameInput, viewModel: viewModel) }
-                Button("Cancel", role: .cancel) {}
+            .alert(tr("action_save_as_new"), isPresented: $linkedImages.showSaveAsCatalogPresetAlert) {
+                TextField(tr("name"), text: $linkedImages.catalogPresetNameInput)
+                Button(tr("action_save")) { linkedImages.savePresetAs(name: linkedImages.catalogPresetNameInput, viewModel: viewModel) }
+                Button(tr("action_cancel"), role: .cancel) {}
             } message: {
-                Text("Save the current sort, filter, and live criteria as a new Stash saved filter.")
+                Text(tr("hint_save_current_sort_filter_and"))
             }
-            .alert("Rename", isPresented: $linkedImages.showRenameCatalogPresetAlert) {
-                TextField("Name", text: $linkedImages.renameCatalogPresetInput)
-                Button("Save") { linkedImages.renamePreset(to: linkedImages.renameCatalogPresetInput, viewModel: viewModel) }
-                Button("Cancel", role: .cancel) {}
+            .alert(tr("action_rename"), isPresented: $linkedImages.showRenameCatalogPresetAlert) {
+                TextField(tr("name"), text: $linkedImages.renameCatalogPresetInput)
+                Button(tr("action_save")) { linkedImages.renamePreset(to: linkedImages.renameCatalogPresetInput, viewModel: viewModel) }
+                Button(tr("action_cancel"), role: .cancel) {}
             } message: {
-                Text("Rename this preset or saved filter.")
+                Text(tr("hint_rename_this_preset_or_saved"))
             }
-            .alert("Delete filter?", isPresented: $linkedImages.showDeleteCatalogPresetAlert) {
-                Button("Delete", role: .destructive) { linkedImages.deletePreset(viewModel: viewModel) }
-                Button("Cancel", role: .cancel) {}
+            .alert(tr("confirm_delete_filter"), isPresented: $linkedImages.showDeleteCatalogPresetAlert) {
+                Button(tr("action_delete"), role: .destructive) { linkedImages.deletePreset(viewModel: viewModel) }
+                Button(tr("action_cancel"), role: .cancel) {}
             } message: {
                 Text(linkedImages.deletePresetConfirmationText(viewModel: viewModel))
             }
@@ -1497,7 +1497,7 @@ struct GroupDetailView: View {
         var slots = CatalogSlotSet(visibility: groupDetailCatalogFloatingChromeForFooter)
         // Edit sits in the floating bar like on performer / studio / tag pages.
         if appearanceManager.isEditModeEnabled {
-            slots.entityActions = [CatalogChromeSlot(systemImage: "pencil", accessibilityLabel: "Edit group") {
+            slots.entityActions = [CatalogChromeSlot(systemImage: "pencil", accessibilityLabel: tr("action_edit_group")) {
                 HapticManager.light()
                 showingEditGroupSheet = true
             }]
@@ -1877,7 +1877,7 @@ struct GroupDetailView: View {
              if viewModel.isLoadingGroupGalleries {
                  VStack(spacing: 8) {
                     ProgressView()
-                    Text("Loading more galleries...").font(.caption).foregroundColor(.secondary)
+                    Text(tr("loading_more_galleries")).font(.caption).foregroundColor(.secondary)
                 }.padding(.vertical, 20)
              } else if viewModel.hasMoreGroupGalleries {
                  Color.clear.frame(height: 1).onAppear { viewModel.loadMoreGroupGalleries(groupId: selectedGroup.id) }
@@ -1898,16 +1898,16 @@ struct GroupDetailView: View {
             items: getGroupDetails().map { DetailHeroItem(label: $0.label, value: $0.value) },
             description: selectedGroup.synopsis,
             showsHero: coverURL != nil,
-            heroAccessibilityLabel: "Group cover",
+            heroAccessibilityLabel: tr("group_cover"),
             onHeroTap: nil,
             isExpanded: $isHeaderExpanded,
             placeholderSystemImage: "rectangle.stack",
             // DVD case instead of the circle: front cover, and the back cover beside it if any.
             leadingAvatars: AnyView(
                 HStack(alignment: .top, spacing: 6) {
-                    coverButton(coverURL, label: "Front cover")
+                    coverButton(coverURL, label: tr("front_cover"))
                     if let back = selectedGroup.backImageURL {
-                        coverButton(back, label: "Back cover")
+                        coverButton(back, label: tr("back_cover"))
                     }
                 }
             ),
@@ -1930,7 +1930,7 @@ struct GroupDetailView: View {
                 GroupDVDCover(url: url, accessibilityLabel: label)
             }
             .buttonStyle(.plain)
-            .accessibilityHint("Opens the cover full screen")
+            .accessibilityHint(tr("opens_cover_full_screen"))
         } else {
             GroupDVDCover(url: nil, accessibilityLabel: label)
         }
@@ -1986,7 +1986,7 @@ struct GroupDetailView: View {
 /// hairline rim and a drop shadow. Used in the group detail header in place of the circle.
 struct GroupDVDCover: View {
     let url: URL?
-    var accessibilityLabel: String = "Cover"
+    var accessibilityLabel: String = tr("cover")
 
     static let width: CGFloat = 72
     static var height: CGFloat { width * 7 / 5 }
@@ -2076,17 +2076,17 @@ struct EditGroupSheet: View {
     var body: some View {
         NavigationView {
             Form {
-                Section("Covers") {
+                Section(tr("covers")) {
                     HStack(alignment: .top, spacing: 16) {
                         coverColumn(
-                            title: "Front",
+                            title: tr("front"),
                             preview: newFront?.preview,
                             url: group.thumbnailURL,
                             item: $frontItem,
                             onRemove: nil
                         )
                         coverColumn(
-                            title: "Back",
+                            title: tr("back"),
                             preview: newBack?.preview,
                             url: removeBack ? nil : group.backImageURL,
                             item: $backItem,
@@ -2102,21 +2102,21 @@ struct EditGroupSheet: View {
                 }
                 .listRowBackground(Color.secondaryAppBackground)
 
-                Section("Identity") {
-                    TextField("Name", text: $name)
-                    TextField("Aliases", text: $aliases)
-                    StashDateField(placeholder: "Date (YYYY-MM-DD)", text: $date)
-                    TextField("Duration (h:mm:ss)", text: $durationText)
+                Section(tr("identity")) {
+                    TextField(tr("name"), text: $name)
+                    TextField(tr("aliases"), text: $aliases)
+                    StashDateField(placeholder: tr("date_yyyy_mm_dd"), text: $date)
+                    TextField(tr("duration_h_mm_ss"), text: $durationText)
                         .keyboardType(.numbersAndPunctuation)
-                    TextField("Rating (0–100)", text: $ratingText)
+                    TextField(tr("rating_0_100"), text: $ratingText)
                         .keyboardType(.numberPad)
                         .numericKeyboardDoneBar()
-                    TextField("Director", text: $director)
+                    TextField(tr("director"), text: $director)
                 }
                 .listRowBackground(Color.secondaryAppBackground)
 
-                Section("Studio & Tags") {
-                    pickerRow(title: "Studio", value: studio?.name ?? "None") { picker = .studio }
+                Section(tr("studio_and_tags")) {
+                    pickerRow(title: tr("studio"), value: studio?.name ?? "None") { picker = .studio }
                     pickerRow(
                         title: "Tags",
                         value: tags.isEmpty ? "None" : tags.map(\.name).joined(separator: ", ")
@@ -2138,19 +2138,19 @@ struct EditGroupSheet: View {
                                 Image(systemName: "minus.circle.fill").foregroundStyle(.red)
                             }
                             .buttonStyle(.plain)
-                            .accessibilityLabel("Remove URL")
+                            .accessibilityLabel(tr("action_remove_url"))
                         }
                     }
                     Button {
                         urls.append("")
                     } label: {
-                        Label("Add URL", systemImage: "plus.circle.fill")
+                        Label(tr("action_add_url"), systemImage: "plus.circle.fill")
                     }
                 }
                 .listRowBackground(Color.secondaryAppBackground)
                 .disabled(!extraFieldsLoaded)
 
-                Section("Synopsis") {
+                Section(tr("synopsis")) {
                     TextEditor(text: $synopsis)
                         .frame(minHeight: 120)
                 }
@@ -2165,7 +2165,7 @@ struct EditGroupSheet: View {
                             if isDeleting {
                                 InlineSpinner(tint: .red)
                             } else {
-                                Label("Delete Group", systemImage: "trash")
+                                Label(tr("action_delete_group"), systemImage: "trash")
                                     .foregroundStyle(.red)
                             }
                             Spacer()
@@ -2178,9 +2178,9 @@ struct EditGroupSheet: View {
             }
             .applyAppBackground()
             .scrollContentBackground(.hidden)
-            .stashyModalSheetChrome("Edit Group", onBack: { dismiss() }) {
+            .stashyModalSheetChrome(tr("action_edit_group"), onBack: { dismiss() }) {
                 StashyChromeTrailingTextButton(
-                    title: "Save",
+                    title: tr("action_save"),
                     enabled: canSave,
                     isBusy: isSaving
                 ) { save() }
@@ -2208,11 +2208,11 @@ struct EditGroupSheet: View {
                     tags: $tags
                 )
             }
-            .alert("Delete Group", isPresented: $showingDeleteConfirmation) {
-                Button("Cancel", role: .cancel) { }
-                Button("Delete", role: .destructive) { performDelete() }
+            .alert(tr("action_delete_group"), isPresented: $showingDeleteConfirmation) {
+                Button(tr("action_cancel"), role: .cancel) { }
+                Button(tr("action_delete"), role: .destructive) { performDelete() }
             } message: {
-                Text("Delete '\(group.name)'? This cannot be undone.")
+                Text(tr("hint_delete_arg_this_cannot_be", group.name))
             }
         }
     }
@@ -2264,10 +2264,10 @@ struct EditGroupSheet: View {
             }
             Text(title).font(.caption).foregroundStyle(.secondary)
             PhotosPicker(selection: item, matching: .images) {
-                Text(url == nil && preview == nil ? "Add" : "Change").font(.caption.weight(.semibold))
+                Text(url == nil && preview == nil ? tr("action_add") : tr("action_change")).font(.caption.weight(.semibold))
             }
             if let onRemove {
-                Button("Remove", role: .destructive, action: onRemove)
+                Button(tr("action_remove"), role: .destructive, action: onRemove)
                     .font(.caption.weight(.semibold))
                     .buttonStyle(.plain)
                     .foregroundStyle(.red)
@@ -2281,7 +2281,7 @@ struct EditGroupSheet: View {
         viewModel.fetchGroupEditFields(groupId: group.id) { fields in
             DispatchQueue.main.async {
                 guard let fields else {
-                    ToastManager.shared.show("Couldn't load all group fields", icon: "exclamationmark.triangle", style: .error)
+                    ToastManager.shared.show(tr("error_load_all_group_fields"), icon: "exclamationmark.triangle", style: .error)
                     return
                 }
                 aliases = fields.aliases ?? ""
@@ -2303,7 +2303,7 @@ struct EditGroupSheet: View {
                   let image = UIImage(data: data),
                   let jpeg = image.jpegData(compressionQuality: 0.9) else {
                 await MainActor.run {
-                    ToastManager.shared.show("Couldn't read that image", icon: "exclamationmark.triangle", style: .error)
+                    ToastManager.shared.show(tr("error_read_that_image"), icon: "exclamationmark.triangle", style: .error)
                 }
                 return
             }
@@ -2321,7 +2321,7 @@ struct EditGroupSheet: View {
                 isDeleting = false
                 switch result {
                 case .success:
-                    ToastManager.shared.show("Group deleted", icon: "trash", style: .success)
+                    ToastManager.shared.show(tr("group_deleted"), icon: "trash", style: .success)
                     dismiss()
                     // Pop the detail only once the sheet is gone — both in one runloop
                     // leaves the navigation stack inconsistent.
@@ -2373,7 +2373,7 @@ struct EditGroupSheet: View {
             guard success else {
                 DispatchQueue.main.async {
                     isSaving = false
-                    ToastManager.shared.show("Failed to update group", icon: "exclamationmark.triangle", style: .error)
+                    ToastManager.shared.show(tr("error_update_group"), icon: "exclamationmark.triangle", style: .error)
                 }
                 return
             }
@@ -2390,7 +2390,7 @@ struct EditGroupSheet: View {
                         updated.rating100 = rating
                     }
                     onComplete(updated)
-                    ToastManager.shared.show("Group updated", icon: "checkmark.circle", style: .success)
+                    ToastManager.shared.show(tr("group_updated"), icon: "checkmark.circle", style: .success)
                     dismiss()
                 }
             }
@@ -2476,7 +2476,7 @@ private struct GroupEntityPickerSheet: View {
         NavigationView {
             Form {
                 Section {
-                    TextField("Search…", text: $query)
+                    TextField(tr("placeholder_search_2"), text: $query)
                         .textInputAutocapitalization(.never)
                         .autocorrectionDisabled()
                 }
@@ -2489,7 +2489,7 @@ private struct GroupEntityPickerSheet: View {
                     .listRowBackground(Color.secondaryAppBackground)
                 } else if !tags.isEmpty {
                     // Chosen tags lead, whatever the search says.
-                    Section("Selected") {
+                    Section(tr("selected")) {
                         ForEach(tags) { tag in
                             row(name: tag.name, selected: true) { tags.removeAll { $0.id == tag.id } }
                         }
@@ -2517,8 +2517,8 @@ private struct GroupEntityPickerSheet: View {
             }
             .applyAppBackground()
             .scrollContentBackground(.hidden)
-            .stashyModalSheetChrome(kind == .studio ? "Studio" : "Tags", onBack: { dismiss() }) {
-                StashyChromeTrailingTextButton(title: "Done") { dismiss() }
+            .stashyModalSheetChrome(kind == .studio ? tr("studio") : "Tags", onBack: { dismiss() }) {
+                StashyChromeTrailingTextButton(title: tr("action_done")) { dismiss() }
             }
             .onAppear { store.load(storeKind) }
             .onChange(of: query) { _, newValue in

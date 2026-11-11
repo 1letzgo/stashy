@@ -1,5 +1,7 @@
 package de.letzgo.stashy.ui.tools
 
+import de.letzgo.stashy.R
+import de.letzgo.stashy.tr
 import de.letzgo.stashy.ui.bottomBarContentPadding
 import de.letzgo.stashy.ui.scaledMaxLines
 import androidx.compose.animation.AnimatedContent
@@ -69,11 +71,11 @@ import de.letzgo.stashy.ui.tools.stats.SessionTimelineToolView
  * a stored "Downloads" or "Watchlist" sub-tab is unknown to [from] and lands on the grid.
  */
 enum class ToolsTab(val title: String, val icon: ImageVector) {
-    Overview("Overview", SF.chartBarFill),
-    OCount("O-Count", SF.calendar),
-    Timeline("Timeline", SF.calendarDayTimelineLeft),
-    TopLists("Charts", SF.listNumber),
-    HotOrNot("Match", SF.flameFill),
+    Overview(tr(R.string.overview), SF.chartBarFill),
+    OCount(tr(R.string.o_count), SF.calendar),
+    Timeline(tr(R.string.timeline), SF.calendarDayTimelineLeft),
+    TopLists(tr(R.string.charts), SF.listNumber),
+    HotOrNot(tr(R.string.match), SF.flameFill),
     RateMe("RateMe", SF.starFill);
 
     companion object {
@@ -84,8 +86,8 @@ enum class ToolsTab(val title: String, val icon: ImageVector) {
          * on the Dashboard row opens Now Playing); a stored "Watchlist" sub-tab lands on the grid.
          */
         val groups: List<Pair<String, List<ToolsTab>>> get() = listOf(
-            "Insights" to listOf(Overview, TopLists, OCount, Timeline),
-            "Discover" to listOf(HotOrNot, RateMe),
+            tr(R.string.insights) to listOf(Overview, TopLists, OCount, Timeline),
+            tr(R.string.discover) to listOf(HotOrNot, RateMe),
         ).filter { it.second.isNotEmpty() }
         val sorted: List<ToolsTab> get() = groups.flatMap { it.second }
     }

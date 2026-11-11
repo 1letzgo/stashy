@@ -1,5 +1,7 @@
 package de.letzgo.stashy.ui.catalog
 
+import de.letzgo.stashy.R
+import de.letzgo.stashy.tr
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.size
@@ -64,8 +66,8 @@ data class ImageDeleteOutcome(val requested: Int, val failedIds: Set<String>) {
 
     companion object {
         /** iOS alert title — literally "Delete N images?". */
-        fun confirmTitle(count: Int) = "Delete $count images?"
-        const val CONFIRM_MESSAGE = "These images will be permanently deleted. This action cannot be undone."
+        fun confirmTitle(count: Int) = tr(R.string.confirm_delete_arg_images, count)
+        val CONFIRM_MESSAGE = tr(R.string.hint_these_images_will_be_permanently)
     }
 }
 
@@ -121,7 +123,7 @@ fun ImageDeleteConfirmation(selection: ImageSelectionController, list: PagedList
         title = ImageDeleteOutcome.confirmTitle(selection.state.count),
         text = ImageDeleteOutcome.CONFIRM_MESSAGE,
         onDismiss = { selection.cancelDelete() },
-        confirmLabel = "Delete",
+        confirmLabel = tr(R.string.action_delete),
         destructive = true,
         icon = SF.trash,
         onConfirm = { selection.confirmDelete(list) },
@@ -145,7 +147,7 @@ fun SelectableImageCell(selected: Boolean, onToggle: () -> Unit, modifier: Modif
         ) {
             Icon(
                 if (selected) SF.checkmarkCircleFill else SF.circle,
-                if (selected) "Selected" else "Not selected",
+                if (selected) tr(R.string.selected) else tr(R.string.not_selected),
                 tint = if (selected) Appearance.tint else Color.White.copy(alpha = 0.7f),
                 modifier = Modifier.size(32.dp),
             )

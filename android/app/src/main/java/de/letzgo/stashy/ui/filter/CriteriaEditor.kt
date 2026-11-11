@@ -1,5 +1,7 @@
 package de.letzgo.stashy.ui.filter
 
+import de.letzgo.stashy.R
+import de.letzgo.stashy.tr
 import de.letzgo.stashy.ui.scaledMaxLines
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
@@ -177,10 +179,10 @@ fun FilterCriteriaEditor(
     val p = Theme.palette
 
     val explanation = when (path.lastOrNull()) {
-        "OR" -> "Matches when at least one condition below is true."
-        "NOT" -> "Excludes everything matching the conditions below."
-        "AND" -> "All conditions below must be true."
-        else -> "All conditions must be true."
+        "OR" -> tr(R.string.hint_matches_when_at_least_one)
+        "NOT" -> tr(R.string.hint_excludes_everything_matching_conditions_below)
+        "AND" -> tr(R.string.hint_all_conditions_below_must_be)
+        else -> tr(R.string.all_conditions_must_be_true)
     }
 
     // Settings look: section header, one Material group (a row per condition + "Add condition"),
@@ -188,11 +190,11 @@ fun FilterCriteriaEditor(
     Column(
         modifier.padding(horizontal = if (embedsInCard) Tokens.Spacing.md else 0.dp).padding(bottom = if (embedsInCard) Tokens.Spacing.xs else 0.dp),
     ) {
-        if (isRoot) NativeSectionHeader(levelTitle?.takeIf { it.isNotEmpty() } ?: "Conditions")
+        if (isRoot) NativeSectionHeader(levelTitle?.takeIf { it.isNotEmpty() } ?: tr(R.string.conditions))
         NativeGroup {
         if (levelKeys.isEmpty()) {
             NativeListItem(
-                if (groupKeys.isEmpty()) "No conditions yet — use Add below." else "No direct conditions.",
+                if (groupKeys.isEmpty()) tr(R.string.empty_conditions_yet_use_add_below) else tr(R.string.empty_direct_conditions),
                 headlineColor = p.secondaryText,
             )
         } else {
@@ -252,7 +254,7 @@ private fun AddConditionBar(addable: List<FilterFieldDescriptor>, onAdd: (Filter
     Box(Modifier.fillMaxWidth()) {
         // Last row of the conditions group, like Settings' "Add New Server".
         NativeListItem(
-            "Add condition", icon = SF.plus, iconTint = p.secondaryText,
+            tr(R.string.action_add_condition), icon = SF.plus, iconTint = p.secondaryText,
             enabled = addable.isNotEmpty(), onClick = { open = true },
         )
         Box(Modifier.align(Alignment.TopStart)) {
@@ -264,7 +266,7 @@ private fun AddConditionBar(addable: List<FilterFieldDescriptor>, onAdd: (Filter
                         text = {
                             Column {
                                 Text(f.label, color = p.text)
-                                if (appOnly) Text("App only", color = p.secondaryText, style = MaterialTheme.typography.bodySmall)
+                                if (appOnly) Text(tr(R.string.app_only), color = p.secondaryText, style = MaterialTheme.typography.bodySmall)
                             }
                         },
                         onClick = { open = false; onAdd(f) },
@@ -285,7 +287,7 @@ private fun AddGroupBar(taken: Boolean, onAdd: (String) -> Unit) {
     var open by remember { mutableStateOf(false) }
     Box(Modifier.fillMaxWidth()) {
         NativeListItem(
-            "Add group", icon = SF.squareStack3dUp, iconTint = p.secondaryText,
+            tr(R.string.action_add_group), icon = SF.squareStack3dUp, iconTint = p.secondaryText,
             enabled = !taken, onClick = { open = true },
         )
         Box(Modifier.align(Alignment.TopStart)) {
@@ -307,14 +309,14 @@ private fun AddGroupBar(taken: Boolean, onAdd: (String) -> Unit) {
 }
 
 fun groupHint(group: String) = when (group) {
-    "AND" -> "Every condition in it must match"
-    "OR" -> "This level or the group must match"
-    "NOT" -> "Leaves out what the group matches"
+    "AND" -> tr(R.string.hint_every_condition_in_it_must)
+    "OR" -> tr(R.string.hint_this_level_or_group_must)
+    "NOT" -> tr(R.string.hint_leaves_out_what_group_matches)
     else -> ""
 }
 
 /** iOS: `groupTitle(_:)`. */
-fun groupTitle(group: String) = when (group) { "AND" -> "All of"; "OR" -> "Any of"; "NOT" -> "None of"; else -> group }
+fun groupTitle(group: String) = when (group) { "AND" -> tr(R.string.all_of); "OR" -> tr(R.string.any_of); "NOT" -> tr(R.string.none_of); else -> group }
 
 @Composable
 private fun GroupCard(document: CriteriaDocument, group: String, path: List<String>, onChange: () -> Unit, applyChange: () -> Unit) {
@@ -348,7 +350,7 @@ private fun GroupCard(document: CriteriaDocument, group: String, path: List<Stri
             }
             Spacer(Modifier.weight(1f))
             androidx.compose.material3.IconButton(onClick = { document.removeGroup(group, path); applyChange() }) {
-                Icon(SF.xmark, "Remove ${groupTitle(group)} group", tint = p.secondaryText)
+                Icon(SF.xmark, tr(R.string.action_remove_arg_group, groupTitle(group)), tint = p.secondaryText)
             }
         }
         FilterCriteriaEditor(document, onChange, embedsInCard = false, path = path + group)
@@ -393,7 +395,7 @@ private fun CriterionCard(
             )
             if (isSet || !isPinned) {
                 androidx.compose.material3.IconButton(onClick = { onClear(isSet) }) {
-                    Icon(SF.xmark, if (isPinned) "Clear ${field.label}" else "Remove ${field.label}", tint = p.secondaryText)
+                    Icon(SF.xmark, if (isPinned) tr(R.string.action_clear_arg, field.label) else tr(R.string.action_remove_arg, field.label), tint = p.secondaryText)
                 }
             }
         }
@@ -439,7 +441,7 @@ private fun CriterionEditorBody(document: CriteriaDocument, field: FilterFieldDe
         CriterionKind.nestedFilter -> {
             val count = dict.size
             Row(Modifier.clickable(onClick = onOpenNested).padding(vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
-                Text(if (count == 0) "Edit…" else "$count criterion(s)", style = IosTypography.subheadline, color = Theme.palette.text)
+                Text(if (count == 0) tr(R.string.action_edit_menu) else "$count criterion(s)", style = IosTypography.subheadline, color = Theme.palette.text)
                 Icon(de.letzgo.stashy.ui.SF.chevronDown, null, tint = Theme.palette.secondaryText, modifier = Modifier.size(16.dp))
             }
         }
@@ -469,9 +471,9 @@ private fun ChipScrollRow(content: @Composable () -> Unit) {
 @Composable
 private fun BoolRow(value: Boolean?, set: (Boolean?) -> Unit, onChange: () -> Unit) {
     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        CatalogFilterChip("Any", value == null) { set(null); onChange() }
-        CatalogFilterChip("Yes", value == true) { set(true); onChange() }
-        CatalogFilterChip("No", value == false) { set(false); onChange() }
+        CatalogFilterChip(tr(R.string.any), value == null) { set(null); onChange() }
+        CatalogFilterChip(tr(R.string.yes), value == true) { set(true); onChange() }
+        CatalogFilterChip(tr(R.string.no), value == false) { set(false); onChange() }
     }
 }
 
@@ -479,7 +481,7 @@ private fun BoolRow(value: Boolean?, set: (Boolean?) -> Unit, onChange: () -> Un
 private fun StringRow(
     value: JsonObject,
     set: (JsonObject) -> Unit,
-    placeholder: String = "Value",
+    placeholder: String = tr(R.string.value),
     modifiers: List<CriterionModifier> = CriterionKind.string.defaultModifiers,
     suggestions: List<FilterFieldCatalog.ValueSuggestion> = emptyList(),
     onChange: () -> Unit,
@@ -536,8 +538,8 @@ private fun DateRow(value: JsonObject, set: (JsonObject) -> Unit, onChange: () -
     }
     if (mod?.needsValue != false) {
         val two = mod?.needsSecondValue == true
-        NativeDateField(text("value"), { setText("value", it) }, label = null, placeholder = if (two) "From (YYYY-MM-DD)" else "YYYY-MM-DD", onCommit = ::commitIfValid)
-        if (two) NativeDateField(text("value2"), { setText("value2", it) }, label = null, placeholder = "To (YYYY-MM-DD)", onCommit = ::commitIfValid)
+        NativeDateField(text("value"), { setText("value", it) }, label = null, placeholder = if (two) tr(R.string.from_yyyy_mm_dd) else "YYYY-MM-DD", onCommit = ::commitIfValid)
+        if (two) NativeDateField(text("value2"), { setText("value2", it) }, label = null, placeholder = tr(R.string.to_yyyy_mm_dd), onCommit = ::commitIfValid)
     }
 }
 
@@ -559,10 +561,10 @@ private fun TimestampRow(value: JsonObject, set: (JsonObject) -> Unit, onChange:
         if (!two) next = next.without("value2")
         update(next)
     }
-    TimestampField(if (needsSecond) "From" else "Date", value["value"].stringValue) {
+    TimestampField(if (needsSecond) tr(R.string.from) else tr(R.string.date), value["value"].stringValue) {
         update(holder.latest.with("value", JsonPrimitive(it)))
     }
-    if (needsSecond) TimestampField("To", value["value2"].stringValue) {
+    if (needsSecond) TimestampField(tr(R.string.to), value["value2"].stringValue) {
         update(holder.latest.with("value2", JsonPrimitive(it)))
     }
 }
@@ -596,9 +598,9 @@ private fun TimestampField(label: String, raw: String?, onPick: (String) -> Unit
                         showDate = false
                     },
                     enabled = state.selectedDateMillis != null,
-                ) { Text("OK") }
+                ) { Text(tr(R.string.ok)) }
             },
-            dismissButton = { TextButton({ showDate = false }) { Text("Cancel") } },
+            dismissButton = { TextButton({ showDate = false }) { Text(tr(R.string.action_cancel)) } },
         ) { DatePicker(state) }
     }
     if (showTime) {
@@ -609,9 +611,9 @@ private fun TimestampField(label: String, raw: String?, onPick: (String) -> Unit
                 TextButton({
                     onPick(FilterTimestampFormat.format(current.toLocalDate().atTime(state.hour, state.minute)))
                     showTime = false
-                }) { Text("OK") }
+                }) { Text(tr(R.string.ok)) }
             },
-            dismissButton = { TextButton({ showTime = false }) { Text("Cancel") } },
+            dismissButton = { TextButton({ showTime = false }) { Text(tr(R.string.action_cancel)) } },
             text = { TimePicker(state) },
         )
     }
@@ -621,7 +623,7 @@ private fun TimestampField(label: String, raw: String?, onPick: (String) -> Unit
 @Composable
 private fun CountDepthRow(value: JsonObject, set: (JsonObject) -> Unit, onChange: () -> Unit) {
     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-        Text("Include sub-tags", Modifier.weight(1f), color = Theme.palette.text)
+        Text(tr(R.string.include_sub_tags), Modifier.weight(1f), color = Theme.palette.text)
         androidx.compose.material3.Switch(value["depth"].numberOrNull == -1.0, { on ->
             set(if (on) value.with("depth", JsonPrimitive(-1)) else value.without("depth"))
             onChange()
@@ -659,8 +661,8 @@ private fun NumericRow(value: JsonObject, set: (JsonObject) -> Unit, isFloat: Bo
         }
         val kb = if (isFloat) KeyboardType.Decimal else KeyboardType.Number
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            FilterTextField(text("value"), { setText("value", it) }, "Value", Modifier.weight(1f), kb, onCommit = onChange)
-            if (mod.needsSecondValue) FilterTextField(text("value2"), { setText("value2", it) }, "Value 2", Modifier.weight(1f), kb, onCommit = onChange)
+            FilterTextField(text("value"), { setText("value", it) }, tr(R.string.value), Modifier.weight(1f), kb, onCommit = onChange)
+            if (mod.needsSecondValue) FilterTextField(text("value2"), { setText("value2", it) }, tr(R.string.value_2), Modifier.weight(1f), kb, onCommit = onChange)
         }
     }
 }
@@ -730,8 +732,8 @@ private fun IsMissingRow(value: String, set: (String) -> Unit, mode: FilterMode,
 @Composable
 private fun TrueFalseRow(value: String, set: (String) -> Unit, onChange: () -> Unit) {
     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        CatalogFilterChip("Yes", value == "true") { set("true"); onChange() }
-        CatalogFilterChip("No", value == "false") { set("false"); onChange() }
+        CatalogFilterChip(tr(R.string.yes), value == "true") { set("true"); onChange() }
+        CatalogFilterChip(tr(R.string.no), value == "false") { set("false"); onChange() }
     }
 }
 
@@ -739,11 +741,11 @@ private fun TrueFalseRow(value: String, set: (String) -> Unit, onChange: () -> U
 private fun StashIdRow(value: JsonObject, set: (JsonObject) -> Unit, multi: Boolean, onChange: () -> Unit) {
     val modifierRaw = value["modifier"].stringValue ?: "NOT_NULL"
     ModifierPicker(modifierRaw, (if (multi) CriterionKind.stashIDs else CriterionKind.stashID).defaultModifiers) { set(value.patch("modifier" to JsonPrimitive(it))); onChange() }
-    FilterTextField(value["endpoint"].stringValue ?: "", { set(if (it.isEmpty()) value.without("endpoint") else value.with("endpoint", JsonPrimitive(it))) }, "Endpoint (optional)", onCommit = onChange)
+    FilterTextField(value["endpoint"].stringValue ?: "", { set(if (it.isEmpty()) value.without("endpoint") else value.with("endpoint", JsonPrimitive(it))) }, tr(R.string.endpoint_optional), onCommit = onChange)
     // `stash_id_endpoint` (StashIDCriterionInput) uses `stash_id`, `stash_ids_endpoint` uses `stash_ids`.
     if (CriterionModifier.from(modifierRaw)?.needsValue != false) {
         val k = if (multi) "stash_ids" else "stash_id"
-        FilterTextField(value[k].stringValue ?: "", { set(if (it.isEmpty()) value.without(k) else value.with(k, JsonPrimitive(it))) }, "Stash ID", onCommit = onChange)
+        FilterTextField(value[k].stringValue ?: "", { set(if (it.isEmpty()) value.without(k) else value.with(k, JsonPrimitive(it))) }, tr(R.string.stash_id), onCommit = onChange)
     }
 }
 
@@ -751,20 +753,20 @@ private fun StashIdRow(value: JsonObject, set: (JsonObject) -> Unit, multi: Bool
 private fun PhashRow(value: JsonObject, set: (JsonObject) -> Unit, onChange: () -> Unit) {
     FilterTextField(value["value"].stringValue ?: "", { set(value.with("value", JsonPrimitive(it))) }, "PHash", onCommit = onChange)
     val distance = value["distance"].numberOrNull?.toLong()?.toString() ?: "0"
-    FilterTextField(distance, { set(value.with("distance", JsonPrimitive(it.toIntOrNull() ?: 0))); onChange() }, "Distance", keyboardType = KeyboardType.Number)
+    FilterTextField(distance, { set(value.with("distance", JsonPrimitive(it.toIntOrNull() ?: 0))); onChange() }, tr(R.string.distance), keyboardType = KeyboardType.Number)
 }
 
 @Composable
 private fun DuplicationRow(value: JsonObject, set: (JsonObject) -> Unit, onChange: () -> Unit) {
     val duplicated = value["duplicated"].boolOrNull ?: true
     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        CatalogFilterChip("Duplicated", duplicated) { set(value.with("duplicated", JsonPrimitive(true))); onChange() }
-        CatalogFilterChip("Unique", !duplicated) { set(value.with("duplicated", JsonPrimitive(false))); onChange() }
+        CatalogFilterChip(tr(R.string.duplicated), duplicated) { set(value.with("duplicated", JsonPrimitive(true))); onChange() }
+        CatalogFilterChip(tr(R.string.unique), !duplicated) { set(value.with("duplicated", JsonPrimitive(false))); onChange() }
     }
     val distance = value["distance"].numberOrNull?.toLong()?.toString() ?: ""
     FilterTextField(distance, { raw ->
         set(if (raw.isEmpty()) value.without("distance") else value.with("distance", JsonPrimitive(raw.toIntOrNull() ?: 0)))
-    }, "PHash distance (optional)", keyboardType = KeyboardType.Number, onCommit = onChange)
+    }, tr(R.string.phash_distance_optional), keyboardType = KeyboardType.Number, onCommit = onChange)
 }
 
 @Composable
@@ -772,17 +774,17 @@ private fun CustomFieldsRow(value: List<JsonObject>, set: (List<JsonObject>) -> 
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
         value.forEachIndexed { idx, row ->
             Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                FilterTextField(row["field"].stringValue ?: "", { t -> set(value.toMutableList().also { it[idx] = row.with("field", JsonPrimitive(t)) }) }, "Field", onCommit = onChange)
+                FilterTextField(row["field"].stringValue ?: "", { t -> set(value.toMutableList().also { it[idx] = row.with("field", JsonPrimitive(t)) }) }, tr(R.string.field), onCommit = onChange)
                 val joined = (row["value"] as? JsonArray)?.joinToString(", ") { it.stringValue ?: it.toString() } ?: ""
                 FilterTextField(joined, { t ->
                     val parts = t.split(",").map { JsonPrimitive(it.trim()) }
                     set(value.toMutableList().also { it[idx] = row.with("value", JsonArray(parts)) })
-                }, "Value", onCommit = onChange)
-                Text("Remove field", Modifier.clickable { set(value.toMutableList().also { it.removeAt(idx) }); onChange() },
+                }, tr(R.string.value), onCommit = onChange)
+                Text(tr(R.string.action_remove_field), Modifier.clickable { set(value.toMutableList().also { it.removeAt(idx) }); onChange() },
                     style = IosTypography.caption, color = StashyColors.systemRed)
             }
         }
-        Text("Add custom field", Modifier.clickable {
+        Text(tr(R.string.action_add_custom_field), Modifier.clickable {
             set(value + JsonObject(mapOf("field" to JsonPrimitive(""), "value" to JsonArray(emptyList()), "modifier" to JsonPrimitive("EQUALS"))))
             onChange()
         }, style = IosTypography.subheadline.copy(fontWeight = FontWeight.SemiBold), color = de.letzgo.stashy.ui.textAccent())
@@ -797,7 +799,7 @@ private fun RawJsonRow(value: JsonObject, set: (JsonObject) -> Unit, onChange: (
         text, { new ->
             text = new
             val obj = runCatching { Json.parseToJsonElement(new) as? JsonObject }.getOrNull()
-            if (obj == null) error = "Not a valid JSON object" else { error = null; set(obj) }
+            if (obj == null) error = tr(R.string.not_valid_json_object) else { error = null; set(obj) }
         },
         label = null,
         modifier = Modifier.heightIn(min = 80.dp),
@@ -851,10 +853,10 @@ private fun MultiIdRow(value: JsonObject, set: (JsonObject) -> Unit, entityKey: 
 private fun subLevelLabel(entityKey: String, hierarchical: Boolean): String? {
     if (!hierarchical) return null
     return when (entityKey) {
-        "tags", "scene_tags", "performer_tags", "parents", "children" -> "Include sub-tags"
-        "studios" -> "Include sub-studios"
-        "groups", "movies", "containing_groups", "sub_groups" -> "Include sub-groups"
-        "folder", "parent_folder" -> "Include sub-folders"
+        "tags", "scene_tags", "performer_tags", "parents", "children" -> tr(R.string.include_sub_tags)
+        "studios" -> tr(R.string.include_sub_studios)
+        "groups", "movies", "containing_groups", "sub_groups" -> tr(R.string.include_sub_groups)
+        "folder", "parent_folder" -> tr(R.string.include_sub_folders)
         else -> null
     }
 }
@@ -899,8 +901,8 @@ fun MultiEntityPicker(
     fun trackChosen(id: String) { if (id !in selectionOrder) selectionOrder = selectionOrder + id }
 
     val summary = run {
-        if (isNone) return@run "None"
-        if (selectedIds.isEmpty() && excludedIds.isEmpty()) return@run "Any"
+        if (isNone) return@run tr(R.string.none)
+        if (selectedIds.isEmpty() && excludedIds.isEmpty()) return@run tr(R.string.any)
         val names = entries.filter { it.id in selectedIds }.map { it.name }
         var s = when {
             names.isEmpty() -> if (selectedIds.isEmpty()) "" else "${selectedIds.size} selected"
@@ -932,7 +934,7 @@ fun MultiEntityPicker(
         if (expanded) Column(Modifier.padding(bottom = 8.dp)) {
             if (kind != null && !isNone) {
                 NativeSearchField(
-                    searchText, { searchText = it; FilterPickerOptionsStore.search(kind, it) }, "Search",
+                    searchText, { searchText = it; FilterPickerOptionsStore.search(kind, it) }, tr(R.string.search),
                     Modifier.padding(vertical = 4.dp),
                     loading = FilterPickerOptionsStore.isSearching(kind),
                     containerColor = p.background,
@@ -963,11 +965,11 @@ fun MultiEntityPicker(
                 }
                 HorizontalDivider(color = p.separator)
             }
-            PickerOptionRow("Any", if (selectedIds.isEmpty() && excludedIds.isEmpty() && !isNone) 1 else 0) {
+            PickerOptionRow(tr(R.string.any), if (selectedIds.isEmpty() && excludedIds.isEmpty() && !isNone) 1 else 0) {
                 onChange(emptyList(), emptyList(), if (isNone) "INCLUDES" else matchMode)
             }
             HorizontalDivider(color = p.separator)
-            PickerOptionRow("None", if (isNone) 1 else 0) { onChange(emptyList(), emptyList(), CriterionModifier.IsNull.raw) }
+            PickerOptionRow(tr(R.string.none), if (isNone) 1 else 0) { onChange(emptyList(), emptyList(), CriterionModifier.IsNull.raw) }
             if (!isNone) visible.forEach { entry ->
                 HorizontalDivider(color = p.separator)
                 val state = when (entry.id) { in selectedIds -> 1; in excludedIds -> 2; else -> 0 }
@@ -1008,8 +1010,8 @@ private fun NestedEditorSheet(title: String, mode: FilterMode, initial: JsonObje
     val doc = remember { CriteriaDocument(mode, initial) }
     ModalBottomSheet(onCancel, sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true), containerColor = p.background) {
         Column(Modifier.fillMaxSize().navigationBarsPadding()) {
-            de.letzgo.stashy.ui.NativeSheetTopBar(title, onClose = onCancel, closeDescription = "Cancel") {
-                de.letzgo.stashy.ui.NativeSheetAction("Done", enabled = !doc.hasInvalidInput) { onDone(doc.sanitizedObjectFilter) }
+            de.letzgo.stashy.ui.NativeSheetTopBar(title, onClose = onCancel, closeDescription = tr(R.string.action_cancel)) {
+                de.letzgo.stashy.ui.NativeSheetAction(tr(R.string.action_done), enabled = !doc.hasInvalidInput) { onDone(doc.sanitizedObjectFilter) }
             }
             Column(Modifier.verticalScroll(rememberScrollState()).padding(top = Tokens.Spacing.xs)) {
                 FilterCriteriaEditor(doc, onChange = {})

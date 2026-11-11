@@ -1,5 +1,7 @@
 package de.letzgo.stashy.ui.feeds
 
+import de.letzgo.stashy.R
+import de.letzgo.stashy.tr
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -102,21 +104,21 @@ fun FeedsFilterSortSheet(
             Spacer(Modifier.height(8.dp))
             Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(20.dp)) {
                 Column {
-                    de.letzgo.stashy.ui.NativeSectionHeader("Filter & sort", Modifier.padding(horizontal = 16.dp))
+                    de.letzgo.stashy.ui.NativeSectionHeader(tr(R.string.action_filter_and_sort), Modifier.padding(horizontal = 16.dp))
                     de.letzgo.stashy.ui.filter.ControlGroup {
                         // Filter
                         ControlCard {
-                            ControlLabel("Filter")
+                            ControlLabel(tr(R.string.filter))
                             Spacer(Modifier.weight(1f))
                             // iOS `filterPickerCard`: None, Stash saved filters, on-device presets.
                             val entries = buildList {
-                                add(MenuEntry("", "None", 0))
+                                add(MenuEntry("", tr(R.string.none), 0))
                                 filters.forEach { add(MenuEntry(ListLivePresetTag.serverRow(it.id), it.name, 1)) }
                                 localPresets.forEach { add(MenuEntry(ListLivePresetTag.localRow(it.id), it.name, 2)) }
                             }
                             MenuPicker(
                                 presetRow, entries,
-                                selectedLabel = entries.firstOrNull { it.value == presetRow }?.label ?: presetName ?: selectedFilter?.name ?: "None",
+                                selectedLabel = entries.firstOrNull { it.value == presetRow }?.label ?: presetName ?: selectedFilter?.name ?: tr(R.string.none),
                             ) { onPresetRow(it) }
                         }
                         // Sort (iOS `sortControlsCard` / `markerSortControlsCard`)
@@ -129,10 +131,10 @@ fun FeedsFilterSortSheet(
                         val random = sort.isRandom
                         de.letzgo.stashy.ui.NativeDivider()
                         ControlCard {
-                            ControlLabel("Sort")
+                            ControlLabel(tr(R.string.action_sort))
                             Row(Modifier.alpha(if (random) 0.4f else 1f), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                                CatalogFilterChip("Asc", ascending && !random) { if (!random) FeedSortKinds.option(sortOptions, sort.sortField, true)?.let(onSort) }
-                                CatalogFilterChip("Desc", !ascending && !random) { if (!random) FeedSortKinds.option(sortOptions, sort.sortField, false)?.let(onSort) }
+                                CatalogFilterChip(tr(R.string.asc), ascending && !random) { if (!random) FeedSortKinds.option(sortOptions, sort.sortField, true)?.let(onSort) }
+                                CatalogFilterChip(tr(R.string.desc), !ascending && !random) { if (!random) FeedSortKinds.option(sortOptions, sort.sortField, false)?.let(onSort) }
                             }
                             Spacer(Modifier.weight(1f))
                             MenuPicker(sort.sortField, kinds.map { MenuEntry(it.field, it.menuLabel) }) { field ->
@@ -144,9 +146,9 @@ fun FeedsFilterSortSheet(
                 }
                 // iOS `FeedsPlaybackSettingsCard`.
                 de.letzgo.stashy.ui.filter.ControlGroup {
-                    ControlToggleRow("Immersive", FeedsConfig.fillHeight) { FeedsConfig.updateFillHeight(it) }
+                    ControlToggleRow(tr(R.string.immersive), FeedsConfig.fillHeight) { FeedsConfig.updateFillHeight(it) }
                     de.letzgo.stashy.ui.NativeDivider()
-                    ControlToggleRow("Continuous", FeedsConfig.continuousPlay) { FeedsConfig.updateContinuousPlay(it) }
+                    ControlToggleRow(tr(R.string.continuous), FeedsConfig.continuousPlay) { FeedsConfig.updateContinuousPlay(it) }
                     // "Delete button" lives in Settings › Feeds (app UI, not a per-feed filter option).
                 }
                 androidx.compose.runtime.key(mode, selectedFilter?.id, presetRow) {
@@ -168,12 +170,12 @@ fun FeedsFilterSortSheet(
     )
     nameDialog?.let { saveAs ->
         NameInputDialog(
-            title = if (saveAs) "Save as new" else "Rename",
+            title = if (saveAs) tr(R.string.action_save_as_new) else tr(R.string.action_rename),
             message = when {
-                !saveAs -> "Renames the selected Stash saved filter or on-device filter."
-                mode == ReelsModeType.Markers -> "Creates a new marker filter on your Stash server."
-                mode == ReelsModeType.Clips -> "Saves sort, filters and live criteria as a new image filter on your Stash server."
-                else -> "Creates a new scene filter on your Stash server."
+                !saveAs -> tr(R.string.hint_renames_selected_stash_saved_filter)
+                mode == ReelsModeType.Markers -> tr(R.string.hint_creates_new_marker_filter_on)
+                mode == ReelsModeType.Clips -> tr(R.string.hint_saves_sort_filters_and_live)
+                else -> tr(R.string.hint_creates_new_scene_filter_on)
             },
             initial = if (saveAs) "" else presetName.orEmpty(),
             onSave = { name -> nameDialog = null; if (saveAs) onSaveAs(name) else onRename(name) },
@@ -182,10 +184,10 @@ fun FeedsFilterSortSheet(
     }
     if (showDelete) AlertDialog(
         onDismissRequest = { showDelete = false },
-        title = { Text("Delete filter?") },
+        title = { Text(tr(R.string.confirm_delete_filter)) },
         text = { Text(deleteConfirmationText()) },
-        confirmButton = { TextButton({ showDelete = false; onDelete() }) { Text("Delete", color = StashyColors.systemRed) } },
-        dismissButton = { TextButton({ showDelete = false }) { Text("Cancel") } },
+        confirmButton = { TextButton({ showDelete = false; onDelete() }) { Text(tr(R.string.action_delete), color = StashyColors.systemRed) } },
+        dismissButton = { TextButton({ showDelete = false }) { Text(tr(R.string.action_cancel)) } },
         containerColor = p.secondaryBackground, titleContentColor = p.text, textContentColor = p.secondaryText,
     )
 }

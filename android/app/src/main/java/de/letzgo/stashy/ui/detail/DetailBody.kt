@@ -1,5 +1,7 @@
 package de.letzgo.stashy.ui.detail
 
+import de.letzgo.stashy.R
+import de.letzgo.stashy.tr
 import de.letzgo.stashy.ui.bottomBarContentPadding
 import de.letzgo.stashy.ui.uniqueItemsIndexed
 import androidx.compose.foundation.layout.Arrangement
@@ -226,7 +228,7 @@ internal class LinkedCatalog(
     /** Top-bar "Settings" of [tab] (iOS filter & sort FAB of the `DetailLinked*` lists). */
     fun settingsSlot(tab: DetailTab): CatalogChromeSlot? {
         val c = controller(tab) ?: return null
-        return CatalogChromeSlot(SF.sliderHorizontal3, isFiltered(tab), "Settings") { c.isSheetPresented = true }
+        return CatalogChromeSlot(SF.sliderHorizontal3, isFiltered(tab), tr(R.string.settings)) { c.isSheetPresented = true }
     }
 
     companion object {
@@ -326,19 +328,19 @@ internal fun <T> LazyGridScope.pagedSection(
         LaunchedEffect(index, list.items.size) { list.onItemShown(index) }
         item(index, value)
     }
-    if (list.isLoading) item(key = "more", span = { GridItemSpan(maxLineSpan) }) { LoadingFooter(loadingMessage?.let { "Loading more ${it.removePrefix("Loading ")}" }) }
+    if (list.isLoading) item(key = "more", span = { GridItemSpan(maxLineSpan) }) { LoadingFooter(loadingMessage?.let { tr(R.string.loading_more_arg, it.removePrefix("Loading ")) }) }
 }
 
 /** The section grid for [tab] — shared by Performer/Studio/Tag/Group details. */
 internal fun LazyGridScope.linkedSection(catalog: LinkedCatalog, tab: DetailTab, gridState: LazyGridState) {
     when (tab) {
         DetailTab.Scenes -> catalog.scenes?.let { l ->
-            pagedSection(l, { it.id }, null, SF.film, "No scenes found") { _, s ->
+            pagedSection(l, { it.id }, null, SF.film, tr(R.string.empty_scenes_found)) { _, s ->
                 SceneCard(s, onClick = { Nav.push(SceneDetailScreen(s.id, s)) })
             }
         }
         DetailTab.Galleries -> catalog.galleries?.let { l ->
-            pagedSection(l, { it.id }, "Loading galleries...", SF.photoOnRectangle, "No galleries found") { _, g ->
+            pagedSection(l, { it.id }, tr(R.string.loading_galleries), SF.photoOnRectangle, tr(R.string.empty_galleries_found)) { _, g ->
                 DetailGalleryCard(g, onClick = { Nav.push(GalleryDetailScreen(g.id, g)) })
             }
         }
@@ -346,7 +348,7 @@ internal fun LazyGridScope.linkedSection(catalog: LinkedCatalog, tab: DetailTab,
             pagedSection(l, { it.id }) { _, s -> DetailStudioCard(s, badge = CatalogCardBadge.forSort(catalog.studioController!!.sort), onClick = { Nav.push(StudioDetailScreen(s.id, s, catalog.opensFilteredOnPerformerId)) }) }
         }
         DetailTab.Performers -> catalog.performers?.let { l ->
-            pagedSection(l, { it.id }, "Loading performers...") { _, p -> DetailPerformerCard(p, badgeType = PerformerBadgeType.forSort(catalog.performerController!!.sort), onClick = { Nav.push(PerformerDetailScreen(p.id, p)) }) }
+            pagedSection(l, { it.id }, tr(R.string.loading_performers)) { _, p -> DetailPerformerCard(p, badgeType = PerformerBadgeType.forSort(catalog.performerController!!.sort), onClick = { Nav.push(PerformerDetailScreen(p.id, p)) }) }
         }
         DetailTab.Tags -> catalog.tags?.let { l ->
             pagedSection(l, { it.id }) { _, t -> DetailTagCard(t, badge = CatalogCardBadge.forSort(catalog.tagController!!.sort), onClick = { Nav.push(TagDetailScreen(t.id, t, catalog.opensFilteredOnPerformerId)) }) }
@@ -383,14 +385,14 @@ internal fun LazyGridScope.imageSection(
     currentGalleryId: String? = null,
 ) {
     if (!useFeed) {
-        pagedSection(list, { it.id }, "Loading images...", SF.cameraFill, "No images found") { index, image ->
-            DetailImageCard(image, onClick = { Nav.push(ImageViewerScreen(list.items, index, onLoadMore = { list.loadMore() })) })
+        pagedSection(list, { it.id }, tr(R.string.loading_images), SF.cameraFill, tr(R.string.empty_images_found)) { index, image ->
+            DetailImageCard(image, prefersTitle = currentGalleryId != null, onClick = { Nav.push(ImageViewerScreen(list.items, index, onLoadMore = { list.loadMore() })) })
         }
         return
     }
     if (list.items.isEmpty()) {
         // Empty / first-load state exactly like the grid.
-        pagedSection(list, { it.id }, "Loading images...", SF.cameraFill, "No images found") { _, _ -> }
+        pagedSection(list, { it.id }, tr(R.string.loading_images), SF.cameraFill, tr(R.string.empty_images_found)) { _, _ -> }
         return
     }
     imageFeedItems(
@@ -402,5 +404,5 @@ internal fun LazyGridScope.imageSection(
         onImageUpdated = { updated -> list.patch { if (it.id == updated.id) updated else it } },
         currentGalleryId = currentGalleryId,
     )
-    if (list.isLoading) item(key = "more", span = { GridItemSpan(maxLineSpan) }) { LoadingFooter("Loading more images...") }
+    if (list.isLoading) item(key = "more", span = { GridItemSpan(maxLineSpan) }) { LoadingFooter(tr(R.string.loading_more_images)) }
 }

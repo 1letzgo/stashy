@@ -1,5 +1,7 @@
 package de.letzgo.stashy.data.tools
 
+import de.letzgo.stashy.R
+import de.letzgo.stashy.tr
 import de.letzgo.stashy.data.GraphQL
 import de.letzgo.stashy.data.Json
 import de.letzgo.stashy.data.Net
@@ -44,12 +46,12 @@ object MatchRepository {
 
     /** iOS: `HotOrNotPoolSettingsView.genderRows`. */
     val genderRows: List<Pair<String, String>> = listOf(
-        "FEMALE" to "Female",
-        "MALE" to "Male",
-        "TRANSGENDER_FEMALE" to "Transgender (female)",
-        "TRANSGENDER_MALE" to "Transgender (male)",
-        "NON_BINARY" to "Non-binary",
-        "INTERSEX" to "Intersex",
+        "FEMALE" to tr(R.string.female),
+        "MALE" to tr(R.string.male),
+        "TRANSGENDER_FEMALE" to tr(R.string.transgender_female),
+        "TRANSGENDER_MALE" to tr(R.string.transgender_male),
+        "NON_BINARY" to "Non-Binary",
+        "INTERSEX" to tr(R.string.intersex),
     )
 
     // MARK: Prefs
@@ -157,7 +159,7 @@ object MatchRepository {
     suspend fun pushPerformerUpdate(performer: Performer, newRating: Int, won: Boolean?, opponentId: String, opponentName: String) {
         val input = MatchElo.buildPerformerUpdate(performer, newRating, won, opponentId, opponentName)
         val data = GraphQL.data(UPDATE_MUTATION.trimIndent(), buildJsonObject { put("input", input) })
-        if (data["performerUpdate"] !is JsonObject) throw Exception("Update failed")
+        if (data["performerUpdate"] !is JsonObject) throw Exception(tr(R.string.error_update))
         LibraryEvents.post(LibraryEvent.PerformerPatched(performer.id) { it.copy(rating100 = newRating) })
     }
 
@@ -165,7 +167,7 @@ object MatchRepository {
     suspend fun pushBracketUpdate(performer: Performer, newRating: Int, matches: List<Triple<String, String, Boolean>>) {
         val input = MatchBracket.performerUpdate(performer, newRating, matches)
         val data = GraphQL.data(UPDATE_MUTATION.trimIndent(), buildJsonObject { put("input", input) })
-        if (data["performerUpdate"] !is JsonObject) throw Exception("Update failed")
+        if (data["performerUpdate"] !is JsonObject) throw Exception(tr(R.string.error_update))
         LibraryEvents.post(LibraryEvent.PerformerPatched(performer.id) { it.copy(rating100 = newRating) })
     }
 

@@ -1,5 +1,7 @@
 package de.letzgo.stashy.ui.detail
 
+import de.letzgo.stashy.R
+import de.letzgo.stashy.tr
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import de.letzgo.stashy.ui.scaledIconSize
 import android.widget.Toast
@@ -109,10 +111,10 @@ internal object Dock {
 
 /** Section icons in the detail chrome bar (iOS `PerformerDetailView.DetailTab` & co.). */
 enum class DetailTab(val title: String) {
-    Scenes("Scenes"), Galleries("Galleries"), Studios("Studios"), Performers("Performers"),
-    Tags("Tags"), Groups("Groups"), Images("Images"),
+    Scenes(tr(R.string.scenes)), Galleries(tr(R.string.galleries)), Studios(tr(R.string.studios)), Performers(tr(R.string.performers)),
+    Tags(tr(R.string.tags)), Groups(tr(R.string.groups)), Images(tr(R.string.images)),
     /** Performer detail only: performers who share scenes with this one ([de.letzgo.stashy.data.CoPerformersRepository]). */
-    AppearsWith("Appears with");
+    AppearsWith(tr(R.string.appears_with));
 
     val icon: ImageVector get() = when (this) {
         Scenes -> SF.film; Galleries -> SF.photoStack; Studios -> SF.building2; Performers -> SF.personFill
@@ -180,7 +182,7 @@ internal fun DetailTopBar(
     favoriteBusy: Boolean = false,
     onFavorite: () -> Unit = {},
     onEdit: (() -> Unit)? = null,
-    editLabel: String = "Edit",
+    editLabel: String = tr(R.string.action_edit),
 ) {
     val p = Theme.palette
     val breadcrumb = selected != null
@@ -196,7 +198,7 @@ internal fun DetailTopBar(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             IconButton(onClick = { Nav.pop() }) {
-                Icon(androidx.compose.material.icons.Icons.AutoMirrored.Filled.ArrowBack, "Back", tint = p.text)
+                Icon(androidx.compose.material.icons.Icons.AutoMirrored.Filled.ArrowBack, tr(R.string.back), tint = p.text)
             }
             // Takes the free width, so a long section name shortens instead of pushing the icons out.
             Box(Modifier.weight(1f), contentAlignment = Alignment.CenterStart) {
@@ -222,7 +224,7 @@ internal fun DetailTopBar(
                 if (isFavorite != null) {
                     TopBarAction(
                         if (isFavorite) SF.heartFill else SF.heart,
-                        if (isFavorite) "Remove favorite" else "Add favorite",
+                        if (isFavorite) tr(R.string.action_remove_favorite) else tr(R.string.action_add_favorite),
                         tint = if (isFavorite) StashyColors.systemRed else null,
                         enabled = !favoriteBusy,
                         onClick = onFavorite,
@@ -266,16 +268,16 @@ object DetailFeedsLink {
  */
 @Composable
 internal fun FeedsPill(contentColor: Color? = null, onClick: () -> Unit) {
-    HeroPill("Open in Feeds", onClick, contentColor) { color ->
+    HeroPill(tr(R.string.action_open_in_feeds), onClick, contentColor) { color ->
         Icon(SF.playRectangleOnRectangle, null, tint = color, modifier = Modifier.size(13.dp))
-        Text("Feeds", fontSize = 12.sp, lineHeight = 14.sp, fontWeight = FontWeight.Bold, color = color, maxLines = 1)
+        Text(tr(R.string.feeds), fontSize = 12.sp, lineHeight = 14.sp, fontWeight = FontWeight.Bold, color = color, maxLines = 1)
     }
 }
 
 /** Expand/collapse chevron pill, same chrome and height as [FeedsPill] (iOS `detailHeroPill`). */
 @Composable
 internal fun ExpandPill(expanded: Boolean, onToggle: () -> Unit) {
-    HeroPill(if (expanded) "Show less" else "Show more", onToggle) { color ->
+    HeroPill(if (expanded) tr(R.string.action_show_less) else tr(R.string.action_show_more), onToggle) { color ->
         Icon(if (expanded) SF.chevronUp else SF.chevronDown, null, tint = color, modifier = Modifier.size(13.dp))
     }
 }
@@ -337,7 +339,7 @@ internal fun BoxScope.HeaderExpandButton(expanded: Boolean, onToggle: () -> Unit
             .background(Appearance.tint.copy(alpha = 0.15f)).clickable(onClick = onToggle),
         contentAlignment = Alignment.Center,
     ) {
-        Icon(if (expanded) SF.chevronUp else SF.chevronDown, if (expanded) "Collapse" else "Expand", tint = Theme.palette.pillAccent, modifier = Modifier.size(scaledIconSize(14.dp)))
+        Icon(if (expanded) SF.chevronUp else SF.chevronDown, if (expanded) tr(R.string.collapse) else tr(R.string.expand), tint = Theme.palette.pillAccent, modifier = Modifier.size(scaledIconSize(14.dp)))
     }
 }
 
@@ -549,7 +551,7 @@ internal fun EditEntitySheet(
                 if (saving) {
                     de.letzgo.stashy.ui.NativeSheetProgress()
                 } else {
-                    de.letzgo.stashy.ui.NativeSheetAction("Save", enabled = canSave) {
+                    de.letzgo.stashy.ui.NativeSheetAction(tr(R.string.action_save), enabled = canSave) {
                         saving = true
                         scope.launch {
                             val ok = onSave()
@@ -566,7 +568,7 @@ internal fun EditEntitySheet(
         AlertDialog(
             onDismissRequest = { confirmDelete = false },
             title = { Text(deleteTitle) },
-            text = { Text("Delete '$entityName'? This cannot be undone.") },
+            text = { Text(tr(R.string.hint_delete_arg_this_cannot_be, entityName)) },
             confirmButton = {
                 TextButton({
                     confirmDelete = false
@@ -576,14 +578,14 @@ internal fun EditEntitySheet(
                             onDelete()
                             onDismiss()
                         } catch (e: Exception) {
-                            detailToast(e.message ?: "Delete failed")
+                            detailToast(e.message ?: tr(R.string.error_delete))
                         } finally {
                             deleting = false
                         }
                     }
-                }) { Text("Delete", color = StashyColors.systemRed) }
+                }) { Text(tr(R.string.action_delete), color = StashyColors.systemRed) }
             },
-            dismissButton = { TextButton({ confirmDelete = false }) { Text("Cancel") } },
+            dismissButton = { TextButton({ confirmDelete = false }) { Text(tr(R.string.action_cancel)) } },
         )
     }
 }

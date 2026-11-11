@@ -1,5 +1,7 @@
 package de.letzgo.stashy.ui.feeds
 
+import de.letzgo.stashy.R
+import de.letzgo.stashy.tr
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
@@ -66,10 +68,10 @@ fun PicsFeed(model: FeedsModel, topPadding: Dp, bottomPadding: Dp) {
         val hasServer = ServerConfigManager.activeConfig != null
         val inset = Modifier.fillMaxSize()
         when {
-            !hasServer -> StatusPlaceholder(SF.server, "Server not reachable", "Retry Connection", { c.refresh() }, inset)
-            list.items.isEmpty() && (list.isLoading || !list.loadedOnce) -> StandardLoading("Loading images...")
-            list.items.isEmpty() && list.error != null -> StatusPlaceholder(SF.server, list.error ?: "Server not reachable", "Retry Connection", { c.refresh() }, inset)
-            list.items.isEmpty() -> StatusPlaceholder(SF.cameraFill, "No images found", "Reload", { c.refresh() }, inset)
+            !hasServer -> StatusPlaceholder(SF.server, tr(R.string.server_not_reachable), tr(R.string.action_retry_connection), { c.refresh() }, inset)
+            list.items.isEmpty() && (list.isLoading || !list.loadedOnce) -> StandardLoading(tr(R.string.loading_images))
+            list.items.isEmpty() && list.error != null -> StatusPlaceholder(SF.server, list.error ?: tr(R.string.server_not_reachable), tr(R.string.action_retry_connection), { c.refresh() }, inset)
+            list.items.isEmpty() -> StatusPlaceholder(SF.cameraFill, tr(R.string.empty_images_found), tr(R.string.action_reload), { c.refresh() }, inset)
             // A name filters the feed by that performer, like Clips (iOS `applyPerformerFilter`).
             else -> PullToRefreshBox(isRefreshing = false, onRefresh = { c.refresh() }, modifier = Modifier.fillMaxSize()) { CompositionLocalProvider(LocalImageFeedPerformerTap provides performerTap) {
                 ImageFeedList(

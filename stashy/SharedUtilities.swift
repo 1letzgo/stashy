@@ -337,7 +337,7 @@ enum SubtitlePreferredLanguage {
 
     /// "Any" first, then the common languages, then everything else by localized name.
     static func pickerOptions(locale: Locale = .current) -> [(id: String, label: String)] {
-        var options: [(id: String, label: String)] = [(id: anyValue, label: "Any")]
+        var options: [(id: String, label: String)] = [(id: anyValue, label: tr("any"))]
         let common = commonCodes
         options += common.map { (id: $0, label: SubtitleTargetLanguage.displayName(for: $0, locale: locale)) }
         let rest = Set(SubtitleTargetLanguage.selectableLanguageCodes).subtracting(common)
@@ -379,10 +379,10 @@ enum SubtitleFontSize: String, CaseIterable, Identifiable {
 
     var label: String {
         switch self {
-        case .small: return "Small"
-        case .medium: return "Medium"
-        case .large: return "Large"
-        case .extraLarge: return "Extra large"
+        case .small: return tr("small")
+        case .medium: return tr("medium")
+        case .large: return tr("large")
+        case .extraLarge: return tr("extra_large")
         }
     }
 
@@ -404,10 +404,10 @@ enum SubtitleFontFamily: String, CaseIterable, Identifiable {
 
     var label: String {
         switch self {
-        case .system: return "System"
-        case .rounded: return "Rounded"
-        case .serif: return "Serif"
-        case .monospaced: return "Monospaced"
+        case .system: return tr("system")
+        case .rounded: return tr("rounded")
+        case .serif: return tr("serif")
+        case .monospaced: return tr("monospaced")
         }
     }
 
@@ -428,11 +428,11 @@ enum SubtitleTextColorChoice: String, CaseIterable, Identifiable {
 
     var label: String {
         switch self {
-        case .white: return "White"
-        case .yellow: return "Yellow"
-        case .cyan: return "Cyan"
-        case .green: return "Green"
-        case .black: return "Black"
+        case .white: return tr("white")
+        case .yellow: return tr("yellow")
+        case .cyan: return tr("cyan")
+        case .green: return tr("green")
+        case .black: return tr("black")
         }
     }
 
@@ -454,10 +454,10 @@ enum SubtitleBackgroundChoice: String, CaseIterable, Identifiable {
 
     var label: String {
         switch self {
-        case .black: return "Black"
-        case .darkGray: return "Dark grey"
-        case .white: return "White"
-        case .none: return "None"
+        case .black: return tr("black")
+        case .darkGray: return tr("dark_grey")
+        case .white: return tr("white")
+        case .none: return tr("none")
         }
     }
 
@@ -1315,7 +1315,7 @@ enum StashJSONValue: Codable, Equatable {
         else if let value = try? container.decode([String: StashJSONValue].self) { self = .object(value) }
         else if let value = try? container.decode([StashJSONValue].self) { self = .array(value) }
         else if container.decodeNil() { self = .null }
-        else { throw DecodingError.typeMismatch(StashJSONValue.self, DecodingError.Context(codingPath: decoder.codingPath, debugDescription: "Invalid StashJSONValue")) }
+        else { throw DecodingError.typeMismatch(StashJSONValue.self, DecodingError.Context(codingPath: decoder.codingPath, debugDescription: tr("invalid_stashjsonvalue"))) }
     }
     
     public func encode(to encoder: Encoder) throws {
@@ -1473,7 +1473,7 @@ extension View {
     }
 
     @ViewBuilder
-    func conditionalSearchable(isVisible: Bool, text: Binding<String>, prompt: String = "Search") -> some View {
+    func conditionalSearchable(isVisible: Bool, text: Binding<String>, prompt: String = tr("search")) -> some View {
         if isVisible {
             self.searchable(text: text, placement: Self.alwaysVisibleSearchPlacement, prompt: Text(prompt))
         } else {
@@ -1593,7 +1593,7 @@ struct StashyBetaBadge: View {
     @ObservedObject private var appearance = AppearanceManager.shared
 
     var body: some View {
-        Text("Beta")
+        Text(tr("beta"))
             .font(.system(size: 11, weight: .bold))
             .foregroundStyle(appearance.tintColor)
             .padding(.horizontal, 6)
@@ -1603,7 +1603,7 @@ struct StashyBetaBadge: View {
                     .fill(appearance.tintColor.opacity(0.16))
             )
             .textCase(nil)
-            .accessibilityLabel("Beta")
+            .accessibilityLabel(tr("beta"))
     }
 }
 #endif
@@ -3183,7 +3183,7 @@ struct StashSyncCard: View {
                                 } label: {
                                     VStack(alignment: .leading, spacing: 8) {
                                         HStack {
-                                            Text("Combined Output")
+                                            Text(tr("combined_output"))
                                                 .font(.subheadline.weight(.bold))
                                             Spacer()
                                             Text("\(Int(combined * 100))%")
@@ -3210,11 +3210,11 @@ struct StashSyncCard: View {
 
                                 if isChannelsExpanded {
                                     VStack(alignment: .leading, spacing: 8) {
-                                        compactBar(label: "Hip / Body", value: videoManager.hipIntensity, color: appearanceManager.tintColor)
-                                        compactBar(label: "Pelvis", value: videoManager.pelvisIntensity, color: .orange)
-                                        compactBar(label: "Head / Neck", value: videoManager.headIntensity, color: .blue)
-                                        compactBar(label: "Wrist / Arm", value: videoManager.wristIntensity, color: .purple)
-                                        compactBar(label: "Horizontal", value: videoManager.horzIntensity, color: .green)
+                                        compactBar(label: tr("hip_body"), value: videoManager.hipIntensity, color: appearanceManager.tintColor)
+                                        compactBar(label: tr("pelvis"), value: videoManager.pelvisIntensity, color: .orange)
+                                        compactBar(label: tr("head_neck"), value: videoManager.headIntensity, color: .blue)
+                                        compactBar(label: tr("wrist_arm"), value: videoManager.wristIntensity, color: .purple)
+                                        compactBar(label: tr("horizontal"), value: videoManager.horzIntensity, color: .green)
                                     }
                                     .transition(.opacity.combined(with: .move(edge: .top)))
                                 }
@@ -3227,7 +3227,7 @@ struct StashSyncCard: View {
 
                         VStack(spacing: 4) {
                             HStack {
-                                Text("Motion Sensitivity")
+                                Text(tr("motion_sensitivity"))
                                     .font(.subheadline.weight(.bold))
                                 Spacer()
                                 Text("\(Int(videoManager.sensitivity * 50))%")
@@ -3246,14 +3246,14 @@ struct StashSyncCard: View {
                             HStack(spacing: 8) {
                                 if handyManager.isEnabled {
                                     deviceTogglePill(
-                                        label: "Handy",
+                                        label: tr("handy"),
                                         icon: handyManager.isStashSyncMode ? "hand.tap.fill" : "hand.tap",
                                         isOn: $handyManager.isStashSyncMode
                                     )
                                 }
                                 if buttplugManager.isEnabled {
                                     deviceTogglePill(
-                                        label: "Intiface",
+                                        label: tr("intiface"),
                                         icon: buttplugManager.isStashSyncMode ? "cable.connector.fill" : "cable.connector",
                                         isOn: $buttplugManager.isStashSyncMode
                                     )
@@ -3276,7 +3276,7 @@ struct StashSyncCard: View {
                     } label: {
                         HStack(spacing: 8) {
                             Image(systemName: "bolt.horizontal.fill")
-                            Text("Activate on Scene")
+                            Text(tr("activate_on_scene"))
                         }
                         .font(.subheadline.weight(.semibold))
                         .frame(maxWidth: .infinity)
@@ -3335,7 +3335,7 @@ struct StashSyncCard: View {
         } label: {
             HStack(spacing: 4) {
                 Image(systemName: icon)
-                Text(isOn.wrappedValue ? "SYNC ON" : label)
+                Text(isOn.wrappedValue ? tr("action_sync_on") : label)
             }
             .font(.caption)
             .fontWeight(.bold)
@@ -3392,13 +3392,13 @@ struct StashSyncSheet: View {
         NavigationView {
             List {
                 Section {
-                    stashyScrollingSectionHeader("Connected Devices")
+                    stashyScrollingSectionHeader(tr("connected_devices"))
                     if handyManager.isEnabled {
                         Toggle(isOn: $handyManager.isStashSyncMode) {
                             HStack(spacing: 12) {
                                 Image(systemName: "bolt.horizontal.fill")
                                     .foregroundColor(handyManager.isStashSyncMode ? .orange : .secondary)
-                                Text("The Handy")
+                                Text(tr("handy_2"))
                             }
                         }
                         .stashyGroupedSettingsRow()
@@ -3408,7 +3408,7 @@ struct StashSyncSheet: View {
                             HStack(spacing: 12) {
                                 Image(systemName: "bolt.horizontal.fill")
                                     .foregroundColor(buttplugManager.isStashSyncMode ? .orange : .secondary)
-                                Text("Intiface")
+                                Text(tr("intiface"))
                             }
                         }
                         .stashyGroupedSettingsRow()
@@ -3426,14 +3426,14 @@ struct StashSyncSheet: View {
                 }
                 if showVideoAnalysis {
                 Section {
-                    stashyScrollingSectionHeader("Live Signal Analysis")
+                    stashyScrollingSectionHeader(tr("live_signal_analysis"))
                     VStack(spacing: 10) {
                         // Combined banner
                         let combined = videoManager.currentIntensity
                         Button(action: { withAnimation(.spring(duration: 0.25)) { isChannelsExpanded.toggle() } }) {
                             VStack(alignment: .leading, spacing: 4) {
                                 HStack {
-                                    Label("Combined Output", systemImage: "waveform").font(.caption2)
+                                    Label(tr("combined_output"), systemImage: "waveform").font(.caption2)
                                     Spacer()
                                     Text("\(Int(combined * 100))%").font(.caption2).monospacedDigit()
                                     Image(systemName: isChannelsExpanded ? "chevron.up" : "chevron.down")
@@ -3457,11 +3457,11 @@ struct StashSyncSheet: View {
                         // Individual channels
                         if isChannelsExpanded {
                             VStack(spacing: 10) {
-                                signalBar(label: "Hip / Body", icon: "figure.walk",         value: videoManager.hipIntensity,    color: appearanceManager.tintColor)
-                                signalBar(label: "Pelvis",     icon: "figure.stand",         value: videoManager.pelvisIntensity, color: .orange)
-                                signalBar(label: "Head / Neck",icon: "person.bust",          value: videoManager.headIntensity,   color: .blue)
-                                signalBar(label: "Wrist / Arm",icon: "hand.raised",          value: videoManager.wristIntensity,  color: .purple)
-                                signalBar(label: "Horizontal", icon: "arrow.left.and.right", value: videoManager.horzIntensity,   color: .green)
+                                signalBar(label: tr("hip_body"), icon: "figure.walk",         value: videoManager.hipIntensity,    color: appearanceManager.tintColor)
+                                signalBar(label: tr("pelvis"),     icon: "figure.stand",         value: videoManager.pelvisIntensity, color: .orange)
+                                signalBar(label: tr("head_neck"),icon: "person.bust",          value: videoManager.headIntensity,   color: .blue)
+                                signalBar(label: tr("wrist_arm"),icon: "hand.raised",          value: videoManager.wristIntensity,  color: .purple)
+                                signalBar(label: tr("horizontal"), icon: "arrow.left.and.right", value: videoManager.horzIntensity,   color: .green)
                             }
                             .transition(.opacity.combined(with: .move(edge: .top)))
                         }
@@ -3471,10 +3471,10 @@ struct StashSyncSheet: View {
                 }
                 } // showVideoAnalysis
                 Section {
-                    stashyScrollingSectionHeader("Analysis Sensitivity")
+                    stashyScrollingSectionHeader(tr("analysis_sensitivity"))
                     VStack(alignment: .leading, spacing: 4) {
                         HStack {
-                            Text("Motion Analysis")
+                            Text(tr("motion_analysis"))
                             Spacer()
                             Text("\(Int(videoManager.sensitivity * 50))%").foregroundColor(.secondary)
                         }
@@ -3484,10 +3484,10 @@ struct StashSyncSheet: View {
                     .stashyGroupedSettingsRow()
                 }
                 Section {
-                    stashyScrollingSectionHeader("Optical Flow Smoothing")
+                    stashyScrollingSectionHeader(tr("optical_flow_smoothing"))
                     VStack(alignment: .leading, spacing: 4) {
                         HStack {
-                            Text("Smoothing")
+                            Text(tr("smoothing"))
                             Spacer()
                             Text("\(Int(videoManager.smoothing * 100))%").foregroundColor(.secondary)
                         }
@@ -3505,7 +3505,7 @@ struct StashSyncSheet: View {
                 }
                 dismiss()
             }) {
-                StashyChromeTrailingTextButton(title: "Done") {
+                StashyChromeTrailingTextButton(title: tr("action_done")) {
                     if handyManager.isStashSyncMode || buttplugManager.isStashSyncMode || loveSpouseManager.isStashSyncMode {
                         stashSync.isActive = true
                     } else {

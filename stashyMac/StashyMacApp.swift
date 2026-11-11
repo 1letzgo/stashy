@@ -10,6 +10,9 @@ struct StashyMacApp: App {
     @StateObject private var navigationCoordinator = NavigationCoordinator()
 
     init() {
+        // English by default (beta); a language picked on iPhone / Mac applies from the next start.
+        AppLanguage.chooseDeviceLanguageOnFirstStart()
+        AppLanguage.applyPreferredLanguages()
         // Entitlements (lifetime IAP, paid-app grandfathering) must sync at launch,
         // not only when Settings is opened.
         _ = StoreManager.shared
@@ -23,7 +26,9 @@ struct StashyMacApp: App {
 
     var body: some SwiftUI.Scene {
         WindowGroup {
-            MainTabView()
+            LanguageRefreshing {
+                MainTabView()
+            }
                 .macFullScreenCoverHost()
                 .environmentObject(navigationCoordinator)
                 .macIOSLikeControlStyles()
@@ -67,14 +72,14 @@ private struct StashyMacCommands: Commands {
 
     var body: some Commands {
         CommandGroup(replacing: .appSettings) {
-            Button("Settings…") { coordinator.selectedTab = .settings }
+            Button(tr("settings_menu")) { coordinator.selectedTab = .settings }
                 .keyboardShortcut(",")
         }
         CommandGroup(after: .textEditing) {
-            Button("Search") { coordinator.selectedTab = .search }
+            Button(tr("search")) { coordinator.selectedTab = .search }
                 .keyboardShortcut("f")
         }
-        CommandMenu("Go") {
+        CommandMenu(tr("action_go")) {
             ForEach(Array(tabManager.visibleTabs.enumerated()), id: \.element) { index, tab in
                 if index < 9 {
                     Button(tab.title) { coordinator.selectedTab = tab }

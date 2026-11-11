@@ -1,5 +1,7 @@
 package de.letzgo.stashy.ui.tools.aitags
 
+import de.letzgo.stashy.R
+import de.letzgo.stashy.tr
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -57,9 +59,9 @@ fun ForgottenFavoritesSettingsView() {
                 item {
                     GroupedCard {
                         SettingsRow(
-                            if (!isUnlocked) "Forgotten Favorites requires stashy+"
-                            else if (engine.hasStatistics) "Forgotten Favorites is off. Turn it on in Recommendations to show it on Home."
-                            else "Turn on Tag suggestions or Similar scenes to show Forgotten Favorites on Home.",
+                            if (!isUnlocked) tr(R.string.forgotten_favorites_requires_stashy_plus)
+                            else if (engine.hasStatistics) tr(R.string.hint_forgotten_favorites_is_off_turn)
+                            else tr(R.string.hint_turn_on_tag_suggestions_or_similar),
                             icon = if (!isUnlocked) SF.lock else Icons.Outlined.Info, iconTint = p.secondaryText, titleColor = p.secondaryText,
                         )
                     }
@@ -68,18 +70,18 @@ fun ForgottenFavoritesSettingsView() {
             }
 
             item {
-                SettingsSectionHeader("Forgotten Favorites", isBeta = true)
+                SettingsSectionHeader(tr(R.string.forgotten_favorites), isBeta = true)
                 GroupedCard {
-                    SettingsRow("Status", icon = SF.arrowClockwise) {
+                    SettingsRow(tr(R.string.status), icon = SF.arrowClockwise) {
                         Text(statusText(), style = NativeType.bodyMedium, color = p.secondaryText)
                     }
                 }
-                SettingsSectionFooter("Favorites you have not played for a while.")
+                SettingsSectionFooter(tr(R.string.hint_favorites_you_have_not_played))
                 SectionSpacer()
             }
 
             item {
-                SettingsSectionHeader("Not played for")
+                SettingsSectionHeader(tr(R.string.not_played_for))
                 Box(Modifier.alpha(if (isUnlocked) 1f else 0.5f)) {
                     GroupedCard {
                         Box(Modifier.padding(horizontal = 16.dp, vertical = 12.dp)) {
@@ -93,18 +95,18 @@ fun ForgottenFavoritesSettingsView() {
             }
 
             item {
-                SettingsSectionHeader("Favorites")
+                SettingsSectionHeader(tr(R.string.favorites))
                 Box(Modifier.alpha(if (isUnlocked) 1f else 0.5f)) {
                     GroupedCard {
                         Column(Modifier.padding(horizontal = 16.dp, vertical = 12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                            Text("Ranked by", style = NativeType.bodyLarge, color = p.text)
+                            Text(tr(R.string.ranked_by), style = NativeType.bodyLarge, color = p.text)
                             Segmented(ForgottenFavoritesRanking.entries, engine.ranking, { it.title }) {
                                 if (isUnlocked) engine.updateRanking(it)
                             }
                         }
                         RowDivider(16.dp)
                         Column(Modifier.padding(horizontal = 16.dp, vertical = 12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                            Text("Top", style = NativeType.bodyLarge, color = p.text)
+                            Text(tr(R.string.top), style = NativeType.bodyLarge, color = p.text)
                             Segmented(ForgottenFavorites.poolChoices, engine.pool, { "$it" }) {
                                 if (isUnlocked) engine.updatePool(it)
                             }
@@ -117,7 +119,7 @@ fun ForgottenFavoritesSettingsView() {
             item {
                 GroupedCard {
                     SettingsRow(
-                        "Reset to defaults", icon = Icons.AutoMirrored.Filled.Undo,
+                        tr(R.string.action_reset_to_defaults), icon = Icons.AutoMirrored.Filled.Undo,
                         iconTint = if (engine.hasCustomSettings) StashyColors.systemRed else p.secondaryText,
                         titleColor = if (engine.hasCustomSettings) StashyColors.systemRed else p.secondaryText,
                         enabled = isUnlocked && engine.hasCustomSettings, onClick = { engine.resetSettings() },
@@ -126,7 +128,7 @@ fun ForgottenFavoritesSettingsView() {
             }
         }
 
-        NativeTopBar("Forgotten Favorites")
+        NativeTopBar(tr(R.string.forgotten_favorites))
     }
 }
 
@@ -139,9 +141,9 @@ private fun daysTitle(days: Int): String = when (days) {
 private fun statusText(): String {
     val engine = ForgottenFavorites
     return when (engine.state) {
-        ForgottenFavoritesState.Idle -> "Not built yet"
-        ForgottenFavoritesState.Loading -> "Looking…"
-        ForgottenFavoritesState.Preparing -> "Waiting for statistics"
+        ForgottenFavoritesState.Idle -> tr(R.string.not_built_yet)
+        ForgottenFavoritesState.Loading -> tr(R.string.looking_menu)
+        ForgottenFavoritesState.Preparing -> tr(R.string.waiting_for_statistics)
         ForgottenFavoritesState.Ready -> "${engine.items.size} of ${engine.poolCount} favorites"
     }
 }

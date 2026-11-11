@@ -2,6 +2,8 @@
 
 package de.letzgo.stashy.ui.player
 
+import de.letzgo.stashy.R
+import de.letzgo.stashy.tr
 import android.content.Context
 import android.graphics.Bitmap
 import android.net.Uri
@@ -388,12 +390,12 @@ class StashPlayer(context: Context, val role: Role = Role.Main) {
                 when (group.type) {
                     C.TRACK_TYPE_AUDIO -> {
                         val parts = listOfNotNull(f.label ?: f.language?.uppercase(), f.sampleMimeType?.substringAfter('/')?.uppercase(), f.channelCount.takeIf { it > 0 }?.let { "${it}ch" })
-                        audio += PlayerTrack(id, parts.joinToString(" · ").ifEmpty { "Audio" }, f.language)
+                        audio += PlayerTrack(id, parts.joinToString(" · ").ifEmpty { tr(R.string.audio) }, f.language)
                         if (group.isTrackSelected(i)) activeAudio = id
                     }
                     C.TRACK_TYPE_TEXT -> {
-                        var name = f.label ?: f.language?.uppercase() ?: "Subtitles"
-                        if (f.selectionFlags and C.SELECTION_FLAG_FORCED != 0) name += " · Forced"
+                        var name = f.label ?: f.language?.uppercase() ?: tr(R.string.subtitles)
+                        if (f.selectionFlags and C.SELECTION_FLAG_FORCED != 0) name += tr(R.string.forced)
                         embeddedText += PlayerTrack(id, name, f.language)
                         if (group.isTrackSelected(i)) activeText = id
                     }
@@ -438,7 +440,7 @@ class StashPlayer(context: Context, val role: Role = Role.Main) {
 
     /** iOS: `addExternalSubtitleTrack` — a server caption (Stash `paths.caption?lang=&type=`). */
     fun addExternalSubtitleTrack(url: String, name: String, language: String?) {
-        val track = PlayerTrack("ext:${externalCaptions.size}", "$name · External", language, isExternal = true)
+        val track = PlayerTrack("ext:${externalCaptions.size}", tr(R.string.arg_external, name), language, isExternal = true)
         externalCaptions = externalCaptions + ExternalCaption(track, url)
         subtitleTracks = subtitleTracks.filterNot { it.isExternal } + externalCaptions.map { it.track }
         autoSelectSubtitleIfNeeded()
@@ -547,7 +549,7 @@ class StashPlayer(context: Context, val role: Role = Role.Main) {
             val http = generateSequence<Throwable>(error) { it.cause }
                 .filterIsInstance<androidx.media3.datasource.HttpDataSource.InvalidResponseCodeException>().firstOrNull()
             val detail = when {
-                http != null -> "The server answered HTTP ${http.responseCode}${http.responseMessage?.takeIf { it.isNotBlank() }?.let { " ($it)" } ?: ""}."
+                http != null -> tr(R.string.server_answered_http_arg_arg, http.responseCode, http.responseMessage?.takeIf { it.isNotBlank() }?.let { " ($it)" } ?: "")
                 else -> generateSequence(error.cause) { it.cause }.mapNotNull { it.localizedMessage?.takeIf { m -> m.isNotBlank() } }.firstOrNull()
             }
             return playbackErrorText(error.errorCode, error.localizedMessage, detail)
@@ -557,20 +559,20 @@ class StashPlayer(context: Context, val role: Role = Role.Main) {
         fun playbackErrorText(code: Int, message: String?, detail: String?): String {
             val headline = when (code) {
                 PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_FAILED,
-                PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_TIMEOUT -> "Could not reach the server."
-                PlaybackException.ERROR_CODE_IO_BAD_HTTP_STATUS -> "The server refused the video."
-                PlaybackException.ERROR_CODE_IO_FILE_NOT_FOUND -> "The video file was not found."
-                PlaybackException.ERROR_CODE_IO_NO_PERMISSION -> "No permission to read the video."
+                PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_TIMEOUT -> tr(R.string.error_reach_server)
+                PlaybackException.ERROR_CODE_IO_BAD_HTTP_STATUS -> tr(R.string.server_refused_video)
+                PlaybackException.ERROR_CODE_IO_FILE_NOT_FOUND -> tr(R.string.hint_video_file_was_not_found)
+                PlaybackException.ERROR_CODE_IO_NO_PERMISSION -> tr(R.string.empty_permission_to_read_video)
                 PlaybackException.ERROR_CODE_PARSING_CONTAINER_UNSUPPORTED,
-                PlaybackException.ERROR_CODE_PARSING_CONTAINER_MALFORMED -> "The file's container can't be read on this device."
+                PlaybackException.ERROR_CODE_PARSING_CONTAINER_MALFORMED -> tr(R.string.hint_files_container_cant_be_read)
                 PlaybackException.ERROR_CODE_DECODER_INIT_FAILED,
                 PlaybackException.ERROR_CODE_DECODER_QUERY_FAILED,
                 PlaybackException.ERROR_CODE_DECODING_FAILED,
                 PlaybackException.ERROR_CODE_DECODING_FORMAT_EXCEEDS_CAPABILITIES,
-                PlaybackException.ERROR_CODE_DECODING_FORMAT_UNSUPPORTED -> "This device can't decode the video."
+                PlaybackException.ERROR_CODE_DECODING_FORMAT_UNSUPPORTED -> tr(R.string.hint_this_device_cant_decode_video)
                 PlaybackException.ERROR_CODE_AUDIO_TRACK_INIT_FAILED,
-                PlaybackException.ERROR_CODE_AUDIO_TRACK_WRITE_FAILED -> "The audio output failed."
-                else -> message?.takeIf { it.isNotBlank() } ?: "Playback failed."
+                PlaybackException.ERROR_CODE_AUDIO_TRACK_WRITE_FAILED -> tr(R.string.error_audio_output)
+                else -> message?.takeIf { it.isNotBlank() } ?: tr(R.string.error_playback)
             }
             val extra = detail?.trim()?.takeIf { it.isNotEmpty() && it != headline && it != message }
             return if (extra != null) "$headline\n$extra" else headline

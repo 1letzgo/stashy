@@ -35,13 +35,13 @@ struct DashboardSettingsView: View {
     var body: some View {
         List {
             Section {
-                stashyScrollingSectionHeader("Dashboard")
+                stashyScrollingSectionHeader(tr("dashboard"))
                 dashboardCard
                     .stashySettingsCardRow()
             }
 
             Section {
-                stashyScrollingSectionHeader("Home Tabs")
+                stashyScrollingSectionHeader(tr("home_tabs"))
                 ForEach(catalogTabs) { tab in
                     catalogTabCard(tab)
                         .stashySettingsCardRow()
@@ -56,7 +56,7 @@ struct DashboardSettingsView: View {
             }
 
             Section {
-                stashyScrollingSectionHeader("Visible Dashboard Rows")
+                stashyScrollingSectionHeader(tr("visible_dashboard_rows"))
                 ForEach(Array(visibleHomeRows.enumerated()), id: \.element.id) { index, row in
                     homeRowToggle(row)
                         .stashyGroupedBlockRow(index: index, count: visibleHomeRows.count + 1)
@@ -66,7 +66,7 @@ struct DashboardSettingsView: View {
                 }
                 // Tap gesture instead of a Button: a Button in a themed list row in edit mode
                 // did not reliably register the tap.
-                Label("Add Row", systemImage: "plus.circle.fill")
+                Label(tr("action_add_row"), systemImage: "plus.circle.fill")
                     .foregroundColor(appearanceManager.tintColor)
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .contentShape(Rectangle())
@@ -78,9 +78,9 @@ struct DashboardSettingsView: View {
 
             if stashyPlus.isUnlocked {
                 Section {
-                    stashyScrollingSectionHeader("Channels")
+                    stashyScrollingSectionHeader(tr("channels"))
                     if channelSettingItems.isEmpty {
-                        Text(viewModel.isLoadingSavedFilters ? "Loading filters…" : "No saved scene or image filters")
+                        Text(viewModel.isLoadingSavedFilters ? tr("loading_filters") : tr("empty_saved_scene_or_image_filters"))
                             .foregroundColor(.secondary)
                             .stashyGroupedBlockRow(index: 0, count: 1)
                             .moveDisabled(true)
@@ -111,7 +111,7 @@ struct DashboardSettingsView: View {
         .environment(\.editMode, .constant(.active))
         .deleteDisabled(true)
         .applyAppBackground()
-        .stashySettingsDetailChrome("Dashboard")
+        .stashySettingsDetailChrome(tr("dashboard"))
         .onAppear {
             viewModel.fetchSavedFilters { _ in
                 tabManager.syncHomeChannelItems(with: Array(viewModel.savedFilters.values))
@@ -125,17 +125,17 @@ struct DashboardSettingsView: View {
                 .presentationDragIndicator(.visible)
                 .presentationBackground(Color.appBackground)
         }
-        .alert("Remove Row", isPresented: Binding(
+        .alert(tr("action_remove_row"), isPresented: Binding(
             get: { rowToRemove != nil },
             set: { if !$0 { rowToRemove = nil } }
         )) {
-            Button("Remove", role: .destructive) {
+            Button(tr("action_remove"), role: .destructive) {
                 if let row = rowToRemove { tabManager.removeCustomHomeRows(ids: [row.id]) }
                 rowToRemove = nil
             }
-            Button("Cancel", role: .cancel) { rowToRemove = nil }
+            Button(tr("action_cancel"), role: .cancel) { rowToRemove = nil }
         } message: {
-            Text("Removes \"\(rowToRemove?.title ?? "")\" from the dashboard. The saved filter itself stays on the server.")
+            Text(tr("hint_removes_arg_from_dashboard_saved", rowToRemove?.title ?? ""))
         }
     }
 
@@ -169,7 +169,7 @@ struct DashboardSettingsView: View {
                     .frame(width: 32, height: 32)
                     .contentShape(Rectangle())
                     .onTapGesture { rowToRemove = row }
-                    .accessibilityLabel("Remove Row")
+                    .accessibilityLabel(tr("action_remove_row"))
                     .accessibilityAddTraits(.isButton)
             }
         }
@@ -178,10 +178,10 @@ struct DashboardSettingsView: View {
     private func customRowSubtitle(_ row: HomeRowConfig) -> String {
         let kind: String
         switch row.filterMode {
-        case .performers: kind = "Performers"
-        case .studios: kind = "Studios"
-        case .galleries: kind = "Galleries"
-        default: kind = "Scenes"
+        case .performers: kind = tr("performers")
+        case .studios: kind = tr("studios")
+        case .galleries: kind = tr("galleries")
+        default: kind = tr("scenes")
         }
         if let id = row.filterId, let name = viewModel.savedFilters[id]?.name {
             return "\(kind) · \(name)"
@@ -231,17 +231,17 @@ struct DashboardSettingsView: View {
     }
 
     private func channelTitle(for item: HomeChannelItemConfig) -> String {
-        viewModel.savedFilters[item.filterId]?.name ?? "Filter"
+        viewModel.savedFilters[item.filterId]?.name ?? tr("filter")
     }
 
     private var dashboardCard: some View {
         VStack(alignment: .leading, spacing: 0) {
             HStack {
-                Label("Dashboard", systemImage: "house.fill")
+                Label(tr("dashboard"), systemImage: "house.fill")
                     .font(.subheadline.weight(.semibold))
                     .foregroundColor(appearanceManager.tintColor)
                 Spacer()
-                Text("Always Visible")
+                Text(tr("always_visible"))
                     .font(.caption)
                     .foregroundColor(.secondary)
             }
@@ -249,11 +249,11 @@ struct DashboardSettingsView: View {
             Divider()
                 .padding(.vertical, 8)
 
-            settingRow("Default Filter") {
+            settingRow(tr("default_filter")) {
                 CatalogDefaultFilterMenu(tab: .dashboard, viewModel: viewModel)
             }
 
-            settingRow("Hero Background") {
+            settingRow(tr("hero_background")) {
                 Toggle("", isOn: Binding(
                     get: { tabManager.showDashboardHeroBackground },
                     set: { tabManager.showDashboardHeroBackground = $0 }
@@ -263,7 +263,7 @@ struct DashboardSettingsView: View {
             }
             .padding(.top, 4)
 
-            settingRow("Hero Autoplay") {
+            settingRow(tr("hero_autoplay")) {
                 Toggle("", isOn: Binding(
                     get: { tabManager.dashboardHeroAutoplay },
                     set: { tabManager.dashboardHeroAutoplay = $0 }
@@ -273,7 +273,7 @@ struct DashboardSettingsView: View {
             }
             .padding(.top, 4)
 
-            settingRow("Compact Statistics") {
+            settingRow(tr("compact_statistics")) {
                 Toggle("", isOn: Binding(
                     get: { tabManager.useCompactStatistics },
                     set: { tabManager.useCompactStatistics = $0 }
@@ -283,7 +283,7 @@ struct DashboardSettingsView: View {
             }
             .padding(.top, 4)
 
-            settingRow("Colored Statistics") {
+            settingRow(tr("colored_statistics")) {
                 Toggle("", isOn: Binding(
                     get: { tabManager.useColoredStatistics },
                     set: { tabManager.useColoredStatistics = $0 }
@@ -321,7 +321,7 @@ struct DashboardSettingsView: View {
                 if isMagazineEnabled {
                     Divider()
                         .padding(.vertical, 8)
-                    settingRow("Default Filter") {
+                    settingRow(tr("default_filter")) {
                         MagazineDefaultFilterMenu(viewModel: viewModel)
                     }
                 }
@@ -330,21 +330,21 @@ struct DashboardSettingsView: View {
                     .padding(.vertical, 8)
 
                 if CatalogCardColumnScope.from(appTab: tab.id) != nil {
-                    settingRow("Display") {
+                    settingRow(tr("display")) {
                         CatalogCardColumnsMenu(tab: tab.id)
                     }
                     .padding(.bottom, 4)
                 }
 
                 if tab.id == .images {
-                    settingRow("Autoplay") {
+                    settingRow(tr("autoplay")) {
                         ImagesFeedAutoplayToggle()
                     }
                     .padding(.bottom, 4)
                 }
 
                 if tab.id == .scenes {
-                    settingRow("Studio Logos") {
+                    settingRow(tr("studio_logos")) {
                         Toggle("", isOn: Binding(
                             get: { tabManager.sceneCardsShowStudioLogo },
                             set: { tabManager.sceneCardsShowStudioLogo = $0 }
@@ -356,17 +356,17 @@ struct DashboardSettingsView: View {
                 }
 
                 if tab.id == .studios, StashServerCapabilities.supports032 {
-                    settingRow("Counts incl. Sub-Studios") {
+                    settingRow(tr("counts_incl_sub_studios")) {
                         StudioCountsSubStudiosToggle()
                     }
                     .padding(.bottom, 4)
                 }
 
-                settingRow("Default Sort") {
+                settingRow(tr("default_sort")) {
                     CatalogDefaultSortMenu(tab: tab.id)
                 }
 
-                settingRow("Default Filter") {
+                settingRow(tr("default_filter")) {
                     CatalogDefaultFilterMenu(tab: tab.id, viewModel: viewModel)
                 }
                 .padding(.top, 4)
@@ -379,7 +379,7 @@ struct DashboardSettingsView: View {
                 }
 
                 if tab.id == .galleries {
-                    settingRow("Opened Gallery") {
+                    settingRow(tr("opened_gallery")) {
                         CatalogCardColumnsMenu(scope: .openedGallery)
                     }
                     .padding(.top, 4)
@@ -418,9 +418,11 @@ private struct DashboardAddCustomRowSheet: View {
     /// The name last put into `title` automatically; a title the user changed is left alone.
     @State private var autoTitle = ""
 
-    private static let modes: [(mode: StashDBViewModel.FilterMode, title: String)] = [
-        (.scenes, "Scenes"), (.performers, "Performers"), (.studios, "Studios"), (.galleries, "Galleries")
+    private static var modes: [(mode: StashDBViewModel.FilterMode, title: String)] {
+[
+        (.scenes, tr("scenes")), (.performers, tr("performers")), (.studios, tr("studios")), (.galleries, tr("galleries"))
     ]
+    }
 
     private var filters: [StashDBViewModel.SavedFilter] {
         viewModel.savedFilters.values
@@ -469,10 +471,10 @@ private struct DashboardAddCustomRowSheet: View {
         NavigationStack {
             List {
                 Section {
-                    stashyScrollingSectionHeader("Build From")
-                    Picker("Build From", selection: $source) {
-                        Text("Filter").tag(Source.filter)
-                        Text("Sort").tag(Source.sort)
+                    stashyScrollingSectionHeader(tr("build_from"))
+                    Picker(tr("build_from"), selection: $source) {
+                        Text(tr("filter")).tag(Source.filter)
+                        Text(tr("action_sort")).tag(Source.sort)
                     }
                     .pickerStyle(.segmented)
                     .labelsHidden()
@@ -480,8 +482,8 @@ private struct DashboardAddCustomRowSheet: View {
                 }
 
                 Section {
-                    stashyScrollingSectionHeader("Kind")
-                    Picker("Kind", selection: $mode) {
+                    stashyScrollingSectionHeader(tr("kind"))
+                    Picker(tr("kind"), selection: $mode) {
                         ForEach(Self.modes, id: \.mode) { Text($0.title).tag($0.mode) }
                     }
                     .pickerStyle(.segmented)
@@ -491,12 +493,12 @@ private struct DashboardAddCustomRowSheet: View {
 
                 if source == .filter {
                     Section {
-                        stashyScrollingSectionHeader("Saved Filter")
+                        stashyScrollingSectionHeader(tr("saved_filter"))
                         let list = filters
                         if list.isEmpty {
                             Text(viewModel.isLoadingSavedFilters
-                                 ? "Loading filters…"
-                                 : "No saved filters of this kind yet. Create one in the list's filter sheet with Save.")
+                                 ? tr("loading_filters")
+                                 : tr("hint_no_saved_filters_of_this"))
                                 .foregroundColor(.secondary)
                                 .stashyGroupedBlockRow(index: 0, count: 1)
                         } else {
@@ -508,7 +510,7 @@ private struct DashboardAddCustomRowSheet: View {
                     }
                 } else {
                     Section {
-                        stashyScrollingSectionHeader("Sort")
+                        stashyScrollingSectionHeader(tr("action_sort"))
                         let list = sortOptions
                         ForEach(Array(list.enumerated()), id: \.element.raw) { index, option in
                             checkRow(option.name, selected: selectedSortRaw == option.raw,
@@ -518,14 +520,14 @@ private struct DashboardAddCustomRowSheet: View {
                 }
 
                 Section {
-                    stashyScrollingSectionHeader("Title")
-                    TextField("Title", text: $title)
+                    stashyScrollingSectionHeader(tr("title"))
+                    TextField(tr("title"), text: $title)
                         .stashyGroupedBlockRow(index: 0, count: 1)
                 }
 
                 Section {
                     Button(action: add) {
-                        Text("Add")
+                        Text(tr("action_add"))
                             .font(.headline)
                             .foregroundColor(Color.onAppTint)
                             .frame(maxWidth: .infinity, minHeight: 48)
@@ -542,7 +544,7 @@ private struct DashboardAddCustomRowSheet: View {
             }
             .stashySettingsList()
             .applyAppBackground()
-            .stashyModalSheetChrome("Add Row", onBack: { dismiss() })
+            .stashyModalSheetChrome(tr("action_add_row"), onBack: { dismiss() })
         }
         .onChange(of: mode) { _, _ in clearSelection() }
         .onChange(of: source) { _, _ in clearSelection() }

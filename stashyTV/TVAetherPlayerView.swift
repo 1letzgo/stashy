@@ -450,7 +450,7 @@ private struct TVAetherPlayerContent<Panel: View>: View {
                 }
 
                 HStack(alignment: .firstTextBaseline, spacing: 16) {
-                    Text(title.isEmpty ? "Untitled Scene" : title)
+                    Text(title.isEmpty ? tr("untitled_scene") : title)
                         .font(.system(size: 34, weight: .bold))
                         .foregroundStyle(.white)
                         .lineLimit(1)
@@ -462,7 +462,7 @@ private struct TVAetherPlayerContent<Panel: View>: View {
                     }
                     Spacer()
                     if engine.isUsingTranscodeFallback {
-                        Text("Transcode")
+                        Text(tr("transcode"))
                             .font(.system(size: 20, weight: .semibold))
                             .foregroundStyle(.white.opacity(0.8))
                             .padding(.horizontal, 14)
@@ -500,12 +500,12 @@ private struct TVAetherPlayerContent<Panel: View>: View {
                     if canGoPrevious || canGoNext {
                         HStack(spacing: 20) {
                             if canGoPrevious {
-                                Label("Hold ▲ Prev", systemImage: "backward.end.fill")
+                                Label(tr("hold_prev"), systemImage: "backward.end.fill")
                             }
                             if canGoNext {
-                                Label("Hold ▼ Next", systemImage: "forward.end.fill")
+                                Label(tr("hold_next"), systemImage: "forward.end.fill")
                             }
-                            Label("▼ Options", systemImage: "chevron.down")
+                            Label(("▼ " + tr("options")), systemImage: "chevron.down")
                         }
                         .font(.system(size: 20))
                         .foregroundStyle(.white.opacity(0.5))
@@ -557,7 +557,7 @@ private struct TVAetherPlayerContent<Panel: View>: View {
                 if canGoPrevious || canGoNext {
                     HStack(spacing: 24) {
                         if canGoPrevious {
-                            panelButton(title: "Previous",
+                            panelButton(title: tr("previous"),
                                         icon: "backward.end.fill",
                                         focusTarget: .nav) {
                                 closePanel()
@@ -565,7 +565,7 @@ private struct TVAetherPlayerContent<Panel: View>: View {
                             }
                         }
                         if canGoNext {
-                            panelButton(title: "Next",
+                            panelButton(title: tr("next"),
                                         icon: "forward.end.fill",
                                         focusTarget: canGoPrevious ? nil : .nav) {
                                 closePanel()
@@ -587,7 +587,7 @@ private struct TVAetherPlayerContent<Panel: View>: View {
                 }
 
                 if !engine.subtitleTracks.isEmpty {
-                    trackRow(heading: "Subtitles",
+                    trackRow(heading: tr("subtitles"),
                              tracks: engine.subtitleTracks,
                              activeIndex: engine.activeSubtitleTrackIndex,
                              allowsOff: true,
@@ -667,7 +667,7 @@ private struct TVAetherPlayerContent<Panel: View>: View {
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 18) {
                     if allowsOff {
-                        panelButton(title: activeIndex == nil ? "✓ Off" : "Off",
+                        panelButton(title: activeIndex == nil ? ("✓ " + tr("off")) : tr("off"),
                                     icon: "captions.bubble",
                                     focusTarget: focusTarget) {
                             select(nil)
@@ -692,7 +692,7 @@ private struct TVAetherPlayerContent<Panel: View>: View {
         let cap = engine.maxNativeRate
         let options = Self.speedOptions.filter { $0 <= cap + 0.001 }
         return VStack(alignment: .leading, spacing: 12) {
-            Text("Speed")
+            Text(tr("speed"))
                 .font(.system(size: 22, weight: .bold))
                 .foregroundStyle(.white.opacity(0.6))
             ScrollView(.horizontal, showsIndicators: false) {
@@ -1018,7 +1018,7 @@ struct TVPlayerErrorView: View {
                 Image(systemName: "exclamationmark.triangle")
                     .font(.system(size: 80))
                     .foregroundStyle(.secondary)
-                Text("Unable to play this scene")
+                Text(tr("error_play_this_scene"))
                     .font(.title2)
                     .foregroundColor(.white.opacity(0.7))
                 if let error {
@@ -1028,7 +1028,7 @@ struct TVPlayerErrorView: View {
                         .multilineTextAlignment(.center)
                         .padding(.horizontal, 80)
                 }
-                Button("Close", action: onDismiss)
+                Button(tr("action_close"), action: onDismiss)
                     .font(.title3)
             }
         }

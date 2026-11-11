@@ -375,7 +375,7 @@ struct HomeRowView: View {
 
     @ViewBuilder
     private var emptyState: some View {
-        Text(store.missingFilter ? "Filter not found" : "No content found")
+        Text(store.missingFilter ? tr("action_filter_not_found") : tr("empty_content_found"))
             .font(.caption)
             .foregroundColor(.secondary)
             .padding(.horizontal, 12)

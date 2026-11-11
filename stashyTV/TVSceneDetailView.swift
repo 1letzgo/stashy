@@ -50,8 +50,8 @@ struct TVSceneDetailView: View {
             ScrollView(showsIndicators: false) {
                 if !hasValidActiveServer {
                     TVConnectionErrorView(
-                        title: "Server not reachable",
-                        subtitle: "Add a server in Settings.",
+                        title: tr("server_not_reachable"),
+                        subtitle: tr("action_add_server_in_settings"),
                         onRetry: retryConnectionAndReload
                     )
                 } else if isLoadingDetail {
@@ -102,7 +102,7 @@ struct TVSceneDetailView: View {
                     .padding(.bottom, 100)
                 } else if shouldShowConnectionFailure {
                     TVConnectionErrorView(
-                        title: "Server not reachable",
+                        title: tr("server_not_reachable"),
                         subtitle: viewModel.errorMessage,
                         onRetry: retryConnectionAndReload
                     )
@@ -135,7 +135,7 @@ struct TVSceneDetailView: View {
             let playing = similar.nowPlaying ?? sceneDetail
             TVAetherPlayerView(
                 model: playerModel,
-                title: playing?.displayTitle ?? "Untitled Scene",
+                title: playing?.displayTitle ?? tr("untitled_scene"),
                 subtitle: playing?.studio?.name ?? "",
                 posterURL: playing?.thumbnailURL,
                 onDisappear: {
@@ -176,10 +176,10 @@ struct TVSceneDetailView: View {
             Image(systemName: "exclamationmark.triangle")
                 .font(.system(size: 64))
                 .foregroundColor(.secondary)
-            Text("Failed to load scene details")
+            Text(tr("error_load_scene_details"))
                 .font(.title2)
                 .foregroundStyle(.secondary)
-            Button("Retry") {
+            Button(tr("action_retry")) {
                 retryConnectionAndReload()
             }
             .font(.title3)
@@ -291,7 +291,7 @@ struct TVSceneDetailView: View {
             }
 
             // 2. Main Title
-            Text(scene.displayTitle ?? "Untitled Scene")
+            Text(scene.displayTitle ?? tr("untitled_scene"))
                 .font(.system(size: 80, weight: .bold))
                 .foregroundColor(.white)
                 .lineLimit(2)
@@ -380,9 +380,9 @@ struct TVSceneDetailView: View {
                     heroActionLabel(
                         icon: isWaiting && !hasStream ? nil : (hasStream ? "play.fill" : "xmark.circle"),
                         title: {
-                            if isWaiting && !hasStream { return "Loading" }
-                            if hasStream { return hasProgress ? "Resume" : "Play" }
-                            return "No Stream"
+                            if isWaiting && !hasStream { return tr("loading") }
+                            if hasStream { return hasProgress ? tr("action_resume") : tr("action_play") }
+                            return tr("empty_stream")
                         }(),
                         showProgress: isWaiting && !hasStream
                     )
@@ -392,7 +392,7 @@ struct TVSceneDetailView: View {
                     heroCardButton(focus: .restart) {
                         startPlayback(for: scene, at: 0)
                     } label: {
-                        heroActionLabel(icon: "arrow.counterclockwise", title: "Restart")
+                        heroActionLabel(icon: "arrow.counterclockwise", title: tr("restart"))
                     }
                 }
 
@@ -424,9 +424,9 @@ struct TVSceneDetailView: View {
                 } label: {
                     heroActionLabel(icon: "star.fill", title: ratingLabel(for: scene))
                 }
-                .confirmationDialog("Rating", isPresented: $showingRatingPicker, titleVisibility: .visible) {
+                .confirmationDialog(tr("rating"), isPresented: $showingRatingPicker, titleVisibility: .visible) {
                     ForEach((0...5).reversed(), id: \.self) { stars in
-                        Button(stars == 0 ? "No Rating" : String(repeating: "★", count: stars)) {
+                        Button(stars == 0 ? tr("empty_rating") : String(repeating: "★", count: stars)) {
                             let value: Int? = (stars == 0) ? nil : (stars * 20)
                             viewModel.updateSceneRating(sceneId: scene.id, rating100: value) { _ in
                                 if let current = sceneDetail {
@@ -440,7 +440,7 @@ struct TVSceneDetailView: View {
                             }
                         }
                     }
-                    Button("Cancel", role: .cancel) {}
+                    Button(tr("action_cancel"), role: .cancel) {}
                 }
             }
             .padding(.top, 16)
@@ -496,7 +496,7 @@ struct TVSceneDetailView: View {
 
     private func ratingLabel(for scene: Scene) -> String {
         let stars = currentRatingStars(scene)
-        return stars == 0 ? "Rate" : "\(stars)/5"
+        return stars == 0 ? tr("action_rate") : "\(stars)/5"
     }
 
     private func resolutionString(for scene: Scene) -> String? {
@@ -535,7 +535,7 @@ struct TVSceneDetailView: View {
     @ViewBuilder
     private func markersSection(markers: [SceneMarker], scene: Scene) -> some View {
         VStack(alignment: .leading, spacing: 16) {
-            sectionHeading(icon: "bookmark.fill", title: "Markers", count: markers.count)
+            sectionHeading(icon: "bookmark.fill", title: tr("markers"), count: markers.count)
 
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 24) {
@@ -585,7 +585,7 @@ struct TVSceneDetailView: View {
                             }
                             .buttonStyle(.card)
                             
-                            Text(marker.title ?? "Untitled Marker")
+                            Text(marker.title ?? tr("untitled_marker"))
                                 .font(.callout)
                                 .fontWeight(.medium)
                                 .foregroundColor(.white.opacity(0.7))
@@ -605,7 +605,7 @@ struct TVSceneDetailView: View {
     @ViewBuilder
     private func performersSection(performers: [ScenePerformer]) -> some View {
         VStack(alignment: .leading, spacing: 16) {
-            sectionHeading(icon: "person.2.fill", title: "Performers", count: performers.count)
+            sectionHeading(icon: "person.2.fill", title: tr("performers"), count: performers.count)
 
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 30) {
@@ -636,7 +636,7 @@ struct TVSceneDetailView: View {
     @ViewBuilder
     private func studioSection(studio: SceneStudio) -> some View {
         VStack(alignment: .leading, spacing: 16) {
-            sectionHeading(icon: "building.2.fill", title: "Studio")
+            sectionHeading(icon: "building.2.fill", title: tr("studio"))
 
             TVNavButton(value: TVStudioLink(id: studio.id, name: studio.name)) {
                 VStack(alignment: .leading, spacing: 12) {
@@ -691,7 +691,7 @@ struct TVSceneDetailView: View {
     @ViewBuilder
     private func tagsSection(tags: [Tag]) -> some View {
         VStack(alignment: .leading, spacing: 16) {
-            sectionHeading(icon: "tag.fill", title: "Tags", count: tags.count)
+            sectionHeading(icon: "tag.fill", title: tr("tags"), count: tags.count)
 
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 30) {

@@ -145,14 +145,14 @@ struct MagazineReaderView: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
         } else if let errorMessage {
             ContentUnavailableView {
-                Label("Could not load pages", systemImage: "exclamationmark.triangle")
+                Label(tr("error_load_pages"), systemImage: "exclamationmark.triangle")
             } description: {
                 Text(errorMessage)
             } actions: {
-                Button("Try again") { Task { await loadPages() } }
+                Button(tr("action_try_again")) { Task { await loadPages() } }
             }
         } else if pages.isEmpty {
-            ContentUnavailableView("No pages", systemImage: "photo.on.rectangle")
+            ContentUnavailableView(tr("empty_pages"), systemImage: "photo.on.rectangle")
         } else {
             MagazinePager(count: spreadCount, index: $spreadIndex) { index in
                 MagazineSpreadView(
@@ -205,7 +205,7 @@ struct MagazineReaderView: View {
                 .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
-            .accessibilityLabel("Gallery details")
+            .accessibilityLabel(tr("gallery_details"))
 
             Spacer(minLength: 0)
 
@@ -223,7 +223,7 @@ struct MagazineReaderView: View {
                     .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
-                .accessibilityLabel("Go to page")
+                .accessibilityLabel(tr("action_go_to_page"))
                 .padding(.trailing, spreadIndex > 0 ? 0 : 16)
             }
 
@@ -235,7 +235,7 @@ struct MagazineReaderView: View {
                         .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
-                .accessibilityLabel("Reset position")
+                .accessibilityLabel(tr("action_reset_position"))
             }
         }
     }
@@ -243,7 +243,7 @@ struct MagazineReaderView: View {
     private var pageLabel: String {
         let first = spreadIndex * 2 + 1
         let last = min(first + 1, pages.count)
-        return first == last ? "Page \(first) / \(pages.count)" : "Page \(first)–\(last) / \(pages.count)"
+        return first == last ? tr("page_arg_arg", first, pages.count) : tr("page_arg_arg_arg", first, last, pages.count)
     }
 
     private func pagesOfSpread(_ index: Int) -> [StashImage] {
@@ -470,7 +470,7 @@ private struct MagazinePagePickerSheet: View {
                 }
             }
             .background(Color.appBackground.ignoresSafeArea())
-            .stashyModalSheetChrome("Go to page", onBack: { dismiss() })
+            .stashyModalSheetChrome(tr("action_go_to_page"), onBack: { dismiss() })
         }
         .presentationDetents([.medium, .large])
         .presentationDragIndicator(.visible)
@@ -485,12 +485,12 @@ private struct MagazinePagePickerSheet: View {
             Image(systemName: "number")
                 .font(.subheadline.weight(.semibold))
                 .foregroundColor(.secondary)
-            TextField("Page (1–\(pages.count))", text: $pageInput)
+            TextField(tr("page_1_arg", pages.count), text: $pageInput)
                 .font(.subheadline)
                 .keyboardType(.numberPad)
                 .onSubmit(goToEnteredPage)
             // The number pad has no return key.
-            CatalogFilterChip(title: "Go", isActive: enteredPage != nil, action: goToEnteredPage)
+            CatalogFilterChip(title: tr("action_go"), isActive: enteredPage != nil, action: goToEnteredPage)
                 .disabled(enteredPage == nil)
         }
         .padding(.horizontal, 12)
@@ -519,7 +519,7 @@ private struct MagazinePagePickerSheet: View {
                 .lineLimit(2)
                 .multilineTextAlignment(.leading)
             Spacer(minLength: 8)
-            Text("Page \(page + 1)")
+            Text(tr("page_arg", page + 1))
                 .font(.caption.monospacedDigit())
                 .foregroundColor(.secondary)
         }
@@ -539,7 +539,7 @@ private struct MagazinePagePickerSheet: View {
             .frame(width: 36, height: 50)
             .clipShape(RoundedRectangle(cornerRadius: 4))
 
-            Text("Page \(index + 1)")
+            Text(tr("page_arg", index + 1))
                 .font(.subheadline.weight(.medium).monospacedDigit())
             Spacer(minLength: 8)
         }
@@ -607,19 +607,19 @@ private struct MagazineDetailsSheet: View {
                             .font(.headline)
                         fact("Pages", "\(pageCount)")
                         if chapterCount > 0 { fact("Chapters", "\(chapterCount)") }
-                        if let studio = gallery.studio { fact("Studio", studio.name) }
-                        if let date = gallery.date, !date.isEmpty { fact("Date", date) }
+                        if let studio = gallery.studio { fact(tr("studio"), studio.name) }
+                        if let date = gallery.date, !date.isEmpty { fact(tr("date"), date) }
                         if let rating = gallery.rating100 {
-                            fact("Rating", String(format: "%g / 5", Double(rating) / 20))
+                            fact(tr("rating"), String(format: "%g / 5", Double(rating) / 20))
                         }
                     }
                     if let performers = gallery.performers, !performers.isEmpty {
-                        section("Performers") {
+                        section(tr("performers")) {
                             card { Text(performers.map(\.name).joined(separator: ", ")).font(.subheadline) }
                         }
                     }
                     if !tags.isEmpty {
-                        section("Tags") {
+                        section(tr("tags")) {
                             card {
                                 FlowLayout(spacing: 6) {
                                     ForEach(tags) { tag in
@@ -634,7 +634,7 @@ private struct MagazineDetailsSheet: View {
                         }
                     }
                     if let details = gallery.details, !details.isEmpty {
-                        section("Details") {
+                        section(tr("details")) {
                             card { Text(details).font(.subheadline) }
                         }
                     }
@@ -643,7 +643,7 @@ private struct MagazineDetailsSheet: View {
                 .padding(.bottom, 16)
             }
             .background(Color.appBackground.ignoresSafeArea())
-            .stashyModalSheetChrome("Details", onBack: { dismiss() })
+            .stashyModalSheetChrome(tr("details"), onBack: { dismiss() })
         }
         .presentationDetents([.medium, .large])
         .presentationDragIndicator(.visible)
@@ -800,7 +800,7 @@ private struct MagazineFullscreenView: View {
                         .contentShape(Capsule())
                     }
                     .buttonStyle(.plain)
-                    .accessibilityLabel("Go to page")
+                    .accessibilityLabel(tr("action_go_to_page"))
                 }
                 .padding(.horizontal, 12)
                 .transition(.opacity)

@@ -20,12 +20,12 @@ struct AcknowledgementsView: View {
 
     private let entries: [Entry] = [
         Entry(name: "AetherEngine",
-              license: "LGPL-3.0, with an App Store / DRM exception",
-              note: "Dynamically linked, so the library can be replaced by a modified version.",
+              license: tr("hint_lgpl_3_0_with_app"),
+              note: tr("hint_dynamically_linked_so_library_can"),
               urlString: "https://github.com/superuser404notfound/AetherEngine"),
         Entry(name: "FFmpeg",
-              license: "LGPL-2.1 or later",
-              note: "Dynamically linked, so relinking with a modified FFmpeg is possible.",
+              license: tr("lgpl_2_1_or_later"),
+              note: tr("hint_dynamically_linked_so_relinking_with"),
               urlString: "https://ffmpeg.org"),
         Entry(name: "libdovi (dovi_tool)",
               license: "MIT",
@@ -41,7 +41,19 @@ struct AcknowledgementsView: View {
               urlString: "https://github.com/swhitty/SwiftDraw")
     ]
 
-    private let footerText = "stashy uses the components above. Their licenses apply in addition to stashy's own terms."
+    /// Where the app's wording and translations come from.
+    private let translationEntries: [Entry] = [
+        Entry(name: "Stash",
+              license: "AGPL-3.0",
+              note: tr("hint_terms_follow_stashs_own_interface"),
+              urlString: "https://github.com/stashapp/stash"),
+        Entry(name: "Tolgee",
+              license: "Apache-2.0",
+              note: tr("translations_are_managed_with_tolgee"),
+              urlString: "https://tolgee.io")
+    ]
+
+    private let footerText = tr("hint_stashy_uses_components_above_their")
 
     var body: some View {
         #if os(tvOS)
@@ -54,22 +66,34 @@ struct AcknowledgementsView: View {
             } footer: {
                 Text(footerText)
             }
+            Section(tr("translations")) {
+                ForEach(translationEntries) { entry in
+                    row(for: entry)
+                }
+            }
         }
-        .navigationTitle("Acknowledgements")
+        .navigationTitle(tr("acknowledgements"))
         #else
         List {
             Section {
-                stashyScrollingSectionHeader("Components")
+                stashyScrollingSectionHeader(tr("components"))
                 ForEach(Array(entries.enumerated()), id: \.element.id) { index, entry in
                     row(for: entry)
                         .stashyGroupedBlockRow(index: index, count: entries.count)
                 }
                 stashyScrollingSectionFooter(footerText)
             }
+            Section {
+                stashyScrollingSectionHeader(tr("translations"))
+                ForEach(Array(translationEntries.enumerated()), id: \.element.id) { index, entry in
+                    row(for: entry)
+                        .stashyGroupedBlockRow(index: index, count: translationEntries.count)
+                }
+            }
         }
         .stashySettingsList()
         .applyAppBackground()
-        .stashySettingsDetailChrome("Acknowledgements")
+        .stashySettingsDetailChrome(tr("acknowledgements"))
         #endif
     }
 

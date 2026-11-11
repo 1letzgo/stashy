@@ -26,7 +26,7 @@ struct AddStudioToSceneSheet: View {
     var body: some View {
         NavigationView {
             Form {
-                Section(header: Text("Search Studio")) {
+                Section(header: Text(tr("search_studio"))) {
                     TextField("Search...", text: $searchText)
                     if isLoading {
                         HStack { Spacer(); ProgressView("Loading..."); Spacer() }.padding()
@@ -50,7 +50,7 @@ struct AddStudioToSceneSheet: View {
                             }
                         }
                         if filtered.count > 30 {
-                            Text("Type more to refine...").font(.caption).foregroundColor(.secondary)
+                            Text(tr("type_more_to_refine_menu")).font(.caption).foregroundColor(.secondary)
                         }
                         if !searchText.isEmpty && filtered.isEmpty {
                             Button {
@@ -58,7 +58,7 @@ struct AddStudioToSceneSheet: View {
                             } label: {
                                 HStack {
                                     Image(systemName: "plus.circle.fill")
-                                    Text("Create \"\(searchText)\"")
+                                    Text(tr("action_create_arg", searchText))
                                 }
                                 .foregroundColor(appearanceManager.tintColor)
                             }
@@ -70,8 +70,8 @@ struct AddStudioToSceneSheet: View {
             }
             .applyAppBackground()
             .scrollContentBackground(.hidden)
-            .stashyModalSheetChrome("Set Studio", onBack: { dismiss() }) {
-                StashyChromeTrailingTextButton(title: "Save", enabled: !isSaving, isBusy: isSaving) { save() }
+            .stashyModalSheetChrome(tr("action_set_studio"), onBack: { dismiss() }) {
+                StashyChromeTrailingTextButton(title: tr("action_save"), enabled: !isSaving, isBusy: isSaving) { save() }
             }
             .onAppear {
                 selectedId = currentStudio?.id ?? ""
@@ -96,7 +96,7 @@ struct AddStudioToSceneSheet: View {
                     selectedId = s.id
                     searchText = ""
                 } else {
-                    ToastManager.shared.show("Failed to create studio", icon: "exclamationmark.triangle", style: .error)
+                    ToastManager.shared.show(tr("error_create_studio"), icon: "exclamationmark.triangle", style: .error)
                 }
             }
         }
@@ -120,7 +120,7 @@ struct AddStudioToSceneSheet: View {
                     }
                     dismiss()
                 } else {
-                    ToastManager.shared.show("Failed to update studio", icon: "exclamationmark.triangle", style: .error)
+                    ToastManager.shared.show(tr("error_update_studio"), icon: "exclamationmark.triangle", style: .error)
                 }
             }
         }

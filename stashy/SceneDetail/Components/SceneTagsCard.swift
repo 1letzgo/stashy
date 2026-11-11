@@ -17,7 +17,7 @@ struct SceneTagsCard: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack {
-                Text("Tags")
+                Text(tr("tags"))
                     .font(.title3)
                     .fontWeight(.semibold)
                 Spacer()
@@ -86,7 +86,7 @@ struct SceneTagsCard: View {
                 .padding(.horizontal, 12)
                 .padding(.bottom, 12)
             } else {
-                Text("No tags assigned")
+                Text(tr("empty_tags_assigned"))
                     .font(.subheadline)
                     .foregroundColor(.secondary)
                     .padding(.horizontal, 12)
@@ -139,7 +139,7 @@ struct AddTagToSceneSheet: View {
     var body: some View {
         NavigationView {
             Form {
-                Section(header: Text("Search Tags")) {
+                Section(header: Text(tr("search_tags"))) {
                     TextField("Search...", text: $searchText)
                     if isLoading {
                         HStack { Spacer(); ProgressView("Loading..."); Spacer() }.padding()
@@ -166,7 +166,7 @@ struct AddTagToSceneSheet: View {
                             }
                         }
                         if filtered.count > 30 {
-                            Text("Type more to refine...").font(.caption).foregroundColor(.secondary)
+                            Text(tr("type_more_to_refine_menu")).font(.caption).foregroundColor(.secondary)
                         }
                         if !searchText.isEmpty && filtered.isEmpty
                             && !pinned.contains(where: { $0.name.localizedCaseInsensitiveContains(searchText) }) {
@@ -175,7 +175,7 @@ struct AddTagToSceneSheet: View {
                             } label: {
                                 HStack {
                                     Image(systemName: "plus.circle.fill")
-                                    Text("Create \"\(searchText)\"")
+                                    Text(tr("action_create_arg", searchText))
                                 }
                                 .foregroundColor(appearanceManager.tintColor)
                             }
@@ -187,8 +187,8 @@ struct AddTagToSceneSheet: View {
             }
             .applyAppBackground()
             .scrollContentBackground(.hidden)
-            .stashyModalSheetChrome("Edit Tags", onBack: { dismiss() }) {
-                StashyChromeTrailingTextButton(title: "Save", enabled: !isSaving, isBusy: isSaving) { save() }
+            .stashyModalSheetChrome(tr("action_edit_tags"), onBack: { dismiss() }) {
+                StashyChromeTrailingTextButton(title: tr("action_save"), enabled: !isSaving, isBusy: isSaving) { save() }
             }
             .onAppear {
                 selectedIds = Set(currentTags.map { $0.id })
@@ -218,7 +218,7 @@ struct AddTagToSceneSheet: View {
                     selectedIds.insert(t.id)
                     searchText = ""
                 } else {
-                    ToastManager.shared.show("Failed to create tag", icon: "exclamationmark.triangle", style: .error)
+                    ToastManager.shared.show(tr("error_create_tag"), icon: "exclamationmark.triangle", style: .error)
                 }
             }
         }
@@ -235,7 +235,7 @@ struct AddTagToSceneSheet: View {
                     onComplete(updated)
                     dismiss()
                 } else {
-                    ToastManager.shared.show("Failed to update tags", icon: "exclamationmark.triangle", style: .error)
+                    ToastManager.shared.show(tr("error_update_tags"), icon: "exclamationmark.triangle", style: .error)
                 }
             }
         }

@@ -13,7 +13,7 @@ struct SceneGroupsCard: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack {
-                Text("Groups")
+                Text(tr("groups"))
                     .font(.title3)
                     .fontWeight(.semibold)
                 Spacer()
@@ -31,7 +31,7 @@ struct SceneGroupsCard: View {
             .padding(.top, 8)
 
             if groups.isEmpty {
-                Text("No groups assigned")
+                Text(tr("empty_groups_assigned"))
                     .font(.subheadline)
                     .foregroundColor(.secondary)
                     .padding(.horizontal, 12)
@@ -149,7 +149,7 @@ struct AddGroupToSceneSheet: View {
     var body: some View {
         NavigationView {
             Form {
-                Section(header: Text("Search Groups")) {
+                Section(header: Text(tr("search_groups"))) {
                     TextField("Search...", text: $searchText)
                     if isLoading {
                         HStack { Spacer(); ProgressView("Loading..."); Spacer() }.padding()
@@ -175,7 +175,7 @@ struct AddGroupToSceneSheet: View {
                             }
                         }
                         if filtered.count > 30 {
-                            Text("Type more to refine...").font(.caption).foregroundColor(.secondary)
+                            Text(tr("type_more_to_refine_menu")).font(.caption).foregroundColor(.secondary)
                         }
                         if !searchText.isEmpty && filtered.isEmpty
                             && !pinned.contains(where: { $0.name.localizedCaseInsensitiveContains(searchText) }) {
@@ -184,7 +184,7 @@ struct AddGroupToSceneSheet: View {
                             } label: {
                                 HStack {
                                     Image(systemName: "plus.circle.fill")
-                                    Text("Create \"\(searchText)\"")
+                                    Text(tr("action_create_arg", searchText))
                                 }
                                 .foregroundColor(appearanceManager.tintColor)
                             }
@@ -196,8 +196,8 @@ struct AddGroupToSceneSheet: View {
             }
             .applyAppBackground()
             .scrollContentBackground(.hidden)
-            .stashyModalSheetChrome("Edit Groups", onBack: { dismiss() }) {
-                StashyChromeTrailingTextButton(title: "Save", enabled: !isSaving, isBusy: isSaving) { save() }
+            .stashyModalSheetChrome(tr("action_edit_groups"), onBack: { dismiss() }) {
+                StashyChromeTrailingTextButton(title: tr("action_save"), enabled: !isSaving, isBusy: isSaving) { save() }
             }
             .onAppear {
                 selectedIds = Set(currentGroups.map { $0.group.id })
@@ -222,7 +222,7 @@ struct AddGroupToSceneSheet: View {
                     selectedIds.insert(g.id)
                     searchText = ""
                 } else {
-                    ToastManager.shared.show("Failed to create group", icon: "exclamationmark.triangle", style: .error)
+                    ToastManager.shared.show(tr("error_create_group"), icon: "exclamationmark.triangle", style: .error)
                 }
             }
         }
@@ -241,7 +241,7 @@ struct AddGroupToSceneSheet: View {
                     onComplete(updated)
                     dismiss()
                 } else {
-                    ToastManager.shared.show("Failed to update groups", icon: "exclamationmark.triangle", style: .error)
+                    ToastManager.shared.show(tr("error_update_groups"), icon: "exclamationmark.triangle", style: .error)
                 }
             }
         }

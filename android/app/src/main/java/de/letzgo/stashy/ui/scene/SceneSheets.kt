@@ -1,5 +1,7 @@
 package de.letzgo.stashy.ui.scene
 
+import de.letzgo.stashy.R
+import de.letzgo.stashy.tr
 import android.graphics.BitmapFactory
 import android.util.Base64
 import androidx.compose.foundation.Image
@@ -114,10 +116,10 @@ fun EditSceneTitleSheet(scene: Scene, onDismiss: () -> Unit, currentProductionDa
     var details by remember { mutableStateOf(scene.details.orEmpty()) }
     var saving by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
-    SceneModalSheet("Edit Scene", onDismiss, actionTitle = "Save", actionEnabled = !saving, actionBusy = saving, onAction = {
+    SceneModalSheet(tr(R.string.action_edit_scene), onDismiss, actionTitle = tr(R.string.action_save), actionEnabled = !saving, actionBusy = saving, onAction = {
         val newDate = productionDate.trim()
         if (showsProductionDate && !SceneEditing.isValidProductionDate(newDate)) {
-            SceneToast.show("Use YYYY, YYYY-MM or YYYY-MM-DD", PlayerIcons.close, SceneToast.Style.Error)
+            SceneToast.show(tr(R.string.action_use_yyyy_yyyy_mm_or), PlayerIcons.close, SceneToast.Style.Error)
             return@SceneModalSheet
         }
         saving = true
@@ -131,22 +133,22 @@ fun EditSceneTitleSheet(scene: Scene, onDismiss: () -> Unit, currentProductionDa
                 }
             }.isSuccess
             if (saved) { onSaved(t, d); onDismiss() }
-            else { saving = false; SceneToast.show("Failed to update scene", PlayerIcons.close, SceneToast.Style.Error) }
+            else { saving = false; SceneToast.show(tr(R.string.error_update_scene), PlayerIcons.close, SceneToast.Style.Error) }
         }
     }) {
-        FormSection("Title") {
-            FormTextField(title, { title = it }, "Title", Modifier.fillMaxWidth())
+        FormSection(tr(R.string.title)) {
+            FormTextField(title, { title = it }, tr(R.string.title), Modifier.fillMaxWidth())
             if (SceneTitleNormalizer.normalized(title) != title) {
-                de.letzgo.stashy.ui.NativeTextButton("Normalize", Modifier.padding(start = 4.dp)) { title = SceneTitleNormalizer.normalized(title) }
+                de.letzgo.stashy.ui.NativeTextButton(tr(R.string.normalize), Modifier.padding(start = 4.dp)) { title = SceneTitleNormalizer.normalized(title) }
             }
         }
-        FormSection("Description") {
+        FormSection(tr(R.string.description)) {
             FormTextField(details, { details = it }, "", Modifier.fillMaxWidth().heightIn(min = 120.dp), singleLine = false)
             if (SceneTitleNormalizer.normalizedDescription(details) != details) {
-                de.letzgo.stashy.ui.NativeTextButton("Normalize", Modifier.padding(start = 4.dp)) { details = SceneTitleNormalizer.normalizedDescription(details) }
+                de.letzgo.stashy.ui.NativeTextButton(tr(R.string.normalize), Modifier.padding(start = 4.dp)) { details = SceneTitleNormalizer.normalizedDescription(details) }
             }
         }
-        if (showsProductionDate) FormSection("Production Date") { FormTextField(productionDate, { productionDate = it }, "YYYY-MM-DD", Modifier.fillMaxWidth()) }
+        if (showsProductionDate) FormSection(tr(R.string.production_date)) { FormTextField(productionDate, { productionDate = it }, "YYYY-MM-DD", Modifier.fillMaxWidth()) }
     }
 }
 
@@ -181,7 +183,7 @@ fun EntityPickerSheet(
     serverSearch: (suspend (String) -> List<PickerEntry>)? = null,
     avatars: Boolean = false,
     lockedIds: Set<String> = emptySet(),
-    actionTitle: String = "Save",
+    actionTitle: String = tr(R.string.action_save),
     requireNewSelection: Boolean = false,
 ) {
     val p = Theme.palette
@@ -248,7 +250,7 @@ fun EntityPickerSheet(
                             if (e.id in selected) { Spacer(Modifier.width(8.dp)); Icon(PlayerIcons.check, null, tint = if (locked) p.secondaryText else nativeAccent(), modifier = Modifier.size(24.dp)) }
                         }
                     }
-                    if (filtered.size > 30) Text("Type more to refine...", Modifier.padding(16.dp), style = NativeType.bodyMedium, color = p.secondaryText)
+                    if (filtered.size > 30) Text(tr(R.string.type_more_to_refine_menu), Modifier.padding(16.dp), style = NativeType.bodyMedium, color = p.secondaryText)
                     if (search.isNotEmpty() && !anyMatch && !searching) {
                         FormRow(if (creating) null else ({
                             creating = true
@@ -262,7 +264,7 @@ fun EntityPickerSheet(
                         })) {
                             Icon(PlayerIcons.plusCircle, null, tint = Appearance.tint, modifier = Modifier.size(20.dp))
                             Spacer(Modifier.width(8.dp))
-                            Text("Create \"$search\"", color = de.letzgo.stashy.ui.textAccent())
+                            Text(tr(R.string.action_create_arg, search), color = de.letzgo.stashy.ui.textAccent())
                         }
                     }
                 }
@@ -327,24 +329,24 @@ fun PerformersPickerSheet(
         return PickerEntry(p.id, p.name, sub, p.imageURL)
     }
     EntityPickerSheet(
-        title = if (addOnly) "Add Performers" else "Edit Performers",
-        searchHeader = "Search Performers",
+        title = if (addOnly) tr(R.string.action_add_performers) else tr(R.string.action_edit_performers),
+        searchHeader = tr(R.string.search_performers),
         initialSelection = startIds,
         multiple = true,
         load = {
-            val head = own.map { if (addOnly) it.copy(subtitle = "Added") else it }
+            val head = own.map { if (addOnly) it.copy(subtitle = tr(R.string.added)) else it }
             head + (if (addOnly) SceneEditing.findPerformers(null, 60) else SceneEditing.allPerformers()).map(::entry)
         },
         create = { name -> entry(SceneEditing.createPerformer(name)) },
-        createFailedText = "Failed to create performer",
+        createFailedText = tr(R.string.error_create_performer),
         save = { ids -> save(ids, ids.filter { it !in startIds }.mapNotNull { byId[it] }) },
-        saveFailedText = if (addOnly) "Could not add performers" else "Failed to update performers",
+        saveFailedText = if (addOnly) tr(R.string.error_add_performers) else tr(R.string.error_update_performers),
         onSaved = { picked -> onSaved(picked.map { byId[it.id] ?: Performer(id = it.id, name = it.name) }) },
         onDismiss = onDismiss,
         serverSearch = { q -> SceneEditing.findPerformers(q, 40).map(::entry) },
         avatars = true,
         lockedIds = if (addOnly) startIds else emptySet(),
-        actionTitle = if (addOnly) "Done" else "Save",
+        actionTitle = if (addOnly) tr(R.string.action_done) else tr(R.string.action_save),
         requireNewSelection = addOnly,
     )
 }
@@ -358,11 +360,11 @@ fun EditStudioSheet(scene: Scene, onDismiss: () -> Unit, onSaved: (Studio?) -> U
 fun EditStudioSheet(initialId: String?, save: suspend (String?) -> Unit, onDismiss: () -> Unit, onSaved: (Studio?) -> Unit) {
     val byId = remember { mutableMapOf<String, Studio>() }
     EntityPickerSheet(
-        "Set Studio", "Search Studio", setOfNotNull(initialId), multiple = false,
+        tr(R.string.action_set_studio), tr(R.string.search_studio), setOfNotNull(initialId), multiple = false,
         load = { SceneEditing.allStudios().onEach { byId[it.id] = it }.map { PickerEntry(it.id, it.name, count(it.sceneCount ?: 0, "scenes")) } },
         create = { name -> SceneEditing.createStudio(name).also { byId[it.id] = it }.let { PickerEntry(it.id, it.name, count(it.sceneCount ?: 0, "scenes")) } },
-        createFailedText = "Failed to create studio",
-        save = { save(it.firstOrNull()) }, saveFailedText = "Failed to update studio",
+        createFailedText = tr(R.string.error_create_studio),
+        save = { save(it.firstOrNull()) }, saveFailedText = tr(R.string.error_update_studio),
         onSaved = { picked -> onSaved(picked.firstOrNull()?.let { byId[it.id] }) }, onDismiss = onDismiss,
     )
 }
@@ -371,11 +373,11 @@ fun EditStudioSheet(initialId: String?, save: suspend (String?) -> Unit, onDismi
 fun EditTagsSheet(scene: Scene, onDismiss: () -> Unit, onSaved: (List<Tag>) -> Unit) {
     val byId = remember { mutableMapOf<String, Tag>() }
     EntityPickerSheet(
-        "Edit Tags", "Search Tags", scene.tags.orEmpty().map { it.id }.toSet(), multiple = true,
+        tr(R.string.action_edit_tags), tr(R.string.search_tags), scene.tags.orEmpty().map { it.id }.toSet(), multiple = true,
         load = { SceneEditing.allTags().onEach { byId[it.id] = it }.map { PickerEntry(it.id, it.name, count(it.sceneCount, "scenes")) } },
         create = { name -> SceneEditing.createTag(name).also { byId[it.id] = it }.let { PickerEntry(it.id, it.name, count(it.sceneCount, "scenes")) } },
-        createFailedText = "Failed to create tag",
-        save = { SceneEditing.updateTags(scene.id, it) }, saveFailedText = "Failed to update tags",
+        createFailedText = tr(R.string.error_create_tag),
+        save = { SceneEditing.updateTags(scene.id, it) }, saveFailedText = tr(R.string.error_update_tags),
         onSaved = { picked -> onSaved(picked.mapNotNull { byId[it.id] }) }, onDismiss = onDismiss,
     )
 }
@@ -384,14 +386,14 @@ fun EditTagsSheet(scene: Scene, onDismiss: () -> Unit, onSaved: (List<Tag>) -> U
 fun EditGroupsSheet(scene: Scene, onDismiss: () -> Unit, onSaved: (List<SceneGroupEntry>) -> Unit) {
     val byId = remember { mutableMapOf<String, GroupStub>() }
     EntityPickerSheet(
-        "Edit Groups", "Search Groups", scene.groups.orEmpty().map { it.group.id }.toSet(), multiple = true,
+        tr(R.string.action_edit_groups), tr(R.string.search_groups), scene.groups.orEmpty().map { it.group.id }.toSet(), multiple = true,
         load = {
             SceneEditing.allGroups().onEach { byId[it.id] = GroupStub(it.id, it.name, it.frontImagePath, it.updatedAt) }
                 .map { PickerEntry(it.id, it.name, count(it.sceneCount, "scenes")) }
         },
         create = { name -> SceneEditing.createGroup(name).also { byId[it.id] = GroupStub(it.id, it.name, it.frontImagePath, it.updatedAt) }.let { PickerEntry(it.id, it.name, count(it.sceneCount, "scenes")) } },
-        createFailedText = "Failed to create group",
-        save = { SceneEditing.updateGroups(scene.id, it) }, saveFailedText = "Failed to update groups",
+        createFailedText = tr(R.string.error_create_group),
+        save = { SceneEditing.updateGroups(scene.id, it) }, saveFailedText = tr(R.string.error_update_groups),
         onSaved = { picked -> onSaved(picked.mapNotNull { byId[it.id] }.map { SceneGroupEntry(it, null) }) }, onDismiss = onDismiss,
     )
 }
@@ -446,7 +448,7 @@ fun EditGalleriesSheet(scene: Scene, onDismiss: () -> Unit, onSaved: (List<Scene
         }
     }
 
-    SceneModalSheet("Edit Galleries", onDismiss, actionTitle = "Save", actionEnabled = !saving, actionBusy = saving, onAction = {
+    SceneModalSheet(tr(R.string.action_edit_galleries), onDismiss, actionTitle = tr(R.string.action_save), actionEnabled = !saving, actionBusy = saving, onAction = {
         saving = true
         val ids = selected.toList()
         scope.launch {
@@ -454,31 +456,31 @@ fun EditGalleriesSheet(scene: Scene, onDismiss: () -> Unit, onSaved: (List<Scene
                 val byId = (scene.galleries.orEmpty().map { SceneGalleryStub(it.id, it.title, it.date, it.imageCount, it.updatedAt, it.cover) } +
                     (performerGalleries + allGalleries).map { SceneGalleryStub(it.id, it.title, it.date, it.imageCount, it.updatedAt, it.cover) }).associateBy { it.id }
                 onSaved(ids.mapNotNull { byId[it] }); onDismiss()
-            } else { saving = false; SceneToast.show("Failed to update galleries", PlayerIcons.close, SceneToast.Style.Error) }
+            } else { saving = false; SceneToast.show(tr(R.string.error_update_galleries), PlayerIcons.close, SceneToast.Style.Error) }
         }
     }) {
         Column(Modifier.verticalScroll(rememberScrollState())) {
-            NativeSearchField(search, { search = it }, "Search Galleries", Modifier.padding(top = 8.dp))
+            NativeSearchField(search, { search = it }, tr(R.string.search_galleries), Modifier.padding(top = 8.dp))
             if (loading && performerGalleries.isEmpty() && allGalleries.isEmpty()) FormSection(null) { LoadingRow() }
             else {
-                if (performerIds.isNotEmpty()) FormSection(if (searching) "From Scene Performers" else "Galleries from Scene Performers") {
+                if (performerIds.isNotEmpty()) FormSection(if (searching) tr(R.string.from_scene_performers) else tr(R.string.galleries_from_scene_performers)) {
                     val list = filter(performerGalleries)
-                    if (list.isEmpty()) Text(if (searching) "No matching performer galleries" else "No galleries for linked performers", Modifier.padding(16.dp), style = NativeType.bodyMedium, color = p.secondaryText)
+                    if (list.isEmpty()) Text(if (searching) tr(R.string.empty_matching_performer_galleries) else tr(R.string.empty_galleries_for_linked_performers), Modifier.padding(16.dp), style = NativeType.bodyMedium, color = p.secondaryText)
                     else list.take(if (searching) 30 else 50).forEachIndexed { i, g -> row(g, i > 0) }
                 }
-                if (searching) FormSection(if (performerIds.isEmpty()) "Galleries" else "Other Galleries") {
+                if (searching) FormSection(if (performerIds.isEmpty()) tr(R.string.galleries) else tr(R.string.other_galleries)) {
                     val others = filter(allGalleries).filter { it.id !in performerSet }
                     when {
                         !didLoadAll || loading -> LoadingRow()
-                        others.isEmpty() -> Text("No matching galleries", Modifier.padding(16.dp), style = NativeType.bodyMedium, color = p.secondaryText)
+                        others.isEmpty() -> Text(tr(R.string.empty_matching_galleries), Modifier.padding(16.dp), style = NativeType.bodyMedium, color = p.secondaryText)
                         else -> {
                             others.take(30).forEachIndexed { i, g -> row(g, i > 0) }
-                            if (others.size > 30) Text("Type more to refine...", Modifier.padding(16.dp), style = NativeType.bodyMedium, color = p.secondaryText)
+                            if (others.size > 30) Text(tr(R.string.type_more_to_refine_menu), Modifier.padding(16.dp), style = NativeType.bodyMedium, color = p.secondaryText)
                         }
                     }
-                } else if (performerIds.isEmpty()) FormSection("All Galleries") {
+                } else if (performerIds.isEmpty()) FormSection(tr(R.string.all_galleries)) {
                     allGalleries.take(30).forEachIndexed { i, g -> row(g, i > 0) }
-                    if (allGalleries.size > 30) Text("Type to search...", Modifier.padding(16.dp), style = NativeType.bodyMedium, color = p.secondaryText)
+                    if (allGalleries.size > 30) Text(tr(R.string.type_to_search_menu), Modifier.padding(16.dp), style = NativeType.bodyMedium, color = p.secondaryText)
                 }
             }
         }
@@ -508,7 +510,7 @@ fun AddMarkerSheet(scene: Scene, seconds: Double, frame: android.graphics.Bitmap
     val filtered = base.filter { it.id in sceneTagIds } + base.filter { it.id !in sceneTagIds }
     fun quickEnd(d: Int) = PlaybackFormat.markerTime(seconds + d)
 
-    SceneModalSheet("Add Marker", onDismiss, actionTitle = "Add", actionEnabled = primaryTagId.isNotEmpty() && title.isNotEmpty() && !creating, actionBusy = creating, onAction = {
+    SceneModalSheet(tr(R.string.action_add_marker), onDismiss, actionTitle = tr(R.string.action_add), actionEnabled = primaryTagId.isNotEmpty() && title.isNotEmpty() && !creating, actionBusy = creating, onAction = {
         creating = true
         val end = PlaybackFormat.parseTime(endText)
         scope.launch {
@@ -528,12 +530,12 @@ fun AddMarkerSheet(scene: Scene, seconds: Double, frame: android.graphics.Bitmap
         }
     }) {
         Column(Modifier.verticalScroll(rememberScrollState())) {
-            FormSection("Marker Details") {
-                FormRow { Text("Start Time:", Modifier.weight(1f), color = p.text); Text(PlaybackFormat.markerTime(seconds), color = p.secondaryText) }
+            FormSection(tr(R.string.marker_details)) {
+                FormRow { Text(tr(R.string.action_start_time), Modifier.weight(1f), color = p.text); Text(PlaybackFormat.markerTime(seconds), color = p.secondaryText) }
                 NativeDivider()
                 Row(Modifier.fillMaxWidth().padding(start = 16.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Text("End Time (optional):", color = p.text)
-                    FormTextField(endText, { v -> endText = v; quick?.let { if (v != quickEnd(it)) quick = null } }, "Seconds or MM:SS", Modifier.weight(1f), keyboardType = KeyboardType.Number, textAlign = TextAlign.End)
+                    Text(tr(R.string.end_time_optional), color = p.text)
+                    FormTextField(endText, { v -> endText = v; quick?.let { if (v != quickEnd(it)) quick = null } }, tr(R.string.seconds_or_mm_ss), Modifier.weight(1f), keyboardType = KeyboardType.Number, textAlign = TextAlign.End)
                 }
                 Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     listOf(30, 60, 90).forEach { d ->
@@ -548,11 +550,11 @@ fun AddMarkerSheet(scene: Scene, seconds: Double, frame: android.graphics.Bitmap
                     }
                 }
             }
-            FormSection("Primary Tag") {
-                NativeSearchField(search, { search = it }, "Search Tags...", Modifier.padding(8.dp))
+            FormSection(tr(R.string.primary_tag)) {
+                NativeSearchField(search, { search = it }, tr(R.string.placeholder_search_tags), Modifier.padding(8.dp))
                 when {
-                    loading -> LoadingRow("Loading tags...")
-                    tags.isEmpty() -> Text("No tags found on server", Modifier.padding(16.dp), style = NativeType.bodyMedium, color = p.secondaryText)
+                    loading -> LoadingRow(tr(R.string.loading_tags))
+                    tags.isEmpty() -> Text(tr(R.string.empty_tags_found_on_server), Modifier.padding(16.dp), style = NativeType.bodyMedium, color = p.secondaryText)
                     else -> {
                         filtered.take(20).forEach { tag ->
                             NativeDivider()
@@ -562,8 +564,8 @@ fun AddMarkerSheet(scene: Scene, seconds: Double, frame: android.graphics.Bitmap
                                 if (primaryTagId == tag.id) { Spacer(Modifier.width(8.dp)); Icon(PlayerIcons.check, null, tint = nativeAccent(), modifier = Modifier.size(24.dp)) }
                             }
                         }
-                        if (filtered.size > 20) Text("Type more to refine search...", Modifier.padding(16.dp), style = NativeType.bodyMedium, color = p.secondaryText)
-                        else if (search.isNotEmpty() && filtered.isEmpty()) Text("No tags match '$search'", Modifier.padding(16.dp), style = NativeType.bodyMedium, color = p.secondaryText)
+                        if (filtered.size > 20) Text(tr(R.string.type_more_to_refine_search_menu), Modifier.padding(16.dp), style = NativeType.bodyMedium, color = p.secondaryText)
+                        else if (search.isNotEmpty() && filtered.isEmpty()) Text(tr(R.string.empty_tags_match_arg, search), Modifier.padding(16.dp), style = NativeType.bodyMedium, color = p.secondaryText)
                     }
                 }
             }
@@ -605,26 +607,26 @@ fun SetTagImageFromFrameSheet(imageDataURL: String, sceneTags: List<Tag>, onDism
     }
     val selectable = sortedByFrequency(if (search.isEmpty()) source else source.filter { it.name.lowercase().contains(search.lowercase()) })
 
-    SceneModalSheet("Generate Tag Cover", onDismiss, actionTitle = "Apply", actionEnabled = selectedId != null, actionBusy = saving, onAction = {
+    SceneModalSheet(tr(R.string.action_generate_tag_cover), onDismiss, actionTitle = tr(R.string.action_apply), actionEnabled = selectedId != null, actionBusy = saving, onAction = {
         val tagId = selectedId ?: return@SceneModalSheet
         saving = true
         scope.launch {
             val ok = runCatching { SceneEditing.setTagImage(tagId, imageDataURL) }.isSuccess
             saving = false
             if (ok) {
-                val name = (sceneTags + allTags).firstOrNull { it.id == tagId }?.name ?: "Tag"
-                SceneToast.show("Image updated for $name", PlayerIcons.tag, SceneToast.Style.Success)
+                val name = (sceneTags + allTags).firstOrNull { it.id == tagId }?.name ?: tr(R.string.tag)
+                SceneToast.show(tr(R.string.image_updated_for_arg, name), PlayerIcons.tag, SceneToast.Style.Success)
                 onDismiss()
-            } else SceneToast.show("Failed to update tag image", PlayerIcons.close, SceneToast.Style.Error)
+            } else SceneToast.show(tr(R.string.error_update_tag_image), PlayerIcons.close, SceneToast.Style.Error)
         }
     }) {
         Column(Modifier.verticalScroll(rememberScrollState())) {
             preview?.let { Image(it, null, Modifier.fillMaxWidth().height(160.dp).padding(top = 4.dp, bottom = 8.dp).clip(RoundedCornerShape(12.dp)), contentScale = ContentScale.Fit) }
-            FormSection(if (search.isEmpty() && sceneTags.isNotEmpty()) "Scene Tags" else "Tags", footer = "The selected tag’s image will be replaced with this video frame.") {
-                NativeSearchField(search, { search = it }, "Search Tags...", Modifier.padding(8.dp))
+            FormSection(if (search.isEmpty() && sceneTags.isNotEmpty()) tr(R.string.scene_tags) else tr(R.string.tags), footer = tr(R.string.hint_selected_tags_image_will_be)) {
+                NativeSearchField(search, { search = it }, tr(R.string.placeholder_search_tags), Modifier.padding(8.dp))
                 when {
-                    loading && allTags.isEmpty() -> LoadingRow("Loading tags...")
-                    selectable.isEmpty() -> Text(if (search.isEmpty()) "No tags available" else "No tags match '$search'", Modifier.padding(16.dp), style = NativeType.bodyMedium, color = p.secondaryText)
+                    loading && allTags.isEmpty() -> LoadingRow(tr(R.string.loading_tags))
+                    selectable.isEmpty() -> Text(if (search.isEmpty()) tr(R.string.empty_tags_available) else tr(R.string.empty_tags_match_arg, search), Modifier.padding(16.dp), style = NativeType.bodyMedium, color = p.secondaryText)
                     else -> {
                         selectable.take(40).forEach { tag ->
                             NativeDivider()
@@ -635,12 +637,12 @@ fun SetTagImageFromFrameSheet(imageDataURL: String, sceneTags: List<Tag>, onDism
                                 }
                                 Column(Modifier.weight(1f).padding(horizontal = 10.dp)) {
                                     Text(tag.name, color = p.text)
-                                    if (sceneTags.any { it.id == tag.id }) Text("On this scene", style = NativeType.bodyMedium, color = p.secondaryText)
+                                    if (sceneTags.any { it.id == tag.id }) Text(tr(R.string.on_this_scene), style = NativeType.bodyMedium, color = p.secondaryText)
                                 }
                                 if (selectedId == tag.id) Icon(PlayerIcons.check, null, tint = nativeAccent(), modifier = Modifier.size(24.dp))
                             }
                         }
-                        if (selectable.size > 40) Text("Type more to refine search...", Modifier.padding(16.dp), style = NativeType.bodyMedium, color = p.secondaryText)
+                        if (selectable.size > 40) Text(tr(R.string.type_more_to_refine_search_menu), Modifier.padding(16.dp), style = NativeType.bodyMedium, color = p.secondaryText)
                     }
                 }
             }

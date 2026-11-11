@@ -1,5 +1,7 @@
 package de.letzgo.stashy.ui.scene
 
+import de.letzgo.stashy.R
+import de.letzgo.stashy.tr
 import de.letzgo.stashy.ui.uniqueItems
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
@@ -128,7 +130,7 @@ fun SceneVideoPlayerCard(model: SceneDetailModel, extraMenuItems: () -> List<Pla
             ) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Icon(PlayerIcons.film, null, tint = Theme.palette.secondaryText, modifier = Modifier.size(34.dp))
-                    Text("Video not available", color = Theme.palette.secondaryText)
+                    Text(tr(R.string.video_not_available), color = Theme.palette.secondaryText)
                 }
             }
         }
@@ -177,10 +179,10 @@ private fun CoverWithOverlay(model: SceneDetailModel) {
                             verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp),
                         ) {
                             Icon(PlayerIcons.resume, null, tint = Color.White, modifier = Modifier.size(scaledIconSize(20.dp)))
-                            Text("Resume from ${PlaybackFormat.time(resume)}", color = Color.White, style = IosTypography.body.copy(fontWeight = FontWeight.Bold))
+                            Text(tr(R.string.action_resume_from_arg, PlaybackFormat.time(resume)), color = Color.White, style = IosTypography.body.copy(fontWeight = FontWeight.Bold))
                         }
                         Text(
-                            "Start from beginning",
+                            tr(R.string.action_start_from_beginning),
                             Modifier.shadow(3.dp, RoundedCornerShape(50)).clip(RoundedCornerShape(50)).background(tint)
                                 .clickable { model.startPlayback(false) }.padding(horizontal = 12.dp, vertical = 6.dp),
                             color = Color.White, style = IosTypography.caption.copy(fontWeight = FontWeight.Medium),
@@ -192,7 +194,7 @@ private fun CoverWithOverlay(model: SceneDetailModel) {
                             Modifier.size(70.dp).clip(CircleShape).background(Color.Black.copy(alpha = 0.5f))
                                 .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) { model.startPlayback(false) },
                             contentAlignment = Alignment.Center,
-                        ) { Icon(PlayerIcons.play, "Play", tint = Color.White, modifier = Modifier.size(40.dp).padding(start = 2.dp)) }
+                        ) { Icon(PlayerIcons.play, tr(R.string.action_play), tint = Color.White, modifier = Modifier.size(40.dp).padding(start = 2.dp)) }
                     }
                 }
             }
@@ -261,7 +263,7 @@ private fun MarkerStrip(markers: List<SceneMarker>, playing: Boolean, onSeek: (D
                     )
                 }
                 Text(
-                    marker.title?.takeIf { it.isNotEmpty() } ?: "Marker at ${PlaybackFormat.time(marker.seconds)}",
+                    marker.title?.takeIf { it.isNotEmpty() } ?: tr(R.string.marker_at_arg, PlaybackFormat.time(marker.seconds)),
                     style = IosTypography.caption2.copy(fontWeight = FontWeight.Medium), color = p.text,
                     maxLines = 2, overflow = TextOverflow.Ellipsis,
                 )
@@ -321,7 +323,7 @@ fun SceneMetadataCardContent(
                 ExpandChevron(isExpanded, Modifier.align(Alignment.BottomEnd), onToggleExpanded)
             }
         }
-        productionDate?.takeIf { it.isNotEmpty() }?.let { Text("Produced $it", style = IosTypography.caption, color = p.secondaryText) }
+        productionDate?.takeIf { it.isNotEmpty() }?.let { Text(tr(R.string.produced_arg, it), style = IosTypography.caption, color = p.secondaryText) }
         // FlowRow: at large font scales the pills wrap onto a second line instead of squeezing
         // the last ones (rating / O) until their text clips.
         FlowRow(
@@ -340,7 +342,7 @@ fun SceneMetadataCardContent(
             Box(center.minimumInteractiveComponentSize(), contentAlignment = Alignment.Center) {
                 InfoPill(
                     oCounterIcon(Appearance.oCounterIcon, filled = true), "$count",
-                    Modifier.semantics { contentDescription = "O-Counter $count, tap to add one, long-press for options" }.combinedClickable(
+                    Modifier.semantics { contentDescription = tr(R.string.hint_o_count_arg_tap_to, count) }.combinedClickable(
                         interactionSource = remember { MutableInteractionSource() }, indication = ripple(),
                         onClick = { haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove); onIncrementO() },
                         onLongClick = { haptics.performHapticFeedback(HapticFeedbackType.LongPress); menu = true },
@@ -348,21 +350,21 @@ fun SceneMetadataCardContent(
                 )
                 DropdownMenu(menu, onDismissRequest = { menu = false }) {
                     if (count > 0) {
-                        DropdownMenuItem(text = { Text("Remove one O") }, leadingIcon = { Icon(PlayerIcons.minusCircle, null) }, onClick = { menu = false; onRemoveO(OCounterMutation.Decrement) })
+                        DropdownMenuItem(text = { Text(tr(R.string.action_remove_one_o)) }, leadingIcon = { Icon(PlayerIcons.minusCircle, null) }, onClick = { menu = false; onRemoveO(OCounterMutation.Decrement) })
                         if (count > 1) DropdownMenuItem(
-                            text = { Text("Reset O-Counter ($count)", color = StashyColors.systemRed) },
+                            text = { Text(tr(R.string.action_reset_o_count_arg, count), color = StashyColors.systemRed) },
                             leadingIcon = { Icon(PlayerIcons.reset, null, tint = StashyColors.systemRed) },
                             onClick = { menu = false; confirmReset = true },
                         )
-                    } else DropdownMenuItem(text = { Text("No O recorded") }, onClick = { menu = false }, enabled = false)
+                    } else DropdownMenuItem(text = { Text(tr(R.string.empty_o_recorded)) }, onClick = { menu = false }, enabled = false)
                 }
             }
             if (confirmReset) AlertDialog(
                 onDismissRequest = { confirmReset = false },
-                title = { Text("Reset O-Counter?") },
-                text = { Text("All $count recorded O entries and their dates are permanently deleted on the server. This cannot be undone.") },
-                confirmButton = { TextButton({ confirmReset = false; onRemoveO(OCounterMutation.Reset) }) { Text("Remove all $count", color = StashyColors.systemRed) } },
-                dismissButton = { TextButton({ confirmReset = false }) { Text("Cancel") } },
+                title = { Text(tr(R.string.confirm_reset_o_count)) },
+                text = { Text(tr(R.string.hint_all_arg_recorded_o_entries, count)) },
+                confirmButton = { TextButton({ confirmReset = false; onRemoveO(OCounterMutation.Reset) }) { Text(tr(R.string.action_remove_all_arg, count), color = StashyColors.systemRed) } },
+                dismissButton = { TextButton({ confirmReset = false }) { Text(tr(R.string.action_cancel)) } },
             )
             StarRating(scene.rating100, size = 14.dp, spacing = 4.dp, modifier = center, container = p.pillAccent.copy(alpha = 0.1f), onChange = onSetRating)
         }
@@ -407,14 +409,14 @@ fun StarRating(
                 },
             )
             .padding(horizontal = edge)
-            .semantics(mergeDescendants = false) { contentDescription = "Rating: $stars of 5 stars" },
+            .semantics(mergeDescendants = false) { contentDescription = tr(R.string.rating_arg_of_5_stars, stars) },
     ) {
         for (i in 1..5) {
             Box(
                 Modifier
                     .heightIn(min = 48.dp)
                     .width(star + spacing)
-                    .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null, onClickLabel = "Rate $i stars") {
+                    .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null, onClickLabel = tr(R.string.action_rate_arg_stars, i)) {
                         haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                         onChange(if (i == stars) null else i * 20)
                     },
@@ -449,6 +451,6 @@ fun ExpandChevron(expanded: Boolean, modifier: Modifier = Modifier, onClick: () 
         modifier.size(scaledIconSize(22.dp)).clip(CircleShape).background(tint.copy(alpha = 0.1f))
             .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null, onClick = onClick),
         contentAlignment = Alignment.Center,
-    ) { Icon(if (expanded) PlayerIcons.chevronUp else PlayerIcons.chevronDown, if (expanded) "Collapse" else "Expand", tint = tint, modifier = Modifier.size(scaledIconSize(14.dp))) }
+    ) { Icon(if (expanded) PlayerIcons.chevronUp else PlayerIcons.chevronDown, if (expanded) tr(R.string.collapse) else tr(R.string.expand), tint = tint, modifier = Modifier.size(scaledIconSize(14.dp))) }
 }
 

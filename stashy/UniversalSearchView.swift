@@ -75,7 +75,7 @@ struct UniversalSearchView: View {
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
           }
-            .navigationTitle("Search")
+            .navigationTitle(tr("search"))
             .navigationBarTitleDisplayMode(.inline)
             .applyAppBackground()
             .modifier(SystemSearchField(text: $searchText))
@@ -120,11 +120,11 @@ struct UniversalSearchView: View {
                 .foregroundColor(.secondary.opacity(0.5))
             
             VStack(spacing: 8) {
-                Text("Search Your Library")
+                Text(tr("search_your_library"))
                     .font(.title2)
                     .fontWeight(.bold)
                 
-                Text("Find scenes, images, performers, studios, tags, galleries, groups and markers")
+                Text(tr("hint_find_scenes_images_performers_studios"))
                     .foregroundColor(.secondary)
                     .multilineTextAlignment(.center)
                     .padding(.horizontal, 40)
@@ -155,7 +155,7 @@ struct UniversalSearchView: View {
                                 .font(.system(size: 50))
                                 .foregroundColor(.secondary)
 
-                            Text("No results for \"\(searchText)\"")
+                            Text(tr("empty_results_for_arg", searchText))
                                 .foregroundColor(.secondary)
                         }
                         .frame(maxWidth: .infinity)
@@ -194,13 +194,13 @@ struct UniversalSearchView: View {
     private func sectionView(for tab: AppTab) -> some View {
         switch tab {
         case .scenes where !scenes.isEmpty:
-            resultRow("Scenes", items: scenes, showAll: {
+            resultRow(tr("scenes"), items: scenes, showAll: {
                 coordinator.navigateToScenes(search: searchText, noDefaultFilter: true)
             }, destination: { SceneDetailView(scene: $0) }) { scene in
                 HomeSceneCardView(scene: scene, isLarge: false)
             }
         case .images where !images.isEmpty:
-            resultRow("Images", items: images, showAll: {
+            resultRow(tr("images"), items: images, showAll: {
                 coordinator.navigateToImages(search: searchText)
             }, destination: { FullScreenImageView(images: $images, selectedImageId: $0.id) }) { image in
                 // The list's pills do not fit a 125 pt card: the picture with a Home-style caption.
@@ -210,41 +210,41 @@ struct UniversalSearchView: View {
                     .clipShape(RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.card))
             }
         case .galleries where !galleries.isEmpty:
-            resultRow("Galleries", items: galleries, showAll: {
+            resultRow(tr("galleries"), items: galleries, showAll: {
                 coordinator.navigateToGalleries(search: searchText)
             }, destination: { ImagesView(gallery: $0) }) { gallery in
                 GalleryCardView(gallery: gallery, compactTitle: true)
                     .frame(width: squareCardSide, height: squareCardSide)
             }
         case .performers where !performers.isEmpty:
-            resultRow("Performers", items: performers, showAll: {
+            resultRow(tr("performers"), items: performers, showAll: {
                 coordinator.navigateToPerformers(search: searchText)
             }, destination: { PerformerDetailView(performer: $0) }) { performer in
                 HomePerformerCardView(performer: performer, config: Self.performerRowConfig, screenWidth: 0)
             }
         case .studios where !studios.isEmpty:
-            resultRow("Studios", items: studios, showAll: {
+            resultRow(tr("studios"), items: studios, showAll: {
                 coordinator.navigateToStudios(search: searchText)
             }, destination: { StudioDetailView(studio: $0) }) { studio in
                 StudioCardView(studio: studio)
                     .frame(width: landscapeCardWidth)
             }
         case .tags where !tags.isEmpty:
-            resultRow("Tags", items: tags, showAll: {
+            resultRow(tr("tags"), items: tags, showAll: {
                 coordinator.navigateToTags(search: searchText)
             }, destination: { TagDetailView(selectedTag: $0) }) { tag in
                 TagCardView(tag: tag)
                     .frame(width: landscapeCardWidth)
             }
         case .groups where !groups.isEmpty:
-            resultRow("Groups", items: groups, showAll: {
+            resultRow(tr("groups"), items: groups, showAll: {
                 coordinator.navigateToGroups(search: searchText)
             }, destination: { GroupDetailView(selectedGroup: $0) }) { group in
                 GroupCardView(group: group)
                     .frame(width: squareCardSide)
             }
         case .markers where !markersWithScene.isEmpty:
-            resultRow("Markers", items: markersWithScene, showAll: {
+            resultRow(tr("markers"), items: markersWithScene, showAll: {
                 coordinator.navigateToMarkers(search: searchText)
             }, destination: { marker in
                 SceneDetailView(scene: marker.scene!.toScene().withResumeTime(marker.seconds), autoPlay: true)
@@ -305,7 +305,7 @@ struct UniversalSearchView: View {
                 .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
-            .accessibilityHint("Shows all \(title.lowercased()) matching the search")
+            .accessibilityHint(tr("hint_shows_all_arg_matching_search", title.lowercased()))
 
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(alignment: .top, spacing: 12) {
@@ -418,10 +418,10 @@ private struct SystemSearchField: ViewModifier {
         if horizontalSizeClass == .regular {
             content
         } else {
-            content.searchable(text: $text, prompt: "Search everything...")
+            content.searchable(text: $text, prompt: tr("placeholder_search_everything"))
         }
         #else
-        content.searchable(text: $text, prompt: "Search everything...")
+        content.searchable(text: $text, prompt: tr("placeholder_search_everything"))
         #endif
     }
 }
@@ -454,7 +454,7 @@ private struct InlineSearchField: View {
             Image(systemName: "magnifyingglass")
                 .foregroundStyle(.secondary)
                 .accessibilityHidden(true)
-            TextField("Search everything...", text: $text)
+            TextField(tr("placeholder_search_everything"), text: $text)
                 .focused($isFocused)
                 .textInputAutocapitalization(.never)
                 .autocorrectionDisabled()
@@ -468,7 +468,7 @@ private struct InlineSearchField: View {
                         .foregroundStyle(.secondary)
                 }
                 .buttonStyle(.plain)
-                .accessibilityLabel("Clear search")
+                .accessibilityLabel(tr("action_clear_search"))
             }
         }
         .padding(.horizontal, 14)

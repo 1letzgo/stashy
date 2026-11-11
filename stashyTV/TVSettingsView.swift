@@ -25,19 +25,19 @@ private enum TVSettingsEntry: Hashable {
 
     var title: String {
         switch self {
-        case .servers: return "Servers"
-        case .appearance: return "Appearance"
-        case .security: return "Security"
+        case .servers: return tr("servers")
+        case .appearance: return tr("appearance")
+        case .security: return tr("security")
         case .stashyPlus: return "stashy+"
-        case .defaultSort: return "Default Sorting"
-        case .defaultFilters: return "Default Filters"
-        case .visibleTabs: return "Visible Tabs"
-        case .homeRows: return "Home Rows"
-        case .subtitles: return "Subtitles"
-        case .dolbyVision: return "Dolby Vision"
-        case .playCount: return "Count As Played"
-        case .maintenance: return "Maintenance"
-        case .about: return "About"
+        case .defaultSort: return tr("default_sorting")
+        case .defaultFilters: return tr("default_filters")
+        case .visibleTabs: return tr("visible_tabs")
+        case .homeRows: return tr("home_rows")
+        case .subtitles: return tr("subtitles")
+        case .dolbyVision: return tr("dolby_vision")
+        case .playCount: return tr("count_as_played")
+        case .maintenance: return tr("maintenance")
+        case .about: return tr("about")
         }
     }
 
@@ -62,31 +62,31 @@ private enum TVSettingsEntry: Hashable {
     var summary: String {
         switch self {
         case .servers:
-            return "Add Stash servers, switch between them, and edit or remove saved ones."
+            return tr("hint_add_stash_servers_switch_between")
         case .appearance:
-            return "Pick the app theme and the accent color used for focus highlights and icons throughout the app."
+            return tr("hint_pick_app_theme_and_accent")
         case .security:
-            return "Require a PIN before the app opens."
+            return tr("hint_require_pin_before_app_opens")
         case .stashyPlus:
-            return "Premium features, including Channels — continuous playback of a performer, studio, tag or saved filter."
+            return tr("hint_premium_features_including_channels_continuous")
         case .defaultSort:
-            return "The sort order each section opens with."
+            return tr("hint_sort_order_each_section_opens")
         case .defaultFilters:
-            return "A saved server filter to apply automatically when a section opens."
+            return tr("hint_saved_server_filter_to_apply")
         case .visibleTabs:
-            return "Hide sections you do not use. They disappear from the sidebar."
+            return tr("hint_hide_sections_you_do_not")
         case .homeRows:
-            return "Choose which rows Home shows — scenes, performers, studios, galleries, Channels — and their order."
+            return tr("hint_choose_which_rows_home_shows")
         case .subtitles:
-            return "Turn subtitles on automatically, choose the language a scene should start with, and set how the cues look."
+            return tr("hint_turn_subtitles_on_automatically_choose")
         case .playCount:
-            return "How long a scene has to play before it counts as played and its position is saved."
+            return tr("hint_how_long_scene_has_to")
         case .dolbyVision:
-            return "Turn off if a Dolby Vision scene shows green or purple colors. It then plays as HDR10, which your TV still shows in HDR."
+            return tr("hint_turn_off_if_dolby_vision")
         case .maintenance:
-            return "Clear the cached artwork for the active server. Images are re-downloaded as they are shown again."
+            return tr("hint_clear_cached_artwork_for_active")
         case .about:
-            return "Version and build number."
+            return tr("version_and_build_number")
         }
     }
 }
@@ -136,7 +136,7 @@ struct TVSettingsView: View {
                 link(.security)
                 link(.stashyPlus)
             } header: {
-                Text("General")
+                Text(tr("general"))
             }
 
             Section {
@@ -145,7 +145,7 @@ struct TVSettingsView: View {
                 link(.visibleTabs)
                 link(.homeRows)
             } header: {
-                Text("Content")
+                Text(tr("content"))
             }
 
             Section {
@@ -157,7 +157,7 @@ struct TVSettingsView: View {
                 .focused($focusedEntry, equals: .dolbyVision)
                 link(.playCount, value: TabManager.playCountThresholdLabel(tabManager.playCountPlayerSeconds))
             } header: {
-                Text("Playback")
+                Text(tr("playback"))
             }
 
             Section {
@@ -218,8 +218,8 @@ struct TVSettingsView: View {
                 }
             }
         }
-        .tvSettingsPage("Count As Played",
-                        description: "How long a scene has to play before it counts as played and its position is saved.")
+        .tvSettingsPage(tr("count_as_played"),
+                        description: tr("hint_how_long_scene_has_to"))
     }
 
     /// Nur Text, Wert rechtsbündig — die tvOS-Form. Icons und Untertitel in
@@ -395,19 +395,19 @@ private struct TVServersSettingsView: View {
                     // Ohne das liess sich der aktive Server (bei nur einem Server: der
                     // einzige) nie bearbeiten, z. B. um den API-Key zu ändern.
                     .contextMenu {
-                        Button("Edit") { serverForm = .edit(config) }
+                        Button(tr("action_edit")) { serverForm = .edit(config) }
                     }
                 } else {
                     HStack {
                         Image(systemName: "exclamationmark.triangle")
                             .foregroundColor(.yellow)
-                        Text("No server configured")
+                        Text(tr("empty_server_configured"))
                             .foregroundStyle(.secondary)
                     }
                     .focusable()
                 }
             } header: {
-                Text("Active Server")
+                Text(tr("active_server"))
             }
 
             if !otherServers.isEmpty {
@@ -421,7 +421,7 @@ private struct TVServersSettingsView: View {
                         )
                     }
                 } header: {
-                    Text("Switch Server")
+                    Text(tr("switch_server"))
                 }
             }
 
@@ -429,7 +429,7 @@ private struct TVServersSettingsView: View {
                 Button {
                     serverForm = .new
                 } label: {
-                    Label("Add Server", systemImage: "plus")
+                    Label(tr("action_add_server"), systemImage: "plus")
                 }
             }
         }
@@ -452,7 +452,7 @@ private struct TVServersSettingsView: View {
                 }
             }
         }
-        .tvSettingsPage("Servers", description: "Add Stash servers and switch between them. Hold Select on a server to edit it or remove a saved one.")
+        .tvSettingsPage(tr("servers"), description: tr("hint_add_stash_servers_and_switch"))
     }
 }
 
@@ -482,12 +482,12 @@ private struct TVSavedServerRow: View {
             .frame(maxWidth: .infinity, alignment: .leading)
         }
         .contextMenu {
-            Button("Edit", action: onEdit)
-            Button("Delete", role: .destructive) { confirmingDelete = true }
+            Button(tr("action_edit"), action: onEdit)
+            Button(tr("action_delete"), role: .destructive) { confirmingDelete = true }
         }
-        .alert("Delete \"\(server.name)\"?", isPresented: $confirmingDelete) {
-            Button("Delete", role: .destructive, action: onDelete)
-            Button("Cancel", role: .cancel) {}
+        .alert(tr("confirm_delete_arg", server.name), isPresented: $confirmingDelete) {
+            Button(tr("action_delete"), role: .destructive, action: onDelete)
+            Button(tr("action_cancel"), role: .cancel) {}
         }
     }
 }
@@ -501,7 +501,7 @@ private struct TVAppearanceSettingsView: View {
         List {
             Section {
                 VStack(alignment: .leading, spacing: 16) {
-                    Text("Theme")
+                    Text(tr("theme"))
                         .font(.headline)
 
                     ScrollView(.horizontal, showsIndicators: false) {
@@ -528,7 +528,7 @@ private struct TVAppearanceSettingsView: View {
 
             Section {
                 VStack(alignment: .leading, spacing: 16) {
-                    Text("Accent Color")
+                    Text(tr("accent_color"))
                         .font(.headline)
 
                     ScrollView(.horizontal, showsIndicators: false) {
@@ -550,7 +550,7 @@ private struct TVAppearanceSettingsView: View {
                 }
             }
         }
-        .tvSettingsPage("Appearance", description: "Pick the app theme and the accent color used for focus highlights and icons throughout the app.")
+        .tvSettingsPage(tr("appearance"), description: tr("hint_pick_app_theme_and_accent"))
     }
 
     private func colorsEqual(_ a: Color, _ b: Color, tolerance: CGFloat = 0.01) -> Bool {
@@ -583,7 +583,7 @@ private struct TVSecuritySettingsView: View {
         List {
             Section {
                 Toggle(
-                    "Enable PIN Lock",
+                    tr("action_enable_pin_lock"),
                     isOn: Binding(
                         get: { securityManager.isPinLockEnabled && securityManager.isPinSet },
                         set: { enabled in
@@ -602,11 +602,11 @@ private struct TVSecuritySettingsView: View {
                 .tint(appearanceManager.tintColor)
 
                 if securityManager.isPinSet {
-                    Button("Change PIN") {
+                    Button(tr("action_change_pin")) {
                         showingSetPasscode = true
                     }
 
-                    Button("Remove PIN", role: .destructive) {
+                    Button(tr("action_remove_pin"), role: .destructive) {
                         securityManager.removePin()
                     }
                 }
@@ -617,7 +617,7 @@ private struct TVSecuritySettingsView: View {
             TVPasscodeSetupView(isPresented: $showingSetPasscode)
                 .presentationBackground(Color.black)
         }
-        .tvSettingsPage("Security", description: "The app asks for your PIN each time it opens and whenever it returns from the background.")
+        .tvSettingsPage(tr("security"), description: tr("hint_app_asks_for_your_pin"))
     }
 }
 
@@ -631,19 +631,19 @@ private struct TVDefaultSortSettingsView: View {
     var body: some View {
         List {
             Section {
-                sortRow(label: "Scenes", tab: .scenes, type: StashDBViewModel.SceneSortOption.self, fallback: .dateDesc)
-                sortRow(label: "Performers", tab: .performers, type: StashDBViewModel.PerformerSortOption.self, fallback: .nameAsc)
-                sortRow(label: "Studios", tab: .studios, type: StashDBViewModel.StudioSortOption.self, fallback: .nameAsc)
-                sortRow(label: "Tags", tab: .tags, type: StashDBViewModel.TagSortOption.self, fallback: .nameAsc)
-                sortRow(label: "Groups", tab: .groups, type: StashDBViewModel.GroupSortOption.self, fallback: .nameAsc)
+                sortRow(label: tr("scenes"), tab: .scenes, type: StashDBViewModel.SceneSortOption.self, fallback: .dateDesc)
+                sortRow(label: tr("performers"), tab: .performers, type: StashDBViewModel.PerformerSortOption.self, fallback: .nameAsc)
+                sortRow(label: tr("studios"), tab: .studios, type: StashDBViewModel.StudioSortOption.self, fallback: .nameAsc)
+                sortRow(label: tr("tags"), tab: .tags, type: StashDBViewModel.TagSortOption.self, fallback: .nameAsc)
+                sortRow(label: tr("groups"), tab: .groups, type: StashDBViewModel.GroupSortOption.self, fallback: .nameAsc)
             }
             if StashServerCapabilities.supports032 {
                 Section {
-                    Toggle("Studio counts include sub-studios", isOn: $includeSubStudios)
+                    Toggle(tr("studio_counts_include_sub_studios"), isOn: $includeSubStudios)
                 }
             }
         }
-        .tvSettingsPage("Default Sorting", description: "The sort order each section opens with.")
+        .tvSettingsPage(tr("default_sorting"), description: tr("hint_sort_order_each_section_opens"))
     }
 
     /// Eine flache Auswahl pro Entität. Vorher lagen hier verschachtelte
@@ -680,17 +680,17 @@ private struct TVDefaultFilterSettingsView: View {
     var body: some View {
         List {
             Section {
-                tvFilterRow(label: "Scenes", icon: "film", tab: .scenes, mode: .scenes)
-                tvFilterRow(label: "Performers", icon: "person.3", tab: .performers, mode: .performers)
-                tvFilterRow(label: "Studios", icon: "building.2", tab: .studios, mode: .studios)
-                tvFilterRow(label: "Tags", icon: "tag", tab: .tags, mode: .tags)
-                tvFilterRow(label: "Groups", icon: "rectangle.stack", tab: .groups, mode: .groups)
+                tvFilterRow(label: tr("scenes"), icon: "film", tab: .scenes, mode: .scenes)
+                tvFilterRow(label: tr("performers"), icon: "person.3", tab: .performers, mode: .performers)
+                tvFilterRow(label: tr("studios"), icon: "building.2", tab: .studios, mode: .studios)
+                tvFilterRow(label: tr("tags"), icon: "tag", tab: .tags, mode: .tags)
+                tvFilterRow(label: tr("groups"), icon: "rectangle.stack", tab: .groups, mode: .groups)
             }
         }
         .onAppear {
             filterViewModel.fetchSavedFilters()
         }
-        .tvSettingsPage("Default Filters", description: "A saved filter from your Stash server, applied automatically when a section opens.")
+        .tvSettingsPage(tr("default_filters"), description: tr("hint_saved_filter_from_your_stash"))
     }
 
     @ViewBuilder
@@ -703,7 +703,7 @@ private struct TVDefaultFilterSettingsView: View {
 
         TVSettingsPickerRow(
             title: label,
-            options: [TVPickerOption("", "None")] + filters.map { TVPickerOption($0.id, $0.name) },
+            options: [TVPickerOption("", tr("none"))] + filters.map { TVPickerOption($0.id, $0.name) },
             selection: Binding(
                 get: { currentId ?? "" },
                 set: { newId in
@@ -728,18 +728,18 @@ private struct TVTabVisibilitySettingsView: View {
     var body: some View {
         List {
             Section {
-                tabVisibilityRow(.reels, label: "Feeds", icon: "play.rectangle.on.rectangle")
-                tabVisibilityRow(.scenes, label: "Scenes", icon: "film.fill")
-                tabVisibilityRow(.performers, label: "Performers", icon: "person.3.fill")
-                tabVisibilityRow(.studios, label: "Studios", icon: "building.2.fill")
-                tabVisibilityRow(.tags, label: "Tags", icon: "tag.fill")
-                tabVisibilityRow(.groups, label: "Groups", icon: "rectangle.stack.fill")
-                tabVisibilityRow(.galleries, label: "Galleries", icon: "photo.stack.fill")
-                tabVisibilityRow(.images, label: "Images", icon: "photo.fill")
-                tabVisibilityRow(.markers, label: "Markers", icon: "bookmark.fill")
+                tabVisibilityRow(.reels, label: tr("feeds"), icon: "play.rectangle.on.rectangle")
+                tabVisibilityRow(.scenes, label: tr("scenes"), icon: "film.fill")
+                tabVisibilityRow(.performers, label: tr("performers"), icon: "person.3.fill")
+                tabVisibilityRow(.studios, label: tr("studios"), icon: "building.2.fill")
+                tabVisibilityRow(.tags, label: tr("tags"), icon: "tag.fill")
+                tabVisibilityRow(.groups, label: tr("groups"), icon: "rectangle.stack.fill")
+                tabVisibilityRow(.galleries, label: tr("galleries"), icon: "photo.stack.fill")
+                tabVisibilityRow(.images, label: tr("images"), icon: "photo.fill")
+                tabVisibilityRow(.markers, label: tr("markers"), icon: "bookmark.fill")
             }
         }
-        .tvSettingsPage("Visible Tabs", description: "Sections you turn off disappear from the sidebar. Home, Search and Settings always stay.")
+        .tvSettingsPage(tr("visible_tabs"), description: tr("hint_sections_you_turn_off_disappear"))
     }
 
     @ViewBuilder
@@ -776,53 +776,53 @@ private struct TVSubtitleSettingsView: View {
     var body: some View {
         List {
             Section {
-                Toggle("Show subtitles automatically", isOn: $tabManager.subtitlesAutoEnabled)
+                Toggle(tr("action_show_subtitles_automatically"), isOn: $tabManager.subtitlesAutoEnabled)
                     .tint(appearanceManager.tintColor)
 
                 Button {
                     showingLanguagePicker = true
                 } label: {
                     HStack {
-                        Text("Preferred language")
+                        Text(tr("preferred_language"))
                         Spacer()
                         Text(languageLabel)
                             .foregroundStyle(.secondary)
                     }
                 }
             } header: {
-                Text("Defaults")
+                Text(tr("defaults"))
             }
 
             Section {
                 TVSettingsPickerRow(
-                    title: "Size",
+                    title: tr("size"),
                     options: SubtitleFontSize.allCases.map { TVPickerOption($0, $0.label) },
                     selection: $tabManager.subtitleFontSize
                 )
 
                 TVSettingsPickerRow(
-                    title: "Font",
+                    title: tr("font"),
                     options: SubtitleFontFamily.allCases.map { TVPickerOption($0, $0.label) },
                     selection: $tabManager.subtitleFontFamily
                 )
 
                 TVSettingsPickerRow(
-                    title: "Text color",
+                    title: tr("text_color"),
                     options: SubtitleTextColorChoice.allCases.map { TVPickerOption($0, $0.label) },
                     selection: $tabManager.subtitleTextColor
                 )
 
-                Toggle("Background box", isOn: $tabManager.subtitleBoxEnabled)
+                Toggle(tr("background_box"), isOn: $tabManager.subtitleBoxEnabled)
                     .tint(appearanceManager.tintColor)
 
                 TVSettingsPickerRow(
-                    title: "Background color",
+                    title: tr("background_color"),
                     options: SubtitleBackgroundChoice.allCases.map { TVPickerOption($0, $0.label) },
                     selection: $tabManager.subtitleBackgroundColor
                 )
                 .disabled(!tabManager.subtitleBoxEnabled)
             } header: {
-                Text("Appearance")
+                Text(tr("appearance"))
             }
         }
         .dismissOnAppLock { showingLanguagePicker = false }
@@ -831,15 +831,15 @@ private struct TVSubtitleSettingsView: View {
         }
         // Die Vorschau steht rechts neben der Liste: unter der Liste wäre sie nicht
         // fokussierbar und damit nie ganz im Bild.
-        .tvSettingsPage("Subtitles",
-                        description: "Subtitles start on the preferred language as soon as a scene's tracks are known. The look applies to every player on this Apple TV.") {
+        .tvSettingsPage(tr("subtitles"),
+                        description: tr("hint_subtitles_start_on_preferred_language")) {
             preview
         }
     }
 
     private var languageLabel: String {
         let code = SubtitlePreferredLanguage.normalized(tabManager.subtitlePreferredLanguage)
-        return SubtitlePreferredLanguage.pickerOptions().first { $0.id == code }?.label ?? "Any"
+        return SubtitlePreferredLanguage.pickerOptions().first { $0.id == code }?.label ?? tr("any")
     }
 
     /// Cue wie der Player ihn zeichnet — mit demselben TV-Scale, damit die
@@ -848,7 +848,7 @@ private struct TVSubtitleSettingsView: View {
         ZStack {
             LinearGradient(colors: [Color(white: 0.22), Color(white: 0.06)],
                            startPoint: .topLeading, endPoint: .bottomTrailing)
-            StashySubtitleText(text: "Sample subtitle",
+            StashySubtitleText(text: tr("sample_subtitle"),
                                scale: TVSubtitleMetrics.previewScale,
                                lineLimit: 2,
                                style: tabManager.subtitleStyle)
@@ -860,7 +860,7 @@ private struct TVSubtitleSettingsView: View {
         .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
         .allowsHitTesting(false)
         .focusable(false)
-        .accessibilityLabel("Subtitle preview")
+        .accessibilityLabel(tr("subtitle_preview"))
     }
 }
 
@@ -901,7 +901,7 @@ private struct TVSubtitleLanguagePickerView: View {
                         row(option)
                     }
                 } header: {
-                    Text("Common")
+                    Text(tr("common"))
                 }
 
                 Section {
@@ -909,11 +909,11 @@ private struct TVSubtitleLanguagePickerView: View {
                         row(option)
                     }
                 } header: {
-                    Text("All Languages")
+                    Text(tr("all_languages"))
                 }
             }
-            .tvSettingsPage("Preferred Language",
-                            description: "The language a scene's subtitles start with. \"Any\" takes the first ordinary track in the file.")
+            .tvSettingsPage(tr("preferred_language"),
+                            description: tr("hint_language_scenes_subtitles_start_with"))
         }
         .background(TVThemeFill())
     }
@@ -955,17 +955,17 @@ private struct TVMaintenanceSettingsView: View {
                     didClear = true
                 } label: {
                     HStack {
-                        Text("Clear Image Cache")
+                        Text(tr("action_clear_image_cache"))
                         if didClear {
                             Spacer()
-                            Text("Cleared")
+                            Text(tr("cleared"))
                                 .foregroundStyle(.secondary)
                         }
                     }
                 }
             }
         }
-        .tvSettingsPage("Maintenance", description: "Removes the cached artwork for the active server. Images are downloaded again as they appear.")
+        .tvSettingsPage(tr("maintenance"), description: tr("hint_removes_cached_artwork_for_active"))
     }
 }
 
@@ -977,12 +977,12 @@ private struct TVAboutSettingsView: View {
             Section {
                 // Jede Zeile fokussierbar: eine tvOS-Liste ohne fokussierbare
                 // Zeile lässt sich weder scrollen noch verlassen.
-                aboutRow("App", "stashy for Apple TV")
-                aboutRow("Version", appVersion)
-                aboutRow("Build", buildNumber)
+                aboutRow(tr("app"), tr("stashy_for_apple_tv"))
+                aboutRow(tr("version"), appVersion)
+                aboutRow(tr("build"), buildNumber)
             }
         }
-        .tvSettingsPage("About", description: "Version and build number of this app.")
+        .tvSettingsPage(tr("about"), description: tr("hint_version_and_build_number_of"))
     }
 
     private func aboutRow(_ label: String, _ value: String) -> some View {
@@ -1043,16 +1043,16 @@ struct TVServerFormView: View {
         NavigationStack {
             ScrollView {
                 VStack(spacing: 40) {
-                    Text(server == nil ? "Add Server" : "Edit Server")
+                    Text(server == nil ? tr("action_add_server") : tr("action_edit_server"))
                         .font(.largeTitle)
                         .fontWeight(.bold)
                         .padding(.top, 40)
 
                     VStack(spacing: 24) {
-                        TextField("Server Name", text: $name)
+                        TextField(tr("server_name"), text: $name)
                             .focused($focusedField, equals: .name)
 
-                        TextField("Server Address", text: $address)
+                        TextField(tr("server_address"), text: $address)
                             .focused($focusedField, equals: .address)
                             .autocorrectionDisabled()
                             .textInputAutocapitalization(.never)
@@ -1065,11 +1065,11 @@ struct TVServerFormView: View {
                             }
 
                         HStack(spacing: 24) {
-                            TextField("Port (optional)", text: $port)
+                            TextField(tr("port_optional"), text: $port)
                                 .focused($focusedField, equals: .port)
                                 .frame(maxWidth: 300)
 
-                            Picker("Protocol", selection: $selectedProtocol) {
+                            Picker(tr("protocol"), selection: $selectedProtocol) {
                                 ForEach(ServerProtocol.allCases, id: \.self) { proto in
                                     Text(proto.displayName).tag(proto)
                                 }
@@ -1079,34 +1079,34 @@ struct TVServerFormView: View {
                         }
 
                         VStack(alignment: .leading, spacing: 8) {
-                            TextField("Local Address (optional, e.g. 192.168.1.100:9999)", text: $localAddress)
+                            TextField(tr("local_address_optional_e_g"), text: $localAddress)
                                 .autocorrectionDisabled()
                                 .textInputAutocapitalization(.never)
-                            Text("Used instead of the address above whenever it answers, for example on your home network. Falls back automatically.")
+                            Text(tr("hint_used_instead_of_address_above"))
                                 .font(.caption)
                                 .foregroundColor(.secondary)
                         }
 
                         // Authentication Section
                         VStack(alignment: .leading, spacing: 24) {
-                            Text("Authentication")
+                            Text(tr("authentication"))
                                 .font(.headline)
                                 .foregroundColor(.secondary)
                             
-                            Picker("Auth Method", selection: $authMethod) {
+                            Picker(tr("auth_method"), selection: $authMethod) {
                                 ForEach(AuthMethod.allCases, id: \.self) { method in
-                                    Text(method.rawValue).tag(method)
+                                    Text(method.displayName).tag(method)
                                 }
                             }
                             .pickerStyle(.segmented)
                             
                             if authMethod == .login {
                                 VStack(spacing: 24) {
-                                    TextField("Username", text: $username)
+                                    TextField(tr("username"), text: $username)
                                         .textContentType(.username)
                                         .textInputAutocapitalization(.never)
                                     
-                                    SecureField("Password", text: $password)
+                                    SecureField(tr("password"), text: $password)
                                         .textContentType(.password)
                                     
                                     Button {
@@ -1116,7 +1116,7 @@ struct TVServerFormView: View {
                                             if isFetchingKey {
                                                 ProgressView()
                                             }
-                                            Text(isFetchingKey ? "Logging in..." : "Fetch API Key")
+                                            Text(isFetchingKey ? tr("logging_in_menu") : tr("action_fetch_api_key"))
                                         }
                                         .frame(minWidth: 300)
                                     }
@@ -1129,7 +1129,7 @@ struct TVServerFormView: View {
                                     }
                                 }
                             } else if authMethod == .apiKey {
-                                TextField("API Key", text: $apiKey)
+                                TextField(tr("api_key"), text: $apiKey)
                                     .focused($focusedField, equals: .apiKey)
                                     .autocorrectionDisabled()
                                     .textInputAutocapitalization(.never)
@@ -1145,11 +1145,11 @@ struct TVServerFormView: View {
                         .frame(maxWidth: 800)
 
                     HStack(spacing: 40) {
-                        Button("Cancel") {
+                        Button(tr("action_cancel")) {
                             dismiss()
                         }
 
-                        Button("Save") {
+                        Button(tr("action_save")) {
                             save()
                         }
                         .disabled(address.isEmpty)
@@ -1192,7 +1192,7 @@ struct TVServerFormView: View {
 
         let config = ServerConfig(
             id: server?.id ?? UUID(),
-            name: name.isEmpty ? "My Stash" : name,
+            name: name.isEmpty ? tr("my_stash") : name,
             serverAddress: finalAddress,
             port: finalPort,
             serverProtocol: selectedProtocol,
@@ -1260,7 +1260,7 @@ struct TVCustomHeadersCard: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 20) {
-            Text("Custom Headers")
+            Text(tr("custom_headers"))
                 .font(.headline)
                 .foregroundStyle(.secondary)
 
@@ -1268,17 +1268,17 @@ struct TVCustomHeadersCard: View {
             // name like `CF-Access-Client-Secret` has to stay readable.
             ForEach($headers) { $header in
                 VStack(alignment: .leading, spacing: 12) {
-                    TextField("Header name", text: $header.name)
+                    TextField(tr("header_name"), text: $header.name)
                         .autocorrectionDisabled()
                         .textInputAutocapitalization(.never)
                     HStack(spacing: 16) {
-                        SecureField("Value", text: $header.value)
+                        SecureField(tr("value"), text: $header.value)
                         Button {
                             headers.removeAll { $0.id == header.id }
                         } label: {
                             Image(systemName: "minus.circle.fill")
                         }
-                        .accessibilityLabel("Remove header")
+                        .accessibilityLabel(tr("action_remove_header"))
                     }
                 }
             }
@@ -1286,10 +1286,10 @@ struct TVCustomHeadersCard: View {
             Button {
                 headers.append(ServerHTTPHeader(name: "", value: ""))
             } label: {
-                Label("Add Header", systemImage: "plus.circle.fill")
+                Label(tr("action_add_header"), systemImage: "plus.circle.fill")
             }
 
-            Text("Sent with every request to this server, e.g. for SSO or a reverse proxy that needs its own token.")
+            Text(tr("hint_sent_with_every_request_to"))
                 .font(.caption)
                 .foregroundStyle(.secondary)
         }

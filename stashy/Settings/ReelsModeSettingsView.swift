@@ -38,12 +38,12 @@ struct ReelsModeSettingsView: View {
     var body: some View {
         List {
             Section {
-                stashyScrollingSectionHeader("Tab")
+                stashyScrollingSectionHeader(tr("tab"))
                 Toggle(isOn: Binding(
                     get: { isEnabled },
                     set: { _ in tabManager.toggle(.reels) }
                 )) {
-                    Label("Show Feeds Tab", systemImage: "play.rectangle.on.rectangle")
+                    Label(tr("action_show_feeds_tab"), systemImage: "play.rectangle.on.rectangle")
                 }
                 .tint(appearanceManager.tintColor)
                 .stashyGroupedSettingsRow()
@@ -52,16 +52,16 @@ struct ReelsModeSettingsView: View {
             // App UI, not a per-feed filter option — moved here from the Feeds filter sheet
             // (same `ReelsShowsDeleteButton` key, existing choices carry over).
             Section {
-                stashyScrollingSectionHeader("Controls")
+                stashyScrollingSectionHeader(tr("controls"))
                 Toggle(isOn: $tabManager.reelsShowsDeleteButton) {
-                    Label("Show Delete Button", systemImage: "trash")
+                    Label(tr("action_show_delete_button"), systemImage: "trash")
                 }
                 .tint(appearanceManager.tintColor)
                 .stashyGroupedSettingsRow()
             }
 
             Section {
-                stashyScrollingSectionHeader("Modes")
+                stashyScrollingSectionHeader(tr("modes"))
                 ForEach(tabManager.configurableReelsModes) { modeConfig in
                     VStack(alignment: .leading, spacing: 0) {
                         // Header
@@ -85,12 +85,12 @@ struct ReelsModeSettingsView: View {
                                 .padding(.vertical, 8)
 
                             // Default Sort
-                            reelsSettingRow(title: "Default Sort") {
+                            reelsSettingRow(title: tr("default_sort")) {
                                 sortPicker(for: modeConfig.type)
                             }
 
                             // Default Filter
-                            reelsSettingRow(title: "Default Filter") {
+                            reelsSettingRow(title: tr("default_filter")) {
                                 filterPicker(for: modeConfig.type)
                             }
                             .padding(.top, 4)
@@ -98,7 +98,7 @@ struct ReelsModeSettingsView: View {
                             // Pics: Bilder zu Sets bündeln (gleiche Prefs wie die 1-Spalten-Ansicht in Images).
                             if modeConfig.type == .pics {
                                 let groupMode = StashImageGroupingPrefs.mode(fromRaw: groupModeRaw)
-                                reelsSettingRow(title: "Group into sets") {
+                                reelsSettingRow(title: tr("group_into_sets")) {
                                     Menu {
                                         ForEach(StashImageGroupMode.allCases, id: \.self) { option in
                                             Button(action: {
@@ -116,7 +116,7 @@ struct ReelsModeSettingsView: View {
 
                                 if groupMode == .gallerySession {
                                     // Max. Abstand zum vorherigen Bild (created_at) für lose Bilder ohne Galerie.
-                                    reelsSettingRow(title: "Session gap") {
+                                    reelsSettingRow(title: tr("session_gap")) {
                                         let currentGap = StashImageGroupingPrefs.normalizedGap(groupGapMinutes)
                                         Menu {
                                             ForEach(StashImageGroupingPrefs.gapOptions, id: \.self) { minutes in
@@ -133,7 +133,7 @@ struct ReelsModeSettingsView: View {
 
                                 if groupMode != .off {
                                     // Max. Bilder pro Set (`stashline_group_max_size`).
-                                    reelsSettingRow(title: "Max set size") {
+                                    reelsSettingRow(title: tr("max_set_size")) {
                                         let currentMax = StashImageGroupingPrefs.normalizedMaxSize(groupMaxSize)
                                         Menu {
                                             ForEach(StashImageGroupingPrefs.maxSizeOptions, id: \.self) { size in
@@ -162,7 +162,7 @@ struct ReelsModeSettingsView: View {
         .environment(\.editMode, .constant(.active))
         .deleteDisabled(true)
         .applyAppBackground()
-        .stashySettingsDetailChrome("Feeds")
+        .stashySettingsDetailChrome(tr("feeds"))
         .onAppear {
             viewModel.fetchSavedFilters()
         }
@@ -255,7 +255,7 @@ struct ReelsModeSettingsView: View {
         switch type {
         case .scenes:
             if sceneFilters.isEmpty && !viewModel.isLoadingSavedFilters {
-                Text("No filters found")
+                Text(tr("empty_filters_found"))
                     .foregroundColor(.secondary)
                     .font(.subheadline)
             } else {
@@ -269,7 +269,7 @@ struct ReelsModeSettingsView: View {
                         }
                     }
                 )) {
-                    Text("None").tag("")
+                    Text(tr("none")).tag("")
                     ForEach(sceneFilters) { filter in
                         Text(filter.name).tag(filter.id)
                     }
@@ -280,7 +280,7 @@ struct ReelsModeSettingsView: View {
 
         case .markers:
             if markerFilters.isEmpty && !viewModel.isLoadingSavedFilters {
-                Text("No filters found")
+                Text(tr("empty_filters_found"))
                     .foregroundColor(.secondary)
                     .font(.subheadline)
             } else {
@@ -294,7 +294,7 @@ struct ReelsModeSettingsView: View {
                         }
                     }
                 )) {
-                    Text("None").tag("")
+                    Text(tr("none")).tag("")
                     ForEach(markerFilters) { filter in
                         Text(filter.name).tag(filter.id)
                     }
@@ -308,7 +308,7 @@ struct ReelsModeSettingsView: View {
                 .filter { $0.mode == .images }
                 .sorted { $0.name < $1.name }
             if filters.isEmpty && !viewModel.isLoadingSavedFilters {
-                Text("No filters found")
+                Text(tr("empty_filters_found"))
                     .foregroundColor(.secondary)
                     .font(.subheadline)
             } else {
@@ -322,7 +322,7 @@ struct ReelsModeSettingsView: View {
                         }
                     }
                 )) {
-                    Text("None").tag("")
+                    Text(tr("none")).tag("")
                     ForEach(filters) { filter in
                         Text(filter.name).tag(filter.id)
                     }
@@ -333,7 +333,7 @@ struct ReelsModeSettingsView: View {
 
         case .previews:
             if sceneFilters.isEmpty && !viewModel.isLoadingSavedFilters {
-                Text("No filters found")
+                Text(tr("empty_filters_found"))
                     .foregroundColor(.secondary)
                     .font(.subheadline)
             } else {
@@ -347,7 +347,7 @@ struct ReelsModeSettingsView: View {
                         }
                     }
                 )) {
-                    Text("None").tag("")
+                    Text(tr("none")).tag("")
                     ForEach(sceneFilters) { filter in
                         Text(filter.name).tag(filter.id)
                     }
@@ -359,7 +359,7 @@ struct ReelsModeSettingsView: View {
         case .verticals:
             // A scene filter like Scenes; the feed always adds portrait on top.
             if sceneFilters.isEmpty && !viewModel.isLoadingSavedFilters {
-                Text("No filters found")
+                Text(tr("empty_filters_found"))
                     .foregroundColor(.secondary)
                     .font(.subheadline)
             } else {
@@ -370,7 +370,7 @@ struct ReelsModeSettingsView: View {
                         tabManager.setDefaultVerticalFilter(for: .reels, filterId: filter?.id, filterName: filter?.name)
                     }
                 )) {
-                    Text("None").tag("")
+                    Text(tr("none")).tag("")
                     ForEach(sceneFilters) { filter in
                         Text(filter.name).tag(filter.id)
                     }
@@ -382,7 +382,7 @@ struct ReelsModeSettingsView: View {
                 .filter { $0.mode == .images }
                 .sorted { $0.name < $1.name }
             if filters.isEmpty && !viewModel.isLoadingSavedFilters {
-                Text("No filters found")
+                Text(tr("empty_filters_found"))
                     .foregroundColor(.secondary)
                     .font(.subheadline)
             } else {
@@ -396,7 +396,7 @@ struct ReelsModeSettingsView: View {
                         }
                     }
                 )) {
-                    Text("None").tag("")
+                    Text(tr("none")).tag("")
                     ForEach(filters) { filter in
                         Text(filter.name).tag(filter.id)
                     }

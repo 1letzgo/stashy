@@ -1,5 +1,7 @@
 package de.letzgo.stashy.ui
 
+import de.letzgo.stashy.R
+import de.letzgo.stashy.tr
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.size
@@ -70,7 +72,7 @@ fun TopBarMenuAction(
 /** Trailing "⋮" overflow menu of the app bar. */
 @Composable
 fun TopBarOverflowMenu(content: @Composable ColumnScope.(dismiss: () -> Unit) -> Unit) {
-    TopBarMenuAction(Icons.Filled.MoreVert, "More options", content = content)
+    TopBarMenuAction(Icons.Filled.MoreVert, tr(R.string.more_options), content = content)
 }
 
 /** One entry of [TopBarOverflowMenu]. */

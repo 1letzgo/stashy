@@ -30,29 +30,30 @@ private enum StashyPlusFeatureCopy {
     }
 
     #if os(macOS)
-    static let appIcons = "Changes the stashy app icon on iPhone and iPad. The Mac app keeps its own icon."
+    static var appIcons: String { tr("hint_changes_stashy_app_icon_on") }
     #else
-    static let appIcons = "Changes the stashy app icon to the color you pick."
+    static var appIcons: String { tr("hint_changes_stashy_app_icon_to") }
     #endif
-    static let downloads = "Saves scenes to your device so you can watch them offline. They are listed in Tools."
-    static let miniPlayer = "Keeps a scene playing in a small bar when you leave its page. Add scenes to your watchlist on the scene page and they play one after another; the watchlist button on the Dashboard opens the list."
-    static let magazine = "Adds a Magazin view on Home that shows your galleries as covers. They open like a magazine and remember the page you stopped on."
-    static let aiSubtitles = "Creates subtitles from a scene's speech on your device and translates them into your subtitle language. Turn them on in the player's AI Subtitles menu."
-    static let tagSuggestions = "Suggests tags based on how your library is already tagged, shows scenes with the same performers, studio or tags on the scene page, and adds For You and Forgotten Favorites rows on Home: scenes picked from what you played, your O-Counts and ratings, and favorites you have not played for a while. No outside service is involved."
-    static let aiMotion = "Analyzes the playing video live on your device and moves your connected hardware in sync with it. Uses a lot of CPU and battery."
-    static let overview = "Shows your library at a glance in Tools: playback, catalog counts and storage."
-    static let oCount = "Shows the O-Counts of your scenes and images as a month calendar in Tools."
-    static let timeline = "Lists your scene plays, O-Counts and markers over time in Tools."
-    static let charts = "Ranks your top scenes, performers, studios and tags in Tools, by measures like O-Count or rating."
-    static let filters = "Lets you create, edit, rename and delete the filters saved on your server, under Settings › Server."
-    static let match = "Puts performers against each other in Tools. You pick the winner and their ratings update on your server."
-    static let rateMe = "Shows unrated scenes or images one at a time in Tools, so you can rate them with stars."
+    static var downloads: String { tr("hint_saves_scenes_to_your_device") }
+    static var miniPlayer: String { tr("hint_keeps_scene_playing_in_small") }
+    static var magazine: String { tr("hint_adds_magazin_view_on_home") }
+    static var aiSubtitles: String { tr("hint_creates_subtitles_from_scenes_speech") }
+    static var tagSuggestions: String { tr("hint_suggests_tags_based_on_how") }
+    static var aiMotion: String { tr("hint_analyzes_playing_video_live_on") }
+    static var overview: String { tr("hint_shows_your_library_at_glance") }
+    static var oCount: String { tr("hint_shows_o_counts_of_your") }
+    static var timeline: String { tr("hint_lists_your_scene_plays_o") }
+    static var charts: String { tr("hint_ranks_your_top_scenes_performers") }
+    static var filters: String { tr("hint_lets_you_create_edit_rename") }
+    static var match: String { tr("hint_puts_performers_against_each_other") }
+    static var rateMe: String { tr("hint_shows_unrated_scenes_or_images") }
 
-    static let lockedFeatures: [LockedFeature] = [
-        .init(title: "Custom App Icons", detail: appIcons),
-        .init(title: "Download Scenes", detail: downloads),
-        .init(title: "Miniplayer & Watchlist", detail: miniPlayer),
-        .init(title: "AI Subtitles and translation", detail: aiSubtitles, isBeta: true),
+    static var lockedFeatures: [LockedFeature] {
+[
+        .init(title: tr("custom_app_icons"), detail: appIcons),
+        .init(title: tr("action_download_scenes"), detail: downloads),
+        .init(title: tr("miniplayer_and_watchlist"), detail: miniPlayer),
+        .init(title: tr("ai_subtitles_and_translation"), detail: aiSubtitles, isBeta: true),
         .init(title: AIMotionCopy.name, detail: aiMotion, isBeta: true),
         .init(title: ToolsItem.statistics.plusFeatureTitle, detail: overview),
         .init(title: ToolsItem.oCount.plusFeatureTitle, detail: oCount),
@@ -61,9 +62,10 @@ private enum StashyPlusFeatureCopy {
         .init(title: ToolsItem.filters.plusFeatureTitle, detail: filters),
         .init(title: ToolsItem.hotOrNot.plusFeatureTitle, detail: match),
         .init(title: ToolsItem.rateMe.title, detail: rateMe),
-        .init(title: "Magazin", detail: magazine),
-        .init(title: "Recommendations", detail: tagSuggestions, isBeta: true),
+        .init(title: tr("magazin"), detail: magazine),
+        .init(title: tr("recommendations"), detail: tagSuggestions, isBeta: true),
     ]
+    }
 }
 
 struct SettingsView: View {
@@ -193,8 +195,8 @@ struct SettingsView: View {
                 selectedSection = .main
             }
         }
-        .alert("Library Scan", isPresented: $showScanAlert) {
-            Button("OK", role: .cancel) { }
+        .alert(tr("library_scan"), isPresented: $showScanAlert) {
+            Button(tr("ok"), role: .cancel) { }
         } message: {
             Text(scanAlertMessage)
         }
@@ -212,21 +214,27 @@ struct SettingsView: View {
             onScan: { startLibraryScan() }
         )
 
+        Section {
+            stashyScrollingSectionHeader(tr("app_language"), isBeta: true)
+            AppLanguageRow()
+                .stashyGroupedSettingsRow()
+        }
+
         if configManager.activeConfig != nil {
             PlaybackSettingsSection()
             interactiveDevicesSection
         }
 
         Section {
-            stashyScrollingSectionHeader("Backup & Transfer")
+            stashyScrollingSectionHeader(tr("backup_and_transfer"))
             SettingsTransferControls(groupedRows: true)
-            stashyScrollingSectionFooter("Servers, settings, default filters, dashboard and tabs as one JSON file — imports on iPhone, iPad, Mac and Android.")
+            stashyScrollingSectionFooter(tr("hint_servers_settings_default_filters_dashboard"))
         }
 
         Section {
             stashyScrollingSectionHeader("iCloud")
             ICloudSettingsSyncRow()
-            stashyScrollingSectionFooter("Keeps servers, API keys and settings the same on your iPhone, iPad and Mac. Turn it on per device. The active server stays each device's own choice.")
+            stashyScrollingSectionFooter(tr("hint_keeps_servers_api_keys_and"))
         }
 
         aboutSection
@@ -235,25 +243,25 @@ struct SettingsView: View {
     @ViewBuilder
     private var designSettings: some View {
         Section {
-            stashyScrollingSectionHeader("Appearance")
+            stashyScrollingSectionHeader(tr("appearance"))
             NavigationLink(destination: AppearanceSettingsView()) {
-                Label("Appearance", systemImage: "paintbrush")
+                Label(tr("appearance"), systemImage: "paintbrush")
             }
             .stashyGroupedBlockRow(index: 0, count: 3)
             NavigationLink(destination: EditModeSettingsView()) {
-                Label("Editing", systemImage: "pencil.circle")
+                Label(tr("editing"), systemImage: "pencil.circle")
             }
             .stashyGroupedBlockRow(index: 1, count: 3)
             NavigationLink(destination: SceneDetailLayoutSettingsView()) {
-                Label("Scene View", systemImage: "rectangle.stack")
+                Label(tr("scene_view"), systemImage: "rectangle.stack")
             }
             .stashyGroupedBlockRow(index: 2, count: 3)
         }
 
         Section {
-            stashyScrollingSectionHeader("Security")
+            stashyScrollingSectionHeader(tr("security"))
             NavigationLink(destination: SecuritySettingsView()) {
-                Label("Security", systemImage: "lock.shield")
+                Label(tr("security"), systemImage: "lock.shield")
             }
             .stashyGroupedSettingsRow()
         }
@@ -262,7 +270,7 @@ struct SettingsView: View {
             ContentSettingsSection()
         } else {
             Section {
-                Text("Content settings require an active server.")
+                Text(tr("hint_content_settings_require_active_server"))
                     .foregroundColor(.secondary)
                     .stashyGroupedSettingsRow()
             }
@@ -273,16 +281,16 @@ struct SettingsView: View {
     private var stashyPlusSettings: some View {
         if stashyPlus.isUnlocked {
             Section {
-                stashyScrollingSectionHeader("Custom App Icons")
+                stashyScrollingSectionHeader(tr("custom_app_icons"))
                 StashyPlusAppIconSettings()
                     .stashyGroupedSettingsRow()
                 stashyScrollingSectionFooter(StashyPlusFeatureCopy.appIcons)
             }
 
             Section {
-                stashyScrollingSectionHeader("Miniplayer & Watchlist")
+                stashyScrollingSectionHeader(tr("miniplayer_and_watchlist"))
                 Toggle(isOn: $tabManager.isMiniPlayerEnabled) {
-                    Label("Miniplayer & Watchlist", systemImage: "rectangle.bottomhalf.inset.filled")
+                    Label(tr("miniplayer_and_watchlist"), systemImage: "rectangle.bottomhalf.inset.filled")
                 }
                 .tint(appearanceManager.tintColor)
                 .stashyGroupedSettingsRow()
@@ -290,16 +298,16 @@ struct SettingsView: View {
             }
 
             Section {
-                stashyScrollingSectionHeader("Magazin")
+                stashyScrollingSectionHeader(tr("magazin"))
                 Toggle(isOn: $isMagazineEnabled) {
-                    Label("Magazin eReader", systemImage: "magazine")
+                    Label(tr("magazin_ereader"), systemImage: "magazine")
                 }
                 .tint(appearanceManager.tintColor)
                 .stashyGroupedBlockRow(index: 0, count: isMagazineEnabled ? 2 : 1)
 
                 if isMagazineEnabled {
                     HStack {
-                        Text("Default Filter")
+                        Text(tr("default_filter"))
                         Spacer()
                         MagazineDefaultFilterMenu(viewModel: viewModel)
                     }
@@ -310,15 +318,15 @@ struct SettingsView: View {
             }
 
             Section {
-                stashyScrollingSectionHeader("AI Subtitles and translation", isBeta: true)
+                stashyScrollingSectionHeader(tr("ai_subtitles_and_translation"), isBeta: true)
                 StashyPlusAISubtitlesSettings()
                 stashyScrollingSectionFooter(StashyPlusFeatureCopy.aiSubtitles)
             }
 
             Section {
-                stashyScrollingSectionHeader("Recommendations", isBeta: true)
+                stashyScrollingSectionHeader(tr("recommendations"), isBeta: true)
                 NavigationLink(destination: AITagsSettingsView()) {
-                    Label("Recommendations", systemImage: "sparkles")
+                    Label(tr("recommendations"), systemImage: "sparkles")
                 }
                 .stashyGroupedSettingsRow()
                 stashyScrollingSectionFooter(StashyPlusFeatureCopy.tagSuggestions)
@@ -334,7 +342,7 @@ struct SettingsView: View {
             }
         } else {
             Section {
-                stashyScrollingSectionHeader("Included with stashy+")
+                stashyScrollingSectionHeader(tr("included_with_stashy_plus"))
                 let features = StashyPlusFeatureCopy.lockedFeatures
                 ForEach(features.indices, id: \.self) { index in
                     lockedPlusFeature(features[index])
@@ -394,7 +402,7 @@ struct SettingsView: View {
 
             if showsPurchaseMenu {
                 Section {
-                    stashyScrollingSectionHeader(stashyPlus.isUnlocked ? "stashy+" : "Unlock stashy+")
+                    stashyScrollingSectionHeader(stashyPlus.isUnlocked ? "stashy+" : tr("action_unlock_stashy_plus"))
 
                     if stashyPlus.isUnlocked && !showsLegacyAppLifetimeButton {
                         HStack(spacing: 10) {
@@ -416,7 +424,7 @@ struct SettingsView: View {
                             if storeManager.isLoadingProducts {
                                 HStack {
                                     ProgressView()
-                                    Text("Loading stashy+ options…")
+                                    Text(tr("loading_stashy_plus_options"))
                                         .foregroundColor(.secondary)
                                 }
                                 .stashyGroupedSettingsRow()
@@ -425,7 +433,7 @@ struct SettingsView: View {
                                     Text(storeManager.lastProductError ?? "stashy+ products unavailable.")
                                         .font(.caption)
                                         .foregroundColor(.secondary)
-                                    Button("Retry") {
+                                    Button(tr("action_retry")) {
                                         Task { await storeManager.fetchProducts() }
                                     }
                                 }
@@ -448,7 +456,7 @@ struct SettingsView: View {
 
                     if stashyPlus.source == .subscription {
                         stashyPlusSecondaryActionCard(
-                            title: "Manage Subscription",
+                            title: tr("action_manage_subscription"),
                             systemImage: "creditcard",
                             showsProgress: false
                         ) {
@@ -457,7 +465,7 @@ struct SettingsView: View {
                     }
 
                     if !stashyPlus.isUnlocked {
-                        stashyScrollingSectionFooter("Monthly, Yearly, or Lifetime. If you bought stashy as a paid app before 3.0, or just switched from TestFlight, tap Restore Purchases.")
+                        stashyScrollingSectionFooter(tr("hint_monthly_yearly_or_lifetime_if"))
                     }
 
                     if stashyPlus.shouldOfferPurchases {
@@ -484,15 +492,15 @@ struct SettingsView: View {
     private var stashyPlusSubscriptionLegalDisclosure: some View {
         VStack(alignment: .leading, spacing: 8) {
             Text((offersFreeTrial
-                  ? "The free trial is for new subscribers. When it ends, the subscription starts at the price shown unless canceled at least 24 hours before. "
+                  ? tr("hint_free_trial_is_for_new")
                   : "")
-                 + "Subscriptions renew automatically unless canceled at least 24 hours before the end of the current period. Manage or cancel in your App Store account settings.")
+                 + tr("hint_subscriptions_renew_automatically_unless_canceled"))
                 .font(.caption2)
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
             HStack(spacing: 16) {
-                Link("Terms of Use (EULA)", destination: StashyLegalLinks.termsOfUse)
-                Link("Privacy Policy", destination: StashyLegalLinks.privacyPolicy)
+                Link(tr("terms_of_use_eula"), destination: StashyLegalLinks.termsOfUse)
+                Link(tr("privacy_policy"), destination: StashyLegalLinks.privacyPolicy)
             }
             .font(.caption)
             .foregroundColor(appearanceManager.tintColor)
@@ -508,14 +516,14 @@ struct SettingsView: View {
             Image(systemName: "checkmark.seal.fill")
                 .font(.title3)
             VStack(alignment: .leading, spacing: 2) {
-                Text("Grab Lifetime")
+                Text(tr("grab_lifetime"))
                     .font(.subheadline.weight(.bold))
-                Text("Included with your app purchase")
+                Text(tr("included_with_your_app_purchase"))
                     .font(.caption)
                     .opacity(0.9)
             }
             Spacer()
-            Text("Purchased")
+            Text(tr("purchased"))
                 .font(.caption.weight(.semibold))
         }
         .foregroundColor(.white)
@@ -566,7 +574,7 @@ struct SettingsView: View {
 
     private var stashyPlusRestoreButton: some View {
         stashyPlusSecondaryButton(
-            title: "Restore Purchases",
+            title: tr("action_restore_purchases"),
             systemImage: "arrow.clockwise",
             showsProgress: storeManager.isRestoringPurchases
         ) {
@@ -658,7 +666,7 @@ struct SettingsView: View {
         if let error = await storeManager.purchase(product) {
             ToastManager.shared.show(error, icon: "exclamationmark.triangle", style: .error)
         } else if stashyPlus.isUnlocked {
-            ToastManager.shared.show("stashy+ unlocked — thank you!", icon: "sparkles", style: .success)
+            ToastManager.shared.show(tr("stashy_plus_unlocked_thank_you"), icon: "sparkles", style: .success)
         }
     }
 
@@ -694,9 +702,9 @@ struct SettingsView: View {
 
     private var restoreFailureMessage: String {
         if storeManager.isAppTransactionSandbox {
-            return "This install is still TestFlight/Sandbox. Open the App Store version and tap Restore Purchases again."
+            return tr("hint_this_install_is_still_testflight")
         }
-        return "No stashy+ subscription or Lifetime purchase on this Apple ID. Pre-3.0 paid-app buyers get Lifetime via Restore Purchases."
+        return tr("hint_no_stashy_plus_subscription_or")
     }
 
     private func restorePurchases() async {
@@ -704,7 +712,7 @@ struct SettingsView: View {
         await storeManager.restorePurchases()
         if stashyPlus.isUnlocked {
             ToastManager.shared.show(
-                wasUnlocked ? "Purchases restored" : "stashy+ unlocked",
+                wasUnlocked ? tr("purchases_restored") : "stashy+ unlocked",
                 icon: "sparkles",
                 style: .success
             )
@@ -736,21 +744,21 @@ struct SettingsView: View {
             tipSection
 
             Section {
-                stashyScrollingSectionHeader("Links")
+                stashyScrollingSectionHeader(tr("links"))
                 Link(destination: URL(string: "https://github.com/1letzgo/stashy")!) {
                     Label("GitHub", systemImage: "chevron.left.forwardslash.chevron.right")
                         .foregroundColor(appearanceManager.tintColor)
                 }
                 .stashyGroupedBlockRow(index: 0, count: 3)
                 Link(destination: URL(string: "https://discord.gg/DMxEFaVzUM")!) {
-                    Label("Discord", systemImage: "bubble.left.and.bubble.right.fill")
+                    Label(tr("discord"), systemImage: "bubble.left.and.bubble.right.fill")
                         .foregroundColor(appearanceManager.tintColor)
                 }
                 .stashyGroupedBlockRow(index: 1, count: 3)
                 NavigationLink {
                     AcknowledgementsView()
                 } label: {
-                    Label("Acknowledgements", systemImage: "doc.text")
+                    Label(tr("acknowledgements"), systemImage: "doc.text")
                 }
                 .stashyGroupedBlockRow(index: 2, count: 3)
             }
@@ -767,21 +775,21 @@ struct SettingsView: View {
     @ViewBuilder
     private var tipSection: some View {
         Section {
-            stashyScrollingSectionHeader("Tips")
+            stashyScrollingSectionHeader(tr("tips"))
             if sortedTipProducts.isEmpty {
                 if storeManager.isLoadingProducts {
                     HStack {
                         ProgressView()
-                        Text("Loading tips…")
+                        Text(tr("loading_tips"))
                             .foregroundColor(.secondary)
                     }
                     .stashyGroupedSettingsRow()
                 } else {
                     VStack(alignment: .leading, spacing: 8) {
-                        Text("Tips unavailable.")
+                        Text(tr("tips_unavailable"))
                             .font(.caption)
                             .foregroundColor(.secondary)
-                        Button("Retry") {
+                        Button(tr("action_retry")) {
                             Task { await storeManager.fetchProducts() }
                         }
                     }
@@ -811,7 +819,7 @@ struct SettingsView: View {
                     .stashyGroupedBlockRow(index: index, count: sortedTipProducts.count)
                 }
             }
-            stashyScrollingSectionFooter("Support stashy. Tips do not unlock stashy+.")
+            stashyScrollingSectionFooter(tr("hint_support_stashy_tips_do_not"))
         }
         .task {
             if storeManager.tipProducts.isEmpty {
@@ -824,23 +832,23 @@ struct SettingsView: View {
         if let error = await storeManager.purchase(product) {
             ToastManager.shared.show(error, icon: "exclamationmark.triangle", style: .error)
         } else {
-            ToastManager.shared.show("Thank you for the tip!", icon: "heart.fill", style: .success)
+            ToastManager.shared.show(tr("thank_you_for_tip"), icon: "heart.fill", style: .success)
         }
     }
     // MARK: - Interactive Devices
     private var interactiveDevicesSection: some View {
         Section {
-            stashyScrollingSectionHeader("Device Synchronization")
+            stashyScrollingSectionHeader(tr("device_synchronization"))
             NavigationLink(destination: HandySettingsView()) {
                 Label("The Handy", systemImage: "hand.tap")
             }
             .stashyGroupedBlockRow(index: 0, count: 3)
             NavigationLink(destination: IntifaceSettingsView()) {
-                Label("Intiface", systemImage: "cable.connector")
+                Label(tr("intiface"), systemImage: "cable.connector")
             }
             .stashyGroupedBlockRow(index: 1, count: 3)
             NavigationLink(destination: LoveSpouseSettingsView()) {
-                Label("Love Spouse", systemImage: "antenna.radiowaves.left.and.right")
+                Label(tr("love_spouse"), systemImage: "antenna.radiowaves.left.and.right")
             }
             .stashyGroupedBlockRow(index: 2, count: 3)
         }
@@ -932,10 +940,10 @@ class StoreManager: ObservableObject {
             let loadedPlus = Set(self.products.map(\.id))
             let missing = plusIDs.subtracting(loadedPlus).sorted()
             if self.products.isEmpty {
-                lastProductError = "No stashy+ products returned. Check the current RevenueCat offering."
+                lastProductError = tr("hint_no_stashy_plus_products_returned")
                 AppLog.debug("💬 RevenueCat offering has no stashy+ products for \(plusIDs.sorted())")
             } else if !missing.isEmpty {
-                lastProductError = "Missing from the store offering: \(missing.joined(separator: ", "))"
+                lastProductError = tr("hint_missing_from_store_offering_arg", missing.joined(separator: ", "))
                 AppLog.debug("💬 RevenueCat loaded \(loadedPlus.sorted()), missing \(missing)")
             } else {
                 lastProductError = nil
@@ -1101,21 +1109,21 @@ struct IntifaceSettingsView: View {
         let serverRowCount = 3
         List {
             Section {
-                Toggle("Enable Intiface", isOn: $buttplugManager.isEnabled)
+                Toggle(tr("action_enable_intiface"), isOn: $buttplugManager.isEnabled)
                     .tint(appearanceManager.tintColor)
                     .stashyGroupedSettingsRow()
             }
 
             Section {
-                stashyScrollingSectionHeader("Intiface Server")
-                TextField("Server Address", text: $buttplugManager.serverAddress)
+                stashyScrollingSectionHeader(tr("intiface_server"))
+                TextField(tr("server_address"), text: $buttplugManager.serverAddress)
                     .autocapitalization(.none)
                     .disableAutocorrection(true)
                     .disabled(!buttplugManager.isEnabled)
                     .stashyGroupedBlockRow(index: 0, count: serverRowCount)
 
                 HStack {
-                    Text("Status")
+                    Text(tr("status"))
                     Spacer()
                     Text(buttplugManager.statusMessage)
                         .foregroundColor(buttplugManager.isConnected ? .green : .secondary)
@@ -1123,12 +1131,12 @@ struct IntifaceSettingsView: View {
                 .stashyGroupedBlockRow(index: 1, count: serverRowCount)
 
                 if buttplugManager.isConnected {
-                    Button("Disconnect", role: .destructive) {
+                    Button(tr("action_disconnect"), role: .destructive) {
                         buttplugManager.disconnect()
                     }
                     .stashyGroupedBlockRow(index: 2, count: serverRowCount)
                 } else {
-                    Button("Connect") {
+                    Button(tr("action_connect")) {
                         buttplugManager.connect()
                     }
                     .disabled(!buttplugManager.isEnabled)
@@ -1138,7 +1146,7 @@ struct IntifaceSettingsView: View {
 
             if !buttplugManager.devices.isEmpty {
                 Section {
-                    stashyScrollingSectionHeader("Discovered Devices")
+                    stashyScrollingSectionHeader(tr("discovered_devices"))
                     ForEach(Array(buttplugManager.devices.enumerated()), id: \.element.id) { index, device in
                         HStack {
                             Image(systemName: "cable.connector")
@@ -1153,12 +1161,12 @@ struct IntifaceSettingsView: View {
             }
 
             Section {
-                stashyScrollingSectionFooter("Stashy connects to Intiface Desktop or Intiface Central via WebSockets. Ensure 'Enable Remote Network Access' is turned on in Intiface settings.")
+                stashyScrollingSectionFooter(tr("hint_stashy_connects_to_intiface_desktop"))
             }
         }
         .stashySettingsList()
         .applyAppBackground()
-        .stashySettingsDetailChrome("Intiface")
+        .stashySettingsDetailChrome(tr("intiface"))
     }
 }
 
@@ -1169,29 +1177,29 @@ struct HandySettingsView: View {
     var body: some View {
         List {
             Section {
-                Toggle("Enable The Handy", isOn: $handyManager.isEnabled)
+                Toggle(tr("action_enable_handy"), isOn: $handyManager.isEnabled)
                     .tint(appearanceManager.tintColor)
                     .stashyGroupedSettingsRow()
             }
 
             Section {
-                stashyScrollingSectionHeader("Device Type")
-                Picker("Device", selection: $handyManager.deviceType) {
+                stashyScrollingSectionHeader(tr("device_type"))
+                Picker(tr("device"), selection: $handyManager.deviceType) {
                     Text("The Handy").tag("The Handy")
-                    Text("The Oh.").tag("Oh.")
+                    Text(tr("oh")).tag("Oh.")
                 }
                 .pickerStyle(.segmented)
                 .disabled(!handyManager.isEnabled)
                 .stashyGroupedSettingsRow()
-                stashyScrollingSectionFooter("The Handy uses HAMP protocol. The Oh. uses HVP protocol.")
+                stashyScrollingSectionFooter(tr("hint_handy_uses_hamp_protocol_oh"))
             }
 
             if handyManager.deviceType == "The Handy" {
                 Section {
-                    stashyScrollingSectionHeader("AI Motion Controls")
+                    stashyScrollingSectionHeader(tr("ai_motion_controls"))
                     VStack(alignment: .leading, spacing: 4) {
                         HStack {
-                            Text("Stroke Length")
+                            Text(tr("stroke_length"))
                             Spacer()
                             Text("\(Int(handyManager.strokeLength))%")
                                 .foregroundColor(.secondary)
@@ -1203,7 +1211,7 @@ struct HandySettingsView: View {
                     .stashyGroupedBlockRow(index: 0, count: 2)
                     VStack(alignment: .leading, spacing: 4) {
                         HStack {
-                            Text("Max Velocity")
+                            Text(tr("max_velocity"))
                             Spacer()
                             Text("\(Int(handyManager.maxVelocity))%")
                                 .foregroundColor(.secondary)
@@ -1217,10 +1225,10 @@ struct HandySettingsView: View {
                 .disabled(!handyManager.isEnabled)
             } else {
                 Section {
-                    stashyScrollingSectionHeader("AI Motion Controls")
+                    stashyScrollingSectionHeader(tr("ai_motion_controls"))
                     VStack(alignment: .leading, spacing: 4) {
                         HStack {
-                            Text("Max Intensity")
+                            Text(tr("max_intensity"))
                             Spacer()
                             Text("\(Int(handyManager.maxAmplitude * 100))%")
                                 .foregroundColor(.secondary)
@@ -1235,14 +1243,14 @@ struct HandySettingsView: View {
             }
 
             Section {
-                stashyScrollingSectionHeader("Handy Connection")
-                TextField("Connection Key", text: HandyManager.shared.$connectionKey)
+                stashyScrollingSectionHeader(tr("handy_connection"))
+                TextField(tr("connection_key"), text: HandyManager.shared.$connectionKey)
                     .autocapitalization(.none)
                     .disableAutocorrection(true)
                     .disabled(!handyManager.isEnabled)
                     .stashyGroupedBlockRow(index: 0, count: 4)
 
-                TextField("Public URL Override (Optional)", text: HandyManager.shared.$publicUrl)
+                TextField(tr("public_url_override_optional"), text: HandyManager.shared.$publicUrl)
                     .autocapitalization(.none)
                     .disableAutocorrection(true)
                     .keyboardType(.URL)
@@ -1250,20 +1258,20 @@ struct HandySettingsView: View {
                     .stashyGroupedBlockRow(index: 1, count: 4)
 
                 HStack {
-                    Text("Status")
+                    Text(tr("status"))
                     Spacer()
                     Text(handyManager.statusMessage)
                         .foregroundColor(handyManager.isConnected ? .green : .secondary)
                 }
                 .stashyGroupedBlockRow(index: 2, count: 4)
 
-                Button("Check Connection") {
+                Button(tr("check_connection")) {
                     handyManager.checkConnection()
                 }
                 .disabled(!handyManager.isEnabled)
                 .stashyGroupedBlockRow(index: 3, count: 4)
 
-                stashyScrollingSectionFooter("Stashy now automatically uploads local funscripts to Handy Cloud. The Public URL is only needed for advanced setups.")
+                stashyScrollingSectionFooter(tr("hint_stashy_now_automatically_uploads_local"))
             }
         }
         .stashySettingsList()
@@ -1279,15 +1287,15 @@ struct LoveSpouseSettingsView: View {
     var body: some View {
         List {
             Section {
-                Toggle("Enable Love Spouse", isOn: $loveSpouseManager.isEnabled)
+                Toggle(tr("action_enable_love_spouse"), isOn: $loveSpouseManager.isEnabled)
                     .tint(appearanceManager.tintColor)
                     .stashyGroupedSettingsRow()
             }
 
             Section {
-                stashyScrollingSectionHeader("Connection Status")
+                stashyScrollingSectionHeader(tr("connection_status"))
                 HStack {
-                    Text("Bluetooth")
+                    Text(tr("bluetooth"))
                     Spacer()
                     Text(loveSpouseManager.statusMessage)
                         .foregroundColor(loveSpouseManager.isConnected ? .green : .secondary)
@@ -1296,12 +1304,12 @@ struct LoveSpouseSettingsView: View {
             }
 
             Section {
-                stashyScrollingSectionFooter("Love Spouse 2.4g toys use BLE advertising. Ensure Bluetooth is enabled and the toy is in pairing/scan mode. Both toys in range will react simultaneously.")
+                stashyScrollingSectionFooter(tr("hint_love_spouse_2_4g_toys"))
             }
         }
         .stashySettingsList()
         .applyAppBackground()
-        .stashySettingsDetailChrome("Love Spouse")
+        .stashySettingsDetailChrome(tr("love_spouse"))
     }
 }
 
@@ -1331,12 +1339,12 @@ struct StashSyncSettingsView: View {
                     Label(AIMotionCopy.requiresPlus, systemImage: "lock.fill")
                         .foregroundColor(.secondary)
                         .stashyGroupedSettingsRow()
-                    stashyScrollingSectionFooter("Unlock stashy+ to use this feature.")
+                    stashyScrollingSectionFooter(tr("hint_unlock_stashy_plus_to_use"))
                 }
             }
 
             Section {
-                stashyScrollingSectionHeader("AI Motion Features")
+                stashyScrollingSectionHeader(tr("ai_motion_features"))
                 Toggle(isOn: syncEnabledBinding) {
                     Label(AIMotionCopy.name, systemImage: "bolt.fill")
                 }
@@ -1347,10 +1355,10 @@ struct StashSyncSettingsView: View {
             }
 
             Section {
-                stashyScrollingSectionHeader("Sensitivity")
+                stashyScrollingSectionHeader(tr("sensitivity"))
                 VStack(alignment: .leading, spacing: 4) {
                     HStack {
-                        Text("AI Motion Sensitivity")
+                        Text(tr("ai_motion_sensitivity"))
                         Spacer()
                         Text("\(Int(videoManager.sensitivity * 50))%").foregroundColor(.secondary)
                     }
@@ -1362,10 +1370,10 @@ struct StashSyncSettingsView: View {
             .disabled(!videoManager.isVideoSyncEnabled)
 
             Section {
-                stashyScrollingSectionHeader("Optical Flow Smoothing")
+                stashyScrollingSectionHeader(tr("optical_flow_smoothing"))
                 VStack(alignment: .leading, spacing: 4) {
                     HStack {
-                        Text("Smoothing")
+                        Text(tr("smoothing"))
                         Spacer()
                         Text("\(Int(videoManager.smoothing * 100))%").foregroundColor(.secondary)
                     }
@@ -1378,9 +1386,9 @@ struct StashSyncSettingsView: View {
         .stashySettingsList()
         .applyAppBackground()
         .stashySettingsDetailChrome(AIMotionCopy.name)
-        .alert("AI Motion Disclaimer", isPresented: $showingDisclaimer) {
-            Button("Cancel", role: .cancel) { }
-            Button("Accept & Enable") {
+        .alert(tr("ai_motion_disclaimer"), isPresented: $showingDisclaimer) {
+            Button(tr("action_cancel"), role: .cancel) { }
+            Button(tr("accept_and_enable")) {
                 videoManager.isDisclaimerAccepted = true
                 videoManager.isVideoSyncEnabled = true
             }
@@ -1444,18 +1452,18 @@ struct LegacySupporterTipPrompt: ViewModifier {
                 UserDefaults.standard.set(Date().timeIntervalSince1970, forKey: Self.lastShownKey)
                 isPresented = true
             }
-            .alert("stashy has grown a lot", isPresented: $isPresented) {
+            .alert(tr("stashy_has_grown_lot"), isPresented: $isPresented) {
                 ForEach(store.tipProducts) { product in
-                    Button("Tip \(product.displayPrice)") {
+                    Button(tr("tip_arg", product.displayPrice)) {
                         Task { await tip(product) }
                     }
                 }
                 // Preferred action: drawn as the filled, prominent button, so closing is
                 // the easiest choice; Return / Esc also close it on macOS.
-                Button("No thanks", role: .cancel) {}
+                Button(tr("empty_thanks"), role: .cancel) {}
                     .keyboardShortcut(.defaultAction)
             } message: {
-                Text("You bought stashy before it moved to subscriptions, so stashy+ stays yours for life. Since then the app has grown massively. If you'd like to support its development, a tip is a kind gesture, entirely optional.")
+                Text(tr("hint_you_bought_stashy_before_it"))
             }
     }
 
@@ -1464,9 +1472,56 @@ struct LegacySupporterTipPrompt: ViewModifier {
             guard error != "Purchase cancelled" else { return }
             ToastManager.shared.show(error, icon: "exclamationmark.triangle", style: .error)
         } else {
-            ToastManager.shared.show("Thank you for the tip!", icon: "heart.fill", style: .success)
+            ToastManager.shared.show(tr("thank_you_for_tip"), icon: "heart.fill", style: .success)
         }
     }
 }
 
 #endif
+
+/// Settings › App Language (beta): English unless the user picks another language (or the
+/// device language on a fresh install); the interface switches at once (`LanguageRefreshing`).
+private struct AppLanguageRow: View {
+    var body: some View {
+        HStack {
+            Label(tr("language"), systemImage: "globe")
+            Spacer()
+            AppLanguageMenu()
+        }
+    }
+}
+
+/// The language menu itself; also used in the setup wizard.
+struct AppLanguageMenu: View {
+    @State private var selection = AppLanguage.stored
+
+    var body: some View {
+        Menu {
+            languageButton(AppLanguage.systemValue)
+            Divider()
+            ForEach(AppLanguage.options, id: \.code) { option in
+                languageButton(option.code)
+            }
+        } label: {
+            HStack(spacing: 4) {
+                Text(AppLanguage.name(for: selection))
+                Image(systemName: "chevron.up.chevron.down").font(.caption2)
+            }
+            .foregroundStyle(.secondary)
+        }
+    }
+
+    private func languageButton(_ code: String) -> some View {
+        Button {
+            guard code != selection else { return }
+            selection = code
+            AppLanguage.select(code)
+        } label: {
+            if code == selection {
+                Label(AppLanguage.name(for: code), systemImage: "checkmark")
+            } else {
+                Text(AppLanguage.name(for: code))
+            }
+        }
+    }
+}

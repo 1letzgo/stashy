@@ -1,5 +1,7 @@
 package de.letzgo.stashy.ui.scene
 
+import de.letzgo.stashy.R
+import de.letzgo.stashy.tr
 import de.letzgo.stashy.ui.scaledIconSize
 import androidx.compose.material3.minimumInteractiveComponentSize
 import androidx.compose.animation.AnimatedVisibility
@@ -110,7 +112,7 @@ fun SceneCardHeader(title: String, onEdit: (() -> Unit)?, trailing: (@Composable
 fun EditCircleButton(onClick: () -> Unit) {
     // Visual circle grows with the font scale; the touch target is the Material 48 dp minimum.
     Box(Modifier.minimumInteractiveComponentSize().size(scaledIconSize(22.dp)).clip(CircleShape).background(Appearance.tint).noRippleClickable(onClick), contentAlignment = Alignment.Center) {
-        Icon(PlayerIcons.edit, "Edit", tint = Color.White, modifier = Modifier.size(scaledIconSize(12.dp)))
+        Icon(PlayerIcons.edit, tr(R.string.action_edit), tint = Color.White, modifier = Modifier.size(scaledIconSize(12.dp)))
     }
 }
 

@@ -1,5 +1,7 @@
 package de.letzgo.stashy.ui.components
 
+import de.letzgo.stashy.R
+import de.letzgo.stashy.tr
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.material3.DatePicker
 import androidx.compose.material3.DatePickerDialog
@@ -32,7 +34,7 @@ import java.time.format.ResolverStyle
  * (iOS: `StashDateInput`).
  */
 object StashDateInput {
-    const val ERROR_TEXT = "Enter a valid date as YYYY-MM-DD"
+    val ERROR_TEXT = tr(R.string.hint_enter_valid_date_as_yyyy)
 
     private val formatter: DateTimeFormatter =
         DateTimeFormatter.ofPattern("uuuu-MM-dd").withResolverStyle(ResolverStyle.STRICT)
@@ -81,7 +83,7 @@ fun NativeDateField(
         supportingText = if (invalid) StashDateInput.ERROR_TEXT else null,
         isError = invalid,
         trailing = {
-            IconButton({ showPicker = true }) { Icon(SF.calendar, "Pick a date") }
+            IconButton({ showPicker = true }) { Icon(SF.calendar, tr(R.string.action_pick_date)) }
         },
     )
     if (showPicker) {
@@ -101,9 +103,9 @@ fun NativeDateField(
                         showPicker = false
                     },
                     enabled = state.selectedDateMillis != null,
-                ) { Text("OK") }
+                ) { Text(tr(R.string.ok)) }
             },
-            dismissButton = { TextButton({ showPicker = false }) { Text("Cancel") } },
+            dismissButton = { TextButton({ showPicker = false }) { Text(tr(R.string.action_cancel)) } },
         ) {
             DatePicker(state)
         }

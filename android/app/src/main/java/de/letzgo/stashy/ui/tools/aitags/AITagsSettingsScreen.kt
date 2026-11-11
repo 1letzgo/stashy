@@ -1,5 +1,7 @@
 package de.letzgo.stashy.ui.tools.aitags
 
+import de.letzgo.stashy.R
+import de.letzgo.stashy.tr
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -78,7 +80,7 @@ class AITagsSettingsScreen : Screen {
     override fun Content() = AITagsSettingsView()
 }
 
-private const val TITLE = "Recommendations"
+private val TITLE = tr(R.string.recommendations)
 
 @Composable
 fun AITagsSettingsView() {
@@ -98,22 +100,22 @@ fun AITagsSettingsView() {
             if (!isUnlocked) {
                 item {
                     GroupedCard {
-                        SettingsRow("Recommendations require stashy+", icon = SF.lock, iconTint = p.secondaryText, titleColor = p.secondaryText)
+                        SettingsRow(tr(R.string.recommendations_require_stashy_plus), icon = SF.lock, iconTint = p.secondaryText, titleColor = p.secondaryText)
                     }
-                    SettingsSectionFooter("Unlock stashy+ to use this feature.")
+                    SettingsSectionFooter(tr(R.string.hint_unlock_stashy_plus_to_use))
                     SectionSpacer()
                 }
             }
 
             // MARK: Features
             item {
-                SettingsSectionHeader("Features", isBeta = true)
+                SettingsSectionHeader(tr(R.string.features), isBeta = true)
                 GroupedCard {
-                    ToggleRow("Tag suggestions", SF.tag, checked = isUnlocked && manager.isEnabled, enabled = isUnlocked) {
+                    ToggleRow(tr(R.string.tag_suggestions), SF.tag, checked = isUnlocked && manager.isEnabled, enabled = isUnlocked) {
                         if (isUnlocked) manager.isEnabled = it
                     }
                     RowDivider()
-                    ToggleRow("Similar scenes", Icons.Outlined.Layers, checked = isUnlocked && similar.isEnabled, enabled = isUnlocked) {
+                    ToggleRow(tr(R.string.similar_scenes), Icons.Outlined.Layers, checked = isUnlocked && similar.isEnabled, enabled = isUnlocked) {
                         if (isUnlocked) similar.isEnabled = it
                     }
                 }
@@ -122,21 +124,21 @@ fun AITagsSettingsView() {
 
             // MARK: For You
             item {
-                SettingsSectionHeader("For You on Home", isBeta = true)
+                SettingsSectionHeader(tr(R.string.for_you_on_home), isBeta = true)
                 GroupedCard {
                     val forYou = de.letzgo.stashy.data.tools.SceneRecommendations
                     ToggleRow(
-                        "For You", SF.wand,
+                        tr(R.string.for_you), SF.wand,
                         checked = isUnlocked && forYou.hasStatistics && forYou.isEnabled,
                         enabled = isUnlocked && forYou.hasStatistics,
                     ) { if (isUnlocked) forYou.updateEnabled(it) }
                     RowDivider()
-                    SettingsRow("For You settings", SF.sliderHorizontal3, enabled = isUnlocked, onClick = { Nav.push(RecommendationSettingsScreen()) })
+                    SettingsRow(tr(R.string.for_you_settings), SF.sliderHorizontal3, enabled = isUnlocked, onClick = { Nav.push(RecommendationSettingsScreen()) })
                 }
                 SettingsSectionFooter(
                     if (de.letzgo.stashy.data.tools.SceneRecommendations.hasStatistics)
-                        "Scenes picked from your plays, O-Counts and ratings."
-                    else "Needs Tag suggestions or Similar scenes."
+                        tr(R.string.hint_scenes_picked_from_your_plays)
+                    else tr(R.string.hint_needs_tag_suggestions_or_similar)
                 )
                 SectionSpacer()
             }
@@ -144,29 +146,29 @@ fun AITagsSettingsView() {
             // MARK: Forgotten Favorites
             item {
                 val forgotten = de.letzgo.stashy.data.tools.ForgottenFavorites
-                SettingsSectionHeader("Forgotten Favorites on Home", isBeta = true)
+                SettingsSectionHeader(tr(R.string.forgotten_favorites_on_home), isBeta = true)
                 GroupedCard {
                     ToggleRow(
-                        "Forgotten Favorites", SF.arrowClockwise,
+                        tr(R.string.forgotten_favorites), SF.arrowClockwise,
                         checked = isUnlocked && forgotten.hasStatistics && forgotten.isEnabled,
                         enabled = isUnlocked && forgotten.hasStatistics,
                     ) { if (isUnlocked) forgotten.updateEnabled(it) }
                     RowDivider()
-                    SettingsRow("Forgotten Favorites settings", SF.sliderHorizontal3, enabled = isUnlocked, onClick = { Nav.push(ForgottenFavoritesSettingsScreen()) })
+                    SettingsRow(tr(R.string.forgotten_favorites_settings), SF.sliderHorizontal3, enabled = isUnlocked, onClick = { Nav.push(ForgottenFavoritesSettingsScreen()) })
                 }
                 SettingsSectionFooter(
                     if (forgotten.hasStatistics)
-                        "Top scenes you have not played for a while."
-                    else "Needs Tag suggestions or Similar scenes."
+                        tr(R.string.hint_top_scenes_you_have_not)
+                    else tr(R.string.hint_needs_tag_suggestions_or_similar)
                 )
                 SectionSpacer()
             }
 
             // MARK: Statistics
             item {
-                SettingsSectionHeader("Statistics")
+                SettingsSectionHeader(tr(R.string.statistics))
                 GroupedCard {
-                    SettingsRow("Status", icon = SF.chartBar) {
+                    SettingsRow(tr(R.string.status), icon = SF.chartBar) {
                         Text(statusText(state, manager.lastBuiltAt), style = NativeType.bodyMedium, color = p.secondaryText, textAlign = TextAlign.End)
                     }
                     RowDivider()
@@ -180,34 +182,34 @@ fun AITagsSettingsView() {
                             Text("${state.processed} of ${state.total} items", style = NativeType.bodySmall, color = p.secondaryText)
                         }
                         RowDivider()
-                        SettingsRow("Stop", icon = Icons.Outlined.StopCircle, iconTint = StashyColors.systemRed, titleColor = StashyColors.systemRed, onClick = { manager.cancelWork() })
+                        SettingsRow(tr(R.string.action_stop), icon = Icons.Outlined.StopCircle, iconTint = StashyColors.systemRed, titleColor = StashyColors.systemRed, onClick = { manager.cancelWork() })
                     } else {
                         SettingsRow(
-                            if (manager.hasModel) "Rebuild statistics" else "Build statistics",
+                            if (manager.hasModel) tr(R.string.rebuild_statistics) else tr(R.string.build_statistics),
                             icon = Icons.Filled.Sync, titleColor = tint,
                             enabled = manager.needsStatistics, onClick = { manager.rebuild() },
                         )
                     }
                 }
-                SettingsSectionFooter("Refreshed every 12 hours.")
+                SettingsSectionFooter(tr(R.string.refreshed_every_12_hours))
                 SectionSpacer()
             }
 
             // MARK: Tuning
             item {
-                SettingsSectionHeader("Tuning")
+                SettingsSectionHeader(tr(R.string.tuning))
                 Box(Modifier.alpha(if (isUnlocked) 1f else 0.5f)) {
                     GroupedCard {
-                        StepperRow("Tags per item", manager.maxSuggestions, 1..20, enabled = isUnlocked && manager.isEnabled) { manager.maxSuggestions = it }
+                        StepperRow(tr(R.string.tags_per_item), manager.maxSuggestions, 1..20, enabled = isUnlocked && manager.isEnabled) { manager.maxSuggestions = it }
                         RowDivider(16.dp)
-                        StepperRow("Similar scenes", similar.maxCount, 4..8, enabled = isUnlocked && similar.isEnabled) { similar.maxCount = it }
+                        StepperRow(tr(R.string.similar_scenes), similar.maxCount, 4..8, enabled = isUnlocked && similar.isEnabled) { similar.maxCount = it }
                         RowDivider(16.dp)
                         val count = manager.dismissedTagCount
                         SettingsRow(
-                            "Ignored tags", icon = Icons.Outlined.ThumbDown, titleColor = tint,
+                            tr(R.string.ignored_tags), icon = Icons.Outlined.ThumbDown, titleColor = tint,
                             enabled = isUnlocked && count > 0, onClick = { manager.resetDismissals() },
                         ) {
-                            Text(if (count == 0) "None" else "$count · reset", style = NativeType.bodyMedium, color = p.secondaryText)
+                            Text(if (count == 0) tr(R.string.none) else "$count · reset", style = NativeType.bodyMedium, color = p.secondaryText)
                         }
                     }
                 }
@@ -220,9 +222,9 @@ fun AITagsSettingsView() {
 }
 
 private fun statusText(state: AITagModelState, lastBuiltAt: Long?): String = when (state) {
-    AITagModelState.Idle -> "Not built"
-    AITagModelState.Loading -> "Loading…"
-    is AITagModelState.Building -> "Counting…"
+    AITagModelState.Idle -> tr(R.string.not_built)
+    AITagModelState.Loading -> tr(R.string.loading)
+    is AITagModelState.Building -> tr(R.string.counting_menu)
     is AITagModelState.Ready -> lastBuiltAt?.let {
         "${state.items} items · ${DateFormat.getDateTimeInstance(DateFormat.MEDIUM, DateFormat.SHORT).format(Date(it))}"
     } ?: "${state.items} items"
@@ -246,8 +248,8 @@ internal fun StepperRow(title: String, value: Int, range: IntRange, enabled: Boo
         disabledContainerColor = p.text.copy(alpha = 0.06f), disabledContentColor = p.text.copy(alpha = 0.38f),
     )
     SettingsRow(title, enabled = enabled) {
-        FilledTonalIconButton({ onChange(value - 1) }, enabled = enabled && value > range.first, colors = colors) { Icon(Icons.Filled.Remove, "Decrement") }
+        FilledTonalIconButton({ onChange(value - 1) }, enabled = enabled && value > range.first, colors = colors) { Icon(Icons.Filled.Remove, tr(R.string.decrement)) }
         Text("$value", style = NativeType.titleMedium, color = p.text, textAlign = TextAlign.Center, maxLines = 1, modifier = Modifier.widthIn(min = 28.dp))
-        FilledTonalIconButton({ onChange(value + 1) }, enabled = enabled && value < range.last, colors = colors) { Icon(Icons.Filled.Add, "Increment") }
+        FilledTonalIconButton({ onChange(value + 1) }, enabled = enabled && value < range.last, colors = colors) { Icon(Icons.Filled.Add, tr(R.string.increment)) }
     }
 }

@@ -83,9 +83,9 @@ class NavigationCoordinator: ObservableObject {
         if let raw = UserDefaults.standard.string(forKey: "stashyDebugOpenStudio"), !raw.isEmpty {
             let parts = raw.split(separator: "|", omittingEmptySubsequences: false).map(String.init)
             func count(_ i: Int) -> Int? { parts.count > i ? Int(parts[i]) : nil }
-            catalogueSubTab = "Studios"
+            catalogueSubTab = tr("studios")
             studioToOpen = Studio(
-                id: parts[0], name: parts.count > 1 ? parts[1] : "Studio",
+                id: parts[0], name: parts.count > 1 ? parts[1] : tr("studio"),
                 sceneCount: count(2) ?? 0, performerCount: count(5), galleryCount: count(3), imageCount: count(4)
             )
         }
@@ -134,7 +134,7 @@ class NavigationCoordinator: ObservableObject {
         performerToOpen = performer
         
         // Switch internal sub-tab to Performers
-        catalogueSubTab = "Performers"
+        catalogueSubTab = tr("performers")
         
         // Switch to Catalogue tab
         selectedTab = .catalogue
@@ -148,7 +148,7 @@ class NavigationCoordinator: ObservableObject {
         studioToOpen = studio
         
         // Switch internal sub-tab to Studios
-        catalogueSubTab = "Studios"
+        catalogueSubTab = tr("studios")
         
         // Switch to Catalogue tab
         selectedTab = .catalogue
@@ -177,49 +177,49 @@ class NavigationCoordinator: ObservableObject {
         self.activeFilter = filter
         self.activeSearchText = search
         self.noDefaultFilter = noDefaultFilter
-        switchToCatalogue("Scenes")
+        switchToCatalogue(tr("scenes"))
     }
     
     func navigateToPerformers(sort: StashDBViewModel.PerformerSortOption? = nil, filter: StashDBViewModel.SavedFilter? = nil, search: String = "") {
         self.activeSortOption = sort?.rawValue
         self.activeFilter = filter
         self.activeSearchText = search
-        switchToCatalogue("Performers")
+        switchToCatalogue(tr("performers"))
     }
     
     func navigateToStudios(sort: StashDBViewModel.StudioSortOption? = nil, filter: StashDBViewModel.SavedFilter? = nil, search: String = "") {
         self.activeSortOption = sort?.rawValue
         self.activeFilter = filter
         self.activeSearchText = search
-        switchToCatalogue("Studios")
+        switchToCatalogue(tr("studios"))
     }
     
     func navigateToTags(search: String = "") {
         self.activeSearchText = search
-        switchToCatalogue("Tags")
+        switchToCatalogue(tr("tags"))
     }
     
     func navigateToGalleries(sort: StashDBViewModel.GallerySortOption? = nil, filter: StashDBViewModel.SavedFilter? = nil, search: String = "") {
         self.activeSortOption = sort?.rawValue
         self.activeFilter = filter
         self.activeSearchText = search
-        switchToCatalogue("Galleries")
+        switchToCatalogue(tr("galleries"))
     }
     
     func navigateToImages(search: String = "") {
         self.activeSearchText = search
         self.noDefaultFilter = !search.isEmpty
-        switchToCatalogue("Images")
+        switchToCatalogue(tr("images"))
     }
     
     func navigateToGroups(search: String = "") {
         self.activeSearchText = search
-        switchToCatalogue("Groups")
+        switchToCatalogue(tr("groups"))
     }
 
     func navigateToMarkers(search: String = "") {
         self.activeSearchText = search
-        switchToCatalogue("Markers")
+        switchToCatalogue(tr("markers"))
     }
     
     func navigateToReels(performer: ScenePerformer? = nil, tags: [Tag] = [], studio: SceneStudio? = nil, mode: String? = nil) {
@@ -243,7 +243,7 @@ class NavigationCoordinator: ObservableObject {
         let link = ReelsDeepLink(
             performer: nil,
             tags: [],
-            mode: "Scenes",
+            mode: tr("scenes"),
             picsPerformer: nil,
             sceneFilter: filter,
             sceneSort: sort.rawValue
@@ -251,7 +251,7 @@ class NavigationCoordinator: ObservableObject {
         self.reelsDeepLink = link
         self.reelsPerformer = nil
         self.reelsTags = []
-        self.reelsTargetMode = "Scenes"
+        self.reelsTargetMode = tr("scenes")
         self.picsPerformerFilter = nil
         NotificationCenter.default.post(name: Notification.Name("ReelsWillRemount"), object: nil)
         self.reelsTabID = UUID()
@@ -265,7 +265,7 @@ class NavigationCoordinator: ObservableObject {
         let link = ReelsDeepLink(
             performer: nil,
             tags: [],
-            mode: "Clips",
+            mode: tr("clips"),
             picsPerformer: nil,
             clipFilter: filter,
             clipSort: sort.rawValue
@@ -273,7 +273,7 @@ class NavigationCoordinator: ObservableObject {
         self.reelsDeepLink = link
         self.reelsPerformer = nil
         self.reelsTags = []
-        self.reelsTargetMode = "Clips"
+        self.reelsTargetMode = tr("clips")
         self.picsPerformerFilter = nil
         NotificationCenter.default.post(name: Notification.Name("ReelsWillRemount"), object: nil)
         self.reelsTabID = UUID()
@@ -283,12 +283,12 @@ class NavigationCoordinator: ObservableObject {
     }
 
     func navigateToStashLine(performer: GalleryPerformer) {
-        let link = ReelsDeepLink(performer: nil, tags: [], mode: "Pics", picsPerformer: performer)
+        let link = ReelsDeepLink(performer: nil, tags: [], mode: tr("pics"), picsPerformer: performer)
         self.reelsDeepLink = link
         self.picsPerformerFilter = performer
         self.reelsPerformer = nil
         self.reelsTags = []
-        self.reelsTargetMode = "Pics"
+        self.reelsTargetMode = tr("pics")
         NotificationCenter.default.post(name: Notification.Name("ReelsWillRemount"), object: nil)
         self.reelsTabID = UUID()
         self.suppressNextFeedsIconRemount = true
@@ -327,7 +327,7 @@ class NavigationCoordinator: ObservableObject {
         clearReelsDeepLink()
         
         // Force navigation to Home (Dashboard) sub-tab
-        self.catalogueSubTab = "Dashboard"
+        self.catalogueSubTab = tr("dashboard")
         self.selectedTab = .catalogue
     }
 }
@@ -361,7 +361,7 @@ struct ReelsDeepLink: Equatable {
 
 // MARK: - Connection Error
 struct ConnectionErrorView: View {
-    var title: String = "Server not reachable"
+    var title: String = tr("server_not_reachable")
     let onRetry: () -> Void
     var isDark: Bool = false
 
@@ -369,7 +369,7 @@ struct ConnectionErrorView: View {
         StatusPlaceholderView(
             icon: "server.rack",
             title: title,
-            buttonText: "Retry Connection",
+            buttonText: tr("action_retry_connection"),
             isDark: isDark,
             fillsScreen: true,
             onAction: onRetry

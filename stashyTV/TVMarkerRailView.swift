@@ -45,7 +45,7 @@ struct TVMarkerRailView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("Markers")
+            Text(tr("markers"))
                 .font(.system(size: 22, weight: .bold))
                 .foregroundStyle(.white.opacity(0.6))
 
@@ -135,7 +135,7 @@ struct TVMarkerRailView: View {
         if let tag = marker.primaryTag?.name.trimmingCharacters(in: .whitespacesAndNewlines), !tag.isEmpty {
             return tag
         }
-        return "Marker"
+        return tr("marker")
     }
 
     private func timeLabel(_ seconds: Double) -> String {

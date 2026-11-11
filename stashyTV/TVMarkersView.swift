@@ -50,9 +50,9 @@ struct TVMarkersView: View {
             hasMore: viewModel.hasMoreMarkers,
             columnWidth: 410,
             emptySystemImage: "bookmark",
-            emptyTitle: "No markers found",
-            loadingText: "Loading markers…",
-            errorTitle: "Error loading markers",
+            emptyTitle: tr("empty_markers_found"),
+            loadingText: tr("loading_markers"),
+            errorTitle: tr("error_loading_markers"),
             focusResetToken: focusResetToken,
             loadMore: { viewModel.loadMoreMarkers() },
             reload: { reload() },
@@ -61,7 +61,7 @@ struct TVMarkersView: View {
                 STVHeaderView(
                     sortMenu: {
                         TVOptionPickerButton(
-                            title: "Sort By",
+                            title: tr("action_sort_by"),
                             icon: "arrow.up.arrow.down",
                             options: sortOptions,
                             selection: $sortBy
@@ -120,7 +120,7 @@ struct TVMarkersView: View {
         }) {
             TVAetherPlayerView(
                 model: playerModel,
-                title: playingScene?.displayTitle ?? "Untitled Scene",
+                title: playingScene?.displayTitle ?? tr("untitled_scene"),
                 subtitle: playingScene?.studio?.name ?? "",
                 posterURL: playingScene?.thumbnailURL,
                 onDisappear: { playerModel.saveProgress() },
@@ -307,7 +307,7 @@ struct TVMarkerCardTitleView: View {
             return title
         }
         if let tag = marker.primaryTag?.name, !tag.isEmpty { return tag }
-        return "Marker"
+        return tr("marker")
     }
 
     var body: some View {

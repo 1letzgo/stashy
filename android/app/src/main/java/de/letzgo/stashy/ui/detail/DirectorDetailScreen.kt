@@ -1,5 +1,7 @@
 package de.letzgo.stashy.ui.detail
 
+import de.letzgo.stashy.R
+import de.letzgo.stashy.tr
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
@@ -63,7 +65,7 @@ class DirectorDetailScreen(val director: String) : Screen {
         Box(Modifier.fillMaxSize().background(Theme.palette.background)) {
             PullToRefreshBox(isRefreshing = false, onRefresh = { scenes.refresh() }, modifier = Modifier.fillMaxSize()) {
                 DetailGrid(gridState, { w -> columnsFor(DetailTab.Scenes, w, 1) }, header = { Header() }) {
-                    pagedSection(scenes.list, { it.id }, "Loading scenes...", SF.film, "No scenes found") { _, s ->
+                    pagedSection(scenes.list, { it.id }, tr(R.string.loading_scenes), SF.film, tr(R.string.empty_scenes_found)) { _, s ->
                         SceneCard(s, onClick = { Nav.push(SceneDetailScreen(s.id, s)) })
                     }
                 }
@@ -79,7 +81,7 @@ class DirectorDetailScreen(val director: String) : Screen {
     private fun Header() {
         DetailHeaderCard(
             title = director, imageUrl = null, placeholderIcon = SF.megaphoneFill,
-            items = listOf(DetailItem("Scenes", "${scenes.list.totalCount}")),
+            items = listOf(DetailItem(tr(R.string.scenes), "${scenes.list.totalCount}")),
             expandable = false, expanded = false, onToggle = {}, titleMaxLines = 2,
             imageContent = {
                 Box(Modifier.fillMaxSize().background(Appearance.tint.copy(alpha = 0.12f)), Alignment.Center) {

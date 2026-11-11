@@ -1,5 +1,7 @@
 package de.letzgo.stashy.ui
 
+import de.letzgo.stashy.R
+import de.letzgo.stashy.tr
 import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.foundation.background
@@ -348,7 +350,7 @@ fun NativeTopBar(
         modifier = modifier,
         navigationIcon = {
             if (onBack != null) androidx.compose.material3.IconButton(onClick = onBack) {
-                Icon(androidx.compose.material.icons.Icons.AutoMirrored.Filled.ArrowBack, "Back", tint = content)
+                Icon(androidx.compose.material.icons.Icons.AutoMirrored.Filled.ArrowBack, tr(R.string.back), tint = content)
             }
         },
         actions = actions,
@@ -375,7 +377,7 @@ fun NativeSheetTopBar(
     title: String,
     onClose: (() -> Unit)?,
     modifier: Modifier = Modifier,
-    closeDescription: String = "Close",
+    closeDescription: String = tr(R.string.action_close),
     windowInsets: androidx.compose.foundation.layout.WindowInsets = androidx.compose.foundation.layout.WindowInsets(0, 0, 0, 0),
     actions: @Composable RowScope.() -> Unit = {},
 ) {
@@ -625,7 +627,7 @@ fun <T> NativeSelectionDialog(title: String?, options: List<T>, selected: T?, la
             }
         },
         confirmButton = {},
-        dismissButton = { TextButton(onDismiss) { Text("Cancel", color = textAccent(), style = NativeType.labelLarge) } },
+        dismissButton = { TextButton(onDismiss) { Text(tr(R.string.action_cancel), color = textAccent(), style = NativeType.labelLarge) } },
     )
 }
 
@@ -652,7 +654,7 @@ fun <T> NativeValuePicker(
     options: List<T>,
     selected: T?,
     label: (T) -> String,
-    valueText: String = selected?.let(label) ?: "None",
+    valueText: String = selected?.let(label) ?: tr(R.string.none),
     enabled: Boolean = true,
     onSelect: (T) -> Unit,
 ) {
@@ -691,7 +693,7 @@ fun <T> NativeDropdownValue(
     label: (T) -> String,
     modifier: Modifier = Modifier,
     title: String? = null,
-    placeholder: String = "None",
+    placeholder: String = tr(R.string.none),
     enabled: Boolean = true,
     onSelect: (T) -> Unit,
 ) {
@@ -710,9 +712,9 @@ fun NativeConfirmDialog(
     title: String,
     text: String?,
     onDismiss: () -> Unit,
-    confirmLabel: String = "OK",
+    confirmLabel: String = tr(R.string.ok),
     destructive: Boolean = false,
-    dismissLabel: String? = "Cancel",
+    dismissLabel: String? = tr(R.string.action_cancel),
     icon: ImageVector? = null,
     onConfirm: () -> Unit = onDismiss,
 ) {
@@ -777,7 +779,7 @@ fun NativeTextField(
             secret -> {
                 {
                     IconButton({ revealed = !revealed }) {
-                        Icon(if (revealed) Icons.Filled.VisibilityOff else Icons.Filled.Visibility, if (revealed) "Hide" else "Show")
+                        Icon(if (revealed) Icons.Filled.VisibilityOff else Icons.Filled.Visibility, if (revealed) tr(R.string.action_hide) else tr(R.string.action_show))
                     }
                 }
             }
@@ -817,7 +819,7 @@ fun NativeTextField(
 fun NativeSearchField(
     query: String,
     onQueryChange: (String) -> Unit,
-    placeholder: String = "Search",
+    placeholder: String = tr(R.string.search),
     modifier: Modifier = Modifier,
     onSearch: ((String) -> Unit)? = null,
     loading: Boolean = false,
@@ -834,7 +836,7 @@ fun NativeSearchField(
         leadingIcon = { Icon(Icons.Filled.Search, null) },
         trailingIcon = when {
             loading -> { { CircularProgressIndicator(Modifier.size(20.dp), color = p.secondaryText, strokeWidth = 2.dp) } }
-            query.isNotEmpty() -> { { IconButton({ onQueryChange("") }) { Icon(Icons.Filled.Close, "Clear search") } } }
+            query.isNotEmpty() -> { { IconButton({ onQueryChange("") }) { Icon(Icons.Filled.Close, tr(R.string.action_clear_search)) } } }
             else -> null
         },
         keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.None, autoCorrectEnabled = false, imeAction = ImeAction.Search),
@@ -861,7 +863,7 @@ fun NativeTextInputDialog(
     onConfirm: (String) -> Unit,
     label: String? = null,
     message: String? = null,
-    confirmLabel: String = "Save",
+    confirmLabel: String = tr(R.string.action_save),
     secret: Boolean = false,
 ) {
     val p = Theme.palette
@@ -877,7 +879,7 @@ fun NativeTextInputDialog(
             }
         },
         confirmButton = { TextButton({ onConfirm(text) }) { Text(confirmLabel, style = NativeType.labelLarge, color = textAccent()) } },
-        dismissButton = { TextButton(onDismiss) { Text("Cancel", style = NativeType.labelLarge, color = textAccent()) } },
+        dismissButton = { TextButton(onDismiss) { Text(tr(R.string.action_cancel), style = NativeType.labelLarge, color = textAccent()) } },
     )
 }
 

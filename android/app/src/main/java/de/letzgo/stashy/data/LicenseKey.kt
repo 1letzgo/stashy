@@ -1,5 +1,7 @@
 package de.letzgo.stashy.data
 
+import de.letzgo.stashy.R
+import de.letzgo.stashy.tr
 import java.io.ByteArrayOutputStream
 import java.math.BigInteger
 import java.security.KeyFactory
@@ -75,35 +77,35 @@ object LicenseKey {
         var firstError: String? = null
         for (body in candidates(input)) {
             val license = runCatching { decodeAndVerify(body, key) }.getOrElse {
-                if (firstError == null) firstError = it.message ?: "Invalid license key."
+                if (firstError == null) firstError = it.message ?: tr(R.string.invalid_license_key)
                 null
             } ?: continue
             return if (license.isExpired(nowMillis)) Result.Expired(license) else Result.Valid(license)
         }
-        return Result.Invalid(firstError ?: "Enter a license key.")
+        return Result.Invalid(firstError ?: tr(R.string.enter_license_key))
     }
 
     private fun decodeAndVerify(body: String, key: PublicKey): License {
         val blob = base32Decode(body)
-        if (blob.size < 5 || blob[0].toInt() != VERSION) throw IllegalArgumentException("This is not a stashy license key.")
+        if (blob.size < 5 || blob[0].toInt() != VERSION) throw IllegalArgumentException(tr(R.string.hint_this_is_not_stashy_license))
         val issued = u16(blob, 1)
         val expires = u16(blob, 3)
         var pos = 5
         val fields = ArrayList<String>(2)
         repeat(2) {
-            if (pos >= blob.size) throw IllegalArgumentException("The license key is incomplete.")
+            if (pos >= blob.size) throw IllegalArgumentException(tr(R.string.license_key_is_incomplete))
             val n = blob[pos].toInt() and 0xFF
             pos++
-            if (pos + n > blob.size) throw IllegalArgumentException("The license key is incomplete.")
+            if (pos + n > blob.size) throw IllegalArgumentException(tr(R.string.license_key_is_incomplete))
             fields += String(blob, pos, n, Charsets.UTF_8)
             pos += n
         }
-        if (blob.size - pos != SIG_LEN) throw IllegalArgumentException("The license key is incomplete.")
+        if (blob.size - pos != SIG_LEN) throw IllegalArgumentException(tr(R.string.license_key_is_incomplete))
         val sig = Signature.getInstance("SHA256withECDSA")
         sig.initVerify(key)
         sig.update(blob, 0, pos)
         val ok = runCatching { sig.verify(rawToDer(blob.copyOfRange(pos, blob.size))) }.getOrDefault(false)
-        if (!ok) throw IllegalArgumentException("This license key is not valid.")
+        if (!ok) throw IllegalArgumentException(tr(R.string.hint_this_license_key_is_not))
         return License(fields[0], fields[1], issued, expires.takeIf { it != 0 })
     }
 
@@ -115,7 +117,7 @@ object LicenseKey {
         var value = 0
         for (ch in text) {
             val idx = ALPHABET.indexOf(ch)
-            if (idx < 0) throw IllegalArgumentException("The license key contains invalid characters.")
+            if (idx < 0) throw IllegalArgumentException(tr(R.string.hint_license_key_contains_invalid_characters))
             value = (value shl 5) or idx
             bits += 5
             if (bits >= 8) {

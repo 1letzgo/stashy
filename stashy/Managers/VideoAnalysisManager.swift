@@ -454,7 +454,7 @@ class StashVideoSyncManager: ObservableObject {
             cachedPersonMask = mask
             return mask
         } catch {
-            DispatchQueue.main.async { self.lastError = "Seg: \(error.localizedDescription)" }
+            DispatchQueue.main.async { self.lastError = tr("seg_arg", error.localizedDescription) }
             return cachedPersonMask
         }
     }
@@ -478,7 +478,7 @@ class StashVideoSyncManager: ObservableObject {
                 analyzeOpticalFlow(result.pixelBuffer, mask: mask)
             }
         } catch {
-            DispatchQueue.main.async { self.lastError = "Flow: \(error.localizedDescription)" }
+            DispatchQueue.main.async { self.lastError = tr("flow_arg", error.localizedDescription) }
         }
         previousPixelBuffer = pixelBuffer
     }

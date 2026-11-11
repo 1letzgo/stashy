@@ -156,7 +156,7 @@ final class SubtitleController: ObservableObject {
 
 extension VideoCaption {
     var displayName: String {
-        if languageCode == "00" { return "Unknown" }
+        if languageCode == "00" { return tr("unknown") }
         if let name = Locale.current.localizedString(forLanguageCode: languageCode) {
             return "\(name) (\(captionType))"
         }

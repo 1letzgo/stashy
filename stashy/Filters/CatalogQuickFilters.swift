@@ -47,41 +47,41 @@ enum CatalogQuickSortCatalog {
     static func fields(for mode: StashDBViewModel.FilterMode) -> [Field] {
         switch mode {
         case .scenes:
-            return [.init(field: "date", label: "Date"), .init(field: "created_at", label: "Added"),
-                    .init(field: "rating", label: "Rating"), .init(field: "o_counter", label: "O Count"),
-                    .init(field: "duration", label: "Duration"), .init(field: "last_played_at", label: "Last played"),
-                    .init(field: "play_count", label: "Plays"), .init(field: "random", label: "Random")]
-                + (StashDBViewModel.SceneSortOption.isForYouAvailable ? [.init(field: forYouField, label: "For You")] : [])
+            return [.init(field: "date", label: tr("date")), .init(field: "created_at", label: tr("added")),
+                    .init(field: "rating", label: tr("rating")), .init(field: "o_counter", label: tr("o_count")),
+                    .init(field: "duration", label: tr("duration")), .init(field: "last_played_at", label: tr("last_played")),
+                    .init(field: "play_count", label: tr("play_count")), .init(field: "random", label: tr("random"))]
+                + (StashDBViewModel.SceneSortOption.isForYouAvailable ? [.init(field: forYouField, label: tr("for_you"))] : [])
         case .performers:
-            return [.init(field: "scenes_count", label: "Scenes"), .init(field: "images_count", label: "Images"),
-                    .init(field: "galleries_count", label: "Galleries"), .init(field: "name", label: "Name"),
-                    .init(field: "o_counter", label: "O Count"), .init(field: "rating", label: "Rating"),
-                    .init(field: "created_at", label: "Added"), .init(field: "birthdate", label: "Birthday"),
-                    .init(field: "random", label: "Random")]
+            return [.init(field: "scenes_count", label: tr("scenes")), .init(field: "images_count", label: tr("images")),
+                    .init(field: "galleries_count", label: tr("galleries")), .init(field: "name", label: tr("name")),
+                    .init(field: "o_counter", label: tr("o_count")), .init(field: "rating", label: tr("rating")),
+                    .init(field: "created_at", label: tr("added")), .init(field: "birthdate", label: tr("birthday")),
+                    .init(field: "random", label: tr("random"))]
         case .studios:
-            return [.init(field: "scenes_count", label: "Scenes"), .init(field: "images_count", label: "Images"),
-                    .init(field: "galleries_count", label: "Galleries"), .init(field: "name", label: "Name"),
-                    .init(field: "rating", label: "Rating"), .init(field: "created_at", label: "Added"),
-                    .init(field: "random", label: "Random")]
+            return [.init(field: "scenes_count", label: tr("scenes")), .init(field: "images_count", label: tr("images")),
+                    .init(field: "galleries_count", label: tr("galleries")), .init(field: "name", label: tr("name")),
+                    .init(field: "rating", label: tr("rating")), .init(field: "created_at", label: tr("added")),
+                    .init(field: "random", label: tr("random"))]
         case .tags:
-            return [.init(field: "scenes_count", label: "Scenes"), .init(field: "images_count", label: "Images"),
-                    .init(field: "galleries_count", label: "Galleries"), .init(field: "name", label: "Name"),
-                    .init(field: "created_at", label: "Added"), .init(field: "random", label: "Random")]
+            return [.init(field: "scenes_count", label: tr("scenes")), .init(field: "images_count", label: tr("images")),
+                    .init(field: "galleries_count", label: tr("galleries")), .init(field: "name", label: tr("name")),
+                    .init(field: "created_at", label: tr("added")), .init(field: "random", label: tr("random"))]
         case .galleries:
-            return [.init(field: "date", label: "Date"), .init(field: "created_at", label: "Added"),
-                    .init(field: "rating", label: "Rating"), .init(field: "images_count", label: "Images"),
-                    .init(field: "title", label: "Title"), .init(field: "random", label: "Random")]
+            return [.init(field: "date", label: tr("date")), .init(field: "created_at", label: tr("added")),
+                    .init(field: "rating", label: tr("rating")), .init(field: "images_count", label: tr("images")),
+                    .init(field: "title", label: tr("title")), .init(field: "random", label: tr("random"))]
         case .images:
-            return [.init(field: "date", label: "Date"), .init(field: "created_at", label: "Added"),
-                    .init(field: "rating", label: "Rating"), .init(field: "o_counter", label: "O Count"),
-                    .init(field: "title", label: "Title"), .init(field: "random", label: "Random")]
+            return [.init(field: "date", label: tr("date")), .init(field: "created_at", label: tr("added")),
+                    .init(field: "rating", label: tr("rating")), .init(field: "o_counter", label: tr("o_count")),
+                    .init(field: "title", label: tr("title")), .init(field: "random", label: tr("random"))]
         case .groups:
-            return [.init(field: "name", label: "Name"), .init(field: "date", label: "Date"),
-                    .init(field: "rating", label: "Rating"), .init(field: "scenes_count", label: "Scenes"),
-                    .init(field: "created_at", label: "Added"), .init(field: "random", label: "Random")]
+            return [.init(field: "name", label: tr("name")), .init(field: "date", label: tr("date")),
+                    .init(field: "rating", label: tr("rating")), .init(field: "scenes_count", label: tr("scenes")),
+                    .init(field: "created_at", label: tr("added")), .init(field: "random", label: tr("random"))]
         case .sceneMarkers:
-            return [.init(field: "created_at", label: "Added"), .init(field: "title", label: "Title"),
-                    .init(field: "seconds", label: "Time"), .init(field: "random", label: "Random")]
+            return [.init(field: "created_at", label: tr("added")), .init(field: "title", label: tr("title")),
+                    .init(field: "seconds", label: tr("time")), .init(field: "random", label: tr("random"))]
         case .unknown:
             return []
         }
@@ -171,21 +171,21 @@ enum QuickFilterCatalog {
         let all: [QuickFilterSection]
         switch mode {
         case .scenes:
-            all = [.entities(key: "tags", title: "Tags"), rating, sceneDuration, resolution, orientation, organized, watched, oCount]
+            all = [.entities(key: "tags", title: tr("tags")), rating, sceneDuration, resolution, orientation, organized, watched, oCount]
         case .performers:
-            all = [gender, favorite(key: "filter_favorites"), rating, age, oCount, .entities(key: "tags", title: "Tags")]
+            all = [gender, favorite(key: "filter_favorites"), rating, age, oCount, .entities(key: "tags", title: tr("tags"))]
         case .studios:
-            all = [favorite(key: "favorite"), rating, .entities(key: "tags", title: "Tags")]
+            all = [favorite(key: "favorite"), rating, .entities(key: "tags", title: tr("tags"))]
         case .tags:
             all = [favorite(key: "favorite"), hasScenes]
         case .galleries:
-            all = [.entities(key: "tags", title: "Tags"), rating, organized]
+            all = [.entities(key: "tags", title: tr("tags")), rating, organized]
         case .images:
-            all = [.entities(key: "tags", title: "Tags"), rating, organized, oCount]
+            all = [.entities(key: "tags", title: tr("tags")), rating, organized, oCount]
         case .groups:
-            all = [.entities(key: "tags", title: "Tags"), rating]
+            all = [.entities(key: "tags", title: tr("tags")), rating]
         case .sceneMarkers:
-            all = [.entities(key: "tags", title: "Tags")]
+            all = [.entities(key: "tags", title: tr("tags"))]
         case .unknown:
             all = []
         }
@@ -216,8 +216,9 @@ enum QuickFilterCatalog {
     }
 
     // Stash stores ratings as 0–100; n stars = rating100 ≥ n·20.
-    private static let rating = QuickFilterSection.choices(
-        key: "rating100", title: "Minimum rating", anyLabel: "Any",
+    private static var rating: QuickFilterSection {
+QuickFilterSection.choices(
+        key: "rating100", title: tr("minimum_rating"), anyLabel: tr("any"),
         choices: (1...5).map { stars in
             QuickFilterChoice(
                 id: "r\(stars)", label: "\(stars)★", activeLabel: "\(stars)★+",
@@ -225,22 +226,26 @@ enum QuickFilterCatalog {
             )
         }
     )
+    }
 
-    private static let sceneDuration = QuickFilterSection.choices(
-        key: "duration", title: "Duration", anyLabel: "Any length",
+    private static var sceneDuration: QuickFilterSection {
+QuickFilterSection.choices(
+        key: "duration", title: tr("duration"), anyLabel: tr("any_length"),
         choices: [
-            .init(id: "short", label: "Under 10 min", activeLabel: "< 10 min",
+            .init(id: "short", label: tr("under_10_min"), activeLabel: "< 10 min",
                   value: ["modifier": "LESS_THAN", "value": 600]),
             .init(id: "mid", label: "10–30 min", activeLabel: "10–30 min",
                   value: ["modifier": "BETWEEN", "value": 600, "value2": 1800]),
-            .init(id: "long", label: "Over 30 min", activeLabel: "> 30 min",
+            .init(id: "long", label: tr("over_30_min"), activeLabel: "> 30 min",
                   value: ["modifier": "GREATER_THAN", "value": 1800]),
         ]
     )
+    }
 
     // `GREATER_THAN` a resolution class means "above that class", so 720p+ is "> 540p".
-    private static let resolution = QuickFilterSection.choices(
-        key: "resolution", title: "Quality", anyLabel: "Any quality",
+    private static var resolution: QuickFilterSection {
+QuickFilterSection.choices(
+        key: "resolution", title: tr("quality"), anyLabel: tr("any_quality"),
         choices: [
             .init(id: "720", label: "720p+", activeLabel: "720p+",
                   value: ["modifier": "GREATER_THAN", "value": StashResolutionOption.webHD.rawValue]),
@@ -250,37 +255,45 @@ enum QuickFilterCatalog {
                   value: ["modifier": "GREATER_THAN", "value": StashResolutionOption.quadHD.rawValue]),
         ]
     )
+    }
 
-    private static let orientation = QuickFilterSection.choices(
-        key: "orientation", title: "Orientation", anyLabel: "Any",
+    private static var orientation: QuickFilterSection {
+QuickFilterSection.choices(
+        key: "orientation", title: tr("orientation"), anyLabel: tr("any"),
         choices: StashOrientationOption.allCases.map { option in
             QuickFilterChoice(id: option.rawValue, label: option.label, activeLabel: option.label,
                               value: ["value": [option.rawValue]])
         }
     )
+    }
 
-    private static let organized = QuickFilterSection.choices(
-        key: "organized", title: "Organized", anyLabel: "Any",
+    private static var organized: QuickFilterSection {
+QuickFilterSection.choices(
+        key: "organized", title: tr("organized"), anyLabel: tr("any"),
         choices: [
-            .init(id: "yes", label: "Organized", activeLabel: "Organized", value: true),
-            .init(id: "no", label: "Not organized", activeLabel: "Not organized", value: false),
+            .init(id: "yes", label: tr("organized"), activeLabel: tr("organized"), value: true),
+            .init(id: "no", label: tr("not_organized"), activeLabel: tr("not_organized"), value: false),
         ]
     )
+    }
 
-    private static let watched = QuickFilterSection.choices(
-        key: "play_count", title: "Watched", anyLabel: "Any",
+    private static var watched: QuickFilterSection {
+QuickFilterSection.choices(
+        key: "play_count", title: tr("watched"), anyLabel: tr("any"),
         choices: [
-            .init(id: "unwatched", label: "Unwatched", activeLabel: "Unwatched",
+            .init(id: "unwatched", label: tr("unwatched"), activeLabel: tr("unwatched"),
                   value: ["modifier": "EQUALS", "value": 0]),
-            .init(id: "watched", label: "Watched", activeLabel: "Watched",
+            .init(id: "watched", label: tr("watched"), activeLabel: tr("watched"),
                   value: ["modifier": "GREATER_THAN", "value": 0]),
         ]
     )
+    }
 
-    private static let oCount = QuickFilterSection.choices(
-        key: "o_counter", title: "O-Count", anyLabel: "Any",
+    private static var oCount: QuickFilterSection {
+QuickFilterSection.choices(
+        key: "o_counter", title: tr("o_count"), anyLabel: tr("any"),
         choices: [
-            .init(id: "o0", label: "None", activeLabel: "No O",
+            .init(id: "o0", label: tr("none"), activeLabel: tr("empty_o"),
                   value: ["modifier": "EQUALS", "value": 0]),
             .init(id: "o1", label: "1+", activeLabel: "O 1+",
                   value: ["modifier": "GREATER_THAN", "value": 0]),
@@ -290,46 +303,53 @@ enum QuickFilterCatalog {
                   value: ["modifier": "GREATER_THAN", "value": 9]),
         ]
     )
+    }
 
-    private static let gender = QuickFilterSection.choices(
-        key: "gender", title: "Gender", anyLabel: "Any",
+    private static var gender: QuickFilterSection {
+QuickFilterSection.choices(
+        key: "gender", title: tr("gender"), anyLabel: tr("any"),
         choices: [
-            ("FEMALE", "Female"), ("MALE", "Male"), ("TRANSGENDER_FEMALE", "Trans female"),
-            ("TRANSGENDER_MALE", "Trans male"), ("NON_BINARY", "Non-binary"),
+            ("FEMALE", tr("female")), ("MALE", tr("male")), ("TRANSGENDER_FEMALE", tr("trans_female")),
+            ("TRANSGENDER_MALE", tr("trans_male")), ("NON_BINARY", "Non-Binary"),
         ].map { raw, label in
             QuickFilterChoice(id: raw, label: label, activeLabel: label,
                               value: ["modifier": "INCLUDES", "value_list": [raw]])
         }
     )
+    }
 
-    private static let age = QuickFilterSection.choices(
-        key: "age", title: "Age", anyLabel: "Any age",
+    private static var age: QuickFilterSection {
+QuickFilterSection.choices(
+        key: "age", title: tr("age"), anyLabel: tr("any_age"),
         choices: [
-            .init(id: "18", label: "18–25", activeLabel: "Age 18–25",
+            .init(id: "18", label: "18–25", activeLabel: tr("age_18_25"),
                   value: ["modifier": "BETWEEN", "value": 18, "value2": 25]),
-            .init(id: "26", label: "26–35", activeLabel: "Age 26–35",
+            .init(id: "26", label: "26–35", activeLabel: tr("age_26_35"),
                   value: ["modifier": "BETWEEN", "value": 26, "value2": 35]),
-            .init(id: "36", label: "36+", activeLabel: "Age 36+",
+            .init(id: "36", label: "36+", activeLabel: tr("age_36_plus"),
                   value: ["modifier": "GREATER_THAN", "value": 35]),
         ]
     )
+    }
 
-    private static let hasScenes = QuickFilterSection.choices(
-        key: "scene_count", title: "Scenes", anyLabel: "Any",
+    private static var hasScenes: QuickFilterSection {
+QuickFilterSection.choices(
+        key: "scene_count", title: tr("scenes"), anyLabel: tr("any"),
         choices: [
-            .init(id: "has", label: "Has scenes", activeLabel: "Has scenes",
+            .init(id: "has", label: tr("has_scenes"), activeLabel: tr("has_scenes"),
                   value: ["modifier": "GREATER_THAN", "value": 0]),
-            .init(id: "none", label: "No scenes", activeLabel: "No scenes",
+            .init(id: "none", label: tr("empty_scenes"), activeLabel: tr("empty_scenes"),
                   value: ["modifier": "EQUALS", "value": 0]),
         ]
     )
+    }
 
     private static func favorite(key: String) -> QuickFilterSection {
         .choices(
-            key: key, title: "Favorite", anyLabel: "Any",
+            key: key, title: tr("favourite"), anyLabel: tr("any"),
             choices: [
-                .init(id: "yes", label: "Favorites", activeLabel: "Favorites", value: true),
-                .init(id: "no", label: "Not favorite", activeLabel: "Not favorite", value: false),
+                .init(id: "yes", label: tr("favorites"), activeLabel: tr("favorites"), value: true),
+                .init(id: "no", label: tr("not_favorite"), activeLabel: tr("not_favorite"), value: false),
             ]
         )
     }
@@ -501,7 +521,7 @@ struct CatalogListQuickBar<Option: CatalogQuickSortable>: View {
                 }
         }
         .buttonStyle(.plain)
-        .accessibilityLabel("Filter and sort settings")
+        .accessibilityLabel(tr("action_filter_and_sort_settings"))
     }
 
     private var sortMenu: some View {
@@ -542,7 +562,7 @@ struct CatalogListQuickBar<Option: CatalogQuickSortable>: View {
             .contentShape(Capsule(style: .continuous))
         }
         .buttonStyle(.plain)
-        .accessibilityLabel("Sort by \(field.label)")
+        .accessibilityLabel(tr("action_sort_by_arg", field.label))
     }
 
     private func removableChip(icon: String?, text: String, onRemove: @escaping () -> Void) -> some View {
@@ -562,7 +582,7 @@ struct CatalogListQuickBar<Option: CatalogQuickSortable>: View {
             .clipShape(Capsule())
         }
         .buttonStyle(.plain)
-        .accessibilityLabel("Remove \(text)")
+        .accessibilityLabel(tr("action_remove_arg", text))
     }
 
     private func chipLabel(key: String, value: Any) -> String {
@@ -643,7 +663,7 @@ struct CatalogFilterCriteriaBody: View {
             HStack(spacing: 8) {
                 Image(systemName: "slider.horizontal.3")
                     .foregroundColor(.secondary)
-                Text("Advanced criteria")
+                Text(tr("advanced_criteria"))
                     .font(.subheadline.weight(.semibold))
                     .foregroundColor(.primary)
                 if advancedOnlyCount > 0 {
@@ -786,7 +806,7 @@ private struct QuickEntityFilterSection: View {
                 QuickFilterSectionTitle(title)
                 Spacer()
                 if selectedIds.count > 1 {
-                    Picker("Match", selection: Binding(
+                    Picker(tr("match"), selection: Binding(
                         get: { modifier },
                         set: { newValue in
                             var dict = currentDict
@@ -795,8 +815,8 @@ private struct QuickEntityFilterSection: View {
                             onChange()
                         }
                     )) {
-                        Text("All").tag(StashCriterionModifier.includesAll.rawValue)
-                        Text("Any").tag(StashCriterionModifier.includes.rawValue)
+                        Text(tr("all")).tag(StashCriterionModifier.includesAll.rawValue)
+                        Text(tr("any")).tag(StashCriterionModifier.includes.rawValue)
                     }
                     .pickerStyle(.segmented)
                     .fixedSize()
@@ -804,7 +824,7 @@ private struct QuickEntityFilterSection: View {
             }
             HStack(spacing: 8) {
                 Image(systemName: "magnifyingglass").foregroundColor(.secondary)
-                TextField("Search \(title.lowercased())", text: $query)
+                TextField(tr("search_arg", title.lowercased()), text: $query)
                     .textInputAutocapitalization(.never)
                     .autocorrectionDisabled()
                     .submitLabel(.search)
@@ -832,7 +852,7 @@ private struct QuickEntityFilterSection: View {
             if let kind, store.isLoading(kind) || store.isSearching(kind) {
                 ProgressView().controlSize(.small)
             } else if visibleOptions.isEmpty {
-                Text(query.isEmpty ? "Search to find \(title.lowercased())." : "No matches.")
+                Text(query.isEmpty ? tr("search_to_find_arg", title.lowercased()) : tr("empty_matches"))
                     .font(.caption)
                     .foregroundColor(.secondary)
             }
@@ -914,7 +934,7 @@ struct CatalogQuickSortMenu<Option: CatalogQuickSortable>: View {
         let fields = sortFields
         let active = fields.first(where: isActive)
         return Menu {
-            Section("Sort by") {
+            Section(tr("action_sort_by")) {
                 ForEach(fields, id: \.self) { field in
                     // A toggle so the menu shows the checkmark and the field's icon together.
                     Toggle(isOn: Binding(
@@ -931,7 +951,7 @@ struct CatalogQuickSortMenu<Option: CatalogQuickSortable>: View {
                 }
             }
             if !CatalogQuickSortCatalog.hasFixedOrder(sort.quickSortField) {
-                Section("Order") {
+                Section(tr("order")) {
                     ForEach(["ASC", "DESC"], id: \.self) { direction in
                         Toggle(isOn: Binding(
                             get: { sort.direction == direction },
@@ -943,7 +963,7 @@ struct CatalogQuickSortMenu<Option: CatalogQuickSortable>: View {
                                 onSort(next)
                             }
                         )) {
-                            Label(direction == "ASC" ? "Ascending" : "Descending",
+                            Label(direction == "ASC" ? tr("ascending") : tr("descending"),
                                   systemImage: direction == "ASC" ? "arrow.up" : "arrow.down")
                         }
                     }
@@ -975,7 +995,7 @@ struct CatalogQuickSortMenu<Option: CatalogQuickSortable>: View {
         .menuIndicator(.hidden)
         .stashyNeutralMenuItems()
         .fixedSize()
-        .accessibilityLabel("Sort, \(active?.label ?? "custom"), \(sort.direction == "ASC" ? "ascending" : "descending")")
+        .accessibilityLabel(tr("action_sort_arg_arg", active?.label ?? "custom", sort.direction == "ASC" ? "ascending" : "descending"))
     }
 
 }

@@ -1,5 +1,7 @@
 package de.letzgo.stashy.ui.tools.downloads
 
+import de.letzgo.stashy.R
+import de.letzgo.stashy.tr
 import de.letzgo.stashy.ui.bottomBarContentPadding
 import de.letzgo.stashy.ui.scaledIconSize
 import androidx.compose.foundation.layout.heightIn
@@ -167,11 +169,11 @@ fun DownloadsToolView(topPadding: androidx.compose.ui.unit.Dp = toolsTopPadding(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(Tokens.Spacing.sm),
         ) {
-            NativeSearchField(search, { search = it }, "Search downloads", Modifier.weight(1f))
+            NativeSearchField(search, { search = it }, tr(R.string.search_downloads), Modifier.weight(1f))
             Box(
                 Modifier.size(48.dp).clip(CircleShape).background(Appearance.tint).clickable { showingJobSheet = true },
                 contentAlignment = Alignment.Center,
-            ) { Icon(SF.plus, "New sync job", tint = Color.White, modifier = Modifier.size(24.dp)) }
+            ) { Icon(SF.plus, tr(R.string.new_sync_job), tint = Color.White, modifier = Modifier.size(24.dp)) }
         }
 
         if (jobs.isNotEmpty()) SyncJobRow(
@@ -188,9 +190,9 @@ fun DownloadsToolView(topPadding: androidx.compose.ui.unit.Dp = toolsTopPadding(
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
                 Icon(SF.squareAndArrowDown, null, tint = Appearance.tint, modifier = Modifier.size(64.dp))
-                Text("No Downloads yet", style = IosTypography.title3.copy(fontWeight = FontWeight.Bold), color = p.text)
+                Text(tr(R.string.empty_downloads_yet), style = IosTypography.title3.copy(fontWeight = FontWeight.Bold), color = p.text)
                 Text(
-                    "Downloaded scenes will appear here for offline viewing.",
+                    tr(R.string.hint_downloaded_scenes_will_appear_here),
                     style = IosTypography.body, color = p.secondaryText, textAlign = TextAlign.Center,
                     modifier = Modifier.padding(horizontal = ToolsTokens.contentPadding),
                 )
@@ -212,7 +214,7 @@ fun DownloadsToolView(topPadding: androidx.compose.ui.unit.Dp = toolsTopPadding(
                 contentPadding = androidx.compose.foundation.layout.PaddingValues(top = ToolsTokens.menuTopPadding, bottom = bottomBarContentPadding()),
             ) {
                 if (running.isNotEmpty()) {
-                    sectionHeading("Active Downloads")
+                    sectionHeading(tr(R.string.active_downloads))
                     item(key = "active-group") {
                         NativeGroup(Modifier.padding(horizontal = ToolsTokens.contentPadding)) {
                             running.forEachIndexed { index, d ->
@@ -224,7 +226,7 @@ fun DownloadsToolView(topPadding: androidx.compose.ui.unit.Dp = toolsTopPadding(
                     item { Spacer(Modifier.height(20.dp)) }
                 }
                 if (queued.isNotEmpty()) {
-                    sectionHeading("Queued")
+                    sectionHeading(tr(R.string.queued))
                     item(key = "queued-group") {
                         NativeGroup(Modifier.padding(horizontal = ToolsTokens.contentPadding)) {
                             queued.forEachIndexed { index, d ->
@@ -236,7 +238,7 @@ fun DownloadsToolView(topPadding: androidx.compose.ui.unit.Dp = toolsTopPadding(
                     item { Spacer(Modifier.height(20.dp)) }
                 }
                 if (scenes.isNotEmpty()) {
-                    sectionHeading("Scenes")
+                    sectionHeading(tr(R.string.scenes))
                     gridRows(scenes.chunked(columns), columns, keyPrefix = "scene", keyOf = { it.id }) { scene ->
                         DownloadedSceneCard(
                             scene,
@@ -247,10 +249,10 @@ fun DownloadsToolView(topPadding: androidx.compose.ui.unit.Dp = toolsTopPadding(
                     item { Spacer(Modifier.height(8.dp)) }
                 }
                 if (galleryEntries.isNotEmpty()) {
-                    downloadSection("Galleries & Images", galleryEntries, columns) { galleryToDelete = it }
+                    downloadSection(tr(R.string.galleries_and_images), galleryEntries, columns) { galleryToDelete = it }
                 }
                 if (tagEntries.isNotEmpty()) {
-                    downloadSection("Tags", tagEntries, columns) { galleryToDelete = it }
+                    downloadSection(tr(R.string.tags), tagEntries, columns) { galleryToDelete = it }
                 }
             }
         }
@@ -261,38 +263,38 @@ fun DownloadsToolView(topPadding: androidx.compose.ui.unit.Dp = toolsTopPadding(
     }
     if (showingRunAll) {
         StashyAlert(
-            title = "Run all jobs?",
-            message = "Each job downloads its configured number of newest items. Items already downloaded are skipped.",
+            title = tr(R.string.confirm_run_all_jobs),
+            message = tr(R.string.hint_each_job_downloads_its_configured),
             onDismiss = { showingRunAll = false },
-            confirmLabel = "Run all",
-            dismissLabel = "Cancel",
+            confirmLabel = tr(R.string.action_run_all),
+            dismissLabel = tr(R.string.action_cancel),
             onConfirm = { showingRunAll = false; DownloadSyncJobRunner.runAll(DownloadSyncJobStore.jobs, savedFilters) },
         )
     }
     jobToDelete?.let { job ->
         StashyAlert(
-            title = "Delete job?",
+            title = tr(R.string.confirm_delete_job),
             message = "${job.filterName} stays on the server; only the job goes away.",
             onDismiss = { jobToDelete = null },
-            confirmLabel = "Delete", destructive = true, dismissLabel = "Cancel",
+            confirmLabel = tr(R.string.action_delete), destructive = true, dismissLabel = tr(R.string.action_cancel),
             onConfirm = { DownloadSyncJobStore.remove(job); jobToDelete = null },
         )
     }
     sceneToDelete?.let { scene ->
         StashyAlert(
-            title = "Delete this download?",
-            message = "The video file is removed from this device.",
+            title = tr(R.string.confirm_delete_this_download),
+            message = tr(R.string.hint_video_file_is_removed_from),
             onDismiss = { sceneToDelete = null },
-            confirmLabel = "Delete Download", destructive = true, dismissLabel = "Cancel",
+            confirmLabel = tr(R.string.action_delete_download), destructive = true, dismissLabel = tr(R.string.action_cancel),
             onConfirm = { Downloads.deleteDownload(scene.id); sceneToDelete = null },
         )
     }
     galleryToDelete?.let { entry ->
         StashyAlert(
-            title = "Delete this download?",
-            message = "The downloaded images are removed from this device.",
+            title = tr(R.string.confirm_delete_this_download),
+            message = tr(R.string.hint_downloaded_images_are_removed_from),
             onDismiss = { galleryToDelete = null },
-            confirmLabel = "Delete", destructive = true, dismissLabel = "Cancel",
+            confirmLabel = tr(R.string.action_delete), destructive = true, dismissLabel = tr(R.string.action_cancel),
             onConfirm = { Downloads.deleteGalleryDownload(entry.id); galleryToDelete = null },
         )
     }
@@ -366,7 +368,7 @@ private fun SyncJobRow(
     Column(
         Modifier.fillMaxWidth().padding(top = Tokens.Spacing.sm, bottom = Tokens.Spacing.md),
     ) {
-        NativeSectionHeader("Sync jobs", Modifier.padding(horizontal = ToolsTokens.contentPadding))
+        NativeSectionHeader(tr(R.string.action_sync_jobs), Modifier.padding(horizontal = ToolsTokens.contentPadding))
         Row(
             Modifier.padding(horizontal = ToolsTokens.contentPadding),
             horizontalArrangement = Arrangement.spacedBy(Tokens.Spacing.xs),
@@ -378,7 +380,7 @@ private fun SyncJobRow(
                 contentAlignment = Alignment.Center,
             ) {
                 Icon(
-                    Icons.AutoMirrored.Filled.PlaylistPlay, "Run all sync jobs",
+                    Icons.AutoMirrored.Filled.PlaylistPlay, tr(R.string.action_run_all_sync_jobs),
                     tint = if (jobs.isEmpty()) p.secondaryText else Appearance.tint, modifier = Modifier.size(20.dp),
                 )
             }
@@ -423,18 +425,18 @@ private fun DownloadSyncJobSheet(
 
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState, containerColor = p.background) {
         Column(Modifier.fillMaxWidth().fillMaxHeight(0.92f)) {
-            de.letzgo.stashy.ui.NativeSheetTopBar("New sync job", onClose = onDismiss)
+            de.letzgo.stashy.ui.NativeSheetTopBar(tr(R.string.new_sync_job), onClose = onDismiss)
             LazyColumn(
                 Modifier.weight(1f).fillMaxWidth(),
                 contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = ToolsTokens.contentPadding, vertical = 8.dp),
             ) {
-                item { NativeSearchField(search, { search = it }, "Search filters") }
+                item { NativeSearchField(search, { search = it }, tr(R.string.search_filters)) }
                 item { Spacer(Modifier.height(20.dp)) }
-                item { NativeSectionHeader("Filter") }
+                item { NativeSectionHeader(tr(R.string.filter)) }
                 item {
                     GroupedCard {
                         if (usable.isEmpty()) {
-                            NativeListItem("No scene or image filters on this server", headlineColor = p.secondaryText)
+                            NativeListItem(tr(R.string.hint_no_scene_or_image_filters), headlineColor = p.secondaryText)
                         }
                         usable.forEachIndexed { index, filter ->
                             if (index > 0) RowDivider()
@@ -449,13 +451,13 @@ private fun DownloadSyncJobSheet(
                     }
                 }
                 item { Spacer(Modifier.height(20.dp)) }
-                item { NativeSectionHeader("Amount per run") }
+                item { NativeSectionHeader(tr(R.string.amount_per_run)) }
                 item {
                     GroupedCard {
-                        NativeSwitchItem("All matching items", everything, onCheckedChange = { everything = it })
+                        NativeSwitchItem(tr(R.string.all_matching_items), everything, onCheckedChange = { everything = it })
                         if (!everything) {
                             NativeDivider()
-                            NativeListItem("Newest $amount") {
+                            NativeListItem(tr(R.string.newest_arg, amount)) {
                                 StepperControl(
                                     onDecrement = { amount = (amount - (if (amount < 20) 1 else 10)).coerceAtLeast(1) },
                                     onIncrement = { amount = (amount + (if (amount < 20) 1 else 10)).coerceAtMost(500) },
@@ -471,7 +473,7 @@ private fun DownloadSyncJobSheet(
                 Modifier.fillMaxWidth().background(p.background)
                     .padding(horizontal = ToolsTokens.contentPadding).padding(top = 6.dp, bottom = 12.dp).navigationBarsPadding(),
             ) {
-                de.letzgo.stashy.ui.NativeButton("Save job", Modifier.fillMaxWidth(), enabled = enabled) {
+                de.letzgo.stashy.ui.NativeButton(tr(R.string.action_save_job), Modifier.fillMaxWidth(), enabled = enabled) {
                     val id = selectedId ?: return@NativeButton
                     val filter = savedFilters[id] ?: return@NativeButton
                     onSave(
@@ -497,11 +499,11 @@ private fun StepperControl(onDecrement: () -> Unit, onIncrement: () -> Unit, can
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Box(Modifier.size(width = 46.dp, height = 32.dp).clickable(enabled = canDecrement, onClick = onDecrement), contentAlignment = Alignment.Center) {
-            Icon(Icons.Filled.Remove, "Decrease", tint = if (canDecrement) p.text else p.tertiaryText, modifier = Modifier.size(18.dp))
+            Icon(Icons.Filled.Remove, tr(R.string.decrease), tint = if (canDecrement) p.text else p.tertiaryText, modifier = Modifier.size(18.dp))
         }
         Box(Modifier.width(0.5.dp).height(18.dp).background(p.separator))
         Box(Modifier.size(width = 46.dp, height = 32.dp).clickable(enabled = canIncrement, onClick = onIncrement), contentAlignment = Alignment.Center) {
-            Icon(SF.plus, "Increase", tint = if (canIncrement) p.text else p.tertiaryText, modifier = Modifier.size(18.dp))
+            Icon(SF.plus, tr(R.string.increase), tint = if (canIncrement) p.text else p.tertiaryText, modifier = Modifier.size(18.dp))
         }
     }
 }
@@ -538,7 +540,7 @@ private fun ActiveDownloadRow(download: ActiveDownload, modifier: Modifier = Mod
 @Composable
 private fun QueuedDownloadRow(download: ActiveDownload, modifier: Modifier = Modifier) {
     NativeListItem(
-        download.title, modifier, supporting = "Queued", supportingMaxLines = 1,
+        download.title, modifier, supporting = tr(R.string.queued), supportingMaxLines = 1,
         icon = SF.clock, iconTint = Theme.palette.secondaryText,
         trailing = { CancelDownloadButton(download.id) },
     )
@@ -547,7 +549,7 @@ private fun QueuedDownloadRow(download: ActiveDownload, modifier: Modifier = Mod
 @Composable
 private fun CancelDownloadButton(id: String) {
     Icon(
-        Icons.Filled.Cancel, "Cancel download", tint = Theme.palette.secondaryText,
+        Icons.Filled.Cancel, tr(R.string.action_cancel_download), tint = Theme.palette.secondaryText,
         modifier = Modifier.size(24.dp).clip(CircleShape).clickable { Downloads.cancelActiveDownload(id) },
     )
 }
@@ -555,7 +557,7 @@ private fun CancelDownloadButton(id: String) {
 /** Byte and progress formatting like iOS `ByteCountFormatter` (`.file`, decimal units). */
 object DownloadsFormat {
     fun bytes(count: Long): String {
-        if (count <= 0) return "Zero KB"
+        if (count <= 0) return tr(R.string.zero_kb)
         if (count < 1000) return "$count bytes"
         val kb = count / 1000.0
         if (kb < 1000) return String.format(Locale.US, "%.0f KB", kb)
@@ -605,7 +607,7 @@ private fun DownloadActionsCard(
                 Box(
                     Modifier.fillMaxSize().clip(RoundedCornerShape(Tokens.Radius.card)).background(Appearance.tint).padding(end = 20.dp),
                     contentAlignment = Alignment.CenterEnd,
-                ) { Icon(SF.trash, "Delete", tint = Color.White) }
+                ) { Icon(SF.trash, tr(R.string.action_delete), tint = Color.White) }
             },
         ) {
             Box(Modifier.combinedClickable(onClick = onOpen, onLongClick = { showMenu = true })) { content() }
@@ -619,7 +621,7 @@ private fun DownloadActionsCard(
                 )
             }
             DropdownMenuItem(
-                text = { Text("Delete", color = StashyColors.systemRed) },
+                text = { Text(tr(R.string.action_delete), color = StashyColors.systemRed) },
                 leadingIcon = { Icon(SF.trash, null, tint = StashyColors.systemRed) },
                 onClick = { showMenu = false; onDelete() },
             )
@@ -638,9 +640,9 @@ private fun DownloadedSceneCard(downloaded: DownloadedScene, onOpen: () -> Unit,
         onOpen = onOpen,
         onDelete = onDelete,
         menu = listOf(
-            Triple<String, ImageVector, () -> Unit>("Share", Icons.Outlined.Share, {
+            Triple<String, ImageVector, () -> Unit>(tr(R.string.action_share), Icons.Outlined.Share, {
                 val file = Downloads.localVideoFile(downloaded.id)
-                if (file != null) shareDownloadedFile(context, file, "video/*") else showToast("File missing")
+                if (file != null) shareDownloadedFile(context, file, "video/*") else showToast(tr(R.string.file_missing))
             }),
         ),
     ) {
@@ -680,7 +682,7 @@ private fun DownloadedSceneCard(downloaded: DownloadedScene, onOpen: () -> Unit,
                 verticalArrangement = Arrangement.SpaceBetween,
             ) {
                 Text(
-                    downloaded.title ?: "Unknown Title", style = IosTypography.subheadline.copy(fontWeight = FontWeight.Bold),
+                    downloaded.title ?: tr(R.string.unknown_title), style = IosTypography.subheadline.copy(fontWeight = FontWeight.Bold),
                     color = p.text, maxLines = 2, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(bottom = 4.dp),
                 )
                 Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(4.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -717,7 +719,7 @@ private fun DownloadedGalleryCard(entry: DownloadedGallery, onOpen: () -> Unit, 
     DownloadActionsCard(
         onOpen = onOpen,
         onDelete = onDelete,
-        menu = if (entry.isSingleImage) emptyList() else listOf(Triple("Sync", Icons.Filled.Sync, onSync)),
+        menu = if (entry.isSingleImage) emptyList() else listOf(Triple(tr(R.string.action_sync), Icons.Filled.Sync, onSync)),
     ) {
         Row(
             Modifier.fillMaxWidth().heightIn(min = 72.dp).clip(shape).background(p.secondaryBackground),
@@ -741,7 +743,7 @@ private fun DownloadedGalleryCard(entry: DownloadedGallery, onOpen: () -> Unit, 
             }
             if (isSyncing) {
                 Icon(
-                    Icons.Outlined.StopCircle, "Cancel download", tint = StashyColors.systemRed,
+                    Icons.Outlined.StopCircle, tr(R.string.action_cancel_download), tint = StashyColors.systemRed,
                     modifier = Modifier.padding(end = Tokens.Spacing.sm).size(24.dp).clip(CircleShape)
                         .clickable { Downloads.cancelGalleryDownload(entry.id) },
                 )
@@ -760,7 +762,7 @@ private fun gallerySubtitle(entry: DownloadedGallery): String {
     val parts = mutableListOf<String>()
     val total = entry.serverImageCount
     when {
-        entry.isSingleImage -> parts += "Single image"
+        entry.isSingleImage -> parts += tr(R.string.single_image)
         total != null && total > entry.images.size -> parts += "${entry.images.size} of $total images"
         else -> parts += "${entry.images.size} image(s)"
     }
@@ -776,14 +778,14 @@ private fun gallerySubtitle(entry: DownloadedGallery): String {
  */
 internal fun shareDownloadedFile(context: Context, file: File, mimeType: String) {
     val uri = runCatching { FileProvider.getUriForFile(context, "${context.packageName}.downloads", file) }.getOrNull()
-        ?: run { showToast("Sharing is not available"); return }
+        ?: run { showToast(tr(R.string.sharing_is_not_available)); return }
     val send = Intent(Intent.ACTION_SEND)
         .setType(mimeType)
         .putExtra(Intent.EXTRA_STREAM, uri)
         .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
     runCatching {
         context.startActivity(Intent.createChooser(send, null).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_GRANT_READ_URI_PERMISSION))
-    }.onFailure { showToast("Sharing is not available") }
+    }.onFailure { showToast(tr(R.string.sharing_is_not_available)) }
 }
 
 /** Android 13+: asks once for the notification permission when a download is running (progress notification). */
@@ -812,7 +814,7 @@ private const val NOTIFICATION_ASKED_KEY = "downloads_notification_permission_as
 class DownloadsScreen : de.letzgo.stashy.ui.Screen {
     override val key = "home-downloads"
 
-    @Composable override fun Content() = de.letzgo.stashy.ui.settings.SettingsDetailScaffold("Downloads") { top ->
+    @Composable override fun Content() = de.letzgo.stashy.ui.settings.SettingsDetailScaffold(tr(R.string.downloads)) { top ->
         DownloadsToolView(topPadding = top)
     }
 }

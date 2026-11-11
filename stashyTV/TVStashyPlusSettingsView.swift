@@ -60,7 +60,7 @@ final class TVStashyPlusStore: ObservableObject {
                 (StashyPlusProduct.sortOrder[$0.id] ?? 99) < (StashyPlusProduct.sortOrder[$1.id] ?? 99)
             }
             if products.isEmpty {
-                lastProductError = "No stashy+ products available."
+                lastProductError = tr("empty_stashy_plus_products_available")
                 AppLog.debug("💬 RevenueCat offering has no stashy+ products for \(StashyPlusProduct.allIDs.sorted())")
             } else {
                 AppLog.debug("💬 RevenueCat loaded products: \(loaded.map(\.id))")
@@ -185,17 +185,17 @@ struct TVStashyPlusSettingsView: View {
                 featureRow(
                     icon: ToolsItem.hotOrNot.icon,
                     text: ToolsItem.hotOrNot.plusFeatureTitle,
-                    detail: "Puts performers against each other under Discover. You pick the winner and their ratings update on your server."
+                    detail: tr("hint_puts_performers_against_each_other_under")
                 )
                 featureRow(
                     icon: ToolsItem.rateMe.icon,
                     text: ToolsItem.rateMe.plusFeatureTitle,
-                    detail: "Shows unrated scenes or images one at a time under Discover, so you can rate them with stars."
+                    detail: tr("hint_shows_unrated_scenes_or_images_one")
                 )
                 featureRow(
                     icon: "sparkles.tv.fill",
-                    text: "Channels",
-                    detail: "Plays scenes back to back from a row on Home: recently released, recently added or your saved scene filters. Performer, studio, tag and group pages get their own channel."
+                    text: tr("channels"),
+                    detail: tr("hint_plays_scenes_back_to_back")
                 )
                     // Wer stashy+ bereits besitzt, bekommt weder Kauf- noch
                     // Restore-Button; während eines Kaufs oder Restores sind sie
@@ -208,11 +208,11 @@ struct TVStashyPlusSettingsView: View {
                     )
                 featureRow(
                     icon: "sparkles.rectangle.stack",
-                    text: "Similar Scenes & Up Next",
-                    detail: "Shows similar scenes on the scene page. When a scene ends, a similar one is offered as Up Next."
+                    text: tr("similar_scenes_and_up_next"),
+                    detail: tr("hint_shows_similar_scenes_on_scene")
                 )
             } footer: {
-                Text("stashy+ unlocks premium features across stashy for iPhone and Apple TV with one purchase.")
+                Text(tr("hint_stashy_plus_unlocks_premium_features"))
             }
 
             if stashyPlus.shouldOfferPurchases {
@@ -265,7 +265,7 @@ struct TVStashyPlusSettingsView: View {
                         }
                     }
                 } header: {
-                    Text("Unlock")
+                    Text(tr("action_unlock"))
                 } footer: {
                     Text(subscriptionFooter)
                 }
@@ -275,7 +275,7 @@ struct TVStashyPlusSettingsView: View {
                         Task { await store.restorePurchases() }
                     } label: {
                         HStack {
-                            Text("Restore Purchases")
+                            Text(tr("action_restore_purchases"))
                             Spacer()
                             if store.isRestoringPurchases {
                                 ProgressView()
@@ -317,15 +317,15 @@ struct TVStashyPlusSettingsView: View {
 
     private func planSubtitle(for product: StashyStoreProduct) -> String {
         if StashyPlusProduct.subscriptionIDs.contains(product.id) {
-            return "Auto-renews · cancel anytime"
+            return tr("auto_renews_cancel_anytime")
         }
-        return "One-time purchase"
+        return tr("one_time_purchase")
     }
 
     private var subscriptionFooter: String {
         if stashyPlus.source == .subscription {
-            return "Your subscription is active. Buying Lifetime keeps stashy+ forever, even after cancelling."
+            return tr("hint_your_subscription_is_active_buying")
         }
-        return "Payment is charged to your Apple ID. Subscriptions renew automatically unless cancelled at least 24 hours before the period ends. Manage or cancel anytime in your App Store settings."
+        return tr("hint_payment_is_charged_to_your")
     }
 }

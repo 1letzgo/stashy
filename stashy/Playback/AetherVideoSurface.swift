@@ -72,7 +72,7 @@ struct AetherVideoSurface: View {
             }
             .overlay(alignment: .bottomTrailing) {
                 if showsTranscodeTag, engine.isUsingTranscodeFallback {
-                    Text("Transcode")
+                    Text(tr("transcode"))
                         .font(.system(size: 11, weight: .semibold))
                         .foregroundStyle(.white)
                         .padding(.horizontal, 10)

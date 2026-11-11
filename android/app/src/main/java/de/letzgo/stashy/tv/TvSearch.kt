@@ -1,5 +1,7 @@
 package de.letzgo.stashy.tv
 
+import de.letzgo.stashy.R
+import de.letzgo.stashy.tr
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -117,7 +119,7 @@ fun TvSearch(model: TvSearchModel) {
     Box(Modifier.fillMaxSize().background(TvColors.background)) {
         if (ServerConfigManager.activeConfig?.hasValidConfig != true) {
             // iOS `viewModel.testConnection()`: re-run the current query once a server is back.
-            TvConnectionError(subtitle = "Add a server in Settings.") { model.commit() }
+            TvConnectionError(subtitle = tr(R.string.action_add_server_in_settings)) { model.commit() }
             return@Box
         }
         LazyColumn(
@@ -131,30 +133,30 @@ fun TvSearch(model: TvSearchModel) {
                 ) {
                     Icon(TvIcons.magnifier, null, Modifier.size(pt(44)), tint = TvColors.secondary)
                     TvTextField(
-                        "Scenes, Performers …", model.query, { model.update(it) },
+                        tr(R.string.scenes_performers_menu), model.query, { model.update(it) },
                         Modifier.weight(1f).focusRequester(fieldFocus).tvFocusMemory(model.focus, "field"),
                         imeAction = ImeAction.Search, onSubmit = { model.commit() },
                     )
                     if (model.query.isNotBlank()) {
-                        TvButton({ model.reset(); runCatching { fieldFocus.requestFocus() } }) { Icon(TvIcons.clear, "Clear input", Modifier.size(pt(36))) }
+                        TvButton({ model.reset(); runCatching { fieldFocus.requestFocus() } }) { Icon(TvIcons.clear, tr(R.string.action_clear_input), Modifier.size(pt(36))) }
                     }
                 }
             }
             when {
-                model.isBusy && !model.hasAnyResults -> item(key = "busy") { TvLoading("Searching …") }
+                model.isBusy && !model.hasAnyResults -> item(key = "busy") { TvLoading(tr(R.string.searching_menu)) }
                 model.hasSearched && !model.hasAnyResults -> item(key = "none") {
                     Column(Modifier.fillMaxWidth().padding(top = pt(40)), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(pt(20))) {
                         Icon(TvIcons.magnifier, null, Modifier.size(pt(56)), tint = TvColors.secondary)
-                        Text("No results for \"${model.query}\"", style = TvType.title3, color = TvColors.secondary)
-                        TvButton({ runCatching { fieldFocus.requestFocus() } }) { Text("Refine Search", style = TvType.headline) }
+                        Text(tr(R.string.empty_results_for_arg, model.query), style = TvType.title3, color = TvColors.secondary)
+                        TvButton({ runCatching { fieldFocus.requestFocus() } }) { Text(tr(R.string.refine_search), style = TvType.headline) }
                     }
                 }
                 model.hasSearched -> results(model)
                 else -> item(key = "placeholder") {
                     Column(Modifier.fillMaxWidth().padding(top = pt(60)), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(pt(16))) {
                         Icon(TvIcons.magnifier, null, Modifier.size(pt(56)), tint = TvColors.secondary)
-                        Text("Search your Stash library", style = TvType.title3, color = TvColors.secondary)
-                        Text("Type at least two characters. Remote or voice input supported.", style = TvType.callout, color = TvColors.secondary, textAlign = TextAlign.Center)
+                        Text(tr(R.string.search_your_stash_library), style = TvType.title3, color = TvColors.secondary)
+                        Text(tr(R.string.hint_type_at_least_two_characters_remote), style = TvType.callout, color = TvColors.secondary, textAlign = TextAlign.Center)
                     }
                 }
             }
@@ -174,27 +176,27 @@ fun TvSearch(model: TvSearchModel) {
 
 private fun LazyListScope.results(model: TvSearchModel) {
     if (model.scenes.isNotEmpty()) item(key = "scenes") {
-        ResultSection(TvIcons.film, "Scenes", model.scenes.size) {
+        ResultSection(TvIcons.film, tr(R.string.scenes), model.scenes.size) {
             items(model.scenes, key = { it.id }) { s -> TvSceneTile(s, { TvNav.push(TvSceneDetailRoute(s.id, s)) }, Modifier.tvFocusMemory(model.focus, "s.${s.id}"), pt(400), pt(225)) }
         }
     }
     if (model.performers.isNotEmpty()) item(key = "performers") {
-        ResultSection(TvIcons.person2, "Performers", model.performers.size) {
+        ResultSection(TvIcons.person2, tr(R.string.performers), model.performers.size) {
             items(model.performers, key = { it.id }) { p -> TvPerformerCard(p, { TvNav.push(TvPerformerDetailRoute(p.id, p.name)) }, Modifier.tvFocusMemory(model.focus, "p.${p.id}")) }
         }
     }
     if (model.studios.isNotEmpty()) item(key = "studios") {
-        ResultSection(TvIcons.building, "Studios", model.studios.size) {
+        ResultSection(TvIcons.building, tr(R.string.studios), model.studios.size) {
             items(model.studios, key = { it.id }) { s -> TvStudioCard(s, { TvNav.push(TvStudioDetailRoute(s.id, s.name)) }, Modifier.tvFocusMemory(model.focus, "st.${s.id}")) }
         }
     }
     if (model.tags.isNotEmpty()) item(key = "tags") {
-        ResultSection(TvIcons.tag, "Tags", model.tags.size) {
+        ResultSection(TvIcons.tag, tr(R.string.tags), model.tags.size) {
             items(model.tags, key = { it.id }) { t -> TvTagCard(t, { TvNav.push(TvTagDetailRoute(t.id, t.name)) }, Modifier.tvFocusMemory(model.focus, "t.${t.id}")) }
         }
     }
     if (model.groups.isNotEmpty()) item(key = "groups") {
-        ResultSection(TvIcons.stack, "Groups", model.groups.size) {
+        ResultSection(TvIcons.stack, tr(R.string.groups), model.groups.size) {
             items(model.groups, key = { it.id }) { g -> TvGroupCard(g, { TvNav.push(TvGroupDetailRoute(g.id, g.name)) }, Modifier.tvFocusMemory(model.focus, "g.${g.id}")) }
         }
     }

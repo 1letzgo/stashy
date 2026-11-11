@@ -196,7 +196,7 @@ struct TVSimilarScenesSection: View {
             Image(systemName: "sparkles.rectangle.stack")
                 .font(.title3)
                 .foregroundColor(AppearanceManager.shared.tintColor)
-            Text("Similar Scenes")
+            Text(tr("similar_scenes"))
                 .font(.title3)
                 .fontWeight(.bold)
                 .foregroundColor(.white)
@@ -237,14 +237,14 @@ struct TVUpNextOverlay: View {
                     .allowsHitTesting(false)
 
                 VStack(alignment: .leading, spacing: 22) {
-                    Text("Up Next · Similar Scene")
+                    Text(tr("up_next_similar_scene"))
                         .font(.system(size: 26, weight: .semibold))
                         .foregroundStyle(.white.opacity(0.7))
 
                     // Card without focus preview: the ended engine is still alive behind it.
                     TVSceneCardView(scene: scene, width: 560, height: 315, showsFocusPreview: false)
 
-                    Text(scene.displayTitle ?? "Untitled Scene")
+                    Text(scene.displayTitle ?? tr("untitled_scene"))
                         .font(.system(size: 34, weight: .bold))
                         .foregroundStyle(.white)
                         .lineLimit(2)
@@ -260,7 +260,7 @@ struct TVUpNextOverlay: View {
                         Button {
                             model.playUpNext()
                         } label: {
-                            Label("Play Now · \(model.countdown)", systemImage: "play.fill")
+                            Label(tr("action_play_now_arg", model.countdown), systemImage: "play.fill")
                                 .monospacedDigit()
                         }
                         .focused($focus, equals: .play)
@@ -268,7 +268,7 @@ struct TVUpNextOverlay: View {
                         Button {
                             model.cancelUpNext()
                         } label: {
-                            Text("Cancel")
+                            Text(tr("action_cancel"))
                         }
                         .focused($focus, equals: .cancel)
                     }

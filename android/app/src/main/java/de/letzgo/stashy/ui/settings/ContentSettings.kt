@@ -1,5 +1,7 @@
 package de.letzgo.stashy.ui.settings
 
+import de.letzgo.stashy.R
+import de.letzgo.stashy.tr
 import de.letzgo.stashy.data.ImageGroupMode
 import de.letzgo.stashy.data.ImageSetGrouping
 import androidx.compose.foundation.layout.Arrangement
@@ -109,10 +111,10 @@ fun DefaultFilterMenu(tab: AppTab, kind: FilterKind = FilterKind.Standard) {
         FilterKind.Standard -> if (tab == AppTab.Markers) TabManager.getDefaultMarkerFilterId(tab) else TabManager.getDefaultFilterId(tab)
     }
     if (filters.isEmpty() && !SavedFiltersStore.isLoading) {
-        Text("No filters found", style = NativeType.bodyMedium, color = Theme.palette.secondaryText)
+        Text(tr(R.string.empty_filters_found), style = NativeType.bodyMedium, color = Theme.palette.secondaryText)
         return
     }
-    MenuValue(listOf("" to "None") + filters.map { it.id to it.name }, current ?: "") { id ->
+    MenuValue(listOf("" to tr(R.string.none)) + filters.map { it.id to it.name }, current ?: "") { id ->
         val f = filters.firstOrNull { it.id == id }
         val (fid, name) = f?.id to f?.name
         when {
@@ -130,10 +132,10 @@ fun DefaultFilterMenu(tab: AppTab, kind: FilterKind = FilterKind.Standard) {
 fun MagazineDefaultFilterMenu() {
     val filters = SavedFiltersStore.ofMode(FilterMode.Galleries.raw)
     if (filters.isEmpty() && !SavedFiltersStore.isLoading) {
-        Text("No filters found", style = NativeType.bodyMedium, color = Theme.palette.secondaryText)
+        Text(tr(R.string.empty_filters_found), style = NativeType.bodyMedium, color = Theme.palette.secondaryText)
         return
     }
-    MenuValue(listOf("" to "None") + filters.map { it.id to it.name }, de.letzgo.stashy.data.tools.MagazineDefaultFilter.id ?: "") { id ->
+    MenuValue(listOf("" to tr(R.string.none)) + filters.map { it.id to it.name }, de.letzgo.stashy.data.tools.MagazineDefaultFilter.id ?: "") { id ->
         de.letzgo.stashy.data.tools.MagazineDefaultFilter.set(filters.firstOrNull { it.id == id }?.id)
     }
 }
@@ -147,24 +149,24 @@ class DashboardSettingsScreen : Screen {
 
     @Composable override fun Content() {
         LaunchedEffect(Unit) { SavedFiltersStore.load(force = true); TabManager.syncHomeChannelItems(SavedFiltersStore.byId.values.toList()) }
-        SettingsDetailScaffold("Dashboard") { top ->
+        SettingsDetailScaffold(tr(R.string.dashboard)) { top ->
             SettingsList(top) {
                 item(key = "dash") {
                     Column(Modifier.padding(bottom = 24.dp)) {
-                        SectionHeaderText("Dashboard")
+                        SectionHeaderText(tr(R.string.dashboard))
                         SettingsCard {
-                            CardHeader("Dashboard", SF.houseFill) { Text("Always Visible", style = NativeType.bodySmall, color = Theme.palette.secondaryText) }
+                            CardHeader(tr(R.string.dashboard), SF.houseFill) { Text(tr(R.string.always_visible), style = NativeType.bodySmall, color = Theme.palette.secondaryText) }
                             CardDivider()
-                            CardSettingRow("Default Filter") { DefaultFilterMenu(AppTab.Dashboard) }
-                            CardSettingRow("Hero Background") { SettingsSwitch(TabManager.showDashboardHeroBackground) { TabManager.showDashboardHeroBackground = it } }
-                            CardSettingRow("Compact Statistics") { SettingsSwitch(TabManager.useCompactStatistics) { TabManager.useCompactStatistics = it } }
-                            CardSettingRow("Colored Statistics") { SettingsSwitch(TabManager.useColoredStatistics) { TabManager.useColoredStatistics = it } }
+                            CardSettingRow(tr(R.string.default_filter)) { DefaultFilterMenu(AppTab.Dashboard) }
+                            CardSettingRow(tr(R.string.hero_background)) { SettingsSwitch(TabManager.showDashboardHeroBackground) { TabManager.showDashboardHeroBackground = it } }
+                            CardSettingRow(tr(R.string.compact_statistics)) { SettingsSwitch(TabManager.useCompactStatistics) { TabManager.useCompactStatistics = it } }
+                            CardSettingRow(tr(R.string.colored_statistics)) { SettingsSwitch(TabManager.useColoredStatistics) { TabManager.useColoredStatistics = it } }
                         }
                     }
                 }
                 item(key = "tabs") {
                     Column(Modifier.padding(bottom = 24.dp)) {
-                        SectionHeaderText("Home Tabs")
+                        SectionHeaderText(tr(R.string.home_tabs))
                         ReorderableColumn(TabManager.catalogSubTabs, { it.id }, { from, to -> TabManager.moveCatalogSubTab(from, to) }) { tab, _, handle ->
                             CatalogTabCard(tab, handle)
                         }
@@ -172,7 +174,7 @@ class DashboardSettingsScreen : Screen {
                 }
                 item(key = "rows") {
                     Column(Modifier.padding(bottom = 24.dp)) {
-                        SectionHeaderText("Visible Dashboard Rows")
+                        SectionHeaderText(tr(R.string.visible_dashboard_rows))
                         // Channels are stashy+: the row is hidden while locked; moves map back onto the full list.
                         val allRows = TabManager.homeRows
                         val rows = allRows.filter {
@@ -201,16 +203,16 @@ class DashboardSettingsScreen : Screen {
                 }
                 if (StashyPlus.isUnlocked) item(key = "channels") {
                     Column(Modifier.padding(bottom = 24.dp)) {
-                        SectionHeaderText("Channels")
+                        SectionHeaderText(tr(R.string.channels))
                         val items = TabManager.homeChannelItems.sortedBy { it.sortOrder }
                         SettingsGroup {
                             if (items.isEmpty()) SettingsRow {
-                                Text(if (SavedFiltersStore.isLoading) "Loading filters…" else "No saved scene or image filters", style = NativeType.bodyLarge, color = Theme.palette.secondaryText)
+                                Text(if (SavedFiltersStore.isLoading) tr(R.string.loading_filters) else tr(R.string.empty_saved_scene_or_image_filters), style = NativeType.bodyLarge, color = Theme.palette.secondaryText)
                             } else ReorderableColumn(items, { it.id }, { from, to -> TabManager.moveHomeChannelItem(from, to) }) { item, i, handle ->
                                 Column {
                                     SettingsRow(verticalPadding = 6.dp) {
                                         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                                            Text(SavedFiltersStore.byId[item.filterId]?.name ?: "Filter", style = NativeType.bodyLarge, color = Theme.palette.text)
+                                            Text(SavedFiltersStore.byId[item.filterId]?.name ?: tr(R.string.filter), style = NativeType.bodyLarge, color = Theme.palette.text)
                                             Text(item.destination.title, style = NativeType.bodyMedium, color = Theme.palette.secondaryText)
                                         }
                                         SettingsSwitch(item.isEnabled) { TabManager.toggleHomeChannelItem(item.id) }
@@ -242,16 +244,16 @@ private fun CatalogTabCard(tab: TabConfig, handle: Modifier) {
         }
         if (!tab.isVisible) return@SettingsCard
         CardDivider()
-        CatalogCardColumnScope.from(tab.id)?.let { scope -> CardSettingRow("Display") { ColumnsMenu(scope) } }
-        if (tab.id == AppTab.Images) CardSettingRow("Autoplay") { SettingsSwitch(TabManager.imagesFeedVideoAutoplay) { TabManager.imagesFeedVideoAutoplay = it } }
-        if (tab.id == AppTab.Scenes) CardSettingRow("Studio Logos") { SettingsSwitch(TabManager.sceneCardsShowStudioLogo) { TabManager.sceneCardsShowStudioLogo = it } }
-        if (tab.id == AppTab.Studios && de.letzgo.stashy.data.ServerCapabilities.supports032) CardSettingRow("Counts incl. Sub-Studios") { SettingsSwitch(de.letzgo.stashy.data.StudioCountsStore.includeSubStudios) { de.letzgo.stashy.data.StudioCountsStore.includeSubStudios = it } }
+        CatalogCardColumnScope.from(tab.id)?.let { scope -> CardSettingRow(tr(R.string.display)) { ColumnsMenu(scope) } }
+        if (tab.id == AppTab.Images) CardSettingRow(tr(R.string.autoplay)) { SettingsSwitch(TabManager.imagesFeedVideoAutoplay) { TabManager.imagesFeedVideoAutoplay = it } }
+        if (tab.id == AppTab.Scenes) CardSettingRow(tr(R.string.studio_logos)) { SettingsSwitch(TabManager.sceneCardsShowStudioLogo) { TabManager.sceneCardsShowStudioLogo = it } }
+        if (tab.id == AppTab.Studios && de.letzgo.stashy.data.ServerCapabilities.supports032) CardSettingRow(tr(R.string.counts_incl_sub_studios)) { SettingsSwitch(de.letzgo.stashy.data.StudioCountsStore.includeSubStudios) { de.letzgo.stashy.data.StudioCountsStore.includeSubStudios = it } }
         tab.id.filterMode?.let { m -> sortNames(m) to defaultSortFallback(tab.id, m) }?.let { (options, fallback) ->
-            CardSettingRow("Default Sort") {
+            CardSettingRow(tr(R.string.default_sort)) {
                 MenuValue(options, TabManager.getPersistentSortOption(tab.id) ?: fallback) { TabManager.setPersistentSortOption(tab.id, it) }
             }
         }
-        CardSettingRow("Default Filter") { DefaultFilterMenu(tab.id) }
+        CardSettingRow(tr(R.string.default_filter)) { DefaultFilterMenu(tab.id) }
         DetailViewContext.forTab(tab.id)?.let { ctx ->
             CardSettingRow(ctx.settingsRowTitle) {
                 val options = when (ctx) {
@@ -263,7 +265,7 @@ private fun CatalogTabCard(tab: TabConfig, handle: Modifier) {
                 MenuValue(options, TabManager.getPersistentDetailSortOption(ctx) ?: "dateDesc") { TabManager.setPersistentDetailSortOption(ctx, it) }
             }
         }
-        if (tab.id == AppTab.Galleries) CardSettingRow("Opened Gallery") { ColumnsMenu(CatalogCardColumnScope.OpenedGallery) }
+        if (tab.id == AppTab.Galleries) CardSettingRow(tr(R.string.opened_gallery)) { ColumnsMenu(CatalogCardColumnScope.OpenedGallery) }
     }
 }
 
@@ -279,7 +281,7 @@ private fun MagazineTabCard(handle: Modifier) {
         }
         if (!mode.isEnabled) return@SettingsCard
         CardDivider()
-        CardSettingRow("Default Filter") { MagazineDefaultFilterMenu() }
+        CardSettingRow(tr(R.string.default_filter)) { MagazineDefaultFilterMenu() }
     }
 }
 
@@ -297,19 +299,19 @@ class FeedsSettingsScreen : Screen {
 
     @Composable override fun Content() {
         LaunchedEffect(Unit) { SavedFiltersStore.load(force = true) }
-        SettingsDetailScaffold("Feeds") { top ->
+        SettingsDetailScaffold(tr(R.string.feeds)) { top ->
             SettingsList(top) {
-                settingsSection(header = "Tab", key = "tab") {
-                    SettingsToggleRow("Show Feeds Tab", TabManager.isVisible(AppTab.Reels), SF.playRectangleOnRectangle) { TabManager.toggle(AppTab.Reels) }
+                settingsSection(header = tr(R.string.tab), key = "tab") {
+                    SettingsToggleRow(tr(R.string.action_show_feeds_tab), TabManager.isVisible(AppTab.Reels), SF.playRectangleOnRectangle) { TabManager.toggle(AppTab.Reels) }
                 }
                 // App UI, not a per-feed filter option — moved here from the Feeds filter sheet
                 // (same `ReelsShowsDeleteButton` key, existing choices carry over).
-                settingsSection(header = "Controls", key = "controls") {
-                    SettingsToggleRow("Show Delete Button", FeedsConfig.showsDeleteButton, SF.trash) { FeedsConfig.updateShowsDeleteButton(it) }
+                settingsSection(header = tr(R.string.controls), key = "controls") {
+                    SettingsToggleRow(tr(R.string.action_show_delete_button), FeedsConfig.showsDeleteButton, SF.trash) { FeedsConfig.updateShowsDeleteButton(it) }
                 }
                 item(key = "modes") {
                     Column(Modifier.padding(bottom = 24.dp)) {
-                        SectionHeaderText("Modes")
+                        SectionHeaderText(tr(R.string.modes))
                         ReorderableColumn(TabManager.configurableReelsModes.filter { !it.type.requiresStashyPlus || de.letzgo.stashy.data.StashyPlus.isUnlocked }, { it.id }, { from, to -> TabManager.moveReelsMode(from, to) }) { mode, _, handle ->
                             FeedsModeCard(mode, handle)
                         }
@@ -336,11 +338,11 @@ private fun FeedsModeCard(mode: ReelsModeConfig, handle: Modifier) {
             ReelsModeType.Clips -> sortNames(FilterMode.Images) to "random"
             ReelsModeType.Pics -> sortNames(FilterMode.Images) to "dateDesc"
         }
-        CardSettingRow("Default Sort") {
+        CardSettingRow(tr(R.string.default_sort)) {
             val current = TabManager.getReelsDefaultSort(mode.type)?.takeIf { c -> options.any { it.first == c } } ?: fallback
             MenuValue(options, current) { TabManager.setReelsDefaultSort(mode.type, it) }
         }
-        CardSettingRow("Default Filter") {
+        CardSettingRow(tr(R.string.default_filter)) {
             when (mode.type) {
                 ReelsModeType.Scenes -> DefaultFilterMenu(AppTab.Reels)
                 ReelsModeType.Markers -> DefaultFilterMenu(AppTab.Reels, FilterKind.Marker)
@@ -352,17 +354,17 @@ private fun FeedsModeCard(mode: ReelsModeConfig, handle: Modifier) {
             }
         }
         if (mode.type == ReelsModeType.Pics) {
-            CardSettingRow("Group into sets") {
+            CardSettingRow(tr(R.string.group_into_sets)) {
                 MenuValue(ImageGroupMode.entries.map { it.raw to it.displayName }, TabManager.stashlineGroupMode.raw) {
                     TabManager.stashlineGroupMode = ImageGroupMode.from(it)
                 }
             }
-            if (TabManager.stashlineGroupMode == ImageGroupMode.GallerySession) CardSettingRow("Session gap") {
+            if (TabManager.stashlineGroupMode == ImageGroupMode.GallerySession) CardSettingRow(tr(R.string.session_gap)) {
                 MenuValue(ImageSetGrouping.gapOptions.map { it.toString() to "$it min" }, TabManager.stashlineGroupGapMinutes.toString()) {
                     TabManager.stashlineGroupGapMinutes = it.toInt()
                 }
             }
-            if (TabManager.stashlineGroupMode != ImageGroupMode.Off) CardSettingRow("Max set size") {
+            if (TabManager.stashlineGroupMode != ImageGroupMode.Off) CardSettingRow(tr(R.string.max_set_size)) {
                 MenuValue(ImageSetGrouping.maxSizeOptions.map { it.toString() to "$it images" }, TabManager.stashlineGroupMaxSize.toString()) {
                     TabManager.stashlineGroupMaxSize = it.toInt()
                 }

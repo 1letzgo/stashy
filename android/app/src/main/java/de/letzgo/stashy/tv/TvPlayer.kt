@@ -1,5 +1,7 @@
 package de.letzgo.stashy.tv
 
+import de.letzgo.stashy.R
+import de.letzgo.stashy.tr
 import de.letzgo.stashy.ui.uniqueItemsIndexed
 import android.os.SystemClock
 import android.view.KeyEvent as AndroidKeyEvent
@@ -94,7 +96,7 @@ import java.util.Locale
 class TvPlaybackModel {
     companion object {
         private val live = java.util.Collections.newSetFromMap(java.util.WeakHashMap<TvPlaybackModel, Boolean>())
-        private const val NO_STREAM = "The server has no playable file for this scene (no stream path)."
+        private val NO_STREAM = tr(R.string.hint_server_has_no_playable_file)
 
         /** Pauses every TV player (app left via Home / another app in front). */
         fun pauseAll() = live.toList().forEach { it.player?.pause() }
@@ -119,7 +121,7 @@ class TvPlaybackModel {
         createPlayer()
     } catch (e: Exception) {
         android.util.Log.e("TvPlayer", "player init failed", e)
-        error = "The video player could not be started: ${e.localizedMessage ?: e.javaClass.simpleName}"
+        error = tr(R.string.hint_video_player_could_not_be, e.localizedMessage ?: e.javaClass.simpleName)
         null
     }
 
@@ -208,7 +210,7 @@ class TvPlaybackModel {
         scene.captions.orEmpty().forEach { caption ->
             val url = captionURL(caption, scene) ?: return@forEach
             val code = caption.languageCode?.takeIf { it.isNotEmpty() && it != "00" }
-            val name = code?.let { Locale(it).getDisplayLanguage(Locale.ENGLISH).takeIf { n -> n.isNotEmpty() && n != it } ?: it.uppercase() } ?: "Captions"
+            val name = code?.let { Locale(it).getDisplayLanguage(Locale.ENGLISH).takeIf { n -> n.isNotEmpty() && n != it } ?: it.uppercase() } ?: tr(R.string.captions)
             p.addExternalSubtitleTrack(url, name, code)
         }
     }
@@ -520,12 +522,12 @@ private fun TvPlayerContent(
                 )
                 if (hasNav) {
                     Row(horizontalArrangement = Arrangement.spacedBy(pt(24))) {
-                        if (canGoPrevious) PanelButton("Previous", TvIcons.backwardEnd, Modifier.focusRequester(panelEntry)) { closePanel(); onPrevious() }
-                        if (canGoNext) PanelButton("Next", TvIcons.forwardEnd, if (!canGoPrevious) Modifier.focusRequester(panelEntry) else Modifier) { closePanel(); onNext() }
+                        if (canGoPrevious) PanelButton(tr(R.string.previous), TvIcons.backwardEnd, Modifier.focusRequester(panelEntry)) { closePanel(); onPrevious() }
+                        if (canGoNext) PanelButton(tr(R.string.next), TvIcons.forwardEnd, if (!canGoPrevious) Modifier.focusRequester(panelEntry) else Modifier) { closePanel(); onNext() }
                     }
                 }
                 if (player.audioTracks.isNotEmpty()) {
-                    TrackRow("Audio", firstTarget == PanelTarget.Audio, panelEntry) {
+                    TrackRow(tr(R.string.audio), firstTarget == PanelTarget.Audio, panelEntry) {
                         itemsIndexed(player.audioTracks) { i, track ->
                             val active = track.id == player.activeAudioTrackId
                             PanelButton(if (active) "✓ ${track.label}" else track.label, TvIcons.speaker, if (i == 0 && it) Modifier.focusRequester(panelEntry) else Modifier) {
@@ -535,10 +537,10 @@ private fun TvPlayerContent(
                     }
                 }
                 if (player.subtitleTracks.isNotEmpty()) {
-                    TrackRow("Subtitles", firstTarget == PanelTarget.Subtitles, panelEntry) {
+                    TrackRow(tr(R.string.subtitles), firstTarget == PanelTarget.Subtitles, panelEntry) {
                         item {
                             val off = player.activeSubtitleTrackId == null
-                            PanelButton(if (off) "✓ Off" else "Off", TvIcons.captionsOutline, if (it) Modifier.focusRequester(panelEntry) else Modifier) { player.clearSubtitle() }
+                            PanelButton(if (off) ("✓ " + tr(R.string.off)) else tr(R.string.off), TvIcons.captionsOutline, if (it) Modifier.focusRequester(panelEntry) else Modifier) { player.clearSubtitle() }
                         }
                         itemsIndexed(player.subtitleTracks) { _, track ->
                             val active = track.id == player.activeSubtitleTrackId
@@ -598,11 +600,11 @@ private fun TransportOverlay(
             }
         }
         Row(verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.spacedBy(pt(16))) {
-            Text(title.ifEmpty { "Untitled Scene" }, Modifier.weight(1f, fill = false), style = TvType.title3.copy(fontSize = 17.sp, fontWeight = FontWeight.Bold), color = Color.White, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(title.ifEmpty { tr(R.string.untitled_scene) }, Modifier.weight(1f, fill = false), style = TvType.title3.copy(fontSize = 17.sp, fontWeight = FontWeight.Bold), color = Color.White, maxLines = 1, overflow = TextOverflow.Ellipsis)
             if (subtitle.isNotEmpty()) Text(subtitle, Modifier.weight(1f, fill = false), style = TvType.body.copy(fontSize = 12.sp), color = Color.White.copy(alpha = 0.65f), maxLines = 1, overflow = TextOverflow.Ellipsis)
             Spacer(Modifier.weight(1f))
             if (player.isUsingTranscodeFallback) {
-                Text("Transcode", Modifier.clip(CircleShape).background(Color.White.copy(alpha = 0.15f)).padding(horizontal = pt(14), vertical = pt(6)),
+                Text(tr(R.string.transcode), Modifier.clip(CircleShape).background(Color.White.copy(alpha = 0.15f)).padding(horizontal = pt(14), vertical = pt(6)),
                     style = TvType.caption.copy(fontSize = 10.sp, fontWeight = FontWeight.SemiBold), color = Color.White.copy(alpha = 0.8f))
             }
             Icon(if (player.isPlaying) TvIcons.play else TvIcons.pause, null, Modifier.size(pt(28)), tint = Color.White.copy(alpha = 0.8f))
@@ -618,9 +620,9 @@ private fun TransportOverlay(
             if (channelMode) {
                 Row(horizontalArrangement = Arrangement.spacedBy(pt(20))) {
                     val hint = TvType.caption.copy(fontSize = 10.sp)
-                    if (canGoPrevious) Text("⏮ Hold ▲ Prev", style = hint, color = Color.White.copy(alpha = 0.5f))
-                    if (canGoNext) Text("⏭ Hold ▼ Next", style = hint, color = Color.White.copy(alpha = 0.5f))
-                    Text("▼ Options", style = hint, color = Color.White.copy(alpha = 0.5f))
+                    if (canGoPrevious) Text(("⏮ " + tr(R.string.hold_prev)), style = hint, color = Color.White.copy(alpha = 0.5f))
+                    if (canGoNext) Text(("⏭ " + tr(R.string.hold_next)), style = hint, color = Color.White.copy(alpha = 0.5f))
+                    Text(("▼ " + tr(R.string.options)), style = hint, color = Color.White.copy(alpha = 0.5f))
                 }
                 Spacer(Modifier.weight(1f))
             }
@@ -636,9 +638,9 @@ fun TvPlayerError(message: String?, onDismiss: () -> Unit) {
     BackHandler { onDismiss() }
     Column(Modifier.fillMaxSize().background(Color.Black), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(pt(24), Alignment.CenterVertically)) {
         Icon(TvIcons.warning, null, Modifier.size(pt(80)), tint = TvColors.secondary)
-        Text("Unable to play this scene", style = TvType.title2.copy(fontWeight = FontWeight.Normal), color = Color.White.copy(alpha = 0.7f))
+        Text(tr(R.string.error_play_this_scene), style = TvType.title2.copy(fontWeight = FontWeight.Normal), color = Color.White.copy(alpha = 0.7f))
         if (message != null) Text(message, Modifier.padding(horizontal = pt(80)), style = TvType.callout, color = TvColors.secondary, textAlign = TextAlign.Center)
-        TvButton(onDismiss, Modifier.focusRequester(focus)) { Text("Close", style = TvType.title3) }
+        TvButton(onDismiss, Modifier.focusRequester(focus)) { Text(tr(R.string.action_close), style = TvType.title3) }
     }
     TvRequestFocus(focus, "player.close")
 }
@@ -654,7 +656,7 @@ fun TvMarkerRail(markers: List<SceneMarker>, currentTime: Double, entry: FocusRe
     val sorted = remember(markers) { markers.sortedBy { it.seconds } }
     val active = activeMarkerIndex(sorted.map { it.seconds }, currentTime)
     Column(verticalArrangement = Arrangement.spacedBy(pt(12))) {
-        Text("Markers", style = TvType.caption.copy(fontSize = 11.sp, fontWeight = FontWeight.Bold), color = Color.White.copy(alpha = 0.6f))
+        Text(tr(R.string.markers), style = TvType.caption.copy(fontSize = 11.sp, fontWeight = FontWeight.Bold), color = Color.White.copy(alpha = 0.6f))
         LazyRow(horizontalArrangement = Arrangement.spacedBy(pt(30)), contentPadding = PaddingValues(horizontal = pt(10), vertical = pt(24))) {
             uniqueItemsIndexed(sorted, { it.id }) { i, marker ->
                 val isActive = i == active
@@ -699,7 +701,7 @@ class TvScenePlayerRoute(private val model: TvPlaybackModel, private val scenePr
         val scene = model.scene ?: sceneProvider()
         TvPlayerScreen(
             model = model,
-            title = scene?.displayTitle ?: "Untitled Scene",
+            title = scene?.displayTitle ?: tr(R.string.untitled_scene),
             subtitle = scene?.studio?.name.orEmpty(),
             posterURL = scene?.thumbnailURL,
             onExit = { model.suspend(); TvNav.pop() },
@@ -735,7 +737,7 @@ class TvChannelPlayerRoute(channel: TvChannel) : TvRoute {
                     Column(Modifier.align(Alignment.Center), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(pt(24))) {
                         Icon(TvIcons.filmOutline, null, Modifier.size(pt(64)), tint = TvColors.secondary)
                         Text(error, style = TvType.title2.copy(fontWeight = FontWeight.Normal), color = TvColors.secondary)
-                        TvButton(close, Modifier.focusRequester(focus)) { Text("Close", style = TvType.title3) }
+                        TvButton(close, Modifier.focusRequester(focus)) { Text(tr(R.string.action_close), style = TvType.title3) }
                     }
                     TvRequestFocus(focus, "player.close")
                 }
@@ -744,7 +746,7 @@ class TvChannelPlayerRoute(channel: TvChannel) : TvRoute {
                     val label = session.indexLabel
                     TvPlayerScreen(
                         model = session.player,
-                        title = scene?.displayTitle ?: "Untitled",
+                        title = scene?.displayTitle ?: tr(R.string.untitled),
                         subtitle = if (label.isEmpty()) session.channel.title else "${session.channel.title} · $label",
                         posterURL = scene?.thumbnailURL,
                         onExit = close,
@@ -775,7 +777,7 @@ private fun TvUpNextRail(session: TvChannelSession, entry: FocusRequester?, clos
     Box(Modifier.height(pt(360))) {
         if (start >= session.scenes.size) {
             LaunchedEffect(Unit) { session.loadMoreForBrowsing() }
-            Text("End of channel", Modifier.align(Alignment.Center), style = TvType.title3, color = TvColors.secondary)
+            Text(tr(R.string.end_of_channel), Modifier.align(Alignment.Center), style = TvType.title3, color = TvColors.secondary)
         } else {
             val entries = session.scenes.subList(start, session.scenes.size).toList()
             LazyRow(horizontalArrangement = Arrangement.spacedBy(pt(30)), contentPadding = PaddingValues(horizontal = pt(50), vertical = pt(30))) {

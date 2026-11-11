@@ -32,10 +32,10 @@ extension AppTheme {
     /// Name in the tvOS theme picker.
     var tvDisplayName: String {
         switch self {
-        case .darkBlue: return "Dark Blue"
-        case .dark: return "Dark"
-        case .light: return "Light"
-        case .system: return "System"
+        case .darkBlue: return tr("dark_blue")
+        case .dark: return tr("dark")
+        case .light: return tr("light")
+        case .system: return tr("system")
         }
     }
 }

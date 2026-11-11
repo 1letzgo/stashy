@@ -1,5 +1,7 @@
 package de.letzgo.stashy.ui.filter
 
+import de.letzgo.stashy.R
+import de.letzgo.stashy.tr
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -28,14 +30,14 @@ fun ImagesFeedAutoplaySettingsCard() {
     var continuous by remember { mutableStateOf(Prefs.bool("images_fullscreen_continuous", false)) }
     var seconds by remember { mutableIntStateOf(Prefs.int("images_fullscreen_continuous_duration", 3)) }
     ControlGroup {
-        ControlToggleRow("Autoplay", TabManager.imagesFeedVideoAutoplay) { TabManager.imagesFeedVideoAutoplay = it }
+        ControlToggleRow(tr(R.string.autoplay), TabManager.imagesFeedVideoAutoplay) { TabManager.imagesFeedVideoAutoplay = it }
         de.letzgo.stashy.ui.NativeDivider()
-        ControlToggleRow("Immersive", immersive) { immersive = it; Prefs.setBool("images_fullscreen_immersive", it) }
+        ControlToggleRow(tr(R.string.immersive), immersive) { immersive = it; Prefs.setBool("images_fullscreen_immersive", it) }
         de.letzgo.stashy.ui.NativeDivider()
-        ControlToggleRow("Continuous", continuous) { continuous = it; Prefs.setBool("images_fullscreen_continuous", it) }
+        ControlToggleRow(tr(R.string.continuous), continuous) { continuous = it; Prefs.setBool("images_fullscreen_continuous", it) }
         if (continuous) de.letzgo.stashy.ui.NativeDivider()
         if (continuous) ControlCard {
-            ControlLabel("Still Duration")
+            ControlLabel(tr(R.string.still_duration))
             Row(
                 Modifier.weight(1f).horizontalScroll(androidx.compose.foundation.rememberScrollState()),
                 horizontalArrangement = Arrangement.spacedBy(8.dp, androidx.compose.ui.Alignment.End),

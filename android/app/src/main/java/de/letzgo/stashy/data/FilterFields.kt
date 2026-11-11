@@ -1,5 +1,7 @@
 package de.letzgo.stashy.data
 
+import de.letzgo.stashy.R
+import de.letzgo.stashy.tr
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
@@ -20,11 +22,11 @@ enum class FilterMode(val raw: String) {
 
 /** iOS: `StashCriterionModifier` (filters.graphql `CriterionModifier`). */
 enum class CriterionModifier(val raw: String, val label: String) {
-    Equals("EQUALS", "Equals"), NotEquals("NOT_EQUALS", "Not equals"), GreaterThan("GREATER_THAN", "Greater than"),
-    LessThan("LESS_THAN", "Less than"), IsNull("IS_NULL", "Is null"), NotNull("NOT_NULL", "Not null"),
-    IncludesAll("INCLUDES_ALL", "Includes all"), Includes("INCLUDES", "Includes"), Excludes("EXCLUDES", "Excludes"),
-    MatchesRegex("MATCHES_REGEX", "Matches regex"), NotMatchesRegex("NOT_MATCHES_REGEX", "Not matches regex"),
-    Between("BETWEEN", "Between"), NotBetween("NOT_BETWEEN", "Not between");
+    Equals("EQUALS", tr(R.string.equals)), NotEquals("NOT_EQUALS", tr(R.string.not_equals)), GreaterThan("GREATER_THAN", tr(R.string.greater_than)),
+    LessThan("LESS_THAN", tr(R.string.less_than)), IsNull("IS_NULL", tr(R.string.is_null)), NotNull("NOT_NULL", tr(R.string.not_null)),
+    IncludesAll("INCLUDES_ALL", tr(R.string.includes_all)), Includes("INCLUDES", tr(R.string.includes)), Excludes("EXCLUDES", tr(R.string.excludes)),
+    MatchesRegex("MATCHES_REGEX", tr(R.string.matches_regex)), NotMatchesRegex("NOT_MATCHES_REGEX", tr(R.string.not_matches_regex)),
+    Between("BETWEEN", tr(R.string.between)), NotBetween("NOT_BETWEEN", tr(R.string.not_between));
 
     val needsValue: Boolean get() = this != IsNull && this != NotNull
     val needsSecondValue: Boolean get() = this == Between || this == NotBetween
@@ -106,7 +108,7 @@ enum class ResolutionOption(val raw: String, val label: String) {
 }
 
 /** iOS: `StashOrientationOption`. */
-enum class OrientationOption(val raw: String, val label: String) { Landscape("LANDSCAPE", "Landscape"), Portrait("PORTRAIT", "Portrait"), Square("SQUARE", "Square") }
+enum class OrientationOption(val raw: String, val label: String) { Landscape("LANDSCAPE", tr(R.string.landscape)), Portrait("PORTRAIT", tr(R.string.portrait)), Square("SQUARE", tr(R.string.square)) }
 
 /** iOS: `StashGenderOption` (label = raw with spaces, capitalized). */
 enum class GenderOption(val raw: String) {
@@ -173,164 +175,164 @@ object FilterFieldCatalog {
 
     private val sceneFields: List<FilterFieldDescriptor> = run {
         boolOps + listOf(
-            f("id", "ID", int), f("title", "Title", string), f("code", "Code", string), f("details", "Details", string),
-            f("director", "Director", string), f("oshash", "OSHash", string), f("checksum", "Checksum", string),
-            f("phash_distance", "PHash distance", phashDistance), f("path", "Path", string), f("file_count", "File count", int),
-            f("rating100", "Rating", int), f("organized", "Organized", boolean), f("o_counter", "O-Count", int),
-            f("duplicated", "Duplicated", duplication), f("resolution", "Resolution", resolution),
-            f("orientation", "Orientation", orientation), f("framerate", "Framerate", int), f("bitrate", "Bitrate", int),
-            f("video_codec", "Video codec", string), f("audio_codec", "Audio codec", string), f("duration", "Duration (s)", int),
-            f("has_markers", "Has markers", hasMarkers), f("is_missing", "Is missing", isMissing),
-            f("studios", "Studios", hierarchicalMulti), f("groups", "Groups", hierarchicalMulti), f("galleries", "Galleries", multi),
-            f("tags", "Tags", hierarchicalMulti), f("tag_count", "Tag count", int), f("performer_tags", "Performer tags", hierarchicalMulti),
-            f("performer_favorite", "Performer favorite", boolean), f("performer_age", "Performer age", int),
-            f("performers", "Performers", multi), f("performer_count", "Performer count", int),
-            f("stash_ids_endpoint", "Stash IDs", stashIDs), f("stash_id_count", "Stash ID count", int), f("url", "URL", string),
-            f("interactive", "Interactive", boolean), f("interactive_speed", "Interactive speed", int), f("captions", "Captions", string),
-            f("resume_time", "Resume time", int), f("play_count", "Play count", int), f("play_duration", "Play duration", int),
-            f("last_played_at", "Last played", timestamp), f("date", "Date", date), f("production_date", "Production date", date),
-            f("created_at", "Created", timestamp), f("updated_at", "Updated", timestamp),
-            f("galleries_filter", "Galleries filter", nestedFilter, FilterMode.Galleries),
-            f("performers_filter", "Performers filter", nestedFilter, FilterMode.Performers),
-            f("studios_filter", "Studios filter", nestedFilter, FilterMode.Studios),
-            f("tags_filter", "Tags filter", nestedFilter, FilterMode.Tags),
-            f("groups_filter", "Groups filter", nestedFilter, FilterMode.Groups),
-            f("markers_filter", "Markers filter", nestedFilter, FilterMode.SceneMarkers),
-            f("folder", "Folder", hierarchicalMulti),
-            f("files_filter", "Files filter", raw), f("custom_fields", "Custom fields", customFields),
-            f("movies", "Movies", multi, deprecated = true), f("phash", "PHash", string, deprecated = true),
-            f("stash_id_endpoint", "Stash ID", stashID),
-            f("movies_filter", "Movies filter", nestedFilter, FilterMode.Groups, deprecated = true),
+            f("id", "ID", int), f("title", tr(R.string.title), string), f("code", tr(R.string.code), string), f("details", tr(R.string.details), string),
+            f("director", tr(R.string.director), string), f("oshash", "OSHash", string), f("checksum", tr(R.string.checksum), string),
+            f("phash_distance", tr(R.string.phash_distance), phashDistance), f("path", tr(R.string.path), string), f("file_count", tr(R.string.file_count), int),
+            f("rating100", tr(R.string.rating), int), f("organized", tr(R.string.organized), boolean), f("o_counter", tr(R.string.o_count), int),
+            f("duplicated", tr(R.string.duplicated), duplication), f("resolution", tr(R.string.resolution), resolution),
+            f("orientation", tr(R.string.orientation), orientation), f("framerate", tr(R.string.framerate), int), f("bitrate", tr(R.string.bitrate), int),
+            f("video_codec", tr(R.string.video_codec), string), f("audio_codec", tr(R.string.audio_codec), string), f("duration", tr(R.string.duration_s), int),
+            f("has_markers", tr(R.string.has_markers), hasMarkers), f("is_missing", tr(R.string.is_missing), isMissing),
+            f("studios", tr(R.string.studios), hierarchicalMulti), f("groups", tr(R.string.groups), hierarchicalMulti), f("galleries", tr(R.string.galleries), multi),
+            f("tags", tr(R.string.tags), hierarchicalMulti), f("tag_count", tr(R.string.tag_count), int), f("performer_tags", tr(R.string.performer_tags), hierarchicalMulti),
+            f("performer_favorite", tr(R.string.performer_favorite), boolean), f("performer_age", tr(R.string.performer_age), int),
+            f("performers", tr(R.string.performers), multi), f("performer_count", tr(R.string.performer_count), int),
+            f("stash_ids_endpoint", tr(R.string.stash_ids), stashIDs), f("stash_id_count", tr(R.string.stash_id_count), int), f("url", "URL", string),
+            f("interactive", tr(R.string.interactive), boolean), f("interactive_speed", tr(R.string.interactive_speed), int), f("captions", tr(R.string.captions), string),
+            f("resume_time", tr(R.string.resume_time), int), f("play_count", tr(R.string.play_count), int), f("play_duration", tr(R.string.play_duration), int),
+            f("last_played_at", tr(R.string.last_played), timestamp), f("date", tr(R.string.date), date), f("production_date", tr(R.string.production_date), date),
+            f("created_at", tr(R.string.created), timestamp), f("updated_at", tr(R.string.updated), timestamp),
+            f("galleries_filter", tr(R.string.galleries_filter), nestedFilter, FilterMode.Galleries),
+            f("performers_filter", tr(R.string.performers_filter), nestedFilter, FilterMode.Performers),
+            f("studios_filter", tr(R.string.studios_filter), nestedFilter, FilterMode.Studios),
+            f("tags_filter", tr(R.string.tags_filter), nestedFilter, FilterMode.Tags),
+            f("groups_filter", tr(R.string.groups_filter), nestedFilter, FilterMode.Groups),
+            f("markers_filter", tr(R.string.markers_filter), nestedFilter, FilterMode.SceneMarkers),
+            f("folder", tr(R.string.folder), hierarchicalMulti),
+            f("files_filter", tr(R.string.files_filter), raw), f("custom_fields", tr(R.string.custom_fields), customFields),
+            f("movies", tr(R.string.movies), multi, deprecated = true), f("phash", "PHash", string, deprecated = true),
+            f("stash_id_endpoint", tr(R.string.stash_id), stashID),
+            f("movies_filter", tr(R.string.movies_filter), nestedFilter, FilterMode.Groups, deprecated = true),
         )
     }
 
     private val performerFields: List<FilterFieldDescriptor> = run {
         boolOps + listOf(
-            f("name", "Name", string), f("disambiguation", "Disambiguation", string), f("details", "Details", string),
-            f("filter_favorites", "Favorite", boolean), f("birth_year", "Birth year", int), f("age", "Age", int),
-            f("ethnicity", "Ethnicity", string), f("country", "Country", string), f("eye_color", "Eye color", string),
-            f("height_cm", "Height (cm)", int), f("measurements", "Measurements", string), f("fake_tits", "Implants", string),
-            f("penis_length", "Penis length", float), f("circumcised", "Circumcised", circumcision),
-            f("career_start", "Career start", date), f("career_end", "Career end", date),
-            f("tattoos", "Tattoos", string), f("piercings", "Piercings", string), f("aliases", "Aliases", string),
-            f("gender", "Gender", gender), f("is_missing", "Is missing", isMissing), f("tags", "Tags", hierarchicalMulti),
-            f("tag_count", "Tag count", int), f("scene_count", "Scene count", int), f("marker_count", "Marker count", int),
-            f("image_count", "Image count", int), f("gallery_count", "Gallery count", int), f("play_count", "Play count", int),
-            f("o_counter", "O-Count", int), f("stash_ids_endpoint", "Stash IDs", stashIDs), f("rating100", "Rating", int),
-            f("url", "URL", string), f("hair_color", "Hair color", string), f("weight", "Weight", int), f("death_year", "Death year", int),
-            f("studios", "Studios", hierarchicalMulti), f("groups", "Groups", hierarchicalMulti), f("performers", "Performers", multi),
-            f("ignore_auto_tag", "Ignore auto-tag", boolean), f("birthdate", "Birthdate", date), f("death_date", "Death date", date),
-            f("scenes_filter", "Scenes filter", nestedFilter, FilterMode.Scenes),
-            f("images_filter", "Images filter", nestedFilter, FilterMode.Images),
-            f("galleries_filter", "Galleries filter", nestedFilter, FilterMode.Galleries),
-            f("tags_filter", "Tags filter", nestedFilter, FilterMode.Tags),
-            f("markers_filter", "Markers filter", nestedFilter, FilterMode.SceneMarkers),
-            f("created_at", "Created", timestamp), f("updated_at", "Updated", timestamp), f("custom_fields", "Custom fields", customFields),
-            f("stash_id_endpoint", "Stash ID", stashID),
+            f("name", tr(R.string.name), string), f("disambiguation", tr(R.string.disambiguation), string), f("details", tr(R.string.details), string),
+            f("filter_favorites", tr(R.string.favourite), boolean), f("birth_year", tr(R.string.birth_year), int), f("age", tr(R.string.age), int),
+            f("ethnicity", tr(R.string.ethnicity), string), f("country", tr(R.string.country), string), f("eye_color", tr(R.string.eye_color), string),
+            f("height_cm", tr(R.string.height_cm), int), f("measurements", tr(R.string.measurements), string), f("fake_tits", tr(R.string.implants), string),
+            f("penis_length", tr(R.string.penis_length), float), f("circumcised", tr(R.string.circumcised), circumcision),
+            f("career_start", tr(R.string.career_start), date), f("career_end", tr(R.string.career_end), date),
+            f("tattoos", tr(R.string.tattoos), string), f("piercings", tr(R.string.piercings), string), f("aliases", tr(R.string.aliases), string),
+            f("gender", tr(R.string.gender), gender), f("is_missing", tr(R.string.is_missing), isMissing), f("tags", tr(R.string.tags), hierarchicalMulti),
+            f("tag_count", tr(R.string.tag_count), int), f("scene_count", tr(R.string.scene_count), int), f("marker_count", tr(R.string.marker_count), int),
+            f("image_count", tr(R.string.image_count), int), f("gallery_count", tr(R.string.gallery_count), int), f("play_count", tr(R.string.play_count), int),
+            f("o_counter", tr(R.string.o_count), int), f("stash_ids_endpoint", tr(R.string.stash_ids), stashIDs), f("rating100", tr(R.string.rating), int),
+            f("url", "URL", string), f("hair_color", tr(R.string.hair_color), string), f("weight", tr(R.string.weight), int), f("death_year", tr(R.string.death_year), int),
+            f("studios", tr(R.string.studios), hierarchicalMulti), f("groups", tr(R.string.groups), hierarchicalMulti), f("performers", tr(R.string.performers), multi),
+            f("ignore_auto_tag", tr(R.string.ignore_auto_tag), boolean), f("birthdate", tr(R.string.birthdate), date), f("death_date", tr(R.string.death_date), date),
+            f("scenes_filter", tr(R.string.scenes_filter), nestedFilter, FilterMode.Scenes),
+            f("images_filter", tr(R.string.images_filter), nestedFilter, FilterMode.Images),
+            f("galleries_filter", tr(R.string.galleries_filter), nestedFilter, FilterMode.Galleries),
+            f("tags_filter", tr(R.string.tags_filter), nestedFilter, FilterMode.Tags),
+            f("markers_filter", tr(R.string.markers_filter), nestedFilter, FilterMode.SceneMarkers),
+            f("created_at", tr(R.string.created), timestamp), f("updated_at", tr(R.string.updated), timestamp), f("custom_fields", tr(R.string.custom_fields), customFields),
+            f("stash_id_endpoint", tr(R.string.stash_id), stashID),
         )
     }
 
     private val studioFields: List<FilterFieldDescriptor> = run {
         boolOps + listOf(
-            f("name", "Name", string), f("details", "Details", string), f("parents", "Parents", multi),
-            f("stash_ids_endpoint", "Stash IDs", stashIDs), f("stash_id_endpoint", "Stash ID", stashID),
-            f("tags", "Tags", hierarchicalMulti), f("is_missing", "Is missing", isMissing),
-            f("rating100", "Rating", int), f("favorite", "Favorite", boolean), f("scene_count", "Scene count", int),
-            f("image_count", "Image count", int), f("gallery_count", "Gallery count", int), f("group_count", "Group count", int),
-            f("tag_count", "Tag count", int), f("url", "URL", string), f("aliases", "Aliases", string), f("child_count", "Child count", int),
-            f("ignore_auto_tag", "Ignore auto-tag", boolean), f("organized", "Organized", boolean),
-            f("scenes_filter", "Scenes filter", nestedFilter, FilterMode.Scenes),
-            f("images_filter", "Images filter", nestedFilter, FilterMode.Images),
-            f("galleries_filter", "Galleries filter", nestedFilter, FilterMode.Galleries),
-            f("groups_filter", "Groups filter", nestedFilter, FilterMode.Groups),
-            f("created_at", "Created", timestamp), f("updated_at", "Updated", timestamp), f("custom_fields", "Custom fields", customFields),
+            f("name", tr(R.string.name), string), f("details", tr(R.string.details), string), f("parents", tr(R.string.parents), multi),
+            f("stash_ids_endpoint", tr(R.string.stash_ids), stashIDs), f("stash_id_endpoint", tr(R.string.stash_id), stashID),
+            f("tags", tr(R.string.tags), hierarchicalMulti), f("is_missing", tr(R.string.is_missing), isMissing),
+            f("rating100", tr(R.string.rating), int), f("favorite", tr(R.string.favourite), boolean), f("scene_count", tr(R.string.scene_count), int),
+            f("image_count", tr(R.string.image_count), int), f("gallery_count", tr(R.string.gallery_count), int), f("group_count", tr(R.string.group_count), int),
+            f("tag_count", tr(R.string.tag_count), int), f("url", "URL", string), f("aliases", tr(R.string.aliases), string), f("child_count", tr(R.string.child_count), int),
+            f("ignore_auto_tag", tr(R.string.ignore_auto_tag), boolean), f("organized", tr(R.string.organized), boolean),
+            f("scenes_filter", tr(R.string.scenes_filter), nestedFilter, FilterMode.Scenes),
+            f("images_filter", tr(R.string.images_filter), nestedFilter, FilterMode.Images),
+            f("galleries_filter", tr(R.string.galleries_filter), nestedFilter, FilterMode.Galleries),
+            f("groups_filter", tr(R.string.groups_filter), nestedFilter, FilterMode.Groups),
+            f("created_at", tr(R.string.created), timestamp), f("updated_at", tr(R.string.updated), timestamp), f("custom_fields", tr(R.string.custom_fields), customFields),
         )
     }
 
     private val galleryFields: List<FilterFieldDescriptor> = run {
         boolOps + listOf(
-            f("id", "ID", int), f("title", "Title", string), f("details", "Details", string), f("checksum", "Checksum", string),
-            f("path", "Path", string), f("file_count", "File count", int), f("is_missing", "Is missing", isMissing),
-            f("is_zip", "Is zip", boolean), f("rating100", "Rating", int), f("organized", "Organized", boolean),
-            f("average_resolution", "Avg resolution", resolution), f("has_chapters", "Has chapters", hasChapters),
-            f("scenes", "Scenes", multi), f("studios", "Studios", hierarchicalMulti), f("tags", "Tags", hierarchicalMulti),
-            f("tag_count", "Tag count", int), f("performer_tags", "Performer tags", hierarchicalMulti), f("performers", "Performers", multi),
-            f("performer_count", "Performer count", int), f("performer_favorite", "Performer favorite", boolean),
-            f("performer_age", "Performer age", int), f("image_count", "Image count", int), f("url", "URL", string),
-            f("date", "Date", date), f("created_at", "Created", timestamp), f("updated_at", "Updated", timestamp),
-            f("code", "Code", string), f("photographer", "Photographer", string),
-            f("scenes_filter", "Scenes filter", nestedFilter, FilterMode.Scenes),
-            f("images_filter", "Images filter", nestedFilter, FilterMode.Images),
-            f("performers_filter", "Performers filter", nestedFilter, FilterMode.Performers),
-            f("studios_filter", "Studios filter", nestedFilter, FilterMode.Studios),
-            f("tags_filter", "Tags filter", nestedFilter, FilterMode.Tags),
-            f("parent_folder", "Folder", hierarchicalMulti),
-            f("files_filter", "Files filter", raw), f("custom_fields", "Custom fields", customFields),
+            f("id", "ID", int), f("title", tr(R.string.title), string), f("details", tr(R.string.details), string), f("checksum", tr(R.string.checksum), string),
+            f("path", tr(R.string.path), string), f("file_count", tr(R.string.file_count), int), f("is_missing", tr(R.string.is_missing), isMissing),
+            f("is_zip", tr(R.string.is_zip), boolean), f("rating100", tr(R.string.rating), int), f("organized", tr(R.string.organized), boolean),
+            f("average_resolution", tr(R.string.avg_resolution), resolution), f("has_chapters", tr(R.string.has_chapters), hasChapters),
+            f("scenes", tr(R.string.scenes), multi), f("studios", tr(R.string.studios), hierarchicalMulti), f("tags", tr(R.string.tags), hierarchicalMulti),
+            f("tag_count", tr(R.string.tag_count), int), f("performer_tags", tr(R.string.performer_tags), hierarchicalMulti), f("performers", tr(R.string.performers), multi),
+            f("performer_count", tr(R.string.performer_count), int), f("performer_favorite", tr(R.string.performer_favorite), boolean),
+            f("performer_age", tr(R.string.performer_age), int), f("image_count", tr(R.string.image_count), int), f("url", "URL", string),
+            f("date", tr(R.string.date), date), f("created_at", tr(R.string.created), timestamp), f("updated_at", tr(R.string.updated), timestamp),
+            f("code", tr(R.string.code), string), f("photographer", tr(R.string.photographer), string),
+            f("scenes_filter", tr(R.string.scenes_filter), nestedFilter, FilterMode.Scenes),
+            f("images_filter", tr(R.string.images_filter), nestedFilter, FilterMode.Images),
+            f("performers_filter", tr(R.string.performers_filter), nestedFilter, FilterMode.Performers),
+            f("studios_filter", tr(R.string.studios_filter), nestedFilter, FilterMode.Studios),
+            f("tags_filter", tr(R.string.tags_filter), nestedFilter, FilterMode.Tags),
+            f("parent_folder", tr(R.string.folder), hierarchicalMulti),
+            f("files_filter", tr(R.string.files_filter), raw), f("custom_fields", tr(R.string.custom_fields), customFields),
         )
     }
 
     private val imageFields: List<FilterFieldDescriptor> = run {
         boolOps + listOf(
-            f("title", "Title", string), f("details", "Details", string), f("id", "ID", int), f("checksum", "Checksum", string),
-            f("phash_distance", "PHash distance", phashDistance), f("path", "Path", string), f("file_count", "File count", int),
-            f("rating100", "Rating", int), f("date", "Date", date), f("url", "URL", string), f("organized", "Organized", boolean),
-            f("o_counter", "O-Count", int), f("resolution", "Resolution", resolution), f("orientation", "Orientation", orientation),
-            f("is_missing", "Is missing", isMissing), f("studios", "Studios", hierarchicalMulti), f("tags", "Tags", hierarchicalMulti),
-            f("tag_count", "Tag count", int), f("performer_tags", "Performer tags", hierarchicalMulti), f("performers", "Performers", multi),
-            f("performer_count", "Performer count", int), f("performer_favorite", "Performer favorite", boolean),
-            f("performer_age", "Performer age", int), f("galleries", "Galleries", multi), f("created_at", "Created", timestamp),
-            f("updated_at", "Updated", timestamp), f("code", "Code", string), f("photographer", "Photographer", string),
-            f("galleries_filter", "Galleries filter", nestedFilter, FilterMode.Galleries),
-            f("performers_filter", "Performers filter", nestedFilter, FilterMode.Performers),
-            f("studios_filter", "Studios filter", nestedFilter, FilterMode.Studios),
-            f("tags_filter", "Tags filter", nestedFilter, FilterMode.Tags),
-            f("folder", "Folder", hierarchicalMulti),
-            f("files_filter", "Files filter", raw), f("custom_fields", "Custom fields", customFields),
+            f("title", tr(R.string.title), string), f("details", tr(R.string.details), string), f("id", "ID", int), f("checksum", tr(R.string.checksum), string),
+            f("phash_distance", tr(R.string.phash_distance), phashDistance), f("path", tr(R.string.path), string), f("file_count", tr(R.string.file_count), int),
+            f("rating100", tr(R.string.rating), int), f("date", tr(R.string.date), date), f("url", "URL", string), f("organized", tr(R.string.organized), boolean),
+            f("o_counter", tr(R.string.o_count), int), f("resolution", tr(R.string.resolution), resolution), f("orientation", tr(R.string.orientation), orientation),
+            f("is_missing", tr(R.string.is_missing), isMissing), f("studios", tr(R.string.studios), hierarchicalMulti), f("tags", tr(R.string.tags), hierarchicalMulti),
+            f("tag_count", tr(R.string.tag_count), int), f("performer_tags", tr(R.string.performer_tags), hierarchicalMulti), f("performers", tr(R.string.performers), multi),
+            f("performer_count", tr(R.string.performer_count), int), f("performer_favorite", tr(R.string.performer_favorite), boolean),
+            f("performer_age", tr(R.string.performer_age), int), f("galleries", tr(R.string.galleries), multi), f("created_at", tr(R.string.created), timestamp),
+            f("updated_at", tr(R.string.updated), timestamp), f("code", tr(R.string.code), string), f("photographer", tr(R.string.photographer), string),
+            f("galleries_filter", tr(R.string.galleries_filter), nestedFilter, FilterMode.Galleries),
+            f("performers_filter", tr(R.string.performers_filter), nestedFilter, FilterMode.Performers),
+            f("studios_filter", tr(R.string.studios_filter), nestedFilter, FilterMode.Studios),
+            f("tags_filter", tr(R.string.tags_filter), nestedFilter, FilterMode.Tags),
+            f("folder", tr(R.string.folder), hierarchicalMulti),
+            f("files_filter", tr(R.string.files_filter), raw), f("custom_fields", tr(R.string.custom_fields), customFields),
         )
     }
 
     private val tagFields: List<FilterFieldDescriptor> = run {
         boolOps + listOf(
-            f("name", "Name", string), f("sort_name", "Sort name", string), f("aliases", "Aliases", string),
-            f("favorite", "Favorite", boolean), f("description", "Description", string), f("is_missing", "Is missing", isMissing),
-            f("scene_count", "Scene count", hierarchicalCount), f("image_count", "Image count", hierarchicalCount),
-            f("gallery_count", "Gallery count", hierarchicalCount), f("performer_count", "Performer count", hierarchicalCount),
-            f("studio_count", "Studio count", hierarchicalCount), f("group_count", "Group count", hierarchicalCount),
-            f("marker_count", "Marker count", hierarchicalCount), f("parents", "Parents", hierarchicalMulti),
-            f("children", "Children", hierarchicalMulti), f("parent_count", "Parent count", int), f("child_count", "Child count", int),
-            f("ignore_auto_tag", "Ignore auto-tag", boolean), f("stash_ids_endpoint", "Stash IDs", stashIDs),
-            f("stash_id_endpoint", "Stash ID", stashID),
-            f("scenes_filter", "Scenes filter", nestedFilter, FilterMode.Scenes),
-            f("images_filter", "Images filter", nestedFilter, FilterMode.Images),
-            f("galleries_filter", "Galleries filter", nestedFilter, FilterMode.Galleries),
-            f("groups_filter", "Groups filter", nestedFilter, FilterMode.Groups),
-            f("performers_filter", "Performers filter", nestedFilter, FilterMode.Performers),
-            f("studios_filter", "Studios filter", nestedFilter, FilterMode.Studios),
-            f("markers_filter", "Markers filter", nestedFilter, FilterMode.SceneMarkers),
-            f("created_at", "Created", timestamp), f("updated_at", "Updated", timestamp), f("custom_fields", "Custom fields", customFields),
+            f("name", tr(R.string.name), string), f("sort_name", tr(R.string.sort_name), string), f("aliases", tr(R.string.aliases), string),
+            f("favorite", tr(R.string.favourite), boolean), f("description", tr(R.string.description), string), f("is_missing", tr(R.string.is_missing), isMissing),
+            f("scene_count", tr(R.string.scene_count), hierarchicalCount), f("image_count", tr(R.string.image_count), hierarchicalCount),
+            f("gallery_count", tr(R.string.gallery_count), hierarchicalCount), f("performer_count", tr(R.string.performer_count), hierarchicalCount),
+            f("studio_count", tr(R.string.studio_count), hierarchicalCount), f("group_count", tr(R.string.group_count), hierarchicalCount),
+            f("marker_count", tr(R.string.marker_count), hierarchicalCount), f("parents", tr(R.string.parents), hierarchicalMulti),
+            f("children", tr(R.string.children), hierarchicalMulti), f("parent_count", tr(R.string.parent_count), int), f("child_count", tr(R.string.child_count), int),
+            f("ignore_auto_tag", tr(R.string.ignore_auto_tag), boolean), f("stash_ids_endpoint", tr(R.string.stash_ids), stashIDs),
+            f("stash_id_endpoint", tr(R.string.stash_id), stashID),
+            f("scenes_filter", tr(R.string.scenes_filter), nestedFilter, FilterMode.Scenes),
+            f("images_filter", tr(R.string.images_filter), nestedFilter, FilterMode.Images),
+            f("galleries_filter", tr(R.string.galleries_filter), nestedFilter, FilterMode.Galleries),
+            f("groups_filter", tr(R.string.groups_filter), nestedFilter, FilterMode.Groups),
+            f("performers_filter", tr(R.string.performers_filter), nestedFilter, FilterMode.Performers),
+            f("studios_filter", tr(R.string.studios_filter), nestedFilter, FilterMode.Studios),
+            f("markers_filter", tr(R.string.markers_filter), nestedFilter, FilterMode.SceneMarkers),
+            f("created_at", tr(R.string.created), timestamp), f("updated_at", tr(R.string.updated), timestamp), f("custom_fields", tr(R.string.custom_fields), customFields),
         )
     }
 
     private val groupFields: List<FilterFieldDescriptor> = run {
         boolOps + listOf(
-            f("name", "Name", string), f("director", "Director", string), f("synopsis", "Synopsis", string),
-            f("duration", "Duration (s)", int), f("rating100", "Rating", int), f("studios", "Studios", hierarchicalMulti),
-            f("is_missing", "Is missing", isMissing), f("url", "URL", string), f("performers", "Performers", multi),
-            f("tags", "Tags", hierarchicalMulti), f("tag_count", "Tag count", int), f("date", "Date", date),
-            f("created_at", "Created", timestamp), f("updated_at", "Updated", timestamp), f("o_counter", "O-Count", int),
-            f("containing_groups", "Containing groups", hierarchicalMulti), f("sub_groups", "Sub groups", hierarchicalMulti),
-            f("containing_group_count", "Containing group count", int), f("sub_group_count", "Sub group count", int),
-            f("scene_count", "Scene count", int), f("scenes_filter", "Scenes filter", nestedFilter, FilterMode.Scenes),
-            f("studios_filter", "Studios filter", nestedFilter, FilterMode.Studios), f("custom_fields", "Custom fields", customFields),
+            f("name", tr(R.string.name), string), f("director", tr(R.string.director), string), f("synopsis", tr(R.string.synopsis), string),
+            f("duration", tr(R.string.duration_s), int), f("rating100", tr(R.string.rating), int), f("studios", tr(R.string.studios), hierarchicalMulti),
+            f("is_missing", tr(R.string.is_missing), isMissing), f("url", "URL", string), f("performers", tr(R.string.performers), multi),
+            f("tags", tr(R.string.tags), hierarchicalMulti), f("tag_count", tr(R.string.tag_count), int), f("date", tr(R.string.date), date),
+            f("created_at", tr(R.string.created), timestamp), f("updated_at", tr(R.string.updated), timestamp), f("o_counter", tr(R.string.o_count), int),
+            f("containing_groups", tr(R.string.containing_groups), hierarchicalMulti), f("sub_groups", "Sub-Groups", hierarchicalMulti),
+            f("containing_group_count", tr(R.string.containing_group_count), int), f("sub_group_count", tr(R.string.sub_group_count), int),
+            f("scene_count", tr(R.string.scene_count), int), f("scenes_filter", tr(R.string.scenes_filter), nestedFilter, FilterMode.Scenes),
+            f("studios_filter", tr(R.string.studios_filter), nestedFilter, FilterMode.Studios), f("custom_fields", tr(R.string.custom_fields), customFields),
         )
     }
 
     private val markerFields: List<FilterFieldDescriptor> = run {
         listOf(
-            f("tags", "Tags", hierarchicalMulti), f("scene_tags", "Scene tags", hierarchicalMulti), f("performers", "Performers", multi),
-            f("scenes", "Scenes", multi), f("duration", "Duration (s)", float), f("created_at", "Created", timestamp),
-            f("updated_at", "Updated", timestamp), f("scene_date", "Scene date", date), f("scene_created_at", "Scene created", timestamp),
-            f("scene_updated_at", "Scene updated", timestamp), f("scene_filter", "Scene filter", nestedFilter, FilterMode.Scenes),
+            f("tags", tr(R.string.tags), hierarchicalMulti), f("scene_tags", tr(R.string.scene_tags), hierarchicalMulti), f("performers", tr(R.string.performers), multi),
+            f("scenes", tr(R.string.scenes), multi), f("duration", tr(R.string.duration_s), float), f("created_at", tr(R.string.created), timestamp),
+            f("updated_at", tr(R.string.updated), timestamp), f("scene_date", tr(R.string.scene_date), date), f("scene_created_at", tr(R.string.scene_created), timestamp),
+            f("scene_updated_at", tr(R.string.scene_updated), timestamp), f("scene_filter", tr(R.string.scene_filter), nestedFilter, FilterMode.Scenes),
         )
     }
 
@@ -393,15 +395,15 @@ object FilterFieldCatalog {
 
 /** iOS: `FilterCriterionSummary` — one-liner for collapsed criterion cards. */
 object FilterCriterionSummary {
-    const val ANY = "Any"
+    val ANY = tr(R.string.any)
 
     fun text(field: FilterFieldDescriptor, value: JsonElement?): String {
         if (value == null || value.isJsonNull) return ANY
         return when (field.kind) {
-            CriterionKind.boolean -> value.boolOrNull?.let { if (it) "Yes" else "No" } ?: ANY
+            CriterionKind.boolean -> value.boolOrNull?.let { if (it) tr(R.string.yes) else tr(R.string.no) } ?: ANY
             CriterionKind.isMissing, CriterionKind.hasMarkers, CriterionKind.hasChapters -> {
                 val s = value.stringValue?.takeIf { it.isNotEmpty() } ?: return ANY
-                if (field.kind == CriterionKind.isMissing) capitalizeWords(s.replace("_", " ")) else if (s == "true") "Yes" else "No"
+                if (field.kind == CriterionKind.isMissing) capitalizeWords(s.replace("_", " ")) else if (s == "true") tr(R.string.yes) else tr(R.string.no)
             }
             CriterionKind.booleanGroup -> ANY
             CriterionKind.nestedFilter, CriterionKind.raw -> {
@@ -418,8 +420,8 @@ object FilterCriterionSummary {
 
     private fun dictSummary(field: FilterFieldDescriptor, dict: JsonObject): String {
         val modifier = CriterionModifier.from(dict["modifier"].stringValue)
-        if (modifier == CriterionModifier.IsNull) return "Not set"
-        if (modifier == CriterionModifier.NotNull) return "Any value"
+        if (modifier == CriterionModifier.IsNull) return tr(R.string.not_set)
+        if (modifier == CriterionModifier.NotNull) return tr(R.string.any_value)
         when (field.kind) {
             CriterionKind.hierarchicalMulti, CriterionKind.multi -> {
                 val inc = FilterMapper.idStrings(dict["value"]).size
@@ -439,7 +441,7 @@ object FilterCriterionSummary {
             }
             CriterionKind.duplication -> {
                 val dup = dict["duplicated"].boolOrNull ?: return ANY
-                return if (dup) "Duplicated" else "Unique"
+                return if (dup) tr(R.string.duplicated) else tr(R.string.unique)
             }
             CriterionKind.stashID, CriterionKind.stashIDs -> return modifier?.label ?: ANY
             else -> {}

@@ -1,5 +1,7 @@
 package de.letzgo.stashy.ui.tools.filters
 
+import de.letzgo.stashy.R
+import de.letzgo.stashy.tr
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -136,7 +138,7 @@ fun FiltersToolEditorSheet(
                 throw e
             } catch (e: Exception) {
                 isSaving = false
-                showToast("Save failed: ${e.message}", long = true)
+                showToast(tr(R.string.action_save_failed_arg, e.message), long = true)
             }
         }
     }
@@ -148,7 +150,7 @@ fun FiltersToolEditorSheet(
     ) {
         Column(Modifier.fillMaxSize().navigationBarsPadding().imePadding()) {
             EditorChromeBar(
-                title = if (isExisting) "Edit filter" else "New filter",
+                title = if (isExisting) tr(R.string.action_edit_filter) else tr(R.string.new_filter),
                 onBack = onDismiss,
                 isSaving = isSaving,
                 saveDimmed = trimmedName.isEmpty() || document.hasInvalidInput,
@@ -162,10 +164,10 @@ fun FiltersToolEditorSheet(
             ) {
                 de.letzgo.stashy.ui.filter.ControlGroup {
                 ControlCard {
-                    ControlLabel("Name")
+                    ControlLabel(tr(R.string.name))
                     Box(Modifier.weight(1f)) {
                         if (name.isEmpty()) {
-                            Text("Filter name", Modifier.fillMaxWidth(), style = de.letzgo.stashy.ui.NativeType.bodyLarge, color = p.secondaryText, textAlign = TextAlign.End)
+                            Text(tr(R.string.filter_name), Modifier.fillMaxWidth(), style = de.letzgo.stashy.ui.NativeType.bodyLarge, color = p.secondaryText, textAlign = TextAlign.End)
                         }
                         BasicTextField(
                             value = name,
@@ -180,9 +182,9 @@ fun FiltersToolEditorSheet(
                 if (sortChoices.isNotEmpty()) {
                     de.letzgo.stashy.ui.NativeDivider()
                     ControlCard {
-                        ControlLabel("Sort")
+                        ControlLabel(tr(R.string.action_sort))
                         Spacer(Modifier.weight(1f))
-                        SortMenu(selectedSort?.raw, sortChoices.map { it.raw to it.label }, selectedSort?.label ?: "Select…") { raw ->
+                        SortMenu(selectedSort?.raw, sortChoices.map { it.raw to it.label }, selectedSort?.label ?: tr(R.string.action_select_menu)) { raw ->
                             sortChoices.firstOrNull { it.raw == raw }?.let { selectedSort = it }
                         }
                     }
@@ -195,7 +197,7 @@ fun FiltersToolEditorSheet(
 
     if (showSaveChoice) {
         SaveFilterChoiceDialog(
-            primaryLabel = if (isExisting) "Update \"${filter?.name ?: trimmedName}\"" else "Save",
+            primaryLabel = if (isExisting) tr(R.string.action_update_arg, filter?.name ?: trimmedName) else tr(R.string.action_save),
             primaryEnabled = trimmedName.isNotEmpty(),
             showsDelete = isExisting,
             onPrimary = { showSaveChoice = false; save(filter?.id, trimmedName) },
@@ -216,8 +218,8 @@ fun FiltersToolEditorSheet(
     if (showDelete && entry != null) {
         AlertDialog(
             onDismissRequest = { showDelete = false },
-            title = { Text("Delete filter?") },
-            text = { Text("Delete “${entry.filter.name}” from the server?") },
+            title = { Text(tr(R.string.confirm_delete_filter)) },
+            text = { Text(tr(R.string.confirm_delete_arg_from_server, entry.filter.name)) },
             confirmButton = {
                 TextButton({
                     showDelete = false
@@ -226,11 +228,11 @@ fun FiltersToolEditorSheet(
                             haptics.performHapticFeedback(HapticFeedbackType.LongPress)
                             SavedFiltersStore.byId.remove(entry.filter.id)
                             onDismiss()
-                        }.onFailure { showToast("Delete failed: ${it.message}", long = true) }
+                        }.onFailure { showToast(tr(R.string.action_delete_failed_arg, it.message), long = true) }
                     }
-                }) { Text("Delete", color = StashyColors.systemRed) }
+                }) { Text(tr(R.string.action_delete), color = StashyColors.systemRed) }
             },
-            dismissButton = { TextButton({ showDelete = false }) { Text("Cancel", color = de.letzgo.stashy.ui.textAccent()) } },
+            dismissButton = { TextButton({ showDelete = false }) { Text(tr(R.string.action_cancel), color = de.letzgo.stashy.ui.textAccent()) } },
             containerColor = p.secondaryBackground, titleContentColor = p.text, textContentColor = p.secondaryText,
         )
     }
@@ -252,7 +254,7 @@ private fun EditorChromeBar(
 ) {
     de.letzgo.stashy.ui.NativeSheetTopBar(title, onClose = onBack) {
         if (isSaving) de.letzgo.stashy.ui.NativeSheetProgress()
-        else de.letzgo.stashy.ui.NativeSheetAction("Save", enabled = saveEnabled, dimmed = saveDimmed, onClick = onSave)
+        else de.letzgo.stashy.ui.NativeSheetAction(tr(R.string.action_save), enabled = saveEnabled, dimmed = saveDimmed, onClick = onSave)
     }
 }
 
@@ -292,16 +294,16 @@ private fun SaveFilterChoiceDialog(
     val p = Theme.palette
     AlertDialog(
         onDismissRequest = onCancel,
-        title = { Text("Save filter") },
+        title = { Text(tr(R.string.action_save_filter)) },
         text = {
             Column(Modifier.fillMaxWidth()) {
                 DialogOption(primaryLabel, if (primaryEnabled) Appearance.tint else p.secondaryText, primaryEnabled, onPrimary)
-                DialogOption("Save as new", Appearance.tint, true, onSaveAs)
-                if (showsDelete) DialogOption("Delete", StashyColors.systemRed, true, onDelete)
+                DialogOption(tr(R.string.action_save_as_new), Appearance.tint, true, onSaveAs)
+                if (showsDelete) DialogOption(tr(R.string.action_delete), StashyColors.systemRed, true, onDelete)
             }
         },
         confirmButton = {},
-        dismissButton = { TextButton(onCancel) { Text("Cancel", color = de.letzgo.stashy.ui.textAccent()) } },
+        dismissButton = { TextButton(onCancel) { Text(tr(R.string.action_cancel), color = de.letzgo.stashy.ui.textAccent()) } },
         containerColor = p.secondaryBackground, titleContentColor = p.text, textContentColor = p.text,
     )
 }
@@ -321,12 +323,12 @@ private fun SaveAsDialog(initial: String, onSave: (String) -> Unit, onCancel: ()
     var text by remember { mutableStateOf(initial) }
     AlertDialog(
         onDismissRequest = onCancel,
-        title = { Text("Save as new", style = IosTypography.headline) },
+        title = { Text(tr(R.string.action_save_as_new), style = IosTypography.headline) },
         text = {
-            NativeTextField(text, { text = it }, label = null, placeholder = "Name", autoCorrect = true)
+            NativeTextField(text, { text = it }, label = null, placeholder = tr(R.string.name), autoCorrect = true)
         },
-        confirmButton = { TextButton({ onSave(text) }) { Text("Save", color = tint, fontWeight = FontWeight.SemiBold) } },
-        dismissButton = { TextButton(onCancel) { Text("Cancel", color = tint) } },
+        confirmButton = { TextButton({ onSave(text) }) { Text(tr(R.string.action_save), color = tint, fontWeight = FontWeight.SemiBold) } },
+        dismissButton = { TextButton(onCancel) { Text(tr(R.string.action_cancel), color = tint) } },
         containerColor = p.secondaryBackground, titleContentColor = p.text, textContentColor = p.text,
     )
 }

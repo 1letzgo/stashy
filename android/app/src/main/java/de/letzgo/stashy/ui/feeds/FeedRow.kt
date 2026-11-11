@@ -1,5 +1,7 @@
 package de.letzgo.stashy.ui.feeds
 
+import de.letzgo.stashy.R
+import de.letzgo.stashy.tr
 import android.view.TextureView
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
@@ -233,7 +235,7 @@ fun FeedRow(
             Box(Modifier.fillMaxSize().noIndicationClick(onPlay), contentAlignment = Alignment.Center) {
                 Box(contentAlignment = Alignment.Center) {
                     Icon(SF.playFill, null, tint = Color.Black.copy(alpha = 0.25f), modifier = Modifier.size(84.dp).blur(10.dp))
-                    Icon(SF.playFill, "Play", tint = Color.White.copy(alpha = 0.7f), modifier = Modifier.size(84.dp))
+                    Icon(SF.playFill, tr(R.string.action_play), tint = Color.White.copy(alpha = 0.7f), modifier = Modifier.size(84.dp))
                 }
             }
         }

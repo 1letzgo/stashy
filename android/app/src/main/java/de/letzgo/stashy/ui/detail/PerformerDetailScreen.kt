@@ -1,5 +1,7 @@
 package de.letzgo.stashy.ui.detail
 
+import de.letzgo.stashy.R
+import de.letzgo.stashy.tr
 import de.letzgo.stashy.data.tools.MatchRepository
 import de.letzgo.stashy.data.Downloads
 import de.letzgo.stashy.ui.tools.downloads.SceneBulkDownloadDialog
@@ -165,10 +167,10 @@ class PerformerDetailScreen(val performerId: String, val preview: Performer? = n
         when {
             list.items.isEmpty() -> item(key = "appears-with-state", span = { GridItemSpan(maxLineSpan) }) {
                 when {
-                    list.isLoading || !list.loadedOnce -> LoadingFooter("Loading performers...")
-                    list.error != null -> InlineEmptyState(SF.exclamationTriangle, "Couldn't load performers")
-                    coPerformers.isFilterActive -> InlineEmptyState(SF.person2, "No performers match the filter")
-                    else -> InlineEmptyState(SF.person2, "No shared scenes, galleries or images")
+                    list.isLoading || !list.loadedOnce -> LoadingFooter(tr(R.string.loading_performers))
+                    list.error != null -> InlineEmptyState(SF.exclamationTriangle, tr(R.string.error_load_performers_2))
+                    coPerformers.isFilterActive -> InlineEmptyState(SF.person2, tr(R.string.empty_performers_match_filter))
+                    else -> InlineEmptyState(SF.person2, tr(R.string.empty_shared_scenes_galleries_or_images))
                 }
             }
             // Repository list is distinctBy id, so the keys are unique.
@@ -186,7 +188,7 @@ class PerformerDetailScreen(val performerId: String, val preview: Performer? = n
                 onClick = { Nav.push(SharedAppearancesScreen(performerId, performer?.name ?: "", other.id, other.name, performer, other, shared)) },
             )
             DropdownMenu(menu, onDismissRequest = { menu = false }, containerColor = Theme.palette.secondaryBackground) {
-                OverflowItem("Open performer", SF.personFill, { menu = false }) { Nav.push(PerformerDetailScreen(other.id, other)) }
+                OverflowItem(tr(R.string.action_open_performer), SF.personFill, { menu = false }) { Nav.push(PerformerDetailScreen(other.id, other)) }
             }
         }
     }
@@ -199,7 +201,7 @@ class PerformerDetailScreen(val performerId: String, val preview: Performer? = n
         scope.launch {
             if (!DetailRepository.setPerformerFavorite(performerId, new)) {
                 isFavorite = !new
-                detailToast("Failed to update favorite")
+                detailToast(tr(R.string.error_update_favorite))
             }
             favoriteBusy = false
         }
@@ -243,7 +245,7 @@ class PerformerDetailScreen(val performerId: String, val preview: Performer? = n
                 // "Appears with" sorts by shared scenes, offered in its sheet only.
                 sort = if (appearsWith) null else catalog.controller(tab),
                 isFavorite = isFavorite, favoriteBusy = favoriteBusy, onFavorite = ::toggleFavorite,
-                onEdit = { editing = true }, editLabel = "Edit performer",
+                onEdit = { editing = true }, editLabel = tr(R.string.action_edit_performer),
             )
         }
 
@@ -283,10 +285,10 @@ class PerformerDetailScreen(val performerId: String, val preview: Performer? = n
             onToggle = { expanded = !expanded },
             hero = url?.let {
                 DetailHero(
-                    DetailHero.Style.Cover, it, Color.Black, "Open image", { fullscreen = HeroImageFullscreenItem(it, name) },
+                    DetailHero.Style.Cover, it, Color.Black, tr(R.string.action_open_image), { fullscreen = HeroImageFullscreenItem(it, name) },
                     backdropAlignment = HeroPortraitBias,
                 ) { HeroPicture(it, name, ContentScale.Crop, SF.personFill, alignment = HeroPortraitBias) }
-            } ?: DetailHero(DetailHero.Style.Cover, null, Color.Black, "Open image", null) { HeroPlaceholder(SF.personFill) },
+            } ?: DetailHero(DetailHero.Style.Cover, null, Color.Black, tr(R.string.action_open_image), null) { HeroPlaceholder(SF.personFill) },
             // iOS: two full rows of the 4-column grid.
             collapsedItemCount = 8,
             titleAccessory = p?.let { perf -> { color -> FeedsPill(color) { DetailFeedsLink.navigate(DetailFeedsLink.Target.Performer(perf.id, perf.name)) } } },
@@ -300,53 +302,53 @@ class PerformerDetailScreen(val performerId: String, val preview: Performer? = n
     private fun EditPerformerSheet(performer: Performer, onDismiss: () -> Unit, onSaved: (Performer) -> Unit) {
         val fields = androidx.compose.runtime.remember(performer.id) {
             listOf(
-                EditSection("Identity", listOf(
-                    EditField("Name", performer.name),
-                    EditField("Disambiguation", performer.disambiguation ?: ""),
-                    EditField("Aliases (comma-separated)", performer.aliasList.orEmpty().joinToString(", ")),
-                    EditField("Gender", performer.gender ?: ""),
-                    EditField("Birthdate (YYYY-MM-DD)", performer.birthdate ?: "", isDate = true),
-                    EditField("Country", performer.country ?: ""),
-                    EditField("Ethnicity", performer.ethnicity ?: ""),
+                EditSection(tr(R.string.identity), listOf(
+                    EditField(tr(R.string.name), performer.name),
+                    EditField(tr(R.string.disambiguation), performer.disambiguation ?: ""),
+                    EditField(tr(R.string.aliases_comma_separated), performer.aliasList.orEmpty().joinToString(", ")),
+                    EditField(tr(R.string.gender), performer.gender ?: ""),
+                    EditField(tr(R.string.birthdate_yyyy_mm_dd), performer.birthdate ?: "", isDate = true),
+                    EditField(tr(R.string.country), performer.country ?: ""),
+                    EditField(tr(R.string.ethnicity), performer.ethnicity ?: ""),
                 )),
-                EditSection("Body", listOf(
-                    EditField("Height (cm)", performer.heightCm?.toString() ?: "", KeyboardType.Number),
-                    EditField("Weight (kg)", performer.weight?.toString() ?: "", KeyboardType.Number),
-                    EditField("Measurements", performer.measurements ?: ""),
-                    EditField("Fake tits", performer.fakeTits ?: ""),
-                    EditField("Penis length (cm)", performer.penisLength?.toString() ?: "", KeyboardType.Decimal),
+                EditSection(tr(R.string.body), listOf(
+                    EditField(tr(R.string.height_cm), performer.heightCm?.toString() ?: "", KeyboardType.Number),
+                    EditField(tr(R.string.weight_kg), performer.weight?.toString() ?: "", KeyboardType.Number),
+                    EditField(tr(R.string.measurements), performer.measurements ?: ""),
+                    EditField(tr(R.string.fake_tits), performer.fakeTits ?: ""),
+                    EditField(tr(R.string.penis_length_cm), performer.penisLength?.toString() ?: "", KeyboardType.Decimal),
                 )),
-                EditSection("Other", listOf(
-                    EditField("Career length", performer.careerLength ?: ""),
-                    EditField("Tattoos", performer.tattoos ?: ""),
-                    EditField("Piercings", performer.piercings ?: ""),
-                    EditField("Rating (0–100)", performer.rating100?.toString() ?: "", KeyboardType.Number),
+                EditSection(tr(R.string.other), listOf(
+                    EditField(tr(R.string.career_length), performer.careerLength ?: ""),
+                    EditField(tr(R.string.tattoos), performer.tattoos ?: ""),
+                    EditField(tr(R.string.piercings), performer.piercings ?: ""),
+                    EditField(tr(R.string.rating_0_100), performer.rating100?.toString() ?: "", KeyboardType.Number),
                 )),
             )
         }
         val f = fields.flatMap { it.fields }.associateBy { it.label }
         EditEntitySheet(
-            title = "Edit Performer", sections = fields,
-            deleteLabel = "Delete Performer", deleteTitle = "Delete Performer", entityName = performer.name,
+            title = tr(R.string.action_edit_performer), sections = fields,
+            deleteLabel = tr(R.string.action_delete_performer), deleteTitle = tr(R.string.action_delete_performer), entityName = performer.name,
             onDismiss = onDismiss,
             onSave = {
                 val edit = PerformerEdit(
-                    name = f.getValue("Name").trimmed,
-                    disambiguation = f.getValue("Disambiguation").optional,
-                    birthdate = f.getValue("Birthdate (YYYY-MM-DD)").optional,
-                    country = f.getValue("Country").optional,
-                    gender = f.getValue("Gender").optional,
-                    ethnicity = f.getValue("Ethnicity").optional,
-                    heightCm = EditParsing.int(f.getValue("Height (cm)").value),
-                    weight = EditParsing.int(f.getValue("Weight (kg)").value),
-                    measurements = f.getValue("Measurements").optional,
-                    fakeTits = f.getValue("Fake tits").optional,
-                    penisLength = EditParsing.decimal(f.getValue("Penis length (cm)").value),
-                    careerLength = f.getValue("Career length").optional,
-                    tattoos = f.getValue("Tattoos").optional,
-                    piercings = f.getValue("Piercings").optional,
-                    aliasList = EditParsing.aliases(f.getValue("Aliases (comma-separated)").value),
-                    rating100 = EditParsing.rating(f.getValue("Rating (0–100)").value),
+                    name = f.getValue(tr(R.string.name)).trimmed,
+                    disambiguation = f.getValue(tr(R.string.disambiguation)).optional,
+                    birthdate = f.getValue(tr(R.string.birthdate_yyyy_mm_dd)).optional,
+                    country = f.getValue(tr(R.string.country)).optional,
+                    gender = f.getValue(tr(R.string.gender)).optional,
+                    ethnicity = f.getValue(tr(R.string.ethnicity)).optional,
+                    heightCm = EditParsing.int(f.getValue(tr(R.string.height_cm)).value),
+                    weight = EditParsing.int(f.getValue(tr(R.string.weight_kg)).value),
+                    measurements = f.getValue(tr(R.string.measurements)).optional,
+                    fakeTits = f.getValue(tr(R.string.fake_tits)).optional,
+                    penisLength = EditParsing.decimal(f.getValue(tr(R.string.penis_length_cm)).value),
+                    careerLength = f.getValue(tr(R.string.career_length)).optional,
+                    tattoos = f.getValue(tr(R.string.tattoos)).optional,
+                    piercings = f.getValue(tr(R.string.piercings)).optional,
+                    aliasList = EditParsing.aliases(f.getValue(tr(R.string.aliases_comma_separated)).value),
+                    rating100 = EditParsing.rating(f.getValue(tr(R.string.rating_0_100)).value),
                 )
                 val ok = DetailRepository.updatePerformer(performer.id, edit)
                 if (ok) {
@@ -357,13 +359,13 @@ class PerformerDetailScreen(val performerId: String, val preview: Performer? = n
                         careerLength = edit.careerLength, tattoos = edit.tattoos, piercings = edit.piercings,
                         aliasList = edit.aliasList, rating100 = edit.rating100,
                     ))
-                    detailToast("Performer updated")
-                } else detailToast("Failed to update performer")
+                    detailToast(tr(R.string.performer_updated))
+                } else detailToast(tr(R.string.error_update_performer))
                 ok
             },
             onDelete = {
                 DetailRepository.deletePerformer(performer.id)
-                detailToast("Performer deleted")
+                detailToast(tr(R.string.performer_deleted))
                 Nav.pop()
             },
         )

@@ -123,7 +123,7 @@ struct SceneCardView: View {
             VStack(alignment: .leading, spacing: 4) {
                 HStack(alignment: .bottom, spacing: 8) {
                     // Title
-                    Text(scene.displayTitle ?? "Unknown Title")
+                    Text(scene.displayTitle ?? tr("unknown_title"))
                         .font(.headline)
                         .fontWeight(.medium)
                         // Sits on the thumbnail: larger sizes would bury the picture.

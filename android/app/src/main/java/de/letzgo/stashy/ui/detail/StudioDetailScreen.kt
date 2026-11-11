@@ -1,5 +1,7 @@
 package de.letzgo.stashy.ui.detail
 
+import de.letzgo.stashy.R
+import de.letzgo.stashy.tr
 import de.letzgo.stashy.data.Downloads
 import de.letzgo.stashy.ui.tools.downloads.SceneBulkDownloadDialog
 import androidx.compose.foundation.background
@@ -87,7 +89,7 @@ class StudioDetailScreen(val studioId: String, val preview: Studio? = null, priv
         scope.launch {
             if (!DetailRepository.setStudioFavorite(studioId, new)) {
                 isFavorite = !new
-                detailToast("Failed to update favorite")
+                detailToast(tr(R.string.error_update_favorite))
             } else studio = studio?.copy(favorite = new)
             favoriteBusy = false
         }
@@ -111,7 +113,7 @@ class StudioDetailScreen(val studioId: String, val preview: Studio? = null, priv
                 studio?.name ?: "", catalog.available, tab, { tab = it }, extra,
                 settings = catalog.settingsSlot(tab), sort = catalog.controller(tab),
                 isFavorite = isFavorite, favoriteBusy = favoriteBusy, onFavorite = ::toggleFavorite,
-                onEdit = { editing = true }, editLabel = "Edit studio",
+                onEdit = { editing = true }, editLabel = tr(R.string.action_edit_studio),
             )
         }
         LinkedSettingsSheets(catalog)
@@ -141,10 +143,10 @@ class StudioDetailScreen(val studioId: String, val preview: Studio? = null, priv
             expanded = expanded,
             onToggle = { expanded = !expanded },
             hero = url?.let {
-                DetailHero(DetailHero.Style.Logo, it, p.studioHeader, "Open logo", { fullscreen = HeroImageFullscreenItem(it, s.name, p.studioHeader, inset = true) }) {
+                DetailHero(DetailHero.Style.Logo, it, p.studioHeader, tr(R.string.action_open_logo), { fullscreen = HeroImageFullscreenItem(it, s.name, p.studioHeader, inset = true) }) {
                     HeroPicture(it, s.name, ContentScale.Fit, SF.building2)
                 }
-            } ?: DetailHero(DetailHero.Style.Cover, null, p.studioHeader, "Open logo", null) { HeroPlaceholder(SF.building2) },
+            } ?: DetailHero(DetailHero.Style.Cover, null, p.studioHeader, tr(R.string.action_open_logo), null) { HeroPlaceholder(SF.building2) },
             collapsedItemCount = 4,
             titleAccessory = { color -> FeedsPill(color) { DetailFeedsLink.navigate(DetailFeedsLink.Target.Studio(s.id, s.name)) } },
             footer = s.url?.takeIf { it.isNotEmpty() }?.let { link -> { HeaderLink(link) } },
@@ -156,32 +158,32 @@ class StudioDetailScreen(val studioId: String, val preview: Studio? = null, priv
     private fun EditStudioSheet(studio: Studio, onDismiss: () -> Unit, onSaved: (Studio) -> Unit) {
         val sections = remember(studio.id) {
             listOf(
-                EditSection("Identity", listOf(
-                    EditField("Name", studio.name),
+                EditSection(tr(R.string.identity), listOf(
+                    EditField(tr(R.string.name), studio.name),
                     EditField("URL", studio.url ?: "", KeyboardType.Uri),
-                    EditField("Rating (0–100)", studio.rating100?.toString() ?: "", KeyboardType.Number),
+                    EditField(tr(R.string.rating_0_100), studio.rating100?.toString() ?: "", KeyboardType.Number),
                 )),
-                EditSection("Description", listOf(EditField("Description", studio.details ?: "", multiline = true))),
+                EditSection(tr(R.string.description), listOf(EditField(tr(R.string.description), studio.details ?: "", multiline = true))),
             )
         }
         val (name, url, rating) = sections[0].fields
         val details = sections[1].fields[0]
         EditEntitySheet(
-            title = "Edit Studio", sections = sections,
-            deleteLabel = "Delete Studio", deleteTitle = "Delete Studio", entityName = studio.name,
+            title = tr(R.string.action_edit_studio), sections = sections,
+            deleteLabel = tr(R.string.action_delete_studio), deleteTitle = tr(R.string.action_delete_studio), entityName = studio.name,
             onDismiss = onDismiss,
             onSave = {
                 val r = EditParsing.rating(rating.value)
                 val ok = DetailRepository.updateStudio(studio.id, name.trimmed, url.optional, details.optional, r)
                 if (ok) {
                     onSaved(studio.copy(name = name.trimmed, url = url.optional, details = details.optional, rating100 = r))
-                    detailToast("Studio updated")
-                } else detailToast("Failed to update studio")
+                    detailToast(tr(R.string.studio_updated))
+                } else detailToast(tr(R.string.error_update_studio))
                 ok
             },
             onDelete = {
                 DetailRepository.deleteStudio(studio.id)
-                detailToast("Studio deleted")
+                detailToast(tr(R.string.studio_deleted))
                 Nav.pop()
             },
         )

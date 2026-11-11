@@ -1,5 +1,7 @@
 package de.letzgo.stashy.ui.tools.match
 
+import de.letzgo.stashy.R
+import de.letzgo.stashy.tr
 import de.letzgo.stashy.ui.tabBarHeight
 import de.letzgo.stashy.ui.bottomBarContentPadding
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
@@ -150,7 +152,7 @@ fun MatchToolView() {
     val config = ServerConfigManager.activeConfig
     if (config == null) {
         Box(Modifier.fillMaxSize()) {
-            NoServerPlaceholder(SF.flame, "Select a server first to use Match.")
+            NoServerPlaceholder(SF.flame, tr(R.string.hint_select_server_first_to_use))
             ToolsBreadcrumbChrome()
         }
         return
@@ -205,7 +207,7 @@ fun MatchToolView() {
         ToolsBreadcrumbChrome(
             crumb = {
                 ToolsCrumbPickerMenu(
-                    title = "Match mode",
+                    title = tr(R.string.match_mode),
                     options = MatchDuelMode.entries.map { ToolsRowMenuOption(it, it.label, duelModeIcon(it)) },
                     selection = model.duelMode,
                     label = model.duelMode.label,
@@ -317,24 +319,24 @@ private fun DuelActionsRow(model: MatchViewModel, hPad: Dp) {
     }
     Row(Modifier.fillMaxWidth().padding(horizontal = hPad), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
         if (model.duelMode == MatchDuelMode.Champion) {
-            MatchActionButton("Stop", Icons.Outlined.StopCircle, prominent = false, enabled = !model.isSubmitting, modifier = Modifier.weight(1f), accessibilityLabel = "End Legend run") {
+            MatchActionButton(tr(R.string.action_stop), Icons.Outlined.StopCircle, prominent = false, enabled = !model.isSubmitting, modifier = Modifier.weight(1f), accessibilityLabel = tr(R.string.end_legend_run)) {
                 view.performMatchHaptic(MatchHaptic.Light)
                 model.startNewClimbRun()
             }
         } else {
-            MatchActionButton("Draw", Icons.Filled.DragHandle, prominent = false, enabled = !model.isSubmitting, modifier = Modifier.weight(1f)) {
+            MatchActionButton(tr(R.string.draw), Icons.Filled.DragHandle, prominent = false, enabled = !model.isSubmitting, modifier = Modifier.weight(1f)) {
                 model.skipDrawAsync()
             }
         }
         if (model.duelMode == MatchDuelMode.Placement) {
-            MatchActionButton("New pair", Icons.Filled.Autorenew, prominent = false, enabled = false, modifier = Modifier.weight(1f), accessibilityLabel = "New pair, not available in Rise") {}
-            MatchActionButton("Stop", Icons.Outlined.StopCircle, prominent = true, enabled = !model.isSubmitting, modifier = Modifier.weight(1f), accessibilityLabel = "End Rise run") {
+            MatchActionButton(tr(R.string.new_pair), Icons.Filled.Autorenew, prominent = false, enabled = false, modifier = Modifier.weight(1f), accessibilityLabel = tr(R.string.hint_new_pair_not_available_in)) {}
+            MatchActionButton(tr(R.string.action_stop), Icons.Outlined.StopCircle, prominent = true, enabled = !model.isSubmitting, modifier = Modifier.weight(1f), accessibilityLabel = tr(R.string.end_rise_run)) {
                 view.performMatchHaptic(MatchHaptic.Light)
                 model.startNewClimbRun()
             }
         } else {
             MatchActionButton(
-                "New pair", Icons.Filled.Autorenew, prominent = true,
+                tr(R.string.new_pair), Icons.Filled.Autorenew, prominent = true,
                 enabled = !model.isSubmitting && !model.isLoadingPair, modifier = Modifier.weight(1f),
             ) { model.newPair() }
         }
@@ -424,7 +426,7 @@ private fun BattleContent(model: MatchViewModel, hPad: Dp, isRegular: Boolean, b
             victor != null -> VictoryCard(model, victor)
             model.needsPlacementStarterSelection -> PlacementStarterInline(model)
             model.duelMode == MatchDuelMode.Bracket && model.bracket?.isFinished == true -> BracketResultsCard(model)
-            model.isLoadingPair && l == null -> MatchLoadingView("Loading pair...", Modifier.fillMaxWidth().heightIn(min = 320.dp))
+            model.isLoadingPair && l == null -> MatchLoadingView(tr(R.string.loading_pair), Modifier.fillMaxWidth().heightIn(min = 320.dp))
             l != null && r != null -> Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
               Row(
                 Modifier.fillMaxWidth().let { if (isRegular) it.widthIn(max = 920.dp) else it },
@@ -463,7 +465,7 @@ private fun BracketActionsRow(model: MatchViewModel, hPad: Dp) {
     val view = LocalView.current
     var showTree by remember { mutableStateOf(false) }
     Row(Modifier.fillMaxWidth().padding(horizontal = hPad), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-        MatchActionButton("Undo", Icons.AutoMirrored.Filled.Undo, prominent = false, enabled = model.bracket?.picks?.isNotEmpty() == true, modifier = Modifier.weight(1f)) {
+        MatchActionButton(tr(R.string.action_undo), Icons.AutoMirrored.Filled.Undo, prominent = false, enabled = model.bracket?.picks?.isNotEmpty() == true, modifier = Modifier.weight(1f)) {
             view.performMatchHaptic(MatchHaptic.Light)
             model.undoBracketPick()
         }
@@ -492,7 +494,7 @@ private fun BracketTreeDialog(state: MatchBracketState, onDismiss: () -> Unit) {
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text(MatchBracket.roundTitle(round, state.roundCount)) },
-        confirmButton = { TextButton(onDismiss) { Text("Done") } },
+        confirmButton = { TextButton(onDismiss) { Text(tr(R.string.action_done)) } },
         text = {
             Column(Modifier.fillMaxWidth().height(440.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -506,7 +508,7 @@ private fun BracketTreeDialog(state: MatchBracketState, onDismiss: () -> Unit) {
                 ) {
                     val matches = state.rounds.getOrNull(round)
                     if (matches == null) {
-                        Text("Not reached yet", style = IosTypography.subheadline, color = p.secondaryText, modifier = Modifier.padding(top = 24.dp))
+                        Text(tr(R.string.not_reached_yet), style = IosTypography.subheadline, color = p.secondaryText, modifier = Modifier.padding(top = 24.dp))
                     }
                     matches?.forEach { m ->
                         Row(
@@ -565,10 +567,10 @@ private fun BracketResultsCard(model: MatchViewModel) {
             Text(champ.name, style = IosTypography.title2.copy(fontWeight = FontWeight.Bold), color = p.text, textAlign = TextAlign.Center)
         }
         if (model.isLoadingBracketResults && model.bracketProposals.isEmpty()) {
-            MatchLoadingView("Calculating ratings...", Modifier.fillMaxWidth().heightIn(min = 160.dp))
+            MatchLoadingView(tr(R.string.calculating_ratings_menu), Modifier.fillMaxWidth().heightIn(min = 160.dp))
         } else {
             if (model.isApplyingBracket) {
-                Text("Saving ratings ${model.bracketAppliedCount}/${model.bracketProposals.size}", style = IosTypography.caption, color = p.secondaryText)
+                Text(tr(R.string.saving_ratings_arg_arg, model.bracketAppliedCount, model.bracketProposals.size), style = IosTypography.caption, color = p.secondaryText)
             }
             Column(Modifier.fillMaxWidth()) {
                 model.bracketProposals.forEach { prop ->
@@ -596,12 +598,12 @@ private fun BracketResultsCard(model: MatchViewModel) {
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             MatchActionButton("32:1", SF.trophy, prominent = false, enabled = true, modifier = Modifier.weight(1f)) { showTree = true }
             if (model.bracketIsApplied) {
-                MatchActionButton("New tournament", Icons.Filled.Autorenew, prominent = true, enabled = true, modifier = Modifier.weight(1f)) { model.newBracket() }
+                MatchActionButton(tr(R.string.new_tournament), Icons.Filled.Autorenew, prominent = true, enabled = true, modifier = Modifier.weight(1f)) { model.newBracket() }
             } else if (!model.isApplyingBracket && !model.isLoadingBracketResults) {
                 // Only after a failed automatic save. Ending it is the way out when a save can
                 // never succeed; without it the mode stayed on this card for good.
-                MatchActionButton("Retry", Icons.Filled.Autorenew, prominent = true, enabled = true, modifier = Modifier.weight(1f)) { model.retryBracketSave() }
-                MatchActionButton("End", Icons.Filled.Close, prominent = false, enabled = true, modifier = Modifier.weight(1f)) { confirmEnd = true }
+                MatchActionButton(tr(R.string.action_retry), Icons.Filled.Autorenew, prominent = true, enabled = true, modifier = Modifier.weight(1f)) { model.retryBracketSave() }
+                MatchActionButton(tr(R.string.end), Icons.Filled.Close, prominent = false, enabled = true, modifier = Modifier.weight(1f)) { confirmEnd = true }
             }
         }
     }
@@ -609,13 +611,13 @@ private fun BracketResultsCard(model: MatchViewModel) {
     if (confirmEnd) {
         AlertDialog(
             onDismissRequest = { confirmEnd = false },
-            title = { Text("End tournament?") },
-            text = { Text("Ratings that were not saved are lost.") },
+            title = { Text(tr(R.string.confirm_end_tournament)) },
+            text = { Text(tr(R.string.hint_ratings_that_were_not_saved)) },
             confirmButton = {
-                TextButton(onClick = { confirmEnd = false; model.newBracket() }) { Text("End tournament") }
+                TextButton(onClick = { confirmEnd = false; model.newBracket() }) { Text(tr(R.string.end_tournament)) }
             },
             dismissButton = {
-                TextButton(onClick = { confirmEnd = false }) { Text("Cancel") }
+                TextButton(onClick = { confirmEnd = false }) { Text(tr(R.string.action_cancel)) }
             },
         )
     }
@@ -631,15 +633,15 @@ private fun VictoryCard(model: MatchViewModel, victor: Performer) {
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        Text("Legend!", style = IosTypography.title2.copy(fontWeight = FontWeight.Bold), color = p.text)
+        Text(tr(R.string.legend_2), style = IosTypography.title2.copy(fontWeight = FontWeight.Bold), color = p.text)
         Text(victor.name, style = IosTypography.headline, color = p.text, textAlign = TextAlign.Center)
-        Text("${model.climbWins} wins · cleared the ladder", style = IosTypography.caption, color = p.secondaryText, textAlign = TextAlign.Center)
+        Text(tr(R.string.hint_arg_wins_cleared_ladder, model.climbWins), style = IosTypography.caption, color = p.secondaryText, textAlign = TextAlign.Center)
         Box(
             Modifier.fillMaxWidth().heightIn(min = 48.dp).clip(RoundedCornerShape(50)).background(tint)
                 .clickable { model.startNewClimbRun() }.padding(vertical = 6.dp),
             contentAlignment = Alignment.Center,
         ) {
-            Text("New run", style = IosTypography.subheadline.copy(fontWeight = FontWeight.SemiBold), color = Color.White)
+            Text(tr(R.string.new_run), style = IosTypography.subheadline.copy(fontWeight = FontWeight.SemiBold), color = Color.White)
         }
     }
 }
@@ -665,7 +667,7 @@ private fun BattleColumn(
         Modifier
             .fillMaxWidth()
             .matchCard(shape)
-            .semantics { contentDescription = "Choose ${performer.name}" }
+            .semantics { contentDescription = tr(R.string.action_choose_arg, performer.name) }
             .clickable(
                 enabled = !model.isSubmitting,
                 interactionSource = remember { MutableInteractionSource() },
@@ -742,7 +744,7 @@ private fun BattleColumn(
                             style = numberStyle.copy(fontSize = 30.sp, fontWeight = FontWeight.ExtraBold, shadow = shadow),
                             color = Color.White,
                         )
-                        Text("Score", fontSize = 11.sp, fontWeight = FontWeight.SemiBold, color = Color.White.copy(alpha = 0.92f))
+                        Text(tr(R.string.score), fontSize = 11.sp, fontWeight = FontWeight.SemiBold, color = Color.White.copy(alpha = 0.92f))
                         Text(
                             "${vote.rating100After}",
                             style = IosTypography.title2.merge(numberStyle).copy(fontWeight = FontWeight.Bold, shadow = shadow),
@@ -771,7 +773,7 @@ private fun ProfileLinkCard(performer: Performer) {
     ) {
         Icon(Icons.Outlined.Groups, null, tint = p.text, modifier = Modifier.size(18.dp))
         Spacer(Modifier.width(6.dp))
-        Text("Profile", style = IosTypography.subheadline.copy(fontWeight = FontWeight.SemiBold), color = p.text)
+        Text(tr(R.string.profile), style = IosTypography.subheadline.copy(fontWeight = FontWeight.SemiBold), color = p.text)
     }
 }
 
@@ -780,9 +782,9 @@ private fun ProfileLinkCard(performer: Performer) {
 private fun PlacementStarterInline(model: MatchViewModel) {
     when {
         model.isLoadingPlacementStarters && model.placementStarters.isEmpty() ->
-            MatchLoadingView("Loading starters...", Modifier.fillMaxWidth().heightIn(min = 220.dp))
+            MatchLoadingView(tr(R.string.loading_starters), Modifier.fillMaxWidth().heightIn(min = 220.dp))
         model.placementStarters.isEmpty() ->
-            MatchUnavailableView("No starters", Icons.Outlined.PersonOff, model.errorMessage ?: "", Modifier.fillMaxWidth())
+            MatchUnavailableView(tr(R.string.empty_starters), Icons.Outlined.PersonOff, model.errorMessage ?: "", Modifier.fillMaxWidth())
         else -> Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             model.placementStarters.take(6).chunked(3).forEach { row ->
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -803,7 +805,7 @@ private fun StarterPickCard(model: MatchViewModel, performer: Performer, modifie
     Column(
         modifier
             .matchCard()
-            .semantics { contentDescription = "Pick ${performer.name} as Rise starter" }
+            .semantics { contentDescription = tr(R.string.action_pick_arg_as_rise_starter, performer.name) }
             .clickable(enabled = !model.isSubmitting, onClick = onPick),
     ) {
         PerformerPhoto(
@@ -820,7 +822,7 @@ private fun StarterPickCard(model: MatchViewModel, performer: Performer, modifie
                 maxLines = 2, minLines = 2, overflow = TextOverflow.Ellipsis,
             )
             Column {
-                Text("Rating", fontSize = 11.sp, lineHeight = 13.sp, color = p.secondaryText)
+                Text(tr(R.string.rating), fontSize = 11.sp, lineHeight = 13.sp, color = p.secondaryText)
                 Text(
                     "${performer.rating100 ?: MatchElo.DEFAULT_RATING}",
                     style = numberStyle.copy(fontSize = 11.sp, lineHeight = 13.sp, fontWeight = FontWeight.Medium), color = p.text,
@@ -835,7 +837,7 @@ private fun StarterPickCard(model: MatchViewModel, performer: Performer, modifie
 @Composable
 private fun LeaderboardContent(model: MatchViewModel, hPad: Dp, isRegular: Boolean, bottom: Dp) {
     if (model.isLoadingBoard && model.leaderboard.isEmpty()) {
-        MatchLoadingView("Loading charts...", Modifier.fillMaxSize())
+        MatchLoadingView(tr(R.string.loading_charts), Modifier.fillMaxSize())
         return
     }
     LazyVerticalGrid(
@@ -905,8 +907,8 @@ private fun LeaderboardCard(performer: Performer, place: Int, onClick: () -> Uni
                         Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(4.dp), verticalArrangement = Arrangement.spacedBy(4.dp),
                         maxItemsInEachRow = if (LocalDensity.current.fontScale > 1.3f) 3 else 5,
                     ) {
-                        StatColumn("Rating", "${performer.rating100 ?: MatchElo.DEFAULT_RATING}", Modifier.weight(1f))
-                        StatColumn("Duels", "${s.totalMatches}", Modifier.weight(1f))
+                        StatColumn(tr(R.string.rating), "${performer.rating100 ?: MatchElo.DEFAULT_RATING}", Modifier.weight(1f))
+                        StatColumn(tr(R.string.duels), "${s.totalMatches}", Modifier.weight(1f))
                         StatColumn("W", "${s.wins}", Modifier.weight(1f))
                         StatColumn("L", "${s.losses}", Modifier.weight(1f))
                         StatColumn("D", "${s.draws}", Modifier.weight(1f))
@@ -948,7 +950,7 @@ private fun PoolSettings(model: MatchViewModel, hPad: Dp, bottom: Dp) {
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         Text(
-            "Genders in pool",
+            tr(R.string.genders_in_pool),
             style = IosTypography.title3.copy(fontWeight = FontWeight.SemiBold), color = p.text,
             modifier = Modifier.padding(horizontal = 12.dp).padding(top = 8.dp),
         )

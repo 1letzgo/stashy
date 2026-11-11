@@ -12,7 +12,7 @@ import SwiftUI
 struct TVConnectionErrorView: View {
     @ObservedObject private var appearanceManager = AppearanceManager.shared
 
-    var title: String = "Server not reachable"
+    var title: String = tr("server_not_reachable")
     var subtitle: String?
     let onRetry: () -> Void
 
@@ -38,7 +38,7 @@ struct TVConnectionErrorView: View {
                     .padding(.horizontal, 80)
             }
 
-            Button("Retry Connection", action: onRetry)
+            Button(tr("action_retry_connection"), action: onRetry)
                 .font(.title3)
 
             Spacer(minLength: 200)

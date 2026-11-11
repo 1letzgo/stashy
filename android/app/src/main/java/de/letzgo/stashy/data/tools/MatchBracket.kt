@@ -1,5 +1,7 @@
 package de.letzgo.stashy.data.tools
 
+import de.letzgo.stashy.R
+import de.letzgo.stashy.tr
 import de.letzgo.stashy.data.Json
 import de.letzgo.stashy.data.Performer
 import de.letzgo.stashy.data.Prefs
@@ -94,12 +96,12 @@ object MatchBracket {
     const val MAX_LOSS = 12
 
     enum class Tier(val label: String, val slots: IntRange, val deltaBounds: IntRange) {
-        Champion("Champion", 0..0, 3..MAX_GAIN),
-        Finalist("Finalist", 1..1, 1..MAX_GAIN),
-        Semifinal("Semifinal", 2..3, 0..MAX_GAIN),
-        Quarterfinal("Quarterfinal", 4..7, -MAX_LOSS..MAX_GAIN),
-        RoundOf16("Round of 16", 8..15, -MAX_LOSS..MAX_GAIN),
-        RoundOf32("Round of 32", 16..31, -MAX_LOSS..0);
+        Champion(tr(R.string.champion), 0..0, 3..MAX_GAIN),
+        Finalist(tr(R.string.finalist), 1..1, 1..MAX_GAIN),
+        Semifinal(tr(R.string.semifinal), 2..3, 0..MAX_GAIN),
+        Quarterfinal(tr(R.string.quarterfinal), 4..7, -MAX_LOSS..MAX_GAIN),
+        RoundOf16(tr(R.string.round_of_16), 8..15, -MAX_LOSS..MAX_GAIN),
+        RoundOf32(tr(R.string.round_of_32), 16..31, -MAX_LOSS..0);
 
         companion object {
             /** Lost in [round] (0 = first round) of a bracket with [roundCount] rounds. */
@@ -212,16 +214,16 @@ object MatchBracket {
     }
 
     fun roundTitle(round: Int, roundCount: Int): String = when (roundCount - round) {
-        1 -> "Final"
-        2 -> "Semifinal"
-        3 -> "Quarterfinal"
-        else -> "Round of ${1 shl (roundCount - round)}"
+        1 -> tr(R.string.final_label)
+        2 -> tr(R.string.semifinal)
+        3 -> tr(R.string.quarterfinal)
+        else -> tr(R.string.round_of_arg, 1 shl (roundCount - round))
     }
 
     /** iOS: `bracketStatusLine` — "Round of 32 · Match 3/16". */
     fun statusLine(state: MatchBracketState): String? {
         val m = state.currentMatch ?: return null
-        return "${roundTitle(m.round, state.roundCount)} · Match ${m.index + 1}/${state.rounds[m.round].size}"
+        return tr(R.string.arg_match_arg_arg, roundTitle(m.round, state.roundCount), m.index + 1, state.rounds[m.round].size)
     }
 
     /**

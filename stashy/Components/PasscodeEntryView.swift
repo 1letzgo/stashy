@@ -27,12 +27,12 @@ struct PasscodeEntryView: View {
                     .font(.system(size: 40))
                     .foregroundColor(appearanceManager.tintColor)
                 
-                Text("Enter Passcode")
+                Text(tr("enter_passcode"))
                     .font(.title2)
                     .fontWeight(.semibold)
                 
                 if isLockedOut {
-                    Text("Too many attempts. Try again in \(securityManager.lockoutRemainingSeconds)s")
+                    Text(tr("hint_too_many_attempts_try_again", securityManager.lockoutRemainingSeconds))
                         .foregroundColor(.red)
                         .font(.caption)
                         .multilineTextAlignment(.center)
@@ -86,7 +86,7 @@ struct PasscodeEntryView: View {
                                     .font(.title)
                             }
                             .buttonStyle(PasscodeKeyStyle(filled: false))
-                            .accessibilityLabel(securityManager.biometryType == .faceID ? "Unlock with Face ID" : "Unlock with Touch ID")
+                            .accessibilityLabel(securityManager.biometryType == .faceID ? tr("action_unlock_with_face_id") : tr("action_unlock_with_touch_id"))
                             .frame(maxWidth: .infinity)
                         } else {
                             Color.clear
@@ -107,7 +107,7 @@ struct PasscodeEntryView: View {
                             .font(.title2)
                     }
                     .buttonStyle(PasscodeKeyStyle(filled: false))
-                    .accessibilityLabel("Delete")
+                    .accessibilityLabel(tr("action_delete"))
                     .frame(maxWidth: .infinity)
                     .opacity(passcode.isEmpty ? 0.35 : 1)
                     .disabled(isLockedOut)
@@ -137,8 +137,8 @@ struct PasscodeEntryView: View {
                 } else {
                     HapticManager.error()
                     errorMessage = isLockedOut
-                        ? "Too many attempts. Try again in \(securityManager.lockoutRemainingSeconds)s"
-                        : "Wrong Passcode"
+                        ? tr("hint_too_many_attempts_try_again", securityManager.lockoutRemainingSeconds)
+                        : tr("wrong_passcode")
                     shakeTrigger.toggle()
                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.45) {
                         passcode = ""

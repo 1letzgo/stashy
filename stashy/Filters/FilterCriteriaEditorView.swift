@@ -75,10 +75,10 @@ struct FilterCriteriaEditorView: View {
     /// which hid the fact that criteria on one level are always ANDed.
     private var levelExplanation: String {
         switch path.last {
-        case "OR": return "Matches when at least one condition below is true."
-        case "NOT": return "Excludes everything matching the conditions below."
-        case "AND": return "All conditions below must be true."
-        default: return "All conditions must be true."
+        case "OR": return tr("hint_matches_when_at_least_one")
+        case "NOT": return tr("hint_excludes_everything_matching_conditions_below")
+        case "AND": return tr("hint_all_conditions_below_must_be")
+        default: return tr("all_conditions_must_be_true")
         }
     }
 
@@ -138,7 +138,7 @@ struct FilterCriteriaEditorView: View {
     }
 
     private var emptyStateCard: some View {
-        Text(groupKeys.isEmpty ? "No conditions yet — use Add below." : "No direct conditions.")
+        Text(groupKeys.isEmpty ? tr("empty_conditions_yet_use_add_below") : tr("empty_direct_conditions"))
             .font(.subheadline)
             .foregroundColor(.secondary)
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -184,7 +184,7 @@ struct FilterCriteriaEditorView: View {
                         Text(field.label)
                         if field.isAppOnly {
                             // Menu subtitle: the web UI drops these when it re-saves the filter.
-                            Text("App only")
+                            Text(tr("app_only"))
                         }
                     }
                 }
@@ -192,7 +192,7 @@ struct FilterCriteriaEditorView: View {
                 HStack(spacing: DesignTokens.Spacing.xs) {
                     Image(systemName: "plus.circle.fill")
                         .foregroundColor(addableFields.isEmpty ? .secondary : appearance.tintColor)
-                    Text("Add condition")
+                    Text(tr("action_add_condition"))
                         .font(.subheadline.weight(.semibold))
                         .foregroundColor(addableFields.isEmpty ? .secondary : .primary)
                 }
@@ -222,21 +222,21 @@ struct FilterCriteriaEditorView: View {
             HStack(spacing: DesignTokens.Spacing.xs) {
                 Image(systemName: "square.stack.3d.up")
                     .foregroundColor(taken ? .secondary : appearance.tintColor)
-                Text("Add group")
+                Text(tr("action_add_group"))
                     .font(.subheadline.weight(.semibold))
                     .foregroundColor(taken ? .secondary : .primary)
             }
             .contentShape(Rectangle())
         }
         .disabled(taken)
-        .accessibilityHint(taken ? "This level already has a group. Add the next one inside it." : "")
+        .accessibilityHint(taken ? tr("hint_this_level_already_has_group") : "")
     }
 
     static func groupHint(_ group: String) -> String {
         switch group {
-        case "AND": return "Every condition in it must match"
-        case "OR": return "This level or the group must match"
-        case "NOT": return "Leaves out what the group matches"
+        case "AND": return tr("hint_every_condition_in_it_must")
+        case "OR": return tr("hint_this_level_or_group_must")
+        case "NOT": return tr("hint_leaves_out_what_group_matches")
         default: return ""
         }
     }
@@ -288,7 +288,7 @@ struct FilterCriteriaEditorView: View {
                         .foregroundColor(.secondary.opacity(0.55))
                 }
                 .buttonStyle(.plain)
-                .accessibilityLabel("Remove \(Self.groupTitle(group)) group")
+                .accessibilityLabel(tr("action_remove_arg_group", Self.groupTitle(group)))
             }
             .padding(.horizontal, DesignTokens.Spacing.sm)
             .padding(.top, DesignTokens.Spacing.sm)
@@ -312,9 +312,9 @@ struct FilterCriteriaEditorView: View {
 
     static func groupTitle(_ group: String) -> String {
         switch group {
-        case "AND": return "All of"
-        case "OR": return "Any of"
-        case "NOT": return "None of"
+        case "AND": return tr("all_of")
+        case "OR": return tr("any_of")
+        case "NOT": return tr("none_of")
         default: return group
         }
     }
@@ -379,7 +379,7 @@ struct FilterCriteriaEditorView: View {
                             .contentShape(Rectangle())
                     }
                     .buttonStyle(.plain)
-                    .accessibilityLabel(isPinned ? "Clear \(field.label)" : "Remove \(field.label)")
+                    .accessibilityLabel(isPinned ? tr("action_clear_arg", field.label) : tr("action_remove_arg", field.label))
                 }
             }
             .padding(.vertical, 10)
@@ -468,7 +468,7 @@ struct FilterCriteriaEditorView: View {
             } label: {
                 let count = (FilterCriteriaDocument.stringKeyedDict(document.value(forKey: field.key, at: path)) ?? [:]).count
                 HStack(spacing: 6) {
-                    Text(count == 0 ? "Edit…" : "\(count) criterion(s)")
+                    Text(count == 0 ? tr("action_edit_menu") : "\(count) criterion(s)")
                         .font(.subheadline)
                     Image(systemName: "chevron.right")
                         .font(.caption.weight(.semibold))
@@ -544,10 +544,10 @@ struct FilterCriteriaEditorView: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") { nestedEditorKey = nil }
+                    Button(tr("action_cancel")) { nestedEditorKey = nil }
                 }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("Done") {
+                    Button(tr("action_done")) {
                         let dict = nestedDocument.sanitizedObjectFilter
                         document.setCriterion(key: key, value: dict.isEmpty ? nil : dict, at: path)
                         nestedEditorKey = nil
@@ -661,7 +661,7 @@ struct FilterModifierPicker: View {
     }
 
     var body: some View {
-        Picker("Modifier", selection: $modifier) {
+        Picker(tr("modifier"), selection: $modifier) {
             ForEach(resolvedOptions) { m in
                 Text(m.label).tag(m.rawValue)
             }
@@ -682,16 +682,16 @@ struct FilterBoolCriterionRow: View {
 
     var body: some View {
         HStack(spacing: 8) {
-            CatalogFilterChip(title: "Any", isActive: value == nil) { value = nil; onChange() }
-            CatalogFilterChip(title: "Yes", isActive: value == true) { value = true; onChange() }
-            CatalogFilterChip(title: "No", isActive: value == false) { value = false; onChange() }
+            CatalogFilterChip(title: tr("any"), isActive: value == nil) { value = nil; onChange() }
+            CatalogFilterChip(title: tr("yes"), isActive: value == true) { value = true; onChange() }
+            CatalogFilterChip(title: tr("no"), isActive: value == false) { value = false; onChange() }
         }
     }
 }
 
 struct FilterStringCriterionRow: View {
     @Binding var value: [String: Any]
-    var placeholder: String = "Value"
+    var placeholder: String = tr("value")
     var modifiers: [StashCriterionModifier] = FilterCriterionKind.defaultModifiers(for: .string)
     /// Per-entity value chips under the text field (hair colour, country, codec, …). Empty = none.
     var suggestions: [FilterFieldCatalog.ValueSuggestion] = []
@@ -764,7 +764,7 @@ struct FilterStringCriterionRow: View {
 /// Stash's `YYYY-MM-DD` date format — shared by the date criteria and every date field of the
 /// edit forms, so nothing that is not a real calendar date ever reaches the server.
 enum StashDateInput {
-    static let errorText = "Enter a valid date as YYYY-MM-DD"
+    static var errorText: String { tr("hint_enter_valid_date_as_yyyy") }
 
     /// Local Gregorian day, like the graphical `DatePicker` (which works in the local time zone),
     /// so the day shown is the day stored. Built per call: the zone can change while the app runs.
@@ -835,7 +835,7 @@ struct StashDateField: View {
                         .foregroundColor(appearance.tintColor)
                 }
                 .buttonStyle(.borderless)
-                .accessibilityLabel(showsCalendar ? "Hide calendar" : "Pick a date")
+                .accessibilityLabel(showsCalendar ? tr("action_hide_calendar") : tr("action_pick_date"))
             }
             if showsCalendar {
                 DatePicker(
@@ -917,14 +917,14 @@ struct FilterDateCriterionRow: View {
             )
             if mod?.needsValue ?? true {
                 StashDateField(
-                    placeholder: mod?.needsSecondValue == true ? "From (YYYY-MM-DD)" : "YYYY-MM-DD",
+                    placeholder: mod?.needsSecondValue == true ? tr("from_yyyy_mm_dd") : "YYYY-MM-DD",
                     text: dateText(key: "value"),
                     editorChrome: true,
                     onCommit: commitIfValid
                 )
                 if mod?.needsSecondValue == true {
                     StashDateField(
-                        placeholder: "To (YYYY-MM-DD)",
+                        placeholder: tr("to_yyyy_mm_dd"),
                         text: dateText(key: "value2"),
                         editorChrome: true,
                         onCommit: commitIfValid
@@ -992,10 +992,10 @@ struct FilterTimestampCriterionRow: View {
                 options: FilterCriterionKind.defaultModifiers(for: .timestamp),
                 onChange: {}
             )
-            DatePicker(needsSecond ? "From" : "Date", selection: dateBinding(key: "value"),
+            DatePicker(needsSecond ? tr("from") : tr("date"), selection: dateBinding(key: "value"),
                        displayedComponents: [.date, .hourAndMinute])
             if needsSecond {
-                DatePicker("To", selection: dateBinding(key: "value2"),
+                DatePicker(tr("to"), selection: dateBinding(key: "value2"),
                            displayedComponents: [.date, .hourAndMinute])
             }
         }
@@ -1022,7 +1022,7 @@ struct FilterCountDepthRow: View {
     var onChange: () -> Void
 
     var body: some View {
-        Toggle("Include sub-tags", isOn: Binding(
+        Toggle(tr("include_sub_tags"), isOn: Binding(
             get: { (value["depth"] as? NSNumber)?.intValue == -1 },
             set: { include in
                 if include { value["depth"] = -1 } else { value.removeValue(forKey: "depth") }
@@ -1062,13 +1062,13 @@ struct FilterNumericCriterionRow: View {
             )
             if mod?.needsValue == true {
                 HStack(spacing: 8) {
-                    TextField("Value", text: numberText(key: "value"))
+                    TextField(tr("value"), text: numberText(key: "value"))
                         .keyboardType(isFloat ? .decimalPad : .numberPad)
                         .numericKeyboardDoneBar()
                         .filterEditorTextFieldChrome()
                         .focused($focusedField, equals: 0)
                     if mod?.needsSecondValue == true {
-                        TextField("Value 2", text: numberText(key: "value2"))
+                        TextField(tr("value_2"), text: numberText(key: "value2"))
                             .keyboardType(isFloat ? .decimalPad : .numberPad)
                             .numericKeyboardDoneBar()
                             .filterEditorTextFieldChrome()
@@ -1294,9 +1294,9 @@ struct FilterIsMissingRow: View {
     }
 
     var body: some View {
-        Picker("Property", selection: $value) {
+        Picker(tr("property"), selection: $value) {
             // A new row has no property yet; without this entry the menu would show nothing.
-            if value.isEmpty { Text("Choose property").tag("") }
+            if value.isEmpty { Text(tr("action_choose_property")).tag("") }
             ForEach(options, id: \.self) { property in
                 Text(label(property)).tag(property)
             }
@@ -1314,8 +1314,8 @@ struct FilterTrueFalseStringRow: View {
 
     var body: some View {
         HStack(spacing: 8) {
-            CatalogFilterChip(title: "Yes", isActive: value == "true") { value = "true"; onChange() }
-            CatalogFilterChip(title: "No", isActive: value == "false") { value = "false"; onChange() }
+            CatalogFilterChip(title: tr("yes"), isActive: value == "true") { value = "true"; onChange() }
+            CatalogFilterChip(title: tr("no"), isActive: value == "false") { value = "false"; onChange() }
         }
     }
 }
@@ -1339,7 +1339,7 @@ struct FilterStashIDCriterionRow: View {
                 options: FilterCriterionKind.defaultModifiers(for: multi ? .stashIDs : .stashID),
                 onChange: onChange
             )
-            TextField("Endpoint (optional)", text: Binding(
+            TextField(tr("endpoint_optional"), text: Binding(
                 get: { value["endpoint"] as? String ?? "" },
                 set: {
                     var d = value
@@ -1355,7 +1355,7 @@ struct FilterStashIDCriterionRow: View {
             // Writing the singular key into the plural type made the server reject the filter.
             if StashCriterionModifier(rawValue: modifierRaw)?.needsValue ?? true {
                 let valueKey = multi ? "stash_ids" : "stash_id"
-                TextField("Stash ID", text: Binding(
+                TextField(tr("stash_id"), text: Binding(
                     get: { value[valueKey] as? String ?? "" },
                     set: {
                         var d = value
@@ -1393,7 +1393,7 @@ struct FilterPhashDistanceRow: View {
             ))
             .filterEditorTextFieldChrome()
             .onSubmit { onChange() }
-            TextField("Distance", text: Binding(
+            TextField(tr("distance"), text: Binding(
                 get: {
                     if let i = value["distance"] as? Int { return String(i) }
                     if let n = value["distance"] as? NSNumber { return n.stringValue }
@@ -1431,10 +1431,10 @@ struct FilterDuplicationRow: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack(spacing: 8) {
-                CatalogFilterChip(title: "Duplicated", isActive: duplicated) { patch(["duplicated": true]) }
-                CatalogFilterChip(title: "Unique", isActive: !duplicated) { patch(["duplicated": false]) }
+                CatalogFilterChip(title: tr("duplicated"), isActive: duplicated) { patch(["duplicated": true]) }
+                CatalogFilterChip(title: tr("unique"), isActive: !duplicated) { patch(["duplicated": false]) }
             }
-            TextField("PHash distance (optional)", text: Binding(
+            TextField(tr("phash_distance_optional"), text: Binding(
                 get: { distanceText },
                 set: { raw in
                     var d = value
@@ -1480,7 +1480,7 @@ struct FilterCustomFieldsRow: View {
             ForEach(rows) { row in
                 let idx = row.index
                 VStack(alignment: .leading, spacing: 6) {
-                    TextField("Field", text: Binding(
+                    TextField(tr("field"), text: Binding(
                         get: { value.indices.contains(idx) ? (value[idx]["field"] as? String ?? "") : "" },
                         set: {
                             guard value.indices.contains(idx) else { return }
@@ -1491,7 +1491,7 @@ struct FilterCustomFieldsRow: View {
                     ))
                     .filterEditorTextFieldChrome()
                     .onSubmit { onChange() }
-                    TextField("Value", text: Binding(
+                    TextField(tr("value"), text: Binding(
                         get: {
                             guard value.indices.contains(idx) else { return "" }
                             if let arr = value[idx]["value"] as? [String] { return arr.joined(separator: ", ") }
@@ -1510,7 +1510,7 @@ struct FilterCustomFieldsRow: View {
                     ))
                     .filterEditorTextFieldChrome()
                     .onSubmit { onChange() }
-                    Button("Remove field", role: .destructive) {
+                    Button(tr("action_remove_field"), role: .destructive) {
                         guard value.indices.contains(idx) else { return }
                         var next = value
                         next.remove(at: idx)
@@ -1520,7 +1520,7 @@ struct FilterCustomFieldsRow: View {
                     .font(.caption)
                 }
             }
-            Button("Add custom field") {
+            Button(tr("action_add_custom_field")) {
                 var next = value
                 next.append([
                     "field": "",
@@ -1548,11 +1548,11 @@ struct FilterRawJSONRow: View {
                 .onAppear { text = prettyJSON(value) }
                 .onChange(of: text) { _, new in
                     guard let data = new.data(using: .utf8) else {
-                        parseError = "Invalid text encoding"
+                        parseError = tr("invalid_text_encoding")
                         return
                     }
                     guard let obj = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any] else {
-                        parseError = "Not a valid JSON object"
+                        parseError = tr("not_valid_json_object")
                         return
                     }
                     parseError = nil
@@ -1655,10 +1655,10 @@ struct FilterMultiIdCriterionRow: View {
     private var subLevelLabel: String? {
         guard hierarchical else { return nil }
         switch entityKey {
-        case "tags", "scene_tags", "performer_tags", "parents", "children": return "Include sub-tags"
-        case "studios": return "Include sub-studios"
-        case "groups", "movies", "containing_groups", "sub_groups": return "Include sub-groups"
-        case "folder", "parent_folder": return "Include sub-folders"
+        case "tags", "scene_tags", "performer_tags", "parents", "children": return tr("include_sub_tags")
+        case "studios": return tr("include_sub_studios")
+        case "groups", "movies", "containing_groups", "sub_groups": return tr("include_sub_groups")
+        case "folder", "parent_folder": return tr("include_sub_folders")
         default: return nil
         }
     }

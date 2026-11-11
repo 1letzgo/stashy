@@ -1,5 +1,7 @@
 package de.letzgo.stashy.ui.feeds
 
+import de.letzgo.stashy.R
+import de.letzgo.stashy.tr
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateMapOf
@@ -371,7 +373,7 @@ object FeedsModel {
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
-                l.error = e.message ?: "Unknown error"
+                l.error = e.message ?: tr(R.string.unknown_error)
                 l.signature = null
             } finally {
                 l.loadedOnce = true
@@ -625,11 +627,11 @@ object FeedsModel {
                 }
                 list(m).signature = signature(m)
                 SavedFiltersStore.fetch()
-                message = if (existingId == null) "Saved “$name”" else "Updated “$name”"
+                message = if (existingId == null) tr(R.string.saved_arg, name) else tr(R.string.updated_arg, name)
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
-                message = "Save failed: ${e.message}"
+                message = tr(R.string.action_save_failed_arg, e.message)
             }
         }
     }
@@ -658,7 +660,7 @@ object FeedsModel {
                 } catch (e: CancellationException) {
                     throw e
                 } catch (e: Exception) {
-                    message = "Rename failed: ${e.message}"
+                    message = tr(R.string.action_rename_failed_arg, e.message)
                 }
             }
             return
@@ -688,7 +690,7 @@ object FeedsModel {
                 } catch (e: CancellationException) {
                     throw e
                 } catch (e: Exception) {
-                    message = "Delete failed: ${e.message}"
+                    message = tr(R.string.action_delete_failed_arg, e.message)
                 }
             }
             return
@@ -707,12 +709,12 @@ object FeedsModel {
     fun deleteConfirmationText(m: ReelsModeType): String {
         val row = presetRow(m)
         ListLivePresetTag.parseServerId(row)?.let { sid ->
-            savedFilters.firstOrNull { it.id == sid }?.let { return "Remove “${it.name}” from Stash? Other devices will lose this saved filter." }
+            savedFilters.firstOrNull { it.id == sid }?.let { return tr(R.string.hint_remove_arg_from_stash_other, it.name) }
         }
         ListLivePresetTag.parseLocalId(row)?.let { lid ->
-            localPresets(m).firstOrNull { it.id == lid }?.let { return "Remove “${it.name}” from this device? This cannot be undone." }
+            localPresets(m).firstOrNull { it.id == lid }?.let { return tr(R.string.hint_remove_arg_from_this_device, it.name) }
         }
-        return "Remove this filter? This cannot be undone."
+        return tr(R.string.hint_remove_this_filter_this_cannot)
     }
 
     /** Tab icon reselect (iOS `reelsWillRemount` → `refetchCurrentReelsModeFromTop`). */
@@ -920,7 +922,7 @@ object FeedsModel {
         val name = from.tags.firstOrNull { it.id == tagId }?.name.orEmpty()
         val remaining: List<Tag> = from.tags.filter { it.id != tagId }
         scope.launch {
-            message = if (AITagSuggestions.write(remaining, from)) "Removed #$name" else "Could not remove tag"
+            message = if (AITagSuggestions.write(remaining, from)) tr(R.string.removed_arg, name) else tr(R.string.error_remove_tag)
         }
     }
 
@@ -949,7 +951,7 @@ object FeedsModel {
                 pics.list.patch { img -> if (img.id == plan.id) img.copy(performers = FeedPerformerAdd.appendingNames(img.performers.orEmpty(), added)) else img }
             }
         }
-        message = if (added.size == 1) "Added ${added[0].name}" else "Added ${added.size} performers"
+        message = if (added.size == 1) tr(R.string.added_arg_2, added[0].name) else tr(R.string.added_arg_performers, added.size)
         return true
     }
 
@@ -961,7 +963,7 @@ object FeedsModel {
             scope.launch {
                 if (!FeedsRepository.updateSceneRating(sceneId, rating100)) {
                     patchScene(sceneId) { it.copy(rating100 = original) }
-                    message = "Failed to save rating"
+                    message = tr(R.string.error_save_rating)
                 }
             }
         } else if (item is FeedItem.ClipItem) {
@@ -970,7 +972,7 @@ object FeedsModel {
             scope.launch {
                 if (!FeedsRepository.updateImageRating(item.image.id, rating100)) {
                     patchImage(item.image.id) { it.copy(rating100 = original) }
-                    message = "Failed to save rating"
+                    message = tr(R.string.error_save_rating)
                 }
             }
         }
@@ -989,14 +991,14 @@ object FeedsModel {
             scope.launch {
                 val count = FeedsRepository.mutateOCounter(sceneId, isImage = false, mutation)
                 patchScene(sceneId) { it.copy(oCounter = count ?: current) }
-                if (count == null) message = "Counter update failed"
+                if (count == null) message = tr(R.string.error_counter_update)
             }
         } else if (item is FeedItem.ClipItem) {
             patchImage(item.image.id) { it.copy(oCounter = optimistic) }
             scope.launch {
                 val count = FeedsRepository.mutateOCounter(item.image.id, isImage = true, mutation)
                 patchImage(item.image.id) { it.copy(oCounter = count ?: current) }
-                if (count == null) message = "Counter update failed"
+                if (count == null) message = tr(R.string.error_counter_update)
             }
         }
     }
@@ -1024,7 +1026,7 @@ object FeedsModel {
             if (ok) {
                 lists.values.forEach { l -> l.items.removeAll { it.sceneID != null && it.sceneID == item.sceneID && item.sceneID != null || it.id == item.id } }
                 message = "${label.replaceFirstChar { it.uppercase() }} deleted"
-            } else message = "Failed to delete $label"
+            } else message = tr(R.string.error_delete_arg_2, label)
             onDone(ok)
         }
     }

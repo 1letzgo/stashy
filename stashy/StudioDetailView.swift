@@ -221,7 +221,7 @@ struct StudioDetailView: View {
     /// The shown section's filter and sort sheet (Groups has none yet).
     private var sectionFilterSlot: CatalogChromeSlot? {
         func slot(active: Bool, open: @escaping () -> Void) -> CatalogChromeSlot {
-            CatalogChromeSlot(systemImage: "slider.horizontal.3", isActive: active, accessibilityLabel: "Filter and sort") {
+            CatalogChromeSlot(systemImage: "slider.horizontal.3", isActive: active, accessibilityLabel: tr("action_filter_and_sort_2")) {
                 HapticManager.light()
                 open()
             }
@@ -248,7 +248,7 @@ struct StudioDetailView: View {
             DispatchQueue.main.async {
                 if !success {
                     isFavorite = !newState
-                    ToastManager.shared.show("Failed to update favorite", icon: "exclamationmark.triangle", style: .error)
+                    ToastManager.shared.show(tr("error_update_favorite"), icon: "exclamationmark.triangle", style: .error)
                 } else {
                     studio.favorite = newState
                 }
@@ -269,9 +269,9 @@ struct StudioDetailView: View {
                     if !viewModel.studioGalleries.isEmpty {
                         galleryGrid
                     } else if viewModel.isLoadingStudioGalleries {
-                        loadingView(message: "Loading galleries...")
+                        loadingView(message: tr("loading_galleries"))
                     } else {
-                        InlineEmptyStateView(icon: "photo.on.rectangle", title: "No galleries found")
+                        InlineEmptyStateView(icon: "photo.on.rectangle", title: tr("empty_galleries_found"))
                     }
                 } else if selectedDetailTab == .studios {
                     studioGrid
@@ -302,23 +302,23 @@ struct StudioDetailView: View {
             .onChange(of: linkedPerformers.catalogPresetRowSelection) { _, newId in
                 linkedPerformers.handlePresetSelection(newId, viewModel: viewModel)
             }
-            .alert("Save as new", isPresented: $linkedPerformers.showSaveAsCatalogPresetAlert) {
-                TextField("Name", text: $linkedPerformers.catalogPresetNameInput)
-                Button("Save") { linkedPerformers.savePresetAs(name: linkedPerformers.catalogPresetNameInput, viewModel: viewModel) }
-                Button("Cancel", role: .cancel) {}
+            .alert(tr("action_save_as_new"), isPresented: $linkedPerformers.showSaveAsCatalogPresetAlert) {
+                TextField(tr("name"), text: $linkedPerformers.catalogPresetNameInput)
+                Button(tr("action_save")) { linkedPerformers.savePresetAs(name: linkedPerformers.catalogPresetNameInput, viewModel: viewModel) }
+                Button(tr("action_cancel"), role: .cancel) {}
             } message: {
-                Text("Save the current sort, filter, and live criteria as a new Stash saved filter.")
+                Text(tr("hint_save_current_sort_filter_and"))
             }
-            .alert("Rename", isPresented: $linkedPerformers.showRenameCatalogPresetAlert) {
-                TextField("Name", text: $linkedPerformers.renameCatalogPresetInput)
-                Button("Save") { linkedPerformers.renamePreset(to: linkedPerformers.renameCatalogPresetInput, viewModel: viewModel) }
-                Button("Cancel", role: .cancel) {}
+            .alert(tr("action_rename"), isPresented: $linkedPerformers.showRenameCatalogPresetAlert) {
+                TextField(tr("name"), text: $linkedPerformers.renameCatalogPresetInput)
+                Button(tr("action_save")) { linkedPerformers.renamePreset(to: linkedPerformers.renameCatalogPresetInput, viewModel: viewModel) }
+                Button(tr("action_cancel"), role: .cancel) {}
             } message: {
-                Text("Rename this preset or saved filter.")
+                Text(tr("hint_rename_this_preset_or_saved"))
             }
-            .alert("Delete filter?", isPresented: $linkedPerformers.showDeleteCatalogPresetAlert) {
-                Button("Delete", role: .destructive) { linkedPerformers.deletePreset(viewModel: viewModel) }
-                Button("Cancel", role: .cancel) {}
+            .alert(tr("confirm_delete_filter"), isPresented: $linkedPerformers.showDeleteCatalogPresetAlert) {
+                Button(tr("action_delete"), role: .destructive) { linkedPerformers.deletePreset(viewModel: viewModel) }
+                Button(tr("action_cancel"), role: .cancel) {}
             } message: {
                 Text(linkedPerformers.deletePresetConfirmationText(viewModel: viewModel))
             }
@@ -332,23 +332,23 @@ struct StudioDetailView: View {
             .onChange(of: linkedTags.catalogPresetRowSelection) { _, newId in
                 linkedTags.handlePresetSelection(newId, viewModel: viewModel)
             }
-            .alert("Save as new", isPresented: $linkedTags.showSaveAsCatalogPresetAlert) {
-                TextField("Name", text: $linkedTags.catalogPresetNameInput)
-                Button("Save") { linkedTags.savePresetAs(name: linkedTags.catalogPresetNameInput, viewModel: viewModel) }
-                Button("Cancel", role: .cancel) {}
+            .alert(tr("action_save_as_new"), isPresented: $linkedTags.showSaveAsCatalogPresetAlert) {
+                TextField(tr("name"), text: $linkedTags.catalogPresetNameInput)
+                Button(tr("action_save")) { linkedTags.savePresetAs(name: linkedTags.catalogPresetNameInput, viewModel: viewModel) }
+                Button(tr("action_cancel"), role: .cancel) {}
             } message: {
-                Text("Save the current sort, filter, and live criteria as a new Stash saved filter.")
+                Text(tr("hint_save_current_sort_filter_and"))
             }
-            .alert("Rename", isPresented: $linkedTags.showRenameCatalogPresetAlert) {
-                TextField("Name", text: $linkedTags.renameCatalogPresetInput)
-                Button("Save") { linkedTags.renamePreset(to: linkedTags.renameCatalogPresetInput, viewModel: viewModel) }
-                Button("Cancel", role: .cancel) {}
+            .alert(tr("action_rename"), isPresented: $linkedTags.showRenameCatalogPresetAlert) {
+                TextField(tr("name"), text: $linkedTags.renameCatalogPresetInput)
+                Button(tr("action_save")) { linkedTags.renamePreset(to: linkedTags.renameCatalogPresetInput, viewModel: viewModel) }
+                Button(tr("action_cancel"), role: .cancel) {}
             } message: {
-                Text("Rename this preset or saved filter.")
+                Text(tr("hint_rename_this_preset_or_saved"))
             }
-            .alert("Delete filter?", isPresented: $linkedTags.showDeleteCatalogPresetAlert) {
-                Button("Delete", role: .destructive) { linkedTags.deletePreset(viewModel: viewModel) }
-                Button("Cancel", role: .cancel) {}
+            .alert(tr("confirm_delete_filter"), isPresented: $linkedTags.showDeleteCatalogPresetAlert) {
+                Button(tr("action_delete"), role: .destructive) { linkedTags.deletePreset(viewModel: viewModel) }
+                Button(tr("action_cancel"), role: .cancel) {}
             } message: {
                 Text(linkedTags.deletePresetConfirmationText(viewModel: viewModel))
             }
@@ -362,23 +362,23 @@ struct StudioDetailView: View {
             .onChange(of: linkedChildStudios.catalogPresetRowSelection) { _, newId in
                 linkedChildStudios.handlePresetSelection(newId, viewModel: viewModel)
             }
-            .alert("Save as new", isPresented: $linkedChildStudios.showSaveAsCatalogPresetAlert) {
-                TextField("Name", text: $linkedChildStudios.catalogPresetNameInput)
-                Button("Save") { linkedChildStudios.savePresetAs(name: linkedChildStudios.catalogPresetNameInput, viewModel: viewModel) }
-                Button("Cancel", role: .cancel) {}
+            .alert(tr("action_save_as_new"), isPresented: $linkedChildStudios.showSaveAsCatalogPresetAlert) {
+                TextField(tr("name"), text: $linkedChildStudios.catalogPresetNameInput)
+                Button(tr("action_save")) { linkedChildStudios.savePresetAs(name: linkedChildStudios.catalogPresetNameInput, viewModel: viewModel) }
+                Button(tr("action_cancel"), role: .cancel) {}
             } message: {
-                Text("Save the current sort, filter, and live criteria as a new Stash saved filter.")
+                Text(tr("hint_save_current_sort_filter_and"))
             }
-            .alert("Rename", isPresented: $linkedChildStudios.showRenameCatalogPresetAlert) {
-                TextField("Name", text: $linkedChildStudios.renameCatalogPresetInput)
-                Button("Save") { linkedChildStudios.renamePreset(to: linkedChildStudios.renameCatalogPresetInput, viewModel: viewModel) }
-                Button("Cancel", role: .cancel) {}
+            .alert(tr("action_rename"), isPresented: $linkedChildStudios.showRenameCatalogPresetAlert) {
+                TextField(tr("name"), text: $linkedChildStudios.renameCatalogPresetInput)
+                Button(tr("action_save")) { linkedChildStudios.renamePreset(to: linkedChildStudios.renameCatalogPresetInput, viewModel: viewModel) }
+                Button(tr("action_cancel"), role: .cancel) {}
             } message: {
-                Text("Rename this preset or saved filter.")
+                Text(tr("hint_rename_this_preset_or_saved"))
             }
-            .alert("Delete filter?", isPresented: $linkedChildStudios.showDeleteCatalogPresetAlert) {
-                Button("Delete", role: .destructive) { linkedChildStudios.deletePreset(viewModel: viewModel) }
-                Button("Cancel", role: .cancel) {}
+            .alert(tr("confirm_delete_filter"), isPresented: $linkedChildStudios.showDeleteCatalogPresetAlert) {
+                Button(tr("action_delete"), role: .destructive) { linkedChildStudios.deletePreset(viewModel: viewModel) }
+                Button(tr("action_cancel"), role: .cancel) {}
             } message: {
                 Text(linkedChildStudios.deletePresetConfirmationText(viewModel: viewModel))
             }
@@ -392,23 +392,23 @@ struct StudioDetailView: View {
             .onChange(of: linkedGalleries.catalogPresetRowSelection) { _, newId in
                 linkedGalleries.handlePresetSelection(newId, viewModel: viewModel)
             }
-            .alert("Save as new", isPresented: $linkedGalleries.showSaveAsCatalogPresetAlert) {
-                TextField("Name", text: $linkedGalleries.catalogPresetNameInput)
-                Button("Save") { linkedGalleries.savePresetAs(name: linkedGalleries.catalogPresetNameInput, viewModel: viewModel) }
-                Button("Cancel", role: .cancel) {}
+            .alert(tr("action_save_as_new"), isPresented: $linkedGalleries.showSaveAsCatalogPresetAlert) {
+                TextField(tr("name"), text: $linkedGalleries.catalogPresetNameInput)
+                Button(tr("action_save")) { linkedGalleries.savePresetAs(name: linkedGalleries.catalogPresetNameInput, viewModel: viewModel) }
+                Button(tr("action_cancel"), role: .cancel) {}
             } message: {
-                Text("Save the current sort, filter, and live criteria as a new Stash saved filter.")
+                Text(tr("hint_save_current_sort_filter_and"))
             }
-            .alert("Rename", isPresented: $linkedGalleries.showRenameCatalogPresetAlert) {
-                TextField("Name", text: $linkedGalleries.renameCatalogPresetInput)
-                Button("Save") { linkedGalleries.renamePreset(to: linkedGalleries.renameCatalogPresetInput, viewModel: viewModel) }
-                Button("Cancel", role: .cancel) {}
+            .alert(tr("action_rename"), isPresented: $linkedGalleries.showRenameCatalogPresetAlert) {
+                TextField(tr("name"), text: $linkedGalleries.renameCatalogPresetInput)
+                Button(tr("action_save")) { linkedGalleries.renamePreset(to: linkedGalleries.renameCatalogPresetInput, viewModel: viewModel) }
+                Button(tr("action_cancel"), role: .cancel) {}
             } message: {
-                Text("Rename this preset or saved filter.")
+                Text(tr("hint_rename_this_preset_or_saved"))
             }
-            .alert("Delete filter?", isPresented: $linkedGalleries.showDeleteCatalogPresetAlert) {
-                Button("Delete", role: .destructive) { linkedGalleries.deletePreset(viewModel: viewModel) }
-                Button("Cancel", role: .cancel) {}
+            .alert(tr("confirm_delete_filter"), isPresented: $linkedGalleries.showDeleteCatalogPresetAlert) {
+                Button(tr("action_delete"), role: .destructive) { linkedGalleries.deletePreset(viewModel: viewModel) }
+                Button(tr("action_cancel"), role: .cancel) {}
             } message: {
                 Text(linkedGalleries.deletePresetConfirmationText(viewModel: viewModel))
             }
@@ -418,23 +418,23 @@ struct StudioDetailView: View {
             .onChange(of: linkedImages.catalogPresetRowSelection) { _, newId in
                 linkedImages.handlePresetSelection(newId, viewModel: viewModel)
             }
-            .alert("Save as new", isPresented: $linkedImages.showSaveAsCatalogPresetAlert) {
-                TextField("Name", text: $linkedImages.catalogPresetNameInput)
-                Button("Save") { linkedImages.savePresetAs(name: linkedImages.catalogPresetNameInput, viewModel: viewModel) }
-                Button("Cancel", role: .cancel) {}
+            .alert(tr("action_save_as_new"), isPresented: $linkedImages.showSaveAsCatalogPresetAlert) {
+                TextField(tr("name"), text: $linkedImages.catalogPresetNameInput)
+                Button(tr("action_save")) { linkedImages.savePresetAs(name: linkedImages.catalogPresetNameInput, viewModel: viewModel) }
+                Button(tr("action_cancel"), role: .cancel) {}
             } message: {
-                Text("Save the current sort, filter, and live criteria as a new Stash saved filter.")
+                Text(tr("hint_save_current_sort_filter_and"))
             }
-            .alert("Rename", isPresented: $linkedImages.showRenameCatalogPresetAlert) {
-                TextField("Name", text: $linkedImages.renameCatalogPresetInput)
-                Button("Save") { linkedImages.renamePreset(to: linkedImages.renameCatalogPresetInput, viewModel: viewModel) }
-                Button("Cancel", role: .cancel) {}
+            .alert(tr("action_rename"), isPresented: $linkedImages.showRenameCatalogPresetAlert) {
+                TextField(tr("name"), text: $linkedImages.renameCatalogPresetInput)
+                Button(tr("action_save")) { linkedImages.renamePreset(to: linkedImages.renameCatalogPresetInput, viewModel: viewModel) }
+                Button(tr("action_cancel"), role: .cancel) {}
             } message: {
-                Text("Rename this preset or saved filter.")
+                Text(tr("hint_rename_this_preset_or_saved"))
             }
-            .alert("Delete filter?", isPresented: $linkedImages.showDeleteCatalogPresetAlert) {
-                Button("Delete", role: .destructive) { linkedImages.deletePreset(viewModel: viewModel) }
-                Button("Cancel", role: .cancel) {}
+            .alert(tr("confirm_delete_filter"), isPresented: $linkedImages.showDeleteCatalogPresetAlert) {
+                Button(tr("action_delete"), role: .destructive) { linkedImages.deletePreset(viewModel: viewModel) }
+                Button(tr("action_cancel"), role: .cancel) {}
             } message: {
                 Text(linkedImages.deletePresetConfirmationText(viewModel: viewModel))
             }
@@ -529,14 +529,14 @@ struct StudioDetailView: View {
     private var entityActionSlots: [CatalogChromeSlot] {
         var actions = [CatalogChromeSlot(
             systemImage: isFavorite ? "heart.fill" : "heart",
-            accessibilityLabel: isFavorite ? "Remove favorite" : "Add favorite",
+            accessibilityLabel: isFavorite ? tr("action_remove_favorite") : tr("action_add_favorite"),
             tint: isFavorite ? .red : nil
         ) {
             guard !isUpdatingFavorite else { return }
             toggleFavorite()
         }]
         if appearanceManager.isEditModeEnabled {
-            actions.append(CatalogChromeSlot(systemImage: "pencil", accessibilityLabel: "Edit studio") {
+            actions.append(CatalogChromeSlot(systemImage: "pencil", accessibilityLabel: tr("action_edit_studio")) {
                 HapticManager.light()
                 showingEditStudioSheet = true
             })
@@ -806,7 +806,7 @@ struct StudioDetailView: View {
             items: getStudioDetails(studio).map { DetailHeroItem(label: $0.label, value: $0.value) },
             description: studio.details,
             showsHero: studioHasCustomImage,
-            heroAccessibilityLabel: "Studio logo",
+            heroAccessibilityLabel: tr("studio_logo"),
             onHeroTap: { showingLogoFullscreen = true },
             isExpanded: $isHeaderExpanded,
             placeholderSystemImage: AppTab.studios.icon,
@@ -886,7 +886,7 @@ struct StudioDetailView: View {
         }
 
         if let oCount = counts.oCount, oCount > 0 {
-            list.append((label: "O COUNT", value: "\(oCount)"))
+            list.append((label: tr("o_count").uppercased(), value: "\(oCount)"))
         }
 
         if let rating = s.rating100 {
@@ -932,7 +932,7 @@ struct StudioDetailView: View {
             }
 
             if viewModel.isLoadingStudioGalleries {
-                loadingIndicator(message: "Loading more galleries...")
+                loadingIndicator(message: tr("loading_more_galleries"))
             } else if viewModel.hasMoreStudioGalleries && !viewModel.studioGalleries.isEmpty {
                 Color.clear.frame(height: 1).onAppear { viewModel.loadMoreStudioGalleries(studioId: studio.id) }
             }
@@ -995,7 +995,7 @@ struct StudioDetailView: View {
             if viewModel.isLoadingDetailPerformers {
                 VStack(spacing: 8) {
                     ProgressView()
-                    Text("Loading more performers...").font(.caption).foregroundColor(.secondary)
+                    Text(tr("loading_more_performers")).font(.caption).foregroundColor(.secondary)
                 }.padding(.vertical, 20)
             } else if viewModel.hasMoreDetailPerformers {
                 Color.clear.frame(height: 1).onAppear {
@@ -1077,18 +1077,18 @@ struct EditStudioSheet: View {
     var body: some View {
         NavigationView {
             Form {
-                Section("Identity") {
-                    TextField("Name", text: $name)
+                Section(tr("identity")) {
+                    TextField(tr("name"), text: $name)
                     TextField("URL", text: $url)
                         .textInputAutocapitalization(.never)
                         .keyboardType(.URL)
-                    TextField("Rating (0–100)", text: $ratingText)
+                    TextField(tr("rating_0_100"), text: $ratingText)
                         .keyboardType(.numberPad)
                         .numericKeyboardDoneBar()
                 }
                 .listRowBackground(Color.secondaryAppBackground)
 
-                Section("Description") {
+                Section(tr("description")) {
                     TextEditor(text: $details)
                         .frame(minHeight: 120)
                 }
@@ -1103,7 +1103,7 @@ struct EditStudioSheet: View {
                             if isDeleting {
                                 InlineSpinner(tint: .red)
                             } else {
-                                Label("Delete Studio", systemImage: "trash")
+                                Label(tr("action_delete_studio"), systemImage: "trash")
                                     .foregroundStyle(.red)
                             }
                             Spacer()
@@ -1116,9 +1116,9 @@ struct EditStudioSheet: View {
             }
             .applyAppBackground()
             .scrollContentBackground(.hidden)
-            .stashyModalSheetChrome("Edit Studio", onBack: { dismiss() }) {
+            .stashyModalSheetChrome(tr("action_edit_studio"), onBack: { dismiss() }) {
                 StashyChromeTrailingTextButton(
-                    title: "Save",
+                    title: tr("action_save"),
                     enabled: !name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
                     isBusy: isSaving
                 ) { save() }
@@ -1129,11 +1129,11 @@ struct EditStudioSheet: View {
                 details = studio.details ?? ""
                 ratingText = studio.rating100.map(String.init) ?? ""
             }
-            .alert("Delete Studio", isPresented: $showingDeleteConfirmation) {
-                Button("Cancel", role: .cancel) { }
-                Button("Delete", role: .destructive) { performDelete() }
+            .alert(tr("action_delete_studio"), isPresented: $showingDeleteConfirmation) {
+                Button(tr("action_cancel"), role: .cancel) { }
+                Button(tr("action_delete"), role: .destructive) { performDelete() }
             } message: {
-                Text("Delete '\(studio.name)'? This cannot be undone.")
+                Text(tr("hint_delete_arg_this_cannot_be", studio.name))
             }
         }
     }
@@ -1145,7 +1145,7 @@ struct EditStudioSheet: View {
                 isDeleting = false
                 switch result {
                 case .success:
-                    ToastManager.shared.show("Studio deleted", icon: "trash", style: .success)
+                    ToastManager.shared.show(tr("studio_deleted"), icon: "trash", style: .success)
                     dismiss()
                     // Pop the detail only once the sheet is gone — both in one runloop
                     // leaves the navigation stack inconsistent.
@@ -1184,10 +1184,10 @@ struct EditStudioSheet: View {
                     updated.details = optionalTrimmed(details)
                     updated.rating100 = rating
                     onComplete(updated)
-                    ToastManager.shared.show("Studio updated", icon: "checkmark.circle", style: .success)
+                    ToastManager.shared.show(tr("studio_updated"), icon: "checkmark.circle", style: .success)
                     dismiss()
                 } else {
-                    ToastManager.shared.show("Failed to update studio", icon: "exclamationmark.triangle", style: .error)
+                    ToastManager.shared.show(tr("error_update_studio"), icon: "exclamationmark.triangle", style: .error)
                 }
             }
         }
@@ -1202,7 +1202,7 @@ struct EditStudioSheet: View {
         sceneCount: 25,
         performerCount: 5,
         galleryCount: 10,
-        details: "This is a sample studio description that might span multiple lines.",
+        details: tr("hint_this_is_sample_studio_description"),
         imagePath: nil,
         favorite: false,
         rating100: nil,

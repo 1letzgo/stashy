@@ -1,5 +1,7 @@
 package de.letzgo.stashy.tv
 
+import de.letzgo.stashy.R
+import de.letzgo.stashy.tr
 import de.letzgo.stashy.ui.uniqueItems
 import android.view.KeyEvent as AndroidKeyEvent
 import androidx.compose.foundation.background
@@ -139,7 +141,7 @@ class TvSceneDetailRoute(private val sceneId: String, initial: Scene? = null) : 
             val s = scene
             when {
                 ServerConfigManager.activeConfig?.hasValidConfig != true ->
-                    TvConnectionError(subtitle = "Add a server in Settings.", focus = anchor) { load() }
+                    TvConnectionError(subtitle = tr(R.string.action_add_server_in_settings), focus = anchor) { load() }
                 isLoading && s == null -> Box(Modifier.fillMaxSize().focusRequester(anchor).focusable(), contentAlignment = Alignment.Center) { TvSpinner(pt(72)) }
                 s != null -> {
                     HeroBackground(s)
@@ -158,8 +160,8 @@ class TvSceneDetailRoute(private val sceneId: String, initial: Scene? = null) : 
                 errorMessage != null -> TvConnectionError(subtitle = errorMessage, focus = anchor) { load() }
                 else -> Column(Modifier.align(Alignment.Center), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(pt(24))) {
                     Icon(TvIcons.warning, null, Modifier.size(pt(64)), tint = TvColors.secondary)
-                    Text("Failed to load scene details", style = TvType.title2.copy(fontWeight = FontWeight.Normal), color = TvColors.secondary)
-                    TvButton({ load() }, Modifier.focusRequester(anchor)) { Text("Retry", style = TvType.title3) }
+                    Text(tr(R.string.error_load_scene_details), style = TvType.title2.copy(fontWeight = FontWeight.Normal), color = TvColors.secondary)
+                    TvButton({ load() }, Modifier.focusRequester(anchor)) { Text(tr(R.string.action_retry), style = TvType.title3) }
                 }
             }
         }
@@ -216,10 +218,10 @@ class TvSceneDetailRoute(private val sceneId: String, initial: Scene? = null) : 
             Row(Modifier.padding(top = pt(16)), horizontalArrangement = Arrangement.spacedBy(pt(20)), verticalAlignment = Alignment.CenterVertically) {
                 HeroButton(
                     if (hasStream) TvIcons.play else TvIcons.noStream,
-                    if (hasStream) (if (hasProgress) "Resume" else "Play") else "No Stream",
+                    if (hasStream) (if (hasProgress) tr(R.string.action_resume) else tr(R.string.action_play)) else tr(R.string.empty_stream),
                     Modifier.focusRequester(playFocus).tvFocusMemory(focus, "play"), enabled = hasStream,
                 ) { startPlayback() }
-                if (hasProgress) HeroButton(TvIcons.restart, "Restart", Modifier.tvFocusMemory(focus, "restart")) { startPlayback(0.0) }
+                if (hasProgress) HeroButton(TvIcons.restart, tr(R.string.restart), Modifier.tvFocusMemory(focus, "restart")) { startPlayback(0.0) }
                 Box(Modifier.padding(horizontal = pt(8)).width(pt(3)).height(pt(72)).background(Color.White.copy(alpha = 0.28f)))
                 HeroButton(TvIcons.heartCircle, "${s.oCounter ?: 0}", Modifier.tvFocusMemory(focus, "o")) { addO() }
                 HeroButton(TvIcons.star, TvFormat.ratingLabel(s.rating100), Modifier.tvFocusMemory(focus, "rating")) { ratingOpen = true }
@@ -227,7 +229,7 @@ class TvSceneDetailRoute(private val sceneId: String, initial: Scene? = null) : 
         }
         if (ratingOpen) {
             TvOptionDialog(
-                "Rating", (5 downTo 0).map { TvOption(it, if (it == 0) "No Rating" else "★".repeat(it)) }, TvFormat.stars(s.rating100),
+                tr(R.string.rating), (5 downTo 0).map { TvOption(it, if (it == 0) tr(R.string.empty_rating) else "★".repeat(it)) }, TvFormat.stars(s.rating100),
                 { rate(it) }, { ratingOpen = false },
             )
         }
@@ -255,7 +257,7 @@ class TvSceneDetailRoute(private val sceneId: String, initial: Scene? = null) : 
     @Composable
     private fun MarkersRow(markers: List<SceneMarker>) {
         Column(verticalArrangement = Arrangement.spacedBy(pt(16))) {
-            TvSectionHeading(TvIcons.bookmark, "Markers", markers.size)
+            TvSectionHeading(TvIcons.bookmark, tr(R.string.markers), markers.size)
             LazyRow(Modifier.focusRestorer(), horizontalArrangement = Arrangement.spacedBy(pt(24)), contentPadding = PaddingValues(horizontal = pt(20), vertical = pt(30))) {
                 uniqueItems(markers.sortedBy { it.seconds }, { it.id }) { marker ->
                     var focused by remember { mutableStateOf(false) }
@@ -271,7 +273,7 @@ class TvSceneDetailRoute(private val sceneId: String, initial: Scene? = null) : 
                                 )
                             }
                         }
-                        Text(marker.title?.takeIf { it.isNotBlank() } ?: "Untitled Marker", Modifier.padding(top = pt(8)), style = TvType.callout.copy(fontWeight = FontWeight.Medium), color = Color.White.copy(alpha = 0.7f), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        Text(marker.title?.takeIf { it.isNotBlank() } ?: tr(R.string.untitled_marker), Modifier.padding(top = pt(8)), style = TvType.callout.copy(fontWeight = FontWeight.Medium), color = Color.White.copy(alpha = 0.7f), maxLines = 1, overflow = TextOverflow.Ellipsis)
                     }
                 }
             }
@@ -282,7 +284,7 @@ class TvSceneDetailRoute(private val sceneId: String, initial: Scene? = null) : 
     @Composable
     private fun TagsRow(tags: List<Tag>) {
         Column(verticalArrangement = Arrangement.spacedBy(pt(16))) {
-            TvSectionHeading(TvIcons.tag, "Tags", tags.size)
+            TvSectionHeading(TvIcons.tag, tr(R.string.tags), tags.size)
             LazyRow(Modifier.focusRestorer(), horizontalArrangement = Arrangement.spacedBy(pt(30)), contentPadding = PaddingValues(horizontal = pt(20), vertical = pt(40))) {
                 uniqueItems(tags, { it.id }) { tag ->
                     TvButton({ TvNav.push(TvTagDetailRoute(tag.id, tag.name)) }, Modifier.tvFocusMemory(focus, "t.${tag.id}"), contentPadding = PaddingValues(horizontal = pt(24), vertical = pt(12))) {
@@ -297,7 +299,7 @@ class TvSceneDetailRoute(private val sceneId: String, initial: Scene? = null) : 
     @Composable
     private fun PerformersRow(performers: List<Performer>) {
         Column(verticalArrangement = Arrangement.spacedBy(pt(16))) {
-            TvSectionHeading(TvIcons.person2, "Performers", performers.size)
+            TvSectionHeading(TvIcons.person2, tr(R.string.performers), performers.size)
             LazyRow(Modifier.focusRestorer(), horizontalArrangement = Arrangement.spacedBy(pt(30)), contentPadding = PaddingValues(horizontal = pt(20), vertical = pt(30))) {
                 uniqueItems(performers, { it.id }) { p ->
                     TvCardButton({ TvNav.push(TvPerformerDetailRoute(p.id, p.name)) }, Modifier.tvFocusMemory(focus, "p.${p.id}")) {
@@ -314,7 +316,7 @@ class TvSceneDetailRoute(private val sceneId: String, initial: Scene? = null) : 
     @Composable
     private fun StudioRow(studio: Studio) {
         Column(verticalArrangement = Arrangement.spacedBy(pt(16))) {
-            TvSectionHeading(TvIcons.building, "Studio")
+            TvSectionHeading(TvIcons.building, tr(R.string.studio))
             Box(Modifier.padding(horizontal = pt(20), vertical = pt(20))) {
                 TvCardButton({ TvNav.push(TvStudioDetailRoute(studio.id, studio.name)) }, Modifier.tvFocusMemory(focus, "studio")) {
                     Column(Modifier.width(pt(320))) {

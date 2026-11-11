@@ -32,18 +32,18 @@ private enum SceneLiveSortFieldKind: String, CaseIterable, Identifiable {
 
     var menuLabel: String {
         switch self {
-        case .date: return "Date"
-        case .production_date: return "Production date"
-        case .created_at: return "Created"
-        case .title: return "Title"
-        case .duration: return "Duration"
-        case .last_played_at: return "Last played"
-        case .play_count: return "Play count"
-        case .play_duration: return "Watch time"
-        case .o_counter: return "O Count"
-        case .rating: return "Rating"
-        case .random: return "Random"
-        case .for_you: return "For You"
+        case .date: return tr("date")
+        case .production_date: return tr("production_date")
+        case .created_at: return tr("created")
+        case .title: return tr("title")
+        case .duration: return tr("duration")
+        case .last_played_at: return tr("last_played")
+        case .play_count: return tr("play_count")
+        case .play_duration: return tr("watch_time")
+        case .o_counter: return tr("o_count")
+        case .rating: return tr("rating")
+        case .random: return tr("random")
+        case .for_you: return tr("for_you")
         }
     }
 
@@ -95,7 +95,7 @@ private enum SceneLiveSortPickerValue: Hashable {
     var menuLabel: String {
         switch self {
         case .known(let k): return k.menuLabel
-        case .unmapped(let f): return "Other (\(f))"
+        case .unmapped(let f): return tr("other_arg", f)
         }
     }
 
@@ -130,11 +130,11 @@ enum MarkerLiveSortFieldKind: String, CaseIterable, Identifiable {
 
     var menuLabel: String {
         switch self {
-        case .created_at: return "Created"
-        case .updated_at: return "Updated"
-        case .title: return "Title"
-        case .seconds: return "Time"
-        case .random: return "Random"
+        case .created_at: return tr("created")
+        case .updated_at: return tr("updated")
+        case .title: return tr("title")
+        case .seconds: return tr("time")
+        case .random: return tr("random")
         }
     }
 
@@ -717,20 +717,20 @@ private struct ScenesViewContent: View {
     private var deletePresetConfirmationText: String {
         if let sid = SceneLivePresetTag.parseServerId(liveSheetPresetSelection),
            let f = viewModel.savedFilters[sid] {
-            return "Remove “\(f.name)” from Stash? Other devices will lose this saved filter."
+            return tr("hint_remove_arg_from_stash_other", f.name)
         }
         if let ls = SceneLivePresetTag.parseLocalUUIDString(liveSheetPresetSelection),
            let uuid = UUID(uuidString: ls),
            let p = liveFilterPresets.first(where: { $0.id == uuid }) {
-            return "Remove “\(p.name)” from this device? This cannot be undone."
+            return tr("hint_remove_arg_from_this_device", p.name)
         }
-        return "Remove this filter? This cannot be undone."
+        return tr("hint_remove_this_filter_this_cannot")
     }
 
     private func saveLivePresetOverwrite() {
         let sel = liveSheetPresetSelection
         if let sid = SceneLivePresetTag.parseServerId(sel) {
-            let currentName = viewModel.savedFilters[sid]?.name ?? "Filter"
+            let currentName = viewModel.savedFilters[sid]?.name ?? tr("filter")
             viewModel.saveFullObjectFilter(
                 mode: .scenes,
                 existingId: sid,
@@ -913,7 +913,7 @@ private struct ScenesViewContent: View {
     // Safe sort change function
     /// A group's scenes can also sort by their number in the group.
     private var groupScopeSortFields: [CatalogQuickSortCatalog.Field] {
-        if case .group = scope { return [.init(field: "group_scene_number", label: "Scene No.")] }
+        if case .group = scope { return [.init(field: "group_scene_number", label: tr("scene_no"))] }
         return []
     }
 
@@ -1112,7 +1112,7 @@ private struct ScenesViewContent: View {
     /// Single source for nav bar + slot chrome. The legacy/native branch lives in `stashyCatalogChrome`.
     private var catalogChromeConfig: CatalogChromeConfig {
         return CatalogChromeConfig(
-            title: "Scenes",
+            title: tr("scenes"),
             ownsNavigationBar: !hideTitle,
             visibility: CatalogFloatingChromeState(
                 hasActiveServerConfig: configManager.activeConfig != nil,
@@ -1124,7 +1124,7 @@ private struct ScenesViewContent: View {
             search: hideTitle ? nil : CatalogSearchChrome(
                 text: $searchText,
                 isVisible: $isSearchVisible,
-                prompt: "Search scenes...",
+                prompt: tr("placeholder_search_scenes"),
                 onClear: { performSearch() }
             )
         )
@@ -1140,10 +1140,10 @@ private struct ScenesViewContent: View {
                     // Keep the bar while a sort/filter change refetches, so it does not jump away.
                     VStack(spacing: 0) {
                         if scrollHeader == nil { quickBar }
-                        StandardLoadingView(message: "Loading scenes...")
+                        StandardLoadingView(message: tr("loading_scenes"))
                     }
                 } else if primarySceneListIsEmpty && viewModel.errorMessage != nil {
-                    ConnectionErrorView(title: viewModel.errorMessage ?? "Server not reachable") { performSearch() }
+                    ConnectionErrorView(title: viewModel.errorMessage ?? tr("server_not_reachable")) { performSearch() }
                 } else if primarySceneListIsEmpty {
                     scenesEmptyContent
                 } else if scrollHeader == nil {
@@ -1270,23 +1270,23 @@ private struct ScenesViewContent: View {
                 }
             }
         }
-        .alert("Save as new", isPresented: $showSaveAsPresetAlert) {
-            TextField("Name", text: $presetNameInput)
-            Button("Save") { saveLivePresetAs(name: presetNameInput) }
-            Button("Cancel", role: .cancel) { }
+        .alert(tr("action_save_as_new"), isPresented: $showSaveAsPresetAlert) {
+            TextField(tr("name"), text: $presetNameInput)
+            Button(tr("action_save")) { saveLivePresetAs(name: presetNameInput) }
+            Button(tr("action_cancel"), role: .cancel) { }
         } message: {
-            Text("Creates a new saved scene filter on your Stash server (visible in Stash and other clients).")
+            Text(tr("hint_creates_new_saved_scene_filter"))
         }
-        .alert("Rename Filter", isPresented: $showRenamePresetAlert) {
-            TextField("Name", text: $presetNameInput)
-            Button("Rename") { renameLivePreset(to: presetNameInput) }
-            Button("Cancel", role: .cancel) { }
+        .alert(tr("action_rename_filter"), isPresented: $showRenamePresetAlert) {
+            TextField(tr("name"), text: $presetNameInput)
+            Button(tr("action_rename")) { renameLivePreset(to: presetNameInput) }
+            Button(tr("action_cancel"), role: .cancel) { }
         } message: {
-            Text("Renames the selected Stash saved filter or on-device filter.")
+            Text(tr("hint_renames_selected_stash_saved_filter"))
         }
-        .alert("Delete Filter", isPresented: $showDeletePresetAlert) {
-            Button("Delete", role: .destructive) { deleteLivePreset() }
-            Button("Cancel", role: .cancel) { }
+        .alert(tr("action_delete_filter"), isPresented: $showDeletePresetAlert) {
+            Button(tr("action_delete"), role: .destructive) { deleteLivePreset() }
+            Button(tr("action_cancel"), role: .cancel) { }
         } message: {
             Text(deletePresetConfirmationText)
         }
@@ -1458,8 +1458,8 @@ private struct ScenesViewContent: View {
     private var emptyStateView: some View {
         SharedEmptyStateView(
             icon: "film",
-            title: "No scenes found",
-            buttonText: "Load Scenes",
+            title: tr("empty_scenes_found"),
+            buttonText: tr("action_load_scenes"),
             onRetry: { performSearch() }
         )
     }
@@ -1525,7 +1525,7 @@ private struct ScenesViewContent: View {
                     .environment(\.stashyDismiss, StashyDismissAction { columnScene = nil })
                     .environment(\.stashySceneDetailInColumn, true)
             } else {
-                ContentUnavailableView("Select a scene", systemImage: "film")
+                ContentUnavailableView(tr("action_select_scene"), systemImage: "film")
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -1801,12 +1801,12 @@ struct SceneLiveFilterSheet: View {
                 VStack(alignment: .leading, spacing: 16) {
                     CatalogNameRegexSearchCard(document: criteriaDocument, onApply: onApply)
                     HStack(alignment: .center, spacing: 12) {
-                        Text("Filter")
+                        Text(tr("filter"))
                             .font(.subheadline.weight(.semibold))
                             .foregroundColor(.secondary)
                             .frame(width: Self.labelColumnWidth, alignment: .leading)
-                        Picker("Filter", selection: $selectedPresetId) {
-                            Text("None").tag("")
+                        Picker(tr("filter"), selection: $selectedPresetId) {
+                            Text(tr("none")).tag("")
                             if !serverSceneFilters.isEmpty {
                                 Section {
                                     ForEach(serverSceneFilters) { f in
@@ -1832,7 +1832,7 @@ struct SceneLiveFilterSheet: View {
                         }
                         .pickerStyle(.menu)
                         .labelsHidden()
-                        .accessibilityLabel("Filter")
+                        .accessibilityLabel(tr("filter"))
                         .tint(appearance.tintColor)
                         .frame(maxWidth: .infinity, alignment: .trailing)
                     }
@@ -1879,7 +1879,7 @@ struct SceneLiveFilterSheet: View {
         let orderControlsDisabled = randomMode
 
         return HStack(alignment: .center, spacing: 12) {
-            Text("Sort")
+            Text(tr("action_sort"))
                 .font(.subheadline.weight(.semibold))
                 .foregroundColor(.secondary)
                 // Gives way to a long sort name instead of widening the sheet.
@@ -1887,17 +1887,17 @@ struct SceneLiveFilterSheet: View {
                 .layoutPriority(1)
 
             HStack(spacing: 6) {
-                filterChip("Asc", isActive: ascending && !orderControlsDisabled) {
+                filterChip(tr("asc"), isActive: ascending && !orderControlsDisabled) {
                     guard let k = pickerValue.knownKind, !orderControlsDisabled else { return }
                     onMarkerSortChange(k.markerSortOption(ascending: true))
                 }
-                .accessibilityLabel("Ascending")
+                .accessibilityLabel(tr("ascending"))
 
-                filterChip("Desc", isActive: !ascending && !orderControlsDisabled) {
+                filterChip(tr("desc"), isActive: !ascending && !orderControlsDisabled) {
                     guard let k = pickerValue.knownKind, !orderControlsDisabled else { return }
                     onMarkerSortChange(k.markerSortOption(ascending: false))
                 }
-                .accessibilityLabel("Descending")
+                .accessibilityLabel(tr("descending"))
             }
             .fixedSize(horizontal: true, vertical: false)
             .opacity(orderControlsDisabled ? 0.4 : 1)
@@ -1905,7 +1905,7 @@ struct SceneLiveFilterSheet: View {
 
             Spacer(minLength: 8)
 
-            Picker("Sort type", selection: Binding(
+            Picker(tr("action_sort_type"), selection: Binding(
                 get: { MarkerLiveSortPickerValue.from(markerSortOption) },
                 set: { newVal in
                     guard case .known(let newKind) = newVal else { return }
@@ -1924,7 +1924,7 @@ struct SceneLiveFilterSheet: View {
             }
             .pickerStyle(.menu)
             .labelsHidden()
-            .accessibilityLabel("Sort field")
+            .accessibilityLabel(tr("action_sort_field"))
             .tint(appearance.tintColor)
             // One line: a wrapped label ("Image count") stretched the card.
             .fixedSize()
@@ -1940,7 +1940,7 @@ struct SceneLiveFilterSheet: View {
         let orderControlsDisabled = randomMode || unmappedMode
 
         return HStack(alignment: .center, spacing: 12) {
-            Text("Sort")
+            Text(tr("action_sort"))
                 .font(.subheadline.weight(.semibold))
                 .foregroundColor(.secondary)
                 // Gives way to a long sort name instead of widening the sheet.
@@ -1948,17 +1948,17 @@ struct SceneLiveFilterSheet: View {
                 .layoutPriority(1)
 
             HStack(spacing: 6) {
-                filterChip("Asc", isActive: ascending && !orderControlsDisabled) {
+                filterChip(tr("asc"), isActive: ascending && !orderControlsDisabled) {
                     guard let k = pickerValue.knownKind, !orderControlsDisabled else { return }
                     onSortChange(k.sceneSortOption(ascending: true))
                 }
-                .accessibilityLabel("Ascending")
+                .accessibilityLabel(tr("ascending"))
 
-                filterChip("Desc", isActive: !ascending && !orderControlsDisabled) {
+                filterChip(tr("desc"), isActive: !ascending && !orderControlsDisabled) {
                     guard let k = pickerValue.knownKind, !orderControlsDisabled else { return }
                     onSortChange(k.sceneSortOption(ascending: false))
                 }
-                .accessibilityLabel("Descending")
+                .accessibilityLabel(tr("descending"))
             }
             .fixedSize(horizontal: true, vertical: false)
             .opacity(orderControlsDisabled ? 0.4 : 1)
@@ -1966,7 +1966,7 @@ struct SceneLiveFilterSheet: View {
 
             Spacer(minLength: 8)
 
-            Picker("Sort type", selection: Binding(
+            Picker(tr("action_sort_type"), selection: Binding(
                 get: { SceneLiveSortPickerValue.from(sortOption) },
                 set: { newVal in
                     switch newVal {
@@ -1984,7 +1984,7 @@ struct SceneLiveFilterSheet: View {
                 }
             )) {
                 if case .unmapped(let f) = pickerValue {
-                    Text("Other (\(f))").tag(SceneLiveSortPickerValue.unmapped(sortField: f))
+                    Text(tr("other_arg", f)).tag(SceneLiveSortPickerValue.unmapped(sortField: f))
                 }
                 ForEach(SceneLiveSortFieldKind.allCases.filter { ($0.isOffered && ($0 != .for_you || offersForYou)) || pickerValue == .known($0) }) { k in
                     Text(k.menuLabel).tag(SceneLiveSortPickerValue.known(k))
@@ -1992,7 +1992,7 @@ struct SceneLiveFilterSheet: View {
             }
             .pickerStyle(.menu)
             .labelsHidden()
-            .accessibilityLabel("Sort field")
+            .accessibilityLabel(tr("action_sort_field"))
             .tint(appearance.tintColor)
             // One line: a wrapped label ("Image count") stretched the card.
             .fixedSize()

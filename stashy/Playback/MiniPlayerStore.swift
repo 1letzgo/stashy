@@ -336,7 +336,7 @@ final class MiniPlayerStore: ObservableObject {
             nowPlayingScene = first
             showsNowPlaying = true
         } else {
-            ToastManager.shared.show("Watchlist is empty", icon: "text.badge.plus", style: .info)
+            ToastManager.shared.show(tr("watchlist_is_empty"), icon: "text.badge.plus", style: .info)
         }
     }
 
@@ -762,7 +762,7 @@ struct SceneMarkerStrip: View {
                                     .padding(2)
                             }
                             .clipShape(RoundedRectangle(cornerRadius: 4))
-                            Text(marker.title ?? "Marker at \(Self.time(marker.seconds))")
+                            Text(marker.title ?? tr("marker_at_arg", Self.time(marker.seconds)))
                                 .font(.system(size: 11, weight: .medium))
                                 .lineLimit(1)
                                 .frame(width: 80, alignment: .leading)
@@ -808,7 +808,7 @@ struct WatchlistSceneRow: View {
                 }
             }
             VStack(alignment: .leading, spacing: 2) {
-                Text(scene.title ?? "Scene")
+                Text(scene.title ?? tr("scene"))
                     .font(.system(size: 14, weight: .semibold))
                     .foregroundColor(isCurrent ? appearance.tintColor : .primary)
                     .lineLimit(2)
@@ -892,7 +892,7 @@ private struct MiniPlayerBarContent: View {
                 .clipShape(RoundedRectangle(cornerRadius: 6))
                 .allowsHitTesting(false)
             VStack(alignment: .leading, spacing: 1) {
-                Text(session.scene.title ?? "Scene")
+                Text(session.scene.title ?? tr("scene"))
                     .font(.system(size: 14, weight: .semibold))
                     .lineLimit(1)
                 if !subtitle.isEmpty {
@@ -913,7 +913,7 @@ private struct MiniPlayerBarContent: View {
                     .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
-            .accessibilityLabel(isPlaying ? "Pause" : "Play")
+            .accessibilityLabel(isPlaying ? tr("action_pause") : tr("action_play"))
             Button {
                 HapticManager.light()
                 MiniPlayerStore.shared.close()
@@ -924,7 +924,7 @@ private struct MiniPlayerBarContent: View {
                     .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
-            .accessibilityLabel("Close mini player")
+            .accessibilityLabel(tr("action_close_mini_player"))
         }
         .padding(.leading, 8)
         .padding(.trailing, 6)
@@ -956,7 +956,7 @@ private struct MiniPlayerBarContent: View {
         )
         .accessibilityElement(children: .contain)
         .accessibilityAddTraits(.isButton)
-        .accessibilityHint("Opens the scene")
+        .accessibilityHint(tr("opens_scene"))
     }
 }
 /// The bar's 2 pt progress line, refreshed once a second from the engine clock.
@@ -1031,7 +1031,7 @@ private struct NowPlayingContent: View {
 
     private static func minimizeSlots(_ action: @escaping () -> Void) -> [CatalogChromeSlot] {
         #if os(macOS)
-        [CatalogChromeSlot(systemImage: "chevron.down", accessibilityLabel: "Minimize", action: action)]
+        [CatalogChromeSlot(systemImage: "chevron.down", accessibilityLabel: tr("minimize"), action: action)]
         #else
         []
         #endif
@@ -1079,11 +1079,11 @@ private struct NowPlayingContent: View {
                         // Sorting is for the watchlist only.
                         .moveDisabled(true)
                 } header: {
-                    sectionHeader("Now Playing") { EmptyView() }
+                    sectionHeader(tr("now_playing")) { EmptyView() }
                 }
                 Section {
                     if watchlist.scenes.isEmpty {
-                        Text("Add scenes with + on a playing scene or the watchlist button on a scene page. They play here one after another.")
+                        Text(tr("hint_add_scenes_with_plus_on"))
                             .font(.footnote)
                             .foregroundColor(.secondary)
                             .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16))
@@ -1100,7 +1100,7 @@ private struct NowPlayingContent: View {
                                         HapticManager.light()
                                         watchlist.remove(entry.id)
                                     } label: {
-                                        Label("Remove", systemImage: "trash")
+                                        Label(tr("action_remove"), systemImage: "trash")
                                     }
                                 }
                                 .contextMenu {
@@ -1108,36 +1108,36 @@ private struct NowPlayingContent: View {
                                         Button {
                                             watchlist.moveAfter(entry.id, currentId: scene.id)
                                         } label: {
-                                            Label("Play next", systemImage: "text.line.first.and.arrowtriangle.forward")
+                                            Label(tr("action_play_next"), systemImage: "text.line.first.and.arrowtriangle.forward")
                                         }
                                     }
                                     if watchlist.scenes.first?.id != entry.id {
                                         Button {
                                             watchlist.shift(entry.id, by: -1)
                                         } label: {
-                                            Label("Move up", systemImage: "arrow.up")
+                                            Label(tr("action_move_up"), systemImage: "arrow.up")
                                         }
                                     }
                                     if watchlist.scenes.last?.id != entry.id {
                                         Button {
                                             watchlist.shift(entry.id, by: 1)
                                         } label: {
-                                            Label("Move down", systemImage: "arrow.down")
+                                            Label(tr("action_move_down"), systemImage: "arrow.down")
                                         }
                                     }
                                     Button(role: .destructive) {
                                         watchlist.remove(entry.id)
                                     } label: {
-                                        Label("Remove from watchlist", systemImage: "trash")
+                                        Label(tr("action_remove_from_watchlist"), systemImage: "trash")
                                     }
                                 }
                         }
                         .onMove { watchlist.move(fromOffsets: $0, toOffset: $1) }
                     }
                 } header: {
-                    sectionHeader("Watchlist") {
+                    sectionHeader(tr("watchlist")) {
                         if !watchlist.scenes.isEmpty {
-                            Button("Clear", role: .destructive) { confirmReset = true }
+                            Button(tr("action_clear"), role: .destructive) { confirmReset = true }
                                 .font(.subheadline.weight(.semibold))
                                 .foregroundColor(.red)
                                 .padding(.trailing, 14)
@@ -1160,20 +1160,20 @@ private struct NowPlayingContent: View {
         .hideSystemNavigationBarForCustomChrome()
         .stashyCustomChromeInset(spacing: 0) {
             StashyDetailTopBar(
-                backTitle: "Close",
+                backTitle: tr("action_close"),
                 backIcon: "xmark",
-                trailingAction: ("Details", "info.circle", { player.openSceneDetails() }),
+                trailingAction: (tr("details"), "info.circle", { player.openSceneDetails() }),
                 // A macOS sheet has no swipe down: it keeps a Minimize button.
                 trailingSlots: Self.minimizeSlots { dismiss() },
                 onBack: { player.closeNowPlaying() }
             )
         }
         }
-        .alert("Clear watchlist?", isPresented: $confirmReset) {
-            Button("Clear", role: .destructive) { watchlist.clear() }
-            Button("Cancel", role: .cancel) {}
+        .alert(tr("confirm_clear_watchlist"), isPresented: $confirmReset) {
+            Button(tr("action_clear"), role: .destructive) { watchlist.clear() }
+            Button(tr("action_cancel"), role: .cancel) {}
         } message: {
-            Text("All scenes are removed from the watchlist. What plays keeps playing.")
+            Text(tr("hint_all_scenes_are_removed_from"))
         }
         .onAppear {
             loadDetailsIfNeeded()
@@ -1215,10 +1215,10 @@ private struct NowPlayingContent: View {
             creditLinks
             Spacer(minLength: 4)
             if let previous = player.previousScene(before: scene.id) {
-                iconButton("backward.end.fill", label: "Previous") { player.showNowPlaying(previous) }
+                iconButton("backward.end.fill", label: tr("previous")) { player.showNowPlaying(previous) }
             }
             if let next = player.nextScene(after: scene.id) {
-                iconButton("forward.end.fill", label: "Next") { player.showNowPlaying(next) }
+                iconButton("forward.end.fill", label: tr("next")) { player.showNowPlaying(next) }
             }
         }
     }
@@ -1261,7 +1261,7 @@ private struct NowPlayingContent: View {
             .clipShape(Capsule())
         }
         .buttonStyle(.plain)
-        .accessibilityHint("Opens the page")
+        .accessibilityHint(tr("opens_page"))
     }
 
     /// Closes the sheet first; navigating under a presented sheet does not show.
@@ -1272,7 +1272,7 @@ private struct NowPlayingContent: View {
     }
 
     private var sortToggle: some View {
-        Button(sortMode.isEditing ? "Done" : "Sort") {
+        Button(sortMode.isEditing ? tr("action_done") : tr("action_sort")) {
             withAnimation { sortMode = sortMode.isEditing ? .inactive : .active }
         }
         .font(.subheadline.weight(.semibold))
@@ -1313,7 +1313,7 @@ private struct NowPlayingContent: View {
                         .contentShape(Rectangle())
                 }
                 .buttonStyle(.borderless)
-                .accessibilityLabel("Add to watchlist")
+                .accessibilityLabel(tr("action_add_to_watchlist"))
             }
         }
     }
@@ -1345,7 +1345,7 @@ private struct NowPlayingContent: View {
                     }
                 }
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(scene.title ?? "Scene")
+                    Text(scene.title ?? tr("scene"))
                         .font(.system(size: 14, weight: .semibold))
                         .foregroundColor(isCurrent ? appearance.tintColor : .primary)
                         .lineLimit(2)

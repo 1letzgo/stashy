@@ -1,5 +1,7 @@
 package de.letzgo.stashy.ui.tools.magazine
 
+import de.letzgo.stashy.R
+import de.letzgo.stashy.tr
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.combinedClickable
@@ -114,7 +116,7 @@ private fun MagazineCoverCard(gallery: Gallery) {
             }
         }
         DropdownMenu(menuOpen, { menuOpen = false }, containerColor = Theme.palette.secondaryBackground) {
-            OverflowItem("Reset position", SF.counterclockwise, { menuOpen = false }) {
+            OverflowItem(tr(R.string.action_reset_position), SF.counterclockwise, { menuOpen = false }) {
                 MagazineReadingStore.resetPosition(gallery.id)
             }
         }

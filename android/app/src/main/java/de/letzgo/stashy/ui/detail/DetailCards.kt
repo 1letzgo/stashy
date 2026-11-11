@@ -1,5 +1,7 @@
 package de.letzgo.stashy.ui.detail
 
+import de.letzgo.stashy.R
+import de.letzgo.stashy.tr
 import de.letzgo.stashy.ui.scaledMaxLines
 import de.letzgo.stashy.ui.scaledIconSize
 import androidx.compose.foundation.background
@@ -241,7 +243,11 @@ internal fun DetailGroupCard(group: StashGroup, modifier: Modifier = Modifier, b
 
 /** iOS: `ImageThumbnailCard` — thumbnail, play badge for clips, studio/date, name + extension. */
 @Composable
-internal fun DetailImageCard(image: StashImage, modifier: Modifier = Modifier, aspect: Float = 1f, onClick: (() -> Unit)? = null) {
+/** [prefersTitle]: inside a gallery the title comes first, the performer only for an untitled image. */
+internal fun DetailImageCard(image: StashImage, modifier: Modifier = Modifier, aspect: Float = 1f, prefersTitle: Boolean = false, onClick: (() -> Unit)? = null) {
+    val title = image.title?.takeIf { it.isNotEmpty() }
+    val performer = image.performers?.firstOrNull()?.name
+    val label = (if (prefersTitle) title ?: performer else performer ?: title) ?: tr(R.string.image)
     CardBox(modifier, aspect, onClick) {
         CardImage(image.thumbnailURL, SF.photo)
         if (image.isVideo) {
@@ -257,7 +263,7 @@ internal fun DetailImageCard(image: StashImage, modifier: Modifier = Modifier, a
         BottomGradient(0.4f)
         Row(Modifier.align(Alignment.BottomStart).fillMaxWidth().padding(12.dp), verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             Text(
-                image.performers?.firstOrNull()?.name ?: image.title ?: "Image", Modifier.weight(1f),
+                label, Modifier.weight(1f),
                 style = NativeType.titleMedium, color = Color.White, maxLines = 2, overflow = TextOverflow.Ellipsis,
             )
             DetailFormatting.fileExtension(image)?.let { NativeMediaLabel(it) }

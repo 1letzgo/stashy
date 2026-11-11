@@ -1,5 +1,7 @@
 package de.letzgo.stashy.ui.catalog
 
+import de.letzgo.stashy.R
+import de.letzgo.stashy.tr
 import de.letzgo.stashy.ui.bottomBarContentPadding
 import de.letzgo.stashy.ui.uniqueItemsIndexed
 import androidx.compose.foundation.background
@@ -165,12 +167,12 @@ private fun SelectionActions(sel: CatalogSelectionChrome) {
     val p = Theme.palette
     Row(verticalAlignment = Alignment.CenterVertically) {
         Text("${sel.count} selected", style = NativeType.labelLarge, color = p.secondaryText, maxLines = 1, modifier = Modifier.padding(horizontal = 4.dp))
-        de.letzgo.stashy.ui.TopBarAction(Icons.Filled.SelectAll, "Select all", tint = p.text, enabled = !sel.isDeleting, onClick = sel.onSelectAll)
+        de.letzgo.stashy.ui.TopBarAction(Icons.Filled.SelectAll, tr(R.string.action_select_all), tint = p.text, enabled = !sel.isDeleting, onClick = sel.onSelectAll)
         de.letzgo.stashy.ui.TopBarAction(
-            SF.trash, "Delete", tint = if (sel.count > 0) de.letzgo.stashy.ui.StashyColors.systemRed else p.tertiaryText,
+            SF.trash, tr(R.string.action_delete), tint = if (sel.count > 0) de.letzgo.stashy.ui.StashyColors.systemRed else p.tertiaryText,
             enabled = sel.count > 0, busy = sel.isDeleting, onClick = sel.onDelete,
         )
-        androidx.compose.material3.TextButton(onClick = sel.onDone) { Text("Done", style = NativeType.labelLarge, color = de.letzgo.stashy.ui.textAccent()) }
+        androidx.compose.material3.TextButton(onClick = sel.onDone) { Text(tr(R.string.action_done), style = NativeType.labelLarge, color = de.letzgo.stashy.ui.textAccent()) }
     }
 }
 
@@ -205,7 +207,7 @@ fun SearchClearChip(text: String, onClear: () -> Unit, modifier: Modifier = Modi
         selected = true, onClick = onClear, modifier = modifier,
         label = { Text(text, style = NativeType.labelLarge, maxLines = 1) },
         leadingIcon = { Icon(SF.magnifyingglass, null, Modifier.size(18.dp)) },
-        trailingIcon = { Icon(SF.xmark, "Clear search", Modifier.size(18.dp)) },
+        trailingIcon = { Icon(SF.xmark, tr(R.string.action_clear_search), Modifier.size(18.dp)) },
         colors = InputChipDefaults.inputChipColors(
             selectedContainerColor = p.secondaryBackground, selectedLabelColor = p.text,
             selectedLeadingIconColor = p.secondaryText, selectedTrailingIconColor = p.text,
@@ -285,13 +287,13 @@ fun <T> CatalogScaffold(
     }
     Box(Modifier.fillMaxSize().background(p.background)) {
         when {
-            !hasServer -> StatusPlaceholder(SF.server, "Server not reachable", "Retry Connection", { controller.refresh() })
+            !hasServer -> StatusPlaceholder(SF.server, tr(R.string.server_not_reachable), tr(R.string.action_retry_connection), { controller.refresh() })
             // iOS: the quick bar stays above the loading state (a sort / filter change refetches)
             // and above the empty state while filters are active, so it never jumps away.
             list.items.isEmpty() && (list.isLoading || !list.loadedOnce) ->
                 if (showsQuickBar) QuickBarAbove(controller, topPadding) { StandardLoading(texts.loading) }
                 else StandardLoading(texts.loading)
-            list.items.isEmpty() && list.error != null -> StatusPlaceholder(SF.server, "Server not reachable", "Retry Connection", { controller.refresh() })
+            list.items.isEmpty() && list.error != null -> StatusPlaceholder(SF.server, tr(R.string.server_not_reachable), tr(R.string.action_retry_connection), { controller.refresh() })
             list.items.isEmpty() ->
                 if (showsQuickBar && controller.isFilterActive) QuickBarAbove(controller, topPadding) {
                     StatusPlaceholder(texts.emptyIcon, texts.emptyTitle, texts.emptyButton, { controller.refresh() })
@@ -359,4 +361,4 @@ private fun LazyGridScope.loadingFooter(isLoading: Boolean) {
  * sheet from the quick bar's pinned settings button instead.
  */
 fun filterSortSlot(controller: CatalogController<*>) =
-    CatalogChromeSlot(SF.sliderHorizontal3, controller.isFilterActive, "Settings") { controller.isSheetPresented = true }
+    CatalogChromeSlot(SF.sliderHorizontal3, controller.isFilterActive, tr(R.string.settings)) { controller.isSheetPresented = true }

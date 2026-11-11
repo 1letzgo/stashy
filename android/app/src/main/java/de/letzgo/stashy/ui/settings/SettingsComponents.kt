@@ -1,5 +1,7 @@
 package de.letzgo.stashy.ui.settings
 
+import de.letzgo.stashy.R
+import de.letzgo.stashy.tr
 import de.letzgo.stashy.ui.bottomBarContentPadding
 import de.letzgo.stashy.ui.scaledMaxLines
 import androidx.compose.foundation.background
@@ -172,7 +174,7 @@ private val LocalCardRowTitle = compositionLocalOf<String?> { null }
  * settings. [options] are (id, name). Material dropdown with radio items; long lists open a dialog.
  */
 @Composable
-fun MenuValue(options: List<Pair<String, String>>, currentId: String?, placeholder: String = "None", onSelect: (String) -> Unit) {
+fun MenuValue(options: List<Pair<String, String>>, currentId: String?, placeholder: String = tr(R.string.none), onSelect: (String) -> Unit) {
     val selected = options.firstOrNull { it.first == currentId }
     NativeDropdownValue(
         options, selected, { it.second },
@@ -241,7 +243,7 @@ fun PrimaryButton(title: String, modifier: Modifier = Modifier, enabled: Boolean
 /** Information alert (title, message, OK) — Material AlertDialog. */
 @Composable
 fun SimpleAlert(title: String, message: String, onDismiss: () -> Unit) =
-    NativeConfirmDialog(title, message, onDismiss, confirmLabel = "OK", dismissLabel = null)
+    NativeConfirmDialog(title, message, onDismiss, confirmLabel = tr(R.string.ok), dismissLabel = null)
 
 /** Confirmation with a destructive action — Material AlertDialog, confirm in the error colour. */
 @Composable

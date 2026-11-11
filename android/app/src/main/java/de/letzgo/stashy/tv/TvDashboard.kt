@@ -1,5 +1,7 @@
 package de.letzgo.stashy.tv
 
+import de.letzgo.stashy.R
+import de.letzgo.stashy.tr
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -63,11 +65,11 @@ class TvDashboardModel {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     val focus = TvFocusMemory()
     val rows = listOf(
-        TvDashboardRow("Continue Watching", HomeRowType.LastPlayed, "lastPlayedAtDesc", large = true),
-        TvDashboardRow("New Releases", HomeRowType.Newest3Min, "dateDesc"),
-        TvDashboardRow("Recently Added", HomeRowType.LastAdded3Min, "createdAtDesc"),
-        TvDashboardRow("Top Rated", HomeRowType.TopRating3Min, "ratingDesc"),
-        TvDashboardRow("Random Picks", HomeRowType.Random, "random"),
+        TvDashboardRow(tr(R.string.continue_watching), HomeRowType.LastPlayed, "lastPlayedAtDesc", large = true),
+        TvDashboardRow(tr(R.string.new_releases), HomeRowType.Newest3Min, "dateDesc"),
+        TvDashboardRow(tr(R.string.recently_added), HomeRowType.LastAdded3Min, "createdAtDesc"),
+        TvDashboardRow(tr(R.string.top_rated), HomeRowType.TopRating3Min, "ratingDesc"),
+        TvDashboardRow(tr(R.string.random_picks), HomeRowType.Random, "random"),
     )
     private val continueWatching get() = rows[0]
     private val topRated get() = rows[3]
@@ -179,7 +181,7 @@ fun TvDashboard(model: TvDashboardModel) {
     val firstRow = model.rows.firstOrNull { it.scenes.isNotEmpty() }
     Box(Modifier.fillMaxSize().background(TvColors.background)) {
         if (!model.hasValidConfig) {
-            TvConnectionError(subtitle = "Add a server in Settings.") { model.load() }
+            TvConnectionError(subtitle = tr(R.string.action_add_server_in_settings)) { model.load() }
             return@Box
         }
         LazyColumn(
@@ -193,7 +195,7 @@ fun TvDashboard(model: TvDashboardModel) {
             val channels = model.channels
             if (channels.isNotEmpty()) item(key = "channels") {
                 Column {
-                    RowTitle("Channels")
+                    RowTitle(tr(R.string.channels))
                     LazyRow(Modifier.focusRestorer(), horizontalArrangement = Arrangement.spacedBy(pt(30)), contentPadding = PaddingValues(horizontal = pt(50), vertical = pt(20))) {
                         items(channels, key = { it.id }) { channel ->
                             Column(Modifier.width(pt(400))) {
@@ -209,7 +211,7 @@ fun TvDashboard(model: TvDashboardModel) {
                 if (row.scenes.isNotEmpty()) item(key = row.type.name) { SceneRow(model, row, firstFocus.takeIf { firstRow === row }) }
             }
             if (!model.isAnyLoading && model.isEmpty) item(key = "empty") {
-                TvEmpty(TvIcons.stackFilm, "No scenes to show yet", buttonLabel = "Reload") { model.load() }
+                TvEmpty(TvIcons.stackFilm, tr(R.string.empty_scenes_to_show_yet), buttonLabel = tr(R.string.action_reload)) { model.load() }
             }
         }
     }

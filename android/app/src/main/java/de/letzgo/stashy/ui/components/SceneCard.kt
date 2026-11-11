@@ -1,5 +1,7 @@
 package de.letzgo.stashy.ui.components
 
+import de.letzgo.stashy.R
+import de.letzgo.stashy.tr
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -100,7 +102,7 @@ fun SceneCard(
 @Composable
 fun DownloadedMark(size: Int = 20) {
     Box(Modifier.size(size.dp).clip(CircleShape).background(StashyColors.systemGreen), contentAlignment = Alignment.Center) {
-        Icon(SF.checkmarkCircleFill, "Downloaded", tint = Color.White, modifier = Modifier.size((size * 0.7f).dp))
+        Icon(SF.checkmarkCircleFill, tr(R.string.downloaded), tint = Color.White, modifier = Modifier.size((size * 0.7f).dp))
     }
 }
 

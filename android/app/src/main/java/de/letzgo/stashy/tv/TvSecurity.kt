@@ -1,5 +1,7 @@
 package de.letzgo.stashy.tv
 
+import de.letzgo.stashy.R
+import de.letzgo.stashy.tr
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.foundation.background
@@ -98,17 +100,17 @@ fun TvPasscodeEntry() {
     var pin by remember { mutableStateOf("") }
     var error by remember { mutableStateOf<String?>(null) }
     var shake by remember { mutableStateOf(false) }
-    BackHandler { error = "Enter PIN to unlock"; shake = !shake }
+    BackHandler { error = tr(R.string.enter_pin_to_unlock); shake = !shake }
     LaunchedEffect(pin) {
         if (pin.length != 4) return@LaunchedEffect
         if (TvSecurity.verify(pin)) TvSecurity.unlock()
         else {
-            error = "Wrong PIN"; shake = !shake
+            error = tr(R.string.wrong_pin); shake = !shake
             delay(350)
             pin = ""; error = null
         }
     }
-    PinScreen("Enter PIN", pin.length, error, shake, onDigit = { if (pin.length < 4) pin += it }, onDelete = { pin = pin.dropLast(1) }, onCancel = null)
+    PinScreen(tr(R.string.enter_pin), pin.length, error, shake, onDigit = { if (pin.length < 4) pin += it }, onDelete = { pin = pin.dropLast(1) }, onCancel = null)
 }
 
 /** iOS: `TVPasscodeSetupView` — set, then confirm; Back cancels. */
@@ -125,13 +127,13 @@ fun TvPasscodeSetup(onDone: () -> Unit) {
         if (step != 2 || confirm.length != 4) return@LaunchedEffect
         if (pin == confirm) { TvSecurity.setPin(pin); onDone() }
         else {
-            error = "PINs do not match"; shake = !shake
+            error = tr(R.string.pins_do_not_match); shake = !shake
             delay(500)
             pin = ""; confirm = ""; step = 1; error = null
         }
     }
     PinScreen(
-        if (step == 1) "Set PIN" else "Confirm PIN", if (step == 1) pin.length else confirm.length, error, shake,
+        if (step == 1) tr(R.string.action_set_pin) else tr(R.string.confirm_pin), if (step == 1) pin.length else confirm.length, error, shake,
         onDigit = { d -> if (step == 1) { if (pin.length < 4) pin += d } else if (confirm.length < 4) confirm += d },
         onDelete = { if (step == 1) pin = pin.dropLast(1) else confirm = confirm.dropLast(1) },
         onCancel = onDone,
@@ -163,10 +165,10 @@ private fun PinScreen(title: String, count: Int, error: String?, shake: Boolean,
                 }
             }
             Row(horizontalArrangement = Arrangement.spacedBy(pt(18))) {
-                if (onCancel != null) PinKey("Cancel", small = true, onClick = onCancel) else Spacer(Modifier.width(pt(140)))
+                if (onCancel != null) PinKey(tr(R.string.action_cancel), small = true, onClick = onCancel) else Spacer(Modifier.width(pt(140)))
                 PinKey("0") { onDigit("0") }
                 TvButton(onDelete, Modifier.width(pt(140)).height(pt(80)), contentPadding = PaddingValues(0.dp)) {
-                    Box(Modifier.width(pt(140)), contentAlignment = Alignment.Center) { Icon(TvIcons.delete, "Delete", Modifier.size(pt(36))) }
+                    Box(Modifier.width(pt(140)), contentAlignment = Alignment.Center) { Icon(TvIcons.delete, tr(R.string.action_delete), Modifier.size(pt(36))) }
                 }
             }
         }

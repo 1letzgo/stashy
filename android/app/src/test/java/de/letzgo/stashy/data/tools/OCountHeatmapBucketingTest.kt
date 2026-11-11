@@ -143,7 +143,7 @@ class OCountHeatmapBucketingTest {
 
         val last = h.cell(5, 4)!!
         assertEquals("2026-10-31", last.id)
-        assertEquals("Oct 31, 2026, 1 O-Count", last.accessibilityLabel)
+        assertEquals("Oct 31, 2026, 1 O Count", last.accessibilityLabel)
         assertEquals("2026-11-01", h.cell(6, 4)!!.id)
     }
 

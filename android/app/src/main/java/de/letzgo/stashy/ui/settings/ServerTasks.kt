@@ -1,5 +1,7 @@
 package de.letzgo.stashy.ui.settings
 
+import de.letzgo.stashy.R
+import de.letzgo.stashy.tr
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -56,28 +58,28 @@ import kotlinx.coroutines.launch
 
 /** iOS `ToolsServerView.CleanupKind`. */
 private enum class CleanupKind(val title: String, val noun: String, val mutation: String) {
-    Tags("Remove Unused Tags", "tags", "tagsDestroy"),
-    Performers("Remove Unused Performers", "performers", "performersDestroy"),
-    Studios("Remove Unused Studios", "studios", "studiosDestroy"),
+    Tags(tr(R.string.action_remove_unused_tags), "tags", "tagsDestroy"),
+    Performers(tr(R.string.action_remove_unused_performers), "performers", "performersDestroy"),
+    Studios(tr(R.string.action_remove_unused_studios), "studios", "studiosDestroy"),
 }
 
 /** One Generate task: label, icon, `GenerateMetadataInput` flag, alert title. */
 private data class GenerateTask(val label: String, val icon: ImageVector, val flag: String, val alertTitle: String = label)
 
 private val generateTasks = listOf(
-    GenerateTask("Scene covers", SFS.photoFill, "covers"),
-    GenerateTask("Video perceptual hashes", SFS.numberSquareFill, "phashes"),
-    GenerateTask("Previews", SFS.playRectangleFill, "previews"),
-    GenerateTask("Animated image previews", SFS.photoOnRectangle, "imagePreviews"),
-    GenerateTask("Scene scrubber sprites", SFS.squareGrid3x3, "sprites"),
-    GenerateTask("Marker previews", SFS.mappinEllipse, "markers"),
-    GenerateTask("Marker animated image previews", SFS.mappinCircleFill, "markerImagePreviews"),
-    GenerateTask("Marker screenshots", SFS.cameraFill, "markerScreenshots"),
-    GenerateTask("Transcodes", SFS.filmStack, "transcodes"),
-    GenerateTask("Generate heatmaps and speeds for interactive scenes", SFS.waveformEcg, "interactiveHeatmapsSpeeds", "Generate heatmaps and speeds"),
-    GenerateTask("Image clip previews", SFS.playRectOnRectFill, "clipPreviews"),
-    GenerateTask("Image thumbnails", SFS.photoOnRectangle, "imageThumbnails"),
-    GenerateTask("Image perceptual hashes", SFS.numberCircleFill, "imagePhashes"),
+    GenerateTask(tr(R.string.scene_covers), SFS.photoFill, "covers"),
+    GenerateTask(tr(R.string.video_perceptual_hashes), SFS.numberSquareFill, "phashes"),
+    GenerateTask(tr(R.string.previews), SFS.playRectangleFill, "previews"),
+    GenerateTask(tr(R.string.animated_image_previews), SFS.photoOnRectangle, "imagePreviews"),
+    GenerateTask(tr(R.string.scene_scrubber_sprites), SFS.squareGrid3x3, "sprites"),
+    GenerateTask(tr(R.string.marker_previews), SFS.mappinEllipse, "markers"),
+    GenerateTask(tr(R.string.marker_animated_image_previews), SFS.mappinCircleFill, "markerImagePreviews"),
+    GenerateTask(tr(R.string.marker_screenshots), SFS.cameraFill, "markerScreenshots"),
+    GenerateTask(tr(R.string.transcodes), SFS.filmStack, "transcodes"),
+    GenerateTask(tr(R.string.hint_generate_heatmaps_and_speeds_for), SFS.waveformEcg, "interactiveHeatmapsSpeeds", tr(R.string.action_generate_heatmaps_and_speeds)),
+    GenerateTask(tr(R.string.image_clip_previews), SFS.playRectOnRectFill, "clipPreviews"),
+    GenerateTask(tr(R.string.image_thumbnails), SFS.photoOnRectangle, "imageThumbnails"),
+    GenerateTask(tr(R.string.image_perceptual_hashes), SFS.numberCircleFill, "imagePhashes"),
 )
 
 /**
@@ -100,8 +102,8 @@ fun ServerTasksContent(topPadding: Dp) {
     if (server == null) {
         Column(Modifier.fillMaxSize().padding(32.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(16.dp, Alignment.CenterVertically)) {
             Icon(SFS.serverRack, null, tint = Appearance.tint, modifier = Modifier.size(64.dp))
-            Text("No active server", style = NativeType.titleLarge.copy(fontWeight = FontWeight.Bold), color = p.text)
-            Text("Select a server under Main first.", style = NativeType.bodyLarge, color = p.secondaryText, textAlign = TextAlign.Center)
+            Text(tr(R.string.empty_active_server), style = NativeType.titleLarge.copy(fontWeight = FontWeight.Bold), color = p.text)
+            Text(tr(R.string.hint_select_server_under_main_first), style = NativeType.bodyLarge, color = p.secondaryText, textAlign = TextAlign.Center)
         }
         return
     }
@@ -133,13 +135,13 @@ fun ServerTasksContent(topPadding: Dp) {
             else FilledTonalIconButton(
                 { run(taskId, action) }, enabled = runningTask == null,
                 colors = IconButtonDefaults.filledTonalIconButtonColors(containerColor = nativeAccent().copy(alpha = 0.16f), contentColor = p.text),
-            ) { Icon(Icons.Filled.PlayArrow, "Run $label") }
+            ) { Icon(Icons.Filled.PlayArrow, tr(R.string.action_run_arg, label)) }
         })
     }
 
     SettingsList(topPadding) {
-        settingsSection(header = "Jobs", key = "jobs") {
-            if (jobs.isEmpty()) NativeListItem(if (jobsLoaded) "No jobs running" else "Loading jobs…", icon = SFS.tray, iconTint = p.secondaryText, headlineColor = p.secondaryText)
+        settingsSection(header = tr(R.string.jobs), key = "jobs") {
+            if (jobs.isEmpty()) NativeListItem(if (jobsLoaded) tr(R.string.empty_jobs_running) else tr(R.string.loading_jobs), icon = SFS.tray, iconTint = p.secondaryText, headlineColor = p.secondaryText)
             else jobs.forEachIndexed { i, job ->
                 JobRow(job, job.id in stopping) {
                     stopping = stopping + job.id
@@ -151,39 +153,39 @@ fun ServerTasksContent(topPadding: Dp) {
                 if (i < jobs.lastIndex) SettingsDivider()
             }
         }
-        settingsSection(header = "Scan & Identify", key = "scan") {
-            TaskRow("Scan Library", SFS.arrowTriangle2Circle, "scan") { "Scan Library" to ServerTasksRepository.scan().second }
+        settingsSection(header = tr(R.string.action_scan_and_identify), key = "scan") {
+            TaskRow(tr(R.string.action_scan_library), SFS.arrowTriangle2Circle, "scan") { tr(R.string.action_scan_library) to ServerTasksRepository.scan().second }
             SettingsDivider()
-            TaskRow("Identify", SFS.personCropSquare, "identify") { "Identify" to ServerTasksRepository.identify().second }
+            TaskRow(tr(R.string.action_identify), SFS.personCropSquare, "identify") { tr(R.string.action_identify) to ServerTasksRepository.identify().second }
         }
-        settingsSection(header = "Generate", key = "generate") {
+        settingsSection(header = tr(R.string.action_generate), key = "generate") {
             generateTasks.forEachIndexed { i, t ->
                 TaskRow(t.label, t.icon, "gen_${t.flag}") { t.alertTitle to ServerTasksRepository.generate(t.flag).second }
                 if (i < generateTasks.lastIndex) SettingsDivider()
             }
         }
-        settingsSection(header = "Library Cleanup", key = "cleanup") {
-            TaskRow("Remove Unused Tags", SFS.tagSlash, "tags_unused") { findUnusedResult(CleanupKind.Tags) { cleanup = it } }
+        settingsSection(header = tr(R.string.library_cleanup), key = "cleanup") {
+            TaskRow(tr(R.string.action_remove_unused_tags), SFS.tagSlash, "tags_unused") { findUnusedResult(CleanupKind.Tags) { cleanup = it } }
             SettingsDivider()
-            TaskRow("Remove Unused Performers", SFS.personSlash, "performers_unused") { findUnusedResult(CleanupKind.Performers) { cleanup = it } }
+            TaskRow(tr(R.string.action_remove_unused_performers), SFS.personSlash, "performers_unused") { findUnusedResult(CleanupKind.Performers) { cleanup = it } }
             SettingsDivider()
-            TaskRow("Remove Unused Studios", SFS.building2Circle, "studios_unused") { findUnusedResult(CleanupKind.Studios) { cleanup = it } }
+            TaskRow(tr(R.string.action_remove_unused_studios), SFS.building2Circle, "studios_unused") { findUnusedResult(CleanupKind.Studios) { cleanup = it } }
         }
         // Admin-Werkzeuge (früher unter Tools), nur mit stashy+.
         if (StashyPlus.isUnlocked) {
             settingsSection(header = "stashy+", key = "stashyplus") {
-                SettingsNavRow("Filters", SF.line3HorizontalDecreaseCircle) { Nav.push(ServerToolScreen.Filters) }
+                SettingsNavRow(tr(R.string.filters), SF.line3HorizontalDecreaseCircle) { Nav.push(ServerToolScreen.Filters) }
                 SettingsDivider()
-                SettingsNavRow("Merge Tags", SF.arrowTriangleMerge) { Nav.push(ServerToolScreen.MergeTags) }
+                SettingsNavRow(tr(R.string.action_merge_tags), SF.arrowTriangleMerge) { Nav.push(ServerToolScreen.MergeTags) }
                 SettingsDivider()
-                SettingsNavRow("Merge Studios", SF.building2) { Nav.push(ServerToolScreen.MergeStudios) }
+                SettingsNavRow(tr(R.string.action_merge_studios), SF.building2) { Nav.push(ServerToolScreen.MergeStudios) }
             }
         }
-        settingsSection(header = "Cache", key = "cache") {
-            TaskRow("Clear Image Cache", SFS.internaldrive, "cache_clear") {
+        settingsSection(header = tr(R.string.cache), key = "cache") {
+            TaskRow(tr(R.string.action_clear_image_cache), SFS.internaldrive, "cache_clear") {
                 // iOS `ImageCache.shared.clearCurrentServerCache()`: the active server only.
                 de.letzgo.stashy.data.ServerImageCache.clearActiveServer(context)
-                "Cache Cleared" to "Images will be reloaded from the server."
+                tr(R.string.cache_cleared) to tr(R.string.hint_images_will_be_reloaded_from)
             }
         }
     }
@@ -193,16 +195,16 @@ fun ServerTasksContent(topPadding: Dp) {
         val preview = candidates.take(8).joinToString(", ") { it.name }
         val rest = if (candidates.size > 8) " and ${candidates.size - 8} more" else ""
         ConfirmAlert(
-            "Remove unused ${kind.noun}?",
-            "${candidates.size} ${kind.noun} are not used anywhere: $preview$rest. Deleting them cannot be undone.",
-            "Delete ${candidates.size}",
+            tr(R.string.confirm_remove_unused_arg, kind.noun),
+            tr(R.string.hint_arg_arg_are_not_used, candidates.size, kind.noun, preview, rest),
+            tr(R.string.action_delete_arg, candidates.size),
             onConfirm = {
                 val ids = candidates.map { it.id }
                 scope.launch {
                     alert = try {
                         val ok = ServerTasksRepository.destroy(kind.mutation, ids)
-                        kind.title to if (ok) "${ids.size} unused ${kind.noun} deleted." else "The server rejected the deletion."
-                    } catch (e: Exception) { kind.title to "Could not delete the ${kind.noun}." }
+                        kind.title to if (ok) "${ids.size} unused ${kind.noun} deleted." else tr(R.string.server_rejected_deletion)
+                    } catch (e: Exception) { kind.title to tr(R.string.error_delete_arg, kind.noun) }
                 }
             },
             onDismiss = { cleanup = null },
@@ -212,7 +214,7 @@ fun ServerTasksContent(topPadding: Dp) {
 
 /** iOS: the stashy+ rows of `ToolsServerView` — Filters, Merge Tags and Merge Studios as pushed pages. */
 private enum class ServerToolScreen(val title: String) : Screen {
-    Filters("Filters"), MergeTags("Merge Tags"), MergeStudios("Merge Studios");
+    Filters(tr(R.string.filters)), MergeTags(tr(R.string.action_merge_tags)), MergeStudios(tr(R.string.action_merge_studios));
 
     override val key get() = "settings-server-$name"
 
@@ -231,9 +233,9 @@ private suspend fun findUnusedResult(kind: CleanupKind, onFound: (Pair<CleanupKi
         CleanupKind.Performers -> ServerTasksRepository.unusedPerformers()
         CleanupKind.Studios -> ServerTasksRepository.unusedStudios()
     }
-    if (unused.isEmpty()) kind.title to "No unused ${kind.noun} found." else { onFound(kind to unused); null }
+    if (unused.isEmpty()) kind.title to tr(R.string.empty_unused_arg_found, kind.noun) else { onFound(kind to unused); null }
 } catch (e: Exception) {
-    kind.title to "Could not load the ${kind.noun} list."
+    kind.title to tr(R.string.error_load_arg_list, kind.noun)
 }
 
 /** iOS `jobRow` — status icon, description, detail line, progress and the cancel button. */
@@ -253,14 +255,14 @@ private fun JobRow(job: StashQueuedJob, isStopping: Boolean, onStop: () -> Unit)
             }
         }
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            Text(job.description ?: "Job ${job.id}", style = NativeType.bodyLarge, color = p.text, maxLines = 2)
+            Text(job.description ?: tr(R.string.job_arg, job.id), style = NativeType.bodyLarge, color = p.text, maxLines = 2)
             jobDetailLine(job)?.let { Text(it, style = NativeType.bodySmall, color = p.secondaryText, maxLines = 1) }
             if (progress != null) LinearProgressIndicator({ progress.toFloat() }, Modifier.fillMaxWidth(), color = nativeAccent(), trackColor = p.separator)
         }
         if (progress != null) Text("${Math.round(progress * 100)}%", style = NativeType.bodySmall, color = p.secondaryText)
         if (job.isActive) {
             if (isStopping || job.status == "STOPPING") RowProgress()
-            else IconButton(onStop) { Icon(Icons.Filled.Close, "Cancel ${job.description ?: "job"}", tint = p.secondaryText) }
+            else IconButton(onStop) { Icon(Icons.Filled.Close, tr(R.string.action_cancel_arg, job.description ?: "job"), tint = p.secondaryText) }
         }
     }
 }
@@ -270,7 +272,7 @@ private fun jobDetailLine(job: StashQueuedJob): String? {
     job.error?.takeIf { it.isNotEmpty() }?.let { return it }
     if (job.isRunning) job.subTasks?.firstOrNull()?.takeIf { it.isNotEmpty() }?.let { return it }
     return when (job.status) {
-        "READY" -> "Queued"; "STOPPING" -> "Stopping…"; "FINISHED" -> "Finished"; "CANCELLED" -> "Cancelled"; "FAILED" -> "Failed"
+        "READY" -> tr(R.string.queued); "STOPPING" -> tr(R.string.stopping_menu); "FINISHED" -> tr(R.string.finished); "CANCELLED" -> tr(R.string.cancelled); "FAILED" -> tr(R.string.error_generic_2)
         else -> null
     }
 }

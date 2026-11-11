@@ -1,5 +1,7 @@
 package de.letzgo.stashy.ui.player.ai
 
+import de.letzgo.stashy.R
+import de.letzgo.stashy.tr
 import android.content.Context
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -86,7 +88,7 @@ class LiveTranscriber(private val context: Context) {
     /** iOS: `start(mode:aether:sceneID:…)`. The caller has probed the language. */
     fun start(mode: SceneTeleprompterMode, player: StashPlayer, sceneId: String, sceneDuration: Double?, sceneLanguage: String) {
         disable()
-        val e = SpeechModelCatalog.entry(sceneLanguage) ?: run { errorMessage = "Speech recognition is not available for this language on this device."; return }
+        val e = SpeechModelCatalog.entry(sceneLanguage) ?: run { errorMessage = tr(R.string.hint_speech_recognition_is_not_available); return }
         this.mode = mode
         this.player = player
         this.sceneId = sceneId
@@ -123,7 +125,7 @@ class LiveTranscriber(private val context: Context) {
             } catch (t: Throwable) {
                 modelDownloadProgress = null
                 needsSpeechModelDownload = true
-                errorMessage = t.localizedMessage ?: "Speech model download failed"
+                errorMessage = t.localizedMessage ?: tr(R.string.error_speech_model_download)
             }
         }
     }
@@ -233,9 +235,9 @@ class LiveTranscriber(private val context: Context) {
                 if (gen == generation) {
                     android.util.Log.w("LiveTranscriber", "session failed", t)
                     errorMessage = when (t) {
-                        is UnsatisfiedLinkError -> "Speech recognition is not available on this device."
-                        is AudioUnavailable -> "No readable audio from the server transcode. Try again later."
-                        else -> t.localizedMessage ?: "Live captions stopped."
+                        is UnsatisfiedLinkError -> tr(R.string.hint_speech_recognition_is_not_available_on)
+                        is AudioUnavailable -> tr(R.string.hint_no_readable_audio_from_server)
+                        else -> t.localizedMessage ?: tr(R.string.live_captions_stopped)
                     }
                     sessionRunning = false
                     isPreparing = false

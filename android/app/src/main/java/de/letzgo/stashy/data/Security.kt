@@ -1,5 +1,7 @@
 package de.letzgo.stashy.data
 
+import de.letzgo.stashy.R
+import de.letzgo.stashy.tr
 import androidx.biometric.BiometricManager
 import androidx.biometric.BiometricPrompt
 import androidx.compose.runtime.getValue
@@ -225,8 +227,8 @@ object SecurityManager {
             override fun onAuthenticationError(errorCode: Int, errString: CharSequence) = completion(false)
         })
         val info = BiometricPrompt.PromptInfo.Builder()
-            .setTitle("Unlock Stashy library")
-            .setNegativeButtonText("Use Passcode")
+            .setTitle(tr(R.string.action_unlock_stashy_library))
+            .setNegativeButtonText(tr(R.string.action_use_passcode))
             .setAllowedAuthenticators(BiometricManager.Authenticators.BIOMETRIC_WEAK)
             .build()
         runCatching { prompt.authenticate(info) }.onFailure { completion(false) }

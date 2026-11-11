@@ -1,5 +1,7 @@
 package de.letzgo.stashy.data
 
+import de.letzgo.stashy.R
+import de.letzgo.stashy.tr
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.suspendCancellableCoroutine
@@ -29,19 +31,19 @@ import kotlin.coroutines.resumeWithException
 
 /** iOS: `GraphQLNetworkError` (same messages). */
 sealed class GraphQLError(message: String) : Exception(message) {
-    object NoServerConfig : GraphQLError("Server configuration is missing or incomplete")
-    object Unauthorized : GraphQLError("API key is invalid or expired")
-    class Server(code: Int, body: String?) : GraphQLError("Server error ($code): ${body?.take(200) ?: "Unknown"}")
-    class Query(message: String) : GraphQLError("GraphQL error: $message")
-    class Decoding(cause: Throwable) : GraphQLError("Failed to decode response: ${cause.message}")
+    object NoServerConfig : GraphQLError(tr(R.string.hint_server_configuration_is_missing_or))
+    object Unauthorized : GraphQLError(tr(R.string.hint_api_key_is_invalid_or))
+    class Server(code: Int, body: String?) : GraphQLError(tr(R.string.server_error_arg_arg, code, body?.take(200) ?: "Unknown"))
+    class Query(message: String) : GraphQLError(tr(R.string.graphql_error_arg, message))
+    class Decoding(cause: Throwable) : GraphQLError(tr(R.string.error_decode_response_arg, cause.message))
     class Network(cause: Throwable) : GraphQLError(networkMessage(cause))
 
     companion object {
         private fun networkMessage(e: Throwable) = when (e) {
-            is java.net.ConnectException -> "Server not reachable - check IP/Port/SSL"
-            is java.net.SocketTimeoutException -> "Connection timed out - is server running?"
-            is java.net.UnknownHostException -> "Host not found"
-            else -> "Network error: ${e.message}"
+            is java.net.ConnectException -> tr(R.string.hint_server_not_reachable_check_ip)
+            is java.net.SocketTimeoutException -> tr(R.string.confirm_connection_timed_out_is_server)
+            is java.net.UnknownHostException -> tr(R.string.host_not_found)
+            else -> tr(R.string.network_error_arg, e.message)
         }
     }
 }

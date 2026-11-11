@@ -1,5 +1,7 @@
 package de.letzgo.stashy.ui.setup
 
+import de.letzgo.stashy.R
+import de.letzgo.stashy.tr
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
@@ -70,7 +72,7 @@ import de.letzgo.stashy.ui.settings.headerProblem
 import kotlinx.coroutines.launch
 
 /** iOS: `AuthMethod` (order and titles identical). */
-enum class AuthMethod(val title: String) { None("None"), Login("Login"), ApiKey("API Key") }
+enum class AuthMethod(val title: String) { None(tr(R.string.none)), Login("Login"), ApiKey(tr(R.string.api_key)) }
 
 private sealed interface TestState {
     data object NotTested : TestState
@@ -89,7 +91,7 @@ fun ServerSetupScreen(existing: ServerConfig? = null, onDone: () -> Unit) {
     val p = Theme.palette
     val scope = rememberCoroutineScope()
     var step by remember { mutableIntStateOf(1) }
-    var serverName by remember { mutableStateOf(existing?.name ?: "My Stash") }
+    var serverName by remember { mutableStateOf(existing?.name ?: tr(R.string.my_stash)) }
     var address by remember { mutableStateOf(existing?.let { ServerAddress.display(it) } ?: "") }
     var proto by remember { mutableStateOf(existing?.serverProtocol ?: ServerProtocol.HTTPS) }
     var auth by remember { mutableStateOf(AuthMethod.None) }
@@ -135,7 +137,7 @@ fun ServerSetupScreen(existing: ServerConfig? = null, onDone: () -> Unit) {
 
     Column(Modifier.fillMaxSize().background(p.background).navigationBarsPadding().imePadding()) {
         // Material top app bar; on step 2 its back arrow returns to the details.
-        NativeTopBar("Server Setup", onBack = if (step > 1) ({ step--; test = TestState.NotTested }) else null)
+        NativeTopBar(tr(R.string.server_setup), onBack = if (step > 1) ({ step--; test = TestState.NotTested }) else null)
         // Step progress (Material linear indicator).
         LinearProgressIndicator(
             progress = { step / 2f },
@@ -149,38 +151,47 @@ fun ServerSetupScreen(existing: ServerConfig? = null, onDone: () -> Unit) {
             if (s == 1) Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 24.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
                 Column(Modifier.fillMaxWidth().padding(top = 32.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     Icon(SFS.serverRack, null, tint = Appearance.tint, modifier = Modifier.size(50.dp))
-                    Text("Server Details", style = NativeType.headlineSmall.copy(fontWeight = FontWeight.Bold), color = p.text)
-                    Text("Enter your Stash server information", style = NativeType.bodyLarge, color = p.secondaryText, textAlign = TextAlign.Center)
+                    Text(tr(R.string.server_details), style = NativeType.headlineSmall.copy(fontWeight = FontWeight.Bold), color = p.text)
+                    Text(tr(R.string.enter_your_stash_server_information), style = NativeType.bodyLarge, color = p.secondaryText, textAlign = TextAlign.Center)
                 }
                 Spacer(Modifier.height(8.dp))
-                PlainTextField(serverName, { serverName = it }, "My Stash", label = "Server Name")
-                Labeled("Protocol") { Segmented(ServerProtocol.entries, proto, { it.name }) { proto = it } }
+                // App language (beta): preset to the device language on a fresh install; a change restarts the app.
+                Labeled(tr(R.string.app_language)) {
+                    val context = androidx.compose.ui.platform.LocalContext.current
+                    val selection = remember { de.letzgo.stashy.AppLanguage.stored }
+                    val codes = listOf(de.letzgo.stashy.AppLanguage.SYSTEM) + de.letzgo.stashy.AppLanguage.options.map { it.first }
+                    de.letzgo.stashy.ui.settings.SettingsPickerRow(tr(R.string.language), codes, selection, { de.letzgo.stashy.AppLanguage.name(it) }, de.letzgo.stashy.ui.SFS.globe) { code ->
+                        if (code != selection) de.letzgo.stashy.AppLanguage.selectAndRestart(context, code)
+                    }
+                }
+                PlainTextField(serverName, { serverName = it }, tr(R.string.my_stash), label = tr(R.string.server_name))
+                Labeled(tr(R.string.protocol)) { Segmented(ServerProtocol.entries, proto, { it.name }) { proto = it } }
                 NativeTextField(
                     address, { v ->
                         val (detected, rest) = ServerAddress.detectProtocol(v)
                         if (detected != null) { proto = detected; address = if (rest.isNotEmpty()) rest else v } else address = v
-                    }, "Server Address",
-                    placeholder = "192.168.1.100:9999 or stash.example.com/stash", keyboard = KeyboardType.Uri,
-                    supportingText = "Enter address (e.g. timeout.com:9999 or example.com/stash)",
+                    }, tr(R.string.server_address),
+                    placeholder = tr(R.string.n192_168_1_100_9999_or), keyboard = KeyboardType.Uri,
+                    supportingText = tr(R.string.hint_enter_address_e_g_timeout),
                 )
                 // Authentication card
                 Column(Modifier.fillMaxWidth().background(p.secondaryBackground, NativeGroupShape).padding(16.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                    Labeled("Authentication") { Segmented(AuthMethod.entries, auth, { it.title }) { auth = it } }
+                    Labeled(tr(R.string.authentication)) { Segmented(AuthMethod.entries, auth, { it.title }) { auth = it } }
                     when (auth) {
                         AuthMethod.Login -> Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                            PlainTextField(username, { username = it }, "Username")
-                            PlainTextField(password, { password = it }, "Password", secret = true)
-                            PrimaryButton("Fetch API Key", enabled = username.isNotEmpty() && password.isNotEmpty() && !fetchingKey, busy = fetchingKey) { fetchKey() }
+                            PlainTextField(username, { username = it }, tr(R.string.username))
+                            PlainTextField(password, { password = it }, tr(R.string.password), secret = true)
+                            PrimaryButton(tr(R.string.action_fetch_api_key), enabled = username.isNotEmpty() && password.isNotEmpty() && !fetchingKey, busy = fetchingKey) { fetchKey() }
                             loginError?.let { Text(it, style = NativeType.bodySmall, color = Color(0xFFFF453A)) }
                         }
-                        AuthMethod.ApiKey -> PlainTextField(apiKey, { apiKey = it }, "Enter API Key", secret = true, label = "API Key")
+                        AuthMethod.ApiKey -> PlainTextField(apiKey, { apiKey = it }, tr(R.string.enter_api_key), secret = true, label = tr(R.string.api_key))
                         AuthMethod.None -> {}
                     }
                 }
                 // Custom headers card (collapsed by default)
                 Column(Modifier.fillMaxWidth().background(p.secondaryBackground, NativeGroupShape).padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     Row(Modifier.fillMaxWidth().clickable { showsHeaders = !showsHeaders }, verticalAlignment = Alignment.CenterVertically) {
-                        Text("Custom Headers", style = NativeType.titleSmall, color = p.text)
+                        Text(tr(R.string.custom_headers), style = NativeType.titleSmall, color = p.text)
                         val n = usableHeaders().size
                         if (n > 0) Text("  $n", style = NativeType.labelSmall.copy(fontWeight = FontWeight.SemiBold), color = p.secondaryText)
                         Spacer(Modifier.weight(1f))
@@ -190,15 +201,15 @@ fun ServerSetupScreen(existing: ServerConfig? = null, onDone: () -> Unit) {
                         headers.forEachIndexed { i, h ->
                             Row(verticalAlignment = Alignment.CenterVertically) {
                                 Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                                    PlainTextField(h.name, { headers[i] = h.copy(name = it) }, "Header name", monospaced = true)
-                                    PlainTextField(h.value, { headers[i] = h.copy(value = it) }, "Value", secret = true)
+                                    PlainTextField(h.name, { headers[i] = h.copy(name = it) }, tr(R.string.header_name), monospaced = true)
+                                    PlainTextField(h.value, { headers[i] = h.copy(value = it) }, tr(R.string.value), secret = true)
                                     headerProblem(h)?.let { Text(it, style = NativeType.bodySmall, color = Color(0xFFFF9F0A)) }
                                 }
-                                IconButton({ headers.removeAt(i) }) { Icon(SFS.minusCircleFill, "Remove header", tint = StashyColors.systemRed) }
+                                IconButton({ headers.removeAt(i) }) { Icon(SFS.minusCircleFill, tr(R.string.action_remove_header), tint = StashyColors.systemRed) }
                             }
                         }
-                        NativeTonalButton("Add Header", leading = SFS.plusCircleFill) { headers.add(HeaderDraft()) }
-                        Text("Sent with every request to this server, e.g. for SSO or a reverse proxy that needs its own token.", style = NativeType.labelSmall, color = p.secondaryText)
+                        NativeTonalButton(tr(R.string.action_add_header), leading = SFS.plusCircleFill) { headers.add(HeaderDraft()) }
+                        Text(tr(R.string.hint_sent_with_every_request_to), style = NativeType.labelSmall, color = p.secondaryText)
                     }
                 }
                 // First setup only: bring servers and settings over from another device. With an
@@ -207,8 +218,8 @@ fun ServerSetupScreen(existing: ServerConfig? = null, onDone: () -> Unit) {
                     val (transfer, launchers) = de.letzgo.stashy.ui.settings.rememberSettingsTransfer {
                         if (de.letzgo.stashy.data.ServerConfigManager.activeConfig != null) onDone()
                     }
-                    NativeTonalButton("Import Settings", Modifier.fillMaxWidth(), leading = androidx.compose.material.icons.Icons.Outlined.FileDownload, onClick = launchers.import)
-                    Text("Servers and settings exported from stashy on another device (iPhone, iPad, Mac or Android).", style = NativeType.labelSmall, color = p.secondaryText)
+                    NativeTonalButton(tr(R.string.action_import_settings), Modifier.fillMaxWidth(), leading = androidx.compose.material.icons.Icons.Outlined.FileDownload, onClick = launchers.import)
+                    Text(tr(R.string.hint_servers_and_settings_exported_from), style = NativeType.labelSmall, color = p.secondaryText)
                     de.letzgo.stashy.ui.settings.SettingsTransferDialogs(transfer, launchers)
                 }
                 Spacer(Modifier.height(32.dp))
@@ -219,19 +230,19 @@ fun ServerSetupScreen(existing: ServerConfig? = null, onDone: () -> Unit) {
                         TestState.NotTested, TestState.Testing -> {
                             if (t == TestState.Testing) CircularProgressIndicator(Modifier.size(48.dp), color = Appearance.tint)
                             else Icon(SFS.antenna, null, tint = Appearance.tint, modifier = Modifier.size(60.dp))
-                            Text(if (t == TestState.Testing) "Connecting..." else "Test Connection", style = NativeType.headlineSmall.copy(fontWeight = FontWeight.Bold), color = p.text)
-                            Text("We're checking if your server is reachable", style = NativeType.bodyLarge, color = p.secondaryText, textAlign = TextAlign.Center)
+                            Text(if (t == TestState.Testing) "Connecting..." else tr(R.string.action_test_connection), style = NativeType.headlineSmall.copy(fontWeight = FontWeight.Bold), color = p.text)
+                            Text(tr(R.string.hint_were_checking_if_your_server), style = NativeType.bodyLarge, color = p.secondaryText, textAlign = TextAlign.Center)
                         }
                         TestState.Success -> {
                             Icon(SF.checkmarkCircleFill, null, tint = Color(0xFF30D158), modifier = Modifier.size(80.dp))
-                            Text("Connection successful!", style = NativeType.headlineSmall.copy(fontWeight = FontWeight.Bold), color = p.text)
-                            Text("Your Stash server was found", style = NativeType.bodyLarge, color = p.secondaryText)
+                            Text(tr(R.string.connection_successful), style = NativeType.headlineSmall.copy(fontWeight = FontWeight.Bold), color = p.text)
+                            Text(tr(R.string.your_stash_server_was_found), style = NativeType.bodyLarge, color = p.secondaryText)
                         }
                         is TestState.Failure -> {
                             Icon(SFS.xmarkCircleFill, null, tint = Color(0xFFFF453A), modifier = Modifier.size(80.dp))
-                            Text("Connection failed", style = NativeType.headlineSmall.copy(fontWeight = FontWeight.Bold), color = p.text)
+                            Text(tr(R.string.error_connection), style = NativeType.headlineSmall.copy(fontWeight = FontWeight.Bold), color = p.text)
                             Text(t.message, style = NativeType.bodyLarge, color = p.secondaryText, textAlign = TextAlign.Center)
-                            NativeTonalButton("Test again", leading = SF.arrowClockwise) { runTest() }
+                            NativeTonalButton(tr(R.string.action_test_again), leading = SF.arrowClockwise) { runTest() }
                         }
                     }
                 }
@@ -239,9 +250,9 @@ fun ServerSetupScreen(existing: ServerConfig? = null, onDone: () -> Unit) {
         }
         // Navigation buttons
         Row(Modifier.fillMaxWidth().padding(horizontal = 24.dp).padding(bottom = 32.dp), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-            if (step > 1) NativeTonalButton("Back", Modifier.weight(1f), leading = SFS.chevronLeft) { step--; test = TestState.NotTested }
+            if (step > 1) NativeTonalButton(tr(R.string.back), Modifier.weight(1f), leading = SFS.chevronLeft) { step--; test = TestState.NotTested }
             PrimaryButton(
-                if (step == 2) "Finish" else "Next", Modifier.weight(1f), enabled = canProceed,
+                if (step == 2) tr(R.string.finish) else tr(R.string.next), Modifier.weight(1f), enabled = canProceed,
                 trailing = if (step == 2) SFS.checkmark else SFS.chevronRight,
             ) { if (step < 2) { cleanAddress(); step++ } else complete() }
         }

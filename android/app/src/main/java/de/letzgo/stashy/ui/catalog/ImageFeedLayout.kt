@@ -1,5 +1,7 @@
 package de.letzgo.stashy.ui.catalog
 
+import de.letzgo.stashy.R
+import de.letzgo.stashy.tr
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
@@ -437,7 +439,7 @@ private fun FeedHero(image: StashImage, autoplay: Boolean, fit: Boolean = false,
 private fun FeedHeader(image: StashImage, currentGalleryId: String?, onAddPerformers: (() -> Unit)? = null) {
     val performers = image.performers.orEmpty()
     val gallery = image.galleries?.let { gs -> if (currentGalleryId != null) gs.firstOrNull { it.id != currentGalleryId } else gs.firstOrNull() }
-    val openGallery: (() -> Unit)? = gallery?.let { g -> { Nav.push(GalleryDetailScreen(g.id, Gallery(id = g.id, title = g.title ?: g.name ?: "Gallery"), forceOneColumnFeed = true)) } }
+    val openGallery: (() -> Unit)? = gallery?.let { g -> { Nav.push(GalleryDetailScreen(g.id, Gallery(id = g.id, title = g.title ?: g.name ?: tr(R.string.gallery)), forceOneColumnFeed = true)) } }
     // iOS: `PerformerDetailView(performer:initialTab: .images)`.
     fun openPerformer(p: IdName) = Nav.push(PerformerDetailScreen(p.id, Performer(id = p.id, name = p.name.orEmpty()), initialTab = de.letzgo.stashy.ui.detail.DetailTab.Images))
     // Feeds › Pics: a name filters the feed instead (iOS `imageFeedPerformerTap`).
@@ -461,7 +463,7 @@ private fun FeedHeader(image: StashImage, currentGalleryId: String?, onAddPerfor
             // "+" right after the names (after the title without performers), like the Feeds overlay.
             Row(verticalAlignment = Alignment.CenterVertically) {
                 when {
-                    performers.isEmpty() -> Text(image.title ?: "Unknown", style = nameStyle, color = Color.White, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false))
+                    performers.isEmpty() -> Text(image.title ?: tr(R.string.unknown), style = nameStyle, color = Color.White, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false))
                     else -> Row(Modifier.weight(1f, fill = false), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                         performers.forEachIndexed { i, pf ->
                             Text(
@@ -579,7 +581,7 @@ private fun FeedRateChrome(image: StashImage, onImageUpdated: (StashImage) -> Un
         scope.launch {
             if (!FeedsRepository.updateImageRating(image.id, r)) {
                 onImageUpdated(image.copy(rating100 = original))
-                showToast("Failed to save rating")
+                showToast(tr(R.string.error_save_rating))
             }
         }
     }
@@ -593,7 +595,7 @@ private fun FeedRateChrome(image: StashImage, onImageUpdated: (StashImage) -> Un
         scope.launch {
             val count = FeedsRepository.mutateOCounter(image.id, isImage = true, m)
             onImageUpdated(image.copy(oCounter = count ?: oCount))
-            if (count == null) showToast("Failed to update O-Counter")
+            if (count == null) showToast(tr(R.string.error_update_o_count))
         }
     }
 
@@ -601,7 +603,7 @@ private fun FeedRateChrome(image: StashImage, onImageUpdated: (StashImage) -> Un
         Box {
             RatePill(SF.starFill, "$stars", stars > 0, onClick = { ratingMenu = true })
             DropdownMenu(ratingMenu, onDismissRequest = { ratingMenu = false }) {
-                DropdownMenuItem(text = { Text("Clear Rating") }, trailingIcon = { if (stars == 0) Icon(SF.checkmark, null) }, onClick = { ratingMenu = false; setRating(0) })
+                DropdownMenuItem(text = { Text(tr(R.string.action_clear_rating)) }, trailingIcon = { if (stars == 0) Icon(SF.checkmark, null) }, onClick = { ratingMenu = false; setRating(0) })
                 HorizontalDivider()
                 for (s in 1..5) DropdownMenuItem(
                     text = { Text("★".repeat(s)) }, trailingIcon = { if (stars == s) Icon(SF.checkmark, null) },
@@ -616,8 +618,8 @@ private fun FeedRateChrome(image: StashImage, onImageUpdated: (StashImage) -> Un
                 onLongClick = { if (oCount > 0) oMenu = true },
             )
             DropdownMenu(oMenu, onDismissRequest = { oMenu = false }) {
-                DropdownMenuItem(text = { Text("Remove one") }, onClick = { oMenu = false; changeO(FeedsRepository.OMutation.Decrement) })
-                DropdownMenuItem(text = { Text("Reset") }, onClick = { oMenu = false; changeO(FeedsRepository.OMutation.Reset) })
+                DropdownMenuItem(text = { Text(tr(R.string.action_remove_one)) }, onClick = { oMenu = false; changeO(FeedsRepository.OMutation.Decrement) })
+                DropdownMenuItem(text = { Text(tr(R.string.action_reset)) }, onClick = { oMenu = false; changeO(FeedsRepository.OMutation.Reset) })
             }
         }
     }

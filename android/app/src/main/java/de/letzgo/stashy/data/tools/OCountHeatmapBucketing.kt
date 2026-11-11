@@ -1,5 +1,7 @@
 package de.letzgo.stashy.data.tools
 
+import de.letzgo.stashy.R
+import de.letzgo.stashy.tr
 import de.letzgo.stashy.data.IdName
 import de.letzgo.stashy.data.VisualFile
 import kotlinx.serialization.json.JsonElement
@@ -52,8 +54,8 @@ data class OCountHeatmapItem(
     val isVideo: Boolean get() = visualFiles?.firstOrNull()?.typename == "VideoFile"
 
     val kindTitle: String get() = when (kind) {
-        Kind.Scene -> "Scene"
-        Kind.Image -> if (isVideo) "Video" else "Image"
+        Kind.Scene -> tr(R.string.scene)
+        Kind.Image -> if (isVideo) tr(R.string.video) else tr(R.string.image)
     }
 
     val rowSubtitle: String get() = when (kind) {
@@ -190,8 +192,8 @@ data class OCountMonthHeatmap(
                 val pretty = prettyFormatter.format(s.date)
                 val a11y = when {
                     !s.inMonth -> "$pretty, outside month"
-                    s.count > 0 -> "$pretty, ${s.count} O-Count"
-                    else -> "$pretty, no O-Count"
+                    s.count > 0 -> tr(R.string.arg_arg_o_count, pretty, s.count)
+                    else -> "$pretty, no O Count"
                 }
                 Cell(s.key, s.col, s.row, s.date.dayOfMonth, s.inMonth, s.count,
                     OCountHeatmapBucketing.colorLevel(if (s.inMonth) s.count else 0, maxValue), a11y)

@@ -1,5 +1,7 @@
 package de.letzgo.stashy.ui.player
 
+import de.letzgo.stashy.R
+import de.letzgo.stashy.tr
 import androidx.compose.foundation.layout.heightIn
 import android.content.Context
 import android.content.pm.PackageManager
@@ -334,14 +336,14 @@ fun ScenePlayerSurface(
                 horizontalArrangement = Arrangement.spacedBy(if (showsMarkerJumps) centerSpacing * 0.6f else centerSpacing),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                if (showsMarkerJumps) GlassCircle(PlayerIcons.previousMarker, skipSize, if (isCompact) 18.dp else 24.dp, "Previous marker", enabled = previous != null) { previous?.let { tick(); seek(it); reveal() } }
+                if (showsMarkerJumps) GlassCircle(PlayerIcons.previousMarker, skipSize, if (isCompact) 18.dp else 24.dp, tr(R.string.previous_marker), enabled = previous != null) { previous?.let { tick(); seek(it); reveal() } }
                 if (PlayerSettings.showsSkipButtons) SkipButton(false, skipSize, isCompact) { skip(-PlayerSettings.skipSeconds) }
                 val showsAsPlaying = isFastForwarding || playing || (player.playWhenReady && player.isBuffering)
-                GlassCircle(if (showsAsPlaying) PlayerIcons.pause else PlayerIcons.play, playSize, if (isCompact) 30.dp else 44.dp, if (showsAsPlaying) "Pause" else "Play") {
+                GlassCircle(if (showsAsPlaying) PlayerIcons.pause else PlayerIcons.play, playSize, if (isCompact) 30.dp else 44.dp, if (showsAsPlaying) tr(R.string.action_pause) else tr(R.string.action_play)) {
                     tick(); player.togglePlayPause(); reveal()
                 }
                 if (PlayerSettings.showsSkipButtons) SkipButton(true, skipSize, isCompact) { skip(PlayerSettings.skipSeconds) }
-                if (showsMarkerJumps) GlassCircle(PlayerIcons.nextMarker, skipSize, if (isCompact) 18.dp else 24.dp, "Next marker", enabled = next != null) { next?.let { tick(); seek(it); reveal() } }
+                if (showsMarkerJumps) GlassCircle(PlayerIcons.nextMarker, skipSize, if (isCompact) 18.dp else 24.dp, tr(R.string.next_marker), enabled = next != null) { next?.let { tick(); seek(it); reveal() } }
             }
 
             // Top row.
@@ -350,17 +352,17 @@ fun ScenePlayerSurface(
                 verticalAlignment = Alignment.Top, horizontalArrangement = Arrangement.spacedBy(10.dp),
             ) {
                 if (onToggleFullscreen != null) {
-                    GlassCircle(if (isFullscreen) PlayerIcons.close else PlayerIcons.expand, chrome, glyph, if (isFullscreen) "Close" else "Full screen") {
+                    GlassCircle(if (isFullscreen) PlayerIcons.close else PlayerIcons.expand, chrome, glyph, if (isFullscreen) tr(R.string.action_close) else tr(R.string.full_screen)) {
                         tick(); onToggleFullscreen(); reveal()
                     }
                 }
-                if (isFullscreen && onRotate != null) GlassCircle(PlayerIcons.rotate, chrome, glyph, "Rotate") { tick(); onRotate(); reveal() }
+                if (isFullscreen && onRotate != null) GlassCircle(PlayerIcons.rotate, chrome, glyph, tr(R.string.rotate)) { tick(); onRotate(); reveal() }
                 if (onPictureInPicture != null && PlayerSettings.isPiPEnabled && supportsPiP(context)) {
-                    GlassCircle(PlayerIcons.pipEnter, chrome, glyph, "Start Picture in Picture") { tick(); onPictureInPicture() }
+                    GlassCircle(PlayerIcons.pipEnter, chrome, glyph, tr(R.string.action_start_picture_in_picture)) { tick(); onPictureInPicture() }
                 }
                 Spacer(Modifier.weight(1f))
                 Box {
-                    GlassCircle(PlayerIcons.options, chrome, glyph, "More options") { menuOpen = true; reveal() }
+                    GlassCircle(PlayerIcons.options, chrome, glyph, tr(R.string.more_options)) { menuOpen = true; reveal() }
                     if (abs(player.rateState - 1f) > 0.001f) {
                         Text(
                             PlaybackFormat.speedLabel(player.rateState), Modifier.align(Alignment.BottomCenter).padding(bottom = 1.dp),
@@ -406,15 +408,15 @@ fun ScenePlayerSurface(
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End), verticalAlignment = Alignment.CenterVertically) {
                     if (player.isUsingTranscodeFallback) {
                         Box(Modifier.heightIn(min = chrome).stashyGlass(RoundedCornerShape(50)).padding(horizontal = 10.dp, vertical = 2.dp), contentAlignment = Alignment.Center) {
-                            Text("Transcode", color = Color.White, style = TextStyle(fontSize = 11.sp, fontWeight = FontWeight.SemiBold))
+                            Text(tr(R.string.transcode), color = Color.White, style = TextStyle(fontSize = 11.sp, fontWeight = FontWeight.SemiBold))
                         }
                     }
-                    if (allowsFill) GlassCircle(if (fillsScreen) PlayerIcons.fit else PlayerIcons.fill, chrome, glyph, if (fillsScreen) "Fit to screen" else "Fill screen") {
+                    if (allowsFill) GlassCircle(if (fillsScreen) PlayerIcons.fit else PlayerIcons.fill, chrome, glyph, if (fillsScreen) tr(R.string.fit_to_screen) else tr(R.string.fill_screen)) {
                         tick(); fillsScreen = !fillsScreen; reveal()
                     }
                 }
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    if (onAddMarker != null) GlassCircle(PlayerIcons.addMarker, chrome, glyph, "Add marker") { tick(); onAddMarker(); reveal() }
+                    if (onAddMarker != null) GlassCircle(PlayerIcons.addMarker, chrome, glyph, tr(R.string.action_add_marker)) { tick(); onAddMarker(); reveal() }
                     TimeBar(
                         currentTime = displayedTime,
                         duration = maxOf(player.duration, 0.0),
@@ -453,7 +455,7 @@ fun playerMenuItems(player: StashPlayer, onChanged: () -> Unit = {}, onHostSubti
     val rate = player.rateState
     items += PlayerMenuItem.Submenu(
         "player.speed",
-        if (abs(rate - 1f) > 0.001f) "Playback Speed (${PlaybackFormat.speedLabel(rate)})" else "Playback Speed",
+        if (abs(rate - 1f) > 0.001f) tr(R.string.playback_speed_arg, PlaybackFormat.speedLabel(rate)) else tr(R.string.playback_speed),
         PlayerIcons.speed,
         PlayerSettings.speedOptions.map { option ->
             PlayerMenuItem.Action("player.speed.$option", PlaybackFormat.speedLabel(option), isChecked = abs(rate - option) < 0.001f) {
@@ -462,15 +464,15 @@ fun playerMenuItems(player: StashPlayer, onChanged: () -> Unit = {}, onHostSubti
         },
     )
     if (player.audioTracks.size > 1) {
-        items += PlayerMenuItem.Submenu("player.audio", "Audio", PlayerIcons.audio, player.audioTracks.map { t ->
+        items += PlayerMenuItem.Submenu("player.audio", tr(R.string.audio), PlayerIcons.audio, player.audioTracks.map { t ->
             PlayerMenuItem.Action("player.audio.${t.id}", t.label, isChecked = player.activeAudioTrackId == t.id) { player.selectAudioTrack(t.id); onChanged() }
         })
     }
     if (player.subtitleTracks.isNotEmpty()) {
-        val current = player.subtitleTracks.firstOrNull { it.id == player.activeSubtitleTrackId }?.label ?: "Off"
+        val current = player.subtitleTracks.firstOrNull { it.id == player.activeSubtitleTrackId }?.label ?: tr(R.string.off)
         items += PlayerMenuItem.Submenu(
-            "player.subtitles", "Subtitles: $current", PlayerIcons.subtitles,
-            listOf(PlayerMenuItem.Action("player.subtitle.off", "Off", isChecked = player.activeSubtitleTrackId == null) { player.clearSubtitle(); onChanged() }) +
+            "player.subtitles", tr(R.string.subtitles_arg, current), PlayerIcons.subtitles,
+            listOf(PlayerMenuItem.Action("player.subtitle.off", tr(R.string.off), isChecked = player.activeSubtitleTrackId == null) { player.clearSubtitle(); onChanged() }) +
                 player.subtitleTracks.map { t ->
                     PlayerMenuItem.Action("player.subtitle.${t.id}", t.label, isChecked = player.activeSubtitleTrackId == t.id) { onHostSubtitleOff(); player.selectSubtitleTrack(t.id); onChanged() }
                 },
@@ -523,7 +525,7 @@ private fun SkipButton(forward: Boolean, size: Dp, compact: Boolean, onClick: ()
             .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null, onClick = onClick),
         contentAlignment = Alignment.Center,
     ) {
-        Icon(PlayerIcons.skip, if (forward) "Forward $label" else "Back $label", tint = Color.White,
+        Icon(PlayerIcons.skip, if (forward) tr(R.string.forward_arg, label) else tr(R.string.back_arg, label), tint = Color.White,
             modifier = Modifier.size(if (compact) 30.dp else 40.dp).scale(scaleX = if (forward) -1f else 1f, scaleY = 1f))
         Text(short, Modifier.offset(y = 1.dp), color = Color.White, style = TextStyle(fontSize = if (compact) 11.sp else 12.sp, fontWeight = FontWeight.Bold))
     }
@@ -534,7 +536,7 @@ private fun MuteGlyph(muted: Boolean, size: Dp, glyph: Dp, onClick: () -> Unit) 
     Box(
         Modifier.size(size).clickable(interactionSource = remember { MutableInteractionSource() }, indication = null, onClick = onClick),
         contentAlignment = Alignment.Center,
-    ) { Icon(if (muted) PlayerIcons.muted else PlayerIcons.unmuted, if (muted) "Unmute" else "Mute", tint = Color.White, modifier = Modifier.size(glyph)) }
+    ) { Icon(if (muted) PlayerIcons.muted else PlayerIcons.unmuted, if (muted) tr(R.string.unmute) else tr(R.string.mute), tint = Color.White, modifier = Modifier.size(glyph)) }
 }
 
 /** Thin custom track (iOS draws its own: the stock slider can't be this thin). */

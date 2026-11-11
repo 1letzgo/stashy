@@ -133,11 +133,11 @@ enum NetworkError: Error {
 
     var localizedDescription: String {
         switch self {
-        case .invalidURL: return "Invalid server URL"
-        case .noData: return "No data received from server"
-        case .decodingError: return "Error processing server response"
-        case .serverError(let message): return "Server error: \(message)"
-        case .networkError(let error): return "Network error: \(error.localizedDescription)"
+        case .invalidURL: return tr("invalid_server_url")
+        case .noData: return tr("empty_data_received_from_server")
+        case .decodingError: return tr("error_processing_server_response")
+        case .serverError(let message): return tr("server_error_arg", message)
+        case .networkError(let error): return tr("network_error_arg", error.localizedDescription)
         }
     }
 }
@@ -159,7 +159,7 @@ class StashDBViewModel: ObservableObject {
     /// Letzter Fehler von `findImages` (Katalog/Galerie/Detail). Getrennt von `errorMessage`, damit parallele Requests
     /// (z. B. `fetchSavedFilters`) den Verbindungsfehler der Bildliste nicht per `performGraphQLQuery` zurücksetzen.
     @Published var imageFindListError: String?
-    @Published var serverStatus: String = "Nicht verbunden"
+    @Published var serverStatus: String = tr("not_connected")
     
     /// Per-kind random seeds. Each content kind (scenes, previews, markers, ...)
     /// maintains an independent stable seed so "Random" sort order is not shared
@@ -986,7 +986,7 @@ class StashDBViewModel: ObservableObject {
         feedFailureStreaks[feed] = (feedFailureStreaks[feed] ?? 0) + 1
         if feedFailureStreaks[feed] == Self.maxFeedConsecutiveFailures {
             AppLog.error("⚠️ Feed \(feed): \(Self.maxFeedConsecutiveFailures) consecutive page failures — pausing auto-paging")
-            errorMessage = "Feed paused after repeated loading failures. Reopen or change filters to retry."
+            errorMessage = tr("hint_feed_paused_after_repeated_loading")
         }
     }
 
@@ -1136,21 +1136,21 @@ class StashDBViewModel: ObservableObject {
 
         var displayName: String {
             switch self {
-            case .titleAsc: return "Name (A-Z)"
-            case .titleDesc: return "Name (Z-A)"
-            case .dateDesc: return "Date (Newest)"
-            case .dateAsc: return "Date (Oldest)"
-            case .ratingDesc: return "Rating (High-Low)"
-            case .ratingAsc: return "Rating (Low-High)"
-            case .createdAtDesc: return "Created (Newest)"
-            case .createdAtAsc: return "Created (Oldest)"
-            case .updatedAtDesc: return "Updated (Newest)"
-            case .updatedAtAsc: return "Updated (Oldest)"
-            case .imageCountDesc: return "Image Count (High-Low)"
-            case .imageCountAsc: return "Image Count (Low-High)"
-            case .performerAgeDesc: return "Performer Age (Oldest First)"
-            case .performerAgeAsc: return "Performer Age (Youngest First)"
-            case .random: return "Random"
+            case .titleAsc: return tr("name_z")
+            case .titleDesc: return tr("name_z_2")
+            case .dateDesc: return tr("date_newest")
+            case .dateAsc: return tr("date_oldest")
+            case .ratingDesc: return tr("rating_high_low")
+            case .ratingAsc: return tr("rating_low_high")
+            case .createdAtDesc: return tr("created_newest")
+            case .createdAtAsc: return tr("created_oldest")
+            case .updatedAtDesc: return tr("updated_newest")
+            case .updatedAtAsc: return tr("updated_oldest")
+            case .imageCountDesc: return tr("image_count_high_low")
+            case .imageCountAsc: return tr("image_count_low_high")
+            case .performerAgeDesc: return tr("performer_age_oldest_first")
+            case .performerAgeAsc: return tr("performer_age_youngest_first")
+            case .random: return tr("random")
             }
         }
 
@@ -1291,19 +1291,19 @@ class StashDBViewModel: ObservableObject {
         
         var displayName: String {
             switch self {
-            case .titleAsc: return "Title (A-Z)"
-            case .titleDesc: return "Title (Z-A)"
-            case .dateDesc: return "Date (Newest)"
-            case .dateAsc: return "Date (Oldest)"
-            case .ratingDesc: return "Rating (High-Low)"
-            case .ratingAsc: return "Rating (Low-High)"
-            case .createdAtDesc: return "Created (Newest)"
-            case .createdAtAsc: return "Created (Oldest)"
-            case .updatedAtDesc: return "Updated (Newest)"
-            case .updatedAtAsc: return "Updated (Oldest)"
-            case .performerAgeDesc: return "Performer Age (Oldest First)"
-            case .performerAgeAsc: return "Performer Age (Youngest First)"
-            case .random: return "Random"
+            case .titleAsc: return tr("title_z")
+            case .titleDesc: return tr("title_z_2")
+            case .dateDesc: return tr("date_newest")
+            case .dateAsc: return tr("date_oldest")
+            case .ratingDesc: return tr("rating_high_low")
+            case .ratingAsc: return tr("rating_low_high")
+            case .createdAtDesc: return tr("created_newest")
+            case .createdAtAsc: return tr("created_oldest")
+            case .updatedAtDesc: return tr("updated_newest")
+            case .updatedAtAsc: return tr("updated_oldest")
+            case .performerAgeDesc: return tr("performer_age_oldest_first")
+            case .performerAgeAsc: return tr("performer_age_youngest_first")
+            case .random: return tr("random")
             }
         }
         
@@ -1370,25 +1370,25 @@ class StashDBViewModel: ObservableObject {
 
         var displayName: String {
             switch self {
-            case .nameAsc: return "Name (A-Z)"
-            case .nameDesc: return "Name (Z-A)"
-            case .sceneCountDesc: return "Scene Count (High-Low)"
-            case .sceneCountAsc: return "Scene Count (Low-High)"
-            case .imageCountDesc: return "Image Count (High-Low)"
-            case .imageCountAsc: return "Image Count (Low-High)"
-            case .galleryCountDesc: return "Gallery Count (High-Low)"
-            case .galleryCountAsc: return "Gallery Count (Low-High)"
-            case .birthdateDesc: return "Birthday (Youngest First)"
-            case .birthdateAsc: return "Birthday (Oldest First)"
-            case .updatedAtDesc: return "Updated (Newest First)"
-            case .updatedAtAsc: return "Updated (Oldest First)"
-            case .createdAtDesc: return "Created (Newest First)"
-            case .createdAtAsc: return "Created (Oldest First)"
-            case .oCountDesc: return "O Count (High-Low)"
-            case .oCountAsc: return "O Count (Low-High)"
-            case .ratingDesc: return "Rating (High-Low)"
-            case .ratingAsc: return "Rating (Low-High)"
-            case .random: return "Random"
+            case .nameAsc: return tr("name_z")
+            case .nameDesc: return tr("name_z_2")
+            case .sceneCountDesc: return tr("scene_count_high_low")
+            case .sceneCountAsc: return tr("scene_count_low_high")
+            case .imageCountDesc: return tr("image_count_high_low")
+            case .imageCountAsc: return tr("image_count_low_high")
+            case .galleryCountDesc: return tr("gallery_count_high_low")
+            case .galleryCountAsc: return tr("gallery_count_low_high")
+            case .birthdateDesc: return tr("birthday_youngest_first")
+            case .birthdateAsc: return tr("birthday_oldest_first")
+            case .updatedAtDesc: return tr("updated_newest_first")
+            case .updatedAtAsc: return tr("updated_oldest_first")
+            case .createdAtDesc: return tr("created_newest_first")
+            case .createdAtAsc: return tr("created_oldest_first")
+            case .oCountDesc: return tr("o_count_high_low")
+            case .oCountAsc: return tr("o_count_low_high")
+            case .ratingDesc: return tr("rating_high_low")
+            case .ratingAsc: return tr("rating_low_high")
+            case .random: return tr("random")
             }
         }
 
@@ -1455,31 +1455,31 @@ class StashDBViewModel: ObservableObject {
 
         var displayName: String {
             switch self {
-            case .nameAsc: return "Name (A-Z)"
-            case .nameDesc: return "Name (Z-A)"
-            case .sceneCountDesc: return "Scene Count (High-Low)"
-            case .sceneCountAsc: return "Scene Count (Low-High)"
-            case .updatedAtDesc: return "Updated (Newest First)"
-            case .updatedAtAsc: return "Updated (Oldest First)"
-            case .createdAtDesc: return "Created (Newest First)"
-            case .createdAtAsc: return "Created (Oldest First)"
-            case .ratingDesc: return "Rating (High-Low)"
-            case .ratingAsc: return "Rating (Low-High)"
-            case .performerCountDesc: return "Performer Count (High-Low)"
-            case .performerCountAsc: return "Performer Count (Low-High)"
-            case .galleryCountDesc: return "Gallery Count (High-Low)"
-            case .galleryCountAsc: return "Gallery Count (Low-High)"
-            case .imageCountDesc: return "Image Count (High-Low)"
-            case .imageCountAsc: return "Image Count (Low-High)"
-            case .oCounterDesc: return "O Count (High-Low)"
-            case .oCounterAsc: return "O Count (Low-High)"
-            case .oCounterAllDesc: return "O Count incl. Sub-Studios (High-Low)"
-            case .oCounterAllAsc: return "O Count incl. Sub-Studios (Low-High)"
-            case .performerCountAllDesc: return "Performer Count incl. Sub-Studios (High-Low)"
-            case .performerCountAllAsc: return "Performer Count incl. Sub-Studios (Low-High)"
-            case .markerCountDesc: return "Marker Count (High-Low)"
-            case .markerCountAsc: return "Marker Count (Low-High)"
-            case .random: return "Random"
+            case .nameAsc: return tr("name_z")
+            case .nameDesc: return tr("name_z_2")
+            case .sceneCountDesc: return tr("scene_count_high_low")
+            case .sceneCountAsc: return tr("scene_count_low_high")
+            case .updatedAtDesc: return tr("updated_newest_first")
+            case .updatedAtAsc: return tr("updated_oldest_first")
+            case .createdAtDesc: return tr("created_newest_first")
+            case .createdAtAsc: return tr("created_oldest_first")
+            case .ratingDesc: return tr("rating_high_low")
+            case .ratingAsc: return tr("rating_low_high")
+            case .performerCountDesc: return tr("performer_count_high_low")
+            case .performerCountAsc: return tr("performer_count_low_high")
+            case .galleryCountDesc: return tr("gallery_count_high_low")
+            case .galleryCountAsc: return tr("gallery_count_low_high")
+            case .imageCountDesc: return tr("image_count_high_low")
+            case .imageCountAsc: return tr("image_count_low_high")
+            case .oCounterDesc: return tr("o_count_high_low")
+            case .oCounterAsc: return tr("o_count_low_high")
+            case .oCounterAllDesc: return tr("o_count_incl_sub_studios_high")
+            case .oCounterAllAsc: return tr("o_count_incl_sub_studios_low")
+            case .performerCountAllDesc: return tr("performer_count_incl_sub_studios_high")
+            case .performerCountAllAsc: return tr("performer_count_incl_sub_studios_low")
+            case .markerCountDesc: return tr("marker_count_high_low")
+            case .markerCountAsc: return tr("marker_count_low_high")
+            case .random: return tr("random")
             }
         }
 
@@ -1559,30 +1559,30 @@ class StashDBViewModel: ObservableObject {
 
         var displayName: String {
             switch self {
-            case .dateDesc: return "Date (Newest First)"
-            case .dateAsc: return "Date (Oldest First)"
-            case .productionDateDesc: return "Production Date (Newest First)"
-            case .productionDateAsc: return "Production Date (Oldest First)"
-            case .createdAtDesc: return "Created (Newest First)"
-            case .createdAtAsc: return "Created (Oldest First)"
-            case .titleAsc: return "Title (A-Z)"
-            case .titleDesc: return "Title (Z-A)"
-            case .durationDesc: return "Duration (Longest First)"
-            case .durationAsc: return "Duration (Shortest First)"
-            case .lastPlayedAtDesc: return "Last Played (Newest First)"
-            case .lastPlayedAtAsc: return "Last Played (Oldest First)"
-            case .playCountDesc: return "Most Viewed"
-            case .playCountAsc: return "Least Viewed"
-            case .playDurationDesc: return "Watch Time (High-Low)"
-            case .playDurationAsc: return "Watch Time (Low-High)"
-            case .oCounterDesc: return "Counter (High-Low)"
-            case .oCounterAsc: return "Counter (Low-High)"
-            case .ratingDesc: return "Rating (High-Low)"
-            case .ratingAsc: return "Rating (Low-High)"
-            case .random: return "Random"
-            case .forYou: return "For You"
-            case .sceneNumberAsc: return "Scene No. (Ascending)"
-            case .sceneNumberDesc: return "Scene No. (Descending)"
+            case .dateDesc: return tr("date_newest_first")
+            case .dateAsc: return tr("date_oldest_first")
+            case .productionDateDesc: return tr("production_date_newest_first")
+            case .productionDateAsc: return tr("production_date_oldest_first")
+            case .createdAtDesc: return tr("created_newest_first")
+            case .createdAtAsc: return tr("created_oldest_first")
+            case .titleAsc: return tr("title_z")
+            case .titleDesc: return tr("title_z_2")
+            case .durationDesc: return tr("duration_longest_first")
+            case .durationAsc: return tr("duration_shortest_first")
+            case .lastPlayedAtDesc: return tr("last_played_newest_first")
+            case .lastPlayedAtAsc: return tr("last_played_oldest_first")
+            case .playCountDesc: return tr("most_viewed")
+            case .playCountAsc: return tr("least_viewed")
+            case .playDurationDesc: return tr("watch_time_high_low")
+            case .playDurationAsc: return tr("watch_time_low_high")
+            case .oCounterDesc: return tr("counter_high_low")
+            case .oCounterAsc: return tr("counter_low_high")
+            case .ratingDesc: return tr("rating_high_low")
+            case .ratingAsc: return tr("rating_low_high")
+            case .random: return tr("random")
+            case .forYou: return tr("for_you")
+            case .sceneNumberAsc: return tr("scene_no_ascending")
+            case .sceneNumberDesc: return tr("scene_no_descending")
             }
         }
 
@@ -1656,15 +1656,15 @@ class StashDBViewModel: ObservableObject {
 
         var displayName: String {
             switch self {
-            case .createdAtDesc: return "Created (Newest First)"
-            case .createdAtAsc: return "Created (Oldest First)"
-            case .updatedAtDesc: return "Updated (Newest First)"
-            case .updatedAtAsc: return "Updated (Oldest First)"
-            case .titleAsc: return "Title (A-Z)"
-            case .titleDesc: return "Title (Z-A)"
-            case .secondsAsc: return "Time (Start)"
-            case .secondsDesc: return "Time (End)"
-            case .random: return "Random"
+            case .createdAtDesc: return tr("created_newest_first")
+            case .createdAtAsc: return tr("created_oldest_first")
+            case .updatedAtDesc: return tr("updated_newest_first")
+            case .updatedAtAsc: return tr("updated_oldest_first")
+            case .titleAsc: return tr("title_z")
+            case .titleDesc: return tr("title_z_2")
+            case .secondsAsc: return tr("time_start")
+            case .secondsDesc: return tr("time_end")
+            case .random: return tr("random")
             }
         }
 
@@ -1708,23 +1708,23 @@ class StashDBViewModel: ObservableObject {
 
         var displayName: String {
             switch self {
-            case .nameAsc: return "Name (A-Z)"
-            case .nameDesc: return "Name (Z-A)"
-            case .sceneCountDesc: return "Scene Count (High-Low)"
-            case .sceneCountAsc: return "Scene Count (Low-High)"
-            case .imageCountDesc: return "Image Count (High-Low)"
-            case .imageCountAsc: return "Image Count (Low-High)"
-            case .galleryCountDesc: return "Gallery Count (High-Low)"
-            case .galleryCountAsc: return "Gallery Count (Low-High)"
-            case .markerCountDesc: return "Marker Count (High-Low)"
-            case .markerCountAsc: return "Marker Count (Low-High)"
-            case .performerCountDesc: return "Performer Count (High-Low)"
-            case .performerCountAsc: return "Performer Count (Low-High)"
-            case .updatedAtDesc: return "Updated (Newest First)"
-            case .updatedAtAsc: return "Updated (Oldest First)"
-            case .createdAtDesc: return "Created (Newest First)"
-            case .createdAtAsc: return "Created (Oldest First)"
-            case .random: return "Random"
+            case .nameAsc: return tr("name_z")
+            case .nameDesc: return tr("name_z_2")
+            case .sceneCountDesc: return tr("scene_count_high_low")
+            case .sceneCountAsc: return tr("scene_count_low_high")
+            case .imageCountDesc: return tr("image_count_high_low")
+            case .imageCountAsc: return tr("image_count_low_high")
+            case .galleryCountDesc: return tr("gallery_count_high_low")
+            case .galleryCountAsc: return tr("gallery_count_low_high")
+            case .markerCountDesc: return tr("marker_count_high_low")
+            case .markerCountAsc: return tr("marker_count_low_high")
+            case .performerCountDesc: return tr("performer_count_high_low")
+            case .performerCountAsc: return tr("performer_count_low_high")
+            case .updatedAtDesc: return tr("updated_newest_first")
+            case .updatedAtAsc: return tr("updated_oldest_first")
+            case .createdAtDesc: return tr("created_newest_first")
+            case .createdAtAsc: return tr("created_oldest_first")
+            case .random: return tr("random")
             }
         }
 
@@ -1771,23 +1771,23 @@ class StashDBViewModel: ObservableObject {
 
         var displayName: String {
             switch self {
-            case .nameAsc: return "Name (A-Z)"
-            case .nameDesc: return "Name (Z-A)"
-            case .sceneCountDesc: return "Scene Count (High-Low)"
-            case .sceneCountAsc: return "Scene Count (Low-High)"
-            case .galleryCountDesc: return "Gallery Count (High-Low)"
-            case .galleryCountAsc: return "Gallery Count (Low-High)"
-            case .performerCountDesc: return "Performer Count (High-Low)"
-            case .performerCountAsc: return "Performer Count (Low-High)"
-            case .dateDesc: return "Date (Newest First)"
-            case .dateAsc: return "Date (Oldest First)"
-            case .ratingDesc: return "Rating (High-Low)"
-            case .ratingAsc: return "Rating (Low-High)"
-            case .updatedAtDesc: return "Updated (Newest First)"
-            case .updatedAtAsc: return "Updated (Oldest First)"
-            case .createdAtDesc: return "Created (Newest First)"
-            case .createdAtAsc: return "Created (Oldest First)"
-            case .random: return "Random"
+            case .nameAsc: return tr("name_z")
+            case .nameDesc: return tr("name_z_2")
+            case .sceneCountDesc: return tr("scene_count_high_low")
+            case .sceneCountAsc: return tr("scene_count_low_high")
+            case .galleryCountDesc: return tr("gallery_count_high_low")
+            case .galleryCountAsc: return tr("gallery_count_low_high")
+            case .performerCountDesc: return tr("performer_count_high_low")
+            case .performerCountAsc: return tr("performer_count_low_high")
+            case .dateDesc: return tr("date_newest_first")
+            case .dateAsc: return tr("date_oldest_first")
+            case .ratingDesc: return tr("rating_high_low")
+            case .ratingAsc: return tr("rating_low_high")
+            case .updatedAtDesc: return tr("updated_newest_first")
+            case .updatedAtAsc: return tr("updated_oldest_first")
+            case .createdAtDesc: return tr("created_newest_first")
+            case .createdAtAsc: return tr("created_oldest_first")
+            case .random: return tr("random")
             }
         }
 
@@ -2501,7 +2501,7 @@ class StashDBViewModel: ObservableObject {
                     }
                     self.savedFiltersSettled = true
                     AppLog.error("❌ Error fetching saved filters: \(error.localizedDescription)")
-                    self.errorMessage = "Failed to load filters: \(error.localizedDescription)"
+                    self.errorMessage = tr("error_load_filters_arg", error.localizedDescription)
                     completion?(false)
                 }
             }
@@ -2607,7 +2607,7 @@ class StashDBViewModel: ObservableObject {
     ) {
         let trimmedName = name.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmedName.isEmpty else {
-            completion(.failure(NSError(domain: "stashy", code: -2, userInfo: [NSLocalizedDescriptionKey: "Name is empty"])))
+            completion(.failure(NSError(domain: "stashy", code: -2, userInfo: [NSLocalizedDescriptionKey: tr("name_is_empty")])))
             return
         }
         let previousLive = existingId.flatMap { savedFilters[$0]?.stashyLiveFragment } ?? [:]
@@ -2659,7 +2659,7 @@ class StashDBViewModel: ObservableObject {
                         return
                     }
                     guard let saved = env.data?.saveFilter else {
-                        let msg = "Save filter response missing data"
+                        let msg = tr("action_save_filter_response_missing_data")
                         self.errorMessage = msg
                         completion(.failure(NSError(domain: "graphql", code: -1, userInfo: [NSLocalizedDescriptionKey: msg])))
                         return
@@ -2691,7 +2691,7 @@ class StashDBViewModel: ObservableObject {
     ) {
         let trimmedName = name.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmedName.isEmpty else {
-            completion(.failure(NSError(domain: "stashy", code: -2, userInfo: [NSLocalizedDescriptionKey: "Name is empty"])))
+            completion(.failure(NSError(domain: "stashy", code: -2, userInfo: [NSLocalizedDescriptionKey: tr("name_is_empty")])))
             return
         }
         let previousLive = existingId.flatMap { savedFilters[$0]?.stashyLiveFragment } ?? [:]
@@ -2739,7 +2739,7 @@ class StashDBViewModel: ObservableObject {
                         return
                     }
                     guard let saved = env.data?.saveFilter else {
-                        let msg = "Save filter response missing data"
+                        let msg = tr("action_save_filter_response_missing_data")
                         self.errorMessage = msg
                         completion(.failure(NSError(domain: "graphql", code: -1, userInfo: [NSLocalizedDescriptionKey: msg])))
                         return
@@ -2786,7 +2786,7 @@ class StashDBViewModel: ObservableObject {
     ) {
         let trimmedName = name.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmedName.isEmpty else {
-            completion(.failure(NSError(domain: "stashy", code: -2, userInfo: [NSLocalizedDescriptionKey: "Name is empty"])))
+            completion(.failure(NSError(domain: "stashy", code: -2, userInfo: [NSLocalizedDescriptionKey: tr("name_is_empty")])))
             return
         }
         let existing = existingId.flatMap { savedFilters[$0] }
@@ -2839,7 +2839,7 @@ class StashDBViewModel: ObservableObject {
                         return
                     }
                     guard let saved = env.data?.saveFilter else {
-                        let msg = "Save filter response missing data"
+                        let msg = tr("action_save_filter_response_missing_data")
                         self.errorMessage = msg
                         completion(.failure(NSError(domain: "graphql", code: -1, userInfo: [NSLocalizedDescriptionKey: msg])))
                         return
@@ -2904,7 +2904,7 @@ class StashDBViewModel: ObservableObject {
                         return
                     }
                     guard env.data?.destroySavedFilter == true else {
-                        let msg = "Could not delete saved filter"
+                        let msg = tr("error_delete_saved_filter")
                         self.errorMessage = msg
                         completion(.failure(NSError(domain: "graphql", code: -1, userInfo: [NSLocalizedDescriptionKey: msg])))
                         return
@@ -2923,7 +2923,7 @@ class StashDBViewModel: ObservableObject {
     func testConnection(force: Bool = false) {
         guard let config = ServerConfigManager.shared.loadConfig(),
               config.hasValidConfig else {
-            errorMessage = "Server configuration is missing or incomplete"
+            errorMessage = tr("hint_server_configuration_is_missing_or")
             AppLog.error("❌ Test connection: No valid server configuration found")
             return
         }
@@ -2961,7 +2961,7 @@ class StashDBViewModel: ObservableObject {
         // AppLog.debug("📱 Server config: Type=\(customConfig.connectionType), Domain=\(customConfig.domain), IP=\(customConfig.ipAddress), Port=\(customConfig.port)")
 
         guard let url = URL(string: urlString) else {
-            errorMessage = "Invalid URL: \(urlString)"
+            errorMessage = tr("invalid_url_arg", urlString)
             // isLoading = false
             return
         }
@@ -3005,9 +3005,9 @@ class StashDBViewModel: ObservableObject {
                 case .failure(let error):
                     // Handle Timeout specifically
                     if let urlError = error as? URLError, urlError.code == .timedOut {
-                         self?.serverStatus = "Not connected (Timeout)"
+                         self?.serverStatus = tr("not_connected_timeout")
                          self?.isServerConnected = false
-                         self?.errorMessage = "Connection timed out after 30 seconds."
+                         self?.errorMessage = tr("hint_connection_timed_out_after_30")
                     } else {
                         AppLog.error("❌ Connection Error: \(error.localizedDescription)")
                         self?.isServerConnected = false
@@ -3016,9 +3016,9 @@ class StashDBViewModel: ObservableObject {
                 }
             } receiveValue: { [weak self] response in
                 self?.isLoading = false
-                let version = response.data?.version.version ?? "Unknown"
+                let version = response.data?.version.version ?? tr("unknown")
                 AppLog.debug("📱 Version erhalten: \(version)")
-                self?.serverStatus = "Connected - Version: \(version)"
+                self?.serverStatus = tr("connected_version_arg", version)
                 StashServerCapabilities.record(version: version, serverID: customConfig.id)
                 self?.isServerConnected = true
                 self?.errorMessage = nil // Clear error on success
@@ -3058,7 +3058,7 @@ class StashDBViewModel: ObservableObject {
                 }
             } else {
                 DispatchQueue.main.async {
-                    self.errorMessage = "Statistics could not be loaded"
+                    self.errorMessage = tr("statistics_could_not_be_loaded")
                     completion?(false)
                 }
             }
@@ -3468,7 +3468,7 @@ class StashDBViewModel: ObservableObject {
                     self.markersInitialInflightKey = nil
                     self.isLoadingMarkers = false
                     self.isLoading = false
-                    self.errorMessage = "Could not load markers"
+                    self.errorMessage = tr("error_load_markers")
                     self.noteFeedFailure("markers")
                 }
             }
@@ -3611,7 +3611,7 @@ class StashDBViewModel: ObservableObject {
                         // of rendering a silent blank screen.
                         if self.previews.isEmpty {
                             let scanned = page * self.previewsPerPage
-                            self.errorMessage = "No scenes with previews found in the first \(scanned) scenes."
+                            self.errorMessage = tr("hint_no_scenes_with_previews_found", scanned)
                         }
 
                         if !isInitialLoad {
@@ -4294,7 +4294,7 @@ class StashDBViewModel: ObservableObject {
 
         return SavedFilter(
             id: filter?.id ?? "merged_temp",
-            name: filter?.name ?? "Merged Filter",
+            name: filter?.name ?? tr("merged_filter"),
             mode: mode,
             filter: filter?.filter,
             object_filter: jsonValue,
@@ -4589,7 +4589,7 @@ class StashDBViewModel: ObservableObject {
                     }
                     self.hasMorePerformerScenes = false
                     if isInitialLoad { self.performerDetailScenesInitialFetchCompleted = true }
-                    self.errorMessage = "Szenen des Schauspielers konnten nicht geladen werden"
+                    self.errorMessage = tr("error_load_performer_scenes")
                 }
             }
         }
@@ -4947,7 +4947,7 @@ class StashDBViewModel: ObservableObject {
               let bodyString = String(data: bodyData, encoding: .utf8) else {
             DispatchQueue.main.async {
                 self.isLoadingDetailImages = false
-                let msg = "Could not load images"
+                let msg = tr("error_load_images")
                 self.imageFindListError = msg
                 self.errorMessage = msg
             }
@@ -4969,7 +4969,7 @@ class StashDBViewModel: ObservableObject {
                     self.imageFindListError = nil
                 } else {
                     self.hasMoreDetailImages = false
-                    let msg = self.errorMessage ?? "Could not load images"
+                    let msg = self.errorMessage ?? tr("error_load_images")
                     self.imageFindListError = msg
                     if self.errorMessage == nil {
                         self.errorMessage = msg
@@ -5101,7 +5101,7 @@ class StashDBViewModel: ObservableObject {
                     } else {
                         self.isLoadingStudioScenes = false
                     }
-                    self.errorMessage = "Szenen des Studios konnten nicht geladen werden"
+                    self.errorMessage = tr("error_load_studio_scenes")
                 }
             }
         }
@@ -5385,7 +5385,7 @@ class StashDBViewModel: ObservableObject {
                     guard generation == self.studiosFetchGeneration else { return }
                     if isInitialLoad {
                         self.isLoadingStudios = false
-                        self.errorMessage = "Studios konnten nicht geladen werden"
+                        self.errorMessage = tr("error_load_studios")
                     } else {
                         if self.currentStudioPage == page { self.currentStudioPage -= 1 }
                         self.isLoadingMoreStudios = false
@@ -5705,7 +5705,7 @@ class StashDBViewModel: ObservableObject {
                 DispatchQueue.main.async {
                     self.isLoadingGroupScenes = false
                     if isInitialLoad {
-                        self.errorMessage = "Szenen der Gruppe konnten nicht geladen werden"
+                        self.errorMessage = tr("error_load_group_scenes")
                     }
                 }
             }
@@ -5901,7 +5901,7 @@ class StashDBViewModel: ObservableObject {
             } else {
                 DispatchQueue.main.async {
                     self.isLoadingTagScenes = false
-                    self.errorMessage = "Could not load tag scenes"
+                    self.errorMessage = tr("error_load_tag_scenes")
                 }
             }
         }
@@ -6094,7 +6094,7 @@ class StashDBViewModel: ObservableObject {
                 DispatchQueue.main.async {
                     guard generation == self.galleriesFetchGeneration else { return }
                     self.isLoadingGalleries = false
-                    self.errorMessage = "Could not load galleries"
+                    self.errorMessage = tr("error_load_galleries")
                 }
             }
         }
@@ -6153,7 +6153,7 @@ class StashDBViewModel: ObservableObject {
               let bodyString = String(data: bodyData, encoding: .utf8) else {
             DispatchQueue.main.async {
                 self.isLoadingGalleryImages = false
-                let msg = "Could not load images"
+                let msg = tr("error_load_images")
                 self.imageFindListError = msg
                 self.errorMessage = msg
             }
@@ -6179,7 +6179,7 @@ class StashDBViewModel: ObservableObject {
             } else {
                 DispatchQueue.main.async {
                     self.isLoadingGalleryImages = false
-                    let msg = self.errorMessage ?? "Could not load images"
+                    let msg = self.errorMessage ?? tr("error_load_images")
                     self.imageFindListError = msg
                     if self.errorMessage == nil {
                         self.errorMessage = msg
@@ -6299,7 +6299,7 @@ class StashDBViewModel: ObservableObject {
               let bodyString = String(data: bodyData, encoding: .utf8) else {
             DispatchQueue.main.async {
                 self.isLoadingImages = false
-                let msg = "Could not load images"
+                let msg = tr("error_load_images")
                 self.imageFindListError = msg
                 self.errorMessage = msg
             }
@@ -6331,7 +6331,7 @@ class StashDBViewModel: ObservableObject {
                     guard requestGeneration == self.imagesFetchGeneration else { return }
                     if isInitialLoad { self.imagesInitialInflightKey = nil }
                     self.isLoadingImages = false
-                    let msg = self.errorMessage ?? "Could not load images"
+                    let msg = self.errorMessage ?? tr("error_load_images")
                     self.imageFindListError = msg
                     if self.errorMessage == nil {
                         self.errorMessage = msg
@@ -6642,7 +6642,7 @@ class StashDBViewModel: ObservableObject {
               let bodyString = String(data: bodyData, encoding: .utf8) else {
             isLoadingClips = false
             if errorMessage == nil {
-                errorMessage = "Could not load clips"
+                errorMessage = tr("error_load_clips")
             }
             return
         }
@@ -6680,7 +6680,7 @@ class StashDBViewModel: ObservableObject {
                     }
                     if isInitialLoad, self.clips.isEmpty {
                         if self.errorMessage == nil {
-                            self.errorMessage = "Could not load clips"
+                            self.errorMessage = tr("error_load_clips")
                         }
                     }
                     self.noteFeedFailure("clips")
@@ -7023,7 +7023,7 @@ class StashDBViewModel: ObservableObject {
         completion: @escaping (T?) -> Void
     ) {
         guard ServerConfigManager.shared.loadConfig()?.hasValidConfig == true else {
-            errorMessage = "Server configuration is missing or incomplete"
+            errorMessage = tr("hint_server_configuration_is_missing_or")
             AppLog.error("❌ No valid server configuration found")
             completion(nil)
             return
@@ -7064,7 +7064,7 @@ class StashDBViewModel: ObservableObject {
     private func handleNetworkError(_ error: GraphQLNetworkError) {
         if isCancellation(error) { return }
         errorMessage = error.errorDescription
-        serverStatus = "Connection failed"
+        serverStatus = tr("error_connection")
         // "AuthError401" is posted once by GraphQLClient.validateResponse.
     }
 
@@ -7074,28 +7074,28 @@ class StashDBViewModel: ObservableObject {
         
         if let probeError = error as? StashConnectionProbeError {
             errorMessage = probeError.message
-            serverStatus = "Connection failed"
+            serverStatus = tr("error_connection")
             return
         }
         if let urlError = error as? URLError {
-            let urlContext = ServerConfigManager.shared.loadConfig()?.baseURL ?? "Unknown URL"
+            let urlContext = ServerConfigManager.shared.loadConfig()?.baseURL ?? tr("unknown_url")
             switch urlError.code {
             case .notConnectedToInternet:
-                errorMessage = "No internet connection"
+                errorMessage = tr("empty_internet_connection")
             case .cannotConnectToHost:
-                errorMessage = "Server not reachable (\(urlContext)) - check IP/Port/SSL"
+                errorMessage = tr("hint_server_not_reachable_arg_check", urlContext)
             case .timedOut:
-                errorMessage = "Connection timed out (\(urlContext)) - is server running?"
+                errorMessage = tr("confirm_connection_timed_out_arg_is", urlContext)
             default:
-                errorMessage = "Network Error: \(urlError.localizedDescription) (\(urlContext))"
+                errorMessage = tr("network_error_arg_arg", urlError.localizedDescription, urlContext)
             }
         } else if let decodingError = error as? DecodingError {
             AppLog.debug("📱 Decoding Error: \(decodingError)")
-            errorMessage = "Could not process server response"
+            errorMessage = tr("error_process_server_response")
         } else {
-            errorMessage = "Error: \(error.localizedDescription)"
+            errorMessage = tr("error_arg", error.localizedDescription)
         }
-        serverStatus = "Connection failed"
+        serverStatus = tr("error_connection")
     }
     
     // MARK: - Library Actions
@@ -7143,7 +7143,7 @@ class StashDBViewModel: ObservableObject {
             let body: [String: Any] = ["query": scanQuery, "variables": ["input": options]]
             guard let bodyData = try? JSONSerialization.data(withJSONObject: body),
                   let bodyString = String(data: bodyData, encoding: .utf8) else {
-                completion(false, "Failed to build scan request.")
+                completion(false, tr("error_build_scan_request"))
                 return
             }
 
@@ -7151,9 +7151,9 @@ class StashDBViewModel: ObservableObject {
                 if let jobId = response?.data?["metadataScan"], !jobId.isEmpty {
                     let enabled = options.values.filter { $0 }.count
                     let suffix = options.isEmpty ? "" : " (\(enabled) server options applied)"
-                    completion(true, "Library scan started successfully!" + suffix)
+                    completion(true, tr("library_scan_started_successfully") + suffix)
                 } else {
-                    completion(false, "Failed to start library scan. Please check your server configuration.")
+                    completion(false, tr("error_start_library_scan_please_check"))
                 }
             }
         }
@@ -7191,7 +7191,7 @@ class StashDBViewModel: ObservableObject {
         let configBody: [String: Any] = ["query": configQuery]
         guard let configData = try? JSONSerialization.data(withJSONObject: configBody),
               let configString = String(data: configData, encoding: .utf8) else {
-            completion(false, "Failed to build configuration request.", nil)
+            completion(false, tr("error_build_configuration_request"), nil)
             return
         }
 
@@ -7199,7 +7199,7 @@ class StashDBViewModel: ObservableObject {
             let config = response?.data?.configuration
             let boxes = config?.general?.stashBoxes ?? []
             if boxes.isEmpty {
-                completion(false, "No Stash-Box endpoints configured on this server.", nil)
+                completion(false, tr("empty_stash_box_endpoints_configured_on"), nil)
                 return
             }
 
@@ -7250,7 +7250,7 @@ class StashDBViewModel: ObservableObject {
             let body: [String: Any] = ["query": identifyQuery, "variables": ["input": input]]
             guard let bodyData = try? JSONSerialization.data(withJSONObject: body),
                   let bodyString = String(data: bodyData, encoding: .utf8) else {
-                completion(false, "Failed to build identify request.", nil)
+                completion(false, tr("error_build_identify_request"), nil)
                 return
             }
 
@@ -7258,18 +7258,18 @@ class StashDBViewModel: ObservableObject {
                 if let jobId = response?.data?["metadataIdentify"], !jobId.isEmpty {
                     let names = boxes.map { $0.name ?? $0.endpoint }.joined(separator: ", ")
                     if let sceneIDs, sceneIDs.count == 1 {
-                        completion(true, "Identify started for this scene using: \(names)", jobId)
+                        completion(true, tr("hint_identify_started_for_this_scene", names), jobId)
                     } else if let sceneIDs, !sceneIDs.isEmpty {
-                        completion(true, "Identify started for \(sceneIDs.count) scenes using: \(names)", jobId)
+                        completion(true, tr("hint_identify_started_for_arg_scenes", sceneIDs.count, names), jobId)
                     } else {
-                        completion(true, "Identify started using: \(names)", jobId)
+                        completion(true, tr("action_identify_started_using_arg", names), jobId)
                     }
                 } else if response != nil {
                     // Older servers may omit / null the job id; treat as started without tracking.
                     let names = boxes.map { $0.name ?? $0.endpoint }.joined(separator: ", ")
-                    completion(true, "Identify started using: \(names)", nil)
+                    completion(true, tr("action_identify_started_using_arg", names), nil)
                 } else {
-                    completion(false, "Failed to start identify. Please check your server configuration.", nil)
+                    completion(false, tr("error_start_identify_please_check_your"), nil)
                 }
             }
         }
@@ -7291,15 +7291,15 @@ class StashDBViewModel: ObservableObject {
                     sawJob = true
                     switch job.status.uppercased() {
                     case "FINISHED":
-                        completion(true, job.description ?? "Identify finished")
+                        completion(true, job.description ?? tr("action_identify_finished"))
                     case "FAILED":
-                        completion(false, job.error ?? "Identify failed")
+                        completion(false, job.error ?? tr("error_identify"))
                     case "CANCELLED":
-                        completion(false, "Identify was cancelled")
+                        completion(false, tr("action_identify_was_cancelled"))
                     default:
                         // READY / RUNNING / STOPPING
                         guard Date() < deadline else {
-                            completion(false, "Identify timed out")
+                            completion(false, tr("action_identify_timed_out"))
                             return
                         }
                         DispatchQueue.main.asyncAfter(deadline: .now() + pollInterval) {
@@ -7311,11 +7311,11 @@ class StashDBViewModel: ObservableObject {
 
                 // Job missing from queue: finished jobs are often purged quickly.
                 if sawJob {
-                    completion(true, "Identify finished")
+                    completion(true, tr("action_identify_finished"))
                     return
                 }
                 guard Date() < deadline else {
-                    completion(false, "Identify job not found")
+                    completion(false, tr("action_identify_job_not_found"))
                     return
                 }
                 DispatchQueue.main.asyncAfter(deadline: .now() + pollInterval) {
@@ -7463,16 +7463,16 @@ class StashDBViewModel: ObservableObject {
         let body: [String: Any] = ["query": query, "variables": ["input": input]]
         guard let bodyData = try? JSONSerialization.data(withJSONObject: body),
               let bodyString = String(data: bodyData, encoding: .utf8) else {
-            completion(false, "Failed to build generate request.", nil)
+            completion(false, tr("error_build_generate_request"), nil)
             return
         }
         performGraphQLQuery(query: bodyString) { (response: GenericMutationResponse?) in
             if let jobId = response?.data?["metadataGenerate"], !jobId.isEmpty {
-                completion(true, "Generate started successfully!", jobId)
+                completion(true, tr("action_generate_started_successfully"), jobId)
             } else if response != nil {
-                completion(true, "Generate started successfully!", nil)
+                completion(true, tr("action_generate_started_successfully"), nil)
             } else {
-                completion(false, "Failed to start generate. Please check your server configuration.", nil)
+                completion(false, tr("error_start_generate_please_check_your"), nil)
             }
         }
     }
@@ -7494,11 +7494,11 @@ class StashDBViewModel: ObservableObject {
         do {
             let data = try await GraphQLClient.shared.executeRaw(query: query, variables: variables)
             guard let json = try JSONSerialization.jsonObject(with: data) as? [String: Any] else {
-                return ServerTaskResult(ok: false, value: nil, error: "Unreadable server response.")
+                return ServerTaskResult(ok: false, value: nil, error: tr("unreadable_server_response"))
             }
             if let errors = json["errors"] as? [[String: Any]], !errors.isEmpty {
                 let message = errors.compactMap { $0["message"] as? String }.joined(separator: "\n")
-                return ServerTaskResult(ok: false, value: nil, error: message.isEmpty ? "The server rejected the task." : message)
+                return ServerTaskResult(ok: false, value: nil, error: message.isEmpty ? tr("server_rejected_task") : message)
             }
             let value = (json["data"] as? [String: Any])?[field]
             let text = value as? String ?? (value as? NSNumber)?.stringValue
@@ -10850,7 +10850,7 @@ struct Gallery: Codable, Identifiable, Equatable {
     
     var displayName: String {
         if !title.isEmpty { return title }
-        return "Untitled Gallery"
+        return tr("untitled_gallery")
     }
 }
 
@@ -11180,7 +11180,7 @@ struct StashImage: Codable, Identifiable, Equatable {
             return URL(fileURLWithPath: cleanPath).lastPathComponent
         }
         // Last resort: use ID
-        return "Image \(id.prefix(8))"
+        return tr("image_arg", id.prefix(8))
     }
 }
 
@@ -11297,9 +11297,9 @@ struct DownloadedGallery: Codable, Identifiable {
         let trimmed = title?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
         if !trimmed.isEmpty { return trimmed }
         switch resolvedKind {
-        case .image: return "Untitled image"
-        case .tag: return "Untitled tag"
-        case .gallery: return "Untitled gallery"
+        case .image: return tr("untitled_image")
+        case .tag: return tr("untitled_tag")
+        case .gallery: return tr("untitled_gallery")
         }
     }
 
@@ -11347,7 +11347,7 @@ struct DownloadedGalleryImage: Codable, Identifiable, Equatable {
     /// What the downloads grid shows.
     var displayTitle: String {
         let trimmed = title?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
-        return trimmed.isEmpty ? "Untitled" : trimmed
+        return trimmed.isEmpty ? tr("untitled") : trimmed
     }
 }
 
@@ -11631,7 +11631,7 @@ class DownloadManager: NSObject, ObservableObject {
         #if !os(tvOS)
         guard StashyPlusManager.isUnlockedNow else {
             ToastManager.shared.show(
-                "Downloads are part of stashy+ — unlock in Settings",
+                tr("hint_downloads_are_part_of_stashy"),
                 icon: "sparkles",
                 style: .error
             )
@@ -11646,7 +11646,7 @@ class DownloadManager: NSObject, ObservableObject {
         queuedSceneIds.insert(sceneId)
         activeDownloads[sceneId] = ActiveDownload(
             id: sceneId,
-            title: scene.title ?? "Unknown Scene",
+            title: scene.title ?? tr("unknown_scene"),
             progress: 0,
             totalSize: 0,
             downloadedSize: 0
@@ -11693,7 +11693,7 @@ class DownloadManager: NSObject, ObservableObject {
 
     private func startDownload(_ scene: Scene) {
         let sceneId = scene.id
-        let title = scene.title ?? "Unknown Scene"
+        let title = scene.title ?? tr("unknown_scene")
         
         // Mark as started
         DispatchQueue.main.async {
@@ -11905,14 +11905,14 @@ class DownloadManager: NSObject, ObservableObject {
                 let pending = scenes.filter { !self.isDownloaded(id: $0.id) && self.activeDownloads[$0.id] == nil }
                 guard !pending.isEmpty else {
                     self.notifyDownload(
-                        scenes.isEmpty ? "No scenes for \(scopeName)" : "All scenes already downloaded",
+                        scenes.isEmpty ? tr("empty_scenes_for_arg", scopeName) : tr("all_scenes_already_downloaded"),
                         icon: "checkmark.circle.fill",
                         isError: false
                     )
                     return
                 }
                 self.notifyDownload(
-                    "Downloading \(pending.count) scene(s) from \(scopeName)",
+                    tr("downloading_arg_scene_s_from", pending.count, scopeName),
                     icon: "arrow.down.circle.fill",
                     isError: false
                 )
@@ -11987,7 +11987,7 @@ class DownloadManager: NSObject, ObservableObject {
             let folder = downloadsFolder.appendingPathComponent(Self.galleryFolderName(for: id), isDirectory: true)
             try? FileManager.default.removeItem(at: folder)
         }
-        notifyDownload("Download cancelled", icon: "xmark.circle")
+        notifyDownload(tr("action_download_cancelled"), icon: "xmark.circle")
     }
 
     func isGalleryDownloaded(id: String) -> Bool {
@@ -12062,7 +12062,7 @@ class DownloadManager: NSObject, ObservableObject {
         guard !isGalleryDownloaded(id: entryId), activeDownloads[entryId] == nil else { return }
 
         let fileTitle = image.downloadTitle
-        let title = fileTitle ?? "Image"
+        let title = fileTitle ?? tr("image")
         activeDownloads[entryId] = ActiveDownload(id: entryId, title: title, progress: 0.05, totalSize: 0, downloadedSize: 0)
 
         let folder = downloadsFolder.appendingPathComponent(Self.galleryFolderName(for: entryId), isDirectory: true)
@@ -12074,7 +12074,7 @@ class DownloadManager: NSObject, ObservableObject {
                 self.activeDownloads.removeValue(forKey: entryId)
                 guard !stored.isEmpty else {
                     try? FileManager.default.removeItem(at: folder)
-                    self.notifyDownload("Download failed", icon: "exclamationmark.triangle.fill", isError: true)
+                    self.notifyDownload(tr("error_download"), icon: "exclamationmark.triangle.fill", isError: true)
                     return
                 }
                 let entry = DownloadedGallery(
@@ -12091,7 +12091,7 @@ class DownloadManager: NSObject, ObservableObject {
                 )
                 self.galleryDownloads.append(entry)
                 self.saveGalleryMetadata()
-                self.notifyDownload("Image downloaded", icon: "checkmark.circle.fill")
+                self.notifyDownload(tr("image_downloaded"), icon: "checkmark.circle.fill")
             }
         }
     }
@@ -12102,7 +12102,7 @@ class DownloadManager: NSObject, ObservableObject {
         let galleryId = gallery.id
         guard !isGalleryDownloaded(id: galleryId), activeDownloads[galleryId] == nil else { return }
 
-        let title = gallery.title.isEmpty ? "Gallery" : gallery.title
+        let title = gallery.title.isEmpty ? tr("gallery") : gallery.title
         activeDownloads[galleryId] = ActiveDownload(id: galleryId, title: title, progress: 0.02, totalSize: 0, downloadedSize: 0)
 
         fetchGalleryImagesForDownload(galleryId: galleryId, limit: limit) { [weak self] images, total in
@@ -12110,7 +12110,7 @@ class DownloadManager: NSObject, ObservableObject {
             guard !images.isEmpty else {
                 Task { @MainActor in
                     self.activeDownloads.removeValue(forKey: galleryId)
-                    self.notifyDownload("Gallery has no images", icon: "exclamationmark.triangle.fill", isError: true)
+                    self.notifyDownload(tr("gallery_has_no_images"), icon: "exclamationmark.triangle.fill", isError: true)
                 }
                 return
             }
@@ -12122,7 +12122,7 @@ class DownloadManager: NSObject, ObservableObject {
                     self.activeDownloads.removeValue(forKey: galleryId)
                     guard !stored.isEmpty else {
                         try? FileManager.default.removeItem(at: folder)
-                        self.notifyDownload("Download failed", icon: "exclamationmark.triangle.fill", isError: true)
+                        self.notifyDownload(tr("error_download"), icon: "exclamationmark.triangle.fill", isError: true)
                         return
                     }
                     let entry = DownloadedGallery(
@@ -12139,7 +12139,7 @@ class DownloadManager: NSObject, ObservableObject {
                     )
                     self.galleryDownloads.append(entry)
                     self.saveGalleryMetadata()
-                    self.notifyDownload("Downloaded \(stored.count) image(s)", icon: "checkmark.circle.fill")
+                    self.notifyDownload(tr("downloaded_arg_image_s", stored.count), icon: "checkmark.circle.fill")
                 }
             }
         }
@@ -12159,7 +12159,7 @@ class DownloadManager: NSObject, ObservableObject {
             guard !images.isEmpty else {
                 Task { @MainActor in
                     self.activeDownloads.removeValue(forKey: entryId)
-                    self.notifyDownload("No images for this tag", icon: "exclamationmark.triangle.fill", isError: true)
+                    self.notifyDownload(tr("empty_images_for_this_tag"), icon: "exclamationmark.triangle.fill", isError: true)
                 }
                 return
             }
@@ -12171,7 +12171,7 @@ class DownloadManager: NSObject, ObservableObject {
                     self.activeDownloads.removeValue(forKey: entryId)
                     guard !stored.isEmpty else {
                         try? FileManager.default.removeItem(at: folder)
-                        self.notifyDownload("Download failed", icon: "exclamationmark.triangle.fill", isError: true)
+                        self.notifyDownload(tr("error_download"), icon: "exclamationmark.triangle.fill", isError: true)
                         return
                     }
                     let entry = DownloadedGallery(
@@ -12188,7 +12188,7 @@ class DownloadManager: NSObject, ObservableObject {
                     )
                     self.galleryDownloads.append(entry)
                     self.saveGalleryMetadata()
-                    self.notifyDownload("Downloaded \(stored.count) image(s)", icon: "checkmark.circle.fill")
+                    self.notifyDownload(tr("downloaded_arg_image_s", stored.count), icon: "checkmark.circle.fill")
                 }
             }
         }
@@ -12214,7 +12214,7 @@ class DownloadManager: NSObject, ObservableObject {
                         self.galleryDownloads[index].serverImageCount = total
                         self.saveGalleryMetadata()
                     }
-                    self.notifyDownload("Already up to date", icon: "checkmark.circle")
+                    self.notifyDownload(tr("already_up_to_date"), icon: "checkmark.circle")
                 }
                 return
             }
@@ -12229,7 +12229,7 @@ class DownloadManager: NSObject, ObservableObject {
                     self.galleryDownloads[index].downloadDate = Date()
                     self.galleryDownloads[index].serverImageCount = total
                     self.saveGalleryMetadata()
-                    self.notifyDownload("Added \(stored.count) new image(s)", icon: "checkmark.circle.fill")
+                    self.notifyDownload(tr("added_arg_new_image_s", stored.count), icon: "checkmark.circle.fill")
                 }
             }
         }
@@ -12252,7 +12252,7 @@ class DownloadManager: NSObject, ObservableObject {
             guard !fresh.isEmpty else {
                 Task { @MainActor in
                     self.activeDownloads.removeValue(forKey: entryId)
-                    self.notifyDownload(images.isEmpty ? "No images for this filter" : "Already up to date", icon: "checkmark.circle")
+                    self.notifyDownload(images.isEmpty ? tr("empty_images_for_this_filter") : tr("already_up_to_date"), icon: "checkmark.circle")
                 }
                 return
             }
@@ -12264,7 +12264,7 @@ class DownloadManager: NSObject, ObservableObject {
                     self.activeDownloads.removeValue(forKey: entryId)
                     guard !stored.isEmpty else {
                         if existing == nil { try? FileManager.default.removeItem(at: folder) }
-                        self.notifyDownload("Download failed", icon: "exclamationmark.triangle.fill", isError: true)
+                        self.notifyDownload(tr("error_download"), icon: "exclamationmark.triangle.fill", isError: true)
                         return
                     }
                     if let index = self.galleryDownloads.firstIndex(where: { $0.id == entryId }) {
@@ -12289,7 +12289,7 @@ class DownloadManager: NSObject, ObservableObject {
                         )
                     }
                     self.saveGalleryMetadata()
-                    self.notifyDownload("Added \(stored.count) image(s) from \(filterName)", icon: "checkmark.circle.fill")
+                    self.notifyDownload(tr("added_arg_image_s_from", stored.count, filterName), icon: "checkmark.circle.fill")
                 }
             }
         }
@@ -12396,7 +12396,7 @@ class DownloadManager: NSObject, ObservableObject {
                         self.galleryDownloads[index].serverImageCount = total
                         self.saveGalleryMetadata()
                     }
-                    self.notifyDownload("Already up to date", icon: "checkmark.circle")
+                    self.notifyDownload(tr("already_up_to_date"), icon: "checkmark.circle")
                 }
                 return
             }
@@ -12412,7 +12412,7 @@ class DownloadManager: NSObject, ObservableObject {
                     self.galleryDownloads[index].downloadDate = Date()
                     self.galleryDownloads[index].serverImageCount = total
                     self.saveGalleryMetadata()
-                    self.notifyDownload("Added \(stored.count) new image(s)", icon: "checkmark.circle.fill")
+                    self.notifyDownload(tr("added_arg_new_image_s", stored.count), icon: "checkmark.circle.fill")
                 }
             }
         }
@@ -12524,7 +12524,7 @@ class DownloadManager: NSObject, ObservableObject {
     private func requireDownloadEntitlement() -> Bool {
         guard StashyPlusManager.isUnlockedNow else {
             ToastManager.shared.show(
-                "Downloads are part of stashy+ — unlock in Settings",
+                tr("hint_downloads_are_part_of_stashy"),
                 icon: "sparkles",
                 style: .error
             )
@@ -13136,7 +13136,7 @@ class HandyManager: ObservableObject {
     }
     @Published var isSyncing: Bool = false
     @Published var isPlayingScript: Bool = false
-    @Published var statusMessage: String = "Not Configured"
+    @Published var statusMessage: String = tr("not_configured")
 
     // API v3
     private let baseURL = "https://www.handyfeeling.com/api/handy-rest/v3"
@@ -13240,7 +13240,7 @@ class HandyManager: ObservableObject {
 
     func checkConnection(completion: ((Bool) -> Void)? = nil) {
         guard !connectionKey.isEmpty else {
-            statusMessage = "No connection key"
+            statusMessage = tr("empty_connection_key")
             isConnected = false
             completion?(false)
             return
@@ -13255,17 +13255,17 @@ class HandyManager: ObservableObject {
                        let resultObj = json["result"] as? [String: Any],
                        let connected = resultObj["connected"] as? Bool {
                         self.isConnected = connected
-                        self.statusMessage = connected ? "Connected" : "Device Offline"
+                        self.statusMessage = connected ? tr("connected") : tr("device_offline")
                         AppLog.debug("📲 Handy v3: connected=\(connected)")
                         completion?(connected)
                     } else {
                         self.isConnected = false
-                        self.statusMessage = "Offline"
+                        self.statusMessage = tr("offline")
                         completion?(false)
                     }
                 case .failure(let error):
                     self.isConnected = false
-                    self.statusMessage = "Offline"
+                    self.statusMessage = tr("offline")
                     AppLog.error("❌ Handy v3: checkConnection failed: \(error.localizedDescription)")
                     completion?(false)
                 }
@@ -13284,7 +13284,7 @@ class HandyManager: ObservableObject {
         guard isConnected else {
             checkConnection { [weak self] connected in
                 if connected { self?.setupScene(funscriptURL: funscriptURL, at: seconds) }
-                else { DispatchQueue.main.async { self?.statusMessage = "Connect Device First" } }
+                else { DispatchQueue.main.async { self?.statusMessage = tr("action_connect_device_first") } }
             }
             return
         }
@@ -13292,12 +13292,12 @@ class HandyManager: ObservableObject {
         isSyncing = false
         // Always download with ApiKey header and upload to Handy Cloud.
         // Never send Stash URLs (especially with ?apikey=) to handyfeeling.com.
-        statusMessage = "Uploading script..."
+        statusMessage = tr("uploading_script_menu")
         uploadToHandyCloud(sourceUrl: funscriptURL) { [weak self] publicUrl in
             if let publicUrl = publicUrl {
                 self?.executeHSSPSetup(url: publicUrl, at: seconds)
             } else {
-                DispatchQueue.main.async { self?.statusMessage = "Upload Failed" }
+                DispatchQueue.main.async { self?.statusMessage = tr("error_upload") }
             }
         }
     }
@@ -13310,7 +13310,7 @@ class HandyManager: ObservableObject {
             guard let self = self else { return }
             switch result {
             case .failure:
-                DispatchQueue.main.async { self.statusMessage = "Mode Error" }
+                DispatchQueue.main.async { self.statusMessage = tr("mode_error") }
                 return
             case .success:
                 self.sendRequest(path: "/hssp/setup", method: "PUT", params: ["url": url.absoluteString, "timeout": 5000]) { [weak self] result in
@@ -13324,13 +13324,13 @@ class HandyManager: ObservableObject {
                             }
                             #endif
                             self.isSyncing = true
-                            self.statusMessage = "Synced & Ready"
+                            self.statusMessage = tr("synced_and_ready")
                             #if DEBUG
                             AppLog.debug("✅ Handy v3: HSSP setup successful")
                             #endif
                             if let seconds = seconds { self.play(at: seconds) }
                         case .failure(let error):
-                            self.statusMessage = "Sync Failed"
+                            self.statusMessage = tr("error_sync")
                             #if DEBUG
                             AppLog.error("❌ Handy v3: HSSP setup failed: \(error.localizedDescription)")
                             #endif
@@ -13495,7 +13495,7 @@ class ButtplugManager: ObservableObject {
     }
     @Published var isConnected: Bool = false
     @Published var isScanning: Bool = false
-    @Published var statusMessage: String = "Not Connected"
+    @Published var statusMessage: String = tr("not_connected")
     @Published var devices: [ButtplugDevice] = []
     
     private var webSocket: URLSessionWebSocketTask?
@@ -13556,7 +13556,7 @@ class ButtplugManager: ObservableObject {
     
     func connect() {
         guard let url = URL(string: serverAddress) else {
-            statusMessage = "Invalid URL"
+            statusMessage = tr("invalid_url")
             return
         }
         
@@ -13584,7 +13584,7 @@ class ButtplugManager: ObservableObject {
         webSocket = nil
         DispatchQueue.main.async {
             self.isConnected = false
-            self.statusMessage = "Disconnected"
+            self.statusMessage = tr("disconnected")
             self.devices.removeAll()
         }
     }
@@ -13634,7 +13634,7 @@ class ButtplugManager: ObservableObject {
             return
         }
         
-        statusMessage = "Loading Script..."
+        statusMessage = tr("loading_script")
         URLSession.shared.dataTask(with: authenticatedStashRequest(for: funscriptURL)) { [weak self] data, response, error in
             guard let self = self, let data = data else { return }
             
@@ -13644,7 +13644,7 @@ class ButtplugManager: ObservableObject {
                     self.currentScript = script
                     self.isSyncing = true
                     self.isStashSyncMode = false // EXCLUSIVITY
-                    self.statusMessage = "Script Loaded"
+                    self.statusMessage = tr("script_loaded")
                     AppLog.debug("✅ Buttplug: Loaded script with \(script.actions?.count ?? 0) actions")
                     if let seconds = seconds {
                         self.play(at: seconds)
@@ -13784,7 +13784,7 @@ class ButtplugManager: ObservableObject {
                 AppLog.error("❌ Buttplug: Receive failed: \(error)")
                 DispatchQueue.main.async {
                     self.isConnected = false
-                    self.statusMessage = "Offline"
+                    self.statusMessage = tr("offline")
                 }
             }
         }
@@ -13798,7 +13798,7 @@ class ButtplugManager: ObservableObject {
             if let _ = dict["ServerInfo"] as? [String: Any] {
                 DispatchQueue.main.async {
                     self.isConnected = true
-                    self.statusMessage = "Connected"
+                    self.statusMessage = tr("connected")
                     self.startScanning()
                     self.requestDeviceList()
                 }
@@ -13835,9 +13835,9 @@ class ButtplugManager: ObservableObject {
                     }
                     AppLog.debug("📱 Buttplug: Found \(self.devices.count) devices")
                 }
-            } else if let _ = dict["Ok"] as? [String: Any] {
+            } else if let _ = dict[tr("ok")] as? [String: Any] {
                 // Acknowledgement
-            } else if let error = dict["Error"] as? [String: Any] {
+            } else if let error = dict[tr("error_generic")] as? [String: Any] {
                 AppLog.error("⚠️ Buttplug Error: \(error["ErrorMessage"] ?? "Unknown")")
             }
         }
@@ -13885,7 +13885,7 @@ class LoveSpouseManager: NSObject, ObservableObject {
             }
         }
     }
-    @Published var statusMessage: String = "Not Connected"
+    @Published var statusMessage: String = tr("not_connected")
     @Published var isAdvertising: Bool = false
     
     @Published var isStashSyncMode: Bool = false {
@@ -13967,25 +13967,25 @@ class LoveSpouseManager: NSObject, ObservableObject {
     func setupScene(funscriptURL: URL, at seconds: Double? = nil) {
         isStashSyncMode = false // EXCLUSIVITY
         guard isEnabled else { return }
-        statusMessage = "Loading Script..."
+        statusMessage = tr("loading_script")
         URLSession.shared.dataTask(with: authenticatedStashRequest(for: funscriptURL)) { [weak self] data, response, error in
             guard let self = self else { return }
 
             if let error = error {
                 AppLog.error("❌ LoveSpouse: Network error fetching funscript: \(error)")
-                DispatchQueue.main.async { self.statusMessage = "Network Error" }
+                DispatchQueue.main.async { self.statusMessage = tr("network_error") }
                 return
             }
 
             if let http = response as? HTTPURLResponse, http.statusCode != 200 {
                 AppLog.error("❌ LoveSpouse: Funscript fetch returned HTTP \(http.statusCode) for \(redactedURLString(funscriptURL))")
-                DispatchQueue.main.async { self.statusMessage = "Script Error (\(http.statusCode))" }
+                DispatchQueue.main.async { self.statusMessage = tr("script_error_arg", http.statusCode) }
                 return
             }
 
             guard let data = data, !data.isEmpty else {
                 AppLog.error("❌ LoveSpouse: Funscript data empty for \(redactedURLString(funscriptURL))")
-                DispatchQueue.main.async { self.statusMessage = "Script Empty" }
+                DispatchQueue.main.async { self.statusMessage = tr("script_empty") }
                 return
             }
 
@@ -13994,7 +13994,7 @@ class LoveSpouseManager: NSObject, ObservableObject {
                 DispatchQueue.main.async {
                     self.currentScript = script
                     self.isSyncing = true
-                    self.statusMessage = "Script Loaded"
+                    self.statusMessage = tr("script_loaded")
                     AppLog.debug("✅ LoveSpouse: Loaded script with \(script.actions?.count ?? 0) actions")
                     if let seconds = seconds {
                         self.play(at: seconds)
@@ -14210,7 +14210,7 @@ extension LoveSpouseManager: CBPeripheralManagerDelegate {
         
         DispatchQueue.main.async {
             self.isConnected = isPoweredOn
-            self.statusMessage = isPoweredOn ? "Ready" : "Radio Off"
+            self.statusMessage = isPoweredOn ? tr("ready") : tr("radio_off")
             
             if isPoweredOn && self.isEnabled {
                 self.selectProgram(self.activeProgram)

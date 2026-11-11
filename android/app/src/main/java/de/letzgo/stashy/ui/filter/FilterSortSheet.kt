@@ -1,5 +1,7 @@
 package de.letzgo.stashy.ui.filter
 
+import de.letzgo.stashy.R
+import de.letzgo.stashy.tr
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -113,7 +115,7 @@ fun CatalogFilterSortSheet(
                     if (controller.supportsNameRegex) NameRegexSearchField(controller.nameRegex) { controller.commitNameRegex(it) }
                     Column {
                         // Header text lines up with the group's row text (Material settings look).
-                        NativeSectionHeader("Filter & sort", Modifier.padding(horizontal = 16.dp))
+                        NativeSectionHeader(tr(R.string.action_filter_and_sort), Modifier.padding(horizontal = 16.dp))
                         ControlGroup {
                             FilterPickerCard(controller)
                             NativeDivider()
@@ -140,8 +142,8 @@ fun CatalogFilterSortSheet(
     )
     nameDialog?.let { kind ->
         NameInputDialog(
-            title = if (kind == NameDialog.SaveAs) "Save as new" else "Rename",
-            message = if (kind == NameDialog.SaveAs) "Save the current sort, filter, and live criteria as a new Stash saved filter." else "Rename this preset or saved filter.",
+            title = if (kind == NameDialog.SaveAs) tr(R.string.action_save_as_new) else tr(R.string.action_rename),
+            message = if (kind == NameDialog.SaveAs) tr(R.string.hint_save_current_sort_filter_and) else tr(R.string.hint_rename_this_preset_or_saved),
             initial = if (kind == NameDialog.SaveAs) "" else controller.renameSeed,
             onSave = { name -> nameDialog = null; if (kind == NameDialog.SaveAs) controller.saveAs(name) else controller.rename(name) },
             onCancel = { nameDialog = null },
@@ -149,10 +151,10 @@ fun CatalogFilterSortSheet(
     }
     if (showDelete) AlertDialog(
         onDismissRequest = { showDelete = false },
-        title = { Text("Delete filter?") },
+        title = { Text(tr(R.string.confirm_delete_filter)) },
         text = { Text(controller.deleteConfirmationText) },
-        confirmButton = { TextButton({ showDelete = false; controller.delete() }) { Text("Delete", color = StashyColors.systemRed) } },
-        dismissButton = { TextButton({ showDelete = false }) { Text("Cancel") } },
+        confirmButton = { TextButton({ showDelete = false; controller.delete() }) { Text(tr(R.string.action_delete), color = StashyColors.systemRed) } },
+        dismissButton = { TextButton({ showDelete = false }) { Text(tr(R.string.action_cancel)) } },
         containerColor = p.secondaryBackground, titleContentColor = p.text, textContentColor = p.secondaryText,
     )
 }
@@ -184,7 +186,7 @@ fun NameRegexSearchField(committed: String, onCommit: (String) -> Boolean) {
             Icon(SF.magnifyingglass, null, Modifier.size(20.dp), tint = p.secondaryText)
             Spacer(Modifier.width(8.dp))
             Box(Modifier.weight(1f), contentAlignment = Alignment.CenterStart) {
-                if (draft.isEmpty()) Text("Name or regex", style = NativeType.bodyLarge, color = p.secondaryText, maxLines = 1)
+                if (draft.isEmpty()) Text(tr(R.string.name_or_regex), style = NativeType.bodyLarge, color = p.secondaryText, maxLines = 1)
                 BasicTextField(
                     value = draft,
                     onValueChange = { draft = it; invalid = false },
@@ -201,12 +203,12 @@ fun NameRegexSearchField(committed: String, onCommit: (String) -> Boolean) {
             }
             if (draft.isNotEmpty() || committed.isNotEmpty()) {
                 IconButton({ draft = ""; invalid = false; onCommit(""); focusManager.clearFocus() }, Modifier.size(40.dp)) {
-                    Icon(SF.xmarkCircleFill, "Clear", Modifier.size(18.dp), tint = p.secondaryText)
+                    Icon(SF.xmarkCircleFill, tr(R.string.action_clear), Modifier.size(18.dp), tint = p.secondaryText)
                 }
             }
         }
         if (invalid) Text(
-            "Invalid regex", Modifier.padding(start = 12.dp, top = 4.dp),
+            tr(R.string.invalid_regex), Modifier.padding(start = 12.dp, top = 4.dp),
             style = NativeType.bodySmall, color = StashyColors.systemRed,
         )
     }
@@ -214,10 +216,10 @@ fun NameRegexSearchField(committed: String, onCommit: (String) -> Boolean) {
 
 /** iOS: `CatalogSettingsSheetChromeBar` (Reset · "Settings" · Save · Done) → Material sheet top bar. */
 @Composable
-internal fun SheetChromeBar(onReset: () -> Unit, onSave: (() -> Unit)?, onDone: () -> Unit, title: String = "Settings") {
-    NativeSheetTopBar(title, onClose = onDone, closeDescription = "Done") {
-        NativeSheetAction("Reset", destructive = true, onClick = onReset)
-        if (onSave != null) NativeSheetAction("Save", onClick = onSave)
+internal fun SheetChromeBar(onReset: () -> Unit, onSave: (() -> Unit)?, onDone: () -> Unit, title: String = tr(R.string.settings)) {
+    NativeSheetTopBar(title, onClose = onDone, closeDescription = tr(R.string.action_done)) {
+        NativeSheetAction(tr(R.string.action_reset), destructive = true, onClick = onReset)
+        if (onSave != null) NativeSheetAction(tr(R.string.action_save), onClick = onSave)
     }
 }
 
@@ -225,16 +227,16 @@ internal fun SheetChromeBar(onReset: () -> Unit, onSave: (() -> Unit)?, onDone: 
 @Composable
 fun FilterPickerCard(controller: CatalogController<*>) {
     val entries = buildList {
-        add(MenuEntry("", "None", 0))
+        add(MenuEntry("", tr(R.string.none), 0))
         controller.serverFilters.forEach { add(MenuEntry(ListLivePresetTag.serverRow(it.id), it.name, 1)) }
         controller.localPresets.forEach { add(MenuEntry(ListLivePresetTag.localRow(it.id), it.name, 2)) }
     }
     ControlCard {
-        ControlLabel("Filter")
+        ControlLabel(tr(R.string.filter))
         Spacer(Modifier.weight(1f))
         MenuPicker(
             controller.presetRow, entries,
-            selectedLabel = entries.firstOrNull { it.value == controller.presetRow }?.label ?: controller.selectedFilter?.name ?: "None",
+            selectedLabel = entries.firstOrNull { it.value == controller.presetRow }?.label ?: controller.selectedFilter?.name ?: tr(R.string.none),
         ) { controller.selectPresetRow(it) }
     }
 }
@@ -249,18 +251,18 @@ fun SortCard(mode: FilterMode, sort: SortOption, extraSorts: List<SortOption> = 
     val known = kinds.firstOrNull { it.field == sort.field }
     val orderDisabled = sort.isRandom || known == null
     ControlCard {
-        ControlLabel("Sort")
+        ControlLabel(tr(R.string.action_sort))
         Row(Modifier.alpha(if (orderDisabled) 0.4f else 1f), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-            CatalogFilterChip("Asc", sort.isAscending && !orderDisabled) {
+            CatalogFilterChip(tr(R.string.asc), sort.isAscending && !orderDisabled) {
                 if (!orderDisabled) SortCatalog.optionFor(mode, sort.field, true, extraSorts)?.let(onChange)
             }
-            CatalogFilterChip("Desc", !sort.isAscending && !orderDisabled) {
+            CatalogFilterChip(tr(R.string.desc), !sort.isAscending && !orderDisabled) {
                 if (!orderDisabled) SortCatalog.optionFor(mode, sort.field, false, extraSorts)?.let(onChange)
             }
         }
         Spacer(Modifier.weight(1f))
         val entries = buildList {
-            if (known == null) add(MenuEntry(sort.field, "Other (${sort.field})"))
+            if (known == null) add(MenuEntry(sort.field, tr(R.string.other_arg, sort.field)))
             kinds.forEach { add(MenuEntry(it.field, it.menuLabel)) }
         }
         MenuPicker(sort.field, entries) { field ->
@@ -283,19 +285,19 @@ internal fun SaveChoiceDialog(
     val p = Theme.palette
     AlertDialog(
         onDismissRequest = onCancel,
-        title = { Text("Save filter") },
+        title = { Text(tr(R.string.action_save_filter)) },
         text = {
             Column(Modifier.fillMaxWidth()) {
-                if (hasPreset) DialogOption(presetName?.let { "Update \"$it\"" } ?: "Update", Appearance.tint, onUpdate)
-                DialogOption("Save as new", Appearance.tint, onSaveAs)
+                if (hasPreset) DialogOption(presetName?.let { tr(R.string.action_update_arg, it) } ?: tr(R.string.action_update), Appearance.tint, onUpdate)
+                DialogOption(tr(R.string.action_save_as_new), Appearance.tint, onSaveAs)
                 if (hasPreset) {
-                    DialogOption("Rename", Appearance.tint, onRename)
-                    DialogOption("Delete", StashyColors.systemRed, onDelete)
+                    DialogOption(tr(R.string.action_rename), Appearance.tint, onRename)
+                    DialogOption(tr(R.string.action_delete), StashyColors.systemRed, onDelete)
                 }
             }
         },
         confirmButton = {},
-        dismissButton = { TextButton(onCancel) { Text("Cancel") } },
+        dismissButton = { TextButton(onCancel) { Text(tr(R.string.action_cancel)) } },
         containerColor = p.secondaryBackground, titleContentColor = p.text, textContentColor = p.text,
     )
 }
@@ -316,11 +318,11 @@ internal fun NameInputDialog(title: String, message: String, initial: String, on
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 Text(message, style = IosTypography.footnote, color = p.secondaryText)
-                NativeTextField(text, { text = it }, label = null, placeholder = "Name", autoCorrect = true)
+                NativeTextField(text, { text = it }, label = null, placeholder = tr(R.string.name), autoCorrect = true)
             }
         },
-        confirmButton = { TextButton({ onSave(text) }, enabled = text.isNotBlank()) { Text("Save") } },
-        dismissButton = { TextButton(onCancel) { Text("Cancel") } },
+        confirmButton = { TextButton({ onSave(text) }, enabled = text.isNotBlank()) { Text(tr(R.string.action_save)) } },
+        dismissButton = { TextButton(onCancel) { Text(tr(R.string.action_cancel)) } },
         containerColor = p.secondaryBackground, titleContentColor = p.text, textContentColor = p.text,
     )
 }
@@ -329,11 +331,11 @@ internal fun NameInputDialog(title: String, message: String, initial: String, on
 @Composable
 fun ImageMediaTypeCard(kind: ImageListMediaKind, onChange: (ImageListMediaKind) -> Unit) {
     ControlCard {
-        ControlLabel("Type")
+        ControlLabel(tr(R.string.type))
         Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-            CatalogFilterChip("Any", kind == ImageListMediaKind.All) { onChange(ImageListMediaKind.All) }
-            CatalogFilterChip("Image", kind == ImageListMediaKind.StillImage) { onChange(ImageListMediaKind.StillImage) }
-            CatalogFilterChip("Video", kind == ImageListMediaKind.Video) { onChange(ImageListMediaKind.Video) }
+            CatalogFilterChip(tr(R.string.any), kind == ImageListMediaKind.All) { onChange(ImageListMediaKind.All) }
+            CatalogFilterChip(tr(R.string.image), kind == ImageListMediaKind.StillImage) { onChange(ImageListMediaKind.StillImage) }
+            CatalogFilterChip(tr(R.string.video), kind == ImageListMediaKind.Video) { onChange(ImageListMediaKind.Video) }
         }
         Spacer(Modifier.weight(1f))
     }
@@ -353,7 +355,7 @@ fun CardColumnsCard(
 ) {
     val current = forced ?: CatalogPrefs.cardColumns(scope)
     ControlCard {
-        ControlLabel("Per row")
+        ControlLabel(tr(R.string.per_row))
         Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
             CatalogFilterChip("1", current == CatalogCardColumns.One) { CatalogPrefs.setCardColumns(scope, CatalogCardColumns.One); onChange() }
             CatalogFilterChip("2", current == CatalogCardColumns.Two) { CatalogPrefs.setCardColumns(scope, CatalogCardColumns.Two); onChange() }

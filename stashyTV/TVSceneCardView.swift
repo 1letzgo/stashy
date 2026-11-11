@@ -173,7 +173,7 @@ struct TVSceneCardTitleView: View {
         VStack(alignment: .leading, spacing: 2) {
             // `displayTitle` fällt auf den Dateinamen zurück — dasselbe
             // Verhalten wie auf iOS (`SceneCardView`, `HomeSceneCardView`).
-            Text(scene.displayTitle ?? "Untitled Scene")
+            Text(scene.displayTitle ?? tr("untitled_scene"))
                 .font(.body)
                 .fontWeight(.semibold)
                 .foregroundColor(.white)

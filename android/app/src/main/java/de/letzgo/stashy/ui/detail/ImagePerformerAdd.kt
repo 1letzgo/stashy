@@ -1,5 +1,7 @@
 package de.letzgo.stashy.ui.detail
 
+import de.letzgo.stashy.R
+import de.letzgo.stashy.tr
 import androidx.compose.runtime.Composable
 import de.letzgo.stashy.data.FeedsRepository
 import de.letzgo.stashy.data.IdName
@@ -39,7 +41,7 @@ object ImagePerformerAdd {
         image.copy(performers = FeedPerformerAdd.appendingNames(image.performers.orEmpty(), added))
 
     fun toastText(added: List<Performer>): String =
-        if (added.size == 1) "Added ${added[0].name}" else "Added ${added.size} performers"
+        if (added.size == 1) tr(R.string.added_arg_2, added[0].name) else tr(R.string.added_arg_performers, added.size)
 
     /**
      * Writes existing ∪ [picked] and returns the updated image (the server's performer list when
@@ -51,7 +53,7 @@ object ImagePerformerAdd {
         picked: List<Performer>,
         write: suspend (id: String, performerIds: List<String>) -> List<IdName> = { id, ids -> FeedsRepository.updateImagePerformers(id, ids) },
     ): StashImage {
-        val plan = checkNotNull(plan(image, picked)) { "Image performers not loaded" }
+        val plan = checkNotNull(plan(image, picked)) { tr(R.string.image_performers_not_loaded) }
         val added = newPerformers(image, picked)
         if (added.isEmpty()) return image
         val server = write(plan.id, plan.performerIds)

@@ -1,5 +1,7 @@
 package de.letzgo.stashy.ui.tools.match
 
+import de.letzgo.stashy.R
+import de.letzgo.stashy.tr
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -28,7 +30,7 @@ enum class MatchHaptic { Light, Selection, Success }
  * detail — iOS keeps its `@StateObject` alive under the `NavigationLink` the same way.
  */
 class MatchViewModel : ViewModel() {
-    enum class Section(val title: String) { Battle("Game"), Leaderboard("Charts"), Settings("Settings") }
+    enum class Section(val title: String) { Battle(tr(R.string.game)), Leaderboard(tr(R.string.charts)), Settings(tr(R.string.settings)) }
 
     var section by mutableStateOf(Section.Battle); private set
     var duelMode by mutableStateOf(MatchRepository.loadDuelMode()); private set
@@ -98,7 +100,7 @@ class MatchViewModel : ViewModel() {
 
     private fun haptic(kind: MatchHaptic) { haptic?.invoke(kind) }
 
-    private fun errorText(e: Throwable) = e.message ?: "Unknown error"
+    private fun errorText(e: Throwable) = e.message ?: tr(R.string.unknown_error)
 
     // MARK: UI intents
 
@@ -262,7 +264,7 @@ class MatchViewModel : ViewModel() {
 
             val champIdx = ranked.indexOfFirst { it.id == champ.id }
             if (champIdx < 0) {
-                errorMessage = "Legend run performer is no longer in this pool. Run reset."
+                errorMessage = tr(R.string.hint_legend_run_performer_is_no)
                 resetClimbStatePreservingMode()
                 loadDuelPair()
                 return
@@ -316,7 +318,7 @@ class MatchViewModel : ViewModel() {
         try {
             val list = MatchRepository.starterCandidates(selectedGenders).items
             placementStarters = list.shuffled().take(6)
-            if (placementStarters.isEmpty()) errorMessage = "No performers to pick as a Rise starter."
+            if (placementStarters.isEmpty()) errorMessage = tr(R.string.hint_no_performers_to_pick_as)
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
@@ -431,7 +433,7 @@ class MatchViewModel : ViewModel() {
                 poolCount = res.count
                 val state = MatchBracket.newBracket(ratingSorted(res.items), MatchBracketStore.recentIds())
                 if (state == null) {
-                    errorMessage = "Need at least ${MatchBracket.SIZE} performers with images for the selected genders."
+                    errorMessage = tr(R.string.hint_need_at_least_arg_performers, MatchBracket.SIZE)
                     clearPair()
                     return
                 }
@@ -561,7 +563,7 @@ class MatchViewModel : ViewModel() {
                 MatchBracketStore.save(state)
             }
             if (firstFailure != null) {
-                errorMessage = "$failedCount of ${bracketProposals.size} ratings not saved. $firstFailure"
+                errorMessage = tr(R.string.hint_arg_of_arg_ratings_not, failedCount, bracketProposals.size, firstFailure)
             } else {
                 haptic(MatchHaptic.Success)
             }
@@ -656,7 +658,7 @@ class MatchViewModel : ViewModel() {
     }
 
     private companion object {
-        const val NOT_ENOUGH = "Not enough performers with images for the selected genders."
+        val NOT_ENOUGH = tr(R.string.hint_not_enough_performers_with_images)
         /** iOS: `duelFeedbackDurationNs` (1.2 s). */
         const val DUEL_FEEDBACK_MS = 1_200L
     }

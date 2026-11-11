@@ -18,15 +18,15 @@ struct RecommendationSettingsView: View {
         List {
             if !stashyPlus.isUnlocked {
                 Section {
-                    Label("For You requires stashy+", systemImage: "lock.fill")
+                    Label(tr("for_you_requires_stashy_plus"), systemImage: "lock.fill")
                         .foregroundColor(.secondary)
                         .stashyGroupedSettingsRow()
                 }
             } else if !engine.isFeatureOn {
                 Section {
                     Label(engine.hasStatistics
-                          ? "For You is off. Turn it on in Recommendations to show it on Home."
-                          : "Turn on Tag suggestions or Similar scenes to show For You on Home.", systemImage: "info.circle")
+                          ? tr("hint_for_you_is_off_turn")
+                          : tr("hint_turn_on_tag_suggestions_or"), systemImage: "info.circle")
                         .foregroundColor(.secondary)
                         .stashyGroupedSettingsRow()
                 }
@@ -41,7 +41,7 @@ struct RecommendationSettingsView: View {
         }
         .stashySettingsList()
         .applyAppBackground()
-        .stashySettingsDetailChrome("For You")
+        .stashySettingsDetailChrome(tr("for_you"))
         .disabled(!stashyPlus.isUnlocked)
         // Changed settings apply from the next list (pull to refresh, Refresh above, app start);
         // leaving here only builds one when none is shown yet.
@@ -49,7 +49,7 @@ struct RecommendationSettingsView: View {
         // Feedback for Refresh: a prepared list swaps in instantly and would otherwise go unseen.
         .onChange(of: engine.builtAt) { old, new in
             guard old != nil, new != nil, engine.state == .ready else { return }
-            ToastManager.shared.show("New suggestions on Home", icon: "sparkles", style: .success)
+            ToastManager.shared.show(tr("new_suggestions_on_home"), icon: "sparkles", style: .success)
         }
     }
 
@@ -57,10 +57,10 @@ struct RecommendationSettingsView: View {
 
     private var statusSection: some View {
         Section {
-            stashyScrollingSectionHeader("For You", isBeta: true)
+            stashyScrollingSectionHeader(tr("for_you"), isBeta: true)
 
             HStack {
-                Label("Status", systemImage: "sparkles")
+                Label(tr("status"), systemImage: "sparkles")
                 Spacer()
                 Text(statusText)
                     .foregroundColor(.secondary)
@@ -72,7 +72,7 @@ struct RecommendationSettingsView: View {
                 engine.rebuild()
             } label: {
                 HStack {
-                    Label("Refresh suggestions", systemImage: "arrow.triangle.2.circlepath")
+                    Label(tr("action_refresh_suggestions"), systemImage: "arrow.triangle.2.circlepath")
                         .foregroundColor(appearanceManager.tintColor)
                     Spacer()
                     if engine.isRefreshing { ProgressView() }
@@ -81,17 +81,17 @@ struct RecommendationSettingsView: View {
             .disabled(engine.isRefreshing)
             .stashyGroupedBlockRow(index: 1, count: 2)
 
-            stashyScrollingSectionFooter("Picked on this device from your plays, O-Counts and ratings.")
+            stashyScrollingSectionFooter(tr("hint_picked_on_this_device_from"))
         }
     }
 
     private var historySection: some View {
         Section {
-            stashyScrollingSectionHeader("Watch history")
+            stashyScrollingSectionHeader(tr("watch_history"))
 
             VStack(alignment: .leading, spacing: 8) {
-                Text("Look back")
-                Picker("Look back", selection: $engine.lookbackDays) {
+                Text(tr("look_back"))
+                Picker(tr("look_back"), selection: $engine.lookbackDays) {
                     ForEach(SceneRecommendationEngine.lookbackChoices, id: \.self) { days in
                         Text("\(days) days").tag(days)
                     }
@@ -104,22 +104,22 @@ struct RecommendationSettingsView: View {
 
             Stepper(value: $engine.count, in: SceneRecommendationEngine.countRange) {
                 HStack {
-                    Text("Suggestions")
+                    Text(tr("suggestions"))
                     Spacer()
                     Text("\(engine.count)").foregroundColor(.secondary)
                 }
             }
             .stashyGroupedBlockRow(index: 1, count: 2)
 
-            stashyScrollingSectionFooter("Scenes played in this period are not suggested.")
+            stashyScrollingSectionFooter(tr("hint_scenes_played_in_this_period"))
         }
     }
 
     private var discoverySection: some View {
         Section {
-            stashyScrollingSectionHeader("What to suggest")
+            stashyScrollingSectionHeader(tr("what_to_suggest"))
 
-            Picker("What to suggest", selection: $engine.discovery) {
+            Picker(tr("what_to_suggest"), selection: $engine.discovery) {
                 ForEach(RecommendationDiscovery.allCases) { mode in
                     Text(mode.title).tag(mode)
                 }
@@ -135,26 +135,26 @@ struct RecommendationSettingsView: View {
 
     private var influenceSection: some View {
         Section {
-            stashyScrollingSectionHeader("Influence")
+            stashyScrollingSectionHeader(tr("influence"))
 
-            weightRow("Similar to watched", icon: "square.stack.3d.up.fill", value: $engine.similarWeight, index: 0)
-            weightRow("Performers", icon: "person.fill", value: $engine.performerWeight, index: 1)
-            weightRow("Studios", icon: "building.2.fill", value: $engine.studioWeight, index: 2)
-            weightRow("Tags", icon: "tag.fill", value: $engine.tagWeight, index: 3)
-            weightRow("O-Counts", icon: appearanceManager.oCounterIcon, value: $engine.oCountWeight, index: 4)
-            weightRow("Ratings", icon: "star.fill", value: $engine.ratingWeight, index: 5)
+            weightRow(tr("similar_to_watched"), icon: "square.stack.3d.up.fill", value: $engine.similarWeight, index: 0)
+            weightRow(tr("performers"), icon: "person.fill", value: $engine.performerWeight, index: 1)
+            weightRow(tr("studios"), icon: "building.2.fill", value: $engine.studioWeight, index: 2)
+            weightRow(tr("tags"), icon: "tag.fill", value: $engine.tagWeight, index: 3)
+            weightRow(tr("o_counts"), icon: appearanceManager.oCounterIcon, value: $engine.oCountWeight, index: 4)
+            weightRow(tr("ratings"), icon: "star.fill", value: $engine.ratingWeight, index: 5)
 
-            stashyScrollingSectionFooter("How much each part steers the picks.")
+            stashyScrollingSectionFooter(tr("hint_how_much_each_part_steers"))
         }
     }
 
     private var adjustmentsSection: some View {
         Section {
-            stashyScrollingSectionHeader("Performers, studios and tags")
+            stashyScrollingSectionHeader(tr("performers_studios_and_tags"))
 
             NavigationLink(destination: LazyView { RecommendationAdjustmentsView() }) {
                 HStack {
-                    Label("Adjustments", systemImage: "slider.horizontal.3")
+                    Label(tr("adjustments"), systemImage: "slider.horizontal.3")
                     Spacer()
                     Text(adjustmentsSummary)
                         .foregroundColor(.secondary)
@@ -162,13 +162,13 @@ struct RecommendationSettingsView: View {
             }
             .stashyGroupedSettingsRow()
 
-            stashyScrollingSectionFooter("Also from the ··· menu below a card.")
+            stashyScrollingSectionFooter(tr("hint_also_from_menu_below_card"))
         }
     }
 
     private var adjustmentsSummary: String {
         let list = engine.adjustments
-        guard !list.isEmpty else { return "None" }
+        guard !list.isEmpty else { return tr("none") }
         let hidden = list.filter(\.isHidden).count
         return hidden > 0 ? "\(list.count) · \(hidden) hidden" : "\(list.count)"
     }
@@ -178,7 +178,7 @@ struct RecommendationSettingsView: View {
             Button(role: .destructive) {
                 engine.resetSettings()
             } label: {
-                Label("Reset to defaults", systemImage: "arrow.uturn.backward")
+                Label(tr("action_reset_to_defaults"), systemImage: "arrow.uturn.backward")
                     .foregroundColor(engine.hasCustomSettings ? .red : .secondary)
             }
             .disabled(!engine.hasCustomSettings)
@@ -208,20 +208,20 @@ struct RecommendationSettingsView: View {
 
     private static func weightLabel(_ value: Double) -> String {
         switch value {
-        case ..<0.01: return "Off"
-        case ..<0.75: return "Low"
-        case ..<1.26: return "Normal"
-        case ..<1.76: return "High"
-        default: return "Max"
+        case ..<0.01: return tr("off")
+        case ..<0.75: return tr("low")
+        case ..<1.26: return tr("normal")
+        case ..<1.76: return tr("high")
+        default: return tr("max")
         }
     }
 
     private var statusText: String {
         switch engine.state {
-        case .idle: return "Not built yet"
-        case .loading: return "Looking…"
-        case .ready where engine.isRefreshing: return "Looking…"
-        case .noHistory: return "No plays yet"
+        case .idle: return tr("not_built_yet")
+        case .loading: return tr("looking_menu")
+        case .ready where engine.isRefreshing: return tr("looking_menu")
+        case .noHistory: return tr("empty_plays_yet")
         case .failed(let message): return message
         case .ready:
             let picks = "\(engine.homeItems.count) scenes from \(engine.seedCount) watched"
@@ -266,7 +266,7 @@ struct RecommendationAdjustmentsView: View {
                                 Button(role: .destructive) {
                                     engine.removeAdjustment(entry.kind, id: entry.itemId)
                                 } label: {
-                                    Label("Remove", systemImage: "trash")
+                                    Label(tr("action_remove"), systemImage: "trash")
                                 }
                             }
                     }
@@ -274,7 +274,7 @@ struct RecommendationAdjustmentsView: View {
             }
 
             Section {
-                stashyScrollingSectionFooter("Hidden never shows it. Above 1× also brings new scenes. Swipe to remove.")
+                stashyScrollingSectionFooter(tr("hint_hidden_never_shows_it_above_1"))
             }
 
             if !engine.adjustments.isEmpty {
@@ -282,7 +282,7 @@ struct RecommendationAdjustmentsView: View {
                     Button(role: .destructive) {
                         confirmsRemoveAll = true
                     } label: {
-                        Label("Remove all", systemImage: "trash")
+                        Label(tr("action_remove_all"), systemImage: "trash")
                             .foregroundColor(.red)
                     }
                     .stashyGroupedSettingsRow()
@@ -291,13 +291,13 @@ struct RecommendationAdjustmentsView: View {
         }
         .stashySettingsList()
         .applyAppBackground()
-        .stashySettingsDetailChrome("Adjustments")
+        .stashySettingsDetailChrome(tr("adjustments"))
         .sheet(item: $addKind) { kind in
             RecommendationAdjustmentPicker(kind: kind)
         }
-        .alert("Remove all adjustments?", isPresented: $confirmsRemoveAll) {
-            Button("Remove all", role: .destructive) { engine.removeAllAdjustments() }
-            Button("Cancel", role: .cancel) {}
+        .alert(tr("confirm_remove_all_adjustments"), isPresented: $confirmsRemoveAll) {
+            Button(tr("action_remove_all"), role: .destructive) { engine.removeAllAdjustments() }
+            Button(tr("action_cancel"), role: .cancel) {}
         }
     }
 
@@ -360,7 +360,7 @@ private struct RecommendationAdjustmentPicker: View {
                             .frame(maxWidth: .infinity)
                             .stashyGroupedSettingsRow()
                     } else if results.isEmpty {
-                        Text(names.isEmpty ? SceneRecommendationEngine.preparingMessage : "Nothing found")
+                        Text(names.isEmpty ? SceneRecommendationEngine.preparingMessage : tr("nothing_found"))
                             .foregroundColor(.secondary)
                             .stashyGroupedSettingsRow()
                     } else {
@@ -393,7 +393,7 @@ private struct RecommendationAdjustmentPicker: View {
         HStack(spacing: 8) {
             Image(systemName: "magnifyingglass")
                 .foregroundColor(.secondary)
-            TextField("Search", text: $search)
+            TextField(tr("search"), text: $search)
                 .textFieldStyle(.plain)
                 .autocorrectionDisabled()
                 .textInputAutocapitalization(.never)
@@ -450,7 +450,7 @@ struct RecommendationAdjustMenu: View {
                     itemMenu(.tag, id: tag.id, name: tag.name)
                 }
             } label: {
-                Label("Tags", systemImage: "tag.fill")
+                Label(tr("tags"), systemImage: "tag.fill")
             }
         }
     }
@@ -461,24 +461,24 @@ struct RecommendationAdjustMenu: View {
             Button {
                 apply(kind, id: id, name: name, factor: RecommendationAdjustment.more)
             } label: {
-                Label("More like this", systemImage: "hand.thumbsup")
+                Label(tr("more_like_this"), systemImage: "hand.thumbsup")
             }
             Button {
                 apply(kind, id: id, name: name, factor: RecommendationAdjustment.less)
             } label: {
-                Label("Less like this", systemImage: "hand.thumbsdown")
+                Label(tr("less_like_this"), systemImage: "hand.thumbsdown")
             }
             Button(role: .destructive) {
                 apply(kind, id: id, name: name, factor: 0)
             } label: {
-                Label("Never suggest", systemImage: "eye.slash")
+                Label(tr("never_suggest"), systemImage: "eye.slash")
             }
             if current != nil {
                 Button {
                     engine.removeAdjustment(kind, id: id)
                     engine.applyAdjustmentsNow()
                 } label: {
-                    Label("Back to normal", systemImage: "arrow.uturn.backward")
+                    Label(tr("back_to_normal"), systemImage: "arrow.uturn.backward")
                 }
             }
         } label: {
@@ -493,8 +493,8 @@ struct RecommendationAdjustMenu: View {
         let message: String
         switch factor {
         case ..<RecommendationAdjustment.hiddenBelow: message = "\(name) won't be suggested"
-        case ..<1: message = "Less of \(name)"
-        default: message = "More of \(name)"
+        case ..<1: message = tr("less_of_arg", name)
+        default: message = tr("more_of_arg", name)
         }
         ToastManager.shared.show(message, icon: factor < RecommendationAdjustment.hiddenBelow ? "eye.slash" : "sparkles", style: .success)
     }

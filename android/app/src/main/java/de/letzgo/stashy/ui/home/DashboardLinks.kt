@@ -1,5 +1,7 @@
 package de.letzgo.stashy.ui.home
 
+import de.letzgo.stashy.R
+import de.letzgo.stashy.tr
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -39,7 +41,7 @@ object DetailLinks {
 }
 
 /** iOS `HomeChannelDestination`. */
-enum class HomeChannelDestination(val label: String) { Scenes("Scenes"), Clips("Clips") }
+enum class HomeChannelDestination(val label: String) { Scenes(tr(R.string.scenes)), Clips(tr(R.string.clips)) }
 
 /**
  * A dashboard channel opened into Feeds (iOS `navigateToReelsChannel(filter:sort:)` /

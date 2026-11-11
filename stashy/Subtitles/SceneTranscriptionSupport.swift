@@ -54,7 +54,7 @@ enum SpeechTranscriberAvailability {
                 }
                 return name
             }
-            return "Cantonese"
+            return tr("cantonese")
         }
         return SubtitleTargetLanguage.displayName(for: subtag, locale: display)
     }
@@ -113,9 +113,9 @@ enum SpeechTranscriberAvailability {
         let tag = (selectedId ?? stored)?
             .replacingOccurrences(of: "_", with: "-")
             .uppercased()
-        guard let tag, !tag.isEmpty else { return "Lang" }
+        guard let tag, !tag.isEmpty else { return tr("lang") }
         let parts = tag.split(separator: "-").map(String.init)
-        guard let lang = parts.first else { return "Lang" }
+        guard let lang = parts.first else { return tr("lang") }
         if lang == "YUE" { return "YUE" }
         return lang
     }
@@ -135,9 +135,9 @@ enum SpeechTranscriptionLocaleResolver {
         var errorDescription: String? {
             switch self {
             case .localeNotSupported:
-                return "Speech recognition is not available for this language on this device."
+                return tr("hint_speech_recognition_is_not_available")
             case .requiresNewerOS:
-                return "Teleprompter requires iOS 26 or newer."
+                return tr("hint_teleprompter_requires_ios_26_or")
             }
         }
     }
@@ -371,9 +371,9 @@ enum SceneTeleprompterMode: String, CaseIterable, Identifiable {
 
     var title: String {
         switch self {
-        case .off: return "Off"
-        case .english, .sceneLanguage: return "English"
-        case .userLanguage: return "My language"
+        case .off: return tr("off")
+        case .english, .sceneLanguage: return tr("english")
+        case .userLanguage: return tr("my_language")
         }
     }
 

@@ -1,5 +1,7 @@
 package de.letzgo.stashy.ui.detail
 
+import de.letzgo.stashy.R
+import de.letzgo.stashy.tr
 import de.letzgo.stashy.data.Gallery
 import de.letzgo.stashy.data.Performer
 import de.letzgo.stashy.data.StashGroup
@@ -19,62 +21,62 @@ object DetailFormatting {
     /** iOS `PerformerDetailView.getPerformerDetails`. */
     fun performer(p: Performer, totalGalleries: Int, battleLine: String? = null): List<DetailItem> {
         val list = mutableListOf<DetailItem>()
-        list += DetailItem("Scenes", "${p.sceneCount ?: 0}")
-        list += DetailItem("Galleries", "${maxOf(p.galleryCount ?: 0, totalGalleries)}")
-        list += DetailItem("Rating", p.rating100?.toString() ?: "—")
-        if (!battleLine.isNullOrEmpty()) list += DetailItem("Battle", battleLine)
-        p.gender?.takeIf { it.isNotEmpty() }?.let { list += DetailItem("Gender", it) }
+        list += DetailItem(tr(R.string.scenes), "${p.sceneCount ?: 0}")
+        list += DetailItem(tr(R.string.galleries), "${maxOf(p.galleryCount ?: 0, totalGalleries)}")
+        list += DetailItem(tr(R.string.rating), p.rating100?.toString() ?: "—")
+        if (!battleLine.isNullOrEmpty()) list += DetailItem(tr(R.string.battle), battleLine)
+        p.gender?.takeIf { it.isNotEmpty() }?.let { list += DetailItem(tr(R.string.gender), it) }
 
         val gender = p.gender?.uppercase() ?: ""
-        val tits = p.fakeTits?.takeIf { it.isNotEmpty() }?.let { DetailItem("Tits", it) }
-        val penis = p.penisLength?.takeIf { it > 0 }?.let { DetailItem("Penis", "${formatSwiftDouble(it)} cm") }
+        val tits = p.fakeTits?.takeIf { it.isNotEmpty() }?.let { DetailItem(tr(R.string.tits), it) }
+        val penis = p.penisLength?.takeIf { it > 0 }?.let { DetailItem(tr(R.string.penis), "${formatSwiftDouble(it)} cm") }
         when {
             gender.contains("FEMALE") -> tits?.let { list += it }
             gender.contains("MALE") || gender == "MAN" -> penis?.let { list += it }
             else -> { tits?.let { list += it }; penis?.let { list += it } }
         }
-        p.birthdate?.takeIf { it.isNotEmpty() }?.let { list += DetailItem("Born", it) }
-        p.country?.takeIf { it.isNotEmpty() }?.let { list += DetailItem("Country", it) }
-        p.ethnicity?.takeIf { it.isNotEmpty() }?.let { list += DetailItem("Ethnicity", it) }
-        p.heightCm?.takeIf { it > 0 }?.let { list += DetailItem("Height", "$it cm") }
-        p.weight?.takeIf { it > 0 }?.let { list += DetailItem("Weight", "$it kg") }
-        p.measurements?.takeIf { it.isNotEmpty() }?.let { list += DetailItem("Measurements", it) }
-        p.careerLength?.takeIf { it.isNotEmpty() }?.let { list += DetailItem("Career", it) }
-        p.tattoos?.takeIf { it.isNotEmpty() }?.let { list += DetailItem("Tattoos", it) }
-        p.piercings?.takeIf { it.isNotEmpty() }?.let { list += DetailItem("Piercings", it) }
+        p.birthdate?.takeIf { it.isNotEmpty() }?.let { list += DetailItem(tr(R.string.born), it) }
+        p.country?.takeIf { it.isNotEmpty() }?.let { list += DetailItem(tr(R.string.country), it) }
+        p.ethnicity?.takeIf { it.isNotEmpty() }?.let { list += DetailItem(tr(R.string.ethnicity), it) }
+        p.heightCm?.takeIf { it > 0 }?.let { list += DetailItem(tr(R.string.height), "$it cm") }
+        p.weight?.takeIf { it > 0 }?.let { list += DetailItem(tr(R.string.weight), "$it kg") }
+        p.measurements?.takeIf { it.isNotEmpty() }?.let { list += DetailItem(tr(R.string.measurements), it) }
+        p.careerLength?.takeIf { it.isNotEmpty() }?.let { list += DetailItem(tr(R.string.career), it) }
+        p.tattoos?.takeIf { it.isNotEmpty() }?.let { list += DetailItem(tr(R.string.tattoos), it) }
+        p.piercings?.takeIf { it.isNotEmpty() }?.let { list += DetailItem(tr(R.string.piercings), it) }
         return list
     }
 
     /** iOS `StudioDetailView.getStudioDetails` (URL is shown on its own row). */
     fun studio(s: Studio, scenes: Int, galleries: Int, counts: de.letzgo.stashy.data.StudioDisplayCounts? = null): List<DetailItem> {
         val allCounts = counts?.takeIf { de.letzgo.stashy.data.StudioCountsStore.includeSubStudios }
-        val list = mutableListOf(DetailItem("Scenes", "${allCounts?.scenes ?: scenes}"))
-        (allCounts?.galleries ?: galleries).takeIf { it > 0 }?.let { list += DetailItem("Galleries", "$it") }
-        (counts?.performers ?: s.performerCount)?.takeIf { it > 0 }?.let { list += DetailItem("Performers", "$it") }
-        counts?.oCount?.takeIf { it > 0 }?.let { list += DetailItem("O count", "$it") }
-        s.rating100?.let { list += DetailItem("Rating", "$it%") }
+        val list = mutableListOf(DetailItem(tr(R.string.scenes), "${allCounts?.scenes ?: scenes}"))
+        (allCounts?.galleries ?: galleries).takeIf { it > 0 }?.let { list += DetailItem(tr(R.string.galleries), "$it") }
+        (counts?.performers ?: s.performerCount)?.takeIf { it > 0 }?.let { list += DetailItem(tr(R.string.performers), "$it") }
+        counts?.oCount?.takeIf { it > 0 }?.let { list += DetailItem(tr(R.string.o_count), "$it") }
+        s.rating100?.let { list += DetailItem(tr(R.string.rating), "$it%") }
         return list
     }
 
     /** iOS `TagDetailView.getTagDetails`. */
     fun tag(t: Tag, scenes: Int, galleries: Int): List<DetailItem> {
-        val list = mutableListOf(DetailItem("Scenes", "$scenes"))
-        if (galleries > 0) list += DetailItem("Galleries", "$galleries")
-        t.performerCount?.takeIf { it > 0 }?.let { list += DetailItem("Performers", "$it") }
-        t.sceneMarkerCount?.takeIf { it > 0 }?.let { list += DetailItem("Markers", "$it") }
-        t.aliases?.takeIf { it.isNotEmpty() }?.let { list += DetailItem("Aliases", it.joinToString(", ")) }
-        t.createdAt?.takeIf { it.isNotEmpty() }?.let { list += DetailItem("Created", it.take(10)) }
-        t.updatedAt?.takeIf { it.isNotEmpty() }?.let { list += DetailItem("Updated", it.take(10)) }
+        val list = mutableListOf(DetailItem(tr(R.string.scenes), "$scenes"))
+        if (galleries > 0) list += DetailItem(tr(R.string.galleries), "$galleries")
+        t.performerCount?.takeIf { it > 0 }?.let { list += DetailItem(tr(R.string.performers), "$it") }
+        t.sceneMarkerCount?.takeIf { it > 0 }?.let { list += DetailItem(tr(R.string.markers), "$it") }
+        t.aliases?.takeIf { it.isNotEmpty() }?.let { list += DetailItem(tr(R.string.aliases), it.joinToString(", ")) }
+        t.createdAt?.takeIf { it.isNotEmpty() }?.let { list += DetailItem(tr(R.string.created), it.take(10)) }
+        t.updatedAt?.takeIf { it.isNotEmpty() }?.let { list += DetailItem(tr(R.string.updated), it.take(10)) }
         return list
     }
 
     /** iOS `GroupDetailView.getGroupDetails`. */
     fun group(g: StashGroup, scenes: Int, galleries: Int): List<DetailItem> {
-        val list = mutableListOf(DetailItem("Scenes", "$scenes"))
-        if (galleries > 0) list += DetailItem("Galleries", "$galleries")
-        g.studio?.name?.let { list += DetailItem("Studio", it) }
-        g.date?.let { list += DetailItem("Date", it) }
-        g.rating100?.let { list += DetailItem("Rating", "$it%") }
+        val list = mutableListOf(DetailItem(tr(R.string.scenes), "$scenes"))
+        if (galleries > 0) list += DetailItem(tr(R.string.galleries), "$galleries")
+        g.studio?.name?.let { list += DetailItem(tr(R.string.studio), it) }
+        g.date?.let { list += DetailItem(tr(R.string.date), it) }
+        g.rating100?.let { list += DetailItem(tr(R.string.rating), "$it%") }
         return list
     }
 
@@ -85,10 +87,10 @@ object DetailFormatting {
     fun gallery(g: Gallery, totalImages: Int): List<DetailItem> {
         val list = mutableListOf<DetailItem>()
         val count = maxOf(totalImages, g.imageCount ?: 0)
-        if (count > 0) list += DetailItem("Images", "$count")
-        g.date?.takeIf { it.isNotEmpty() }?.let { list += DetailItem("Date", it) }
-        g.rating100?.let { list += DetailItem("Rating", "$it%") }
-        if (g.organized == true) list += DetailItem("Organized", "Yes")
+        if (count > 0) list += DetailItem(tr(R.string.images), "$count")
+        g.date?.takeIf { it.isNotEmpty() }?.let { list += DetailItem(tr(R.string.date), it) }
+        g.rating100?.let { list += DetailItem(tr(R.string.rating), "$it%") }
+        if (g.organized == true) list += DetailItem(tr(R.string.organized), "Yes")
         return list
     }
 

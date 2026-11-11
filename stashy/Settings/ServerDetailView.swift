@@ -34,22 +34,22 @@ struct ServerDetailView: View {
         let usesLocal = isActive && configManager.usesLocalAddress
         List {
             Section {
-                stashyScrollingSectionHeader("Server Information")
-                LabeledContent("Name", value: server.name)
+                stashyScrollingSectionHeader(tr("server_information"))
+                LabeledContent(tr("name"), value: server.name)
                     .stashyGroupedBlockRow(index: 0, count: infoCount)
-                LabeledContent(hasLocal ? "Remote" : "URL", value: server.externalBaseURL)
+                LabeledContent(hasLocal ? tr("remote") : "URL", value: server.externalBaseURL)
                     .fontWeight(hasLocal && isActive && !usesLocal ? .bold : .regular)
                     .stashyGroupedBlockRow(index: 1, count: infoCount)
                 if let local = server.localBaseURL {
-                    LabeledContent("Local", value: local)
+                    LabeledContent(tr("local"), value: local)
                         .fontWeight(usesLocal ? .bold : .regular)
                         .stashyGroupedBlockRow(index: 2, count: infoCount)
                 }
-                LabeledContent("Protocol", value: server.serverProtocol.displayName)
+                LabeledContent(tr("protocol"), value: server.serverProtocol.displayName)
                     .stashyGroupedBlockRow(index: hasLocal ? 3 : 2, count: infoCount)
                 if isActive {
                     HStack {
-                        Text("Status")
+                        Text(tr("status"))
                         Spacer()
                         Text(viewModel.serverStatus)
                             .foregroundColor(viewModel.isServerConnected ? .green : .red)
@@ -60,7 +60,7 @@ struct ServerDetailView: View {
 
             if !isActive {
                 Section {
-                    taskRow(label: "Connect to Server", icon: "power", taskId: "connect") {
+                    taskRow(label: tr("action_connect_to_server"), icon: "power", taskId: "connect") {
                         connectServer()
                     }
                     .stashyGroupedSettingsRow()
@@ -68,14 +68,14 @@ struct ServerDetailView: View {
             }
 
             Section {
-                stashyScrollingSectionHeader("Server Configuration")
+                stashyScrollingSectionHeader(tr("server_configuration"))
                 Button(action: { showingEditSheet = true }) {
-                    Label("Edit Configuration", systemImage: "pencil")
+                    Label(tr("action_edit_configuration"), systemImage: "pencil")
                         .foregroundColor(.primary)
                 }
                 .stashyGroupedBlockRow(index: 0, count: 2)
                 Button(role: .destructive, action: { showingDeleteAlert = true }) {
-                    Label("Delete Server", systemImage: "trash")
+                    Label(tr("action_delete_server"), systemImage: "trash")
                         .foregroundColor(appearanceManager.tintColor)
                 }
                 .stashyGroupedBlockRow(index: 1, count: 2)
@@ -90,17 +90,17 @@ struct ServerDetailView: View {
                     .font(.caption)
             }
         }
-        .alert("Delete Server", isPresented: $showingDeleteAlert) {
-            Button("Cancel", role: .cancel) { }
-            Button("Delete", role: .destructive) {
+        .alert(tr("action_delete_server"), isPresented: $showingDeleteAlert) {
+            Button(tr("action_cancel"), role: .cancel) { }
+            Button(tr("action_delete"), role: .destructive) {
                 configManager.deleteServer(id: server.id)
                 presentationMode.wrappedValue.dismiss()
             }
         } message: {
-            Text("Are you sure you want to delete this server configuration? This action cannot be undone.")
+            Text(tr("hint_are_you_sure_you_want_to"))
         }
         .alert(alertTitle, isPresented: $showAlert) {
-            Button("OK", role: .cancel) { }
+            Button(tr("ok"), role: .cancel) { }
         } message: {
             Text(alertMessage)
         }

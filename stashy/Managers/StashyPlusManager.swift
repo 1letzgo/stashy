@@ -29,14 +29,16 @@ nonisolated enum StashyPlusProduct {
     static let tipIDs: Set<String> = [tipSmall, tipMedium, tipLarge]
     static let legacyTipIDs: Set<String> = tipIDs
 
-    static let displayNames: [String: String] = [
-        monthly: "Monthly",
-        yearly: "Yearly",
-        lifetime: "Lifetime",
-        tipSmall: "Small",
-        tipMedium: "Medium",
-        tipLarge: "Large",
+    static var displayNames: [String: String] {
+[
+        monthly: tr("monthly"),
+        yearly: tr("yearly"),
+        lifetime: tr("lifetime"),
+        tipSmall: tr("small"),
+        tipMedium: tr("medium"),
+        tipLarge: tr("large"),
     ]
+    }
 
     static let sortOrder: [String: Int] = [
         monthly: 0,
@@ -61,7 +63,7 @@ enum StashyPlusSource: String, Equatable {
 
     var statusTitle: String {
         switch self {
-        case .none, .legacyTip: return "Not unlocked"
+        case .none, .legacyTip: return tr("not_unlocked")
         case .localDevelopment: return "stashy+ (Local Build)"
         case .subscription: return "stashy+ active"
         case .lifetime: return "stashy+ Lifetime"
@@ -72,15 +74,15 @@ enum StashyPlusSource: String, Equatable {
     var statusDetail: String {
         switch self {
         case .none, .legacyTip:
-            return "Subscribe or buy Lifetime to unlock premium features."
+            return tr("hint_subscribe_or_buy_lifetime_to")
         case .localDevelopment:
-            return "Unlocked automatically because the app was launched from Xcode. Not active in any distributed build."
+            return tr("hint_unlocked_automatically_because_app_was")
         case .subscription:
-            return "Thanks for supporting stashy."
+            return tr("thanks_for_supporting_stashy")
         case .lifetime:
-            return "Unlocked forever on this Apple ID."
+            return tr("hint_unlocked_forever_on_this_apple")
         case .legacyPaidApp:
-            return "Included because you bought stashy at full price before 3.0."
+            return tr("hint_included_because_you_bought_stashy")
         }
     }
 }
@@ -546,12 +548,12 @@ enum StashyRevenueCat {
     static func purchase(_ product: StashyStoreProduct) async -> (message: String?, customerInfo: CustomerInfo?) {
         do {
             let result = try await purchases.purchase(package: product.package)
-            if result.userCancelled { return ("Purchase cancelled", nil) }
+            if result.userCancelled { return (tr("purchase_cancelled"), nil) }
             return (nil, result.customerInfo)
         } catch let error as ErrorCode {
             switch error {
-            case .purchaseCancelledError: return ("Purchase cancelled", nil)
-            case .paymentPendingError: return ("Purchase pending approval", nil)
+            case .purchaseCancelledError: return (tr("purchase_cancelled"), nil)
+            case .paymentPendingError: return (tr("purchase_pending_approval"), nil)
             default: return (error.localizedDescription, nil)
             }
         } catch {

@@ -1,5 +1,7 @@
 package de.letzgo.stashy.ui.tools.stats
 
+import de.letzgo.stashy.R
+import de.letzgo.stashy.tr
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
@@ -70,7 +72,7 @@ internal fun InsightsLoading(message: String, modifier: Modifier = Modifier) {
 
 /** iOS: `ConnectionErrorView` (`StatusPlaceholderView` with server icon and retry button). */
 @Composable
-internal fun InsightsConnectionError(onRetry: () -> Unit, title: String = "Server not reachable") {
+internal fun InsightsConnectionError(onRetry: () -> Unit, title: String = tr(R.string.server_not_reachable)) {
     val p = Theme.palette
     Column(
         Modifier.fillMaxSize().padding(horizontal = 24.dp),
@@ -80,7 +82,7 @@ internal fun InsightsConnectionError(onRetry: () -> Unit, title: String = "Serve
         Icon(SF.server, null, tint = Appearance.tint, modifier = Modifier.size(64.dp))
         Text(title, style = IosTypography.title3.copy(fontWeight = FontWeight.Bold), color = p.text, textAlign = TextAlign.Center)
         Button(onClick = onRetry, colors = ButtonDefaults.buttonColors(containerColor = Appearance.tint, contentColor = Color.White)) {
-            Text("Retry Connection", fontWeight = FontWeight.SemiBold)
+            Text(tr(R.string.action_retry_connection), fontWeight = FontWeight.SemiBold)
         }
     }
 }

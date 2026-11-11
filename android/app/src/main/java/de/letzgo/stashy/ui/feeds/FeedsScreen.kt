@@ -1,5 +1,7 @@
 package de.letzgo.stashy.ui.feeds
 
+import de.letzgo.stashy.R
+import de.letzgo.stashy.tr
 import de.letzgo.stashy.ui.player.PlayerMute
 import de.letzgo.stashy.ui.tabBarHeight
 import androidx.compose.animation.AnimatedVisibility
@@ -210,11 +212,11 @@ fun FeedsScreen() {
         when {
             // Pics keeps the full bar padding while the bar auto-hides, like every other list.
             mode == ReelsModeType.Pics -> PicsFeed(model, topPadding = chromeHeight, bottomPadding = if (isUIVisible) tabBarHeight() else navBottom)
-            ServerConfigManager.activeConfig == null -> StatusPlaceholder(SF.server, "Server not reachable", "Retry Connection", { model.refetch(mode) })
-            items.isEmpty() && list.isLoading -> StandardLoading("Loading feeds...")
-            items.isEmpty() && list.error != null -> StatusPlaceholder(SF.server, "Server not reachable", "Retry Connection", { model.refetch(mode) })
-            items.isEmpty() && list.loadedOnce -> StatusPlaceholder(emptyIcon(mode), emptyTitle(mode), "Reload", { model.refetch(mode) })
-            items.isEmpty() -> StandardLoading("Loading feeds...")
+            ServerConfigManager.activeConfig == null -> StatusPlaceholder(SF.server, tr(R.string.server_not_reachable), tr(R.string.action_retry_connection), { model.refetch(mode) })
+            items.isEmpty() && list.isLoading -> StandardLoading(tr(R.string.loading_feeds))
+            items.isEmpty() && list.error != null -> StatusPlaceholder(SF.server, tr(R.string.server_not_reachable), tr(R.string.action_retry_connection), { model.refetch(mode) })
+            items.isEmpty() && list.loadedOnce -> StatusPlaceholder(emptyIcon(mode), emptyTitle(mode), tr(R.string.action_reload), { model.refetch(mode) })
+            items.isEmpty() -> StandardLoading(tr(R.string.loading_feeds))
             else -> androidx.compose.runtime.key(mode) {
                 FeedPager(
                     model = model, mode = mode, items = items, pool = pool,
@@ -342,10 +344,10 @@ fun FeedsScreen() {
         val isImage = item is FeedItem.ClipItem
         AlertDialog(
             onDismissRequest = { deleteTarget = null },
-            title = { Text(if (isImage) "Delete image?" else "Delete scene?") },
-            text = { Text(if (isImage) "The image is removed from the server. This cannot be undone." else "The scene and its files are removed from the server. This cannot be undone.") },
-            confirmButton = { TextButton({ deleteTarget = null; model.delete(item) {} }) { Text("Delete", color = Color(0xFFFF453A)) } },
-            dismissButton = { TextButton({ deleteTarget = null }) { Text("Cancel") } },
+            title = { Text(if (isImage) tr(R.string.confirm_delete_image) else tr(R.string.confirm_delete_scene)) },
+            text = { Text(if (isImage) tr(R.string.hint_image_is_removed_from_server) else tr(R.string.hint_scene_and_its_files_are)) },
+            confirmButton = { TextButton({ deleteTarget = null; model.delete(item) {} }) { Text(tr(R.string.action_delete), color = Color(0xFFFF453A)) } },
+            dismissButton = { TextButton({ deleteTarget = null }) { Text(tr(R.string.action_cancel)) } },
         )
     }
 }
@@ -517,7 +519,7 @@ private fun FeedPager(
                 isUIVisible = isUIVisible,
                 isPlaying = isPlaying,
                 isScrolling = scrolling,
-                errorMessage = if (pool.failed[item.id] == true || (item.isVideo.not() && !item.isAnimated)) "No playable source" else null,
+                errorMessage = if (pool.failed[item.id] == true || (item.isVideo.not() && !item.isAnimated)) tr(R.string.empty_playable_source) else null,
                 onToggleUI = onToggleUI,
                 onSkip = { delta ->
                     pool.player(item.id)?.let { p ->
@@ -680,9 +682,9 @@ private fun emptyIcon(mode: ReelsModeType) = when (mode) {
 }
 
 private fun emptyTitle(mode: ReelsModeType) = when (mode) {
-    ReelsModeType.Scenes, ReelsModeType.Verticals -> "No scenes found"
-    ReelsModeType.Markers -> "No markers found"
-    ReelsModeType.Clips -> "No clips found"
-    ReelsModeType.Previews -> "No previews found"
-    ReelsModeType.Pics -> "No images found"
+    ReelsModeType.Scenes, ReelsModeType.Verticals -> tr(R.string.empty_scenes_found)
+    ReelsModeType.Markers -> tr(R.string.empty_markers_found)
+    ReelsModeType.Clips -> tr(R.string.empty_clips_found)
+    ReelsModeType.Previews -> tr(R.string.empty_previews_found)
+    ReelsModeType.Pics -> tr(R.string.empty_images_found)
 }

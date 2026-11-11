@@ -1,5 +1,7 @@
 package de.letzgo.stashy.ui.tools.aitags
 
+import de.letzgo.stashy.R
+import de.letzgo.stashy.tr
 import androidx.compose.foundation.background
 import de.letzgo.stashy.ui.NativeSheetTopBar
 import androidx.compose.foundation.layout.imePadding
@@ -72,9 +74,9 @@ internal val RecommendationAdjustment.Kind.icon: ImageVector
 
 internal val RecommendationAdjustment.Kind.addTitle: String
     get() = when (this) {
-        RecommendationAdjustment.Kind.Performer -> "Add performer"
-        RecommendationAdjustment.Kind.Studio -> "Add studio"
-        RecommendationAdjustment.Kind.Tag -> "Add tag"
+        RecommendationAdjustment.Kind.Performer -> tr(R.string.action_add_performer)
+        RecommendationAdjustment.Kind.Studio -> tr(R.string.action_add_studio)
+        RecommendationAdjustment.Kind.Tag -> tr(R.string.action_add_tag)
     }
 
 /** iOS: `RecommendationAdjustmentsView` (Settings › For You › Adjustments). */
@@ -109,24 +111,24 @@ private fun RecommendationAdjustmentsView() {
                 }
             }
             item {
-                SettingsSectionFooter("Hidden never shows it. Above 1× also brings new scenes.")
+                SettingsSectionFooter(tr(R.string.hint_hidden_never_shows_it_above))
                 SectionSpacer()
             }
             if (engine.adjustments.isNotEmpty()) {
                 item {
                     GroupedCard {
-                        SettingsRow("Remove all", SF.trash, iconTint = StashyColors.systemRed, titleColor = StashyColors.systemRed, onClick = { confirmsRemoveAll = true })
+                        SettingsRow(tr(R.string.action_remove_all), SF.trash, iconTint = StashyColors.systemRed, titleColor = StashyColors.systemRed, onClick = { confirmsRemoveAll = true })
                     }
                 }
             }
         }
-        NativeTopBar("Adjustments")
+        NativeTopBar(tr(R.string.adjustments))
     }
     addKind?.let { kind -> AdjustmentPickerSheet(kind) { addKind = null } }
     if (confirmsRemoveAll) {
         NativeConfirmDialog(
-            "Remove all adjustments?", null,
-            onDismiss = { confirmsRemoveAll = false }, confirmLabel = "Remove all", destructive = true,
+            tr(R.string.confirm_remove_all_adjustments), null,
+            onDismiss = { confirmsRemoveAll = false }, confirmLabel = tr(R.string.action_remove_all), destructive = true,
             onConfirm = { engine.removeAllAdjustments(); confirmsRemoveAll = false },
         )
     }
@@ -164,9 +166,9 @@ private fun AdjustmentPickerSheet(kind: RecommendationAdjustment.Kind, onDismiss
             }
             androidx.compose.foundation.lazy.LazyColumn(Modifier.weight(1f).padding(top = 8.dp)) {
                 when {
-                    names == null -> item { SettingsRow("Loading…") { SmallSpinner() } }
+                    names == null -> item { SettingsRow(tr(R.string.loading)) { SmallSpinner() } }
                     hits.isEmpty() -> item {
-                        SettingsRow(if (names.isNullOrEmpty()) SceneRecommendations.PREPARING_MESSAGE else "Nothing found", titleColor = p.secondaryText)
+                        SettingsRow(if (names.isNullOrEmpty()) SceneRecommendations.PREPARING_MESSAGE else tr(R.string.nothing_found), titleColor = p.secondaryText)
                     }
                     else -> hits.forEachIndexed { i, (id, name) ->
                         item(key = id) {
@@ -195,7 +197,7 @@ private fun AdjustmentRow(entry: RecommendationAdjustment) {
             Text(RecommendationAdjustment.label(entry.factor), style = NativeType.bodyLarge,
                 color = if (entry.isHidden) StashyColors.systemRed else p.secondaryText)
             IconButton({ SceneRecommendations.removeAdjustment(entry.kind, entry.itemId) }) {
-                Icon(SF.trash, "Remove", tint = p.secondaryText, modifier = Modifier.size(20.dp))
+                Icon(SF.trash, tr(R.string.action_remove), tint = p.secondaryText, modifier = Modifier.size(20.dp))
             }
         }
         Slider(
@@ -219,7 +221,7 @@ fun RecommendationAdjustButton(scene: Scene, tint: Color) {
     var showsTags by remember { mutableStateOf(false) }
     Box {
         IconButton({ open = true; chosen = null; showsTags = false }, Modifier.size(28.dp, 20.dp)) {
-            Icon(SF.ellipsis, "Adjust suggestions", tint = tint, modifier = Modifier.size(18.dp))
+            Icon(SF.ellipsis, tr(R.string.adjust_suggestions), tint = tint, modifier = Modifier.size(18.dp))
         }
         DropdownMenu(open, { open = false }, containerColor = p.secondaryBackground) {
             val choice = chosen
@@ -230,17 +232,17 @@ fun RecommendationAdjustButton(scene: Scene, tint: Color) {
                     SceneRecommendations.applyAdjustmentsNow()
                     showToast(when {
                         factor < RecommendationAdjustment.HIDDEN_BELOW -> "$name won't be suggested"
-                        factor < 1 -> "Less of $name"
-                        else -> "More of $name"
+                        factor < 1 -> tr(R.string.less_of_arg, name)
+                        else -> tr(R.string.more_of_arg, name)
                     })
                     open = false
                 }
                 Text(name, style = NativeType.labelLarge, color = p.secondaryText, modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp))
-                MenuItem("More like this", Icons.Outlined.ThumbUp) { apply(RecommendationAdjustment.MORE) }
-                MenuItem("Less like this", Icons.Outlined.ThumbDown) { apply(RecommendationAdjustment.LESS) }
-                MenuItem("Never suggest", Icons.Outlined.VisibilityOff, StashyColors.systemRed) { apply(0.0) }
+                MenuItem(tr(R.string.more_like_this), Icons.Outlined.ThumbUp) { apply(RecommendationAdjustment.MORE) }
+                MenuItem(tr(R.string.less_like_this), Icons.Outlined.ThumbDown) { apply(RecommendationAdjustment.LESS) }
+                MenuItem(tr(R.string.never_suggest), Icons.Outlined.VisibilityOff, StashyColors.systemRed) { apply(0.0) }
                 if (SceneRecommendations.adjustment(kind, id) != null) {
-                    MenuItem("Back to normal", Icons.AutoMirrored.Filled.Undo) {
+                    MenuItem(tr(R.string.back_to_normal), Icons.AutoMirrored.Filled.Undo) {
                         SceneRecommendations.removeAdjustment(kind, id)
                         SceneRecommendations.applyAdjustmentsNow()
                         open = false
@@ -253,7 +255,7 @@ fun RecommendationAdjustButton(scene: Scene, tint: Color) {
             } else {
                 scene.performers.take(4).forEach { ItemEntry(RecommendationAdjustment.Kind.Performer, it.id, it.name) { c -> chosen = c } }
                 scene.studio?.let { ItemEntry(RecommendationAdjustment.Kind.Studio, it.id, it.name) { c -> chosen = c } }
-                if (!scene.tags.isNullOrEmpty()) MenuItem("Tags", SF.tag) { showsTags = true }
+                if (!scene.tags.isNullOrEmpty()) MenuItem(tr(R.string.tags), SF.tag) { showsTags = true }
             }
         }
     }

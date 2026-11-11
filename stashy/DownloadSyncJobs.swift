@@ -103,7 +103,7 @@ final class DownloadSyncJobStore: ObservableObject {
 enum DownloadSyncJobRunner {
     static func run(_ job: DownloadSyncJob, filters: [String: StashDBViewModel.SavedFilter], viewModel: StashDBViewModel) {
         guard let filter = filters[job.filterId] else {
-            ToastManager.shared.show("Filter for \(job.filterName) is gone", icon: "exclamationmark.triangle", style: .error)
+            ToastManager.shared.show(tr("action_filter_for_arg_is_gone", job.filterName), icon: "exclamationmark.triangle", style: .error)
             return
         }
         let criteria = viewModel.sanitizeFilter(filter.filterDict ?? [:])

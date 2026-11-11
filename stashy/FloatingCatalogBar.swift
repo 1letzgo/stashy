@@ -102,7 +102,7 @@ struct HomeViewsMenu: View {
                     }
                 }
             } else {
-                Picker("Library", selection: $selection) {
+                Picker(tr("library"), selection: $selection) {
                     ForEach(libraryTabs, id: \.self) { tab in
                         Label(tab.rawValue, systemImage: tab.icon)
                             .tag(tab)
@@ -112,7 +112,7 @@ struct HomeViewsMenu: View {
             }
         } label: {
             HStack(spacing: 6) {
-                Text(onDashboard ? "Dashboard" : selection.rawValue)
+                Text(onDashboard ? tr("dashboard") : selection.rawValue)
                     .font(.subheadline.weight(.semibold))
                     .lineLimit(1)
                     .minimumScaleFactor(0.8)
@@ -131,7 +131,7 @@ struct HomeViewsMenu: View {
         .menuIndicator(.hidden)
         .stashyNeutralMenuItems()
         .fixedSize()
-        .accessibilityLabel(onDashboard ? "Dashboard" : "Library, \(selection.rawValue)")
+        .accessibilityLabel(onDashboard ? tr("dashboard") : "Library, \(selection.rawValue)")
     }
 }
 
@@ -189,7 +189,7 @@ struct DetailBreadcrumbRow<Trailing: View>: View {
                     .contentShape(Circle())
             }
             .buttonStyle(.plain)
-            .accessibilityLabel("Back")
+            .accessibilityLabel(tr("back"))
             sectionMenu
             Spacer(minLength: 0)
             trailing()
@@ -202,7 +202,7 @@ struct DetailBreadcrumbRow<Trailing: View>: View {
     private var sectionMenu: some View {
         if crumb.sections.count > 1 {
             Menu {
-                Picker("Section", selection: Binding(
+                Picker(tr("section"), selection: Binding(
                     get: { crumb.selectionID },
                     set: { crumb.onSelect($0) }
                 )) {
@@ -296,7 +296,7 @@ struct HomeBreadcrumbRow<Trailing: View>: View {
                 .contentShape(Circle())
         }
         .buttonStyle(.plain)
-        .accessibilityLabel("Home")
+        .accessibilityLabel(tr("home"))
         .accessibilityAddTraits(onHome ? .isSelected : [])
     }
 
@@ -397,14 +397,14 @@ struct SettingsCategoryRow: View {
 
     var body: some View {
         StashyTopNavNameDropdownRow(
-            title: sections.count == 1 ? (sections.first?.rawValue ?? "Settings") : "Settings",
+            title: sections.count == 1 ? (sections.first?.rawValue ?? tr("settings")) : tr("settings"),
             items: sections.map {
                 StashyNavMenuItem(id: $0.rawValue, title: $0.rawValue, systemImage: $0.icon)
             },
             selectionID: selection.rawValue,
             titleColor: .white,
-            menuAccessibilityLabel: "Settings section",
-            menuAccessibilityHint: "Chooses which settings section to show"
+            menuAccessibilityLabel: tr("settings_section"),
+            menuAccessibilityHint: tr("hint_chooses_which_settings_section_to")
         ) { id in
             if let section = SettingsView.SettingsSection(rawValue: id) {
                 selection = section

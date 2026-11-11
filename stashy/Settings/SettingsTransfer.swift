@@ -115,8 +115,8 @@ enum SettingsTransferError: LocalizedError {
 
     var errorDescription: String? {
         switch self {
-        case .notASettingsFile: return "This is not a stashy settings file."
-        case .newerVersion(let v): return "This file was made by a newer stashy (format \(v)). Update the app first."
+        case .notASettingsFile: return tr("hint_this_is_not_stashy_settings")
+        case .newerVersion(let v): return tr("hint_this_file_was_made_by", v)
         }
     }
 }
@@ -157,7 +157,7 @@ enum SettingsTransfer {
     private static let deviceLocalPrefixes = [
         "reels_last_visible_", "reels_session_", "reels_playback_checkpoint_", "reels_restart_from_top_",
         "stashy.magazine.progress_", "stashy.hotOrNot.bracket", "stashy_timeline_image_o_actions_",
-        "download_sync_jobs_", "stashyDebug", "StashyWindowSize", "recommendations_last_picks_", "forgotten_favorites_last_picks_",
+        "download_sync_jobs_", "stashyDebug", "StashyWindowSize", "recommendations_last_picks_", "forgotten_favorites_last_picks_", "app_language",
     ]
 
     static func isSyncable(_ key: String) -> Bool {
@@ -434,15 +434,15 @@ struct SettingsTransferControls: View {
         Button {
             showsSecretsChoice = true
         } label: {
-            Label("Export Settings", systemImage: "square.and.arrow.up")
+            Label(tr("action_export_settings"), systemImage: "square.and.arrow.up")
         }
         .modifier(TransferRowStyle(grouped: groupedRows, index: 0, count: 2))
-        .alert("Include API keys?", isPresented: $showsSecretsChoice) {
-            Button("Without API keys") { startExport(includeSecrets: false) }
-            Button("With API keys and headers", role: .destructive) { startExport(includeSecrets: true) }
-            Button("Cancel", role: .cancel) {}
+        .alert(tr("confirm_include_api_keys"), isPresented: $showsSecretsChoice) {
+            Button(tr("without_api_keys")) { startExport(includeSecrets: false) }
+            Button(tr("with_api_keys_and_headers"), role: .destructive) { startExport(includeSecrets: true) }
+            Button(tr("action_cancel"), role: .cancel) {}
         } message: {
-            Text("With API keys the file gives full access to your servers. Keep it private.")
+            Text(tr("hint_with_api_keys_file_gives"))
         }
         .fileExporter(
             isPresented: $showsExporter,
@@ -461,14 +461,14 @@ struct SettingsTransferControls: View {
         Button {
             showsImporter = true
         } label: {
-            Label("Import Settings", systemImage: "square.and.arrow.down")
+            Label(tr("action_import_settings"), systemImage: "square.and.arrow.down")
         }
         .modifier(TransferRowStyle(grouped: groupedRows, index: importOnly ? 0 : 1, count: importOnly ? 1 : 2))
         .fileImporter(isPresented: $showsImporter, allowedContentTypes: [.json, .data]) { result in
             handleImport(result)
         }
-        .alert("Settings", isPresented: $showsResult) {
-            Button("OK", role: .cancel) {}
+        .alert(tr("settings"), isPresented: $showsResult) {
+            Button(tr("ok"), role: .cancel) {}
         } message: {
             Text(resultMessage ?? "")
         }
@@ -496,7 +496,7 @@ struct SettingsTransferControls: View {
                 // The import resets the navigation (ServerConfigChanged), which would tear an
                 // alert down with this view — the toast outlives it.
                 ToastManager.shared.show(
-                    "Imported \(summary.servers) server(s) and \(summary.settings) setting(s). Restart stashy to apply every setting.",
+                    tr("hint_imported_arg_server_s_and", summary.servers, summary.settings),
                     icon: "square.and.arrow.down.fill",
                     duration: 4
                 )

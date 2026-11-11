@@ -1,5 +1,7 @@
 package de.letzgo.stashy.ui.catalog
 
+import de.letzgo.stashy.R
+import de.letzgo.stashy.tr
 import de.letzgo.stashy.ui.bottomBarContentPadding
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
@@ -64,7 +66,7 @@ fun PerformersCatalog() {
 @Composable
 fun PerformersList(c: CatalogController<Performer>, topPadding: androidx.compose.ui.unit.Dp = catalogTopPadding()) {
     CatalogScaffold(
-        c, CatalogTexts("Loading performers...", SF.person3, "No performers found", "Load Performers"),
+        c, CatalogTexts(tr(R.string.loading_performers), SF.person3, tr(R.string.empty_performers_found), tr(R.string.action_load_performers)),
         CatalogSlots(), posterColumns, { it.id }, topPadding, gridKey = c.listResetToken,
     ) { _, performer ->
         PerformerCard(performer, badgeType = PerformerBadgeType.forSort(c.sort), onClick = { Nav.push(PerformerDetailScreen(performer.id, performer)) })
@@ -82,7 +84,7 @@ fun StudiosCatalog() {
 @Composable
 fun StudiosList(c: CatalogController<Studio>, topPadding: androidx.compose.ui.unit.Dp = catalogTopPadding()) {
     CatalogScaffold(
-        c, CatalogTexts("Loading studios...", SF.building2, "No studios found", "Load Studios"),
+        c, CatalogTexts(tr(R.string.loading_studios), SF.building2, tr(R.string.empty_studios_found), tr(R.string.action_load_studios)),
         CatalogSlots(), posterColumns, { it.id }, topPadding, gridKey = c.listResetToken,
     ) { _, studio ->
         StudioCard(studio, badge = CatalogCardBadge.forSort(c.sort), onClick = { Nav.push(StudioDetailScreen(studio.id, studio)) })
@@ -100,7 +102,7 @@ fun TagsCatalog() {
 @Composable
 fun TagsList(c: CatalogController<Tag>, topPadding: androidx.compose.ui.unit.Dp = catalogTopPadding()) {
     CatalogScaffold(
-        c, CatalogTexts("Loading tags...", SF.tag, "No tags found", "Load Tags"),
+        c, CatalogTexts(tr(R.string.loading_tags), SF.tag, tr(R.string.empty_tags_found), tr(R.string.action_load_tags)),
         CatalogSlots(), posterColumns, { it.id }, topPadding, gridKey = c.listResetToken,
     ) { _, tag ->
         TagCard(tag, badge = CatalogCardBadge.forSort(c.sort), onClick = { Nav.push(TagDetailScreen(tag.id, tag)) })
@@ -113,7 +115,7 @@ fun TagsList(c: CatalogController<Tag>, topPadding: androidx.compose.ui.unit.Dp 
 fun GroupsCatalog() {
     val c = rememberCatalogController<StashGroup>(FilterMode.Groups)
     CatalogScaffold(
-        c, CatalogTexts("Loading groups...", SF.rectangleStackFill, "No groups found", "Load Groups"),
+        c, CatalogTexts(tr(R.string.loading_groups), SF.rectangleStackFill, tr(R.string.empty_groups_found), tr(R.string.action_load_groups)),
         CatalogSlots(), posterColumns, { it.id }, gridKey = c.listResetToken,
     ) { _, group ->
         GroupCard(group, badge = CatalogCardBadge.forSort(c.sort), onClick = { Nav.push(GroupDetailScreen(group.id, group)) })
@@ -126,7 +128,7 @@ fun GroupsCatalog() {
 fun MarkersCatalog() {
     val c = rememberCatalogController<SceneMarker>(FilterMode.SceneMarkers)
     CatalogScaffold(
-        c, CatalogTexts("Loading markers...", SF.bookmarkFill, "No markers found", "Load Markers"),
+        c, CatalogTexts(tr(R.string.loading_markers), SF.bookmarkFill, tr(R.string.empty_markers_found), tr(R.string.action_load_markers)),
         CatalogSlots(), posterColumns, { it.id }, gridKey = c.listResetToken,
     ) { _, marker ->
         MarkerCard(marker, onClick = {
@@ -157,7 +159,7 @@ fun GalleriesList(
 ) {
     val cols = CatalogPrefs.cardColumns(columnScope)
     CatalogScaffold(
-        c, CatalogTexts("Loading galleries...", SF.photoStack, "No galleries found", "Reload"),
+        c, CatalogTexts(tr(R.string.loading_galleries), SF.photoStack, tr(R.string.empty_galleries_found), tr(R.string.action_reload)),
         CatalogSlots(),
         columns = columns ?: { cols.columnCount(it) }, itemKey = { it.id }, topPadding = topPadding, gridKey = cols to c.listResetToken,
     ) { _, gallery ->
@@ -193,10 +195,10 @@ fun ImagesList(c: CatalogController<StashImage>, holder: ImageMediaKindHolder, c
     val selection = androidx.compose.runtime.remember { ImageSelectionController() }
     androidx.activity.compose.BackHandler(enabled = selection.isActive) { selection.end() }
     CatalogScaffold(
-        c, CatalogTexts("Loading images...", SF.photo, "No images found", "Reload"),
+        c, CatalogTexts(tr(R.string.loading_images), SF.photo, tr(R.string.empty_images_found), tr(R.string.action_reload)),
         // No Settings button: the quick bar's pinned settings button opens the sheet.
         CatalogSlots(
-            contextual = CatalogChromeSlot(SF.checkmarkCircle, false, "Select images") { selection.begin() },
+            contextual = CatalogChromeSlot(SF.checkmarkCircle, false, tr(R.string.action_select_images)) { selection.begin() },
             selection = CatalogSelectionChrome(
                 isActive = selection.isActive,
                 count = selection.state.count,

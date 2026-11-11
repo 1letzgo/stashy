@@ -1,0 +1,11 @@
+{
+  "$schema": "https://docs.tolgee.io/cli-schema.json",
+  "apiUrl": "https://tolgee.shelf.am",
+  "projectId": 2,
+  "format": "ANDROID_XML",
+  "push": {
+    "files": [{ "path": "../../android/app/src/main/res/values/strings.xml", "language": "en" }],
+    "languages": ["en"],
+    "forceMode": "OVERRIDE"
+  }
+}

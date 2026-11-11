@@ -1,5 +1,7 @@
 package de.letzgo.stashy.data.tools
 
+import de.letzgo.stashy.R
+import de.letzgo.stashy.tr
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -45,13 +47,13 @@ sealed class RecommendationReason {
     @kotlinx.serialization.Serializable data object Favorite : RecommendationReason()
 
     val label: String get() = when (this) {
-        is Performer -> "More with $name"
-        is Studio -> "More from $name"
-        is Tag -> "You like $name"
-        is RelatedTag -> "Goes with your tags: $name"
-        is SimilarTo -> "Like “$title”"
-        Rediscover -> "Rediscover"
-        Favorite -> "One of your favorites"
+        is Performer -> tr(R.string.more_with_arg, name)
+        is Studio -> tr(R.string.more_from_arg, name)
+        is Tag -> tr(R.string.you_like_arg, name)
+        is RelatedTag -> tr(R.string.goes_with_your_tags_arg, name)
+        is SimilarTo -> tr(R.string.like_arg, title)
+        Rediscover -> tr(R.string.rediscover)
+        Favorite -> tr(R.string.one_of_your_favorites)
     }
 }
 
@@ -63,9 +65,9 @@ data class SceneRecommendation(val scene: Scene, val reason: RecommendationReaso
 
 /** iOS: `RecommendationDiscovery` (raw values identical). */
 enum class RecommendationDiscovery(val raw: String, val title: String, val detail: String) {
-    Fresh("fresh", "New only", "Only scenes you have never played."),
-    Balanced("balanced", "Balanced", "Unplayed scenes and scenes you have not played in this period, weighed the same."),
-    Favorites("favorites", "Favorites", "Scenes with O-Counts or high ratings you have not played in a while.");
+    Fresh("fresh", tr(R.string.new_only), tr(R.string.hint_only_scenes_you_have_never)),
+    Balanced("balanced", tr(R.string.balanced), tr(R.string.hint_unplayed_scenes_and_scenes_you)),
+    Favorites("favorites", tr(R.string.favorites), tr(R.string.hint_scenes_with_o_counts_or));
 
     companion object { fun fromRaw(raw: String?) = entries.firstOrNull { it.raw == raw } ?: Balanced }
 }
@@ -81,9 +83,9 @@ enum class RecommendationState { Idle, Loading, Ready, NoHistory, Failed }
 data class RecommendationAdjustment(val kind: Kind, val itemId: String, val name: String, val factor: Double) {
     @kotlinx.serialization.Serializable
     enum class Kind(val title: String) {
-        @kotlinx.serialization.SerialName("performer") Performer("Performers"),
-        @kotlinx.serialization.SerialName("studio") Studio("Studios"),
-        @kotlinx.serialization.SerialName("tag") Tag("Tags"),
+        @kotlinx.serialization.SerialName("performer") Performer(tr(R.string.performers)),
+        @kotlinx.serialization.SerialName("studio") Studio(tr(R.string.studios)),
+        @kotlinx.serialization.SerialName("tag") Tag(tr(R.string.tags)),
     }
 
     val id: String get() = "${kind.name.lowercase()}:$itemId"
@@ -94,7 +96,7 @@ data class RecommendationAdjustment(val kind: Kind, val itemId: String, val name
         const val HIDDEN_BELOW = 0.05
         const val LESS = 0.5
         const val MORE = 2.0
-        fun label(factor: Double): String = if (factor < HIDDEN_BELOW) "Hidden" else String.format(java.util.Locale.US, "%.1f×", factor)
+        fun label(factor: Double): String = if (factor < HIDDEN_BELOW) tr(R.string.hidden) else String.format(java.util.Locale.US, "%.1f×", factor)
     }
 }
 
@@ -402,7 +404,7 @@ object SceneRecommendations {
                 state = if (picks.isEmpty() && seeds == 0) RecommendationState.NoHistory else RecommendationState.Ready
                 if (picks.isNotEmpty()) saveRecentPicks(picks.take(count).map { it.id }, loadRecentPicks())
             }.onFailure {
-                if (recommendations.isEmpty()) { failure = it.message ?: "Could not build your list"; state = RecommendationState.Failed }
+                if (recommendations.isEmpty()) { failure = it.message ?: tr(R.string.error_build_your_list); state = RecommendationState.Failed }
             }
             builtAt = System.currentTimeMillis()
             isRefreshing = false
@@ -548,7 +550,7 @@ object SceneRecommendations {
     }
 
     /** Shown until the first statistics build on this device is done. */
-    const val PREPARING_MESSAGE = "Getting your library ready on this device…"
+    val PREPARING_MESSAGE = tr(R.string.hint_getting_your_library_ready_on)
 
     /** A finished statistics build: the next list reads the new index; a row still waiting gets its list now. */
     fun onSceneIndexChanged() {
@@ -754,7 +756,7 @@ object SceneRecommendations {
             studioScore to candidate.studio?.let { RecommendationReason.Studio(it.second) },
             tagScore to tagHits.firstOrNull()?.let { RecommendationReason.Tag(tagName(it.first)) },
             relatedScore to bestRelated?.let { RecommendationReason.RelatedTag(tagName(it.first)) },
-            similarScore to similarAnchor?.let { RecommendationReason.SimilarTo(it.title ?: "a scene you watched") },
+            similarScore to similarAnchor?.let { RecommendationReason.SimilarTo(it.title ?: tr(R.string.scene_you_watched)) },
         )
         val strongest = factors.filter { it.second != null && it.first > 0 }.maxByOrNull { it.first }?.second
         val reason = when {

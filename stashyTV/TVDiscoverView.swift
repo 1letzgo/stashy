@@ -47,7 +47,7 @@ struct TVDiscoverView: View {
     var body: some View {
         ScrollView(.vertical, showsIndicators: false) {
             VStack(alignment: .leading, spacing: 40) {
-                Text("Discover")
+                Text(tr("discover"))
                     .font(.largeTitle)
                     .fontWeight(.bold)
 
@@ -59,7 +59,7 @@ struct TVDiscoverView: View {
                 .focusSection()
 
                 if !stashyPlus.isUnlocked {
-                    Label("Match and RateMe are part of stashy+.", systemImage: "lock.fill")
+                    Label(tr("hint_match_and_rateme_are_part"), systemImage: "lock.fill")
                         .font(.headline)
                         .foregroundStyle(.secondary)
                 }

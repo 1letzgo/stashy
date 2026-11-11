@@ -1,5 +1,7 @@
 package de.letzgo.stashy.data.tools
 
+import de.letzgo.stashy.R
+import de.letzgo.stashy.tr
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
@@ -13,8 +15,8 @@ import kotlin.random.Random
 
 /** iOS: `RateMeViewModel.Mode` (raw values persisted under `stashy.rateMe.mode`). */
 enum class RateMeMode(val raw: String, val label: String) {
-    Scenes("scenes", "Scenes"),
-    Images("images", "Images");
+    Scenes("scenes", tr(R.string.scenes)),
+    Images("images", tr(R.string.images));
 
     companion object {
         fun from(raw: String?): RateMeMode? = entries.firstOrNull { it.raw == raw }
@@ -29,9 +31,9 @@ enum class RateMeImageMediaKind(val raw: String) {
 
     /** iOS: `RateMeToolsView.mediaKindTitle`. */
     val title: String get() = when (this) {
-        All -> "Any media"
-        StillImage -> "Images"
-        Video -> "Videos"
+        All -> tr(R.string.any_media)
+        StillImage -> tr(R.string.images)
+        Video -> tr(R.string.videos)
     }
 
     /** iOS: `pathCriterion` — `ImageFilterType.path` with `MATCHES_REGEX`. */
@@ -74,9 +76,9 @@ sealed class RateMeTheme {
     }
 
     val label: String get() = when (this) {
-        Random -> "Random"
-        Newest -> "Newest"
-        MostPlayed -> "Most played"
+        Random -> tr(R.string.random)
+        Newest -> tr(R.string.newest)
+        MostPlayed -> tr(R.string.most_played)
         is Performer -> option.name
         is Studio -> option.name
         is Tag -> option.name
@@ -85,9 +87,9 @@ sealed class RateMeTheme {
 
 /** iOS: `RateMeToolsView.ThemePickerKind`. */
 enum class RateMeThemePickerKind(val raw: String, val title: String) {
-    Performer("performer", "Performer"),
-    Studio("studio", "Studio"),
-    Tag("tag", "Tag");
+    Performer("performer", tr(R.string.performer)),
+    Studio("studio", tr(R.string.studio)),
+    Tag("tag", tr(R.string.tag));
 
     fun theme(option: RateMeOption): RateMeTheme = when (this) {
         Performer -> RateMeTheme.Performer(option)
@@ -208,18 +210,18 @@ object RateMeLogic {
 
     /** iOS: trimmed title or the "Untitled …" fallback. */
     fun displayTitle(title: String?, mode: RateMeMode): String =
-        title?.trim()?.takeIf { it.isNotEmpty() } ?: if (mode == RateMeMode.Scenes) "Untitled scene" else "Untitled image"
+        title?.trim()?.takeIf { it.isNotEmpty() } ?: if (mode == RateMeMode.Scenes) tr(R.string.untitled_scene) else tr(R.string.untitled_image)
 
     /** iOS: "No unrated scenes left in Random." */
     fun noneLeftMessage(mode: RateMeMode, theme: RateMeTheme): String =
-        "No unrated ${mode.label.lowercase()} left in ${theme.label}."
+        tr(R.string.empty_unrated_arg_left_in_arg, mode.label.lowercase(), theme.label)
 
     fun deleteConfirmationTitle(mode: RateMeMode): String =
-        if (mode == RateMeMode.Scenes) "Really delete scene and files?" else "Really delete image and files?"
+        if (mode == RateMeMode.Scenes) tr(R.string.confirm_really_delete_scene_and_files) else tr(R.string.confirm_really_delete_image_and_files)
 
     fun deleteConfirmationMessage(mode: RateMeMode, itemTitle: String?): String {
         val name = itemTitle ?: if (mode == RateMeMode.Scenes) "this scene" else "this image"
-        return "‘$name’ and all associated files will be permanently deleted. This action cannot be undone."
+        return tr(R.string.hint_arg_and_all_associated_files, name)
     }
 
     // MARK: StarRatingView

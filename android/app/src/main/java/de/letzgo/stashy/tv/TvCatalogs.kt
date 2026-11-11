@@ -1,5 +1,7 @@
 package de.letzgo.stashy.tv
 
+import de.letzgo.stashy.R
+import de.letzgo.stashy.tr
 import de.letzgo.stashy.ui.uniqueItemsIndexed
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -146,18 +148,18 @@ fun TvCatalogHeader(model: TvCatalogModel<*>, modifier: Modifier = Modifier, sor
     Row(modifier.padding(vertical = pt(30)), horizontalArrangement = Arrangement.spacedBy(pt(24)), verticalAlignment = Alignment.CenterVertically) {
         val sortLabel = TvSortLabels.options(model.mode).firstOrNull { it.first == model.sort.raw }?.second ?: model.sort.label
         TvChromeButton(TvIcons.sort, sortLabel, { sortOpen = true }, if (sortFocus != null) Modifier.focusRequester(sortFocus) else Modifier)
-        TvChromeButton(if (model.filter != null) TvIcons.filterFill else TvIcons.filter, model.filter?.name ?: "No Filter", { filterOpen = true })
+        TvChromeButton(if (model.filter != null) TvIcons.filterFill else TvIcons.filter, model.filter?.name ?: tr(R.string.empty_filter), { filterOpen = true })
     }
     if (sortOpen) {
         TvOptionDialog(
-            "Sort By", TvSortLabels.options(model.mode).map { TvOption(it.first, it.second) }, model.sort.raw,
+            tr(R.string.action_sort_by), TvSortLabels.options(model.mode).map { TvOption(it.first, it.second) }, model.sort.raw,
             { model.changeSort(it) }, { sortOpen = false },
         )
     }
     if (filterOpen) {
         val none = "\u0000none"
         TvOptionDialog(
-            "Filter", listOf(TvOption(none, "No Filter")) + model.savedFilters.map { TvOption(it.id, it.name) }, model.filter?.id ?: none,
+            tr(R.string.filter), listOf(TvOption(none, tr(R.string.empty_filter))) + model.savedFilters.map { TvOption(it.id, it.name) }, model.filter?.id ?: none,
             { id -> model.changeFilter(if (id == none) null else SavedFiltersStore.byId[id]) }, { filterOpen = false },
         )
     }
@@ -190,7 +192,7 @@ fun <T> TvCatalogGrid(
     val firstFocus = remember { FocusRequester() }
     Box(Modifier.fillMaxSize().background(TvColors.background)) {
         when {
-            !hasConfig -> TvConnectionError(subtitle = "Add a server in Settings.") { model.reload() }
+            !hasConfig -> TvConnectionError(subtitle = tr(R.string.action_add_server_in_settings)) { model.reload() }
             items.isEmpty() && list.error != null && !list.isLoading -> Column(Modifier.padding(horizontal = pt(60))) {
                 TvCatalogHeader(model, sortFocus = headerFocus)
                 TvConnectionError(errorTitle, list.error) { model.reload() }
@@ -247,42 +249,42 @@ fun <T> TvCatalogGrid(
 @Composable
 fun TvScenesGrid(model: TvCatalogModel<Scene>, autoFocusFirst: Boolean = false) {
     TvCatalogGrid(
-        model, pt(410), 4, emptyIcon = TvIcons.filmOutline, emptyTitle = "No scenes found",
-        loadingText = "Loading scenes…", errorTitle = "Error loading scenes", autoFocusFirst = autoFocusFirst,
+        model, pt(410), 4, emptyIcon = TvIcons.filmOutline, emptyTitle = tr(R.string.empty_scenes_found),
+        loadingText = tr(R.string.loading_scenes), errorTitle = tr(R.string.error_loading_scenes), autoFocusFirst = autoFocusFirst,
     ) { scene, modifier -> TvSceneTile(scene, { TvNav.push(TvSceneDetailRoute(scene.id, scene)) }, modifier) }
 }
 
 @Composable
 fun TvPerformersGrid(model: TvCatalogModel<Performer>) {
-    TvCatalogGrid(model, pt(260), 6, emptyIcon = TvIcons.person3, emptyTitle = "No Performers Found", loadingText = "Loading performers…", errorTitle = "Error loading performers") { p, modifier ->
+    TvCatalogGrid(model, pt(260), 6, emptyIcon = TvIcons.person3, emptyTitle = tr(R.string.empty_performers_found), loadingText = tr(R.string.loading_performers), errorTitle = tr(R.string.error_loading_performers)) { p, modifier ->
         TvPerformerCard(p, { TvNav.push(TvPerformerDetailRoute(p.id, p.name)) }, modifier)
     }
 }
 
 @Composable
 fun TvStudiosGrid(model: TvCatalogModel<Studio>) {
-    TvCatalogGrid(model, pt(410), 4, emptyIcon = TvIcons.building, emptyTitle = "No Studios Found", loadingText = "Loading studios…", errorTitle = "Error loading studios") { s, modifier ->
+    TvCatalogGrid(model, pt(410), 4, emptyIcon = TvIcons.building, emptyTitle = tr(R.string.empty_studios_found), loadingText = tr(R.string.loading_studios), errorTitle = tr(R.string.error_loading_studios)) { s, modifier ->
         TvStudioCard(s, { TvNav.push(TvStudioDetailRoute(s.id, s.name)) }, modifier)
     }
 }
 
 @Composable
 fun TvTagsGrid(model: TvCatalogModel<Tag>) {
-    TvCatalogGrid(model, pt(400), 4, emptyIcon = TvIcons.tag, emptyTitle = "No Tags Found", loadingText = "Loading tags…", errorTitle = "Error loading tags") { t, modifier ->
+    TvCatalogGrid(model, pt(400), 4, emptyIcon = TvIcons.tag, emptyTitle = tr(R.string.empty_tags_found), loadingText = tr(R.string.loading_tags), errorTitle = tr(R.string.error_loading_tags)) { t, modifier ->
         TvTagCard(t, { TvNav.push(TvTagDetailRoute(t.id, t.name)) }, modifier)
     }
 }
 
 @Composable
 fun TvGroupsGrid(model: TvCatalogModel<StashGroup>) {
-    TvCatalogGrid(model, pt(260), 6, emptyIcon = TvIcons.stack, emptyTitle = "No Groups Found", loadingText = "Loading groups…", errorTitle = "Error loading groups") { g, modifier ->
+    TvCatalogGrid(model, pt(260), 6, emptyIcon = TvIcons.stack, emptyTitle = tr(R.string.empty_groups_found), loadingText = tr(R.string.loading_groups), errorTitle = tr(R.string.error_loading_groups)) { g, modifier ->
         TvGroupCard(g, { TvNav.push(TvGroupDetailRoute(g.id, g.name)) }, modifier)
     }
 }
 
 @Composable
 fun TvGalleriesGrid(model: TvCatalogModel<Gallery>) {
-    TvCatalogGrid(model, pt(410), 4, emptyIcon = TvIcons.photoStack, emptyTitle = "No Galleries Found", loadingText = "Loading galleries…", errorTitle = "Error loading galleries") { g, modifier ->
+    TvCatalogGrid(model, pt(410), 4, emptyIcon = TvIcons.photoStack, emptyTitle = tr(R.string.empty_galleries_found), loadingText = tr(R.string.loading_galleries), errorTitle = tr(R.string.error_loading_galleries)) { g, modifier ->
         TvGalleryCard(g, { TvNav.push(TvGalleryDetailRoute(g.id, g.displayTitle, g)) }, modifier)
     }
 }
@@ -292,11 +294,11 @@ fun TvGalleriesGrid(model: TvCatalogModel<Gallery>) {
 fun TvImagesGrid(model: TvCatalogModel<StashImage>) {
     val stills = model.list.items.tvStillImages()
     TvCatalogGrid(
-        model, pt(300), 5, spacing = pt(30), emptyIcon = TvIcons.photo, emptyTitle = "No Images Found",
-        loadingText = "Loading images…", errorTitle = "Error loading images", items = stills,
+        model, pt(300), 5, spacing = pt(30), emptyIcon = TvIcons.photo, emptyTitle = tr(R.string.empty_images_found),
+        loadingText = tr(R.string.loading_images), errorTitle = tr(R.string.error_loading_images), items = stills,
     ) { image, modifier ->
         TvImageTile(image, {
-            TvNav.push(TvImageViewerRoute(image.id, image.tvDisplayTitle ?: "Untitled", { model.list.items.tvStillImages() }, { model.list.loadMore() }, { model.list.hasMore }))
+            TvNav.push(TvImageViewerRoute(image.id, image.tvDisplayTitle ?: tr(R.string.untitled), { model.list.items.tvStillImages() }, { model.list.loadMore() }, { model.list.hasMore }))
         }, modifier)
     }
 }

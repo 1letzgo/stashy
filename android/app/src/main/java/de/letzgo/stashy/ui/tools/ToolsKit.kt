@@ -1,5 +1,7 @@
 package de.letzgo.stashy.ui.tools
 
+import de.letzgo.stashy.R
+import de.letzgo.stashy.tr
 import de.letzgo.stashy.ui.bottomBarContentPadding
 import android.widget.Toast
 import androidx.compose.foundation.background
@@ -103,7 +105,7 @@ fun SettingsSectionFooter(text: String, modifier: Modifier = Modifier) = de.letz
 fun BetaBadge() {
     val tint = Appearance.tint
     Text(
-        "Beta",
+        tr(R.string.beta),
         fontSize = 11.sp, fontWeight = FontWeight.Bold, color = de.letzgo.stashy.ui.textAccent(),
         modifier = Modifier.background(tint.copy(alpha = 0.16f), RoundedCornerShape(50)).padding(horizontal = 6.dp, vertical = 2.dp),
     )
@@ -156,7 +158,7 @@ fun NoServerPlaceholder(icon: ImageVector, message: String) {
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         Icon(icon, null, tint = Appearance.tint, modifier = Modifier.size(64.dp))
-        Text("No active server", style = IosTypography.title3.copy(fontWeight = FontWeight.Bold), color = p.text)
+        Text(tr(R.string.empty_active_server), style = IosTypography.title3.copy(fontWeight = FontWeight.Bold), color = p.text)
         Text(message, style = IosTypography.body, color = p.secondaryText, textAlign = TextAlign.Center)
     }
 }
@@ -167,7 +169,7 @@ fun StashyAlert(
     title: String,
     message: String?,
     onDismiss: () -> Unit,
-    confirmLabel: String = "OK",
+    confirmLabel: String = tr(R.string.ok),
     destructive: Boolean = false,
     dismissLabel: String? = null,
     onConfirm: () -> Unit = onDismiss,

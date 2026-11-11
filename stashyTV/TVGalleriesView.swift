@@ -40,9 +40,9 @@ struct TVGalleriesView: View {
             hasMore: viewModel.hasMoreGalleries,
             columnWidth: 410,
             emptySystemImage: "photo.stack",
-            emptyTitle: "No Galleries Found",
-            loadingText: "Loading galleries…",
-            errorTitle: "Error loading galleries",
+            emptyTitle: tr("empty_galleries_found"),
+            loadingText: tr("loading_galleries"),
+            errorTitle: tr("error_loading_galleries"),
             focusResetToken: focusResetToken,
             loadMore: { viewModel.loadMoreGalleries() },
             reload: { reload() },
@@ -51,7 +51,7 @@ struct TVGalleriesView: View {
                 STVHeaderView(
                     sortMenu: {
                         TVOptionPickerButton(
-                            title: "Sort By",
+                            title: tr("action_sort_by"),
                             icon: "arrow.up.arrow.down",
                             options: sortOptions,
                             selection: $sortBy
@@ -122,20 +122,20 @@ struct TVGalleriesView: View {
 
     private func label(for option: StashDBViewModel.GallerySortOption) -> String {
         switch option {
-        case .titleAsc: return "Title (A-Z)"
-        case .titleDesc: return "Title (Z-A)"
-        case .dateDesc: return "Newest First"
-        case .dateAsc: return "Oldest First"
-        case .ratingDesc: return "Highest Rated"
-        case .ratingAsc: return "Lowest Rated"
-        case .createdAtDesc: return "Recently Added"
-        case .createdAtAsc: return "Oldest Added"
-        case .updatedAtDesc: return "Recently Updated"
-        case .updatedAtAsc: return "Least Recently Updated"
-        case .imageCountDesc: return "Most Images"
-        case .imageCountAsc: return "Least Images"
+        case .titleAsc: return tr("title_z")
+        case .titleDesc: return tr("title_z_2")
+        case .dateDesc: return tr("newest_first")
+        case .dateAsc: return tr("oldest_first")
+        case .ratingDesc: return tr("highest_rated")
+        case .ratingAsc: return tr("lowest_rated")
+        case .createdAtDesc: return tr("recently_added")
+        case .createdAtAsc: return tr("oldest_added")
+        case .updatedAtDesc: return tr("recently_updated")
+        case .updatedAtAsc: return tr("least_recently_updated")
+        case .imageCountDesc: return tr("most_images")
+        case .imageCountAsc: return tr("least_images")
         case .performerAgeDesc, .performerAgeAsc: return option.displayName
-        case .random: return "Random"
+        case .random: return tr("random")
         }
     }
 }
@@ -184,19 +184,19 @@ struct TVGalleryDetailView: View {
                                 .font(.system(size: 48))
                                 .foregroundColor(.secondary)
                             Text(viewModel.galleryImages.isEmpty
-                                  ? "No images in this gallery"
-                                  : "No supported images in this gallery")
+                                  ? tr("empty_images_in_this_gallery")
+                                  : tr("empty_supported_images_in_this_gallery"))
                                 .font(.title3)
                                 .foregroundStyle(.secondary)
                             if !viewModel.galleryImages.isEmpty && displayImages.isEmpty {
-                                Text("Only unsupported or animated formats (e.g. GIF) were found.")
+                                Text(tr("hint_only_unsupported_or_animated_formats"))
                                     .font(.body)
                                     .foregroundStyle(.tertiary)
                                     .multilineTextAlignment(.center)
                                     .padding(.horizontal, 80)
                             }
                             // Focus anchor so Menu/Back hits tvExitDismissable instead of exiting the app.
-                            Button("Back") { dismiss() }
+                            Button(tr("back")) { dismiss() }
                                 .focused($emptyFocus)
                         }
                         Spacer()
@@ -210,7 +210,7 @@ struct TVGalleryDetailView: View {
                                 Button {
                                     presentedImage = TVImageLink(
                                         id: image.id,
-                                        title: image.displayTitle ?? "Untitled",
+                                        title: image.displayTitle ?? tr("untitled"),
                                         galleryId: galleryId
                                     )
                                 } label: {
@@ -320,15 +320,15 @@ struct TVGalleryDetailView: View {
 
                         LazyVGrid(columns: TVGridSpec.infoColumns, alignment: .leading, spacing: 12) {
                             if let count = gallery.imageCount {
-                                Text("Images").font(.title3).foregroundStyle(.secondary)
+                                Text(tr("images")).font(.title3).foregroundStyle(.secondary)
                                 Text("\(count)").font(.title3).foregroundColor(.white)
                             }
                             if let date = gallery.date, !date.isEmpty {
-                                Text("Date").font(.title3).foregroundStyle(.secondary)
+                                Text(tr("date")).font(.title3).foregroundStyle(.secondary)
                                 Text(date).font(.title3).foregroundColor(.white)
                             }
                             if let studio = gallery.studio {
-                                Text("Studio").font(.title3).foregroundStyle(.secondary)
+                                Text(tr("studio")).font(.title3).foregroundStyle(.secondary)
                                 Text(studio.name).font(.title3).foregroundColor(.white)
                             }
                         }

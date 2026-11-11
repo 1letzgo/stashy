@@ -61,7 +61,7 @@ struct ScenePerformersStudioCard: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack {
-                Text("Metadata")
+                Text(tr("metadata"))
                     .font(.title3)
                     .fontWeight(.semibold)
                 Spacer()
@@ -70,18 +70,18 @@ struct ScenePerformersStudioCard: View {
                         Button {
                             activeEditor = .studio
                         } label: {
-                            Label("Edit Studio", systemImage: "building.2")
+                            Label(tr("action_edit_studio"), systemImage: "building.2")
                         }
                         Button {
                             activeEditor = .performers
                         } label: {
-                            Label("Edit Performers", systemImage: "person.2")
+                            Label(tr("action_edit_performers"), systemImage: "person.2")
                         }
                         if galleries != nil {
                             Button {
                                 activeEditor = .galleries
                             } label: {
-                                Label("Edit Galleries", systemImage: "photo.on.rectangle")
+                                Label(tr("action_edit_galleries"), systemImage: "photo.on.rectangle")
                             }
                         }
                     } label: {
@@ -95,7 +95,7 @@ struct ScenePerformersStudioCard: View {
             .padding(.top, 8)
 
             if isEmpty {
-                Text("No metadata assigned")
+                Text(tr("empty_metadata_assigned"))
                     .font(.subheadline)
                     .foregroundColor(.secondary)
                     .padding(.horizontal, 12)
@@ -412,7 +412,7 @@ struct AddPerformerToSceneSheet: View {
     var body: some View {
         NavigationView {
             Form {
-                Section(header: Text("Search Performers")) {
+                Section(header: Text(tr("search_performers"))) {
                     TextField("Search...", text: $searchText)
                     if isLoading {
                         HStack { Spacer(); ProgressView("Loading..."); Spacer() }.padding()
@@ -438,7 +438,7 @@ struct AddPerformerToSceneSheet: View {
                             }
                         }
                         if filtered.count > 30 {
-                            Text("Type more to refine...").font(.caption).foregroundColor(.secondary)
+                            Text(tr("type_more_to_refine_menu")).font(.caption).foregroundColor(.secondary)
                         }
                         if !searchText.isEmpty && filtered.isEmpty
                             && !pinned.contains(where: { $0.name.localizedCaseInsensitiveContains(searchText) }) {
@@ -447,7 +447,7 @@ struct AddPerformerToSceneSheet: View {
                             } label: {
                                 HStack {
                                     Image(systemName: "plus.circle.fill")
-                                    Text("Create \"\(searchText)\"")
+                                    Text(tr("action_create_arg", searchText))
                                 }
                                 .foregroundColor(appearanceManager.tintColor)
                             }
@@ -459,8 +459,8 @@ struct AddPerformerToSceneSheet: View {
             }
             .applyAppBackground()
             .scrollContentBackground(.hidden)
-            .stashyModalSheetChrome("Edit Performers", onBack: { dismiss() }) {
-                StashyChromeTrailingTextButton(title: "Save", enabled: !isSaving, isBusy: isSaving) { save() }
+            .stashyModalSheetChrome(tr("action_edit_performers"), onBack: { dismiss() }) {
+                StashyChromeTrailingTextButton(title: tr("action_save"), enabled: !isSaving, isBusy: isSaving) { save() }
             }
             .onAppear {
                 selectedIds = Set(currentPerformers.map { $0.id })
@@ -485,7 +485,7 @@ struct AddPerformerToSceneSheet: View {
                     selectedIds.insert(p.id)
                     searchText = ""
                 } else {
-                    ToastManager.shared.show("Failed to create performer", icon: "exclamationmark.triangle", style: .error)
+                    ToastManager.shared.show(tr("error_create_performer"), icon: "exclamationmark.triangle", style: .error)
                 }
             }
         }
@@ -511,7 +511,7 @@ struct AddPerformerToSceneSheet: View {
                     onComplete(updated)
                     dismiss()
                 } else {
-                    ToastManager.shared.show("Failed to update performers", icon: "exclamationmark.triangle", style: .error)
+                    ToastManager.shared.show(tr("error_update_performers"), icon: "exclamationmark.triangle", style: .error)
                 }
             }
         }
@@ -535,7 +535,7 @@ struct AddPerformerPlusButton: View {
                 .contentShape(Rectangle().inset(by: -Self.hitInset))
         }
         .buttonStyle(.plain)
-        .accessibilityLabel("Edit performers")
+        .accessibilityLabel(tr("action_edit_performers"))
     }
 }
 #endif

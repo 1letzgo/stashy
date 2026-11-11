@@ -21,10 +21,10 @@ class LoginAuthHelper {
         
         var errorDescription: String? {
             switch self {
-            case .invalidURL: return "Invalid server URL"
-            case .loginFailed(let msg): return "Login failed: \(msg)"
-            case .noData: return "No data received from server"
-            case .apiKeyNotFound: return "API Key not found in server configuration"
+            case .invalidURL: return tr("invalid_server_url")
+            case .loginFailed(let msg): return tr("login_failed_arg", msg)
+            case .noData: return tr("empty_data_received_from_server")
+            case .apiKeyNotFound: return tr("hint_api_key_not_found_in")
             case .connectionError(let error): return error.localizedDescription
             }
         }

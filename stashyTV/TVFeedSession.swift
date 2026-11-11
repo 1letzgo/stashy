@@ -39,11 +39,11 @@ enum TVFeedItem: Identifiable {
     var title: String {
         switch self {
         case .scene(let s), .preview(let s):
-            return s.displayTitle ?? "Untitled Scene"
+            return s.displayTitle ?? tr("untitled_scene")
         case .marker(let m):
             if let t = m.title?.trimmingCharacters(in: .whitespacesAndNewlines), !t.isEmpty { return t }
             if let name = m.primaryTag?.name, !name.isEmpty { return name }
-            return m.scene?.toScene().displayTitle ?? "Marker"
+            return m.scene?.toScene().displayTitle ?? tr("marker")
         case .clip(let c):
             return c.displayFilename
         }
@@ -669,7 +669,7 @@ final class TVFeedSession: ObservableObject {
         let fetching = isFetching(mode)
         isLoading = items.isEmpty && (fetching || (catalog.isLoadingSavedFilters && mode.defaultFilterId != nil))
         if items.isEmpty, !fetching, loadedKeys[mode] != nil {
-            errorMessage = catalog.errorMessage ?? "Nothing to play in \(mode.defaultTitle)."
+            errorMessage = catalog.errorMessage ?? tr("nothing_to_play_in_arg", mode.defaultTitle)
         } else if !items.isEmpty {
             errorMessage = nil
         }
@@ -750,7 +750,7 @@ final class TVFeedSession: ObservableObject {
     private func ensureEngine() -> AetherSceneEngine? {
         if let engine { return engine }
         guard let created = try? AetherSceneEngine() else {
-            errorMessage = "Playback engine unavailable"
+            errorMessage = tr("playback_engine_unavailable")
             return nil
         }
         created.audioSessionPolicy = .playback

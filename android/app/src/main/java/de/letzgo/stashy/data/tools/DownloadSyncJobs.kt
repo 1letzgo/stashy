@@ -1,5 +1,7 @@
 package de.letzgo.stashy.data.tools
 
+import de.letzgo.stashy.R
+import de.letzgo.stashy.tr
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -107,7 +109,7 @@ object DownloadSavedFilters {
 object DownloadSyncJobRunner {
     fun run(job: DownloadSyncJob, filters: Map<String, DownloadSavedFilter>) {
         val filter = filters[job.filterId] ?: run {
-            de.letzgo.stashy.ui.tools.showToast("Filter for ${job.filterName} is gone")
+            de.letzgo.stashy.ui.tools.showToast(tr(R.string.action_filter_for_arg_is_gone, job.filterName))
             return
         }
         val criteria = DownloadFilterSanitizer.sanitize(filter.filterDict ?: JsonObject(emptyMap()))

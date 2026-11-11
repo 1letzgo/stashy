@@ -1,5 +1,7 @@
 package de.letzgo.stashy.ui.scene
 
+import de.letzgo.stashy.R
+import de.letzgo.stashy.tr
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.DownloadForOffline
@@ -80,8 +82,8 @@ class SceneAiSubtitles(private val model: SceneDetailModel) {
     /** iOS: `aiSubtitleMenuItems()` — a single locked row without stashy+. */
     fun menuItems(): List<PlayerMenuItem> {
         if (!StashyPlus.isUnlocked) {
-            return listOf(PlayerMenuItem.Action("extras.aiSubtitles.locked", "AI Subtitles · stashy+", Icons.Filled.Lock) {
-                SceneToast.show("AI subtitles are part of stashy+", Icons.Filled.AutoAwesome, SceneToast.Style.Error)
+            return listOf(PlayerMenuItem.Action("extras.aiSubtitles.locked", tr(R.string.ai_subtitles_stashy_plus), Icons.Filled.Lock) {
+                SceneToast.show(tr(R.string.hint_ai_subtitles_are_part_of), Icons.Filled.AutoAwesome, SceneToast.Style.Error)
                 de.letzgo.stashy.ui.tools.openStashyPlusPaywall()
             })
         }
@@ -93,7 +95,7 @@ class SceneAiSubtitles(private val model: SceneDetailModel) {
         val aiOn = isAISubtitleActive
 
         val rows = mutableListOf<PlayerMenuItem>(
-            PlayerMenuItem.Action("extras.captions.off", "Off", isChecked = !aiOn) { setTeleprompterMode(SceneTeleprompterMode.Off) },
+            PlayerMenuItem.Action("extras.captions.off", tr(R.string.off), isChecked = !aiOn) { setTeleprompterMode(SceneTeleprompterMode.Off) },
             PlayerMenuItem.Action("extras.captions.english", SceneTeleprompterMode.English.title, isChecked = aiOn && mode.captionTargetCode(userLanguage) == "en") {
                 setTeleprompterMode(SceneTeleprompterMode.English)
             },
@@ -106,29 +108,29 @@ class SceneAiSubtitles(private val model: SceneDetailModel) {
         val progress = transcriber.modelDownloadProgress
         val modelName = transcriber.downloadingModelLanguage ?: "speech"
         if (progress != null) {
-            rows += PlayerMenuItem.Info("extras.captions.speechModelProgress", "Downloading $modelName speech model… ${(progress * 100).toInt()} %", Icons.Filled.DownloadForOffline)
+            rows += PlayerMenuItem.Info("extras.captions.speechModelProgress", tr(R.string.hint_downloading_arg_speech_model_arg, modelName, (progress * 100).toInt()), Icons.Filled.DownloadForOffline)
         } else if (transcriber.needsSpeechModelDownload) {
-            rows += PlayerMenuItem.Action("extras.captions.downloadSpeechModel", "Download $modelName speech model", Icons.Filled.DownloadForOffline) {
+            rows += PlayerMenuItem.Action("extras.captions.downloadSpeechModel", tr(R.string.action_download_arg_speech_model, modelName), Icons.Filled.DownloadForOffline) {
                 transcriber.approveSpeechModelDownload()
             }
         }
         val target = translator.targetCode ?: userLanguage.uppercase()
         if (translator.isDownloadingLanguagePack) {
-            rows += PlayerMenuItem.Info("extras.captions.packProgress", "Downloading $target language pack…", Icons.Filled.Translate)
+            rows += PlayerMenuItem.Info("extras.captions.packProgress", tr(R.string.downloading_arg_language_pack_menu, target), Icons.Filled.Translate)
         } else if (translator.needsLanguageDownload) {
-            rows += PlayerMenuItem.Action("extras.captions.downloadPack", "Download $target language pack", Icons.Filled.DownloadForOffline) {
+            rows += PlayerMenuItem.Action("extras.captions.downloadPack", tr(R.string.action_download_arg_language_pack, target), Icons.Filled.DownloadForOffline) {
                 translator.approveDownload()
             }
         }
 
-        rows += PlayerMenuItem.Separator("extras.section.spoken", "Spoken in this scene")
+        rows += PlayerMenuItem.Separator("extras.section.spoken", tr(R.string.spoken_in_this_scene))
         val hasLanguage = selectedLanguage != null || !storedLanguage.isNullOrEmpty()
         val languageLabel = selectedLanguage?.let { id -> languageOptions.firstOrNull { it.first == id }?.second }
             ?: storedLanguage?.let { SubtitleTargetLanguage.displayName(it) }
             ?: ""
         rows += PlayerMenuItem.Action(
             "extras.language",
-            if (hasLanguage) "Spoken: $languageLabel" else "Set spoken language",
+            if (hasLanguage) tr(R.string.spoken_arg, languageLabel) else tr(R.string.action_set_spoken_language),
             if (isPickingSpokenLanguage) Icons.Filled.KeyboardArrowUp else Icons.Filled.Language,
             keepsMenuOpen = true,
         ) { isPickingSpokenLanguage = !isPickingSpokenLanguage }
@@ -143,12 +145,12 @@ class SceneAiSubtitles(private val model: SceneDetailModel) {
         }
 
         val current = when {
-            !aiOn -> "Off"
+            !aiOn -> tr(R.string.off)
             mode == SceneTeleprompterMode.UserLanguage -> SubtitleTargetLanguage.displayName(userLanguage)
             mode == SceneTeleprompterMode.English -> SceneTeleprompterMode.English.title
-            else -> "On"
+            else -> tr(R.string.on)
         }
-        return listOf(PlayerMenuItem.Submenu("extras.aiSubtitles", "AI Subtitles: $current", if (aiOn) Icons.Filled.AutoAwesome else Icons.Outlined.AutoAwesome, rows))
+        return listOf(PlayerMenuItem.Submenu("extras.aiSubtitles", tr(R.string.ai_subtitles_arg, current), if (aiOn) Icons.Filled.AutoAwesome else Icons.Outlined.AutoAwesome, rows))
     }
 
     // MARK: Start / stop
@@ -181,13 +183,13 @@ class SceneAiSubtitles(private val model: SceneDetailModel) {
         val player = model.player
         if (!StashyPlus.isUnlocked) {
             if (userInitiated) {
-                SceneToast.show("AI captions are part of stashy+", Icons.Filled.AutoAwesome, SceneToast.Style.Error)
+                SceneToast.show(tr(R.string.hint_ai_captions_are_part_of), Icons.Filled.AutoAwesome, SceneToast.Style.Error)
                 de.letzgo.stashy.ui.tools.openStashyPlusPaywall()
             }
             return
         }
         if (player == null || player.currentURL == null) {
-            if (userInitiated) SceneToast.show("Start playback first", null, SceneToast.Style.Error)
+            if (userInitiated) SceneToast.show(tr(R.string.action_start_playback_first), null, SceneToast.Style.Error)
             return
         }
         val scene = model.scene
@@ -200,7 +202,7 @@ class SceneAiSubtitles(private val model: SceneDetailModel) {
             }
         }
         val language = sceneLanguage ?: run {
-            if (userInitiated) SceneToast.show("Set scene language first", Icons.Filled.Language, SceneToast.Style.Error)
+            if (userInitiated) SceneToast.show(tr(R.string.action_set_scene_language_first), Icons.Filled.Language, SceneToast.Style.Error)
             return
         }
         val targetLanguage = mode.captionTargetCode() ?: SubtitleTargetLanguage.load()
@@ -216,7 +218,7 @@ class SceneAiSubtitles(private val model: SceneDetailModel) {
             when (val probe = transcriber.probeSpeechModel(language)) {
                 LiveTranscriber.ModelProbe.Ready -> {}
                 is LiveTranscriber.ModelProbe.Unsupported -> {
-                    SceneToast.show("Live CC has no speech model for ${probe.languageName}", null, SceneToast.Style.Error)
+                    SceneToast.show(tr(R.string.hint_live_cc_has_no_speech, probe.languageName), null, SceneToast.Style.Error)
                     return@launch
                 }
                 is LiveTranscriber.ModelProbe.NeedsDownload ->
@@ -228,11 +230,11 @@ class SceneAiSubtitles(private val model: SceneDetailModel) {
                 when (val a = CaptionTranslator.availability(language, targetLanguage)) {
                     CaptionTranslator.Availability.Ready, CaptionTranslator.Availability.NeedsDownload -> translates = true
                     is CaptionTranslator.Availability.SourceUnsupported ->
-                        SceneToast.show("No translation from ${a.code} — showing captions in the scene language", Icons.Filled.Translate, SceneToast.Style.Info)
+                        SceneToast.show(tr(R.string.hint_no_translation_from_arg_showing, a.code), Icons.Filled.Translate, SceneToast.Style.Info)
                     is CaptionTranslator.Availability.TargetUnsupported ->
-                        SceneToast.show("No translation to ${a.code} on this device — showing captions in the scene language", Icons.Filled.Translate, SceneToast.Style.Info)
+                        SceneToast.show(tr(R.string.hint_no_translation_to_arg_on, a.code), Icons.Filled.Translate, SceneToast.Style.Info)
                     is CaptionTranslator.Availability.PairUnsupported ->
-                        SceneToast.show("No translation ${a.source} → ${a.target} — showing captions in the scene language", Icons.Filled.Translate, SceneToast.Style.Info)
+                        SceneToast.show(tr(R.string.hint_no_translation_arg_arg_showing, a.source, a.target), Icons.Filled.Translate, SceneToast.Style.Info)
                 }
             }
             if (translates) {
@@ -283,12 +285,12 @@ class SceneAiSubtitles(private val model: SceneDetailModel) {
             }.isSuccess
             if (ok) {
                 SceneEvents.post(SceneEvent.Updated(model.scene))
-                if (detected) SceneToast.show("Spoken language from the file: ${SubtitleTargetLanguage.displayName(code)}", Icons.Filled.Language, SceneToast.Style.Success)
-                else SceneToast.show("Language set to ${code.uppercase()}", Icons.Filled.Language, SceneToast.Style.Success)
+                if (detected) SceneToast.show(tr(R.string.hint_spoken_language_from_file_arg, SubtitleTargetLanguage.displayName(code)), Icons.Filled.Language, SceneToast.Style.Success)
+                else SceneToast.show(tr(R.string.language_set_to_arg, code.uppercase()), Icons.Filled.Language, SceneToast.Style.Success)
             } else {
                 pickedSpokenLanguage = null
                 if (model.scene.id == previous.id) model.scene = previous
-                SceneToast.show("Failed to save language", null, SceneToast.Style.Error)
+                SceneToast.show(tr(R.string.error_save_language), null, SceneToast.Style.Error)
             }
         }
     }
@@ -326,12 +328,12 @@ fun SceneAiSubtitlesEffects(controller: SceneAiSubtitles, model: SceneDetailMode
         val size = controller.transcriber.downloadingModelSize?.let { " (about $it)" } ?: ""
         AlertDialog(
             onDismissRequest = { controller.showSpeechModelDownloadOffer = false },
-            title = { Text("Download speech model?") },
-            text = { Text("Live captions need the on-device $name speech model$size. It is downloaded once and stays on this device; captions are recognized offline.") },
+            title = { Text(tr(R.string.confirm_download_speech_model)) },
+            text = { Text(tr(R.string.hint_live_captions_need_on_device_arg, name, size)) },
             confirmButton = {
-                TextButton({ controller.showSpeechModelDownloadOffer = false; controller.transcriber.approveSpeechModelDownload() }) { Text("Download") }
+                TextButton({ controller.showSpeechModelDownloadOffer = false; controller.transcriber.approveSpeechModelDownload() }) { Text(tr(R.string.action_download)) }
             },
-            dismissButton = { TextButton({ controller.showSpeechModelDownloadOffer = false }) { Text("Not now") } },
+            dismissButton = { TextButton({ controller.showSpeechModelDownloadOffer = false }) { Text(tr(R.string.not_now)) } },
         )
     }
 }

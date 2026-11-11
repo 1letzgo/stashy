@@ -1,5 +1,7 @@
 package de.letzgo.stashy.ui.scene
 
+import de.letzgo.stashy.R
+import de.letzgo.stashy.tr
 import de.letzgo.stashy.ui.cappedFontScale
 import de.letzgo.stashy.ui.scaledIconSize
 import androidx.compose.foundation.layout.sizeIn
@@ -108,17 +110,17 @@ fun ScenePerformersStudioCard(
     val tint = Appearance.tint
     val p = Theme.palette
     SceneCardContainer(Modifier.fillMaxWidth()) {
-        SceneCardHeader("Metadata", onEdit = null, trailing = if (edit) { { PerformersStudioEditMenu(onEditStudio, onEditPerformers, onEditGalleries) } } else null)
+        SceneCardHeader(tr(R.string.metadata), onEdit = null, trailing = if (edit) { { PerformersStudioEditMenu(onEditStudio, onEditPerformers, onEditGalleries) } } else null)
         if (isEmpty) {
-            Box(Modifier.padding(top = 8.dp)) { SceneCardEmpty("No metadata assigned") }
+            Box(Modifier.padding(top = 8.dp)) { SceneCardEmpty(tr(R.string.empty_metadata_assigned)) }
         } else {
             LazyRow(Modifier.padding(top = 8.dp, bottom = 12.dp), contentPadding = PaddingValues(horizontal = 12.dp), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
                 if (studio != null) item("studio-${studio.id}") { StudioItem(studio) }
                 uniqueItems(galleries, { "gallery:${it.id}" }) { gallery ->
-                    CircleThumbTile(Net.signed(gallery.cover?.paths?.thumbnail), "Gallery", PlayerIcons.gallery) { DetailLinks.gallery(gallery) }
+                    CircleThumbTile(Net.signed(gallery.cover?.paths?.thumbnail), tr(R.string.gallery), PlayerIcons.gallery) { DetailLinks.gallery(gallery) }
                 }
                 uniqueItems(scenes, { "scene:${it.id}" }) { scene ->
-                    CircleThumbTile(scene.thumbnailURL, "Scene", PlayerIcons.film) { DetailLinks.scene(scene) }
+                    CircleThumbTile(scene.thumbnailURL, tr(R.string.scene), PlayerIcons.film) { DetailLinks.scene(scene) }
                 }
                 uniqueItems(performers.sortedBy { it.name }, { it.id }) { performer ->
                     ScenePerformerTile(performer, ageAt(performer.birthdate, date)?.toString()) { DetailLinks.performer(performer) }
@@ -203,9 +205,9 @@ private fun PerformersStudioEditMenu(onEditStudio: () -> Unit, onEditPerformers:
     Box {
         EditCircleButton { open = true }
         DropdownMenu(open, onDismissRequest = { open = false }, containerColor = Theme.palette.secondaryBackground) {
-            OverflowItem("Edit Studio", SF.building2, { open = false }, onClick = onEditStudio)
-            OverflowItem("Edit Performers", PlayerIcons.person, { open = false }, onClick = onEditPerformers)
-            onEditGalleries?.let { OverflowItem("Edit Galleries", PlayerIcons.gallery, { open = false }, onClick = it) }
+            OverflowItem(tr(R.string.action_edit_studio), SF.building2, { open = false }, onClick = onEditStudio)
+            OverflowItem(tr(R.string.action_edit_performers), PlayerIcons.person, { open = false }, onClick = onEditPerformers)
+            onEditGalleries?.let { OverflowItem(tr(R.string.action_edit_galleries), PlayerIcons.gallery, { open = false }, onClick = it) }
         }
     }
 }
@@ -215,8 +217,8 @@ private fun PerformersStudioEditMenu(onEditStudio: () -> Unit, onEditPerformers:
 fun SceneGroupsCard(groups: List<SceneGroupEntry>, onEdit: () -> Unit, modifier: Modifier = Modifier) {
     val tint = Appearance.tint
     SceneCardContainer(modifier.fillMaxWidth()) {
-        SceneCardHeader("Groups", onEdit)
-        if (groups.isEmpty()) Box(Modifier.padding(top = 8.dp)) { SceneCardEmpty("No groups assigned") }
+        SceneCardHeader(tr(R.string.groups), onEdit)
+        if (groups.isEmpty()) Box(Modifier.padding(top = 8.dp)) { SceneCardEmpty(tr(R.string.empty_groups_assigned)) }
         else LazyRow(Modifier.padding(top = 8.dp, bottom = 12.dp), contentPadding = PaddingValues(horizontal = 12.dp), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
             uniqueItems(groups.sortedBy { it.group.name }, { it.group.id }) { entry ->
                 Box(Modifier.padding(bottom = 8.dp).plainClick { DetailLinks.group(entry.group) }, contentAlignment = Alignment.BottomCenter) {
@@ -242,8 +244,8 @@ fun SceneTagsCard(tags: List<Tag>?, expanded: Boolean, onToggleExpanded: () -> U
     // Collapsed height ≈ 1½ chip rows; grows with the font scale like the chips themselves.
     val collapsed = 68.dp * cappedFontScale()
     SceneCardContainer(modifier.fillMaxWidth()) {
-        SceneCardHeader("Tags", onEdit)
-        if (tags.isNullOrEmpty()) Box(Modifier.padding(top = 8.dp)) { SceneCardEmpty("No tags assigned") }
+        SceneCardHeader(tr(R.string.tags), onEdit)
+        if (tags.isNullOrEmpty()) Box(Modifier.padding(top = 8.dp)) { SceneCardEmpty(tr(R.string.empty_tags_assigned)) }
         else Column(Modifier.fillMaxWidth().padding(start = 12.dp, end = 12.dp, top = 8.dp, bottom = 12.dp), horizontalAlignment = Alignment.End) {
             Box(Modifier.fillMaxWidth().then(if (expanded) Modifier else Modifier.heightIn(max = collapsed)).clipToBounds()) {
                 FlowRow(
@@ -281,7 +283,7 @@ fun SceneHeatmapCard(heatmapURL: String?, duration: Double, currentTime: Double,
     var draft by remember { mutableStateOf(0f) }
     val progress = if (dragging) draft else if (duration > 0) (currentTime.coerceIn(0.0, duration) / duration).toFloat() else 0f
     SceneCardContainer(Modifier.fillMaxWidth()) {
-        SceneCardHeader("Interactive", null, trailing = { Icon(PlayerIcons.waveform, null, tint = p.pillAccent, modifier = Modifier.size(18.dp)) })
+        SceneCardHeader(tr(R.string.interactive), null, trailing = { Icon(PlayerIcons.waveform, null, tint = p.pillAccent, modifier = Modifier.size(18.dp)) })
         Box(
             // No fixed height: the time-label row below the heatmap sizes the box at any font scale.
             Modifier.fillMaxWidth().padding(start = 12.dp, end = 12.dp, top = 12.dp, bottom = 8.dp)
@@ -326,7 +328,7 @@ fun SceneHeatmapCard(heatmapURL: String?, duration: Double, currentTime: Double,
                         contentScale = ContentScale.FillBounds,
                     )
                 } else Box(Modifier.fillMaxWidth().height(heatmapHeight).background(Color.Gray.copy(alpha = 0.1f)), contentAlignment = Alignment.Center) {
-                    Text("No Heatmap", style = IosTypography.caption2, color = p.secondaryText)
+                    Text(tr(R.string.empty_heatmap), style = IosTypography.caption2, color = p.secondaryText)
                 }
                 // Playhead.
                 Box(Modifier.offset(x = w * progress - 1.dp, y = (-2).dp).size(2.dp, heatmapHeight + 4.dp).background(tint))
@@ -363,7 +365,7 @@ fun SceneSimilarScenesCard(scenes: List<de.letzgo.stashy.data.Scene>, isLoading:
         Modifier.fillMaxWidth().clip(shape).background(Theme.palette.secondaryBackground).padding(bottom = 8.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        SceneCardHeader("Similar Scenes", null, trailing = {
+        SceneCardHeader(tr(R.string.similar_scenes), null, trailing = {
             if (isLoading) CircularProgressIndicator(Modifier.size(20.dp), color = Theme.palette.secondaryText, strokeWidth = 2.dp)
         })
         if (scenes.isNotEmpty()) {

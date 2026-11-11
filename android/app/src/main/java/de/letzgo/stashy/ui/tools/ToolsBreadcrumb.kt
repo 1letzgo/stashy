@@ -1,5 +1,7 @@
 package de.letzgo.stashy.ui.tools
 
+import de.letzgo.stashy.R
+import de.letzgo.stashy.tr
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -95,7 +97,7 @@ fun ToolsBreadcrumbStrip(
     ) {
         Row(Modifier.fillMaxWidth().heightIn(min = 48.dp).padding(horizontal = 4.dp), verticalAlignment = Alignment.CenterVertically) {
             IconButton(onClick = { context.onSelect(null) }) {
-                Icon(SF.squareGrid2x2, "Tools", tint = if (context.current == null) nativeAccent() else p.secondaryText)
+                Icon(SF.squareGrid2x2, tr(R.string.tools), tint = if (context.current == null) nativeAccent() else p.secondaryText)
             }
             Icon(Icons.Chevron, null, tint = p.tertiaryText, modifier = Modifier.size(18.dp))
             ToolMenu(context)
@@ -118,7 +120,7 @@ private fun ToolMenu(context: ToolsBreadcrumbContext) {
         current = context.current,
         items = context.tools, title = { it.title }, icon = { it.icon },
         onSelect = { context.onSelect(it) },
-        accessibilityPrefix = "Tool", neutralTitle = "Tools",
+        accessibilityPrefix = tr(R.string.tool), neutralTitle = tr(R.string.tools),
     )
 }
 

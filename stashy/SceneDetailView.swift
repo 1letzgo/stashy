@@ -120,7 +120,7 @@ struct SceneDetailView: View {
             actions.append(CatalogChromeSlot(
                 systemImage: isIdentifying ? "hourglass" : "person.crop.square.filled.and.at.rectangle",
                 isActive: isIdentifying,
-                accessibilityLabel: isIdentifying ? "Identifying" : "Identify scene"
+                accessibilityLabel: isIdentifying ? tr("identifying") : tr("action_identify_scene")
             ) {
                 guard !isIdentifying else { return }
                 startSceneIdentify()
@@ -133,12 +133,12 @@ struct SceneDetailView: View {
             actions.append(CatalogChromeSlot(
                 systemImage: listed ? "text.badge.checkmark" : "text.badge.plus",
                 isActive: listed,
-                accessibilityLabel: listed ? "Remove from watchlist" : "Add to watchlist"
+                accessibilityLabel: listed ? tr("action_remove_from_watchlist") : tr("action_add_to_watchlist")
             ) {
                 HapticManager.light()
                 watchlist.toggle(activeScene)
                 ToastManager.shared.show(
-                    listed ? "Removed from watchlist" : "Added to watchlist",
+                    listed ? tr("removed_from_watchlist") : tr("added_to_watchlist"),
                     icon: listed ? "text.badge.minus" : "text.badge.checkmark",
                     style: .success
                 )
@@ -146,17 +146,17 @@ struct SceneDetailView: View {
         }
         #endif
         if downloadManager.isDownloaded(id: activeScene.id) {
-            actions.append(CatalogChromeSlot(systemImage: "checkmark.circle.fill", accessibilityLabel: "Downloaded", tint: .green) {})
+            actions.append(CatalogChromeSlot(systemImage: "checkmark.circle.fill", accessibilityLabel: tr("downloaded"), tint: .green) {})
         } else if downloadManager.activeDownloads[activeScene.id] != nil {
-            actions.append(CatalogChromeSlot(systemImage: "arrow.down.circle.dotted", isActive: true, accessibilityLabel: "Downloading") {})
+            actions.append(CatalogChromeSlot(systemImage: "arrow.down.circle.dotted", isActive: true, accessibilityLabel: tr("downloading")) {})
         } else {
-            actions.append(CatalogChromeSlot(systemImage: "arrow.down.doc", accessibilityLabel: "Download scene") {
+            actions.append(CatalogChromeSlot(systemImage: "arrow.down.doc", accessibilityLabel: tr("action_download_scene")) {
                 HapticManager.light()
                 downloadManager.downloadScene(activeScene)
             })
         }
         // Rarely used, so it lives in the top bar instead of as a big card under the scene.
-        actions.append(CatalogChromeSlot(systemImage: "trash", accessibilityLabel: "Delete Scene") {
+        actions.append(CatalogChromeSlot(systemImage: "trash", accessibilityLabel: tr("action_delete_scene")) {
             showDeleteWithFilesConfirmation = true
         })
         return actions
@@ -165,7 +165,7 @@ struct SceneDetailView: View {
     /// Back (Close when opened from the mini player) and the scene's actions at the right.
     private var sceneDetailNavBar: some View {
         StashyDetailTopBar(
-            backTitle: presentedFromMiniPlayer || isInColumn ? "Close" : "Back",
+            backTitle: presentedFromMiniPlayer || isInColumn ? tr("action_close") : tr("back"),
             backIcon: presentedFromMiniPlayer || isInColumn ? "xmark" : "chevron.left",
             trailingSlots: sceneActionSlots,
             onBack: { dismiss() }
@@ -236,9 +236,9 @@ struct SceneDetailView: View {
                 if !jobSuccess {
                     ToastManager.shared.show(fallbackMessage, icon: "exclamationmark.triangle", style: .error)
                 } else if self.activeScene.hasStashID {
-                    ToastManager.shared.show("Scene identified", icon: "checkmark.circle", style: .success)
+                    ToastManager.shared.show(tr("scene_identified"), icon: "checkmark.circle", style: .success)
                 } else {
-                    ToastManager.shared.show("Identify finished — no match", icon: "info.circle", style: .info)
+                    ToastManager.shared.show(tr("action_identify_finished_no_match"), icon: "info.circle", style: .info)
                 }
             }
         }
@@ -462,7 +462,7 @@ struct SceneDetailView: View {
             .modifier(SceneDetailAlertModifier(
                 showDeleteConfirmation: $showDeleteWithFilesConfirmation,
                 showingAddMarkerSheet: $showingAddMarkerSheet,
-                title: activeScene.displayTitle ?? "Unknown Title",
+                title: activeScene.displayTitle ?? tr("unknown_title"),
                 capturedMarkerTime: capturedMarkerTime,
                 sceneId: activeScene.id,
                 sceneTagIds: Set((activeScene.tags ?? []).map(\.id)),
@@ -588,7 +588,7 @@ struct SceneDetailView: View {
         .sheet(isPresented: $showingFullscreenAddMarkerSheet) {
             AddMarkerSheet(
                 sceneId: activeScene.id,
-                sceneTitle: activeScene.displayTitle ?? "Unknown Title",
+                sceneTitle: activeScene.displayTitle ?? tr("unknown_title"),
                 sceneTagIds: Set((activeScene.tags ?? []).map(\.id)),
                 seconds: capturedMarkerTime,
                 videoURL: activeScene.aetherVideoURL,
@@ -1098,7 +1098,7 @@ struct SceneDetailView: View {
             } catch {
                 AppLog.error("Playback engine unavailable: \(error.localizedDescription)")
                 ToastManager.shared.show(
-                    "Playback engine unavailable",
+                    tr("playback_engine_unavailable"),
                     icon: "exclamationmark.triangle",
                     style: .error
                 )
@@ -1242,7 +1242,7 @@ struct SceneDetailView: View {
             guard !didAnnounceTranscodeFallback else { return }
             didAnnounceTranscodeFallback = true
             ToastManager.shared.show(
-                "Original could not be played — using the server transcode",
+                tr("hint_original_could_not_be_played"),
                 icon: "arrow.triangle.2.circlepath",
                 style: .error
             )
@@ -1258,7 +1258,7 @@ struct SceneDetailView: View {
                 : caption.languageCode
             let name = language.flatMap { Locale.current.localizedString(forIdentifier: $0) }
                 ?? language?.uppercased()
-                ?? "Captions"
+                ?? tr("captions")
             engine.addExternalSubtitleTrack(url: url,
                                             name: name,
                                             language: language,
@@ -1323,11 +1323,11 @@ struct SceneDetailView: View {
         viewModel.deleteSceneWithFiles(scene: activeScene) { success in
             if success {
                 AppLog.debug("🎉 Scene and files completely removed!")
-                ToastManager.shared.show("Scene deleted", icon: "trash", style: .success)
+                ToastManager.shared.show(tr("scene_deleted"), icon: "trash", style: .success)
                 self.dismiss()
             } else {
                 isDeleting = false
-                ToastManager.shared.show("Failed to delete scene", icon: "exclamationmark.triangle", style: .error)
+                ToastManager.shared.show(tr("error_delete_scene"), icon: "exclamationmark.triangle", style: .error)
                 AppLog.error("❌ Failed to delete scene or files")
             }
         }
@@ -1525,21 +1525,21 @@ struct AddMarkerSheet: View {
     var body: some View {
         NavigationStack {
             Form {
-                Section(header: Text("Marker Details")) {
+                Section(header: Text(tr("marker_details"))) {
                     HStack {
-                        Text("Start Time:")
+                        Text(tr("action_start_time"))
                         Spacer()
                         Text(formatTime(seconds))
                             .foregroundColor(.secondary)
                     }
 
                     HStack {
-                        Text("End Time (optional):")
+                        Text(tr("end_time_optional"))
                         Spacer()
                         // No keyboard toolbar here: the SwiftUI `.keyboard` toolbar inside a
                         // sheet over the fullscreen cover froze the app in landscape (layout
                         // loop). The numbers-and-punctuation keyboard has its own Return key.
-                        TextField("Seconds or MM:SS", text: $endTimeString)
+                        TextField(tr("seconds_or_mm_ss"), text: $endTimeString)
                             .multilineTextAlignment(.trailing)
                             .keyboardType(.numbersAndPunctuation)
                             .submitLabel(.done)
@@ -1579,18 +1579,18 @@ struct AddMarkerSheet: View {
                 }
                 .listRowBackground(Color.secondaryAppBackground)
 
-                Section(header: Text("Primary Tag")) {
-                    TextField("Search Tags...", text: $searchText)
+                Section(header: Text(tr("primary_tag"))) {
+                    TextField(tr("placeholder_search_tags"), text: $searchText)
 
                     if isLoadingTags {
                         HStack {
                             Spacer()
-                            ProgressView("Loading tags...")
+                            ProgressView(tr("loading_tags"))
                             Spacer()
                         }
                         .padding()
                     } else if tags.isEmpty {
-                        Text("No tags found on server")
+                        Text(tr("empty_tags_found_on_server"))
                             .foregroundColor(.secondary)
                             .padding()
                     } else {
@@ -1618,11 +1618,11 @@ struct AddMarkerSheet: View {
                         }
 
                         if filteredTags.count > 20 {
-                            Text("Type more to refine search...")
+                            Text(tr("type_more_to_refine_search_menu"))
                                 .font(.caption)
                                 .foregroundColor(.secondary)
                         } else if !searchText.isEmpty && filteredTags.isEmpty {
-                            Text("No tags match '\(searchText)'")
+                            Text(tr("empty_tags_match_arg", searchText))
                                 .foregroundColor(.secondary)
                         }
                     }
@@ -1631,9 +1631,9 @@ struct AddMarkerSheet: View {
             }
             .applyAppBackground()
             .scrollContentBackground(.hidden)
-            .stashyModalSheetChrome("Add Marker", onBack: { dismiss() }) {
+            .stashyModalSheetChrome(tr("action_add_marker"), onBack: { dismiss() }) {
                 StashyChromeTrailingTextButton(
-                    title: "Add",
+                    title: tr("action_add"),
                     enabled: canAddMarker,
                     isBusy: isCreating
                 ) {
@@ -1814,11 +1814,11 @@ private struct SceneDetailAlertModifier: ViewModifier {
 
     func body(content: Content) -> some View {
         content
-            .alert("Really delete scene and files?", isPresented: $showDeleteConfirmation) {
-                Button("Cancel", role: .cancel) { }
-                Button("Delete", role: .destructive) { onDelete() }
+            .alert(tr("confirm_really_delete_scene_and_files"), isPresented: $showDeleteConfirmation) {
+                Button(tr("action_cancel"), role: .cancel) { }
+                Button(tr("action_delete"), role: .destructive) { onDelete() }
             } message: {
-                Text("The scene '\(title)' and all associated files will be permanently deleted. This action cannot be undone.")
+                Text(tr("hint_scene_arg_and_all_associated", title))
             }
             .sheet(isPresented: $showingAddMarkerSheet) {
                 AddMarkerSheet(

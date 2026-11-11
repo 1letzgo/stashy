@@ -1,5 +1,7 @@
 package de.letzgo.stashy.tv
 
+import de.letzgo.stashy.R
+import de.letzgo.stashy.tr
 import androidx.compose.foundation.background
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.Arrangement
@@ -127,7 +129,7 @@ fun TvGenericDetail(
                         if (showsChannel) {
                             TvButton({ TvNav.push(TvChannelPlayerRoute(channel!!)) }, Modifier.focusRequester(headerFocus).tvFocusMemory(memory, "channel")) {
                                 Icon(TvIcons.playTv, null, Modifier.size(pt(30)))
-                                Text("Play as Channel", style = TvType.headline)
+                                Text(tr(R.string.action_play_as_channel), style = TvType.headline)
                             }
                         }
                         if (isLoading) TvSpinner(pt(48))
@@ -140,7 +142,7 @@ fun TvGenericDetail(
                 }
             }
             item(span = { GridItemSpan(maxLineSpan) }, key = "scenesHeading") {
-                TvSectionHeading(TvIcons.film, "Scenes", scenes.totalCount.takeIf { it > 0 }, large = true)
+                TvSectionHeading(TvIcons.film, tr(R.string.scenes), scenes.totalCount.takeIf { it > 0 }, large = true)
             }
             val items = scenes.items
             when {
@@ -148,9 +150,9 @@ fun TvGenericDetail(
                 items.isEmpty() -> item(span = { GridItemSpan(maxLineSpan) }, key = "empty") {
                     Column(Modifier.fillMaxWidth().padding(vertical = pt(60)), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(pt(16))) {
                         Icon(TvIcons.filmOutline, null, Modifier.size(pt(48)), tint = TvColors.secondary)
-                        Text("No scenes found", style = TvType.title3, color = TvColors.secondary)
+                        Text(tr(R.string.empty_scenes_found), style = TvType.title3, color = TvColors.secondary)
                         // Focus anchor of an empty page (Back must have a target).
-                        TvButton({ TvNav.pop() }, Modifier.focusRequester(emptyFocus)) { Text("Back", style = TvType.title3) }
+                        TvButton({ TvNav.pop() }, Modifier.focusRequester(emptyFocus)) { Text(tr(R.string.back), style = TvType.title3) }
                     }
                 }
                 else -> itemsIndexed(items, key = { _, s -> s.id }) { index, scene ->
@@ -189,13 +191,13 @@ class TvPerformerDetailRoute(private val id: String, private val name: String) :
             TvChannel.performer(id, p?.name ?: name), scenes.list, focus,
         ) {
             if (p != null) {
-                p.gender?.takeIf { it.isNotEmpty() }?.let { TvInfoRow("Gender", it.lowercase().replace('_', ' ').replaceFirstChar { c -> c.uppercase() }) }
-                p.country?.takeIf { it.isNotEmpty() }?.let { TvInfoRow("Country", it) }
-                p.ethnicity?.takeIf { it.isNotEmpty() }?.let { TvInfoRow("Ethnicity", it.lowercase().replaceFirstChar { c -> c.uppercase() }) }
-                p.birthdate?.takeIf { it.isNotEmpty() }?.let { TvInfoRow("Birthdate", it) }
-                TvInfoRow("Scenes", "${p.sceneCount ?: 0}")
-                p.rating100?.let { r -> TvInfoRow("Rating") { RatingValue(r) } }
-                if (p.favorite == true) TvInfoRow("Favorite") { Icon(TvIcons.heart, null, Modifier.size(pt(36)), tint = TvColors.red) }
+                p.gender?.takeIf { it.isNotEmpty() }?.let { TvInfoRow(tr(R.string.gender), it.lowercase().replace('_', ' ').replaceFirstChar { c -> c.uppercase() }) }
+                p.country?.takeIf { it.isNotEmpty() }?.let { TvInfoRow(tr(R.string.country), it) }
+                p.ethnicity?.takeIf { it.isNotEmpty() }?.let { TvInfoRow(tr(R.string.ethnicity), it.lowercase().replaceFirstChar { c -> c.uppercase() }) }
+                p.birthdate?.takeIf { it.isNotEmpty() }?.let { TvInfoRow(tr(R.string.birthdate), it) }
+                TvInfoRow(tr(R.string.scenes), "${p.sceneCount ?: 0}")
+                p.rating100?.let { r -> TvInfoRow(tr(R.string.rating)) { RatingValue(r) } }
+                if (p.favorite == true) TvInfoRow(tr(R.string.favourite)) { Icon(TvIcons.heart, null, Modifier.size(pt(36)), tint = TvColors.red) }
             }
         }
     }
@@ -234,12 +236,12 @@ class TvStudioDetailRoute(private val id: String, private val name: String) : Tv
         ) {
             if (s != null) {
                 val counts = de.letzgo.stashy.data.rememberStudioCounts(s, refresh = true)
-                TvInfoRow("Scenes", "${counts.scenes ?: 0}")
-                counts.oCount?.takeIf { it > 0 }?.let { TvInfoRow("O Count", "$it") }
-                counts.performers?.takeIf { it > 0 }?.let { TvInfoRow("Performers", "$it") }
-                counts.galleries?.takeIf { it > 0 }?.let { TvInfoRow("Galleries", "$it") }
-                s.rating100?.let { r -> TvInfoRow("Rating") { RatingValue(r) } }
-                if (s.favorite == true) TvInfoRow("Favorite") { Icon(TvIcons.heart, null, Modifier.size(pt(36)), tint = TvColors.red) }
+                TvInfoRow(tr(R.string.scenes), "${counts.scenes ?: 0}")
+                counts.oCount?.takeIf { it > 0 }?.let { TvInfoRow(tr(R.string.o_count), "$it") }
+                counts.performers?.takeIf { it > 0 }?.let { TvInfoRow(tr(R.string.performers), "$it") }
+                counts.galleries?.takeIf { it > 0 }?.let { TvInfoRow(tr(R.string.galleries), "$it") }
+                s.rating100?.let { r -> TvInfoRow(tr(R.string.rating)) { RatingValue(r) } }
+                if (s.favorite == true) TvInfoRow(tr(R.string.favourite)) { Icon(TvIcons.heart, null, Modifier.size(pt(36)), tint = TvColors.red) }
                 s.url?.takeIf { it.isNotEmpty() }?.let { TvInfoRow("URL") { Text(it, style = TvType.callout, color = TvColors.tint, maxLines = 1, overflow = TextOverflow.Ellipsis) } }
             }
         }
@@ -264,7 +266,7 @@ class TvTagDetailRoute(private val id: String, private val name: String) : TvDet
             t?.name ?: name, t?.description, loading, 16f / 9f, TvIcons.tag, t?.imageURL?.takeIf { t.hasImage },
             TvChannel.tag(id, t?.name ?: name), scenes.list, focus,
         ) {
-            if (scenes.list.totalCount > 0) TvInfoRow("Scenes", "${scenes.list.totalCount}")
+            if (scenes.list.totalCount > 0) TvInfoRow(tr(R.string.scenes), "${scenes.list.totalCount}")
         }
     }
 }
@@ -312,14 +314,14 @@ class TvGroupDetailRoute(private val id: String, private val name: String) : TvD
             },
         ) {
             if (g != null) {
-                TvInfoRow("Cover") {
+                TvInfoRow(tr(R.string.cover)) {
                     Row(horizontalArrangement = Arrangement.spacedBy(pt(14))) {
-                        TvButton({ back = false }, contentPadding = PaddingValues(horizontal = pt(18), vertical = pt(8))) { Text(if (!back) "✓ Front" else "Front", style = TvType.headline) }
-                        TvButton({ back = true }, contentPadding = PaddingValues(horizontal = pt(18), vertical = pt(8))) { Text(if (back) "✓ Back" else "Back", style = TvType.headline) }
+                        TvButton({ back = false }, contentPadding = PaddingValues(horizontal = pt(18), vertical = pt(8))) { Text(if (!back) ("✓ " + tr(R.string.front)) else tr(R.string.front), style = TvType.headline) }
+                        TvButton({ back = true }, contentPadding = PaddingValues(horizontal = pt(18), vertical = pt(8))) { Text(if (back) ("✓ " + tr(R.string.back)) else tr(R.string.back), style = TvType.headline) }
                     }
                 }
             }
-            if (scenes.list.totalCount > 0) TvInfoRow("Scenes", "${scenes.list.totalCount}")
+            if (scenes.list.totalCount > 0) TvInfoRow(tr(R.string.scenes), "${scenes.list.totalCount}")
         }
     }
 }
@@ -365,9 +367,9 @@ class TvGalleryDetailRoute(private val id: String, private val title: String, in
                             else if (g != null) {
                                 g.details?.takeIf { it.isNotEmpty() }?.let { Text(it, style = TvType.body, color = TvColors.secondary, maxLines = 6, overflow = TextOverflow.Ellipsis) }
                                 Box(Modifier.fillMaxWidth().height(1.dp).background(TvColors.secondary.copy(alpha = 0.4f)))
-                                g.imageCount?.let { TvInfoRow("Images", "$it") }
-                                g.date?.takeIf { it.isNotEmpty() }?.let { TvInfoRow("Date", it) }
-                                g.studio?.name?.let { TvInfoRow("Studio", it) }
+                                g.imageCount?.let { TvInfoRow(tr(R.string.images), "$it") }
+                                g.date?.takeIf { it.isNotEmpty() }?.let { TvInfoRow(tr(R.string.date), it) }
+                                g.studio?.name?.let { TvInfoRow(tr(R.string.studio), it) }
                             }
                         }
                     }
@@ -377,16 +379,16 @@ class TvGalleryDetailRoute(private val id: String, private val title: String, in
                     stills.isEmpty() -> item(span = { GridItemSpan(maxLineSpan) }, key = "empty") {
                         Column(Modifier.fillMaxWidth().padding(vertical = pt(60)), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(pt(16))) {
                             Icon(TvIcons.photo, null, Modifier.size(pt(48)), tint = TvColors.secondary)
-                            Text(if (images.items.isEmpty()) "No images in this gallery" else "No supported images in this gallery", style = TvType.title3, color = TvColors.secondary)
-                            if (images.items.isNotEmpty()) Text("Only unsupported or animated formats (e.g. GIF) were found.", style = TvType.body, color = TvColors.tertiary)
-                            TvButton({ TvNav.pop() }, Modifier.focusRequester(emptyFocus)) { Text("Back", style = TvType.title3) }
+                            Text(if (images.items.isEmpty()) tr(R.string.empty_images_in_this_gallery) else tr(R.string.empty_supported_images_in_this_gallery), style = TvType.title3, color = TvColors.secondary)
+                            if (images.items.isNotEmpty()) Text(tr(R.string.hint_only_unsupported_or_animated_formats), style = TvType.body, color = TvColors.tertiary)
+                            TvButton({ TvNav.pop() }, Modifier.focusRequester(emptyFocus)) { Text(tr(R.string.back), style = TvType.title3) }
                         }
                     }
                     else -> itemsIndexed(stills, key = { _, i -> i.id }) { index, image ->
                         LaunchedEffect(index, stills.size) { if (index >= stills.size - 3 && images.hasMore) images.loadMore() }
                         TvImageTile(
                             image,
-                            { TvNav.push(TvImageViewerRoute(image.id, image.tvDisplayTitle ?: "Untitled", { images.items.tvStillImages() }, { images.loadMore() }, { images.hasMore })) },
+                            { TvNav.push(TvImageViewerRoute(image.id, image.tvDisplayTitle ?: tr(R.string.untitled), { images.items.tvStillImages() }, { images.loadMore() }, { images.hasMore })) },
                             Modifier.tvFocusMemory(focus, image.id).then(if (index == 0) Modifier.focusRequester(emptyFocus) else Modifier),
                         )
                     }

@@ -25,10 +25,10 @@ struct AITagsSettingsView: View {
         List {
             if !isUnlocked {
                 Section {
-                    Label("Recommendations require stashy+", systemImage: "lock.fill")
+                    Label(tr("recommendations_require_stashy_plus"), systemImage: "lock.fill")
                         .foregroundColor(.secondary)
                         .stashyGroupedSettingsRow()
-                    stashyScrollingSectionFooter("Unlock stashy+ to use this feature.")
+                    stashyScrollingSectionFooter(tr("hint_unlock_stashy_plus_to_use"))
                 }
             }
 
@@ -40,7 +40,7 @@ struct AITagsSettingsView: View {
         }
         .stashySettingsList()
         .applyAppBackground()
-        .stashySettingsDetailChrome("Recommendations")
+        .stashySettingsDetailChrome(tr("recommendations"))
         .task { await manager.loadIfNeeded() }
     }
 
@@ -48,10 +48,10 @@ struct AITagsSettingsView: View {
 
     private var togglesSection: some View {
         Section {
-            stashyScrollingSectionHeader("Features", isBeta: true)
+            stashyScrollingSectionHeader(tr("features"), isBeta: true)
 
             Toggle(isOn: enabledBinding) {
-                Label("Tag suggestions", systemImage: "tag")
+                Label(tr("tag_suggestions"), systemImage: "tag")
             }
             .tint(appearanceManager.tintColor)
             .disabled(!isUnlocked)
@@ -64,7 +64,7 @@ struct AITagsSettingsView: View {
                     similar.isEnabled = newValue
                 }
             )) {
-                Label("Similar scenes", systemImage: "square.stack.3d.up")
+                Label(tr("similar_scenes"), systemImage: "square.stack.3d.up")
             }
             .tint(appearanceManager.tintColor)
             .disabled(!isUnlocked)
@@ -74,7 +74,7 @@ struct AITagsSettingsView: View {
 
     private var forYouSection: some View {
         Section {
-            stashyScrollingSectionHeader("For You on Home", isBeta: true)
+            stashyScrollingSectionHeader(tr("for_you_on_home"), isBeta: true)
             Toggle(isOn: Binding(
                 get: { isUnlocked && forYou.hasStatistics && forYou.isEnabled },
                 set: { newValue in
@@ -82,27 +82,27 @@ struct AITagsSettingsView: View {
                     forYou.isEnabled = newValue
                 }
             )) {
-                Label("For You", systemImage: "wand.and.stars")
+                Label(tr("for_you"), systemImage: "wand.and.stars")
             }
             .tint(appearanceManager.tintColor)
             .disabled(!isUnlocked || !forYou.hasStatistics)
             .stashyGroupedBlockRow(index: 0, count: 2)
 
             NavigationLink(destination: LazyView { RecommendationSettingsView() }) {
-                Label("For You settings", systemImage: "slider.horizontal.3")
+                Label(tr("for_you_settings"), systemImage: "slider.horizontal.3")
             }
             .disabled(!isUnlocked)
             .stashyGroupedBlockRow(index: 1, count: 2)
 
             stashyScrollingSectionFooter(forYou.hasStatistics
-                ? "Scenes picked from your plays, O-Counts and ratings."
-                : "Needs Tag suggestions or Similar scenes.")
+                ? tr("hint_scenes_picked_from_your_plays")
+                : tr("hint_needs_tag_suggestions_or_similar"))
         }
     }
 
     private var forgottenSection: some View {
         Section {
-            stashyScrollingSectionHeader("Forgotten Favorites on Home", isBeta: true)
+            stashyScrollingSectionHeader(tr("forgotten_favorites_on_home"), isBeta: true)
             Toggle(isOn: Binding(
                 get: { isUnlocked && forgotten.hasStatistics && forgotten.isEnabled },
                 set: { newValue in
@@ -110,30 +110,30 @@ struct AITagsSettingsView: View {
                     forgotten.isEnabled = newValue
                 }
             )) {
-                Label("Forgotten Favorites", systemImage: "clock.arrow.circlepath")
+                Label(tr("forgotten_favorites"), systemImage: "clock.arrow.circlepath")
             }
             .tint(appearanceManager.tintColor)
             .disabled(!isUnlocked || !forgotten.hasStatistics)
             .stashyGroupedBlockRow(index: 0, count: 2)
 
             NavigationLink(destination: LazyView { ForgottenFavoritesSettingsView() }) {
-                Label("Forgotten Favorites settings", systemImage: "slider.horizontal.3")
+                Label(tr("forgotten_favorites_settings"), systemImage: "slider.horizontal.3")
             }
             .disabled(!isUnlocked)
             .stashyGroupedBlockRow(index: 1, count: 2)
 
             stashyScrollingSectionFooter(forgotten.hasStatistics
-                ? "Top scenes you have not played for a while."
-                : "Needs Tag suggestions or Similar scenes.")
+                ? tr("hint_top_scenes_you_have_not")
+                : tr("hint_needs_tag_suggestions_or_similar"))
         }
     }
 
     private var modelSection: some View {
         Section {
-            stashyScrollingSectionHeader("Statistics")
+            stashyScrollingSectionHeader(tr("statistics"))
 
             HStack {
-                Label("Status", systemImage: "chart.bar.doc.horizontal")
+                Label(tr("status"), systemImage: "chart.bar.doc.horizontal")
                 Spacer()
                 Text(statusText)
                     .foregroundColor(.secondary)
@@ -155,7 +155,7 @@ struct AITagsSettingsView: View {
                 Button(role: .destructive) {
                     manager.cancelWork()
                 } label: {
-                    Label("Stop", systemImage: "stop.circle")
+                    Label(tr("action_stop"), systemImage: "stop.circle")
                         .foregroundColor(.red)
                 }
                 .stashyGroupedBlockRow(index: 2, count: 3)
@@ -170,17 +170,17 @@ struct AITagsSettingsView: View {
                 .stashyGroupedBlockRow(index: 1, count: 2)
             }
 
-            stashyScrollingSectionFooter("Refreshed every 12 hours.")
+            stashyScrollingSectionFooter(tr("refreshed_every_12_hours"))
         }
     }
 
     private var tuningSection: some View {
         Section {
-            stashyScrollingSectionHeader("Tuning")
+            stashyScrollingSectionHeader(tr("tuning"))
 
             Stepper(value: $manager.maxSuggestions, in: 1...20) {
                 HStack {
-                    Text("Tags per item")
+                    Text(tr("tags_per_item"))
                     Spacer()
                     Text("\(manager.maxSuggestions)").foregroundColor(.secondary)
                 }
@@ -190,7 +190,7 @@ struct AITagsSettingsView: View {
 
             Stepper(value: $similar.maxCount, in: 4...8) {
                 HStack {
-                    Text("Similar scenes")
+                    Text(tr("similar_scenes"))
                     Spacer()
                     Text("\(similar.maxCount)").foregroundColor(.secondary)
                 }
@@ -202,10 +202,10 @@ struct AITagsSettingsView: View {
                 manager.resetDismissals()
             } label: {
                 HStack {
-                    Label("Ignored tags", systemImage: "hand.thumbsdown")
+                    Label(tr("ignored_tags"), systemImage: "hand.thumbsdown")
                         .foregroundColor(appearanceManager.tintColor)
                     Spacer()
-                    Text(manager.dismissedTagCount == 0 ? "None" : "\(manager.dismissedTagCount) · reset")
+                    Text(manager.dismissedTagCount == 0 ? tr("none") : "\(manager.dismissedTagCount) · reset")
                         .foregroundColor(.secondary)
                 }
             }
@@ -235,11 +235,11 @@ struct AITagsSettingsView: View {
     private var statusText: String {
         switch manager.state {
         case .idle:
-            return "Not built"
+            return tr("not_built")
         case .loading:
-            return "Loading…"
+            return tr("loading")
         case .building:
-            return "Counting…"
+            return tr("counting_menu")
         case .ready(let items):
             if let date = manager.lastBuiltAt {
                 return "\(items) items · \(date.formatted(date: .abbreviated, time: .shortened))"
@@ -251,7 +251,7 @@ struct AITagsSettingsView: View {
     }
 
     private var buildButtonTitle: String {
-        manager.hasModel ? "Rebuild statistics" : "Build statistics"
+        manager.hasModel ? tr("rebuild_statistics") : tr("build_statistics")
     }
 }
 

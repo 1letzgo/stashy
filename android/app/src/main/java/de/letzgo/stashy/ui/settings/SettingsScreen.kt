@@ -1,5 +1,7 @@
 package de.letzgo.stashy.ui.settings
 
+import de.letzgo.stashy.R
+import de.letzgo.stashy.tr
 import kotlinx.coroutines.launch
 import android.content.Intent
 import android.net.Uri
@@ -13,6 +15,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
@@ -38,7 +41,7 @@ import de.letzgo.stashy.ui.tools.stashyPlusSettingsItems
 
 /** iOS: `SettingsView.SettingsSection` (titles = chip labels). */
 enum class SettingsSection(val title: String, val icon: ImageVector) {
-    Main("Settings", SFS.gearshapeFill), Design("Design", SFS.paintbrushFill), Actions("Server", SFS.serverRack), StashyPlus("stashy+", SF.sparkles)
+    Main(tr(R.string.settings), SFS.gearshapeFill), Design(tr(R.string.design), SFS.paintbrushFill), Actions(tr(R.string.server), SFS.serverRack), StashyPlus("stashy+", SF.sparkles)
 }
 
 /** iOS: `SettingsView` — floating section chips (Settings · Design · Server · stashy+). */
@@ -64,35 +67,36 @@ fun SettingsScreen() {
 
 private fun androidx.compose.foundation.lazy.LazyListScope.mainSettings() {
     serverListSection()
+    appLanguageSection()
     if (ServerConfigManager.activeConfig != null) playbackSections()
     settingsTransferSection()
     aboutSection()
 }
 
 private fun androidx.compose.foundation.lazy.LazyListScope.designSettings() {
-    settingsSection(header = "Appearance", key = "appearance") {
-        SettingsNavRow("Appearance", SFS.paintbrush) { Nav.push(AppearanceSettingsScreen()) }
+    settingsSection(header = tr(R.string.appearance), key = "appearance") {
+        SettingsNavRow(tr(R.string.appearance), SFS.paintbrush) { Nav.push(AppearanceSettingsScreen()) }
         SettingsDivider()
-        SettingsNavRow("Editing", SFS.pencilCircle) { Nav.push(EditModeSettingsScreen()) }
+        SettingsNavRow(tr(R.string.editing), SFS.pencilCircle) { Nav.push(EditModeSettingsScreen()) }
         SettingsDivider()
-        SettingsNavRow("Scene View", SF.rectangleGrid1x2) { Nav.push(SceneViewSettingsScreen()) }
+        SettingsNavRow(tr(R.string.scene_view), SF.rectangleGrid1x2) { Nav.push(SceneViewSettingsScreen()) }
     }
-    settingsSection(header = "Security", key = "security") {
-        SettingsNavRow("Security", SFS.lockShield) { Nav.push(SecuritySettingsScreen()) }
+    settingsSection(header = tr(R.string.security), key = "security") {
+        SettingsNavRow(tr(R.string.security), SFS.lockShield) { Nav.push(SecuritySettingsScreen()) }
     }
     if (ServerConfigManager.activeConfig != null) {
-        settingsSection(header = "Content & Tabs", key = "content") {
-            SettingsNavRow("Dashboard", SFS.uiwindowSplit) { Nav.push(DashboardSettingsScreen()) }
+        settingsSection(header = tr(R.string.content_and_tabs), key = "content") {
+            SettingsNavRow(tr(R.string.dashboard), SFS.uiwindowSplit) { Nav.push(DashboardSettingsScreen()) }
             SettingsDivider()
-            SettingsNavRow("Feeds", SF.playRectangleOnRectangle) { Nav.push(FeedsSettingsScreen()) }
+            SettingsNavRow(tr(R.string.feeds), SF.playRectangleOnRectangle) { Nav.push(FeedsSettingsScreen()) }
             if (StashyPlus.isUnlocked) {
                 SettingsDivider()
-                SettingsNavRow("Tools", SF.cubeBox) { Nav.push(ToolsSettingsScreen()) }
+                SettingsNavRow(tr(R.string.tools), SF.cubeBox) { Nav.push(ToolsSettingsScreen()) }
             }
         }
     } else {
         settingsSection(key = "content") {
-            SettingsRow { Text("Content settings require an active server.", color = Theme.palette.secondaryText, style = NativeType.bodyLarge) }
+            SettingsRow { Text(tr(R.string.hint_content_settings_require_active_server), color = Theme.palette.secondaryText, style = NativeType.bodyLarge) }
         }
     }
 }
@@ -112,16 +116,16 @@ private fun androidx.compose.foundation.lazy.LazyListScope.aboutSection() {
     if (!BuildConfig.LICENSE_KEYS || StashyPlus.tipProducts.isNotEmpty()) item(key = "tips") {
         StashyTipsSection(Modifier.padding(bottom = 24.dp))
     }
-    settingsSection(header = "Links", key = "links") {
+    settingsSection(header = tr(R.string.links), key = "links") {
         LinkRow("GitHub", SFS.code, "https://github.com/1letzgo/stashy")
         SettingsDivider()
-        LinkRow("Discord", SFS.bubbles, "https://discord.gg/DMxEFaVzUM")
+        LinkRow(tr(R.string.discord), SFS.bubbles, "https://discord.gg/DMxEFaVzUM")
         SettingsDivider()
-        SettingsNavRow("Acknowledgements", SFS.docText) { Nav.push(AcknowledgementsScreen()) }
+        SettingsNavRow(tr(R.string.acknowledgements), SFS.docText) { Nav.push(AcknowledgementsScreen()) }
     }
     // Android only: sideload builds update themselves from buntes.am (Play builds update via
     // the Play Store and, like iOS, have no such row).
-    if (de.letzgo.stashy.data.AppUpdate.isEnabled) settingsSection(header = "App", key = "app-version") { AppUpdateRow() }
+    if (de.letzgo.stashy.data.AppUpdate.isEnabled) settingsSection(header = tr(R.string.app), key = "app-version") { AppUpdateRow() }
 }
 
 /** Version of this build + manual check for a newer sideload APK. */
@@ -130,7 +134,7 @@ private fun AppUpdateRow() {
     val context = LocalContext.current
     val scope = androidx.compose.runtime.rememberCoroutineScope()
     val version = "${de.letzgo.stashy.data.AppUpdate.currentVersionName(context)} (${de.letzgo.stashy.data.AppUpdate.currentVersionCode(context)})"
-    SettingsNavRow("Check for Updates", SFS.arrowDownCircle, trailing = version) {
+    SettingsNavRow(tr(R.string.check_for_updates), SFS.arrowDownCircle, trailing = version) {
         scope.launch { de.letzgo.stashy.data.AppUpdate.check(context, manual = true) }
     }
 }
@@ -141,4 +145,16 @@ private fun LinkRow(title: String, icon: ImageVector, url: String) {
     de.letzgo.stashy.ui.NativeListItem(title, supporting = url.removePrefix("https://"), icon = icon, onClick = {
         runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url))) }
     })
+}
+
+/** iOS: `AppLanguageRow` — Settings › App Language (beta); switching restarts the app at once. */
+private fun androidx.compose.foundation.lazy.LazyListScope.appLanguageSection() {
+    settingsSection(header = tr(R.string.app_language), isBeta = true, key = "app-language") {
+        val context = androidx.compose.ui.platform.LocalContext.current
+        val selection = remember { de.letzgo.stashy.AppLanguage.stored }
+        val codes = listOf(de.letzgo.stashy.AppLanguage.SYSTEM) + de.letzgo.stashy.AppLanguage.options.map { it.first }
+        SettingsPickerRow(tr(R.string.language), codes, selection, { de.letzgo.stashy.AppLanguage.name(it) }, SFS.globe) { code ->
+            if (code != selection) de.letzgo.stashy.AppLanguage.selectAndRestart(context, code)
+        }
+    }
 }

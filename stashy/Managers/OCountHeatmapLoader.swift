@@ -46,8 +46,8 @@ struct OCountHeatmapItem: Identifiable, Equatable {
 
     var kindTitle: String {
         switch kind {
-        case .scene: return "Scene"
-        case .image: return asImage.isVideo ? "Video" : "Image"
+        case .scene: return tr("scene")
+        case .image: return asImage.isVideo ? tr("video") : tr("image")
         }
     }
 
@@ -717,7 +717,7 @@ final class OCountHeatmapLoader: ObservableObject {
         async let images = fetchOptionally { try await fetchImageCountsByDay() }
         let (sceneBuckets, imageBuckets) = await (scenes, images)
         if sceneBuckets == nil, imageBuckets == nil {
-            throw GraphQLNetworkError.graphQLError(message: "O-Count query failed")
+            throw GraphQLNetworkError.graphQLError(message: "O Count query failed")
         }
         var merged = sceneBuckets ?? OCountDayBuckets()
         if let imageBuckets {
@@ -1393,9 +1393,9 @@ struct OCountMonthHeatmap {
             if !item.inMonth {
                 a11y = "\(pretty), outside month"
             } else if item.count > 0 {
-                a11y = "\(pretty), \(item.count) O-Count"
+                a11y = tr("arg_arg_o_count", pretty, item.count)
             } else {
-                a11y = "\(pretty), no O-Count"
+                a11y = "\(pretty), no O Count"
             }
             cells.append(
                 Cell(

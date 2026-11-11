@@ -106,7 +106,7 @@ struct AetherTimeBar: View {
                 }
                 .buttonStyle(.plain)
                 .padding(.leading, -4)
-                .accessibilityLabel(mute.isMuted ? "Unmute" : "Mute")
+                .accessibilityLabel(mute.isMuted ? tr("unmute") : tr("mute"))
             }
             if let playPause {
                 Button(action: playPause.toggle) {
@@ -118,7 +118,7 @@ struct AetherTimeBar: View {
                 }
                 .buttonStyle(.plain)
                 .padding(.leading, -4)
-                .accessibilityLabel(playPause.isPlaying ? "Pause" : "Play")
+                .accessibilityLabel(playPause.isPlaying ? tr("action_pause") : tr("action_play"))
             }
         }
         .padding(.horizontal, 16)

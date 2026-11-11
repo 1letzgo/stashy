@@ -135,12 +135,12 @@ enum HotOrNotBracketMath {
 
         var label: String {
             switch self {
-            case .champion: return "Champion"
-            case .finalist: return "Finalist"
-            case .semifinal: return "Semifinal"
-            case .quarterfinal: return "Quarterfinal"
-            case .roundOf16: return "Round of 16"
-            case .roundOf32: return "Round of 32"
+            case .champion: return tr("champion")
+            case .finalist: return tr("finalist")
+            case .semifinal: return tr("semifinal")
+            case .quarterfinal: return tr("quarterfinal")
+            case .roundOf16: return tr("round_of_16")
+            case .roundOf32: return tr("round_of_32")
             }
         }
 
@@ -297,10 +297,10 @@ enum HotOrNotBracketMath {
 
     static func roundTitle(round: Int, roundCount: Int) -> String {
         switch roundCount - round {
-        case 1: return "Final"
-        case 2: return "Semifinal"
-        case 3: return "Quarterfinal"
-        default: return "Round of \(1 << (roundCount - round))"
+        case 1: return tr("final_label")
+        case 2: return tr("semifinal")
+        case 3: return tr("quarterfinal")
+        default: return tr("round_of_arg", 1 << (roundCount - round))
         }
     }
 }

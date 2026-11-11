@@ -53,7 +53,7 @@ struct TVOptionPickerButton<Value: Hashable>: View {
                     selection = option.value
                 }
             }
-            Button("Cancel", role: .cancel) {}
+            Button(tr("action_cancel"), role: .cancel) {}
         }
     }
 }
@@ -101,12 +101,12 @@ struct TVFilterPickerButton: View {
                 icon: selection != nil
                     ? "line.3.horizontal.decrease.circle.fill"
                     : "line.3.horizontal.decrease.circle",
-                text: selection?.name ?? "No Filter"
+                text: selection?.name ?? tr("empty_filter")
             )
         }
         .buttonStyle(TVChromeButtonStyle())
-        .confirmationDialog("Filter", isPresented: $isPresented, titleVisibility: .visible) {
-            Button(selection == nil ? "✓ No Filter" : "No Filter") {
+        .confirmationDialog(tr("filter"), isPresented: $isPresented, titleVisibility: .visible) {
+            Button(selection == nil ? ("✓ " + tr("empty_filter")) : tr("empty_filter")) {
                 selection = nil
             }
             ForEach(filters) { filter in
@@ -114,7 +114,7 @@ struct TVFilterPickerButton: View {
                     selection = filter
                 }
             }
-            Button("Cancel", role: .cancel) {}
+            Button(tr("action_cancel"), role: .cancel) {}
         }
     }
 }
@@ -204,8 +204,8 @@ struct TVCatalogGrid<Item: Identifiable, Card: View, Header: View>: View where I
         VStack(spacing: 0) {
             if !hasValidConfig {
                 TVConnectionErrorView(
-                    title: "Server not reachable",
-                    subtitle: "Add a server in Settings."
+                    title: tr("server_not_reachable"),
+                    subtitle: tr("action_add_server_in_settings")
                 ) { reload() }
             } else if items.isEmpty && (errorMessage?.isEmpty == false) {
                 // Sortierung/Filter auch im Fehler- und Leerzustand erreichbar lassen —
@@ -288,7 +288,7 @@ struct TVCatalogGrid<Item: Identifiable, Card: View, Header: View>: View where I
             } label: {
                 HStack(spacing: 8) {
                     Image(systemName: "arrow.clockwise")
-                    Text("Retry")
+                    Text(tr("action_retry"))
                 }
                 .font(.title3)
             }
@@ -362,7 +362,7 @@ struct TVSettingsPickerRow<Value: Hashable>: View {
                     selection = option.value
                 }
             }
-            Button("Cancel", role: .cancel) {}
+            Button(tr("action_cancel"), role: .cancel) {}
         }
     }
 }

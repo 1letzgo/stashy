@@ -1,5 +1,7 @@
 package de.letzgo.stashy.ui.detail
 
+import de.letzgo.stashy.R
+import de.letzgo.stashy.tr
 import de.letzgo.stashy.ui.tools.downloads.GalleryDownloadOptionsDialog
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
@@ -141,23 +143,23 @@ class GalleryDetailScreen(
             if (selection.isActive) {
                 // iOS `CatalogSelectionChrome`: Select all · Delete · Done.
                 DetailTopBar(
-                    "${selection.state.count} Selected", emptyList(), null, {},
+                    tr(R.string.arg_selected, selection.state.count), emptyList(), null, {},
                     listOf(
-                        ChromeSlot(Icons.Filled.SelectAll, "Select all") { selection.selectAll(images.list.items) },
-                        ChromeSlot(SF.trash, "Delete") { selection.requestDelete() },
-                        ChromeSlot(SF.checkmark, "Done", isActive = true) { selection.end() },
+                        ChromeSlot(Icons.Filled.SelectAll, tr(R.string.action_select_all)) { selection.selectAll(images.list.items) },
+                        ChromeSlot(SF.trash, tr(R.string.action_delete)) { selection.requestDelete() },
+                        ChromeSlot(SF.checkmark, tr(R.string.action_done), isActive = true) { selection.end() },
                     ),
                 )
             } else {
                 // iOS `openedGalleryActions`: Edit (edit mode only) · Select · `galleryDownloadSlot`,
                 // all in the top bar, before filter & sort.
-                val edit = if (Appearance.isEditModeEnabled && gallery != null) ChromeSlot(SF.pencil, "Edit gallery") { editing = true } else null
-                val select = ChromeSlot(SF.checkmarkCircle, "Select images") { selection.begin() }
-                val download = gallery?.let { imageSetDownloadSlot(it.id, "Download gallery") { showDownloadOptions = true } }
+                val edit = if (Appearance.isEditModeEnabled && gallery != null) ChromeSlot(SF.pencil, tr(R.string.action_edit_gallery)) { editing = true } else null
+                val select = ChromeSlot(SF.checkmarkCircle, tr(R.string.action_select_images)) { selection.begin() }
+                val download = gallery?.let { imageSetDownloadSlot(it.id, tr(R.string.action_download_gallery)) { showDownloadOptions = true } }
                 // iOS bf9d8830: Back · "Images", then the actions, the sort menu and the settings.
                 DetailTopBar(
                     gallery?.displayTitle ?: "", listOf(DetailTab.Images), DetailTab.Images, {}, listOfNotNull(edit, select, download),
-                    settings = CatalogChromeSlot(SF.sliderHorizontal3, images.isFilterActive || kind.kind != ImageListMediaKind.All, "Settings") {
+                    settings = CatalogChromeSlot(SF.sliderHorizontal3, images.isFilterActive || kind.kind != ImageListMediaKind.All, tr(R.string.settings)) {
                         images.isSheetPresented = true
                     },
                     sort = images,
@@ -233,7 +235,7 @@ class GalleryDetailScreen(
             hero = if (hero != null && url != null) {
                 val (image, coverIndex, isCover) = hero
                 val thumb = image.thumbnailURL
-                DetailHero(DetailHero.Style.Cover, thumb ?: url, Color.Black, "Open image", { openHero(image, coverIndex, isCover) }) {
+                DetailHero(DetailHero.Style.Cover, thumb ?: url, Color.Black, tr(R.string.action_open_image), { openHero(image, coverIndex, isCover) }) {
                     // 76dp circle: the thumbnail is plenty; full picture only when there is none.
                     SubcomposeAsyncImage(
                         thumb ?: url, g.displayTitle, Modifier.fillMaxSize(), contentScale = ContentScale.Crop, alignment = Alignment.Center,
@@ -245,7 +247,7 @@ class GalleryDetailScreen(
                         },
                     )
                 }
-            } else DetailHero(DetailHero.Style.Cover, null, Color.Black, "Open image", null) { HeroPlaceholder(photoOnRectangleIcon()) },
+            } else DetailHero(DetailHero.Style.Cover, null, Color.Black, tr(R.string.action_open_image), null) { HeroPlaceholder(photoOnRectangleIcon()) },
         )
     }
 
@@ -266,30 +268,30 @@ class GalleryDetailScreen(
     private fun EditGallerySheet(gallery: Gallery, onDismiss: () -> Unit, onSaved: (Gallery) -> Unit) {
         val sections = remember(gallery.id) {
             listOf(
-                EditSection("Identity", listOf(
-                    EditField("Title", gallery.title ?: ""),
-                    EditField("Date (YYYY-MM-DD)", gallery.date ?: "", KeyboardType.Ascii, isDate = true),
+                EditSection(tr(R.string.identity), listOf(
+                    EditField(tr(R.string.title), gallery.title ?: ""),
+                    EditField(tr(R.string.date_yyyy_mm_dd), gallery.date ?: "", KeyboardType.Ascii, isDate = true),
                 )),
-                EditSection("Details", listOf(EditField("Details", gallery.details ?: "", multiline = true))),
+                EditSection(tr(R.string.details), listOf(EditField(tr(R.string.details), gallery.details ?: "", multiline = true))),
             )
         }
         val (title, date) = sections[0].fields
         val details = sections[1].fields[0]
         EditEntitySheet(
-            title = "Edit Gallery", sections = sections,
-            deleteLabel = "Delete Gallery", deleteTitle = "Delete Gallery", entityName = gallery.title ?: "",
+            title = tr(R.string.action_edit_gallery), sections = sections,
+            deleteLabel = tr(R.string.action_delete_gallery), deleteTitle = tr(R.string.action_delete_gallery), entityName = gallery.title ?: "",
             onDismiss = onDismiss,
             onSave = {
                 val ok = DetailRepository.updateGallery(gallery.id, title.trimmed, date.optional, details.optional)
                 if (ok) {
                     onSaved(gallery.copy(title = title.trimmed, date = date.optional, details = details.optional))
-                    detailToast("Gallery updated")
-                } else detailToast("Failed to update gallery")
+                    detailToast(tr(R.string.gallery_updated))
+                } else detailToast(tr(R.string.error_update_gallery))
                 ok
             },
             onDelete = {
                 DetailRepository.deleteGallery(gallery.id)
-                detailToast("Gallery deleted")
+                detailToast(tr(R.string.gallery_deleted))
                 Nav.pop()
             },
         )
@@ -298,9 +300,9 @@ class GalleryDetailScreen(
 
 /** [imageSection] in selection mode: per-image cards with the selection overlay (iOS `imageCell`). */
 private fun LazyGridScope.selectableImageSection(list: PagedList<StashImage>, selection: ImageSelectionController) {
-    pagedSection(list, { it.id }, "Loading images...", SF.cameraFill, "No images found") { _, image ->
+    pagedSection(list, { it.id }, tr(R.string.loading_images), SF.cameraFill, tr(R.string.empty_images_found)) { _, image ->
         SelectableImageCell(selection.state.isSelected(image.id), { selection.toggle(image.id) }) {
-            DetailImageCard(image)
+            DetailImageCard(image, prefersTitle = true)
         }
     }
 }

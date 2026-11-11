@@ -25,7 +25,7 @@ struct CatalogChromeSlot {
 /// Slot 2: a menu instead of a plain button (quick filter / preset picker).
 struct CatalogQuickFilterMenuModel {
     var isActive: Bool = false
-    var accessibilityLabel: String = "Quick filter"
+    var accessibilityLabel: String = tr("quick_filter")
     var menuContent: AnyView
 }
 
@@ -42,7 +42,7 @@ struct CatalogSelectionChrome {
 struct CatalogSearchChrome {
     var text: Binding<String>
     var isVisible: Binding<Bool>
-    var prompt: String = "Search"
+    var prompt: String = tr("search")
     /// Called after the text was cleared, so the screen can refetch.
     var onClear: () -> Void
 }
@@ -218,7 +218,7 @@ struct CatalogSlotBar: View {
                 // call site's bottom overlay.
                 CatalogFABIconButton(
                     systemImage: "checkmark.circle.fill",
-                    accessibilityLabel: "Done selecting",
+                    accessibilityLabel: tr("action_done_selecting"),
                     action: selection.onDone
                 )
                 .frame(maxWidth: .infinity)

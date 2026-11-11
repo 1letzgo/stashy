@@ -1,5 +1,7 @@
 package de.letzgo.stashy.ui.player
 
+import de.letzgo.stashy.R
+import de.letzgo.stashy.tr
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -171,7 +173,7 @@ fun TimeBar(
             )
             FixedLabel("-" + PlaybackFormat.time(remaining), "-$template", labelStyle)
             if (playPause != null) {
-                val label = if (playPause.isPlaying) "Pause" else "Play"
+                val label = if (playPause.isPlaying) tr(R.string.action_pause) else tr(R.string.action_play)
                 Box(
                     Modifier
                         // iOS `.padding(.leading, -4)`: reports 4 dp less, so the gap to the label is 8 dp.

@@ -254,21 +254,21 @@ private struct MarkersViewContent: View {
     private var deleteMarkerPresetConfirmationText: String {
         if let sid = SceneLivePresetTag.parseServerId(liveSheetPresetSelection),
            let f = viewModel.savedFilters[sid] {
-            return "Remove “\(f.name)” from Stash? Other devices will lose this saved filter."
+            return tr("hint_remove_arg_from_stash_other", f.name)
         }
         if let ls = SceneLivePresetTag.parseLocalUUIDString(liveSheetPresetSelection),
            let uuid = UUID(uuidString: ls),
            let p = markerLocalPresets.first(where: { $0.id == uuid }) {
-            return "Remove “\(p.name)” from this device? This cannot be undone."
+            return tr("hint_remove_arg_from_this_device", p.name)
         }
-        return "Remove this filter? This cannot be undone."
+        return tr("hint_remove_this_filter_this_cannot")
     }
 
     private func saveMarkerPresetOverwrite() {
         let sel = liveSheetPresetSelection
         let liveDict = (criteriaDocument.merged(with: [:]) ?? [:])
         if let sid = SceneLivePresetTag.parseServerId(sel) {
-            let currentName = viewModel.savedFilters[sid]?.name ?? "Filter"
+            let currentName = viewModel.savedFilters[sid]?.name ?? tr("filter")
             viewModel.saveCatalogSavedFilter(
                 mode: .sceneMarkers,
                 randomSeedKind: .markers,
@@ -507,7 +507,7 @@ private struct MarkersViewContent: View {
                 // Keep the bar while a sort/filter change refetches, so it does not jump away.
                 VStack(spacing: 0) {
                     quickBar
-                    StandardLoadingView(message: "Loading markers...")
+                    StandardLoadingView(message: tr("loading_markers"))
                 }
             } else if viewModel.sceneMarkers.isEmpty && viewModel.errorMessage != nil {
                 ConnectionErrorView { performSearch() }
@@ -537,7 +537,7 @@ private struct MarkersViewContent: View {
 
     private var catalogChromeConfig: CatalogChromeConfig {
         CatalogChromeConfig(
-            title: "Markers",
+            title: tr("markers"),
             ownsNavigationBar: !hideTitle,
             visibility: CatalogFloatingChromeState(
                 hasActiveServerConfig: configManager.activeConfig != nil,
@@ -548,7 +548,7 @@ private struct MarkersViewContent: View {
             search: CatalogSearchChrome(
                 text: $searchText,
                 isVisible: $isSearchVisible,
-                prompt: "Search markers...",
+                prompt: tr("placeholder_search_markers"),
                 onClear: { performSearch() }
             )
         )
@@ -559,23 +559,23 @@ private struct MarkersViewContent: View {
         .sheet(isPresented: $showFilterSortSheet) {
             markersFilterSortSheet
         }
-        .alert("Save as new", isPresented: $showSaveAsPresetAlert) {
-            TextField("Name", text: $presetNameInput)
-            Button("Save") { saveMarkerPresetAs(name: presetNameInput) }
-            Button("Cancel", role: .cancel) { }
+        .alert(tr("action_save_as_new"), isPresented: $showSaveAsPresetAlert) {
+            TextField(tr("name"), text: $presetNameInput)
+            Button(tr("action_save")) { saveMarkerPresetAs(name: presetNameInput) }
+            Button(tr("action_cancel"), role: .cancel) { }
         } message: {
-            Text("Creates a new saved marker filter on your Stash server (visible in Stash and other clients).")
+            Text(tr("hint_creates_new_saved_marker_filter"))
         }
-        .alert("Rename Filter", isPresented: $showRenamePresetAlert) {
-            TextField("Name", text: $presetNameInput)
-            Button("Rename") { renameMarkerPreset(to: presetNameInput) }
-            Button("Cancel", role: .cancel) { }
+        .alert(tr("action_rename_filter"), isPresented: $showRenamePresetAlert) {
+            TextField(tr("name"), text: $presetNameInput)
+            Button(tr("action_rename")) { renameMarkerPreset(to: presetNameInput) }
+            Button(tr("action_cancel"), role: .cancel) { }
         } message: {
-            Text("Renames the selected Stash saved filter or on-device filter.")
+            Text(tr("hint_renames_selected_stash_saved_filter"))
         }
-        .alert("Delete Filter", isPresented: $showDeletePresetAlert) {
-            Button("Delete", role: .destructive) { deleteMarkerPreset() }
-            Button("Cancel", role: .cancel) { }
+        .alert(tr("action_delete_filter"), isPresented: $showDeletePresetAlert) {
+            Button(tr("action_delete"), role: .destructive) { deleteMarkerPreset() }
+            Button(tr("action_cancel"), role: .cancel) { }
         } message: {
             Text(deleteMarkerPresetConfirmationText)
         }
@@ -662,8 +662,8 @@ private struct MarkersViewContent: View {
     private var emptyStateView: some View {
         SharedEmptyStateView(
             icon: "bookmark.fill",
-            title: "No markers found",
-            buttonText: "Load Markers",
+            title: tr("empty_markers_found"),
+            buttonText: tr("action_load_markers"),
             onRetry: { performSearch() }
         )
     }
@@ -807,7 +807,7 @@ struct MarkerCardView: View {
                 VStack {
                     HStack(alignment: .top) {
                         // Marker Name (Top Left)
-                        Text(marker.title ?? "Marker")
+                        Text(marker.title ?? tr("marker"))
                             .font(.system(size: 11, weight: .bold))
                             .foregroundColor(.white)
                             .padding(.horizontal, 8).padding(.vertical, 4)
@@ -833,7 +833,7 @@ struct MarkerCardView: View {
                     Spacer()
                     
                     // Scene Name (Bottom Left)
-                    Text(marker.scene?.title ?? "Unknown Scene")
+                    Text(marker.scene?.title ?? tr("unknown_scene"))
                         .font(.caption)
                         .fontWeight(.bold)
                         .foregroundColor(.white)

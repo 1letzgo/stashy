@@ -359,7 +359,7 @@ object OCountHeatmapLoader {
         val images = async { fetchOptionally { fetchImageCountsByDay() } }
         val sceneBuckets = scenes.await()
         val imageBuckets = images.await()
-        if (sceneBuckets == null && imageBuckets == null) throw GraphQLError.Query("O-Count query failed")
+        if (sceneBuckets == null && imageBuckets == null) throw GraphQLError.Query("O Count query failed")
         val merged = sceneBuckets ?: OCountDayBuckets()
         if (imageBuckets != null) merged.merge(imageBuckets)
         merged

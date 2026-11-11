@@ -68,7 +68,7 @@ class DownloadsMetadataTest {
         val old = galleries[1]
         assertNull(old.sourceKind)
         assertEquals(DownloadedGallery.Kind.Gallery, old.resolvedKind)
-        assertEquals("Untitled gallery", old.displayTitle)
+        assertEquals("Untitled Gallery", old.displayTitle)
         assertNull(old.localCoverPath)
         assertNull(old.serverImageCount)
         assertFalse(old.mayHaveMore)

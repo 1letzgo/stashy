@@ -1,5 +1,7 @@
 package de.letzgo.stashy.ui.tools.downloads
 
+import de.letzgo.stashy.R
+import de.letzgo.stashy.tr
 import de.letzgo.stashy.ui.bottomBarContentPadding
 import androidx.compose.foundation.layout.heightIn
 import de.letzgo.stashy.ui.uniqueItemsIndexed
@@ -140,25 +142,25 @@ class DownloadedGalleryScreen(val entryId: String) : Screen {
                     horizontalAlignment = Alignment.CenterHorizontally,
                 ) {
                     Icon(Icons.Outlined.PhotoLibrary, null, tint = p.secondaryText, modifier = Modifier.size(40.dp))
-                    Text("Download no longer available", style = IosTypography.subheadline, color = p.secondaryText)
+                    Text(tr(R.string.action_download_no_longer_available), style = IosTypography.subheadline, color = p.secondaryText)
                 }
             }
 
             // Top chrome: Material app bar — back · title · Cancel (while syncing) or Sync ·
             // "⋮" with Sync newest N and Delete.
-            NativeTopBar(entry?.displayTitle ?: "Download") {
+            NativeTopBar(entry?.displayTitle ?: tr(R.string.action_download)) {
                 if (isSyncing) {
-                    TopBarAction(Icons.Outlined.StopCircle, "Cancel download", tint = StashyColors.systemRed) {
+                    TopBarAction(Icons.Outlined.StopCircle, tr(R.string.action_cancel_download), tint = StashyColors.systemRed) {
                         Downloads.cancelGalleryDownload(entryId)
                     }
                 } else if (entry != null) {
-                    if (!entry.isSingleImage) TopBarAction(Icons.Filled.Sync, "Sync newest") { sync(entry, null) }
+                    if (!entry.isSingleImage) TopBarAction(Icons.Filled.Sync, tr(R.string.action_sync_newest)) { sync(entry, null) }
                     TopBarOverflowMenu { dismiss ->
                         val batch = Downloads.galleryNewestBatchSize
                         if (!entry.isSingleImage && showsSyncNewestBatch(entry.serverImageCount, batch)) {
-                            OverflowItem("Sync newest $batch", Icons.Filled.VerticalAlignBottom, dismiss) { sync(entry, batch) }
+                            OverflowItem(tr(R.string.action_sync_newest_arg, batch), Icons.Filled.VerticalAlignBottom, dismiss) { sync(entry, batch) }
                         }
-                        OverflowItem("Delete", SF.trash, dismiss, color = StashyColors.systemRed) { confirmDelete = true }
+                        OverflowItem(tr(R.string.action_delete), SF.trash, dismiss, color = StashyColors.systemRed) { confirmDelete = true }
                     }
                 }
             }
@@ -166,10 +168,10 @@ class DownloadedGalleryScreen(val entryId: String) : Screen {
 
         if (confirmDelete) {
             StashyAlert(
-                title = "Delete this download?",
-                message = "The downloaded images are removed from this device.",
+                title = tr(R.string.confirm_delete_this_download),
+                message = tr(R.string.hint_downloaded_images_are_removed_from),
                 onDismiss = { confirmDelete = false },
-                confirmLabel = "Delete", destructive = true, dismissLabel = "Cancel",
+                confirmLabel = tr(R.string.action_delete), destructive = true, dismissLabel = tr(R.string.action_cancel),
                 onConfirm = {
                     confirmDelete = false
                     Downloads.deleteGalleryDownload(entryId)
@@ -202,11 +204,11 @@ private fun DownloadedImageCell(image: DownloadedGalleryImage, onClick: () -> Un
         )
         if (image.isVideo) {
             NativeMediaLabelBox(Modifier.align(Alignment.TopEnd).padding(8.dp)) {
-                Icon(Icons.Filled.PlayCircle, "Video", tint = Theme.palette.text, modifier = Modifier.size(14.dp))
+                Icon(Icons.Filled.PlayCircle, tr(R.string.video), tint = Theme.palette.text, modifier = Modifier.size(14.dp))
             }
         }
         Text(
-            image.title?.trim()?.takeIf { it.isNotEmpty() } ?: "Untitled",
+            image.title?.trim()?.takeIf { it.isNotEmpty() } ?: tr(R.string.untitled),
             style = IosTypography.headline.copy(fontWeight = FontWeight.Medium), color = Color.White,
             maxLines = 2, overflow = TextOverflow.Ellipsis,
             modifier = Modifier.align(Alignment.BottomStart).fillMaxWidth().padding(12.dp),
@@ -241,7 +243,7 @@ class DownloadedImageViewerScreen(val entryId: String, val startIndex: Int) : Sc
                     when {
                         !file.exists() -> Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(12.dp)) {
                             Icon(SF.exclamationTriangle, null, tint = Color.White)
-                            Text("File missing", color = Color.White)
+                            Text(tr(R.string.file_missing), color = Color.White)
                         }
                         image.isVideo -> OfflineLoopingVideo(file, active = page == pager.currentPage && isPlaying, muted = isMuted)
                         else -> AsyncImage(fileUrl(file), image.title, Modifier.fillMaxSize(), contentScale = ContentScale.Fit)
@@ -316,8 +318,8 @@ private fun ViewerInfoOverlay(
             Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 val enabled = image.isVideo
                 // Same buttons as the Feeds control stack ([FeedsInfoOverlay]).
-                ChromePillIconButton(if (isMuted) SF.speakerSlashFill else SF.speakerWave2Fill, if (isMuted) "Unmute" else "Mute", enabled = enabled, onClick = onToggleMute)
-                ChromePillIconButton(if (isPlaying) SF.pauseFill else SF.playFill, if (isPlaying) "Pause" else "Play", enabled = enabled, onClick = onTogglePlay)
+                ChromePillIconButton(if (isMuted) SF.speakerSlashFill else SF.speakerWave2Fill, if (isMuted) tr(R.string.unmute) else tr(R.string.mute), enabled = enabled, onClick = onToggleMute)
+                ChromePillIconButton(if (isPlaying) SF.pauseFill else SF.playFill, if (isPlaying) tr(R.string.action_pause) else tr(R.string.action_play), enabled = enabled, onClick = onTogglePlay)
             }
         }
         if (tags.isNotEmpty()) {

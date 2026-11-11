@@ -1,5 +1,7 @@
 package de.letzgo.stashy.data.tools
 
+import de.letzgo.stashy.R
+import de.letzgo.stashy.tr
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -19,9 +21,9 @@ import kotlinx.serialization.builtins.serializer
 
 /** iOS: `ForgottenFavoritesRanking` (raw values identical). */
 enum class ForgottenFavoritesRanking(val raw: String, val title: String, val detail: String) {
-    Plays("plays", "Plays", "Favorites are your most played scenes."),
-    OCount("oCount", "O-Count", "Favorites are your scenes with the highest O-Count."),
-    Both("both", "Both", "Favorites are your most played scenes and those with the highest O-Count.");
+    Plays("plays", tr(R.string.play_count), tr(R.string.hint_favorites_are_your_most_played)),
+    OCount("oCount", tr(R.string.o_count), tr(R.string.hint_favorites_are_your_scenes_with)),
+    Both("both", tr(R.string.both), tr(R.string.hint_favorites_are_your_most_played_scenes));
 
     companion object { fun fromRaw(raw: String?) = entries.firstOrNull { it.raw == raw } ?: Both }
 }
@@ -32,12 +34,12 @@ data class ForgottenFavorite(val scene: Scene, val lastPlayed: Long?, val plays:
 
     /** Below the card: how long it has been. */
     val label: String get() {
-        val last = lastPlayed ?: return if (plays == 0) "Never played" else "Not played in a long time"
+        val last = lastPlayed ?: return if (plays == 0) tr(R.string.never_played) else tr(R.string.hint_not_played_in_long_time)
         val days = ((System.currentTimeMillis() - last) / 86_400_000L).coerceAtLeast(0).toInt()
         return when {
-            days < 60 -> "Last played $days days ago"
-            days < 730 -> "Last played ${days / 30} months ago"
-            else -> "Last played ${days / 365} years ago"
+            days < 60 -> tr(R.string.last_played_arg_days_ago, days)
+            days < 730 -> tr(R.string.last_played_arg_months_ago, days / 30)
+            else -> tr(R.string.last_played_arg_years_ago, days / 365)
         }
     }
 }

@@ -25,20 +25,20 @@ enum SceneDetailCard: String, CaseIterable, Identifiable {
 
     var title: String {
         switch self {
-        case .details: return "Details"
-        case .heatmap: return "Funscript Heatmap"
-        case .aiMotion: return "AI Motion Status"
-        case .similarScenes: return "Similar Scenes"
-        case .performersStudio: return "Metadata"
-        case .groups: return "Groups"
-        case .tags: return "Tags"
+        case .details: return tr("details")
+        case .heatmap: return tr("funscript_heatmap")
+        case .aiMotion: return tr("ai_motion_status")
+        case .similarScenes: return tr("similar_scenes")
+        case .performersStudio: return tr("metadata")
+        case .groups: return tr("groups")
+        case .tags: return tr("tags")
         }
     }
 
     var subtitle: String? {
         switch self {
-        case .heatmap: return "Interactive scenes with a funscript"
-        case .aiMotion: return "While AI Motion is syncing"
+        case .heatmap: return tr("interactive_scenes_with_funscript")
+        case .aiMotion: return tr("while_ai_motion_is_syncing")
         case .similarScenes: return "stashy+"
         default: return nil
         }
@@ -141,7 +141,7 @@ struct SceneDetailLayoutSettingsView: View {
     var body: some View {
         List {
             Section {
-                stashyScrollingSectionHeader("Cards")
+                stashyScrollingSectionHeader(tr("cards"))
                 ForEach(Array(layout.order.enumerated()), id: \.element.id) { index, card in
                     Toggle(isOn: Binding(
                         get: { layout.isVisible(card) },
@@ -166,12 +166,12 @@ struct SceneDetailLayoutSettingsView: View {
                 .onMove { indices, newOffset in
                     layout.move(from: indices, to: newOffset)
                 }
-                stashyScrollingSectionFooter("Drag to reorder the cards below the video player; switch a card off to hide it. In landscape, Groups and Tags sit side by side when they are next to each other. Cards that have nothing to show stay hidden either way.")
+                stashyScrollingSectionFooter(tr("hint_drag_to_reorder_cards_below_video"))
                     .moveDisabled(true)
             }
 
             Section {
-                Button("Reset to Default") {
+                Button(tr("action_reset_to_default")) {
                     layout.resetToDefault()
                 }
                 .disabled(layout.isDefault)
@@ -183,7 +183,7 @@ struct SceneDetailLayoutSettingsView: View {
         .environment(\.editMode, .constant(.active))
         .deleteDisabled(true)
         .applyAppBackground()
-        .stashySettingsDetailChrome("Scene View")
+        .stashySettingsDetailChrome(tr("scene_view"))
     }
 }
 #endif

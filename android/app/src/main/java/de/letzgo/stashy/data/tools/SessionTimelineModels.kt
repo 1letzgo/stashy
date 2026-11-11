@@ -1,5 +1,7 @@
 package de.letzgo.stashy.data.tools
 
+import de.letzgo.stashy.R
+import de.letzgo.stashy.tr
 import de.letzgo.stashy.data.IdName
 import java.time.Instant
 
@@ -35,7 +37,7 @@ data class TimelineSceneSnapshot(
 
 /** iOS: `TimelineKind` (raw values identical). */
 enum class TimelineKind(val raw: String, val label: String) {
-    Watch("watch", "Watch"), OCount("oCount", "O-Count"), Marker("marker", "Markers");
+    Watch("watch", tr(R.string.watch)), OCount("oCount", tr(R.string.o_count)), Marker("marker", tr(R.string.markers));
 
     companion object {
         fun from(raw: String): TimelineKind? = entries.firstOrNull { it.raw == raw }

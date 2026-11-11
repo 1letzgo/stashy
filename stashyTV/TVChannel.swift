@@ -27,10 +27,10 @@ struct TVChannel: Identifiable, Hashable {
 
         var label: String {
             switch self {
-            case .performer: return "Performer"
-            case .studio: return "Studio"
-            case .tag: return "Tag"
-            case .group: return "Group"
+            case .performer: return tr("performer")
+            case .studio: return tr("studio")
+            case .tag: return tr("tag")
+            case .group: return tr("group")
             }
         }
 
@@ -83,9 +83,9 @@ struct TVChannel: Identifiable, Hashable {
 
     var subtitle: String {
         switch kind {
-        case .savedFilter: return "Saved filter"
+        case .savedFilter: return tr("saved_filter")
         case .scoped(let scope, _): return scope.label
-        default: return "Channel"
+        default: return tr("channel")
         }
     }
 
@@ -119,17 +119,21 @@ struct TVChannel: Identifiable, Hashable {
         }
     }
 
-    static let recentlyReleased = TVChannel(
+    static var recentlyReleased: TVChannel {
+TVChannel(
         kind: .recentlyReleased,
-        title: "Recently Released",
+        title: tr("recently_released"),
         savedFilter: nil
     )
+    }
 
-    static let recentlyAdded = TVChannel(
+    static var recentlyAdded: TVChannel {
+TVChannel(
         kind: .recentlyAdded,
-        title: "Recently Added",
+        title: tr("recently_added"),
         savedFilter: nil
     )
+    }
 
     static func performer(id: String, name: String) -> TVChannel {
         TVChannel(kind: .scoped(.performer, id: id), title: name, savedFilter: nil)

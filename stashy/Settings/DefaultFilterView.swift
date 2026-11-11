@@ -29,7 +29,7 @@ struct MagazineDefaultFilterMenu: View {
             .filter { $0.mode == .galleries }
             .sorted { $0.name < $1.name }
         if filters.isEmpty && !viewModel.isLoadingSavedFilters {
-            Text("No filters found")
+            Text(tr("empty_filters_found"))
                 .foregroundColor(.secondary)
                 .font(.subheadline)
         } else {
@@ -38,7 +38,7 @@ struct MagazineDefaultFilterMenu: View {
                     MagazineDefaultFilter.set(nil)
                     currentId = ""
                 } label: {
-                    HStack { Text("None"); if currentId.isEmpty { Image(systemName: "checkmark") } }
+                    HStack { Text(tr("none")); if currentId.isEmpty { Image(systemName: "checkmark") } }
                 }
                 if !filters.isEmpty { Divider() }
                 ForEach(filters) { filter in
@@ -50,7 +50,7 @@ struct MagazineDefaultFilterMenu: View {
                     }
                 }
             } label: {
-                Text(filters.first(where: { $0.id == currentId })?.name ?? "None")
+                Text(filters.first(where: { $0.id == currentId })?.name ?? tr("none"))
                     .foregroundColor(.secondary)
                     .font(.subheadline)
                     .lineLimit(1)
@@ -120,13 +120,13 @@ struct CatalogDefaultFilterMenu: View {
         setFilter: @escaping (StashDBViewModel.SavedFilter) -> Void
     ) -> some View {
         if filters.isEmpty && !viewModel.isLoadingSavedFilters {
-            Text("No filters found")
+            Text(tr("empty_filters_found"))
                 .foregroundColor(.secondary)
                 .font(.subheadline)
         } else {
             Menu {
                 Button(action: setNone) {
-                    HStack { Text("None"); if currentId.isEmpty { Image(systemName: "checkmark") } }
+                    HStack { Text(tr("none")); if currentId.isEmpty { Image(systemName: "checkmark") } }
                 }
                 if !filters.isEmpty { Divider() }
                 ForEach(filters) { filter in
@@ -135,7 +135,7 @@ struct CatalogDefaultFilterMenu: View {
                     }
                 }
             } label: {
-                Text(filters.first(where: { $0.id == currentId })?.name ?? "None")
+                Text(filters.first(where: { $0.id == currentId })?.name ?? tr("none"))
                     .foregroundColor(.secondary)
                     .font(.subheadline)
                     .lineLimit(1)
