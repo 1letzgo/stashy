@@ -230,7 +230,7 @@ fun ScenePlayerSurface(
         val surfaceW = maxWidth
         val surfaceH = maxHeight
         val isLandscape = surfaceW > surfaceH
-        val isCompact = isFullscreen || surfaceH < 260.dp
+        val isCompact = isFullscreen || surfaceH < 260.dp || surfaceW < 600.dp
         val skipSize = if (isCompact) 44.dp else 66.dp
         val playSize = if (isCompact) 64.dp else 96.dp
         val chrome = if (isCompact) 34.dp else 42.dp

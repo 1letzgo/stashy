@@ -8,6 +8,11 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.width
+import androidx.compose.runtime.movableContentOf
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
@@ -92,6 +97,9 @@ class SceneDetailScreen(
 
     @Composable override fun Content() = SceneDetailContent(model, openedFromMiniPlayer)
 }
+
+/** Experiment (iOS `phoneLandscapeSideColumn`): a phone in landscape gets the player-left / cards-right layout too. */
+private const val PHONE_LANDSCAPE_SIDE_COLUMN = true
 
 private enum class EditSheet { Title, Performers, Studio, Groups, Tags, Galleries }
 
@@ -242,21 +250,22 @@ private fun SceneDetailContent(model: SceneDetailModel, openedFromMiniPlayer: Bo
         }
     } else Box(Modifier.fillMaxSize().background(p.background)) {
         val landscape = LocalConfiguration.current.orientation == Configuration.ORIENTATION_LANDSCAPE
-        val pinned = model.isPlaybackStarted && player != null && !landscape
         Column(Modifier.fillMaxSize()) {
             SceneDetailNavBar(model, openedFromMiniPlayer) { sheet = EditSheet.Title }
-            val playerCard: @Composable () -> Unit = {
-                Column(Modifier.fillMaxWidth().cardShadow().clip(RoundedCornerShape(Tokens.Radius.card)).background(p.secondaryBackground)) {
-                    SceneVideoPlayerCard(model, extraMenuItems)
+            BoxWithConstraints(Modifier.fillMaxWidth().weight(1f)) {
+                // From the page's own container, never the device type (iOS `usesSideInfoColumn`).
+                val sideColumn = maxWidth > maxHeight && (maxWidth >= 900.dp || PHONE_LANDSCAPE_SIDE_COLUMN)
+                val pinned = model.isPlaybackStarted && player != null && !landscape && !sideColumn
+                // One instance of the player card: movable, so a switch between portrait, pinned and
+                // the side column moves it instead of recreating it (the player lives in the model).
+                val currentExtraMenuItems by rememberUpdatedState(extraMenuItems)
+                val playerCard = remember(model) {
+                    movableContentOf {
+                        Column(Modifier.fillMaxWidth().cardShadow().clip(RoundedCornerShape(Tokens.Radius.card)).background(p.secondaryBackground)) {
+                            SceneVideoPlayerCard(model, { currentExtraMenuItems() })
+                        }
+                    }
                 }
-            }
-            if (pinned) Box(Modifier.padding(start = 16.dp, end = 16.dp, top = 16.dp)) { playerCard() }
-            Column(
-                Modifier.fillMaxSize().verticalScroll(rememberScrollState())
-                    .padding(start = 16.dp, end = 16.dp, top = if (pinned) 12.dp else 16.dp, bottom = bottomBarContentPadding()),
-                verticalArrangement = Arrangement.spacedBy(12.dp),
-            ) {
-                if (!pinned) playerCard()
                 // Settings › Design › Scene View: card order and visibility (applies live). In
                 // landscape adjacent half-width cards (Groups, Tags) share a row.
                 @Composable
@@ -281,9 +290,37 @@ private fun SceneDetailContent(model: SceneDetailModel, openedFromMiniPlayer: Bo
                         SceneDetailCard.Tags -> SceneTagsCard(scene.tags, model.isTagsExpanded, { model.isTagsExpanded = !model.isTagsExpanded }, { sheet = EditSheet.Tags }, modifier)
                     }
                 }
-                SceneDetailLayoutLogic.rows(SceneDetailLayout.order, SceneDetailLayout.hidden, landscape).forEach { row ->
-                    if (row.size == 1) card(row[0], Modifier)
-                    else Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) { row.forEach { card(it, Modifier.weight(1f)) } }
+                if (sideColumn) {
+                    // Player left, every card in one column right that scrolls on its own (iOS `sideInfoColumns`).
+                    val total = (maxWidth - 32.dp - 12.dp).coerceAtLeast(0.dp)
+                    val third = minOf(maxOf(320.dp, total / 3), total / 2)
+                    val pictureWidth = (maxHeight - 32.dp).coerceAtLeast(0.dp) * 16f / 9f
+                    val mainWidth = minOf(total - third, pictureWidth).coerceAtLeast(0.dp)
+                    val sideWidth = (total - mainWidth).coerceAtLeast(0.dp)
+                    Row(Modifier.fillMaxSize().padding(horizontal = 16.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                        // Scrolls only when the marker strip under the picture does not fit.
+                        Column(Modifier.width(mainWidth).fillMaxHeight().verticalScroll(rememberScrollState()).padding(vertical = 16.dp)) { playerCard() }
+                        Column(
+                            Modifier.width(sideWidth).fillMaxHeight().verticalScroll(rememberScrollState())
+                                .padding(top = 16.dp, bottom = 16.dp + bottomBarContentPadding()),
+                            verticalArrangement = Arrangement.spacedBy(12.dp),
+                        ) {
+                            SceneDetailLayoutLogic.rows(SceneDetailLayout.order, SceneDetailLayout.hidden, false).forEach { row -> card(row[0], Modifier) }
+                        }
+                    }
+                } else Column(Modifier.fillMaxSize()) {
+                    if (pinned) Box(Modifier.padding(start = 16.dp, end = 16.dp, top = 16.dp)) { playerCard() }
+                    Column(
+                        Modifier.fillMaxSize().verticalScroll(rememberScrollState())
+                            .padding(start = 16.dp, end = 16.dp, top = if (pinned) 12.dp else 16.dp, bottom = bottomBarContentPadding()),
+                        verticalArrangement = Arrangement.spacedBy(12.dp),
+                    ) {
+                        if (!pinned) playerCard()
+                        SceneDetailLayoutLogic.rows(SceneDetailLayout.order, SceneDetailLayout.hidden, landscape).forEach { row ->
+                            if (row.size == 1) card(row[0], Modifier)
+                            else Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) { row.forEach { card(it, Modifier.weight(1f)) } }
+                        }
+                    }
                 }
             }
         }
