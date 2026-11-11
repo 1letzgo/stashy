@@ -84,7 +84,7 @@ import de.letzgo.stashy.ui.tools.ToolsBreadcrumbChrome
 import de.letzgo.stashy.ui.tools.ToolsMenuItem
 import de.letzgo.stashy.ui.tools.ToolsRowMenu
 import de.letzgo.stashy.ui.tools.ToolsRowMenuOption
-import de.letzgo.stashy.ui.tools.ToolsRowPickerMenu
+import de.letzgo.stashy.ui.tools.ToolsCrumbPickerMenu
 import de.letzgo.stashy.ui.tools.ToolsTokens
 import de.letzgo.stashy.ui.tools.toolsTopPadding
 import kotlinx.coroutines.launch
@@ -120,22 +120,27 @@ fun ChartsToolView() {
         }
         // iOS: `toolsBreadcrumbChrome { sectionMenu; metricMenu }` — section and ranking metric
         // sit in the Tools row. A section switch only swaps the list (no back-stack reset).
-        ToolsBreadcrumbChrome {
-            Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
-                ToolsRowPickerMenu(
+        ToolsBreadcrumbChrome(
+            crumb = {
+                ToolsCrumbPickerMenu(
                     title = "Charts list",
                     options = ChartsSection.entries.map { ToolsRowMenuOption(it, it.title, it.icon) },
                     selection = section,
+                    label = section.title,
+                    active = true,
                 ) {
-                    haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                    ChartsState.section = it
+                    if (it != section) {
+                        haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                        ChartsState.section = it
+                    }
                 }
-                when (section) {
-                    ChartsSection.Scenes -> TopListsMetricMenu(vm.scenes)
-                    ChartsSection.Performers -> TopListsMetricMenu(vm.performers)
-                    ChartsSection.Studios -> TopListsMetricMenu(vm.studios)
-                    ChartsSection.Tags -> TopListsMetricMenu(vm.tags)
-                }
+            },
+        ) {
+            when (section) {
+                ChartsSection.Scenes -> TopListsMetricMenu(vm.scenes)
+                ChartsSection.Performers -> TopListsMetricMenu(vm.performers)
+                ChartsSection.Studios -> TopListsMetricMenu(vm.studios)
+                ChartsSection.Tags -> TopListsMetricMenu(vm.tags)
             }
         }
     }

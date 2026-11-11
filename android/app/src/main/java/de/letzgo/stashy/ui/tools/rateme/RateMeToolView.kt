@@ -115,7 +115,7 @@ import de.letzgo.stashy.ui.tools.ToolsMenuItem
 import de.letzgo.stashy.ui.tools.ToolsMenuSectionHeader
 import de.letzgo.stashy.ui.tools.ToolsRowMenu
 import de.letzgo.stashy.ui.tools.ToolsRowMenuOption
-import de.letzgo.stashy.ui.tools.ToolsRowPickerMenu
+import de.letzgo.stashy.ui.tools.ToolsCrumbPickerMenu
 import de.letzgo.stashy.ui.tools.ToolsTokens
 import de.letzgo.stashy.ui.tools.match.MatchActionButton
 import de.letzgo.stashy.ui.tools.match.MatchLoadingView
@@ -199,21 +199,24 @@ fun RateMeToolView() {
         }
         // iOS: `toolsBreadcrumbChrome { modeMenu; themeMenu }` — Scenes / Images, then theme (and
         // media kind) in the Tools row.
-        ToolsBreadcrumbChrome {
-            Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
-                ToolsRowPickerMenu(
+        ToolsBreadcrumbChrome(
+            crumb = {
+                ToolsCrumbPickerMenu(
                     title = "RateMe section",
                     options = RateMeMode.entries.map { ToolsRowMenuOption(it, it.label, ModeIcons.getValue(it)) },
                     selection = model.mode,
+                    label = model.mode.label,
                     enabled = !model.isSubmitting,
+                    active = true,
                 ) { mode ->
-                    if (!model.isSubmitting) {
+                    if (mode != model.mode && !model.isSubmitting) {
                         view.performRateMeHaptic(RateMeHaptic.Selection)
                         model.selectMode(mode)
                     }
                 }
-                ThemeMenu(model) { themePicker = it }
-            }
+            },
+        ) {
+            ThemeMenu(model) { themePicker = it }
         }
     }
 

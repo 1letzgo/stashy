@@ -664,13 +664,16 @@ struct ToolsRowMenuOption<Value: Hashable>: Identifiable {
     var id: Value { value }
 }
 
-/// A tool's section switch as a menu in the Tools row (it was a pill row above the content):
-/// the current section's icon collapsed, every section with icon and title open.
-struct ToolsRowPickerMenu<Value: Hashable>: View {
+/// A tool's section as one more crumb after its name in the Tools row (Match › game mode,
+/// RateMe › Scenes, Charts › Performers): a pill with the section's title that opens the
+/// sections as a menu. Highlighted like the tool's own pill while `isActive`.
+struct ToolsCrumbPickerMenu<Value: Hashable>: View {
     let title: String
     let options: [ToolsRowMenuOption<Value>]
     @Binding var selection: Value
+    var isActive = true
     var isDisabled = false
+    @ObservedObject private var appearance = AppearanceManager.shared
 
     var body: some View {
         let current = options.first { $0.value == selection }
@@ -689,7 +692,19 @@ struct ToolsRowPickerMenu<Value: Hashable>: View {
             }
             .pickerStyle(.inline)
         } label: {
-            ToolsRowMenuLabel(systemImage: current?.systemImage ?? "square.grid.2x2")
+            HStack(spacing: 6) {
+                Text(current?.title ?? "")
+                    .font(.subheadline.weight(.semibold))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
+                Image(systemName: "chevron.up.chevron.down")
+                    .font(.system(size: 11, weight: .bold))
+            }
+            .foregroundStyle(isActive ? Color.onAppTint : Color.white.opacity(0.85))
+            .padding(.horizontal, StashyExpandingDock.activeHorizontalPadding)
+            .frame(height: StashyExpandingDock.activeHeight)
+            .stashyChromeFill(shape: Capsule(style: .continuous), activeColor: isActive ? appearance.tintColor : nil)
+            .contentShape(Capsule(style: .continuous))
         }
         .menuStyle(.button)
         .buttonStyle(.plain)

@@ -1979,10 +1979,12 @@ struct HotOrNotToolsView: View {
                 Image(systemName: "chevron.up.chevron.down")
                     .font(.system(size: 11, weight: .bold))
             }
-            .foregroundStyle(Color.white.opacity(0.85))
+            // Highlighted like the Match pill while the game is on screen; Charts and
+            // Settings highlight their own button instead.
+            .foregroundStyle(model.section == .battle ? Color.onAppTint : Color.white.opacity(0.85))
             .padding(.horizontal, StashyExpandingDock.activeHorizontalPadding)
             .frame(height: StashyExpandingDock.activeHeight)
-            .stashyChromeFill(shape: Capsule(style: .continuous), activeColor: nil)
+            .stashyChromeFill(shape: Capsule(style: .continuous), activeColor: model.section == .battle ? appearance.tintColor : nil)
             .contentShape(Capsule(style: .continuous))
         }
         .menuStyle(.button)

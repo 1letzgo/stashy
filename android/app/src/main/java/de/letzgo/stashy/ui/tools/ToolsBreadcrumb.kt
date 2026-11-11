@@ -162,7 +162,7 @@ fun ToolsRowMenu(
     }
 }
 
-/** A neutral (untinted) pill crumb showing [label] with up/down chevrons; opens a menu of [options] (current one checked). */
+/** A pill crumb (neutral, or accent text when `active`) showing [label] with up/down chevrons; opens a menu of [options] (current one checked). */
 @Composable
 fun <T> ToolsCrumbPickerMenu(
     title: String,
@@ -170,11 +170,13 @@ fun <T> ToolsCrumbPickerMenu(
     selection: T,
     label: String,
     enabled: Boolean = true,
+    /** Highlighted like the tool's own pill (accent text), e.g. Match's mode while the game is on screen. */
+    active: Boolean = false,
     onSelect: (T) -> Unit,
 ) {
     val p = Theme.palette
     var open by remember { mutableStateOf(false) }
-    val color = if (enabled) p.text.copy(alpha = 0.85f) else p.tertiaryText
+    val color = if (!enabled) p.tertiaryText else if (active) nativeAccent() else p.text.copy(alpha = 0.85f)
     Box {
         Row(
             Modifier.heightIn(min = 40.dp).clip(RoundedCornerShape(12.dp))
@@ -204,34 +206,6 @@ fun <T> ToolsCrumbPickerMenu(
 
 /** iOS: `ToolsRowMenuOption` — one choice of a tool's section menu (Charts' Scenes / Performers …). */
 class ToolsRowMenuOption<T>(val value: T, val title: String, val icon: ImageVector)
-
-/**
- * iOS: `ToolsRowPickerMenu` — a tool's section switch as a menu in the Tools row (it was a pill
- * row above the content): the current section's icon collapsed, every section with icon, title
- * and checkmark open. [onSelect] only fires for a different value; haptics are the caller's.
- */
-@Composable
-fun <T> ToolsRowPickerMenu(
-    title: String,
-    options: List<ToolsRowMenuOption<T>>,
-    selection: T,
-    enabled: Boolean = true,
-    onSelect: (T) -> Unit,
-) {
-    val current = options.firstOrNull { it.value == selection }
-    ToolsRowMenu(
-        icon = current?.icon ?: SF.squareGrid2x2,
-        accessibilityLabel = "$title, ${current?.title.orEmpty()}",
-        enabled = enabled,
-    ) { dismiss ->
-        options.forEach { option ->
-            ToolsMenuItem(option.title, option.icon, checked = option.value == selection) {
-                dismiss()
-                if (option.value != selection) onSelect(option.value)
-            }
-        }
-    }
-}
 
 /** Menu item colours: text, icon and checkmark in the normal content colour, never the accent. */
 @Composable

@@ -869,21 +869,21 @@ struct RateMeToolsView: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(Color.appBackground)
-        .toolsBreadcrumbChrome(toolsBreadcrumb) {
-            HStack(spacing: 6) {
-                ToolsRowPickerMenu(
-                    title: "RateMe section",
-                    options: RateMeViewModel.Mode.allCases.map {
-                        ToolsRowMenuOption(value: $0, title: $0.label, systemImage: $0.emptyIcon)
-                    },
-                    selection: Binding(
-                        get: { model.mode },
-                        set: { if !model.isSubmitting { model.mode = $0 } }
-                    ),
-                    isDisabled: model.isSubmitting
-                )
-                themeMenu
-            }
+        // What is rated (Scenes, Images, …) is the crumb after "RateMe", the theme sits right.
+        .toolsBreadcrumbChrome(toolsBreadcrumb, crumb: {
+            ToolsCrumbPickerMenu(
+                title: "RateMe section",
+                options: RateMeViewModel.Mode.allCases.map {
+                    ToolsRowMenuOption(value: $0, title: $0.label, systemImage: $0.emptyIcon)
+                },
+                selection: Binding(
+                    get: { model.mode },
+                    set: { if !model.isSubmitting { model.mode = $0 } }
+                ),
+                isDisabled: model.isSubmitting
+            )
+        }) {
+            themeMenu
         }
         .safeAreaInset(edge: .bottom, spacing: 0) {
             if let item = model.item {

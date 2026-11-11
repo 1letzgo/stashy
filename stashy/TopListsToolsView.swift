@@ -803,15 +803,15 @@ struct TopListsToolsContainerView: View {
         // A section switch clears details pushed above Charts, never Charts itself (popping to
         // the root would leave the tool for the Tools grid).
         .background(CatalogueStackTrim(trigger: section.rawValue, keepsLibraryPage: true))
-        .toolsBreadcrumbChrome(toolsBreadcrumb) {
-            HStack(spacing: 6) {
-                ToolsRowPickerMenu(
-                    title: "Charts list",
-                    options: Section.allCases.map { ToolsRowMenuOption(value: $0, title: $0.title, systemImage: $0.icon) },
-                    selection: $section
-                )
-                metricMenu
-            }
+        // The list (Scenes, Performers, …) is the crumb after "Charts", its metric sits right.
+        .toolsBreadcrumbChrome(toolsBreadcrumb, crumb: {
+            ToolsCrumbPickerMenu(
+                title: "Charts list",
+                options: Section.allCases.map { ToolsRowMenuOption(value: $0, title: $0.title, systemImage: $0.icon) },
+                selection: $section
+            )
+        }) {
+            metricMenu
         }
     }
 

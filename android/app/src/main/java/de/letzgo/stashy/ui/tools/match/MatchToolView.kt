@@ -210,6 +210,7 @@ fun MatchToolView() {
                     selection = model.duelMode,
                     label = model.duelMode.label,
                     enabled = !model.isSubmitting,
+                    active = model.section == MatchViewModel.Section.Battle,
                 ) { mode ->
                     if (!model.isSubmitting) {
                         view.performMatchHaptic(MatchHaptic.Selection)
