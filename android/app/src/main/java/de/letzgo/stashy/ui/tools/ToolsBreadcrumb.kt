@@ -72,9 +72,9 @@ val LocalToolsBreadcrumb = compositionLocalOf<ToolsBreadcrumbContext?> { null }
  * on top, at the top edge.
  */
 @Composable
-fun ToolsBreadcrumbChrome(trailing: @Composable () -> Unit = {}) {
+fun ToolsBreadcrumbChrome(crumb: (@Composable () -> Unit)? = null, trailing: @Composable () -> Unit = {}) {
     val context = LocalToolsBreadcrumb.current ?: return
-    ToolsBreadcrumbStrip(context, trailing)
+    ToolsBreadcrumbStrip(context, trailing, crumb)
 }
 
 /**
@@ -82,7 +82,12 @@ fun ToolsBreadcrumbChrome(trailing: @Composable () -> Unit = {}) {
  * grid) › a tinted menu named after the open tool, then the tool's control at the right edge.
  */
 @Composable
-fun ToolsBreadcrumbStrip(context: ToolsBreadcrumbContext, trailing: @Composable () -> Unit = {}) {
+fun ToolsBreadcrumbStrip(
+    context: ToolsBreadcrumbContext,
+    trailing: @Composable () -> Unit = {},
+    /** iOS: `crumb` — an extra crumb after the tool pill (with its chevron); only Match uses it. */
+    crumb: (@Composable () -> Unit)? = null,
+) {
     val p = Theme.palette
     Column(
         Modifier.fillMaxWidth().background(p.background)
@@ -94,6 +99,10 @@ fun ToolsBreadcrumbStrip(context: ToolsBreadcrumbContext, trailing: @Composable 
             }
             Icon(Icons.Chevron, null, tint = p.tertiaryText, modifier = Modifier.size(18.dp))
             ToolMenu(context)
+            if (crumb != null) {
+                Icon(Icons.Chevron, null, tint = p.tertiaryText, modifier = Modifier.size(18.dp))
+                crumb()
+            }
             Spacer(Modifier.weight(1f))
             trailing()
             Spacer(Modifier.width(4.dp))
@@ -149,6 +158,46 @@ fun ToolsRowMenu(
         }
         DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
             content { open = false }
+        }
+    }
+}
+
+/** A neutral (untinted) pill crumb showing [label] with up/down chevrons; opens a menu of [options] (current one checked). */
+@Composable
+fun <T> ToolsCrumbPickerMenu(
+    title: String,
+    options: List<ToolsRowMenuOption<T>>,
+    selection: T,
+    label: String,
+    enabled: Boolean = true,
+    onSelect: (T) -> Unit,
+) {
+    val p = Theme.palette
+    var open by remember { mutableStateOf(false) }
+    val color = if (enabled) p.text.copy(alpha = 0.85f) else p.tertiaryText
+    Box {
+        Row(
+            Modifier.heightIn(min = 40.dp).clip(RoundedCornerShape(12.dp))
+                .background(p.secondaryBackground)
+                .clickable(enabled = enabled) { open = true }
+                .padding(horizontal = 10.dp)
+                .semantics(mergeDescendants = true) { contentDescription = "$title, $label" },
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(4.dp),
+        ) {
+            Text(
+                label, Modifier.weight(1f, fill = false), style = MaterialTheme.typography.titleSmall, color = color,
+                maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+            )
+            Icon(SF.chevronUpChevronDown, null, tint = color, modifier = Modifier.size(16.dp))
+        }
+        DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
+            options.forEach { option ->
+                ToolsMenuItem(option.title, option.icon, checked = option.value == selection) {
+                    open = false
+                    onSelect(option.value)
+                }
+            }
         }
     }
 }

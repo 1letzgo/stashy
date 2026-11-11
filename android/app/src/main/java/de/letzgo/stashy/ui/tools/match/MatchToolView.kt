@@ -116,7 +116,9 @@ import de.letzgo.stashy.ui.detail.PerformerDetailScreen
 import de.letzgo.stashy.ui.tools.NoServerPlaceholder
 import de.letzgo.stashy.ui.tools.ToolsBreadcrumbChrome
 import de.letzgo.stashy.ui.tools.ToolsRowMenuOption
-import de.letzgo.stashy.ui.tools.ToolsRowPickerMenu
+import de.letzgo.stashy.ui.tools.ToolsCrumbPickerMenu
+import de.letzgo.stashy.ui.nativeAccent
+import de.letzgo.stashy.ui.onNativeAccent
 import de.letzgo.stashy.ui.tools.ToolsTokens
 import androidx.compose.material.icons.automirrored.filled.TrendingUp
 import androidx.compose.material.icons.filled.EmojiEvents
@@ -198,33 +200,51 @@ fun MatchToolView() {
                 if (model.showsDuelActions) Box(Modifier.padding(bottom = 6.dp)) { DuelActionsRow(model, hPad) }
             }
         }
-        // iOS: `toolsBreadcrumbChrome { sectionMenu; modeMenu }` — Game / Charts / Settings, and the
-        // game mode while playing, at the right of the Tools row (they were pill rows).
-        ToolsBreadcrumbChrome {
-            Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
-                ToolsRowPickerMenu(
-                    title = "Match section",
-                    options = MatchViewModel.Section.entries.map { ToolsRowMenuOption(it, it.title, sectionIcon(it)) },
-                    selection = model.section,
-                ) { section ->
-                    view.performMatchHaptic(MatchHaptic.Selection)
-                    model.selectSection(section)
-                }
-                if (model.section == MatchViewModel.Section.Battle) {
-                    ToolsRowPickerMenu(
-                        title = "Match mode",
-                        options = MatchDuelMode.entries.map { ToolsRowMenuOption(it, it.label, duelModeIcon(it)) },
-                        selection = model.duelMode,
-                        enabled = !model.isSubmitting,
-                    ) { mode ->
-                        if (!model.isSubmitting) {
-                            view.performMatchHaptic(MatchHaptic.Selection)
-                            model.selectDuelMode(mode)
-                        }
+        // iOS: `toolsBreadcrumbChrome(crumb: { modeCrumb }) { sectionButton ×2 }` — the game mode is a
+        // crumb after "Match", Charts / Settings are round buttons at the right edge.
+        ToolsBreadcrumbChrome(
+            crumb = {
+                ToolsCrumbPickerMenu(
+                    title = "Match mode",
+                    options = MatchDuelMode.entries.map { ToolsRowMenuOption(it, it.label, duelModeIcon(it)) },
+                    selection = model.duelMode,
+                    label = model.duelMode.label,
+                    enabled = !model.isSubmitting,
+                ) { mode ->
+                    if (!model.isSubmitting) {
+                        view.performMatchHaptic(MatchHaptic.Selection)
+                        if (mode != model.duelMode) model.selectDuelMode(mode)
+                        if (model.section != MatchViewModel.Section.Battle) model.selectSection(MatchViewModel.Section.Battle)
                     }
                 }
+            },
+        ) {
+            Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
+                MatchSectionButton(MatchViewModel.Section.Leaderboard, model)
+                MatchSectionButton(MatchViewModel.Section.Settings, model)
             }
         }
+    }
+}
+
+/** iOS: `sectionButton(_:)` — round icon button; the shown section is accent-filled, a tap on it returns to Game. */
+@Composable
+private fun MatchSectionButton(section: MatchViewModel.Section, model: MatchViewModel) {
+    val view = LocalView.current
+    val p = Theme.palette
+    val accent = nativeAccent()
+    val isOn = model.section == section
+    Box(
+        Modifier.size(40.dp).clip(CircleShape)
+            .background(if (isOn) accent else p.secondaryBackground)
+            .clickable {
+                view.performMatchHaptic(MatchHaptic.Light)
+                model.selectSection(if (isOn) MatchViewModel.Section.Battle else section)
+            }
+            .semantics { contentDescription = section.title },
+        contentAlignment = Alignment.Center,
+    ) {
+        Icon(sectionIcon(section), null, tint = if (isOn) onNativeAccent(accent) else p.secondaryText, modifier = Modifier.size(22.dp))
     }
 }
 

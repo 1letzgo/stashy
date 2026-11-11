@@ -1952,36 +1952,66 @@ struct HotOrNotToolsView: View {
 
     private var isRegular: Bool { horizontalSizeClass == .regular }
 
-    /// The game mode at the right of the Tools row while playing (it was a pill row under the
-    /// sections); Charts and Settings have none.
-    @ViewBuilder
-    private var modeMenu: some View {
-        if model.section == .battle {
-            Menu {
-                Picker("Mode", selection: Binding(
-                    get: { model.duelMode },
-                    set: { mode in
-                        guard !model.isSubmitting, mode != model.duelMode else { return }
-                        HapticManager.selection()
-                        model.duelMode = mode
-                    }
-                )) {
-                    ForEach([HotOrNotViewModel.DuelMode.headToHead, .bracket, .placement, .champion]) { mode in
-                        Label(mode.label, systemImage: Self.icon(for: mode)).tag(mode)
-                    }
+    /// The game mode as the crumb after "Match" in the Tools row. Picking one also returns
+    /// from Charts or Settings to the game.
+    private var modeCrumb: some View {
+        Menu {
+            Picker("Mode", selection: Binding(
+                get: { model.duelMode },
+                set: { mode in
+                    guard !model.isSubmitting else { return }
+                    HapticManager.selection()
+                    if mode != model.duelMode { model.duelMode = mode }
+                    if model.section != .battle { model.section = .battle }
                 }
-                .pickerStyle(.inline)
-            } label: {
-                ToolsRowMenuLabel(systemImage: Self.icon(for: model.duelMode))
+            )) {
+                ForEach([HotOrNotViewModel.DuelMode.headToHead, .bracket, .placement, .champion]) { mode in
+                    Label(mode.label, systemImage: Self.icon(for: mode)).tag(mode)
+                }
             }
-            .menuStyle(.button)
-            .buttonStyle(.plain)
-            .menuIndicator(.hidden)
-            .stashyNeutralMenuItems()
-            .fixedSize()
-            .disabled(model.isSubmitting)
-            .accessibilityLabel("Match mode, \(model.duelMode.label)")
+            .pickerStyle(.inline)
+        } label: {
+            HStack(spacing: 6) {
+                Text(model.duelMode.label)
+                    .font(.subheadline.weight(.semibold))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
+                Image(systemName: "chevron.up.chevron.down")
+                    .font(.system(size: 11, weight: .bold))
+            }
+            .foregroundStyle(Color.white.opacity(0.85))
+            .padding(.horizontal, StashyExpandingDock.activeHorizontalPadding)
+            .frame(height: StashyExpandingDock.activeHeight)
+            .stashyChromeFill(shape: Capsule(style: .continuous), activeColor: nil)
+            .contentShape(Capsule(style: .continuous))
         }
+        .menuStyle(.button)
+        .buttonStyle(.plain)
+        .menuIndicator(.hidden)
+        .stashyNeutralMenuItems()
+        .fixedSize()
+        .disabled(model.isSubmitting)
+        .accessibilityLabel("Match mode, \(model.duelMode.label)")
+    }
+
+    /// Charts / Settings as a button at the right of the Tools row: highlighted while its
+    /// page is shown, and a second tap goes back to the game.
+    private func sectionButton(_ section: HotOrNotViewModel.Section) -> some View {
+        let isOn = model.section == section
+        return Button {
+            HapticManager.light()
+            model.section = isOn ? .battle : section
+        } label: {
+            Image(systemName: Self.icon(for: section))
+                .font(.system(size: StashyExpandingDock.iconSize, weight: .semibold))
+                .foregroundStyle(isOn ? Color.onAppTint : Color.white.opacity(StashyExpandingDock.inactiveIconOpacity))
+                .frame(width: StashyExpandingDock.circleSize, height: StashyExpandingDock.circleSize)
+                .stashyChromeFill(shape: Circle(), activeColor: isOn ? appearance.tintColor : nil)
+                .contentShape(Circle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(section.rawValue)
+        .accessibilityAddTraits(isOn ? .isSelected : [])
     }
 
     private static func icon(for section: HotOrNotViewModel.Section) -> String {
@@ -2025,16 +2055,10 @@ struct HotOrNotToolsView: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(Color.appBackground)
-        .toolsBreadcrumbChrome(toolsBreadcrumb) {
+        .toolsBreadcrumbChrome(toolsBreadcrumb, crumb: { modeCrumb }) {
             HStack(spacing: 6) {
-                ToolsRowPickerMenu(
-                    title: "Match section",
-                    options: HotOrNotViewModel.Section.allCases.map {
-                        ToolsRowMenuOption(value: $0, title: $0.rawValue, systemImage: Self.icon(for: $0))
-                    },
-                    selection: $model.section
-                )
-                modeMenu
+                sectionButton(.leaderboard)
+                sectionButton(.settings)
             }
         }
         .safeAreaInset(edge: .bottom, spacing: 0) {

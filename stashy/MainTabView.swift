@@ -485,6 +485,8 @@ struct ToolsBreadcrumbRow<Trailing: View>: View {
     /// nil on the grid.
     let current: ToolsView.ToolsTab?
     var onSelect: (ToolsView.ToolsTab?) -> Void
+    /// A further crumb after the tool's name (Match's game mode), with its own chevron.
+    var crumb: AnyView? = nil
     /// The tool's own controls at the right edge (sort / filter menu).
     @ViewBuilder var trailing: () -> Trailing
 
@@ -498,6 +500,13 @@ struct ToolsBreadcrumbRow<Trailing: View>: View {
                 .foregroundStyle(Color.white.opacity(0.4))
                 .accessibilityHidden(true)
             toolMenu(current)
+            if current != nil, let crumb {
+                Image(systemName: "chevron.compact.right")
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundStyle(Color.white.opacity(0.4))
+                    .accessibilityHidden(true)
+                crumb
+            }
             Spacer(minLength: 0)
             if current != nil { trailing() }
         }
@@ -622,6 +631,24 @@ extension View {
             environment(\.toolsBreadcrumb, nil)
                 .stashySectionChrome {
                     ToolsBreadcrumbRow(tools: context.tools, current: context.current, onSelect: context.onSelect, trailing: trailing)
+                }
+        } else {
+            self
+        }
+    }
+
+    /// The same row with one more crumb after the tool's name (Match › game mode).
+    @ViewBuilder
+    func toolsBreadcrumbChrome<Crumb: View, Trailing: View>(
+        _ context: ToolsBreadcrumbContext?,
+        @ViewBuilder crumb: @escaping () -> Crumb,
+        @ViewBuilder trailing: @escaping () -> Trailing
+    ) -> some View {
+        if let context {
+            environment(\.toolsBreadcrumb, nil)
+                .stashySectionChrome {
+                    ToolsBreadcrumbRow(tools: context.tools, current: context.current, onSelect: context.onSelect,
+                                       crumb: AnyView(crumb()), trailing: trailing)
                 }
         } else {
             self
