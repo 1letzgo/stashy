@@ -110,10 +110,12 @@ class SceneDetailModel(
     private val openedFromMiniPlayer: Boolean = false,
 ) {
     /**
-     * iOS `playsInNowPlaying`: with the mini player on, Play hands the scene to Now Playing
-     * instead of playing on this page.
+     * iOS `playsInNowPlaying`. Experiment: Play always plays on this page, also with the mini
+     * player on; the video moves to the bar only when the page is left. `true` sends Play to
+     * Now Playing instead, as before:
+     * `!playerOnly && !openedFromMiniPlayer && MiniPlayerStore.isEnabled`.
      */
-    private val playsInNowPlaying: Boolean get() = !playerOnly && !openedFromMiniPlayer && MiniPlayerStore.isEnabled
+    private val playsInNowPlaying: Boolean get() = false
 
     /** Outlives the composition: activity saves on leaving must still go out. */
     val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)

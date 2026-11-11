@@ -335,6 +335,22 @@ private fun SceneDetailNavBar(model: SceneDetailModel, openedFromMiniPlayer: Boo
         if (!model.scene.hasStashID) {
             TopBarAction(PlayerIcons.identify, "Identify scene", busy = model.isIdentifying) { model.identify() }
         }
+        // stashy+ and switched on: the watchlist belongs to the mini player.
+        if (de.letzgo.stashy.ui.player.MiniPlayerStore.isEnabled) {
+            val listed = de.letzgo.stashy.data.WatchlistStore.contains(model.scene.id)
+            TopBarAction(
+                if (listed) de.letzgo.stashy.ui.player.WatchlistIcons.listed else de.letzgo.stashy.ui.player.WatchlistIcons.add,
+                if (listed) "Remove from watchlist" else "Add to watchlist",
+                tint = if (listed) Appearance.tint else null,
+            ) {
+                de.letzgo.stashy.data.WatchlistStore.toggle(model.scene)
+                SceneToast.show(
+                    if (listed) "Removed from watchlist" else "Added to watchlist",
+                    if (listed) de.letzgo.stashy.ui.player.WatchlistIcons.removed else de.letzgo.stashy.ui.player.WatchlistIcons.listed,
+                    SceneToast.Style.Success,
+                )
+            }
+        }
         // iOS `sceneDownloadNavButton`: green check · progress ring · "Save scene" (stashy+ gate on tap).
         SceneDownloadNavButton(model.scene)
         // iOS `sceneActionSlots`: Delete sits in the bar itself (opens the confirmation).

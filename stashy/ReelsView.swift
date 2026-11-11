@@ -430,6 +430,12 @@ struct ReelsViewBody: View {
     @State private var currentItemIsPlaying = true
     @State private var currentItemShowRatingOverlay = false
     @State private var showStashSyncSheet = false
+    /// Feeds › Scenes "Add Marker": the scene and the time the button was pressed at.
+    @State private var feedsMarkerDraft: FeedsMarkerDraft?
+    /// Feeds played when the marker sheet opened and goes on once it closes.
+    @State private var resumesAfterMarkerSheet = false
+    /// Bumped by a marker created here, so the dots on the time bar follow.
+    @State private var feedsMarkerRevision = 0
     /// Bewusst `@State`, **nicht** `@StateObject`: Der Scrubber tickt mit 10 Hz und soll
     /// `ReelsViewBody` nicht neu rendern. Observiert wird nur in ``IsolatedScrubberBar``.
     @State private var scrubberState = ScrubberState()
@@ -1510,6 +1516,7 @@ struct ReelsViewBody: View {
     private var reelsChromeAutoHideBlocked: Bool {
         isMenuOpen
             || showStashSyncSheet
+            || feedsMarkerDraft != nil
             || showReelsSceneFilterSheet
             || reelsClipImageFilters.showFilterSortSheet
             || tagEditorTarget != nil
@@ -1811,6 +1818,24 @@ struct ReelsViewBody: View {
         var titleLinkAutoPlays: Bool {
             if case .marker = self { return true }
             return false
+        }
+
+        /// The scene the title opens, carrying where Feeds stands right now. Feeds writes the
+        /// resume point only every 10 s and not before the scene counts as played, so the
+        /// saved one lags (or is missing after a seek while paused). A whole scene with a
+        /// live position continues exactly there; markers and segments keep their own start.
+        func titleLinkScene(livePosition: Double?) -> Scene? {
+            guard case .scene = self, playbackSegment == nil,
+                  let position = livePosition, position.isFinite, position > 1 else { return titleLinkScene }
+            return titleLinkScene?.withResumeTime(position)
+        }
+
+        /// With a live position the page continues playback instead of showing the cover.
+        func titleLinkAutoPlays(livePosition: Double?) -> Bool {
+            if titleLinkAutoPlays { return true }
+            guard case .scene = self, playbackSegment == nil,
+                  let position = livePosition, position.isFinite, position > 1 else { return false }
+            return true
         }
 
         /// Rows a scrub still can be decoded for: real video with a stream.
@@ -3215,6 +3240,14 @@ struct ReelsViewBody: View {
                 accessory.togglePlay = { currentItemIsPlaying.toggle() }
                 accessory.toggleMute = { toggleFeedsMute() }
             }
+            // Marker dots of the scene on screen (Feeds › Scenes only; other modes have none).
+            .onChange(of: feedsMarkerDotsKey, initial: true) { _, _ in
+                let seconds: [Double] = {
+                    guard reelsMode == .scenes, case .scene(let scene)? = currentVisibleReelItem else { return [] }
+                    return FeedsMarkerTimes.seconds(for: scene.id)
+                }()
+                if scrubberState.markerSeconds != seconds { scrubberState.markerSeconds = seconds }
+            }
             .onChange(of: isMuted, initial: true) { _, muted in
                 let accessory = FeedsScrubberAccessory.shared
                 if accessory.isMuted != muted { accessory.isMuted = muted }
@@ -3324,6 +3357,24 @@ struct ReelsViewBody: View {
             }
             .sheet(isPresented: $showReelsSceneFilterSheet) {
                 reelsSceneStyleFilterSheet
+            }
+            .sheet(item: $feedsMarkerDraft, onDismiss: {
+                if resumesAfterMarkerSheet { currentItemIsPlaying = true }
+                resumesAfterMarkerSheet = false
+            }) { draft in
+                // No engine handed over: the row owns it. The marker gets its still from the server.
+                AddMarkerSheet(
+                    sceneId: draft.scene.id,
+                    sceneTitle: draft.scene.displayTitle ?? "Unknown Title",
+                    sceneTagIds: Set((draft.scene.tags ?? []).map(\.id)),
+                    seconds: draft.seconds,
+                    videoURL: draft.scene.aetherVideoURL,
+                    aetherEngine: nil,
+                    viewModel: viewModel
+                ) {
+                    FeedsMarkerTimes.add(draft.seconds, for: draft.scene.id)
+                    feedsMarkerRevision += 1
+                }
             }
             .sheet(isPresented: $reelsClipImageFilters.showFilterSortSheet) {
                 reelsClipFilterSortSheet
@@ -5146,7 +5197,13 @@ struct ReelsViewBody: View {
     private func reelsTitleText(item: ReelItemData) -> some View {
         if let title = item.title, !title.isEmpty {
             if let scene = item.titleLinkScene {
-                NavigationLink(destination: LazyView { SceneDetailView(scene: scene, autoPlay: item.titleLinkAutoPlays) }) {
+                // Read when the page opens, not when this row was drawn.
+                let scrubber = scrubberState
+                let isCurrent = item.id == currentVisibleSceneId
+                NavigationLink(destination: LazyView {
+                    let live: Double? = isCurrent ? scrubber.time : nil
+                    return SceneDetailView(scene: item.titleLinkScene(livePosition: live) ?? scene, autoPlay: item.titleLinkAutoPlays(livePosition: live))
+                }) {
                     Text(title)
                         .font(.subheadline.weight(.medium))
                         .dynamicTypeSize(...DynamicTypeSize.accessibility1)
@@ -5250,8 +5307,30 @@ struct ReelsViewBody: View {
                 }
             }
             .accessibilityLabel("Rating")
+
+            // Optional (Settings › Feeds): a marker at the current position of a whole scene.
+            if tabManager.feedsAddMarkerButton, reelsMode == .scenes,
+               case .scene(let scene)? = currentItem, currentItem?.playbackSegment == nil {
+                Button {
+                    resumesAfterMarkerSheet = currentItemIsPlaying
+                    currentItemIsPlaying = false
+                    feedsMarkerDraft = FeedsMarkerDraft(scene: scene, seconds: max(0, scrubberState.time))
+                } label: {
+                    Image(systemName: "plus.square.fill.on.square.fill")
+                        .font(.system(size: StashyExpandingDock.iconSize, weight: .semibold))
+                        .foregroundColor(.white.opacity(StashyExpandingDock.inactiveIconOpacity))
+                        .modifier(StashyChromePillStyle(height: StashyExpandingDock.stackedButtonSize, width: StashyExpandingDock.stackedButtonSize, hashtagColors: true))
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Add Marker")
+            }
         }
         .fixedSize()
+    }
+
+    /// Changes whenever the marker dots on the time bar have to be read again.
+    private var feedsMarkerDotsKey: String {
+        "\(reelsMode.rawValue)|\(currentVisibleSceneId ?? "")|\(viewModel.scenes.count)|\(feedsMarkerRevision)"
     }
 
     private func toggleFeedsMute() {
@@ -6244,6 +6323,19 @@ extension ReelItemView {
         }
         HapticManager.light()
         let duration = aether.duration
+        // Settings › Feeds "Double tap jumps to markers": a whole scene with markers goes to
+        // the next / previous one. Back needs 2 s of distance, so a second tap moves on to
+        // the marker before instead of landing on the same one again.
+        if TabManager.shared.feedsDoubleTapMarkers, effectivePlaybackSegment == nil, case .scene(let scene) = item {
+            let now = aether.currentTime
+            let markers = FeedsMarkerTimes.seconds(for: scene.id).filter { duration <= 0 || $0 < duration }
+            let marker = delta > 0 ? markers.first(where: { $0 > now + 0.5 }) : markers.last(where: { $0 < now - 2 })
+            if let marker {
+                Task { await aether.seek(to: marker) }
+                onInteraction()
+                return true
+            }
+        }
         let raw = aether.currentTime + delta
         let target: Double
         if let segment = effectivePlaybackSegment {
@@ -6429,7 +6521,11 @@ extension ReelItemView {
         if let title = item.title, !title.isEmpty {
             Group {
                 if let scene = item.titleLinkScene {
-                    NavigationLink(destination: LazyView { SceneDetailView(scene: scene, autoPlay: item.titleLinkAutoPlays) }) {
+                    // Read when the page opens, not when this row was drawn.
+                    NavigationLink(destination: LazyView {
+                        let live: Double? = aetherCurrentTime ?? (isActive ? scrubberState.time : nil)
+                        return SceneDetailView(scene: item.titleLinkScene(livePosition: live) ?? scene, autoPlay: item.titleLinkAutoPlays(livePosition: live))
+                    }) {
                         titleText(title, item: item)
                     }
                     .buttonStyle(.plain)
@@ -7195,11 +7291,20 @@ final class FeedsScrubberAccessory: ObservableObject {
     }
 }
 
+/// Feeds › Scenes "Add Marker": what the sheet is opened for.
+struct FeedsMarkerDraft: Identifiable {
+    let id = UUID()
+    let scene: Scene
+    let seconds: Double
+}
+
 class ScrubberState: ObservableObject {
     @Published var time: Double = 0.0
     @Published var duration: Double = 1.0
     @Published var seeking: Bool = false
     @Published var seekTarget: Double? = nil
+    /// Marker times of the active item, drawn as dots on the bar (Feeds › Scenes).
+    @Published var markerSeconds: [Double] = []
     /// Scrub preview still for the active row. The bar renders it; the active `ReelItemView`
     /// is the only writer (it owns the decode). Deliberately parked here rather than passed
     /// down: the bar lives outside the pager, so this object is the only channel between them.
@@ -7328,7 +7433,7 @@ struct IsolatedScrubberBar: View {
             isScrubbing: state.seeking,
             previewImage: state.previewImage,
             previewPlaceholderURL: state.previewPlaceholderURL,
-            markerSeconds: [],
+            markerSeconds: state.markerSeconds,
             isCompact: false,
             playPause: playPause,
             mute: mute,

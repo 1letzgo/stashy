@@ -518,6 +518,19 @@ class TabManager: ObservableObject {
             UserDefaults.standard.set(reelsContinuousPlay, forKey: reelsContinuousPlayKey)
         }
     }
+    /// Feeds › Scenes: a double tap on the outer thirds jumps to the previous / next marker
+    /// of a scene that has markers, instead of skipping seconds (Settings › Feeds).
+    @Published var feedsDoubleTapMarkers: Bool = false {
+        didSet {
+            UserDefaults.standard.set(feedsDoubleTapMarkers, forKey: feedsDoubleTapMarkersKey)
+        }
+    }
+    /// Feeds › Scenes: an "Add Marker" button beside the rating (Settings › Feeds).
+    @Published var feedsAddMarkerButton: Bool = false {
+        didSet {
+            UserDefaults.standard.set(feedsAddMarkerButton, forKey: feedsAddMarkerButtonKey)
+        }
+    }
     /// Seconds one skip covers — the skip buttons and a double tap on the player's outer
     /// thirds (Settings › Playback › "Skip interval").
     @Published var playerSkipSeconds: Double = 10 {
@@ -791,6 +804,8 @@ class TabManager: ObservableObject {
     private let toolsKey = "ToolsConfig"
     private let reelsFillHeightKey = "ReelsFillHeight"
     private let reelsContinuousPlayKey = "ReelsContinuousPlay"
+    private let feedsAddMarkerButtonKey = "FeedsAddMarkerButton"
+    private let feedsDoubleTapMarkersKey = "FeedsDoubleTapMarkers"
     private let isPiPEnabledKey = "isPiPEnabled"
     private let isMiniPlayerEnabledKey = "isMiniPlayerEnabled"
     private let playerSkipSecondsKey = "playerSkipSeconds"
@@ -858,6 +873,8 @@ class TabManager: ObservableObject {
         loadTools()
         self.reelsFillHeight = UserDefaults.standard.object(forKey: reelsFillHeightKey) as? Bool ?? true
         self.reelsContinuousPlay = UserDefaults.standard.bool(forKey: reelsContinuousPlayKey)
+        self.feedsAddMarkerButton = UserDefaults.standard.bool(forKey: feedsAddMarkerButtonKey)
+        self.feedsDoubleTapMarkers = UserDefaults.standard.bool(forKey: feedsDoubleTapMarkersKey)
         self.isPiPEnabled = UserDefaults.standard.object(forKey: isPiPEnabledKey) as? Bool ?? true
         self.isMiniPlayerEnabled = UserDefaults.standard.object(forKey: isMiniPlayerEnabledKey) as? Bool ?? true
         let storedSkip = UserDefaults.standard.object(forKey: playerSkipSecondsKey) as? Double ?? 10

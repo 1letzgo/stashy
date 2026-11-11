@@ -185,8 +185,6 @@ private fun CoverWithOverlay(model: SceneDetailModel) {
                                 .clickable { model.startPlayback(false) }.padding(horizontal = 12.dp, vertical = 6.dp),
                             color = Color.White, style = IosTypography.caption.copy(fontWeight = FontWeight.Medium),
                         )
-                        // stashy+ and switched on: the watchlist belongs to the mini player.
-                        if (de.letzgo.stashy.ui.player.MiniPlayerStore.isEnabled) WatchlistCoverButton(scene)
                     }
                 } else {
                     Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(16.dp)) {
@@ -195,8 +193,6 @@ private fun CoverWithOverlay(model: SceneDetailModel) {
                                 .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) { model.startPlayback(false) },
                             contentAlignment = Alignment.Center,
                         ) { Icon(PlayerIcons.play, "Play", tint = Color.White, modifier = Modifier.size(40.dp).padding(start = 2.dp)) }
-                        // stashy+ and switched on: the watchlist belongs to the mini player.
-                        if (de.letzgo.stashy.ui.player.MiniPlayerStore.isEnabled) WatchlistCoverButton(scene)
                     }
                 }
             }
@@ -239,35 +235,6 @@ private fun CoverInfoPill(text: String, icon: androidx.compose.ui.graphics.vecto
     ) {
         Icon(icon, null, tint = Color.White, modifier = Modifier.size(scaledIconSize(11.dp)))
         Text(text, color = Color.White, style = IosTypography.caption2.copy(fontWeight = FontWeight.Bold))
-    }
-}
-
-/**
- * iOS: the cover's watchlist capsule under "Start from beginning" (or under Play) — adds /
- * removes the scene on the mini player's watchlist, tinted while listed.
- */
-@Composable
-private fun WatchlistCoverButton(scene: de.letzgo.stashy.data.Scene) {
-    val listed = de.letzgo.stashy.data.WatchlistStore.contains(scene.id)
-    Row(
-        Modifier.clip(RoundedCornerShape(50)).background(if (listed) Appearance.tint else Color.Black.copy(alpha = 0.45f))
-            .clickable {
-                de.letzgo.stashy.data.WatchlistStore.toggle(scene)
-                SceneToast.show(
-                    if (listed) "Removed from watchlist" else "Added to watchlist",
-                    if (listed) de.letzgo.stashy.ui.player.WatchlistIcons.removed else de.letzgo.stashy.ui.player.WatchlistIcons.listed,
-                    SceneToast.Style.Success,
-                )
-            }
-            .padding(horizontal = 12.dp, vertical = 6.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(5.dp),
-    ) {
-        Icon(
-            if (listed) de.letzgo.stashy.ui.player.WatchlistIcons.listed else de.letzgo.stashy.ui.player.WatchlistIcons.add,
-            null, tint = Color.White, modifier = Modifier.size(scaledIconSize(14.dp)),
-        )
-        Text(if (listed) "On watchlist" else "Add to watchlist", color = Color.White, style = IosTypography.caption.copy(fontWeight = FontWeight.Medium))
     }
 }
 

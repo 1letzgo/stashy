@@ -54,7 +54,8 @@ import de.letzgo.stashy.ui.nativeAccent
 /** iOS: `ToolsBreadcrumbContext` — what a tool needs to draw the Tools row itself. */
 class ToolsBreadcrumbContext(
     val tools: List<ToolsTab>,
-    val current: ToolsTab,
+    /** null on the grid: the menu pill is then neutral ("Tools"). */
+    val current: ToolsTab?,
     /** null = back to the grid. */
     val onSelect: (ToolsTab?) -> Unit,
 )
@@ -89,7 +90,7 @@ fun ToolsBreadcrumbStrip(context: ToolsBreadcrumbContext, trailing: @Composable 
     ) {
         Row(Modifier.fillMaxWidth().heightIn(min = 48.dp).padding(horizontal = 4.dp), verticalAlignment = Alignment.CenterVertically) {
             IconButton(onClick = { context.onSelect(null) }) {
-                Icon(SF.squareGrid2x2, "Tools", tint = p.secondaryText)
+                Icon(SF.squareGrid2x2, "Tools", tint = if (context.current == null) nativeAccent() else p.secondaryText)
             }
             Icon(Icons.Chevron, null, tint = p.tertiaryText, modifier = Modifier.size(18.dp))
             ToolMenu(context)
@@ -101,31 +102,15 @@ fun ToolsBreadcrumbStrip(context: ToolsBreadcrumbContext, trailing: @Composable 
     }
 }
 
-/** iOS: `toolMenu(_:)` — the open tool's name, tinted; the menu lists every tool. */
+/** iOS: `toolMenu(_:)` — the open tool's name, tinted (neutral "Tools" on the grid); the menu lists every tool. */
 @Composable
 private fun ToolMenu(context: ToolsBreadcrumbContext) {
-    var open by remember { mutableStateOf(false) }
-    val current = context.current
-    Box {
-        Row(
-            Modifier.heightIn(min = 40.dp).clip(RoundedCornerShape(12.dp)).clickable { open = true }
-                .padding(horizontal = 10.dp)
-                .semantics(mergeDescendants = true) { contentDescription = "Tool, ${current.title}" },
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(4.dp),
-        ) {
-            Text(current.title, style = MaterialTheme.typography.titleSmall, color = nativeAccent(), maxLines = 1)
-            Icon(SF.chevronUpChevronDown, null, tint = nativeAccent(), modifier = Modifier.size(16.dp))
-        }
-        DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
-            context.tools.forEach { tool ->
-                ToolsMenuItem(tool.title, tool.icon, checked = tool == current) {
-                    open = false
-                    if (tool != current) context.onSelect(tool)
-                }
-            }
-        }
-    }
+    de.letzgo.stashy.ui.catalog.BreadcrumbSectionMenu(
+        current = context.current,
+        items = context.tools, title = { it.title }, icon = { it.icon },
+        onSelect = { context.onSelect(it) },
+        accessibilityPrefix = "Tool", neutralTitle = "Tools",
+    )
 }
 
 /**

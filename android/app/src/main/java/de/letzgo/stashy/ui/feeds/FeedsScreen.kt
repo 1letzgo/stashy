@@ -54,6 +54,7 @@ import de.letzgo.stashy.data.FeedsConfig
 import de.letzgo.stashy.data.IdName
 import de.letzgo.stashy.data.Performer
 import de.letzgo.stashy.data.ReelsModeType
+import de.letzgo.stashy.data.Scene
 import de.letzgo.stashy.data.tools.AITagTarget
 import de.letzgo.stashy.ui.components.AddTagsSheet
 import de.letzgo.stashy.ui.Theme
@@ -458,6 +459,9 @@ private fun FeedPager(
     // Scrubber state of the active row (iOS `ScrubberState`), play-count credit and checkpoint.
     var time by remember { mutableDoubleStateOf(0.0) }
     var duration by remember { mutableDoubleStateOf(activeItem?.duration ?: 1.0) }
+    /** The "Add Marker" sheet's scene + file time, and whether the feed was playing when it opened. */
+    var markerDraft by remember { mutableStateOf<FeedsMarkerDraft?>(null) }
+    var resumesAfterMarkerSheet by remember { mutableStateOf(false) }
     var seeking by remember { mutableStateOf(false) }
     LaunchedEffect(activeId) {
         time = 0.0
@@ -517,6 +521,14 @@ private fun FeedPager(
                 onToggleUI = onToggleUI,
                 onSkip = { delta ->
                     pool.player(item.id)?.let { p ->
+                        // iOS `feedsDoubleTapMarkers`: a whole scene in Scenes jumps to the next / previous marker.
+                        if (FeedsConfig.doubleTapJumpsToMarkers && mode == ReelsModeType.Scenes && item is FeedItem.SceneItem && item.segment == null) {
+                            val pos = p.currentPosition / 1000.0
+                            val known = item.id == activeId && duration > 0
+                            val marks = FeedsMarkerTimes.seconds(item.scene).filter { !known || it < duration }
+                            val jump = if (delta > 0) marks.firstOrNull { it > pos + 0.5 } else marks.lastOrNull { it < pos - 2.0 }
+                            if (jump != null) { pool.seek(item.id, jump); return@let }
+                        }
                         val target = (p.currentPosition / 1000.0 + delta).coerceAtLeast(0.0)
                         pool.seek(item.id, if (duration > 0) target.coerceAtMost(duration) else target)
                     }
@@ -543,7 +555,19 @@ private fun FeedPager(
                         Nav.push(PerformerDetailScreen(p.id, Performer(id = p.id, name = p.name), initialTab = if (images) de.letzgo.stashy.ui.detail.DetailTab.Images else null))
                     },
                     onTitle = {
-                        activeItem.titleLinkScene?.let { s -> Nav.push(SceneDetailScreen(s.id, s)) }
+                        activeItem.titleLinkScene?.let { s ->
+                            // iOS parity: a whole playing scene hands its live position (file time)
+                            // to the page; the saved resume point is up to ~10 s old or stale after
+                            // a paused seek. Markers keep their own start, previews/clips are skipped.
+                            var scene = s
+                            var continues = false
+                            if (activeItem is FeedItem.SceneItem && activeItem.segment == null) {
+                                val position = (pool.player(activeItem.id)?.currentPosition ?: 0L) / 1000.0
+                                if (position.isFinite() && position > 1.0) { scene = s.copy(resumeTime = position); continues = true }
+                            }
+                            // With a live position the page continues playback instead of showing the cover.
+                            Nav.push(SceneDetailScreen(scene.id, scene, autoPlay = continues))
+                        }
                     },
                     onTag = { t -> model.toggleTag(t) },
                     onAddTags = { onAddTags(activeItem.aiTagTarget) },
@@ -559,6 +583,13 @@ private fun FeedPager(
                     pausesAdvance = activeItem.isAnimated && continuous,
                     // Edit Mode gate like the tag row's "Add tag" (iOS parity).
                     onAddPerformers = if (de.letzgo.stashy.ui.Appearance.isEditModeEnabled && activeItem.canAddPerformers) ({ onAddPerformers(activeItem) }) else null,
+                    // Settings › Feeds › "Show Add Marker Button": whole scenes in Scenes only.
+                    onAddMarker = if (FeedsConfig.showsAddMarkerButton && mode == ReelsModeType.Scenes && activeItem is FeedItem.SceneItem && activeItem.segment == null) ({
+                        val position = (pool.player(activeItem.id)?.currentPosition ?: 0L) / 1000.0
+                        resumesAfterMarkerSheet = model.isPlaying
+                        model.isPlaying = false
+                        markerDraft = FeedsMarkerDraft(activeItem.scene, if (position.isFinite()) maxOf(0.0, position) else maxOf(0.0, time))
+                    }) else null,
                 )
                 if (!activeItem.isAnimated) {
                     // iOS `ReelsView` scrub preview: the scene's sprite sheet + VTT index, like the
@@ -578,6 +609,9 @@ private fun FeedPager(
                         // iOS: play / pause sits at the bar's trailing end, not in the control stack.
                         playPause = de.letzgo.stashy.ui.player.TimeBarPlayPause(isPlaying) { model.isPlaying = !model.isPlaying },
                         aspectRatio = pool.videoSizes[activeItem.id]?.let { if (it.width > 0 && it.height > 0) it.width.toFloat() / it.height else null } ?: fileAspect(activeItem),
+                        // Dots: Feeds › Scenes, whole scenes only (the setting does not matter).
+                        markers = if (mode == ReelsModeType.Scenes && activeItem is FeedItem.SceneItem && activeItem.segment == null)
+                            FeedsMarkerTimes.seconds(activeItem.scene).map { de.letzgo.stashy.ui.player.TimeBarMarker(it, null) } else emptyList(),
                         onScrub = { s -> seeking = true; time = s; pool.player(activeId)?.playWhenReady = false; pool.seek(activeId, s) },
                         onScrubEnd = { s ->
                             time = s; pool.seek(activeId, s); seeking = false
@@ -588,6 +622,42 @@ private fun FeedPager(
                 Spacer(Modifier.height(tabBarOverlap))
             }
         }
+    }
+
+    // The scene page's sheet, opened by the overlay's "Add Marker" at the feed player's position.
+    markerDraft?.let { draft ->
+        de.letzgo.stashy.ui.scene.AddMarkerSheet(
+            draft.scene, draft.seconds, null,
+            onDismiss = {
+                markerDraft = null
+                if (resumesAfterMarkerSheet) model.isPlaying = true
+                resumesAfterMarkerSheet = false
+            },
+            // Runs after creation (and again once Stash generated the previews): idempotent.
+            onComplete = { FeedsMarkerTimes.add(draft.scene.id, draft.seconds) },
+        )
+    }
+}
+
+/** Feeds › Scenes "Add Marker": what the sheet is opened for. */
+private data class FeedsMarkerDraft(val scene: Scene, val seconds: Double)
+
+/**
+ * iOS: `FeedsMarkerTimes` — markers created from Feeds, on top of the feed query's
+ * `feed_marker_seconds` (kept apart from the scene's real `sceneMarkers`, which the feed never fetches in full).
+ */
+internal object FeedsMarkerTimes {
+    private val added = androidx.compose.runtime.mutableStateMapOf<String, List<Double>>()
+
+    fun add(sceneId: String, seconds: Double) {
+        val current = added[sceneId].orEmpty()
+        if (current.none { kotlin.math.abs(it - seconds) < 0.001 }) added[sceneId] = current + seconds
+    }
+
+    /** All marker times of [scene], sorted: the feed query's plus the ones added here. */
+    fun seconds(scene: Scene): List<Double> {
+        val base = scene.feedMarkerSeconds?.map { it.seconds } ?: scene.sceneMarkers.orEmpty().map { it.seconds }
+        return (base + added[scene.id].orEmpty()).distinct().sorted()
     }
 }
 

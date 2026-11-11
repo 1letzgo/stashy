@@ -333,8 +333,6 @@ struct ToolsView: View {
     @StateObject private var topListsViewModel = TopListsViewModel()
 
     enum ToolsTab: String, CaseIterable {
-        case downloads = "Downloads"
-        case watchlist = "Watchlist"
         case overview = "Overview"
         case oCount = "O-Count"
         case timeline = "Timeline"
@@ -344,8 +342,6 @@ struct ToolsView: View {
         
         var icon: String {
             switch self {
-            case .downloads: return "square.and.arrow.down"
-            case .watchlist: return "text.badge.checkmark"
             case .overview: return "chart.bar.fill"
             case .oCount: return "calendar"
             case .timeline: return "calendar.day.timeline.left"
@@ -360,17 +356,12 @@ struct ToolsView: View {
     /// hand-sorted flat list stopped being a good way in once Tools grew — the grid needs stable
     /// categories, so the order is part of the design now rather than a setting.
     static let toolGroups: [(title: String, tools: [ToolsTab])] = [
-        ("Library", [.downloads, .watchlist]),
+        // Downloads and the watchlist are not tools any more: the Dashboard row opens them.
         ("Insights", [.overview, .topLists, .oCount, .timeline]),
         ("Discover", [.hotOrNot, .rateMe])
     ]
 
-    /// Settings › stashy+ › Miniplayer & Watchlist off: no Watchlist tool either.
-    private var visibleToolGroups: [(title: String, tools: [ToolsTab])] {
-        Self.toolGroups.map { group in
-            (group.title, group.tools.filter { $0 != .watchlist || tabManager.isMiniPlayerEnabled })
-        }
-    }
+    private var visibleToolGroups: [(title: String, tools: [ToolsTab])] { Self.toolGroups }
 
     private var sortedTabs: [ToolsTab] {
         visibleToolGroups.flatMap(\.tools)
@@ -416,7 +407,6 @@ struct ToolsView: View {
             normalizeToolsSubTab()
         }
         .onChange(of: stashyPlus.isUnlocked) { _, _ in normalizeToolsSubTab() }
-        .onChange(of: tabManager.isMiniPlayerEnabled) { _, _ in normalizeToolsSubTab() }
         .stashySectionChrome {
             ToolsBreadcrumbRow(tools: sortedTabs, current: nil) { select($0) }
         }
@@ -448,10 +438,6 @@ struct ToolsView: View {
     @ViewBuilder
     private func toolContent(_ tool: ToolsTab) -> some View {
         switch tool {
-        case .downloads:
-            DownloadsView()
-        case .watchlist:
-            WatchlistToolsView()
         case .overview:
             ToolsStatisticsView(viewModel: statisticsViewModel)
         case .oCount:
@@ -492,8 +478,8 @@ struct ToolsView: View {
 }
 
 
-/// The Tools row, built like Home's breadcrumb. On the grid: Tools (highlighted) › every tool as
-/// an icon. In a tool: Tools › a native menu named after the open tool.
+/// The Tools row, built like Home's breadcrumb. On the grid: Tools (highlighted) › "Tools"
+/// dropdown. In a tool: Tools › a native menu named after the open tool.
 struct ToolsBreadcrumbRow<Trailing: View>: View {
     let tools: [ToolsView.ToolsTab]
     /// nil on the grid.
@@ -511,20 +497,9 @@ struct ToolsBreadcrumbRow<Trailing: View>: View {
                 .font(.system(size: 16, weight: .semibold))
                 .foregroundStyle(Color.white.opacity(0.4))
                 .accessibilityHidden(true)
-            if let current {
-                toolMenu(current)
-                Spacer(minLength: 0)
-                trailing()
-            } else {
-                StashyExpandingDockBrowseStrip(
-                    items: tools.map { StashyNavMenuItem(id: $0.rawValue, title: $0.rawValue, systemImage: $0.icon) },
-                    selectionID: "",
-                    accessibilityLabel: "Tool",
-                    accessibilityHint: "Opens a tool"
-                ) { id in
-                    if let tool = ToolsView.ToolsTab(rawValue: id) { onSelect(tool) }
-                }
-            }
+            toolMenu(current)
+            Spacer(minLength: 0)
+            if current != nil { trailing() }
         }
         // As on Home: one mask over the row, so every pill fades as one when the chrome hides.
         .mask(Rectangle().padding(.vertical, -24))
@@ -550,27 +525,39 @@ struct ToolsBreadcrumbRow<Trailing: View>: View {
         .accessibilityAddTraits(onRoot ? .isSelected : [])
     }
 
-    private func toolMenu(_ current: ToolsView.ToolsTab) -> some View {
+    /// On the grid (`current` nil) the pill reads "Tools" in plain glass and lists the
+    /// tools as buttons; in a tool it is highlighted and names it.
+    private func toolMenu(_ current: ToolsView.ToolsTab?) -> some View {
         Menu {
-            Picker("Tool", selection: Binding(get: { current }, set: { onSelect($0) })) {
+            if let current {
+                Picker("Tool", selection: Binding(get: { current }, set: { onSelect($0) })) {
+                    ForEach(tools, id: \.self) { tool in
+                        Label(tool.rawValue, systemImage: tool.icon).tag(tool)
+                    }
+                }
+                .pickerStyle(.inline)
+            } else {
                 ForEach(tools, id: \.self) { tool in
-                    Label(tool.rawValue, systemImage: tool.icon).tag(tool)
+                    Button {
+                        onSelect(tool)
+                    } label: {
+                        Label(tool.rawValue, systemImage: tool.icon)
+                    }
                 }
             }
-            .pickerStyle(.inline)
         } label: {
             HStack(spacing: 6) {
-                Text(current.rawValue)
+                Text(current?.rawValue ?? "Tools")
                     .font(.subheadline.weight(.semibold))
                     .lineLimit(1)
                     .minimumScaleFactor(0.8)
                 Image(systemName: "chevron.up.chevron.down")
                     .font(.system(size: 11, weight: .bold))
             }
-            .foregroundStyle(Color.onAppTint)
+            .foregroundStyle(current == nil ? Color.white.opacity(0.85) : Color.onAppTint)
             .padding(.horizontal, StashyExpandingDock.activeHorizontalPadding)
             .frame(height: StashyExpandingDock.activeHeight)
-            .stashyChromeFill(shape: Capsule(style: .continuous), activeColor: appearance.tintColor)
+            .stashyChromeFill(shape: Capsule(style: .continuous), activeColor: current == nil ? nil : appearance.tintColor)
             .contentShape(Capsule(style: .continuous))
         }
         .menuStyle(.button)
@@ -578,7 +565,7 @@ struct ToolsBreadcrumbRow<Trailing: View>: View {
         .menuIndicator(.hidden)
         .stashyNeutralMenuItems()
         .fixedSize()
-        .accessibilityLabel("Tool, \(current.rawValue)")
+        .accessibilityLabel(current.map { "Tool, \($0.rawValue)" } ?? "Tools")
     }
 }
 
@@ -1540,7 +1527,7 @@ private struct FeedsTimeBar: View {
             isScrubbing: state.seeking,
             previewImage: state.previewImage,
             previewPlaceholderURL: state.previewPlaceholderURL,
-            markerSeconds: [],
+            markerSeconds: state.markerSeconds,
             isCompact: isCompact,
             showsGlass: false,
             playPause: AetherTimeBarPlayPause(isPlaying: accessory.isPlaying) { accessory.togglePlay?() },

@@ -120,7 +120,7 @@ struct PlaybackSettingsSection: View {
             } label: {
                 Label("Start position", systemImage: "forward.end")
             }
-            .stashyGroupedBlockRow(index: 0, count: verticalsAvailable ? 5 : 4)
+            .stashyGroupedBlockRow(index: 0, count: verticalsAvailable ? 7 : 6)
 
             // Feeds › Markers: length of a marker without an end time.
             Picker(selection: $tabManager.feedsMarkerDefaultSeconds) {
@@ -130,7 +130,7 @@ struct PlaybackSettingsSection: View {
             } label: {
                 Label("Marker length", systemImage: "bookmark")
             }
-            .stashyGroupedBlockRow(index: 1, count: verticalsAvailable ? 5 : 4)
+            .stashyGroupedBlockRow(index: 1, count: verticalsAvailable ? 7 : 6)
 
             Picker(selection: $tabManager.holdSpeedFeeds) {
                 ForEach(TabManager.holdSpeedOptions, id: \.self) { rate in
@@ -139,7 +139,7 @@ struct PlaybackSettingsSection: View {
             } label: {
                 Label("Hold to speed up", systemImage: "forward.frame.fill")
             }
-            .stashyGroupedBlockRow(index: 2, count: verticalsAvailable ? 5 : 4)
+            .stashyGroupedBlockRow(index: 2, count: verticalsAvailable ? 7 : 6)
 
             Picker(selection: $tabManager.playCountFeedsSeconds) {
                 ForEach(TabManager.playCountThresholdOptions, id: \.self) { seconds in
@@ -148,7 +148,7 @@ struct PlaybackSettingsSection: View {
             } label: {
                 Label(verticalsAvailable ? "Count as played · Scenes" : "Count as played", systemImage: "rectangle.stack.badge.play")
             }
-            .stashyGroupedBlockRow(index: 3, count: verticalsAvailable ? 5 : 4)
+            .stashyGroupedBlockRow(index: 3, count: verticalsAvailable ? 7 : 6)
 
             if verticalsAvailable {
                 Picker(selection: $tabManager.playCountVerticalsSeconds) {
@@ -158,8 +158,23 @@ struct PlaybackSettingsSection: View {
                 } label: {
                     Label("Count as played · Verticals", systemImage: "rectangle.portrait")
                 }
-                .stashyGroupedBlockRow(index: 4, count: 5)
+                .stashyGroupedBlockRow(index: 4, count: 7)
             }
+
+            // Feeds › Scenes: a marker at the current position, beside the rating.
+            Toggle(isOn: $tabManager.feedsAddMarkerButton) {
+                Label("Add Marker button", systemImage: "plus.square.fill.on.square.fill")
+            }
+            .tint(appearanceManager.tintColor)
+            .stashyGroupedBlockRow(index: verticalsAvailable ? 5 : 4, count: verticalsAvailable ? 7 : 6)
+
+            // Feeds › Scenes: double tap left / right goes to the previous / next marker.
+            Toggle(isOn: $tabManager.feedsDoubleTapMarkers) {
+                Label("Double tap jumps to markers", systemImage: "bookmark")
+            }
+            .tint(appearanceManager.tintColor)
+            .stashyGroupedBlockRow(index: verticalsAvailable ? 6 : 5, count: verticalsAvailable ? 7 : 6)
+            stashyScrollingSectionFooter("Double tap jumps to markers: in Feeds › Scenes a double tap on the left or right goes to the previous or next marker of a scene that has markers. Without a marker in that direction it skips seconds as usual.")
         }
     }
 

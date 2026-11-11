@@ -315,6 +315,20 @@ final class MiniPlayerStore: ObservableObject {
         showsNowPlaying = true
     }
 
+    /// The Dashboard row's watchlist button: the full view as the popup. What the bar runs
+    /// stays; with nothing running the first watchlist entry starts. The list itself (sort,
+    /// remove, clear) is managed in that view.
+    func openWatchlist() {
+        guard isEnabled else { return }
+        if session != nil {
+            expand()
+        } else if let first = WatchlistStore.shared.scenes.first {
+            openNowPlaying(first, startAt: nil)
+        } else {
+            ToastManager.shared.show("Watchlist is empty", icon: "text.badge.plus", style: .info)
+        }
+    }
+
     /// Switches the full view to `scene` (row tap, previous / next, end of a scene).
     func showNowPlaying(_ scene: Scene) {
         notePlaying(scene)
@@ -752,132 +766,6 @@ struct SceneMarkerStrip: View {
     private static func time(_ seconds: Double) -> String {
         let h = Int(seconds) / 3600, m = (Int(seconds) % 3600) / 60, s = Int(seconds) % 60
         return h > 0 ? String(format: "%d:%02d:%02d", h, m, s) : String(format: "%d:%02d", m, s)
-    }
-}
-
-/// Tools → Watchlist: the list when nothing plays. A row opens and plays its scene; leaving
-/// the page hands it to the mini player, which plays on through the list.
-struct WatchlistToolsView: View {
-    @ObservedObject private var watchlist = WatchlistStore.shared
-    @ObservedObject private var player = MiniPlayerStore.shared
-    @ObservedObject private var appearance = AppearanceManager.shared
-    @State private var confirmReset = false
-    @State private var openedScene: Scene?
-    @State private var showsScene = false
-    /// Sorting shows the drag handles; outside it, swipe left removes a row.
-    @State private var sortMode: EditMode = .inactive
-
-    var body: some View {
-        Group {
-            if watchlist.scenes.isEmpty {
-                ContentUnavailableView(
-                    "Watchlist is empty",
-                    systemImage: "text.badge.plus",
-                    description: Text("Add scenes with \"Add to watchlist\" on a scene. They play one after another in the mini player.")
-                )
-            } else {
-                List {
-                    Section {
-                        HStack(spacing: StashyExpandingDock.itemSpacing) {
-                            Button {
-                                HapticManager.light()
-                                openedScene = watchlist.scenes.first
-                                showsScene = openedScene != nil
-                            } label: {
-                                Label("Play all", systemImage: "play.fill")
-                                    .font(.subheadline.weight(.semibold))
-                                    .foregroundStyle(Color.onAppTint)
-                                    .frame(maxWidth: .infinity)
-                                    .frame(height: StashyExpandingDock.activeHeight)
-                                    .stashyChromeFill(shape: Capsule(style: .continuous), activeColor: appearance.tintColor)
-                            }
-                            .buttonStyle(.plain)
-                            Button(role: .destructive) { confirmReset = true } label: {
-                                Text("Clear")
-                                    .font(.subheadline.weight(.semibold))
-                                    .foregroundStyle(Color.red)
-                                    .padding(.horizontal, 18)
-                                    .frame(height: StashyExpandingDock.activeHeight)
-                                    .stashyChromeFill(shape: Capsule(style: .continuous), activeColor: nil)
-                            }
-                            .buttonStyle(.plain)
-                            Button {
-                                withAnimation { sortMode = sortMode.isEditing ? .inactive : .active }
-                            } label: {
-                                Text(sortMode.isEditing ? "Done" : "Sort")
-                                    .font(.subheadline.weight(.semibold))
-                                    .foregroundStyle(sortMode.isEditing ? Color.onAppTint : Color.primary.opacity(0.85))
-                                    .padding(.horizontal, 18)
-                                    .frame(height: StashyExpandingDock.activeHeight)
-                                    .stashyChromeFill(
-                                        shape: Capsule(style: .continuous),
-                                        activeColor: sortMode.isEditing ? appearance.tintColor : nil
-                                    )
-                            }
-                            .buttonStyle(.plain)
-                        }
-                        .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 12, trailing: 16))
-                        .listRowBackground(Color.clear)
-                        .listRowSeparator(.hidden)
-                    }
-                    Section {
-                        ForEach(watchlist.scenes) { scene in
-                            Button {
-                                HapticManager.light()
-                                openedScene = scene
-                                showsScene = true
-                            } label: {
-                                WatchlistSceneRow(scene: scene, isCurrent: player.session?.scene.id == scene.id)
-                            }
-                            .buttonStyle(.plain)
-                            .listRowInsets(EdgeInsets(top: 6, leading: 16, bottom: 6, trailing: 16))
-                            .listRowBackground(Color.clear)
-                            .listRowSeparatorTint(Color.primary.opacity(0.08))
-                            .swipeActions(edge: .trailing, allowsFullSwipe: true) {
-                                    Button(role: .destructive) {
-                                        HapticManager.light()
-                                        watchlist.remove(scene.id)
-                                    } label: {
-                                        Label("Remove", systemImage: "trash")
-                                    }
-                                }
-                            .contextMenu {
-                                if watchlist.scenes.first?.id != scene.id {
-                                    Button { watchlist.shift(scene.id, by: -1) } label: {
-                                        Label("Move up", systemImage: "arrow.up")
-                                    }
-                                }
-                                if watchlist.scenes.last?.id != scene.id {
-                                    Button { watchlist.shift(scene.id, by: 1) } label: {
-                                        Label("Move down", systemImage: "arrow.down")
-                                    }
-                                }
-                                Button(role: .destructive) { watchlist.remove(scene.id) } label: {
-                                    Label("Remove from watchlist", systemImage: "trash")
-                                }
-                            }
-                        }
-                        .onMove { watchlist.move(fromOffsets: $0, toOffset: $1) }
-                    }
-                }
-                .listStyle(.plain)
-                .environment(\.editMode, $sortMode)
-                .scrollContentBackground(.hidden)
-            }
-        }
-        .background(Color.appBackground.ignoresSafeArea())
-        .navigationDestination(isPresented: $showsScene) {
-            if let openedScene {
-                SceneDetailView(scene: openedScene, autoPlay: true)
-            }
-        }
-        .alert("Clear watchlist?", isPresented: $confirmReset) {
-            Button("Clear", role: .destructive) { watchlist.clear() }
-            Button("Cancel", role: .cancel) {}
-        } message: {
-            Text("All scenes are removed from the watchlist.")
-        }
-        .onAppear { watchlist.checkAgainstServer() }
     }
 }
 

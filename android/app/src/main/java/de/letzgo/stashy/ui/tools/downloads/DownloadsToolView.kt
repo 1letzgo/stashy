@@ -132,7 +132,7 @@ internal val DownloadsIconSize = 18.dp
  * Galleries & Images and Tags. Works offline (no "no server" placeholder, like iOS).
  */
 @Composable
-fun DownloadsToolView() {
+fun DownloadsToolView(topPadding: androidx.compose.ui.unit.Dp = toolsTopPadding()) {
     val p = Theme.palette
     var search by rememberSaveable { mutableStateOf("") }
     var showingJobSheet by remember { mutableStateOf(false) }
@@ -158,7 +158,7 @@ fun DownloadsToolView() {
     val query = search.trim()
 
     Column(Modifier.fillMaxSize()) {
-        Spacer(Modifier.height(toolsTopPadding()))
+        Spacer(Modifier.height(topPadding))
         // Search field plus the round "+" for a new sync job.
         Row(
             Modifier.fillMaxWidth()
@@ -804,3 +804,15 @@ private fun DownloadsNotificationPermission() {
 
 /** Android-only flag: the notification permission was requested once. */
 private const val NOTIFICATION_ASKED_KEY = "downloads_notification_permission_asked"
+
+/**
+ * iOS: `CatalogsView.downloadsPage` — the Downloads screen as a page pushed onto the Home dashboard
+ * (system back / back arrow return to it). Same screen the Tools tab used to show.
+ */
+class DownloadsScreen : de.letzgo.stashy.ui.Screen {
+    override val key = "home-downloads"
+
+    @Composable override fun Content() = de.letzgo.stashy.ui.settings.SettingsDetailScaffold("Downloads") { top ->
+        DownloadsToolView(topPadding = top)
+    }
+}

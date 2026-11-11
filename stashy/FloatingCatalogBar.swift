@@ -87,29 +87,43 @@ struct HomeViewsMenu: View {
     /// Every view except the dashboard, in the user's order.
     var libraryTabs: [CatalogsView.CatalogsTab] { tabs.filter { $0 != .dashboard } }
 
+    /// On the dashboard no library view is open: the pill reads "Dashboard" in plain glass (Home
+    /// beside it is the highlighted one) and the entries are plain buttons, no checkmark.
+    private var onDashboard: Bool { selection == .dashboard }
+
     var body: some View {
         Menu {
-            Picker("Library", selection: $selection) {
+            if onDashboard {
                 ForEach(libraryTabs, id: \.self) { tab in
-                    Label(tab.rawValue, systemImage: tab.icon)
-                        .tag(tab)
+                    Button {
+                        selection = tab
+                    } label: {
+                        Label(tab.rawValue, systemImage: tab.icon)
+                    }
                 }
+            } else {
+                Picker("Library", selection: $selection) {
+                    ForEach(libraryTabs, id: \.self) { tab in
+                        Label(tab.rawValue, systemImage: tab.icon)
+                            .tag(tab)
+                    }
+                }
+                .pickerStyle(.inline)
             }
-            .pickerStyle(.inline)
         } label: {
             HStack(spacing: 6) {
-                Text(selection.rawValue)
+                Text(onDashboard ? "Dashboard" : selection.rawValue)
                     .font(.subheadline.weight(.semibold))
                     .lineLimit(1)
                     .minimumScaleFactor(0.8)
                 Image(systemName: "chevron.up.chevron.down")
                     .font(.system(size: 11, weight: .bold))
             }
-            // Always highlighted: it names the view that is shown (the sort crumb is too).
-            .foregroundStyle(Color.onAppTint)
+            // Highlighted while it names the view that is shown (the sort crumb is too).
+            .foregroundStyle(onDashboard ? Color.white.opacity(0.85) : Color.onAppTint)
             .padding(.horizontal, StashyExpandingDock.activeHorizontalPadding)
             .frame(height: StashyExpandingDock.activeHeight)
-            .stashyChromeFill(shape: Capsule(style: .continuous), activeColor: appearance.tintColor)
+            .stashyChromeFill(shape: Capsule(style: .continuous), activeColor: onDashboard ? nil : appearance.tintColor)
             .contentShape(Capsule(style: .continuous))
         }
         .menuStyle(.button)
@@ -117,7 +131,7 @@ struct HomeViewsMenu: View {
         .menuIndicator(.hidden)
         .stashyNeutralMenuItems()
         .fixedSize()
-        .accessibilityLabel("Library, \(selection.rawValue)")
+        .accessibilityLabel(onDashboard ? "Dashboard" : "Library, \(selection.rawValue)")
     }
 }
 
@@ -232,8 +246,8 @@ struct DetailBreadcrumbRow<Trailing: View>: View {
     }
 }
 
-/// One row of breadcrumb chrome. On the dashboard: Home (highlighted) › every library view as
-/// an icon. In a view: Home › views menu, and at the right edge whatever the list puts there
+/// One row of breadcrumb chrome. On the dashboard: Home (highlighted) › "Dashboard" dropdown
+/// with every library view. In a view: Home › views menu, and at the right edge whatever the list puts there
 /// (sort menu, settings).
 struct HomeBreadcrumbRow<Trailing: View>: View {
     let menu: HomeViewsMenu
@@ -250,18 +264,10 @@ struct HomeBreadcrumbRow<Trailing: View>: View {
                 separator
             }
             if onHome {
-                StashyExpandingDockBrowseStrip(
-                    items: menu.libraryTabs.map {
-                        StashyNavMenuItem(id: $0.rawValue, title: $0.rawValue, systemImage: $0.icon)
-                    },
-                    selectionID: "",
-                    accessibilityLabel: "Library",
-                    accessibilityHint: "Opens a library view"
-                ) { id in
-                    if let tab = CatalogsView.CatalogsTab(rawValue: id) {
-                        menu.selection = tab
-                    }
-                }
+                // The library views as a dropdown, like in a view; Downloads at the right edge.
+                menu
+                Spacer(minLength: 0)
+                trailing()
             } else {
                 menu
                 // The list's controls (sort menu, settings) sit at the right edge, not as a crumb.
@@ -299,6 +305,30 @@ struct HomeBreadcrumbRow<Trailing: View>: View {
             .font(.system(size: 16, weight: .semibold))
             .foregroundStyle(Color.white.opacity(0.4))
             .accessibilityHidden(true)
+    }
+}
+
+/// A glass circle at the right of the Dashboard row, like the Home button: the watchlist
+/// popup and Downloads.
+struct HomeRowIconButton: View {
+    let systemImage: String
+    let label: String
+    let action: () -> Void
+
+    var body: some View {
+        Button {
+            HapticManager.light()
+            action()
+        } label: {
+            Image(systemName: systemImage)
+                .font(.system(size: StashyExpandingDock.iconSize, weight: .semibold))
+                .foregroundStyle(Color.white.opacity(StashyExpandingDock.inactiveIconOpacity))
+                .frame(width: StashyExpandingDock.circleSize, height: StashyExpandingDock.circleSize)
+                .stashyChromeFill(shape: Circle(), activeColor: nil)
+                .contentShape(Circle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(label)
     }
 }
 

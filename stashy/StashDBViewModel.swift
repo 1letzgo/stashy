@@ -9655,7 +9655,9 @@ struct Scene: Codable, Identifiable, Equatable {
         // `feed_marker_seconds: scene_markers { seconds }` — tolerant, it is only a start hint.
         if let extra = try? decoder.container(keyedBy: FeedCodingKeys.self),
            let entries = try? extra.decodeIfPresent([FeedMarkerSeconds].self, forKey: .feedMarkerSeconds) {
-            earliestMarkerSeconds = entries.map(\.seconds).filter { $0.isFinite && $0 >= 0 }.min()
+            let seconds = entries.map(\.seconds).filter { $0.isFinite && $0 >= 0 }
+            earliestMarkerSeconds = seconds.min()
+            FeedsMarkerTimes.set(seconds, for: id)
         }
     }
 
@@ -11766,10 +11768,13 @@ class DownloadManager: NSObject, ObservableObject {
         }
     }
     
-    private func downloadFile(id: String, from url: URL, to destination: URL, progressHandler: @escaping (Double, Int64, Int64) -> Void, completion: @escaping (Bool) -> Void) {
+    private func downloadFile(id: String, from remoteURL: URL, to destination: URL, progressHandler: @escaping (Double, Int64, Int64) -> Void, completion: @escaping (Bool) -> Void) {
+        let config = ServerConfigManager.shared.loadConfig()
+        // The URL may come from a list loaded through the server's other address.
+        let url = config?.activeAddressed(remoteURL) ?? remoteURL
         var request = URLRequest(url: url)
         
-        for (name, value) in ServerConfigManager.shared.loadConfig()?.requestHeaders(for: url) ?? [:] {
+        for (name, value) in config?.requestHeaders(for: url) ?? [:] {
             request.setValue(value, forHTTPHeaderField: name)
         }
         
@@ -14259,5 +14264,32 @@ final class HomeRowStore: ObservableObject {
 
     var isEmpty: Bool {
         scenes.isEmpty && performers.isEmpty && studios.isEmpty && galleries.isEmpty
+    }
+}
+
+/// Marker times of the scenes Feeds › Scenes loaded (`findScenesFeed`), for the dots on the
+/// Feeds time bar. Kept by scene id rather than on `Scene`: its copy-constructors drop
+/// feed-only fields, so a rating or O count would lose them.
+nonisolated enum FeedsMarkerTimes {
+    private static let lock = NSLock()
+    nonisolated(unsafe) private static var times: [String: [Double]] = [:]
+
+    static func set(_ seconds: [Double], for sceneID: String) {
+        lock.lock(); defer { lock.unlock() }
+        times[sceneID] = seconds.sorted()
+    }
+
+    /// A marker just created in Feeds.
+    static func add(_ seconds: Double, for sceneID: String) {
+        lock.lock(); defer { lock.unlock() }
+        // The sheet reports completion twice (created, then its still is ready).
+        let known = times[sceneID] ?? []
+        guard !known.contains(where: { abs($0 - seconds) < 0.001 }) else { return }
+        times[sceneID] = (known + [seconds]).sorted()
+    }
+
+    static func seconds(for sceneID: String) -> [Double] {
+        lock.lock(); defer { lock.unlock() }
+        return times[sceneID] ?? []
     }
 }

@@ -268,7 +268,7 @@ fun ChromePillIconButton(icon: ImageVector, description: String, enabled: Boolea
 /** iOS: `reelsRateChrome` — O-Counter (tap +1, long press menu) and Rating (menu). */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
-fun FeedsRateChrome(item: FeedItem, onOCounter: (FeedsRepository.OMutation) -> Unit, onRating: (Int?) -> Unit) {
+fun FeedsRateChrome(item: FeedItem, onOCounter: (FeedsRepository.OMutation) -> Unit, onRating: (Int?) -> Unit, onAddMarker: (() -> Unit)? = null) {
     val oCount = item.oCounter ?: 0
     val stars = ((item.rating100 ?: 0) / 20.0).roundToInt().coerceIn(0, 5)
     var oMenu by remember { mutableStateOf(false) }
@@ -291,6 +291,7 @@ fun FeedsRateChrome(item: FeedItem, onOCounter: (FeedsRepository.OMutation) -> U
                 DropdownMenuItem(text = { Text("Reset") }, onClick = { oMenu = false; onOCounter(FeedsRepository.OMutation.Reset) })
             }
         }
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
         Box {
             StackedPill(SF.starFill, "$stars", stars > 0, Modifier.noIndicationClick { ratingMenu = true })
             DropdownMenu(ratingMenu, onDismissRequest = { ratingMenu = false }) {
@@ -306,6 +307,9 @@ fun FeedsRateChrome(item: FeedItem, onOCounter: (FeedsRepository.OMutation) -> U
                     onClick = { ratingMenu = false; onRating(s * 20) },
                 )
             }
+        }
+        // Optional (Settings › Feeds): a marker at the current position of a whole scene.
+        if (onAddMarker != null) ChromePillIconButton(de.letzgo.stashy.ui.player.PlayerIcons.addMarker, "Add Marker", onClick = onAddMarker)
         }
     }
 }
@@ -349,12 +353,13 @@ fun FeedsInfoOverlay(
     onTogglePlay: () -> Unit,
     pausesAdvance: Boolean,
     onAddPerformers: (() -> Unit)? = null,
+    onAddMarker: (() -> Unit)? = null,
 ) {
     // Over video: text follows the system font scale up to OverlayMaxFontScale (1.3×) so the
     // overlay never covers most of the clip; containers below wrap their content.
     de.letzgo.stashy.ui.CappedFontScale { FeedsInfoOverlayContent(
         item, mode, isMuted, isPlaying, onPerformerFilter, onPerformerOpen, onTitle, onTag, onAddTags,
-        onRemoveTag, onOCounter, onRating, onToggleMute, onTogglePlay, pausesAdvance, onAddPerformers,
+        onRemoveTag, onOCounter, onRating, onToggleMute, onTogglePlay, pausesAdvance, onAddPerformers, onAddMarker,
     ) }
 }
 
@@ -376,6 +381,7 @@ private fun FeedsInfoOverlayContent(
     onTogglePlay: () -> Unit,
     pausesAdvance: Boolean,
     onAddPerformers: (() -> Unit)?,
+    onAddMarker: (() -> Unit)?,
 ) {
     Column(Modifier.fillMaxWidth()) {
         Row(Modifier.fillMaxWidth().padding(horizontal = FeedsDock.edgePadding), verticalAlignment = Alignment.Bottom) {
@@ -403,7 +409,7 @@ private fun FeedsInfoOverlayContent(
             }
             Spacer(Modifier.width(8.dp))
             Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                if (mode != ReelsModeType.Pics) FeedsRateChrome(item, onOCounter, onRating)
+                if (mode != ReelsModeType.Pics) FeedsRateChrome(item, onOCounter, onRating, onAddMarker)
                 ChromePillIconButton(if (isMuted) SF.speakerSlashFill else SF.speakerWave2Fill, if (isMuted) "Unmute" else "Mute", enabled = item.isVideo, onClick = onToggleMute)
                 // Videos play and pause from the time bar ([FeedsScrubber]); only an animated clip,
                 // which has no time bar, keeps a button here (iOS parity).
@@ -532,6 +538,8 @@ fun FeedsScrubber(
     previewImageAt: ((Double) -> androidx.compose.ui.graphics.ImageBitmap?)? = null,
     /** Play / pause at the bar's trailing end (iOS `IsolatedScrubberBar.playPause`). */
     playPause: de.letzgo.stashy.ui.player.TimeBarPlayPause? = null,
+    /** Dots on the track (Feeds › Scenes: the scene's markers). */
+    markers: List<de.letzgo.stashy.ui.player.TimeBarMarker> = emptyList(),
     onScrub: (Double) -> Unit,
     onScrubEnd: (Double) -> Unit,
 ) {
@@ -545,7 +553,7 @@ fun FeedsScrubber(
         previewImage = previewImage,
         previewPlaceholderURL = placeholderURL,
         previewAspectRatio = aspectRatio,
-        markers = emptyList(),
+        markers = markers,
         modifier = Modifier.padding(horizontal = 16.dp).padding(top = 8.dp, bottom = 8.dp),
         playPause = playPause,
         onScrubChanged = { s ->

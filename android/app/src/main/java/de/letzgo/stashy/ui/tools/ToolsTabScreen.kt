@@ -57,17 +57,18 @@ import de.letzgo.stashy.ui.Appearance
 import de.letzgo.stashy.ui.cardShadow
 import de.letzgo.stashy.ui.noRippleClickable
 import de.letzgo.stashy.ui.tools.charts.ChartsToolView
-import de.letzgo.stashy.ui.tools.downloads.DownloadsToolView
 import de.letzgo.stashy.ui.tools.match.MatchToolView
 import de.letzgo.stashy.ui.tools.rateme.RateMeToolView
 import de.letzgo.stashy.ui.tools.stats.OCountHeatmapToolView
 import de.letzgo.stashy.ui.tools.stats.OverviewToolView
 import de.letzgo.stashy.ui.tools.stats.SessionTimelineToolView
 
-/** iOS: `ToolsView.ToolsTab` — raw values are the titles (`coordinator.toolsSubTab`). */
+/**
+ * iOS: `ToolsView.ToolsTab` — raw values are the titles (`coordinator.toolsSubTab`). Downloads is no
+ * longer a tool (a pushed page from the Home dashboard row, [de.letzgo.stashy.ui.tools.downloads.DownloadsScreen]);
+ * a stored "Downloads" or "Watchlist" sub-tab is unknown to [from] and lands on the grid.
+ */
 enum class ToolsTab(val title: String, val icon: ImageVector) {
-    Downloads("Downloads", SF.squareAndArrowDown),
-    Watchlist("Watchlist", de.letzgo.stashy.ui.player.WatchlistIcons.listed),
     Overview("Overview", SF.chartBarFill),
     OCount("O-Count", SF.calendar),
     Timeline("Timeline", SF.calendarDayTimelineLeft),
@@ -79,14 +80,13 @@ enum class ToolsTab(val title: String, val icon: ImageVector) {
         fun from(raw: String) = entries.firstOrNull { it.title == raw }
 
         /**
-         * iOS: `ToolsView.visibleToolGroups` — fixed grouping and order; Settings › stashy+ ›
-         * Miniplayer & Watchlist off: no Watchlist tool either.
+         * iOS: `ToolsView.toolGroups` — fixed grouping and order. The watchlist is no tool (a button
+         * on the Dashboard row opens Now Playing); a stored "Watchlist" sub-tab lands on the grid.
          */
         val groups: List<Pair<String, List<ToolsTab>>> get() = listOf(
-            "Library" to if (de.letzgo.stashy.data.TabManager.isMiniPlayerEnabled) listOf(Downloads, Watchlist) else listOf(Downloads),
             "Insights" to listOf(Overview, TopLists, OCount, Timeline),
             "Discover" to listOf(HotOrNot, RateMe),
-        )
+        ).filter { it.second.isNotEmpty() }
         val sorted: List<ToolsTab> get() = groups.flatMap { it.second }
     }
 }
@@ -118,8 +118,8 @@ fun ToolsTabScreen() {
 
 /**
  * iOS: `ToolsView` — like Home, the tool grid is the root and a tool is a page pushed onto it
- * (system back returns to the grid, see `AppShell`). The grid's row reads Tools › every tool as
- * an icon; a tool's row reads Tools › tool menu (› the tool's own control, see
+ * (system back returns to the grid, see `AppShell`). The grid's row reads Tools (highlighted) › neutral
+ * "All Tools" menu; a tool's row reads Tools › tool menu (› the tool's own control, see
  * [toolsWithOwnControls]). Picking another tool from the menu swaps it in place.
  */
 @Composable
@@ -149,7 +149,7 @@ private fun ToolsView() {
         Box(Modifier.fillMaxSize().background(p.background)) {
             if (tool == null) {
                 ToolsLandingView { ToolsNav.subTab = it.title }
-                ToolsStrip()
+                ToolsBreadcrumbStrip(ToolsBreadcrumbContext(ToolsTab.sorted, null) { ToolsNav.subTab = it?.title ?: "" })
             } else {
                 ToolPage(tool)
             }
@@ -170,8 +170,6 @@ private fun ToolPage(tool: ToolsTab) {
     val drawsOwnRow = tool in toolsWithOwnControls
     CompositionLocalProvider(LocalToolsBreadcrumb provides context.takeIf { drawsOwnRow }) {
         when (tool) {
-            ToolsTab.Downloads -> DownloadsToolView()
-            ToolsTab.Watchlist -> de.letzgo.stashy.ui.tools.watchlist.WatchlistToolView()
             ToolsTab.Overview -> OverviewToolView()
             ToolsTab.OCount -> OCountHeatmapToolView()
             ToolsTab.Timeline -> SessionTimelineToolView()
@@ -193,17 +191,6 @@ private fun normalizeToolsSubTab() {
         ToolsTab.from(raw)?.takeIf { it in ToolsTab.sorted } == null -> ""
         else -> raw
     }
-}
-
-/**
- * iOS: `ToolsBreadcrumbRow(current: nil)` on the grid — Tools (grid icon, highlighted) pinned at
- * the left, every tool as an icon beside it; tapping one opens that tool. Same native strip as
- * the Home dashboard row.
- */
-@Composable
-private fun ToolsStrip() {
-    val items: List<ToolsTab?> = listOf<ToolsTab?>(null) + ToolsTab.sorted
-    de.letzgo.stashy.ui.NativeTabStrip(items, null, { it?.title ?: "Tools" }, { tool -> tool?.let { ToolsNav.subTab = it.title } }, icon = { it?.icon ?: de.letzgo.stashy.ui.SF.squareGrid2x2 }, pinFirst = true)
 }
 
 /**

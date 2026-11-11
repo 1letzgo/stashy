@@ -59,7 +59,10 @@ fun LazyListScope.playbackSections() {
         SettingsPickerRow("Count as played", TabManager.playCountThresholdOptions, TabManager.playCountPlayerSeconds, TabConfigLogic::playCountThresholdLabel, SFS.playCircle) { TabManager.playCountPlayerSeconds = it }
     }
     // Feeds playback (Scenes / Markers rows).
-    settingsSection(header = "Feeds", key = "feeds-playback") {
+    settingsSection(
+        header = "Feeds", key = "feeds-playback",
+        footer = "Double tap jumps to markers: in Feeds › Scenes a double tap on the left or right goes to the previous or next marker of a scene that has markers. Without a marker in that direction it skips seconds as usual.",
+    ) {
         // Feeds › Scenes only: skip studio intros (beginning / first marker / 30 s / random in the first half).
         SettingsPickerRow("Start position", FeedsSceneStartPosition.entries, TabManager.feedsSceneStartPosition, { it.label }, SFS.goforward) { TabManager.feedsSceneStartPosition = it }
         SettingsDivider()
@@ -74,6 +77,11 @@ fun LazyListScope.playbackSections() {
             SettingsDivider()
             SettingsPickerRow("Count as played · Verticals", TabManager.playCountThresholdOptions, TabManager.playCountVerticalsSeconds, TabConfigLogic::playCountThresholdLabel, SFS.rectangleStackBadgePlay) { TabManager.playCountVerticalsSeconds = it }
         }
+        SettingsDivider()
+        // Feeds › Scenes: a marker at the current position, beside the rating.
+        SettingsToggleRow("Add Marker button", de.letzgo.stashy.data.FeedsConfig.showsAddMarkerButton, de.letzgo.stashy.ui.player.PlayerIcons.addMarker) { de.letzgo.stashy.data.FeedsConfig.updateShowsAddMarkerButton(it) }
+        SettingsDivider()
+        SettingsToggleRow("Double tap jumps to markers", de.letzgo.stashy.data.FeedsConfig.doubleTapJumpsToMarkers, de.letzgo.stashy.ui.player.PlayerIcons.bookmark) { de.letzgo.stashy.data.FeedsConfig.updateDoubleTapJumpsToMarkers(it) }
     }
     // Stash web "Track activity": play count, history, resume point, watch time.
     settingsSection(

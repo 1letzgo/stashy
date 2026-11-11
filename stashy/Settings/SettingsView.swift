@@ -35,7 +35,7 @@ private enum StashyPlusFeatureCopy {
     static let appIcons = "Changes the stashy app icon to the color you pick."
     #endif
     static let downloads = "Saves scenes to your device so you can watch them offline. They are listed in Tools."
-    static let miniPlayer = "Keeps a scene playing in a small bar when you leave its page. Add scenes to your watchlist on the scene page and they play one after another; the list is in Tools."
+    static let miniPlayer = "Keeps a scene playing in a small bar when you leave its page. Add scenes to your watchlist on the scene page and they play one after another; the watchlist button on the Dashboard opens the list."
     static let magazine = "Adds a Magazin view on Home that shows your galleries as covers. They open like a magazine and remember the page you stopped on."
     static let aiSubtitles = "Creates subtitles from a scene's speech on your device and translates them into your subtitle language. Turn them on in the player's AI Subtitles menu."
     static let tagSuggestions = "Suggests tags based on how your library is already tagged, shows scenes with the same performers, studio or tags on the scene page, and adds For You and Forgotten Favorites rows on Home: scenes picked from what you played, your O-Counts and ratings, and favorites you have not played for a while. No outside service is involved."

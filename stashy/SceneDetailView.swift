@@ -25,6 +25,11 @@ struct SceneDetailView: View {
     @ObservedObject private var stashSyncManager = StashSyncManager.shared
     
     @ObservedObject private var downloadManager = DownloadManager.shared
+    #if !os(tvOS)
+    @ObservedObject private var watchlist = WatchlistStore.shared
+    @ObservedObject private var stashyPlus = StashyPlusManager.shared
+    @ObservedObject private var miniPlayerSettings = TabManager.shared
+    #endif
     /// Card order / visibility from Settings › Scene View — observed so changes apply live.
     @ObservedObject private var sceneDetailLayout = SceneDetailLayoutManager.shared
     @StateObject private var subtitleController = SubtitleController()
@@ -121,6 +126,25 @@ struct SceneDetailView: View {
                 startSceneIdentify()
             })
         }
+        #if !os(tvOS)
+        // Watchlist (mini player on, stashy+): in the bar, not on the cover.
+        if stashyPlus.isUnlocked, miniPlayerSettings.isMiniPlayerEnabled {
+            let listed = watchlist.contains(activeScene.id)
+            actions.append(CatalogChromeSlot(
+                systemImage: listed ? "text.badge.checkmark" : "text.badge.plus",
+                isActive: listed,
+                accessibilityLabel: listed ? "Remove from watchlist" : "Add to watchlist"
+            ) {
+                HapticManager.light()
+                watchlist.toggle(activeScene)
+                ToastManager.shared.show(
+                    listed ? "Removed from watchlist" : "Added to watchlist",
+                    icon: listed ? "text.badge.minus" : "text.badge.checkmark",
+                    style: .success
+                )
+            })
+        }
+        #endif
         if downloadManager.isDownloaded(id: activeScene.id) {
             actions.append(CatalogChromeSlot(systemImage: "checkmark.circle.fill", accessibilityLabel: "Downloaded", tint: .green) {})
         } else if downloadManager.activeDownloads[activeScene.id] != nil {
@@ -275,8 +299,14 @@ struct SceneDetailView: View {
             // between the two places is not animated — SwiftUI slid the cover down and out
             // of the page on the way.
             if isPlayerPinned {
+                // An explicit width: left to the stack, the 16:9 card shares the height with
+                // the scroll view and shrinks to a small box on a wide screen (iPad). Full
+                // width, unless the picture would then take more than 60 % of the height.
+                let pinnedWidth = max(0, min(proxy.size.width - 32, proxy.size.height * 0.6 * 16 / 9))
                 playerCardView
-                    .padding(.horizontal, 16)
+                    .frame(width: pinnedWidth)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .layoutPriority(1)
                     .padding(.top, 16)
             }
 
@@ -980,15 +1010,11 @@ struct SceneDetailView: View {
         updated.postListMetadataUpdated()
     }
 
-    /// Mini player on: Play hands the scene to Now Playing instead of playing on this page.
-    /// The page Now Playing embeds (`playerOnly`) and its Details page play themselves.
-    private var playsInNowPlaying: Bool {
-        #if os(tvOS)
-        false
-        #else
-        !playerOnly && !presentedFromMiniPlayer && MiniPlayerStore.shared.isEnabled
-        #endif
-    }
+    /// Experiment: Play always plays on this page, also with the mini player on; the video moves
+    /// to the bar only when the page is left (`finishDisappearTeardown`). `true` here sends Play
+    /// to Now Playing instead, as before:
+    /// `!playerOnly && !presentedFromMiniPlayer && MiniPlayerStore.shared.isEnabled` (never on tvOS).
+    private var playsInNowPlaying: Bool { false }
 
     private func startPlayback(resume: Bool, startAt: Double? = nil) {
         #if !os(tvOS)

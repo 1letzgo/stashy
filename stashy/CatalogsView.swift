@@ -222,8 +222,9 @@ struct CatalogsView: View {
                     keepsLibraryPage: false,
                     isEnabled: effectiveTab == .dashboard
                 ))
+                .navigationDestination(isPresented: $showsDownloads) { downloadsPage }
                 .stashySectionChrome(showsSwitcher: true) {
-                    HomeBreadcrumbRow(menu: dashboardRowMenu) { EmptyView() }
+                    HomeBreadcrumbRow(menu: dashboardRowMenu) { dashboardDownloadsButton }
                 }
         } else {
             switchedRoot
@@ -256,9 +257,50 @@ struct CatalogsView: View {
         .animation(nil, value: coordinator.catalogueSubTab)
         // Swipe-back can desync UIKit/SwiftUI stacks; menu switches must always clear details.
         .popNavigationToRootOnChange("\(coordinator.catalogueSubTab)|\(coordinator.cataloguePopToken.uuidString)")
+        .navigationDestination(isPresented: $showsDownloads) { downloadsPage }
         .stashySectionChrome(showsSwitcher: showTabSwitcher) {
-            HomeBreadcrumbRow(menu: homeViewsMenu) { EmptyView() }
+            // Only the dashboard draws this row itself; a list draws its own with its sort.
+            HomeBreadcrumbRow(menu: homeViewsMenu) { dashboardDownloadsButton }
         }
+    }
+
+    /// Downloads and the watchlist moved out of Tools: with stashy+ the Dashboard row opens
+    /// them, top right. The watchlist (only with Miniplayer & Watchlist on in Settings) opens
+    /// as the Now Playing popup, which also manages the list.
+    @State private var showsDownloads = false
+
+    @ViewBuilder
+    private var dashboardDownloadsButton: some View {
+        if stashyPlus.isUnlocked {
+            HStack(spacing: 6) {
+                if tabManager.isMiniPlayerEnabled {
+                    HomeRowIconButton(systemImage: "text.badge.checkmark", label: "Watchlist") {
+                        MiniPlayerStore.shared.openWatchlist()
+                    }
+                }
+                HomeRowIconButton(systemImage: "square.and.arrow.down", label: "Downloads") {
+                    showsDownloads = true
+                }
+            }
+        }
+    }
+
+    /// Pushed from the dashboard: Back and the page's name as its chrome row, like a detail page.
+    private var downloadsPage: some View {
+        DownloadsView()
+            .collapsesCatalogChrome()
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .applyAppBackground()
+            .stashySectionChrome {
+                DetailBreadcrumbRow(crumb: DetailBreadcrumb(
+                    sections: [.init(id: "downloads", title: "Downloads", systemImage: "square.and.arrow.down")],
+                    selectionID: "downloads",
+                    onSelect: { _ in },
+                    onBack: { showsDownloads = false }
+                )) { EmptyView() }
+            }
+            .hideSystemNavigationBarForCustomChrome()
+            .enableSwipeBackWhenNavBarHidden()
     }
 }
 

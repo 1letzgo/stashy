@@ -249,6 +249,18 @@ object MiniPlayerStore {
         showsNowPlaying = true
     }
 
+    /**
+     * iOS `openWatchlist()`: the Dashboard's watchlist button. A running bar session opens its full
+     * view, else the first watchlist entry starts there; an empty list says so.
+     */
+    fun openWatchlist() {
+        if (!isEnabled) return
+        if (session != null) { expand(); return }
+        val first = WatchlistStore.all.firstOrNull()
+        if (first != null) openNowPlaying(first, startAt = null)
+        else de.letzgo.stashy.ui.tools.showToast("Watchlist is empty")
+    }
+
     /** Now Playing reached the end of [currentId]: on to what comes next, if anything. */
     fun advanceNowPlaying(currentId: String) {
         if (!showsNowPlaying) return

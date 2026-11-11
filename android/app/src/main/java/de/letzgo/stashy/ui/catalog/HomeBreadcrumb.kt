@@ -67,13 +67,14 @@ val LocalHomeBreadcrumb = compositionLocalOf { false }
 /**
  * iOS: the catalog row of the Home breadcrumb — Home › views menu (all library views, named), and
  * at the right the list's own actions, its sort menu (icon + direction) and settings button.
- * The dashboard keeps the icon strip ([CatalogsScreen] `TopNavStrip`), like iOS.
+ * On the dashboard the Home button is the highlighted one and the pill is neutral ("Dashboard").
  */
 @Composable
 internal fun HomeBreadcrumbStrip(tabs: List<CatalogTab>) {
     val p = Theme.palette
     val actions = CatalogTopActions.slots
     val controller = CatalogTopActions.controller
+    val onDashboard = Nav.catalogTab == CatalogTab.Dashboard
     Column(
         Modifier.fillMaxWidth().background(p.background)
             .windowInsetsPadding(WindowInsets.statusBars),
@@ -82,11 +83,17 @@ internal fun HomeBreadcrumbStrip(tabs: List<CatalogTab>) {
             // Without a visible dashboard (Settings › Home Tabs) there is no Home to go back to.
             if (CatalogTab.Dashboard in tabs) {
                 IconButton(onClick = { Nav.catalogTab = CatalogTab.Dashboard }) {
-                    Icon(SF.houseFill, "Home", tint = p.secondaryText)
+                    Icon(SF.houseFill, "Home", tint = if (onDashboard) nativeAccent() else p.secondaryText)
                 }
                 Icon(Icons.Chevron, null, tint = p.tertiaryText, modifier = Modifier.size(18.dp))
             }
-            LibraryMenu(tabs.filter { it != CatalogTab.Dashboard })
+            val views = tabs.filter { it != CatalogTab.Dashboard }
+            BreadcrumbSectionMenu(
+                current = Nav.catalogTab.takeUnless { onDashboard },
+                items = views, title = { it.title }, icon = { it.icon },
+                onSelect = { Nav.catalogTab = it },
+                accessibilityPrefix = "Library", neutralTitle = "Dashboard",
+            )
             Spacer(Modifier.weight(1f))
             val selection = actions?.selection?.takeIf { it.isActive }
             if (selection != null) {
@@ -101,38 +108,21 @@ internal fun HomeBreadcrumbStrip(tabs: List<CatalogTab>) {
                     actions?.filterSort?.let { FilterSortAction(it) }
                 }
             }
+            // iOS `dashboardWatchlistButton`: left of Downloads; stashy+ and Miniplayer & Watchlist on.
+            if (onDashboard && de.letzgo.stashy.ui.player.MiniPlayerStore.isEnabled) {
+                IconButton(onClick = { de.letzgo.stashy.ui.player.MiniPlayerStore.openWatchlist() }) {
+                    Icon(de.letzgo.stashy.ui.player.WatchlistIcons.listed, "Watchlist", tint = p.secondaryText)
+                }
+            }
+            // iOS `HomeDownloadsButton`: dashboard only, stashy+ only, right edge.
+            if (onDashboard && de.letzgo.stashy.data.StashyPlus.isUnlocked) {
+                IconButton(onClick = { Nav.push(de.letzgo.stashy.ui.tools.downloads.DownloadsScreen()) }) {
+                    Icon(SF.squareAndArrowDown, "Downloads", tint = p.secondaryText)
+                }
+            }
             Spacer(Modifier.width(4.dp))
         }
         Box(Modifier.fillMaxWidth().height(0.5.dp).background(p.separator))
-    }
-}
-
-/** iOS `HomeViewsMenu`: the open view's name, highlighted; the menu lists every library view. */
-@Composable
-private fun LibraryMenu(tabs: List<CatalogTab>) {
-    var open by remember { mutableStateOf(false) }
-    val current = Nav.catalogTab
-    Box {
-        Row(
-            Modifier.heightIn(min = 40.dp).clip(RoundedCornerShape(12.dp)).clickable { open = true }
-                .padding(horizontal = 10.dp)
-                .semantics(mergeDescendants = true) { contentDescription = "Library, ${current.title}" },
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(4.dp),
-        ) {
-            Text(current.title, style = MaterialTheme.typography.titleSmall, color = nativeAccent(), maxLines = 1)
-            Icon(SF.chevronUpChevronDown, null, tint = nativeAccent(), modifier = Modifier.size(16.dp))
-        }
-        DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
-            tabs.forEach { tab ->
-                DropdownMenuItem(
-                    text = { Text(tab.title) },
-                    leadingIcon = { Icon(tab.icon, null) },
-                    trailingIcon = { if (tab == current) Icon(SF.checkmark, null) },
-                    onClick = { open = false; Nav.catalogTab = tab },
-                )
-            }
-        }
     }
 }
 
@@ -142,29 +132,36 @@ private fun LibraryMenu(tabs: List<CatalogTab>) {
  */
 @Composable
 internal fun <T> BreadcrumbSectionMenu(
-    current: T,
+    current: T?,
     items: List<T>,
     title: (T) -> String,
     icon: (T) -> ImageVector,
     onSelect: (T) -> Unit,
     modifier: Modifier = Modifier,
     accessibilityPrefix: String = "Section",
+    /** Shown when [current] is null: the pill turns neutral (no accent) and lists every item unchecked. */
+    neutralTitle: String = "",
 ) {
     var open by remember { mutableStateOf(false) }
-    val selectable = items.size > 1
+    val neutral = current == null
+    val selectable = items.size > 1 || neutral
+    val label = current?.let(title) ?: neutralTitle
+    val tint = if (neutral) Theme.palette.text.copy(alpha = 0.85f) else nativeAccent()
     Box(modifier) {
         Row(
-            Modifier.heightIn(min = 40.dp).clip(RoundedCornerShape(12.dp)).clickable(enabled = selectable) { open = true }
+            Modifier.heightIn(min = 40.dp).clip(RoundedCornerShape(12.dp))
+                .then(if (neutral) Modifier.background(Theme.palette.secondaryBackground) else Modifier)
+                .clickable(enabled = selectable) { open = true }
                 .padding(horizontal = 10.dp)
-                .semantics(mergeDescendants = true) { contentDescription = "$accessibilityPrefix, ${title(current)}" },
+                .semantics(mergeDescendants = true) { contentDescription = "$accessibilityPrefix, $label" },
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(4.dp),
         ) {
             Text(
-                title(current), Modifier.weight(1f, fill = false), style = MaterialTheme.typography.titleSmall, color = nativeAccent(),
+                label, Modifier.weight(1f, fill = false), style = MaterialTheme.typography.titleSmall, color = tint,
                 maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
             )
-            if (selectable) Icon(SF.chevronUpChevronDown, null, tint = nativeAccent(), modifier = Modifier.size(16.dp))
+            if (selectable) Icon(SF.chevronUpChevronDown, null, tint = tint, modifier = Modifier.size(16.dp))
         }
         DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
             items.forEach { item ->

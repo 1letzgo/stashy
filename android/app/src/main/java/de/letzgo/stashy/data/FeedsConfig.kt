@@ -104,10 +104,18 @@ object FeedsConfig {
         private set
     var showsDeleteButton by mutableStateOf(Prefs.bool("ReelsShowsDeleteButton"))
         private set
+    /** iOS `FeedsAddMarkerButton`: "Add Marker" beside the rating in Feeds › Scenes (default off). */
+    var showsAddMarkerButton by mutableStateOf(Prefs.bool("FeedsAddMarkerButton"))
+        private set
+    /** iOS `FeedsDoubleTapMarkers`: double tap on the outer thirds jumps to the previous / next marker (default off). */
+    var doubleTapJumpsToMarkers by mutableStateOf(Prefs.bool("FeedsDoubleTapMarkers"))
+        private set
 
     fun updateFillHeight(v: Boolean) { fillHeight = v; Prefs.setBool("ReelsFillHeight", v) }
     fun updateContinuousPlay(v: Boolean) { continuousPlay = v; Prefs.setBool("ReelsContinuousPlay", v) }
     fun updateShowsDeleteButton(v: Boolean) { showsDeleteButton = v; Prefs.setBool("ReelsShowsDeleteButton", v) }
+    fun updateShowsAddMarkerButton(v: Boolean) { showsAddMarkerButton = v; Prefs.setBool("FeedsAddMarkerButton", v) }
+    fun updateDoubleTapJumpsToMarkers(v: Boolean) { doubleTapJumpsToMarkers = v; Prefs.setBool("FeedsDoubleTapMarkers", v) }
 
     /** iOS: `holdSpeedFeeds` (default 2×). Stored as Double on iOS; read leniently. */
     val holdSpeedFeeds: Float get() = readNumber("hold_speed_feeds", 2f)
