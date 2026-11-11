@@ -465,6 +465,7 @@
   <string name="conditions">Betingelser</string>
   <string name="confirm_add_arg">Tilføj #%1$s?</string>
   <string name="confirm_auto_tag_whole_library">Auto-tag hele biblioteket?</string>
+  <string name="confirm_change_language">Skift sprog?</string>
   <string name="confirm_clean_generated_files">Rens genererede filer?</string>
   <string name="confirm_clean_library">Rens biblioteket?</string>
   <string name="confirm_clear_watchlist">Ryd Se senere?</string>
@@ -1050,6 +1051,7 @@
   <string name="hint_keeps_scene_playing_in_small">Fortsætter med at afspille en scene i en lille bjælke, når du forlader dens side. Føj scener til Se senere på scenesiden, så afspilles de efter hinanden; knappen Se senere på Dashboard åbner listen.</string>
   <string name="hint_keeps_servers_api_keys_and">Holder servere, API-nøgler og indstillinger ens på din iPhone, iPad og Mac. Slå det til på hver enhed. Den aktive server vælges stadig på hver enkelt enhed.</string>
   <string name="hint_language_scenes_subtitles_start_with">Det sprog, en scenes undertekster starter med. \"Enhver\" tager det første almindelige spor i filen.</string>
+  <string name="hint_language_switch">stashy skifter til %1$s og genindlæses.</string>
   <string name="hint_leaves_out_what_group_matches">Udelader det, gruppen matcher</string>
   <string name="hint_legend_run_performer_is_no">Kunstneren i Legend-runden er ikke længere i denne pulje. Nulstil runden.</string>
   <string name="hint_lets_you_create_edit_rename">Lader dig oprette, redigere, omdøbe og slette de filtre, der er gemt på din server, under Indstillinger › Server.</string>

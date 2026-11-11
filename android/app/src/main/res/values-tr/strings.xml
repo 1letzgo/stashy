@@ -465,6 +465,7 @@
   <string name="conditions">Koşullar</string>
   <string name="confirm_add_arg">#%1$s eklensin mi?</string>
   <string name="confirm_auto_tag_whole_library">Tüm kütüphane otomatik etiketlensin mi?</string>
+  <string name="confirm_change_language">Dil değiştirilsin mi?</string>
   <string name="confirm_clean_generated_files">Oluşturulan dosyalar temizlensin mi?</string>
   <string name="confirm_clean_library">Kütüphane temizlensin mi?</string>
   <string name="confirm_clear_watchlist">İzleme listesi temizlensin mi?</string>
@@ -1050,6 +1051,7 @@
   <string name="hint_keeps_scene_playing_in_small">Sayfasından ayrıldığında sahneyi küçük bir çubukta oynatmaya devam eder. Sahne sayfasında izleme listene sahne ekle, art arda oynatılırlar; Dashboard\'daki izleme listesi düğmesi listeyi açar.</string>
   <string name="hint_keeps_servers_api_keys_and">Sunucuları, API anahtarlarını ve ayarları iPhone, iPad ve Mac\'inde aynı tutar. Her aygıtta ayrı aç. Etkin sunucu her aygıtın kendi seçimi olarak kalır.</string>
   <string name="hint_language_scenes_subtitles_start_with">Bir sahnenin altyazılarının başlayacağı dil. “Herhangi”, dosyadaki ilk normal izi alır.</string>
+  <string name="hint_language_switch">stashy %1$s diline geçip yeniden yüklenecek.</string>
   <string name="hint_leaves_out_what_group_matches">Grubun eşleştiklerini dışarıda bırakır</string>
   <string name="hint_legend_run_performer_is_no">Legend turundaki oyuncu artık bu havuzda değil. Turu sıfırla.</string>
   <string name="hint_lets_you_create_edit_rename">Sunucunda kayıtlı filtreleri Ayarlar › Sunucu altında oluşturmanı, düzenlemeni, yeniden adlandırmanı ve silmeni sağlar.</string>

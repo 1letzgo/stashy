@@ -465,6 +465,7 @@
   <string name="conditions">条件</string>
   <string name="confirm_add_arg">#%1$sを追加しますか？</string>
   <string name="confirm_auto_tag_whole_library">ライブラリ全体を自動タグ付けしますか？</string>
+  <string name="confirm_change_language">言語を変更しますか？</string>
   <string name="confirm_clean_generated_files">生成ファイルをクリーンアップしますか？</string>
   <string name="confirm_clean_library">ライブラリをクリーンアップしますか？</string>
   <string name="confirm_clear_watchlist">ウォッチリストを空にしますか？</string>
@@ -1050,6 +1051,7 @@
   <string name="hint_keeps_scene_playing_in_small">シーンのページを離れても、小さなバーで再生を続けます。シーンのページでウォッチリストに追加すると順番に再生されます。Dashboardのウォッチリストボタンでリストを開けます。</string>
   <string name="hint_keeps_servers_api_keys_and">サーバー、APIキー、設定をiPhone、iPad、Macで同じに保ちます。デバイスごとにオンにしてください。使用中のサーバーは各デバイスで個別に選択されます。</string>
   <string name="hint_language_scenes_subtitles_start_with">シーンの字幕の初期言語です。「指定なし」ではファイル内の最初の通常トラックを使用します。</string>
+  <string name="hint_language_switch">stashyを%1$sに切り替えて再読み込みします。</string>
   <string name="hint_leaves_out_what_group_matches">グループに一致するものを除外</string>
   <string name="hint_legend_run_performer_is_no">Legendランの出演者がこのプールに存在しません。ランをリセットしてください。</string>
   <string name="hint_lets_you_create_edit_rename">サーバーに保存されたフィルターを作成、編集、名前変更、削除できます。設定 › サーバーから利用できます。</string>

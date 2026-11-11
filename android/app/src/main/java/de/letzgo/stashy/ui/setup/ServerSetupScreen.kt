@@ -156,14 +156,7 @@ fun ServerSetupScreen(existing: ServerConfig? = null, onDone: () -> Unit) {
                 }
                 Spacer(Modifier.height(8.dp))
                 // App language (beta): preset to the device language on a fresh install; a change restarts the app.
-                Labeled(tr(R.string.app_language)) {
-                    val context = androidx.compose.ui.platform.LocalContext.current
-                    val selection = remember { de.letzgo.stashy.AppLanguage.stored }
-                    val codes = listOf(de.letzgo.stashy.AppLanguage.SYSTEM) + de.letzgo.stashy.AppLanguage.options.map { it.first }
-                    de.letzgo.stashy.ui.settings.SettingsPickerRow(tr(R.string.language), codes, selection, { de.letzgo.stashy.AppLanguage.name(it) }, de.letzgo.stashy.ui.SFS.globe) { code ->
-                        if (code != selection) de.letzgo.stashy.AppLanguage.selectAndRestart(context, code)
-                    }
-                }
+                Labeled(tr(R.string.app_language)) { de.letzgo.stashy.ui.settings.AppLanguagePickerRow() }
                 PlainTextField(serverName, { serverName = it }, tr(R.string.my_stash), label = tr(R.string.server_name))
                 Labeled(tr(R.string.protocol)) { Segmented(ServerProtocol.entries, proto, { it.name }) { proto = it } }
                 NativeTextField(

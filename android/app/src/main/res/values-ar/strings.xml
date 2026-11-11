@@ -465,6 +465,7 @@
   <string name="conditions">الشروط</string>
   <string name="confirm_add_arg">إضافة #%1$s؟</string>
   <string name="confirm_auto_tag_whole_library">الوسم التلقائي للمكتبة بأكملها؟</string>
+  <string name="confirm_change_language">تغيير اللغة؟</string>
   <string name="confirm_clean_generated_files">تنظيف الملفات المولّدة؟</string>
   <string name="confirm_clean_library">تنظيف المكتبة؟</string>
   <string name="confirm_clear_watchlist">مسح قائمة المشاهدة؟</string>
@@ -1050,6 +1051,7 @@
   <string name="hint_keeps_scene_playing_in_small">يُبقي المشهد قيد التشغيل في شريط صغير عند مغادرة صفحته. أضف مشاهد إلى قائمة المشاهدة من صفحة المشهد ليتم تشغيلها واحدًا تلو الآخر؛ يفتح زر قائمة المشاهدة في Dashboard القائمة.</string>
   <string name="hint_keeps_servers_api_keys_and">يُبقي الخوادم ومفاتيح API والإعدادات متطابقة على iPhone وiPad وMac. فعّله لكل جهاز على حدة. يبقى الخادم النشط اختيار كل جهاز على حدة.</string>
   <string name="hint_language_scenes_subtitles_start_with">اللغة التي تبدأ بها ترجمات المشهد. «أي» يأخذ أول مسار عادي في الملف.</string>
+  <string name="hint_language_switch">سيتحول stashy إلى %1$s ويُعاد تحميله.</string>
   <string name="hint_leaves_out_what_group_matches">يستبعد ما تطابقه المجموعة</string>
   <string name="hint_legend_run_performer_is_no">لم يعد مؤدي جولة Legend ضمن هذه المجموعة. أعد تعيين الجولة.</string>
   <string name="hint_lets_you_create_edit_rename">يتيح لك إنشاء الفلاتر المحفوظة على الخادم وتعديلها وإعادة تسميتها وحذفها، من الإعدادات › الخادم.</string>

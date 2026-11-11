@@ -465,6 +465,7 @@
   <string name="conditions">條件</string>
   <string name="confirm_add_arg">要新增 #%1$s 嗎？</string>
   <string name="confirm_auto_tag_whole_library">要對整個資料庫執行自動標籤嗎？</string>
+  <string name="confirm_change_language">要變更語言嗎？</string>
   <string name="confirm_clean_generated_files">要清理已產生的檔案嗎？</string>
   <string name="confirm_clean_library">要清理資料庫嗎？</string>
   <string name="confirm_clear_watchlist">要清除待看清單嗎？</string>
@@ -1050,6 +1051,7 @@
   <string name="hint_keeps_scene_playing_in_small">離開短片頁面時，短片會在小型列中繼續播放。在短片頁面將短片加入待看清單，它們會依序播放；Dashboard 上的待看清單按鈕可打開清單。</string>
   <string name="hint_keeps_servers_api_keys_and">讓 iPhone、iPad 和 Mac 上的伺服器、API 金鑰和設定保持一致。需在每部裝置上個別開啟。使用中的伺服器仍由各裝置自行選擇。</string>
   <string name="hint_language_scenes_subtitles_start_with">短片字幕預設使用的語言。「任意」會採用檔案中的第一個一般字幕軌。</string>
+  <string name="hint_language_switch">stashy 將切換為%1$s並重新載入。</string>
   <string name="hint_leaves_out_what_group_matches">排除該群組符合的項目</string>
   <string name="hint_legend_run_performer_is_no">Legend 回合的演員已不在此參賽名單中。請重置回合。</string>
   <string name="hint_lets_you_create_edit_rename">讓你在「設定 › 伺服器」中建立、編輯、重新命名和刪除伺服器上儲存的篩選條件。</string>

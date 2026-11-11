@@ -147,14 +147,33 @@ private fun LinkRow(title: String, icon: ImageVector, url: String) {
     })
 }
 
-/** iOS: `AppLanguageRow` — Settings › App Language (beta); switching restarts the app at once. */
+/** iOS: `AppLanguagePicker` in Settings › App Language (beta). */
 private fun androidx.compose.foundation.lazy.LazyListScope.appLanguageSection() {
     settingsSection(header = tr(R.string.app_language), isBeta = true, key = "app-language") {
-        val context = androidx.compose.ui.platform.LocalContext.current
-        val selection = remember { de.letzgo.stashy.AppLanguage.stored }
-        val codes = listOf(de.letzgo.stashy.AppLanguage.SYSTEM) + de.letzgo.stashy.AppLanguage.options.map { it.first }
-        SettingsPickerRow(tr(R.string.language), codes, selection, { de.letzgo.stashy.AppLanguage.name(it) }, SFS.globe) { code ->
-            if (code != selection) de.letzgo.stashy.AppLanguage.selectAndRestart(context, code)
-        }
+        AppLanguagePickerRow()
+    }
+}
+
+/**
+ * iOS: `AppLanguagePicker` — the language picker of Settings and the setup wizard. A pick is
+ * confirmed in an alert, then the app restarts in that language.
+ */
+@androidx.compose.runtime.Composable
+fun AppLanguagePickerRow() {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val selection = remember { de.letzgo.stashy.AppLanguage.stored }
+    var pending by remember { androidx.compose.runtime.mutableStateOf<String?>(null) }
+    val codes = listOf(de.letzgo.stashy.AppLanguage.SYSTEM) + de.letzgo.stashy.AppLanguage.options.map { it.first }
+    SettingsPickerRow(tr(R.string.language), codes, selection, { de.letzgo.stashy.AppLanguage.name(it) }, SFS.globe) { code ->
+        if (code != selection) pending = code
+    }
+    pending?.let { code ->
+        de.letzgo.stashy.ui.NativeConfirmDialog(
+            title = tr(R.string.confirm_change_language),
+            text = tr(R.string.hint_language_switch, de.letzgo.stashy.AppLanguage.name(code)),
+            onDismiss = { pending = null },
+            confirmLabel = tr(R.string.action_change),
+            onConfirm = { pending = null; de.letzgo.stashy.AppLanguage.selectAndRestart(context, code) },
+        )
     }
 }

@@ -465,6 +465,7 @@
   <string name="conditions">Bedingungen</string>
   <string name="confirm_add_arg">#%1$s hinzufügen?</string>
   <string name="confirm_auto_tag_whole_library">Auto-Tag für die ganze Bibliothek?</string>
+  <string name="confirm_change_language">Sprache ändern?</string>
   <string name="confirm_clean_generated_files">Generierte Dateien aufräumen?</string>
   <string name="confirm_clean_library">Bibliothek aufräumen?</string>
   <string name="confirm_clear_watchlist">Merkliste leeren?</string>
@@ -1050,6 +1051,7 @@
   <string name="hint_keeps_scene_playing_in_small">Spielt eine Szene in einer kleinen Leiste weiter, wenn du ihre Seite verlässt. Füge Szenen auf der Szenenseite deiner Merkliste hinzu, dann laufen sie nacheinander; der Merkliste-Button im Dashboard öffnet die Liste.</string>
   <string name="hint_keeps_servers_api_keys_and">Hält Server, API-Schlüssel und Einstellungen auf iPhone, iPad und Mac gleich. Schalte es pro Gerät ein. Der aktive Server bleibt die Wahl jedes Geräts.</string>
   <string name="hint_language_scenes_subtitles_start_with">Die Sprache, mit der die Untertitel einer Szene starten. „Beliebig“ nimmt die erste normale Spur der Datei.</string>
+  <string name="hint_language_switch">stashy wechselt zu %1$s und wird neu geladen.</string>
   <string name="hint_leaves_out_what_group_matches">Lässt weg, was die Gruppe erfüllt</string>
   <string name="hint_legend_run_performer_is_no">Der Darsteller des Legend-Laufs ist nicht mehr in diesem Pool. Setze den Lauf zurück.</string>
   <string name="hint_lets_you_create_edit_rename">Damit kannst du die auf deinem Server gespeicherten Filter erstellen, bearbeiten, umbenennen und löschen, unter Einstellungen › Server.</string>

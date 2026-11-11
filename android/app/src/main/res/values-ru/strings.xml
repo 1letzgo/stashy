@@ -465,6 +465,7 @@
   <string name="conditions">Условия</string>
   <string name="confirm_add_arg">Добавить #%1$s?</string>
   <string name="confirm_auto_tag_whole_library">Запустить автотегирование всей библиотеки?</string>
+  <string name="confirm_change_language">Изменить язык?</string>
   <string name="confirm_clean_generated_files">Очистить сгенерированные файлы?</string>
   <string name="confirm_clean_library">Очистить библиотеку?</string>
   <string name="confirm_clear_watchlist">Очистить «Смотреть позже»?</string>
@@ -1050,6 +1051,7 @@
   <string name="hint_keeps_scene_playing_in_small">Сцена продолжает воспроизводиться в небольшой панели, когда вы покидаете ее страницу. Добавляйте сцены в «Смотреть позже» на странице сцены — они воспроизводятся одна за другой; кнопка «Смотреть позже» на Dashboard открывает список.</string>
   <string name="hint_keeps_servers_api_keys_and">Синхронизирует серверы, ключи API и настройки на iPhone, iPad и Mac. Включается на каждом устройстве отдельно. Активный сервер каждое устройство выбирает само.</string>
   <string name="hint_language_scenes_subtitles_start_with">Язык, с которого начинаются субтитры сцены. «Любой» — первая обычная дорожка в файле.</string>
+  <string name="hint_language_switch">stashy переключится на %1$s и перезагрузится.</string>
   <string name="hint_leaves_out_what_group_matches">Исключает то, что соответствует группе</string>
   <string name="hint_legend_run_performer_is_no">Исполнителя из забега Legend больше нет в этом пуле. Сбросьте забег.</string>
   <string name="hint_lets_you_create_edit_rename">Позволяет создавать, изменять, переименовывать и удалять фильтры, сохраненные на сервере, в меню «Настройки › Сервер».</string>

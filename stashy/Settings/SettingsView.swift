@@ -216,7 +216,7 @@ struct SettingsView: View {
 
         Section {
             stashyScrollingSectionHeader(tr("app_language"), isBeta: true)
-            AppLanguageRow()
+            AppLanguagePicker()
                 .stashyGroupedSettingsRow()
         }
 
@@ -1480,48 +1480,41 @@ struct LegacySupporterTipPrompt: ViewModifier {
 #endif
 
 /// Settings › App Language (beta): English unless the user picks another language (or the
-/// device language on a fresh install); the interface switches at once (`LanguageRefreshing`).
-private struct AppLanguageRow: View {
-    var body: some View {
-        HStack {
-            Label(tr("language"), systemImage: "globe")
-            Spacer()
-            AppLanguageMenu()
-        }
-    }
-}
-
-/// The language menu itself; also used in the setup wizard.
-struct AppLanguageMenu: View {
+/// device language on a fresh install). A pick is confirmed in an alert, then the interface
+/// switches at once. Same `Picker` as the other settings rows; also used in the setup wizard.
+struct AppLanguagePicker: View {
     @State private var selection = AppLanguage.stored
+    @State private var pending: String?
 
     var body: some View {
-        Menu {
-            languageButton(AppLanguage.systemValue)
+        Picker(selection: Binding(
+            get: { selection },
+            set: { code in
+                guard code != selection else { return }
+                pending = code
+            }
+        )) {
+            Text(AppLanguage.name(for: AppLanguage.systemValue)).tag(AppLanguage.systemValue)
             Divider()
             ForEach(AppLanguage.options, id: \.code) { option in
-                languageButton(option.code)
+                Text(option.name).tag(option.code)
             }
         } label: {
-            HStack(spacing: 4) {
-                Text(AppLanguage.name(for: selection))
-                Image(systemName: "chevron.up.chevron.down").font(.caption2)
-            }
-            .foregroundStyle(.secondary)
+            Label(tr("language"), systemImage: "globe")
         }
-    }
-
-    private func languageButton(_ code: String) -> some View {
-        Button {
-            guard code != selection else { return }
-            selection = code
-            AppLanguage.select(code)
-        } label: {
-            if code == selection {
-                Label(AppLanguage.name(for: code), systemImage: "checkmark")
-            } else {
-                Text(AppLanguage.name(for: code))
+        .alert(tr("confirm_change_language"), isPresented: Binding(
+            get: { pending != nil },
+            set: { if !$0 { pending = nil } }
+        )) {
+            Button(tr("action_cancel"), role: .cancel) { pending = nil }
+            Button(tr("action_change")) {
+                guard let code = pending else { return }
+                pending = nil
+                selection = code
+                AppLanguage.select(code)
             }
+        } message: {
+            Text(tr("hint_language_switch", AppLanguage.name(for: pending ?? selection)))
         }
     }
 }

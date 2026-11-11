@@ -465,6 +465,7 @@
   <string name="conditions">Condizioni</string>
   <string name="confirm_add_arg">Aggiungere #%1$s?</string>
   <string name="confirm_auto_tag_whole_library">Eseguire l\'auto tag sull\'intera libreria?</string>
+  <string name="confirm_change_language">Cambiare lingua?</string>
   <string name="confirm_clean_generated_files">Rimuovere i file generati?</string>
   <string name="confirm_clean_library">Pulire la libreria?</string>
   <string name="confirm_clear_watchlist">Svuotare Da guardare?</string>
@@ -1050,6 +1051,7 @@
   <string name="hint_keeps_scene_playing_in_small">Mantiene una scena in riproduzione in una piccola barra quando lasci la sua pagina. Aggiungi scene a Da guardare nella pagina della scena e verranno riprodotte una dopo l\'altra; il pulsante Da guardare nella Dashboard apre l\'elenco.</string>
   <string name="hint_keeps_servers_api_keys_and">Mantiene uguali server, chiavi API e impostazioni su iPhone, iPad e Mac. Attivala su ogni dispositivo. Il server attivo resta una scelta di ciascun dispositivo.</string>
   <string name="hint_language_scenes_subtitles_start_with">La lingua con cui partono i sottotitoli di una scena. \"Qualsiasi\" prende la prima traccia normale del file.</string>
+  <string name="hint_language_switch">stashy passerà a %1$s e verrà ricaricata.</string>
   <string name="hint_leaves_out_what_group_matches">Esclude ciò che corrisponde al gruppo</string>
   <string name="hint_legend_run_performer_is_no">Il performer della partita Legend non è più in questo gruppo. Ripristina la partita.</string>
   <string name="hint_lets_you_create_edit_rename">Ti permette di creare, modificare, rinominare ed eliminare i filtri salvati sul server, in Impostazioni › Server.</string>

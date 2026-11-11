@@ -465,6 +465,7 @@
   <string name="conditions">Condiciones</string>
   <string name="confirm_add_arg">¿Añadir #%1$s?</string>
   <string name="confirm_auto_tag_whole_library">¿Etiquetar automáticamente toda la biblioteca?</string>
+  <string name="confirm_change_language">¿Cambiar el idioma?</string>
   <string name="confirm_clean_generated_files">¿Limpiar archivos generados?</string>
   <string name="confirm_clean_library">¿Limpiar la biblioteca?</string>
   <string name="confirm_clear_watchlist">¿Vaciar la lista para ver?</string>
@@ -1050,6 +1051,7 @@
   <string name="hint_keeps_scene_playing_in_small">Mantiene una escena en reproducción en una barra pequeña al salir de su página. Añade escenas a tu lista para ver en la página de la escena y se reproducirán una tras otra; el botón de la lista en el Dashboard abre la lista.</string>
   <string name="hint_keeps_servers_api_keys_and">Mantiene iguales los servidores, las claves de API y los ajustes en tu iPhone, iPad y Mac. Actívalo en cada dispositivo. Cada dispositivo elige su propio servidor activo.</string>
   <string name="hint_language_scenes_subtitles_start_with">El idioma con el que empiezan los subtítulos de una escena. «Cualquiera» usa la primera pista normal del archivo.</string>
+  <string name="hint_language_switch">stashy cambiará a %1$s y se volverá a cargar.</string>
   <string name="hint_leaves_out_what_group_matches">Excluye lo que coincide con el grupo</string>
   <string name="hint_legend_run_performer_is_no">El intérprete de la partida de Legend ya no está en este grupo. Reinicia la partida.</string>
   <string name="hint_lets_you_create_edit_rename">Te permite crear, editar, renombrar y eliminar los filtros guardados en tu servidor, en Ajustes › Servidor.</string>

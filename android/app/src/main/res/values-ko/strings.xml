@@ -465,6 +465,7 @@
   <string name="conditions">조건</string>
   <string name="confirm_add_arg">#%1$s을(를) 추가하겠습니까?</string>
   <string name="confirm_auto_tag_whole_library">전체 라이브러리를 자동 태깅하겠습니까?</string>
+  <string name="confirm_change_language">언어를 변경하시겠습니까?</string>
   <string name="confirm_clean_generated_files">생성된 파일을 정리하겠습니까?</string>
   <string name="confirm_clean_library">라이브러리를 정리하겠습니까?</string>
   <string name="confirm_clear_watchlist">시청 목록을 비우겠습니까?</string>
@@ -1050,6 +1051,7 @@
   <string name="hint_keeps_scene_playing_in_small">영상 페이지를 떠나도 작은 막대에서 영상을 계속 재생합니다. 영상 페이지에서 시청 목록에 영상을 추가하면 차례로 재생됩니다. Dashboard의 시청 목록 버튼을 누르면 목록이 열립니다.</string>
   <string name="hint_keeps_servers_api_keys_and">iPhone, iPad 및 Mac에서 서버, API 키 및 설정을 동일하게 유지합니다. 기기별로 켜세요. 활성 서버는 각 기기에서 따로 선택합니다.</string>
   <string name="hint_language_scenes_subtitles_start_with">영상 자막의 시작 언어입니다. \'모두\'를 선택하면 파일의 첫 번째 일반 트랙을 사용합니다.</string>
+  <string name="hint_language_switch">stashy가 %1$s(으)로 전환되고 다시 로드됩니다.</string>
   <string name="hint_leaves_out_what_group_matches">그룹과 일치하는 항목을 제외합니다</string>
   <string name="hint_legend_run_performer_is_no">Legend 진행 중인 배우가 더 이상 이 풀에 없습니다. 진행을 재설정하세요.</string>
   <string name="hint_lets_you_create_edit_rename">서버에 저장된 필터를 생성, 편집, 이름 변경 및 삭제할 수 있습니다. 설정 › 서버에 있습니다.</string>

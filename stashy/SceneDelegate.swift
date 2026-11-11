@@ -33,8 +33,9 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
 
         // A language switch rebuilds the whole interface like a fresh start (iOS cannot relaunch an
         // app): a new root with new views and view models; the coordinator keeps the selected tab.
+        // Waits until the language menu has closed: a snapshot taken earlier would still show it.
         languageObserver = AppLanguageStore.shared.$revision.dropFirst().sink { [weak self] _ in
-            DispatchQueue.main.async { self?.reloadForLanguageChange() }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) { self?.reloadForLanguageChange() }
         }
     }
 
@@ -50,9 +51,20 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
 
     private func reloadForLanguageChange() {
         guard let window else { return }
+        // A frozen picture of the old screen covers the swap; the new interface is laid out
+        // underneath without animation and the picture fades away (no frames grow from a corner).
+        let snapshot = window.snapshotView(afterScreenUpdates: false)
         window.rootViewController?.dismiss(animated: false)
-        UIView.transition(with: window, duration: 0.3, options: .transitionCrossDissolve) {
-            window.rootViewController = self.makeRootController()
+        UIView.performWithoutAnimation {
+            window.rootViewController = makeRootController()
+            window.layoutIfNeeded()
+        }
+        guard let snapshot else { return }
+        window.addSubview(snapshot)
+        UIView.animate(withDuration: 0.25, delay: 0.05, options: .curveEaseOut) {
+            snapshot.alpha = 0
+        } completion: { _ in
+            snapshot.removeFromSuperview()
         }
     }
 

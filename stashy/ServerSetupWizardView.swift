@@ -158,7 +158,8 @@ struct ServerSetupWizardView: View {
                         HStack {
                             Label(tr("language"), systemImage: "globe")
                             Spacer()
-                            AppLanguageMenu()
+                            AppLanguagePicker()
+                                .labelsHidden()
                         }
                         .padding()
                         .background(Color.secondaryAppBackground)

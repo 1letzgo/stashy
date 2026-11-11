@@ -465,6 +465,7 @@
   <string name="conditions">Voorwaarden</string>
   <string name="confirm_add_arg">#%1$s toevoegen?</string>
   <string name="confirm_auto_tag_whole_library">De hele bibliotheek automatisch labelen?</string>
+  <string name="confirm_change_language">Taal wijzigen?</string>
   <string name="confirm_clean_generated_files">Gegenereerde bestanden wissen?</string>
   <string name="confirm_clean_library">De bibliotheek opschonen?</string>
   <string name="confirm_clear_watchlist">Kijklijst wissen?</string>
@@ -1050,6 +1051,7 @@
   <string name="hint_keeps_scene_playing_in_small">Laat een scène doorspelen in een kleine balk als je de pagina verlaat. Zet scènes op je kijklijst via de scènepagina en ze worden na elkaar afgespeeld; de kijklijstknop op het Dashboard opent de lijst.</string>
   <string name="hint_keeps_servers_api_keys_and">Houdt servers, API-sleutels en instellingen gelijk op je iPhone, iPad en Mac. Schakel het per apparaat in. De actieve server blijft een keuze per apparaat.</string>
   <string name="hint_language_scenes_subtitles_start_with">De taal waarmee de ondertiteling van een scène begint. \'Elke\' neemt het eerste gewone spoor in het bestand.</string>
+  <string name="hint_language_switch">stashy schakelt over naar %1$s en wordt opnieuw geladen.</string>
   <string name="hint_leaves_out_what_group_matches">Laat weg wat aan de groep voldoet</string>
   <string name="hint_legend_run_performer_is_no">De performer van de Legend-run zit niet meer in deze pool. Stel de run opnieuw in.</string>
   <string name="hint_lets_you_create_edit_rename">Hiermee kun je de filters die op je server zijn bewaard aanmaken, wijzigen, hernoemen en verwijderen, onder Instellingen › Server.</string>

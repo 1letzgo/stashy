@@ -465,6 +465,7 @@
   <string name="conditions">Villkor</string>
   <string name="confirm_add_arg">Lägg till #%1$s?</string>
   <string name="confirm_auto_tag_whole_library">Tagga hela biblioteket automatiskt?</string>
+  <string name="confirm_change_language">Byta språk?</string>
   <string name="confirm_clean_generated_files">Rensa genererade filer?</string>
   <string name="confirm_clean_library">Rensa biblioteket?</string>
   <string name="confirm_clear_watchlist">Rensa bevakningslistan?</string>
@@ -1050,6 +1051,7 @@
   <string name="hint_keeps_scene_playing_in_small">Låter en scen fortsätta spela i ett litet fält när du lämnar dess sida. Lägg till scener i bevakningslistan på scensidan så spelas de efter varandra; bevakningslisteknappen på Dashboard öppnar listan.</string>
   <string name="hint_keeps_servers_api_keys_and">Håller servrar, API-nycklar och inställningar likadana på din iPhone, iPad och Mac. Slå på det per enhet. Den aktiva servern väljs fortfarande per enhet.</string>
   <string name="hint_language_scenes_subtitles_start_with">Språket som en scens undertexter börjar med. ”Valfri” tar det första vanliga spåret i filen.</string>
+  <string name="hint_language_switch">stashy byter till %1$s och laddas om.</string>
   <string name="hint_leaves_out_what_group_matches">Utelämnar det som gruppen matchar</string>
   <string name="hint_legend_run_performer_is_no">Legend-omgångens stjärna finns inte längre i urvalet. Återställ omgången.</string>
   <string name="hint_lets_you_create_edit_rename">Låter dig skapa, redigera, byta namn på och radera filtren som sparats på servern, under Inställningar › Server.</string>

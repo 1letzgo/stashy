@@ -465,6 +465,7 @@
   <string name="conditions">Warunki</string>
   <string name="confirm_add_arg">Dodać #%1$s?</string>
   <string name="confirm_auto_tag_whole_library">Automatycznie otagować całą bibliotekę?</string>
+  <string name="confirm_change_language">Zmienić język?</string>
   <string name="confirm_clean_generated_files">Wyczyścić wygenerowane pliki?</string>
   <string name="confirm_clean_library">Wyczyścić bibliotekę?</string>
   <string name="confirm_clear_watchlist">Wyczyścić listę Do obejrzenia?</string>
@@ -1050,6 +1051,7 @@
   <string name="hint_keeps_scene_playing_in_small">Odtwarza scenę dalej w małym pasku, gdy opuszczasz jej stronę. Dodawaj sceny do listy Do obejrzenia na stronie sceny, a będą odtwarzane jedna po drugiej; przycisk Do obejrzenia na Dashboardzie otwiera listę.</string>
   <string name="hint_keeps_servers_api_keys_and">Utrzymuje te same serwery, klucze API i ustawienia na iPhonie, iPadzie i Macu. Włącz na każdym urządzeniu osobno. Aktywny serwer pozostaje wyborem każdego urządzenia.</string>
   <string name="hint_language_scenes_subtitles_start_with">Język, od którego zaczynają się napisy sceny. „Dowolny” wybiera pierwszą zwykłą ścieżkę w pliku.</string>
+  <string name="hint_language_switch">stashy przełączy się na język %1$s i uruchomi się ponownie.</string>
   <string name="hint_leaves_out_what_group_matches">Pomija to, co pasuje do grupy</string>
   <string name="hint_legend_run_performer_is_no">Aktora z rundy Legend nie ma już w tej puli. Zresetuj rundę.</string>
   <string name="hint_lets_you_create_edit_rename">Pozwala tworzyć, edytować, zmieniać nazwy i usuwać filtry zapisane na serwerze, w Ustawienia › Serwer.</string>

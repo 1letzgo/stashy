@@ -80,16 +80,31 @@ enum AppLanguage {
 
     /// For SwiftUI's own formatting (dates, numbers) inside the app.
     static var locale: Locale {
-        let code = state.withLock { $0.code }
-        return code == systemValue ? .autoupdatingCurrent : Locale(identifier: code)
+        Locale(identifier: state.withLock { $0.resolved })
+    }
+
+    /// The device's languages. Read from the defaults rather than `Locale.preferredLanguages`:
+    /// that one keeps this app's own `AppleLanguages` override until the next start.
+    private static var deviceLanguages: [String] {
+        UserDefaults.standard.stringArray(forKey: "AppleLanguages") ?? Locale.preferredLanguages
+    }
+
+    /// "system" → the best of stashy's languages for the device, English when none fits.
+    private static func resolve(_ code: String) -> String {
+        guard code == systemValue else { return code }
+        let codes = options.map(\.code)
+        let match = Bundle.preferredLocalizations(from: codes, forPreferences: deviceLanguages).first
+        return match.flatMap { codes.contains($0) ? $0 : nil } ?? defaultValue
     }
 
     private struct State {
         let code: String
+        let resolved: String
         let bundle: Bundle
         init(code: String) {
             self.code = code
-            bundle = code == AppLanguage.systemValue ? .main : (AppLanguage.lproj(code) ?? AppLanguage.english)
+            resolved = AppLanguage.resolve(code)
+            bundle = AppLanguage.lproj(resolved) ?? AppLanguage.english
         }
     }
 

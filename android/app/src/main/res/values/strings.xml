@@ -466,6 +466,7 @@
     <string name="conditions">Conditions</string>
     <string name="confirm_add_arg">Add #%1$s?</string>
     <string name="confirm_auto_tag_whole_library">Auto Tag the whole library?</string>
+    <string name="confirm_change_language">Change language?</string>
     <string name="confirm_clean_generated_files">Clean generated files?</string>
     <string name="confirm_clean_library">Clean the library?</string>
     <string name="confirm_clear_watchlist">Clear watchlist?</string>
@@ -1051,6 +1052,7 @@
     <string name="hint_keeps_scene_playing_in_small">Keeps a scene playing in a small bar when you leave its page. Add scenes to your watchlist on the scene page and they play one after another; the watchlist button on the Dashboard opens the list.</string>
     <string name="hint_keeps_servers_api_keys_and">Keeps servers, API keys and settings the same on your iPhone, iPad and Mac. Turn it on per device. The active server stays each device\'s own choice.</string>
     <string name="hint_language_scenes_subtitles_start_with">The language a scene\'s subtitles start with. \"Any\" takes the first ordinary track in the file.</string>
+    <string name="hint_language_switch">stashy switches to %1$s and reloads.</string>
     <string name="hint_leaves_out_what_group_matches">Leaves out what the group matches</string>
     <string name="hint_legend_run_performer_is_no">Legend run performer is no longer in this pool. Run reset.</string>
     <string name="hint_lets_you_create_edit_rename">Lets you create, edit, rename and delete the filters saved on your server, under Settings › Server.</string>
