@@ -1443,7 +1443,9 @@ private struct StashyAppBackgroundModifier: ViewModifier {
     func body(content: Content) -> some View {
         content
             .scrollContentBackground(.hidden)
-            .background(Color.appBackground(for: appearance.currentTheme))
+            // Also under the keyboard: its rounded top corners show what lies behind it, and
+            // in a sheet that was the system's sheet colour instead of the app background.
+            .background { Color.appBackground(for: appearance.currentTheme).ignoresSafeArea() }
     }
 }
 #endif
