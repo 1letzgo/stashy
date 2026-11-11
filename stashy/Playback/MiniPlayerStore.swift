@@ -297,8 +297,13 @@ final class MiniPlayerStore: ObservableObject {
         session?.engine.togglePlayPause()
     }
 
+    /// Whether the full view starts its scene by itself. Off only when the Dashboard's
+    /// watchlist button opens it with nothing running: the list is what was asked for.
+    private(set) var nowPlayingAutoPlays = true
+
     func expand() {
         guard let scene = session?.scene else { return }
+        nowPlayingAutoPlays = true
         nowPlayingScene = scene
         showsNowPlaying = true
     }
@@ -306,6 +311,7 @@ final class MiniPlayerStore: ObservableObject {
     /// Play on a scene page while the mini player is on: the scene plays in the full view (and
     /// is listed on the watchlist) instead of on the page. `startAt` nil resumes where it was left.
     func openNowPlaying(_ scene: Scene, startAt: Double?) {
+        nowPlayingAutoPlays = true
         notePlaying(scene)
         // The bar already runs it: the full view takes that engine as is, so jump it here.
         if let startAt, let current = session, current.scene.id == scene.id {
@@ -316,14 +322,19 @@ final class MiniPlayerStore: ObservableObject {
     }
 
     /// The Dashboard row's watchlist button: the full view as the popup. What the bar runs
-    /// stays; with nothing running the first watchlist entry starts. The list itself (sort,
-    /// remove, clear) is managed in that view.
+    /// stays as it is (playing or paused); with nothing running the scene played last (else
+    /// the first watchlist entry) is shown with its cover and starts only on Play or a tap
+    /// on a row. The list itself
+    /// (sort, remove, clear) is managed in that view.
     func openWatchlist() {
         guard isEnabled else { return }
         if session != nil {
             expand()
-        } else if let first = WatchlistStore.shared.scenes.first {
-            openNowPlaying(first, startAt: nil)
+        } else if let first = playingQueue.first ?? WatchlistStore.shared.scenes.first {
+            // The scene played last when there is one, else the top of the watchlist.
+            nowPlayingAutoPlays = false
+            nowPlayingScene = first
+            showsNowPlaying = true
         } else {
             ToastManager.shared.show("Watchlist is empty", icon: "text.badge.plus", style: .info)
         }
@@ -331,6 +342,7 @@ final class MiniPlayerStore: ObservableObject {
 
     /// Switches the full view to `scene` (row tap, previous / next, end of a scene).
     func showNowPlaying(_ scene: Scene) {
+        nowPlayingAutoPlays = true
         notePlaying(scene)
         nowPlayingScene = scene
     }
@@ -997,8 +1009,12 @@ private struct NowPlayingContent: View {
     let scene: Scene
 
 
+    /// Read once when this scene's view is built (see `nowPlayingAutoPlays`).
+    private let autoPlays: Bool
+
     init(scene: Scene) {
         self.scene = scene
+        self.autoPlays = MiniPlayerStore.shared.nowPlayingAutoPlays
         _displayedScene = State(initialValue: scene)
     }
     @ObservedObject private var player = MiniPlayerStore.shared
@@ -1038,7 +1054,7 @@ private struct NowPlayingContent: View {
         layout {
             // The scene page itself in player-only mode: it takes the engine from the mini
             // player and hands it back when the view closes.
-            SceneDetailView(scene: scene, autoPlay: true)
+            SceneDetailView(scene: scene, autoPlay: autoPlays)
                 .environment(\.stashyScenePlayerOnly, true)
                 .frame(maxWidth: .infinity)
                 // Same gap under the chrome as the scene page (`mainContentView`).

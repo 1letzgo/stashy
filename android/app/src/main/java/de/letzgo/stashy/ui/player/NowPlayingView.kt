@@ -109,7 +109,7 @@ private fun NowPlayingContent(initial: Scene, onOpen: (de.letzgo.stashy.ui.Scree
     val p = Theme.palette
     // The scene page's model in player-only mode: takes the bar's player (no reload), hands it
     // back on leaving even when paused; a scene the bar does not run starts with autoplay.
-    val model = remember { de.letzgo.stashy.ui.scene.SceneDetailModel(initial, autoPlay = true, playerOnly = true) }
+    val model = remember { de.letzgo.stashy.ui.scene.SceneDetailModel(initial, autoPlay = MiniPlayerStore.nowPlayingAutoPlays, playerOnly = true) }
     val scene = model.scene
     val watchlist = WatchlistStore.all
     val drag = remember { WatchlistDragState() }

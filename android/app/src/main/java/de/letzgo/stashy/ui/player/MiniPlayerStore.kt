@@ -232,7 +232,15 @@ object MiniPlayerStore {
     }
 
     /** Now Playing: switch to [scene] (row tap, previous / next, end of a scene); the view rebuilds its player module for it. */
+    /**
+     * iOS `nowPlayingAutoPlays`: whether the full view starts its scene by itself. Off only when
+     * the Dashboard's watchlist button opens it with nothing running — the list was asked for.
+     */
+    var nowPlayingAutoPlays = true
+        private set
+
     fun showInNowPlaying(scene: Scene) {
+        nowPlayingAutoPlays = true
         notePlaying(scene)
         nowPlayingScene = scene
     }
@@ -242,6 +250,7 @@ object MiniPlayerStore {
      * the full view (and is listed under "Playing"). [startAt] null resumes where it was left.
      */
     fun openNowPlaying(scene: Scene, startAt: Double?) {
+        nowPlayingAutoPlays = true
         notePlaying(scene)
         // The bar already runs it: the full view takes that player as is, so jump it here.
         if (startAt != null) session?.takeIf { it.scene.id == scene.id }?.player?.seek(startAt)
@@ -250,15 +259,20 @@ object MiniPlayerStore {
     }
 
     /**
-     * iOS `openWatchlist()`: the Dashboard's watchlist button. A running bar session opens its full
-     * view, else the first watchlist entry starts there; an empty list says so.
+     * iOS `openWatchlist()`: the Dashboard's watchlist button. A bar session opens its full view
+     * as it is (playing or paused); with nothing running the first watchlist entry is shown with
+     * its cover and starts only on Play or a tap on a row; an empty list says so.
      */
     fun openWatchlist() {
         if (!isEnabled) return
         if (session != null) { expand(); return }
-        val first = WatchlistStore.all.firstOrNull()
-        if (first != null) openNowPlaying(first, startAt = null)
-        else de.letzgo.stashy.ui.tools.showToast("Watchlist is empty")
+        // The scene played last when there is one, else the top of the watchlist.
+        val first = playingQueue.firstOrNull() ?: WatchlistStore.all.firstOrNull()
+        if (first != null) {
+            nowPlayingAutoPlays = false
+            nowPlayingScene = first
+            showsNowPlaying = true
+        } else de.letzgo.stashy.ui.tools.showToast("Watchlist is empty")
     }
 
     /** Now Playing reached the end of [currentId]: on to what comes next, if anything. */
@@ -402,7 +416,7 @@ object MiniPlayerStore {
         tracker.noteSeek(seconds)
     }
 
-    fun expand() { session?.let { nowPlayingScene = it.scene; showsNowPlaying = true } }
+    fun expand() { session?.let { nowPlayingAutoPlays = true; nowPlayingScene = it.scene; showsNowPlaying = true } }
 
     /** Resume tracking plus the play count, which the page would otherwise have counted. */
     private fun handleTime(seconds: Double, duration: Double) {
