@@ -109,6 +109,8 @@ object GraphQL {
     private class DatabaseLocked : Exception()
 
     private suspend fun perform(query: String, variables: JsonObject?): JsonObject = withContext(Dispatchers.IO) {
+        // A running endpoint probe decides the address first (local vs external).
+        ServerEndpointSelector.settle()
         val config = ServerConfigManager.activeConfig?.takeIf { it.hasValidConfig } ?: throw GraphQLError.NoServerConfig
         val body = buildJsonObject {
             put("query", JsonPrimitive(query))
@@ -120,7 +122,7 @@ object GraphQL {
             .post(body.toRequestBody(jsonType))
             .build()
         val call = Net.client.newCall(request).apply { timeout().timeout(Net.GRAPHQL_CALL_TIMEOUT_SECONDS, java.util.concurrent.TimeUnit.SECONDS) }
-        val response = try { call.await() } catch (e: IOException) { throw GraphQLError.Network(e) }
+        val response = try { call.await() } catch (e: IOException) { ServerEndpointSelector.noteConnectionFailure(); throw GraphQLError.Network(e) }
         response.use { r ->
             val text = r.body?.string().orEmpty()
             val root = runCatching { Json.parseToJsonElement(text).jsonObject }.getOrNull()

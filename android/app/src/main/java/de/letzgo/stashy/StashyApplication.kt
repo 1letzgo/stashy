@@ -17,11 +17,29 @@ import kotlinx.coroutines.launch
 
 /** App entry (iOS: `App.swift`). Sets up prefs, the server config and the image cache. */
 class StashyApplication : Application(), SingletonImageLoader.Factory {
+    private var coldStartDone = false
+
     override fun onCreate() {
         super.onCreate()
         Prefs.init(this)
         Net.watchNetworkChanges(this)
         ServerConfigManager.init()
+        // Local address of the active server: probe at start; requests wait for it (settle()).
+        de.letzgo.stashy.data.ServerEndpointSelector.refresh(blocking = true)
+        registerActivityLifecycleCallbacks(object : android.app.Application.ActivityLifecycleCallbacks {
+            private var started = 0
+            override fun onActivityStarted(activity: android.app.Activity) {
+                // Back in the foreground (first started activity, not the cold start): re-check quietly.
+                if (started++ == 0 && coldStartDone) de.letzgo.stashy.data.ServerEndpointSelector.refresh(blocking = false)
+                coldStartDone = true
+            }
+            override fun onActivityStopped(activity: android.app.Activity) { started-- }
+            override fun onActivityCreated(activity: android.app.Activity, savedInstanceState: android.os.Bundle?) {}
+            override fun onActivityResumed(activity: android.app.Activity) {}
+            override fun onActivityPaused(activity: android.app.Activity) {}
+            override fun onActivitySaveInstanceState(activity: android.app.Activity, outState: android.os.Bundle) {}
+            override fun onActivityDestroyed(activity: android.app.Activity) {}
+        })
         StashyPlus.start(this)
         de.letzgo.stashy.data.SecurityManager.init()
         de.letzgo.stashy.data.TabManager.ensureLoaded()

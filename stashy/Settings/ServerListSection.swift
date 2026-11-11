@@ -17,6 +17,7 @@ struct ServerListSection: View {
     @Binding var showingAddServerSheet: Bool
     @Binding var editingServer: ServerConfig?
     var onScan: () -> Void
+    @State private var pendingDelete: ServerConfig?
 
     var body: some View {
         Section {
@@ -43,15 +44,31 @@ struct ServerListSection: View {
                 .stashyGroupedBlockRow(index: index, count: configManager.savedServers.count + 1)
             }
             .onDelete { indexSet in
-                configManager.deleteServer(at: indexSet)
+                // Ask first: the swipe would otherwise drop the server with its key and cache.
+                pendingDelete = indexSet.compactMap { index in
+                    configManager.savedServers.indices.contains(index) ? configManager.savedServers[index] : nil
+                }.first
             }
-
             Button(action: {
                 showingAddServerSheet = true
             }) {
                 Label("Add New Server", systemImage: "plus")
             }
             .stashyGroupedBlockRow(index: configManager.savedServers.count, count: configManager.savedServers.count + 1)
+            .alert("Delete Server", isPresented: Binding(
+                get: { pendingDelete != nil },
+                set: { if !$0 { pendingDelete = nil } }
+            )) {
+                Button("Cancel", role: .cancel) { pendingDelete = nil }
+                Button("Delete", role: .destructive) {
+                    if let server = pendingDelete {
+                        configManager.deleteServer(id: server.id)
+                    }
+                    pendingDelete = nil
+                }
+            } message: {
+                Text("Are you sure you want to delete \"\(pendingDelete?.name ?? "this server")\"? This action cannot be undone.")
+            }
         }
     }
 }
@@ -62,6 +79,7 @@ struct ServerListRow: View {
     let server: ServerConfig
     @ObservedObject var viewModel: StashDBViewModel
     @ObservedObject var appearanceManager = AppearanceManager.shared
+    @ObservedObject private var configManager = ServerConfigManager.shared
     let isActive: Bool
     let isConnected: Bool
     let isScanning: Bool
@@ -87,24 +105,42 @@ struct ServerListRow: View {
                             .font(.headline)
                             .foregroundColor(.primary)
 
-                        Text(server.baseURL)
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                            .lineLimit(1)
-                            .minimumScaleFactor(0.8)
-                            .truncationMode(.middle)
+                        if let local = server.localBaseURL {
+                            let usesLocal = configManager.usesLocalAddress
+                            addressLine("Remote: \(server.externalBaseURL)", inUse: isActive && !usesLocal)
+                            addressLine("Local: \(local)", inUse: isActive && usesLocal)
+                        } else {
+                            Text(server.externalBaseURL)
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                                .lineLimit(1)
+                                .minimumScaleFactor(0.8)
+                                .truncationMode(.middle)
+                        }
                     }
                     Spacer()
                 }
                 .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
+            // The link below would otherwise claim half the row and cut the addresses short.
+            .layoutPriority(1)
 
             NavigationLink(destination: ServerDetailView(server: server, viewModel: viewModel)) {
                 EmptyView()
             }
             .padding(.leading, 8)
         }
+    }
+
+    /// One address at full length and caption size; the one in use is bold. A long address
+    /// wraps instead of shrinking.
+    private func addressLine(_ text: String, inUse: Bool) -> some View {
+        Text(text)
+            .font(.caption)
+            .fontWeight(inUse ? .bold : .regular)
+            .foregroundColor(.secondary)
+            .fixedSize(horizontal: false, vertical: true)
     }
 
     private var indicatorColor: Color {

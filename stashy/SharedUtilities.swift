@@ -522,9 +522,11 @@ struct StashySubtitleText: View {
 
 /// Adds the API key as a query parameter to the URL for authentication
 func signedURL(_ url: URL?) -> URL? {
-    guard let url = url else { return nil }
-    guard let config = ServerConfigManager.shared.activeConfig, 
-          let key = config.secureApiKey, !key.isEmpty else { return url }
+    guard var url = url else { return nil }
+    guard let config = ServerConfigManager.shared.activeConfig else { return url }
+    // A URL kept from before a switch between the local and the regular address.
+    url = config.activeAddressed(url)
+    guard let key = config.secureApiKey, !key.isEmpty else { return url }
     
     // Check if apikey is already present (case-insensitive check)
     if url.query?.lowercased().contains("apikey=") == true { return url }
@@ -585,9 +587,10 @@ func stashRequest(to url: URL, config: ServerConfig?, timeout: TimeInterval = 30
 
 /// Funscript / media download request using `ApiKey` header instead of query secrets.
 func authenticatedStashRequest(for url: URL) -> URLRequest {
-    let cleanURL = urlByRemovingApiKeyQuery(url)
+    let config = ServerConfigManager.shared.activeConfig
+    let cleanURL = urlByRemovingApiKeyQuery(config?.activeAddressed(url) ?? url)
     var request = URLRequest(url: cleanURL)
-    for (name, value) in ServerConfigManager.shared.activeConfig?.requestHeaders(for: cleanURL) ?? [:] {
+    for (name, value) in config?.requestHeaders(for: cleanURL) ?? [:] {
         request.setValue(value, forHTTPHeaderField: name)
     }
     return request

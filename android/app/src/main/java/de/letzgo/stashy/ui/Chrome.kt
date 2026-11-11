@@ -505,6 +505,8 @@ fun NativeListItem(
     onClick: (() -> Unit)? = null,
     onLongClick: (() -> Unit)? = null,
     supportingMaxLines: Int = 3,
+    /** Supporting text with its own spans (e.g. one bold line); replaces [supporting]. */
+    supportingStyled: androidx.compose.ui.text.AnnotatedString? = null,
     leading: (@Composable () -> Unit)? = null,
     trailing: (@Composable RowScope.() -> Unit)? = null,
 ) {
@@ -512,7 +514,7 @@ fun NativeListItem(
     val alpha = if (enabled) 1f else 0.38f
     Row(
         modifier.fillMaxWidth()
-            .heightIn(min = if (supporting != null) 72.dp else 56.dp)
+            .heightIn(min = if (supporting != null || supportingStyled != null) 72.dp else 56.dp)
             .let {
                 when {
                     onLongClick != null -> it.combinedClickable(enabled = enabled, onClick = onClick ?: {}, onLongClick = onLongClick)
@@ -530,7 +532,8 @@ fun NativeListItem(
         }
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
             Text(headline, style = NativeType.bodyLarge, color = headlineColor.copy(alpha = headlineColor.alpha * alpha), maxLines = 2, overflow = TextOverflow.Ellipsis)
-            if (supporting != null) Text(supporting, style = NativeType.bodyMedium, color = p.secondaryText.copy(alpha = p.secondaryText.alpha * alpha), maxLines = supportingMaxLines, overflow = TextOverflow.Ellipsis)
+            if (supportingStyled != null) Text(supportingStyled, style = NativeType.bodyMedium, color = p.secondaryText.copy(alpha = p.secondaryText.alpha * alpha), maxLines = supportingMaxLines, overflow = TextOverflow.Ellipsis)
+            else if (supporting != null) Text(supporting, style = NativeType.bodyMedium, color = p.secondaryText.copy(alpha = p.secondaryText.alpha * alpha), maxLines = supportingMaxLines, overflow = TextOverflow.Ellipsis)
         }
         if (trailing != null) Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp), content = trailing)
     }

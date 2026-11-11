@@ -50,6 +50,7 @@ class TvServerFormState(server: ServerConfig?) {
     val id: String? = server?.id
     var name by mutableStateOf(server?.name ?: "My Stash")
     var address by mutableStateOf(server?.let { ServerAddress.display(it) } ?: "")
+    var localAddress by mutableStateOf(server?.localURL ?: "")
     var port by mutableStateOf("")
     var protocol by mutableStateOf(server?.serverProtocol ?: ServerProtocol.HTTPS)
     var apiKey by mutableStateOf(server?.apiKey ?: "")
@@ -75,6 +76,7 @@ class TvServerFormState(server: ServerConfig?) {
             port = port.trim().ifEmpty { parsed.port },
             serverProtocol = protocol,
             subpath = parsed.subpath,
+            localURL = ServerAddress.normalizeLocal(localAddress),
         )
     }
 
@@ -99,7 +101,7 @@ class TvServerFormState(server: ServerConfig?) {
 
 /** The fields shared by first-run setup and the Settings server form. */
 @Composable
-fun TvServerFields(state: TvServerFormState, firstFocus: FocusRequester? = null) {
+fun TvServerFields(state: TvServerFormState, firstFocus: FocusRequester? = null, showLocalAddress: Boolean = false) {
     val scope = rememberCoroutineScope()
     Column(verticalArrangement = Arrangement.spacedBy(pt(24))) {
         TvTextField("Server Name", state.name, { state.name = it }, if (firstFocus != null) Modifier.focusRequester(firstFocus) else Modifier)
@@ -107,6 +109,10 @@ fun TvServerFields(state: TvServerFormState, firstFocus: FocusRequester? = null)
         Row(horizontalArrangement = Arrangement.spacedBy(pt(24)), verticalAlignment = Alignment.CenterVertically) {
             TvTextField("Port (optional)", state.port, { v -> state.port = v.filter { it.isDigit() } }, Modifier.width(pt(300)), keyboardType = KeyboardType.Number)
             TvSegmented(listOf(TvOption(ServerProtocol.HTTP, "HTTP"), TvOption(ServerProtocol.HTTPS, "HTTPS")), state.protocol, { state.protocol = it })
+        }
+        if (showLocalAddress) {
+            TvTextField("Local Address (e.g. 192.168.1.100:9999)", state.localAddress, { state.localAddress = it }, keyboardType = KeyboardType.Uri)
+            Text("Optional. Used instead of the address above whenever it answers, for example on your home network. Falls back automatically.", style = TvType.caption, color = TvColors.secondary)
         }
         Column(
             Modifier.fillMaxWidth().clip(RoundedCornerShape(pt(20))).background(Color.White.copy(alpha = 0.05f)).padding(pt(32)),
@@ -248,7 +254,7 @@ class TvServerFormRoute(private val server: ServerConfig?) : TvRoute {
             verticalArrangement = Arrangement.spacedBy(pt(40)),
         ) {
             item { Text(if (server == null) "Add Server" else "Edit Server", style = TvType.largeTitle, color = Color.White) }
-            item { Box(Modifier.width(pt(800))) { TvServerFields(state, first) } }
+            item { Box(Modifier.width(pt(800))) { TvServerFields(state, first, showLocalAddress = true) } }
             item {
                 Row(horizontalArrangement = Arrangement.spacedBy(pt(40))) {
                     TvButton({ TvNav.pop() }) { Text("Cancel", style = TvType.title3) }

@@ -84,6 +84,7 @@ struct SettingsTransferFile: Codable {
         var subpath: String?
         var apiKey: String?
         var customHeaders: [Header]?
+        var localURL: String?
     }
 
     struct Header: Codable {
@@ -174,6 +175,7 @@ enum SettingsTransfer {
             serverProtocol: config.serverProtocol.rawValue,
             subpath: config.subpath
         )
+        server.localURL = config.localBaseURL
         if includeSecrets {
             server.apiKey = config.secureApiKey
             let headers = config.secureCustomHeaders
@@ -300,6 +302,7 @@ enum SettingsTransfer {
         config.id = id
         config.name = server.name
         config.subpath = server.subpath
+        config.localURL = server.localURL.flatMap(ServerConfig.normalizedLocalURL)
         return config
     }
 

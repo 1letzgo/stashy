@@ -17,6 +17,11 @@ struct ServerFormViewNew: View {
     @State private var name: String = "My Stash"
     @State private var serverAddress: String = ""
     @State private var serverProtocol: ServerProtocol = .https
+    /// Optional second address of the same server, used while it answers (home network).
+    @State private var localAddress: String = ""
+    @State private var isTestingLocal = false
+    @State private var localTestResult: ConnectionTestResult = .none
+    @State private var localTestMessage: String = ""
     @State private var apiKey: String = ""
     /// Custom HTTP headers (SSO / reverse proxy). Kept in the Keychain on save.
     @State private var customHeaders: [ServerHTTPHeader] = []
@@ -145,6 +150,44 @@ struct ServerFormViewNew: View {
                 }
                 .padding(.vertical, 4)
                 .stashyGroupedBlockRow(index: 2, count: 3)
+            }
+
+            Section {
+                stashyScrollingSectionHeader("Local Address")
+                TextField("192.168.1.100:9999", text: $localAddress)
+                    .keyboardType(.URL)
+                    .autocapitalization(.none)
+                    .autocorrectionDisabled()
+                    .onChange(of: localAddress) { _, _ in
+                        localTestResult = .none
+                        localTestMessage = ""
+                    }
+                    .stashyGroupedBlockRow(index: 0, count: localURL == nil ? 1 : 2)
+                if localURL != nil {
+                    Button(action: { testConnection(local: true) }) {
+                        HStack {
+                            if isTestingLocal {
+                                ProgressView()
+                                    .progressViewStyle(CircularProgressViewStyle())
+                            } else {
+                                Image(systemName: icon(for: localTestResult))
+                                    .foregroundColor(color(for: localTestResult))
+                            }
+                            Text(isTestingLocal ? "Testing..." : "Test Local Address")
+                                .foregroundColor(.primary)
+                            Spacer()
+                            if !localTestMessage.isEmpty {
+                                Text(localTestMessage)
+                                    .font(.caption)
+                                    .foregroundColor(localTestResult == .success ? .green : .secondary)
+                                    .multilineTextAlignment(.trailing)
+                            }
+                        }
+                    }
+                    .disabled(isTestingLocal)
+                    .stashyGroupedBlockRow(index: 1, count: 2)
+                }
+                stashyScrollingSectionFooter("Optional. Used instead of the address above whenever it answers, for example on your home network. Falls back automatically.")
             }
 
             Section {
@@ -310,6 +353,7 @@ struct ServerFormViewNew: View {
                 serverAddress = address
                 
                 serverProtocol = config.serverProtocol
+                localAddress = config.localBaseURL ?? ""
                 customHeaders = config.secureCustomHeaders
                 originalCustomHeaders = customHeaders
                 
@@ -342,36 +386,52 @@ struct ServerFormViewNew: View {
         }
     }
     
-    private var testResultIcon: String {
-        switch testResult {
+    private var testResultIcon: String { icon(for: testResult) }
+
+    private var testResultColor: Color { color(for: testResult) }
+
+    private func icon(for result: ConnectionTestResult) -> String {
+        switch result {
         case .none: return "network"
         case .success: return "checkmark.circle.fill"
         case .failure: return "xmark.circle.fill"
         }
     }
-    
-    private var testResultColor: Color {
-        switch testResult {
+
+    private func color(for result: ConnectionTestResult) -> Color {
+        switch result {
         case .none: return .secondary
         case .success: return .green
         case .failure: return .red
         }
     }
+
+    /// The local address as stored, nil while the field is empty or unusable.
+    private var localURL: String? { ServerConfig.normalizedLocalURL(localAddress) }
     
     private func resetTestState() {
         testResult = .none
         testMessage = ""
     }
     
-    private func testConnection() {
-        isTesting = true
-        testResult = .none
-        testMessage = ""
-        
-        guard let url = URL(string: "\(currentBaseURL)/graphql") else {
-            isTesting = false
-            testResult = .failure
-            testMessage = "Invalid URL"
+    private func testConnection(local: Bool = false) {
+        func finish(_ result: ConnectionTestResult, _ message: String) {
+            if local {
+                isTestingLocal = false
+                localTestResult = result
+                localTestMessage = message
+            } else {
+                isTesting = false
+                testResult = result
+                testMessage = message
+            }
+        }
+        if local { isTestingLocal = true } else { isTesting = true }
+        finish(.none, "")
+        if local { isTestingLocal = true } else { isTesting = true }
+
+        guard let url = URL(string: "\(local ? (localURL ?? "") : currentBaseURL)/graphql"), url.host != nil else {
+            finish(.failure, "Invalid URL")
             return
         }
         
@@ -395,19 +455,15 @@ struct ServerFormViewNew: View {
         let sessionConfig = URLSessionConfiguration.ephemeral
         sessionConfig.timeoutIntervalForRequest = 15
         sessionConfig.timeoutIntervalForResource = 20
-        let sessionForTest = URLSession(configuration: sessionConfig)
+        // The local address may present a self-signed certificate, as in every other request.
+        let sessionForTest = URLSession(configuration: sessionConfig, delegate: local ? StashTrustDelegate() : nil, delegateQueue: nil)
         
         sessionForTest.dataTask(with: request) { data, response, error in
             let outcome = StashConnectionProbe.evaluate(data: data, response: response, error: error)
             DispatchQueue.main.async {
-                isTesting = false
                 switch outcome {
-                case .stash(let version):
-                    testResult = .success
-                    testMessage = version
-                case .failure(let message):
-                    testResult = .failure
-                    testMessage = message
+                case .stash(let version): finish(.success, version)
+                case .failure(let message): finish(.failure, message)
                 }
             }
         }.resume()
@@ -443,7 +499,8 @@ struct ServerFormViewNew: View {
             port: parsed.port,
             serverProtocol: serverProtocol,
             apiKey: nil, // API key now stored in Keychain
-            subpath: parsed.subpath
+            subpath: parsed.subpath,
+            localURL: localURL
         )
         onSave(newConfig)
 

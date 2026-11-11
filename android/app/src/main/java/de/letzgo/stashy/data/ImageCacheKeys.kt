@@ -39,7 +39,9 @@ object ImageCacheKeys {
     val interceptor = Interceptor { chain ->
         val request = chain.request
         val url = request.data.toString()
-        val k = key(url, ServerConfigManager.activeConfig?.id)
+        val config = ServerConfigManager.activeConfig
+        // Same image, same key on either address: the host of the other endpoint is not part of it.
+        val k = key(config?.canonicalAddressed(url) ?: url, config?.id)
         if (k == null || request.diskCacheKey != null) chain.proceed()
         else chain.withRequest(
             request.newBuilder()

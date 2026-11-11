@@ -8,6 +8,7 @@
 import Foundation
 import SwiftUI
 import Combine
+import Network
 
 extension Notification.Name {
     /// Nach Abschluss von `StashDBViewModel.initializeServerConnection()` (Filter + Statistik). z.B. tvOS-Dashboard nach Serverwechsel neu laden; vermeidet Race mit `GraphQLClient.cancelAllRequests()`.
@@ -163,31 +164,89 @@ struct ServerConfig: Codable, Identifiable, Equatable {
     /// Custom headers. iOS keeps them in the Keychain (`secureCustomHeaders`) and leaves this
     /// nil; tvOS has no Keychain here and stores them in the config like the API key.
     var customHeaders: [ServerHTTPHeader]?
+    /// Optional second address of the same server, as a full base URL (`http://192.168.1.10:9999`,
+    /// no trailing slash). While it answers as Stash the app uses it instead of the address
+    /// above (`ServerEndpointSelector`); id, API key and headers stay the same.
+    var localURL: String?
 
+    /// The address in use right now: the local one while it is reachable, else the regular one.
     var baseURL: String {
+        if let local = localBaseURL, ServerEndpointSelector.shared.usesLocal(id) {
+            return local
+        }
+        return externalBaseURL
+    }
+
+    /// The regular (external) address, whatever is in use.
+    nonisolated var externalBaseURL: String {
         let effectivePort = port ?? serverProtocol.defaultPort
         let scheme = serverProtocol == .https ? "https" : "http"
-        
+
         // Only append port if it's not the default for the protocol
-        let needsPort = (serverProtocol == .https && effectivePort != "443") || 
+        let needsPort = (serverProtocol == .https && effectivePort != "443") ||
                        (serverProtocol == .http && effectivePort != "80")
-        
-        let url: String
-        if needsPort {
-            url = "\(scheme)://\(serverAddress):\(effectivePort)"
-        } else {
-            url = "\(scheme)://\(serverAddress)"
-        }
-        
+
+        var url = needsPort ? "\(scheme)://\(serverAddress):\(effectivePort)" : "\(scheme)://\(serverAddress)"
         if let sub = subpath, !sub.isEmpty {
-            let cleanSub = sub.hasPrefix("/") ? sub : "/\(sub)"
-            let finalURL = url + cleanSub
-            AppLog.debug("🌐 SERVER CONFIG: Using URL with subpath: \(finalURL)")
-            return finalURL
+            url += sub.hasPrefix("/") ? sub : "/\(sub)"
         }
-        
-        AppLog.debug("🌐 SERVER CONFIG: Using URL: \(url)")
         return url
+    }
+
+    nonisolated var localBaseURL: String? {
+        guard let local = localURL?.trimmingCharacters(in: .whitespacesAndNewlines), !local.isEmpty else { return nil }
+        return local
+    }
+
+    /// "192.168.1.10:9999/stash" → "http://192.168.1.10:9999/stash"; nil when empty or unusable.
+    /// A local address defaults to HTTP when no scheme is typed.
+    nonisolated static func normalizedLocalURL(_ input: String) -> String? {
+        var text = input.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !text.isEmpty else { return nil }
+        if !text.lowercased().hasPrefix("http://") && !text.lowercased().hasPrefix("https://") {
+            text = "http://" + text
+        }
+        while text.hasSuffix("/") { text.removeLast() }
+        guard let comps = URLComponents(string: text), let host = comps.host, !host.isEmpty else { return nil }
+        return text
+    }
+
+    /// Stash answers with absolute URLs for the host a request came through, so a URL kept in a
+    /// list or a cache can name the address that is not in use. Moves such a URL to the other
+    /// address of this server; anything else comes back unchanged.
+    nonisolated func addressed(_ url: URL, toLocal: Bool) -> URL {
+        guard let local = localBaseURL, !url.isFileURL else { return url }
+        return toLocal
+            ? Self.swappingBase(of: url, from: externalBaseURL, to: local)
+            : Self.swappingBase(of: url, from: local, to: externalBaseURL)
+    }
+
+    /// `url` on the address in use right now.
+    nonisolated func activeAddressed(_ url: URL) -> URL {
+        addressed(url, toLocal: ServerEndpointSelector.shared.usesLocal(id))
+    }
+
+    nonisolated static func swappingBase(of url: URL, from: String, to: String) -> URL {
+        guard let source = URLComponents(string: from), let target = URLComponents(string: to),
+              var comps = URLComponents(url: url, resolvingAgainstBaseURL: false),
+              let host = comps.host?.lowercased(), host == source.host?.lowercased() else { return url }
+        func effectivePort(_ c: URLComponents) -> Int {
+            c.port ?? (c.scheme?.lowercased() == "https" ? 443 : 80)
+        }
+        // A proxy that ends TLS can make Stash answer with the other scheme: without an
+        // explicit port on either side the host alone decides.
+        guard effectivePort(comps) == effectivePort(source) || (comps.port == nil && source.port == nil) else { return url }
+
+        var path = comps.percentEncodedPath
+        let sourceSub = source.percentEncodedPath
+        if !sourceSub.isEmpty, path == sourceSub || path.hasPrefix(sourceSub + "/") {
+            path.removeFirst(sourceSub.count)
+        }
+        comps.scheme = target.scheme
+        comps.host = target.host
+        comps.port = target.port
+        comps.percentEncodedPath = target.percentEncodedPath + path
+        return comps.url ?? url
     }
 
     var hasValidConfig: Bool {
@@ -226,7 +285,8 @@ struct ServerConfig: Codable, Identifiable, Equatable {
             headers["ApiKey"] = key
         }
         let host = url?.host?.lowercased()
-        if host == nil || host == serverAddress.lowercased() {
+        let localHost = localBaseURL.flatMap { URLComponents(string: $0)?.host?.lowercased() }
+        if host == nil || host == serverAddress.lowercased() || host == localHost {
             for header in secureCustomHeaders {
                 headers[header.name] = header.value
             }
@@ -243,7 +303,8 @@ struct ServerConfig: Codable, Identifiable, Equatable {
         serverProtocol: ServerProtocol = .https,
         apiKey: String? = nil,
         subpath: String? = nil,
-        customHeaders: [ServerHTTPHeader]? = nil
+        customHeaders: [ServerHTTPHeader]? = nil,
+        localURL: String? = nil
     ) {
         self.id = id
         self.name = name
@@ -253,6 +314,7 @@ struct ServerConfig: Codable, Identifiable, Equatable {
         self.apiKey = apiKey
         self.subpath = subpath
         self.customHeaders = customHeaders
+        self.localURL = localURL
     }
     
     // Backward compatibility decoder
@@ -263,6 +325,7 @@ struct ServerConfig: Codable, Identifiable, Equatable {
         name = try container.decodeIfPresent(String.self, forKey: .name) ?? "My Stash"
         apiKey = try container.decodeIfPresent(String.self, forKey: .apiKey)
         customHeaders = try container.decodeIfPresent([ServerHTTPHeader].self, forKey: .customHeaders)
+        localURL = try container.decodeIfPresent(String.self, forKey: .localURL)
         
         // Try to decode new format first
         if let serverAddress = try? container.decode(String.self, forKey: .serverAddress),
@@ -303,10 +366,11 @@ struct ServerConfig: Codable, Identifiable, Equatable {
         try container.encodeIfPresent(apiKey, forKey: .apiKey)
         try container.encodeIfPresent(subpath, forKey: .subpath)
         try container.encodeIfPresent(customHeaders, forKey: .customHeaders)
+        try container.encodeIfPresent(localBaseURL, forKey: .localURL)
     }
     
     enum CodingKeys: String, CodingKey {
-        case id, name, apiKey, subpath, customHeaders
+        case id, name, apiKey, subpath, customHeaders, localURL
         // New format keys
         case serverAddress, port, serverProtocol
         // Legacy format keys (for backward compatibility)
@@ -375,10 +439,13 @@ class ServerConfigManager: ObservableObject {
     // Publish saved servers list updates
     @Published var activeConfig: ServerConfig?
     @Published var savedServers: [ServerConfig] = []
+    /// The active server is reached through its local address right now (`ServerEndpointSelector`).
+    @Published var usesLocalAddress = false
     
     private init() {
         self.activeConfig = loadConfig()
         self.savedServers = getSavedServers() // Load initial list
+        ServerEndpointSelector.shared.start()
     }
 
     // MARK: - Active Server Management
@@ -391,8 +458,13 @@ class ServerConfigManager: ObservableObject {
             self.activeConfig = config
             AppLog.debug("✅ Active server updated: \(config.name)")
             
+            // Decide between the two addresses before anything refetches: requests wait for it.
+            if oldConfig?.id != config.id || oldConfig?.localBaseURL != config.localBaseURL {
+                ServerEndpointSelector.shared.refresh(blocking: true)
+            }
+
             let coreSettingsChanged = oldConfig == nil ||
-                oldConfig?.baseURL != config.baseURL ||
+                oldConfig?.externalBaseURL != config.externalBaseURL ||
                 oldConfig?.secureApiKey != config.secureApiKey ||
                 oldConfig?.secureCustomHeaders != config.secureCustomHeaders ||
                 oldConfig?.id != config.id
@@ -547,6 +619,134 @@ class ServerConfigManager: ObservableObject {
         NotificationCenter.default.post(name: NSNotification.Name("ServerConfigChanged"), object: nil)
     }
 }
+// MARK: - Local / external address
+
+/// Picks between a server's regular address and its optional local one (`ServerConfig.localURL`)
+/// by asking the local one whether it is Stash: no Wi-Fi name, so no location permission, and
+/// it works the same on iOS, macOS and tvOS. Probes on app start, a server change and a network
+/// change (requests wait for those, `settle`), and quietly on becoming active and after a
+/// connection error. A change of address is not a server change: nothing is reset, URLs that
+/// name the other address are moved over where they are requested (`activeAddressed`).
+nonisolated final class ServerEndpointSelector: @unchecked Sendable {
+    static let shared = ServerEndpointSelector()
+
+    private let lock = NSLock()
+    private var localServerID: UUID?
+    private var probe: Task<Void, Never>?
+    private var blockingProbes = 0
+    private var lastFailureProbe = Date.distantPast
+    private var started = false
+    private var lastPathSignature: String?
+    private let monitor = NWPathMonitor()
+
+    private static let session: URLSession = {
+        let config = URLSessionConfiguration.ephemeral
+        config.timeoutIntervalForRequest = 1.5
+        config.timeoutIntervalForResource = 2
+        config.waitsForConnectivity = false
+        return URLSession(configuration: config, delegate: StashTrustDelegate(), delegateQueue: nil)
+    }()
+
+    func usesLocal(_ id: UUID) -> Bool {
+        lock.lock(); defer { lock.unlock() }
+        return localServerID == id
+    }
+
+    func start() {
+        lock.lock()
+        let first = !started
+        started = true
+        lock.unlock()
+        guard first else { return }
+
+        refresh(blocking: true)
+        monitor.pathUpdateHandler = { [weak self] path in
+            guard let self else { return }
+            let signature = "\(path.status)|" + path.availableInterfaces.map { "\($0.type):\($0.name)" }.joined(separator: ",")
+            self.lock.lock()
+            let previous = self.lastPathSignature
+            self.lastPathSignature = signature
+            self.lock.unlock()
+            // The first report is the state at launch, which `start` already probes.
+            guard let previous, previous != signature else { return }
+            self.refresh(blocking: true)
+        }
+        monitor.start(queue: DispatchQueue(label: "stashy.endpoint.path"))
+        NotificationCenter.default.addObserver(
+            forName: UIApplication.didBecomeActiveNotification, object: nil, queue: nil
+        ) { [weak self] _ in
+            self?.refresh(blocking: false)
+        }
+    }
+
+    /// Asks the local address again. `blocking`: requests started meanwhile wait for the answer
+    /// (at most 2 s), because the address in use is unknown; otherwise they keep the current one.
+    func refresh(blocking: Bool) {
+        lock.lock()
+        let previous = probe
+        if blocking { blockingProbes += 1 }
+        let task = Task { [weak self] in
+            await previous?.value
+            await self?.runProbe()
+            guard let self, blocking else { return }
+            self.lock.lock()
+            self.blockingProbes -= 1
+            self.lock.unlock()
+        }
+        probe = task
+        lock.unlock()
+    }
+
+    /// Returns once the address in use is known. Immediately unless a blocking probe runs.
+    func settle() async {
+        lock.lock()
+        let pending = blockingProbes > 0 ? probe : nil
+        lock.unlock()
+        await pending?.value
+    }
+
+    /// A request could not connect: the network may have changed without a path update.
+    func noteConnectionFailure() {
+        lock.lock()
+        let due = Date().timeIntervalSince(lastFailureProbe) > 10
+        if due { lastFailureProbe = Date() }
+        lock.unlock()
+        if due { refresh(blocking: false) }
+    }
+
+    private func runProbe() async {
+        let config = await MainActor.run { ServerConfigManager.shared.loadConfig() }
+        var reachable = false
+        if let config, let local = config.localBaseURL, let url = URL(string: "\(local)/graphql") {
+            var request = URLRequest(url: url)
+            request.httpMethod = "POST"
+            request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+            request.timeoutInterval = 1.5
+            for (name, value) in config.requestHeaders(for: url) {
+                request.setValue(value, forHTTPHeaderField: name)
+            }
+            request.httpBody = StashConnectionProbe.versionQueryBody.data(using: .utf8)
+            if let (data, response) = try? await Self.session.data(for: request),
+               case .stash = StashConnectionProbe.evaluate(data: data, response: response, error: nil) {
+                reachable = true
+            }
+        }
+        let newID = reachable ? config?.id : nil
+        lock.lock()
+        let changed = localServerID != newID
+        localServerID = newID
+        lock.unlock()
+        if changed {
+            AppLog.debug("🌐 SERVER CONFIG: using \(reachable ? "local" : "regular") address")
+        }
+        await MainActor.run {
+            if ServerConfigManager.shared.usesLocalAddress != reachable {
+                ServerConfigManager.shared.usesLocalAddress = reachable
+            }
+        }
+    }
+}
+
 // MARK: - Server capabilities
 
 /// What the active server can answer. Stash rejects a whole query over one unknown field or sort,

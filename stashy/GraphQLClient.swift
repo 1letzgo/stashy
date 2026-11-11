@@ -256,7 +256,17 @@ actor GraphQLClient {
     // MARK: - Private Helpers
 
     private func performRequest(_ request: URLRequest) async throws -> Data {
-        let (data, response) = try await session.data(for: request)
+        let data: Data
+        let response: URLResponse
+        do {
+            (data, response) = try await session.data(for: request)
+        } catch {
+            // Maybe the address in use stopped answering (left or joined the home network).
+            if let code = (error as? URLError)?.code, code != .cancelled {
+                ServerEndpointSelector.shared.noteConnectionFailure()
+            }
+            throw error
+        }
 
         if Self.isDatabaseLocked(data: data) {
             throw DatabaseLockedError()
@@ -282,6 +292,8 @@ actor GraphQLClient {
     }
 
     private func buildRequest(query: String, variables: [String: Any]?) async throws -> URLRequest {
+        // Local or regular address: wait for the answer when it is being decided (max. 2 s).
+        await ServerEndpointSelector.shared.settle()
         let (urlString, authHeaders) = await MainActor.run { () -> (String?, [String: String]) in
             guard let config = ServerConfigManager.shared.loadConfig(),
                   config.hasValidConfig else {

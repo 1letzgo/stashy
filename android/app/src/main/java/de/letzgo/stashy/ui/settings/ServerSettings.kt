@@ -21,6 +21,7 @@ import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
@@ -87,6 +88,22 @@ object ActiveServerStatus {
     fun reset() { isConnected = null; testedFor = null; statusText = "Not connected" }
 }
 
+/** URL lines of a server: the external address, as "Remote: …" plus "Local: …" when it has a local one; the active server's address in use is bold. */
+@Composable
+private fun serverUrlText(server: ServerConfig, active: Boolean): androidx.compose.ui.text.AnnotatedString {
+    val local = server.localURL?.takeIf { it.isNotBlank() }
+        ?: return androidx.compose.ui.text.AnnotatedString(server.externalBaseURL)
+    val usesLocal by de.letzgo.stashy.data.ServerEndpointSelector.activeUsesLocal.collectAsState()
+    val bold = androidx.compose.ui.text.SpanStyle(fontWeight = androidx.compose.ui.text.font.FontWeight.Bold)
+    return androidx.compose.ui.text.buildAnnotatedString {
+        val remote = "Remote: " + server.externalBaseURL
+        if (active && !usesLocal) { pushStyle(bold); append(remote); pop() } else append(remote)
+        append("\n")
+        val localLine = "Local: $local"
+        if (active && usesLocal) { pushStyle(bold); append(localLine); pop() } else append(localLine)
+    }
+}
+
 /** iOS `ServerListRow.onConnect` / `ServerDetailView.connectServer`: activate and reset all stacks. */
 fun connectServer(server: ServerConfig) {
     ServerConfigManager.activate(server)
@@ -135,7 +152,7 @@ private fun ServerListRow(server: ServerConfig) {
         // Material list item like the Wi-Fi list: tap connects, the gear opens the server details.
         Box(Modifier.background(p.secondaryBackground)) {
             NativeListItem(
-                server.name, supporting = server.baseURL,
+                server.name, supportingStyled = serverUrlText(server, active),
                 onClick = { if (!active) connectServer(server) },
                 leading = { Box(Modifier.size(24.dp), contentAlignment = Alignment.Center) { Box(Modifier.size(10.dp).background(dot, CircleShape)) } },
                 trailing = {
@@ -174,7 +191,7 @@ class ServerDetailScreen(private val serverId: String) : Screen {
             SettingsList(top) {
                 settingsSection(header = "Server Information", key = "info") {
                     ValueRow("Name", server.name); SettingsDivider()
-                    ValueRow("URL", server.baseURL); SettingsDivider()
+                    NativeListItem("URL", supportingStyled = serverUrlText(server, active)); SettingsDivider()
                     ValueRow("Protocol", server.serverProtocol.name)
                     if (active) {
                         SettingsDivider()
@@ -300,6 +317,7 @@ class ServerFormScreen(private val serverId: String?) : Screen {
         var name by remember { mutableStateOf(existing?.name ?: "My Stash") }
         var address by remember { mutableStateOf(existing?.let { ServerAddress.display(it) } ?: "") }
         var proto by remember { mutableStateOf(existing?.serverProtocol ?: ServerProtocol.HTTPS) }
+        var localAddress by remember { mutableStateOf(existing?.localURL ?: "") }
         var apiKey by remember { mutableStateOf(existing?.apiKey ?: "") }
         var auth by remember { mutableStateOf(if (existing?.apiKey != null) AuthMethod.ApiKey else AuthMethod.None) }
         var username by remember { mutableStateOf("") }
@@ -337,6 +355,7 @@ class ServerFormScreen(private val serverId: String?) : Screen {
             val config = ServerConfig(
                 id = existing?.id ?: java.util.UUID.randomUUID().toString().uppercase(),
                 name = name, serverAddress = parsed.host, port = parsed.port, serverProtocol = proto, subpath = parsed.subpath,
+                localURL = ServerAddress.normalizeLocal(localAddress),
             )
             val key = if (auth != AuthMethod.None) apiKey.trim().ifEmpty { null } else null
             ServerConfigManager.save(config, apiKey = key, headers = usableHeaders())
@@ -366,6 +385,12 @@ class ServerFormScreen(private val serverId: String?) : Screen {
                     SettingsRow {
                         PlainTextField(address, ::onAddress, "192.168.1.100:9999 or stash.example.com", keyboard = KeyboardType.Uri, label = "Server Address")
                     }
+                }
+                settingsSection(
+                    header = "Local Address", key = "local",
+                    footer = "Optional. Used instead of the address above whenever it answers, for example on your home network. Falls back automatically.",
+                ) {
+                    SettingsRow { PlainTextField(localAddress, { localAddress = it }, "192.168.1.100:9999", keyboard = KeyboardType.Uri, label = "Local Address") }
                 }
                 val authFooter = when (auth) {
                     AuthMethod.None -> "No authentication will be used."

@@ -28,15 +28,16 @@ object ServerConnection {
     }
 
     /** Only a GraphQL answer carrying Stash's version counts as connected (same rules as iOS). */
-    suspend fun probe(baseURL: String, apiKey: String?, headers: List<ServerHTTPHeader> = emptyList()): Outcome = withContext(Dispatchers.IO) {
-        val request = Request.Builder().url("$baseURL/graphql")
+    suspend fun probe(baseURL: String, apiKey: String?, headers: List<ServerHTTPHeader> = emptyList(), timeoutMillis: Long? = null): Outcome = withContext(Dispatchers.IO) {
+        val client = timeoutMillis?.let { probeClient.newBuilder().readTimeout(it, TimeUnit.MILLISECONDS).callTimeout(it, TimeUnit.MILLISECONDS).build() } ?: probeClient
+        val request = Request.Builder().url("$baseURL/graphql").tag(Net.NoRewrite::class.java, Net.NoRewrite)
             .post(VERSION_QUERY.toRequestBody("application/json".toMediaType()))
             .apply {
                 apiKey?.takeIf { it.isNotBlank() }?.let { header("ApiKey", it.trim()) }
                 headers.filter { it.isUsable }.forEach { header(it.name.trim(), it.value.trim()) }
             }.build()
         try {
-            probeClient.newCall(request).execute().use { r ->
+            client.newCall(request).execute().use { r ->
                 val text = r.body?.string().orEmpty()
                 // Stash 0.32+ refuses these before authentication, so "check the API key" would mislead.
                 val body = text.lowercase()
@@ -72,10 +73,10 @@ object ServerConnection {
             .cookieJar(MemoryCookieJar())
             .build()
         fun Request.Builder.custom() = apply { headers.filter { it.isUsable }.forEach { header(it.name.trim(), it.value.trim()) } }
-        val login = Request.Builder().url("$baseURL/login").custom()
+        val login = Request.Builder().url("$baseURL/login").tag(Net.NoRewrite::class.java, Net.NoRewrite).custom()
             .post(FormBody.Builder().add("username", username).add("password", password).build()).build()
         client.newCall(login).execute().use { if (it.code != 200) throw Exception("Login failed: Server returned status code ${it.code}") }
-        val gql = Request.Builder().url("$baseURL/graphql").custom()
+        val gql = Request.Builder().url("$baseURL/graphql").tag(Net.NoRewrite::class.java, Net.NoRewrite).custom()
             .post("""{"query": "{ configuration { general { apiKey } } }"}""".toRequestBody("application/json".toMediaType())).build()
         client.newCall(gql).execute().use { r ->
             if (r.code != 200) throw Exception("Login failed: GraphQL request failed: ${r.code}")

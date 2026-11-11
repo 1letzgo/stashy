@@ -40,4 +40,20 @@ object ServerAddress {
         config.subpath?.takeIf { it.isNotEmpty() }?.let { s += if (it.startsWith("/")) it else "/$it" }
         return s
     }
+
+    /**
+     * Local address field → `scheme://host[:port][/subpath]` (scheme defaults to http, no trailing
+     * slash); blank or unparsable → null.
+     */
+    fun normalizeLocal(input: String): String? {
+        val trimmed = input.trim()
+        if (trimmed.isEmpty()) return null
+        val (protocol, rest) = detectProtocol(trimmed)
+        val parsed = parse(rest)
+        if (parsed.host.isBlank() || parsed.host.contains(' ')) return null
+        val scheme = if (protocol == ServerProtocol.HTTPS) "https" else "http"
+        val port = parsed.port?.let { ":$it" }.orEmpty()
+        val sub = parsed.subpath?.let { if (it.startsWith("/")) it else "/$it" }.orEmpty()
+        return "$scheme://${parsed.host}$port$sub"
+    }
 }

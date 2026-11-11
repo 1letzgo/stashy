@@ -1015,6 +1015,7 @@ struct TVServerFormView: View {
     @State private var name: String = ""
     @State private var address: String = ""
     @State private var port: String = ""
+    @State private var localAddress: String = ""
     @State private var selectedProtocol: ServerProtocol = .https
     @State private var apiKey: String = ""
     /// Custom HTTP headers (SSO / reverse proxy), stored with the config on tvOS.
@@ -1075,6 +1076,15 @@ struct TVServerFormView: View {
                             }
                             .pickerStyle(.segmented)
                             .frame(maxWidth: 300)
+                        }
+
+                        VStack(alignment: .leading, spacing: 8) {
+                            TextField("Local Address (optional, e.g. 192.168.1.100:9999)", text: $localAddress)
+                                .autocorrectionDisabled()
+                                .textInputAutocapitalization(.never)
+                            Text("Used instead of the address above whenever it answers, for example on your home network. Falls back automatically.")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
                         }
 
                         // Authentication Section
@@ -1154,6 +1164,7 @@ struct TVServerFormView: View {
                     name = server.name
                     address = server.serverAddress
                     port = server.port ?? ""
+                    localAddress = server.localBaseURL ?? ""
                     selectedProtocol = server.serverProtocol
                     apiKey = server.secureApiKey ?? ""
                     customHeaders = server.secureCustomHeaders
@@ -1189,7 +1200,8 @@ struct TVServerFormView: View {
             customHeaders: {
                 let usable = ServerHTTPHeader.sanitized(customHeaders)
                 return usable.isEmpty ? nil : usable
-            }()
+            }(),
+            localURL: ServerConfig.normalizedLocalURL(localAddress)
         )
 
         onSave(config)

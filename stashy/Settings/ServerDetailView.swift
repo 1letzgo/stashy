@@ -16,6 +16,7 @@ struct ServerDetailView: View {
     @EnvironmentObject var coordinator: NavigationCoordinator
 
     @State private var showingEditSheet = false
+    @State private var showingDeleteAlert = false
     @State private var alertTitle = ""
     @State private var alertMessage = ""
     @State private var showAlert = false
@@ -28,16 +29,24 @@ struct ServerDetailView: View {
     }
 
     var body: some View {
-        let infoCount = isActive ? 4 : 3
+        let hasLocal = server.localBaseURL != nil
+        let infoCount = (isActive ? 4 : 3) + (hasLocal ? 1 : 0)
+        let usesLocal = isActive && configManager.usesLocalAddress
         List {
             Section {
                 stashyScrollingSectionHeader("Server Information")
                 LabeledContent("Name", value: server.name)
                     .stashyGroupedBlockRow(index: 0, count: infoCount)
-                LabeledContent("URL", value: server.baseURL)
+                LabeledContent(hasLocal ? "Remote" : "URL", value: server.externalBaseURL)
+                    .fontWeight(hasLocal && isActive && !usesLocal ? .bold : .regular)
                     .stashyGroupedBlockRow(index: 1, count: infoCount)
+                if let local = server.localBaseURL {
+                    LabeledContent("Local", value: local)
+                        .fontWeight(usesLocal ? .bold : .regular)
+                        .stashyGroupedBlockRow(index: 2, count: infoCount)
+                }
                 LabeledContent("Protocol", value: server.serverProtocol.displayName)
-                    .stashyGroupedBlockRow(index: 2, count: infoCount)
+                    .stashyGroupedBlockRow(index: hasLocal ? 3 : 2, count: infoCount)
                 if isActive {
                     HStack {
                         Text("Status")
@@ -45,7 +54,7 @@ struct ServerDetailView: View {
                         Text(viewModel.serverStatus)
                             .foregroundColor(viewModel.isServerConnected ? .green : .red)
                     }
-                    .stashyGroupedBlockRow(index: 3, count: infoCount)
+                    .stashyGroupedBlockRow(index: infoCount - 1, count: infoCount)
                 }
             }
 
@@ -65,10 +74,7 @@ struct ServerDetailView: View {
                         .foregroundColor(.primary)
                 }
                 .stashyGroupedBlockRow(index: 0, count: 2)
-                Button(role: .destructive, action: {
-                    configManager.deleteServer(id: server.id)
-                    presentationMode.wrappedValue.dismiss()
-                }) {
+                Button(role: .destructive, action: { showingDeleteAlert = true }) {
                     Label("Delete Server", systemImage: "trash")
                         .foregroundColor(appearanceManager.tintColor)
                 }
@@ -83,6 +89,15 @@ struct ServerDetailView: View {
                     .foregroundColor(.green)
                     .font(.caption)
             }
+        }
+        .alert("Delete Server", isPresented: $showingDeleteAlert) {
+            Button("Cancel", role: .cancel) { }
+            Button("Delete", role: .destructive) {
+                configManager.deleteServer(id: server.id)
+                presentationMode.wrappedValue.dismiss()
+            }
+        } message: {
+            Text("Are you sure you want to delete this server configuration? This action cannot be undone.")
         }
         .alert(alertTitle, isPresented: $showAlert) {
             Button("OK", role: .cancel) { }

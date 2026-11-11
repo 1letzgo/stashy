@@ -41,6 +41,7 @@ data class SettingsTransferFile(
         val port: String? = null,
         val serverProtocol: String,
         val subpath: String? = null,
+        val localURL: String? = null,
         val apiKey: String? = null,
         val customHeaders: List<Header>? = null,
     )
@@ -211,6 +212,7 @@ object SettingsTransfer {
         return ServerConfig(
             id = server.id, name = server.name, serverAddress = server.serverAddress,
             port = server.port?.takeIf { it.isNotBlank() }, serverProtocol = proto, subpath = server.subpath?.takeIf { it.isNotBlank() },
+            localURL = server.localURL?.takeIf { it.isNotBlank() },
         )
     }
 
@@ -220,7 +222,7 @@ object SettingsTransfer {
         val servers = ServerConfigManager.savedServers.map { c ->
             SettingsTransferFile.Server(
                 id = c.id, name = c.name, serverAddress = c.serverAddress, port = c.port,
-                serverProtocol = c.serverProtocol.name, subpath = c.subpath,
+                serverProtocol = c.serverProtocol.name, subpath = c.subpath, localURL = c.localURL,
                 apiKey = if (includeSecrets) c.apiKey else null,
                 customHeaders = if (includeSecrets) c.customHeaders.takeIf { it.isNotEmpty() }?.map { SettingsTransferFile.Header(it.id, it.name, it.value) } else null,
             )

@@ -2252,7 +2252,8 @@ struct FullScreenImageView: View {
     private func shareCurrentImage() {
         let targetId = currentVisibleId ?? selectedImageId
         guard let currentImage = images.first(where: { $0.id == targetId }),
-              let url = currentImage.imageURL else { return }
+              let imageURL = currentImage.imageURL else { return }
+        let url = ServerConfigManager.shared.activeConfig?.activeAddressed(imageURL) ?? imageURL
 
         Task {
             let sessionConfig = URLSessionConfiguration.default

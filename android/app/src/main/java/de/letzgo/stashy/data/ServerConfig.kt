@@ -41,8 +41,11 @@ data class ServerConfig(
     val port: String? = null,
     val serverProtocol: ServerProtocol = ServerProtocol.HTTPS,
     val subpath: String? = null,
+    /** Optional second address (`scheme://host[:port][/subpath]`, no trailing slash), used while it answers as Stash. */
+    val localURL: String? = null,
 ) {
-    val baseURL: String get() {
+    /** The normal (external) address. */
+    val externalBaseURL: String get() {
         val effectivePort = port?.takeIf { it.isNotBlank() } ?: serverProtocol.defaultPort
         val scheme = if (serverProtocol == ServerProtocol.HTTPS) "https" else "http"
         val needsPort = effectivePort != serverProtocol.defaultPort
@@ -50,6 +53,32 @@ data class ServerConfig(
         subpath?.takeIf { it.isNotEmpty() }?.let { url += if (it.startsWith("/")) it else "/$it" }
         return url
     }
+
+    /** [localURL] while [ServerEndpointSelector] says this server currently uses it, else [externalBaseURL]. */
+    val baseURL: String get() = localURL?.takeIf { it.isNotBlank() && ServerEndpointSelector.usesLocal(id) } ?: externalBaseURL
+
+    private val localEndpoint: Endpoint? get() = localURL?.takeIf { it.isNotBlank() }?.let { Endpoint.parse(it) }
+
+    /** True when [host] is this server's external or local host (custom headers / ApiKey go there). */
+    fun ownsHost(host: String): Boolean =
+        host.equals(serverAddress, ignoreCase = true) || localEndpoint?.host.equals(host, ignoreCase = true)
+
+    /**
+     * Rewrites an absolute URL of the other endpoint to [toLocal]'s endpoint. Unchanged without a
+     * local address, for foreign hosts, or when the ports/subpath do not match the other endpoint.
+     */
+    fun addressed(url: String, toLocal: Boolean): String {
+        val local = localEndpoint ?: return url
+        val external = Endpoint.parse(externalBaseURL) ?: return url
+        return if (toLocal) Endpoint.swap(url, external, local) else Endpoint.swap(url, local, external)
+    }
+
+    /** [url] on whichever endpoint is in use right now. */
+    fun activeAddressed(url: String): String =
+        if (localURL == null) url else addressed(url, ServerEndpointSelector.usesLocal(id))
+
+    /** [url] on the external endpoint (stable cache keys). */
+    fun canonicalAddressed(url: String): String = addressed(url, toLocal = false)
 
     val hasValidConfig: Boolean get() = serverAddress.isNotEmpty()
 
@@ -65,10 +94,47 @@ data class ServerConfig(
     fun requestHeaders(host: String? = null): Map<String, String> {
         val headers = mutableMapOf<String, String>()
         apiKey?.let { headers["ApiKey"] = it }
-        if (host == null || host.equals(serverAddress, ignoreCase = true)) {
+        if (host == null || ownsHost(host)) {
             customHeaders.forEach { headers[it.name.trim()] = it.value.trim() }
         }
         return headers
+    }
+}
+
+/** A parsed base URL (`scheme://host[:port][/subpath]`); pure, so the address swap is unit-testable. */
+internal data class Endpoint(val scheme: String, val host: String, val explicitPort: Int?, val subpath: String) {
+    val port: Int get() = explicitPort ?: if (scheme == "https") 443 else 80
+
+    companion object {
+        private val pattern = Regex("""^(https?)://(?:[^/?#@]*@)?(\[[^\]]+\]|[^/?#:]+)(?::(\d+))?([^?#]*)(.*)$""", RegexOption.IGNORE_CASE)
+
+        fun parse(url: String): Endpoint? {
+            val m = pattern.matchEntire(url.trim()) ?: return null
+            val path = m.groupValues[4].let { if (it == "/") "" else it.trimEnd('/') }
+            return Endpoint(m.groupValues[1].lowercase(), m.groupValues[2], m.groupValues[3].toIntOrNull(), path)
+        }
+
+        /** Moves [url] from [from] to [to] when it belongs to [from]; otherwise returns it as is. */
+        fun swap(url: String, from: Endpoint, to: Endpoint): String {
+            val m = pattern.matchEntire(url) ?: return url
+            val scheme = m.groupValues[1].lowercase()
+            val host = m.groupValues[2]
+            val explicit = m.groupValues[3].toIntOrNull()
+            if (!host.equals(from.host, ignoreCase = true)) return url
+            val effective = explicit ?: if (scheme == "https") 443 else 80
+            val fromEffective = from.explicitPort ?: if (from.scheme == "https") 443 else 80
+            val samePort = effective == fromEffective || (explicit == null && from.explicitPort == null)
+            if (!samePort) return url
+            val path = m.groupValues[4]
+            val rest = when {
+                from.subpath.isEmpty() -> path
+                path == from.subpath -> ""
+                path.startsWith(from.subpath + "/") -> path.removePrefix(from.subpath)
+                else -> return url
+            }
+            val authority = to.host + (to.explicitPort?.let { ":$it" } ?: "")
+            return "${to.scheme}://$authority${to.subpath}$rest${m.groupValues[5]}"
+        }
     }
 }
 
@@ -136,6 +202,8 @@ object ServerConfigManager {
         AuthEvents.reset()
         Prefs.commitString(ACTIVE_KEY, config?.let { Json.encodeToString(ServerConfig.serializer(), it) })
         Net.resetConnections()
+        // Before the data reload: requests wait for this probe (ServerEndpointSelector.settle()).
+        ServerEndpointSelector.refresh(blocking = true)
     }
 
     fun delete(config: ServerConfig) {

@@ -142,7 +142,9 @@ class ImageCache {
     
     /// Creates a stable cache key by stripping variable query parameters (like ?t=timestamp)
     /// But KEEPS size parameters (width, height) to allow caching different sizes
-    private func stableCacheKey(for url: NSURL) -> String {
+    private func stableCacheKey(for rawURL: NSURL) -> String {
+        // One entry per image, whichever of the server's two addresses delivered it.
+        let url = (ServerConfigManager.shared.activeConfig?.addressed(rawURL as URL, toLocal: false) ?? rawURL as URL) as NSURL
         let absString = url.absoluteString ?? ""
         // Fast path: if no query params, return as is
         if !absString.contains("?") {

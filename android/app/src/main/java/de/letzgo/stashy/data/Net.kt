@@ -8,6 +8,7 @@ import kotlinx.serialization.json.Json as KJson
 import okhttp3.ConnectionPool
 import okhttp3.Dispatcher
 import okhttp3.Interceptor
+import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 import okhttp3.OkHttpClient
 import java.net.Socket
 import java.security.KeyStore
@@ -34,12 +35,23 @@ val Json = KJson {
  * `ApiKey` and custom headers automatically.
  */
 object Net {
+    /** Request tag: probes name their address explicitly, so it must not be rewritten. */
+    object NoRewrite
+
+    /**
+     * Single choke point for stored absolute URLs: a URL of the server's other address (images,
+     * streams, downloads, captions) is moved to the address in use, then the auth headers follow.
+     */
     private val authInterceptor = Interceptor { chain ->
-        val request = chain.request()
+        var request = chain.request()
         val config = ServerConfigManager.activeConfig
-        if (config == null || !request.url.host.equals(config.serverAddress, ignoreCase = true)) {
-            return@Interceptor chain.proceed(request)
+        if (config == null) return@Interceptor chain.proceed(request)
+        if (config.localURL != null && request.tag(NoRewrite::class.java) == null) {
+            val original = request.url.toString()
+            val rewritten = config.activeAddressed(original)
+            if (rewritten != original) rewritten.toHttpUrlOrNull()?.let { request = request.newBuilder().url(it).build() }
         }
+        if (!config.ownsHost(request.url.host)) return@Interceptor chain.proceed(request)
         val builder = request.newBuilder()
         config.requestHeaders(request.url.host).forEach { (name, value) ->
             if (request.header(name) == null) builder.header(name, value)
@@ -131,6 +143,8 @@ object Net {
         debugLog?.invoke("$reason: evicting idle connections")
         pool.evictAll()
         dns.forgetFailures()
+        // The local address may (not) be reachable on the new network.
+        ServerEndpointSelector.refresh(blocking = true)
     }
 
     private fun systemTrustManager(): X509TrustManager {
