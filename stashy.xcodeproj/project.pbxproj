@@ -965,6 +965,11 @@
 				"zh-Hans",
 				"zh-Hant",
 				ar,
+				es,
+				it,
+				ko,
+				ru,
+				tr,
 			);
 			mainGroup = 08FB778CFE84155DC02AAC07;
 			packageReferences = (
@@ -1549,7 +1554,7 @@
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_ENTITLEMENTS = stashy.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 485;
+				CURRENT_PROJECT_VERSION = 486;
 				DEVELOPMENT_TEAM = 699G2QY959;
 				ENABLE_PREVIEWS = YES;
 				INFOPLIST_FILE = stashy/Info.plist;
@@ -1580,7 +1585,7 @@
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_ENTITLEMENTS = stashy.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 485;
+				CURRENT_PROJECT_VERSION = 486;
 				DEVELOPMENT_TEAM = 699G2QY959;
 				ENABLE_PREVIEWS = YES;
 				INFOPLIST_FILE = stashy/Info.plist;
@@ -1694,7 +1699,7 @@
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 405;
+				CURRENT_PROJECT_VERSION = 406;
 				DEVELOPMENT_TEAM = 699G2QY959;
 				ENABLE_HARDENED_RUNTIME = YES;
 				ENABLE_PREVIEWS = YES;
@@ -1725,7 +1730,7 @@
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 405;
+				CURRENT_PROJECT_VERSION = 406;
 				DEVELOPMENT_TEAM = 699G2QY959;
 				ENABLE_HARDENED_RUNTIME = YES;
 				ENABLE_PREVIEWS = YES;

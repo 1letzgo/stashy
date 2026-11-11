@@ -33,10 +33,11 @@ enum AppLanguage {
 
     /// Languages with a translation in Tolgee, named in their own language.
     static let options: [(code: String, name: String)] = [
-        ("en", "English"), ("de", "Deutsch"), ("fr", "Français"), ("nl", "Nederlands"),
-        ("sv", "Svenska"), ("da", "Dansk"), ("nb", "Norsk bokmål"), ("pl", "Polski"),
-        ("pt-BR", "Português (Brasil)"), ("ja", "日本語"), ("zh-Hans", "简体中文"),
-        ("zh-Hant", "繁體中文"), ("ar", "العربية"),
+        ("en", "English"), ("de", "Deutsch"), ("es", "Español"), ("fr", "Français"),
+        ("it", "Italiano"), ("nl", "Nederlands"), ("sv", "Svenska"), ("da", "Dansk"),
+        ("nb", "Norsk bokmål"), ("pl", "Polski"), ("pt-BR", "Português (Brasil)"),
+        ("tr", "Türkçe"), ("ru", "Русский"), ("ar", "العربية"), ("ja", "日本語"),
+        ("ko", "한국어"), ("zh-Hans", "简体中文"), ("zh-Hant", "繁體中文"),
     ]
 
     /// The stored choice (what the picker shows).
@@ -99,6 +100,19 @@ enum AppLanguage {
     private static let english: Bundle = lproj("en") ?? .main
     private static let state = LockedValue(State(code: stored))
     private static let missing = "\u{1}"
+
+    /// Whether `text` is the text of `key` in any of the app's languages (or an older English
+    /// wording of it), e.g. a default title stored while another language was active.
+    static func isTranslation(_ text: String, ofKey key: String) -> Bool {
+        let fold: (String) -> String = { $0.lowercased().filter { $0.isLetter || $0.isNumber } }
+        let target = fold(text)
+        if target.isEmpty { return false }
+        let codes = ["en"] + options.map(\.code)
+        return codes.contains { code in
+            guard let bundle = lproj(code) else { return false }
+            return fold(bundle.localizedString(forKey: key, value: missing, table: nil)) == target
+        }
+    }
 
     /// The text in the active language, English when it has no translation yet.
     static func text(for key: String) -> String {

@@ -243,7 +243,7 @@ struct HomeChannelsRowView: View {
     @ViewBuilder
     private var header: some View {
         HStack(spacing: 4) {
-            Text(config.title)
+            Text(config.displayTitle)
                 .font(.headline)
                 .foregroundColor(.primary)
             Spacer(minLength: 0)

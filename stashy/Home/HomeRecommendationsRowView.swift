@@ -57,7 +57,7 @@ struct HomeRecommendationsRowView: View {
             coordinator.navigateToScenes(sort: .forYou)
         } label: {
             HStack(spacing: 4) {
-                Text(config.title)
+                Text(config.displayTitle)
                     .font(.headline)
                     .foregroundColor(isLarge ? .white : .primary)
                 Image(systemName: "chevron.right")

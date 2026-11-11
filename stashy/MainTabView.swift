@@ -106,7 +106,10 @@ struct MainTabView: View {
             // Collapsing the tab bar is decided there: only with something in the accessory slot.
             .modifier(MiniPlayerHost(hidden: coordinator.selectedTab == .reels, selectedTab: coordinator.selectedTab))
             #endif
+            #if os(macOS)
+            // macOS has no window root to swap: the tab content rebuilds (iOS: SceneDelegate).
             .id(languageStore.revision)
+            #endif
             .onAppear {
                 ServerConfigManager.shared.scrubPlaintextAPIKeysFromDisk()
                 checkConfiguration()

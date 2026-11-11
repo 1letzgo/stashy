@@ -2,7 +2,7 @@
 
 Every UI text of stashy has one **key**, shared by iOS / tvOS / macOS and Android. English is the
 source language; translations live in Tolgee, project **stashy** on https://tolgee.shelf.am
-(project id 2, languages de, fr, nl, sv, da, nb, pl, ja, pt-BR, zh-Hans, zh-Hant, ar).
+(project id 2, languages de, es, fr, it, nl, sv, da, nb, pl, pt-BR, tr, ru, ar, ja, ko, zh-Hans, zh-Hant).
 
 | | Swift | Kotlin |
 |---|---|---|

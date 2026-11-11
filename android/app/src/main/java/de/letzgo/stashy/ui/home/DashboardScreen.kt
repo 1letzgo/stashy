@@ -1,5 +1,7 @@
 package de.letzgo.stashy.ui.home
 
+
+import de.letzgo.stashy.data.displayTitle
 import de.letzgo.stashy.R
 import de.letzgo.stashy.tr
 import de.letzgo.stashy.ui.bottomBarContentPadding
@@ -252,7 +254,7 @@ private fun HomeRow(config: HomeRowConfig, isLarge: Boolean, isFirst: Boolean) {
         }
         Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
             DashboardSectionHeader(
-                config.title, Modifier.padding(top = if (isFirst) 12.dp else 0.dp),
+                config.displayTitle, Modifier.padding(top = if (isFirst) 12.dp else 0.dp),
                 onHero = showsHero, onSeeAll = { openCatalogCategory(config.type) },
             )
             when {
@@ -487,7 +489,7 @@ private fun ChannelsRow(config: HomeRowConfig, isFirst: Boolean) {
         }
     }
     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-        DashboardSectionHeader(config.title, Modifier.padding(top = if (isFirst) 12.dp else 0.dp))
+        DashboardSectionHeader(config.displayTitle, Modifier.padding(top = if (isFirst) 12.dp else 0.dp))
         if (channels.isEmpty()) {
             val msg = when {
                 SavedFiltersStore.isLoading -> tr(R.string.loading_channels)
@@ -548,7 +550,7 @@ private fun RecommendationsRow(config: HomeRowConfig, isLarge: Boolean, isFirst:
     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
         // Like every scene row: "See all" opens Scenes, here sorted For You.
         DashboardSectionHeader(
-            config.title, Modifier.padding(top = if (isFirst) 12.dp else 0.dp),
+            config.displayTitle, Modifier.padding(top = if (isFirst) 12.dp else 0.dp),
             onHero = showsHero, onSeeAll = { Nav.openCatalog(CatalogTab.Scenes, sort = "forYou") },
         )
         val items = engine.homeItems
@@ -608,7 +610,7 @@ private fun ForgottenFavoritesRow(config: HomeRowConfig, isLarge: Boolean, isFir
             HeroBackdrop((items.getOrNull(focusedIndex) ?: items.firstOrNull())?.scene?.thumbnailURL, Modifier.matchParentSize())
         }
         Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            DashboardSectionHeader(config.title, Modifier.padding(top = if (isFirst) 12.dp else 0.dp), onHero = showsHero, onSeeAll = null)
+            DashboardSectionHeader(config.displayTitle, Modifier.padding(top = if (isFirst) 12.dp else 0.dp), onHero = showsHero, onSeeAll = null)
             when {
                 engine.state == de.letzgo.stashy.data.tools.ForgottenFavoritesState.Preparing ->
                     Text(de.letzgo.stashy.data.tools.SceneRecommendations.PREPARING_MESSAGE, style = NativeType.bodyMedium, color = p.secondaryText, modifier = Modifier.padding(horizontal = RowMargin))

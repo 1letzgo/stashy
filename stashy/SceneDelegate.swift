@@ -7,6 +7,7 @@
 
 #if os(iOS)
 import UIKit
+import Combine
 import SwiftUI
 import SwiftUI
 
@@ -22,18 +23,36 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
         // This delegate does not imply the connecting scene or session are new (see `application:configurationForConnectingSceneSession` instead).
 
         // Create the SwiftUI view that provides the window contents.
-        let coordinator = navigationCoordinator
-        let contentView = LanguageRefreshing {
-            MainTabView()
-                .environmentObject(coordinator)
-        }
-
         // Use a UIHostingController as window root view controller.
         if let windowScene = scene as? UIWindowScene {
             let window = UIWindow(windowScene: windowScene)
-            window.rootViewController = UIHostingController(rootView: contentView)
+            window.rootViewController = makeRootController()
             self.window = window
             window.makeKeyAndVisible()
+        }
+
+        // A language switch rebuilds the whole interface like a fresh start (iOS cannot relaunch an
+        // app): a new root with new views and view models; the coordinator keeps the selected tab.
+        languageObserver = AppLanguageStore.shared.$revision.dropFirst().sink { [weak self] _ in
+            DispatchQueue.main.async { self?.reloadForLanguageChange() }
+        }
+    }
+
+    private var languageObserver: AnyCancellable?
+
+    private func makeRootController() -> UIViewController {
+        let coordinator = navigationCoordinator
+        return UIHostingController(rootView: LanguageRefreshing {
+            MainTabView()
+                .environmentObject(coordinator)
+        })
+    }
+
+    private func reloadForLanguageChange() {
+        guard let window else { return }
+        window.rootViewController?.dismiss(animated: false)
+        UIView.transition(with: window, duration: 0.3, options: .transitionCrossDissolve) {
+            window.rootViewController = self.makeRootController()
         }
     }
 

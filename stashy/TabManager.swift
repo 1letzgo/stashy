@@ -331,30 +331,42 @@ enum HomeRowType: String, Codable {
     /// Rows that exist only with stashy+ (hidden from Home and Settings while locked).
     var requiresStashyPlus: Bool { self == .channels || self == .recommendations || self == .forgottenFavorites }
     
-    var defaultTitle: String {
+    /// Localization key of the default title (also used to recognise a stored default title).
+    var defaultTitleKey: String {
         switch self {
-        case .lastPlayed: return tr("scenes_last_played")
-        case .lastAdded3Min: return tr("scenes_recently_added")
-        case .newest3Min: return tr("scenes_new")
-        case .mostViewed3Min: return tr("scenes_most_viewed")
-        case .topCounter3Min: return tr("scenes_top_counter")
-        case .topRating3Min: return tr("scenes_top_rated")
-        case .random: return tr("scenes_random")
-        case .statistics: return tr("statistics")
-        case .newPerformers: return tr("performers_new")
-        case .performersHighestSceneCount: return tr("performers_top")
-        case .newStudios: return tr("studios_new")
-        case .studiosHighestSceneCount: return tr("studios_top")
-        case .newGalleries: return tr("galleries_new")
-        case .recentlyUpdatedGalleries: return tr("galleries_recently_updated")
-        case .performersHighestOCount: return tr("performers_counter")
-        case .performersHighestRating: return tr("performers_rating")
-        case .galleriesHighestImageCount: return tr("galleries_image_count")
-        case .channels: return tr("channels")
-        case .recommendations: return tr("scenes_for_you")
-        case .forgottenFavorites: return tr("scenes_forgotten_favorites")
-        case .customFilter: return tr("custom_filter")
+        case .lastPlayed: return "scenes_last_played"
+        case .lastAdded3Min: return "scenes_recently_added"
+        case .newest3Min: return "scenes_new"
+        case .mostViewed3Min: return "scenes_most_viewed"
+        case .topCounter3Min: return "scenes_top_counter"
+        case .topRating3Min: return "scenes_top_rated"
+        case .random: return "scenes_random"
+        case .statistics: return "statistics"
+        case .newPerformers: return "performers_new"
+        case .performersHighestSceneCount: return "performers_top"
+        case .newStudios: return "studios_new"
+        case .studiosHighestSceneCount: return "studios_top"
+        case .newGalleries: return "galleries_new"
+        case .recentlyUpdatedGalleries: return "galleries_recently_updated"
+        case .performersHighestOCount: return "performers_counter"
+        case .performersHighestRating: return "performers_rating"
+        case .galleriesHighestImageCount: return "galleries_image_count"
+        case .channels: return "channels"
+        case .recommendations: return "scenes_for_you"
+        case .forgottenFavorites: return "scenes_forgotten_favorites"
+        case .customFilter: return "custom_filter"
         }
+    }
+
+    var defaultTitle: String { tr(defaultTitleKey) }
+}
+
+extension HomeRowConfig {
+    /// The title to show: a built-in row's stored title is its default from the day it was created
+    /// (in that day's language), so it follows the app language; a renamed or custom row keeps its own.
+    var displayTitle: String {
+        guard type != .customFilter, AppLanguage.isTranslation(title, ofKey: type.defaultTitleKey) else { return title }
+        return type.defaultTitle
     }
 }
 

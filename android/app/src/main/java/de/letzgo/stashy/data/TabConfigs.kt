@@ -75,31 +75,34 @@ data class TabConfig(
 
 /** iOS: `HomeRowType` (raw values and default titles identical). */
 @Serializable
-enum class HomeRowType(val defaultTitle: String) {
-    @SerialName("lastPlayed") LastPlayed(tr(R.string.scenes_last_played)),
-    @SerialName("lastAdded3Min") LastAdded3Min(tr(R.string.scenes_recently_added)),
-    @SerialName("newest3Min") Newest3Min(tr(R.string.scenes_new)),
-    @SerialName("mostViewed3Min") MostViewed3Min(tr(R.string.scenes_most_viewed)),
-    @SerialName("topCounter3Min") TopCounter3Min(tr(R.string.scenes_top_counter)),
-    @SerialName("topRating3Min") TopRating3Min(tr(R.string.scenes_top_rated)),
-    @SerialName("random") Random(tr(R.string.scenes_random)),
-    @SerialName("statistics") Statistics(tr(R.string.statistics)),
-    @SerialName("newPerformers") NewPerformers(tr(R.string.performers_new)),
-    @SerialName("performersHighestSceneCount") PerformersHighestSceneCount(tr(R.string.performers_top)),
-    @SerialName("newStudios") NewStudios(tr(R.string.studios_new)),
-    @SerialName("studiosHighestSceneCount") StudiosHighestSceneCount(tr(R.string.studios_top)),
-    @SerialName("newGalleries") NewGalleries(tr(R.string.galleries_new)),
-    @SerialName("recentlyUpdatedGalleries") RecentlyUpdatedGalleries(tr(R.string.galleries_recently_updated)),
-    @SerialName("performersHighestOCount") PerformersHighestOCount(tr(R.string.performers_counter)),
-    @SerialName("performersHighestRating") PerformersHighestRating(tr(R.string.performers_rating)),
-    @SerialName("galleriesHighestImageCount") GalleriesHighestImageCount(tr(R.string.galleries_image_count)),
-    @SerialName("channels") Channels(tr(R.string.channels)),
+enum class HomeRowType(@androidx.annotation.StringRes val titleRes: Int) {
+    @SerialName("lastPlayed") LastPlayed(R.string.scenes_last_played),
+    @SerialName("lastAdded3Min") LastAdded3Min(R.string.scenes_recently_added),
+    @SerialName("newest3Min") Newest3Min(R.string.scenes_new),
+    @SerialName("mostViewed3Min") MostViewed3Min(R.string.scenes_most_viewed),
+    @SerialName("topCounter3Min") TopCounter3Min(R.string.scenes_top_counter),
+    @SerialName("topRating3Min") TopRating3Min(R.string.scenes_top_rated),
+    @SerialName("random") Random(R.string.scenes_random),
+    @SerialName("statistics") Statistics(R.string.statistics),
+    @SerialName("newPerformers") NewPerformers(R.string.performers_new),
+    @SerialName("performersHighestSceneCount") PerformersHighestSceneCount(R.string.performers_top),
+    @SerialName("newStudios") NewStudios(R.string.studios_new),
+    @SerialName("studiosHighestSceneCount") StudiosHighestSceneCount(R.string.studios_top),
+    @SerialName("newGalleries") NewGalleries(R.string.galleries_new),
+    @SerialName("recentlyUpdatedGalleries") RecentlyUpdatedGalleries(R.string.galleries_recently_updated),
+    @SerialName("performersHighestOCount") PerformersHighestOCount(R.string.performers_counter),
+    @SerialName("performersHighestRating") PerformersHighestRating(R.string.performers_rating),
+    @SerialName("galleriesHighestImageCount") GalleriesHighestImageCount(R.string.galleries_image_count),
+    @SerialName("channels") Channels(R.string.channels),
     /** stashy+: "For You" — scenes picked from the user's own watch history (iOS `.recommendations`). */
-    @SerialName("recommendations") Recommendations(tr(R.string.scenes_for_you)),
+    @SerialName("recommendations") Recommendations(R.string.scenes_for_you),
     /** stashy+: top played / O-Counted scenes not played for a while (iOS `.forgottenFavorites`). */
-    @SerialName("forgottenFavorites") ForgottenFavorites(tr(R.string.scenes_forgotten_favorites));
+    @SerialName("forgottenFavorites") ForgottenFavorites(R.string.scenes_forgotten_favorites);
 
-    /** iOS `requiresStashyPlus`: rows hidden from Home and Settings while locked. */
+        /** Default title in the app's language. */
+    val defaultTitle: String get() = tr(titleRes)
+
+/** iOS `requiresStashyPlus`: rows hidden from Home and Settings while locked. */
     val requiresStashyPlus get() = this == Channels || this == Recommendations || this == ForgottenFavorites
 
     val isPerformerRow get() = this in setOf(NewPerformers, PerformersHighestSceneCount, PerformersHighestOCount, PerformersHighestRating)
@@ -117,6 +120,13 @@ data class HomeRowConfig(
     val sortOrder: Int,
     val type: HomeRowType,
 )
+
+/**
+ * iOS `HomeRowConfig.displayTitle`: a built-in row's stored title is its default from the day it
+ * was created (in that day's language), so it follows the app language; a renamed row keeps its own.
+ */
+val HomeRowConfig.displayTitle: String
+    get() = if (de.letzgo.stashy.AppLanguage.isTranslation(title, type.titleRes)) type.defaultTitle else title
 
 /** iOS: `HomeChannelSourceKind`. */
 @Serializable

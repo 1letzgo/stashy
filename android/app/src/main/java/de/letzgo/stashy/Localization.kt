@@ -34,10 +34,11 @@ object AppLanguage {
 
     /** Languages with a translation in Tolgee, named in their own language. */
     val options: List<Pair<String, String>> = listOf(
-        "en" to "English", "de" to "Deutsch", "fr" to "Français", "nl" to "Nederlands",
-        "sv" to "Svenska", "da" to "Dansk", "nb" to "Norsk bokmål", "pl" to "Polski",
-        "pt-BR" to "Português (Brasil)", "ja" to "日本語", "zh-Hans" to "简体中文",
-        "zh-Hant" to "繁體中文", "ar" to "العربية",
+        "en" to "English", "de" to "Deutsch", "es" to "Español", "fr" to "Français",
+        "it" to "Italiano", "nl" to "Nederlands", "sv" to "Svenska", "da" to "Dansk",
+        "nb" to "Norsk bokmål", "pl" to "Polski", "pt-BR" to "Português (Brasil)",
+        "tr" to "Türkçe", "ru" to "Русский", "ar" to "العربية", "ja" to "日本語",
+        "ko" to "한국어", "zh-Hans" to "简体中文", "zh-Hant" to "繁體中文",
     )
 
     /** The stored choice (what the picker shows). */
@@ -56,6 +57,29 @@ object AppLanguage {
         val launch = context.packageManager.getLaunchIntentForPackage(context.packageName) ?: return
         context.startActivity(android.content.Intent.makeRestartActivityTask(launch.component))
         Runtime.getRuntime().exit(0)
+    }
+
+    private val translationCache = java.util.concurrent.ConcurrentHashMap<Int, Set<String>>()
+
+    /**
+     * Whether [text] is the text of [id] in any of the app's languages (or an older English wording
+     * of it), e.g. a default title stored while another language was active.
+     */
+    fun isTranslation(text: String, @StringRes id: Int): Boolean {
+        val fold = { s: String -> s.lowercase().filter { it.isLetterOrDigit() } }
+        val target = fold(text)
+        if (target.isEmpty()) return false
+        val context = Localization.context ?: return false
+        val all = translationCache.getOrPut(id) {
+            options.map { it.first }.mapNotNull { code ->
+                runCatching {
+                    val config = android.content.res.Configuration(context.resources.configuration)
+                    config.setLocale(java.util.Locale.forLanguageTag(code))
+                    fold(context.createConfigurationContext(config).getString(id))
+                }.getOrNull()
+            }.toSet()
+        }
+        return target in all
     }
 
     /** For formatting (weekdays, dates) in the app's language. */

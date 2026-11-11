@@ -135,7 +135,7 @@ struct DashboardSettingsView: View {
             }
             Button(tr("action_cancel"), role: .cancel) { rowToRemove = nil }
         } message: {
-            Text(tr("hint_removes_arg_from_dashboard_saved", rowToRemove?.title ?? ""))
+            Text(tr("hint_removes_arg_from_dashboard_saved", rowToRemove?.displayTitle ?? ""))
         }
     }
 
@@ -149,14 +149,14 @@ struct DashboardSettingsView: View {
             )) {
                 if row.type == .customFilter {
                     VStack(alignment: .leading, spacing: 2) {
-                        Text(row.title)
+                        Text(row.displayTitle)
                         Text(customRowSubtitle(row))
                             .font(.caption)
                             .foregroundColor(.secondary)
                             .lineLimit(1)
                     }
                 } else {
-                    Text(row.title)
+                    Text(row.displayTitle)
                 }
             }
             .tint(appearanceManager.tintColor)

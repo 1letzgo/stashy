@@ -22,7 +22,7 @@ struct HomeForgottenFavoritesRowView: View {
     var body: some View {
         // An empty row is left out by HomeView: nothing forgotten is good news, not a message.
         VStack(alignment: .leading, spacing: isLarge ? 8 : 12) {
-            Text(config.title)
+            Text(config.displayTitle)
                 .font(.headline)
                 .foregroundColor(isLarge ? .white : .primary)
                 .padding(.horizontal, 12)

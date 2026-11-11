@@ -1,5 +1,7 @@
 package de.letzgo.stashy.ui.settings
 
+
+import de.letzgo.stashy.data.displayTitle
 import de.letzgo.stashy.R
 import de.letzgo.stashy.tr
 import de.letzgo.stashy.data.ImageGroupMode
@@ -191,7 +193,7 @@ class DashboardSettingsScreen : Screen {
                             }) { row, i, handle ->
                                 Column {
                                     SettingsRow(verticalPadding = 6.dp) {
-                                        Text(row.title, style = NativeType.bodyLarge, color = Theme.palette.text, modifier = Modifier.weight(1f))
+                                        Text(row.displayTitle, style = NativeType.bodyLarge, color = Theme.palette.text, modifier = Modifier.weight(1f))
                                         SettingsSwitch(row.isEnabled) { TabManager.toggleHomeRow(row.id) }
                                         DragHandle(handle)
                                     }

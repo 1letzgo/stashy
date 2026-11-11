@@ -168,7 +168,7 @@ struct TVImageSlideshowView: View {
                     .foregroundStyle(.white)
                 Text(tr("every_arg", TVSlideshowSettings.label(for: interval)))
                     .foregroundStyle(.white.opacity(0.85))
-                Text(("◀ ▶ " + tr("hint_browse_pause_click_speed_menu")))
+                Text(tr("hint_browse_pause_click_speed_menu"))
                     .foregroundStyle(.white.opacity(0.55))
             }
             .font(.system(size: 24, weight: .medium))

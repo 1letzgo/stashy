@@ -290,7 +290,7 @@ struct HomeRowView: View {
     private var headerRow: some View {
         Button(action: openCatalogCategory) {
             HStack(spacing: 4) {
-                Text(config.title)
+                Text(config.displayTitle)
                     .font(.headline)
                     .foregroundColor(isLarge ? .white : .primary)
                 Image(systemName: "chevron.right")

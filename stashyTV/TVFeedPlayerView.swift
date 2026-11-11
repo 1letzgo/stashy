@@ -362,7 +362,7 @@ struct TVFeedPlayerView: View {
                         .foregroundStyle(.white.opacity(0.8))
                         .lineLimit(1)
                 }
-                Text(("▲ ▼ " + tr("hint_browse_seek_hold_to_scan")))
+                Text(tr("hint_browse_seek_hold_to_scan"))
                     .font(.system(size: 20))
                     .foregroundStyle(.white.opacity(0.5))
                     .padding(.top, 6)
