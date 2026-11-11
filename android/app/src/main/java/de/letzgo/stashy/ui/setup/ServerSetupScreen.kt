@@ -72,7 +72,11 @@ import de.letzgo.stashy.ui.settings.headerProblem
 import kotlinx.coroutines.launch
 
 /** iOS: `AuthMethod` (order and titles identical). */
-enum class AuthMethod(val title: String) { None(tr(R.string.none)), Login("Login"), ApiKey(tr(R.string.api_key)) }
+enum class AuthMethod(@androidx.annotation.StringRes private val titleRes: Int) { None(R.string.none), Login(R.string.login), ApiKey(R.string.api_key);
+
+    /** Read on use: a constant must not freeze its text at class load. */
+    val title: String get() = tr(titleRes)
+}
 
 private sealed interface TestState {
     data object NotTested : TestState
@@ -155,8 +159,10 @@ fun ServerSetupScreen(existing: ServerConfig? = null, onDone: () -> Unit) {
                     Text(tr(R.string.enter_your_stash_server_information), style = NativeType.bodyLarge, color = p.secondaryText, textAlign = TextAlign.Center)
                 }
                 Spacer(Modifier.height(8.dp))
-                // App language (beta): preset to the device language on a fresh install; a change restarts the app.
-                Labeled(tr(R.string.app_language)) { de.letzgo.stashy.ui.settings.AppLanguagePickerRow() }
+                // App language: stashy follows the device; the switch forces English (restarts the app).
+                if (de.letzgo.stashy.AppLanguage.offersEnglishSwitch) {
+                    Labeled(tr(R.string.app_language)) { de.letzgo.stashy.ui.settings.AppLanguageSwitchRow() }
+                }
                 PlainTextField(serverName, { serverName = it }, tr(R.string.my_stash), label = tr(R.string.server_name))
                 Labeled(tr(R.string.protocol)) { Segmented(ServerProtocol.entries, proto, { it.name }) { proto = it } }
                 NativeTextField(
@@ -223,7 +229,7 @@ fun ServerSetupScreen(existing: ServerConfig? = null, onDone: () -> Unit) {
                         TestState.NotTested, TestState.Testing -> {
                             if (t == TestState.Testing) CircularProgressIndicator(Modifier.size(48.dp), color = Appearance.tint)
                             else Icon(SFS.antenna, null, tint = Appearance.tint, modifier = Modifier.size(60.dp))
-                            Text(if (t == TestState.Testing) "Connecting..." else tr(R.string.action_test_connection), style = NativeType.headlineSmall.copy(fontWeight = FontWeight.Bold), color = p.text)
+                            Text(if (t == TestState.Testing) tr(R.string.loading_connecting) else tr(R.string.action_test_connection), style = NativeType.headlineSmall.copy(fontWeight = FontWeight.Bold), color = p.text)
                             Text(tr(R.string.hint_were_checking_if_your_server), style = NativeType.bodyLarge, color = p.secondaryText, textAlign = TextAlign.Center)
                         }
                         TestState.Success -> {

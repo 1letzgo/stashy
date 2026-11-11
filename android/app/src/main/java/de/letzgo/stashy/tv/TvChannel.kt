@@ -26,8 +26,10 @@ import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
 
 /** iOS: `TVChannel.Scope` — entity-scoped channels, keyed by the scene-filter field. */
-enum class TvChannelScope(val raw: String, val label: String) {
-    Performer("performers", tr(R.string.performer)), Studio("studios", tr(R.string.studio)), Tag("tags", tr(R.string.tag)), Group("groups", tr(R.string.group));
+enum class TvChannelScope(val raw: String, @androidx.annotation.StringRes private val labelRes: Int) {
+    Performer("performers", R.string.performer), Studio("studios", R.string.studio), Tag("tags", R.string.tag), Group("groups", R.string.group);
+    /** Read on use: a constant must not freeze its text at class load. */
+    val label: String get() = tr(labelRes)
 
     /** Everything but `performers` is a `HierarchicalMultiCriterionInput` (needs `depth`). */
     val isHierarchical: Boolean get() = this != Performer

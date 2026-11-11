@@ -1,6 +1,7 @@
 package de.letzgo.stashy.data.tools
 
 import de.letzgo.stashy.R
+import de.letzgo.stashy.UiText
 import de.letzgo.stashy.tr
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -64,10 +65,15 @@ data class SceneRecommendation(val scene: Scene, val reason: RecommendationReaso
 }
 
 /** iOS: `RecommendationDiscovery` (raw values identical). */
-enum class RecommendationDiscovery(val raw: String, val title: String, val detail: String) {
-    Fresh("fresh", tr(R.string.new_only), tr(R.string.hint_only_scenes_you_have_never)),
-    Balanced("balanced", tr(R.string.balanced), tr(R.string.hint_unplayed_scenes_and_scenes_you)),
-    Favorites("favorites", tr(R.string.favorites), tr(R.string.hint_scenes_with_o_counts_or));
+enum class RecommendationDiscovery(val raw: String, @androidx.annotation.StringRes private val titleRes: Int, @androidx.annotation.StringRes private val detailRes: Int) {
+    Fresh("fresh", R.string.new_only, R.string.hint_only_scenes_you_have_never),
+    Balanced("balanced", R.string.balanced, R.string.hint_unplayed_scenes_and_scenes_you),
+    Favorites("favorites", R.string.favorites, R.string.hint_scenes_with_o_counts_or);
+    /** Read on use: a constant must not freeze its text at class load. */
+    val title: String get() = tr(titleRes)
+
+    /** Read on use: a constant must not freeze its text at class load. */
+    val detail: String get() = tr(detailRes)
 
     companion object { fun fromRaw(raw: String?) = entries.firstOrNull { it.raw == raw } ?: Balanced }
 }
@@ -82,10 +88,13 @@ enum class RecommendationState { Idle, Loading, Ready, NoHistory, Failed }
 @kotlinx.serialization.Serializable
 data class RecommendationAdjustment(val kind: Kind, val itemId: String, val name: String, val factor: Double) {
     @kotlinx.serialization.Serializable
-    enum class Kind(val title: String) {
-        @kotlinx.serialization.SerialName("performer") Performer(tr(R.string.performers)),
-        @kotlinx.serialization.SerialName("studio") Studio(tr(R.string.studios)),
-        @kotlinx.serialization.SerialName("tag") Tag(tr(R.string.tags)),
+    enum class Kind(private val titleText: UiText) {
+        @kotlinx.serialization.SerialName("performer") Performer(UiText(R.string.performers)),
+        @kotlinx.serialization.SerialName("studio") Studio(UiText(R.string.studios)),
+        @kotlinx.serialization.SerialName("tag") Tag(UiText(R.string.tags));
+
+        /** Read on use: a constant must not freeze its text at class load. */
+        val title: String get() = titleText.text
     }
 
     val id: String get() = "${kind.name.lowercase()}:$itemId"

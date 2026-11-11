@@ -57,10 +57,13 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 /** iOS `ToolsServerView.CleanupKind`. */
-private enum class CleanupKind(val title: String, val noun: String, val mutation: String) {
-    Tags(tr(R.string.action_remove_unused_tags), "tags", "tagsDestroy"),
-    Performers(tr(R.string.action_remove_unused_performers), "performers", "performersDestroy"),
-    Studios(tr(R.string.action_remove_unused_studios), "studios", "studiosDestroy"),
+private enum class CleanupKind(@androidx.annotation.StringRes private val titleRes: Int, val noun: String, val mutation: String) {
+    Tags(R.string.action_remove_unused_tags, "tags", "tagsDestroy"),
+    Performers(R.string.action_remove_unused_performers, "performers", "performersDestroy"),
+    Studios(R.string.action_remove_unused_studios, "studios", "studiosDestroy");
+
+    /** Read on use: a constant must not freeze its text at class load. */
+    val title: String get() = tr(titleRes)
 }
 
 /** One Generate task: label, icon, `GenerateMetadataInput` flag, alert title. */
@@ -213,8 +216,10 @@ fun ServerTasksContent(topPadding: Dp) {
 }
 
 /** iOS: the stashy+ rows of `ToolsServerView` — Filters, Merge Tags and Merge Studios as pushed pages. */
-private enum class ServerToolScreen(val title: String) : Screen {
-    Filters(tr(R.string.filters)), MergeTags(tr(R.string.action_merge_tags)), MergeStudios(tr(R.string.action_merge_studios));
+private enum class ServerToolScreen(@androidx.annotation.StringRes private val titleRes: Int) : Screen {
+    Filters(R.string.filters), MergeTags(R.string.action_merge_tags), MergeStudios(R.string.action_merge_studios);
+    /** Read on use: a constant must not freeze its text at class load. */
+    val title: String get() = tr(titleRes)
 
     override val key get() = "settings-server-$name"
 

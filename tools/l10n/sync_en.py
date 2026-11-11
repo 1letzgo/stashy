@@ -65,7 +65,8 @@ def main() -> None:
     for k in removed:
         del strings[k]
     catalog["strings"] = dict(sorted(strings.items()))
-    CATALOG.write_text(json.dumps(catalog, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    # One line, as Tolgee exports it: a pretty-printed catalog would turn every sync into a 200k-line diff.
+    CATALOG.write_text(json.dumps(catalog, ensure_ascii=False, separators=(",", ":")), encoding="utf-8")
     print(f"{len(english)} keys: {added} added, {changed} changed, {len(removed)} removed")
 
 

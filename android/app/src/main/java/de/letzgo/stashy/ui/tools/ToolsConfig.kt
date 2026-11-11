@@ -1,6 +1,7 @@
 package de.letzgo.stashy.ui.tools
 
 import de.letzgo.stashy.R
+import de.letzgo.stashy.UiText
 import de.letzgo.stashy.tr
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -14,16 +15,18 @@ import kotlinx.serialization.builtins.ListSerializer
 
 /** iOS: `ToolsItem` (raw values identical — persisted in `ToolsConfig_<serverID>`). */
 @Serializable
-enum class ToolsItem(val title: String) {
-    @SerialName("server") Server(tr(R.string.server)),
-    @SerialName("downloads") Downloads(tr(R.string.downloads)),
-    @SerialName("statistics") Statistics(tr(R.string.overview)),
-    @SerialName("oCount") OCount(tr(R.string.o_count)),
-    @SerialName("timeline") Timeline(tr(R.string.timeline)),
-    @SerialName("topLists") TopLists(tr(R.string.charts)),
-    @SerialName("filters") Filters(tr(R.string.filters)),
-    @SerialName("hotOrNot") HotOrNot(tr(R.string.match)),
-    @SerialName("rateMe") RateMe("RateMe");
+enum class ToolsItem(private val titleText: UiText) {
+    @SerialName("server") Server(UiText(R.string.server)),
+    @SerialName("downloads") Downloads(UiText(R.string.downloads)),
+    @SerialName("statistics") Statistics(UiText(R.string.overview)),
+    @SerialName("oCount") OCount(UiText(R.string.o_count)),
+    @SerialName("timeline") Timeline(UiText(R.string.timeline)),
+    @SerialName("topLists") TopLists(UiText(R.string.charts)),
+    @SerialName("filters") Filters(UiText(R.string.filters)),
+    @SerialName("hotOrNot") HotOrNot(UiText(R.string.match)),
+    @SerialName("rateMe") RateMe(UiText("RateMe"));
+    /** Read on use: a constant must not freeze its text at class load. */
+    val title: String get() = titleText.text
 
     /** Name used in stashy+ settings / paywall lists. */
     val plusFeatureTitle: String get() = if (this == HotOrNot) tr(R.string.performer_match) else title

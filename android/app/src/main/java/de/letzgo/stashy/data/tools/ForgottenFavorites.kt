@@ -20,10 +20,15 @@ import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.builtins.serializer
 
 /** iOS: `ForgottenFavoritesRanking` (raw values identical). */
-enum class ForgottenFavoritesRanking(val raw: String, val title: String, val detail: String) {
-    Plays("plays", tr(R.string.play_count), tr(R.string.hint_favorites_are_your_most_played)),
-    OCount("oCount", tr(R.string.o_count), tr(R.string.hint_favorites_are_your_scenes_with)),
-    Both("both", tr(R.string.both), tr(R.string.hint_favorites_are_your_most_played_scenes));
+enum class ForgottenFavoritesRanking(val raw: String, @androidx.annotation.StringRes private val titleRes: Int, @androidx.annotation.StringRes private val detailRes: Int) {
+    Plays("plays", R.string.play_count, R.string.hint_favorites_are_your_most_played),
+    OCount("oCount", R.string.o_count, R.string.hint_favorites_are_your_scenes_with),
+    Both("both", R.string.both, R.string.hint_favorites_are_your_most_played_scenes);
+    /** Read on use: a constant must not freeze its text at class load. */
+    val title: String get() = tr(titleRes)
+
+    /** Read on use: a constant must not freeze its text at class load. */
+    val detail: String get() = tr(detailRes)
 
     companion object { fun fromRaw(raw: String?) = entries.firstOrNull { it.raw == raw } ?: Both }
 }

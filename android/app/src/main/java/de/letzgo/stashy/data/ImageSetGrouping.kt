@@ -8,10 +8,12 @@ import kotlin.math.abs
  * iOS: `StashImageGroupMode` — how the 1/row image feeds bundle images into sets. Raw values are
  * the iOS ones (`stashline_group_mode`).
  */
-enum class ImageGroupMode(val raw: String, val displayName: String) {
-    Off("off", tr(R.string.off)),
-    Gallery("gallery", tr(R.string.by_gallery)),
-    GallerySession("gallerySession", tr(R.string.by_gallery_plus_session));
+enum class ImageGroupMode(val raw: String, @androidx.annotation.StringRes private val displayNameRes: Int) {
+    Off("off", R.string.off),
+    Gallery("gallery", R.string.by_gallery),
+    GallerySession("gallerySession", R.string.by_gallery_plus_session);
+    /** Read on use: a constant must not freeze its text at class load. */
+    val displayName: String get() = tr(displayNameRes)
 
     companion object {
         fun from(raw: String?): ImageGroupMode = entries.firstOrNull { it.raw == raw } ?: GallerySession

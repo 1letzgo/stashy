@@ -40,7 +40,7 @@ enum AuthMethod: String, Codable, CaseIterable {
     var displayName: String {
         switch self {
         case .none: return tr("none")
-        case .login: return "Login"
+        case .login: return tr("login")
         case .apiKey: return tr("api_key")
         }
     }

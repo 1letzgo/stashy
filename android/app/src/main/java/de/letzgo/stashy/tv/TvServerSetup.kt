@@ -45,7 +45,11 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 /** iOS: `AuthMethod` (raw values = labels). */
-enum class TvAuthMethod(val label: String) { None(tr(R.string.none)), Login("Login"), ApiKey(tr(R.string.api_key)) }
+enum class TvAuthMethod(@androidx.annotation.StringRes private val labelRes: Int) { None(R.string.none), Login(R.string.login), ApiKey(R.string.api_key);
+
+    /** Read on use: a constant must not freeze its text at class load. */
+    val label: String get() = tr(labelRes)
+}
 
 /** Editable state of the server form (iOS: the `@State`s of `TVServerSetupView` / `TVServerFormView`). */
 class TvServerFormState(server: ServerConfig?) {
@@ -215,7 +219,7 @@ fun TvServerSetup() {
             item {
                 TvButton({ if (!isTesting) connect() }, enabled = state.address.isNotEmpty(), contentPadding = PaddingValues(horizontal = pt(60), vertical = pt(16))) {
                     if (isTesting) TvSpinner(pt(30))
-                    Text(if (isTesting) "Connecting..." else tr(R.string.action_connect), style = TvType.title3.copy(fontWeight = FontWeight.SemiBold))
+                    Text(if (isTesting) tr(R.string.loading_connecting) else tr(R.string.action_connect), style = TvType.title3.copy(fontWeight = FontWeight.SemiBold))
                 }
             }
         }

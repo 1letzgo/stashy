@@ -23,36 +23,48 @@ interface TopListsMetric {
 }
 
 /** iOS: `SceneTopMetric` (raw values identical). */
-enum class TopListsSceneMetric(val raw: String, override val label: String, override val sortField: String) : TopListsMetric {
-    Views("views", tr(R.string.play_count), "play_count"),
-    OCount("oCount", tr(R.string.o_count), "o_counter"),
-    WatchTime("watchTime", tr(R.string.watch_time), "play_duration"),
-    Rating("rating", tr(R.string.rating), "rating"),
+enum class TopListsSceneMetric(val raw: String, @androidx.annotation.StringRes private val labelRes: Int, override val sortField: String) : TopListsMetric {
+    Views("views", R.string.play_count, "play_count"),
+    OCount("oCount", R.string.o_count, "o_counter"),
+    WatchTime("watchTime", R.string.watch_time, "play_duration"),
+    Rating("rating", R.string.rating, "rating");
+
+    /** Read on use: a constant must not freeze its text at class load. */
+    override val label: String get() = tr(labelRes)
 }
 
 /** iOS: `PerformerTopMetric`. */
-enum class TopListsPerformerMetric(val raw: String, override val label: String, override val sortField: String) : TopListsMetric {
-    OCount("oCount", tr(R.string.o_count), "o_counter"),
-    Scenes("scenes", tr(R.string.scenes), "scenes_count"),
-    Rating("rating", tr(R.string.rating), "rating"),
-    Images("images", tr(R.string.images), "images_count"),
-    Galleries("galleries", tr(R.string.galleries), "galleries_count"),
+enum class TopListsPerformerMetric(val raw: String, @androidx.annotation.StringRes private val labelRes: Int, override val sortField: String) : TopListsMetric {
+    OCount("oCount", R.string.o_count, "o_counter"),
+    Scenes("scenes", R.string.scenes, "scenes_count"),
+    Rating("rating", R.string.rating, "rating"),
+    Images("images", R.string.images, "images_count"),
+    Galleries("galleries", R.string.galleries, "galleries_count");
+
+    /** Read on use: a constant must not freeze its text at class load. */
+    override val label: String get() = tr(labelRes)
 }
 
 /** iOS: `StudioTopMetric`. */
-enum class TopListsStudioMetric(val raw: String, override val label: String, override val sortField: String) : TopListsMetric {
-    Scenes("scenes", tr(R.string.scenes), "scenes_count"),
-    Galleries("galleries", tr(R.string.galleries), "galleries_count"),
-    Rating("rating", tr(R.string.rating), "rating"),
-    Images("images", tr(R.string.images), "images_count"),
+enum class TopListsStudioMetric(val raw: String, @androidx.annotation.StringRes private val labelRes: Int, override val sortField: String) : TopListsMetric {
+    Scenes("scenes", R.string.scenes, "scenes_count"),
+    Galleries("galleries", R.string.galleries, "galleries_count"),
+    Rating("rating", R.string.rating, "rating"),
+    Images("images", R.string.images, "images_count");
+
+    /** Read on use: a constant must not freeze its text at class load. */
+    override val label: String get() = tr(labelRes)
 }
 
 /** iOS: `TagTopMetric`. */
-enum class TopListsTagMetric(val raw: String, override val label: String, override val sortField: String) : TopListsMetric {
-    Scenes("scenes", tr(R.string.scenes), "scenes_count"),
-    Images("images", tr(R.string.images), "images_count"),
-    Galleries("galleries", tr(R.string.galleries), "galleries_count"),
-    Markers("markers", tr(R.string.markers), "scene_markers_count"),
+enum class TopListsTagMetric(val raw: String, @androidx.annotation.StringRes private val labelRes: Int, override val sortField: String) : TopListsMetric {
+    Scenes("scenes", R.string.scenes, "scenes_count"),
+    Images("images", R.string.images, "images_count"),
+    Galleries("galleries", R.string.galleries, "galleries_count"),
+    Markers("markers", R.string.markers, "scene_markers_count");
+
+    /** Read on use: a constant must not freeze its text at class load. */
+    override val label: String get() = tr(labelRes)
 }
 
 /** iOS: `TopListPage` — paging cursor of one ranking. */

@@ -19,53 +19,59 @@ interface SortChoice {
 }
 
 object DetailSort {
-    enum class Scene(override val raw: String, override val label: String, override val field: String, override val direction: String) : SortChoice {
-        Random("random", tr(R.string.random), "random", "DESC"),
-        DateDesc("dateDesc", tr(R.string.date_newest_first), "date", "DESC"),
-        DateAsc("dateAsc", tr(R.string.date_oldest_first), "date", "ASC"),
-        CreatedAtDesc("createdAtDesc", tr(R.string.created_newest_first), "created_at", "DESC"),
-        CreatedAtAsc("createdAtAsc", tr(R.string.created_oldest_first), "created_at", "ASC"),
-        TitleAsc("titleAsc", tr(R.string.title_z), "title", "ASC"),
-        TitleDesc("titleDesc", tr(R.string.title_z_2), "title", "DESC"),
-        DurationDesc("durationDesc", tr(R.string.duration_longest_first), "duration", "DESC"),
-        DurationAsc("durationAsc", tr(R.string.duration_shortest_first), "duration", "ASC"),
-        LastPlayedAtDesc("lastPlayedAtDesc", tr(R.string.last_played_newest_first), "last_played_at", "DESC"),
-        LastPlayedAtAsc("lastPlayedAtAsc", tr(R.string.last_played_oldest_first), "last_played_at", "ASC"),
-        PlayCountDesc("playCountDesc", tr(R.string.most_viewed), "play_count", "DESC"),
-        PlayCountAsc("playCountAsc", tr(R.string.least_viewed), "play_count", "ASC"),
-        PlayDurationDesc("playDurationDesc", tr(R.string.watch_time_high_low), "play_duration", "DESC"),
-        PlayDurationAsc("playDurationAsc", tr(R.string.watch_time_low_high), "play_duration", "ASC"),
-        OCounterDesc("oCounterDesc", tr(R.string.counter_high_low), "o_counter", "DESC"),
-        OCounterAsc("oCounterAsc", tr(R.string.counter_low_high), "o_counter", "ASC"),
-        RatingDesc("ratingDesc", tr(R.string.rating_high_low), "rating", "DESC"),
-        RatingAsc("ratingAsc", tr(R.string.rating_low_high), "rating", "ASC");
+    enum class Scene(override val raw: String, @androidx.annotation.StringRes private val labelRes: Int, override val field: String, override val direction: String) : SortChoice {
+        Random("random", R.string.random, "random", "DESC"),
+        DateDesc("dateDesc", R.string.date_newest_first, "date", "DESC"),
+        DateAsc("dateAsc", R.string.date_oldest_first, "date", "ASC"),
+        CreatedAtDesc("createdAtDesc", R.string.created_newest_first, "created_at", "DESC"),
+        CreatedAtAsc("createdAtAsc", R.string.created_oldest_first, "created_at", "ASC"),
+        TitleAsc("titleAsc", R.string.title_z, "title", "ASC"),
+        TitleDesc("titleDesc", R.string.title_z_2, "title", "DESC"),
+        DurationDesc("durationDesc", R.string.duration_longest_first, "duration", "DESC"),
+        DurationAsc("durationAsc", R.string.duration_shortest_first, "duration", "ASC"),
+        LastPlayedAtDesc("lastPlayedAtDesc", R.string.last_played_newest_first, "last_played_at", "DESC"),
+        LastPlayedAtAsc("lastPlayedAtAsc", R.string.last_played_oldest_first, "last_played_at", "ASC"),
+        PlayCountDesc("playCountDesc", R.string.most_viewed, "play_count", "DESC"),
+        PlayCountAsc("playCountAsc", R.string.least_viewed, "play_count", "ASC"),
+        PlayDurationDesc("playDurationDesc", R.string.watch_time_high_low, "play_duration", "DESC"),
+        PlayDurationAsc("playDurationAsc", R.string.watch_time_low_high, "play_duration", "ASC"),
+        OCounterDesc("oCounterDesc", R.string.counter_high_low, "o_counter", "DESC"),
+        OCounterAsc("oCounterAsc", R.string.counter_low_high, "o_counter", "ASC"),
+        RatingDesc("ratingDesc", R.string.rating_high_low, "rating", "DESC"),
+        RatingAsc("ratingAsc", R.string.rating_low_high, "rating", "ASC");
+    /** Read on use: a constant must not freeze its text at class load. */
+    override val label: String get() = tr(labelRes)
         companion object { fun from(raw: String?) = entries.firstOrNull { it.raw == raw } }
     }
 
-    enum class Image(override val raw: String, override val label: String, override val field: String, override val direction: String) : SortChoice {
-        TitleAsc("titleAsc", tr(R.string.title_z), "title", "ASC"),
-        TitleDesc("titleDesc", tr(R.string.title_z_2), "title", "DESC"),
-        DateDesc("dateDesc", tr(R.string.date_newest), "date", "DESC"),
-        DateAsc("dateAsc", tr(R.string.date_oldest), "date", "ASC"),
-        RatingDesc("ratingDesc", tr(R.string.rating_high_low), "rating", "DESC"),
-        RatingAsc("ratingAsc", tr(R.string.rating_low_high), "rating", "ASC"),
-        CreatedAtDesc("createdAtDesc", tr(R.string.created_newest), "created_at", "DESC"),
-        CreatedAtAsc("createdAtAsc", tr(R.string.created_oldest), "created_at", "ASC"),
-        UpdatedAtDesc("updatedAtDesc", tr(R.string.updated_newest), "updated_at", "DESC"),
-        UpdatedAtAsc("updatedAtAsc", tr(R.string.updated_oldest), "updated_at", "ASC"),
-        Random("random", tr(R.string.random), "random", "DESC");
+    enum class Image(override val raw: String, @androidx.annotation.StringRes private val labelRes: Int, override val field: String, override val direction: String) : SortChoice {
+        TitleAsc("titleAsc", R.string.title_z, "title", "ASC"),
+        TitleDesc("titleDesc", R.string.title_z_2, "title", "DESC"),
+        DateDesc("dateDesc", R.string.date_newest, "date", "DESC"),
+        DateAsc("dateAsc", R.string.date_oldest, "date", "ASC"),
+        RatingDesc("ratingDesc", R.string.rating_high_low, "rating", "DESC"),
+        RatingAsc("ratingAsc", R.string.rating_low_high, "rating", "ASC"),
+        CreatedAtDesc("createdAtDesc", R.string.created_newest, "created_at", "DESC"),
+        CreatedAtAsc("createdAtAsc", R.string.created_oldest, "created_at", "ASC"),
+        UpdatedAtDesc("updatedAtDesc", R.string.updated_newest, "updated_at", "DESC"),
+        UpdatedAtAsc("updatedAtAsc", R.string.updated_oldest, "updated_at", "ASC"),
+        Random("random", R.string.random, "random", "DESC");
+    /** Read on use: a constant must not freeze its text at class load. */
+    override val label: String get() = tr(labelRes)
         companion object { fun from(raw: String?) = entries.firstOrNull { it.raw == raw } }
     }
 
 }
 
 /** iOS: `DetailViewContext` (rawValues are the persisted keys). */
-enum class DetailViewContext(val raw: String, val title: String) {
-    Performer("performer_detail", tr(R.string.performer_scenes)),
-    Studio("studio_detail", tr(R.string.studio_scenes)),
-    Tag("tag_detail", tr(R.string.tag_scenes)),
-    Gallery("gallery_detail", tr(R.string.gallery_images)),
-    Group("group_detail", tr(R.string.group_scenes));
+enum class DetailViewContext(val raw: String, @androidx.annotation.StringRes private val titleRes: Int) {
+    Performer("performer_detail", R.string.performer_scenes),
+    Studio("studio_detail", R.string.studio_scenes),
+    Tag("tag_detail", R.string.tag_scenes),
+    Gallery("gallery_detail", R.string.gallery_images),
+    Group("group_detail", R.string.group_scenes);
+    /** Read on use: a constant must not freeze its text at class load. */
+    val title: String get() = tr(titleRes)
 
     /** iOS `settingsRowTitle`. */
     val settingsRowTitle: String get() = if (this == Gallery) tr(R.string.images_sort) else tr(R.string.scenes_sort)

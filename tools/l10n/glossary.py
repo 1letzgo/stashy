@@ -34,7 +34,7 @@ LOCALE_URL = "https://raw.githubusercontent.com/stashapp/stash/{sha}/ui/v2.5/src
 TARGETS = {
     "de": "de-DE", "fr": "fr-FR", "nl": "nl-NL", "sv": "sv-SE", "da": "da-DK",
     "nb": "nb-NO", "pl": "pl-PL", "ja": "ja-JP", "pt-BR": "pt-BR",
-    "zh-Hans": "zh-CN", "zh-Hant": "zh-TW", "ar": "ar",
+    "zh-Hans": "zh-CN", "zh-Hant": "zh-TW",
     "es": "es-ES", "it": "it-IT", "ko": "ko-KR", "ru": "ru-RU", "tr": "tr-TR",
 }
 

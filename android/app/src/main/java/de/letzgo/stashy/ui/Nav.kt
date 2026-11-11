@@ -27,9 +27,11 @@ interface Screen {
 enum class MainTab { Home, Feeds, Tools, Settings, Search }
 
 /** iOS: `CatalogsView.CatalogsTab` (order and icons identical). */
-enum class CatalogTab(val title: String) {
-    Dashboard(tr(R.string.dashboard)), Scenes(tr(R.string.scenes)), Images(tr(R.string.images)), Galleries(tr(R.string.galleries)),
-    Performers(tr(R.string.performers)), Studios(tr(R.string.studios)), Tags(tr(R.string.tags)), Groups(tr(R.string.groups)), Markers(tr(R.string.markers)), Magazine(tr(R.string.magazin));
+enum class CatalogTab(@androidx.annotation.StringRes private val titleRes: Int) {
+    Dashboard(R.string.dashboard), Scenes(R.string.scenes), Images(R.string.images), Galleries(R.string.galleries),
+    Performers(R.string.performers), Studios(R.string.studios), Tags(R.string.tags), Groups(R.string.groups), Markers(R.string.markers), Magazine(R.string.magazin);
+    /** Read on use: a constant must not freeze its text at class load. */
+    val title: String get() = tr(titleRes)
 
     val icon get() = when (this) {
         Dashboard -> SF.houseFill; Scenes -> SF.film; Images -> SF.photo; Galleries -> SF.photoStack

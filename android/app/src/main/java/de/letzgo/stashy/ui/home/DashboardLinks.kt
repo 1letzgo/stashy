@@ -41,7 +41,11 @@ object DetailLinks {
 }
 
 /** iOS `HomeChannelDestination`. */
-enum class HomeChannelDestination(val label: String) { Scenes(tr(R.string.scenes)), Clips(tr(R.string.clips)) }
+enum class HomeChannelDestination(@androidx.annotation.StringRes private val labelRes: Int) { Scenes(R.string.scenes), Clips(R.string.clips);
+
+    /** Read on use: a constant must not freeze its text at class load. */
+    val label: String get() = tr(labelRes)
+}
 
 /**
  * A dashboard channel opened into Feeds (iOS `navigateToReelsChannel(filter:sort:)` /

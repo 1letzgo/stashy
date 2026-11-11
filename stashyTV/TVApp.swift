@@ -18,7 +18,8 @@ struct TVApp: App {
     @State private var lastScenePhase: ScenePhase = .active
 
     init() {
-        // English by default (beta); a language picked on iPhone / Mac applies from the next start.
+        // Apple TV stays English: it has no language picker and `app_language` is device-local
+        // (never synced), so the stored choice is always the English default here.
         AppLanguage.applyPreferredLanguages()
         #if canImport(AetherEngine)
         // TLS-Policy und Logging der Playback-Engine einmalig verdrahten.
@@ -585,7 +586,7 @@ struct TVServerSetupView: View {
                             if isTesting {
                                 ProgressView()
                             }
-                            Text(isTesting ? "Connecting..." : tr("action_connect"))
+                            Text(isTesting ? tr("loading_connecting") : tr("action_connect"))
                                 .font(.title3)
                                 .fontWeight(.semibold)
                         }

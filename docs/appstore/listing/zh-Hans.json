@@ -38,7 +38,7 @@
  "req": "系统要求：自托管 Stash 服务器（v0.26+）。",
  "eula": "使用条款（EULA）：",
  "keywords": "stash,媒体服务器,整理,视频,流媒体,客户端,管理,收藏,mirage",
- "n_lang": "stashy 现已支持 12 种语言，并在应用内提供语言选择器",
+ "n_lang": "stashy 现已支持 17 种语言，并在应用内提供语言选择器",
  "n_foryou": "For You（stashy+）：在主页推荐短片，在设备端生成，并可按演员、工作室和标签调整",
  "n_forgotten": "Forgotten Favorites（stashy+）：主页中的一行，收录你很久没有播放的收藏",
  "n_rows": "用已保存的过滤器或排序创建你自己的主页行",

@@ -340,11 +340,23 @@ struct ToolsView: View {
 
     enum ToolsTab: String, CaseIterable {
         case overview = "Overview"
-        case oCount = "O Count"
+        case oCount = "O-Count"
         case timeline = "Timeline"
         case topLists = "Charts"
         case hotOrNot = "Match"
         case rateMe = "RateMe"
+
+        /// The name on screen. The raw value is data (stored selection, launch argument).
+        var title: String {
+            switch self {
+            case .overview: return tr("overview")
+            case .oCount: return tr("o_count")
+            case .timeline: return tr("timeline")
+            case .topLists: return tr("charts")
+            case .hotOrNot: return tr("match")
+            case .rateMe: return "RateMe"
+            }
+        }
         
         var icon: String {
             switch self {
@@ -549,7 +561,7 @@ struct ToolsBreadcrumbRow<Trailing: View>: View {
             if let current {
                 Picker(tr("tool"), selection: Binding(get: { current }, set: { onSelect($0) })) {
                     ForEach(tools, id: \.self) { tool in
-                        Label(tool.rawValue, systemImage: tool.icon).tag(tool)
+                        Label(tool.title, systemImage: tool.icon).tag(tool)
                     }
                 }
                 .pickerStyle(.inline)
@@ -558,13 +570,13 @@ struct ToolsBreadcrumbRow<Trailing: View>: View {
                     Button {
                         onSelect(tool)
                     } label: {
-                        Label(tool.rawValue, systemImage: tool.icon)
+                        Label(tool.title, systemImage: tool.icon)
                     }
                 }
             }
         } label: {
             HStack(spacing: 6) {
-                Text(current?.rawValue ?? tr("tools"))
+                Text(current?.title ?? tr("tools"))
                     .font(.subheadline.weight(.semibold))
                     .lineLimit(1)
                     .minimumScaleFactor(0.8)
@@ -582,7 +594,7 @@ struct ToolsBreadcrumbRow<Trailing: View>: View {
         .menuIndicator(.hidden)
         .stashyNeutralMenuItems()
         .fixedSize()
-        .accessibilityLabel(current.map { "Tool, \($0.rawValue)" } ?? tr("tools"))
+        .accessibilityLabel(current.map { "\(tr("tool")), \($0.title)" } ?? tr("tools"))
     }
 }
 
@@ -822,7 +834,7 @@ private struct ToolsLandingView: View {
                 .clipped()
 
             HStack(spacing: 8) {
-                Text(tool.rawValue)
+                Text(tool.title)
                     .font(.subheadline)
                     .fontWeight(.bold)
                     .foregroundColor(.primary)
@@ -1233,7 +1245,7 @@ struct ToolsServerView: View {
             await refreshJobs()
             let message: String
             if result.ok {
-                message = [queued ? tr("hint_added_to_servers_job_queue") : "Done.", note]
+                message = [queued ? tr("hint_added_to_servers_job_queue") : tr("action_done"), note]
                     .compactMap { $0 }.joined(separator: " ")
             } else {
                 message = result.error ?? tr("hint_server_did_not_start_task")

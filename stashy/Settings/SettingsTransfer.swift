@@ -255,10 +255,15 @@ enum SettingsTransfer {
 
         var summary = ImportSummary()
         let defaults = UserDefaults.standard
+        let languageBefore = AppLanguage.stored
 
         for entry in file.settings where isTransferable(entry.key) {
             if apply(entry, to: defaults) { summary.settings += 1 } else { summary.skipped += 1 }
         }
+        // A language from the file must go through `select`: written to the defaults alone the
+        // picker shows it while every text stays in the old one until the next start.
+        let language = AppLanguage.stored
+        if language != languageBefore { AppLanguage.select(language) }
 
         let manager = ServerConfigManager.shared
         var imported: [ServerConfig] = []

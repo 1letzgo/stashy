@@ -825,6 +825,17 @@ struct TagDetailView: View {
         case groups = "Groups"
         case images = "Images"
 
+        /// The name on screen; the raw value is data.
+        var title: String {
+            switch self {
+            case .scenes: return tr("scenes")
+            case .galleries: return tr("galleries")
+            case .studios: return tr("studios")
+            case .groups: return tr("groups")
+            case .images: return tr("images")
+            }
+        }
+
         var icon: String {
             switch self {
             case .scenes: return "film"
@@ -984,7 +995,7 @@ struct TagDetailView: View {
     /// Back · section dropdown, like the overviews' breadcrumb (PerformerDetail template).
     private var detailCrumb: DetailBreadcrumb {
         DetailBreadcrumb(
-            sections: availableTabs.map { .init(id: $0.rawValue, title: $0.rawValue, systemImage: $0.icon) },
+            sections: availableTabs.map { .init(id: $0.rawValue, title: $0.title, systemImage: $0.icon) },
             selectionID: selectedDetailTab.rawValue,
             onSelect: { id in
                 if let tab = DetailTab(rawValue: id) { selectedDetailTab = tab }

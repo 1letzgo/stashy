@@ -361,6 +361,7 @@
   <string name="app_only">僅限 App</string>
   <string name="app_theme">App 主題</string>
   <string name="arg_arg_o_count">%1$s，O 計數 %2$s</string>
+  <string name="arg_criteria">條件：%1$s</string>
   <string name="arg_external">%1$s · 外部</string>
   <string name="arg_images_in_this_gallery">此圖庫中有 %1$s 張圖片</string>
   <string name="arg_match_arg_arg">%1$s · Match %2$s/%3$s</string>
@@ -1376,6 +1377,7 @@
   <string name="loading">正在載入</string>
   <string name="loading_channels">正在載入頻道…</string>
   <string name="loading_charts">正在載入 Charts…</string>
+  <string name="loading_connecting">正在連線…</string>
   <string name="loading_feeds">正在載入 Feeds…</string>
   <string name="loading_filters">正在載入篩選條件…</string>
   <string name="loading_galleries">正在載入圖庫…</string>
@@ -1411,6 +1413,7 @@
   <string name="local_address_optional_e_g">本機位址（選填，例如 192.168.1.100:9999）</string>
   <string name="local_arg">本機：%1$s</string>
   <string name="logging_in_menu">正在登入…</string>
+  <string name="login">登入</string>
   <string name="login_failed_arg">登入失敗：%1$s</string>
   <string name="longest_first">最長優先</string>
   <string name="look_back">回溯期間</string>
@@ -1519,6 +1522,7 @@
   <string name="next_marker">下一個標記</string>
   <string name="next_month">下個月</string>
   <string name="no">否</string>
+  <string name="non_binary">非二元</string>
   <string name="none">無</string>
   <string name="none_of">皆不符合</string>
   <string name="normal">正常</string>
@@ -1639,6 +1643,7 @@
   <string name="piercings">穿環</string>
   <string name="pink">粉紅色</string>
   <string name="pins_do_not_match">PIN 碼不相符</string>
+  <string name="placeholder_date">YYYY-MM-DD</string>
   <string name="placeholder_search">搜尋…</string>
   <string name="placeholder_search_2">搜尋…</string>
   <string name="placeholder_search_everything">搜尋全部…</string>
@@ -1990,6 +1995,7 @@
   <string name="updated_oldest_first">更新日期（最舊優先）</string>
   <string name="uploading_script_menu">正在上傳腳本…</string>
   <string name="up_next_similar_scene">下一部 · 相似短片</string>
+  <string name="use_stashy_in_english">以英文使用 stashy</string>
   <string name="username">使用者名稱</string>
   <string name="value">值</string>
   <string name="value_2">值 2</string>

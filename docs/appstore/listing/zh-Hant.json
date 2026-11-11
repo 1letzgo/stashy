@@ -38,7 +38,7 @@
  "req": "系統需求：自架 Stash 伺服器（v0.26+）。",
  "eula": "使用條款（EULA）：",
  "keywords": "stash,媒體伺服器,整理,影片,串流,用戶端,管理,收藏,mirage",
- "n_lang": "stashy 現已支援 12 種語言，並在 App 內提供語言選擇器",
+ "n_lang": "stashy 現已支援 17 種語言，並在 App 內提供語言選擇器",
  "n_foryou": "For You（stashy+）：在首頁推薦短片，於裝置端產生，並可依演員、工作室與標籤調整",
  "n_forgotten": "Forgotten Favorites（stashy+）：首頁中的一列，收錄你很久沒播放的最愛",
  "n_rows": "以已儲存的過濾條件或排序建立你專屬的首頁列",

@@ -361,6 +361,7 @@
   <string name="app_only">Kun app</string>
   <string name="app_theme">Apptema</string>
   <string name="arg_arg_o_count">%1$s, %2$s O-tæller</string>
+  <string name="arg_criteria">Kriterier: %1$s</string>
   <string name="arg_external">%1$s · Ekstern</string>
   <string name="arg_images_in_this_gallery">%1$s billeder i dette galleri</string>
   <string name="arg_match_arg_arg">%1$s · Match %2$s/%3$s</string>
@@ -1376,6 +1377,7 @@
   <string name="loading">Indlæser</string>
   <string name="loading_channels">Indlæser kanaler…</string>
   <string name="loading_charts">Indlæser charts…</string>
+  <string name="loading_connecting">Opretter forbindelse…</string>
   <string name="loading_feeds">Indlæser feeds…</string>
   <string name="loading_filters">Indlæser filtre…</string>
   <string name="loading_galleries">Indlæser gallerier…</string>
@@ -1411,6 +1413,7 @@
   <string name="local_address_optional_e_g">Lokal adresse (valgfri, f.eks. 192.168.1.100:9999)</string>
   <string name="local_arg">Lokal: %1$s</string>
   <string name="logging_in_menu">Logger ind…</string>
+  <string name="login">Login</string>
   <string name="login_failed_arg">Login mislykkedes: %1$s</string>
   <string name="longest_first">Længste først</string>
   <string name="look_back">Tilbageblik</string>
@@ -1519,6 +1522,7 @@
   <string name="next_marker">Næste markør</string>
   <string name="next_month">Næste måned</string>
   <string name="no">Nej</string>
+  <string name="non_binary">Nonbinær</string>
   <string name="none">Ingen</string>
   <string name="none_of">Ingen af</string>
   <string name="normal">Normal</string>
@@ -1639,6 +1643,7 @@
   <string name="piercings">Piercinger</string>
   <string name="pink">Lyserød</string>
   <string name="pins_do_not_match">Pinkoderne matcher ikke</string>
+  <string name="placeholder_date">ÅÅÅÅ-MM-DD</string>
   <string name="placeholder_search">Søg …</string>
   <string name="placeholder_search_2">Søg…</string>
   <string name="placeholder_search_everything">Søg i alt…</string>
@@ -1990,6 +1995,7 @@
   <string name="updated_oldest_first">Opdateret (ældste først)</string>
   <string name="uploading_script_menu">Uploader script…</string>
   <string name="up_next_similar_scene">Næste · Lignende scene</string>
+  <string name="use_stashy_in_english">Brug stashy på engelsk</string>
   <string name="username">Brugernavn</string>
   <string name="value">Værdi</string>
   <string name="value_2">Værdi 2</string>

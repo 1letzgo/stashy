@@ -165,6 +165,9 @@ Every UI text has one key shared by iOS / tvOS / macOS and Android: Swift `tr("p
 - A new UI text gets a key in `values/strings.xml` and `tr(...)` on both platforms; then `sync_en.py`. Never a bare literal in `Text(...)` for UI. Key names follow the role prefixes in `tools/l10n/README.md` (`action_`, `confirm_`, `error_`, `loading_`, `empty_`, `placeholder_`, `hint_`; Stash terms keep Stash's key). Reuse the key when the English is the same; never compose a text from several keys; symbols and upper-casing go in code.
 - Never `tr()` for data: UserDefaults keys, raw values, ids, comparisons, file names, HTTP bodies, GraphQL, logs. Enums whose `rawValue` is persisted stay literal and get a separate display property that calls `tr`.
 - Wording follows Stash's own UI (US spelling): `localization/glossary.csv`. "O Count", "Play Count", "Groups", "API key" …
+- Enum labels are read on use, never stored: Swift enums get a `title` next to the persisted `rawValue`; a Kotlin enum constant takes a `@StringRes` id (or `UiText` when some constants are fixed text such as "RateMe") with a computed property, because `tr(...)` in a constructor freezes the text when the class loads. Protocol and JSON keys (Buttplug `"Ok"` / `"Error"`) stay literals.
+- Language: the device's language when stashy has it, English otherwise (`AppLanguage`, `app_language` = `system` or `en`). No picker: one switch "Use stashy in English" in Settings and the setup wizard, shown only when the device is not English anyway (`offersEnglishSwitch`). iOS / macOS switch in place, Android restarts.
+- Apple TV stays English (no switch). Arabic is not shipped: no right-to-left layout yet.
 - `SWIFT_EMIT_LOC_STRINGS = NO`: Xcode must not add extracted literals to the catalog; the catalog only holds Tolgee keys.
 
 ## Server Versions

@@ -989,6 +989,14 @@ final class HotOrNotViewModel: ObservableObject {
         case battle = "Game"
         case leaderboard = "Charts"
         case settings = "Settings"
+
+        var title: String {
+            switch self {
+            case .battle: return tr("game")
+            case .leaderboard: return tr("charts")
+            case .settings: return tr("settings")
+            }
+        }
     }
 
     /// Persisted `rawValue`: `headToHead` | `placement` | `champion` (legacy `swiss` / `gauntlet` migrated on load).
@@ -2012,7 +2020,7 @@ struct HotOrNotToolsView: View {
                 .contentShape(Circle())
         }
         .buttonStyle(.plain)
-        .accessibilityLabel(section.rawValue)
+        .accessibilityLabel(section.title)
         .accessibilityAddTraits(isOn ? .isSelected : [])
     }
 

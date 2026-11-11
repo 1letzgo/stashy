@@ -374,7 +374,7 @@ internal data class TLSceneRow(
         val studioModel = studio?.let { s -> val sid = s.id; val n = s.name; if (sid != null && !n.isNullOrEmpty()) IdName(sid, n) else null }
         return TimelineSceneSnapshot(
             id = id,
-            title = title?.takeIf { it.trim().isNotEmpty() } ?: tr(R.string.untitled),
+            title = title?.takeIf { it.trim().isNotEmpty() } ?: "Untitled",
             thumbnailPath = paths?.screenshot,
             duration = if (includeDetails) files?.mapNotNull { it.duration }?.maxOrNull() else null,
             resumeTime = if (includeDetails) resumeTime else null,

@@ -964,7 +964,6 @@
 				"pt-BR",
 				"zh-Hans",
 				"zh-Hant",
-				ar,
 				es,
 				it,
 				ko,

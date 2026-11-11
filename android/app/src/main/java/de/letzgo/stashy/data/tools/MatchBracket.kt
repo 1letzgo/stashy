@@ -95,13 +95,15 @@ object MatchBracket {
     const val MAX_GAIN = 20
     const val MAX_LOSS = 12
 
-    enum class Tier(val label: String, val slots: IntRange, val deltaBounds: IntRange) {
-        Champion(tr(R.string.champion), 0..0, 3..MAX_GAIN),
-        Finalist(tr(R.string.finalist), 1..1, 1..MAX_GAIN),
-        Semifinal(tr(R.string.semifinal), 2..3, 0..MAX_GAIN),
-        Quarterfinal(tr(R.string.quarterfinal), 4..7, -MAX_LOSS..MAX_GAIN),
-        RoundOf16(tr(R.string.round_of_16), 8..15, -MAX_LOSS..MAX_GAIN),
-        RoundOf32(tr(R.string.round_of_32), 16..31, -MAX_LOSS..0);
+    enum class Tier(@androidx.annotation.StringRes private val labelRes: Int, val slots: IntRange, val deltaBounds: IntRange) {
+        Champion(R.string.champion, 0..0, 3..MAX_GAIN),
+        Finalist(R.string.finalist, 1..1, 1..MAX_GAIN),
+        Semifinal(R.string.semifinal, 2..3, 0..MAX_GAIN),
+        Quarterfinal(R.string.quarterfinal, 4..7, -MAX_LOSS..MAX_GAIN),
+        RoundOf16(R.string.round_of_16, 8..15, -MAX_LOSS..MAX_GAIN),
+        RoundOf32(R.string.round_of_32, 16..31, -MAX_LOSS..0);
+    /** Read on use: a constant must not freeze its text at class load. */
+    val label: String get() = tr(labelRes)
 
         companion object {
             /** Lost in [round] (0 = first round) of a bracket with [roundCount] rounds. */

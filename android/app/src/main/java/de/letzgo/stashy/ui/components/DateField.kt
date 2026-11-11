@@ -67,7 +67,7 @@ fun NativeDateField(
     onValueChange: (String) -> Unit,
     label: String?,
     modifier: Modifier = Modifier,
-    placeholder: String? = "YYYY-MM-DD",
+    placeholder: String? = tr(R.string.placeholder_date),
     onCommit: () -> Unit = {},
 ) {
     var showPicker by remember { mutableStateOf(false) }

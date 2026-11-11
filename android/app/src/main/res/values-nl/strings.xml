@@ -361,6 +361,7 @@
   <string name="app_only">Alleen app</string>
   <string name="app_theme">Thema van app</string>
   <string name="arg_arg_o_count">%1$s, %2$s O-teller</string>
+  <string name="arg_criteria">Criteria: %1$s</string>
   <string name="arg_external">%1$s · Extern</string>
   <string name="arg_images_in_this_gallery">%1$s afbeeldingen in deze galerij</string>
   <string name="arg_match_arg_arg">%1$s · Match %2$s/%3$s</string>
@@ -1376,6 +1377,7 @@
   <string name="loading">Laden</string>
   <string name="loading_channels">Kanalen laden…</string>
   <string name="loading_charts">Charts laden…</string>
+  <string name="loading_connecting">Verbinden…</string>
   <string name="loading_feeds">Feeds laden…</string>
   <string name="loading_filters">Filters laden…</string>
   <string name="loading_galleries">Galerijen laden…</string>
@@ -1411,6 +1413,7 @@
   <string name="local_address_optional_e_g">Lokaal adres (optioneel, bijv. 192.168.1.100:9999)</string>
   <string name="local_arg">Lokaal: %1$s</string>
   <string name="logging_in_menu">Inloggen…</string>
+  <string name="login">Inloggen</string>
   <string name="login_failed_arg">Inloggen mislukt: %1$s</string>
   <string name="longest_first">Langste eerst</string>
   <string name="look_back">Terugkijkperiode</string>
@@ -1519,6 +1522,7 @@
   <string name="next_marker">Volgende markering</string>
   <string name="next_month">Volgende maand</string>
   <string name="no">Nee</string>
+  <string name="non_binary">Non-binair</string>
   <string name="none">Geen</string>
   <string name="none_of">Geen van</string>
   <string name="normal">Normaal</string>
@@ -1639,6 +1643,7 @@
   <string name="piercings">Piercings</string>
   <string name="pink">Roze</string>
   <string name="pins_do_not_match">Pincodes komen niet overeen</string>
+  <string name="placeholder_date">JJJJ-MM-DD</string>
   <string name="placeholder_search">Zoek …</string>
   <string name="placeholder_search_2">Zoek…</string>
   <string name="placeholder_search_everything">Zoek in alles…</string>
@@ -1990,6 +1995,7 @@
   <string name="updated_oldest_first">Bijgewerkt (oudste eerst)</string>
   <string name="uploading_script_menu">Script uploaden…</string>
   <string name="up_next_similar_scene">Volgende · vergelijkbare scène</string>
+  <string name="use_stashy_in_english">stashy in het Engels gebruiken</string>
   <string name="username">Gebruikersnaam</string>
   <string name="value">Waarde</string>
   <string name="value_2">Waarde 2</string>

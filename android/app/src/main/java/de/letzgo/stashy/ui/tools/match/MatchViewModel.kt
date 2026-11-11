@@ -30,7 +30,11 @@ enum class MatchHaptic { Light, Selection, Success }
  * detail — iOS keeps its `@StateObject` alive under the `NavigationLink` the same way.
  */
 class MatchViewModel : ViewModel() {
-    enum class Section(val title: String) { Battle(tr(R.string.game)), Leaderboard(tr(R.string.charts)), Settings(tr(R.string.settings)) }
+    enum class Section(@androidx.annotation.StringRes private val titleRes: Int) { Battle(R.string.game), Leaderboard(R.string.charts), Settings(R.string.settings);
+
+    /** Read on use: a constant must not freeze its text at class load. */
+    val title: String get() = tr(titleRes)
+}
 
     var section by mutableStateOf(Section.Battle); private set
     var duelMode by mutableStateOf(MatchRepository.loadDuelMode()); private set

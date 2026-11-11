@@ -1,6 +1,7 @@
 package de.letzgo.stashy.data
 
 import de.letzgo.stashy.R
+import de.letzgo.stashy.UiText
 import de.letzgo.stashy.tr
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -12,13 +13,15 @@ import androidx.compose.runtime.setValue
  * galleries now sit in Metadata); [isHalfWidth] cards pair up side by side with an
  * adjacent half-width card in landscape.
  */
-enum class SceneDetailCard(val id: String, val title: String, val isHalfWidth: Boolean = false) {
-    Details("details", tr(R.string.details)),
-    Heatmap("heatmap", tr(R.string.heatmap)),
-    SimilarScenes("similarScenes", tr(R.string.similar_scenes)),
-    PerformersStudio("performersStudio", tr(R.string.metadata)),
-    Groups("groups", tr(R.string.groups), isHalfWidth = true),
-    Tags("tags", tr(R.string.tags), isHalfWidth = true);
+enum class SceneDetailCard(val id: String, private val titleText: UiText, val isHalfWidth: Boolean = false) {
+    Details("details", UiText(R.string.details)),
+    Heatmap("heatmap", UiText(R.string.heatmap)),
+    SimilarScenes("similarScenes", UiText(R.string.similar_scenes)),
+    PerformersStudio("performersStudio", UiText(R.string.metadata)),
+    Groups("groups", UiText(R.string.groups), isHalfWidth = true),
+    Tags("tags", UiText(R.string.tags), isHalfWidth = true);
+    /** Read on use: a constant must not freeze its text at class load. */
+    val title: String get() = titleText.text
 
     companion object {
         val defaultOrder: List<SceneDetailCard> get() = entries

@@ -149,21 +149,18 @@ struct ServerSetupWizardView: View {
                 .padding(.top, 32)
                 
                 VStack(spacing: 16) {
-                    // App language (beta): preset to the device language on a fresh install
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text(tr("app_language"))
-                            .font(.caption)
-                            .foregroundColor(.secondary)
+                    // App language: stashy follows the device; the switch forces English.
+                    if AppLanguage.offersEnglishSwitch {
+                        VStack(alignment: .leading, spacing: 8) {
+                            Text(tr("app_language"))
+                                .font(.caption)
+                                .foregroundColor(.secondary)
 
-                        HStack {
-                            Label(tr("language"), systemImage: "globe")
-                            Spacer()
-                            AppLanguagePicker()
-                                .labelsHidden()
+                            AppLanguageSwitch()
+                                .padding()
+                                .background(Color.secondaryAppBackground)
+                                .cornerRadius(DesignTokens.CornerRadius.card)
                         }
-                        .padding()
-                        .background(Color.secondaryAppBackground)
-                        .cornerRadius(DesignTokens.CornerRadius.card)
                     }
 
                     // Server Name
@@ -398,7 +395,7 @@ struct ServerSetupWizardView: View {
                             .foregroundColor(appearanceManager.tintColor)
                     }
                     
-                    Text(connectionTestResult == .testing ? "Connecting..." : tr("action_test_connection"))
+                    Text(connectionTestResult == .testing ? tr("loading_connecting") : tr("action_test_connection"))
                         .font(.title2.bold())
                     
                     Text(tr("hint_were_checking_if_your_server"))

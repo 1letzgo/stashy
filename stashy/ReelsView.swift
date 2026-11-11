@@ -4949,7 +4949,7 @@ struct ReelsViewBody: View {
                 return StashyNavMenuItem(id: Self.verticalsDockID, title: type.defaultTitle, systemImage: type.icon)
             }
             let mode = ReelsMode(from: type)
-            return StashyNavMenuItem(id: mode.rawValue, title: mode.rawValue, systemImage: mode.icon)
+            return StashyNavMenuItem(id: mode.rawValue, title: mode.toModeType.defaultTitle, systemImage: mode.icon)
         }
     }
 
@@ -4975,7 +4975,7 @@ struct ReelsViewBody: View {
             HStack(spacing: 6) {
                 Image(systemName: current?.systemImage ?? reelsMode.icon)
                     .font(.system(size: 14, weight: .semibold))
-                Text(current?.title ?? reelsMode.rawValue)
+                Text(current?.title ?? reelsMode.toModeType.defaultTitle)
                     .font(.subheadline.weight(.semibold))
                     .lineLimit(1)
                     .minimumScaleFactor(0.8)
@@ -4993,7 +4993,7 @@ struct ReelsViewBody: View {
         .menuIndicator(.hidden)
         .stashyNeutralMenuItems()
         .fixedSize()
-        .accessibilityLabel("Feed, \(current?.title ?? reelsMode.rawValue)")
+        .accessibilityLabel("\(tr("feed")), \(current?.title ?? reelsMode.toModeType.defaultTitle)")
         .accessibilityHint(tr("hint_chooses_which_feed_mode_to"))
     }
 

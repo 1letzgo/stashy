@@ -1,6 +1,7 @@
 package de.letzgo.stashy.ui.tools
 
 import de.letzgo.stashy.R
+import de.letzgo.stashy.UiText
 import de.letzgo.stashy.tr
 import de.letzgo.stashy.ui.bottomBarContentPadding
 import de.letzgo.stashy.ui.scaledMaxLines
@@ -70,16 +71,24 @@ import de.letzgo.stashy.ui.tools.stats.SessionTimelineToolView
  * longer a tool (a pushed page from the Home dashboard row, [de.letzgo.stashy.ui.tools.downloads.DownloadsScreen]);
  * a stored "Downloads" or "Watchlist" sub-tab is unknown to [from] and lands on the grid.
  */
-enum class ToolsTab(val title: String, val icon: ImageVector) {
-    Overview(tr(R.string.overview), SF.chartBarFill),
-    OCount(tr(R.string.o_count), SF.calendar),
-    Timeline(tr(R.string.timeline), SF.calendarDayTimelineLeft),
-    TopLists(tr(R.string.charts), SF.listNumber),
-    HotOrNot(tr(R.string.match), SF.flameFill),
-    RateMe("RateMe", SF.starFill);
+enum class ToolsTab(private val titleText: UiText, val icon: ImageVector) {
+    Overview(UiText(R.string.overview), SF.chartBarFill),
+    OCount(UiText(R.string.o_count), SF.calendar),
+    Timeline(UiText(R.string.timeline), SF.calendarDayTimelineLeft),
+    TopLists(UiText(R.string.charts), SF.listNumber),
+    HotOrNot(UiText(R.string.match), SF.flameFill),
+    RateMe(UiText("RateMe"), SF.starFill);
+    /** Read on use: a constant must not freeze its text at class load. */
+    val title: String get() = titleText.text
+
+    /** The stored selection (iOS `ToolsTab.rawValue`); never the translated title. */
+    val raw: String get() = when (this) {
+        Overview -> "Overview"; OCount -> "O-Count"; Timeline -> "Timeline"
+        TopLists -> "Charts"; HotOrNot -> "Match"; RateMe -> "RateMe"
+    }
 
     companion object {
-        fun from(raw: String) = entries.firstOrNull { it.title == raw }
+        fun from(raw: String) = entries.firstOrNull { it.raw == raw }
 
         /**
          * iOS: `ToolsView.toolGroups` — fixed grouping and order. The watchlist is no tool (a button
@@ -102,7 +111,7 @@ object ToolsNav {
 
     /** Switches to the Tools tab and opens [tool] (no-op target while stashy+ is locked). */
     fun openTool(tool: ToolsTab) {
-        subTab = tool.title
+        subTab = tool.raw
         de.letzgo.stashy.ui.Nav.tab = de.letzgo.stashy.ui.MainTab.Tools
         de.letzgo.stashy.ui.Nav.popToRoot(de.letzgo.stashy.ui.MainTab.Tools)
     }
@@ -150,8 +159,8 @@ private fun ToolsView() {
     ) { tool ->
         Box(Modifier.fillMaxSize().background(p.background)) {
             if (tool == null) {
-                ToolsLandingView { ToolsNav.subTab = it.title }
-                ToolsBreadcrumbStrip(ToolsBreadcrumbContext(ToolsTab.sorted, null) { ToolsNav.subTab = it?.title ?: "" })
+                ToolsLandingView { ToolsNav.subTab = it.raw }
+                ToolsBreadcrumbStrip(ToolsBreadcrumbContext(ToolsTab.sorted, null) { ToolsNav.subTab = it?.raw ?: "" })
             } else {
                 ToolPage(tool)
             }
@@ -168,7 +177,7 @@ private val toolsWithOwnControls = setOf(ToolsTab.TopLists, ToolsTab.RateMe, Too
 /** iOS: `toolPage` + `ToolPageChrome` — the tool with its Tools row. */
 @Composable
 private fun ToolPage(tool: ToolsTab) {
-    val context = ToolsBreadcrumbContext(ToolsTab.sorted, tool) { ToolsNav.subTab = it?.title ?: "" }
+    val context = ToolsBreadcrumbContext(ToolsTab.sorted, tool) { ToolsNav.subTab = it?.raw ?: "" }
     val drawsOwnRow = tool in toolsWithOwnControls
     CompositionLocalProvider(LocalToolsBreadcrumb provides context.takeIf { drawsOwnRow }) {
         when (tool) {
@@ -187,9 +196,9 @@ private fun ToolPage(tool: ToolsTab) {
 private fun normalizeToolsSubTab() {
     val raw = ToolsNav.subTab
     ToolsNav.subTab = when {
-        raw == "Hot or Not" || raw == "Server" -> ToolsTab.sorted.first().title
-        raw == "Statistics" -> ToolsTab.Overview.title
-        raw == "Top 10" || raw == "Top" -> ToolsTab.TopLists.title
+        raw == "Hot or Not" || raw == "Server" -> ToolsTab.sorted.first().raw
+        raw == "Statistics" -> ToolsTab.Overview.raw
+        raw == "Top 10" || raw == "Top" -> ToolsTab.TopLists.raw
         ToolsTab.from(raw)?.takeIf { it in ToolsTab.sorted } == null -> ""
         else -> raw
     }

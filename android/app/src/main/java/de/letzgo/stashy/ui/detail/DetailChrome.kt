@@ -110,11 +110,13 @@ internal object Dock {
 }
 
 /** Section icons in the detail chrome bar (iOS `PerformerDetailView.DetailTab` & co.). */
-enum class DetailTab(val title: String) {
-    Scenes(tr(R.string.scenes)), Galleries(tr(R.string.galleries)), Studios(tr(R.string.studios)), Performers(tr(R.string.performers)),
-    Tags(tr(R.string.tags)), Groups(tr(R.string.groups)), Images(tr(R.string.images)),
+enum class DetailTab(@androidx.annotation.StringRes private val titleRes: Int) {
+    Scenes(R.string.scenes), Galleries(R.string.galleries), Studios(R.string.studios), Performers(R.string.performers),
+    Tags(R.string.tags), Groups(R.string.groups), Images(R.string.images),
     /** Performer detail only: performers who share scenes with this one ([de.letzgo.stashy.data.CoPerformersRepository]). */
-    AppearsWith(tr(R.string.appears_with));
+    AppearsWith(R.string.appears_with);
+    /** Read on use: a constant must not freeze its text at class load. */
+    val title: String get() = tr(titleRes)
 
     val icon: ImageVector get() = when (this) {
         Scenes -> SF.film; Galleries -> SF.photoStack; Studios -> SF.building2; Performers -> SF.personFill

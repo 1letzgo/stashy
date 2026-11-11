@@ -1,6 +1,7 @@
 package de.letzgo.stashy.data.tools
 
 import de.letzgo.stashy.R
+import de.letzgo.stashy.UiText
 import de.letzgo.stashy.tr
 import de.letzgo.stashy.data.Performer
 import kotlinx.serialization.json.Json
@@ -61,12 +62,14 @@ data class MatchRecord(
  * iOS: `HotOrNotViewModel.DuelMode`. [raw] is the persisted value (`stashy.hotOrNot.duelMode`),
  * [ascensionMode] the plugin mode string used by the K factor / outcome math.
  */
-enum class MatchDuelMode(val raw: String, val label: String, val ascensionMode: String) {
-    HeadToHead("headToHead", "1 vs. 1", "swiss"),
+enum class MatchDuelMode(val raw: String, private val labelText: UiText, val ascensionMode: String) {
+    HeadToHead("headToHead", UiText("1 vs. 1"), "swiss"),
     /** 32:1 bracket (`MatchBracket`); [ascensionMode] unused — no per-pick Elo. */
-    Bracket("bracket", "32:1", "bracket"),
-    Placement("placement", tr(R.string.rise), "gauntlet"),
-    Champion("champion", tr(R.string.legend), "champion");
+    Bracket("bracket", UiText("32:1"), "bracket"),
+    Placement("placement", UiText(R.string.rise), "gauntlet"),
+    Champion("champion", UiText(R.string.legend), "champion");
+    /** Read on use: a constant must not freeze its text at class load. */
+    val label: String get() = labelText.text
 
     companion object {
         /** iOS: `duelMode(migratingPersistedRaw:)` — legacy `swiss` / `gauntlet` values. */

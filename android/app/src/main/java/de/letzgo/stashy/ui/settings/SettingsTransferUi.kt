@@ -72,6 +72,10 @@ fun rememberSettingsTransfer(onImported: () -> Unit = {}): Pair<SettingsTransfer
                 val summary = SettingsTransfer.importFile(text)
                 Appearance.reload()
                 onImported()
+                // A language from the file only shows after a restart (iOS switches in place).
+                if (de.letzgo.stashy.AppLanguage.stored != de.letzgo.stashy.AppLanguage.active) {
+                    de.letzgo.stashy.AppLanguage.selectAndRestart(context, de.letzgo.stashy.AppLanguage.stored)
+                }
                 tr(R.string.hint_imported_arg_server_s_and, summary.servers, summary.settings)
             }.getOrElse { it.message ?: tr(R.string.error_import) }
         }

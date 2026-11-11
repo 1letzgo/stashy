@@ -961,7 +961,7 @@ struct EditSceneTitleSheet: View {
 
                 if showsProductionDate {
                     Section(header: Text(tr("production_date"))) {
-                        TextField("YYYY-MM-DD", text: $productionDate)
+                        TextField(tr("placeholder_date"), text: $productionDate)
                             .keyboardType(.numbersAndPunctuation)
                     }
                     .listRowBackground(Color.secondaryAppBackground)

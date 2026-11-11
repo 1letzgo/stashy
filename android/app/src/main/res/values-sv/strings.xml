@@ -361,6 +361,7 @@
   <string name="app_only">Endast appen</string>
   <string name="app_theme">Apptema</string>
   <string name="arg_arg_o_count">%1$s, %2$s O-räknare</string>
+  <string name="arg_criteria">Villkor: %1$s</string>
   <string name="arg_external">%1$s · Extern</string>
   <string name="arg_images_in_this_gallery">%1$s bilder i det här galleriet</string>
   <string name="arg_match_arg_arg">%1$s · Match %2$s/%3$s</string>
@@ -1376,6 +1377,7 @@
   <string name="loading">Läser in</string>
   <string name="loading_channels">Läser in kanaler…</string>
   <string name="loading_charts">Läser in Charts…</string>
+  <string name="loading_connecting">Ansluter…</string>
   <string name="loading_feeds">Läser in flöden…</string>
   <string name="loading_filters">Läser in filter…</string>
   <string name="loading_galleries">Läser in gallerier…</string>
@@ -1411,6 +1413,7 @@
   <string name="local_address_optional_e_g">Lokal adress (valfritt, t.ex. 192.168.1.100:9999)</string>
   <string name="local_arg">Lokal: %1$s</string>
   <string name="logging_in_menu">Loggar in…</string>
+  <string name="login">Inloggning</string>
   <string name="login_failed_arg">Inloggningen misslyckades: %1$s</string>
   <string name="longest_first">Längst först</string>
   <string name="look_back">Bakåtblick</string>
@@ -1519,6 +1522,7 @@
   <string name="next_marker">Nästa markör</string>
   <string name="next_month">Nästa månad</string>
   <string name="no">Nej</string>
+  <string name="non_binary">Icke-binär</string>
   <string name="none">Ingen</string>
   <string name="none_of">Ingen av</string>
   <string name="normal">Normal</string>
@@ -1639,6 +1643,7 @@
   <string name="piercings">Piercingar</string>
   <string name="pink">Rosa</string>
   <string name="pins_do_not_match">PIN-koderna matchar inte</string>
+  <string name="placeholder_date">ÅÅÅÅ-MM-DD</string>
   <string name="placeholder_search">Sök …</string>
   <string name="placeholder_search_2">Sök…</string>
   <string name="placeholder_search_everything">Sök i allt…</string>
@@ -1990,6 +1995,7 @@
   <string name="updated_oldest_first">Uppdaterad (äldst först)</string>
   <string name="uploading_script_menu">Laddar upp skript…</string>
   <string name="up_next_similar_scene">Nästa · Liknande scen</string>
+  <string name="use_stashy_in_english">Använd stashy på engelska</string>
   <string name="username">Användarnamn</string>
   <string name="value">Värde</string>
   <string name="value_2">Värde 2</string>

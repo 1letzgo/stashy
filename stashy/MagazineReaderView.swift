@@ -409,6 +409,7 @@ private struct MagazinePagePickerSheet: View {
         case chapters = "Chapters"
         case pages = "Pages"
         var id: String { rawValue }
+        var title: String { self == .chapters ? tr("chapters") : tr("pages") }
     }
 
     let pages: [StashImage]
@@ -503,7 +504,7 @@ private struct MagazinePagePickerSheet: View {
     private var modeChips: some View {
         HStack(spacing: 8) {
             ForEach(Mode.allCases) { option in
-                CatalogFilterChip(title: option.rawValue, isActive: mode == option) { mode = option }
+                CatalogFilterChip(title: option.title, isActive: mode == option) { mode = option }
             }
             Spacer(minLength: 0)
         }

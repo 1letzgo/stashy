@@ -15,7 +15,6 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
 
     func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?) -> Bool {
         // English by default (beta); the language picked in Settings › Server applies from the next start.
-        AppLanguage.chooseDeviceLanguageOnFirstStart()
         AppLanguage.applyPreferredLanguages()
         _ = AppIconManager.shared
         // "Done" above every keyboard (SwiftUI's keyboard toolbar was unreliable).

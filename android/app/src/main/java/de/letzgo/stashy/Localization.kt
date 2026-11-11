@@ -23,29 +23,57 @@ object Localization {
 }
 
 /**
- * The language of stashy's own texts. Beta: English unless the user picks another one in
- * Settings; "system" follows the device. Chosen once per launch; a change restarts the app at once.
+ * The language of stashy's own texts: the device's language when stashy has it, English otherwise.
+ * One switch in Settings ("Use stashy in English", offered when the device is not English anyway)
+ * forces English. Chosen once per launch; a change restarts the app at once.
  * iOS: `AppLanguage` in Localization.swift (same key and values).
  */
 object AppLanguage {
     const val STORAGE_KEY = "app_language"
     const val SYSTEM = "system"
-    private const val DEFAULT = "en"
+    const val ENGLISH = "en"
 
     /** Languages with a translation in Tolgee, named in their own language. */
     val options: List<Pair<String, String>> = listOf(
         "en" to "English", "de" to "Deutsch", "es" to "Español", "fr" to "Français",
         "it" to "Italiano", "nl" to "Nederlands", "sv" to "Svenska", "da" to "Dansk",
         "nb" to "Norsk bokmål", "pl" to "Polski", "pt-BR" to "Português (Brasil)",
-        "tr" to "Türkçe", "ru" to "Русский", "ar" to "العربية", "ja" to "日本語",
+        "tr" to "Türkçe", "ru" to "Русский", "ja" to "日本語",
         "ko" to "한국어", "zh-Hans" to "简体中文", "zh-Hant" to "繁體中文",
     )
 
-    /** The stored choice (what the picker shows). */
-    val stored: String get() = Prefs.string(STORAGE_KEY) ?: DEFAULT
+    /**
+     * The stored choice: "en" (the switch is on) or "system". A language picked in the former
+     * picker counts as "system".
+     */
+    val stored: String get() = known(Prefs.string(STORAGE_KEY))
+
+    private fun known(code: String?): String = if (code == ENGLISH) ENGLISH else SYSTEM
+
+    /** The switch "Use stashy in English". */
+    val usesEnglish: Boolean get() = stored == ENGLISH
+
+    /** The language stashy speaks on this device without the switch. */
+    val deviceLanguage: String
+        get() {
+            val codes = options.map { it.first }
+            val list = android.os.LocaleList.getDefault()
+            return (0 until list.size()).asSequence().map { list[it] }.mapNotNull { locale ->
+                val lang = locale.language
+                when {
+                    lang == "pt" -> "pt-BR"
+                    lang == "zh" -> if (locale.script == "Hant" || locale.country in setOf("TW", "HK", "MO")) "zh-Hant" else "zh-Hans"
+                    lang == "no" || lang == "nn" -> "nb"
+                    else -> lang
+                }.takeIf { it in codes }
+            }.firstOrNull() ?: ENGLISH
+        }
+
+    /** Whether the switch is offered: not on a device that gets English anyway (unless it is on). */
+    val offersEnglishSwitch: Boolean get() = usesEnglish || deviceLanguage != ENGLISH
 
     /** The choice this launch runs with. */
-    var active: String = DEFAULT
+    var active: String = SYSTEM
         private set
 
     /**
@@ -89,33 +117,14 @@ object AppLanguage {
     fun name(code: String): String =
         if (code == SYSTEM) tr(R.string.device_language) else options.firstOrNull { it.first == code }?.second ?: code
 
-    /**
-     * First start (nothing chosen, no server yet): take the device language when stashy has it, so
-     * the setup wizard already speaks it. Existing installs keep English until changed.
-     */
-    private fun chooseDeviceLanguageOnFirstStart() {
-        if (Prefs.string(STORAGE_KEY) != null || Prefs.has("stashy_saved_servers") || Prefs.has("stashy_server_config")) return
-        val codes = options.map { it.first }
-        val list = android.os.LocaleList.getDefault()
-        val match = (0 until list.size()).asSequence().map { list[it] }.mapNotNull { locale ->
-            val lang = locale.language
-            when {
-                lang == "pt" -> "pt-BR"
-                lang == "zh" -> if (locale.script == "Hant" || locale.country in setOf("TW", "HK", "MO")) "zh-Hant" else "zh-Hans"
-                lang == "no" || lang == "nn" -> "nb"
-                else -> lang
-            }.takeIf { it in codes }
-        }.firstOrNull()
-        Prefs.setString(STORAGE_KEY, match ?: DEFAULT)
-    }
-
     /** [context] with the chosen language for resources; the device language for "system". */
     internal fun localized(context: Context): Context {
-        runCatching { chooseDeviceLanguageOnFirstStart() }
-        active = runCatching { Prefs.string(STORAGE_KEY) }.getOrNull() ?: DEFAULT
-        if (active == SYSTEM) return context
+        active = known(runCatching { Prefs.string(STORAGE_KEY) }.getOrNull())
+        // "system": the device language when stashy has it; Android's own fallback would pick a
+        // second device language over English otherwise.
+        val code = if (active == SYSTEM) deviceLanguage else active
         val config = android.content.res.Configuration(context.resources.configuration)
-        config.setLocale(java.util.Locale.forLanguageTag(active))
+        config.setLocale(java.util.Locale.forLanguageTag(code))
         return context.createConfigurationContext(config)
     }
 }
@@ -167,4 +176,14 @@ private object JvmStrings {
         }
         return out.toString()
     }
+}
+
+/**
+ * The label of an enum constant: a string resource, read on use, or fixed text such as a brand
+ * name. A constant built with `tr(...)` would freeze its text when the class loads.
+ */
+class UiText private constructor(@androidx.annotation.StringRes private val res: Int, private val fixed: String?) {
+    constructor(@androidx.annotation.StringRes res: Int) : this(res, null)
+    constructor(fixed: String) : this(0, fixed)
+    val text: String get() = fixed ?: tr(res)
 }

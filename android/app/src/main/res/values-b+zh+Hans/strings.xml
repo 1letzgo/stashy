@@ -361,6 +361,7 @@
   <string name="app_only">仅限 App</string>
   <string name="app_theme">App 主题</string>
   <string name="arg_arg_o_count">%1$s，%2$s 次 O</string>
+  <string name="arg_criteria">条件：%1$s</string>
   <string name="arg_external">%1$s · 外部</string>
   <string name="arg_images_in_this_gallery">此图库中有 %1$s 张图片</string>
   <string name="arg_match_arg_arg">%1$s · 对决 %2$s/%3$s</string>
@@ -1376,6 +1377,7 @@
   <string name="loading">正在载入</string>
   <string name="loading_channels">正在载入频道…</string>
   <string name="loading_charts">正在载入排行榜…</string>
+  <string name="loading_connecting">正在连接…</string>
   <string name="loading_feeds">正在载入信息流…</string>
   <string name="loading_filters">正在载入过滤器…</string>
   <string name="loading_galleries">正在载入图库…</string>
@@ -1411,6 +1413,7 @@
   <string name="local_address_optional_e_g">本地地址（可选，例如 192.168.1.100:9999）</string>
   <string name="local_arg">本地：%1$s</string>
   <string name="logging_in_menu">正在登录…</string>
+  <string name="login">登录</string>
   <string name="login_failed_arg">登录失败：%1$s</string>
   <string name="longest_first">最长优先</string>
   <string name="look_back">回溯时间</string>
@@ -1519,6 +1522,7 @@
   <string name="next_marker">下一个标记</string>
   <string name="next_month">下个月</string>
   <string name="no">否</string>
+  <string name="non_binary">非二元</string>
   <string name="none">无</string>
   <string name="none_of">全部不满足</string>
   <string name="normal">正常</string>
@@ -1639,6 +1643,7 @@
   <string name="piercings">穿孔</string>
   <string name="pink">粉色</string>
   <string name="pins_do_not_match">PIN 码不匹配</string>
+  <string name="placeholder_date">YYYY-MM-DD</string>
   <string name="placeholder_search">搜索…</string>
   <string name="placeholder_search_2">搜索…</string>
   <string name="placeholder_search_everything">搜索全部…</string>
@@ -1990,6 +1995,7 @@
   <string name="updated_oldest_first">更新时间（最早优先）</string>
   <string name="uploading_script_menu">正在上传脚本…</string>
   <string name="up_next_similar_scene">接下来播放 · 相似短片</string>
+  <string name="use_stashy_in_english">以英语使用 stashy</string>
   <string name="username">用户名</string>
   <string name="value">值</string>
   <string name="value_2">值 2</string>

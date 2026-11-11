@@ -28,7 +28,7 @@ struct AppearanceSettingsView: View {
             stashyScrollingSectionHeader(tr("app_theme"))
             Picker(tr("theme"), selection: $appearanceManager.preferredTheme) {
                 ForEach(AppTheme.allCases) { theme in
-                    Text(theme.rawValue).tag(theme)
+                    Text(theme.title).tag(theme)
                 }
             }
             .pickerStyle(.segmented)

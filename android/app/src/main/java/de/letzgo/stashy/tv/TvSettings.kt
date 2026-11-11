@@ -1,6 +1,7 @@
 package de.letzgo.stashy.tv
 
 import de.letzgo.stashy.R
+import de.letzgo.stashy.UiText
 import de.letzgo.stashy.tr
 import android.app.Activity
 import androidx.activity.compose.BackHandler
@@ -78,18 +79,22 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 /** iOS: `TVSettingsEntry` — one entry of the Settings overview (title, icon, right-column text). */
-enum class TvSettingsEntry(val title: String, val summary: String) {
-    Servers(tr(R.string.servers), tr(R.string.hint_add_stash_servers_switch_between)),
-    Appearance(tr(R.string.appearance), tr(R.string.hint_pick_accent_color_used_for)),
-    Security(tr(R.string.security), tr(R.string.hint_require_pin_before_app_opens)),
-    StashyPlus("stashy+", tr(R.string.hint_premium_features_including_channels_continuous)),
-    DefaultSort(tr(R.string.default_sorting), tr(R.string.hint_sort_order_each_section_opens)),
-    DefaultFilters(tr(R.string.default_filters), tr(R.string.hint_saved_server_filter_to_apply)),
-    VisibleTabs(tr(R.string.visible_tabs), tr(R.string.hint_hide_sections_you_do_not)),
-    Subtitles(tr(R.string.subtitles), tr(R.string.hint_turn_subtitles_on_automatically_choose)),
-    PlayCount(tr(R.string.count_as_played), tr(R.string.hint_how_long_scene_has_to)),
-    Maintenance(tr(R.string.maintenance), tr(R.string.hint_clear_cached_artwork_for_active)),
-    About(tr(R.string.about), tr(R.string.version_build_number_and_updates));
+enum class TvSettingsEntry(private val titleText: UiText, @androidx.annotation.StringRes private val summaryRes: Int) {
+    Servers(UiText(R.string.servers), R.string.hint_add_stash_servers_switch_between),
+    Appearance(UiText(R.string.appearance), R.string.hint_pick_accent_color_used_for),
+    Security(UiText(R.string.security), R.string.hint_require_pin_before_app_opens),
+    StashyPlus(UiText("stashy+"), R.string.hint_premium_features_including_channels_continuous),
+    DefaultSort(UiText(R.string.default_sorting), R.string.hint_sort_order_each_section_opens),
+    DefaultFilters(UiText(R.string.default_filters), R.string.hint_saved_server_filter_to_apply),
+    VisibleTabs(UiText(R.string.visible_tabs), R.string.hint_hide_sections_you_do_not),
+    Subtitles(UiText(R.string.subtitles), R.string.hint_turn_subtitles_on_automatically_choose),
+    PlayCount(UiText(R.string.count_as_played), R.string.hint_how_long_scene_has_to),
+    Maintenance(UiText(R.string.maintenance), R.string.hint_clear_cached_artwork_for_active),
+    About(UiText(R.string.about), R.string.version_build_number_and_updates);
+    /** Read on use: a constant must not freeze its text at class load. */
+    val title: String get() = titleText.text
+    /** Read on use: a constant must not freeze its text at class load. */
+    val summary: String get() = tr(summaryRes)
 
     val icon: ImageVector get() = when (this) {
         Servers -> TvIcons.server

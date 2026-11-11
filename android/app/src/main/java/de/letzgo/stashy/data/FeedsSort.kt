@@ -1,6 +1,7 @@
 package de.letzgo.stashy.data
 
 import de.letzgo.stashy.R
+import de.letzgo.stashy.UiText
 import de.letzgo.stashy.tr
 /*
  * Sort options used by the Feeds tab. Raw values (enum names), labels, GraphQL fields and
@@ -19,26 +20,28 @@ interface FeedSort {
 }
 
 /** iOS: `StashDBViewModel.SceneSortOption`. */
-enum class SceneSortOption(override val displayName: String, override val sortField: String, override val direction: String) : FeedSort {
-    random("Random", "random", "DESC"),
-    dateDesc(tr(R.string.date_newest_first), "date", "DESC"),
-    dateAsc(tr(R.string.date_oldest_first), "date", "ASC"),
-    createdAtDesc(tr(R.string.created_newest_first), "created_at", "DESC"),
-    createdAtAsc(tr(R.string.created_oldest_first), "created_at", "ASC"),
-    titleAsc(tr(R.string.title_z), "title", "ASC"),
-    titleDesc(tr(R.string.title_z_2), "title", "DESC"),
-    durationDesc(tr(R.string.duration_longest_first), "duration", "DESC"),
-    durationAsc(tr(R.string.duration_shortest_first), "duration", "ASC"),
-    lastPlayedAtDesc(tr(R.string.last_played_newest_first), "last_played_at", "DESC"),
-    lastPlayedAtAsc(tr(R.string.last_played_oldest_first), "last_played_at", "ASC"),
-    playCountDesc(tr(R.string.most_viewed), "play_count", "DESC"),
-    playCountAsc(tr(R.string.least_viewed), "play_count", "ASC"),
-    playDurationDesc(tr(R.string.watch_time_high_low), "play_duration", "DESC"),
-    playDurationAsc(tr(R.string.watch_time_low_high), "play_duration", "ASC"),
-    oCounterDesc(tr(R.string.counter_high_low), "o_counter", "DESC"),
-    oCounterAsc(tr(R.string.counter_low_high), "o_counter", "ASC"),
-    ratingDesc(tr(R.string.rating_high_low), "rating", "DESC"),
-    ratingAsc(tr(R.string.rating_low_high), "rating", "ASC");
+enum class SceneSortOption(private val displayNameText: UiText, override val sortField: String, override val direction: String) : FeedSort {
+    random(UiText(R.string.random), "random", "DESC"),
+    dateDesc(UiText(R.string.date_newest_first), "date", "DESC"),
+    dateAsc(UiText(R.string.date_oldest_first), "date", "ASC"),
+    createdAtDesc(UiText(R.string.created_newest_first), "created_at", "DESC"),
+    createdAtAsc(UiText(R.string.created_oldest_first), "created_at", "ASC"),
+    titleAsc(UiText(R.string.title_z), "title", "ASC"),
+    titleDesc(UiText(R.string.title_z_2), "title", "DESC"),
+    durationDesc(UiText(R.string.duration_longest_first), "duration", "DESC"),
+    durationAsc(UiText(R.string.duration_shortest_first), "duration", "ASC"),
+    lastPlayedAtDesc(UiText(R.string.last_played_newest_first), "last_played_at", "DESC"),
+    lastPlayedAtAsc(UiText(R.string.last_played_oldest_first), "last_played_at", "ASC"),
+    playCountDesc(UiText(R.string.most_viewed), "play_count", "DESC"),
+    playCountAsc(UiText(R.string.least_viewed), "play_count", "ASC"),
+    playDurationDesc(UiText(R.string.watch_time_high_low), "play_duration", "DESC"),
+    playDurationAsc(UiText(R.string.watch_time_low_high), "play_duration", "ASC"),
+    oCounterDesc(UiText(R.string.counter_high_low), "o_counter", "DESC"),
+    oCounterAsc(UiText(R.string.counter_low_high), "o_counter", "ASC"),
+    ratingDesc(UiText(R.string.rating_high_low), "rating", "DESC"),
+    ratingAsc(UiText(R.string.rating_low_high), "rating", "ASC");
+    /** Read on use: a constant must not freeze its text at class load. */
+    override val displayName: String get() = displayNameText.text
 
     override val raw: String get() = name
 
@@ -58,16 +61,18 @@ enum class SceneSortOption(override val displayName: String, override val sortFi
 }
 
 /** iOS: `StashDBViewModel.SceneMarkerSortOption`. */
-enum class SceneMarkerSortOption(override val displayName: String, override val sortField: String, override val direction: String) : FeedSort {
-    random("Random", "random", "DESC"),
-    createdAtDesc(tr(R.string.created_newest_first), "created_at", "DESC"),
-    createdAtAsc(tr(R.string.created_oldest_first), "created_at", "ASC"),
-    updatedAtDesc(tr(R.string.updated_newest_first), "updated_at", "DESC"),
-    updatedAtAsc(tr(R.string.updated_oldest_first), "updated_at", "ASC"),
-    titleAsc(tr(R.string.title_z), "title", "ASC"),
-    titleDesc(tr(R.string.title_z_2), "title", "DESC"),
-    secondsAsc(tr(R.string.time_start), "seconds", "ASC"),
-    secondsDesc(tr(R.string.time_end), "seconds", "DESC");
+enum class SceneMarkerSortOption(private val displayNameText: UiText, override val sortField: String, override val direction: String) : FeedSort {
+    random(UiText(R.string.random), "random", "DESC"),
+    createdAtDesc(UiText(R.string.created_newest_first), "created_at", "DESC"),
+    createdAtAsc(UiText(R.string.created_oldest_first), "created_at", "ASC"),
+    updatedAtDesc(UiText(R.string.updated_newest_first), "updated_at", "DESC"),
+    updatedAtAsc(UiText(R.string.updated_oldest_first), "updated_at", "ASC"),
+    titleAsc(UiText(R.string.title_z), "title", "ASC"),
+    titleDesc(UiText(R.string.title_z_2), "title", "DESC"),
+    secondsAsc(UiText(R.string.time_start), "seconds", "ASC"),
+    secondsDesc(UiText(R.string.time_end), "seconds", "DESC");
+    /** Read on use: a constant must not freeze its text at class load. */
+    override val displayName: String get() = displayNameText.text
 
     override val raw: String get() = name
 
@@ -77,18 +82,20 @@ enum class SceneMarkerSortOption(override val displayName: String, override val 
 }
 
 /** iOS: `StashDBViewModel.ImageSortOption` (Clips, Pics). */
-enum class ImageSortOption(override val displayName: String, override val sortField: String, override val direction: String) : FeedSort {
-    titleAsc(tr(R.string.title_z), "title", "ASC"),
-    titleDesc(tr(R.string.title_z_2), "title", "DESC"),
-    dateDesc(tr(R.string.date_newest), "date", "DESC"),
-    dateAsc(tr(R.string.date_oldest), "date", "ASC"),
-    ratingDesc(tr(R.string.rating_high_low), "rating", "DESC"),
-    ratingAsc(tr(R.string.rating_low_high), "rating", "ASC"),
-    createdAtDesc(tr(R.string.created_newest), "created_at", "DESC"),
-    createdAtAsc(tr(R.string.created_oldest), "created_at", "ASC"),
-    updatedAtDesc(tr(R.string.updated_newest), "updated_at", "DESC"),
-    updatedAtAsc(tr(R.string.updated_oldest), "updated_at", "ASC"),
-    random("Random", "random", "DESC");
+enum class ImageSortOption(private val displayNameText: UiText, override val sortField: String, override val direction: String) : FeedSort {
+    titleAsc(UiText(R.string.title_z), "title", "ASC"),
+    titleDesc(UiText(R.string.title_z_2), "title", "DESC"),
+    dateDesc(UiText(R.string.date_newest), "date", "DESC"),
+    dateAsc(UiText(R.string.date_oldest), "date", "ASC"),
+    ratingDesc(UiText(R.string.rating_high_low), "rating", "DESC"),
+    ratingAsc(UiText(R.string.rating_low_high), "rating", "ASC"),
+    createdAtDesc(UiText(R.string.created_newest), "created_at", "DESC"),
+    createdAtAsc(UiText(R.string.created_oldest), "created_at", "ASC"),
+    updatedAtDesc(UiText(R.string.updated_newest), "updated_at", "DESC"),
+    updatedAtAsc(UiText(R.string.updated_oldest), "updated_at", "ASC"),
+    random(UiText(R.string.random), "random", "DESC");
+    /** Read on use: a constant must not freeze its text at class load. */
+    override val displayName: String get() = displayNameText.text
 
     override val raw: String get() = name
 

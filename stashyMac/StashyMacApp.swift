@@ -11,7 +11,6 @@ struct StashyMacApp: App {
 
     init() {
         // English by default (beta); a language picked on iPhone / Mac applies from the next start.
-        AppLanguage.chooseDeviceLanguageOnFirstStart()
         AppLanguage.applyPreferredLanguages()
         // Entitlements (lifetime IAP, paid-app grandfathering) must sync at launch,
         // not only when Settings is opened.

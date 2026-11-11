@@ -98,13 +98,13 @@ struct HomeViewsMenu: View {
                     Button {
                         selection = tab
                     } label: {
-                        Label(tab.rawValue, systemImage: tab.icon)
+                        Label(tab.title, systemImage: tab.icon)
                     }
                 }
             } else {
                 Picker(tr("library"), selection: $selection) {
                     ForEach(libraryTabs, id: \.self) { tab in
-                        Label(tab.rawValue, systemImage: tab.icon)
+                        Label(tab.title, systemImage: tab.icon)
                             .tag(tab)
                     }
                 }
@@ -112,7 +112,7 @@ struct HomeViewsMenu: View {
             }
         } label: {
             HStack(spacing: 6) {
-                Text(onDashboard ? tr("dashboard") : selection.rawValue)
+                Text(onDashboard ? tr("dashboard") : selection.title)
                     .font(.subheadline.weight(.semibold))
                     .lineLimit(1)
                     .minimumScaleFactor(0.8)
@@ -131,7 +131,7 @@ struct HomeViewsMenu: View {
         .menuIndicator(.hidden)
         .stashyNeutralMenuItems()
         .fixedSize()
-        .accessibilityLabel(onDashboard ? tr("dashboard") : "Library, \(selection.rawValue)")
+        .accessibilityLabel(onDashboard ? tr("dashboard") : "\(tr("library")), \(selection.title)")
     }
 }
 
@@ -397,9 +397,9 @@ struct SettingsCategoryRow: View {
 
     var body: some View {
         StashyTopNavNameDropdownRow(
-            title: sections.count == 1 ? (sections.first?.rawValue ?? tr("settings")) : tr("settings"),
+            title: sections.count == 1 ? (sections.first?.title ?? tr("settings")) : tr("settings"),
             items: sections.map {
-                StashyNavMenuItem(id: $0.rawValue, title: $0.rawValue, systemImage: $0.icon)
+                StashyNavMenuItem(id: $0.rawValue, title: $0.title, systemImage: $0.icon)
             },
             selectionID: selection.rawValue,
             titleColor: .white,

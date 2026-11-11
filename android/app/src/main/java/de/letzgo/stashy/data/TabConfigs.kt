@@ -1,6 +1,7 @@
 package de.letzgo.stashy.data
 
 import de.letzgo.stashy.R
+import de.letzgo.stashy.UiText
 import de.letzgo.stashy.tr
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
@@ -14,26 +15,28 @@ import java.util.UUID
 
 /** iOS: `AppTab` (raw values identical). */
 @Serializable
-enum class AppTab(val title: String) {
-    @SerialName("dashboard") Dashboard(tr(R.string.dashboard)),
-    @SerialName("studios") Studios(tr(R.string.studios)),
-    @SerialName("performers") Performers(tr(R.string.performers)),
-    @SerialName("scenes") Scenes(tr(R.string.scenes)),
-    @SerialName("galleries") Galleries(tr(R.string.galleries)),
-    @SerialName("tags") Tags(tr(R.string.tags)),
-    @SerialName("media") Media(tr(R.string.media)),
-    @SerialName("catalogue") Catalogue(tr(R.string.home)),
-    @SerialName("downloads") Downloads(tr(R.string.downloads)),
-    @SerialName("tools") Tools(tr(R.string.tools)),
-    @SerialName("stashyPlus") StashyPlus("stashy+"),
-    @SerialName("reels") Reels(tr(R.string.feeds)),
-    @SerialName("search") Search(tr(R.string.search)),
-    @SerialName("settings") Settings(tr(R.string.settings)),
-    @SerialName("images") Images(tr(R.string.images)),
-    @SerialName("groups") Groups(tr(R.string.groups)),
-    @SerialName("markers") Markers(tr(R.string.markers)),
-    @SerialName("stashline") Stashline("StashLine"),
-    @SerialName("magazine") Magazine(tr(R.string.magazin));
+enum class AppTab(private val titleText: UiText) {
+    @SerialName("dashboard") Dashboard(UiText(R.string.dashboard)),
+    @SerialName("studios") Studios(UiText(R.string.studios)),
+    @SerialName("performers") Performers(UiText(R.string.performers)),
+    @SerialName("scenes") Scenes(UiText(R.string.scenes)),
+    @SerialName("galleries") Galleries(UiText(R.string.galleries)),
+    @SerialName("tags") Tags(UiText(R.string.tags)),
+    @SerialName("media") Media(UiText(R.string.media)),
+    @SerialName("catalogue") Catalogue(UiText(R.string.home)),
+    @SerialName("downloads") Downloads(UiText(R.string.downloads)),
+    @SerialName("tools") Tools(UiText(R.string.tools)),
+    @SerialName("stashyPlus") StashyPlus(UiText("stashy+")),
+    @SerialName("reels") Reels(UiText(R.string.feeds)),
+    @SerialName("search") Search(UiText(R.string.search)),
+    @SerialName("settings") Settings(UiText(R.string.settings)),
+    @SerialName("images") Images(UiText(R.string.images)),
+    @SerialName("groups") Groups(UiText(R.string.groups)),
+    @SerialName("markers") Markers(UiText(R.string.markers)),
+    @SerialName("stashline") Stashline(UiText("StashLine")),
+    @SerialName("magazine") Magazine(UiText(R.string.magazin));
+    /** Read on use: a constant must not freeze its text at class load. */
+    val title: String get() = titleText.text
 
     /** Raw value as stored by iOS. */
     val raw: String get() = name.replaceFirstChar { it.lowercase() }.let { if (this == StashyPlus) "stashyPlus" else it }
@@ -130,9 +133,11 @@ val HomeRowConfig.displayTitle: String
 
 /** iOS: `HomeChannelSourceKind`. */
 @Serializable
-enum class HomeChannelSourceKind(val title: String) {
-    @SerialName("scenes") Scenes(tr(R.string.scenes)),
-    @SerialName("clips") Clips(tr(R.string.clips));
+enum class HomeChannelSourceKind(@androidx.annotation.StringRes private val titleRes: Int) {
+    @SerialName("scenes") Scenes(R.string.scenes),
+    @SerialName("clips") Clips(R.string.clips);
+    /** Read on use: a constant must not freeze its text at class load. */
+    val title: String get() = tr(titleRes)
     val raw get() = name.lowercase()
 }
 
@@ -149,14 +154,16 @@ data class HomeChannelItemConfig(
 
 /** iOS: `ReelsModeType`. */
 @Serializable
-enum class ReelsModeType(val defaultTitle: String) {
-    @SerialName("scenes") Scenes(tr(R.string.scenes)),
-    @SerialName("markers") Markers(tr(R.string.markers)),
-    @SerialName("clips") Clips(tr(R.string.clips)),
-    @SerialName("previews") Previews(tr(R.string.previews)),
-    @SerialName("pics") Pics(tr(R.string.pics)),
+enum class ReelsModeType(@androidx.annotation.StringRes private val defaultTitleRes: Int) {
+    @SerialName("scenes") Scenes(R.string.scenes),
+    @SerialName("markers") Markers(R.string.markers),
+    @SerialName("clips") Clips(R.string.clips),
+    @SerialName("previews") Previews(R.string.previews),
+    @SerialName("pics") Pics(R.string.pics),
     /** stashy+: the Scenes feed with its filter preset to portrait videos (iOS `.verticals`). */
-    @SerialName("verticals") Verticals(tr(R.string.verticals));
+    @SerialName("verticals") Verticals(R.string.verticals);
+    /** Read on use: a constant must not freeze its text at class load. */
+    val defaultTitle: String get() = tr(defaultTitleRes)
 
     /** Feed modes behind stashy+. */
     val requiresStashyPlus: Boolean get() = this == Verticals
@@ -184,12 +191,14 @@ data class ReelsModeConfig(
 )
 
 /** iOS: `DetailViewContext` (raw values are the persisted key parts). */
-enum class DetailViewContext(val raw: String, val title: String) {
-    Performer("performer_detail", tr(R.string.performer_scenes)),
-    Studio("studio_detail", tr(R.string.studio_scenes)),
-    Tag("tag_detail", tr(R.string.tag_scenes)),
-    Gallery("gallery_detail", tr(R.string.gallery_images)),
-    Group("group_detail", tr(R.string.group_scenes));
+enum class DetailViewContext(val raw: String, @androidx.annotation.StringRes private val titleRes: Int) {
+    Performer("performer_detail", R.string.performer_scenes),
+    Studio("studio_detail", R.string.studio_scenes),
+    Tag("tag_detail", R.string.tag_scenes),
+    Gallery("gallery_detail", R.string.gallery_images),
+    Group("group_detail", R.string.group_scenes);
+    /** Read on use: a constant must not freeze its text at class load. */
+    val title: String get() = tr(titleRes)
 
     val settingsRowTitle: String get() = if (this == Gallery) tr(R.string.images_sort) else tr(R.string.scenes_sort)
 

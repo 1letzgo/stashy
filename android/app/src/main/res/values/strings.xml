@@ -362,6 +362,7 @@
     <string name="appearance">Appearance</string>
     <string name="appears_with">Appears With</string>
     <string name="arg_arg_o_count">%1$s, %2$s O Count</string>
+    <string name="arg_criteria">Criteria: %1$s</string>
     <string name="arg_external">%1$s · External</string>
     <string name="arg_images_in_this_gallery">%1$s images in this gallery</string>
     <string name="arg_match_arg_arg">%1$s · Match %2$s/%3$s</string>
@@ -1377,6 +1378,7 @@
     <string name="loading">Loading</string>
     <string name="loading_channels">Loading channels…</string>
     <string name="loading_charts">Loading charts…</string>
+    <string name="loading_connecting">Connecting…</string>
     <string name="loading_feeds">Loading feeds…</string>
     <string name="loading_filters">Loading filters…</string>
     <string name="loading_galleries">Loading galleries…</string>
@@ -1412,6 +1414,7 @@
     <string name="local_address_optional_e_g">Local Address (optional, e.g. 192.168.1.100:9999)</string>
     <string name="local_arg">Local: %1$s</string>
     <string name="logging_in_menu">Logging in…</string>
+    <string name="login">Login</string>
     <string name="login_failed_arg">Login failed: %1$s</string>
     <string name="longest_first">Longest First</string>
     <string name="look_back">Look back</string>
@@ -1520,6 +1523,7 @@
     <string name="next_marker">Next marker</string>
     <string name="next_month">Next month</string>
     <string name="no">No</string>
+    <string name="non_binary">Non-Binary</string>
     <string name="none">None</string>
     <string name="none_of">None of</string>
     <string name="normal">Normal</string>
@@ -1640,6 +1644,7 @@
     <string name="piercings">Piercings</string>
     <string name="pink">Pink</string>
     <string name="pins_do_not_match">PINs do not match</string>
+    <string name="placeholder_date">YYYY-MM-DD</string>
     <string name="placeholder_search">Search …</string>
     <string name="placeholder_search_2">Search…</string>
     <string name="placeholder_search_everything">Search everything…</string>
@@ -1991,6 +1996,7 @@
     <string name="updated_oldest">Updated (Oldest)</string>
     <string name="updated_oldest_first">Updated (Oldest First)</string>
     <string name="uploading_script_menu">Uploading script…</string>
+    <string name="use_stashy_in_english">Use stashy in English</string>
     <string name="username">Username</string>
     <string name="value">Value</string>
     <string name="value_2">Value 2</string>

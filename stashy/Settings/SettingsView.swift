@@ -98,7 +98,17 @@ struct SettingsView: View {
         case stashyPlus = "stashy+"
         
         var id: String { rawValue }
-        
+
+        /// The name on screen; the raw value is data.
+        var title: String {
+            switch self {
+            case .main: return tr("settings")
+            case .design: return tr("design")
+            case .actions: return tr("server")
+            case .stashyPlus: return "stashy+"
+            }
+        }
+
         var icon: String {
             switch self {
             case .main: return "gearshape.fill"
@@ -214,10 +224,12 @@ struct SettingsView: View {
             onScan: { startLibraryScan() }
         )
 
-        Section {
-            stashyScrollingSectionHeader(tr("app_language"), isBeta: true)
-            AppLanguagePicker()
-                .stashyGroupedSettingsRow()
+        if AppLanguage.offersEnglishSwitch {
+            Section {
+                stashyScrollingSectionHeader(tr("app_language"), isBeta: true)
+                AppLanguageSwitch()
+                    .stashyGroupedSettingsRow()
+            }
         }
 
         if configManager.activeConfig != nil {
@@ -1479,28 +1491,26 @@ struct LegacySupporterTipPrompt: ViewModifier {
 
 #endif
 
-/// Settings › App Language (beta): English unless the user picks another language (or the
-/// device language on a fresh install). A pick is confirmed in an alert, then the interface
-/// switches at once. Same `Picker` as the other settings rows; also used in the setup wizard.
-struct AppLanguagePicker: View {
-    @State private var selection = AppLanguage.stored
-    @State private var pending: String?
+/// Settings › App Language: stashy follows the device; this switch forces English. Offered only
+/// when the device is not English anyway (`AppLanguage.offersEnglishSwitch`). A change is confirmed
+/// in an alert, then the interface switches at once. Also used in the setup wizard.
+struct AppLanguageSwitch: View {
+    @State private var usesEnglish = AppLanguage.usesEnglish
+    @State private var pending: Bool?
+
+    private var pendingLanguageName: String {
+        AppLanguage.name(for: (pending ?? usesEnglish) ? AppLanguage.defaultValue : AppLanguage.deviceLanguage)
+    }
 
     var body: some View {
-        Picker(selection: Binding(
-            get: { selection },
-            set: { code in
-                guard code != selection else { return }
-                pending = code
+        Toggle(isOn: Binding(
+            get: { usesEnglish },
+            set: { value in
+                guard value != usesEnglish else { return }
+                pending = value
             }
         )) {
-            Text(AppLanguage.name(for: AppLanguage.systemValue)).tag(AppLanguage.systemValue)
-            Divider()
-            ForEach(AppLanguage.options, id: \.code) { option in
-                Text(option.name).tag(option.code)
-            }
-        } label: {
-            Label(tr("language"), systemImage: "globe")
+            Label(tr("use_stashy_in_english"), systemImage: "globe")
         }
         .alert(tr("confirm_change_language"), isPresented: Binding(
             get: { pending != nil },
@@ -1508,13 +1518,13 @@ struct AppLanguagePicker: View {
         )) {
             Button(tr("action_cancel"), role: .cancel) { pending = nil }
             Button(tr("action_change")) {
-                guard let code = pending else { return }
+                guard let value = pending else { return }
                 pending = nil
-                selection = code
-                AppLanguage.select(code)
+                usesEnglish = value
+                AppLanguage.select(value ? AppLanguage.defaultValue : AppLanguage.systemValue)
             }
         } message: {
-            Text(tr("hint_language_switch", AppLanguage.name(for: pending ?? selection)))
+            Text(tr("hint_language_switch", pendingLanguageName))
         }
     }
 }

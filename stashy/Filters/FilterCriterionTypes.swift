@@ -229,7 +229,16 @@ enum StashGenderOption: String, CaseIterable, Identifiable {
     case intersex = "INTERSEX"
     case nonBinary = "NON_BINARY"
     var id: String { rawValue }
-    var label: String { rawValue.replacingOccurrences(of: "_", with: " ").capitalized }
+    var label: String {
+        switch self {
+        case .male: return tr("male")
+        case .female: return tr("female")
+        case .transgenderMale: return tr("transgender_male")
+        case .transgenderFemale: return tr("transgender_female")
+        case .intersex: return tr("intersex")
+        case .nonBinary: return tr("non_binary")
+        }
+    }
 }
 
 

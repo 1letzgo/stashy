@@ -361,6 +361,7 @@
   <string name="app_only">Appのみ</string>
   <string name="app_theme">Appのテーマ</string>
   <string name="arg_arg_o_count">%1$s、Oカウント %2$s</string>
+  <string name="arg_criteria">条件：%1$s</string>
   <string name="arg_external">%1$s · 外部</string>
   <string name="arg_images_in_this_gallery">このギャラリーの画像：%1$s枚</string>
   <string name="arg_match_arg_arg">%1$s · 対戦 %2$s/%3$s</string>
@@ -1376,6 +1377,7 @@
   <string name="loading">読み込み中</string>
   <string name="loading_channels">チャンネルを読み込み中…</string>
   <string name="loading_charts">Chartsを読み込み中…</string>
+  <string name="loading_connecting">接続中…</string>
   <string name="loading_feeds">Feedsを読み込み中…</string>
   <string name="loading_filters">フィルターを読み込み中…</string>
   <string name="loading_galleries">ギャラリーを読み込み中…</string>
@@ -1411,6 +1413,7 @@
   <string name="local_address_optional_e_g">ローカルアドレス（任意、例：192.168.1.100:9999）</string>
   <string name="local_arg">ローカル：%1$s</string>
   <string name="logging_in_menu">ログイン中…</string>
+  <string name="login">ログイン</string>
   <string name="login_failed_arg">ログインに失敗しました：%1$s</string>
   <string name="longest_first">長い順</string>
   <string name="look_back">振り返り期間</string>
@@ -1519,6 +1522,7 @@
   <string name="next_marker">次のマーカー</string>
   <string name="next_month">翌月</string>
   <string name="no">いいえ</string>
+  <string name="non_binary">ノンバイナリー</string>
   <string name="none">なし</string>
   <string name="none_of">いずれにも該当しない</string>
   <string name="normal">標準</string>
@@ -1639,6 +1643,7 @@
   <string name="piercings">ピアス</string>
   <string name="pink">ピンク</string>
   <string name="pins_do_not_match">PINが一致しません</string>
+  <string name="placeholder_date">YYYY-MM-DD</string>
   <string name="placeholder_search">検索 …</string>
   <string name="placeholder_search_2">検索…</string>
   <string name="placeholder_search_everything">すべてを検索…</string>
@@ -1990,6 +1995,7 @@
   <string name="updated_oldest_first">更新日（古い順）</string>
   <string name="uploading_script_menu">スクリプトをアップロード中…</string>
   <string name="up_next_similar_scene">次に再生 · 類似シーン</string>
+  <string name="use_stashy_in_english">stashyを英語で使用</string>
   <string name="username">ユーザー名</string>
   <string name="value">値</string>
   <string name="value_2">値2</string>

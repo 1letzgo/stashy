@@ -361,6 +361,7 @@
   <string name="app_only">앱 전용</string>
   <string name="app_theme">앱 테마</string>
   <string name="arg_arg_o_count">%1$s, O 카운트 %2$s</string>
+  <string name="arg_criteria">조건: %1$s</string>
   <string name="arg_external">%1$s · 외부</string>
   <string name="arg_images_in_this_gallery">이 갤러리의 이미지 %1$s개</string>
   <string name="arg_match_arg_arg">%1$s · 대결 %2$s/%3$s</string>
@@ -1376,6 +1377,7 @@
   <string name="loading">불러오는 중</string>
   <string name="loading_channels">채널 불러오는 중…</string>
   <string name="loading_charts">Charts 불러오는 중…</string>
+  <string name="loading_connecting">연결 중…</string>
   <string name="loading_feeds">피드 불러오는 중…</string>
   <string name="loading_filters">필터 불러오는 중…</string>
   <string name="loading_galleries">갤러리 불러오는 중…</string>
@@ -1411,6 +1413,7 @@
   <string name="local_address_optional_e_g">로컬 주소(선택 사항, 예: 192.168.1.100:9999)</string>
   <string name="local_arg">로컬: %1$s</string>
   <string name="logging_in_menu">로그인 중…</string>
+  <string name="login">로그인</string>
   <string name="login_failed_arg">로그인 실패: %1$s</string>
   <string name="longest_first">긴 순</string>
   <string name="look_back">되돌아볼 기간</string>
@@ -1519,6 +1522,7 @@
   <string name="next_marker">다음 마커</string>
   <string name="next_month">다음 달</string>
   <string name="no">아니요</string>
+  <string name="non_binary">논바이너리</string>
   <string name="none">없음</string>
   <string name="none_of">모두 불일치</string>
   <string name="normal">보통</string>
@@ -1639,6 +1643,7 @@
   <string name="piercings">피어싱</string>
   <string name="pink">분홍색</string>
   <string name="pins_do_not_match">PIN이 일치하지 않습니다</string>
+  <string name="placeholder_date">YYYY-MM-DD</string>
   <string name="placeholder_search">검색 …</string>
   <string name="placeholder_search_2">검색…</string>
   <string name="placeholder_search_everything">전체 검색…</string>
@@ -1990,6 +1995,7 @@
   <string name="updated_oldest_first">업데이트(오래된 순)</string>
   <string name="uploading_script_menu">스크립트 업로드 중…</string>
   <string name="up_next_similar_scene">다음 항목 · 유사한 영상</string>
+  <string name="use_stashy_in_english">stashy를 영어로 사용</string>
   <string name="username">사용자 이름</string>
   <string name="value">값</string>
   <string name="value_2">값 2</string>

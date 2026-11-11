@@ -67,7 +67,20 @@ struct PerformerDetailView: View {
         case tags = "Tags"
         case groups = "Groups"
         case images = "Images"
-        case appearsWith = "Appears With"
+        case appearsWith = "Appears with"
+
+        /// The name on screen; the raw value is data.
+        var title: String {
+            switch self {
+            case .scenes: return tr("scenes")
+            case .galleries: return tr("galleries")
+            case .studios: return tr("studios")
+            case .tags: return tr("tags")
+            case .groups: return tr("groups")
+            case .images: return tr("images")
+            case .appearsWith: return tr("appears_with")
+            }
+        }
 
         var icon: String {
             switch self {
@@ -415,7 +428,7 @@ struct PerformerDetailView: View {
     /// settings sit at its right edge.
     private var detailCrumb: DetailBreadcrumb {
         DetailBreadcrumb(
-            sections: availableTabs.map { .init(id: $0.rawValue, title: $0.rawValue, systemImage: $0.icon) },
+            sections: availableTabs.map { .init(id: $0.rawValue, title: $0.title, systemImage: $0.icon) },
             selectionID: selectedDetailTab.rawValue,
             onSelect: { id in
                 if let tab = DetailTab(rawValue: id) { selectedDetailTab = tab }
@@ -1575,6 +1588,15 @@ struct SharedAppearancesView: View {
         case galleries = "Galleries"
         case images = "Images"
 
+        /// The name on screen; the raw value is data.
+        var title: String {
+            switch self {
+            case .scenes: return tr("scenes")
+            case .galleries: return tr("galleries")
+            case .images: return tr("images")
+            }
+        }
+
         var icon: String {
             switch self {
             case .scenes: return "film"
@@ -1616,7 +1638,7 @@ struct SharedAppearancesView: View {
 
     private var crumb: DetailBreadcrumb {
         DetailBreadcrumb(
-            sections: Self.sections(for: shared).map { .init(id: $0.rawValue, title: $0.rawValue, systemImage: $0.icon) },
+            sections: Self.sections(for: shared).map { .init(id: $0.rawValue, title: $0.title, systemImage: $0.icon) },
             selectionID: selected.rawValue,
             onSelect: { id in if let section = Section(rawValue: id) { selected = section } },
             onBack: { navigationBackTrigger = UUID() }

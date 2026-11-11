@@ -43,15 +43,17 @@ import de.letzgo.stashy.ui.Theme
  * iOS: `StashyAppIcon` (raw values and labels identical). Android swaps the launcher entry
  * between `activity-alias`es in the manifest (`.Launcher<Name>`), one per icon.
  */
-enum class StashyAppIcon(val raw: String, val label: String, val aliasName: String, @DrawableRes val preview: Int) {
-    SystemDefault("systemDefault", tr(R.string.default_label), "LauncherDefault", R.drawable.app_icon_choice_default),
-    Light("light", tr(R.string.light), "LauncherLight", R.drawable.app_icon_choice_light),
-    Brown("brown", tr(R.string.brown), "LauncherBrown", R.drawable.app_icon_choice_brown),
-    Blue("blue", tr(R.string.blue), "LauncherBlue", R.drawable.app_icon_choice_blue),
-    Purple("purple", tr(R.string.purple), "LauncherPurple", R.drawable.app_icon_choice_purple),
-    Pink("pink", tr(R.string.pink), "LauncherPink", R.drawable.app_icon_choice_pink),
-    Rainbow("rainbow", tr(R.string.rainbow), "LauncherRainbow", R.drawable.app_icon_choice_rainbow),
-    Gold("gold", tr(R.string.gold), "LauncherGold", R.drawable.app_icon_choice_gold);
+enum class StashyAppIcon(val raw: String, @androidx.annotation.StringRes private val labelRes: Int, val aliasName: String, @DrawableRes val preview: Int) {
+    SystemDefault("systemDefault", R.string.default_label, "LauncherDefault", R.drawable.app_icon_choice_default),
+    Light("light", R.string.light, "LauncherLight", R.drawable.app_icon_choice_light),
+    Brown("brown", R.string.brown, "LauncherBrown", R.drawable.app_icon_choice_brown),
+    Blue("blue", R.string.blue, "LauncherBlue", R.drawable.app_icon_choice_blue),
+    Purple("purple", R.string.purple, "LauncherPurple", R.drawable.app_icon_choice_purple),
+    Pink("pink", R.string.pink, "LauncherPink", R.drawable.app_icon_choice_pink),
+    Rainbow("rainbow", R.string.rainbow, "LauncherRainbow", R.drawable.app_icon_choice_rainbow),
+    Gold("gold", R.string.gold, "LauncherGold", R.drawable.app_icon_choice_gold);
+    /** Read on use: a constant must not freeze its text at class load. */
+    val label: String get() = tr(labelRes)
 
     companion object { fun from(raw: String?) = entries.firstOrNull { it.raw == raw } ?: SystemDefault }
 }

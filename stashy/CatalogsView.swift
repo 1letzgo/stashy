@@ -33,6 +33,22 @@ struct CatalogsView: View {
         case groups = "Groups"
         case markers = "Markers"
         case magazine = "Magazin"
+
+        /// The name on screen; the raw value is data.
+        var title: String {
+            switch self {
+            case .dashboard: return tr("dashboard")
+            case .scenes: return tr("scenes")
+            case .images: return tr("images")
+            case .galleries: return tr("galleries")
+            case .performers: return tr("performers")
+            case .studios: return tr("studios")
+            case .tags: return tr("tags")
+            case .groups: return tr("groups")
+            case .markers: return tr("markers")
+            case .magazine: return tr("magazin")
+            }
+        }
         
         var icon: String {
             switch self {
@@ -1059,6 +1075,19 @@ struct GroupDetailView: View {
         case tags = "Tags"
         case images = "Images"
 
+        /// The name on screen; the raw value is data.
+        var title: String {
+            switch self {
+            case .scenes: return tr("scenes")
+            case .groups: return tr("groups")
+            case .galleries: return tr("galleries")
+            case .performers: return tr("performers")
+            case .studios: return tr("studios")
+            case .tags: return tr("tags")
+            case .images: return tr("images")
+            }
+        }
+
         var icon: String {
             switch self {
             case .scenes: return "film"
@@ -1229,7 +1258,7 @@ struct GroupDetailView: View {
     /// Back · section dropdown, like the overviews' breadcrumb (PerformerDetail template).
     private var detailCrumb: DetailBreadcrumb {
         DetailBreadcrumb(
-            sections: availableTabs.map { .init(id: $0.rawValue, title: $0.rawValue, systemImage: $0.icon) },
+            sections: availableTabs.map { .init(id: $0.rawValue, title: $0.title, systemImage: $0.icon) },
             selectionID: selectedDetailTab.rawValue,
             onSelect: { id in
                 if let tab = DetailTab(rawValue: id) { selectedDetailTab = tab }
@@ -2118,7 +2147,7 @@ struct EditGroupSheet: View {
                 Section(tr("studio_and_tags")) {
                     pickerRow(title: tr("studio"), value: studio?.name ?? "None") { picker = .studio }
                     pickerRow(
-                        title: "Tags",
+                        title: tr("tags"),
                         value: tags.isEmpty ? "None" : tags.map(\.name).joined(separator: ", ")
                     ) { picker = .tags }
                 }
@@ -2497,7 +2526,7 @@ private struct GroupEntityPickerSheet: View {
                     .listRowBackground(Color.secondaryAppBackground)
                 }
 
-                Section(kind == .studio ? "Studios" : "Tags") {
+                Section(kind == .studio ? tr("studios") : tr("tags")) {
                     if store.isLoading(storeKind) && options.isEmpty {
                         HStack { Spacer(); InlineSpinner(); Spacer() }
                     } else {
@@ -2517,7 +2546,7 @@ private struct GroupEntityPickerSheet: View {
             }
             .applyAppBackground()
             .scrollContentBackground(.hidden)
-            .stashyModalSheetChrome(kind == .studio ? tr("studio") : "Tags", onBack: { dismiss() }) {
+            .stashyModalSheetChrome(kind == .studio ? tr("studio") : tr("tags"), onBack: { dismiss() }) {
                 StashyChromeTrailingTextButton(title: tr("action_done")) { dismiss() }
             }
             .onAppear { store.load(storeKind) }

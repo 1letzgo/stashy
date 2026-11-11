@@ -148,7 +148,7 @@ fun EditSceneTitleSheet(scene: Scene, onDismiss: () -> Unit, currentProductionDa
                 de.letzgo.stashy.ui.NativeTextButton(tr(R.string.normalize), Modifier.padding(start = 4.dp)) { details = SceneTitleNormalizer.normalizedDescription(details) }
             }
         }
-        if (showsProductionDate) FormSection(tr(R.string.production_date)) { FormTextField(productionDate, { productionDate = it }, "YYYY-MM-DD", Modifier.fillMaxWidth()) }
+        if (showsProductionDate) FormSection(tr(R.string.production_date)) { FormTextField(productionDate, { productionDate = it }, tr(R.string.placeholder_date), Modifier.fillMaxWidth()) }
     }
 }
 

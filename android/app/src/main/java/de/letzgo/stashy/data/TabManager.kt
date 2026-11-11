@@ -12,33 +12,43 @@ import kotlinx.serialization.builtins.MapSerializer
 import kotlinx.serialization.builtins.serializer
 
 /** Settings › Playback › "Feeds start position": where a Feeds › Scenes row starts (skips studio intros). */
-enum class FeedsSceneStartPosition(val raw: String, val label: String) {
-    Beginning("beginning", tr(R.string.beginning)), FirstMarker("firstMarker", tr(R.string.first_marker)), Skip30("skip30", tr(R.string.action_skip_30s)), Random("random", tr(R.string.random));
+enum class FeedsSceneStartPosition(val raw: String, @androidx.annotation.StringRes private val labelRes: Int) {
+    Beginning("beginning", R.string.beginning), FirstMarker("firstMarker", R.string.first_marker), Skip30("skip30", R.string.action_skip_30s), Random("random", R.string.random);
+    /** Read on use: a constant must not freeze its text at class load. */
+    val label: String get() = tr(labelRes)
     companion object { fun from(raw: String?) = entries.firstOrNull { it.raw == raw } ?: Beginning }
 }
 
 /** iOS: `SubtitleFontSize`. */
-enum class SubtitleFontSize(val raw: String, val label: String) {
-    Small("small", tr(R.string.small)), Medium("medium", tr(R.string.medium)), Large("large", tr(R.string.large)), ExtraLarge("extraLarge", tr(R.string.extra_large));
+enum class SubtitleFontSize(val raw: String, @androidx.annotation.StringRes private val labelRes: Int) {
+    Small("small", R.string.small), Medium("medium", R.string.medium), Large("large", R.string.large), ExtraLarge("extraLarge", R.string.extra_large);
+    /** Read on use: a constant must not freeze its text at class load. */
+    val label: String get() = tr(labelRes)
     companion object { fun from(raw: String?) = entries.firstOrNull { it.raw == raw } ?: Medium }
 }
 
 /** iOS: `SubtitleFontFamily`. */
-enum class SubtitleFontFamily(val raw: String, val label: String) {
-    System("system", tr(R.string.system)), Rounded("rounded", tr(R.string.rounded)), Serif("serif", tr(R.string.serif)), Monospaced("monospaced", tr(R.string.monospaced));
+enum class SubtitleFontFamily(val raw: String, @androidx.annotation.StringRes private val labelRes: Int) {
+    System("system", R.string.system), Rounded("rounded", R.string.rounded), Serif("serif", R.string.serif), Monospaced("monospaced", R.string.monospaced);
+    /** Read on use: a constant must not freeze its text at class load. */
+    val label: String get() = tr(labelRes)
     companion object { fun from(raw: String?) = entries.firstOrNull { it.raw == raw } ?: System }
 }
 
 /** iOS: `SubtitleTextColorChoice`. */
-enum class SubtitleTextColorChoice(val raw: String, val label: String, val argb: Long) {
-    White("white", tr(R.string.white), 0xFFFFFFFF), Yellow("yellow", tr(R.string.yellow), 0xFFFFDE40), Cyan("cyan", tr(R.string.cyan), 0xFF73E6FF),
-    Green("green", tr(R.string.green), 0xFF73F280), Black("black", tr(R.string.black), 0xFF000000);
+enum class SubtitleTextColorChoice(val raw: String, @androidx.annotation.StringRes private val labelRes: Int, val argb: Long) {
+    White("white", R.string.white, 0xFFFFFFFF), Yellow("yellow", R.string.yellow, 0xFFFFDE40), Cyan("cyan", R.string.cyan, 0xFF73E6FF),
+    Green("green", R.string.green, 0xFF73F280), Black("black", R.string.black, 0xFF000000);
+    /** Read on use: a constant must not freeze its text at class load. */
+    val label: String get() = tr(labelRes)
     companion object { fun from(raw: String?) = entries.firstOrNull { it.raw == raw } ?: White }
 }
 
 /** iOS: `SubtitleBackgroundChoice` (`argb` null = no box). */
-enum class SubtitleBackgroundChoice(val raw: String, val label: String, val argb: Long?) {
-    Black("black", tr(R.string.black), 0xA6000000), DarkGray("darkGray", tr(R.string.dark_grey), 0xBF404040), White("white", tr(R.string.white), 0xBFFFFFFF), None("none", tr(R.string.none), null);
+enum class SubtitleBackgroundChoice(val raw: String, @androidx.annotation.StringRes private val labelRes: Int, val argb: Long?) {
+    Black("black", R.string.black, 0xA6000000), DarkGray("darkGray", R.string.dark_grey, 0xBF404040), White("white", R.string.white, 0xBFFFFFFF), None("none", R.string.none, null);
+    /** Read on use: a constant must not freeze its text at class load. */
+    val label: String get() = tr(labelRes)
     companion object { fun from(raw: String?) = entries.firstOrNull { it.raw == raw } ?: Black }
 }
 

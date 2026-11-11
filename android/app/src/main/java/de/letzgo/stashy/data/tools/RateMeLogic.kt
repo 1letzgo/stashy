@@ -14,9 +14,11 @@ import kotlin.random.Random
 // unit tested in `RateMeLogicTest`.
 
 /** iOS: `RateMeViewModel.Mode` (raw values persisted under `stashy.rateMe.mode`). */
-enum class RateMeMode(val raw: String, val label: String) {
-    Scenes("scenes", tr(R.string.scenes)),
-    Images("images", tr(R.string.images));
+enum class RateMeMode(val raw: String, @androidx.annotation.StringRes private val labelRes: Int) {
+    Scenes("scenes", R.string.scenes),
+    Images("images", R.string.images);
+    /** Read on use: a constant must not freeze its text at class load. */
+    val label: String get() = tr(labelRes)
 
     companion object {
         fun from(raw: String?): RateMeMode? = entries.firstOrNull { it.raw == raw }
@@ -86,10 +88,12 @@ sealed class RateMeTheme {
 }
 
 /** iOS: `RateMeToolsView.ThemePickerKind`. */
-enum class RateMeThemePickerKind(val raw: String, val title: String) {
-    Performer("performer", tr(R.string.performer)),
-    Studio("studio", tr(R.string.studio)),
-    Tag("tag", tr(R.string.tag));
+enum class RateMeThemePickerKind(val raw: String, @androidx.annotation.StringRes private val titleRes: Int) {
+    Performer("performer", R.string.performer),
+    Studio("studio", R.string.studio),
+    Tag("tag", R.string.tag);
+    /** Read on use: a constant must not freeze its text at class load. */
+    val title: String get() = tr(titleRes)
 
     fun theme(option: RateMeOption): RateMeTheme = when (this) {
         Performer -> RateMeTheme.Performer(option)

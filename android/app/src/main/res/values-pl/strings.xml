@@ -361,6 +361,7 @@
   <string name="app_only">Tylko w aplikacji</string>
   <string name="app_theme">Motyw aplikacji</string>
   <string name="arg_arg_o_count">%1$s, licznik O: %2$s</string>
+  <string name="arg_criteria">Kryteria: %1$s</string>
   <string name="arg_external">%1$s · zewnętrzne</string>
   <string name="arg_images_in_this_gallery">Obrazy w tej galerii: %1$s</string>
   <string name="arg_match_arg_arg">%1$s · Match %2$s/%3$s</string>
@@ -1376,6 +1377,7 @@
   <string name="loading">Wczytywanie</string>
   <string name="loading_channels">Wczytywanie kanałów…</string>
   <string name="loading_charts">Wczytywanie Charts…</string>
+  <string name="loading_connecting">Łączenie…</string>
   <string name="loading_feeds">Wczytywanie Feeds…</string>
   <string name="loading_filters">Wczytywanie filtrów…</string>
   <string name="loading_galleries">Wczytywanie galerii…</string>
@@ -1411,6 +1413,7 @@
   <string name="local_address_optional_e_g">Adres lokalny (opcjonalnie, np. 192.168.1.100:9999)</string>
   <string name="local_arg">Lokalny: %1$s</string>
   <string name="logging_in_menu">Logowanie…</string>
+  <string name="login">Logowanie</string>
   <string name="login_failed_arg">Logowanie nie powiodło się: %1$s</string>
   <string name="longest_first">Od najdłuższych</string>
   <string name="look_back">Okres wstecz</string>
@@ -1519,6 +1522,7 @@
   <string name="next_marker">Następny znacznik</string>
   <string name="next_month">Następny miesiąc</string>
   <string name="no">Nie</string>
+  <string name="non_binary">Niebinarna</string>
   <string name="none">Brak</string>
   <string name="none_of">Żaden z</string>
   <string name="normal">Normalnie</string>
@@ -1639,6 +1643,7 @@
   <string name="piercings">Kolczyki</string>
   <string name="pink">Różowy</string>
   <string name="pins_do_not_match">PIN-y nie są zgodne</string>
+  <string name="placeholder_date">RRRR-MM-DD</string>
   <string name="placeholder_search">Szukaj…</string>
   <string name="placeholder_search_2">Szukaj…</string>
   <string name="placeholder_search_everything">Szukaj wszędzie…</string>
@@ -1990,6 +1995,7 @@
   <string name="updated_oldest_first">Zaktualizowano (od najstarszych)</string>
   <string name="uploading_script_menu">Wysyłanie skryptu…</string>
   <string name="up_next_similar_scene">Następne · podobna scena</string>
+  <string name="use_stashy_in_english">Używaj stashy po angielsku</string>
   <string name="username">Nazwa użytkownika</string>
   <string name="value">Wartość</string>
   <string name="value_2">Wartość 2</string>

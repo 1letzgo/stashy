@@ -2090,7 +2090,7 @@ class StashDBViewModel: ObservableObject {
         currentGroupFilter = nil
         currentGroupLiveFilter = nil
         
-        serverStatus = "Connecting..."
+        serverStatus = tr("loading_connecting")
         errorMessage = nil
     }
     
@@ -13564,7 +13564,7 @@ class ButtplugManager: ObservableObject {
         DispatchQueue.main.async {
             self.isConnected = false
             self.devices.removeAll()
-            self.statusMessage = "Connecting..."
+            self.statusMessage = tr("loading_connecting")
         }
         
         // Cancel a previous socket so its callbacks don't pile up on the new one
@@ -13835,9 +13835,9 @@ class ButtplugManager: ObservableObject {
                     }
                     AppLog.debug("📱 Buttplug: Found \(self.devices.count) devices")
                 }
-            } else if let _ = dict[tr("ok")] as? [String: Any] {
+            } else if let _ = dict["Ok"] as? [String: Any] {
                 // Acknowledgement
-            } else if let error = dict[tr("error_generic")] as? [String: Any] {
+            } else if let error = dict["Error"] as? [String: Any] {
                 AppLog.error("⚠️ Buttplug Error: \(error["ErrorMessage"] ?? "Unknown")")
             }
         }

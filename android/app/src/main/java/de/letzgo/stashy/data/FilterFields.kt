@@ -21,12 +21,14 @@ enum class FilterMode(val raw: String) {
 }
 
 /** iOS: `StashCriterionModifier` (filters.graphql `CriterionModifier`). */
-enum class CriterionModifier(val raw: String, val label: String) {
-    Equals("EQUALS", tr(R.string.equals)), NotEquals("NOT_EQUALS", tr(R.string.not_equals)), GreaterThan("GREATER_THAN", tr(R.string.greater_than)),
-    LessThan("LESS_THAN", tr(R.string.less_than)), IsNull("IS_NULL", tr(R.string.is_null)), NotNull("NOT_NULL", tr(R.string.not_null)),
-    IncludesAll("INCLUDES_ALL", tr(R.string.includes_all)), Includes("INCLUDES", tr(R.string.includes)), Excludes("EXCLUDES", tr(R.string.excludes)),
-    MatchesRegex("MATCHES_REGEX", tr(R.string.matches_regex)), NotMatchesRegex("NOT_MATCHES_REGEX", tr(R.string.not_matches_regex)),
-    Between("BETWEEN", tr(R.string.between)), NotBetween("NOT_BETWEEN", tr(R.string.not_between));
+enum class CriterionModifier(val raw: String, @androidx.annotation.StringRes private val labelRes: Int) {
+    Equals("EQUALS", R.string.equals), NotEquals("NOT_EQUALS", R.string.not_equals), GreaterThan("GREATER_THAN", R.string.greater_than),
+    LessThan("LESS_THAN", R.string.less_than), IsNull("IS_NULL", R.string.is_null), NotNull("NOT_NULL", R.string.not_null),
+    IncludesAll("INCLUDES_ALL", R.string.includes_all), Includes("INCLUDES", R.string.includes), Excludes("EXCLUDES", R.string.excludes),
+    MatchesRegex("MATCHES_REGEX", R.string.matches_regex), NotMatchesRegex("NOT_MATCHES_REGEX", R.string.not_matches_regex),
+    Between("BETWEEN", R.string.between), NotBetween("NOT_BETWEEN", R.string.not_between);
+    /** Read on use: a constant must not freeze its text at class load. */
+    val label: String get() = tr(labelRes)
 
     val needsValue: Boolean get() = this != IsNull && this != NotNull
     val needsSecondValue: Boolean get() = this == Between || this == NotBetween
@@ -108,7 +110,11 @@ enum class ResolutionOption(val raw: String, val label: String) {
 }
 
 /** iOS: `StashOrientationOption`. */
-enum class OrientationOption(val raw: String, val label: String) { Landscape("LANDSCAPE", tr(R.string.landscape)), Portrait("PORTRAIT", tr(R.string.portrait)), Square("SQUARE", tr(R.string.square)) }
+enum class OrientationOption(val raw: String, @androidx.annotation.StringRes private val labelRes: Int) { Landscape("LANDSCAPE", R.string.landscape), Portrait("PORTRAIT", R.string.portrait), Square("SQUARE", R.string.square);
+
+    /** Read on use: a constant must not freeze its text at class load. */
+    val label: String get() = tr(labelRes)
+}
 
 /** iOS: `StashGenderOption` (label = raw with spaces, capitalized). */
 enum class GenderOption(val raw: String) {

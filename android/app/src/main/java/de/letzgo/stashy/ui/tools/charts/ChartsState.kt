@@ -217,8 +217,11 @@ class TopListsViewModel {
 }
 
 /** iOS: `TopListsToolsContainerView.Section`. */
-enum class ChartsSection(val title: String, val icon: ImageVector) {
-    Scenes(tr(R.string.scenes), SF.film), Performers(tr(R.string.performers), SF.person2), Studios(tr(R.string.studios), SF.building2), Tags(tr(R.string.tags), SF.tag),
+enum class ChartsSection(@androidx.annotation.StringRes private val titleRes: Int, val icon: ImageVector) {
+    Scenes(R.string.scenes, SF.film), Performers(R.string.performers, SF.person2), Studios(R.string.studios, SF.building2), Tags(R.string.tags, SF.tag);
+
+    /** Read on use: a constant must not freeze its text at class load. */
+    val title: String get() = tr(titleRes)
 }
 
 /** Process-wide state of Tools › Charts (survives switching tools). */

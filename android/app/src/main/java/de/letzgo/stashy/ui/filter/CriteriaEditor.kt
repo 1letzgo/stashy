@@ -441,7 +441,7 @@ private fun CriterionEditorBody(document: CriteriaDocument, field: FilterFieldDe
         CriterionKind.nestedFilter -> {
             val count = dict.size
             Row(Modifier.clickable(onClick = onOpenNested).padding(vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
-                Text(if (count == 0) tr(R.string.action_edit_menu) else "$count criterion(s)", style = IosTypography.subheadline, color = Theme.palette.text)
+                Text(if (count == 0) tr(R.string.action_edit_menu) else tr(R.string.arg_criteria, count), style = IosTypography.subheadline, color = Theme.palette.text)
                 Icon(de.letzgo.stashy.ui.SF.chevronDown, null, tint = Theme.palette.secondaryText, modifier = Modifier.size(16.dp))
             }
         }
@@ -538,7 +538,7 @@ private fun DateRow(value: JsonObject, set: (JsonObject) -> Unit, onChange: () -
     }
     if (mod?.needsValue != false) {
         val two = mod?.needsSecondValue == true
-        NativeDateField(text("value"), { setText("value", it) }, label = null, placeholder = if (two) tr(R.string.from_yyyy_mm_dd) else "YYYY-MM-DD", onCommit = ::commitIfValid)
+        NativeDateField(text("value"), { setText("value", it) }, label = null, placeholder = if (two) tr(R.string.from_yyyy_mm_dd) else tr(R.string.placeholder_date), onCommit = ::commitIfValid)
         if (two) NativeDateField(text("value2"), { setText("value2", it) }, label = null, placeholder = tr(R.string.to_yyyy_mm_dd), onCommit = ::commitIfValid)
     }
 }

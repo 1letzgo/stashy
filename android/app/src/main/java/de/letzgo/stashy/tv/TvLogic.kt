@@ -274,11 +274,13 @@ class TvStacks<R>(private val roots: Set<TvRootTab>) {
 }
 
 /** iOS: `TVRootTab` — the sidebar entries. */
-enum class TvRootTab(val title: String) {
-    Search(tr(R.string.search)), Home(tr(R.string.home)),
-    Scenes(tr(R.string.scenes)), Performers(tr(R.string.performers)), Studios(tr(R.string.studios)), Tags(tr(R.string.tags)),
-    Groups(tr(R.string.groups)), Galleries(tr(R.string.galleries)), Images(tr(R.string.images)),
-    Settings(tr(R.string.settings));
+enum class TvRootTab(@androidx.annotation.StringRes private val titleRes: Int) {
+    Search(R.string.search), Home(R.string.home),
+    Scenes(R.string.scenes), Performers(R.string.performers), Studios(R.string.studios), Tags(R.string.tags),
+    Groups(R.string.groups), Galleries(R.string.galleries), Images(R.string.images),
+    Settings(R.string.settings);
+    /** Read on use: a constant must not freeze its text at class load. */
+    val title: String get() = tr(titleRes)
 
     val isLibrary: Boolean get() = this !in setOf(Search, Home, Settings)
 

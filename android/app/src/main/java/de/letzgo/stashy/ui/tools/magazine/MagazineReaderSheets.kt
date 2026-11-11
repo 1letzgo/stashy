@@ -64,7 +64,11 @@ import de.letzgo.stashy.ui.SF
 import de.letzgo.stashy.ui.Theme
 import de.letzgo.stashy.ui.components.SelectChip
 
-private enum class PagePickerMode(val title: String) { Chapters(tr(R.string.chapters)), Pages(tr(R.string.pages)) }
+private enum class PagePickerMode(@androidx.annotation.StringRes private val titleRes: Int) { Chapters(R.string.chapters), Pages(R.string.pages);
+
+    /** Read on use: a constant must not freeze its text at class load. */
+    val title: String get() = tr(titleRes)
+}
 
 /** iOS: `MagazinePagePickerSheet` — by number, from the page list, or by chapter when there are any. */
 @OptIn(ExperimentalMaterial3Api::class)

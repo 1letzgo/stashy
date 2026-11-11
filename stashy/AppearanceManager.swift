@@ -15,6 +15,16 @@ enum AppTheme: String, CaseIterable, Identifiable {
     case darkBlue = "Dark Blue"
     
     var id: String { self.rawValue }
+
+    /// The name on screen; the raw value is stored.
+    var title: String {
+        switch self {
+        case .system: return tr("system")
+        case .light: return tr("light")
+        case .dark: return tr("dark")
+        case .darkBlue: return tr("dark_blue")
+        }
+    }
     
     var colorScheme: ColorScheme? {
         switch self {

@@ -361,6 +361,7 @@
   <string name="app_only">Только приложение</string>
   <string name="app_theme">Тема приложения</string>
   <string name="arg_arg_o_count">%1$s, счетчик O: %2$s</string>
+  <string name="arg_criteria">Критерии: %1$s</string>
   <string name="arg_external">%1$s · Внешние</string>
   <string name="arg_images_in_this_gallery">Изображений в этой галерее: %1$s</string>
   <string name="arg_match_arg_arg">%1$s · Матч %2$s/%3$s</string>
@@ -1376,6 +1377,7 @@
   <string name="loading">Загрузка</string>
   <string name="loading_channels">Загрузка каналов…</string>
   <string name="loading_charts">Загрузка Charts…</string>
+  <string name="loading_connecting">Подключение…</string>
   <string name="loading_feeds">Загрузка лент…</string>
   <string name="loading_filters">Загрузка фильтров…</string>
   <string name="loading_galleries">Загрузка галерей…</string>
@@ -1411,6 +1413,7 @@
   <string name="local_address_optional_e_g">Локальный адрес (необязательно, например 192.168.1.100:9999)</string>
   <string name="local_arg">Локальный: %1$s</string>
   <string name="logging_in_menu">Вход…</string>
+  <string name="login">Вход</string>
   <string name="login_failed_arg">Не удалось войти: %1$s</string>
   <string name="longest_first">Сначала длинные</string>
   <string name="look_back">Период анализа</string>
@@ -1519,6 +1522,7 @@
   <string name="next_marker">Следующий маркер</string>
   <string name="next_month">Следующий месяц</string>
   <string name="no">Нет</string>
+  <string name="non_binary">Небинарный</string>
   <string name="none">Нет</string>
   <string name="none_of">Ни одно из</string>
   <string name="normal">Обычная</string>
@@ -1639,6 +1643,7 @@
   <string name="piercings">Пирсинг</string>
   <string name="pink">Розовый</string>
   <string name="pins_do_not_match">PIN-коды не совпадают</string>
+  <string name="placeholder_date">ГГГГ-ММ-ДД</string>
   <string name="placeholder_search">Поиск…</string>
   <string name="placeholder_search_2">Поиск…</string>
   <string name="placeholder_search_everything">Искать везде…</string>
@@ -1990,6 +1995,7 @@
   <string name="updated_oldest_first">Обновлено (сначала старые)</string>
   <string name="uploading_script_menu">Выгрузка скрипта…</string>
   <string name="up_next_similar_scene">Далее · Похожая сцена</string>
+  <string name="use_stashy_in_english">Использовать stashy на английском</string>
   <string name="username">Имя пользователя</string>
   <string name="value">Значение</string>
   <string name="value_2">Значение 2</string>

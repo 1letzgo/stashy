@@ -468,7 +468,7 @@ struct FilterCriteriaEditorView: View {
             } label: {
                 let count = (FilterCriteriaDocument.stringKeyedDict(document.value(forKey: field.key, at: path)) ?? [:]).count
                 HStack(spacing: 6) {
-                    Text(count == 0 ? tr("action_edit_menu") : "\(count) criterion(s)")
+                    Text(count == 0 ? tr("action_edit_menu") : tr("arg_criteria", count))
                         .font(.subheadline)
                     Image(systemName: "chevron.right")
                         .font(.caption.weight(.semibold))
@@ -917,7 +917,7 @@ struct FilterDateCriterionRow: View {
             )
             if mod?.needsValue ?? true {
                 StashDateField(
-                    placeholder: mod?.needsSecondValue == true ? tr("from_yyyy_mm_dd") : "YYYY-MM-DD",
+                    placeholder: mod?.needsSecondValue == true ? tr("from_yyyy_mm_dd") : tr("placeholder_date"),
                     text: dateText(key: "value"),
                     editorChrome: true,
                     onCommit: commitIfValid

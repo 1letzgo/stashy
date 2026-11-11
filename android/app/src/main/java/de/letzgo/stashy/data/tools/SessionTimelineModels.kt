@@ -29,15 +29,19 @@ data class TimelineSceneSnapshot(
     val displayTitle: String get() {
         if (title != "Untitled" && title.isNotEmpty()) return title
         val names = performers.mapNotNull { it.name }.filter { it.isNotEmpty() }
-        return if (names.isEmpty()) title else names.joinToString(", ")
+        if (names.isNotEmpty()) return names.joinToString(", ")
+        // "Untitled" is the stored placeholder (data); the screen gets the translated word.
+        return if (title == "Untitled") tr(R.string.untitled) else title
     }
 
     val studioName: String? get() = studio?.name?.trim()?.takeIf { it.isNotEmpty() }
 }
 
 /** iOS: `TimelineKind` (raw values identical). */
-enum class TimelineKind(val raw: String, val label: String) {
-    Watch("watch", tr(R.string.watch)), OCount("oCount", tr(R.string.o_count)), Marker("marker", tr(R.string.markers));
+enum class TimelineKind(val raw: String, @androidx.annotation.StringRes private val labelRes: Int) {
+    Watch("watch", R.string.watch), OCount("oCount", R.string.o_count), Marker("marker", R.string.markers);
+    /** Read on use: a constant must not freeze its text at class load. */
+    val label: String get() = tr(labelRes)
 
     companion object {
         fun from(raw: String): TimelineKind? = entries.firstOrNull { it.raw == raw }

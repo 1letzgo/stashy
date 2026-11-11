@@ -39,7 +39,9 @@ struct TimelineSceneSnapshot: Equatable {
     var displayTitle: String {
         if title != "Untitled", !title.isEmpty { return title }
         let names = performers.map(\.name).filter { !$0.isEmpty }
-        return names.isEmpty ? title : names.joined(separator: ", ")
+        if !names.isEmpty { return names.joined(separator: ", ") }
+        // "Untitled" is the stored placeholder (data); the screen gets the translated word.
+        return title == "Untitled" ? tr("untitled") : title
     }
 
     var studioName: String? {
