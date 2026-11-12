@@ -61,7 +61,7 @@ struct UniversalSearchView: View {
           VStack(spacing: 0) {
             // A fixed sibling of the content below: it keeps focus when the content switches
             // between the empty state and the results (first letter, clearing).
-            RegularWidthSearchField(text: $searchText)
+            PageSearchField(text: $searchText)
             Group {
                 if configManager.activeConfig == nil {
                     // No server configured: the only way forward is Settings.
@@ -75,9 +75,16 @@ struct UniversalSearchView: View {
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
           }
-            .navigationTitle(tr("search"))
-            .navigationBarTitleDisplayMode(.inline)
             .applyAppBackground()
+            // The section header of Home / Tools / Settings instead of a system title.
+            .stashySectionChrome {
+                StashyTopNavNameDropdownRow(
+                    title: tr("search"),
+                    items: [StashyNavMenuItem(id: "search", title: tr("search"), systemImage: "magnifyingglass")],
+                    selectionID: "search",
+                    titleColor: .white
+                ) { _ in }
+            }
             .modifier(SystemSearchField(text: $searchText))
             .onChange(of: searchText) { oldValue, newValue in
                 let query = newValue.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -403,43 +410,31 @@ struct UniversalSearchView: View {
     }
 }
 
-/// At regular width (iPad, open iPhone Duo) the system puts a search tab's field beside the
-/// floating tab bar (on narrower windows only a round button), and while it is active it hides
-/// the tab bar with no way back. There the field is the page's own bar above the results
-/// (`RegularWidthSearchField`) and the tab bar stays; compact width keeps the system field.
+/// iOS draws its own field above the results (`PageSearchField`): the page has the section header
+/// instead of a navigation bar, which is where the system field would sit, and at regular width
+/// (iPad, open iPhone Duo) the system field of a search tab hides the tab bar with no way back.
+/// macOS keeps the system field in the window's toolbar.
 private struct SystemSearchField: ViewModifier {
     @Binding var text: String
-    #if os(iOS)
-    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
-    #endif
 
     func body(content: Content) -> some View {
         #if os(iOS)
-        if horizontalSizeClass == .regular {
-            content
-        } else {
-            content.searchable(text: $text, prompt: tr("placeholder_search_everything"))
-        }
+        content
         #else
         content.searchable(text: $text, prompt: tr("placeholder_search_everything"))
         #endif
     }
 }
 
-/// The page's own search field at regular width; nothing at compact width (system field).
-private struct RegularWidthSearchField: View {
+/// The page's own search field on iOS; nothing on macOS (system field).
+private struct PageSearchField: View {
     @Binding var text: String
-    #if os(iOS)
-    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
-    #endif
 
     var body: some View {
         #if os(iOS)
-        if horizontalSizeClass == .regular {
-            InlineSearchField(text: $text)
-                .padding(.horizontal, 16)
-                .padding(.vertical, 8)
-        }
+        InlineSearchField(text: $text)
+            .padding(.horizontal, 16)
+            .padding(.vertical, 8)
         #endif
     }
 }

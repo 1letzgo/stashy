@@ -169,8 +169,8 @@ fun SearchScreen() {
     }
 
     Box(Modifier.fillMaxSize().background(p.background)) {
-        Column(Modifier.fillMaxSize().statusBarsPadding().imePadding()) {
-            Text(tr(R.string.search), style = IosTypography.headline, color = p.text, modifier = Modifier.align(Alignment.CenterHorizontally).padding(top = 12.dp))
+        // The section header of Home / Tools / Settings (the strip below) instead of a plain title.
+        Column(Modifier.fillMaxSize().padding(top = de.letzgo.stashy.ui.catalog.catalogTopPadding()).imePadding()) {
             // iOS `.searchable(prompt: "Search everything...")`
             NativeSearchField(text, { text = it }, tr(R.string.placeholder_search_everything), Modifier.padding(horizontal = 16.dp, vertical = 10.dp))
             when {
@@ -179,6 +179,7 @@ fun SearchScreen() {
                 else -> Results(query, searching)
             }
         }
+        de.letzgo.stashy.ui.settings.SectionChipStrip(listOf(Unit), Unit, { SF.magnifyingglass }, { tr(R.string.search) }) {}
     }
 }
 
