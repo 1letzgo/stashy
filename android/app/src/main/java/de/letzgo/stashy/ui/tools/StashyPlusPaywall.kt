@@ -32,6 +32,7 @@ import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.material.icons.outlined.ContentPaste
 import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.Key
+import androidx.compose.material.icons.outlined.Translate
 import androidx.compose.material3.IconButton
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalFocusManager
@@ -196,8 +197,25 @@ fun LazyListScope.stashyPlusSettingsItems() {
                 de.letzgo.stashy.ui.settings.SettingsToggleRow(tr(R.string.magazin_ereader), mode.isEnabled, SF.magazine) { mode.isEnabled = it }
                 if (mode.isEnabled) {
                     RowDivider()
-                    Box(Modifier.padding(horizontal = 16.dp)) {
+                    // Same leading icon slot as the rows above and below.
+                    Row(
+                        Modifier.padding(horizontal = 16.dp),
+                        verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
+                        horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(16.dp),
+                    ) {
+                        androidx.compose.material3.Icon(SF.line3HorizontalDecreaseCircle, null, tint = Appearance.tint, modifier = Modifier.size(24.dp))
                         de.letzgo.stashy.ui.settings.CardSettingRow(tr(R.string.default_filter)) { de.letzgo.stashy.ui.settings.MagazineDefaultFilterMenu() }
+                    }
+                    RowDivider()
+                    val language = de.letzgo.stashy.ui.tools.magazine.MagazineTranslationLanguage
+                    var code by remember { mutableStateOf(language.load()) }
+                    val options = remember { language.pickerOptions() }
+                    de.letzgo.stashy.ui.settings.SettingsPickerRow(
+                        tr(R.string.translation_language), options.map { it.first }, code,
+                        { id -> options.firstOrNull { it.first == id }?.second ?: id }, Icons.Outlined.Translate,
+                    ) {
+                        code = it
+                        language.persist(it)
                     }
                 }
             }

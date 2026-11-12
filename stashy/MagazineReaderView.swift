@@ -7,6 +7,10 @@
 //
 
 import SwiftUI
+import Combine
+import Vision
+import NaturalLanguage
+import Translation
 
 // MARK: - Page order
 
@@ -730,6 +734,9 @@ private struct MagazineSpreadView: View {
 
 private struct MagazinePageImage: View {
     let image: StashImage
+    /// Text found on the page, outlined while translating is on (fullscreen only).
+    var textBlocks: [MagazineTextBlock] = []
+    var selectedBlockID: UUID?
 
     var body: some View {
         CustomAsyncImage(url: image.imageURL) { loader in
@@ -737,6 +744,11 @@ private struct MagazinePageImage: View {
                 loaded
                     .resizable()
                     .scaledToFit()
+                    .overlay {
+                        if !textBlocks.isEmpty {
+                            MagazineTextBlockOutlines(blocks: textBlocks, selectedID: selectedBlockID)
+                        }
+                    }
             } else if loader.isLoading {
                 ProgressView()
                     .tint(.white)
@@ -759,21 +771,47 @@ private struct MagazineFullscreenView: View {
 
     @State private var isZoomed = false
     @State private var showsChrome = true
+    /// Tap a text to translate it. Stays on for the next comic.
+    @AppStorage(MagazinePageTranslation.enabledKey) private var translatesText = false
+    @StateObject private var translation = MagazinePageTranslation()
+    @ObservedObject private var appearance = AppearanceManager.shared
+
+    private var currentImage: StashImage? { pages.indices.contains(page) ? pages[page] : nil }
 
     var body: some View {
         ZStack(alignment: .top) {
             Color.black.ignoresSafeArea()
 
             MagazinePager(count: pages.count, index: $page, isPagingEnabled: !isZoomed) { index in
+                let image = pages[index]
                 ZoomableScrollView(isZoomed: $isZoomed, onTap: { _ in
                     withAnimation(.easeOut(duration: 0.15)) { showsChrome.toggle() }
+                }, onContentTap: { point, size, viewportY in
+                    translatesText && translation.handleTap(at: point, in: size, viewportY: viewportY, image: image)
                 }) {
-                    MagazinePageImage(image: pages[index])
+                    MagazinePageImage(
+                        image: image,
+                        textBlocks: translatesText ? translation.blocks(for: image) : [],
+                        selectedBlockID: translation.selected?.id
+                    )
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
                 }
             }
             .ignoresSafeArea()
-            .onChange(of: page) { _, _ in isZoomed = false }
+            .onChange(of: page) { _, _ in
+                isZoomed = false
+                translation.select(nil)
+                analyzeCurrentPage()
+            }
+            .onChange(of: translatesText) { _, isOn in
+                if isOn { analyzeCurrentPage() } else { translation.select(nil) }
+            }
+            .onAppear(perform: analyzeCurrentPage)
+            // The session lives as long as the view carrying `translationTask`, and the system's
+            // language download sheet is presented from it.
+            .translationTask(translation.translator.configuration) { session in
+                await translation.translator.run(session: session)
+            }
 
             if showsChrome {
                 HStack {
@@ -787,6 +825,8 @@ private struct MagazineFullscreenView: View {
                     .buttonStyle(.plain)
 
                     Spacer()
+
+                    translateButton
 
                     Button(action: onShowPagePicker) {
                         HStack(spacing: 3) {
@@ -807,6 +847,15 @@ private struct MagazineFullscreenView: View {
                 .transition(.opacity)
             }
         }
+        // The translation keeps clear of the text it belongs to: above for a tap in the lower half.
+        .overlay(alignment: translation.selected != nil && translation.selectedInLowerHalf ? .top : .bottom) {
+            if translatesText, let currentImage {
+                MagazineTranslationPanel(translation: translation, image: currentImage)
+                    .padding(.horizontal, 12)
+                    .padding(.bottom, 12)
+                    .padding(.top, 56)
+            }
+        }
         #if os(macOS)
         .overlay {
             if showsChrome {
@@ -820,6 +869,465 @@ private struct MagazineFullscreenView: View {
             }
         }
         #endif
+    }
+}
+
+private extension MagazineFullscreenView {
+    var translateButton: some View {
+        Button {
+            HapticManager.light()
+            translatesText.toggle()
+        } label: {
+            Image(systemName: "translate")
+                .font(.body.weight(.semibold))
+                .foregroundStyle(translatesText ? Color.onAppTint : .white)
+                .frame(width: 44, height: 44)
+                .background(
+                    translatesText ? AnyShapeStyle(appearance.tintColor) : AnyShapeStyle(.black.opacity(0.45)),
+                    in: Circle()
+                )
+                .contentShape(Circle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(tr("action_translate_text"))
+        .accessibilityAddTraits(translatesText ? .isSelected : [])
+    }
+
+    func analyzeCurrentPage() {
+        guard translatesText, let currentImage else { return }
+        translation.analyze(currentImage)
+    }
+}
+
+// MARK: - Page translation
+
+/// A piece of text on a page: a speech bubble, a caption, a sound word.
+struct MagazineTextBlock: Identifiable, Equatable {
+    let id = UUID()
+    /// Within the image, 0…1, origin top left.
+    let rect: CGRect
+    let text: String
+}
+
+/// Finds the text of a page on the device. From iOS 26 the document request reads vertical
+/// Japanese and Chinese as well; older systems only get horizontal lines.
+enum MagazineTextRecognizer {
+    struct Result {
+        var blocks: [MagazineTextBlock]
+        /// Language of the whole page (`ja`, `zh-Hans`, `ko`, …): a single bubble is too short
+        /// to tell Japanese written in kanji from Chinese.
+        var language: String?
+        var imageSize: CGSize
+    }
+
+    /// One recognized paragraph or line, in pixels with the origin top left.
+    private struct Piece {
+        var rect: CGRect
+        var text: String
+        /// Height of a horizontal line, width of a vertical column.
+        var thickness: CGFloat
+        var isVertical: Bool
+    }
+
+    static func recognize(_ image: CGImage) async -> Result {
+        let size = CGSize(width: image.width, height: image.height)
+        let pieces = await pieces(in: image, size: size).filter { $0.text.contains(where: \.isLetter) }
+        let blocks = merged(pieces).map { group -> MagazineTextBlock in
+            let rect = group.dropFirst().reduce(group[0].rect) { $0.union($1.rect) }
+            let text = joined(group)
+            return MagazineTextBlock(
+                rect: CGRect(x: rect.minX / size.width, y: rect.minY / size.height,
+                             width: rect.width / size.width, height: rect.height / size.height),
+                text: text
+            )
+        }
+        let recognizer = NLLanguageRecognizer()
+        recognizer.processString(blocks.map(\.text).joined(separator: "\n"))
+        return Result(blocks: blocks, language: recognizer.dominantLanguage?.rawValue, imageSize: size)
+    }
+
+    private static func pieces(in image: CGImage, size: CGSize) async -> [Piece] {
+        if #available(iOS 26, macOS 26, *) {
+            var request = RecognizeDocumentsRequest()
+            request.textRecognitionOptions.automaticallyDetectLanguage = true
+            if let observations = try? await request.perform(on: image) {
+                return observations.flatMap { $0.document.paragraphs }.map { paragraph in
+                    let rect = pixelRect(paragraph.boundingRegion.boundingBox.cgRect, size: size)
+                    let lines = paragraph.lines.map { pixelRect($0.boundingRegion.boundingBox.cgRect, size: size) }
+                    let line = lines.first ?? rect
+                    return Piece(
+                        rect: rect,
+                        text: paragraph.transcript.replacingOccurrences(of: "\n", with: " "),
+                        thickness: lines.map { min($0.width, $0.height) }.min() ?? min(rect.width, rect.height),
+                        isVertical: line.height > line.width * 1.3
+                    )
+                }
+            }
+        }
+        return await withCheckedContinuation { continuation in
+            DispatchQueue.global(qos: .userInitiated).async {
+                let request = VNRecognizeTextRequest()
+                request.recognitionLevel = .accurate
+                request.automaticallyDetectsLanguage = true
+                try? VNImageRequestHandler(cgImage: image).perform([request])
+                let found = (request.results ?? []).compactMap { observation -> Piece? in
+                    guard let text = observation.topCandidates(1).first?.string else { return nil }
+                    let rect = pixelRect(observation.boundingBox, size: size)
+                    return Piece(rect: rect, text: text, thickness: min(rect.width, rect.height),
+                                 isVertical: rect.height > rect.width * 1.3)
+                }
+                continuation.resume(returning: found)
+            }
+        }
+    }
+
+    /// Vision's rectangles are 0…1 with the origin bottom left.
+    private static func pixelRect(_ normalized: CGRect, size: CGSize) -> CGRect {
+        CGRect(x: normalized.minX * size.width, y: (1 - normalized.maxY) * size.height,
+               width: normalized.width * size.width, height: normalized.height * size.height)
+    }
+
+    /// The lines of one bubble come as separate pieces: those of the same direction and letter
+    /// size that lie closer than about half a line belong together.
+    private static func merged(_ pieces: [Piece]) -> [[Piece]] {
+        var group = Array(pieces.indices)
+        func root(_ index: Int) -> Int {
+            var index = index
+            while group[index] != index { index = group[index] }
+            return index
+        }
+        for first in pieces.indices {
+            for second in pieces.indices where second > first {
+                let a = pieces[first], b = pieces[second]
+                guard a.isVertical == b.isVertical else { continue }
+                let thin = min(a.thickness, b.thickness), thick = max(a.thickness, b.thickness)
+                guard thin > 0, thick / thin < 1.6 else { continue }
+                let reach = thin * 0.6
+                if a.rect.insetBy(dx: -reach, dy: -reach).intersects(b.rect) {
+                    group[root(second)] = root(first)
+                }
+            }
+        }
+        return Dictionary(grouping: pieces.indices, by: root).values.map { $0.map { pieces[$0] } }
+    }
+
+    /// Reading order: vertical columns from right to left, horizontal lines from the top.
+    private static func joined(_ group: [Piece]) -> String {
+        let ordered = group.sorted { a, b in
+            a.isVertical ? a.rect.maxX > b.rect.maxX : a.rect.minY < b.rect.minY
+        }
+        let texts = ordered.map { $0.text.trimmingCharacters(in: .whitespacesAndNewlines) }
+        let usesSpaces = !texts.joined().unicodeScalars.contains { scalar in
+            (0x3040...0x30FF).contains(scalar.value) || (0x4E00...0x9FFF).contains(scalar.value)
+        }
+        return texts.joined(separator: usesSpaces ? " " : "")
+    }
+}
+
+/// The language Magazin translates into (Settings › stashy+ › Magazin). Until one is picked it
+/// is the subtitle language, which itself starts as the device's language.
+enum MagazineTranslationLanguage {
+    static let storageKey = "magazine_translate_target_language"
+
+    static func load(from defaults: UserDefaults = .standard) -> String {
+        let raw = defaults.string(forKey: storageKey)?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        return raw.isEmpty ? SubtitleTargetLanguage.load(from: defaults) : SubtitleTargetLanguage.normalized(raw)
+    }
+
+    static func persist(_ code: String, to defaults: UserDefaults = .standard) {
+        defaults.set(SubtitleTargetLanguage.normalized(code), forKey: storageKey)
+    }
+
+    static func pickerOptions() -> [(id: String, label: String)] {
+        var options = SubtitleTargetLanguage.pickerOptions()
+        let current = load()
+        if !options.contains(where: { $0.id == current }) {
+            options.append((id: current, label: SubtitleTargetLanguage.displayName(for: current)))
+            options.sort { $0.label < $1.label }
+        }
+        return options
+    }
+}
+
+/// Settings › stashy+ › Magazin: the language a tapped text is translated into.
+struct MagazineTranslationLanguagePicker: View {
+    /// Local selection so the picker label refreshes after a pick (UserDefaults alone does not).
+    @State private var languageCode = MagazineTranslationLanguage.load()
+
+    var body: some View {
+        Picker(selection: Binding(
+            get: { languageCode },
+            set: { newValue in
+                languageCode = newValue
+                MagazineTranslationLanguage.persist(newValue)
+            }
+        )) {
+            ForEach(MagazineTranslationLanguage.pickerOptions(), id: \.id) { option in
+                Text(option.label).tag(option.id)
+            }
+        } label: {
+            Label(tr("translation_language"), systemImage: "translate")
+        }
+    }
+}
+
+/// Text recognition and translation for the page shown fullscreen; everything stays on the device.
+@MainActor
+final class MagazinePageTranslation: ObservableObject {
+    static let enabledKey = "magazine_translate_text"
+
+    enum Status: Equatable {
+        case translating
+        case translated(String)
+        /// The page is already in the reader's language.
+        case sameLanguage
+        case unavailable(source: String, target: String)
+    }
+
+    @Published private(set) var pages: [String: MagazineTextRecognizer.Result] = [:]
+    @Published private(set) var analyzing: Set<String> = []
+    @Published private(set) var selected: MagazineTextBlock?
+    /// Where on the screen the selected text was tapped.
+    @Published private(set) var selectedInLowerHalf = false
+    @Published private(set) var status: [UUID: Status] = [:]
+    /// Tells the reader once what the outlines are for.
+    @Published private(set) var hasSelectedOnce = false
+
+    let translator = SceneCaptionTranslator()
+    private var observers = Set<AnyCancellable>()
+
+    init() {
+        translator.onTranslated = { [weak self] id, text in
+            self?.status[id] = .translated(text)
+        }
+        // The panel shows the translator's download state.
+        translator.objectWillChange.sink { [weak self] _ in self?.objectWillChange.send() }.store(in: &observers)
+    }
+
+    var targetLanguage: String { MagazineTranslationLanguage.load() }
+
+    func blocks(for image: StashImage) -> [MagazineTextBlock] { pages[image.id]?.blocks ?? [] }
+
+    func isAnalyzing(_ image: StashImage) -> Bool { analyzing.contains(image.id) }
+
+    func hasResult(for image: StashImage) -> Bool { pages[image.id] != nil }
+
+    func analyze(_ image: StashImage) {
+        let id = image.id
+        guard pages[id] == nil, !analyzing.contains(id), let url = image.imageURL else { return }
+        analyzing.insert(id)
+        Task {
+            var result = MagazineTextRecognizer.Result(blocks: [], language: nil, imageSize: .zero)
+            if let cgImage = await ImageLoader.uiImage(for: url)?.cgImage {
+                result = await Task.detached(priority: .userInitiated) {
+                    await MagazineTextRecognizer.recognize(cgImage)
+                }.value
+            }
+            analyzing.remove(id)
+            // A failed download is tried again with the next visit of the page.
+            if result.imageSize != .zero { pages[id] = result }
+        }
+    }
+
+    func select(_ block: MagazineTextBlock?) {
+        selected = block
+    }
+
+    /// `point` in the zoomable content of `size`, in which the image is fitted and centred;
+    /// `viewportY` is the tap's height on the screen, 0 at the top and 1 at the bottom.
+    /// Returns whether the tap was for the translation.
+    func handleTap(at point: CGPoint, in size: CGSize, viewportY: CGFloat, image: StashImage) -> Bool {
+        guard let page = pages[image.id], page.imageSize.width > 0, page.imageSize.height > 0 else { return false }
+        let scale = min(size.width / page.imageSize.width, size.height / page.imageSize.height)
+        let fitted = CGSize(width: page.imageSize.width * scale, height: page.imageSize.height * scale)
+        guard fitted.width > 0, fitted.height > 0 else { return false }
+        let unit = CGPoint(
+            x: (point.x - (size.width - fitted.width) / 2) / fitted.width,
+            y: (point.y - (size.height - fitted.height) / 2) / fitted.height
+        )
+        // A finger is wider than a narrow column of text.
+        let reach = CGSize(width: 10 / fitted.width, height: 10 / fitted.height)
+        let hit = page.blocks
+            .filter { $0.rect.insetBy(dx: -reach.width, dy: -reach.height).contains(unit) }
+            .min { $0.rect.width * $0.rect.height < $1.rect.width * $1.rect.height }
+        guard let hit else {
+            // A tap beside the text closes the translation instead of toggling the bars.
+            guard selected != nil else { return false }
+            selected = nil
+            return true
+        }
+        HapticManager.light()
+        selectedInLowerHalf = viewportY > 0.5
+        selected = hit
+        hasSelectedOnce = true
+        translate(hit, language: page.language)
+        return true
+    }
+
+    func approveDownload() {
+        translator.approveDownload()
+        // Requests made while the pack was missing were not queued.
+        if let selected, status[selected.id] == .translating {
+            Task {
+                try? await Task.sleep(nanoseconds: 600_000_000)
+                translator.requestTranslation(id: selected.id, text: selected.text)
+            }
+        }
+    }
+
+    private func translate(_ block: MagazineTextBlock, language: String?) {
+        if case .translated = status[block.id] { return }
+        let target = targetLanguage
+        let targetCode = SubtitleTargetLanguage.canonicalCode(from: target) ?? target.lowercased()
+        guard let source = SubtitleTargetLanguage.canonicalCode(from: language) else {
+            status[block.id] = .unavailable(source: "?", target: SubtitleTargetLanguage.displayName(for: targetCode))
+            return
+        }
+        guard source != targetCode else {
+            status[block.id] = .sameLanguage
+            return
+        }
+        status[block.id] = .translating
+        Task {
+            switch await SceneCaptionTranslator.availability(from: source, to: target) {
+            case .ready, .needsDownload:
+                translator.activate(source: source, target: target)
+                translator.requestTranslation(id: block.id, text: block.text)
+            case .sourceUnsupported, .targetUnsupported, .pairUnsupported:
+                status[block.id] = .unavailable(
+                    source: SubtitleTargetLanguage.displayName(for: source),
+                    target: SubtitleTargetLanguage.displayName(for: targetCode)
+                )
+            }
+        }
+    }
+}
+
+/// Thin frames around the text that can be tapped; part of the page, so they zoom with it.
+private struct MagazineTextBlockOutlines: View {
+    let blocks: [MagazineTextBlock]
+    let selectedID: UUID?
+    @ObservedObject private var appearance = AppearanceManager.shared
+
+    var body: some View {
+        GeometryReader { geometry in
+            ForEach(blocks) { block in
+                let isSelected = block.id == selectedID
+                RoundedRectangle(cornerRadius: 4)
+                    .fill(appearance.tintColor.opacity(isSelected ? 0.22 : 0))
+                    .stroke(appearance.tintColor.opacity(isSelected ? 1 : 0.55), lineWidth: isSelected ? 2 : 1)
+                    .frame(
+                        width: block.rect.width * geometry.size.width + 6,
+                        height: block.rect.height * geometry.size.height + 6
+                    )
+                    .position(
+                        x: block.rect.midX * geometry.size.width,
+                        y: block.rect.midY * geometry.size.height
+                    )
+            }
+        }
+        .allowsHitTesting(false)
+        .accessibilityHidden(true)
+    }
+}
+
+/// Below the page: the translation of the tapped text, or what the reader has to know before.
+private struct MagazineTranslationPanel: View {
+    @ObservedObject var translation: MagazinePageTranslation
+    let image: StashImage
+
+    var body: some View {
+        if let block = translation.selected {
+            card(for: block)
+                .transition(.opacity)
+        } else if let note {
+            Text(note)
+                .font(.footnote)
+                .padding(.horizontal, 14)
+                .padding(.vertical, 8)
+                .background(.black.opacity(0.7), in: Capsule())
+                .allowsHitTesting(false)
+        }
+    }
+
+    private var note: String? {
+        if translation.isAnalyzing(image) { return tr("loading_recognizing_text") }
+        guard translation.hasResult(for: image) else { return nil }
+        if translation.blocks(for: image).isEmpty { return tr("empty_text_on_page") }
+        return translation.hasSelectedOnce ? nil : tr("hint_tap_text_to_translate")
+    }
+
+    private func card(for block: MagazineTextBlock) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(alignment: .top, spacing: 8) {
+                content(for: block)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                Button { translation.select(nil) } label: {
+                    Image(systemName: "xmark")
+                        .font(.footnote.weight(.semibold))
+                        .frame(width: 32, height: 32)
+                        .background(.white.opacity(0.15), in: Circle())
+                        .contentShape(Circle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel(tr("action_close"))
+            }
+            Text(block.text)
+                .font(.footnote)
+                .foregroundStyle(.white.opacity(0.65))
+                .lineLimit(3)
+                .textSelection(.enabled)
+        }
+        .padding(14)
+        .frame(maxWidth: 560, alignment: .leading)
+        .background(.black.opacity(0.85), in: RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.card))
+        .overlay(RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.card).stroke(.white.opacity(0.18), lineWidth: 1))
+    }
+
+    @ViewBuilder
+    private func content(for block: MagazineTextBlock) -> some View {
+        switch translation.status[block.id] {
+        case .translated(let text):
+            Text(text)
+                .font(.body.weight(.medium))
+                .textSelection(.enabled)
+        case .sameLanguage:
+            Text(block.text)
+                .font(.body.weight(.medium))
+                .textSelection(.enabled)
+        case .unavailable(let source, let target):
+            Text(tr("hint_no_translation_arg_arg_on_device", source, target))
+                .font(.subheadline)
+        case .translating, nil:
+            if translation.translator.needsLanguageDownload {
+                Button {
+                    translation.approveDownload()
+                } label: {
+                    Label(
+                        tr("action_download_arg_language_pack",
+                           SubtitleTargetLanguage.displayName(for: translation.targetLanguage)),
+                        systemImage: "arrow.down.circle"
+                    )
+                    .font(.subheadline.weight(.semibold))
+                }
+                .buttonStyle(.plain)
+                .frame(minHeight: 32)
+            } else if let message = translation.translator.statusMessage {
+                Text(message)
+                    .font(.subheadline)
+            } else {
+                HStack(spacing: 8) {
+                    ProgressView()
+                        .tint(.white)
+                    Text(translation.translator.isDownloadingLanguagePack
+                         ? tr("downloading_arg_language_pack_menu",
+                              SubtitleTargetLanguage.displayName(for: translation.targetLanguage))
+                         : tr("loading_translating"))
+                        .font(.subheadline)
+                }
+                .frame(minHeight: 32)
+            }
+        }
     }
 }
 

@@ -276,6 +276,7 @@
   <string name="action_test_again">再次測試</string>
   <string name="action_test_connection">測試連線</string>
   <string name="action_test_local_address">測試本機位址</string>
+  <string name="action_translate_text">翻譯文字</string>
   <string name="action_try_again">再試一次</string>
   <string name="action_turn_off">關閉</string>
   <string name="action_turn_on">開啟</string>
@@ -787,6 +788,7 @@
   <string name="empty_tags_match_arg">沒有符合「%1$s」的標籤</string>
   <string name="empty_tag_suggestions">沒有標籤建議</string>
   <string name="empty_tags_yet">尚無標籤。</string>
+  <string name="empty_text_on_page">此頁面找不到文字</string>
   <string name="empty_thanks">不用了，謝謝</string>
   <string name="empty_unrated_images_left_in_arg">%1$s 中已沒有未評分的圖片。</string>
   <string name="empty_unrated_scenes_left_in_arg">%1$s 中已沒有未評分的短片。</string>
@@ -907,6 +909,7 @@
   <string name="error_start_library_scan_please_check">無法開始掃描資料庫。請檢查你的伺服器設定。</string>
   <string name="error_stashy_plus_products_unavailable">stashy+ 商品暫不可用。</string>
   <string name="error_sync">同步失敗</string>
+  <string name="error_text_recognition_unavailable">此裝置無法使用文字辨識</string>
   <string name="error_update">更新失敗</string>
   <string name="error_update_check">無法檢查更新。</string>
   <string name="error_update_favorite">無法更新最愛</string>
@@ -1221,6 +1224,7 @@
   <string name="hint_nothing_new_matches_your_taste">目前沒有符合你喜好的新內容。請在「為你推薦」中嘗試其他設定。</string>
   <string name="hint_not_on_this_server_kept">不在此伺服器上（保留在範本中）：%1$s%2$s</string>
   <string name="hint_not_played_in_long_time">很久沒有播放</string>
+  <string name="hint_no_translation_arg_arg_on_device">此裝置無法進行 %1$s → %2$s 的翻譯</string>
   <string name="hint_no_translation_arg_arg_showing">沒有 %1$s → %2$s 的翻譯 — 以短片語言顯示字幕</string>
   <string name="hint_no_translation_from_arg_showing">沒有從%1$s的翻譯 — 以短片語言顯示字幕</string>
   <string name="hint_no_translation_to_arg_on">此裝置上沒有翻譯為%1$s的功能 — 以短片語言顯示字幕</string>
@@ -1329,6 +1333,7 @@
   <string name="hint_suggests_tags_based_on_how">依據你資料庫現有的標籤方式建議標籤，在短片頁面顯示具有相同演員、工作室或標籤的短片，並在首頁加入「為你推薦」和「被遺忘的最愛」列：依據你的播放紀錄、O 計數和評分挑選的短片，以及你一段時間沒播放的最愛。不涉及任何外部服務。</string>
   <string name="hint_support_stashy_tips_do_not">支持 stashy。小費不會解鎖 stashy+。</string>
   <string name="hint_tag_is_added_to_arg">標籤已加入 %2$s 個中的 %1$s 個項目。已有此標籤的項目保持不變。</string>
+  <string name="hint_tap_text_to_translate">點一下文字即可翻譯</string>
   <string name="hint_teleprompter_requires_ios_26_or">提詞機需要 iOS 26 或以上版本。</string>
   <string name="hint_teleprompter_requires_ios_26_plus">提詞機需要 iOS 26 以上版本及支援的硬體</string>
   <string name="hint_terms_follow_stashs_own_interface">用語遵循 Stash 本身的介面，並以其社群翻譯（Weblate）作為各語言的參考。</string>
@@ -1531,6 +1536,7 @@
   <string name="loading_o_count">正在載入 O 計數…</string>
   <string name="loading_pair">正在載入組合…</string>
   <string name="loading_performers">正在載入演員…</string>
+  <string name="loading_recognizing_text">正在辨識文字…</string>
   <string name="loading_scenes">正在載入短片…</string>
   <string name="loading_script">正在載入腳本…</string>
   <string name="loading_searching">正在搜尋…</string>
@@ -1546,6 +1552,7 @@
   <string name="loading_top_scenes">正在載入熱門短片…</string>
   <string name="loading_top_studios">正在載入熱門工作室…</string>
   <string name="loading_top_tags">正在載入熱門標籤…</string>
+  <string name="loading_translating">正在翻譯…</string>
   <string name="local">本機</string>
   <string name="local_address">本機位址</string>
   <string name="local_address_e_g_192">本機位址（例如 192.168.1.100:9999）</string>
@@ -2117,6 +2124,7 @@
   <string name="trans_female">跨性別女性</string>
   <string name="transgender_female">跨性別（女性）</string>
   <string name="transgender_male">跨性別（男性）</string>
+  <string name="translation_language">翻譯語言</string>
   <string name="translations">翻譯</string>
   <string name="translations_are_managed_with_tolgee">翻譯透過 Tolgee 管理。</string>
   <string name="trans_male">跨性別男性</string>

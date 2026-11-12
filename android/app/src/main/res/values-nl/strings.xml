@@ -276,6 +276,7 @@
   <string name="action_test_again">Test opnieuw</string>
   <string name="action_test_connection">Test verbinding</string>
   <string name="action_test_local_address">Test lokaal adres</string>
+  <string name="action_translate_text">Tekst vertalen</string>
   <string name="action_try_again">Probeer opnieuw</string>
   <string name="action_turn_off">Schakel uit</string>
   <string name="action_turn_on">Schakel in</string>
@@ -787,6 +788,7 @@
   <string name="empty_tags_match_arg">Geen labels gevonden voor \'%1$s\'</string>
   <string name="empty_tag_suggestions">Geen labelsuggesties</string>
   <string name="empty_tags_yet">Nog geen labels.</string>
+  <string name="empty_text_on_page">Geen tekst gevonden op deze pagina</string>
   <string name="empty_thanks">Nee, bedankt</string>
   <string name="empty_unrated_images_left_in_arg">Geen onbeoordeelde afbeeldingen meer in %1$s.</string>
   <string name="empty_unrated_scenes_left_in_arg">Geen onbeoordeelde scènes meer in %1$s.</string>
@@ -907,6 +909,7 @@
   <string name="error_start_library_scan_please_check">Kan bibliotheekscan niet starten. Controleer de configuratie van je server.</string>
   <string name="error_stashy_plus_products_unavailable">stashy+-producten niet beschikbaar.</string>
   <string name="error_sync">Synchronisatie mislukt</string>
+  <string name="error_text_recognition_unavailable">Tekstherkenning is niet beschikbaar op dit apparaat</string>
   <string name="error_update">Bijwerken mislukt</string>
   <string name="error_update_check">Zoeken naar updates mislukt.</string>
   <string name="error_update_favorite">Kan favoriet niet bijwerken</string>
@@ -1221,6 +1224,7 @@
   <string name="hint_nothing_new_matches_your_taste">Er past nu niets nieuws bij je smaak. Probeer een andere instelling in \'Voor jou\'.</string>
   <string name="hint_not_on_this_server_kept">Niet op deze server (bewaard in sjabloon): %1$s%2$s</string>
   <string name="hint_not_played_in_long_time">Lang niet afgespeeld</string>
+  <string name="hint_no_translation_arg_arg_on_device">Geen vertaling %1$s → %2$s op dit apparaat</string>
   <string name="hint_no_translation_arg_arg_showing">Geen vertaling %1$s → %2$s – bijschriften worden in de taal van de scène getoond</string>
   <string name="hint_no_translation_from_arg_showing">Geen vertaling vanuit %1$s – bijschriften worden in de taal van de scène getoond</string>
   <string name="hint_no_translation_to_arg_on">Geen vertaling naar %1$s op dit apparaat – bijschriften worden in de taal van de scène getoond</string>
@@ -1329,6 +1333,7 @@
   <string name="hint_suggests_tags_based_on_how">Stelt labels voor op basis van hoe je bibliotheek al is gelabeld, toont op de scènepagina scènes met dezelfde performers, studio of labels en voegt de rijen \'Voor jou\' en \'Vergeten favorieten\' toe aan Home: scènes gekozen uit wat je hebt afgespeeld, je O-tellers en beoordelingen, en favorieten die je een tijd niet hebt afgespeeld. Er is geen externe dienst bij betrokken.</string>
   <string name="hint_support_stashy_tips_do_not">Steun stashy. Fooien ontgrendelen stashy+ niet.</string>
   <string name="hint_tag_is_added_to_arg">Het label wordt toegevoegd aan %1$s van %2$s. Items die het al hebben, blijven ongewijzigd.</string>
+  <string name="hint_tap_text_to_translate">Tik op een tekst om die te vertalen</string>
   <string name="hint_teleprompter_requires_ios_26_or">Teleprompter vereist iOS 26 of nieuwer.</string>
   <string name="hint_teleprompter_requires_ios_26_plus">Teleprompter vereist iOS 26+ en ondersteunde hardware</string>
   <string name="hint_terms_follow_stashs_own_interface">De termen volgen de interface van Stash zelf, en de communityvertalingen daarvan (Weblate) dienen als referentie voor elke taal.</string>
@@ -1531,6 +1536,7 @@
   <string name="loading_o_count">O-teller laden…</string>
   <string name="loading_pair">Paar laden…</string>
   <string name="loading_performers">Performers laden…</string>
+  <string name="loading_recognizing_text">Tekst herkennen…</string>
   <string name="loading_scenes">Scènes laden…</string>
   <string name="loading_script">Script laden…</string>
   <string name="loading_searching">Zoeken…</string>
@@ -1546,6 +1552,7 @@
   <string name="loading_top_scenes">Topscènes laden…</string>
   <string name="loading_top_studios">Topstudio\'s laden…</string>
   <string name="loading_top_tags">Toplabels laden…</string>
+  <string name="loading_translating">Vertalen…</string>
   <string name="local">Lokaal</string>
   <string name="local_address">Lokaal adres</string>
   <string name="local_address_e_g_192">Lokaal adres (bijv. 192.168.1.100:9999)</string>
@@ -2117,6 +2124,7 @@
   <string name="trans_female">Transvrouw</string>
   <string name="transgender_female">Transgender (vrouw)</string>
   <string name="transgender_male">Transgender (man)</string>
+  <string name="translation_language">Vertaaltaal</string>
   <string name="translations">Vertalingen</string>
   <string name="translations_are_managed_with_tolgee">Vertalingen worden beheerd met Tolgee.</string>
   <string name="trans_male">Transman</string>

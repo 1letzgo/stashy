@@ -276,6 +276,7 @@
   <string name="action_test_again">다시 테스트</string>
   <string name="action_test_connection">연결 테스트</string>
   <string name="action_test_local_address">로컬 주소 테스트</string>
+  <string name="action_translate_text">텍스트 번역</string>
   <string name="action_try_again">다시 시도</string>
   <string name="action_turn_off">끄기</string>
   <string name="action_turn_on">켜기</string>
@@ -787,6 +788,7 @@
   <string name="empty_tags_match_arg">\'%1$s\'과(와) 일치하는 태그 없음</string>
   <string name="empty_tag_suggestions">태그 제안 없음</string>
   <string name="empty_tags_yet">아직 태그가 없습니다.</string>
+  <string name="empty_text_on_page">이 페이지에서 텍스트를 찾을 수 없습니다</string>
   <string name="empty_thanks">괜찮습니다</string>
   <string name="empty_unrated_images_left_in_arg">%1$s에 별점이 없는 이미지가 더 없습니다.</string>
   <string name="empty_unrated_scenes_left_in_arg">%1$s에 별점이 없는 영상이 더 없습니다.</string>
@@ -907,6 +909,7 @@
   <string name="error_start_library_scan_please_check">라이브러리 스캔을 시작할 수 없습니다. 서버 구성을 확인하세요.</string>
   <string name="error_stashy_plus_products_unavailable">stashy+ 상품을 사용할 수 없어요.</string>
   <string name="error_sync">동기화 실패</string>
+  <string name="error_text_recognition_unavailable">이 기기에서는 텍스트 인식을 사용할 수 없습니다</string>
   <string name="error_update">업데이트 실패</string>
   <string name="error_update_check">업데이트 확인에 실패했습니다.</string>
   <string name="error_update_favorite">즐겨찾기를 업데이트할 수 없음</string>
@@ -1221,6 +1224,7 @@
   <string name="hint_nothing_new_matches_your_taste">현재 취향에 맞는 새 항목이 없습니다. 맞춤 추천에서 다른 설정을 시도하세요.</string>
   <string name="hint_not_on_this_server_kept">이 서버에 없음(템플릿에 유지됨): %1$s%2$s</string>
   <string name="hint_not_played_in_long_time">오랫동안 재생하지 않음</string>
+  <string name="hint_no_translation_arg_arg_on_device">이 기기에서는 %1$s → %2$s 번역을 할 수 없습니다</string>
   <string name="hint_no_translation_arg_arg_showing">%1$s → %2$s 번역 없음 — 영상 언어로 캡션 표시</string>
   <string name="hint_no_translation_from_arg_showing">%1$s에서 번역 없음 — 영상 언어로 캡션 표시</string>
   <string name="hint_no_translation_to_arg_on">이 기기에서 %1$s(으)로 번역할 수 없음 — 영상 언어로 캡션 표시</string>
@@ -1329,6 +1333,7 @@
   <string name="hint_suggests_tags_based_on_how">라이브러리에 이미 지정된 태그를 바탕으로 태그를 제안하고, 영상 페이지에 같은 배우, 스튜디오 또는 태그가 있는 영상을 표시하며, 홈에 맞춤 추천 및 잊힌 즐겨찾기 행을 추가합니다. 재생한 영상, O 카운트 및 별점을 바탕으로 선택한 영상과 한동안 재생하지 않은 즐겨찾기입니다. 외부 서비스는 사용하지 않습니다.</string>
   <string name="hint_support_stashy_tips_do_not">stashy를 후원하세요. 팁으로는 stashy+가 잠금 해제되지 않습니다.</string>
   <string name="hint_tag_is_added_to_arg">태그가 %2$s개 중 %1$s개에 추가됩니다. 이미 태그가 있는 항목은 변경되지 않습니다.</string>
+  <string name="hint_tap_text_to_translate">텍스트를 탭하면 번역합니다</string>
   <string name="hint_teleprompter_requires_ios_26_or">텔레프롬프터를 사용하려면 iOS 26 이상이 필요합니다.</string>
   <string name="hint_teleprompter_requires_ios_26_plus">텔레프롬프터를 사용하려면 iOS 26 이상과 지원되는 하드웨어가 필요합니다</string>
   <string name="hint_terms_follow_stashs_own_interface">용어는 Stash 자체 인터페이스를 따르며, 각 언어의 커뮤니티 번역(Weblate)을 참고합니다.</string>
@@ -1531,6 +1536,7 @@
   <string name="loading_o_count">O 카운트 불러오는 중…</string>
   <string name="loading_pair">대결 상대 불러오는 중…</string>
   <string name="loading_performers">배우 불러오는 중…</string>
+  <string name="loading_recognizing_text">텍스트 인식 중…</string>
   <string name="loading_scenes">영상 불러오는 중…</string>
   <string name="loading_script">스크립트 불러오는 중…</string>
   <string name="loading_searching">검색하는 중…</string>
@@ -1546,6 +1552,7 @@
   <string name="loading_top_scenes">상위 영상 불러오는 중…</string>
   <string name="loading_top_studios">상위 스튜디오 불러오는 중…</string>
   <string name="loading_top_tags">상위 태그 불러오는 중…</string>
+  <string name="loading_translating">번역 중…</string>
   <string name="local">로컬</string>
   <string name="local_address">로컬 주소</string>
   <string name="local_address_e_g_192">로컬 주소(예: 192.168.1.100:9999)</string>
@@ -2117,6 +2124,7 @@
   <string name="trans_female">트랜스 여성</string>
   <string name="transgender_female">트랜스젠더(여성)</string>
   <string name="transgender_male">트랜스젠더(남성)</string>
+  <string name="translation_language">번역 언어</string>
   <string name="translations">번역</string>
   <string name="translations_are_managed_with_tolgee">번역은 Tolgee로 관리됩니다.</string>
   <string name="trans_male">트랜스 남성</string>

@@ -276,6 +276,7 @@
   <string name="action_test_again">Test igen</string>
   <string name="action_test_connection">Test forbindelse</string>
   <string name="action_test_local_address">Test lokal adresse</string>
+  <string name="action_translate_text">Oversæt tekst</string>
   <string name="action_try_again">Prøv igen</string>
   <string name="action_turn_off">Slå fra</string>
   <string name="action_turn_on">Slå til</string>
@@ -787,6 +788,7 @@
   <string name="empty_tags_match_arg">Ingen tags matcher \'%1$s\'</string>
   <string name="empty_tag_suggestions">Ingen tagforslag</string>
   <string name="empty_tags_yet">Ingen tags endnu.</string>
+  <string name="empty_text_on_page">Ingen tekst fundet på denne side</string>
   <string name="empty_thanks">Nej tak</string>
   <string name="empty_unrated_images_left_in_arg">Ingen billeder uden bedømmelse tilbage i %1$s.</string>
   <string name="empty_unrated_scenes_left_in_arg">Ingen scener uden bedømmelse tilbage i %1$s.</string>
@@ -907,6 +909,7 @@
   <string name="error_start_library_scan_please_check">Kunne ikke starte biblioteksscanning. Tjek din serverkonfiguration.</string>
   <string name="error_stashy_plus_products_unavailable">stashy+-produkter er ikke tilgængelige.</string>
   <string name="error_sync">Synkronisering mislykkedes</string>
+  <string name="error_text_recognition_unavailable">Tekstgenkendelse er ikke tilgængelig på denne enhed</string>
   <string name="error_update">Opdatering mislykkedes</string>
   <string name="error_update_check">Søgning efter opdateringer mislykkedes.</string>
   <string name="error_update_favorite">Kunne ikke opdatere favorit</string>
@@ -1221,6 +1224,7 @@
   <string name="hint_nothing_new_matches_your_taste">Intet nyt matcher din smag lige nu. Prøv en anden indstilling i Til dig.</string>
   <string name="hint_not_on_this_server_kept">Ikke på denne server (beholdt i skabelonen): %1$s%2$s</string>
   <string name="hint_not_played_in_long_time">Ikke afspillet i lang tid</string>
+  <string name="hint_no_translation_arg_arg_on_device">Ingen oversættelse %1$s → %2$s på denne enhed</string>
   <string name="hint_no_translation_arg_arg_showing">Ingen oversættelse %1$s → %2$s – viser undertekster på scenens sprog</string>
   <string name="hint_no_translation_from_arg_showing">Ingen oversættelse fra %1$s – viser undertekster på scenens sprog</string>
   <string name="hint_no_translation_to_arg_on">Ingen oversættelse til %1$s på denne enhed – viser undertekster på scenens sprog</string>
@@ -1329,6 +1333,7 @@
   <string name="hint_suggests_tags_based_on_how">Foreslår tags ud fra, hvordan dit bibliotek allerede er tagget, viser scener med de samme kunstnere, studie eller tags på scenesiden og tilføjer rækkerne Til dig og Glemte favoritter på Hjem: scener udvalgt ud fra det, du har afspillet, dine O-tællere og bedømmelser, og favoritter, du ikke har afspillet i et stykke tid. Ingen ekstern tjeneste er involveret.</string>
   <string name="hint_support_stashy_tips_do_not">Støt stashy. Drikkepenge låser ikke stashy+ op.</string>
   <string name="hint_tag_is_added_to_arg">Tagget føjes til %1$s af %2$s. Elementer, der allerede har det, forbliver uændrede.</string>
+  <string name="hint_tap_text_to_translate">Tryk på en tekst for at oversætte den</string>
   <string name="hint_teleprompter_requires_ios_26_or">Teleprompter kræver iOS 26 eller nyere.</string>
   <string name="hint_teleprompter_requires_ios_26_plus">Teleprompter kræver iOS 26+ og understøttet hardware</string>
   <string name="hint_terms_follow_stashs_own_interface">Begreberne følger Stashs egen brugerflade, og dens fællesskabsoversættelser (Weblate) fungerer som reference for hvert sprog.</string>
@@ -1531,6 +1536,7 @@
   <string name="loading_o_count">Indlæser O-tæller…</string>
   <string name="loading_pair">Indlæser par…</string>
   <string name="loading_performers">Indlæser kunstnere…</string>
+  <string name="loading_recognizing_text">Genkender tekst…</string>
   <string name="loading_scenes">Indlæser scener…</string>
   <string name="loading_script">Indlæser script…</string>
   <string name="loading_searching">Søger…</string>
@@ -1546,6 +1552,7 @@
   <string name="loading_top_scenes">Indlæser topscener…</string>
   <string name="loading_top_studios">Indlæser topstudier…</string>
   <string name="loading_top_tags">Indlæser toptags…</string>
+  <string name="loading_translating">Oversætter…</string>
   <string name="local">Lokal</string>
   <string name="local_address">Lokal adresse</string>
   <string name="local_address_e_g_192">Lokal adresse (f.eks. 192.168.1.100:9999)</string>
@@ -2117,6 +2124,7 @@
   <string name="trans_female">Transkvinde</string>
   <string name="transgender_female">Transkønnet (kvinde)</string>
   <string name="transgender_male">Transkønnet (mand)</string>
+  <string name="translation_language">Oversættelsessprog</string>
   <string name="translations">Oversættelser</string>
   <string name="translations_are_managed_with_tolgee">Oversættelser administreres med Tolgee.</string>
   <string name="trans_male">Transmand</string>

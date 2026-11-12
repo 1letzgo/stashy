@@ -277,6 +277,7 @@
     <string name="action_test_again">Test again</string>
     <string name="action_test_connection">Test Connection</string>
     <string name="action_test_local_address">Test Local Address</string>
+    <string name="action_translate_text">Translate text</string>
     <string name="action_try_again">Try again</string>
     <string name="action_turn_off">Turn Off</string>
     <string name="action_turn_on">Turn On</string>
@@ -680,6 +681,7 @@
     <string name="empty_tags_found_on_server">No tags found on server</string>
     <string name="empty_tags_match_arg">No tags match \'%1$s\'</string>
     <string name="empty_tags_yet">No tags yet.</string>
+    <string name="empty_text_on_page">No text found on this page</string>
     <string name="empty_thanks">No thanks</string>
     <string name="empty_url_provided">No URL provided</string>
     <string name="end">End</string>
@@ -778,6 +780,7 @@
     <string name="error_start_identify_please_check_your">Failed to start identify. Please check your server configuration.</string>
     <string name="error_start_library_scan_please_check">Failed to start library scan. Please check your server configuration.</string>
     <string name="error_sync">Sync Failed</string>
+    <string name="error_text_recognition_unavailable">Text recognition is not available on this device</string>
     <string name="error_update">Update failed</string>
     <string name="error_update_check">Update check failed.</string>
     <string name="error_update_favorite">Failed to update favorite</string>
@@ -1074,6 +1077,7 @@
     <string name="hint_no_stashy_plus_products_returned">No stashy+ products returned. Check the current RevenueCat offering.</string>
     <string name="hint_no_stashy_plus_products_returned_install">No stashy+ products returned. Install from the Play Store (internal testing) to load products.</string>
     <string name="hint_no_stashy_plus_subscription_or">No stashy+ subscription or Lifetime purchase on this Apple ID. Pre-3.0 paid-app buyers get Lifetime via Restore Purchases.</string>
+    <string name="hint_no_translation_arg_arg_on_device">No translation %1$s → %2$s on this device</string>
     <string name="hint_no_translation_arg_arg_showing">No translation %1$s → %2$s — showing captions in the scene language</string>
     <string name="hint_no_translation_from_arg_showing">No translation from %1$s — showing captions in the scene language</string>
     <string name="hint_no_translation_to_arg_on">No translation to %1$s on this device — showing captions in the scene language</string>
@@ -1182,6 +1186,7 @@
     <string name="hint_suggests_tags_based_on_how">Suggests tags based on how your library is already tagged, shows scenes with the same performers, studio or tags on the scene page, and adds For You and Forgotten Favorites rows on Home: scenes picked from what you played, your O Counts and ratings, and favorites you have not played for a while. No outside service is involved.</string>
     <string name="hint_support_stashy_tips_do_not">Support stashy. Tips do not unlock stashy+.</string>
     <string name="hint_tag_is_added_to_arg">The tag is added to %1$s of %2$s. Items that already have it stay unchanged.</string>
+    <string name="hint_tap_text_to_translate">Tap a text to translate it</string>
     <string name="hint_teleprompter_requires_ios_26_or">Teleprompter requires iOS 26 or newer.</string>
     <string name="hint_teleprompter_requires_ios_26_plus">Teleprompter requires iOS 26+ and supported hardware</string>
     <string name="hint_terms_follow_stashs_own_interface">Terms follow Stash\'s own interface, and its community translations (Weblate) serve as the reference for each language.</string>
@@ -1376,6 +1381,7 @@
     <string name="loading_o_count">Loading O Count…</string>
     <string name="loading_pair">Loading pair…</string>
     <string name="loading_performers">Loading performers…</string>
+    <string name="loading_recognizing_text">Recognizing text…</string>
     <string name="loading_scenes">Loading scenes…</string>
     <string name="loading_script">Loading Script…</string>
     <string name="loading_starters">Loading starters…</string>
@@ -1389,6 +1395,7 @@
     <string name="loading_top_scenes">Loading top scenes…</string>
     <string name="loading_top_studios">Loading top studios…</string>
     <string name="loading_top_tags">Loading top tags…</string>
+    <string name="loading_translating">Translating…</string>
     <string name="local">Local</string>
     <string name="local_address">Local Address</string>
     <string name="local_address_e_g_192">Local Address (e.g. 192.168.1.100:9999)</string>
@@ -1934,6 +1941,7 @@
     <string name="transcodes">Transcodes</string>
     <string name="transgender_female">Transgender (female)</string>
     <string name="transgender_male">Transgender (male)</string>
+    <string name="translation_language">Translation language</string>
     <string name="translations">Translations</string>
     <string name="translations_are_managed_with_tolgee">Translations are managed with Tolgee.</string>
     <string name="transparency">Transparency</string>

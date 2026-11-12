@@ -276,6 +276,7 @@
   <string name="action_test_again">もう一度テスト</string>
   <string name="action_test_connection">接続をテスト</string>
   <string name="action_test_local_address">ローカルアドレスをテスト</string>
+  <string name="action_translate_text">テキストを翻訳</string>
   <string name="action_try_again">もう一度試す</string>
   <string name="action_turn_off">オフにする</string>
   <string name="action_turn_on">オンにする</string>
@@ -787,6 +788,7 @@
   <string name="empty_tags_match_arg">「%1$s」に一致するタグはありません</string>
   <string name="empty_tag_suggestions">タグの提案はありません</string>
   <string name="empty_tags_yet">タグはまだありません。</string>
+  <string name="empty_text_on_page">このページにテキストが見つかりません</string>
   <string name="empty_thanks">結構です</string>
   <string name="empty_unrated_images_left_in_arg">%1$sに未評価の画像はもうありません。</string>
   <string name="empty_unrated_scenes_left_in_arg">%1$sに未評価のシーンはもうありません。</string>
@@ -907,6 +909,7 @@
   <string name="error_start_library_scan_please_check">ライブラリのスキャンを開始できませんでした。サーバーの設定を確認してください。</string>
   <string name="error_stashy_plus_products_unavailable">stashy+の商品は利用できません。</string>
   <string name="error_sync">同期に失敗しました</string>
+  <string name="error_text_recognition_unavailable">このデバイスではテキスト認識を利用できません</string>
   <string name="error_update">更新に失敗しました</string>
   <string name="error_update_check">アップデートの確認に失敗しました。</string>
   <string name="error_update_favorite">お気に入りを更新できませんでした</string>
@@ -1221,6 +1224,7 @@
   <string name="hint_nothing_new_matches_your_taste">現在、好みに合う新しいシーンはありません。おすすめで別の設定をお試しください。</string>
   <string name="hint_not_on_this_server_kept">このサーバーにありません（テンプレートに保持）：%1$s%2$s</string>
   <string name="hint_not_played_in_long_time">長い間再生されていません</string>
+  <string name="hint_no_translation_arg_arg_on_device">このデバイスでは %1$s → %2$s の翻訳ができません</string>
   <string name="hint_no_translation_arg_arg_showing">%1$s → %2$s の翻訳がありません — シーンの言語で字幕を表示します</string>
   <string name="hint_no_translation_from_arg_showing">%1$sからの翻訳がありません — シーンの言語で字幕を表示します</string>
   <string name="hint_no_translation_to_arg_on">このデバイスに%1$sへの翻訳がありません — シーンの言語で字幕を表示します</string>
@@ -1329,6 +1333,7 @@
   <string name="hint_suggests_tags_based_on_how">ライブラリの既存のタグ付けをもとにタグを提案し、シーンのページに同じ出演者、スタジオ、タグのシーンを表示し、ホームに「おすすめ」と「忘れられたお気に入り」の行を追加します：再生履歴、Oカウント、評価から選んだシーンと、しばらく再生していないお気に入りです。外部サービスは使用しません。</string>
   <string name="hint_support_stashy_tips_do_not">stashyを応援しましょう。チップではstashy+はロック解除されません。</string>
   <string name="hint_tag_is_added_to_arg">タグは%2$s件中%1$s件に追加されます。すでにタグがある項目は変更されません。</string>
+  <string name="hint_tap_text_to_translate">テキストをタップすると翻訳します</string>
   <string name="hint_teleprompter_requires_ios_26_or">テレプロンプターにはiOS 26以降が必要です。</string>
   <string name="hint_teleprompter_requires_ios_26_plus">テレプロンプターにはiOS 26以降と対応ハードウェアが必要です</string>
   <string name="hint_terms_follow_stashs_own_interface">用語はStash自体のインターフェイスに準拠し、各言語ではそのコミュニティ翻訳（Weblate）を参考にしています。</string>
@@ -1531,6 +1536,7 @@
   <string name="loading_o_count">Oカウントを読み込み中…</string>
   <string name="loading_pair">ペアを読み込み中…</string>
   <string name="loading_performers">出演者を読み込み中…</string>
+  <string name="loading_recognizing_text">テキストを認識中…</string>
   <string name="loading_scenes">シーンを読み込み中…</string>
   <string name="loading_script">スクリプトを読み込み中…</string>
   <string name="loading_searching">検索中…</string>
@@ -1546,6 +1552,7 @@
   <string name="loading_top_scenes">トップシーンを読み込み中…</string>
   <string name="loading_top_studios">トップスタジオを読み込み中…</string>
   <string name="loading_top_tags">トップタグを読み込み中…</string>
+  <string name="loading_translating">翻訳中…</string>
   <string name="local">ローカル</string>
   <string name="local_address">ローカルアドレス</string>
   <string name="local_address_e_g_192">ローカルアドレス（例：192.168.1.100:9999）</string>
@@ -2117,6 +2124,7 @@
   <string name="trans_female">トランス女性</string>
   <string name="transgender_female">トランスジェンダー（女性）</string>
   <string name="transgender_male">トランスジェンダー（男性）</string>
+  <string name="translation_language">翻訳先の言語</string>
   <string name="translations">翻訳</string>
   <string name="translations_are_managed_with_tolgee">翻訳はTolgeeで管理されています。</string>
   <string name="trans_male">トランス男性</string>

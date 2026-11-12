@@ -276,6 +276,7 @@
   <string name="action_test_again">Yeniden test et</string>
   <string name="action_test_connection">Bağlantıyı Test Et</string>
   <string name="action_test_local_address">Yerel Adresi Test Et</string>
+  <string name="action_translate_text">Metni çevir</string>
   <string name="action_try_again">Yeniden dene</string>
   <string name="action_turn_off">Kapat</string>
   <string name="action_turn_on">Aç</string>
@@ -787,6 +788,7 @@
   <string name="empty_tags_match_arg">\'%1$s\' ile eşleşen etiket yok</string>
   <string name="empty_tag_suggestions">Etiket önerisi yok</string>
   <string name="empty_tags_yet">Henüz etiket yok.</string>
+  <string name="empty_text_on_page">Bu sayfada metin bulunamadı</string>
   <string name="empty_thanks">Hayır, teşekkürler</string>
   <string name="empty_unrated_images_left_in_arg">%1$s içinde puanlanmamış resim kalmadı.</string>
   <string name="empty_unrated_scenes_left_in_arg">%1$s içinde puanlanmamış sahne kalmadı.</string>
@@ -907,6 +909,7 @@
   <string name="error_start_library_scan_please_check">Kütüphane taraması başlatılamadı. Sunucu yapılandırmanı denetle.</string>
   <string name="error_stashy_plus_products_unavailable">stashy+ ürünleri kullanılamıyor.</string>
   <string name="error_sync">Eşzamanlama Başarısız</string>
+  <string name="error_text_recognition_unavailable">Metin tanıma bu cihazda kullanılamıyor</string>
   <string name="error_update">Güncellenemedi</string>
   <string name="error_update_check">Güncelleme denetlenemedi.</string>
   <string name="error_update_favorite">Favori güncellenemedi</string>
@@ -1221,6 +1224,7 @@
   <string name="hint_nothing_new_matches_your_taste">Şu anda zevkine uyan yeni bir şey yok. Sana Özel\'de başka bir ayar dene.</string>
   <string name="hint_not_on_this_server_kept">Bu sunucuda yok (şablonda tutuldu): %1$s%2$s</string>
   <string name="hint_not_played_in_long_time">Uzun süredir oynatılmadı</string>
+  <string name="hint_no_translation_arg_arg_on_device">Bu cihazda %1$s → %2$s çevirisi yok</string>
   <string name="hint_no_translation_arg_arg_showing">%1$s → %2$s çevirisi yok — altyazılar sahne dilinde gösteriliyor</string>
   <string name="hint_no_translation_from_arg_showing">%1$s dilinden çeviri yok — altyazılar sahne dilinde gösteriliyor</string>
   <string name="hint_no_translation_to_arg_on">Bu aygıtta %1$s diline çeviri yok — altyazılar sahne dilinde gösteriliyor</string>
@@ -1329,6 +1333,7 @@
   <string name="hint_suggests_tags_based_on_how">Kütüphanenin mevcut etiketlenmesine göre etiket önerir, sahne sayfasında aynı oyuncuları, stüdyoyu veya etiketleri içeren sahneleri gösterir ve Ana Sayfa\'ya Sana Özel ve Unutulan Favoriler satırlarını ekler: oynattıklarından, O Sayılarından ve puanlarından seçilen sahneler ve bir süredir oynatmadığın favoriler. Hiçbir dış hizmet kullanılmaz.</string>
   <string name="hint_support_stashy_tips_do_not">stashy\'yi destekle. Bahşişler stashy+\'nın kilidini açmaz.</string>
   <string name="hint_tag_is_added_to_arg">Etiket şunlara eklenir: %1$s (%2$s). Etiketi zaten olan öğeler değişmez.</string>
+  <string name="hint_tap_text_to_translate">Çevirmek için bir metne dokunun</string>
   <string name="hint_teleprompter_requires_ios_26_or">Teleprompter için iOS 26 veya daha yenisi gerekir.</string>
   <string name="hint_teleprompter_requires_ios_26_plus">Teleprompter için iOS 26+ ve desteklenen donanım gerekir</string>
   <string name="hint_terms_follow_stashs_own_interface">Terimler Stash\'in kendi arayüzünü izler; her dil için topluluk çevirileri (Weblate) referans alınır.</string>
@@ -1531,6 +1536,7 @@
   <string name="loading_o_count">O Sayısı yükleniyor…</string>
   <string name="loading_pair">Eşleşme yükleniyor…</string>
   <string name="loading_performers">Oyuncular yükleniyor…</string>
+  <string name="loading_recognizing_text">Metin tanınıyor…</string>
   <string name="loading_scenes">Sahneler yükleniyor…</string>
   <string name="loading_script">Script Yükleniyor…</string>
   <string name="loading_searching">Aranıyor…</string>
@@ -1546,6 +1552,7 @@
   <string name="loading_top_scenes">En iyi sahneler yükleniyor…</string>
   <string name="loading_top_studios">En iyi stüdyolar yükleniyor…</string>
   <string name="loading_top_tags">En iyi etiketler yükleniyor…</string>
+  <string name="loading_translating">Çevriliyor…</string>
   <string name="local">Yerel</string>
   <string name="local_address">Yerel Adres</string>
   <string name="local_address_e_g_192">Yerel Adres (ör. 192.168.1.100:9999)</string>
@@ -2117,6 +2124,7 @@
   <string name="trans_female">Trans kadın</string>
   <string name="transgender_female">Transgender (kadın)</string>
   <string name="transgender_male">Transgender (erkek)</string>
+  <string name="translation_language">Çeviri dili</string>
   <string name="translations">Çeviriler</string>
   <string name="translations_are_managed_with_tolgee">Çeviriler Tolgee ile yönetilir.</string>
   <string name="trans_male">Trans erkek</string>

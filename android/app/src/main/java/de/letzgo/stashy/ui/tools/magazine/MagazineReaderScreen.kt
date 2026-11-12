@@ -23,8 +23,10 @@ import androidx.compose.foundation.pager.PagerState
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Info
+import androidx.compose.material.icons.outlined.Translate
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -45,6 +47,7 @@ import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -58,6 +61,7 @@ import coil3.imageLoader
 import coil3.request.Disposable
 import coil3.request.ImageRequest
 import de.letzgo.stashy.data.Gallery
+import de.letzgo.stashy.data.Prefs
 import de.letzgo.stashy.data.StashImage
 import de.letzgo.stashy.data.tools.MagazineChapter
 import de.letzgo.stashy.data.tools.MagazineLogic
@@ -92,6 +96,9 @@ class MagazineReaderScreen(private val gallery: Gallery) : Screen {
     private var info by mutableStateOf(MagazineReaderInfo(tags = gallery.tags.orEmpty()))
     private var showsPagePicker by mutableStateOf(false)
     private var showsDetails by mutableStateOf(false)
+    /** Tap a text to translate it (fullscreen page only). Stays on for the next comic. */
+    private var translatesText by mutableStateOf(Prefs.bool(MagazinePageTranslation.ENABLED_KEY))
+    private val translation = MagazinePageTranslation()
 
     private val chapters: List<MagazineChapter> get() = info.chapters.sortedBy { it.imageIndex }
 
@@ -336,14 +343,33 @@ class MagazineReaderScreen(private val gallery: Gallery) : Screen {
         LaunchedEffect(fullscreenPage) {
             if (pagerState.settledPage != fullscreenPage) pagerState.scrollToPage(fullscreenPage)
         }
+        val context = LocalContext.current
+        val current = pages.getOrNull(fullscreenPage)
+        val reachPx = with(LocalDensity.current) { 10.dp.toPx() }
+        LaunchedEffect(translatesText, current?.id) {
+            translation.select(null)
+            if (translatesText && current != null) translation.analyze(context, current)
+        }
+        DisposableEffect(Unit) { onDispose { translation.close() } }
         Box(Modifier.fillMaxSize().background(Color.Black)) {
             HorizontalPager(
                 pagerState, Modifier.fillMaxSize(),
                 beyondViewportPageCount = 1, userScrollEnabled = !zoomed,
             ) { index ->
                 TurningPage(pagerState, index) { shown ->
-                    ZoomableBox(onTap = { showsChrome = !showsChrome }, onZoomChange = { zoomed = it }) {
-                        PageImage(pages[shown], Alignment.Center, Modifier.fillMaxSize())
+                    val image = pages[shown]
+                    ZoomableBox(
+                        onTap = { showsChrome = !showsChrome },
+                        onZoomChange = { zoomed = it },
+                        onTapAt = { point, size, viewportY ->
+                            translatesText && translation.handleTap(point, size, viewportY, image, reachPx)
+                        },
+                    ) {
+                        PageImage(image, Alignment.Center, Modifier.fillMaxSize())
+                        val found = if (translatesText) translation.page(image) else null
+                        if (found != null && found.blocks.isNotEmpty()) {
+                            MagazineTextBlockOutlines(found, translation.selected?.id)
+                        }
                     }
                 }
             }
@@ -354,6 +380,7 @@ class MagazineReaderScreen(private val gallery: Gallery) : Screen {
                 ) {
                     CircleIcon(SF.xmark, tr(R.string.action_close), background = true) { closeFullscreen() }
                     Spacer(Modifier.weight(1f))
+                    TranslateButton()
                     Row(
                         Modifier.clip(CircleShape).background(Color.Black.copy(alpha = 0.45f))
                             .clickable { showsPagePicker = true }.padding(horizontal = 12.dp, vertical = 8.dp),
@@ -363,6 +390,37 @@ class MagazineReaderScreen(private val gallery: Gallery) : Screen {
                         Icon(SF.chevronDown, tr(R.string.action_go_to_page), Modifier.size(16.dp), tint = Color.White)
                     }
                 }
+            }
+            if (translatesText && current != null) {
+                // The translation keeps clear of the text it belongs to: above for a tap in the lower half.
+                val onTop = translation.selected != null && translation.selectedInLowerHalf
+                MagazineTranslationPanel(
+                    translation, current,
+                    Modifier.align(if (onTop) Alignment.TopCenter else Alignment.BottomCenter)
+                        .safeDrawingPadding().padding(start = 12.dp, end = 12.dp, bottom = 12.dp, top = 60.dp),
+                )
+            }
+        }
+    }
+
+    @Composable
+    private fun TranslateButton() {
+        val tint = MaterialTheme.colorScheme.primary
+        Box(
+            Modifier.size(48.dp).clickable {
+                translatesText = !translatesText
+                Prefs.setBool(MagazinePageTranslation.ENABLED_KEY, translatesText)
+            },
+            contentAlignment = Alignment.Center,
+        ) {
+            Box(
+                Modifier.size(40.dp).clip(CircleShape).background(if (translatesText) tint else Color.Black.copy(alpha = 0.45f)),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(
+                    Icons.Outlined.Translate, tr(R.string.action_translate_text),
+                    tint = if (translatesText) MaterialTheme.colorScheme.onPrimary else Color.White,
+                )
             }
         }
     }

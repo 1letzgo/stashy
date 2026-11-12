@@ -1792,6 +1792,7 @@ struct ZoomableScrollView<Content: View>: View {
     private var onTap: ((CGPoint) -> Void)?
     private var onLongPress: ((Bool) -> Void)?
     private var onDoubleTap: ((CGPoint) -> Bool)?
+    private var onContentTap: ((CGPoint, CGSize, CGFloat) -> Bool)?
     @Binding var isZoomed: Bool
 
     @State private var scale: CGFloat = 1
@@ -1799,11 +1800,12 @@ struct ZoomableScrollView<Content: View>: View {
     @State private var offset: CGSize = .zero
     @State private var baseOffset: CGSize = .zero
 
-    init(isZoomed: Binding<Bool> = .constant(false), onTap: ((CGPoint) -> Void)? = nil, onLongPress: ((Bool) -> Void)? = nil, onDoubleTap: ((CGPoint) -> Bool)? = nil, @ViewBuilder content: () -> Content) {
+    init(isZoomed: Binding<Bool> = .constant(false), onTap: ((CGPoint) -> Void)? = nil, onLongPress: ((Bool) -> Void)? = nil, onDoubleTap: ((CGPoint) -> Bool)? = nil, onContentTap: ((CGPoint, CGSize, CGFloat) -> Bool)? = nil, @ViewBuilder content: () -> Content) {
         self._isZoomed = isZoomed
         self.onTap = onTap
         self.onLongPress = onLongPress
         self.onDoubleTap = onDoubleTap
+        self.onContentTap = onContentTap
         self.content = content()
     }
 
@@ -1833,7 +1835,19 @@ struct ZoomableScrollView<Content: View>: View {
                     withAnimation(.easeInOut(duration: 0.2)) { setScale(scale > 1 ? 1 : 2.5) }
                     baseScale = scale
                 }
-                .onTapGesture(count: 1, coordinateSpace: .global) { location in onTap?(location) }
+                .onTapGesture(count: 1, coordinateSpace: .global) { location in
+                    if let onContentTap {
+                        // Undo `scaleEffect` (around the centre) and `offset` to get the content's point.
+                        let frame = geo.frame(in: .global)
+                        let point = CGPoint(
+                            x: (location.x - frame.midX - offset.width) / scale + frame.width / 2,
+                            y: (location.y - frame.midY - offset.height) / scale + frame.height / 2
+                        )
+                        let viewportY = frame.height > 0 ? (location.y - frame.minY) / frame.height : 0
+                        if onContentTap(point, frame.size, viewportY) { return }
+                    }
+                    onTap?(location)
+                }
                 .onLongPressGesture(minimumDuration: 0.6) {
                 } onPressingChanged: { pressing in
                     onLongPress?(pressing)
@@ -1865,13 +1879,18 @@ struct ZoomableScrollView<Content: View>: UIViewRepresentable {
     /// Called with the window location first; returning `true` claims the double tap
     /// (e.g. skip), `false` lets it zoom as usual.
     private var onDoubleTap: ((CGPoint) -> Bool)?
+    /// Called first with the tap in the content's own coordinates (zoom and scroll taken out),
+    /// the content's size and the tap's height in the visible area (0 top … 1 bottom);
+    /// returning `true` claims the tap, so `onTap` is not called.
+    private var onContentTap: ((CGPoint, CGSize, CGFloat) -> Bool)?
     @Binding var isZoomed: Bool
     
-    init(isZoomed: Binding<Bool> = .constant(false), onTap: ((CGPoint) -> Void)? = nil, onLongPress: ((Bool) -> Void)? = nil, onDoubleTap: ((CGPoint) -> Bool)? = nil, @ViewBuilder content: () -> Content) {
+    init(isZoomed: Binding<Bool> = .constant(false), onTap: ((CGPoint) -> Void)? = nil, onLongPress: ((Bool) -> Void)? = nil, onDoubleTap: ((CGPoint) -> Bool)? = nil, onContentTap: ((CGPoint, CGSize, CGFloat) -> Bool)? = nil, @ViewBuilder content: () -> Content) {
         self._isZoomed = isZoomed
         self.onTap = onTap
         self.onLongPress = onLongPress
         self.onDoubleTap = onDoubleTap
+        self.onContentTap = onContentTap
         self.content = content()
     }
     
@@ -1924,6 +1943,7 @@ struct ZoomableScrollView<Content: View>: UIViewRepresentable {
         context.coordinator.onTap = onTap
         context.coordinator.onLongPress = onLongPress
         context.coordinator.onDoubleTap = onDoubleTap
+        context.coordinator.onContentTap = onContentTap
         context.coordinator.isZoomed = $isZoomed
         // Parent clears `isZoomed` on page/mode change — reset scale so pan pass-through works again.
         if !isZoomed, uiView.zoomScale != uiView.minimumZoomScale {
@@ -1941,6 +1961,7 @@ struct ZoomableScrollView<Content: View>: UIViewRepresentable {
         var onTap: ((CGPoint) -> Void)?
         var onLongPress: ((Bool) -> Void)?
         var onDoubleTap: ((CGPoint) -> Bool)?
+        var onContentTap: ((CGPoint, CGSize, CGFloat) -> Bool)?
         
         init(hostingController: UIHostingController<Content>, isZoomed: Binding<Bool>, onTap: ((CGPoint) -> Void)? = nil, onLongPress: ((Bool) -> Void)? = nil, onDoubleTap: ((CGPoint) -> Bool)? = nil) {
             self.hostingController = hostingController
@@ -1969,6 +1990,17 @@ struct ZoomableScrollView<Content: View>: UIViewRepresentable {
         }
         
         @objc func handleSingleTap(_ gesture: UITapGestureRecognizer) {
+            if let onContentTap, let hosted = hostingController.view {
+                // SwiftUI lays the content out inside the hosting view's safe area.
+                let area = hosted.bounds.inset(by: hosted.safeAreaInsets)
+                let point = gesture.location(in: hosted)
+                let viewportY = gesture.view.map { view in
+                    view.bounds.height > 0 ? (gesture.location(in: view).y - view.bounds.minY) / view.bounds.height : 0
+                } ?? 0
+                if onContentTap(CGPoint(x: point.x - area.minX, y: point.y - area.minY), area.size, viewportY) {
+                    return
+                }
+            }
             let location = gesture.location(in: gesture.view?.window)
             onTap?(location)
         }

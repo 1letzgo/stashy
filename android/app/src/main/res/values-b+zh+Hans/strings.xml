@@ -276,6 +276,7 @@
   <string name="action_test_again">再次测试</string>
   <string name="action_test_connection">测试连接</string>
   <string name="action_test_local_address">测试本地地址</string>
+  <string name="action_translate_text">翻译文本</string>
   <string name="action_try_again">再试一次</string>
   <string name="action_turn_off">关闭</string>
   <string name="action_turn_on">打开</string>
@@ -787,6 +788,7 @@
   <string name="empty_tags_match_arg">没有与“%1$s”匹配的标签</string>
   <string name="empty_tag_suggestions">无标签建议</string>
   <string name="empty_tags_yet">尚无标签。</string>
+  <string name="empty_text_on_page">此页面未找到文本</string>
   <string name="empty_thanks">不用了</string>
   <string name="empty_unrated_images_left_in_arg">%1$s 中已没有未评分的图片。</string>
   <string name="empty_unrated_scenes_left_in_arg">%1$s 中已没有未评分的短片。</string>
@@ -907,6 +909,7 @@
   <string name="error_start_library_scan_please_check">无法开始扫描资料库。请检查服务器配置。</string>
   <string name="error_stashy_plus_products_unavailable">stashy+ 商品暂不可用。</string>
   <string name="error_sync">同步失败</string>
+  <string name="error_text_recognition_unavailable">此设备无法使用文本识别</string>
   <string name="error_update">更新失败</string>
   <string name="error_update_check">检查更新失败。</string>
   <string name="error_update_favorite">无法更新收藏</string>
@@ -1221,6 +1224,7 @@
   <string name="hint_nothing_new_matches_your_taste">目前没有符合你口味的新内容。请在“为你推荐”中尝试其他设置。</string>
   <string name="hint_not_on_this_server_kept">不在此服务器上（保留在模板中）：%1$s%2$s</string>
   <string name="hint_not_played_in_long_time">很久没有播放</string>
+  <string name="hint_no_translation_arg_arg_on_device">此设备无法进行 %1$s → %2$s 的翻译</string>
   <string name="hint_no_translation_arg_arg_showing">无 %1$s → %2$s 翻译 — 以短片语言显示字幕</string>
   <string name="hint_no_translation_from_arg_showing">无法从%1$s翻译 — 以短片语言显示字幕</string>
   <string name="hint_no_translation_to_arg_on">此设备无法翻译为%1$s — 以短片语言显示字幕</string>
@@ -1329,6 +1333,7 @@
   <string name="hint_suggests_tags_based_on_how">根据你的资料库已有的标签方式建议标签，在短片页面显示具有相同演员、工作室或标签的短片，并在主页添加“为你推荐”和“被遗忘的最爱”行：根据你的播放内容、O 计数和评分挑选的短片，以及你有一段时间没有播放的最爱。不涉及任何外部服务。</string>
   <string name="hint_support_stashy_tips_do_not">支持 stashy。打赏不会解锁 stashy+。</string>
   <string name="hint_tag_is_added_to_arg">标签将添加到 %2$s 中的 %1$s。已有此标签的项目保持不变。</string>
+  <string name="hint_tap_text_to_translate">轻点文本即可翻译</string>
   <string name="hint_teleprompter_requires_ios_26_or">提词器需要 iOS 26 或更高版本。</string>
   <string name="hint_teleprompter_requires_ios_26_plus">提词器需要 iOS 26+ 及受支持的硬件</string>
   <string name="hint_terms_follow_stashs_own_interface">术语遵循 Stash 自身界面，其社区翻译（Weblate）作为各语言的参考。</string>
@@ -1531,6 +1536,7 @@
   <string name="loading_o_count">正在载入 O 计数…</string>
   <string name="loading_pair">正在载入对决…</string>
   <string name="loading_performers">正在载入演员…</string>
+  <string name="loading_recognizing_text">正在识别文本…</string>
   <string name="loading_scenes">正在载入短片…</string>
   <string name="loading_script">正在载入脚本…</string>
   <string name="loading_searching">正在搜索…</string>
@@ -1546,6 +1552,7 @@
   <string name="loading_top_scenes">正在载入热门短片…</string>
   <string name="loading_top_studios">正在载入热门工作室…</string>
   <string name="loading_top_tags">正在载入热门标签…</string>
+  <string name="loading_translating">正在翻译…</string>
   <string name="local">本地</string>
   <string name="local_address">本地地址</string>
   <string name="local_address_e_g_192">本地地址（例如 192.168.1.100:9999）</string>
@@ -2117,6 +2124,7 @@
   <string name="trans_female">跨性别女性</string>
   <string name="transgender_female">跨性别（女性）</string>
   <string name="transgender_male">跨性别（男性）</string>
+  <string name="translation_language">翻译语言</string>
   <string name="translations">翻译</string>
   <string name="translations_are_managed_with_tolgee">翻译通过 Tolgee 管理。</string>
   <string name="trans_male">跨性别男性</string>

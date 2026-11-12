@@ -276,6 +276,7 @@
   <string name="action_test_again">Testa igen</string>
   <string name="action_test_connection">Testa anslutning</string>
   <string name="action_test_local_address">Testa lokal adress</string>
+  <string name="action_translate_text">Översätt text</string>
   <string name="action_try_again">Försök igen</string>
   <string name="action_turn_off">Stäng av</string>
   <string name="action_turn_on">Slå på</string>
@@ -787,6 +788,7 @@
   <string name="empty_tags_match_arg">Inga taggar matchar ”%1$s”</string>
   <string name="empty_tag_suggestions">Inga taggförslag</string>
   <string name="empty_tags_yet">Inga taggar än.</string>
+  <string name="empty_text_on_page">Ingen text hittades på den här sidan</string>
   <string name="empty_thanks">Nej tack</string>
   <string name="empty_unrated_images_left_in_arg">Inga bilder utan betyg kvar i %1$s.</string>
   <string name="empty_unrated_scenes_left_in_arg">Inga scener utan betyg kvar i %1$s.</string>
@@ -907,6 +909,7 @@
   <string name="error_start_library_scan_please_check">Kunde inte starta biblioteksskanningen. Kontrollera serverns konfiguration.</string>
   <string name="error_stashy_plus_products_unavailable">stashy+-produkter är inte tillgängliga.</string>
   <string name="error_sync">Synkningen misslyckades</string>
+  <string name="error_text_recognition_unavailable">Textigenkänning är inte tillgänglig på den här enheten</string>
   <string name="error_update">Uppdateringen misslyckades</string>
   <string name="error_update_check">Kunde inte söka efter uppdateringar.</string>
   <string name="error_update_favorite">Kunde inte uppdatera favorit</string>
@@ -1221,6 +1224,7 @@
   <string name="hint_nothing_new_matches_your_taste">Inget nytt matchar din smak just nu. Prova en annan inställning i För dig.</string>
   <string name="hint_not_on_this_server_kept">Inte på den här servern (behålls i mallen): %1$s%2$s</string>
   <string name="hint_not_played_in_long_time">Inte spelad på länge</string>
+  <string name="hint_no_translation_arg_arg_on_device">Ingen översättning %1$s → %2$s på den här enheten</string>
   <string name="hint_no_translation_arg_arg_showing">Ingen översättning %1$s → %2$s – visar undertexter på scenens språk</string>
   <string name="hint_no_translation_from_arg_showing">Ingen översättning från %1$s – visar undertexter på scenens språk</string>
   <string name="hint_no_translation_to_arg_on">Ingen översättning till %1$s på den här enheten – visar undertexter på scenens språk</string>
@@ -1329,6 +1333,7 @@
   <string name="hint_suggests_tags_based_on_how">Föreslår taggar utifrån hur ditt bibliotek redan är taggat, visar scener med samma stjärnor, studio eller taggar på scensidan och lägger till raderna För dig och Glömda favoriter på Hem: scener utvalda utifrån vad du har spelat, dina O-räknare och betyg samt favoriter du inte har spelat på ett tag. Ingen extern tjänst används.</string>
   <string name="hint_support_stashy_tips_do_not">Stöd stashy. Dricks låser inte upp stashy+.</string>
   <string name="hint_tag_is_added_to_arg">Taggen läggs till på %1$s av %2$s. Objekt som redan har den lämnas oförändrade.</string>
+  <string name="hint_tap_text_to_translate">Tryck på en text för att översätta den</string>
   <string name="hint_teleprompter_requires_ios_26_or">Teleprompter kräver iOS 26 eller senare.</string>
   <string name="hint_teleprompter_requires_ios_26_plus">Teleprompter kräver iOS 26+ och hårdvara som stöds</string>
   <string name="hint_terms_follow_stashs_own_interface">Termerna följer Stashs eget gränssnitt, och dess communityöversättningar (Weblate) fungerar som referens för varje språk.</string>
@@ -1531,6 +1536,7 @@
   <string name="loading_o_count">Läser in O-räknare…</string>
   <string name="loading_pair">Läser in par…</string>
   <string name="loading_performers">Läser in stjärnor…</string>
+  <string name="loading_recognizing_text">Känner igen text…</string>
   <string name="loading_scenes">Läser in scener…</string>
   <string name="loading_script">Läser in skript…</string>
   <string name="loading_searching">Söker…</string>
@@ -1546,6 +1552,7 @@
   <string name="loading_top_scenes">Läser in toppscener…</string>
   <string name="loading_top_studios">Läser in toppstudior…</string>
   <string name="loading_top_tags">Läser in topptaggar…</string>
+  <string name="loading_translating">Översätter…</string>
   <string name="local">Lokal</string>
   <string name="local_address">Lokal adress</string>
   <string name="local_address_e_g_192">Lokal adress (t.ex. 192.168.1.100:9999)</string>
@@ -2117,6 +2124,7 @@
   <string name="trans_female">Transkvinna</string>
   <string name="transgender_female">Transperson (kvinna)</string>
   <string name="transgender_male">Transperson (man)</string>
+  <string name="translation_language">Översättningsspråk</string>
   <string name="translations">Översättningar</string>
   <string name="translations_are_managed_with_tolgee">Översättningarna hanteras med Tolgee.</string>
   <string name="trans_male">Transman</string>

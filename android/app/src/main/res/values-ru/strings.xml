@@ -276,6 +276,7 @@
   <string name="action_test_again">Проверить снова</string>
   <string name="action_test_connection">Проверить подключение</string>
   <string name="action_test_local_address">Проверить локальный адрес</string>
+  <string name="action_translate_text">Перевести текст</string>
   <string name="action_try_again">Повторить попытку</string>
   <string name="action_turn_off">Выключить</string>
   <string name="action_turn_on">Включить</string>
@@ -787,6 +788,7 @@
   <string name="empty_tags_match_arg">Нет тегов, соответствующих «%1$s»</string>
   <string name="empty_tag_suggestions">Нет предложений тегов</string>
   <string name="empty_tags_yet">Тегов пока нет.</string>
+  <string name="empty_text_on_page">На этой странице текст не найден</string>
   <string name="empty_thanks">Нет, спасибо</string>
   <string name="empty_unrated_images_left_in_arg">В «%1$s» не осталось изображений без рейтинга.</string>
   <string name="empty_unrated_scenes_left_in_arg">В «%1$s» не осталось сцен без рейтинга.</string>
@@ -907,6 +909,7 @@
   <string name="error_start_library_scan_please_check">Не удалось запустить сканирование библиотеки. Проверьте конфигурацию сервера.</string>
   <string name="error_stashy_plus_products_unavailable">Продукты stashy+ недоступны.</string>
   <string name="error_sync">Сбой синхронизации</string>
+  <string name="error_text_recognition_unavailable">Распознавание текста недоступно на этом устройстве</string>
   <string name="error_update">Не удалось обновить</string>
   <string name="error_update_check">Не удалось проверить обновления.</string>
   <string name="error_update_favorite">Не удалось обновить избранное</string>
@@ -1221,6 +1224,7 @@
   <string name="hint_nothing_new_matches_your_taste">Сейчас нет ничего нового на ваш вкус. Попробуйте другие настройки «Для вас».</string>
   <string name="hint_not_on_this_server_kept">Нет на этом сервере (сохранено в шаблоне): %1$s%2$s</string>
   <string name="hint_not_played_in_long_time">Давно не воспроизводилось</string>
+  <string name="hint_no_translation_arg_arg_on_device">Нет перевода %1$s → %2$s на этом устройстве</string>
   <string name="hint_no_translation_arg_arg_showing">Нет перевода %1$s → %2$s — субтитры показаны на языке сцены</string>
   <string name="hint_no_translation_from_arg_showing">Нет перевода с языка %1$s — субтитры показаны на языке сцены</string>
   <string name="hint_no_translation_to_arg_on">Нет перевода на язык %1$s на этом устройстве — субтитры показаны на языке сцены</string>
@@ -1329,6 +1333,7 @@
   <string name="hint_suggests_tags_based_on_how">Предлагает теги на основе того, как уже размечена ваша библиотека, показывает на странице сцены сцены с теми же исполнителями, студией или тегами и добавляет на главную ряды «Для вас» и «Забытое избранное»: сцены, подобранные по вашим воспроизведениям, O и рейтингам, и избранное, которое вы давно не смотрели. Внешние сервисы не используются.</string>
   <string name="hint_support_stashy_tips_do_not">Поддержите stashy. Чаевые не открывают stashy+.</string>
   <string name="hint_tag_is_added_to_arg">Тег будет добавлен к %1$s из %2$s. Объекты, у которых он уже есть, не изменятся.</string>
+  <string name="hint_tap_text_to_translate">Коснитесь текста, чтобы перевести его</string>
   <string name="hint_teleprompter_requires_ios_26_or">Для телесуфлера требуется iOS 26 или новее.</string>
   <string name="hint_teleprompter_requires_ios_26_plus">Для телесуфлера требуется iOS 26+ и поддерживаемое оборудование</string>
   <string name="hint_terms_follow_stashs_own_interface">Термины следуют интерфейсу Stash, а его переводы от сообщества (Weblate) служат образцом для каждого языка.</string>
@@ -1531,6 +1536,7 @@
   <string name="loading_o_count">Загрузка счетчика O…</string>
   <string name="loading_pair">Загрузка пары…</string>
   <string name="loading_performers">Загрузка исполнителей…</string>
+  <string name="loading_recognizing_text">Распознавание текста…</string>
   <string name="loading_scenes">Загрузка сцен…</string>
   <string name="loading_script">Загрузка скрипта…</string>
   <string name="loading_searching">Поиск…</string>
@@ -1546,6 +1552,7 @@
   <string name="loading_top_scenes">Загрузка лучших сцен…</string>
   <string name="loading_top_studios">Загрузка лучших студий…</string>
   <string name="loading_top_tags">Загрузка лучших тегов…</string>
+  <string name="loading_translating">Перевод…</string>
   <string name="local">Локальный</string>
   <string name="local_address">Локальный адрес</string>
   <string name="local_address_e_g_192">Локальный адрес (например, 192.168.1.100:9999)</string>
@@ -2117,6 +2124,7 @@
   <string name="trans_female">Транс-женщина</string>
   <string name="transgender_female">Трансгендер (женщина)</string>
   <string name="transgender_male">Трансгендер (мужчина)</string>
+  <string name="translation_language">Язык перевода</string>
   <string name="translations">Переводы</string>
   <string name="translations_are_managed_with_tolgee">Переводы ведутся в Tolgee.</string>
   <string name="trans_male">Транс-мужчина</string>

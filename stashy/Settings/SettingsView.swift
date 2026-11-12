@@ -313,16 +313,19 @@ struct SettingsView: View {
                     Label(tr("magazin_ereader"), systemImage: "magazine")
                 }
                 .tint(appearanceManager.tintColor)
-                .stashyGroupedBlockRow(index: 0, count: isMagazineEnabled ? 2 : 1)
+                .stashyGroupedBlockRow(index: 0, count: isMagazineEnabled ? 3 : 1)
 
                 if isMagazineEnabled {
                     HStack {
-                        Text(tr("default_filter"))
+                        Label(tr("default_filter"), systemImage: "line.3.horizontal.decrease.circle")
                         Spacer()
                         MagazineDefaultFilterMenu(viewModel: viewModel)
                     }
-                    .stashyGroupedBlockRow(index: 1, count: 2)
+                    .stashyGroupedBlockRow(index: 1, count: 3)
                     .task { viewModel.fetchSavedFilters() }
+
+                    MagazineTranslationLanguagePicker()
+                        .stashyGroupedBlockRow(index: 2, count: 3)
                 }
                 stashyScrollingSectionFooter(StashyPlusFeatureCopy.magazine)
             }

@@ -134,5 +134,11 @@ dependencies {
     // ML Kit on-device translation (language packs downloaded on demand).
     implementation("com.alphacephei:vosk-android:0.3.75")
     implementation("com.google.mlkit:translate:17.0.3")
+    // Magazin: text of a comic page for tap-to-translate. Bundled models (one per script), so it
+    // works offline and without Google Play services; the Play services variant failed on
+    // devices whose Play services do not offer the module.
+    implementation("com.google.mlkit:text-recognition-japanese:16.0.1")
+    implementation("com.google.mlkit:text-recognition-chinese:16.0.1")
+    implementation("com.google.mlkit:text-recognition-korean:16.0.1")
     testImplementation("junit:junit:4.13.2")
 }

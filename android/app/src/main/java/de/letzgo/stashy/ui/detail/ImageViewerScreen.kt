@@ -823,10 +823,17 @@ internal fun ZoomableBox(
     onHold: ((Boolean) -> Unit)? = null,
     /** iOS `onDoubleTap(location)` → skip; returns whether it handled the tap (outer thirds of a video). */
     onDoubleTapAt: ((x: Float, width: Float) -> Boolean)? = null,
+    /**
+     * iOS `onContentTap`: called first with the tap in the content's own coordinates (zoom and
+     * pan taken out), the content's size and the tap's height on the screen (0 top … 1 bottom);
+     * returning true claims the tap, so [onTap] is not called.
+     */
+    onTapAt: ((point: Offset, size: androidx.compose.ui.geometry.Size, viewportY: Float) -> Boolean)? = null,
     content: @Composable () -> Unit,
 ) {
     var scale by remember { mutableFloatStateOf(1f) }
     var offset by remember { mutableStateOf(Offset.Zero) }
+    val currentOnTapAt by androidx.compose.runtime.rememberUpdatedState(onTapAt)
     BoxWithConstraints(Modifier.fillMaxSize()) {
         val w = constraints.maxWidth.toFloat()
         val h = constraints.maxHeight.toFloat()
@@ -840,7 +847,12 @@ internal fun ZoomableBox(
                 .pointerInput(zoomEnabled, onHold != null, onDoubleTapAt != null) {
                     var holding = false
                     detectTapGestures(
-                        onTap = { onTap() },
+                        onTap = { tap ->
+                            // Undo the layer's scale (around the centre) and translation.
+                            val point = Offset((tap.x - w / 2f - offset.x) / scale + w / 2f, (tap.y - h / 2f - offset.y) / scale + h / 2f)
+                            val claimed = currentOnTapAt?.invoke(point, androidx.compose.ui.geometry.Size(w, h), if (h > 0f) tap.y / h else 0f) == true
+                            if (!claimed) onTap()
+                        },
                         onLongPress = if (onHold == null) null else { _ -> holding = true; onHold(true) },
                         onPress = {
                             tryAwaitRelease()

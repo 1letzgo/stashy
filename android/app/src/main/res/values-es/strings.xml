@@ -276,6 +276,7 @@
   <string name="action_test_again">Probar de nuevo</string>
   <string name="action_test_connection">Probar conexión</string>
   <string name="action_test_local_address">Probar dirección local</string>
+  <string name="action_translate_text">Traducir texto</string>
   <string name="action_try_again">Intentar de nuevo</string>
   <string name="action_turn_off">Desactivar</string>
   <string name="action_turn_on">Activar</string>
@@ -787,6 +788,7 @@
   <string name="empty_tags_match_arg">Ninguna etiqueta coincide con «%1$s»</string>
   <string name="empty_tag_suggestions">No hay sugerencias de etiquetas</string>
   <string name="empty_tags_yet">Aún no hay etiquetas.</string>
+  <string name="empty_text_on_page">No se encontró texto en esta página</string>
   <string name="empty_thanks">No, gracias</string>
   <string name="empty_unrated_images_left_in_arg">No quedan imágenes sin valorar en %1$s.</string>
   <string name="empty_unrated_scenes_left_in_arg">No quedan escenas sin valorar en %1$s.</string>
@@ -907,6 +909,7 @@
   <string name="error_start_library_scan_please_check">No se pudo iniciar el escaneo de la biblioteca. Comprueba la configuración del servidor.</string>
   <string name="error_stashy_plus_products_unavailable">Productos de stashy+ no disponibles.</string>
   <string name="error_sync">Error de sincronización</string>
+  <string name="error_text_recognition_unavailable">El reconocimiento de texto no está disponible en este dispositivo</string>
   <string name="error_update">Error al actualizar</string>
   <string name="error_update_check">Error al buscar actualizaciones.</string>
   <string name="error_update_favorite">No se pudo actualizar el favorito</string>
@@ -1221,6 +1224,7 @@
   <string name="hint_nothing_new_matches_your_taste">Ahora mismo no hay nada nuevo que encaje con tus gustos. Prueba otro ajuste en Para ti.</string>
   <string name="hint_not_on_this_server_kept">No está en este servidor (se conserva en la plantilla): %1$s%2$s</string>
   <string name="hint_not_played_in_long_time">Sin reproducir desde hace mucho</string>
+  <string name="hint_no_translation_arg_arg_on_device">Sin traducción %1$s → %2$s en este dispositivo</string>
   <string name="hint_no_translation_arg_arg_showing">No hay traducción %1$s → %2$s; se muestran los subtítulos en el idioma de la escena</string>
   <string name="hint_no_translation_from_arg_showing">No hay traducción desde %1$s; se muestran los subtítulos en el idioma de la escena</string>
   <string name="hint_no_translation_to_arg_on">No hay traducción a %1$s en este dispositivo; se muestran los subtítulos en el idioma de la escena</string>
@@ -1329,6 +1333,7 @@
   <string name="hint_suggests_tags_based_on_how">Sugiere etiquetas según cómo está etiquetada ya tu biblioteca, muestra en la página de la escena escenas con los mismos intérpretes, estudio o etiquetas, y añade a Inicio las filas Para ti y Favoritos olvidados: escenas elegidas a partir de lo que has reproducido, tus contadores O y valoraciones, y favoritos que no has reproducido desde hace tiempo. No interviene ningún servicio externo.</string>
   <string name="hint_support_stashy_tips_do_not">Apoya a stashy. Las propinas no desbloquean stashy+.</string>
   <string name="hint_tag_is_added_to_arg">La etiqueta se añade a %1$s de %2$s. Los elementos que ya la tienen no cambian.</string>
+  <string name="hint_tap_text_to_translate">Toca un texto para traducirlo</string>
   <string name="hint_teleprompter_requires_ios_26_or">El teleprompter requiere iOS 26 o posterior.</string>
   <string name="hint_teleprompter_requires_ios_26_plus">El teleprompter requiere iOS 26+ y hardware compatible</string>
   <string name="hint_terms_follow_stashs_own_interface">Los términos siguen la propia interfaz de Stash, y sus traducciones de la comunidad (Weblate) sirven de referencia para cada idioma.</string>
@@ -1531,6 +1536,7 @@
   <string name="loading_o_count">Cargando contador O…</string>
   <string name="loading_pair">Cargando pareja…</string>
   <string name="loading_performers">Cargando intérpretes…</string>
+  <string name="loading_recognizing_text">Reconociendo texto…</string>
   <string name="loading_scenes">Cargando escenas…</string>
   <string name="loading_script">Cargando script…</string>
   <string name="loading_searching">Buscando…</string>
@@ -1546,6 +1552,7 @@
   <string name="loading_top_scenes">Cargando mejores escenas…</string>
   <string name="loading_top_studios">Cargando mejores estudios…</string>
   <string name="loading_top_tags">Cargando mejores etiquetas…</string>
+  <string name="loading_translating">Traduciendo…</string>
   <string name="local">Local</string>
   <string name="local_address">Dirección local</string>
   <string name="local_address_e_g_192">Dirección local (p. ej., 192.168.1.100:9999)</string>
@@ -2117,6 +2124,7 @@
   <string name="trans_female">Mujer trans</string>
   <string name="transgender_female">Transgénero (mujer)</string>
   <string name="transgender_male">Transgénero (hombre)</string>
+  <string name="translation_language">Idioma de traducción</string>
   <string name="translations">Traducciones</string>
   <string name="translations_are_managed_with_tolgee">Las traducciones se gestionan con Tolgee.</string>
   <string name="trans_male">Hombre trans</string>
