@@ -49,6 +49,7 @@ final class CatalogChromeCollapse: ObservableObject {
     /// scroll down: on iPad the chrome came back, left again and came back in one swipe.
     private var flippedThisGesture = false
     private var anchor: CGFloat = 0
+    private var lastPosition: CGFloat = 0
     /// The list the finger last dragged. Lists kept alive off screen (other Home sections)
     /// report their geometry too; loading a page re-lays them out at offset 0, which read as
     /// "back at the top" and brought the bar back on every page load.
@@ -70,6 +71,7 @@ final class CatalogChromeCollapse: ObservableObject {
         }
         // Rubber-banding at either end is not a scroll direction.
         let position = min(max(offset, 0), max(scrollRange, 0))
+        lastPosition = position
         guard !dragStartedWithMenuOpen else {
             anchor = position
             return
@@ -117,9 +119,19 @@ final class CatalogChromeCollapse: ObservableObject {
         reset()
     }
 
+    /// Chrome brought back from outside the scrolling (Feeds › Pics after a menu or a return to
+    /// the app). The scroll state has to agree: left at "hidden", the next swipe down changes
+    /// nothing and the bar stays until the list is scrolled up and down again.
+    func reveal() {
+        guard targetCollapsed else { return }
+        anchor = lastPosition
+        setCollapsed(false)
+    }
+
     func reset() {
         owner = nil
         anchor = 0
+        lastPosition = 0
         isDragging = false
         setCollapsed(false)
     }

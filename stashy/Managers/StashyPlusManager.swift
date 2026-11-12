@@ -93,7 +93,27 @@ final class StashyPlusManager: ObservableObject {
     static let shared = StashyPlusManager()
 
     /// Permanent unlock (lifetime IAP or paid-app grandfathering).
-    nonisolated static let lifetimeKey = "plus_status_lifetime"
+    nonisolated static let lifetimeKey = "stashy_plus_lifetime"
+    /// Builds 492–495 read and wrote the lifetime flag under this name (a text key renamed over
+    /// the storage key). They found no flag, so a TestFlight install, where the store cannot
+    /// confirm an App Store purchase, lost its Lifetime and stored the source `none`.
+    nonisolated private static let strayLifetimeKey = "plus_status_lifetime"
+
+    /// Undoes what those builds stored: the real flag was never touched by them, so it still
+    /// says whether this install had Lifetime.
+    nonisolated private static func repairStrayLifetimeKeyIfNeeded() {
+        let defaults = UserDefaults.standard
+        guard defaults.object(forKey: strayLifetimeKey) != nil else { return }
+        let strayValue = defaults.bool(forKey: strayLifetimeKey)
+        defaults.removeObject(forKey: strayLifetimeKey)
+        let stored = StashyPlusSource(rawValue: defaults.string(forKey: sourceKey) ?? "") ?? .none
+        if strayValue, stored == .lifetime || stored == .legacyPaidApp {
+            // Bought or confirmed while one of those builds ran.
+            defaults.set(true, forKey: lifetimeKey)
+        } else if defaults.bool(forKey: lifetimeKey), stored == .none {
+            defaults.set(StashyPlusSource.lifetime.rawValue, forKey: sourceKey)
+        }
+    }
     /// Legacy tip-era flag — no longer grants access.
     nonisolated static let unlockedKey = "stashy_plus_unlocked"
     nonisolated static let tipsCountKey = "totalTipsCount"
@@ -226,6 +246,7 @@ final class StashyPlusManager: ObservableObject {
 
     private init() {
         let defaults = UserDefaults.standard
+        Self.repairStrayLifetimeKeyIfNeeded()
         Self.revokeTipEraUnlockIfNeeded()
 
         let storedSource = StashyPlusSource(rawValue: defaults.string(forKey: Self.sourceKey) ?? "") ?? .none
@@ -506,6 +527,15 @@ struct StashyStoreProduct: Identifiable {
     }
 }
 
+/// Outcome of a store purchase. A cancel is its own case, so callers never decide by the
+/// (translated) message text.
+enum StashyPurchaseOutcome {
+    case purchased
+    case cancelled
+    /// Not bought: pending approval (Ask to Buy) or an error; `message` is shown to the user.
+    case failed(String)
+}
+
 /// Shared RevenueCat plumbing for the iOS `StoreManager` and the tvOS `TVStashyPlusStore`.
 ///
 /// RevenueCat handles purchases, finishing transactions and restore. The entitlement
@@ -543,20 +573,20 @@ enum StashyRevenueCat {
         return (offerings.current?.availablePackages ?? []).map(StashyStoreProduct.init)
     }
 
-    /// Error text for the UI, or `nil` on success.
-    static func purchase(_ product: StashyStoreProduct) async -> (message: String?, customerInfo: CustomerInfo?) {
+    /// Purchase outcome; `customerInfo` only on `.purchased`.
+    static func purchase(_ product: StashyStoreProduct) async -> (outcome: StashyPurchaseOutcome, customerInfo: CustomerInfo?) {
         do {
             let result = try await purchases.purchase(package: product.package)
-            if result.userCancelled { return (tr("purchase_cancelled"), nil) }
-            return (nil, result.customerInfo)
+            if result.userCancelled { return (.cancelled, nil) }
+            return (.purchased, result.customerInfo)
         } catch let error as ErrorCode {
             switch error {
-            case .purchaseCancelledError: return (tr("purchase_cancelled"), nil)
-            case .paymentPendingError: return (tr("purchase_pending_approval"), nil)
-            default: return (error.localizedDescription, nil)
+            case .purchaseCancelledError: return (.cancelled, nil)
+            case .paymentPendingError: return (.failed(tr("purchase_pending_approval")), nil)
+            default: return (.failed(error.localizedDescription), nil)
             }
         } catch {
-            return (error.localizedDescription, nil)
+            return (.failed(error.localizedDescription), nil)
         }
     }
 

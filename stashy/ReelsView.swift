@@ -1543,6 +1543,8 @@ struct ReelsViewBody: View {
     /// Shows the chrome again; returns whether it had been hidden by scrolling.
     @discardableResult
     private func reelsRevealChromeAfterScroll() -> Bool {
+        // Pics takes its hidden state from the shared scroll state, which must come back with it.
+        if reelsMode == .pics { CatalogChromeCollapse.shared.reveal() }
         guard isChromeScrollHidden else { return false }
         isChromeScrollHidden = false
         return true
