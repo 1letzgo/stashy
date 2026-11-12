@@ -1737,20 +1737,13 @@ struct ImageCatalogFeedHeader: View {
         HStack(spacing: 10) {
             HStack(spacing: 0) {
                 ForEach(Array(performers.enumerated()), id: \.element.id) { idx, performer in
-                    // Avatar → gallery in 1/row feed (not performer detail).
-                    if let galleryDestination {
-                        NavigationLink(
-                            destination: ImagesView(gallery: galleryDestination, forceOneColumnFeed: true)
-                        ) {
-                            performerAvatar(performer, offset: idx)
-                        }
-                        .buttonStyle(.plain)
-                    } else {
-                        NavigationLink(destination: PerformerDetailView(performer: performer.toPerformer(), initialTab: .images)) {
-                            performerAvatar(performer, offset: idx)
-                        }
-                        .buttonStyle(.plain)
+                    // Avatar → performer, like every Feeds mode (the name filters). Only an image
+                    // without performers leads to its gallery.
+                    NavigationLink(destination: PerformerDetailView(performer: performer.toPerformer(), initialTab: .images)) {
+                        performerAvatar(performer, offset: idx)
                     }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel(performer.name)
                 }
                 if performers.isEmpty {
                     Group {

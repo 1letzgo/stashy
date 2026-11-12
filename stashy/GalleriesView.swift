@@ -35,8 +35,6 @@ private struct GalleriesViewContent: View {
     @State private var didApplyDefaultFilter = false
     @State private var searchText = ""
     @State private var isSearchVisible = false
-    @State private var scrollPosition: String? = nil
-    @State private var shouldRestoreScroll = false
     var hideTitle: Bool = false
 
     @State private var showFilterSortSheet = false
@@ -431,8 +429,6 @@ private struct GalleriesViewContent: View {
             viewModel.refreshRandomSeed()
         }
         selectedSortOption = newOption
-        scrollPosition = nil
-        shouldRestoreScroll = false
         
         // Save to TabManager
         TabManager.shared.setSortOption(for: .galleries, option: newOption.rawValue)

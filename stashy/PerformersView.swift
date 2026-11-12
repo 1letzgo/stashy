@@ -12,8 +12,6 @@ import SwiftUI
 private struct PerformersViewContent: View {
     @ObservedObject var viewModel: StashDBViewModel
     @ObservedObject var configManager = ServerConfigManager.shared
-    @State private var scrollPosition: String? = nil
-    @State private var shouldRestoreScroll = false
     @State private var selectedSortOption: StashDBViewModel.PerformerSortOption
     @State private var isChangingSort = false
     @State private var searchText = ""
@@ -422,8 +420,6 @@ private struct PerformersViewContent: View {
             viewModel.refreshRandomSeed()
         }
         selectedSortOption = newOption
-        scrollPosition = nil
-        shouldRestoreScroll = false
         
         // Save to TabManager
         TabManager.shared.setSortOption(for: .performers, option: newOption.rawValue)
@@ -434,8 +430,6 @@ private struct PerformersViewContent: View {
     
     // Search function with debouncing
     private func performSearch() {
-        scrollPosition = nil
-        shouldRestoreScroll = false
         viewModel.fetchPerformers(sortBy: selectedSortOption, searchQuery: searchText, filter: fetchBaseFilter, liveFilter: effectiveLiveFilter)
     }
 
@@ -758,7 +752,7 @@ private struct PerformersViewContent: View {
     }
 
     private var performersGrid: some View {
-        ScrollViewReader { proxy in
+        ScrollViewReader { _ in
             ScrollView {
                 VStack(spacing: 0) {
                 LazyVGrid(columns: columns, spacing: 12) {
@@ -783,18 +777,8 @@ private struct PerformersViewContent: View {
                         Color.clear
                             .frame(height: 1)
                             .onAppear {
-                                // Save scroll position before loading - use element around 3/4 of current list
-                                let currentCount = viewModel.performers.count
-                                if currentCount > 4 {
-                                    let targetIndex = currentCount * 3 / 4
-                                    if targetIndex < currentCount {
-                                        scrollPosition = viewModel.performers[targetIndex].id
-                                        shouldRestoreScroll = true
-                                    }
-                                } else if let lastPerformer = viewModel.performers.last {
-                                    scrollPosition = lastPerformer.id
-                                    shouldRestoreScroll = true
-                                }
+                                // Appended rows don't move a LazyVGrid. A scroll back to a saved
+                                // row after the page arrived pulled fast scrollers up a few rows.
                                 viewModel.loadMorePerformers()
                             }
                             .id("pagination-trigger")
@@ -806,19 +790,6 @@ private struct PerformersViewContent: View {
             }
             .collapsesCatalogChrome()
             .refreshable { performSearch() }
-            .onChange(of: viewModel.isLoadingMorePerformers) { oldValue, isLoading in
-                if !isLoading && shouldRestoreScroll {
-                    // Loading completed, restore scroll position
-                    if let scrollPosition = scrollPosition {
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
-                            withAnimation(.easeOut(duration: 0.3)) {
-                                proxy.scrollTo(scrollPosition, anchor: .top)
-                            }
-                            shouldRestoreScroll = false
-                        }
-                    }
-                }
-            }
         }
     }
 }

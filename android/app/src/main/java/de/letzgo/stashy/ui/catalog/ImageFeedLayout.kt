@@ -455,9 +455,10 @@ private fun FeedHeader(image: StashImage, currentGalleryId: String?, onAddPerfor
         horizontalArrangement = Arrangement.spacedBy(10.dp),
     ) {
         Row(horizontalArrangement = Arrangement.spacedBy((-10).dp)) {
-            // Avatar → gallery in the 1/row feed (not performer detail), like iOS.
+            // Avatar → performer, like every Feeds mode (the name filters). Only an image without
+            // performers leads to its gallery. iOS the same.
             if (performers.isEmpty()) Avatar(null, null, onClick = openGallery)
-            else performers.forEach { pf -> Avatar(pf, performerImageURL(pf.id), onClick = openGallery ?: { openPerformer(pf) }) }
+            else performers.forEach { pf -> Avatar(pf, performerImageURL(pf.id), onClick = { openPerformer(pf) }) }
         }
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(1.dp)) {
             // "+" right after the names (after the title without performers), like the Feeds overlay.
