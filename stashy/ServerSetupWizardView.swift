@@ -90,6 +90,7 @@ struct ServerSetupWizardView: View {
                         if ServerConfigManager.shared.activeConfig != nil { dismiss() }
                     }
                     .buttonStyle(.borderless)
+                    .tint(appearanceManager.tintColor)
                     .padding(.bottom, 8)
 
                     Button {
@@ -100,6 +101,7 @@ struct ServerSetupWizardView: View {
                     }
                     .disabled(waitsForICloud)
                     .buttonStyle(.borderless)
+                    .tint(appearanceManager.tintColor)
                     .padding(.bottom, 8)
                     .onReceive(ServerConfigManager.shared.$activeConfig) { active in
                         if waitsForICloud, active != nil { dismiss() }

@@ -1512,6 +1512,7 @@ struct AppLanguagePicker: View {
         } label: {
             Label(tr("language"), systemImage: "globe")
         }
+        .tint(AppearanceManager.shared.tintColor)
         .alert(tr("confirm_change_language"), isPresented: Binding(
             get: { pending != nil },
             set: { if !$0 { pending = nil } }
