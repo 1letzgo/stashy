@@ -16,6 +16,8 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.ui.semantics.Role
+import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.height
@@ -602,7 +604,11 @@ fun <T> NativeOptionsMenu(expanded: Boolean, onDismiss: () -> Unit, options: Lis
     }
 }
 
-/** Material single-choice dialog (radio list) for long option lists, e.g. languages. Picking closes it. */
+/**
+ * Material 3 single-choice dialog for long option lists, e.g. languages: 56 dp rows that are
+ * tappable over their full width (radio role), radio + 16 dp + label, dividers above and below the
+ * scrolling list. Picking closes it.
+ */
 @Composable
 fun <T> NativeSelectionDialog(title: String?, options: List<T>, selected: T?, label: (T) -> String, onDismiss: () -> Unit, onSelect: (T) -> Unit) {
     val p = Theme.palette
@@ -612,18 +618,29 @@ fun <T> NativeSelectionDialog(title: String?, options: List<T>, selected: T?, la
         containerColor = p.secondaryBackground, titleContentColor = p.text, textContentColor = p.text,
         title = title?.let { { Text(it, style = NativeType.headlineSmall) } },
         text = {
-            LazyColumn(Modifier.heightIn(max = 440.dp), state = listState) {
-                items(options.size) { i ->
-                    val o = options[i]
-                    Row(
-                        Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).clickable { onSelect(o); onDismiss() },
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        NativeRadio(o == selected)
-                        Spacer(Modifier.width(8.dp))
-                        Text(label(o), style = NativeType.bodyLarge, color = p.text, maxLines = 2, overflow = TextOverflow.Ellipsis)
+            Column {
+                HorizontalDivider(color = p.separator)
+                LazyColumn(Modifier.heightIn(max = 480.dp), state = listState) {
+                    items(options.size) { i ->
+                        val o = options[i]
+                        val isSelected = o == selected
+                        Row(
+                            Modifier.fillMaxWidth().heightIn(min = 56.dp)
+                                .selectable(isSelected, role = Role.RadioButton) { onSelect(o); onDismiss() }
+                                .padding(vertical = 4.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            // The row carries the click and the radio role; the button only shows the state.
+                            RadioButton(
+                                isSelected, null,
+                                colors = RadioButtonDefaults.colors(selectedColor = nativeAccent(), unselectedColor = p.secondaryText),
+                            )
+                            Spacer(Modifier.width(16.dp))
+                            Text(label(o), style = NativeType.bodyLarge, color = p.text, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                        }
                     }
                 }
+                HorizontalDivider(color = p.separator)
             }
         },
         confirmButton = {},
