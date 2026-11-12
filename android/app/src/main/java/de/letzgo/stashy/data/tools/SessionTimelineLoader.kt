@@ -228,7 +228,7 @@ object SessionTimelineLoader {
                 lastError = e
             }
         }
-        throw lastError ?: GraphQLError.Query("Query failed")
+        throw lastError ?: GraphQLError.Query(tr(R.string.error_query_failed))
     }
 
     private suspend fun fetchScenes(start: Instant, variant: QueryVariant): List<TimelineSceneRowData> {

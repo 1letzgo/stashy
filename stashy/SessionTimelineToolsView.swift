@@ -295,15 +295,15 @@ private struct TimelineSessionBlock: View {
 
     static func watchedLabel(_ seconds: TimeInterval) -> String {
         let minutes = max(1, Int((seconds / 60.0).rounded()))
-        if minutes < 60 { return "\(minutes)m watched" }
-        return "\(minutes / 60)h \(minutes % 60)m watched"
+        if minutes < 60 { return tr("arg_m_watched", minutes) }
+        return tr("arg_h_m_watched", minutes / 60, minutes % 60)
     }
 
     static func watchedLine(for visit: TimelineVisit) -> String? {
         guard visit.isPlayback else { return nil }
         let watched = watchedLabel(visit.watchedSeconds)
         guard let start = visit.sceneStartSeconds, start >= 5 else { return watched }
-        return "started at \(clock(start))  ·  \(watched)"
+        return tr("arg_started_at_arg_arg", clock(start), watched)
     }
 }
 

@@ -430,7 +430,7 @@ class ServerFormScreen(private val serverId: String?) : Screen {
                             null, tint = when (testResult) { true -> Color(0xFF30D158); false -> Color(0xFFFF453A); null -> Theme.palette.secondaryText },
                             modifier = Modifier.size(22.dp),
                         )
-                        Text(if (testing) "Testing..." else tr(R.string.action_test_connection), style = NativeType.bodyLarge, color = Theme.palette.text, modifier = Modifier.weight(1f))
+                        Text(if (testing) tr(R.string.loading_testing) else tr(R.string.action_test_connection), style = NativeType.bodyLarge, color = Theme.palette.text, modifier = Modifier.weight(1f))
                         if (testResult == true) Text(testMessage, style = NativeType.bodySmall, color = Color(0xFF30D158))
                     }
                     if (testResult == false && testMessage.isNotEmpty()) {

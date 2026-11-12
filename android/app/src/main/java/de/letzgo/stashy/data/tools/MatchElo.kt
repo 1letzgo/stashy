@@ -553,12 +553,12 @@ object MatchElo {
             tits ?: pl?.let(::cm) ?: dash
         }
         return listOf(
-            "RATING" to rating,
-            "GENDER" to genderVal,
-            "SCENES" to scenesVal,
-            "IMAGES" to imagesVal,
-            "COUNTRY" to countryVal,
-            "TITS" to titsVal,
+            tr(R.string.rating).uppercase() to rating,
+            tr(R.string.gender).uppercase() to genderVal,
+            tr(R.string.scenes).uppercase() to scenesVal,
+            tr(R.string.images).uppercase() to imagesVal,
+            tr(R.string.country).uppercase() to countryVal,
+            tr(R.string.tits).uppercase() to titsVal,
         )
     }
 

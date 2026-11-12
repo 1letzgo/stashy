@@ -440,7 +440,7 @@ struct SettingsView: View {
                                 .stashyGroupedSettingsRow()
                             } else {
                                 VStack(alignment: .leading, spacing: 8) {
-                                    Text(storeManager.lastProductError ?? "stashy+ products unavailable.")
+                                    Text(storeManager.lastProductError ?? tr("error_stashy_plus_products_unavailable"))
                                         .font(.caption)
                                         .foregroundColor(.secondary)
                                     Button(tr("action_retry")) {
@@ -687,11 +687,11 @@ struct SettingsView: View {
             if let exp = stashyPlus.subscriptionExpiration {
                 let formatted = exp.formatted(date: .abbreviated, time: .omitted)
                 if stashyPlus.isInTrial {
-                    return "\(name) · free trial until \(formatted)"
+                    return tr("arg_arg_free_trial_until", name, formatted)
                 }
-                return "\(name) · renews or expires \(formatted)"
+                return tr("arg_arg_renews_or_expires", name, formatted)
             }
-            return "\(name) plan"
+            return tr("arg_plan", name)
         }
         return stashyPlus.source.statusDetail
     }
@@ -1479,7 +1479,7 @@ struct LegacySupporterTipPrompt: ViewModifier {
 
     private func tip(_ product: StashyStoreProduct) async {
         if let error = await store.purchase(product) {
-            guard error != "Purchase cancelled" else { return }
+            guard error != tr("purchase_cancelled") else { return }
             ToastManager.shared.show(error, icon: "exclamationmark.triangle", style: .error)
         } else {
             ToastManager.shared.show(tr("thank_you_for_tip"), icon: "heart.fill", style: .success)

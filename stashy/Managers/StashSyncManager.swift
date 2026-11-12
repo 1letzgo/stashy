@@ -5,7 +5,7 @@ import SwiftUI
 
 /// User-facing copy for video-reactive device sync (internal type remains StashSync).
 enum AIMotionCopy {
-    static let name = "AI Motion"
+    static var name: String { tr("ai_motion") }
     static var requiresPlus: String { tr("ai_motion_requires_stashy_plus") }
     static var plusLockedToast: String { tr("hint_ai_motion_is_part_of") }
     static var disclaimer: String { tr("hint_ai_motion_uses_real_time") }

@@ -885,17 +885,17 @@ struct StudioDetailView: View {
         
         // Add Scenes and Galleries as the first row (matching PerformerDetailView)
         let counts = studioCounts.display(for: s, includeSubStudios: includeSubStudios)
-        list.append((label: "SCENES", value: "\(includeSubStudios ? counts.scenes : effectiveScenesCount)"))
+        list.append((label: tr("scenes").uppercased(), value: "\(includeSubStudios ? counts.scenes : effectiveScenesCount)"))
         
         let galleries = includeSubStudios ? (counts.galleries ?? 0) : effectiveGalleriesCount
         if galleries > 0 {
-            list.append((label: "GALLERIES", value: "\(galleries)"))
+            list.append((label: tr("galleries").uppercased(), value: "\(galleries)"))
         } else {
              // Optional: Add placeholder if needed for grid alignment, but usually fine to omit
         }
         
         if let count = counts.performers, count > 0 {
-            list.append((label: "PERFORMERS", value: "\(count)"))
+            list.append((label: tr("performers").uppercased(), value: "\(count)"))
         }
 
         if let oCount = counts.oCount, oCount > 0 {
@@ -903,7 +903,7 @@ struct StudioDetailView: View {
         }
 
         if let rating = s.rating100 {
-            list.append((label: "RATING", value: "\(rating)%"))
+            list.append((label: tr("rating").uppercased(), value: "\(rating)%"))
         }
 
         // URL renders as its own tappable row under the hero (footer).

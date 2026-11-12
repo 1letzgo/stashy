@@ -61,13 +61,13 @@ data class ImageSelection(val isActive: Boolean = false, val selectedIds: Set<St
 data class ImageDeleteOutcome(val requested: Int, val failedIds: Set<String>) {
     val deleted: Int get() = requested - failedIds.size
     val message: String
-        get() = if (failedIds.isEmpty()) "$deleted image${if (deleted == 1) "" else "s"} deleted"
-        else "$deleted of $requested deleted — ${failedIds.size} failed"
+        get() = if (failedIds.isEmpty()) tr(if (deleted == 1) R.string.arg_image_deleted else R.string.arg_images_deleted, deleted)
+        else tr(R.string.arg_deleted_of_failed, deleted, requested, failedIds.size)
 
     companion object {
         /** iOS alert title — literally "Delete N images?". */
         fun confirmTitle(count: Int) = tr(R.string.confirm_delete_arg_images, count)
-        val CONFIRM_MESSAGE = tr(R.string.hint_these_images_will_be_permanently)
+        val CONFIRM_MESSAGE: String get() = tr(R.string.hint_these_images_will_be_permanently)
     }
 }
 

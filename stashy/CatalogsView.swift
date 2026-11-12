@@ -684,7 +684,7 @@ private struct GroupsViewContent: View {
 
     private var catalogChromeConfig: CatalogChromeConfig {
         CatalogChromeConfig(
-            title: "Groups",
+            title: tr("groups"),
             ownsNavigationBar: !hideTitle,
             visibility: CatalogFloatingChromeState(
                 hasActiveServerConfig: configManager.activeConfig != nil,
@@ -1992,18 +1992,18 @@ struct GroupDetailView: View {
 
     private func getGroupDetails() -> [(label: String, value: String)] {
         var list: [(label: String, value: String)] = []
-        list.append((label: "SCENES", value: "\(viewModel.totalGroupScenes)"))
+        list.append((label: tr("scenes").uppercased(), value: "\(viewModel.totalGroupScenes)"))
         if effectiveGalleries > 0 {
-            list.append((label: "GALLERIES", value: "\(effectiveGalleries)"))
+            list.append((label: tr("galleries").uppercased(), value: "\(effectiveGalleries)"))
         }
         if let studio = selectedGroup.studio {
-            list.append((label: "STUDIO", value: studio.name))
+            list.append((label: tr("studio").uppercased(), value: studio.name))
         }
         if let date = selectedGroup.date {
-            list.append((label: "DATE", value: date))
+            list.append((label: tr("date").uppercased(), value: date))
         }
         if let rating = selectedGroup.rating100 {
-            list.append((label: "RATING", value: "\(rating)%"))
+            list.append((label: tr("rating").uppercased(), value: "\(rating)%"))
         }
         return list
     }
@@ -2145,7 +2145,7 @@ struct EditGroupSheet: View {
                 .listRowBackground(Color.secondaryAppBackground)
 
                 Section(tr("studio_and_tags")) {
-                    pickerRow(title: tr("studio"), value: studio?.name ?? "None") { picker = .studio }
+                    pickerRow(title: tr("studio"), value: studio?.name ?? tr("none")) { picker = .studio }
                     pickerRow(
                         title: tr("tags"),
                         value: tags.isEmpty ? "None" : tags.map(\.name).joined(separator: ", ")
@@ -2513,7 +2513,7 @@ private struct GroupEntityPickerSheet: View {
 
                 if kind == .studio {
                     Section {
-                        row(name: "None", selected: studio == nil) { studio = nil; dismiss() }
+                        row(name: tr("none"), selected: studio == nil) { studio = nil; dismiss() }
                     }
                     .listRowBackground(Color.secondaryAppBackground)
                 } else if !tags.isEmpty {

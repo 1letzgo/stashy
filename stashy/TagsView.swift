@@ -1602,31 +1602,31 @@ struct TagDetailView: View {
     private func getTagDetails(_ t: Tag) -> [(label: String, value: String)] {
         var list: [(label: String, value: String)] = []
         
-        list.append((label: "SCENES", value: "\(effectiveScenes)"))
+        list.append((label: tr("scenes").uppercased(), value: "\(effectiveScenes)"))
         if effectiveGalleries > 0 {
-            list.append((label: "GALLERIES", value: "\(effectiveGalleries)"))
+            list.append((label: tr("galleries").uppercased(), value: "\(effectiveGalleries)"))
         }
         
         if let val = t.performerCount, val > 0 {
-            list.append((label: "PERFORMERS", value: "\(val)"))
+            list.append((label: tr("performers").uppercased(), value: "\(val)"))
         }
         
         if let val = t.sceneMarkerCount, val > 0 {
-            list.append((label: "MARKERS", value: "\(val)"))
+            list.append((label: tr("markers").uppercased(), value: "\(val)"))
         }
 
         if let aliases = t.aliases, !aliases.isEmpty {
-            list.append((label: "ALIASES", value: aliases.joined(separator: ", ")))
+            list.append((label: tr("aliases").uppercased(), value: aliases.joined(separator: ", ")))
         }
         
         if let created = t.createdAt, !created.isEmpty {
             let date = created.prefix(10)
-            list.append((label: "CREATED", value: String(date)))
+            list.append((label: tr("created").uppercased(), value: String(date)))
         }
         
         if let updated = t.updatedAt, !updated.isEmpty {
             let date = updated.prefix(10)
-            list.append((label: "UPDATED", value: String(date)))
+            list.append((label: tr("updated").uppercased(), value: String(date)))
         }
         
         return list

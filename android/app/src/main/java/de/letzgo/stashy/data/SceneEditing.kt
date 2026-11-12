@@ -164,7 +164,7 @@ object SceneEditing {
         val fields = mutableMapOf<String, Any?>("scene_id" to sceneId, "title" to title, "seconds" to seconds, "primary_tag_id" to primaryTagId)
         if (endSeconds != null) fields["end_seconds"] = endSeconds
         val data = GraphQL.data(SceneQueries.sceneMarkerCreate, vars("input" to fields))
-        return GraphQL.decode(SceneMarker.serializer(), data["sceneMarkerCreate"] ?: throw GraphQLError.Query("Marker not created"))
+        return GraphQL.decode(SceneMarker.serializer(), data["sceneMarkerCreate"] ?: throw GraphQLError.Query(tr(R.string.error_marker_not_created)))
     }
 
     suspend fun updateMarker(markerId: String, title: String?, seconds: Double?, endSeconds: Double?, primaryTagId: String?) {
@@ -249,7 +249,7 @@ object SceneEditing {
     suspend fun identify(sceneIds: List<String>): Pair<String, String?> {
         val config = GraphQL.named("configuration")["configuration"].obj
         val boxes = config?.get("general").obj?.get("stashBoxes").arr.orEmpty().mapNotNull { it.obj }
-        if (boxes.isEmpty()) throw GraphQLError.Query("No Stash-Box endpoints configured on this server.")
+        if (boxes.isEmpty()) throw GraphQLError.Query(tr(R.string.empty_stash_box_endpoints_configured_on))
         val identifyDefaults = config?.get("defaults").obj?.get("identify").obj
         val defaultSources = identifyDefaults?.get("sources").arr.orEmpty().mapNotNull { it.obj }
         val sources: List<Map<String, Any?>> = if (defaultSources.isNotEmpty()) {

@@ -442,7 +442,7 @@ internal fun HeaderLink(url: String) {
 internal fun HeaderLinks(urls: List<String>) {
     val handler = LocalUriHandler.current
     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-        Text("LINKS", fontSize = 11.sp, color = Theme.palette.secondaryText)
+        Text(tr(R.string.links).uppercase(), fontSize = 11.sp, color = Theme.palette.secondaryText)
         urls.forEach { link ->
             val target = if (link.contains("://")) link else "https://$link"
             val label = link.substringAfter("://").removePrefix("www.").trimEnd('/')

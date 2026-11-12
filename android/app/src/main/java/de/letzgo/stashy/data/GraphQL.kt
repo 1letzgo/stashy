@@ -33,7 +33,7 @@ import kotlin.coroutines.resumeWithException
 sealed class GraphQLError(message: String) : Exception(message) {
     object NoServerConfig : GraphQLError(tr(R.string.hint_server_configuration_is_missing_or))
     object Unauthorized : GraphQLError(tr(R.string.hint_api_key_is_invalid_or))
-    class Server(code: Int, body: String?) : GraphQLError(tr(R.string.server_error_arg_arg, code, body?.take(200) ?: "Unknown"))
+    class Server(code: Int, body: String?) : GraphQLError(tr(R.string.server_error_arg_arg, code, body?.take(200) ?: tr(R.string.unknown)))
     class Query(message: String) : GraphQLError(tr(R.string.graphql_error_arg, message))
     class Decoding(cause: Throwable) : GraphQLError(tr(R.string.error_decode_response_arg, cause.message))
     class Network(cause: Throwable) : GraphQLError(networkMessage(cause))
@@ -89,7 +89,7 @@ object GraphQL {
                 return perform(query, variables)
             } catch (e: DatabaseLocked) {
                 attempt++
-                if (attempt >= MAX_DATABASE_RETRIES) throw GraphQLError.Query("Database is locked")
+                if (attempt >= MAX_DATABASE_RETRIES) throw GraphQLError.Query(tr(R.string.error_database_is_locked))
                 delay(attempt * 500L)
             }
         }
@@ -141,8 +141,8 @@ object GraphQL {
             }
             val data = root?.get("data") as? JsonObject
             if (data == null) {
-                if (errors.any { it.contains("Cannot query field") }) throw GraphQLError.Query("GraphQL schema not compatible")
-                throw GraphQLError.Query(errors.firstOrNull() ?: "Query failed")
+                if (errors.any { it.contains("Cannot query field") }) throw GraphQLError.Query(tr(R.string.error_graphql_schema_not_compatible))
+                throw GraphQLError.Query(errors.firstOrNull() ?: tr(R.string.error_query_failed))
             }
             data
         }

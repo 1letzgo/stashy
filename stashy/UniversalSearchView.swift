@@ -150,7 +150,7 @@ struct UniversalSearchView: View {
         ScrollView {
             LazyVStack(alignment: .leading, spacing: 24) {
                 if isSearching {
-                    StandardLoadingView(message: "Searching...", fillsScreen: false)
+                    StandardLoadingView(message: tr("loading_searching"), fillsScreen: false)
                 } else {
                     ForEach(orderedSections, id: \.self) { section in
                         sectionView(for: section)

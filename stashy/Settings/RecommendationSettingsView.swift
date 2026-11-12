@@ -170,7 +170,7 @@ struct RecommendationSettingsView: View {
         let list = engine.adjustments
         guard !list.isEmpty else { return tr("none") }
         let hidden = list.filter(\.isHidden).count
-        return hidden > 0 ? "\(list.count) · \(hidden) hidden" : "\(list.count)"
+        return hidden > 0 ? tr("arg_arg_hidden", list.count, hidden) : "\(list.count)"
     }
 
     private var resetSection: some View {
@@ -224,7 +224,7 @@ struct RecommendationSettingsView: View {
         case .noHistory: return tr("empty_plays_yet")
         case .failed(let message): return message
         case .ready:
-            let picks = "\(engine.homeItems.count) scenes from \(engine.seedCount) watched"
+            let picks = tr("arg_scenes_from_arg_watched", engine.homeItems.count, engine.seedCount)
             if let date = engine.builtAt {
                 return "\(picks) · \(date.formatted(date: .omitted, time: .shortened))"
             }

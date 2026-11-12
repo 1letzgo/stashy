@@ -113,7 +113,7 @@ struct HomeRecommendationsRowView: View {
                 .truncationMode(.tail)
             if item.isUnwatched {
                 Spacer(minLength: 2)
-                Text("NEW")
+                Text(tr("badge_new").uppercased())
                     .font(.system(size: 9, weight: .heavy))
                     .padding(.horizontal, 5)
                     .padding(.vertical, 2)

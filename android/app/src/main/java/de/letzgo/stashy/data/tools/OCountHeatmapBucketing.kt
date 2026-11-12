@@ -46,7 +46,7 @@ data class OCountHeatmapItem(
     val displayTitle: String get() {
         if (title != "Untitled") return title
         val names = performers.mapNotNull { it.name }.filter { it.isNotEmpty() }
-        return if (names.isEmpty()) title else names.joinToString(", ")
+        return if (names.isEmpty()) tr(R.string.untitled) else names.joinToString(", ")
     }
 
     val performerNamesLine: String get() = performers.mapNotNull { it.name }.filter { it.isNotEmpty() }.joinToString(", ")
@@ -191,9 +191,9 @@ data class OCountMonthHeatmap(
                 }
                 val pretty = prettyFormatter.format(s.date)
                 val a11y = when {
-                    !s.inMonth -> "$pretty, outside month"
+                    !s.inMonth -> tr(R.string.arg_outside_month, pretty)
                     s.count > 0 -> tr(R.string.arg_arg_o_count, pretty, s.count)
-                    else -> "$pretty, no O Count"
+                    else -> tr(R.string.arg_no_o_count, pretty)
                 }
                 Cell(s.key, s.col, s.row, s.date.dayOfMonth, s.inMonth, s.count,
                     OCountHeatmapBucketing.colorLevel(if (s.inMonth) s.count else 0, maxValue), a11y)

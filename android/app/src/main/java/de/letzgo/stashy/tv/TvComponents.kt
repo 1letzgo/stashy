@@ -471,12 +471,12 @@ fun TvSpinner(size: Dp = pt(40), color: Color = Color.White) {
 }
 
 @Composable
-fun TvEmpty(icon: ImageVector, title: String, modifier: Modifier = Modifier, buttonLabel: String = "Retry", focus: FocusRequester? = null, onRetry: (() -> Unit)?) {
+fun TvEmpty(icon: ImageVector, title: String, modifier: Modifier = Modifier, buttonLabel: String = tr(R.string.action_retry), focus: FocusRequester? = null, onRetry: (() -> Unit)?) {
     Column(modifier.fillMaxWidth().padding(vertical = pt(100)), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(pt(24))) {
         Icon(icon, null, Modifier.size(pt(80)), tint = TvColors.secondary)
         Text(title, style = TvType.title2.copy(fontWeight = FontWeight.SemiBold), color = TvColors.secondary, textAlign = TextAlign.Center)
         if (onRetry != null) TvButton(onRetry, if (focus != null) Modifier.focusRequester(focus) else Modifier) {
-            if (buttonLabel == "Retry") Icon(TvIcons.retry, null, Modifier.size(pt(32)))
+            if (buttonLabel == tr(R.string.action_retry)) Icon(TvIcons.retry, null, Modifier.size(pt(32)))
             Text(buttonLabel, style = TvType.title3)
         }
     }

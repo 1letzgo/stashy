@@ -632,7 +632,7 @@ final class ScenePlayerExtrasController: ObservableObject {
                 return
             case .needsDownload(let name, _), .downloading(let name, _):
                 ToastManager.shared.show(
-                    "\(name) speech model required",
+                    tr("arg_speech_model_required", name),
                     icon: "arrow.down.circle",
                     style: .info
                 )
@@ -799,7 +799,7 @@ struct ScenePlayerExtrasSheetsModifier: ViewModifier {
                 }
                 Button(tr("not_now"), role: .cancel) {}
             } message: {
-                let name = controller.transcriptionController?.downloadingModelLanguage ?? "this language"
+                let name = controller.transcriptionController?.downloadingModelLanguage ?? tr("this_language")
                 Text(
                     tr("hint_live_captions_need_on_device", name)
                     + tr("hint_download_is_managed_by_ios")

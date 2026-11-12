@@ -140,9 +140,9 @@ struct AddTagToSceneSheet: View {
         NavigationView {
             Form {
                 Section(header: Text(tr("search_tags"))) {
-                    TextField("Search...", text: $searchText)
+                    TextField(tr("placeholder_search_2"), text: $searchText)
                     if isLoading {
-                        HStack { Spacer(); ProgressView("Loading..."); Spacer() }.padding()
+                        HStack { Spacer(); ProgressView(tr("loading_ellipsis")); Spacer() }.padding()
                     } else {
                         ForEach(pinned + Array(filtered.prefix(30))) { tag in
                             HStack {

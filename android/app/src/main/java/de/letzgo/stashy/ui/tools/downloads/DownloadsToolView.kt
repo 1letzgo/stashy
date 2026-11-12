@@ -274,7 +274,7 @@ fun DownloadsToolView(topPadding: androidx.compose.ui.unit.Dp = toolsTopPadding(
     jobToDelete?.let { job ->
         StashyAlert(
             title = tr(R.string.confirm_delete_job),
-            message = "${job.filterName} stays on the server; only the job goes away.",
+            message = tr(R.string.arg_stays_on_server_only_job_goes, job.filterName),
             onDismiss = { jobToDelete = null },
             confirmLabel = tr(R.string.action_delete), destructive = true, dismissLabel = tr(R.string.action_cancel),
             onConfirm = { DownloadSyncJobStore.remove(job); jobToDelete = null },

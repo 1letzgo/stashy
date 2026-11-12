@@ -419,7 +419,7 @@ object FiltersLogic {
             "updated_at" to tr(R.string.updated),
             "o_counter" to tr(R.string.o_count),
             "containing_groups" to tr(R.string.containing_groups),
-            "sub_groups" to "Sub-Groups",
+            "sub_groups" to tr(R.string.sub_groups),
             "containing_group_count" to tr(R.string.containing_group_count),
             "sub_group_count" to tr(R.string.sub_group_count),
             "scene_count" to tr(R.string.scene_count),

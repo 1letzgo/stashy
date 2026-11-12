@@ -563,7 +563,7 @@ private fun BracketResultsCard(model: MatchViewModel) {
     ) {
         state.championId?.let { state.entrant(it) }?.let { champ ->
             Icon(SF.trophy, null, tint = tint, modifier = Modifier.size(34.dp))
-            Text("CHAMPION", style = IosTypography.caption.copy(fontWeight = FontWeight.SemiBold), color = p.secondaryText)
+            Text(tr(R.string.champion).uppercase(), style = IosTypography.caption.copy(fontWeight = FontWeight.SemiBold), color = p.secondaryText)
             Text(champ.name, style = IosTypography.title2.copy(fontWeight = FontWeight.Bold), color = p.text, textAlign = TextAlign.Center)
         }
         if (model.isLoadingBracketResults && model.bracketProposals.isEmpty()) {
@@ -765,7 +765,7 @@ private fun ProfileLinkCard(performer: Performer) {
         Modifier
             .fillMaxWidth()
             .matchCard()
-            .semantics { contentDescription = "Profile, ${performer.name}" }
+            .semantics { contentDescription = tr(R.string.arg_profile, performer.name) }
             .clickable { Nav.push(PerformerDetailScreen(performer.id, performer)) }
             .padding(12.dp),
         horizontalArrangement = Arrangement.Center,

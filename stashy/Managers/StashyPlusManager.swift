@@ -64,10 +64,10 @@ enum StashyPlusSource: String, Equatable {
     var statusTitle: String {
         switch self {
         case .none, .legacyTip: return tr("not_unlocked")
-        case .localDevelopment: return "stashy+ (Local Build)"
-        case .subscription: return "stashy+ active"
-        case .lifetime: return "stashy+ Lifetime"
-        case .legacyPaidApp: return "stashy+ Lifetime"
+        case .localDevelopment: return tr("plus_status_local_build")
+        case .subscription: return tr("plus_status_active")
+        case .lifetime: return tr("plus_status_lifetime")
+        case .legacyPaidApp: return tr("plus_status_lifetime")
         }
     }
 
@@ -93,7 +93,7 @@ final class StashyPlusManager: ObservableObject {
     static let shared = StashyPlusManager()
 
     /// Permanent unlock (lifetime IAP or paid-app grandfathering).
-    nonisolated static let lifetimeKey = "stashy_plus_lifetime"
+    nonisolated static let lifetimeKey = "plus_status_lifetime"
     /// Legacy tip-era flag — no longer grants access.
     nonisolated static let unlockedKey = "stashy_plus_unlocked"
     nonisolated static let tipsCountKey = "totalTipsCount"

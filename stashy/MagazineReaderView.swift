@@ -606,8 +606,8 @@ private struct MagazineDetailsSheet: View {
                     card {
                         Text(gallery.displayName)
                             .font(.headline)
-                        fact("Pages", "\(pageCount)")
-                        if chapterCount > 0 { fact("Chapters", "\(chapterCount)") }
+                        fact(tr("pages"), "\(pageCount)")
+                        if chapterCount > 0 { fact(tr("chapters"), "\(chapterCount)") }
                         if let studio = gallery.studio { fact(tr("studio"), studio.name) }
                         if let date = gallery.date, !date.isEmpty { fact(tr("date"), date) }
                         if let rating = gallery.rating100 {

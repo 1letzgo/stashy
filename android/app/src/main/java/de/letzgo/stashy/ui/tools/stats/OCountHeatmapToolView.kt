@@ -542,7 +542,7 @@ class OCountImageDestinationScreen(private val item: OCountHeatmapItem) : Screen
             viewer.Content()
         } else {
             Box(Modifier.fillMaxSize().background(Color.Black), contentAlignment = Alignment.Center) {
-                InsightsLoading("Loading...")
+                InsightsLoading(tr(R.string.loading_ellipsis))
             }
         }
     }

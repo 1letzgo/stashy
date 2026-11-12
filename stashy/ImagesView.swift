@@ -824,17 +824,17 @@ private struct ImagesViewBody: View {
         var list: [(label: String, value: String)] = []
         let imageCount = max(viewModel.totalGalleryImages, gallery.imageCount ?? 0)
         if imageCount > 0 {
-            list.append((label: "IMAGES", value: "\(imageCount)"))
+            list.append((label: tr("images").uppercased(), value: "\(imageCount)"))
         }
         if let date = gallery.date, !date.isEmpty {
-            list.append((label: "DATE", value: date))
+            list.append((label: tr("date").uppercased(), value: date))
         }
         if let rating = gallery.rating100 {
-            list.append((label: "RATING", value: "\(rating)%"))
+            list.append((label: tr("rating").uppercased(), value: "\(rating)%"))
         }
         // Studio and performers live in their own cards below the header.
         if gallery.organized == true {
-            list.append((label: "ORGANIZED", value: "Yes"))
+            list.append((label: tr("organized").uppercased(), value: tr("yes")))
         }
         return list
     }
@@ -1210,11 +1210,11 @@ private struct ImagesViewBody: View {
             if failedIds.isEmpty {
                 selectedImageIds.removeAll()
                 withAnimation(DesignTokens.Animation.quick) { isSelectionMode = false }
-                ToastManager.shared.show("\(count) image\(count == 1 ? "" : "s") deleted", icon: "trash", style: .success)
+                ToastManager.shared.show(count == 1 ? tr("arg_image_deleted", count) : tr("arg_images_deleted", count), icon: "trash", style: .success)
             } else {
                 // Keep the failed ones selected so the user can retry.
                 selectedImageIds = failedIds
-                ToastManager.shared.show("\(count) of \(idsToDelete.count) deleted — \(failedIds.count) failed", icon: "exclamationmark.triangle.fill", style: .error)
+                ToastManager.shared.show(tr("arg_deleted_of_failed", count, idsToDelete.count, failedIds.count), icon: "exclamationmark.triangle.fill", style: .error)
             }
 
             imageListFilters.refetchImages(viewModel: viewModel, initial: true)

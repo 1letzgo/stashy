@@ -717,7 +717,7 @@ final class OCountHeatmapLoader: ObservableObject {
         async let images = fetchOptionally { try await fetchImageCountsByDay() }
         let (sceneBuckets, imageBuckets) = await (scenes, images)
         if sceneBuckets == nil, imageBuckets == nil {
-            throw GraphQLNetworkError.graphQLError(message: "O Count query failed")
+            throw GraphQLNetworkError.graphQLError(message: tr("error_o_count_query_failed"))
         }
         var merged = sceneBuckets ?? OCountDayBuckets()
         if let imageBuckets {
@@ -789,7 +789,7 @@ final class OCountHeatmapLoader: ObservableObject {
                     return try await fetchCountsByDayWithoutHistory()
                 }
                 if response.data?.findScenes?.scenes == nil {
-                    throw GraphQLNetworkError.graphQLError(message: message.isEmpty ? "Query failed" : message)
+                    throw GraphQLNetworkError.graphQLError(message: message.isEmpty ? tr("error_query_failed") : message)
                 }
             }
             let scenes = response.data?.findScenes?.scenes ?? []
@@ -951,7 +951,7 @@ final class OCountHeatmapLoader: ObservableObject {
             )
             if let errors = response.errors, !errors.isEmpty {
                 let message = errors.compactMap(\.message).joined(separator: "; ")
-                throw GraphQLNetworkError.graphQLError(message: message.isEmpty ? "Query failed" : message)
+                throw GraphQLNetworkError.graphQLError(message: message.isEmpty ? tr("error_query_failed") : message)
             }
             let images = response.data?.findImages?.images ?? []
             total = response.data?.findImages?.count ?? images.count
@@ -1391,11 +1391,11 @@ struct OCountMonthHeatmap {
             let pretty = prettyFormatter.string(from: item.date)
             let a11y: String
             if !item.inMonth {
-                a11y = "\(pretty), outside month"
+                a11y = tr("arg_outside_month", pretty)
             } else if item.count > 0 {
                 a11y = tr("arg_arg_o_count", pretty, item.count)
             } else {
-                a11y = "\(pretty), no O Count"
+                a11y = tr("arg_no_o_count", pretty)
             }
             cells.append(
                 Cell(

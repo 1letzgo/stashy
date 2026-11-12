@@ -45,12 +45,12 @@ object MatchRepository {
     """
 
     /** iOS: `HotOrNotPoolSettingsView.genderRows`. */
-    val genderRows: List<Pair<String, String>> = listOf(
+    val genderRows: List<Pair<String, String>> get() = listOf(
         "FEMALE" to tr(R.string.female),
         "MALE" to tr(R.string.male),
         "TRANSGENDER_FEMALE" to tr(R.string.transgender_female),
         "TRANSGENDER_MALE" to tr(R.string.transgender_male),
-        "NON_BINARY" to "Non-Binary",
+        "NON_BINARY" to tr(R.string.non_binary),
         "INTERSEX" to tr(R.string.intersex),
     )
 

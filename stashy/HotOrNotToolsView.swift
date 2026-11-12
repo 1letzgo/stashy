@@ -528,12 +528,12 @@ func hotOrNotBattleFixedInfoRows(_ p: HotOrNotPerformerData) -> [(label: String,
         return dash
     }()
     return [
-        ("RATING", rating),
-        ("GENDER", genderVal),
-        ("SCENES", scenesVal),
-        ("IMAGES", imagesVal),
-        ("COUNTRY", countryVal),
-        ("TITS", titsVal)
+        (tr("rating"), rating),
+        (tr("gender"), genderVal),
+        (tr("scenes"), scenesVal),
+        (tr("images"), imagesVal),
+        (tr("country"), countryVal),
+        (tr("tits"), titsVal)
     ]
 }
 
@@ -602,7 +602,7 @@ private struct HotOrNotProfileLinkCard: View {
                 .cardShadow()
         }
         .buttonStyle(.plain)
-        .accessibilityLabel("Profile, \(performer.displayName)")
+        .accessibilityLabel(tr("arg_profile", performer.displayName))
     }
 }
 
@@ -853,7 +853,7 @@ private struct HotOrNotGauntletStarterPickCard: View {
     /// Same label/value typography as one cell in `HotOrNotBattleColumn`’s `detailGrid`, but only rating.
     private var ratingOnlyRow: some View {
         VStack(alignment: .leading, spacing: 0) {
-            Text("RATING")
+            Text(tr("rating"))
                 .font(.system(size: 11))
                 .foregroundColor(.secondary)
                 .textCase(.uppercase)
@@ -2764,7 +2764,7 @@ private struct HotOrNotPoolSettingsView: View {
         ("MALE", tr("male")),
         ("TRANSGENDER_FEMALE", tr("transgender_female")),
         ("TRANSGENDER_MALE", tr("transgender_male")),
-        ("NON_BINARY", "Non-Binary"),
+        ("NON_BINARY", tr("non_binary")),
         ("INTERSEX", tr("intersex"))
     ]
     }

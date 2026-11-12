@@ -337,7 +337,7 @@ private fun <T : MergeableItem> MergeToolsContent(config: MergeToolsConfig<T>, n
                 sources = emptySet()
                 setItems(allItems.filterNot { it.id in sourceIds })
                 config.didMerge()
-                showToast("$mergedCount ${nounFor(mergedCount)} merged into ${dest.name}")
+                showToast(tr(R.string.arg_arg_merged_into_arg, mergedCount, nounFor(mergedCount), dest.name))
                 load()
             } catch (e: CancellationException) {
                 throw e
@@ -376,7 +376,7 @@ private fun <T : MergeableItem> MergeToolsContent(config: MergeToolsConfig<T>, n
             isMerging = false
             if (mergedTotal > 0) config.didMerge()
             if (failed.isEmpty()) {
-                showToast("$mergedTotal ${nounFor(mergedTotal)} merged from ${jobs.size} templates")
+                showToast(tr(R.string.arg_arg_merged_from_arg_templates, mergedTotal, nounFor(mergedTotal), jobs.size))
             } else {
                 val more = if (failed.size > 3) " +${failed.size - 3}" else ""
                 showToast("$mergedTotal merged, failed: ${failed.take(3).joinToString(", ")}$more", long = true)
@@ -474,7 +474,7 @@ private fun <T : MergeableItem> MergeToolsContent(config: MergeToolsConfig<T>, n
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         SmallSpinner()
-                        Text("Loading...", style = IosTypography.subheadline, color = p.secondaryText)
+                        Text(tr(R.string.loading_ellipsis), style = IosTypography.subheadline, color = p.secondaryText)
                     }
                 }
                 filtered.isEmpty() -> item(key = "empty") {
@@ -531,7 +531,7 @@ private fun <T : MergeableItem> MergeToolsContent(config: MergeToolsConfig<T>, n
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     if (isMerging) SmallSpinner(Color.White)
-                    Text(if (isMerging) "Merging..." else tr(R.string.action_merge_arg, nounTitle), style = IosTypography.body.copy(fontWeight = FontWeight.SemiBold), color = Color.White)
+                    Text(if (isMerging) tr(R.string.loading_merging) else tr(R.string.action_merge_arg, nounTitle), style = IosTypography.body.copy(fontWeight = FontWeight.SemiBold), color = Color.White)
                 }
                 MergeSecondaryButton(tr(R.string.action_save), canSavePreset) {
                     val active = activePreset
@@ -580,7 +580,7 @@ private fun <T : MergeableItem> MergeToolsContent(config: MergeToolsConfig<T>, n
         val skipped = presets.presets.size - runnable.size
         var text = tr(R.string.hint_arg_of_arg_templates_have, runnable.size, presets.presets.size) +
             tr(R.string.hint_arg_arg_will_be_merged, sourceCount, nounFor(sourceCount))
-        if (skipped > 0) text += tr(R.string.hint_arg_arg_nothing_to_do, skipped, if (skipped == 1) "template has" else "templates have")
+        if (skipped > 0) text += tr(R.string.hint_arg_arg_nothing_to_do, skipped, if (skipped == 1) tr(R.string.template_has) else tr(R.string.templates_have))
         text += tr(R.string.this_cannot_be_undone)
         StashyAlert(
             title = tr(R.string.confirm_run_all_templates), message = text,
@@ -745,7 +745,7 @@ private fun <T : MergeableItem> MergeDestinationSheet(
             de.letzgo.stashy.ui.NativeSheetTopBar(tr(R.string.action_merge_into), onClose = onCancel, closeDescription = tr(R.string.action_cancel))
             LazyColumn(Modifier.weight(1f).fillMaxWidth(), contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp)) {
                 item(key = "search") {
-                    NativeSearchField(searchText, { searchText = it }, "Search...", Modifier.padding(bottom = 12.dp))
+                    NativeSearchField(searchText, { searchText = it }, tr(R.string.placeholder_search_2), Modifier.padding(bottom = 12.dp))
                 }
                 item(key = "header") { NativeSectionHeader(sectionTitle) }
                 val more = visibleCount < filtered.size

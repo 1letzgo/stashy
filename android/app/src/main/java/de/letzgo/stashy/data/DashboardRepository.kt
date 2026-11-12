@@ -39,7 +39,7 @@ object DashboardRepository {
     private val seed = (1..1_000_000).random()
 
     suspend fun statistics(): StashStatistics {
-        val stats = GraphQL.decode(StashStatistics.serializer(), GraphQL.data(STATS_QUERY)["stats"] ?: throw GraphQLError.Query("Statistics could not be loaded"))
+        val stats = GraphQL.decode(StashStatistics.serializer(), GraphQL.data(STATS_QUERY)["stats"] ?: throw GraphQLError.Query(tr(R.string.statistics_could_not_be_loaded)))
         val markers = runCatching { GraphQL.data(MARKER_COUNT_QUERY)["findSceneMarkers"].obj?.get("count").stringOrNull?.toIntOrNull() }.getOrNull()
         markers?.let { Prefs.setInt(Prefs.serverKey(CACHED_MARKER_COUNT_KEY), it) }
         return stats.copy(sceneMarkerCount = markers ?: Prefs.int(Prefs.serverKey(CACHED_MARKER_COUNT_KEY)).takeIf { it > 0 })
@@ -181,7 +181,7 @@ object ServerTasksRepository {
             val job = GraphQL.named("metadataScan", vars("input" to options))["metadataScan"].stringOrNull
             if (!job.isNullOrEmpty()) {
                 val enabled = options.values.count { it }
-                true to (tr(R.string.library_scan_started_successfully) + if (options.isEmpty()) "" else " ($enabled server options applied)")
+                true to (tr(R.string.library_scan_started_successfully) + if (options.isEmpty()) "" else " (${tr(R.string.arg_server_options_applied, enabled)})")
             } else false to tr(R.string.error_start_library_scan_please_check)
         } catch (e: Exception) {
             false to tr(R.string.error_start_library_scan_please_check)

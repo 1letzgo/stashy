@@ -234,7 +234,7 @@ QuickFilterSection.choices(
         choices: [
             .init(id: "short", label: tr("under_10_min"), activeLabel: "< 10 min",
                   value: ["modifier": "LESS_THAN", "value": 600]),
-            .init(id: "mid", label: "10–30 min", activeLabel: "10–30 min",
+            .init(id: "mid", label: tr("duration_10_30_min"), activeLabel: tr("duration_10_30_min"),
                   value: ["modifier": "BETWEEN", "value": 600, "value2": 1800]),
             .init(id: "long", label: tr("over_30_min"), activeLabel: "> 30 min",
                   value: ["modifier": "GREATER_THAN", "value": 1800]),
@@ -310,7 +310,7 @@ QuickFilterSection.choices(
         key: "gender", title: tr("gender"), anyLabel: tr("any"),
         choices: [
             ("FEMALE", tr("female")), ("MALE", tr("male")), ("TRANSGENDER_FEMALE", tr("trans_female")),
-            ("TRANSGENDER_MALE", tr("trans_male")), ("NON_BINARY", "Non-Binary"),
+            ("TRANSGENDER_MALE", tr("trans_male")), ("NON_BINARY", tr("non_binary")),
         ].map { raw, label in
             QuickFilterChoice(id: raw, label: label, activeLabel: label,
                               value: ["modifier": "INCLUDES", "value_list": [raw]])

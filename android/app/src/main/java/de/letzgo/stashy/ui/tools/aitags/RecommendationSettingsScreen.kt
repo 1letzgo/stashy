@@ -171,7 +171,7 @@ fun RecommendationSettingsView() {
                         val list = engine.adjustments
                         val hidden = list.count { it.isHidden }
                         Text(
-                            if (list.isEmpty()) tr(R.string.none) else if (hidden > 0) "${list.size} · $hidden hidden" else "${list.size}",
+                            if (list.isEmpty()) tr(R.string.none) else if (hidden > 0) tr(R.string.arg_arg_hidden, list.size, hidden) else "${list.size}",
                             style = NativeType.bodyMedium, color = p.secondaryText,
                         )
                     }
@@ -204,7 +204,7 @@ private fun statusText(): String {
         RecommendationState.NoHistory -> tr(R.string.empty_plays_yet)
         RecommendationState.Failed -> engine.failure ?: tr(R.string.error_generic_2)
         RecommendationState.Ready -> if (engine.isRefreshing) tr(R.string.looking_menu) else {
-            val picks = "${engine.recommendations.size} scenes from ${engine.seedCount} watched"
+            val picks = tr(R.string.arg_scenes_from_arg_watched, engine.recommendations.size, engine.seedCount)
             engine.builtAt?.let { "$picks · ${DateFormat.getTimeInstance(DateFormat.SHORT).format(Date(it))}" } ?: picks
         }
     }

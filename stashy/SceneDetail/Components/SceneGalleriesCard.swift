@@ -36,7 +36,7 @@ struct AddGalleryToSceneSheet: View {
         NavigationView {
             Form {
                 Section(header: Text(tr("search_galleries"))) {
-                    TextField("Search...", text: $searchText)
+                    TextField(tr("placeholder_search_2"), text: $searchText)
                         .onChange(of: searchText) { _, newValue in
                             if !newValue.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                                 loadAllGalleriesIfNeeded()
@@ -47,7 +47,7 @@ struct AddGalleryToSceneSheet: View {
 
                 if isLoading && performerGalleries.isEmpty && allGalleries.isEmpty {
                     Section {
-                        HStack { Spacer(); ProgressView("Loading..."); Spacer() }.padding()
+                        HStack { Spacer(); ProgressView(tr("loading_ellipsis")); Spacer() }.padding()
                     }
                     .listRowBackground(Color.secondaryAppBackground)
                 } else {

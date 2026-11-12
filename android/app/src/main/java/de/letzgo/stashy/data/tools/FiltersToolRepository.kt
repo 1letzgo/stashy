@@ -1,5 +1,7 @@
 package de.letzgo.stashy.data.tools
 
+import de.letzgo.stashy.R
+import de.letzgo.stashy.tr
 import de.letzgo.stashy.data.GraphQL
 import de.letzgo.stashy.data.GraphQLError
 import de.letzgo.stashy.data.vars
@@ -42,15 +44,15 @@ object FiltersToolRepository {
 
     suspend fun findSavedFilters(): List<FiltersToolEntry> {
         val data = GraphQL.data(FIND_SAVED_FILTERS)
-        val rows = data["findSavedFilters"] as? JsonArray ?: throw GraphQLError.Query("Saved filters query successful but data is missing")
+        val rows = data["findSavedFilters"] as? JsonArray ?: throw GraphQLError.Query(tr(R.string.error_saved_filters_data_missing))
         return FiltersLogic.entries(rows)
     }
 
     /** iOS: `renameSavedFilter(_:to:)`. Throws when the name is empty or the server rejects it. */
     suspend fun rename(entry: FiltersToolEntry, name: String): FiltersToolEntry {
-        val input = FiltersLogic.renameInput(entry, name) ?: throw GraphQLError.Query("Name is empty")
+        val input = FiltersLogic.renameInput(entry, name) ?: throw GraphQLError.Query(tr(R.string.name_is_empty))
         val data = GraphQL.data(SAVE_FILTER, vars("input" to input))
-        val saved = data["saveFilter"]?.let { FiltersLogic.entry(it) } ?: throw GraphQLError.Query("Save filter response missing data")
+        val saved = data["saveFilter"]?.let { FiltersLogic.entry(it) } ?: throw GraphQLError.Query(tr(R.string.action_save_filter_response_missing_data))
         return saved
     }
 
@@ -58,6 +60,6 @@ object FiltersToolRepository {
     suspend fun delete(id: String) {
         val data = GraphQL.data(DESTROY_FILTER, buildJsonObject { put("input", buildJsonObject { put("id", JsonPrimitive(id)) }) })
         val ok = (data["destroySavedFilter"] as? JsonPrimitive)?.booleanOrNull == true
-        if (!ok) throw GraphQLError.Query("Could not delete saved filter")
+        if (!ok) throw GraphQLError.Query(tr(R.string.error_delete_saved_filter))
     }
 }

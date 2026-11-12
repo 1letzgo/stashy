@@ -1,5 +1,6 @@
 package de.letzgo.stashy.data.tools
 
+import androidx.annotation.StringRes
 import de.letzgo.stashy.R
 import de.letzgo.stashy.tr
 import androidx.compose.runtime.getValue
@@ -69,11 +70,11 @@ data class MergeTag(
     override val mergeAliases: List<String> get() = aliases.orEmpty()
     override val mergeUsageSummary: String get() {
         val parts = mutableListOf<String>()
-        MergeUsage.append(parts, sceneCount, "scene")
-        MergeUsage.append(parts, imageCount, "image")
-        MergeUsage.append(parts, galleryCount, "gallery", plural = "galleries")
-        MergeUsage.append(parts, performerCount, "performer")
-        MergeUsage.append(parts, sceneMarkerCount, "marker")
+        MergeUsage.append(parts, sceneCount, R.string.arg_count_scene, R.string.arg_count_scenes)
+        MergeUsage.append(parts, imageCount, R.string.arg_count_image, R.string.arg_count_images)
+        MergeUsage.append(parts, galleryCount, R.string.arg_count_gallery, R.string.arg_count_galleries)
+        MergeUsage.append(parts, performerCount, R.string.arg_count_performer, R.string.arg_count_performers)
+        MergeUsage.append(parts, sceneMarkerCount, R.string.arg_count_marker, R.string.arg_count_markers)
         return if (parts.isEmpty()) tr(R.string.unused) else parts.joinToString(" · ")
     }
 }
@@ -94,19 +95,19 @@ data class MergeStudio(
     override val mergeAliases: List<String> get() = aliases.orEmpty()
     override val mergeUsageSummary: String get() {
         val parts = mutableListOf<String>()
-        MergeUsage.append(parts, sceneCount, "scene")
-        MergeUsage.append(parts, imageCount, "image")
-        MergeUsage.append(parts, galleryCount, "gallery", plural = "galleries")
-        MergeUsage.append(parts, performerCount, "performer")
+        MergeUsage.append(parts, sceneCount, R.string.arg_count_scene, R.string.arg_count_scenes)
+        MergeUsage.append(parts, imageCount, R.string.arg_count_image, R.string.arg_count_images)
+        MergeUsage.append(parts, galleryCount, R.string.arg_count_gallery, R.string.arg_count_galleries)
+        MergeUsage.append(parts, performerCount, R.string.arg_count_performer, R.string.arg_count_performers)
         return if (parts.isEmpty()) tr(R.string.unused) else parts.joinToString(" · ")
     }
 }
 
 /** iOS: `MergeUsage`. */
 object MergeUsage {
-    fun append(parts: MutableList<String>, value: Int?, singular: String, plural: String? = null) {
+    fun append(parts: MutableList<String>, value: Int?, @StringRes singular: Int, @StringRes plural: Int) {
         if (value == null || value <= 0) return
-        parts.add("$value ${if (value == 1) singular else (plural ?: singular + "s")}")
+        parts.add(tr(if (value == 1) singular else plural, value))
     }
 }
 

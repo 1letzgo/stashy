@@ -248,13 +248,13 @@ private fun clock(seconds: Double): String {
 }
 private fun watchedLabel(seconds: Double): String {
     val minutes = maxOf(1L, (seconds / 60.0).roundToLong())
-    return if (minutes < 60) "${minutes}m watched" else "${minutes / 60}h ${minutes % 60}m watched"
+    return if (minutes < 60) tr(R.string.arg_m_watched, minutes) else tr(R.string.arg_h_m_watched, minutes / 60, minutes % 60)
 }
 private fun watchedLine(visit: TimelineVisit): String? {
     if (!visit.isPlayback) return null
     val watched = watchedLabel(visit.watchedSeconds)
     val start = visit.sceneStartSeconds?.takeIf { it >= 5 } ?: return watched
-    return "started at ${clock(start)}  ·  $watched"
+    return tr(R.string.arg_started_at_arg, clock(start)) + "  ·  " + watched
 }
 
 /** iOS: `TimelineSessionBlock`. */

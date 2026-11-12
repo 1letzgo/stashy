@@ -26,7 +26,7 @@ enum GraphQLNetworkError: LocalizedError {
         case .unauthorized:
             return tr("hint_api_key_is_invalid_or")
         case .serverError(let code, let message):
-            return tr("server_error_arg_arg", code, message ?? "Unknown")
+            return tr("server_error_arg_arg", code, message ?? tr("unknown"))
         case .graphQLError(let message):
             return tr("graphql_error_arg", message)
         case .decodingError(let error):
@@ -390,8 +390,8 @@ actor GraphQLClient {
 
         let messages = errors.compactMap { $0["message"] as? String }
         if messages.contains(where: { $0.contains("Cannot query field") }) {
-            throw GraphQLNetworkError.graphQLError(message: "GraphQL schema not compatible")
+            throw GraphQLNetworkError.graphQLError(message: tr("error_graphql_schema_not_compatible"))
         }
-        throw GraphQLNetworkError.graphQLError(message: messages.first ?? "Query failed")
+        throw GraphQLNetworkError.graphQLError(message: messages.first ?? tr("error_query_failed"))
     }
 }

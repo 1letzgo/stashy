@@ -219,7 +219,7 @@ struct DetailBreadcrumbRow<Trailing: View>: View {
             .menuIndicator(.hidden)
             .stashyNeutralMenuItems()
             .fixedSize()
-            .accessibilityLabel("Section, \(crumb.selectedTitle)")
+            .accessibilityLabel(tr("hint_section_arg", crumb.selectedTitle))
         } else if !crumb.sections.isEmpty {
             sectionLabel(showsChevron: false)
                 .fixedSize()

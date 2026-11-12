@@ -67,7 +67,7 @@ struct ServerListSection: View {
                     pendingDelete = nil
                 }
             } message: {
-                Text(tr("hint_are_you_sure_you_want", pendingDelete?.name ?? "this server"))
+                Text(tr("hint_are_you_sure_you_want", pendingDelete?.name ?? tr("this_server")))
             }
         }
     }

@@ -152,8 +152,9 @@ fun FeedsSortMenu(state: FeedsSortMenuState) {
                 .noIndicationClick { open = true }
                 .padding(horizontal = FeedsDock.activeHorizontalPadding)
                 .semantics(mergeDescendants = true) {
-                    contentDescription = "Sort, ${active?.label ?: "custom"}" +
-                        if (state.isRandom) "" else if (state.isAscending) ", ascending" else ", descending"
+                    contentDescription = (active?.label ?: tr(R.string.custom)).let { label ->
+                        tr(if (state.isRandom) R.string.arg_sort_description else if (state.isAscending) R.string.arg_sort_description_ascending else R.string.arg_sort_description_descending, label)
+                    }
                 },
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(5.dp),

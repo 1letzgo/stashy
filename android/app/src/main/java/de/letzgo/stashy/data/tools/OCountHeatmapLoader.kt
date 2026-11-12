@@ -1,5 +1,7 @@
 package de.letzgo.stashy.data.tools
 
+import de.letzgo.stashy.R
+import de.letzgo.stashy.tr
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -359,7 +361,7 @@ object OCountHeatmapLoader {
         val images = async { fetchOptionally { fetchImageCountsByDay() } }
         val sceneBuckets = scenes.await()
         val imageBuckets = images.await()
-        if (sceneBuckets == null && imageBuckets == null) throw GraphQLError.Query("O Count query failed")
+        if (sceneBuckets == null && imageBuckets == null) throw GraphQLError.Query(tr(R.string.error_o_count_query_failed))
         val merged = sceneBuckets ?: OCountDayBuckets()
         if (imageBuckets != null) merged.merge(imageBuckets)
         merged

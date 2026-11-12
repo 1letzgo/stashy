@@ -173,7 +173,7 @@ struct ServerFormViewNew: View {
                                 Image(systemName: icon(for: localTestResult))
                                     .foregroundColor(color(for: localTestResult))
                             }
-                            Text(isTestingLocal ? "Testing..." : tr("action_test_local_address"))
+                            Text(isTestingLocal ? tr("loading_testing") : tr("action_test_local_address"))
                                 .foregroundColor(.primary)
                             Spacer()
                             if !localTestMessage.isEmpty {
@@ -277,7 +277,7 @@ struct ServerFormViewNew: View {
                                 .foregroundColor(testResultColor)
                         }
 
-                        Text(isTesting ? "Testing..." : tr("action_test_connection"))
+                        Text(isTesting ? tr("loading_testing") : tr("action_test_connection"))
                             .foregroundColor(.primary)
 
                         Spacer()

@@ -54,7 +54,7 @@ struct PasscodeEntryView: View {
                 .animation(.snappy(duration: 0.15), value: passcode.count)
                 .padding(.top, 8)
                 .accessibilityElement()
-                .accessibilityLabel("\(passcode.count) of 4 digits entered")
+                .accessibilityLabel(tr("hint_arg_of_4_digits_entered", passcode.count))
             }
             
             Spacer()

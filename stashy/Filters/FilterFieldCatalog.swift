@@ -362,7 +362,7 @@ boolOps() + [
         .init(key: "updated_at", label: tr("updated"), kind: .timestamp),
         .init(key: "o_counter", label: tr("o_count"), kind: .int),
         .init(key: "containing_groups", label: tr("containing_groups"), kind: .hierarchicalMulti),
-        .init(key: "sub_groups", label: "Sub-Groups", kind: .hierarchicalMulti),
+        .init(key: "sub_groups", label: tr("sub_groups"), kind: .hierarchicalMulti),
         .init(key: "containing_group_count", label: tr("containing_group_count"), kind: .int),
         .init(key: "sub_group_count", label: tr("sub_group_count"), kind: .int),
         .init(key: "scene_count", label: tr("scene_count"), kind: .int),
@@ -392,13 +392,13 @@ boolOps() + [
     static func valueSuggestions(key: String, mode: StashDBViewModel.FilterMode) -> [ValueSuggestion] {
         switch (mode, key) {
         case (.performers, "hair_color"):
-            return ["Blonde", "Brunette", "Brown", "Black", "Red", "Auburn", "Grey", "White", "Bald", "Various"].map { .init($0) }
+            return [("Blonde", "blonde"), ("Brunette", "brunette"), ("Brown", "brown"), ("Black", "black"), ("Red", "red"), ("Auburn", "auburn"), ("Grey", "grey"), ("White", "white"), ("Bald", "bald"), ("Various", "various")].map { .init($0.0, tr($0.1)) }
         case (.performers, "eye_color"):
-            return ["Blue", "Brown", "Green", "Grey", "Hazel", "Amber"].map { .init($0) }
+            return [("Blue", "blue"), ("Brown", "brown"), ("Green", "green"), ("Grey", "grey"), ("Hazel", "hazel"), ("Amber", "amber")].map { .init($0.0, tr($0.1)) }
         case (.performers, "ethnicity"):
-            return ["Caucasian", "Black", "Asian", "Indian", "Latin", "Middle Eastern", "Mixed", "Other"].map { .init($0) }
+            return [("Caucasian", "caucasian"), ("Black", "black"), ("Asian", "asian"), ("Indian", "indian"), ("Latin", "latin"), ("Middle Eastern", "middle_eastern"), ("Mixed", "mixed"), ("Other", "other")].map { .init($0.0, tr($0.1)) }
         case (.performers, "fake_tits"):
-            return ["Natural", "Fake"].map { .init($0) }
+            return [("Natural", "natural"), ("Fake", "fake")].map { .init($0.0, tr($0.1)) }
         case (.performers, "country"):
             return countrySuggestions
         case (.scenes, "video_codec"):
@@ -605,10 +605,10 @@ enum FilterCriterionSummary {
             return anyText
         case .nestedFilter, .raw:
             let count = (FilterCriteriaDocument.stringKeyedDict(value) ?? [:]).count
-            return count == 0 ? anyText : "\(count) criteria"
+            return count == 0 ? anyText : tr("arg_criteria", count)
         case .customFields:
             let count = (value as? [Any])?.count ?? 0
-            return count == 0 ? anyText : "\(count) field(s)"
+            return count == 0 ? anyText : tr("arg_fields", count)
         default:
             guard let dict = FilterCriteriaDocument.stringKeyedDict(value) else { return anyText }
             return dictSummary(field: field, dict: dict)
@@ -627,8 +627,8 @@ enum FilterCriterionSummary {
             let excluded = FilterMapper.idStrings(from: dict["excludes"]).count
             if included == 0 && excluded == 0 { return anyText }
             var parts: [String] = []
-            if included > 0 { parts.append("\(included) selected") }
-            if excluded > 0 { parts.append("\(excluded) excluded") }
+            if included > 0 { parts.append(tr("arg_selected_count", included)) }
+            if excluded > 0 { parts.append(tr("arg_excluded", excluded)) }
             return parts.joined(separator: ", ")
         case .gender, .circumcision:
             let list = (dict["value_list"] as? [String]) ?? (dict["value"] as? [String]) ?? []
@@ -670,8 +670,8 @@ enum FilterCriterionSummary {
             text.removeFirst(FilterCriteriaDocument.nameSearchRegexPrefix.count)
         }
         let isPlainText = text.rangeOfCharacter(from: CharacterSet(charactersIn: "\\^$.|?*+()[]{}")) == nil
-        if isPlainText { return negated ? "without “\(text)”" : "“\(text)”" }
-        return negated ? "not matching \(text)" : "matches \(text)"
+        if isPlainText { return negated ? tr("arg_without_quoted", text) : "“\(text)”" }
+        return negated ? tr("arg_not_matching", text) : tr("arg_matches", text)
     }
 
     private static func compactModifier(_ modifier: StashCriterionModifier?) -> String {
@@ -681,11 +681,11 @@ enum FilterCriterionSummary {
         case .greaterThan: return ">"
         case .lessThan: return "<"
         case .between: return ""
-        case .notBetween: return "not"
-        case .includes, .includesAll: return "contains"
-        case .excludes: return "without"
-        case .matchesRegex: return "regex"
-        case .notMatchesRegex: return "not regex"
+        case .notBetween: return tr("modifier_not")
+        case .includes, .includesAll: return tr("modifier_contains")
+        case .excludes: return tr("modifier_without")
+        case .matchesRegex: return tr("modifier_regex")
+        case .notMatchesRegex: return tr("modifier_not_regex")
         default: return ""
         }
     }

@@ -664,7 +664,7 @@ private fun RecommendationReasonLine(item: de.letzgo.stashy.data.tools.SceneReco
         )
         if (item.isUnwatched) {
             Text(
-                "NEW", style = NativeType.labelSmall, fontWeight = FontWeight.Black, color = onNativeAccent(),
+                tr(R.string.badge_new).uppercase(), style = NativeType.labelSmall, fontWeight = FontWeight.Black, color = onNativeAccent(),
                 modifier = Modifier.padding(start = 4.dp).background(nativeAccent(), RoundedCornerShape(50)).padding(horizontal = 5.dp, vertical = 1.dp),
             )
         }

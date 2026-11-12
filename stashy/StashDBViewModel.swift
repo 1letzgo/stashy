@@ -7150,7 +7150,7 @@ class StashDBViewModel: ObservableObject {
             self.performGraphQLQuery(query: bodyString) { (response: GenericMutationResponse?) in
                 if let jobId = response?.data?["metadataScan"], !jobId.isEmpty {
                     let enabled = options.values.filter { $0 }.count
-                    let suffix = options.isEmpty ? "" : " (\(enabled) server options applied)"
+                    let suffix = options.isEmpty ? "" : " (" + tr("arg_server_options_applied", enabled) + ")"
                     completion(true, tr("library_scan_started_successfully") + suffix)
                 } else {
                     completion(false, tr("error_start_library_scan_please_check"))
@@ -8966,12 +8966,12 @@ extension StashDBViewModel {
                 guard let payload = json?["data"] as? [String: Any],
                       let value = payload[resultField],
                       !(value is NSNull) else {
-                    completion(.failure(GraphQLNetworkError.graphQLError(message: "Delete failed")))
+                    completion(.failure(GraphQLNetworkError.graphQLError(message: tr("error_delete"))))
                     return
                 }
 
                 if let ok = value as? Bool, ok == false {
-                    completion(.failure(GraphQLNetworkError.graphQLError(message: "Delete failed")))
+                    completion(.failure(GraphQLNetworkError.graphQLError(message: tr("error_delete"))))
                     return
                 }
 
@@ -13653,7 +13653,7 @@ class ButtplugManager: ObservableObject {
             } catch {
                 AppLog.error("❌ Buttplug: Failed to parse Funscript: \(error)")
                 DispatchQueue.main.async {
-                    self.statusMessage = "Script Error"
+                    self.statusMessage = tr("error_script")
                 }
             }
         }.resume()
@@ -14005,7 +14005,7 @@ class LoveSpouseManager: NSObject, ObservableObject {
                 if let raw = String(data: data, encoding: .utf8)?.prefix(200) {
                     AppLog.error("❌ LoveSpouse: Raw response: \(raw)")
                 }
-                DispatchQueue.main.async { self.statusMessage = "Script Error" }
+                DispatchQueue.main.async { self.statusMessage = tr("error_script") }
             }
         }.resume()
     }

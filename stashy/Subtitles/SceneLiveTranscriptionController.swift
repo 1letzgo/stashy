@@ -336,7 +336,7 @@ final class SceneLiveTranscriptionController: ObservableObject {
         guard let locale = await SpeechTranscriptionLocaleResolver.supportedLocaleMatching(preferred) else {
             // Dictation covers more languages; report that separately so the UI can explain.
             if let _ = await DictationTranscriber.supportedLocale(equivalentTo: preferred) {
-                return .unsupported(languageName: "\(name) (SpeechTranscriber; dictation-only)")
+                return .unsupported(languageName: tr("arg_dictation_only", name))
             }
             return .unsupported(languageName: name)
         }

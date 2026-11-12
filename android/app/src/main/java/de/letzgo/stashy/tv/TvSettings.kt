@@ -313,7 +313,7 @@ class TvServerDetailRoute : TvRoute {
                     DetailLine(tr(R.string.protocol), config.serverProtocol.name)
                     DetailLine(tr(R.string.address), config.serverAddress)
                     config.port?.takeIf { it.isNotEmpty() }?.let { DetailLine(tr(R.string.port), it) }
-                    DetailLine(tr(R.string.api_key), if (!config.apiKey.isNullOrEmpty()) "•••• configured" else tr(R.string.not_set))
+                    DetailLine(tr(R.string.api_key), if (!config.apiKey.isNullOrEmpty()) tr(R.string.hint_api_key_configured) else tr(R.string.not_set))
                 }
             }
         }
@@ -425,7 +425,7 @@ private fun StashyPlusPage() {
         item {
             TvListRow(
                 source.statusTitle, {}, Modifier.focusRequester(first),
-                subtitle = license?.let { l -> tr(R.string.licensed_to_arg, l.name) + (l.expiresText?.let { " · valid until $it" } ?: "") } ?: source.statusDetail,
+                subtitle = license?.let { l -> tr(R.string.licensed_to_arg, l.name) + (l.expiresText?.let { " · " + tr(R.string.arg_valid_until, it) } ?: "") } ?: source.statusDetail,
                 leading = if (StashyPlus.isUnlocked) TvIcons.checkSeal else TvIcons.lock, leadingTint = if (StashyPlus.isUnlocked) TvColors.green else TvColors.tint,
             )
         }
@@ -476,7 +476,7 @@ private fun StashyPlusPage() {
 
 // MARK: - Default sorting / filters / tabs
 
-private val contentTabs = listOf(AppTab.Scenes to tr(R.string.scenes), AppTab.Performers to tr(R.string.performers), AppTab.Studios to tr(R.string.studios), AppTab.Tags to tr(R.string.tags), AppTab.Groups to tr(R.string.groups))
+private val contentTabs get() = listOf(AppTab.Scenes to tr(R.string.scenes), AppTab.Performers to tr(R.string.performers), AppTab.Studios to tr(R.string.studios), AppTab.Tags to tr(R.string.tags), AppTab.Groups to tr(R.string.groups))
 
 @Composable
 private fun DefaultSortPage() {

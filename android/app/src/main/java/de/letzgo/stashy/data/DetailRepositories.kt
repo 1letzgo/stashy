@@ -1,5 +1,7 @@
 package de.letzgo.stashy.data
 
+import de.letzgo.stashy.R
+import de.letzgo.stashy.tr
 import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonNull
@@ -280,7 +282,7 @@ object DetailRepository {
     private suspend fun destroy(query: String, field: String, variables: JsonObject) {
         val data = GraphQL.data(query, variables)
         val ok = (data[field] as? JsonPrimitive)?.content == "true"
-        if (!ok) throw GraphQLError.Query("Delete failed")
+        if (!ok) throw GraphQLError.Query(tr(R.string.error_delete))
     }
 
     // MARK: Images (fullscreen viewer)

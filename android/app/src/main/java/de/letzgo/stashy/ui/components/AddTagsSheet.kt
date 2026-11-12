@@ -28,9 +28,9 @@ fun AddTagsSheet(target: AITagTarget, onDismiss: () -> Unit, onComplete: (List<T
         AITagTarget.Kind.Scene, AITagTarget.Kind.Marker -> tag.sceneCount ?: 0
     }
     fun usageLabel(tag: Tag): String {
-        performerCounts[tag.id]?.takeIf { it > 0 }?.let { return "$it× performer" }
+        performerCounts[tag.id]?.takeIf { it > 0 }?.let { return tr(R.string.arg_performer_times, it) }
         val n = usage(tag)
-        return if (target.kind == AITagTarget.Kind.Image) "$n images" else "$n scenes"
+        return if (target.kind == AITagTarget.Kind.Image) tr(R.string.arg_count_images, n) else tr(R.string.arg_scenes, n)
     }
     fun entry(tag: Tag) = PickerEntry(tag.id, tag.name, usageLabel(tag))
 

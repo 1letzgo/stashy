@@ -101,7 +101,7 @@ private fun FormRow(onClick: (() -> Unit)? = null, content: @Composable androidx
 }
 
 @Composable
-private fun LoadingRow(text: String = "Loading...") {
+private fun LoadingRow(text: String = tr(R.string.loading_ellipsis)) {
     NativeListItem(text, headlineColor = Theme.palette.secondaryText, leading = {
         CircularProgressIndicator(Modifier.size(24.dp), strokeWidth = 2.dp, color = Theme.palette.secondaryText)
     })

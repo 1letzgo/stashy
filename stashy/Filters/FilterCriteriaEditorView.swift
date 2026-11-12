@@ -1251,6 +1251,7 @@ struct FilterCircumcisionCriterionRow: View {
     @Binding var value: [String: Any]
     var onChange: () -> Void
     private let options = ["CUT", "UNCUT"]
+    private func title(for opt: String) -> String { opt == "CUT" ? tr("cut") : tr("uncut") }
 
     private var selected: Set<String> {
         if let arr = value["value"] as? [String] { return Set(arr) }
@@ -1260,7 +1261,7 @@ struct FilterCircumcisionCriterionRow: View {
     var body: some View {
         HStack(spacing: 8) {
             ForEach(options, id: \.self) { opt in
-                CatalogFilterChip(title: opt.capitalized, isActive: selected.contains(opt)) {
+                CatalogFilterChip(title: title(for: opt), isActive: selected.contains(opt)) {
                     var next = selected
                     if next.contains(opt) { next.remove(opt) } else { next.insert(opt) }
                     var d = value

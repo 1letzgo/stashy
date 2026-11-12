@@ -17,8 +17,9 @@ import androidx.compose.ui.unit.dp
 import de.letzgo.stashy.data.Prefs
 
 /** iOS: `AppTheme` (raw values identical, stored under `kPreferredTheme`). */
-enum class AppTheme(val raw: String) {
-    System("System"), Light("Light"), Dark("Dark"), DarkBlue("Dark Blue");
+enum class AppTheme(val raw: String, @androidx.annotation.StringRes val titleRes: Int) {
+    System("System", R.string.system), Light("Light", R.string.light), Dark("Dark", R.string.dark), DarkBlue("Dark Blue", R.string.dark_blue);
+    val title: String get() = tr(titleRes)
     companion object { fun from(raw: String?) = entries.firstOrNull { it.raw == raw } ?: DarkBlue }
 }
 

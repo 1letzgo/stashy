@@ -288,7 +288,7 @@ private fun PurchaseSection() {
                     }
                 } else {
                     Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Text(StashyPlus.lastProductError ?: "stashy+ products unavailable.", style = NativeType.bodyMedium, color = p.secondaryText)
+                        Text(StashyPlus.lastProductError ?: tr(R.string.error_stashy_plus_products_unavailable), style = NativeType.bodyMedium, color = p.secondaryText)
                         NativeTonalButton(tr(R.string.action_retry), leading = SF.arrowClockwise) { retryProducts() }
                     }
                 }
@@ -361,16 +361,16 @@ private fun statusDetailText(): String {
         val name = StashyPlusProduct.displayNames[id]
         StashyPlus.trialEndsAt?.let { end ->
             val date = java.text.DateFormat.getDateInstance(java.text.DateFormat.MEDIUM).format(end)
-            return "${name ?: "stashy+"} · free trial until $date"
+            return tr(R.string.arg_arg_free_trial_until, name ?: "stashy+", date)
         }
-        name?.let { return "$it plan" }
+        name?.let { return tr(R.string.arg_plan, it) }
     }
     if (StashyPlus.source == StashyPlusSource.License) StashyPlus.license?.let { return licenseText(it) }
     return StashyPlus.source.statusDetail
 }
 
 private fun licenseText(license: de.letzgo.stashy.data.License): String =
-    tr(R.string.licensed_to_arg, license.name) + (license.expiresText?.let { " · valid until $it" } ?: "")
+    tr(R.string.licensed_to_arg, license.name) + (license.expiresText?.let { " · " + tr(R.string.arg_valid_until, it) } ?: "")
 
 /**
  * Sideload flavor: enter / remove the offline license key ([StashyPlus.activateLicense]).

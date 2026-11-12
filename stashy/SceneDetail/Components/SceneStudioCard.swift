@@ -27,15 +27,15 @@ struct AddStudioToSceneSheet: View {
         NavigationView {
             Form {
                 Section(header: Text(tr("search_studio"))) {
-                    TextField("Search...", text: $searchText)
+                    TextField(tr("placeholder_search_2"), text: $searchText)
                     if isLoading {
-                        HStack { Spacer(); ProgressView("Loading..."); Spacer() }.padding()
+                        HStack { Spacer(); ProgressView(tr("loading")); Spacer() }.padding()
                     } else {
                         ForEach(filtered.prefix(30)) { studio in
                             HStack {
                                 Text(studio.name)
                                 Spacer()
-                                Text("\(studio.sceneCount) scenes").font(.caption).foregroundColor(.secondary)
+                                Text(tr("arg_count_scenes", studio.sceneCount)).font(.caption).foregroundColor(.secondary)
                                 if selectedId == studio.id {
                                     Image(systemName: "checkmark").foregroundColor(appearanceManager.tintColor)
                                 }

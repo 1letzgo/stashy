@@ -183,7 +183,7 @@ private fun FeedModeMenu(modes: List<ReelsModeType>, selected: ReelsModeType, on
                 .stashyGlass(Capsule, Appearance.tint)
                 .noIndicationClick { open = true }
                 .padding(horizontal = FeedsDock.activeHorizontalPadding)
-                .semantics(mergeDescendants = true) { role = Role.Button; contentDescription = "Feed, ${selected.title}" },
+                .semantics(mergeDescendants = true) { role = Role.Button; contentDescription = tr(R.string.label_feed_arg, selected.title) },
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(6.dp),
         ) {

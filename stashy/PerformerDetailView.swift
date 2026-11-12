@@ -1290,15 +1290,15 @@ struct PerformerDetailView: View {
         var list: [(label: String, value: String)] = []
         
         // First row: scenes + galleries; third slot is rating (Stash 0–100).
-        list.append((label: "SCENES", value: "\(p.sceneCount)"))
+        list.append((label: tr("scenes").uppercased(), value: "\(p.sceneCount)"))
         let galleryDisplay = max(p.galleryCount ?? 0, viewModel.totalPerformerGalleries)
-        list.append((label: "GALLERIES", value: "\(galleryDisplay)"))
-        list.append((label: "RATING", value: p.rating100.map { String($0) } ?? "—"))
+        list.append((label: tr("galleries").uppercased(), value: "\(galleryDisplay)"))
+        list.append((label: tr("rating").uppercased(), value: p.rating100.map { String($0) } ?? "—"))
         if let battleLine, !battleLine.isEmpty {
-            list.append((label: "BATTLE", value: battleLine))
+            list.append((label: tr("battle").uppercased(), value: battleLine))
         }
         
-        if let val = p.gender, !val.isEmpty { list.append((label: "GENDER", value: val)) }
+        if let val = p.gender, !val.isEmpty { list.append((label: tr("gender").uppercased(), value: val)) }
         
         let gender = p.gender?.uppercased() ?? ""
         if gender.contains("FEMALE") {
@@ -1310,15 +1310,15 @@ struct PerformerDetailView: View {
             if let val = p.fakeTits, !val.isEmpty { list.append((label: tr("tits"), value: val)) }
             if let val = p.penis_length, val > 0 { list.append((label: tr("penis"), value: "\(val) cm")) }
         }
-        if let val = p.birthdate, !val.isEmpty { list.append((label: "BORN", value: val)) }
-        if let val = p.country, !val.isEmpty { list.append((label: "COUNTRY", value: val)) }
-        if let val = p.ethnicity, !val.isEmpty { list.append((label: "ETHNICITY", value: val)) }
-        if let val = p.height, val > 0 { list.append((label: "HEIGHT", value: "\(val) cm")) }
-        if let val = p.weight, val > 0 { list.append((label: "WEIGHT", value: "\(val) kg")) }
-        if let val = p.measurements, !val.isEmpty { list.append((label: "MEASUREMENTS", value: val)) }
-        if let val = p.careerLength, !val.isEmpty { list.append((label: "CAREER", value: val)) }
-        if let val = p.tattoos, !val.isEmpty { list.append((label: "TATTOOS", value: val)) }
-        if let val = p.piercings, !val.isEmpty { list.append((label: "PIERCINGS", value: val)) }
+        if let val = p.birthdate, !val.isEmpty { list.append((label: tr("born").uppercased(), value: val)) }
+        if let val = p.country, !val.isEmpty { list.append((label: tr("country").uppercased(), value: val)) }
+        if let val = p.ethnicity, !val.isEmpty { list.append((label: tr("ethnicity").uppercased(), value: val)) }
+        if let val = p.height, val > 0 { list.append((label: tr("height").uppercased(), value: "\(val) cm")) }
+        if let val = p.weight, val > 0 { list.append((label: tr("weight").uppercased(), value: "\(val) kg")) }
+        if let val = p.measurements, !val.isEmpty { list.append((label: tr("measurements").uppercased(), value: val)) }
+        if let val = p.careerLength, !val.isEmpty { list.append((label: tr("career").uppercased(), value: val)) }
+        if let val = p.tattoos, !val.isEmpty { list.append((label: tr("tattoos").uppercased(), value: val)) }
+        if let val = p.piercings, !val.isEmpty { list.append((label: tr("piercings").uppercased(), value: val)) }
         
         return list
     }

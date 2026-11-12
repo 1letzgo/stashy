@@ -500,8 +500,8 @@ object SceneRecommendations {
         companion object {
             fun of(e: de.letzgo.stashy.data.tools.LocalSceneIndex.Entry, index: de.letzgo.stashy.data.tools.LocalSceneIndex) = RecItem(
                 e.id, e.title,
-                e.p.map { it to (index.performerNames[it] ?: "this performer") },
-                e.s?.let { it to (index.studioNames[it] ?: "this studio") },
+                e.p.map { it to (index.performerNames[it] ?: tr(R.string.this_performer)) },
+                e.s?.let { it to (index.studioNames[it] ?: tr(R.string.this_studio)) },
                 e.t, e.pc, e.oc, e.r, e.lp?.let(Instant::ofEpochMilli), e.pd, e.d,
             )
         }
@@ -759,7 +759,7 @@ object SceneRecommendations {
         // Per-build jitter: close scores resolve differently in every list.
         score *= 1 + 0.35 * jitter(candidate.id)
 
-        fun tagName(id: String) = vocabulary.tagNames[id] ?: "this tag"
+        fun tagName(id: String) = vocabulary.tagNames[id] ?: tr(R.string.this_tag)
         val factors = listOf(
             performerScore to performerHits.firstOrNull()?.let { RecommendationReason.Performer(it.first.second) },
             studioScore to candidate.studio?.let { RecommendationReason.Studio(it.second) },

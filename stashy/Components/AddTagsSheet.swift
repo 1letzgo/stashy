@@ -56,10 +56,10 @@ struct AddTagsSheet: View {
         NavigationView {
             Form {
                 Section(header: Text(tr("search_tags"))) {
-                    TextField("Search...", text: $searchText)
+                    TextField(tr("placeholder_search_2"), text: $searchText)
 
                     if isLoading {
-                        HStack { Spacer(); ProgressView("Loading..."); Spacer() }.padding()
+                        HStack { Spacer(); ProgressView(tr("loading_ellipsis")); Spacer() }.padding()
                     } else {
                         ForEach(pinned + Array(filtered.prefix(30))) { tag in
                             HStack {
@@ -177,12 +177,12 @@ struct AddTagsSheet: View {
         // A performer count says far more here than the library total, so it wins the
         // one line of space the row has.
         if let performerCount = performerCounts[tag.id], performerCount > 0 {
-            return "\(performerCount)× performer"
+            return tr("arg_performer_times", performerCount)
         }
         let count = usage(of: tag)
         switch target.kind {
-        case .image: return "\(count) images"
-        case .scene, .marker: return "\(count) scenes"
+        case .image: return tr("arg_count_images", count)
+        case .scene, .marker: return tr("arg_count_scenes", count)
         }
     }
 

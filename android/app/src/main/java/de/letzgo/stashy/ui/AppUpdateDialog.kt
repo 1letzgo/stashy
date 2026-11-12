@@ -36,15 +36,18 @@ fun AppUpdateDialog() {
         AppUpdate.State.Checking -> Quad(tr(R.string.checking_for_updates_menu), null, null, action(tr(R.string.action_cancel)) { AppUpdate.dismiss() })
         is AppUpdate.State.Available -> Quad(
             tr(R.string.action_update_available),
-            "stashy " + listOfNotNull(state.versionName, state.versionCode?.let { "($it)" }).joinToString(" ").ifEmpty { "" } +
-                " is available" + (state.bytes?.let { " (%.1f MB)".format(it / 1_048_576f) } ?: "") + ".",
+            tr(
+                R.string.hint_stashy_arg_is_available_arg,
+                listOfNotNull(state.versionName, state.versionCode?.let { "($it)" }).joinToString(" "),
+                state.bytes?.let { " (%.1f MB)".format(it / 1_048_576f) } ?: "",
+            ),
             action(tr(R.string.action_download)) { scope.launch { AppUpdate.download(context) } },
             action(tr(R.string.later)) { AppUpdate.dismiss() },
         )
         is AppUpdate.State.Downloading -> Quad(tr(R.string.downloading_update_menu), null, null, null)
         is AppUpdate.State.ReadyToInstall -> Quad(
             tr(R.string.install_update),
-            "stashy ${state.versionName ?: ""} (${state.versionCode}) is ready." +
+            tr(R.string.hint_stashy_arg_arg_is_ready, state.versionName ?: "", state.versionCode ?: "") +
                 if (AppUpdate.needsInstallPermission(context)) tr(R.string.hint_allow_stashy_to_install_apps) else "",
             action(tr(R.string.install)) { AppUpdate.install(context) },
             action(tr(R.string.later)) { AppUpdate.dismiss() },

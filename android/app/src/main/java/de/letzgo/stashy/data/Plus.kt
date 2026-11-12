@@ -58,10 +58,10 @@ enum class StashyPlusSource(val raw: String) {
 
     val statusTitle: String get() = when (this) {
         None -> tr(R.string.not_unlocked)
-        LocalDevelopment -> "stashy+ (Local Build)"
-        License -> "stashy+ licensed"
-        Subscription -> "stashy+ active"
-        Lifetime -> "stashy+ Lifetime"
+        LocalDevelopment -> tr(R.string.plus_status_local_build)
+        License -> tr(R.string.plus_status_licensed)
+        Subscription -> tr(R.string.plus_status_active)
+        Lifetime -> tr(R.string.plus_status_lifetime)
     }
 
     val statusDetail: String get() = when (this) {

@@ -1525,11 +1525,11 @@ enum AetherTrackLabel {
         if name.isEmpty, let language = track.language, !language.isEmpty {
             name = language.uppercased()
         }
-        if name.isEmpty { name = "Subtitles" }
+        if name.isEmpty { name = tr("subtitles") }
         var suffixes: [String] = []
-        if track.isForced { suffixes.append("Forced") }
-        if track.isHearingImpaired { suffixes.append("SDH") }
-        if track.isExternal { suffixes.append("External") }
+        if track.isForced { suffixes.append(tr("subtitle_forced")) }
+        if track.isHearingImpaired { suffixes.append(tr("subtitle_sdh")) }
+        if track.isExternal { suffixes.append(tr("subtitle_external")) }
         return suffixes.isEmpty ? name : "\(name) · \(suffixes.joined(separator: " · "))"
     }
 

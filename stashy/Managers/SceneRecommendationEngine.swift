@@ -640,8 +640,8 @@ final class SceneRecommendationEngine: ObservableObject {
         init(entry: LocalSceneIndex.Entry, performerNames: [String: String], studioNames: [String: String]) {
             id = entry.id
             title = entry.title
-            performers = entry.p.map { ($0, performerNames[$0] ?? "this performer") }
-            studio = entry.s.map { ($0, studioNames[$0] ?? "this studio") }
+            performers = entry.p.map { ($0, performerNames[$0] ?? tr("this_performer")) }
+            studio = entry.s.map { ($0, studioNames[$0] ?? tr("this_studio")) }
             tagIds = entry.t
             playCount = entry.pc
             oCounter = entry.oc
@@ -1104,7 +1104,7 @@ final class SceneRecommendationEngine: ObservableObject {
         // Per-build jitter: close scores resolve differently in every list.
         score *= 1 + 0.35 * Self.jitter(candidate.id, seed: cfg.sessionSeed)
 
-        let tagName = { (id: String) in vocabulary.tagNames[id] ?? "this tag" }
+        let tagName = { (id: String) in vocabulary.tagNames[id] ?? tr("this_tag") }
         let factors: [(Double, SceneRecommendation.Reason?)] = [
             (performerScore, performerHits.first.map { .performer($0.0.name) }),
             (studioScore, candidate.studio.map { .studio($0.name) }),

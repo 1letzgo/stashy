@@ -29,8 +29,8 @@ enum CatalogCardColumns: Int, CaseIterable, Codable, Hashable {
 
     var settingsLabel: String {
         switch self {
-        case .one: return "1 per Row"
-        case .two: return "2 per Row"
+        case .one: return tr("per_row_one")
+        case .two: return tr("per_row_two")
         }
     }
 

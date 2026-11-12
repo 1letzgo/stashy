@@ -189,7 +189,7 @@ object QuickFilterCatalog {
         "duration", tr(R.string.duration), tr(R.string.any_length),
         listOf(
             QuickFilterChoice("short", tr(R.string.under_10_min), "< 10 min", obj("modifier" to "LESS_THAN", "value" to 600)),
-            QuickFilterChoice("mid", "10–30 min", "10–30 min", obj("modifier" to "BETWEEN", "value" to 600, "value2" to 1800)),
+            QuickFilterChoice("mid", tr(R.string.duration_10_30_min), tr(R.string.duration_10_30_min), obj("modifier" to "BETWEEN", "value" to 600, "value2" to 1800)),
             QuickFilterChoice("long", tr(R.string.over_30_min), "> 30 min", obj("modifier" to "GREATER_THAN", "value" to 1800)),
         ),
     )
@@ -243,7 +243,7 @@ object QuickFilterCatalog {
         "gender", tr(R.string.gender), tr(R.string.any),
         listOf(
             "FEMALE" to tr(R.string.female), "MALE" to tr(R.string.male), "TRANSGENDER_FEMALE" to tr(R.string.trans_female),
-            "TRANSGENDER_MALE" to tr(R.string.trans_male), "NON_BINARY" to "Non-Binary",
+            "TRANSGENDER_MALE" to tr(R.string.trans_male), "NON_BINARY" to tr(R.string.non_binary),
         ).map { (raw, label) ->
             QuickFilterChoice(raw, label, label, obj("modifier" to "INCLUDES", "value_list" to listOf(raw)))
         },

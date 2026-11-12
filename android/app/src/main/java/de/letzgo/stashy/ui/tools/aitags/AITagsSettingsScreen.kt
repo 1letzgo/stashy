@@ -80,7 +80,7 @@ class AITagsSettingsScreen : Screen {
     override fun Content() = AITagsSettingsView()
 }
 
-private val TITLE = tr(R.string.recommendations)
+private val TITLE: String get() = tr(R.string.recommendations)
 
 @Composable
 fun AITagsSettingsView() {
@@ -209,7 +209,7 @@ fun AITagsSettingsView() {
                             tr(R.string.ignored_tags), icon = Icons.Outlined.ThumbDown, titleColor = tint,
                             enabled = isUnlocked && count > 0, onClick = { manager.resetDismissals() },
                         ) {
-                            Text(if (count == 0) tr(R.string.none) else "$count · reset", style = NativeType.bodyMedium, color = p.secondaryText)
+                            Text(if (count == 0) tr(R.string.none) else "$count · ${tr(R.string.action_reset).lowercase()}", style = NativeType.bodyMedium, color = p.secondaryText)
                         }
                     }
                 }
@@ -226,8 +226,8 @@ private fun statusText(state: AITagModelState, lastBuiltAt: Long?): String = whe
     AITagModelState.Loading -> tr(R.string.loading)
     is AITagModelState.Building -> tr(R.string.counting_menu)
     is AITagModelState.Ready -> lastBuiltAt?.let {
-        "${state.items} items · ${DateFormat.getDateTimeInstance(DateFormat.MEDIUM, DateFormat.SHORT).format(Date(it))}"
-    } ?: "${state.items} items"
+        "${tr(R.string.arg_items, state.items)} · ${DateFormat.getDateTimeInstance(DateFormat.MEDIUM, DateFormat.SHORT).format(Date(it))}"
+    } ?: tr(R.string.arg_items, state.items)
     is AITagModelState.Failed -> state.message
 }
 

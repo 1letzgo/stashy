@@ -14,7 +14,7 @@ enum class CatalogCardColumns(val raw: Int) {
     val cardAspectRatio: Float get() = if (this == One) 16f / 9f else 1f
     val idealCardWidth: Float get() = if (this == One) 480f else 260f
     val accessibilityLabel: String get() = if (this == One) tr(R.string.one_card_per_row) else tr(R.string.two_cards_per_row)
-    val settingsLabel: String get() = if (this == One) "1 per Row" else "2 per Row"
+    val settingsLabel: String get() = if (this == One) tr(R.string.per_row_one) else tr(R.string.per_row_two)
 
     /** iOS: `gridItems(width:)` — the toggle picks the card size, width decides the count. */
     fun columnCount(widthDp: Float): Int =

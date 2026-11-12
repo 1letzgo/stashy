@@ -222,7 +222,7 @@ class SceneAiSubtitles(private val model: SceneDetailModel) {
                     return@launch
                 }
                 is LiveTranscriber.ModelProbe.NeedsDownload ->
-                    SceneToast.show("${probe.languageName} speech model required", Icons.Filled.DownloadForOffline, SceneToast.Style.Info)
+                    SceneToast.show(tr(R.string.arg_speech_model_required, probe.languageName), Icons.Filled.DownloadForOffline, SceneToast.Style.Info)
             }
 
             var translates = false
@@ -324,8 +324,8 @@ fun SceneAiSubtitlesEffects(controller: SceneAiSubtitles, model: SceneDetailMode
     LaunchedEffect(needs) { if (needs) controller.showSpeechModelDownloadOffer = true }
 
     if (controller.showSpeechModelDownloadOffer) {
-        val name = controller.transcriber.downloadingModelLanguage ?: "this language"
-        val size = controller.transcriber.downloadingModelSize?.let { " (about $it)" } ?: ""
+        val name = controller.transcriber.downloadingModelLanguage ?: tr(R.string.this_language)
+        val size = controller.transcriber.downloadingModelSize?.let { " (" + tr(R.string.arg_about_size, it) + ")" } ?: ""
         AlertDialog(
             onDismissRequest = { controller.showSpeechModelDownloadOffer = false },
             title = { Text(tr(R.string.confirm_download_speech_model)) },

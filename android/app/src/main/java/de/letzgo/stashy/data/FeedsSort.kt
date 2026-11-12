@@ -119,19 +119,19 @@ enum class ImageSortOption(private val displayNameText: UiText, override val sor
  */
 
 object FeedSortKinds {
-    val scene = listOf(
-        SortFieldKind("date", "Date"), SortFieldKind("created_at", "Created"), SortFieldKind("title", "Title"),
-        SortFieldKind("duration", "Duration"), SortFieldKind("last_played_at", "Last Played"),
-        SortFieldKind("play_count", "Play Count"), SortFieldKind("play_duration", "Watch time"),
-        SortFieldKind("o_counter", "O Count"), SortFieldKind("rating", "Rating"), SortFieldKind("random", "Random"),
+    val scene get() = listOf(
+        SortFieldKind("date", tr(R.string.date)), SortFieldKind("created_at", tr(R.string.created)), SortFieldKind("title", tr(R.string.title)),
+        SortFieldKind("duration", tr(R.string.duration)), SortFieldKind("last_played_at", tr(R.string.last_played)),
+        SortFieldKind("play_count", tr(R.string.play_count)), SortFieldKind("play_duration", tr(R.string.watch_time)),
+        SortFieldKind("o_counter", tr(R.string.o_count)), SortFieldKind("rating", tr(R.string.rating)), SortFieldKind("random", tr(R.string.random)),
     )
-    val marker = listOf(
-        SortFieldKind("created_at", "Created"), SortFieldKind("updated_at", "Updated"), SortFieldKind("title", "Title"),
-        SortFieldKind("seconds", "Time"), SortFieldKind("random", "Random"),
+    val marker get() = listOf(
+        SortFieldKind("created_at", tr(R.string.created)), SortFieldKind("updated_at", tr(R.string.updated)), SortFieldKind("title", tr(R.string.title)),
+        SortFieldKind("seconds", tr(R.string.time)), SortFieldKind("random", tr(R.string.random)),
     )
-    val image = listOf(
-        SortFieldKind("title", "Title"), SortFieldKind("date", "Date"), SortFieldKind("rating", "Rating"),
-        SortFieldKind("created_at", "Created"), SortFieldKind("updated_at", "Updated"), SortFieldKind("random", "Random"),
+    val image get() = listOf(
+        SortFieldKind("title", tr(R.string.title)), SortFieldKind("date", tr(R.string.date)), SortFieldKind("rating", tr(R.string.rating)),
+        SortFieldKind("created_at", tr(R.string.created)), SortFieldKind("updated_at", tr(R.string.updated)), SortFieldKind("random", tr(R.string.random)),
     )
 
     /**

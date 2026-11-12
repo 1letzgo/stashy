@@ -368,7 +368,7 @@ struct ToolsPillMenuRow: View {
                         .contentShape(Capsule(style: .continuous))
                 }
                 .buttonStyle(.plain)
-                .accessibilityLabel("\(item.title)\(selected ? ", selected" : "")")
+                .accessibilityLabel(selected ? tr("arg_selected_2", item.title) : item.title)
                 .accessibilityAddTraits(selected ? .isSelected : [])
             }
         }

@@ -115,7 +115,7 @@ struct ScenePerformersStudioCard: View {
 
                         ForEach(galleries ?? []) { gallery in
                             NavigationLink(destination: ImagesView(gallery: gallery)) {
-                                tile(name: "Gallery") {
+                                tile(name: tr("gallery")) {
                                     CircleThumbnail(url: gallery.thumbnailURL, placeholder: "photo.on.rectangle", size: Self.tileSize)
                                 }
                             }
@@ -124,7 +124,7 @@ struct ScenePerformersStudioCard: View {
 
                         ForEach(scenes) { scene in
                             NavigationLink(destination: SceneDetailView(scene: scene)) {
-                                tile(name: "Scene") {
+                                tile(name: tr("scene")) {
                                     CircleThumbnail(url: scene.thumbnailURL, placeholder: "film", size: Self.tileSize)
                                 }
                             }
@@ -413,9 +413,9 @@ struct AddPerformerToSceneSheet: View {
         NavigationView {
             Form {
                 Section(header: Text(tr("search_performers"))) {
-                    TextField("Search...", text: $searchText)
+                    TextField(tr("placeholder_search_2"), text: $searchText)
                     if isLoading {
-                        HStack { Spacer(); ProgressView("Loading..."); Spacer() }.padding()
+                        HStack { Spacer(); ProgressView(tr("loading_ellipsis")); Spacer() }.padding()
                     } else {
                         ForEach(pinned + Array(filtered.prefix(30))) { performer in
                             HStack(spacing: 12) {

@@ -205,7 +205,7 @@ struct AITagsSettingsView: View {
                     Label(tr("ignored_tags"), systemImage: "hand.thumbsdown")
                         .foregroundColor(appearanceManager.tintColor)
                     Spacer()
-                    Text(manager.dismissedTagCount == 0 ? tr("none") : "\(manager.dismissedTagCount) · reset")
+                    Text(manager.dismissedTagCount == 0 ? tr("none") : tr("arg_reset_suffix", manager.dismissedTagCount))
                         .foregroundColor(.secondary)
                 }
             }
@@ -242,9 +242,9 @@ struct AITagsSettingsView: View {
             return tr("counting_menu")
         case .ready(let items):
             if let date = manager.lastBuiltAt {
-                return "\(items) items · \(date.formatted(date: .abbreviated, time: .shortened))"
+                return tr("arg_items_arg", items, date.formatted(date: .abbreviated, time: .shortened))
             }
-            return "\(items) items"
+            return tr("arg_items", items)
         case .failed(let message):
             return message
         }

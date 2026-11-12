@@ -224,7 +224,7 @@ object RateMeLogic {
         if (mode == RateMeMode.Scenes) tr(R.string.confirm_really_delete_scene_and_files) else tr(R.string.confirm_really_delete_image_and_files)
 
     fun deleteConfirmationMessage(mode: RateMeMode, itemTitle: String?): String {
-        val name = itemTitle ?: if (mode == RateMeMode.Scenes) "this scene" else "this image"
+        val name = itemTitle ?: if (mode == RateMeMode.Scenes) tr(R.string.this_scene) else tr(R.string.this_image)
         return tr(R.string.hint_arg_and_all_associated_files, name)
     }
 

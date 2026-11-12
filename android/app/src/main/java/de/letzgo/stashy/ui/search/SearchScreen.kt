@@ -213,7 +213,7 @@ private fun Results(query: String, searching: Boolean) {
         if (searching) {
             item { Row(Modifier.fillMaxWidth().padding(24.dp), horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically) {
                 CircularProgressIndicator(Modifier.size(22.dp), color = p.secondaryText, strokeWidth = 2.dp)
-                Text("  Searching...", style = IosTypography.subheadline, color = p.secondaryText)
+                Text(tr(R.string.loading_searching), modifier = Modifier.padding(start = 8.dp), style = IosTypography.subheadline, color = p.secondaryText)
             } }
             return@LazyColumn
         }

@@ -934,7 +934,7 @@ struct RateMeToolsView: View {
     }
 
     private var deleteConfirmationMessage: String {
-        let name = model.item?.title ?? (model.mode == .scenes ? "this scene" : "this image")
+        let name = model.item?.title ?? (model.mode == .scenes ? tr("this_scene") : tr("this_image"))
         return tr("hint_arg_and_all_associated_files", name)
     }
 
@@ -1017,7 +1017,7 @@ struct RateMeToolsView: View {
         .stashyNeutralMenuItems()
         .fixedSize()
         .disabled(model.isSubmitting)
-        .accessibilityLabel("Theme, \(model.theme.label)")
+        .accessibilityLabel(tr("arg_theme", model.theme.label))
     }
 
     private func pickedTheme(for kind: ThemePickerKind) -> RateMeViewModel.Theme? {
@@ -1236,11 +1236,11 @@ private struct RateMeThemePickerSheet: View {
         NavigationView {
             Form {
                 Section(header: Text(tr("search_arg_s", kind.title))) {
-                    TextField("Search...", text: $query)
+                    TextField(tr("placeholder_search_2"), text: $query)
                         .textInputAutocapitalization(.never)
                         .autocorrectionDisabled()
                     if store.isLoading(storeKind) && options.isEmpty {
-                        HStack { Spacer(); ProgressView("Loading..."); Spacer() }.padding()
+                        HStack { Spacer(); ProgressView(tr("loading_ellipsis")); Spacer() }.padding()
                     } else {
                         ForEach(options.prefix(50)) { option in
                             HStack {

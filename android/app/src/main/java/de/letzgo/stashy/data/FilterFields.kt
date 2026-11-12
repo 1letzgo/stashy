@@ -326,7 +326,7 @@ object FilterFieldCatalog {
             f("is_missing", tr(R.string.is_missing), isMissing), f("url", "URL", string), f("performers", tr(R.string.performers), multi),
             f("tags", tr(R.string.tags), hierarchicalMulti), f("tag_count", tr(R.string.tag_count), int), f("date", tr(R.string.date), date),
             f("created_at", tr(R.string.created), timestamp), f("updated_at", tr(R.string.updated), timestamp), f("o_counter", tr(R.string.o_count), int),
-            f("containing_groups", tr(R.string.containing_groups), hierarchicalMulti), f("sub_groups", "Sub-Groups", hierarchicalMulti),
+            f("containing_groups", tr(R.string.containing_groups), hierarchicalMulti), f("sub_groups", tr(R.string.sub_groups), hierarchicalMulti),
             f("containing_group_count", tr(R.string.containing_group_count), int), f("sub_group_count", tr(R.string.sub_group_count), int),
             f("scene_count", tr(R.string.scene_count), int), f("scenes_filter", tr(R.string.scenes_filter), nestedFilter, FilterMode.Scenes),
             f("studios_filter", tr(R.string.studios_filter), nestedFilter, FilterMode.Studios), f("custom_fields", tr(R.string.custom_fields), customFields),
@@ -471,9 +471,9 @@ object FilterCriterionSummary {
         val text = pattern.removePrefix(NameRegexFilter.CASE_INSENSITIVE_PREFIX)
         val isPlainText = text.none { it in "\\^$.|?*+()[]{}" }
         return when {
-            isPlainText -> if (negated) "without “$text”" else "“$text”"
-            negated -> "not matching $text"
-            else -> "matches $text"
+            isPlainText -> if (negated) tr(R.string.arg_without_quoted, text) else "“$text”"
+            negated -> tr(R.string.arg_not_matching, text)
+            else -> tr(R.string.arg_matches, text)
         }
     }
 
@@ -481,11 +481,11 @@ object FilterCriterionSummary {
         CriterionModifier.NotEquals -> "≠"
         CriterionModifier.GreaterThan -> ">"
         CriterionModifier.LessThan -> "<"
-        CriterionModifier.NotBetween -> "not"
-        CriterionModifier.Includes, CriterionModifier.IncludesAll -> "contains"
-        CriterionModifier.Excludes -> "without"
-        CriterionModifier.MatchesRegex -> "regex"
-        CriterionModifier.NotMatchesRegex -> "not regex"
+        CriterionModifier.NotBetween -> tr(R.string.modifier_not)
+        CriterionModifier.Includes, CriterionModifier.IncludesAll -> tr(R.string.modifier_contains)
+        CriterionModifier.Excludes -> tr(R.string.modifier_without)
+        CriterionModifier.MatchesRegex -> tr(R.string.modifier_regex)
+        CriterionModifier.NotMatchesRegex -> tr(R.string.modifier_not_regex)
         else -> ""
     }
 

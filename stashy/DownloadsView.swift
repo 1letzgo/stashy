@@ -157,7 +157,7 @@ struct DownloadsView: View {
             }
             Button(tr("action_cancel"), role: .cancel) { jobToDelete = nil }
         } message: {
-            Text(jobToDelete.map { "\($0.filterName) stays on the server; only the job goes away." } ?? "")
+            Text(jobToDelete.map { tr("arg_stays_on_server_only_job_goes", $0.filterName) } ?? "")
         }
     }
 
@@ -1203,11 +1203,11 @@ struct DownloadedGalleryCard: View {
     private var subtitle: String {
         var parts: [String] = []
         if entry.isSingleImage {
-            parts.append("Single image")
+            parts.append(tr("single_image"))
         } else if let total = entry.serverImageCount, total > entry.images.count {
-            parts.append("\(entry.images.count) of \(total) images")
+            parts.append(tr("arg_of_arg_images", entry.images.count, total))
         } else {
-            parts.append("\(entry.images.count) image(s)")
+            parts.append(tr("arg_image_s", entry.images.count))
         }
         if let studio = entry.studioName, !studio.isEmpty { parts.append(studio) }
         return parts.joined(separator: " · ")

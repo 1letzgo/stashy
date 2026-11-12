@@ -150,11 +150,11 @@ struct AITagSuggestionBar: View {
     }
 
     private func bulkMessage(for plan: AITagSuggestionManager.BulkPlan) -> String {
-        let scope = plan.scope == .gallery ? "this gallery" : "this performer"
+        let scope = plan.scope == .gallery ? tr("this_gallery") : tr("this_performer")
         var parts: [String] = []
-        if !plan.imageIds.isEmpty { parts.append("\(plan.imageIds.count) images") }
-        if !plan.sceneIds.isEmpty { parts.append("\(plan.sceneIds.count) scenes") }
-        return tr("hint_tag_is_added_to_arg", parts.joined(separator: " and "), scope)
+        if !plan.imageIds.isEmpty { parts.append(tr("arg_count_images", plan.imageIds.count)) }
+        if !plan.sceneIds.isEmpty { parts.append(tr("arg_count_scenes", plan.sceneIds.count)) }
+        return tr("hint_tag_is_added_to_arg", (parts.count == 2 ? tr("arg_and_arg", parts[0], parts[1]) : (parts.first ?? "")), scope)
     }
 
     /// Counts first, asks second: a bulk write can touch hundreds of items, and undoing

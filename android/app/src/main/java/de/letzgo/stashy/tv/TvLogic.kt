@@ -154,7 +154,7 @@ fun activeMarkerIndex(starts: List<Double>, currentTime: Double): Int? {
 
 /** iOS: the per-catalog sort pickers of `TVScenesView`, `TVPerformersView` … (order and labels). */
 object TvSortLabels {
-    val scenes = listOf(
+    val scenes get() = listOf(
         "random" to tr(R.string.random), "dateDesc" to tr(R.string.recently_released), "dateAsc" to tr(R.string.oldest_first),
         "createdAtDesc" to tr(R.string.recently_added), "createdAtAsc" to tr(R.string.oldest_added),
         "lastPlayedAtDesc" to tr(R.string.recently_played), "lastPlayedAtAsc" to tr(R.string.least_recently_played),
@@ -164,7 +164,7 @@ object TvSortLabels {
         "oCounterDesc" to tr(R.string.o_count_high_low), "oCounterAsc" to tr(R.string.o_count_low_high),
         "ratingDesc" to tr(R.string.highest_rated), "ratingAsc" to tr(R.string.lowest_rated),
     )
-    val performers = listOf(
+    val performers get() = listOf(
         "random" to tr(R.string.random), "nameAsc" to tr(R.string.name_z), "nameDesc" to tr(R.string.name_z_2),
         "sceneCountDesc" to tr(R.string.most_scenes), "sceneCountAsc" to tr(R.string.least_scenes),
         "birthdateDesc" to tr(R.string.youngest_first), "birthdateAsc" to tr(R.string.oldest_first),
@@ -173,19 +173,19 @@ object TvSortLabels {
         "createdAtDesc" to tr(R.string.recently_added), "createdAtAsc" to tr(R.string.oldest_added),
         "updatedAtDesc" to tr(R.string.recently_updated), "updatedAtAsc" to tr(R.string.least_recently_updated),
     )
-    val studios = listOf(
+    val studios get() = listOf(
         "random" to tr(R.string.random), "nameAsc" to tr(R.string.name_z), "nameDesc" to tr(R.string.name_z_2),
         "sceneCountDesc" to tr(R.string.most_scenes), "sceneCountAsc" to tr(R.string.least_scenes),
         "createdAtDesc" to tr(R.string.recently_added), "createdAtAsc" to tr(R.string.oldest_added),
         "updatedAtDesc" to tr(R.string.recently_updated), "updatedAtAsc" to tr(R.string.least_recently_updated),
     )
-    val tags = listOf(
+    val tags get() = listOf(
         "random" to tr(R.string.random), "nameAsc" to tr(R.string.name_z), "nameDesc" to tr(R.string.name_z_2),
         "sceneCountDesc" to tr(R.string.most_scenes), "sceneCountAsc" to tr(R.string.least_scenes),
         "createdAtDesc" to tr(R.string.recently_added), "createdAtAsc" to tr(R.string.oldest_added),
         "updatedAtDesc" to tr(R.string.recently_updated), "updatedAtAsc" to tr(R.string.least_recently_updated),
     )
-    val groups = listOf(
+    val groups get() = listOf(
         "random" to tr(R.string.random), "nameAsc" to tr(R.string.name_z), "nameDesc" to tr(R.string.name_z_2),
         "sceneCountDesc" to tr(R.string.most_scenes), "sceneCountAsc" to tr(R.string.least_scenes),
         "dateDesc" to tr(R.string.newest_first), "dateAsc" to tr(R.string.oldest_first),
@@ -193,7 +193,7 @@ object TvSortLabels {
         "createdAtDesc" to tr(R.string.recently_added), "createdAtAsc" to tr(R.string.oldest_added),
         "updatedAtDesc" to tr(R.string.recently_updated), "updatedAtAsc" to tr(R.string.least_recently_updated),
     )
-    val galleries = listOf(
+    val galleries get() = listOf(
         "random" to tr(R.string.random), "titleAsc" to tr(R.string.title_z), "titleDesc" to tr(R.string.title_z_2),
         "dateDesc" to tr(R.string.newest_first), "dateAsc" to tr(R.string.oldest_first),
         "imageCountDesc" to tr(R.string.most_images), "imageCountAsc" to tr(R.string.least_images),
@@ -201,7 +201,7 @@ object TvSortLabels {
         "createdAtDesc" to tr(R.string.recently_added), "createdAtAsc" to tr(R.string.oldest_added),
         "updatedAtDesc" to tr(R.string.recently_updated), "updatedAtAsc" to tr(R.string.least_recently_updated),
     )
-    val images = listOf(
+    val images get() = listOf(
         "random" to tr(R.string.random), "titleAsc" to tr(R.string.title_z), "titleDesc" to tr(R.string.title_z_2),
         "dateDesc" to tr(R.string.newest_first), "dateAsc" to tr(R.string.oldest_first),
         "ratingDesc" to tr(R.string.highest_rated), "ratingAsc" to tr(R.string.lowest_rated),

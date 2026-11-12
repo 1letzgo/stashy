@@ -426,7 +426,7 @@ final class SessionTimelineLoader: ObservableObject {
                 AppLog.error("⚠️ Session timeline query \(variant) failed: \(error)")
             }
         }
-        throw lastError ?? GraphQLNetworkError.graphQLError(message: "Query failed")
+        throw lastError ?? GraphQLNetworkError.graphQLError(message: tr("error_query_failed"))
     }
 
     private func fetchScenes(from start: Date, to end: Date, variant: QueryVariant) async throws -> [TimelineSceneRow] {
@@ -442,7 +442,7 @@ final class SessionTimelineLoader: ObservableObject {
             )
             if let errors = response.errors, !errors.isEmpty, response.data?.findScenes?.scenes == nil {
                 let message = errors.compactMap(\.message).joined(separator: "; ")
-                throw GraphQLNetworkError.graphQLError(message: message.isEmpty ? "Query failed" : message)
+                throw GraphQLNetworkError.graphQLError(message: message.isEmpty ? tr("error_query_failed") : message)
             }
             let pageRows = response.data?.findScenes?.scenes ?? []
             total = response.data?.findScenes?.count ?? pageRows.count

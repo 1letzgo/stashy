@@ -65,7 +65,7 @@ class AppearanceSettingsScreen : Screen {
     @Composable override fun Content() = SettingsDetailScaffold(tr(R.string.appearance)) { top ->
         SettingsList(top) {
             settingsSection(header = tr(R.string.app_theme), footer = tr(R.string.hint_choose_appearance_of_app), key = "theme") {
-                SettingsPickerRow(tr(R.string.theme), AppTheme.entries, Appearance.theme, { it.raw }, SFS.circleLeftHalf) { Appearance.updateTheme(it) }
+                SettingsPickerRow(tr(R.string.theme), AppTheme.entries, Appearance.theme, { it.title }, SFS.circleLeftHalf) { Appearance.updateTheme(it) }
             }
             settingsSection(
                 header = tr(R.string.tab_bar), key = "tabbar",

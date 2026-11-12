@@ -28,11 +28,11 @@ extension Tag: MergeableItem {
 
     var mergeUsageSummary: String {
         var parts: [String] = []
-        MergeUsage.append(&parts, sceneCount, "scene")
-        MergeUsage.append(&parts, imageCount, "image")
-        MergeUsage.append(&parts, galleryCount, "gallery", plural: "galleries")
-        MergeUsage.append(&parts, performerCount, "performer")
-        MergeUsage.append(&parts, sceneMarkerCount, "marker")
+        MergeUsage.append(&parts, sceneCount, one: "arg_count_scene", other: "arg_count_scenes")
+        MergeUsage.append(&parts, imageCount, one: "arg_count_image", other: "arg_count_images")
+        MergeUsage.append(&parts, galleryCount, one: "arg_count_gallery", other: "arg_count_galleries")
+        MergeUsage.append(&parts, performerCount, one: "arg_count_performer", other: "arg_count_performers")
+        MergeUsage.append(&parts, sceneMarkerCount, one: "arg_count_marker", other: "arg_count_markers")
         return parts.isEmpty ? tr("unused") : parts.joined(separator: " · ")
     }
 }
@@ -43,18 +43,19 @@ extension Studio: MergeableItem {
 
     var mergeUsageSummary: String {
         var parts: [String] = []
-        MergeUsage.append(&parts, sceneCount, "scene")
-        MergeUsage.append(&parts, imageCount, "image")
-        MergeUsage.append(&parts, galleryCount, "gallery", plural: "galleries")
-        MergeUsage.append(&parts, performerCount, "performer")
+        MergeUsage.append(&parts, sceneCount, one: "arg_count_scene", other: "arg_count_scenes")
+        MergeUsage.append(&parts, imageCount, one: "arg_count_image", other: "arg_count_images")
+        MergeUsage.append(&parts, galleryCount, one: "arg_count_gallery", other: "arg_count_galleries")
+        MergeUsage.append(&parts, performerCount, one: "arg_count_performer", other: "arg_count_performers")
         return parts.isEmpty ? tr("unused") : parts.joined(separator: " · ")
     }
 }
 
 enum MergeUsage {
-    static func append(_ parts: inout [String], _ value: Int?, _ singular: String, plural: String? = nil) {
+    /// `one` / `other` are localization keys (one value placeholder each).
+    static func append(_ parts: inout [String], _ value: Int?, one: String, other: String) {
         guard let value, value > 0 else { return }
-        parts.append("\(value) \(value == 1 ? singular : (plural ?? singular + "s"))")
+        parts.append(tr(value == 1 ? one : other, value))
     }
 }
 
@@ -577,7 +578,7 @@ struct MergeToolsView<Item: MergeableItem>: View {
                 Divider()
                     .overlay(Color.primary.opacity(0.15))
                 if isLoading && allItems.isEmpty {
-                    HStack { Spacer(); ProgressView("Loading..."); Spacer() }
+                    HStack { Spacer(); ProgressView(tr("loading")); Spacer() }
                         .padding(.vertical, DesignTokens.Spacing.lg)
                 } else if filtered.isEmpty {
                     Text(allItems.isEmpty ? tr("hint_this_server_has_no_arg", config.nounPlural) : tr("empty_matches"))
@@ -667,7 +668,7 @@ struct MergeToolsView<Item: MergeableItem>: View {
                 } label: {
                     HStack(spacing: DesignTokens.Spacing.xs) {
                         if isMerging { InlineSpinner() }
-                        Text(isMerging ? "Merging..." : tr("action_merge_arg", nounTitle))
+                        Text(isMerging ? tr("loading_merging") : tr("action_merge_arg", nounTitle))
                     }
                     .frame(maxWidth: .infinity)
                 }
@@ -735,10 +736,10 @@ struct MergeToolsView<Item: MergeableItem>: View {
 
     private func presetSubtitle(_ preset: MergePreset, missing: Int) -> String {
         let total = preset.sources.count
-        let noun = total == 1 ? "source" : "sources"
+        let noun = total == 1 ? tr("source_lower") : tr("sources_lower")
         // Vor dem Laden ist nichts aufgelöst — dann nur die Gesamtzahl. Danach immer
         // "K of N", auch wenn alle da sind, damit die Pill ihre Form nicht wechselt.
-        if allItems.isEmpty { return "\(total) \(noun)" }
+        if allItems.isEmpty { return tr(total == 1 ? "arg_count_source" : "arg_count_sources", total) }
         return tr("hint_arg_of_arg_arg_on", total - missing, total, noun)
     }
 
@@ -760,7 +761,7 @@ struct MergeToolsView<Item: MergeableItem>: View {
         var text = tr("hint_arg_of_arg_templates_have", runnable.count, presets.presets.count)
             + tr("hint_arg_arg_will_be_merged", sourceCount, sourceCount == 1 ? config.noun : config.nounPlural)
         if skipped > 0 {
-            text += tr("hint_arg_arg_nothing_to_do", skipped, skipped == 1 ? "template has" : "templates have")
+            text += tr("hint_arg_arg_nothing_to_do", skipped, skipped == 1 ? tr("template_has") : tr("templates_have"))
         }
         return text + tr("this_cannot_be_undone")
     }
@@ -802,7 +803,7 @@ struct MergeToolsView<Item: MergeableItem>: View {
                 if merged > 0 { config.didMerge() }
                 if failed.isEmpty {
                     ToastManager.shared.show(
-                        "\(merged) \(merged == 1 ? config.noun : config.nounPlural) merged from \(jobs.count) templates",
+                        tr("arg_arg_merged_from_arg_templates", merged, merged == 1 ? config.noun : config.nounPlural, jobs.count),
                         icon: "arrow.triangle.merge",
                         style: .success
                     )
@@ -942,7 +943,7 @@ struct MergeToolsView<Item: MergeableItem>: View {
                     itemIndex = MergeItemIndex(items: allItems)
                     config.didMerge()
                     ToastManager.shared.show(
-                        "\(mergedCount) \(mergedCount == 1 ? config.noun : config.nounPlural) merged into \(destination.name)",
+                        tr("arg_arg_merged_into_arg", mergedCount, mergedCount == 1 ? config.noun : config.nounPlural, destination.name),
                         icon: "arrow.triangle.merge",
                         style: .success
                     )
@@ -989,7 +990,7 @@ private struct MergeDestinationSheet<Item: MergeableItem>: View {
     var body: some View {
         Form {
             Section(header: Text(sectionTitle)) {
-                TextField("Search...", text: $searchText)
+                TextField(tr("placeholder_search_2"), text: $searchText)
 
                 let shown = Array(filtered.prefix(visibleCount))
                 ForEach(shown) { item in

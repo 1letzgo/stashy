@@ -187,14 +187,14 @@ fun AITagSuggestionBar(
     }
 
     pendingBulk?.let { plan ->
-        val scopeText = if (plan.scope == AITagBulkScope.Gallery) "this gallery" else "this performer"
+        val scopeText = if (plan.scope == AITagBulkScope.Gallery) tr(R.string.this_gallery) else tr(R.string.this_performer)
         val parts = buildList {
-            if (plan.imageIds.isNotEmpty()) add("${plan.imageIds.size} images")
-            if (plan.sceneIds.isNotEmpty()) add("${plan.sceneIds.size} scenes")
+            if (plan.imageIds.isNotEmpty()) add(tr(R.string.arg_count_images, plan.imageIds.size))
+            if (plan.sceneIds.isNotEmpty()) add(tr(R.string.arg_count_scenes, plan.sceneIds.size))
         }
         StashyAlert(
             title = tr(R.string.confirm_add_arg, plan.tag.name),
-            message = tr(R.string.hint_tag_is_added_to_arg, parts.joinToString(" and "), scopeText),
+            message = tr(R.string.hint_tag_is_added_to_arg, if (parts.size == 2) tr(R.string.arg_and_arg, parts[0], parts[1]) else parts.joinToString(), scopeText),
             onDismiss = { pendingBulk = null },
             confirmLabel = tr(R.string.action_add_to_arg, plan.total),
             dismissLabel = tr(R.string.action_cancel),

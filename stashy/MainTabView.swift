@@ -732,7 +732,7 @@ struct ToolsCrumbPickerMenu<Value: Hashable>: View {
         .stashyNeutralMenuItems()
         .fixedSize()
         .disabled(isDisabled)
-        .accessibilityLabel("\(title), \(current?.title ?? "")")
+        .accessibilityLabel(tr("arg_arg_comma", title, current?.title ?? ""))
     }
 }
 

@@ -258,7 +258,7 @@ private fun ThemeMenu(model: RateMeViewModel, onPick: (RateMeThemePickerKind) ->
     val view = LocalView.current
     ToolsRowMenu(
         icon = themeIcon(model.theme),
-        accessibilityLabel = "Theme, ${model.theme.label}",
+        accessibilityLabel = tr(R.string.arg_theme, model.theme.label),
         isActive = model.mode == RateMeMode.Images && model.imageMediaKind != RateMeImageMediaKind.All,
         enabled = !model.isSubmitting,
     ) { dismiss ->
@@ -572,11 +572,11 @@ private fun ThemePickerSheet(
                         loading = RateMePickerOptions.isSearching(storeKind),
                     )
                 }
-                item { NativeSectionHeader("${kind.title}s") }
+                item { NativeSectionHeader(when (kind) { RateMeThemePickerKind.Performer -> tr(R.string.performers); RateMeThemePickerKind.Studio -> tr(R.string.studios); RateMeThemePickerKind.Tag -> tr(R.string.tags) }) }
                 item {
                     NativeGroup {
                         if (RateMePickerOptions.isLoading(storeKind) && options.isEmpty()) {
-                            NativeListItem("Loading...", headlineColor = p.secondaryText, leading = {
+                            NativeListItem(tr(R.string.loading) + "…", headlineColor = p.secondaryText, leading = {
                                 CircularProgressIndicator(Modifier.size(24.dp), color = p.secondaryText, strokeWidth = 2.dp)
                             })
                         } else if (options.isEmpty()) {

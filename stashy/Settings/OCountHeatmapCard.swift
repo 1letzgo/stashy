@@ -704,7 +704,7 @@ struct OCountImageDestination: View {
             } else {
                 ZStack {
                     Color.black.ignoresSafeArea()
-                    StandardLoadingView(message: "Loading...")
+                    StandardLoadingView(message: tr("loading"))
                 }
             }
         }

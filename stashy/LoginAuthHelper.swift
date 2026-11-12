@@ -60,7 +60,7 @@ class LoginAuthHelper {
         }
         
         if httpLoginResponse.statusCode != 200 {
-            throw LoginError.loginFailed("Server returned status code \(httpLoginResponse.statusCode)")
+            throw LoginError.loginFailed(tr("error_server_returned_status_code_arg", httpLoginResponse.statusCode))
         }
         
         // 2. Fetch API Key via GraphQL
@@ -86,7 +86,7 @@ class LoginAuthHelper {
         }
         
         if httpGqlResponse.statusCode != 200 {
-            throw LoginError.loginFailed("GraphQL request failed: \(httpGqlResponse.statusCode)")
+            throw LoginError.loginFailed(tr("error_graphql_request_failed_arg", httpGqlResponse.statusCode))
         }
         
         // Parse the response
