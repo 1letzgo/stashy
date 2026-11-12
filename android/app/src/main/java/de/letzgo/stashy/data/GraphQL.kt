@@ -34,7 +34,8 @@ sealed class GraphQLError(message: String) : Exception(message) {
     object NoServerConfig : GraphQLError(tr(R.string.hint_server_configuration_is_missing_or))
     object Unauthorized : GraphQLError(tr(R.string.hint_api_key_is_invalid_or))
     class Server(code: Int, body: String?) : GraphQLError(tr(R.string.server_error_arg_arg, code, body?.take(200) ?: tr(R.string.unknown)))
-    class Query(message: String) : GraphQLError(tr(R.string.graphql_error_arg, message))
+    /** [serverMessages]: the server's own `errors[].message` texts (English, untranslated) — match on these, never on [message]. */
+    class Query(message: String, val serverMessages: List<String> = emptyList()) : GraphQLError(tr(R.string.graphql_error_arg, message))
     class Decoding(cause: Throwable) : GraphQLError(tr(R.string.error_decode_response_arg, cause.message))
     class Network(cause: Throwable) : GraphQLError(networkMessage(cause))
 
@@ -141,8 +142,8 @@ object GraphQL {
             }
             val data = root?.get("data") as? JsonObject
             if (data == null) {
-                if (errors.any { it.contains("Cannot query field") }) throw GraphQLError.Query(tr(R.string.error_graphql_schema_not_compatible))
-                throw GraphQLError.Query(errors.firstOrNull() ?: tr(R.string.error_query_failed))
+                if (errors.any { it.contains("Cannot query field") }) throw GraphQLError.Query(tr(R.string.error_graphql_schema_not_compatible), errors)
+                throw GraphQLError.Query(errors.firstOrNull() ?: tr(R.string.error_query_failed), errors)
             }
             data
         }

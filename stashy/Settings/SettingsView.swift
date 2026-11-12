@@ -673,10 +673,15 @@ struct SettingsView: View {
     }
 
     private func purchaseStashyPlus(_ product: StashyStoreProduct) async {
-        if let error = await storeManager.purchase(product) {
+        switch await storeManager.purchase(product) {
+        case .cancelled:
+            break
+        case .failed(let error):
             ToastManager.shared.show(error, icon: "exclamationmark.triangle", style: .error)
-        } else if stashyPlus.isUnlocked {
-            ToastManager.shared.show(tr("stashy_plus_unlocked_thank_you"), icon: "sparkles", style: .success)
+        case .purchased:
+            if stashyPlus.isUnlocked {
+                ToastManager.shared.show(tr("stashy_plus_unlocked_thank_you"), icon: "sparkles", style: .success)
+            }
         }
     }
 
@@ -839,9 +844,12 @@ struct SettingsView: View {
     }
 
     private func purchaseTip(_ product: StashyStoreProduct) async {
-        if let error = await storeManager.purchase(product) {
+        switch await storeManager.purchase(product) {
+        case .cancelled:
+            break
+        case .failed(let error):
             ToastManager.shared.show(error, icon: "exclamationmark.triangle", style: .error)
-        } else {
+        case .purchased:
             ToastManager.shared.show(tr("thank_you_for_tip"), icon: "heart.fill", style: .success)
         }
     }
@@ -967,20 +975,20 @@ class StoreManager: ObservableObject {
 
     /// Result used by the Settings UI for toasts.
     @discardableResult
-    func purchase(_ product: StashyStoreProduct) async -> String? {
+    func purchase(_ product: StashyStoreProduct) async -> StashyPurchaseOutcome {
         purchasingProductID = product.id
         defer { purchasingProductID = nil }
-        let (message, customerInfo) = await StashyRevenueCat.purchase(product)
-        if let message { return message }
+        let (outcome, customerInfo) = await StashyRevenueCat.purchase(product)
+        guard case .purchased = outcome else { return outcome }
         if StashyPlusProduct.tipIDs.contains(product.id) {
             UserDefaults.standard.set(true, forKey: LegacySupporterTipPrompt.hasTippedKey)
-            return nil
+            return .purchased
         }
         StashyPlusManager.shared.clearDebugForceLock()
         await syncUnlockFromStore(customerInfo: customerInfo)
         // A trial taken is gone for the whole subscription group.
         trialEligibleIDs = await StashyRevenueCat.trialEligibleIDs(for: products)
-        return nil
+        return .purchased
     }
 
     /// Refresh entitlements (RevenueCat + StoreKit: subscriptions, lifetime, paid app before 3.0).
@@ -1478,10 +1486,12 @@ struct LegacySupporterTipPrompt: ViewModifier {
     }
 
     private func tip(_ product: StashyStoreProduct) async {
-        if let error = await store.purchase(product) {
-            guard error != tr("purchase_cancelled") else { return }
+        switch await store.purchase(product) {
+        case .cancelled:
+            break
+        case .failed(let error):
             ToastManager.shared.show(error, icon: "exclamationmark.triangle", style: .error)
-        } else {
+        case .purchased:
             ToastManager.shared.show(tr("thank_you_for_tip"), icon: "heart.fill", style: .success)
         }
     }

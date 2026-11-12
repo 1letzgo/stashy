@@ -13,6 +13,9 @@ enum GraphQLNetworkError: LocalizedError {
     case unauthorized
     case serverError(statusCode: Int, message: String?)
     case graphQLError(message: String)
+    /// The server does not know a field of the query (an older or newer Stash). `serverMessages`
+    /// are Stash's own, untranslated texts — match on these, never on `localizedDescription`.
+    case schemaMismatch(serverMessages: [String])
     case decodingError(Error)
     case networkError(Error)
     case timeout
@@ -29,6 +32,8 @@ enum GraphQLNetworkError: LocalizedError {
             return tr("server_error_arg_arg", code, message ?? tr("unknown"))
         case .graphQLError(let message):
             return tr("graphql_error_arg", message)
+        case .schemaMismatch:
+            return tr("graphql_error_arg", tr("error_graphql_schema_not_compatible"))
         case .decodingError(let error):
             return tr("error_decode_response_arg", error.localizedDescription)
         case .networkError(let error):
@@ -390,7 +395,7 @@ actor GraphQLClient {
 
         let messages = errors.compactMap { $0["message"] as? String }
         if messages.contains(where: { $0.contains("Cannot query field") }) {
-            throw GraphQLNetworkError.graphQLError(message: tr("error_graphql_schema_not_compatible"))
+            throw GraphQLNetworkError.schemaMismatch(serverMessages: messages)
         }
         throw GraphQLNetworkError.graphQLError(message: messages.first ?? tr("error_query_failed"))
     }

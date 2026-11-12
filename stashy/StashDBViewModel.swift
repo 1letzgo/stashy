@@ -850,6 +850,8 @@ class StashDBViewModel: ObservableObject {
     private var previewsNoProgressStreak = 0
     private var clipsNoProgressStreak = 0
     private var previewsEmptyChaseCount = 0
+    /// The "no scenes with previews" hint as shown, so it is cleared by identity, not by matching its (translated) text.
+    private var previewsEmptyMessage: String?
     private var feedFailureStreaks: [String: Int] = [:]
 
     // Single-flight guard: TabView remounts fire `onAppear` multiple times, each
@@ -3589,8 +3591,9 @@ class StashDBViewModel: ObservableObject {
                             self.previews.append(contentsOf: newScenes)
                             addedCount = newScenes.count
                         }
-                        if !self.previews.isEmpty, self.errorMessage?.contains("previews") == true {
-                            self.errorMessage = nil
+                        if !self.previews.isEmpty, let shown = self.previewsEmptyMessage {
+                            if self.errorMessage == shown { self.errorMessage = nil }
+                            self.previewsEmptyMessage = nil
                         }
                         self.hasMorePreviews = hasMore
                         self.currentPreviewPage = page
@@ -3611,7 +3614,9 @@ class StashDBViewModel: ObservableObject {
                         // of rendering a silent blank screen.
                         if self.previews.isEmpty {
                             let scanned = page * self.previewsPerPage
-                            self.errorMessage = tr("hint_no_scenes_with_previews_found", scanned)
+                            let message = tr("hint_no_scenes_with_previews_found", scanned)
+                            self.errorMessage = message
+                            self.previewsEmptyMessage = message
                         }
 
                         if !isInitialLoad {

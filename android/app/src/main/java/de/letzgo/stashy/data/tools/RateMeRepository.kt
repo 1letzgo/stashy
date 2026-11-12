@@ -4,6 +4,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import de.letzgo.stashy.data.GraphQL
+import de.letzgo.stashy.data.GraphQLError
 import de.letzgo.stashy.data.IdName
 import de.letzgo.stashy.data.ImagePaths
 import de.letzgo.stashy.data.Net
@@ -307,9 +308,9 @@ object RateMeRepository {
             throw e
         } catch (e: Exception) {
             // Newer Stash: the field no longer exists → use `sceneAddO`.
-            if (e.message?.contains("sceneIncrementO") == true || e.message?.contains("schema not compatible") == true ||
-                e.message?.contains("Cannot query field") == true
-            ) {
+            // Match the server's untranslated texts, not the (localized) exception message.
+            val server = (e as? GraphQLError.Query)?.serverMessages.orEmpty()
+            if (server.any { it.contains("sceneIncrementO") || it.contains("Cannot query field") }) {
                 GraphQL.data(SCENE_ADD_O, vars)["sceneAddO"].obj?.get("count").stringOrNull?.toIntOrNull()
             } else throw e
         }

@@ -115,6 +115,14 @@ struct RateMeIncrementOData: Codable {
     let imageIncrementO: Int?
 }
 
+struct RateMeAddOResponse: Codable {
+    struct DataBox: Codable {
+        struct Count: Codable { let count: Int? }
+        let sceneAddO: Count?
+    }
+    let data: DataBox?
+}
+
 struct RateMeDestroyResponse: Codable {
     let data: RateMeDestroyData?
 }
@@ -671,10 +679,22 @@ final class RateMeViewModel: ObservableObject {
             }
             """
         }
-        let res: RateMeIncrementOResponse = try await client.execute(
-            query: mutation,
-            variables: ["id": id]
-        )
+        let res: RateMeIncrementOResponse
+        do {
+            res = try await client.execute(query: mutation, variables: ["id": id])
+        } catch GraphQLNetworkError.schemaMismatch(let serverMessages) where mode == .scenes
+                    && serverMessages.contains(where: { $0.contains("sceneIncrementO") || $0.contains("Cannot query field") }) {
+            // Newer Stash: the field is gone → `sceneAddO` (same as Android `incrementSceneO`).
+            let added: RateMeAddOResponse = try await client.execute(
+                query: """
+                mutation RateMeSceneAddO($id: ID!) {
+                  sceneAddO(id: $id) { count }
+                }
+                """,
+                variables: ["id": id]
+            )
+            return added.data?.sceneAddO?.count
+        }
         switch mode {
         case .scenes: return res.data?.sceneIncrementO
         case .images: return res.data?.imageIncrementO

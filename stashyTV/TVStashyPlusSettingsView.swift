@@ -73,14 +73,14 @@ final class TVStashyPlusStore: ObservableObject {
 
     /// Result used by the Settings UI for inline messages.
     @discardableResult
-    func purchase(_ product: StashyStoreProduct) async -> String? {
+    func purchase(_ product: StashyStoreProduct) async -> StashyPurchaseOutcome {
         purchasingProductID = product.id
         defer { purchasingProductID = nil }
-        let (message, customerInfo) = await StashyRevenueCat.purchase(product)
-        if let message { return message }
+        let (outcome, customerInfo) = await StashyRevenueCat.purchase(product)
+        guard case .purchased = outcome else { return outcome }
         StashyPlusManager.shared.clearDebugForceLock()
         await syncUnlockFromStore(customerInfo: customerInfo)
-        return nil
+        return .purchased
     }
 
     func restorePurchases() async {
@@ -229,7 +229,7 @@ struct TVStashyPlusSettingsView: View {
                             Button {
                                 let productToBuy = product
                                 Task {
-                                    if let message = await store.purchase(productToBuy), !message.isEmpty {
+                                    if case .failed(let message) = await store.purchase(productToBuy) {
                                         AppLog.debug("Purchase result: \(message)")
                                     }
                                 }

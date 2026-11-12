@@ -787,10 +787,26 @@ final class SceneLiveTranscriptionController: ObservableObject {
                 break
             }
         }
-        let ns = error as NSError
-        if ns.domain == NSURLErrorDomain && ns.code == NSURLErrorCancelled { return true }
-        let message = ns.localizedDescription.lowercased()
-        return message.contains("cancelled") || message.contains("canceled")
+        // Decide by domain and code: `localizedDescription` follows the app language
+        // ("abgebrochen" in German), so a text match only ever worked in English.
+        var current: NSError? = error as NSError
+        var depth = 0
+        while let ns = current, depth < 4 {
+            if isCancellation(ns) { return true }
+            current = ns.userInfo[NSUnderlyingErrorKey] as? NSError
+            depth += 1
+        }
+        return false
+    }
+
+    private static func isCancellation(_ ns: NSError) -> Bool {
+        switch ns.domain {
+        case NSURLErrorDomain: return ns.code == NSURLErrorCancelled
+        case NSCocoaErrorDomain: return ns.code == NSUserCancelledError
+        case "kAFAssistantErrorDomain": return ns.code == 216 || ns.code == 301 // request cancelled
+        case "Swift.CancellationError": return true
+        default: return false
+        }
     }
 
     private func startSession(generation: UInt) async throws {
