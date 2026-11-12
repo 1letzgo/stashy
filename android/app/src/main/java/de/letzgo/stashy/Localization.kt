@@ -69,8 +69,11 @@ object AppLanguage {
             }.firstOrNull() ?: ENGLISH
         }
 
-    /** Whether the switch is offered: not on a device that gets English anyway (unless it is on). */
-    val offersEnglishSwitch: Boolean get() = usesEnglish || deviceLanguage != ENGLISH
+    /**
+     * Whether the switch is offered: not on a device that gets English anyway. Also not while it is
+     * still on there from an earlier version: it would change nothing and vanish when turned off.
+     */
+    val offersEnglishSwitch: Boolean get() = deviceLanguage != ENGLISH
 
     /** The choice this launch runs with. */
     var active: String = SYSTEM

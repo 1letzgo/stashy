@@ -57,8 +57,9 @@ enum AppLanguage {
     /// The language stashy speaks on this device without the switch.
     static var deviceLanguage: String { resolve(systemValue) }
 
-    /// Whether the switch is offered: not on a device that gets English anyway (unless it is on).
-    static var offersEnglishSwitch: Bool { usesEnglish || deviceLanguage != defaultValue }
+    /// Whether the switch is offered: not on a device that gets English anyway. Also not while it
+    /// is still on there from an earlier version: it would change nothing and vanish when turned off.
+    static var offersEnglishSwitch: Bool { deviceLanguage != defaultValue }
 
     /// Switches every text to `code` right away and rebuilds the interface.
     static func select(_ code: String) {
@@ -86,13 +87,19 @@ enum AppLanguage {
         Locale(identifier: state.withLock { $0.resolved })
     }
 
-    /// The device's languages, from the global domain: the app's own `AppleLanguages` override
-    /// (set while the switch is on) hides them in the standard defaults and in
-    /// `Locale.preferredLanguages` until the next start.
-    private static var deviceLanguages: [String] {
-        let global = UserDefaults.standard.persistentDomain(forName: UserDefaults.globalDomain)?["AppleLanguages"] as? [String]
-        return global ?? Locale.preferredLanguages
-    }
+    /// The device's languages, read once per start. While the switch is on, the app's own
+    /// `AppleLanguages` override hides them (also in `Locale.preferredLanguages`, and the global
+    /// domain is not readable from the sandbox), so the override is lifted for the read: the
+    /// standard defaults then fall through to the device's list.
+    private static let deviceLanguages: [String] = {
+        let defaults = UserDefaults.standard
+        let own = Bundle.main.bundleIdentifier.flatMap { defaults.persistentDomain(forName: $0)?["AppleLanguages"] }
+        guard let own else { return defaults.stringArray(forKey: "AppleLanguages") ?? Locale.preferredLanguages }
+        defaults.removeObject(forKey: "AppleLanguages")
+        let device = defaults.stringArray(forKey: "AppleLanguages")
+        defaults.set(own, forKey: "AppleLanguages")
+        return device ?? Locale.preferredLanguages
+    }()
 
     /// "system" → the best of stashy's languages for the device, English when none fits.
     private static func resolve(_ code: String) -> String {
