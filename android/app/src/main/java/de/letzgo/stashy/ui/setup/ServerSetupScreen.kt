@@ -159,10 +159,8 @@ fun ServerSetupScreen(existing: ServerConfig? = null, onDone: () -> Unit) {
                     Text(tr(R.string.enter_your_stash_server_information), style = NativeType.bodyLarge, color = p.secondaryText, textAlign = TextAlign.Center)
                 }
                 Spacer(Modifier.height(8.dp))
-                // App language: stashy follows the device; the switch forces English (restarts the app).
-                if (de.letzgo.stashy.AppLanguage.offersEnglishSwitch) {
-                    Labeled(tr(R.string.app_language)) { de.letzgo.stashy.ui.settings.AppLanguageSwitchRow() }
-                }
+                // App language: follows the device unless one is picked here; a change restarts the app.
+                Labeled(tr(R.string.app_language)) { de.letzgo.stashy.ui.settings.AppLanguagePickerRow() }
                 PlainTextField(serverName, { serverName = it }, tr(R.string.my_stash), label = tr(R.string.server_name))
                 Labeled(tr(R.string.protocol)) { Segmented(ServerProtocol.entries, proto, { it.name }) { proto = it } }
                 NativeTextField(

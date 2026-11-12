@@ -23,9 +23,9 @@ object Localization {
 }
 
 /**
- * The language of stashy's own texts: the device's language when stashy has it, English otherwise.
- * One switch in Settings ("Use stashy in English", offered when the device is not English anyway)
- * forces English. Chosen once per launch; a change restarts the app at once.
+ * The language of stashy's own texts. Unless the user picks one in Settings it follows the device
+ * ("system"): the device's language when stashy has it, English otherwise. Chosen once per launch;
+ * a change restarts the app at once.
  * iOS: `AppLanguage` in Localization.swift (same key and values).
  */
 object AppLanguage {
@@ -43,17 +43,14 @@ object AppLanguage {
     )
 
     /**
-     * The stored choice: "en" (the switch is on) or "system". A language picked in the former
-     * picker counts as "system".
+     * The stored choice (what the picker shows): "system" unless one of stashy's languages was
+     * picked. Nothing stored, or a language stashy no longer has, counts as "system".
      */
     val stored: String get() = known(Prefs.string(STORAGE_KEY))
 
-    private fun known(code: String?): String = if (code == ENGLISH) ENGLISH else SYSTEM
+    private fun known(code: String?): String = if (options.any { it.first == code }) code!! else SYSTEM
 
-    /** The switch "Use stashy in English". */
-    val usesEnglish: Boolean get() = stored == ENGLISH
-
-    /** The language stashy speaks on this device without the switch. */
+    /** The language stashy speaks on this device when none is picked. */
     val deviceLanguage: String
         get() {
             val codes = options.map { it.first }
@@ -68,12 +65,6 @@ object AppLanguage {
                 }.takeIf { it in codes }
             }.firstOrNull() ?: ENGLISH
         }
-
-    /**
-     * Whether the switch is offered: not on a device that gets English anyway. Also not while it is
-     * still on there from an earlier version: it would change nothing and vanish when turned off.
-     */
-    val offersEnglishSwitch: Boolean get() = deviceLanguage != ENGLISH
 
     /** The choice this launch runs with. */
     var active: String = SYSTEM

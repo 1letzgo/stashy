@@ -70,7 +70,7 @@ fun SettingsScreen() {
 
 private fun androidx.compose.foundation.lazy.LazyListScope.mainSettings() {
     serverListSection()
-    if (de.letzgo.stashy.AppLanguage.offersEnglishSwitch) appLanguageSection()
+    appLanguageSection()
     if (ServerConfigManager.activeConfig != null) playbackSections()
     settingsTransferSection()
     aboutSection()
@@ -150,34 +150,34 @@ private fun LinkRow(title: String, icon: ImageVector, url: String) {
     })
 }
 
-/** iOS: `AppLanguageSwitch` in Settings › App Language (beta). */
+/** iOS: `AppLanguagePicker` in Settings › App Language (beta). */
 private fun androidx.compose.foundation.lazy.LazyListScope.appLanguageSection() {
     settingsSection(header = tr(R.string.app_language), isBeta = true, key = "app-language") {
-        AppLanguageSwitchRow()
+        AppLanguagePickerRow()
     }
 }
 
 /**
- * iOS: `AppLanguageSwitch` — stashy follows the device; this switch forces English. Offered only
- * when the device is not English anyway ([de.letzgo.stashy.AppLanguage.offersEnglishSwitch]). A
- * change is confirmed in an alert, then the app restarts in that language.
+ * iOS: `AppLanguagePicker` — the language picker of Settings and the setup wizard: "Device
+ * Language" unless one of stashy's languages is picked. A pick is confirmed in an alert, then the
+ * app restarts in that language.
  */
 @androidx.compose.runtime.Composable
-fun AppLanguageSwitchRow() {
-    val language = de.letzgo.stashy.AppLanguage
+fun AppLanguagePickerRow() {
     val context = androidx.compose.ui.platform.LocalContext.current
-    val usesEnglish = remember { language.usesEnglish }
-    var pending by remember { androidx.compose.runtime.mutableStateOf<Boolean?>(null) }
-    SettingsToggleRow(tr(R.string.use_stashy_in_english), pending ?: usesEnglish, icon = SFS.globe) { value ->
-        if (value != usesEnglish) pending = value
+    val selection = remember { de.letzgo.stashy.AppLanguage.stored }
+    var pending by remember { androidx.compose.runtime.mutableStateOf<String?>(null) }
+    val codes = listOf(de.letzgo.stashy.AppLanguage.SYSTEM) + de.letzgo.stashy.AppLanguage.options.map { it.first }
+    SettingsPickerRow(tr(R.string.language), codes, selection, { de.letzgo.stashy.AppLanguage.name(it) }, SFS.globe) { code ->
+        if (code != selection) pending = code
     }
-    pending?.let { value ->
+    pending?.let { code ->
         de.letzgo.stashy.ui.NativeConfirmDialog(
             title = tr(R.string.confirm_change_language),
-            text = tr(R.string.hint_language_switch, language.name(if (value) language.ENGLISH else language.deviceLanguage)),
+            text = tr(R.string.hint_language_switch, de.letzgo.stashy.AppLanguage.name(code)),
             onDismiss = { pending = null },
             confirmLabel = tr(R.string.action_change),
-            onConfirm = { pending = null; language.selectAndRestart(context, if (value) language.ENGLISH else language.SYSTEM) },
+            onConfirm = { pending = null; de.letzgo.stashy.AppLanguage.selectAndRestart(context, code) },
         )
     }
 }

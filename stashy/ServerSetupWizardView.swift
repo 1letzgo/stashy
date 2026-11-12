@@ -149,18 +149,21 @@ struct ServerSetupWizardView: View {
                 .padding(.top, 32)
                 
                 VStack(spacing: 16) {
-                    // App language: stashy follows the device; the switch forces English.
-                    if AppLanguage.offersEnglishSwitch {
-                        VStack(alignment: .leading, spacing: 8) {
-                            Text(tr("app_language"))
-                                .font(.caption)
-                                .foregroundColor(.secondary)
+                    // App language: follows the device unless one is picked here.
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text(tr("app_language"))
+                            .font(.caption)
+                            .foregroundColor(.secondary)
 
-                            AppLanguageSwitch()
-                                .padding()
-                                .background(Color.secondaryAppBackground)
-                                .cornerRadius(DesignTokens.CornerRadius.card)
+                        HStack {
+                            Label(tr("language"), systemImage: "globe")
+                            Spacer()
+                            AppLanguagePicker()
+                                .labelsHidden()
                         }
+                        .padding()
+                        .background(Color.secondaryAppBackground)
+                        .cornerRadius(DesignTokens.CornerRadius.card)
                     }
 
                     // Server Name

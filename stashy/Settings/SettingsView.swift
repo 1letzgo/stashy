@@ -224,12 +224,10 @@ struct SettingsView: View {
             onScan: { startLibraryScan() }
         )
 
-        if AppLanguage.offersEnglishSwitch {
-            Section {
-                stashyScrollingSectionHeader(tr("app_language"), isBeta: true)
-                AppLanguageSwitch()
-                    .stashyGroupedSettingsRow()
-            }
+        Section {
+            stashyScrollingSectionHeader(tr("app_language"), isBeta: true)
+            AppLanguagePicker()
+                .stashyGroupedSettingsRow()
         }
 
         if configManager.activeConfig != nil {
@@ -1491,26 +1489,28 @@ struct LegacySupporterTipPrompt: ViewModifier {
 
 #endif
 
-/// Settings › App Language: stashy follows the device; this switch forces English. Offered only
-/// when the device is not English anyway (`AppLanguage.offersEnglishSwitch`). A change is confirmed
-/// in an alert, then the interface switches at once. Also used in the setup wizard.
-struct AppLanguageSwitch: View {
-    @State private var usesEnglish = AppLanguage.usesEnglish
-    @State private var pending: Bool?
-
-    private var pendingLanguageName: String {
-        AppLanguage.name(for: (pending ?? usesEnglish) ? AppLanguage.defaultValue : AppLanguage.deviceLanguage)
-    }
+/// Settings › App Language: stashy follows the device ("Device Language") unless the user picks
+/// one of its languages. A pick is confirmed in an alert, then the interface switches at once.
+/// Same `Picker` as the other settings rows; also used in the setup wizard.
+struct AppLanguagePicker: View {
+    @State private var selection = AppLanguage.stored
+    @State private var pending: String?
 
     var body: some View {
-        Toggle(isOn: Binding(
-            get: { usesEnglish },
-            set: { value in
-                guard value != usesEnglish else { return }
-                pending = value
+        Picker(selection: Binding(
+            get: { selection },
+            set: { code in
+                guard code != selection else { return }
+                pending = code
             }
         )) {
-            Label(tr("use_stashy_in_english"), systemImage: "globe")
+            Text(AppLanguage.name(for: AppLanguage.systemValue)).tag(AppLanguage.systemValue)
+            Divider()
+            ForEach(AppLanguage.options, id: \.code) { option in
+                Text(option.name).tag(option.code)
+            }
+        } label: {
+            Label(tr("language"), systemImage: "globe")
         }
         .alert(tr("confirm_change_language"), isPresented: Binding(
             get: { pending != nil },
@@ -1518,13 +1518,13 @@ struct AppLanguageSwitch: View {
         )) {
             Button(tr("action_cancel"), role: .cancel) { pending = nil }
             Button(tr("action_change")) {
-                guard let value = pending else { return }
+                guard let code = pending else { return }
                 pending = nil
-                usesEnglish = value
-                AppLanguage.select(value ? AppLanguage.defaultValue : AppLanguage.systemValue)
+                selection = code
+                AppLanguage.select(code)
             }
         } message: {
-            Text(tr("hint_language_switch", pendingLanguageName))
+            Text(tr("hint_language_switch", AppLanguage.name(for: pending ?? selection)))
         }
     }
 }

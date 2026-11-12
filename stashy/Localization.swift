@@ -22,11 +22,11 @@ func tr(_ key: String, _ args: Any...) -> String {
     return String(format: format, arguments: texts)
 }
 
-/// The language of stashy's own texts: the device's language when stashy has it, English otherwise.
-/// One switch in Settings ("Use stashy in English", offered when the device is not English anyway)
-/// forces English. A change applies at once: `tr()` reads the new bundle and `LanguageRefreshing`
-/// rebuilds the interface. System texts (alerts, date pickers) follow from the next start, through
-/// `AppleLanguages`. Apple TV has no switch and stays English.
+/// The language of stashy's own texts. Unless the user picks one in Settings it follows the device
+/// ("system"): the device's language when stashy has it, English otherwise. A change applies at
+/// once: `tr()` reads the new bundle and `LanguageRefreshing` rebuilds the interface. System texts
+/// (alerts, date pickers) follow from the next start, through `AppleLanguages`. Apple TV has no
+/// picker and stays English.
 enum AppLanguage {
     static let storageKey = "app_language"
     static let systemValue = "system"
@@ -41,25 +41,17 @@ enum AppLanguage {
         ("ko", "한국어"), ("zh-Hans", "简体中文"), ("zh-Hant", "繁體中文"),
     ]
 
-    /// The stored choice: "en" (the switch is on) or "system". A language picked in the former
-    /// picker counts as "system".
+    /// The stored choice (what the picker shows): "system" unless one of stashy's languages was
+    /// picked. Nothing stored, or a language stashy no longer has, counts as "system".
     static var stored: String {
         #if os(tvOS)
         return defaultValue
         #else
-        return UserDefaults.standard.string(forKey: storageKey) == defaultValue ? defaultValue : systemValue
+        guard let code = UserDefaults.standard.string(forKey: storageKey),
+              options.contains(where: { $0.code == code }) else { return systemValue }
+        return code
         #endif
     }
-
-    /// The switch "Use stashy in English".
-    static var usesEnglish: Bool { stored == defaultValue }
-
-    /// The language stashy speaks on this device without the switch.
-    static var deviceLanguage: String { resolve(systemValue) }
-
-    /// Whether the switch is offered: not on a device that gets English anyway. Also not while it
-    /// is still on there from an earlier version: it would change nothing and vanish when turned off.
-    static var offersEnglishSwitch: Bool { deviceLanguage != defaultValue }
 
     /// Switches every text to `code` right away and rebuilds the interface.
     static func select(_ code: String) {
@@ -87,7 +79,7 @@ enum AppLanguage {
         Locale(identifier: state.withLock { $0.resolved })
     }
 
-    /// The device's languages, read once per start. While the switch is on, the app's own
+    /// The device's languages, read once per start. While a language is picked, the app's own
     /// `AppleLanguages` override hides them (also in `Locale.preferredLanguages`, and the global
     /// domain is not readable from the sandbox), so the override is lifted for the read: the
     /// standard defaults then fall through to the device's list.
