@@ -101,6 +101,10 @@ final class StashyPlusManager: ObservableObject {
 
     /// Undoes what those builds stored: the real flag was never touched by them, so it still
     /// says whether this install had Lifetime.
+    /// Runs once, before the first read of the unlock state, wherever that read comes from:
+    /// `isUnlockedNow` is asked by tabs and Home before this manager exists.
+    nonisolated private static let strayLifetimeRepair: Void = repairStrayLifetimeKeyIfNeeded()
+
     nonisolated private static func repairStrayLifetimeKeyIfNeeded() {
         let defaults = UserDefaults.standard
         guard defaults.object(forKey: strayLifetimeKey) != nil else { return }
@@ -233,6 +237,7 @@ final class StashyPlusManager: ObservableObject {
 
     /// Thread-safe read for non-`MainActor` call sites.
     nonisolated static var isUnlockedNow: Bool {
+        _ = strayLifetimeRepair
         let defaults = UserDefaults.standard
         if defaults.bool(forKey: debugForceLockedKey) { return false }
         if localUnlockActive { return true }
@@ -246,7 +251,7 @@ final class StashyPlusManager: ObservableObject {
 
     private init() {
         let defaults = UserDefaults.standard
-        Self.repairStrayLifetimeKeyIfNeeded()
+        _ = Self.strayLifetimeRepair
         Self.revokeTipEraUnlockIfNeeded()
 
         let storedSource = StashyPlusSource(rawValue: defaults.string(forKey: Self.sourceKey) ?? "") ?? .none
