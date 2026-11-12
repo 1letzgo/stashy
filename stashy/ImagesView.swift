@@ -1223,7 +1223,7 @@ private struct ImagesViewBody: View {
     
     private var floatingDeleteBar: some View {
         HStack(spacing: DesignTokens.Spacing.md) {
-            Text(tr("arg_selected", selectedImageIds.count))
+            Text(tr("arg_selected_count", selectedImageIds.count))
                 .font(.subheadline)
                 .fontWeight(.bold)
                 .foregroundColor(.primary)
@@ -2230,7 +2230,7 @@ private struct GalleryDownloadOptionsAlert: ViewModifier {
             Button(tr("action_cancel"), role: .cancel) {}
         } message: {
             if let stored, let total = stored.serverImageCount {
-                Text("\(stored.images.count) of \(total) downloaded")
+                Text(tr("arg_of_arg_downloaded", stored.images.count, total))
             } else if let count = gallery?.imageCount {
                 Text(tr("arg_images_in_this_gallery", count))
             }

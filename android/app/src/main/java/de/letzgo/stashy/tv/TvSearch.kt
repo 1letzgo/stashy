@@ -143,7 +143,7 @@ fun TvSearch(model: TvSearchModel) {
                 }
             }
             when {
-                model.isBusy && !model.hasAnyResults -> item(key = "busy") { TvLoading(tr(R.string.searching_menu)) }
+                model.isBusy && !model.hasAnyResults -> item(key = "busy") { TvLoading(tr(R.string.loading_searching)) }
                 model.hasSearched && !model.hasAnyResults -> item(key = "none") {
                     Column(Modifier.fillMaxWidth().padding(top = pt(40)), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(pt(20))) {
                         Icon(TvIcons.magnifier, null, Modifier.size(pt(56)), tint = TvColors.secondary)

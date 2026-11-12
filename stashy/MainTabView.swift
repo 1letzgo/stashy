@@ -919,11 +919,48 @@ struct ToolsServerView: View {
             case .studios: return tr("action_remove_unused_studios")
             }
         }
-        var noun: String {
+        /// For logs only; UI texts have a key per kind (an inserted noun would stay English).
+        var logName: String {
             switch self {
             case .tags: return "tags"
             case .performers: return "performers"
             case .studios: return "studios"
+            }
+        }
+        var confirmTitle: String {
+            switch self {
+            case .tags: return tr("confirm_remove_unused_tags")
+            case .performers: return tr("confirm_remove_unused_performers")
+            case .studios: return tr("confirm_remove_unused_studios")
+            }
+        }
+        var emptyText: String {
+            switch self {
+            case .tags: return tr("empty_unused_tags_found")
+            case .performers: return tr("empty_unused_performers_found")
+            case .studios: return tr("empty_unused_studios_found")
+            }
+        }
+        var loadError: String {
+            switch self {
+            case .tags: return tr("error_load_tag_list")
+            case .performers: return tr("error_load_performer_list")
+            case .studios: return tr("error_load_studio_list")
+            }
+        }
+        var deleteError: String {
+            switch self {
+            case .tags: return tr("error_delete_unused_tags")
+            case .performers: return tr("error_delete_unused_performers")
+            case .studios: return tr("error_delete_unused_studios")
+            }
+        }
+        /// "1 tag" / "3 performers".
+        func counted(_ count: Int) -> String {
+            switch self {
+            case .tags: return tr(count == 1 ? "arg_count_tag" : "arg_count_tags", count)
+            case .performers: return tr(count == 1 ? "arg_count_performer" : "arg_count_performers", count)
+            case .studios: return tr(count == 1 ? "arg_count_studio" : "arg_count_studios", count)
             }
         }
     }
@@ -1084,7 +1121,7 @@ struct ToolsServerView: View {
         } message: {
             Text(tr("hint_deletes_covers_previews_sprites_transcodes"))
         }
-        .alert(tr("confirm_remove_unused_arg", cleanupKind.noun), isPresented: $showCleanupConfirmation) {
+        .alert(cleanupKind.confirmTitle, isPresented: $showCleanupConfirmation) {
             Button(tr("action_delete_arg", cleanupCandidates.count), role: .destructive) { deleteUnused() }
             Button(tr("action_cancel"), role: .cancel) { runningTask = nil }
         } message: {
@@ -1171,7 +1208,7 @@ struct ToolsServerView: View {
                             .font(.title2)
                     }
                     .buttonStyle(.borderless)
-                    .accessibilityLabel(tr("action_cancel_arg", job.description ?? "job"))
+                    .accessibilityLabel(job.description.map { tr("action_cancel_arg", $0) } ?? tr("action_cancel"))
                 }
             }
         }
@@ -1300,8 +1337,8 @@ struct ToolsServerView: View {
     private var cleanupConfirmationMessage: String {
         // Ein paar Namen zeigen, damit die Zahl nachvollziehbar ist.
         let preview = cleanupCandidates.prefix(8).map(\.name).joined(separator: ", ")
-        let rest = cleanupCandidates.count > 8 ? " and \(cleanupCandidates.count - 8) more" : ""
-        return tr("hint_arg_arg_are_not_used", cleanupCandidates.count, cleanupKind.noun, preview, rest)
+        let names = cleanupCandidates.count > 8 ? tr("arg_and_arg_more", preview, cleanupCandidates.count - 8) : preview
+        return tr("hint_arg_not_used_anywhere", cleanupKind.counted(cleanupCandidates.count), names)
     }
 
     /// Zählt ein Tag nirgends, ist es ungenutzt. Alle fünf Zähler kommen aus `TagFields`.
@@ -1329,16 +1366,16 @@ struct ToolsServerView: View {
                 }
                 await MainActor.run {
                     guard !unused.isEmpty else {
-                        showResult(title: kind.title, message: tr("empty_unused_arg_found", kind.noun))
+                        showResult(title: kind.title, message: kind.emptyText)
                         return
                     }
                     cleanupCandidates = unused
                     showCleanupConfirmation = true
                 }
             } catch {
-                AppLog.error("❌ Scanning \(kind.noun) failed: \(error.localizedDescription)")
+                AppLog.error("❌ Scanning \(kind.logName) failed: \(error.localizedDescription)")
                 await MainActor.run {
-                    showResult(title: kind.title, message: tr("error_load_arg_list", kind.noun))
+                    showResult(title: kind.title, message: kind.loadError)
                 }
             }
         }
@@ -1362,14 +1399,14 @@ struct ToolsServerView: View {
                     FilterPickerOptionsStore.shared.invalidate()
                     showResult(
                         title: kind.title,
-                        message: ok ? "\(count) unused \(kind.noun) deleted." : tr("server_rejected_deletion")
+                        message: ok ? tr("arg_deleted", kind.counted(count)) : tr("server_rejected_deletion")
                     )
                 }
             } catch {
-                AppLog.error("❌ Deleting unused \(kind.noun) failed: \(error.localizedDescription)")
+                AppLog.error("❌ Deleting unused \(kind.logName) failed: \(error.localizedDescription)")
                 await MainActor.run {
                     cleanupCandidates = []
-                    showResult(title: kind.title, message: tr("error_delete_arg", kind.noun))
+                    showResult(title: kind.title, message: kind.deleteError)
                 }
             }
         }

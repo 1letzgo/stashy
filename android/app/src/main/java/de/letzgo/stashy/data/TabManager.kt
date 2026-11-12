@@ -85,7 +85,7 @@ object TabManager {
     /** "10 s", "3 min" — the picker's wording (iOS `playerSkipLabel`). */
     fun playerSkipLabel(seconds: Double): String {
         val value = Math.round(seconds).toInt()
-        return if (value >= 60 && value % 60 == 0) "${value / 60} min" else "$value s"
+        return if (value >= 60 && value % 60 == 0) tr(R.string.arg_minutes_short, value / 60) else tr(R.string.arg_seconds_short, value)
     }
 
     /** "10", "3m" — what fits inside the skip button's arrow (iOS `playerSkipShortLabel`). */

@@ -41,6 +41,17 @@ case "${1:-}" in
       mkdir -p "$RES/$(android_dir "$tag")"
       cp "$dir/strings.xml" "$RES/$(android_dir "$tag")/strings.xml"
     done
+    # Tolgee writes a value with a leading or trailing space unquoted, and aapt drops that space:
+    # " This cannot be undone." would glue onto the sentence before it. Quote such values.
+    python3 -I - "$RES" <<'PY'
+import re, sys
+from pathlib import Path
+for f in Path(sys.argv[1]).glob("values-*/strings.xml"):
+    s = f.read_text(encoding="utf-8")
+    t = re.sub(r'(<string name="[^"]+">)((?: [^<"]*)|(?:[^<"]* ))(</string>)', r'\1"\2"\3', s)
+    if t != s:
+        f.write_text(t, encoding="utf-8")
+PY
     "${CLI[@]}" pull --format APPLE_XCSTRINGS --path "$tmp/apple" \
       --file-structure-template "Localizable.{extension}"
     cp "$tmp/apple/Localizable.xcstrings" "$ROOT/stashy/Localizable.xcstrings"

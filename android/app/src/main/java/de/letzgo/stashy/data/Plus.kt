@@ -93,10 +93,10 @@ class StashyStoreProduct(val pkg: Package) {
     val freeTrialLength: String? get() {
         val period = pkg.product.defaultOption?.freePhase?.billingPeriod ?: return null
         return when (period.unit) {
-            com.revenuecat.purchases.models.Period.Unit.DAY -> if (period.value == 1) "1 day" else "${period.value} days"
-            com.revenuecat.purchases.models.Period.Unit.WEEK -> "${period.value * 7} days"
-            com.revenuecat.purchases.models.Period.Unit.MONTH -> if (period.value == 1) "1 month" else "${period.value} months"
-            com.revenuecat.purchases.models.Period.Unit.YEAR -> if (period.value == 1) "1 year" else "${period.value} years"
+            com.revenuecat.purchases.models.Period.Unit.DAY -> tr(if (period.value == 1) R.string.arg_count_day else R.string.arg_count_days, period.value)
+            com.revenuecat.purchases.models.Period.Unit.WEEK -> tr(R.string.arg_count_days, period.value * 7)
+            com.revenuecat.purchases.models.Period.Unit.MONTH -> tr(if (period.value == 1) R.string.arg_count_month else R.string.arg_count_months, period.value)
+            com.revenuecat.purchases.models.Period.Unit.YEAR -> tr(if (period.value == 1) R.string.arg_count_year else R.string.arg_count_years, period.value)
             else -> null
         }
     }
@@ -104,14 +104,15 @@ class StashyStoreProduct(val pkg: Package) {
     /** "4,99 €/month" — what the plan costs once the trial is over. */
     val pricePerPeriod: String get() {
         val period = pkg.product.period ?: return price
-        val unit = when (period.unit) {
-            com.revenuecat.purchases.models.Period.Unit.DAY -> "day"
-            com.revenuecat.purchases.models.Period.Unit.WEEK -> "week"
-            com.revenuecat.purchases.models.Period.Unit.MONTH -> "month"
-            com.revenuecat.purchases.models.Period.Unit.YEAR -> "year"
+        val n = period.value
+        val (one, many) = when (period.unit) {
+            com.revenuecat.purchases.models.Period.Unit.DAY -> R.string.arg_per_day to R.string.arg_count_days
+            com.revenuecat.purchases.models.Period.Unit.WEEK -> R.string.arg_per_week to R.string.arg_count_weeks
+            com.revenuecat.purchases.models.Period.Unit.MONTH -> R.string.arg_per_month to R.string.arg_count_months
+            com.revenuecat.purchases.models.Period.Unit.YEAR -> R.string.arg_per_year to R.string.arg_count_years
             else -> return price
         }
-        return if (period.value == 1) "$price/$unit" else "$price/${period.value} ${unit}s"
+        return if (n == 1) tr(one, price) else tr(R.string.arg_per_arg, price, tr(many, n))
     }
 }
 

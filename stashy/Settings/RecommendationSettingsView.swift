@@ -93,7 +93,7 @@ struct RecommendationSettingsView: View {
                 Text(tr("look_back"))
                 Picker(tr("look_back"), selection: $engine.lookbackDays) {
                     ForEach(SceneRecommendationEngine.lookbackChoices, id: \.self) { days in
-                        Text("\(days) days").tag(days)
+                        Text(tr("arg_count_days", days)).tag(days)
                     }
                 }
                 .pickerStyle(.segmented)
@@ -492,7 +492,7 @@ struct RecommendationAdjustMenu: View {
         engine.applyAdjustmentsNow()
         let message: String
         switch factor {
-        case ..<RecommendationAdjustment.hiddenBelow: message = "\(name) won't be suggested"
+        case ..<RecommendationAdjustment.hiddenBelow: message = tr("arg_wont_be_suggested", name)
         case ..<1: message = tr("less_of_arg", name)
         default: message = tr("more_of_arg", name)
         }

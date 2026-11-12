@@ -286,7 +286,7 @@ final class RateMeViewModel: ObservableObject {
                 item = try await fetchUnratedImage()
             }
             if item == nil {
-                errorMessage = tr("empty_unrated_arg_left_in_arg", mode.label.lowercased(), theme.label)
+                errorMessage = tr(mode == .scenes ? "empty_unrated_scenes_left_in_arg" : "empty_unrated_images_left_in_arg", theme.label)
             }
         } catch {
             item = nil
@@ -842,6 +842,13 @@ struct RateMeToolsView: View {
             case .tag: return tr("tag")
             }
         }
+        var searchTitle: String {
+            switch self {
+            case .performer: return tr("search_performers")
+            case .studio: return tr("search_studios")
+            case .tag: return tr("search_tags")
+            }
+        }
         var icon: String {
             switch self {
             case .performer: return "person.fill"
@@ -959,7 +966,7 @@ struct RateMeToolsView: View {
                 tr("nothing_to_rate"),
                 systemImage: model.mode.emptyIcon,
                 // An error already shows in red above the pills.
-                description: Text(tr("hint_all_arg_already_have_rating", model.mode.label.lowercased()))
+                description: Text(tr(model.mode == .scenes ? "hint_all_scenes_already_have_rating" : "hint_all_images_already_have_rating"))
             )
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
@@ -1235,8 +1242,8 @@ private struct RateMeThemePickerSheet: View {
         // chrome with Back, a "Search …" section holding the text field and the list below it.
         NavigationView {
             Form {
-                Section(header: Text(tr("search_arg_s", kind.title))) {
-                    TextField(tr("placeholder_search_2"), text: $query)
+                Section(header: Text(kind.searchTitle)) {
+                    TextField(tr("placeholder_search"), text: $query)
                         .textInputAutocapitalization(.never)
                         .autocorrectionDisabled()
                     if store.isLoading(storeKind) && options.isEmpty {
@@ -1259,7 +1266,7 @@ private struct RateMeThemePickerSheet: View {
                         if store.isSearching(storeKind) {
                             HStack { Spacer(); ProgressView(); Spacer() }
                         } else if !query.isEmpty && options.isEmpty {
-                            Text(tr("empty_arg_s_match_arg", kind.title.lowercased(), query))
+                            Text(tr("empty_results_for_arg", query))
                                 .foregroundColor(.secondary)
                         }
                     }

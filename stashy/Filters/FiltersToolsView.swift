@@ -437,7 +437,7 @@ private struct FiltersToolsEditorSheet: View {
                                 .disabled(trimmedName.isEmpty)
                         }
                         Button(tr("action_save_as_new")) {
-                            saveAsName = trimmedName.isEmpty ? "" : trimmedName + " copy"
+                            saveAsName = trimmedName.isEmpty ? "" : tr("arg_copy", trimmedName)
                             showSaveAs = true
                         }
                         if isExisting {

@@ -159,7 +159,7 @@ struct TVRateMeView: View {
             ContentUnavailableView(
                 tr("nothing_to_rate"),
                 systemImage: model.mode.emptyIcon,
-                description: Text(model.errorMessage ?? tr("hint_all_arg_already_have_rating", model.mode.label.lowercased()))
+                description: Text(model.errorMessage ?? tr(model.mode == .scenes ? "hint_all_scenes_already_have_rating" : "hint_all_images_already_have_rating"))
             )
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         }

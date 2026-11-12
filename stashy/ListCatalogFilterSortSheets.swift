@@ -472,7 +472,7 @@ struct CatalogNamedEntityLiveFilterMultiPickerRow<Item: Identifiable & Equatable
         let names = entries.filter { selectedIds.contains($0.id) }.map(\.name)
         var summary: String
         if names.isEmpty {
-            summary = selectedIds.isEmpty ? "" : "\(selectedIds.count) selected"
+            summary = selectedIds.isEmpty ? "" : tr("arg_selected_count", selectedIds.count)
         } else if names.count <= 2 {
             summary = names.joined(separator: ", ")
         } else {
@@ -623,12 +623,12 @@ struct CatalogNamedEntityLiveFilterMultiPickerRow<Item: Identifiable & Equatable
     private var tristateLegend: some View {
         HStack(spacing: 10) {
             Label {
-                Text("included")
+                Text(tr("included"))
             } icon: {
                 Image(systemName: "checkmark.circle.fill").foregroundColor(appearance.tintColor)
             }
             Label {
-                Text("excluded")
+                Text(tr("excluded"))
             } icon: {
                 Image(systemName: "xmark.circle.fill").foregroundColor(.red)
             }

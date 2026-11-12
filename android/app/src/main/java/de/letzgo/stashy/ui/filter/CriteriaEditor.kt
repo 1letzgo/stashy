@@ -905,7 +905,7 @@ fun MultiEntityPicker(
         if (selectedIds.isEmpty() && excludedIds.isEmpty()) return@run tr(R.string.any)
         val names = entries.filter { it.id in selectedIds }.map { it.name }
         var s = when {
-            names.isEmpty() -> if (selectedIds.isEmpty()) "" else "${selectedIds.size} selected"
+            names.isEmpty() -> if (selectedIds.isEmpty()) "" else tr(R.string.arg_selected_count, selectedIds.size)
             names.size <= 2 -> names.joinToString(", ")
             else -> "${names[0]}, ${names[1]} +${names.size - 2}"
         }
@@ -942,9 +942,9 @@ fun MultiEntityPicker(
             }
             if (!isNone) Row(Modifier.padding(horizontal = 4.dp).padding(bottom = 6.dp), horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
                 Icon(SF.checkmarkCircleFill, null, tint = Appearance.tint, modifier = Modifier.size(12.dp))
-                Text("included", style = IosTypography.caption2, color = p.secondaryText)
+                Text(tr(R.string.included), style = IosTypography.caption2, color = p.secondaryText)
                 Icon(SF.xmarkCircleFill, null, tint = StashyColors.systemRed, modifier = Modifier.size(12.dp))
-                Text("excluded", style = IosTypography.caption2, color = p.secondaryText)
+                Text(tr(R.string.excluded), style = IosTypography.caption2, color = p.secondaryText)
             }
             if (matchModeOptions.isNotEmpty() && !isNone) {
                 var mm by remember { mutableStateOf(false) }

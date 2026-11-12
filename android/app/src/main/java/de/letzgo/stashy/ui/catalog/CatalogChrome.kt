@@ -166,7 +166,7 @@ internal fun FilterSortAction(slot: CatalogChromeSlot) {
 private fun SelectionActions(sel: CatalogSelectionChrome) {
     val p = Theme.palette
     Row(verticalAlignment = Alignment.CenterVertically) {
-        Text("${sel.count} selected", style = NativeType.labelLarge, color = p.secondaryText, maxLines = 1, modifier = Modifier.padding(horizontal = 4.dp))
+        Text(tr(R.string.arg_selected_count, sel.count), style = NativeType.labelLarge, color = p.secondaryText, maxLines = 1, modifier = Modifier.padding(horizontal = 4.dp))
         de.letzgo.stashy.ui.TopBarAction(Icons.Filled.SelectAll, tr(R.string.action_select_all), tint = p.text, enabled = !sel.isDeleting, onClick = sel.onSelectAll)
         de.letzgo.stashy.ui.TopBarAction(
             SF.trash, tr(R.string.action_delete), tint = if (sel.count > 0) de.letzgo.stashy.ui.StashyColors.systemRed else p.tertiaryText,

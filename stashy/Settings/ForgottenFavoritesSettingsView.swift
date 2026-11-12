@@ -119,7 +119,7 @@ struct ForgottenFavoritesSettingsView: View {
         case .idle: return tr("not_built_yet")
         case .loading: return tr("looking_menu")
         case .preparing: return tr("waiting_for_statistics")
-        case .ready: return "\(engine.items.count) of \(engine.poolCount) favorites"
+        case .ready: return tr("arg_of_arg_favorites", engine.items.count, engine.poolCount)
         }
     }
 }

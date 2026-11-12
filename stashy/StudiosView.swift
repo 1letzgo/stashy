@@ -894,7 +894,7 @@ struct StudioRowView: View {
                 HStack(spacing: 4) {
                     Image(systemName: "film")
                         .font(.caption2)
-                    Text(tr("arg_scenes", studioCounts.display(for: studio, includeSubStudios: includeSubStudios).scenes))
+                    Text(tr("arg_count_scenes", studioCounts.display(for: studio, includeSubStudios: includeSubStudios).scenes))
                         .font(.caption)
                 }
                 .foregroundColor(.appAccent)
@@ -968,7 +968,7 @@ struct StudioCardView: View {
             )
             .overlay(alignment: .topTrailing) {
                 CatalogCardCountPill(icon: shown.badge.icon(oCounterIcon: appearance.oCounterIcon),
-                                     count: shown.count, noun: shown.badge.noun)
+                                     count: shown.count, spokenLabel: shown.badge.spokenCount(shown.count))
                     .padding(8)
             }
             .overlay(alignment: .bottomLeading) {
@@ -996,16 +996,8 @@ struct StudioCardView: View {
 struct CatalogCardCountPill: View {
     let icon: String
     let count: Int
-    /// Singular noun for VoiceOver; "gallery" becomes "galleries".
-    let noun: String
-
-    private var spokenLabel: String {
-        guard count != 1 else { return "1 \(noun)" }
-        if noun.hasSuffix("y") { return "\(count) \(noun.dropLast())ies" }
-        if noun == "O" { return "\(count) O" }
-        if noun == "rating" { return tr("rating_arg", count) }
-        return "\(count) \(noun)s"
-    }
+    /// VoiceOver text, e.g. "3 scenes" (`PerformerBadgeType.spokenCount`).
+    let spokenLabel: String
 
     var body: some View {
         // Same type and shadow as the performer card's pills.

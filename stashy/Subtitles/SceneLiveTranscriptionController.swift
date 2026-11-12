@@ -1718,7 +1718,7 @@ final class SceneLiveTranscriptionController: ObservableObject {
         }
 
         throw SceneLiveTranscriptionError.modelDownloadFailed(
-            tr("hint_timed_out_while_ios_reported", speechAssetStatusText ?? "unknown", languageName)
+            tr("hint_timed_out_while_ios_reported", speechAssetStatusText ?? tr("unknown"), languageName)
         )
     }
 

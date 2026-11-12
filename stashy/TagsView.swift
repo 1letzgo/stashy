@@ -766,7 +766,7 @@ struct TagCardView: View {
             .overlay(alignment: .topTrailing) {
                 let shown = shownCount
                 CatalogCardCountPill(icon: shown.badge.icon(oCounterIcon: appearanceManager.oCounterIcon),
-                                     count: shown.count, noun: shown.badge.noun)
+                                     count: shown.count, spokenLabel: shown.badge.spokenCount(shown.count))
                     .padding(8)
             }
             .overlay(alignment: .bottomLeading) {

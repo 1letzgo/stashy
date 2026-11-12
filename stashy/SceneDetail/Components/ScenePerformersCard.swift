@@ -413,7 +413,7 @@ struct AddPerformerToSceneSheet: View {
         NavigationView {
             Form {
                 Section(header: Text(tr("search_performers"))) {
-                    TextField(tr("placeholder_search_2"), text: $searchText)
+                    TextField(tr("placeholder_search"), text: $searchText)
                     if isLoading {
                         HStack { Spacer(); ProgressView(tr("loading_ellipsis")); Spacer() }.padding()
                     } else {
@@ -423,7 +423,7 @@ struct AddPerformerToSceneSheet: View {
                                 Text(performer.name)
                                     .lineLimit(1)
                                 Spacer()
-                                Text("\(performer.sceneCount) scenes").font(.caption).foregroundColor(.secondary)
+                                Text(tr(performer.sceneCount == 1 ? "arg_count_scene" : "arg_count_scenes", performer.sceneCount)).font(.caption).foregroundColor(.secondary)
                                 if selectedIds.contains(performer.id) {
                                     Image(systemName: "checkmark").foregroundColor(appearanceManager.tintColor)
                                 }

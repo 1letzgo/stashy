@@ -1,5 +1,6 @@
 package de.letzgo.stashy.data.tools
 
+import de.letzgo.stashy.R
 import de.letzgo.stashy.data.FilterMapper
 import de.letzgo.stashy.data.FilterMode
 import de.letzgo.stashy.data.SavedFilter
@@ -8,6 +9,7 @@ import de.letzgo.stashy.data.SortCatalog
 import de.letzgo.stashy.data.SortOption
 import de.letzgo.stashy.data.encodedSortPair
 import de.letzgo.stashy.data.stashyMetadata
+import de.letzgo.stashy.tr
 import kotlinx.serialization.json.JsonObject
 
 /**
@@ -32,7 +34,7 @@ object FiltersEditorLogic {
             ?: SortCatalog.choices(mode).firstOrNull()
 
     /** iOS: "Save as new" seeds the name field with "<name> copy" (empty when there is no name). */
-    fun saveAsSeed(name: String): String = name.trim().let { if (it.isEmpty()) "" else "$it copy" }
+    fun saveAsSeed(name: String): String = name.trim().let { if (it.isEmpty()) "" else tr(R.string.arg_copy, it) }
 
     /**
      * iOS: `saveFullObjectFilter(mode:existingId:name:sortField:sortDirection:sortRaw:objectFilter:randomSeedKind:)`

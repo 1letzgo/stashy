@@ -824,7 +824,7 @@ private struct QuickEntityFilterSection: View {
             }
             HStack(spacing: 8) {
                 Image(systemName: "magnifyingglass").foregroundColor(.secondary)
-                TextField(tr("search_arg", title.lowercased()), text: $query)
+                TextField(key == "tags" ? tr("placeholder_search_tags") : tr("search_arg", title), text: $query)
                     .textInputAutocapitalization(.never)
                     .autocorrectionDisabled()
                     .submitLabel(.search)
@@ -995,7 +995,7 @@ struct CatalogQuickSortMenu<Option: CatalogQuickSortable>: View {
         .menuIndicator(.hidden)
         .stashyNeutralMenuItems()
         .fixedSize()
-        .accessibilityLabel(tr("action_sort_arg_arg", active?.label ?? "custom", sort.direction == "ASC" ? "ascending" : "descending"))
+        .accessibilityLabel(tr("action_sort_arg_arg", active?.label ?? tr("custom"), tr(sort.direction == "ASC" ? "ascending" : "descending")))
     }
 
 }

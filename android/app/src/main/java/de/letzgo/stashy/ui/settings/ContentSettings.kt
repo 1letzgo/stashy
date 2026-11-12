@@ -362,12 +362,12 @@ private fun FeedsModeCard(mode: ReelsModeConfig, handle: Modifier) {
                 }
             }
             if (TabManager.stashlineGroupMode == ImageGroupMode.GallerySession) CardSettingRow(tr(R.string.session_gap)) {
-                MenuValue(ImageSetGrouping.gapOptions.map { it.toString() to "$it min" }, TabManager.stashlineGroupGapMinutes.toString()) {
+                MenuValue(ImageSetGrouping.gapOptions.map { it.toString() to tr(R.string.arg_minutes_short, it) }, TabManager.stashlineGroupGapMinutes.toString()) {
                     TabManager.stashlineGroupGapMinutes = it.toInt()
                 }
             }
             if (TabManager.stashlineGroupMode != ImageGroupMode.Off) CardSettingRow(tr(R.string.max_set_size)) {
-                MenuValue(ImageSetGrouping.maxSizeOptions.map { it.toString() to "$it images" }, TabManager.stashlineGroupMaxSize.toString()) {
+                MenuValue(ImageSetGrouping.maxSizeOptions.map { it.toString() to tr(R.string.arg_count_images, it) }, TabManager.stashlineGroupMaxSize.toString()) {
                     TabManager.stashlineGroupMaxSize = it.toInt()
                 }
             }

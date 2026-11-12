@@ -143,7 +143,7 @@ class GalleryDetailScreen(
             if (selection.isActive) {
                 // iOS `CatalogSelectionChrome`: Select all · Delete · Done.
                 DetailTopBar(
-                    tr(R.string.arg_selected, selection.state.count), emptyList(), null, {},
+                    tr(R.string.arg_selected_count, selection.state.count), emptyList(), null, {},
                     listOf(
                         ChromeSlot(Icons.Filled.SelectAll, tr(R.string.action_select_all)) { selection.selectAll(images.list.items) },
                         ChromeSlot(SF.trash, tr(R.string.action_delete)) { selection.requestDelete() },

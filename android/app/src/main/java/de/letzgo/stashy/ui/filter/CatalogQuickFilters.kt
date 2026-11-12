@@ -366,7 +366,7 @@ private fun QuickEntityFilterSection(document: CriteriaDocument, key: String, ti
             }
         }
         if (kind != null) NativeSearchField(
-            query, { query = it; FilterPickerOptionsStore.search(kind, it) }, tr(R.string.search_arg, title.lowercase()),
+            query, { query = it; FilterPickerOptionsStore.search(kind, it) }, if (key == "tags") tr(R.string.placeholder_search_tags) else tr(R.string.search_arg, title),
             loading = FilterPickerOptionsStore.isSearching(kind),
         )
         QuickChipRow {

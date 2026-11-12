@@ -202,7 +202,7 @@ internal fun SortMenu(controller: CatalogController<*>, offersForYou: Boolean = 
             Modifier.heightIn(min = 40.dp).clip(RoundedCornerShape(12.dp)).clickable { open = true }
                 .padding(horizontal = 8.dp)
                 .semantics(mergeDescendants = true) {
-                    contentDescription = tr(R.string.action_sort_arg_arg, active?.label ?: "custom", if (sort.isAscending) "ascending" else "descending")
+                    contentDescription = tr(R.string.action_sort_arg_arg, active?.label ?: tr(R.string.custom), tr(if (sort.isAscending) R.string.ascending else R.string.descending))
                 },
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(2.dp),

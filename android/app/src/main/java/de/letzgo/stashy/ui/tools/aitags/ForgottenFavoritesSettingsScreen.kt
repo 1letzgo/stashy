@@ -144,6 +144,6 @@ private fun statusText(): String {
         ForgottenFavoritesState.Idle -> tr(R.string.not_built_yet)
         ForgottenFavoritesState.Loading -> tr(R.string.looking_menu)
         ForgottenFavoritesState.Preparing -> tr(R.string.waiting_for_statistics)
-        ForgottenFavoritesState.Ready -> "${engine.items.size} of ${engine.poolCount} favorites"
+        ForgottenFavoritesState.Ready -> tr(R.string.arg_of_arg_favorites, engine.items.size, engine.poolCount)
     }
 }

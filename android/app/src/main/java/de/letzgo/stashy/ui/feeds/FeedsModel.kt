@@ -1022,11 +1022,11 @@ object FeedsModel {
                 is FeedItem.ClipItem -> FeedsRepository.deleteImage(item.image.id)
                 is FeedItem.MarkerItem -> false
             }
-            val label = if (item is FeedItem.ClipItem) "image" else "scene"
+            val isImage = item is FeedItem.ClipItem
             if (ok) {
                 lists.values.forEach { l -> l.items.removeAll { it.sceneID != null && it.sceneID == item.sceneID && item.sceneID != null || it.id == item.id } }
-                message = "${label.replaceFirstChar { it.uppercase() }} deleted"
-            } else message = tr(R.string.error_delete_arg_2, label)
+                message = tr(if (isImage) R.string.image_deleted else R.string.scene_deleted)
+            } else message = tr(if (isImage) R.string.error_delete_image else R.string.error_delete_scene)
             onDone(ok)
         }
     }

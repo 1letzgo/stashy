@@ -414,11 +414,11 @@ object FilterCriterionSummary {
             CriterionKind.booleanGroup -> ANY
             CriterionKind.nestedFilter, CriterionKind.raw -> {
                 val n = (value as? JsonObject)?.size ?: 0
-                if (n == 0) ANY else "$n criteria"
+                if (n == 0) ANY else tr(R.string.arg_count_criteria, n)
             }
             CriterionKind.customFields -> {
                 val n = (value as? JsonArray)?.size ?: 0
-                if (n == 0) ANY else "$n field(s)"
+                if (n == 0) ANY else tr(R.string.arg_fields, n)
             }
             else -> (value as? JsonObject)?.let { dictSummary(field, it) } ?: ANY
         }
@@ -433,7 +433,7 @@ object FilterCriterionSummary {
                 val inc = FilterMapper.idStrings(dict["value"]).size
                 val exc = FilterMapper.idStrings(dict["excludes"]).size
                 if (inc == 0 && exc == 0) return ANY
-                return listOfNotNull(if (inc > 0) "$inc selected" else null, if (exc > 0) "$exc excluded" else null).joinToString(", ")
+                return listOfNotNull(if (inc > 0) tr(R.string.arg_selected_count, inc) else null, if (exc > 0) tr(R.string.arg_excluded, exc) else null).joinToString(", ")
             }
             CriterionKind.gender, CriterionKind.circumcision -> {
                 val list = stringList(dict["value_list"]).ifEmpty { stringList(dict["value"]) }

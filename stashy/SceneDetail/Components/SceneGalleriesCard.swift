@@ -36,7 +36,7 @@ struct AddGalleryToSceneSheet: View {
         NavigationView {
             Form {
                 Section(header: Text(tr("search_galleries"))) {
-                    TextField(tr("placeholder_search_2"), text: $searchText)
+                    TextField(tr("placeholder_search"), text: $searchText)
                         .onChange(of: searchText) { _, newValue in
                             if !newValue.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                                 loadAllGalleriesIfNeeded()
@@ -125,7 +125,7 @@ struct AddGalleryToSceneSheet: View {
                     .font(.body)
                     .lineLimit(2)
                 if let count = gallery.imageCount {
-                    Text("\(count) images")
+                    Text(tr(count == 1 ? "arg_count_image" : "arg_count_images", count))
                         .font(.caption)
                         .foregroundColor(.secondary)
                 }

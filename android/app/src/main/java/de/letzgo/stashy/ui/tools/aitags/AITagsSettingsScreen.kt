@@ -179,7 +179,7 @@ fun AITagsSettingsView() {
                                 modifier = Modifier.fillMaxWidth(),
                                 color = nativeAccent(), trackColor = p.separator,
                             )
-                            Text("${state.processed} of ${state.total} items", style = NativeType.bodySmall, color = p.secondaryText)
+                            Text(tr(R.string.arg_of_arg_items, state.processed, state.total), style = NativeType.bodySmall, color = p.secondaryText)
                         }
                         RowDivider()
                         SettingsRow(tr(R.string.action_stop), icon = Icons.Outlined.StopCircle, iconTint = StashyColors.systemRed, titleColor = StashyColors.systemRed, onClick = { manager.cancelWork() })

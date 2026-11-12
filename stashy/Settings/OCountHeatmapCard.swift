@@ -367,7 +367,7 @@ struct OCountHeatmapCard: View {
         return (
             tr("o_count"),
             countLabel(heatmap.totalInMonth),
-            "\(heatmap.monthTitle), \(heatmap.daysWithOCount) days, \(countLabel(heatmap.totalInMonth))"
+            "\(heatmap.monthTitle), \(tr(heatmap.daysWithOCount == 1 ? "arg_count_day" : "arg_count_days", heatmap.daysWithOCount)), \(countLabel(heatmap.totalInMonth))"
         )
     }
 

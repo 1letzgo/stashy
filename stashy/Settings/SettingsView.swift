@@ -626,10 +626,10 @@ struct SettingsView: View {
                     // The trial leads, the price it turns into sits right below — App Review
                     // (3.1.2) wants what is charged after the trial as visible as the trial.
                     VStack(alignment: .trailing, spacing: 2) {
-                        Text("\(trial) free")
+                        Text(tr("arg_free", trial))
                             .font(.subheadline.weight(.semibold))
                             .foregroundColor(appearanceManager.tintColor)
-                        Text("then \(product.pricePerPeriod)")
+                        Text(tr("arg_then", product.pricePerPeriod))
                             .font(.caption)
                             .foregroundColor(.secondary)
                     }

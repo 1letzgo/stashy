@@ -140,7 +140,7 @@ struct AddTagToSceneSheet: View {
         NavigationView {
             Form {
                 Section(header: Text(tr("search_tags"))) {
-                    TextField(tr("placeholder_search_2"), text: $searchText)
+                    TextField(tr("placeholder_search"), text: $searchText)
                     if isLoading {
                         HStack { Spacer(); ProgressView(tr("loading_ellipsis")); Spacer() }.padding()
                     } else {
@@ -149,7 +149,7 @@ struct AddTagToSceneSheet: View {
                                 Text(tag.name)
                                 if let count = tag.sceneCount {
                                     Spacer()
-                                    Text("\(count) scenes").font(.caption).foregroundColor(.secondary)
+                                    Text(tr(count == 1 ? "arg_count_scene" : "arg_count_scenes", count)).font(.caption).foregroundColor(.secondary)
                                 }
                                 if selectedIds.contains(tag.id) {
                                     Spacer()

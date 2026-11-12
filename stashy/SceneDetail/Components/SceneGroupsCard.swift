@@ -150,7 +150,7 @@ struct AddGroupToSceneSheet: View {
         NavigationView {
             Form {
                 Section(header: Text(tr("search_groups"))) {
-                    TextField(tr("placeholder_search_2"), text: $searchText)
+                    TextField(tr("placeholder_search"), text: $searchText)
                     if isLoading {
                         HStack { Spacer(); ProgressView(tr("loading_ellipsis")); Spacer() }.padding()
                     } else {
@@ -159,7 +159,7 @@ struct AddGroupToSceneSheet: View {
                                 Text(group.name)
                                 Spacer()
                                 if let count = group.scene_count {
-                                    Text("\(count) scenes").font(.caption).foregroundColor(.secondary)
+                                    Text(tr(count == 1 ? "arg_count_scene" : "arg_count_scenes", count)).font(.caption).foregroundColor(.secondary)
                                 }
                                 if selectedIds.contains(group.id) {
                                     Image(systemName: "checkmark").foregroundColor(appearanceManager.tintColor)

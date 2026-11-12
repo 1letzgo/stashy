@@ -1010,7 +1010,7 @@ struct GroupCardView: View {
                     Spacer()
                     if let shown = shownCount {
                         CatalogCardCountPill(icon: shown.badge.icon(oCounterIcon: appearanceManager.oCounterIcon),
-                                             count: shown.count, noun: shown.badge.noun)
+                                             count: shown.count, spokenLabel: shown.badge.spokenCount(shown.count))
                     }
                 }
                 .padding(8)
@@ -2283,7 +2283,7 @@ struct EditGroupSheet: View {
                         .frame(width: GroupDVDCover.width, height: GroupDVDCover.height)
                         .clipShape(RoundedRectangle(cornerRadius: 4, style: .continuous))
                 } else if url != nil {
-                    GroupDVDCover(url: url, accessibilityLabel: "\(title) cover")
+                    GroupDVDCover(url: url, accessibilityLabel: tr("arg_cover", title))
                 } else {
                     RoundedRectangle(cornerRadius: 4, style: .continuous)
                         .strokeBorder(Color.secondary.opacity(0.5), style: StrokeStyle(lineWidth: 1, dash: [4]))
@@ -2505,7 +2505,7 @@ private struct GroupEntityPickerSheet: View {
         NavigationView {
             Form {
                 Section {
-                    TextField(tr("placeholder_search_2"), text: $query)
+                    TextField(tr("placeholder_search"), text: $query)
                         .textInputAutocapitalization(.never)
                         .autocorrectionDisabled()
                 }

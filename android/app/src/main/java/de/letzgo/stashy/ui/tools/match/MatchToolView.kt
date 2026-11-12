@@ -520,7 +520,7 @@ private fun BracketTreeDialog(state: MatchBracketState, onDismiss: () -> Unit) {
                             listOf(m.leftId, m.rightId).forEachIndexed { i, id ->
                                 val won = m.winnerId == id
                                 val lost = m.winnerId != null && !won
-                                if (i == 1) Text("vs", style = IosTypography.caption2, color = p.secondaryText)
+                                if (i == 1) Text(tr(R.string.vs), style = IosTypography.caption2, color = p.secondaryText)
                                 Text(
                                     state.entrant(id)?.name ?: "—",
                                     style = IosTypography.subheadline.copy(fontWeight = if (won) FontWeight.Bold else FontWeight.Normal),

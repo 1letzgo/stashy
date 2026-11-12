@@ -231,7 +231,7 @@ fun RecommendationAdjustButton(scene: Scene, tint: Color) {
                     SceneRecommendations.setAdjustment(kind, id, name, factor)
                     SceneRecommendations.applyAdjustmentsNow()
                     showToast(when {
-                        factor < RecommendationAdjustment.HIDDEN_BELOW -> "$name won't be suggested"
+                        factor < RecommendationAdjustment.HIDDEN_BELOW -> tr(R.string.arg_wont_be_suggested, name)
                         factor < 1 -> tr(R.string.less_of_arg, name)
                         else -> tr(R.string.more_of_arg, name)
                     })

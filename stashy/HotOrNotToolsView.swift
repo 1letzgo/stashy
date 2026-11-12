@@ -2566,7 +2566,7 @@ private struct HotOrNotBracketTreeSheet: View {
     private func matchCell(_ m: HotOrNotBracketState.Match) -> some View {
         HStack(spacing: 10) {
             nameLine(m.leftId, winnerId: m.winnerId, alignment: .leading)
-            Text("vs")
+            Text(tr("vs"))
                 .font(.caption2)
                 .foregroundStyle(.tertiary)
             nameLine(m.rightId, winnerId: m.winnerId, alignment: .trailing)

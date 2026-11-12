@@ -555,7 +555,7 @@ class TabManager: ObservableObject {
     /// "10 s", "3 min" — the picker's wording.
     static func playerSkipLabel(_ seconds: Double) -> String {
         let value = Int(seconds.rounded())
-        return value >= 60 && value % 60 == 0 ? "\(value / 60) min" : "\(value) s"
+        return value >= 60 && value % 60 == 0 ? tr("arg_minutes_short", value / 60) : tr("arg_seconds_short", value)
     }
 
     /// "10", "3m" — what fits inside the skip button's arrow.
@@ -712,8 +712,8 @@ class TabManager: ObservableObject {
     static func playCountThresholdLabel(_ seconds: Double) -> String {
         switch seconds {
         case 0: return tr("immediately")
-        case ..<60: return "\(Int(seconds)) s"
-        default: return "\(Int(seconds / 60)) min"
+        case ..<60: return tr("arg_seconds_short", Int(seconds))
+        default: return tr("arg_minutes_short", Int(seconds / 60))
         }
     }
 

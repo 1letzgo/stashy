@@ -208,8 +208,9 @@ struct CoAppearanceCounts: Equatable {
 
     /// "3 scenes, 1 gallery" — VoiceOver value of an "Appears with" card.
     var accessibilityText: String {
-        func part(_ n: Int, _ one: String, _ many: String) -> String? { n > 0 ? "\(n) shared \(n == 1 ? one : many)" : nil }
-        return [part(scenes, "scene", "scenes"), part(galleries, "gallery", "galleries"), part(images, "image", "images")]
+        func part(_ n: Int, _ one: String, _ many: String) -> String? { n > 0 ? tr(n == 1 ? one : many, n) : nil }
+        return [part(scenes, "arg_shared_scene", "arg_shared_scenes"), part(galleries, "arg_shared_gallery", "arg_shared_galleries"),
+                part(images, "arg_shared_image", "arg_shared_images")]
             .compactMap { $0 }.joined(separator: ", ")
     }
 }

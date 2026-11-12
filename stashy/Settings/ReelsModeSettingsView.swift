@@ -121,11 +121,11 @@ struct ReelsModeSettingsView: View {
                                         Menu {
                                             ForEach(StashImageGroupingPrefs.gapOptions, id: \.self) { minutes in
                                                 Button(action: { groupGapMinutes = minutes }) {
-                                                    HStack { Text("\(minutes) min"); if minutes == currentGap { Image(systemName: "checkmark") } }
+                                                    HStack { Text(tr("arg_minutes_short", minutes)); if minutes == currentGap { Image(systemName: "checkmark") } }
                                                 }
                                             }
                                         } label: {
-                                            pickerLabelText("\(currentGap) min")
+                                            pickerLabelText(tr("arg_minutes_short", currentGap))
                                         }
                                     }
                                     .padding(.top, 4)
@@ -138,11 +138,11 @@ struct ReelsModeSettingsView: View {
                                         Menu {
                                             ForEach(StashImageGroupingPrefs.maxSizeOptions, id: \.self) { size in
                                                 Button(action: { groupMaxSize = size }) {
-                                                    HStack { Text("\(size) images"); if size == currentMax { Image(systemName: "checkmark") } }
+                                                    HStack { Text(tr("arg_count_images", size)); if size == currentMax { Image(systemName: "checkmark") } }
                                                 }
                                             }
                                         } label: {
-                                            pickerLabelText("\(currentMax) images")
+                                            pickerLabelText(tr("arg_count_images", currentMax))
                                         }
                                     }
                                     .padding(.top, 4)

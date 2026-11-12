@@ -402,8 +402,8 @@ object TabConfigLogic {
     /** iOS `TabManager.playCountThresholdLabel`. */
     fun playCountThresholdLabel(seconds: Double): String = when {
         seconds == 0.0 -> tr(R.string.immediately)
-        seconds < 60 -> "${seconds.toInt()} s"
-        else -> "${(seconds / 60).toInt()} min"
+        seconds < 60 -> tr(R.string.arg_seconds_short, seconds.toInt())
+        else -> tr(R.string.arg_minutes_short, (seconds / 60).toInt())
     }
 
     /** iOS `TabManager.holdSpeedLabel`. */

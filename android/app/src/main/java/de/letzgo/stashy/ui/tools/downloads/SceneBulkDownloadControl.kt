@@ -158,7 +158,7 @@ fun GalleryDownloadOptionsDialog(gallery: Gallery, onDismiss: () -> Unit) {
     val stored = Downloads.galleryDownloads.firstOrNull { it.id == gallery.id }
     val batch = Downloads.galleryNewestBatchSize
     val message = when {
-        stored != null && stored.serverImageCount != null -> "${stored.images.size} of ${stored.serverImageCount} downloaded"
+        stored != null && stored.serverImageCount != null -> tr(R.string.arg_of_arg_downloaded, stored.images.size, stored.serverImageCount)
         gallery.imageCount != null -> tr(R.string.arg_images_in_this_gallery, gallery.imageCount)
         else -> null
     }

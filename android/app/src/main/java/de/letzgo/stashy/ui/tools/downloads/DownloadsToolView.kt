@@ -558,7 +558,7 @@ private fun CancelDownloadButton(id: String) {
 object DownloadsFormat {
     fun bytes(count: Long): String {
         if (count <= 0) return tr(R.string.zero_kb)
-        if (count < 1000) return "$count bytes"
+        if (count < 1000) return tr(R.string.arg_bytes, count)
         val kb = count / 1000.0
         if (kb < 1000) return String.format(Locale.US, "%.0f KB", kb)
         val mb = kb / 1000.0
@@ -571,8 +571,8 @@ object DownloadsFormat {
     fun progressCaption(download: ActiveDownload): String {
         val parts = mutableListOf("${(download.progress.coerceIn(0.0, 1.0) * 100).toInt()}%")
         when {
-            download.totalUnits > 0 -> parts += "${download.completedUnits} of ${download.totalUnits} images"
-            download.totalSize > 0 -> parts += "${bytes(download.downloadedSize)} of ${bytes(download.totalSize)}"
+            download.totalUnits > 0 -> parts += tr(R.string.arg_of_arg_images, download.completedUnits, download.totalUnits)
+            download.totalSize > 0 -> parts += tr(R.string.arg_of_arg, bytes(download.downloadedSize), bytes(download.totalSize))
             download.downloadedSize > 0 -> parts += bytes(download.downloadedSize)
         }
         if (download.speed > 0) parts += "${bytes(download.speed.toLong())}/s"
@@ -763,8 +763,8 @@ private fun gallerySubtitle(entry: DownloadedGallery): String {
     val total = entry.serverImageCount
     when {
         entry.isSingleImage -> parts += tr(R.string.single_image)
-        total != null && total > entry.images.size -> parts += "${entry.images.size} of $total images"
-        else -> parts += "${entry.images.size} image(s)"
+        total != null && total > entry.images.size -> parts += tr(R.string.arg_of_arg_images, entry.images.size, total)
+        else -> parts += tr(if (entry.images.size == 1) R.string.arg_count_image else R.string.arg_count_images, entry.images.size)
     }
     entry.studioName?.takeIf { it.isNotEmpty() }?.let { parts += it }
     return parts.joinToString(" · ")

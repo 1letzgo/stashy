@@ -27,7 +27,7 @@ struct AddStudioToSceneSheet: View {
         NavigationView {
             Form {
                 Section(header: Text(tr("search_studio"))) {
-                    TextField(tr("placeholder_search_2"), text: $searchText)
+                    TextField(tr("placeholder_search"), text: $searchText)
                     if isLoading {
                         HStack { Spacer(); ProgressView(tr("loading")); Spacer() }.padding()
                     } else {

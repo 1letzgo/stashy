@@ -189,9 +189,9 @@ struct DownloadsView: View {
     private func progressCaption(for download: ActiveDownload) -> String {
         var parts: [String] = ["\(Int(min(max(download.progress, 0), 1) * 100))%"]
         if download.totalUnits > 0 {
-            parts.append("\(download.completedUnits) of \(download.totalUnits) images")
+            parts.append(tr("arg_of_arg_images", download.completedUnits, download.totalUnits))
         } else if download.totalSize > 0 {
-            parts.append("\(ByteCountFormatter.string(fromByteCount: download.downloadedSize, countStyle: .file)) of \(ByteCountFormatter.string(fromByteCount: download.totalSize, countStyle: .file))")
+            parts.append(tr("arg_of_arg", ByteCountFormatter.string(fromByteCount: download.downloadedSize, countStyle: .file), ByteCountFormatter.string(fromByteCount: download.totalSize, countStyle: .file)))
         } else if download.downloadedSize > 0 {
             parts.append(ByteCountFormatter.string(fromByteCount: download.downloadedSize, countStyle: .file))
         }
@@ -369,7 +369,7 @@ private struct DownloadSyncJobSheet: View {
                         .listRowInsets(EdgeInsets())
                         .listRowBackground(Color.clear)
                 } header: {
-                    sectionHeader(tr("placeholder_search"))
+                    sectionHeader(tr("search"))
                 }
 
                 Section {

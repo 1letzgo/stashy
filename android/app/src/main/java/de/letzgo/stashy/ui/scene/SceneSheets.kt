@@ -279,7 +279,7 @@ private fun count(n: Int?, unit: String) = n?.let { "$it $unit" }
 fun EditPerformersSheet(scene: Scene, onDismiss: () -> Unit, onSaved: (List<Performer>) -> Unit) =
     PerformersPickerSheet(
         itemKey = "scene-${scene.id}",
-        current = scene.performers.map { PickerEntry(it.id, it.name, it.disambiguation?.takeIf { d -> d.isNotBlank() } ?: it.sceneCount?.let { n -> "$n scenes" }, it.imageURL) },
+        current = scene.performers.map { PickerEntry(it.id, it.name, it.disambiguation?.takeIf { d -> d.isNotBlank() } ?: it.sceneCount?.let { n -> tr(if (n == 1) R.string.arg_count_scene else R.string.arg_count_scenes, n) }, it.imageURL) },
         known = scene.performers,
         save = { ids, _ -> SceneEditing.updatePerformers(scene.id, ids) },
         onDismiss = onDismiss, onSaved = onSaved,
@@ -442,7 +442,7 @@ fun EditGalleriesSheet(scene: Scene, onDismiss: () -> Unit, onSaved: (List<Scene
             }
             Column(Modifier.weight(1f).padding(horizontal = 12.dp)) {
                 Text(g.displayTitle, color = p.text, maxLines = 2)
-                g.imageCount?.let { Text("$it images", style = NativeType.bodyMedium, color = p.secondaryText) }
+                g.imageCount?.let { Text(tr(if (it == 1) R.string.arg_count_image else R.string.arg_count_images, it), style = NativeType.bodyMedium, color = p.secondaryText) }
             }
             Icon(if (g.id in selected) PlayerIcons.checkCircle else PlayerIcons.circle, null, tint = if (g.id in selected) Appearance.tint else p.secondaryText)
         }

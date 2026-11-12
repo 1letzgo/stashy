@@ -57,13 +57,32 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 /** iOS `ToolsServerView.CleanupKind`. */
-private enum class CleanupKind(@androidx.annotation.StringRes private val titleRes: Int, val noun: String, val mutation: String) {
-    Tags(R.string.action_remove_unused_tags, "tags", "tagsDestroy"),
-    Performers(R.string.action_remove_unused_performers, "performers", "performersDestroy"),
-    Studios(R.string.action_remove_unused_studios, "studios", "studiosDestroy");
+private enum class CleanupKind(
+    @androidx.annotation.StringRes private val titleRes: Int,
+    @androidx.annotation.StringRes private val confirmRes: Int,
+    @androidx.annotation.StringRes private val emptyRes: Int,
+    @androidx.annotation.StringRes private val loadErrorRes: Int,
+    @androidx.annotation.StringRes private val deleteErrorRes: Int,
+    @androidx.annotation.StringRes private val oneRes: Int,
+    @androidx.annotation.StringRes private val otherRes: Int,
+    val mutation: String,
+) {
+    // One key per sentence and kind: an inserted noun would stay English in every translation.
+    Tags(R.string.action_remove_unused_tags, R.string.confirm_remove_unused_tags, R.string.empty_unused_tags_found,
+        R.string.error_load_tag_list, R.string.error_delete_unused_tags, R.string.arg_count_tag, R.string.arg_count_tags, "tagsDestroy"),
+    Performers(R.string.action_remove_unused_performers, R.string.confirm_remove_unused_performers, R.string.empty_unused_performers_found,
+        R.string.error_load_performer_list, R.string.error_delete_unused_performers, R.string.arg_count_performer, R.string.arg_count_performers, "performersDestroy"),
+    Studios(R.string.action_remove_unused_studios, R.string.confirm_remove_unused_studios, R.string.empty_unused_studios_found,
+        R.string.error_load_studio_list, R.string.error_delete_unused_studios, R.string.arg_count_studio, R.string.arg_count_studios, "studiosDestroy");
 
     /** Read on use: a constant must not freeze its text at class load. */
     val title: String get() = tr(titleRes)
+    val confirmTitle: String get() = tr(confirmRes)
+    val emptyText: String get() = tr(emptyRes)
+    val loadError: String get() = tr(loadErrorRes)
+    val deleteError: String get() = tr(deleteErrorRes)
+    /** "1 tag" / "3 performers". */
+    fun counted(count: Int): String = tr(if (count == 1) oneRes else otherRes, count)
 }
 
 /** One Generate task: label, icon, `GenerateMetadataInput` flag, alert title. */
@@ -196,18 +215,18 @@ fun ServerTasksContent(topPadding: Dp) {
     alert?.let { (t, m) -> SimpleAlert(t, m) { alert = null } }
     cleanup?.let { (kind, candidates) ->
         val preview = candidates.take(8).joinToString(", ") { it.name }
-        val rest = if (candidates.size > 8) " and ${candidates.size - 8} more" else ""
+        val names = if (candidates.size > 8) tr(R.string.arg_and_arg_more, preview, candidates.size - 8) else preview
         ConfirmAlert(
-            tr(R.string.confirm_remove_unused_arg, kind.noun),
-            tr(R.string.hint_arg_arg_are_not_used, candidates.size, kind.noun, preview, rest),
+            kind.confirmTitle,
+            tr(R.string.hint_arg_not_used_anywhere, kind.counted(candidates.size), names),
             tr(R.string.action_delete_arg, candidates.size),
             onConfirm = {
                 val ids = candidates.map { it.id }
                 scope.launch {
                     alert = try {
                         val ok = ServerTasksRepository.destroy(kind.mutation, ids)
-                        kind.title to if (ok) "${ids.size} unused ${kind.noun} deleted." else tr(R.string.server_rejected_deletion)
-                    } catch (e: Exception) { kind.title to tr(R.string.error_delete_arg, kind.noun) }
+                        kind.title to if (ok) tr(R.string.arg_deleted, kind.counted(ids.size)) else tr(R.string.server_rejected_deletion)
+                    } catch (e: Exception) { kind.title to kind.deleteError }
                 }
             },
             onDismiss = { cleanup = null },
@@ -238,9 +257,9 @@ private suspend fun findUnusedResult(kind: CleanupKind, onFound: (Pair<CleanupKi
         CleanupKind.Performers -> ServerTasksRepository.unusedPerformers()
         CleanupKind.Studios -> ServerTasksRepository.unusedStudios()
     }
-    if (unused.isEmpty()) kind.title to tr(R.string.empty_unused_arg_found, kind.noun) else { onFound(kind to unused); null }
+    if (unused.isEmpty()) kind.title to kind.emptyText else { onFound(kind to unused); null }
 } catch (e: Exception) {
-    kind.title to tr(R.string.error_load_arg_list, kind.noun)
+    kind.title to kind.loadError
 }
 
 /** iOS `jobRow` — status icon, description, detail line, progress and the cancel button. */
@@ -267,7 +286,7 @@ private fun JobRow(job: StashQueuedJob, isStopping: Boolean, onStop: () -> Unit)
         if (progress != null) Text("${Math.round(progress * 100)}%", style = NativeType.bodySmall, color = p.secondaryText)
         if (job.isActive) {
             if (isStopping || job.status == "STOPPING") RowProgress()
-            else IconButton(onStop) { Icon(Icons.Filled.Close, tr(R.string.action_cancel_arg, job.description ?: "job"), tint = p.secondaryText) }
+            else IconButton(onStop) { Icon(Icons.Filled.Close, job.description?.let { tr(R.string.action_cancel_arg, it) } ?: tr(R.string.action_cancel), tint = p.secondaryText) }
         }
     }
 }

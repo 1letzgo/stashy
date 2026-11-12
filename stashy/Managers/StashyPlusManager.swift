@@ -483,15 +483,14 @@ struct StashyStoreProduct: Identifiable {
     /// "4,99 €/month" — what the plan costs once the trial is over.
     var pricePerPeriod: String {
         guard let period = package.storeProduct.subscriptionPeriod else { return displayPrice }
-        let unit: String
+        let one = period.value == 1
         switch period.unit {
-        case .day: unit = period.value == 1 ? "day" : "\(period.value) days"
-        case .week: unit = period.value == 1 ? "week" : "\(period.value) weeks"
-        case .month: unit = period.value == 1 ? "month" : "\(period.value) months"
-        case .year: unit = period.value == 1 ? "year" : "\(period.value) years"
+        case .day: return one ? tr("arg_per_day", displayPrice) : tr("arg_per_arg", displayPrice, tr("arg_count_days", period.value))
+        case .week: return one ? tr("arg_per_week", displayPrice) : tr("arg_per_arg", displayPrice, tr("arg_count_weeks", period.value))
+        case .month: return one ? tr("arg_per_month", displayPrice) : tr("arg_per_arg", displayPrice, tr("arg_count_months", period.value))
+        case .year: return one ? tr("arg_per_year", displayPrice) : tr("arg_per_arg", displayPrice, tr("arg_count_years", period.value))
         @unknown default: return displayPrice
         }
-        return "\(displayPrice)/\(unit)"
     }
 
     private static func lengthText(_ period: RevenueCat.SubscriptionPeriod) -> String {
@@ -499,11 +498,11 @@ struct StashyStoreProduct: Identifiable {
         switch period.unit {
         case .day: days = period.value
         case .week: days = period.value * 7
-        case .month: return period.value == 1 ? "1 month" : "\(period.value) months"
-        case .year: return period.value == 1 ? "1 year" : "\(period.value) years"
+        case .month: return tr(period.value == 1 ? "arg_count_month" : "arg_count_months", period.value)
+        case .year: return tr(period.value == 1 ? "arg_count_year" : "arg_count_years", period.value)
         @unknown default: days = period.value
         }
-        return days == 1 ? "1 day" : "\(days) days"
+        return tr(days == 1 ? "arg_count_day" : "arg_count_days", days)
     }
 }
 

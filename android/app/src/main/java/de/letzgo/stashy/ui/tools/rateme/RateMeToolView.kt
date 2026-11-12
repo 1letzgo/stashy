@@ -336,7 +336,7 @@ private fun Content(model: RateMeViewModel, hPad: Dp, isRegular: Boolean, bottom
             )
             else -> MatchUnavailableView(
                 tr(R.string.nothing_to_rate), ModeIcons.getValue(model.mode),
-                tr(R.string.hint_all_arg_already_have_rating, model.mode.label.lowercase()),
+                tr(if (model.mode == RateMeMode.Scenes) R.string.hint_all_scenes_already_have_rating else R.string.hint_all_images_already_have_rating),
                 Modifier.fillMaxWidth().heightIn(min = 320.dp),
             )
         }
@@ -438,7 +438,7 @@ private fun StarRating(rating100: Int?, interactive: Boolean, size: Dp, spacing:
                 contentAlignment = Alignment.Center,
             ) {
                 Icon(
-                    if (filled) SF.starFill else SF.star, "$index stars",
+                    if (filled) SF.starFill else SF.star, tr(R.string.action_rate_arg_stars, index),
                     tint = if (filled) Appearance.tint else Color.Gray.copy(alpha = 0.5f),
                     modifier = Modifier.size(star),
                 )
@@ -567,7 +567,7 @@ private fun ThemePickerSheet(
             ) {
                 item {
                     NativeSearchField(
-                        query, { query = it }, tr(R.string.search_arg_s, kind.title),
+                        query, { query = it }, kind.searchTitle,
                         Modifier.padding(bottom = 12.dp),
                         loading = RateMePickerOptions.isSearching(storeKind),
                     )
@@ -581,7 +581,7 @@ private fun ThemePickerSheet(
                             })
                         } else if (options.isEmpty()) {
                             if (query.isNotEmpty() && !RateMePickerOptions.isSearching(storeKind)) {
-                                NativeListItem(tr(R.string.empty_arg_s_match_arg, kind.title.lowercase(), query), headlineColor = p.secondaryText)
+                                NativeListItem(tr(R.string.empty_results_for_arg, query), headlineColor = p.secondaryText)
                             }
                         } else {
                             options.take(50).forEachIndexed { index, option ->

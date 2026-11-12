@@ -463,8 +463,8 @@ private fun PurchaseButton(product: StashyStoreProduct) {
             // The trial leads, the price it turns into right below it (Play policy: what is
             // charged after the trial must be as clear as the trial).
             trial != null -> Column(horizontalAlignment = Alignment.End) {
-                Text("$trial free", style = NativeType.bodyMedium, color = Appearance.tint, maxLines = 1)
-                Text("then ${product.pricePerPeriod}", style = NativeType.labelSmall, color = Theme.palette.secondaryText, maxLines = 1)
+                Text(tr(R.string.arg_free, trial), style = NativeType.bodyMedium, color = Appearance.tint, maxLines = 1)
+                Text(tr(R.string.arg_then, product.pricePerPeriod), style = NativeType.labelSmall, color = Theme.palette.secondaryText, maxLines = 1)
             }
             else -> Text(StashyPlus.price(product), style = NativeType.bodyMedium, color = Theme.palette.secondaryText, maxLines = 1)
         }

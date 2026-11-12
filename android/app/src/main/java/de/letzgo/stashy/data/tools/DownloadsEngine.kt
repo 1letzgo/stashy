@@ -513,7 +513,7 @@ class DownloadsWorker(context: Context, params: WorkerParameters) : CoroutineWor
                         it.copy(progress = max(0.02, done.toDouble() / max(total, 1)), completedUnits = done, totalUnits = total, downloadedSize = snapshotBytes)
                     }
                 }
-                foreground(p.title, done * 100 / max(total, 1), "$done of $total images", force = done == total)
+                foreground(p.title, done * 100 / max(total, 1), tr(R.string.arg_of_arg_images, done, total), force = done == total)
             }
             withContext(NonCancellable + Dispatchers.Main) { Downloads.imagesCommitted(p, stored.toList()) }
             DownloadsPendingStore.delete(applicationContext, key)

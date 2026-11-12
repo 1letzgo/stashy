@@ -138,7 +138,7 @@ struct TVSearchView: View {
             VStack(spacing: 16) {
                 ProgressView()
                     .scaleEffect(1.5)
-                Text(tr("searching_menu"))
+                Text(tr("loading_searching"))
                     .font(.title3)
                     .foregroundStyle(.secondary)
             }

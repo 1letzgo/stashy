@@ -145,7 +145,7 @@ struct AITagsSettingsView: View {
                 VStack(alignment: .leading, spacing: 6) {
                     ProgressView(value: manager.buildProgress)
                         .tint(appearanceManager.tintColor)
-                    Text("\(processed) of \(total) items")
+                    Text(tr("arg_of_arg_items", processed, total))
                         .font(.caption)
                         .foregroundColor(.secondary)
                 }

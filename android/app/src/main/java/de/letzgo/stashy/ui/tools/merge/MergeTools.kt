@@ -99,13 +99,27 @@ import kotlinx.coroutines.launch
 class MergeToolsConfig<T : MergeableItem>(
     /** Only for the template key (`tags`, `studios`). */
     val kind: String,
-    val noun: String,
-    val nounPlural: String,
     val loadAll: suspend () -> List<T>,
     val merge: suspend (sourceIds: List<String>, destinationId: String) -> Unit,
     /** After a successful merge (invalidate caches …). */
     val didMerge: () -> Unit = {},
-)
+) {
+    // One key per sentence and kind: an inserted "tag"/"studio" would stay English in every
+    // translation and rarely fits the grammar of the sentence around it.
+    private val isTags get() = kind == "tags"
+    val title: String get() = tr(if (isTags) R.string.tags else R.string.studios)
+    val searchPrompt: String get() = tr(if (isTags) R.string.placeholder_search_tags else R.string.placeholder_search_studios)
+    val confirmTitle: String get() = tr(if (isTags) R.string.confirm_merge_tags else R.string.confirm_merge_studios)
+    val emptyServerText: String get() = tr(if (isTags) R.string.hint_this_server_has_no_tags else R.string.hint_this_server_has_no_studios)
+    val mergeAction: String get() = tr(if (isTags) R.string.action_merge_tags else R.string.action_merge_studios)
+    val loadError: String get() = tr(if (isTags) R.string.error_load_tags else R.string.error_load_studios)
+    val noServerText: String get() = tr(if (isTags) R.string.hint_connect_to_stash_server_to_merge_tags else R.string.hint_connect_to_stash_server_to_merge_studios)
+    /** "1 tag" / "3 studios". */
+    fun counted(count: Int): String = when {
+        isTags -> tr(if (count == 1) R.string.arg_count_tag else R.string.arg_count_tags, count)
+        else -> tr(if (count == 1) R.string.arg_count_studio else R.string.arg_count_studios, count)
+    }
+}
 
 /** iOS: `MergeToolsLayout`. */
 private object MergeToolsLayout {
@@ -123,7 +137,7 @@ private object MergeToolsLayout {
 fun TagMergeToolView(topPadding: Dp = toolsTopPadding()) {
     val config = remember {
         MergeToolsConfig<MergeTag>(
-            kind = "tags", noun = "tag", nounPlural = "tags",
+            kind = "tags",
             loadAll = { MergeRepository.fetchEveryTagForMerge() },
             merge = { sources, destination -> MergeRepository.mergeTags(sources, destination) },
         )
@@ -139,7 +153,7 @@ fun TagMergeToolView(topPadding: Dp = toolsTopPadding()) {
 fun StudioMergeToolView(topPadding: Dp = toolsTopPadding()) {
     val config = remember {
         MergeToolsConfig<MergeStudio>(
-            kind = "studios", noun = "studio", nounPlural = "studios",
+            kind = "studios",
             loadAll = { MergeRepository.fetchEveryStudioForMerge() },
             merge = { sources, destination -> MergeRepository.mergeStudios(sources, destination) },
         )
@@ -153,20 +167,19 @@ fun StudioMergeToolView(topPadding: Dp = toolsTopPadding()) {
  */
 @Composable
 fun <T : MergeableItem> MergeToolsView(config: MergeToolsConfig<T>, topPadding: Dp = toolsTopPadding()) {
-    val nounTitle = config.nounPlural.replaceFirstChar { it.uppercase() }
     if (ServerConfigManager.activeConfig == null) {
-        NoServerPlaceholder(Icons.Filled.MergeType, tr(R.string.hint_connect_to_stash_server_to_merge, nounTitle))
+        NoServerPlaceholder(Icons.Filled.MergeType, config.noServerText)
         return
     }
     // Each server has its own list and templates.
-    key(ServerConfigManager.activeConfig?.id) { MergeToolsContent(config, nounTitle, topPadding) }
+    key(ServerConfigManager.activeConfig?.id) { MergeToolsContent(config, topPadding) }
 }
 
 private data class RunnablePreset<T>(val preset: MergePreset, val destination: T, val sources: List<T>)
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
-private fun <T : MergeableItem> MergeToolsContent(config: MergeToolsConfig<T>, nounTitle: String, topPadding: Dp) {
+private fun <T : MergeableItem> MergeToolsContent(config: MergeToolsConfig<T>, topPadding: Dp) {
     val p = Theme.palette
     val tint = Appearance.tint
     val scope = rememberCoroutineScope()
@@ -242,12 +255,10 @@ private fun <T : MergeableItem> MergeToolsContent(config: MergeToolsConfig<T>, n
 
     fun presetSubtitle(preset: MergePreset, missing: Int): String {
         val total = preset.sources.size
-        val noun = if (total == 1) "source" else "sources"
-        if (allItems.isEmpty()) return "$total $noun"
-        return tr(R.string.hint_arg_of_arg_arg_on, total - missing, total, noun)
+        val counted = tr(if (total == 1) R.string.arg_count_source else R.string.arg_count_sources, total)
+        if (allItems.isEmpty()) return counted
+        return tr(R.string.hint_arg_of_arg_on_server, total - missing, counted)
     }
-
-    fun nounFor(count: Int) = if (count == 1) config.noun else config.nounPlural
 
     fun load() {
         visibleCount = MergeToolsLayout.PAGE_SIZE
@@ -261,7 +272,7 @@ private fun <T : MergeableItem> MergeToolsContent(config: MergeToolsConfig<T>, n
                 throw e
             } catch (e: Exception) {
                 isLoading = false
-                showToast(tr(R.string.error_load_arg, config.nounPlural))
+                showToast(config.loadError)
             }
         }
     }
@@ -288,7 +299,7 @@ private fun <T : MergeableItem> MergeToolsContent(config: MergeToolsConfig<T>, n
         if (missingNames.isNotEmpty()) {
             val shown = missingNames.take(3).joinToString(", ")
             val rest = missingNames.size - minOf(3, missingNames.size)
-            showToast(tr(R.string.hint_not_on_this_server_kept, shown, if (rest > 0) " +$rest more" else ""), long = true)
+            showToast(tr(R.string.hint_not_on_this_server_kept, if (rest > 0) shown + " " + tr(R.string.arg_plus_more, rest) else shown), long = true)
         }
     }
 
@@ -337,7 +348,7 @@ private fun <T : MergeableItem> MergeToolsContent(config: MergeToolsConfig<T>, n
                 sources = emptySet()
                 setItems(allItems.filterNot { it.id in sourceIds })
                 config.didMerge()
-                showToast(tr(R.string.arg_arg_merged_into_arg, mergedCount, nounFor(mergedCount), dest.name))
+                showToast(tr(R.string.arg_merged_into_arg, config.counted(mergedCount), dest.name))
                 load()
             } catch (e: CancellationException) {
                 throw e
@@ -376,10 +387,10 @@ private fun <T : MergeableItem> MergeToolsContent(config: MergeToolsConfig<T>, n
             isMerging = false
             if (mergedTotal > 0) config.didMerge()
             if (failed.isEmpty()) {
-                showToast(tr(R.string.arg_arg_merged_from_arg_templates, mergedTotal, nounFor(mergedTotal), jobs.size))
+                showToast(tr(R.string.arg_merged_from_arg_templates, config.counted(mergedTotal), jobs.size))
             } else {
-                val more = if (failed.size > 3) " +${failed.size - 3}" else ""
-                showToast("$mergedTotal merged, failed: ${failed.take(3).joinToString(", ")}$more", long = true)
+                val more = if (failed.size > 3) " " + tr(R.string.arg_plus_more, failed.size - 3) else ""
+                showToast(tr(R.string.arg_merged_failed_arg, mergedTotal, failed.take(3).joinToString(", ") + more), long = true)
             }
             load()
         }
@@ -453,10 +464,10 @@ private fun <T : MergeableItem> MergeToolsContent(config: MergeToolsConfig<T>, n
                 }
             }
 
-            NativeSearchField(searchText, { searchText = it }, tr(R.string.search_arg, config.nounPlural), Modifier.padding(top = Tokens.Spacing.sm))
+            NativeSearchField(searchText, { searchText = it }, config.searchPrompt, Modifier.padding(top = Tokens.Spacing.sm))
 
             // Category heading over the list, Settings style.
-            NativeSectionHeader(nounTitle, Modifier.padding(top = 12.dp))
+            NativeSectionHeader(config.title, Modifier.padding(top = 12.dp))
         }
 
         // MARK: List card — search as first row, then the rows it filters.
@@ -479,7 +490,7 @@ private fun <T : MergeableItem> MergeToolsContent(config: MergeToolsConfig<T>, n
                 }
                 filtered.isEmpty() -> item(key = "empty") {
                     Text(
-                        if (allItems.isEmpty()) tr(R.string.hint_this_server_has_no_arg, config.nounPlural) else tr(R.string.empty_matches),
+                        if (allItems.isEmpty()) config.emptyServerText else tr(R.string.empty_matches),
                         style = NativeType.bodyMedium, color = p.secondaryText,
                         modifier = Modifier.fillMaxWidth().background(p.secondaryBackground, cardShape(true, true)).padding(16.dp),
                     )
@@ -517,7 +528,7 @@ private fun <T : MergeableItem> MergeToolsContent(config: MergeToolsConfig<T>, n
         ) {
             val dest = destination
             if (canMerge && dest != null) {
-                Text("${sources.size} ${nounFor(sources.size)} → ${dest.name}", style = IosTypography.caption, color = p.secondaryText, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text("${config.counted(sources.size)} → ${dest.name}", style = IosTypography.caption, color = p.secondaryText, maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
             Row(horizontalArrangement = Arrangement.spacedBy(Tokens.Spacing.sm), verticalAlignment = Alignment.CenterVertically) {
                 Row(
@@ -531,7 +542,7 @@ private fun <T : MergeableItem> MergeToolsContent(config: MergeToolsConfig<T>, n
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     if (isMerging) SmallSpinner(Color.White)
-                    Text(if (isMerging) tr(R.string.loading_merging) else tr(R.string.action_merge_arg, nounTitle), style = IosTypography.body.copy(fontWeight = FontWeight.SemiBold), color = Color.White)
+                    Text(if (isMerging) tr(R.string.loading_merging) else config.mergeAction, style = IosTypography.body.copy(fontWeight = FontWeight.SemiBold), color = Color.White)
                 }
                 MergeSecondaryButton(tr(R.string.action_save), canSavePreset) {
                     val active = activePreset
@@ -553,7 +564,7 @@ private fun <T : MergeableItem> MergeToolsContent(config: MergeToolsConfig<T>, n
         MergeDestinationSheet(
             items = allItems,
             excludedIds = sources,
-            sectionTitle = nounTitle,
+            sectionTitle = config.title,
             onPick = { picked ->
                 destination = picked
                 sources = sources - picked.id
@@ -566,7 +577,7 @@ private fun <T : MergeableItem> MergeToolsContent(config: MergeToolsConfig<T>, n
     if (showingConfirmation) {
         val dest = destination
         StashyAlert(
-            title = tr(R.string.confirm_merge_arg, config.nounPlural),
+            title = config.confirmTitle,
             message = dest?.let { tr(R.string.hint_arg_will_be_merged_into, selectedSources.joinToString(", ") { s -> s.name }, it.name) } ?: "",
             onDismiss = { showingConfirmation = false },
             confirmLabel = tr(R.string.action_merge), destructive = true, dismissLabel = tr(R.string.action_cancel),
@@ -579,8 +590,8 @@ private fun <T : MergeableItem> MergeToolsContent(config: MergeToolsConfig<T>, n
         val sourceCount = runnable.sumOf { it.sources.size }
         val skipped = presets.presets.size - runnable.size
         var text = tr(R.string.hint_arg_of_arg_templates_have, runnable.size, presets.presets.size) +
-            tr(R.string.hint_arg_arg_will_be_merged, sourceCount, nounFor(sourceCount))
-        if (skipped > 0) text += tr(R.string.hint_arg_arg_nothing_to_do, skipped, if (skipped == 1) tr(R.string.template_has) else tr(R.string.templates_have))
+            tr(R.string.hint_arg_will_be_merged, config.counted(sourceCount))
+        if (skipped > 0) text += tr(if (skipped == 1) R.string.hint_one_template_nothing_to_do else R.string.hint_arg_templates_nothing_to_do, skipped)
         text += tr(R.string.this_cannot_be_undone)
         StashyAlert(
             title = tr(R.string.confirm_run_all_templates), message = text,
@@ -745,7 +756,7 @@ private fun <T : MergeableItem> MergeDestinationSheet(
             de.letzgo.stashy.ui.NativeSheetTopBar(tr(R.string.action_merge_into), onClose = onCancel, closeDescription = tr(R.string.action_cancel))
             LazyColumn(Modifier.weight(1f).fillMaxWidth(), contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp)) {
                 item(key = "search") {
-                    NativeSearchField(searchText, { searchText = it }, tr(R.string.placeholder_search_2), Modifier.padding(bottom = 12.dp))
+                    NativeSearchField(searchText, { searchText = it }, tr(R.string.placeholder_search), Modifier.padding(bottom = 12.dp))
                 }
                 item(key = "header") { NativeSectionHeader(sectionTitle) }
                 val more = visibleCount < filtered.size

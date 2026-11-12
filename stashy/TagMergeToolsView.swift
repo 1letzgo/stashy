@@ -18,8 +18,6 @@ struct TagMergeToolsView: View {
     var body: some View {
         MergeToolsView(config: MergeToolsConfig<Tag>(
             kind: "tags",
-            noun: "tag",
-            nounPlural: "tags",
             loadAll: { try await Self.repository.fetchEveryTagForMerge() },
             merge: { sources, destination in
                 try await Self.repository.mergeTags(sourceIds: sources, destinationId: destination)

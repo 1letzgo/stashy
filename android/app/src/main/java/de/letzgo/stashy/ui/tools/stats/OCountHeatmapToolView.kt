@@ -430,7 +430,7 @@ private fun SummaryCard(heatmap: OCountMonthHeatmap, selectedDayKey: String?) {
     }
     // iOS `summaryContent(heatmap:).accessibility`.
     val accessibility = if (selectedCell != null) "$title, $value"
-    else "${heatmap.monthTitle}, ${heatmap.daysWithOCount} days, ${countLabel(heatmap.totalInMonth)}"
+    else "${heatmap.monthTitle}, ${tr(if (heatmap.daysWithOCount == 1) R.string.arg_count_day else R.string.arg_count_days, heatmap.daysWithOCount)}, ${countLabel(heatmap.totalInMonth)}"
     Column(
         Modifier.fillMaxWidth().insightsCard().semantics(mergeDescendants = true) { contentDescription = accessibility }.padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(4.dp),

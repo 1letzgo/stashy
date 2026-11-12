@@ -56,7 +56,7 @@ struct AddTagsSheet: View {
         NavigationView {
             Form {
                 Section(header: Text(tr("search_tags"))) {
-                    TextField(tr("placeholder_search_2"), text: $searchText)
+                    TextField(tr("placeholder_search"), text: $searchText)
 
                     if isLoading {
                         HStack { Spacer(); ProgressView(tr("loading_ellipsis")); Spacer() }.padding()

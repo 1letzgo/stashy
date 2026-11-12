@@ -3181,10 +3181,10 @@ struct ReelsViewBody: View {
             DispatchQueue.main.async {
                 guard success else {
                     self.currentVisibleSceneId = item.id
-                    ToastManager.shared.show(tr("error_delete_arg_2", label), icon: "exclamationmark.triangle", style: .error)
+                    ToastManager.shared.show(tr(label == "image" ? "error_delete_image" : "error_delete_scene"), icon: "exclamationmark.triangle", style: .error)
                     return
                 }
-                ToastManager.shared.show("\(label.capitalized) deleted", icon: "trash", style: .success)
+                ToastManager.shared.show(tr(label == "image" ? "image_deleted" : "scene_deleted"), icon: "trash", style: .success)
                 prune()
                 if successorId == nil {
                     self.currentVisibleSceneId = nil

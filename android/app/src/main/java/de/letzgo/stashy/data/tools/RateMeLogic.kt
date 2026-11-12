@@ -88,12 +88,17 @@ sealed class RateMeTheme {
 }
 
 /** iOS: `RateMeToolsView.ThemePickerKind`. */
-enum class RateMeThemePickerKind(val raw: String, @androidx.annotation.StringRes private val titleRes: Int) {
-    Performer("performer", R.string.performer),
-    Studio("studio", R.string.studio),
-    Tag("tag", R.string.tag);
+enum class RateMeThemePickerKind(
+    val raw: String,
+    @androidx.annotation.StringRes private val titleRes: Int,
+    @androidx.annotation.StringRes private val searchTitleRes: Int,
+) {
+    Performer("performer", R.string.performer, R.string.search_performers),
+    Studio("studio", R.string.studio, R.string.search_studios),
+    Tag("tag", R.string.tag, R.string.search_tags);
     /** Read on use: a constant must not freeze its text at class load. */
     val title: String get() = tr(titleRes)
+    val searchTitle: String get() = tr(searchTitleRes)
 
     fun theme(option: RateMeOption): RateMeTheme = when (this) {
         Performer -> RateMeTheme.Performer(option)
@@ -218,7 +223,7 @@ object RateMeLogic {
 
     /** iOS: "No unrated scenes left in Random." */
     fun noneLeftMessage(mode: RateMeMode, theme: RateMeTheme): String =
-        tr(R.string.empty_unrated_arg_left_in_arg, mode.label.lowercase(), theme.label)
+        tr(if (mode == RateMeMode.Scenes) R.string.empty_unrated_scenes_left_in_arg else R.string.empty_unrated_images_left_in_arg, theme.label)
 
     fun deleteConfirmationTitle(mode: RateMeMode): String =
         if (mode == RateMeMode.Scenes) tr(R.string.confirm_really_delete_scene_and_files) else tr(R.string.confirm_really_delete_image_and_files)

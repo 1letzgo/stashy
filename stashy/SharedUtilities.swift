@@ -157,16 +157,17 @@ enum CatalogCardBadge: Equatable {
         }
     }
 
-    /// Singular noun for VoiceOver (`CatalogCardCountPill`).
-    var noun: String {
+    /// VoiceOver value of `CatalogCardCountPill`: "3 scenes", "1 gallery", "O Count, 5".
+    func spokenCount(_ count: Int) -> String {
+        let one = count == 1
         switch self {
-        case .scenes: return "scene"
-        case .images: return "image"
-        case .galleries: return "gallery"
-        case .performers, .performersAll: return "performer"
-        case .markers: return "marker"
-        case .oCount, .oCountAll: return "O"
-        case .rating: return "rating"
+        case .scenes: return tr(one ? "arg_count_scene" : "arg_count_scenes", count)
+        case .images: return tr(one ? "arg_count_image" : "arg_count_images", count)
+        case .galleries: return tr(one ? "arg_count_gallery" : "arg_count_galleries", count)
+        case .performers, .performersAll: return tr(one ? "arg_count_performer" : "arg_count_performers", count)
+        case .markers: return tr(one ? "arg_count_marker" : "arg_count_markers", count)
+        case .oCount, .oCountAll: return tr("o_count_arg", count)
+        case .rating: return tr("rating_arg", count)
         }
     }
 }

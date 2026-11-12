@@ -254,13 +254,28 @@ final class MergePresetStore: ObservableObject {
 struct MergeToolsConfig<Item: MergeableItem> {
     /// Nur für den Preset-Schlüssel (`tags`, `studios`).
     let kind: String
-    /// Singular/Plural für Buttons und Meldungen ("tag"/"tags").
-    let noun: String
-    let nounPlural: String
     let loadAll: () async throws -> [Item]
     let merge: (_ sourceIds: [String], _ destinationId: String) async throws -> Void
     /// Nach erfolgreichem Merge (Caches invalidieren etc.).
     let didMerge: () -> Void
+}
+
+/// Texte je Art. Jeder Satz hat seinen eigenen Key: ein eingesetztes "tag"/"studio" bliebe
+/// in jeder Übersetzung englisch und passt in vielen Sprachen grammatisch nicht.
+extension MergeToolsConfig {
+    private var isTags: Bool { kind == "tags" }
+    var title: String { tr(isTags ? "tags" : "studios") }
+    var searchSectionTitle: String { tr(isTags ? "search_tags" : "search_studios") }
+    var searchPrompt: String { tr(isTags ? "placeholder_search_tags" : "placeholder_search_studios") }
+    var confirmTitle: String { tr(isTags ? "confirm_merge_tags" : "confirm_merge_studios") }
+    var emptyServerText: String { tr(isTags ? "hint_this_server_has_no_tags" : "hint_this_server_has_no_studios") }
+    var mergeAction: String { tr(isTags ? "action_merge_tags" : "action_merge_studios") }
+    var loadError: String { tr(isTags ? "error_load_tags" : "error_load_studios") }
+    /// "1 tag" / "3 studios".
+    func counted(_ count: Int) -> String {
+        if isTags { return tr(count == 1 ? "arg_count_tag" : "arg_count_tags", count) }
+        return tr(count == 1 ? "arg_count_studio" : "arg_count_studios", count)
+    }
 }
 
 // MARK: - Merge view
@@ -340,8 +355,6 @@ struct MergeToolsView<Item: MergeableItem>: View {
         destination != nil || !sources.isEmpty || !searchText.isEmpty
     }
 
-    private var nounTitle: String { config.nounPlural.capitalized }
-
     var body: some View {
         Group {
             if configManager.activeConfig == nil {
@@ -361,7 +374,7 @@ struct MergeToolsView<Item: MergeableItem>: View {
             visibleCount = MergeToolsLayout.pageSize
         }
         .sheet(isPresented: $showingDestinationPicker) {
-            MergeDestinationSheet(items: allItems, excludedIds: sources, sectionTitle: tr("search_arg", nounTitle)) { picked in
+            MergeDestinationSheet(items: allItems, excludedIds: sources, sectionTitle: config.searchSectionTitle) { picked in
                 destination = picked
                 sources.remove(picked.id)
                 showingDestinationPicker = false
@@ -369,7 +382,7 @@ struct MergeToolsView<Item: MergeableItem>: View {
                 showingDestinationPicker = false
             }
         }
-        .alert(tr("confirm_merge_arg", config.nounPlural), isPresented: $showingConfirmation) {
+        .alert(config.confirmTitle, isPresented: $showingConfirmation) {
             Button(tr("action_merge"), role: .destructive) { merge() }
             Button(tr("action_cancel"), role: .cancel) {}
         } message: {
@@ -463,7 +476,7 @@ struct MergeToolsView<Item: MergeableItem>: View {
             }
 
             // Category heading over the list, Settings style, 8 pt above the card.
-            StashySectionHeading(title: nounTitle)
+            StashySectionHeading(title: config.title)
                 .padding(.top, DesignTokens.Spacing.md)
         }
         .padding(.horizontal, DesignTokens.Tools.contentPadding)
@@ -559,7 +572,7 @@ struct MergeToolsView<Item: MergeableItem>: View {
                 HStack(spacing: DesignTokens.Spacing.xs) {
                     Image(systemName: "magnifyingglass")
                         .foregroundColor(.secondary)
-                    TextField(tr("search_arg", config.nounPlural), text: $searchText)
+                    TextField(config.searchPrompt, text: $searchText)
                         .textInputAutocapitalization(.never)
                         .disableAutocorrection(true)
                     if !searchText.isEmpty {
@@ -581,7 +594,7 @@ struct MergeToolsView<Item: MergeableItem>: View {
                     HStack { Spacer(); ProgressView(tr("loading")); Spacer() }
                         .padding(.vertical, DesignTokens.Spacing.lg)
                 } else if filtered.isEmpty {
-                    Text(allItems.isEmpty ? tr("hint_this_server_has_no_arg", config.nounPlural) : tr("empty_matches"))
+                    Text(allItems.isEmpty ? config.emptyServerText : tr("empty_matches"))
                         .font(.callout)
                         .foregroundColor(.secondary)
                         .frame(maxWidth: .infinity, alignment: .leading)
@@ -657,7 +670,7 @@ struct MergeToolsView<Item: MergeableItem>: View {
     private var mergeBar: some View {
         VStack(spacing: DesignTokens.Spacing.xs) {
             if canMerge, let destination {
-                Text("\(sources.count) \(sources.count == 1 ? config.noun : config.nounPlural) → \(destination.name)")
+                Text("\(config.counted(sources.count)) → \(destination.name)")
                     .font(.caption)
                     .foregroundColor(.secondary)
             }
@@ -668,7 +681,7 @@ struct MergeToolsView<Item: MergeableItem>: View {
                 } label: {
                     HStack(spacing: DesignTokens.Spacing.xs) {
                         if isMerging { InlineSpinner() }
-                        Text(isMerging ? tr("loading_merging") : tr("action_merge_arg", nounTitle))
+                        Text(isMerging ? tr("loading_merging") : config.mergeAction)
                     }
                     .frame(maxWidth: .infinity)
                 }
@@ -736,11 +749,11 @@ struct MergeToolsView<Item: MergeableItem>: View {
 
     private func presetSubtitle(_ preset: MergePreset, missing: Int) -> String {
         let total = preset.sources.count
-        let noun = total == 1 ? tr("source_lower") : tr("sources_lower")
         // Vor dem Laden ist nichts aufgelöst — dann nur die Gesamtzahl. Danach immer
         // "K of N", auch wenn alle da sind, damit die Pill ihre Form nicht wechselt.
-        if allItems.isEmpty { return tr(total == 1 ? "arg_count_source" : "arg_count_sources", total) }
-        return tr("hint_arg_of_arg_arg_on", total - missing, total, noun)
+        let counted = tr(total == 1 ? "arg_count_source" : "arg_count_sources", total)
+        if allItems.isEmpty { return counted }
+        return tr("hint_arg_of_arg_on_server", total - missing, counted)
     }
 
     /// Vorlagen, für die es gerade etwas zu tun gibt: Ziel vorhanden und mindestens
@@ -759,9 +772,9 @@ struct MergeToolsView<Item: MergeableItem>: View {
         let sourceCount = runnable.reduce(0) { $0 + $1.sources.count }
         let skipped = presets.presets.count - runnable.count
         var text = tr("hint_arg_of_arg_templates_have", runnable.count, presets.presets.count)
-            + tr("hint_arg_arg_will_be_merged", sourceCount, sourceCount == 1 ? config.noun : config.nounPlural)
+            + tr("hint_arg_will_be_merged", config.counted(sourceCount))
         if skipped > 0 {
-            text += tr("hint_arg_arg_nothing_to_do", skipped, skipped == 1 ? tr("template_has") : tr("templates_have"))
+            text += tr(skipped == 1 ? "hint_one_template_nothing_to_do" : "hint_arg_templates_nothing_to_do", skipped)
         }
         return text + tr("this_cannot_be_undone")
     }
@@ -803,13 +816,13 @@ struct MergeToolsView<Item: MergeableItem>: View {
                 if merged > 0 { config.didMerge() }
                 if failed.isEmpty {
                     ToastManager.shared.show(
-                        tr("arg_arg_merged_from_arg_templates", merged, merged == 1 ? config.noun : config.nounPlural, jobs.count),
+                        tr("arg_merged_from_arg_templates", config.counted(merged), jobs.count),
                         icon: "arrow.triangle.merge",
                         style: .success
                     )
                 } else {
                     ToastManager.shared.show(
-                        "\(merged) merged, failed: \(failed.prefix(3).joined(separator: ", "))\(failed.count > 3 ? " +\(failed.count - 3)" : "")",
+                        tr("arg_merged_failed_arg", merged, failed.prefix(3).joined(separator: ", ") + (failed.count > 3 ? " " + tr("arg_plus_more", failed.count - 3) : "")),
                         icon: "exclamationmark.triangle",
                         style: .error
                     )
@@ -845,7 +858,7 @@ struct MergeToolsView<Item: MergeableItem>: View {
             let shown = missingNames.prefix(3).joined(separator: ", ")
             let rest = missingNames.count - min(3, missingNames.count)
             ToastManager.shared.show(
-                tr("hint_not_on_this_server_kept", shown, rest > 0 ? " +\(rest) more" : ""),
+                tr("hint_not_on_this_server_kept", rest > 0 ? shown + " " + tr("arg_plus_more", rest) : shown),
                 icon: "info.circle",
                 style: .info
             )
@@ -917,10 +930,10 @@ struct MergeToolsView<Item: MergeableItem>: View {
                     isLoading = false
                 }
             } catch {
-                AppLog.error("❌ Loading \(config.nounPlural) failed: \(error.localizedDescription)")
+                AppLog.error("❌ Loading \(config.kind) failed: \(error.localizedDescription)")
                 await MainActor.run {
                     isLoading = false
-                    ToastManager.shared.show(tr("error_load_arg", config.nounPlural), icon: "exclamationmark.triangle", style: .error)
+                    ToastManager.shared.show(config.loadError, icon: "exclamationmark.triangle", style: .error)
                 }
             }
         }
@@ -943,7 +956,7 @@ struct MergeToolsView<Item: MergeableItem>: View {
                     itemIndex = MergeItemIndex(items: allItems)
                     config.didMerge()
                     ToastManager.shared.show(
-                        tr("arg_arg_merged_into_arg", mergedCount, mergedCount == 1 ? config.noun : config.nounPlural, destination.name),
+                        tr("arg_merged_into_arg", config.counted(mergedCount), destination.name),
                         icon: "arrow.triangle.merge",
                         style: .success
                     )
@@ -990,7 +1003,7 @@ private struct MergeDestinationSheet<Item: MergeableItem>: View {
     var body: some View {
         Form {
             Section(header: Text(sectionTitle)) {
-                TextField(tr("placeholder_search_2"), text: $searchText)
+                TextField(tr("placeholder_search"), text: $searchText)
 
                 let shown = Array(filtered.prefix(visibleCount))
                 ForEach(shown) { item in
@@ -1041,7 +1054,7 @@ private struct MergeSearchField: View {
     @Binding var text: String
 
     var body: some View {
-        ToolsSearchField(prompt: tr("placeholder_search_2"), text: $text)
+        ToolsSearchField(prompt: tr("placeholder_search"), text: $text)
     }
 }
 
@@ -1056,8 +1069,6 @@ struct StudioMergeToolsView: View {
     var body: some View {
         MergeToolsView(config: MergeToolsConfig<Studio>(
             kind: "studios",
-            noun: "studio",
-            nounPlural: "studios",
             loadAll: { try await Self.repository.fetchEveryStudioForMerge() },
             merge: { sources, destination in
                 try await Self.repository.mergeStudios(sourceIds: sources, destinationId: destination)
