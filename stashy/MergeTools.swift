@@ -858,7 +858,8 @@ struct MergeToolsView<Item: MergeableItem>: View {
             let shown = missingNames.prefix(3).joined(separator: ", ")
             let rest = missingNames.count - min(3, missingNames.count)
             ToastManager.shared.show(
-                tr("hint_not_on_this_server_kept", rest > 0 ? shown + " " + tr("arg_plus_more", rest) : shown),
+                // Two placeholders: the names, then the "+N more" part (empty when all are shown).
+                tr("hint_not_on_this_server_kept", shown, rest > 0 ? " " + tr("arg_plus_more", rest) : ""),
                 icon: "info.circle",
                 style: .info
             )

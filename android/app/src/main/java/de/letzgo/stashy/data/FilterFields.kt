@@ -346,10 +346,10 @@ object FilterFieldCatalog {
     data class ValueSuggestion(val value: String, val label: String = value)
 
     fun valueSuggestions(key: String, mode: FilterMode): List<ValueSuggestion> = when {
-        mode == FilterMode.Performers && key == "hair_color" -> listOf("Blonde", "Brunette", "Brown", "Black", "Red", "Auburn", "Grey", "White", "Bald", "Various").map { ValueSuggestion(it) }
-        mode == FilterMode.Performers && key == "eye_color" -> listOf("Blue", "Brown", "Green", "Grey", "Hazel", "Amber").map { ValueSuggestion(it) }
-        mode == FilterMode.Performers && key == "ethnicity" -> listOf("Caucasian", "Black", "Asian", "Indian", "Latin", "Middle Eastern", "Mixed", "Other").map { ValueSuggestion(it) }
-        mode == FilterMode.Performers && key == "fake_tits" -> listOf("Natural", "Fake").map { ValueSuggestion(it) }
+        mode == FilterMode.Performers && key == "hair_color" -> listOf("Blonde" to R.string.blonde, "Brunette" to R.string.brunette, "Brown" to R.string.brown, "Black" to R.string.black, "Red" to R.string.red, "Auburn" to R.string.auburn, "Grey" to R.string.grey, "White" to R.string.white, "Bald" to R.string.bald, "Various" to R.string.various).map { ValueSuggestion(it.first, tr(it.second)) }
+        mode == FilterMode.Performers && key == "eye_color" -> listOf("Blue" to R.string.blue, "Brown" to R.string.brown, "Green" to R.string.green, "Grey" to R.string.grey, "Hazel" to R.string.hazel, "Amber" to R.string.amber).map { ValueSuggestion(it.first, tr(it.second)) }
+        mode == FilterMode.Performers && key == "ethnicity" -> listOf("Caucasian" to R.string.caucasian, "Black" to R.string.black, "Asian" to R.string.asian, "Indian" to R.string.indian, "Latin" to R.string.latin, "Middle Eastern" to R.string.middle_eastern, "Mixed" to R.string.mixed, "Other" to R.string.other).map { ValueSuggestion(it.first, tr(it.second)) }
+        mode == FilterMode.Performers && key == "fake_tits" -> listOf("Natural" to R.string.natural, "Fake" to R.string.fake).map { ValueSuggestion(it.first, tr(it.second)) }
         mode == FilterMode.Performers && key == "country" -> countrySuggestions
         mode == FilterMode.Scenes && key == "video_codec" -> listOf("h264", "hevc", "av1", "vp9", "vp8", "mpeg4", "wmv3", "mpeg2video").map { ValueSuggestion(it) }
         mode == FilterMode.Scenes && key == "audio_codec" -> listOf("aac", "mp3", "ac3", "eac3", "opus", "vorbis", "flac", "pcm_s16le").map { ValueSuggestion(it) }

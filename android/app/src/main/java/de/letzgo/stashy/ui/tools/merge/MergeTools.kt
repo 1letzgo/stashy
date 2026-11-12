@@ -299,7 +299,7 @@ private fun <T : MergeableItem> MergeToolsContent(config: MergeToolsConfig<T>, t
         if (missingNames.isNotEmpty()) {
             val shown = missingNames.take(3).joinToString(", ")
             val rest = missingNames.size - minOf(3, missingNames.size)
-            showToast(tr(R.string.hint_not_on_this_server_kept, if (rest > 0) shown + " " + tr(R.string.arg_plus_more, rest) else shown), long = true)
+            showToast(tr(R.string.hint_not_on_this_server_kept, shown, if (rest > 0) " " + tr(R.string.arg_plus_more, rest) else ""), long = true)
         }
     }
 
