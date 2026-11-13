@@ -333,6 +333,10 @@ object SceneEditing {
     suspend fun allStudios(): List<Studio> =
         findPage("findStudios", "findStudios", "studios", Studio.serializer(), FindFilter(1, 1000, sort = "scenes_count"), "studio_filter", JsonObject(emptyMap())).items
 
+    /** Every studio in name order (the parent studio picker). */
+    suspend fun allStudiosByName(): List<Studio> =
+        findPage("findStudios", "findStudios", "studios", Studio.serializer(), FindFilter(1, -1, sort = "name", direction = "ASC"), "studio_filter", JsonObject(emptyMap())).items
+
     /** iOS: `fetchAllGroupsForScene` (all, by name). */
     suspend fun allGroups(): List<StashGroup> {
         val data = GraphQL.data(SceneQueries.findGroupsForScene, vars("filter" to mapOf("per_page" to -1, "sort" to "name", "direction" to "ASC")))

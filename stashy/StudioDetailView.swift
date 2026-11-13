@@ -523,12 +523,20 @@ struct StudioDetailView: View {
         // Every filter sheet of this page offers "Include sub-studio content"; the Scenes list
         // reloads itself, the other sections here.
         .environment(\.showsSubStudioContentOption, true)
+        // A studio moved in the hierarchy: this page's sub-studios (and what they hold) changed.
+        .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("StudioParentChanged"))) { note in
+            guard (note.userInfo?["studioId"] as? String) != studio.id else { return }
+            linkedChildStudios.refetchStudios(viewModel: viewModel, initial: true)
+            studioCounts.request(studio.id, refresh: true)
+        }
         .onChange(of: includeSubStudios) { _, _ in
             linkedGalleries.refetchGalleries(viewModel: viewModel, initial: true)
             linkedPerformers.refetchPerformers(viewModel: viewModel, initial: true)
             linkedTags.refetchTags(viewModel: viewModel, initial: true)
             viewModel.fetchDetailGroups(studioId: studio.id)
             linkedImages.refetchImages(viewModel: viewModel, initial: true)
+            // Their scene count sort counts sub-studios in.
+            linkedChildStudios.refetchStudios(viewModel: viewModel, initial: true)
         }
         .sceneBulkDownloadDialog(
             isPresented: $showingSceneDownloadOptions,
@@ -1114,6 +1122,9 @@ struct EditStudioSheet: View {
     @State private var isSaving = false
     @State private var isDeleting = false
     @State private var showingDeleteConfirmation = false
+    /// The studio this one belongs to. Written as soon as it is picked, like a scene's studio.
+    @State private var parent: Studio.StudioRef?
+    @State private var showingParentPicker = false
 
     var body: some View {
         NavigationView {
@@ -1132,6 +1143,26 @@ struct EditStudioSheet: View {
                 Section(tr("description")) {
                     TextEditor(text: $details)
                         .frame(minHeight: 120)
+                }
+                .listRowBackground(Color.secondaryAppBackground)
+
+                Section(tr("parent_studio")) {
+                    Button {
+                        showingParentPicker = true
+                    } label: {
+                        HStack {
+                            Image(systemName: "building.2")
+                                .foregroundColor(appearanceManager.tintColor)
+                            Text(parent?.name ?? tr("none"))
+                                .foregroundColor(.primary)
+                            Spacer()
+                            Image(systemName: "chevron.right")
+                                .font(.caption.weight(.semibold))
+                                .foregroundColor(.secondary)
+                        }
+                        .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
                 }
                 .listRowBackground(Color.secondaryAppBackground)
 
@@ -1169,6 +1200,23 @@ struct EditStudioSheet: View {
                 url = studio.url ?? ""
                 details = studio.details ?? ""
                 ratingText = studio.rating100.map(String.init) ?? ""
+                parent = studio.parentStudio
+            }
+            .sheet(isPresented: $showingParentPicker) {
+                AddStudioToSceneSheet(
+                    sceneId: "",
+                    currentStudio: parent.map { SceneStudio(id: $0.id, name: $0.name ?? "", updatedAt: nil) },
+                    viewModel: viewModel,
+                    saveStudioId: { id, done in
+                        viewModel.updateStudioParent(studioId: studio.id, parentId: id, completion: done)
+                    },
+                    excludedStudioId: studio.id
+                ) { picked in
+                    parent = picked.map { Studio.StudioRef(id: $0.id, name: $0.name) }
+                    var updated = studio
+                    updated.parentStudio = parent
+                    onComplete(updated)
+                }
             }
             .alert(tr("action_delete_studio"), isPresented: $showingDeleteConfirmation) {
                 Button(tr("action_cancel"), role: .cancel) { }
@@ -1224,6 +1272,7 @@ struct EditStudioSheet: View {
                     updated.url = optionalTrimmed(url)
                     updated.details = optionalTrimmed(details)
                     updated.rating100 = rating
+                    updated.parentStudio = parent
                     onComplete(updated)
                     ToastManager.shared.show(tr("studio_updated"), icon: "checkmark.circle", style: .success)
                     dismiss()

@@ -181,6 +181,13 @@ class CatalogController<T>(
                 }
             }
         }
+        // A studio moved in the hierarchy: it joins or leaves the top level ("Hide sub-studios")
+        // or a studio's sub-studio tab, and the cards' "Part of …" and counts change.
+        if (mode == FilterMode.Studios) coroutineScope.launch {
+            LibraryEvents.events.collect { event ->
+                if (event is LibraryEvent.StudioParentChanged) refresh()
+            }
+        }
         // iOS `PerformerImageUpdated` → `patchPerformerImageInLists`.
         if (mode == FilterMode.Performers) coroutineScope.launch {
             PerformerEvents.events.collect { event ->

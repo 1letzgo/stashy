@@ -1497,55 +1497,73 @@ struct StudiosCatalogFilterSortSheet: View {
         let pickerValue = StudioCatalogSortPickerValue.from(sortOption)
         let ascending = sortOption.direction == "ASC"
         let orderDisabled = pickerValue.isRandom || pickerValue.isUnmapped
-        return HStack(alignment: .center, spacing: 12) {
-            Text(tr("action_sort"))
-                .font(.subheadline.weight(.semibold))
-                .foregroundColor(.secondary)
-                // Gives way to a long sort name instead of widening the sheet.
-                .frame(minWidth: 44, idealWidth: CatalogFilterSortSheetLayout.labelColumnWidth, maxWidth: CatalogFilterSortSheetLayout.labelColumnWidth, alignment: .leading)
-                .layoutPriority(1)
-            HStack(spacing: 6) {
-                CatalogFilterChip(title: tr("asc"), isActive: ascending && !orderDisabled) {
-                    guard let k = pickerValue.knownKind, !orderDisabled else { return }
-                    onSortChange(k.studioSortOption(ascending: true))
-                }
-                CatalogFilterChip(title: tr("desc"), isActive: !ascending && !orderDisabled) {
-                    guard let k = pickerValue.knownKind, !orderDisabled else { return }
-                    onSortChange(k.studioSortOption(ascending: false))
-                }
+        let label = Text(tr("action_sort"))
+            .font(.subheadline.weight(.semibold))
+            .foregroundColor(.secondary)
+            // Gives way to a long sort name instead of widening the sheet.
+            .frame(minWidth: 44, idealWidth: CatalogFilterSortSheetLayout.labelColumnWidth, maxWidth: CatalogFilterSortSheetLayout.labelColumnWidth, alignment: .leading)
+            .layoutPriority(1)
+        let chips = HStack(spacing: 6) {
+            CatalogFilterChip(title: tr("asc"), isActive: ascending && !orderDisabled) {
+                guard let k = pickerValue.knownKind, !orderDisabled else { return }
+                onSortChange(k.studioSortOption(ascending: true))
             }
-            .opacity(orderDisabled ? 0.4 : 1)
-            .allowsHitTesting(!orderDisabled)
-            Spacer(minLength: 8)
-            Picker(tr("action_sort_type"), selection: Binding(
-                get: { StudioCatalogSortPickerValue.from(sortOption) },
-                set: { newVal in
-                    switch newVal {
-                    case .known(let newKind):
-                        if newKind == .random {
-                            onSortChange(.random)
-                        } else if StudioCatalogSortPickerValue.from(sortOption).isRandom {
-                            onSortChange(newKind.studioSortOption(ascending: false))
-                        } else {
-                            onSortChange(newKind.studioSortOption(ascending: sortOption.direction == "ASC"))
-                        }
-                    case .unmapped:
-                        break
+            CatalogFilterChip(title: tr("desc"), isActive: !ascending && !orderDisabled) {
+                guard let k = pickerValue.knownKind, !orderDisabled else { return }
+                onSortChange(k.studioSortOption(ascending: false))
+            }
+        }
+        .opacity(orderDisabled ? 0.4 : 1)
+        .allowsHitTesting(!orderDisabled)
+        let picker = Picker(tr("action_sort_type"), selection: Binding(
+            get: { StudioCatalogSortPickerValue.from(sortOption) },
+            set: { newVal in
+                switch newVal {
+                case .known(let newKind):
+                    if newKind == .random {
+                        onSortChange(.random)
+                    } else if StudioCatalogSortPickerValue.from(sortOption).isRandom {
+                        onSortChange(newKind.studioSortOption(ascending: false))
+                    } else {
+                        onSortChange(newKind.studioSortOption(ascending: sortOption.direction == "ASC"))
                     }
-                }
-            )) {
-                if case .unmapped(let f) = pickerValue {
-                    Text(tr("other_arg", f)).tag(StudioCatalogSortPickerValue.unmapped(sortField: f))
-                }
-                ForEach(StudioCatalogSortFieldKind.allCases.filter { $0.studioSortOption(ascending: false).isAvailableOnServer }) { k in
-                    Text(k.menuLabel).tag(StudioCatalogSortPickerValue.known(k))
+                case .unmapped:
+                    break
                 }
             }
-            .pickerStyle(.menu)
-            .labelsHidden()
-            .tint(appearance.tintColor)
-            // One line: a wrapped label ("Image count") stretched the card.
-            .fixedSize()
+        )) {
+            if case .unmapped(let f) = pickerValue {
+                Text(tr("other_arg", f)).tag(StudioCatalogSortPickerValue.unmapped(sortField: f))
+            }
+            ForEach(StudioCatalogSortFieldKind.allCases.filter { $0.studioSortOption(ascending: false).isAvailableOnServer }) { k in
+                Text(k.menuLabel).tag(StudioCatalogSortPickerValue.known(k))
+            }
+        }
+        .pickerStyle(.menu)
+        .labelsHidden()
+        .tint(appearance.tintColor)
+        // One line: a wrapped label ("Image count") stretched the card.
+        .fixedSize()
+        // One row when it fits; a long sort name ("Anzahl Szenen" beside "Absteigend") takes a
+        // second row instead of widening the whole sheet past the screen.
+        return ViewThatFits(in: .horizontal) {
+            HStack(alignment: .center, spacing: 12) {
+                label
+                chips
+                Spacer(minLength: 8)
+                picker
+            }
+            VStack(alignment: .leading, spacing: 6) {
+                HStack(alignment: .center, spacing: 12) {
+                    label
+                    chips
+                    Spacer(minLength: 0)
+                }
+                HStack {
+                    Spacer(minLength: 0)
+                    picker
+                }
+            }
         }
         .catalogFilterSortControlCardChrome()
     }

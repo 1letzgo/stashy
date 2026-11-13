@@ -60,4 +60,35 @@ class SubStudiosTest {
         val q = CatalogQuery(FilterMode.Studios, SortCatalog.option(FilterMode.Studios, SortCatalog.defaultRaw(FilterMode.Studios))!!, live = parentsIsNull)
         assertEquals(parentsIsNull, q.entityFilter())
     }
+
+    private fun studio(name: String, own: Int?, all: Int?) = Studio(id = name, name = name, sceneCount = own, sceneCountAll = all)
+
+    @Test fun sceneCountSortIsDoneHereOnlyWithIncludeOn() {
+        assertTrue(SubStudios.sortsBySceneCountAll("scenes_count", true))
+        assertFalse(SubStudios.sortsBySceneCountAll("scenes_count", false))
+        assertFalse(SubStudios.sortsBySceneCountAll("name", true))
+        assertFalse(SubStudios.sortsBySceneCountAll("galleries_count", true))
+    }
+
+    @Test fun sortsBySceneCountAllDescendingWithNameTies() {
+        val list = listOf(
+            studio("Blender Shorts", 1, 1), studio("Apple Samples", 1, 2), studio("Blender", 1, 3),
+            studio("Blender Open Movies", 0, 1), studio("durian Project", 1, 1), studio("Apple HLS", 1, 1),
+        )
+        assertEquals(
+            listOf("Blender", "Apple Samples", "Apple HLS", "Blender Open Movies", "Blender Shorts", "durian Project"),
+            SubStudios.sortedBySceneCountAll(list, ascending = false).map { it.name },
+        )
+    }
+
+    @Test fun sortsAscendingAndFallsBackToOwnCount() {
+        val list = listOf(studio("B", 5, null), studio("A", 2, null), studio("C", 0, 9), studio("D", null, null))
+        assertEquals(listOf("D", "A", "B", "C"), SubStudios.sortedBySceneCountAll(list, ascending = true).map { it.name })
+        assertEquals(listOf("C", "B", "A", "D"), SubStudios.sortedBySceneCountAll(list, ascending = false).map { it.name })
+    }
+
+    @Test fun aliasIsInsertedAfterStudioFields() {
+        val out = SubStudios.withSceneCountAll("studios {\n      ...StudioFields\n    }")
+        assertTrue(out.contains("...StudioFields\n      scene_count_all: scene_count(depth: -1)"))
+    }
 }

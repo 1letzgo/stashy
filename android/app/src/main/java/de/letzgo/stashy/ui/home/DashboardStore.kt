@@ -130,6 +130,8 @@ object DashboardStore {
                 is LibraryEvent.GalleryPatched -> state.galleries.patched(event.id, { it.id }, event.patch)?.let { state.copy(galleries = it) }
                 is LibraryEvent.GalleryDeleted -> state.galleries.patched(event.id, { it.id }, null)?.let { state.copy(galleries = it) }
                 LibraryEvent.StatsChanged -> null
+                // The patch that came with it already updated the cards.
+                is LibraryEvent.StudioParentChanged -> null
             }
             if (next != null) rows[type] = next
         }

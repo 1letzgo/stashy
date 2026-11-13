@@ -1759,6 +1759,7 @@
   <string name="pages">Strony</string>
   <string name="parent_count">Liczba nadrzędnych</string>
   <string name="parents">Nadrzędne</string>
+  <string name="parent_studio">Studio nadrzędne</string>
   <string name="passcode">Kod</string>
   <string name="passcodes_do_not_match">Kody nie są zgodne</string>
   <string name="password">Hasło</string>

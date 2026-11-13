@@ -1,5 +1,7 @@
 package de.letzgo.stashy.ui.detail
 
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.height
 import de.letzgo.stashy.R
 import de.letzgo.stashy.tr
 import de.letzgo.stashy.data.Downloads
@@ -221,6 +223,21 @@ class StudioDetailScreen(val studioId: String, val preview: Studio? = null, priv
         }
         val (name, url, rating) = sections[0].fields
         val details = sections[1].fields[0]
+        // The parent is written as soon as it is picked, like a scene's studio.
+        var pickingParent by remember { mutableStateOf(false) }
+        if (pickingParent) {
+            de.letzgo.stashy.ui.scene.EditStudioSheet(
+                initialId = studio.parentStudio?.id,
+                save = { id -> if (!DetailRepository.setStudioParent(studio.id, id)) error("studioUpdate failed") },
+                onDismiss = { pickingParent = false },
+                onSaved = { picked ->
+                    val parent = picked?.let { de.letzgo.stashy.data.IdName(it.id, it.name) }
+                    DetailRepository.studioParentChanged(studio.id, parent)
+                    onSaved(studio.copy(parentStudio = parent))
+                },
+                excludeId = studio.id,
+            )
+        }
         EditEntitySheet(
             title = tr(R.string.action_edit_studio), sections = sections,
             deleteLabel = tr(R.string.action_delete_studio), deleteTitle = tr(R.string.action_delete_studio), entityName = studio.name,
@@ -238,6 +255,17 @@ class StudioDetailScreen(val studioId: String, val preview: Studio? = null, priv
                 DetailRepository.deleteStudio(studio.id)
                 detailToast(tr(R.string.studio_deleted))
                 Nav.pop()
+            },
+            extraSections = {
+                Spacer(Modifier.height(20.dp))
+                de.letzgo.stashy.ui.NativeSectionHeader(tr(R.string.parent_studio))
+                de.letzgo.stashy.ui.NativeGroup {
+                    de.letzgo.stashy.ui.NativeListItem(
+                        studio.parentStudio?.name ?: tr(R.string.none),
+                        icon = de.letzgo.stashy.ui.SF.building2,
+                        onClick = { pickingParent = true },
+                    )
+                }
             },
         )
     }

@@ -1759,6 +1759,7 @@
   <string name="pages">ページ</string>
   <string name="parent_count">親の数</string>
   <string name="parents">親</string>
+  <string name="parent_studio">親スタジオ</string>
   <string name="passcode">パスコード</string>
   <string name="passcodes_do_not_match">パスコードが一致しません</string>
   <string name="password">パスワード</string>

@@ -4656,7 +4656,8 @@ class StashDBViewModel: ObservableObject {
         }
         
         let page = isInitialLoad ? 1 : currentDetailStudioPage + 1
-        let query = GraphQLQueries.queryWithFragments("findStudios")
+        let sortsBySceneCountAll = Self.sortsBySceneCountAll((isInitialLoad ? sortBy : currentDetailStudioSortOption).sortField)
+        let query = sortsBySceneCountAll ? GraphQLQueries.findStudiosWithSceneCountAll : GraphQLQueries.queryWithFragments("findStudios")
         
         var studioScope: [String: Any] = [:]
         if let pid = performerId {
@@ -4679,7 +4680,7 @@ class StashDBViewModel: ObservableObject {
         let studioFilterMerged = mergeDetailScopeWithSavedAndLiveFilters(scope: studioScope, saved: filter, live: liveFilter)
         
         let variables: [String: Any] = [
-            "filter": ["page": page, "per_page": 20, "sort": sortField, "direction": sortToUse.direction],
+            "filter": ["page": page, "per_page": sortsBySceneCountAll ? -1 : 20, "sort": sortField, "direction": sortToUse.direction],
             "studio_filter": studioFilterMerged
         ]
         
@@ -4696,12 +4697,14 @@ class StashDBViewModel: ObservableObject {
             DispatchQueue.main.async {
                 if let result = response?.data?.findStudios {
                     if isInitialLoad {
-                        self.detailStudios = result.studios
+                        self.detailStudios = sortsBySceneCountAll
+                            ? Self.sortedBySceneCountAll(result.studios, ascending: sortToUse.direction == "ASC")
+                            : result.studios
                         self.totalDetailStudios = result.count
                     } else {
                         self.detailStudios.append(contentsOf: result.studios)
                     }
-                    self.hasMoreDetailStudios = result.studios.count == 20
+                    self.hasMoreDetailStudios = !sortsBySceneCountAll && result.studios.count == 20
                     self.currentDetailStudioPage = page
                 } else {
                     self.hasMoreDetailStudios = false
@@ -5316,6 +5319,20 @@ class StashDBViewModel: ObservableObject {
         loadStudiosPage(page: currentStudioPage, sortBy: currentStudioSortOption, searchQuery: currentStudioSearchQuery, filter: currentStudioFilter)
     }
     
+    /// Scene count sort while "Include sub-studio content" is on: sorted here, over all levels.
+    static func sortsBySceneCountAll(_ sortField: String) -> Bool {
+        sortField == "scenes_count" && StudioCountsStore.includesSubStudioContent
+    }
+
+    /// By scenes including sub-studios, the name as tie-breaker.
+    static func sortedBySceneCountAll(_ studios: [Studio], ascending: Bool) -> [Studio] {
+        studios.sorted { a, b in
+            let x = a.sceneCountAll ?? a.sceneCount, y = b.sceneCountAll ?? b.sceneCount
+            if x != y { return ascending ? x < y : x > y }
+            return a.name.localizedCaseInsensitiveCompare(b.name) == .orderedAscending
+        }
+    }
+
     private func loadStudiosPage(page: Int, sortBy: StudioSortOption, searchQuery: String = "", filter: SavedFilter? = nil) {
         let isInitialLoad = (page == 1)
         if isInitialLoad {
@@ -5337,10 +5354,14 @@ class StashDBViewModel: ObservableObject {
             }
         }
         
+        // "Include sub-studio content" with the scene count sort: the server only knows a
+        // studio's own scenes, so the whole list comes in one page and is sorted here.
+        let sortsBySceneCountAll = Self.sortsBySceneCountAll(sortBy.sortField)
+
         // Variables for GraphQL - search query goes in FindFilterType, not StudioFilterType
         var filterParams: [String: Any] = [
             "page": page,
-            "per_page": studiosPerPage,
+            "per_page": sortsBySceneCountAll ? -1 : studiosPerPage,
             "sort": sortBy.sortField == "random" ? randomSort(.studios) : sortBy.sortField,
             "direction": sortBy.direction
         ]
@@ -5355,7 +5376,7 @@ class StashDBViewModel: ObservableObject {
             "studio_filter": sanitizeFilter(currentStudioLiveFilter.isEmpty ? studioFilter : studioFilter.merging(currentStudioLiveFilter) { _, new in new })
         ]
         
-        let query = GraphQLQueries.queryWithFragments("findStudios")
+        let query = sortsBySceneCountAll ? GraphQLQueries.findStudiosWithSceneCountAll : GraphQLQueries.queryWithFragments("findStudios")
         
         let body: [String: Any] = [
             "query": query,
@@ -5367,13 +5388,16 @@ class StashDBViewModel: ObservableObject {
             AppLog.error("❌ Error: Could not serialize Studios request body")
             return
         }
+        let ascending = sortBy.direction == "ASC"
         
         performGraphQLQuery(query: bodyString) { (response: StudiosResponse?) in
             if let studiosResult = response?.data?.findStudios {
                 DispatchQueue.main.async {
                     guard generation == self.studiosFetchGeneration else { return }
                     if isInitialLoad {
-                        self.studios = studiosResult.studios
+                        self.studios = sortsBySceneCountAll
+                            ? Self.sortedBySceneCountAll(studiosResult.studios, ascending: ascending)
+                            : studiosResult.studios
                         #if DEBUG
                         if UserDefaults.standard.string(forKey: "stashyDebugStudiosSearch") != nil {
                             AppLog.debug("StudiosDebug: " + self.studios.map { "\($0.id)=\($0.name)[\($0.sceneCount)]" }.joined(separator: ", "))
@@ -5385,7 +5409,7 @@ class StashDBViewModel: ObservableObject {
                     }
                     
                     // Check if there are more pages
-                    self.hasMoreStudios = studiosResult.studios.count == self.studiosPerPage
+                    self.hasMoreStudios = !sortsBySceneCountAll && studiosResult.studios.count == self.studiosPerPage
                     
                     if isInitialLoad {
                         self.isLoadingStudios = false
@@ -7970,10 +7994,14 @@ struct GenerateData: Codable {
         }
     }
 
-    func fetchAllStudios(completion: @escaping ([Studio]) -> Void) {
+    /// `allByName`: every studio in name order (the parent studio picker) instead of the
+    /// 1000 with the most scenes.
+    func fetchAllStudios(allByName: Bool = false, completion: @escaping ([Studio]) -> Void) {
         let query = GraphQLQueries.queryWithFragments("findStudios")
         let variables: [String: Any] = [
-            "filter": ["per_page": 1000, "sort": "scenes_count", "direction": "DESC"],
+            "filter": allByName
+                ? ["per_page": -1, "sort": "name", "direction": "ASC"]
+                : ["per_page": 1000, "sort": "scenes_count", "direction": "DESC"],
             "studio_filter": [:]
         ]
         guard let bodyData = try? JSONSerialization.data(withJSONObject: ["query": query, "variables": variables]),
@@ -8691,6 +8719,26 @@ struct GenerateData: Codable {
             } else {
                 completion(false)
             }
+        }
+    }
+
+    /// Sets or clears (nil) the studio a studio belongs to.
+    func updateStudioParent(studioId: String, parentId: String?, completion: @escaping (Bool) -> Void) {
+        let input: [String: Any] = ["id": studioId, "parent_id": parentId ?? NSNull()]
+        guard let bodyData = try? JSONSerialization.data(withJSONObject: ["query": GraphQLQueries.studioUpdateParentMutation, "variables": ["input": input]]),
+              let bodyString = String(data: bodyData, encoding: .utf8) else {
+            completion(false)
+            return
+        }
+        performGraphQLQuery(query: bodyString) { (response: StudioUpdateResponse?) in
+            let ok = response?.data?.studioUpdate != nil
+            if ok {
+                Self.postEntityUpdated("StudioUpdated", key: "studioId", id: studioId)
+                // The studio moved in the hierarchy: the Studios list ("Hide sub-studios") and
+                // the sub-studio tabs of open studio pages reload.
+                Self.postEntityUpdated("StudioParentChanged", key: "studioId", id: studioId)
+            }
+            completion(ok)
         }
     }
 
@@ -10591,6 +10639,8 @@ struct Studio: Codable, Identifiable, Equatable {
     var parentStudio: StudioRef?
     var childStudios: [StudioRef]?
     var subStudioCount: Int { childStudios?.count ?? 0 }
+    /// Scenes of this studio and all its sub-studios; only from `findStudiosWithSceneCountAll`.
+    var sceneCountAll: Int?
 
     struct StudioRef: Codable, Equatable {
         let id: String
@@ -10601,6 +10651,7 @@ struct Studio: Codable, Identifiable, Equatable {
         case id, name, url, details, favorite, rating100, aliases
         case parentStudio = "parent_studio"
         case childStudios = "child_studios"
+        case sceneCountAll = "scene_count_all"
         case stashIds = "stash_ids"
         case sceneCount = "scene_count"
         case performerCount = "performer_count"

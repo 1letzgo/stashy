@@ -181,6 +181,8 @@ fun EntityPickerSheet(
     onSaved: (List<PickerEntry>) -> Unit,
     onDismiss: () -> Unit,
     serverSearch: (suspend (String) -> List<PickerEntry>)? = null,
+    /** Every entry instead of the first 30 matches. */
+    showsAll: Boolean = false,
     avatars: Boolean = false,
     lockedIds: Set<String> = emptySet(),
     actionTitle: String = tr(R.string.action_save),
@@ -234,7 +236,7 @@ fun EntityPickerSheet(
             FormSection(null) {
                 if (loading) LoadingRow()
                 else {
-                    (pinned + filtered.take(30)).forEachIndexed { index, e ->
+                    (if (showsAll) entries.filter { search.isEmpty() || it.name.contains(search, ignoreCase = true) } else pinned + filtered.take(30)).forEachIndexed { index, e ->
                         if (index > 0) NativeDivider()
                         val locked = e.id in lockedIds
                         FormRow(if (locked) null else ({ if (e.id in selected) selected.remove(e.id) else { if (!multiple) selected.clear(); selected.add(e.id) } })) {
@@ -250,7 +252,7 @@ fun EntityPickerSheet(
                             if (e.id in selected) { Spacer(Modifier.width(8.dp)); Icon(PlayerIcons.check, null, tint = if (locked) p.secondaryText else nativeAccent(), modifier = Modifier.size(24.dp)) }
                         }
                     }
-                    if (filtered.size > 30) Text(tr(R.string.type_more_to_refine_menu), Modifier.padding(16.dp), style = NativeType.bodyMedium, color = p.secondaryText)
+                    if (!showsAll && filtered.size > 30) Text(tr(R.string.type_more_to_refine_menu), Modifier.padding(16.dp), style = NativeType.bodyMedium, color = p.secondaryText)
                     if (search.isNotEmpty() && !anyMatch && !searching) {
                         FormRow(if (creating) null else ({
                             creating = true
@@ -353,15 +355,31 @@ fun PerformersPickerSheet(
 
 @Composable
 fun EditStudioSheet(scene: Scene, onDismiss: () -> Unit, onSaved: (Studio?) -> Unit) =
-    EditStudioSheet(scene.studio?.id, { SceneEditing.updateStudio(scene.id, it) }, onDismiss, onSaved)
+    EditStudioSheet(scene.studio?.id, { SceneEditing.updateStudio(scene.id, it) }, onDismiss, onSaved = onSaved)
 
 /** Studio picker for any owner (scene, gallery): `save` writes the chosen id (null clears it). */
 @Composable
-fun EditStudioSheet(initialId: String?, save: suspend (String?) -> Unit, onDismiss: () -> Unit, onSaved: (Studio?) -> Unit) {
+fun EditStudioSheet(
+    initialId: String?, save: suspend (String?) -> Unit, onDismiss: () -> Unit,
+    /**
+     * Left out of the list: a studio cannot be its own parent. Set = the sheet picks a parent
+     * studio: every studio by name, with its number of sub-studios instead of scenes.
+     */
+    excludeId: String? = null,
+    onSaved: (Studio?) -> Unit,
+) {
     val byId = remember { mutableMapOf<String, Studio>() }
+    val picksParent = excludeId != null
+    fun subStudios(n: Int): String? =
+        if (n > 0) tr(if (n == 1) R.string.arg_count_sub_studio else R.string.arg_count_sub_studios, n) else null
     EntityPickerSheet(
         tr(R.string.action_set_studio), tr(R.string.search_studio), setOfNotNull(initialId), multiple = false,
-        load = { SceneEditing.allStudios().onEach { byId[it.id] = it }.map { PickerEntry(it.id, it.name, count(it.sceneCount ?: 0, "scenes")) } },
+        showsAll = picksParent,
+        load = {
+            if (picksParent) SceneEditing.allStudiosByName().filter { it.id != excludeId }.onEach { byId[it.id] = it }
+                .map { PickerEntry(it.id, it.name, subStudios(it.subStudioCount)) }
+            else SceneEditing.allStudios().onEach { byId[it.id] = it }.map { PickerEntry(it.id, it.name, count(it.sceneCount ?: 0, "scenes")) }
+        },
         create = { name -> SceneEditing.createStudio(name).also { byId[it.id] = it }.let { PickerEntry(it.id, it.name, count(it.sceneCount ?: 0, "scenes")) } },
         createFailedText = tr(R.string.error_create_studio),
         save = { save(it.firstOrNull()) }, saveFailedText = tr(R.string.error_update_studio),

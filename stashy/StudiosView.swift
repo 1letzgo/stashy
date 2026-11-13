@@ -38,6 +38,7 @@ private struct StudiosViewContent: View {
     // Filter & sort sheet
     @State private var showFilterSortSheet = false
     @AppStorage(StudioCountsStore.hideSubStudiosKey) private var hidesSubStudios = false
+    @AppStorage(StudioCountsStore.includeSubStudiosKey) private var includesSubStudioContent = false
     @StateObject private var criteriaDocument = FilterCriteriaDocument(mode: .studios, pinsDefaults: true)
     @State private var catalogPresetRowSelection = ""
     @State private var localCatalogPresets: [StudioListLiveFilterPreset] = StudioListLiveFilterPresetStore.loadPresets()
@@ -417,6 +418,15 @@ private struct StudiosViewContent: View {
         studiosCoreChrome
             .sheet(isPresented: $showFilterSortSheet, content: studiosFilterSortSheet)
             .onChange(of: hidesSubStudios) { _, _ in applyLiveFilter() }
+            // The scene count sort counts sub-studios in while the content switch is on.
+            .onChange(of: includesSubStudioContent) { _, _ in
+                if selectedSortOption.sortField == "scenes_count" { applyLiveFilter() }
+            }
+            // A studio got or lost its parent: it joins or leaves the top level, and the cards'
+            // "Part of …" and sub-studio counts change.
+            .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("StudioParentChanged"))) { _ in
+                applyLiveFilter()
+            }
             .onChange(of: catalogPresetRowSelection) { _, newId in
                 handleCatalogPresetSelectionChange(newId)
             }

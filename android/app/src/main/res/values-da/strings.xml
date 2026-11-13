@@ -1759,6 +1759,7 @@
   <string name="pages">Sider</string>
   <string name="parent_count">Antal overordnede</string>
   <string name="parents">Overordnede</string>
+  <string name="parent_studio">Overordnet studie</string>
   <string name="passcode">Adgangskode</string>
   <string name="passcodes_do_not_match">Adgangskoderne matcher ikke</string>
   <string name="password">Adgangskode</string>

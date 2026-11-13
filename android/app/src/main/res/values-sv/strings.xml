@@ -1759,6 +1759,7 @@
   <string name="pages">Sidor</string>
   <string name="parent_count">Antal överordnade</string>
   <string name="parents">Överordnade</string>
+  <string name="parent_studio">Överordnad studio</string>
   <string name="passcode">Lösenkod</string>
   <string name="passcodes_do_not_match">Lösenkoderna matchar inte</string>
   <string name="password">Lösenord</string>

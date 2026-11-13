@@ -66,6 +66,8 @@ data class Studio(
     @SerialName("child_studios") val childStudios: List<IdName>? = null,
     @SerialName("created_at") val createdAt: String? = null,
     @SerialName("updated_at") val updatedAt: String? = null,
+    /** Scenes of this studio and all its sub-studios; only from [SubStudios.withSceneCountAll]. */
+    @SerialName("scene_count_all") val sceneCountAll: Int? = null,
 ) {
     val subStudioCount: Int get() = childStudios?.size ?: 0
 

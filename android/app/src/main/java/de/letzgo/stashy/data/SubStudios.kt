@@ -53,4 +53,20 @@ object SubStudios {
         }
         return if (mode == FilterMode.Tags) buildJsonObject { put("scenes_filter", studios) } else studios
     }
+
+    /**
+     * Stash sorts `scenes_count` by a studio's own scenes only. With "Include sub-studio content"
+     * on, the list is fetched whole and sorted by [sortedBySceneCountAll] instead.
+     */
+    fun sortsBySceneCountAll(sortField: String, includeContent: Boolean): Boolean = sortField == "scenes_count" && includeContent
+
+    /** By scenes including sub-studios (own count as fallback), the name as tie-breaker. */
+    fun sortedBySceneCountAll(studios: List<Studio>, ascending: Boolean): List<Studio> {
+        val byCount = compareBy<Studio> { it.sceneCountAll ?: it.sceneCount ?: 0 }
+        return studios.sortedWith((if (ascending) byCount else byCount.reversed()).thenBy(String.CASE_INSENSITIVE_ORDER) { it.name })
+    }
+
+    /** `findStudios` plus each studio's `scene_count_all` (`scene_count(depth: -1)`, also on Stash 0.31). */
+    fun withSceneCountAll(document: String): String =
+        document.replace("...StudioFields", "...StudioFields\n      scene_count_all: scene_count(depth: -1)")
 }

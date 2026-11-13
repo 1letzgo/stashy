@@ -113,6 +113,21 @@ object CatalogRepository {
             return Page(list.size, list as List<T>)
         }
         val s = spec<T>(query.mode)
+        // Studios by scene count with "Include sub-studio content": one page of every studio,
+        // sorted here (the server only counts a studio's own scenes).
+        if (query.mode == FilterMode.Studios && SubStudios.sortsBySceneCountAll(query.sort.field, StudioCountsStore.contentDepth != 0)) {
+            if (page > 1) return Page(0, emptyList())
+            val variables = buildJsonObject {
+                put("filter", findFilter(query, 1, -1).json())
+                query.entityFilter()?.let { put(s.filterVar, it) }
+            }
+            val data = GraphQL.data(SubStudios.withSceneCountAll(GraphQLQueries.load(s.document)), variables)
+            val obj = data["findStudios"].obj ?: throw GraphQLError.Query("Missing findStudios")
+            val studios = GraphQL.decode(ListSerializer(Studio.serializer()), obj["studios"] ?: JsonArray(emptyList()))
+            val sorted = SubStudios.sortedBySceneCountAll(studios, query.sort.isAscending)
+            @Suppress("UNCHECKED_CAST")
+            return Page(obj["count"].stringOrNull?.toIntOrNull() ?: sorted.size, sorted as List<T>)
+        }
         val document = s.document
         return findPage(document, document, s.listField, s.serializer, findFilter(query, page, perPage), s.filterVar, query.entityFilter())
     }

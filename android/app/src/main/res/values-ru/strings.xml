@@ -1759,6 +1759,7 @@
   <string name="pages">Страницы</string>
   <string name="parent_count">Число родительских</string>
   <string name="parents">Родительские</string>
+  <string name="parent_studio">Родительская студия</string>
   <string name="passcode">Код-пароль</string>
   <string name="passcodes_do_not_match">Код-пароли не совпадают</string>
   <string name="password">Пароль</string>

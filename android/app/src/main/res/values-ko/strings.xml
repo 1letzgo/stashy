@@ -1759,6 +1759,7 @@
   <string name="pages">페이지</string>
   <string name="parent_count">상위 항목 수</string>
   <string name="parents">상위 항목</string>
+  <string name="parent_studio">상위 스튜디오</string>
   <string name="passcode">암호</string>
   <string name="passcodes_do_not_match">암호가 일치하지 않습니다</string>
   <string name="password">암호</string>

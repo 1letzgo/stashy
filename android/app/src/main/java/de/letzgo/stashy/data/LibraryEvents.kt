@@ -13,6 +13,8 @@ sealed class LibraryEvent {
     /** The performer after an edit, favorite or rating change; applied as a patch on the row's copy. */
     data class PerformerPatched(val id: String, val patch: (Performer) -> Performer) : LibraryEvent()
     data class StudioPatched(val id: String, val patch: (Studio) -> Studio) : LibraryEvent()
+    /** A studio got or lost its parent: studio lists reload (iOS `StudioParentChanged`). */
+    data class StudioParentChanged(val id: String) : LibraryEvent()
     data class GalleryPatched(val id: String, val patch: (Gallery) -> Gallery) : LibraryEvent()
     data class PerformerDeleted(val id: String) : LibraryEvent()
     data class StudioDeleted(val id: String) : LibraryEvent()

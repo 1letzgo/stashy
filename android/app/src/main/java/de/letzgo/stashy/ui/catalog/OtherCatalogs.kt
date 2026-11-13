@@ -88,6 +88,15 @@ fun StudiosList(c: CatalogController<Studio>, topPadding: androidx.compose.ui.un
     val hidesSubStudios = de.letzgo.stashy.data.StudioCountsStore.hideSubStudios
     var seenHide by androidx.compose.runtime.remember { mutableStateOf(hidesSubStudios) }
     LaunchedEffect(hidesSubStudios) { if (hidesSubStudios != seenHide) { seenHide = hidesSubStudios; c.refetch() } }
+    // "Include sub-studio content" changes the order of a list sorted by scene count.
+    val includesContent = de.letzgo.stashy.data.StudioCountsStore.includeSubStudios
+    var seenInclude by androidx.compose.runtime.remember { mutableStateOf(includesContent) }
+    LaunchedEffect(includesContent) {
+        if (includesContent != seenInclude) {
+            seenInclude = includesContent
+            if (c.sort.field == "scenes_count") c.refetch()
+        }
+    }
     CatalogScaffold(
         c, CatalogTexts(tr(R.string.loading_studios), SF.building2, tr(R.string.empty_studios_found), tr(R.string.action_load_studios)),
         CatalogSlots(), posterColumns, { it.id }, topPadding, gridKey = c.listResetToken,

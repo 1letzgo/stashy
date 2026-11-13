@@ -175,6 +175,17 @@ object DetailRepository {
         LibraryEvents.post(LibraryEvent.StudioPatched(id) { it.copy(name = name, url = url, details = details, rating100 = rating100) })
     }
 
+    /** Sets or clears (null) the studio a studio belongs to; [studioParentChanged] tells the lists. */
+    suspend fun setStudioParent(id: String, parentId: String?) = input(
+        "mutation StudioUpdate(\$input: StudioUpdateInput!) { studioUpdate(input: \$input) { id parent_studio { id name } } }",
+        "studioUpdate", mapOf("id" to id, "parent_id" to parentId),
+    )
+
+    fun studioParentChanged(id: String, parent: IdName?) {
+        LibraryEvents.post(LibraryEvent.StudioPatched(id) { it.copy(parentStudio = parent) })
+        LibraryEvents.post(LibraryEvent.StudioParentChanged(id))
+    }
+
     /** [aliases] only goes into `TagUpdateInput` when non-null (a tag loaded without them keeps them). */
     suspend fun updateTag(id: String, name: String, description: String?, aliases: List<String>? = null) = input(
         "mutation TagUpdate(\$input: TagUpdateInput!) { tagUpdate(input: \$input) { id name description aliases } }",

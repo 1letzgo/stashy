@@ -1759,6 +1759,7 @@
   <string name="pages">页面</string>
   <string name="parent_count">父项数量</string>
   <string name="parents">父项</string>
+  <string name="parent_studio">上级工作室</string>
   <string name="passcode">密码</string>
   <string name="passcodes_do_not_match">密码不匹配</string>
   <string name="password">密码</string>

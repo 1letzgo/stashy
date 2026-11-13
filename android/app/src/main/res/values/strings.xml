@@ -2229,4 +2229,5 @@
     <string name="arg_part_of">Part of %1$s</string>
     <string name="arg_count_sub_studio">%1$s sub-studio</string>
     <string name="arg_count_sub_studios">%1$s sub-studios</string>
+    <string name="parent_studio">Parent Studio</string>
 </resources>

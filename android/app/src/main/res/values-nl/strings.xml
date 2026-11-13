@@ -1759,6 +1759,7 @@
   <string name="pages">Pagina\'s</string>
   <string name="parent_count">Aantal bovenliggende</string>
   <string name="parents">Bovenliggend</string>
+  <string name="parent_studio">Bovenliggende studio</string>
   <string name="passcode">Toegangscode</string>
   <string name="passcodes_do_not_match">Toegangscodes komen niet overeen</string>
   <string name="password">Wachtwoord</string>

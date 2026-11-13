@@ -548,6 +548,22 @@ class GraphQLQueries {
         }
         """
 
+    /// `findStudios` plus each studio's scene count over all its sub-studios. Stash sorts
+    /// `scenes_count` by a studio's own scenes only, so "Include sub-studio content" fetches the
+    /// whole list with this and sorts it itself (`StashDBViewModel.sortedBySceneCountAll`).
+    static var findStudiosWithSceneCountAll: String {
+        queryWithFragments("findStudios").replacingOccurrences(
+            of: "...StudioFields",
+            with: "...StudioFields\n      scene_count_all: scene_count(depth: -1)"
+        )
+    }
+
+    static let studioUpdateParentMutation = """
+        mutation StudioUpdate($input: StudioUpdateInput!) {
+            studioUpdate(input: $input) { id }
+        }
+        """
+
     static let studioUpdateDetailsMutation = """
         mutation StudioUpdate($input: StudioUpdateInput!) {
             studioUpdate(input: $input) { id name url details rating100 }

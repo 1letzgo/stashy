@@ -7,6 +7,10 @@ struct AddStudioToSceneSheet: View {
     let currentStudio: SceneStudio?
     @ObservedObject var viewModel: StashDBViewModel
     var saveStudioId: ((String?, @escaping (Bool) -> Void) -> Void)? = nil
+    /// Left out of the list: a studio cannot be its own parent. Set = the sheet picks a parent
+    /// studio: every studio by name, with its number of sub-studios instead of scenes.
+    var excludedStudioId: String? = nil
+    private var picksParent: Bool { excludedStudioId != nil }
     var onComplete: (SceneStudio?) -> Void
 
     @Environment(\.stashyDismiss) var dismiss
@@ -19,8 +23,9 @@ struct AddStudioToSceneSheet: View {
     @State private var isCreating = false
 
     var filtered: [Studio] {
-        if searchText.isEmpty { return studios }
-        return studios.filter { $0.name.lowercased().contains(searchText.lowercased()) }
+        let offered = excludedStudioId.map { excluded in studios.filter { $0.id != excluded } } ?? studios
+        if searchText.isEmpty { return offered }
+        return offered.filter { $0.name.lowercased().contains(searchText.lowercased()) }
     }
 
     var body: some View {
@@ -31,11 +36,16 @@ struct AddStudioToSceneSheet: View {
                     if isLoading {
                         HStack { Spacer(); ProgressView(tr("loading")); Spacer() }.padding()
                     } else {
-                        ForEach(filtered.prefix(30)) { studio in
+                        ForEach(picksParent ? filtered : Array(filtered.prefix(30))) { studio in
                             HStack {
                                 Text(studio.name)
                                 Spacer()
-                                Text(tr("arg_count_scenes", studio.sceneCount)).font(.caption).foregroundColor(.secondary)
+                                if !picksParent {
+                                    Text(tr("arg_count_scenes", studio.sceneCount)).font(.caption).foregroundColor(.secondary)
+                                } else if studio.subStudioCount > 0 {
+                                    Text(tr(studio.subStudioCount == 1 ? "arg_count_sub_studio" : "arg_count_sub_studios", studio.subStudioCount))
+                                        .font(.caption).foregroundColor(.secondary)
+                                }
                                 if selectedId == studio.id {
                                     Image(systemName: "checkmark").foregroundColor(appearanceManager.tintColor)
                                 }
@@ -49,7 +59,7 @@ struct AddStudioToSceneSheet: View {
                                 }
                             }
                         }
-                        if filtered.count > 30 {
+                        if !picksParent, filtered.count > 30 {
                             Text(tr("type_more_to_refine_menu")).font(.caption).foregroundColor(.secondary)
                         }
                         if !searchText.isEmpty && filtered.isEmpty {
@@ -76,7 +86,7 @@ struct AddStudioToSceneSheet: View {
             .onAppear {
                 selectedId = currentStudio?.id ?? ""
                 isLoading = true
-                viewModel.fetchAllStudios { fetched in
+                viewModel.fetchAllStudios(allByName: picksParent) { fetched in
                     DispatchQueue.main.async {
                         self.studios = fetched
                         self.isLoading = false

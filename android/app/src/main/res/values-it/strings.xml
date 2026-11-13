@@ -1759,6 +1759,7 @@
   <string name="pages">Pagine</string>
   <string name="parent_count">Numero di genitori</string>
   <string name="parents">Genitori</string>
+  <string name="parent_studio">Studio principale</string>
   <string name="passcode">Codice</string>
   <string name="passcodes_do_not_match">I codici non corrispondono</string>
   <string name="password">Password</string>

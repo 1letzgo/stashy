@@ -1759,6 +1759,7 @@
   <string name="pages">Sider</string>
   <string name="parent_count">Antall overordnede</string>
   <string name="parents">Overordnede</string>
+  <string name="parent_studio">Overordnet studio</string>
   <string name="passcode">Kode</string>
   <string name="passcodes_do_not_match">Kodene samsvarer ikke</string>
   <string name="password">Passord</string>
