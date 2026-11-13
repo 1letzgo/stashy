@@ -215,6 +215,7 @@ struct HomeRowView: View {
     var isLarge: Bool = false
     var isFirst: Bool = false
     @State private var scrollID: String?
+    @ObservedObject private var lastPlayedHidden = LastPlayedHiddenStore.shared
     @EnvironmentObject var coordinator: NavigationCoordinator
 
     init(config: HomeRowConfig, viewModel: StashDBViewModel, isLarge: Bool = false, isFirst: Bool = false) {
@@ -227,7 +228,12 @@ struct HomeRowView: View {
 
     // MARK: - Derived content
 
-    private var scenes: [Scene]       { store.scenes }
+    /// Last Played leaves out what the user removed from it on this device (the fetch asks
+    /// for that many more, so ten remain).
+    private var scenes: [Scene] {
+        guard config.type == .lastPlayed, lastPlayedHidden.count > 0 else { return store.scenes }
+        return Array(store.scenes.filter { !lastPlayedHidden.isHidden($0) }.prefix(10))
+    }
     private var performers: [Performer] { store.performers }
     private var studios: [Studio]     { store.studios }
     private var galleries: [Gallery]  { store.galleries }
@@ -419,8 +425,16 @@ struct HomeRowView: View {
                 default:
                     ForEach(scenes) { scene in
                         cardLink(destination: SceneDetailView(scene: scene), id: scene.id, width: w) {
-                            HomeSceneCardView(scene: scene, isLarge: isLarge, screenWidth: screenWidth,
-                                              autoplaysPreview: heroAutoplays(scene.id))
+                            if config.type == .lastPlayed {
+                                VStack(alignment: .leading, spacing: 6) {
+                                    HomeSceneCardView(scene: scene, isLarge: isLarge, screenWidth: screenWidth,
+                                                      autoplaysPreview: heroAutoplays(scene.id))
+                                    lastPlayedLine(scene, width: w)
+                                }
+                            } else {
+                                HomeSceneCardView(scene: scene, isLarge: isLarge, screenWidth: screenWidth,
+                                                  autoplaysPreview: heroAutoplays(scene.id))
+                            }
                         }
                     }
                 }
@@ -431,6 +445,55 @@ struct HomeRowView: View {
         .homeRowPosition($scrollID, row: config.id.uuidString, ids: items)
         .scrollTargetBehavior(.viewAligned)
         .scrollContentBackground(.hidden)
+    }
+
+    /// Below a Last Played card: when it was played, and the ··· menu (the card's own long
+    /// press is the preview) with "Mark as Finished" and "Remove from Last Played".
+    private func lastPlayedLine(_ scene: Scene, width: CGFloat) -> some View {
+        let onBackdrop = isLarge && isFirst && tabManager.showDashboardHeroBackground
+        let color: Color = onBackdrop ? .white.opacity(0.8) : .secondary
+        return HStack(spacing: 4) {
+            if let played = StashTimestamp.relative(scene.lastPlayedAt) {
+                Image(systemName: "clock.arrow.circlepath")
+                    .font(.system(size: 10, weight: .semibold))
+                    .foregroundStyle(AppearanceManager.shared.tintColor)
+                    .accessibilityHidden(true)
+                Text(played)
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundColor(color)
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+            }
+            Spacer(minLength: 2)
+            Menu {
+                if (scene.resumeTime ?? 0) > 0 {
+                    Button {
+                        HapticManager.light()
+                        viewModel.markSceneFinished(sceneId: scene.id, previousResumeTime: scene.resumeTime)
+                    } label: {
+                        Label(tr("action_mark_as_finished"), systemImage: "checkmark.circle")
+                    }
+                }
+                Button {
+                    HapticManager.light()
+                    withAnimation(DesignTokens.Animation.quick) { lastPlayedHidden.hide(scene.id) }
+                } label: {
+                    Label(tr("action_remove_from_last_played"), systemImage: "eye.slash")
+                }
+            } label: {
+                Image(systemName: "ellipsis")
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundColor(color)
+                    .frame(width: 28, height: 20)
+                    .contentShape(Rectangle())
+            }
+            .menuStyle(.button)
+            .buttonStyle(.plain)
+            .accessibilityLabel(tr("more_options"))
+        }
+        .dynamicTypeSize(...DynamicTypeSize.xLarge)
+        .padding(.horizontal, 2)
+        .frame(width: width, alignment: .leading)
     }
 
     private var performerBadge: PerformerBadgeType {

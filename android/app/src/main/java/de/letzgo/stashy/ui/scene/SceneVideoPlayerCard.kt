@@ -181,12 +181,20 @@ private fun CoverWithOverlay(model: SceneDetailModel) {
                             Icon(PlayerIcons.resume, null, tint = Color.White, modifier = Modifier.size(scaledIconSize(20.dp)))
                             Text(tr(R.string.action_resume_from_arg, PlaybackFormat.time(resume)), color = Color.White, style = IosTypography.body.copy(fontWeight = FontWeight.Bold))
                         }
-                        Text(
-                            tr(R.string.action_start_from_beginning),
-                            Modifier.shadow(3.dp, RoundedCornerShape(50)).clip(RoundedCornerShape(50)).background(tint)
-                                .clickable { model.startPlayback(false) }.padding(horizontal = 12.dp, vertical = 6.dp),
-                            color = Color.White, style = IosTypography.caption.copy(fontWeight = FontWeight.Medium),
-                        )
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                            Text(
+                                tr(R.string.action_start_from_beginning),
+                                Modifier.shadow(3.dp, RoundedCornerShape(50)).clip(RoundedCornerShape(50)).background(tint)
+                                    .clickable { model.startPlayback(false) }.padding(horizontal = 12.dp, vertical = 6.dp),
+                                color = Color.White, style = IosTypography.caption.copy(fontWeight = FontWeight.Medium),
+                            )
+                            Text(
+                                tr(R.string.action_mark_as_finished),
+                                Modifier.shadow(3.dp, RoundedCornerShape(50)).clip(RoundedCornerShape(50)).background(tint)
+                                    .clickable { model.markAsFinished() }.padding(horizontal = 12.dp, vertical = 6.dp),
+                                color = Color.White, style = IosTypography.caption.copy(fontWeight = FontWeight.Medium),
+                            )
+                        }
                     }
                 } else {
                     Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(16.dp)) {
@@ -286,6 +294,8 @@ fun SceneMetadataCard(model: SceneDetailModel, productionDate: String?, onEditTi
     onIncrementO = model::incrementO,
     onRemoveO = model::removeO,
     onSetRating = model::setRating,
+    onMarkAsFinished = if (!model.isPlaybackStarted) model::markAsFinished else null,
+    onToggleLastPlayedHidden = model::toggleLastPlayedHidden,
 )
 
 /**
@@ -304,6 +314,9 @@ fun SceneMetadataCardContent(
     onIncrementO: () -> Unit,
     onRemoveO: (OCounterMutation) -> Unit,
     onSetRating: (Int?) -> Unit,
+    /** Null while playback runs on the page: "Mark as Finished" is then not offered. */
+    onMarkAsFinished: (() -> Unit)? = null,
+    onToggleLastPlayedHidden: (() -> Unit)? = null,
 ) {
     val p = Theme.palette
     val tint = Appearance.tint
@@ -334,7 +347,7 @@ fun SceneMetadataCardContent(
             val center = Modifier.align(Alignment.CenterVertically)
             scene.date?.let { InfoPill(PlayerIcons.calendar, it, center) }
             scene.sceneDuration?.let { InfoPill(PlayerIcons.clock, PlaybackFormat.time(it), center) }
-            InfoPill(PlayerIcons.playCircle, "${scene.playCount ?: 0}", center)
+            PlayCountPill(scene, center, onMarkAsFinished, onToggleLastPlayedHidden)
             var menu by remember { mutableStateOf(false) }
             var confirmReset by remember { mutableStateOf(false) }
             val count = scene.oCounter ?: 0
@@ -367,6 +380,39 @@ fun SceneMetadataCardContent(
                 dismissButton = { TextButton({ confirmReset = false }) { Text(tr(R.string.action_cancel)) } },
             )
             StarRating(scene.rating100, size = 14.dp, spacing = 4.dp, modifier = center, container = p.pillAccent.copy(alpha = 0.1f), onChange = onSetRating)
+        }
+    }
+}
+
+/**
+ * The play-count pill. Tappable when a menu applies: "Mark as Finished" (resume point and no
+ * playback on the page), "Remove from Last Played" / "Show in Last Played again" (scene was
+ * played; local hide, nothing changes on the server). Otherwise a plain pill.
+ */
+@Composable
+private fun PlayCountPill(scene: de.letzgo.stashy.data.Scene, modifier: Modifier, onMarkAsFinished: (() -> Unit)?, onToggleHidden: (() -> Unit)?) {
+    val canFinish = onMarkAsFinished != null && (scene.resumeTime ?: 0.0) > 0
+    val played = (scene.playCount ?: 0) > 0 || !scene.lastPlayedAt.isNullOrEmpty()
+    val hidden = de.letzgo.stashy.data.LastPlayedHidden.isHidden(scene.id, scene.lastPlayedAt)
+    val canToggle = onToggleHidden != null && (played || hidden)
+    val label = "${scene.playCount ?: 0}"
+    if (!canFinish && !canToggle) { InfoPill(PlayerIcons.playCircle, label, modifier); return }
+    var menu by remember { mutableStateOf(false) }
+    Box(modifier.minimumInteractiveComponentSize(), contentAlignment = Alignment.Center) {
+        InfoPill(
+            PlayerIcons.playCircle, label,
+            Modifier.clickable(interactionSource = remember { MutableInteractionSource() }, indication = ripple()) { menu = true },
+        )
+        DropdownMenu(menu, onDismissRequest = { menu = false }) {
+            if (canFinish) DropdownMenuItem(
+                text = { Text(tr(R.string.action_mark_as_finished)) }, leadingIcon = { Icon(PlayerIcons.check, null) },
+                onClick = { menu = false; onMarkAsFinished?.invoke() },
+            )
+            if (canToggle) DropdownMenuItem(
+                text = { Text(tr(if (hidden) R.string.action_show_in_last_played_again else R.string.action_remove_from_last_played)) },
+                leadingIcon = { Icon(PlayerIcons.clock, null) },
+                onClick = { menu = false; onToggleHidden?.invoke() },
+            )
         }
     }
 }

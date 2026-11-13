@@ -3697,6 +3697,11 @@ class StashDBViewModel: ObservableObject {
     
     /// Convenience: dispatch to the correct fetch method based on row content type.
     func refreshHomeRow(config: HomeRowConfig, limit: Int = 10) {
+        // Last Played leaves out the scenes hidden on this device: fetch that many more, so
+        // the row still shows its ten.
+        #if !os(tvOS)
+        let limit = config.type == .lastPlayed ? limit + min(LastPlayedHiddenStore.shared.count, 40) : limit
+        #endif
         switch config.type {
         case .customFilter:
             fetchCustomFilterHomeRow(config: config, limit: limit)
@@ -6989,6 +6994,44 @@ class StashDBViewModel: ObservableObject {
     /// Convenience: resume-only save (play duration delta 0).
     func updateSceneResumeTime(sceneId: String, resumeTime: Double, completion: ((Bool) -> Void)? = nil) {
         updateSceneResumeTime(sceneId: sceneId, resumeTime: resumeTime, playDuration: 0, completion: completion)
+    }
+
+    /// "Mark as Finished": drops the scene's resume point, so it no longer counts as started.
+    /// Never adds a play: plays are credited from watched time, not from reaching the end.
+    /// The lists follow at once (`SceneResumeTimeUpdated`); a failed request puts the old
+    /// position back. An explicit command, so it also runs with "Track activity" off.
+    func markSceneFinished(sceneId: String, previousResumeTime: Double?, completion: ((Bool) -> Void)? = nil) {
+        func publish(_ time: Double) {
+            updateSceneResumeTime(id: sceneId, newResumeTime: time)
+            NotificationCenter.default.post(
+                name: NSNotification.Name("SceneResumeTimeUpdated"),
+                object: nil,
+                userInfo: ["sceneId": sceneId, "resumeTime": time]
+            )
+        }
+        publish(0)
+        #if !os(tvOS)
+        DownloadManager.shared.updateLocalResumeTime(id: sceneId, seconds: 0, duration: nil)
+        #endif
+        let mutation = """
+        {
+          "query": "mutation SceneSaveActivity($id: ID!, $resume_time: Float, $playDuration: Float) { sceneSaveActivity(id: $id, resume_time: $resume_time, playDuration: $playDuration) }",
+          "variables": { "id": "\(sceneId)", "resume_time": 0, "playDuration": 0 }
+        }
+        """
+        performGraphQLMutationSilent(query: mutation) { result in
+            let saved = (result?["data"]?.value as? [String: Any])?["sceneSaveActivity"] != nil
+            DispatchQueue.main.async {
+                if !saved {
+                    AppLog.error("❌ MARK FINISHED failed for scene \(sceneId)")
+                    if let previousResumeTime, previousResumeTime > 0 { publish(previousResumeTime) }
+                    #if !os(tvOS)
+                    ToastManager.shared.show(tr("error_mark_as_finished"), icon: "exclamationmark.triangle", style: .error)
+                    #endif
+                }
+                completion?(saved)
+            }
+        }
     }
     
     func fetchSceneDetails(sceneId: String, completion: @escaping (Scene?) -> Void) {

@@ -485,6 +485,29 @@ class SceneDetailModel(
         }
     }
 
+    /** "Mark as Finished": optimistic, the old resume time comes back with a toast when the server refuses. */
+    fun markAsFinished() {
+        val previous = scene.resumeTime ?: 0.0
+        if (previous <= 0) return
+        val id = scene.id
+        scene = scene.copy(resumeTime = 0.0)
+        de.letzgo.stashy.data.SceneMarkAsFinished.run(id, previous) {
+            if (scene.id == id) scene = scene.copy(resumeTime = previous)
+            SceneToast.show(tr(R.string.error_mark_as_finished), PlayerIcons.close, SceneToast.Style.Error)
+        }
+    }
+
+    /** Local hide from the Home row "Last Played" (nothing changes on the server). */
+    fun toggleLastPlayedHidden() {
+        val id = scene.id
+        if (de.letzgo.stashy.data.LastPlayedHidden.isHidden(id, scene.lastPlayedAt)) {
+            de.letzgo.stashy.data.LastPlayedHidden.unhide(id)
+        } else {
+            de.letzgo.stashy.data.LastPlayedHidden.hide(id)
+            SceneToast.show(tr(R.string.removed_from_last_played), PlayerIcons.clock, SceneToast.Style.Success)
+        }
+    }
+
     /** iOS: `removeOCounter` — optimistic, rolled back with a toast on failure. */
     fun removeO(mutation: OCounterMutation) {
         val original = scene.oCounter ?: 0

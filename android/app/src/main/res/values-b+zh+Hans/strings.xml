@@ -136,6 +136,7 @@
   <string name="action_load_studios">载入工作室</string>
   <string name="action_load_tags">载入标签</string>
   <string name="action_manage_subscription">管理订阅</string>
+  <string name="action_mark_as_finished">标记为已看完</string>
   <string name="action_merge">合并</string>
   <string name="action_merge_all">全部合并</string>
   <string name="action_merge_failed_arg">合并失败：%1$s</string>
@@ -177,6 +178,7 @@
   <string name="action_remove_download">移除下载</string>
   <string name="action_remove_favorite">取消收藏</string>
   <string name="action_remove_field">移除字段</string>
+  <string name="action_remove_from_last_played">从“上次播放”中移除</string>
   <string name="action_remove_from_watchlist">从稍后观看中移除</string>
   <string name="action_remove_header">移除标头</string>
   <string name="action_remove_license">移除许可证</string>
@@ -243,6 +245,7 @@
   <string name="action_show_delete_button">显示删除按钮</string>
   <string name="action_show_feeds_tab">显示 Feeds 标签页</string>
   <string name="action_show_in_feeds">在 Feeds 中显示</string>
+  <string name="action_show_in_last_played_again">重新显示在“上次播放”中</string>
   <string name="action_show_less">显示更少</string>
   <string name="action_show_more">显示更多</string>
   <string name="action_show_on_home">在主页显示</string>
@@ -884,6 +887,7 @@
   <string name="error_load_tag_scenes">无法载入标签的短片</string>
   <string name="error_load_this_image">无法载入此图片</string>
   <string name="error_login">登录失败</string>
+  <string name="error_mark_as_finished">无法标记为已看完</string>
   <string name="error_marker_not_created">未能创建标记</string>
   <string name="error_move_file">无法移动文件</string>
   <string name="error_o_count_query_failed">O 计数查询失败</string>
@@ -1888,6 +1892,7 @@
   <string name="remote_2">远程：</string>
   <string name="remote_arg">远程：%1$s</string>
   <string name="removed_arg">已移除 #%1$s</string>
+  <string name="removed_from_last_played">已从“上次播放”中移除</string>
   <string name="removed_from_watchlist">已从稍后观看中移除</string>
   <string name="reorder">重新排序</string>
   <string name="request_timed_out">请求超时</string>

@@ -136,6 +136,7 @@
   <string name="action_load_studios">Carregar estúdios</string>
   <string name="action_load_tags">Carregar etiquetas</string>
   <string name="action_manage_subscription">Gerenciar assinatura</string>
+  <string name="action_mark_as_finished">Marcar como concluída</string>
   <string name="action_merge">Mesclar</string>
   <string name="action_merge_all">Mesclar tudo</string>
   <string name="action_merge_failed_arg">Não foi possível mesclar: %1$s</string>
@@ -177,6 +178,7 @@
   <string name="action_remove_download">Remover download</string>
   <string name="action_remove_favorite">Remover dos favoritos</string>
   <string name="action_remove_field">Remover campo</string>
+  <string name="action_remove_from_last_played">Remover de Última reprodução</string>
   <string name="action_remove_from_watchlist">Remover da lista para assistir</string>
   <string name="action_remove_header">Remover cabeçalho</string>
   <string name="action_remove_license">Remover licença</string>
@@ -243,6 +245,7 @@
   <string name="action_show_delete_button">Mostrar botão Apagar</string>
   <string name="action_show_feeds_tab">Mostrar aba Feeds</string>
   <string name="action_show_in_feeds">Mostrar em Feeds</string>
+  <string name="action_show_in_last_played_again">Mostrar novamente em Última reprodução</string>
   <string name="action_show_less">Mostrar menos</string>
   <string name="action_show_more">Mostrar mais</string>
   <string name="action_show_on_home">Mostrar no Início</string>
@@ -884,6 +887,7 @@
   <string name="error_load_tag_scenes">Não foi possível carregar as cenas da etiqueta</string>
   <string name="error_load_this_image">Não foi possível carregar esta imagem</string>
   <string name="error_login">Falha no login</string>
+  <string name="error_mark_as_finished">Não foi possível marcar como concluída</string>
   <string name="error_marker_not_created">Marcador não criado</string>
   <string name="error_move_file">Não foi possível mover o arquivo</string>
   <string name="error_o_count_query_failed">Falha na consulta da contagem O</string>
@@ -1888,6 +1892,7 @@
   <string name="remote_2">"Remoto: "</string>
   <string name="remote_arg">Remoto: %1$s</string>
   <string name="removed_arg">#%1$s removida</string>
+  <string name="removed_from_last_played">Removida de Última reprodução</string>
   <string name="removed_from_watchlist">Removido da lista para assistir</string>
   <string name="reorder">Reordenar</string>
   <string name="request_timed_out">A solicitação expirou</string>

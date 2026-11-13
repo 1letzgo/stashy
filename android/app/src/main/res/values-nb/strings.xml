@@ -136,6 +136,7 @@
   <string name="action_load_studios">Last inn studioer</string>
   <string name="action_load_tags">Last inn tagger</string>
   <string name="action_manage_subscription">Administrer abonnement</string>
+  <string name="action_mark_as_finished">Merk som ferdig</string>
   <string name="action_merge">Slå sammen</string>
   <string name="action_merge_all">Slå sammen alle</string>
   <string name="action_merge_failed_arg">Kunne ikke slå sammen: %1$s</string>
@@ -177,6 +178,7 @@
   <string name="action_remove_download">Fjern nedlasting</string>
   <string name="action_remove_favorite">Fjern favoritt</string>
   <string name="action_remove_field">Fjern felt</string>
+  <string name="action_remove_from_last_played">Fjern fra Sist spilt</string>
   <string name="action_remove_from_watchlist">Fjern fra Se senere</string>
   <string name="action_remove_header">Fjern header</string>
   <string name="action_remove_license">Fjern lisens</string>
@@ -243,6 +245,7 @@
   <string name="action_show_delete_button">Vis sletteknapp</string>
   <string name="action_show_feeds_tab">Vis Feeds-fanen</string>
   <string name="action_show_in_feeds">Vis i Feeds</string>
+  <string name="action_show_in_last_played_again">Vis i Sist spilt igjen</string>
   <string name="action_show_less">Vis mindre</string>
   <string name="action_show_more">Vis mer</string>
   <string name="action_show_on_home">Vis på Hjem</string>
@@ -884,6 +887,7 @@
   <string name="error_load_tag_scenes">Kunne ikke laste inn taggens scener</string>
   <string name="error_load_this_image">Kunne ikke laste inn dette bildet</string>
   <string name="error_login">Innlogging mislyktes</string>
+  <string name="error_mark_as_finished">Kunne ikke merke som ferdig</string>
   <string name="error_marker_not_created">Markøren ble ikke opprettet</string>
   <string name="error_move_file">Kunne ikke flytte filen</string>
   <string name="error_o_count_query_failed">O Antall-spørringen mislyktes</string>
@@ -1888,6 +1892,7 @@
   <string name="remote_2">"Ekstern: "</string>
   <string name="remote_arg">Ekstern: %1$s</string>
   <string name="removed_arg">Fjernet #%1$s</string>
+  <string name="removed_from_last_played">Fjernet fra Sist spilt</string>
   <string name="removed_from_watchlist">Fjernet fra Se senere</string>
   <string name="reorder">Endre rekkefølge</string>
   <string name="request_timed_out">Tidsavbrudd for forespørselen</string>

@@ -136,6 +136,7 @@
   <string name="action_load_studios">スタジオを読み込む</string>
   <string name="action_load_tags">タグを読み込む</string>
   <string name="action_manage_subscription">サブスクリプションを管理</string>
+  <string name="action_mark_as_finished">視聴済みにする</string>
   <string name="action_merge">統合</string>
   <string name="action_merge_all">すべて統合</string>
   <string name="action_merge_failed_arg">統合できませんでした：%1$s</string>
@@ -177,6 +178,7 @@
   <string name="action_remove_download">ダウンロードを削除</string>
   <string name="action_remove_favorite">お気に入りから削除</string>
   <string name="action_remove_field">フィールドを削除</string>
+  <string name="action_remove_from_last_played">「最終再生」から削除</string>
   <string name="action_remove_from_watchlist">ウォッチリストから削除</string>
   <string name="action_remove_header">ヘッダーを削除</string>
   <string name="action_remove_license">ライセンスを削除</string>
@@ -243,6 +245,7 @@
   <string name="action_show_delete_button">削除ボタンを表示</string>
   <string name="action_show_feeds_tab">Feedsタブを表示</string>
   <string name="action_show_in_feeds">Feedsで表示</string>
+  <string name="action_show_in_last_played_again">「最終再生」に再表示</string>
   <string name="action_show_less">表示を減らす</string>
   <string name="action_show_more">さらに表示</string>
   <string name="action_show_on_home">ホームに表示</string>
@@ -884,6 +887,7 @@
   <string name="error_load_tag_scenes">タグのシーンを読み込めませんでした</string>
   <string name="error_load_this_image">この画像を読み込めませんでした</string>
   <string name="error_login">ログインに失敗しました</string>
+  <string name="error_mark_as_finished">視聴済みにできませんでした</string>
   <string name="error_marker_not_created">マーカーを作成できませんでした</string>
   <string name="error_move_file">ファイルを移動できませんでした</string>
   <string name="error_o_count_query_failed">Oカウントのクエリに失敗しました</string>
@@ -1888,6 +1892,7 @@
   <string name="remote_2">"リモート: "</string>
   <string name="remote_arg">リモート：%1$s</string>
   <string name="removed_arg">#%1$sを取り除きました</string>
+  <string name="removed_from_last_played">「最終再生」から削除しました</string>
   <string name="removed_from_watchlist">ウォッチリストから取り除きました</string>
   <string name="reorder">並べ替え</string>
   <string name="request_timed_out">リクエストがタイムアウトしました</string>

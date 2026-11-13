@@ -136,6 +136,7 @@
   <string name="action_load_studios">Carica studi</string>
   <string name="action_load_tags">Carica tag</string>
   <string name="action_manage_subscription">Gestisci abbonamento</string>
+  <string name="action_mark_as_finished">Segna come terminata</string>
   <string name="action_merge">Unisci</string>
   <string name="action_merge_all">Unisci tutto</string>
   <string name="action_merge_failed_arg">Unione non riuscita: %1$s</string>
@@ -177,6 +178,7 @@
   <string name="action_remove_download">Rimuovi download</string>
   <string name="action_remove_favorite">Rimuovi dai preferiti</string>
   <string name="action_remove_field">Rimuovi campo</string>
+  <string name="action_remove_from_last_played">Rimuovi da Ultima riproduzione</string>
   <string name="action_remove_from_watchlist">Rimuovi da Da guardare</string>
   <string name="action_remove_header">Rimuovi header</string>
   <string name="action_remove_license">Rimuovi licenza</string>
@@ -243,6 +245,7 @@
   <string name="action_show_delete_button">Mostra pulsante Elimina</string>
   <string name="action_show_feeds_tab">Mostra tab Feeds</string>
   <string name="action_show_in_feeds">Mostra in Feeds</string>
+  <string name="action_show_in_last_played_again">Mostra di nuovo in Ultima riproduzione</string>
   <string name="action_show_less">Mostra meno</string>
   <string name="action_show_more">Mostra altro</string>
   <string name="action_show_on_home">Mostra nella Home</string>
@@ -884,6 +887,7 @@
   <string name="error_load_tag_scenes">Impossibile caricare le scene del tag</string>
   <string name="error_load_this_image">Impossibile caricare questa immagine</string>
   <string name="error_login">Accesso non riuscito</string>
+  <string name="error_mark_as_finished">Impossibile segnare come terminata</string>
   <string name="error_marker_not_created">Marcatore non creato</string>
   <string name="error_move_file">Impossibile spostare il file</string>
   <string name="error_o_count_query_failed">Query del Contatore O non riuscita</string>
@@ -1888,6 +1892,7 @@
   <string name="remote_2">"Remoto: "</string>
   <string name="remote_arg">Remoto: %1$s</string>
   <string name="removed_arg">Rimosso #%1$s</string>
+  <string name="removed_from_last_played">Rimossa da Ultima riproduzione</string>
   <string name="removed_from_watchlist">Rimossa da Da guardare</string>
   <string name="reorder">Riordina</string>
   <string name="request_timed_out">Richiesta scaduta</string>

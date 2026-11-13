@@ -136,6 +136,7 @@
   <string name="action_load_studios">Charger les studios</string>
   <string name="action_load_tags">Charger les étiquettes</string>
   <string name="action_manage_subscription">Gérer l\'abonnement</string>
+  <string name="action_mark_as_finished">Marquer comme terminée</string>
   <string name="action_merge">Fusionner</string>
   <string name="action_merge_all">Tout fusionner</string>
   <string name="action_merge_failed_arg">Échec de la fusion : %1$s</string>
@@ -177,6 +178,7 @@
   <string name="action_remove_download">Retirer le téléchargement</string>
   <string name="action_remove_favorite">Retirer des favoris</string>
   <string name="action_remove_field">Retirer le champ</string>
+  <string name="action_remove_from_last_played">Retirer de Dernière lecture</string>
   <string name="action_remove_from_watchlist">Retirer de la liste à regarder</string>
   <string name="action_remove_header">Retirer l\'en-tête</string>
   <string name="action_remove_license">Retirer la licence</string>
@@ -243,6 +245,7 @@
   <string name="action_show_delete_button">Afficher le bouton Supprimer</string>
   <string name="action_show_feeds_tab">Afficher l\'onglet Feeds</string>
   <string name="action_show_in_feeds">Afficher dans Feeds</string>
+  <string name="action_show_in_last_played_again">Afficher à nouveau dans Dernière lecture</string>
   <string name="action_show_less">Afficher moins</string>
   <string name="action_show_more">Afficher plus</string>
   <string name="action_show_on_home">Afficher sur l\'accueil</string>
@@ -884,6 +887,7 @@
   <string name="error_load_tag_scenes">Impossible de charger les scènes de l\'étiquette</string>
   <string name="error_load_this_image">Impossible de charger cette image</string>
   <string name="error_login">Échec de la connexion</string>
+  <string name="error_mark_as_finished">Impossible de marquer comme terminée</string>
   <string name="error_marker_not_created">Marqueur non créé</string>
   <string name="error_move_file">Impossible de déplacer le fichier</string>
   <string name="error_o_count_query_failed">Échec de la requête du Compteur O</string>
@@ -1888,6 +1892,7 @@
   <string name="remote_2">"Distante : "</string>
   <string name="remote_arg">Distante : %1$s</string>
   <string name="removed_arg">#%1$s retiré</string>
+  <string name="removed_from_last_played">Retirée de Dernière lecture</string>
   <string name="removed_from_watchlist">Retiré de la liste à regarder</string>
   <string name="reorder">Réordonner</string>
   <string name="request_timed_out">Délai de la requête dépassé</string>

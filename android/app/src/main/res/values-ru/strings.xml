@@ -136,6 +136,7 @@
   <string name="action_load_studios">Загрузить студии</string>
   <string name="action_load_tags">Загрузить теги</string>
   <string name="action_manage_subscription">Управлять подпиской</string>
+  <string name="action_mark_as_finished">Отметить как просмотренное</string>
   <string name="action_merge">Объединить</string>
   <string name="action_merge_all">Объединить все</string>
   <string name="action_merge_failed_arg">Не удалось объединить: %1$s</string>
@@ -177,6 +178,7 @@
   <string name="action_remove_download">Удалить загрузку</string>
   <string name="action_remove_favorite">Удалить из избранного</string>
   <string name="action_remove_field">Удалить поле</string>
+  <string name="action_remove_from_last_played">Убрать из «Последнее воспроизведение»</string>
   <string name="action_remove_from_watchlist">Удалить из «Смотреть позже»</string>
   <string name="action_remove_header">Удалить заголовок</string>
   <string name="action_remove_license">Удалить лицензию</string>
@@ -243,6 +245,7 @@
   <string name="action_show_delete_button">Показывать кнопку удаления</string>
   <string name="action_show_feeds_tab">Показывать вкладку Feeds</string>
   <string name="action_show_in_feeds">Показать в Feeds</string>
+  <string name="action_show_in_last_played_again">Снова показывать в «Последнее воспроизведение»</string>
   <string name="action_show_less">Свернуть</string>
   <string name="action_show_more">Показать больше</string>
   <string name="action_show_on_home">Показать на главной</string>
@@ -884,6 +887,7 @@
   <string name="error_load_tag_scenes">Не удалось загрузить сцены тега</string>
   <string name="error_load_this_image">Не удалось загрузить это изображение</string>
   <string name="error_login">Не удалось войти</string>
+  <string name="error_mark_as_finished">Не удалось отметить как просмотренное</string>
   <string name="error_marker_not_created">Маркер не создан</string>
   <string name="error_move_file">Не удалось переместить файл</string>
   <string name="error_o_count_query_failed">Ошибка запроса счетчика O</string>
@@ -1888,6 +1892,7 @@
   <string name="remote_2">"Удаленный: "</string>
   <string name="remote_arg">Удаленный: %1$s</string>
   <string name="removed_arg">Удален #%1$s</string>
+  <string name="removed_from_last_played">Убрано из «Последнее воспроизведение»</string>
   <string name="removed_from_watchlist">Удалено из «Смотреть позже»</string>
   <string name="reorder">Изменить порядок</string>
   <string name="request_timed_out">Время запроса истекло</string>

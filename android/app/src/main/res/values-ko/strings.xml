@@ -136,6 +136,7 @@
   <string name="action_load_studios">스튜디오 불러오기</string>
   <string name="action_load_tags">태그 불러오기</string>
   <string name="action_manage_subscription">구독 관리</string>
+  <string name="action_mark_as_finished">시청 완료로 표시</string>
   <string name="action_merge">병합</string>
   <string name="action_merge_all">모두 병합</string>
   <string name="action_merge_failed_arg">병합할 수 없음: %1$s</string>
@@ -177,6 +178,7 @@
   <string name="action_remove_download">다운로드 제거</string>
   <string name="action_remove_favorite">즐겨찾기에서 제거</string>
   <string name="action_remove_field">항목 제거</string>
+  <string name="action_remove_from_last_played">‘마지막 재생’에서 제거</string>
   <string name="action_remove_from_watchlist">시청 목록에서 제거</string>
   <string name="action_remove_header">헤더 제거</string>
   <string name="action_remove_license">라이선스 제거</string>
@@ -243,6 +245,7 @@
   <string name="action_show_delete_button">삭제 버튼 보기</string>
   <string name="action_show_feeds_tab">Feeds 탭 보기</string>
   <string name="action_show_in_feeds">Feeds에서 보기</string>
+  <string name="action_show_in_last_played_again">‘마지막 재생’에 다시 표시</string>
   <string name="action_show_less">간략히 보기</string>
   <string name="action_show_more">더 보기</string>
   <string name="action_show_on_home">홈에 표시</string>
@@ -884,6 +887,7 @@
   <string name="error_load_tag_scenes">태그 영상을 불러올 수 없음</string>
   <string name="error_load_this_image">이 이미지를 불러올 수 없음</string>
   <string name="error_login">로그인 실패</string>
+  <string name="error_mark_as_finished">시청 완료로 표시하지 못했습니다</string>
   <string name="error_marker_not_created">마커를 만들지 못했어요</string>
   <string name="error_move_file">파일을 이동할 수 없음</string>
   <string name="error_o_count_query_failed">O 카운트 쿼리 실패</string>
@@ -1888,6 +1892,7 @@
   <string name="remote_2">"원격: "</string>
   <string name="remote_arg">원격: %1$s</string>
   <string name="removed_arg">#%1$s 제거됨</string>
+  <string name="removed_from_last_played">‘마지막 재생’에서 제거됨</string>
   <string name="removed_from_watchlist">시청 목록에서 제거됨</string>
   <string name="reorder">순서 변경</string>
   <string name="request_timed_out">요청 시간 초과</string>

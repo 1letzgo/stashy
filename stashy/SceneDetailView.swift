@@ -278,6 +278,7 @@ struct SceneDetailView: View {
                     transcriptionController: transcriptionController,
                     extrasController: extrasController,
                     onSeek: { seconds in seekTo(seconds) },
+                    onMarkFinished: { markAsFinished() },
                     onStartPlayback: { resume in startPlayback(resume: resume) }
                 )
         }
@@ -969,7 +970,8 @@ struct SceneDetailView: View {
                     onSeek: { seconds in seekTo(seconds) },
                     onTitleUpdated: { newTitle, newDetails in
                         applyLocalSceneEdit(Scene(id: activeScene.id, title: newTitle, details: newDetails, director: activeScene.director, date: activeScene.date, duration: activeScene.duration, studio: activeScene.studio, performers: activeScene.performers, files: activeScene.files, tags: activeScene.tags, galleries: activeScene.galleries, groups: activeScene.groups, organized: activeScene.organized, resumeTime: activeScene.resumeTime, playCount: activeScene.playCount, oCounter: activeScene.oCounter, rating100: activeScene.rating100, createdAt: activeScene.createdAt, updatedAt: activeScene.updatedAt, paths: activeScene.paths, sceneMarkers: activeScene.sceneMarkers, interactive: activeScene.interactive, stashIds: activeScene.stashIds, captions: activeScene.captions, customFields: activeScene.customFields))
-                    }
+                    },
+                    onMarkFinished: { markAsFinished() }
                 )
             }
             .background(Color.secondaryAppBackground)
@@ -1071,6 +1073,20 @@ struct SceneDetailView: View {
     /// to Now Playing instead, as before:
     /// `!playerOnly && !presentedFromMiniPlayer && MiniPlayerStore.shared.isEnabled` (never on tvOS).
     private var playsInNowPlaying: Bool { false }
+
+    /// "Mark as Finished": drops the resume point. The cover goes back to its plain play
+    /// button and the lists lose the progress bar; no play is added.
+    private func markAsFinished() {
+        let sceneId = activeScene.id
+        let previous = activeScene.resumeTime
+        HapticManager.light()
+        withAnimation(DesignTokens.Animation.quick) { activeScene = activeScene.withResumeTime(0) }
+        viewModel.markSceneFinished(sceneId: sceneId, previousResumeTime: previous) { saved in
+            if !saved, activeScene.id == sceneId, let previous {
+                activeScene = activeScene.withResumeTime(previous)
+            }
+        }
+    }
 
     private func startPlayback(resume: Bool, startAt: Double? = nil) {
         #if !os(tvOS)

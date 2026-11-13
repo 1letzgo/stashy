@@ -137,6 +137,7 @@
     <string name="action_load_studios">Load Studios</string>
     <string name="action_load_tags">Load Tags</string>
     <string name="action_manage_subscription">Manage Subscription</string>
+    <string name="action_mark_as_finished">Mark as Finished</string>
     <string name="action_merge">Merge</string>
     <string name="action_merge_all">Merge all</string>
     <string name="action_merge_failed_arg">Merge failed: %1$s</string>
@@ -179,6 +180,7 @@
     <string name="action_remove_favorite">Remove favorite</string>
     <string name="action_remove_field">Remove field</string>
     <string name="action_remove_from_watchlist">Remove from watchlist</string>
+    <string name="action_remove_from_last_played">Remove from Last Played</string>
     <string name="action_remove_header">Remove header</string>
     <string name="action_remove_license">Remove License</string>
     <string name="action_remove_one">Remove one</string>
@@ -244,6 +246,7 @@
     <string name="action_show_delete_button">Show Delete Button</string>
     <string name="action_show_feeds_tab">Show Feeds Tab</string>
     <string name="action_show_in_feeds">Show in Feeds</string>
+    <string name="action_show_in_last_played_again">Show in Last Played Again</string>
     <string name="action_show_less">Show less</string>
     <string name="action_show_more">Show more</string>
     <string name="action_show_on_home">Show on Home</string>
@@ -763,6 +766,7 @@
     <string name="error_loading_tags">Error loading tags</string>
     <string name="error_login">Login failed</string>
     <string name="error_move_file">Could not move file</string>
+    <string name="error_mark_as_finished">Failed to mark as finished</string>
     <string name="error_play_scenes_in_this_channel">Unable to play scenes in this channel</string>
     <string name="error_play_this_scene">Unable to play this scene</string>
     <string name="error_playback">Playback failed.</string>
@@ -1717,6 +1721,7 @@
     <string name="remote_2">"Remote: "</string>
     <string name="remote_arg">Remote: %1$s</string>
     <string name="removed_arg">Removed #%1$s</string>
+    <string name="removed_from_last_played">Removed from Last Played</string>
     <string name="removed_from_watchlist">Removed from watchlist</string>
     <string name="reorder">Reorder</string>
     <string name="request_timed_out">Request timed out</string>

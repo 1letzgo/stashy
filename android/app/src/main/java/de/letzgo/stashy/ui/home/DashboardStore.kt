@@ -204,7 +204,8 @@ object DashboardStore {
         fetching += type
         rows[type] = state.copy(isLoading = true)
         scope.launch {
-            val limit = 10
+            // Last Played leaves out the locally hidden scenes: fetch that many more, so ten remain.
+            val limit = 10 + if (type == HomeRowType.LastPlayed) minOf(de.letzgo.stashy.data.LastPlayedHidden.entries.size, 40) else 0
             val next = try {
                 when {
                     type.isPerformerRow -> HomeRowState(performers = DashboardRepository.performers(type, limit))

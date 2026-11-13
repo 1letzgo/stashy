@@ -136,6 +136,7 @@
   <string name="action_load_studios">Wczytaj studia</string>
   <string name="action_load_tags">Wczytaj tagi</string>
   <string name="action_manage_subscription">Zarządzaj subskrypcją</string>
+  <string name="action_mark_as_finished">Oznacz jako obejrzane</string>
   <string name="action_merge">Scal</string>
   <string name="action_merge_all">Scal wszystkie</string>
   <string name="action_merge_failed_arg">Scalanie nie powiodło się: %1$s</string>
@@ -177,6 +178,7 @@
   <string name="action_remove_download">Usuń pobrany plik</string>
   <string name="action_remove_favorite">Usuń z ulubionych</string>
   <string name="action_remove_field">Usuń pole</string>
+  <string name="action_remove_from_last_played">Usuń z Ostatnio odtwarzane</string>
   <string name="action_remove_from_watchlist">Usuń z listy Do obejrzenia</string>
   <string name="action_remove_header">Usuń nagłówek</string>
   <string name="action_remove_license">Usuń licencję</string>
@@ -243,6 +245,7 @@
   <string name="action_show_delete_button">Pokazuj przycisk Usuń</string>
   <string name="action_show_feeds_tab">Pokazuj kartę Feeds</string>
   <string name="action_show_in_feeds">Pokaż w Feeds</string>
+  <string name="action_show_in_last_played_again">Pokaż ponownie w Ostatnio odtwarzane</string>
   <string name="action_show_less">Pokaż mniej</string>
   <string name="action_show_more">Pokaż więcej</string>
   <string name="action_show_on_home">Pokazuj na ekranie Start</string>
@@ -884,6 +887,7 @@
   <string name="error_load_tag_scenes">Nie można wczytać scen tagu</string>
   <string name="error_load_this_image">Nie można wczytać tego obrazu</string>
   <string name="error_login">Logowanie nie powiodło się</string>
+  <string name="error_mark_as_finished">Nie udało się oznaczyć jako obejrzane</string>
   <string name="error_marker_not_created">Nie utworzono znacznika</string>
   <string name="error_move_file">Nie można przenieść pliku</string>
   <string name="error_o_count_query_failed">Zapytanie o O Count nie powiodło się</string>
@@ -1888,6 +1892,7 @@
   <string name="remote_2">"Zdalny: "</string>
   <string name="remote_arg">Zdalny: %1$s</string>
   <string name="removed_arg">Usunięto #%1$s</string>
+  <string name="removed_from_last_played">Usunięto z Ostatnio odtwarzane</string>
   <string name="removed_from_watchlist">Usunięto z listy Do obejrzenia</string>
   <string name="reorder">Zmień kolejność</string>
   <string name="request_timed_out">Przekroczono czas żądania</string>

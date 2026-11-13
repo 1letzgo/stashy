@@ -136,6 +136,7 @@
   <string name="action_load_studios">Stüdyoları Yükle</string>
   <string name="action_load_tags">Etiketleri Yükle</string>
   <string name="action_manage_subscription">Aboneliği Yönet</string>
+  <string name="action_mark_as_finished">Bitti olarak işaretle</string>
   <string name="action_merge">Birleştir</string>
   <string name="action_merge_all">Tümünü birleştir</string>
   <string name="action_merge_failed_arg">Birleştirilemedi: %1$s</string>
@@ -177,6 +178,7 @@
   <string name="action_remove_download">İndirmeyi kaldır</string>
   <string name="action_remove_favorite">Favorilerden kaldır</string>
   <string name="action_remove_field">Alanı kaldır</string>
+  <string name="action_remove_from_last_played">Son Oynatma\'dan kaldır</string>
   <string name="action_remove_from_watchlist">İzleme listesinden kaldır</string>
   <string name="action_remove_header">Başlığı kaldır</string>
   <string name="action_remove_license">Lisansı Kaldır</string>
@@ -243,6 +245,7 @@
   <string name="action_show_delete_button">Sil Düğmesini Göster</string>
   <string name="action_show_feeds_tab">Feeds Sekmesini Göster</string>
   <string name="action_show_in_feeds">Feeds\'te Göster</string>
+  <string name="action_show_in_last_played_again">Son Oynatma\'da yeniden göster</string>
   <string name="action_show_less">Daha az göster</string>
   <string name="action_show_more">Daha fazla göster</string>
   <string name="action_show_on_home">Ana Sayfa\'da Göster</string>
@@ -884,6 +887,7 @@
   <string name="error_load_tag_scenes">Etiket sahneleri yüklenemedi</string>
   <string name="error_load_this_image">Bu resim yüklenemedi</string>
   <string name="error_login">Giriş yapılamadı</string>
+  <string name="error_mark_as_finished">Bitti olarak işaretlenemedi</string>
   <string name="error_marker_not_created">İşaretçi oluşturulmadı</string>
   <string name="error_move_file">Dosya taşınamadı</string>
   <string name="error_o_count_query_failed">O Sayısı sorgusu başarısız oldu</string>
@@ -1888,6 +1892,7 @@
   <string name="remote_2">"Uzak: "</string>
   <string name="remote_arg">Uzak: %1$s</string>
   <string name="removed_arg">#%1$s kaldırıldı</string>
+  <string name="removed_from_last_played">Son Oynatma\'dan kaldırıldı</string>
   <string name="removed_from_watchlist">İzleme listesinden kaldırıldı</string>
   <string name="reorder">Yeniden sırala</string>
   <string name="request_timed_out">İstek zaman aşımına uğradı</string>

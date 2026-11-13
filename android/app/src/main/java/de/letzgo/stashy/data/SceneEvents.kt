@@ -44,7 +44,11 @@ sealed class SceneEvent {
 object SceneEvents {
     private val flow = MutableSharedFlow<SceneEvent>(extraBufferCapacity = 32)
     val events: SharedFlow<SceneEvent> get() = flow
-    fun post(event: SceneEvent) { flow.tryEmit(event) }
+    fun post(event: SceneEvent) {
+        // A play from this app brings the scene back into the Home row "Last Played".
+        if (event is SceneEvent.PlayAdded) runCatching { LastPlayedHidden.unhide(event.sceneId) }
+        flow.tryEmit(event)
+    }
 }
 
 /** Applies [event] to a scene list; returns null when nothing changed. */

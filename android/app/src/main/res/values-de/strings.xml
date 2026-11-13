@@ -136,6 +136,7 @@
   <string name="action_load_studios">Studios laden</string>
   <string name="action_load_tags">Tags laden</string>
   <string name="action_manage_subscription">Abo verwalten</string>
+  <string name="action_mark_as_finished">Als beendet markieren</string>
   <string name="action_merge">Zusammenführen</string>
   <string name="action_merge_all">Alle zusammenführen</string>
   <string name="action_merge_failed_arg">Zusammenführen fehlgeschlagen: %1$s</string>
@@ -177,6 +178,7 @@
   <string name="action_remove_download">Download entfernen</string>
   <string name="action_remove_favorite">Aus Favoriten entfernen</string>
   <string name="action_remove_field">Feld entfernen</string>
+  <string name="action_remove_from_last_played">Aus „Zuletzt gespielt“ entfernen</string>
   <string name="action_remove_from_watchlist">Von Merkliste entfernen</string>
   <string name="action_remove_header">Header entfernen</string>
   <string name="action_remove_license">Lizenz entfernen</string>
@@ -243,6 +245,7 @@
   <string name="action_show_delete_button">Löschen-Taste anzeigen</string>
   <string name="action_show_feeds_tab">Feeds-Tab anzeigen</string>
   <string name="action_show_in_feeds">In Feeds anzeigen</string>
+  <string name="action_show_in_last_played_again">Wieder in „Zuletzt gespielt“ anzeigen</string>
   <string name="action_show_less">Weniger anzeigen</string>
   <string name="action_show_more">Mehr anzeigen</string>
   <string name="action_show_on_home">Auf Start anzeigen</string>
@@ -884,6 +887,7 @@
   <string name="error_load_tag_scenes">Szenen des Tags konnten nicht geladen werden</string>
   <string name="error_load_this_image">Dieses Bild konnte nicht geladen werden</string>
   <string name="error_login">Anmeldung fehlgeschlagen</string>
+  <string name="error_mark_as_finished">Konnte nicht als beendet markiert werden</string>
   <string name="error_marker_not_created">Marker nicht erstellt</string>
   <string name="error_move_file">Datei konnte nicht verschoben werden</string>
   <string name="error_o_count_query_failed">O-Zähler-Abfrage fehlgeschlagen</string>
@@ -1888,6 +1892,7 @@
   <string name="remote_2">"Extern: "</string>
   <string name="remote_arg">Extern: %1$s</string>
   <string name="removed_arg">#%1$s entfernt</string>
+  <string name="removed_from_last_played">Aus „Zuletzt gespielt“ entfernt</string>
   <string name="removed_from_watchlist">Von der Merkliste entfernt</string>
   <string name="reorder">Neu anordnen</string>
   <string name="request_timed_out">Zeitüberschreitung der Anfrage</string>

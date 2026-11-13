@@ -136,6 +136,7 @@
   <string name="action_load_studios">Cargar estudios</string>
   <string name="action_load_tags">Cargar etiquetas</string>
   <string name="action_manage_subscription">Gestionar suscripción</string>
+  <string name="action_mark_as_finished">Marcar como terminada</string>
   <string name="action_merge">Combinar</string>
   <string name="action_merge_all">Combinar todo</string>
   <string name="action_merge_failed_arg">Error al combinar: %1$s</string>
@@ -177,6 +178,7 @@
   <string name="action_remove_download">Eliminar descarga</string>
   <string name="action_remove_favorite">Quitar de favoritos</string>
   <string name="action_remove_field">Quitar campo</string>
+  <string name="action_remove_from_last_played">Quitar de Última reproducción</string>
   <string name="action_remove_from_watchlist">Quitar de la lista para ver</string>
   <string name="action_remove_header">Quitar encabezado</string>
   <string name="action_remove_license">Quitar licencia</string>
@@ -243,6 +245,7 @@
   <string name="action_show_delete_button">Mostrar botón Eliminar</string>
   <string name="action_show_feeds_tab">Mostrar pestaña Feeds</string>
   <string name="action_show_in_feeds">Mostrar en Feeds</string>
+  <string name="action_show_in_last_played_again">Mostrar de nuevo en Última reproducción</string>
   <string name="action_show_less">Mostrar menos</string>
   <string name="action_show_more">Mostrar más</string>
   <string name="action_show_on_home">Mostrar en Inicio</string>
@@ -884,6 +887,7 @@
   <string name="error_load_tag_scenes">No se pudieron cargar las escenas de la etiqueta</string>
   <string name="error_load_this_image">No se pudo cargar esta imagen</string>
   <string name="error_login">Error al iniciar sesión</string>
+  <string name="error_mark_as_finished">No se pudo marcar como terminada</string>
   <string name="error_marker_not_created">Marcador no creado</string>
   <string name="error_move_file">No se pudo mover el archivo</string>
   <string name="error_o_count_query_failed">Falló la consulta del Contador O</string>
@@ -1888,6 +1892,7 @@
   <string name="remote_2">"Remota: "</string>
   <string name="remote_arg">Remota: %1$s</string>
   <string name="removed_arg">#%1$s quitada</string>
+  <string name="removed_from_last_played">Quitada de Última reproducción</string>
   <string name="removed_from_watchlist">Quitado de la lista para ver</string>
   <string name="reorder">Reordenar</string>
   <string name="request_timed_out">Se agotó el tiempo de la solicitud</string>

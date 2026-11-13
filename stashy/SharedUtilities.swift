@@ -814,6 +814,107 @@ extension View {
     }
 }
 
+// MARK: - Hidden from Last Played
+
+/// Scenes the user took out of Home's "Last Played" row. Only this app hides them: play count
+/// and play history on the server stay as they are. A scene returns once it is played again
+/// (a play from this app removes the entry; one from elsewhere shows by its later
+/// `last_played_at`). Per server in `last_played_hidden_<serverID>`: scene id → time hidden
+/// (seconds since 1970), same on Android.
+#if !os(tvOS)
+@MainActor
+final class LastPlayedHiddenStore: ObservableObject {
+    static let shared = LastPlayedHiddenStore()
+    static let maxEntries = 500
+
+    @Published private(set) var hiddenAt: [String: Double] = [:]
+
+    var count: Int { hiddenAt.count }
+
+    private var key: String? {
+        ServerConfigManager.shared.activeConfig.map { "last_played_hidden_\($0.id.uuidString)" }
+    }
+
+    private init() {
+        load()
+        let center = NotificationCenter.default
+        center.addObserver(forName: NSNotification.Name("ServerConfigChanged"), object: nil, queue: .main) { [weak self] _ in
+            Task { @MainActor in self?.load() }
+        }
+        center.addObserver(forName: NSNotification.Name("ScenePlayAdded"), object: nil, queue: .main) { [weak self] notification in
+            guard let id = notification.userInfo?["sceneId"] as? String else { return }
+            Task { @MainActor in self?.unhide(id) }
+        }
+    }
+
+    private func load() {
+        guard let key, let data = UserDefaults.standard.data(forKey: key),
+              let decoded = try? JSONDecoder().decode([String: Double].self, from: data) else {
+            hiddenAt = [:]
+            return
+        }
+        hiddenAt = decoded
+    }
+
+    private func save() {
+        guard let key else { return }
+        if hiddenAt.isEmpty {
+            UserDefaults.standard.removeObject(forKey: key)
+        } else if let data = try? JSONEncoder().encode(hiddenAt) {
+            UserDefaults.standard.set(data, forKey: key)
+        }
+    }
+
+    func isHidden(_ scene: Scene) -> Bool {
+        Self.isHidden(hiddenAt: hiddenAt[scene.id], lastPlayedAt: scene.lastPlayedAt)
+    }
+
+    /// Hidden until a play later than the hiding.
+    nonisolated static func isHidden(hiddenAt: Double?, lastPlayedAt: String?) -> Bool {
+        guard let hiddenAt else { return false }
+        guard let played = lastPlayedAt.flatMap(StashTimestamp.date(from:)) else { return true }
+        return played.timeIntervalSince1970 <= hiddenAt
+    }
+
+    func hide(_ sceneId: String) {
+        var entries = hiddenAt
+        entries[sceneId] = Date().timeIntervalSince1970
+        if entries.count > Self.maxEntries {
+            let oldest = entries.sorted { $0.value < $1.value }.prefix(entries.count - Self.maxEntries)
+            for (id, _) in oldest { entries[id] = nil }
+        }
+        hiddenAt = entries
+        save()
+    }
+
+    func unhide(_ sceneId: String) {
+        guard hiddenAt[sceneId] != nil else { return }
+        hiddenAt[sceneId] = nil
+        save()
+    }
+}
+#endif
+
+/// Stash's timestamps (`last_played_at`, …): RFC 3339, with or without fractional seconds.
+enum StashTimestamp {
+    static func date(from raw: String) -> Date? {
+        let iso = ISO8601DateFormatter()
+        iso.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        if let date = iso.date(from: raw) { return date }
+        iso.formatOptions = [.withInternetDateTime]
+        return iso.date(from: raw)
+    }
+
+    /// "3 days ago", in the app's language.
+    static func relative(_ raw: String?) -> String? {
+        guard let date = raw.flatMap(date(from:)) else { return nil }
+        let formatter = RelativeDateTimeFormatter()
+        formatter.locale = AppLanguage.locale
+        formatter.unitsStyle = .full
+        return formatter.localizedString(for: min(date, Date()), relativeTo: Date())
+    }
+}
+
 /// Builds an `AVURLAsset` for a Stash stream URL with apikey-query + ApiKey-header
 /// authentication applied consistently. Single source of truth for asset creation.
 func makeAuthenticatedAsset(for url: URL) -> AVURLAsset {

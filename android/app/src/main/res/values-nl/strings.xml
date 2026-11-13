@@ -136,6 +136,7 @@
   <string name="action_load_studios">Laad studio\'s</string>
   <string name="action_load_tags">Laad labels</string>
   <string name="action_manage_subscription">Beheer abonnement</string>
+  <string name="action_mark_as_finished">Markeer als afgekeken</string>
   <string name="action_merge">Voeg samen</string>
   <string name="action_merge_all">Voeg alles samen</string>
   <string name="action_merge_failed_arg">Samenvoegen mislukt: %1$s</string>
@@ -177,6 +178,7 @@
   <string name="action_remove_download">Verwijder download</string>
   <string name="action_remove_favorite">Verwijder favoriet</string>
   <string name="action_remove_field">Verwijder veld</string>
+  <string name="action_remove_from_last_played">Haal uit Laatst afgespeeld</string>
   <string name="action_remove_from_watchlist">Haal van kijklijst</string>
   <string name="action_remove_header">Verwijder header</string>
   <string name="action_remove_license">Verwijder licentie</string>
@@ -243,6 +245,7 @@
   <string name="action_show_delete_button">Toon verwijderknop</string>
   <string name="action_show_feeds_tab">Toon Feeds-tab</string>
   <string name="action_show_in_feeds">Toon in Feeds</string>
+  <string name="action_show_in_last_played_again">Toon weer in Laatst afgespeeld</string>
   <string name="action_show_less">Toon minder</string>
   <string name="action_show_more">Toon meer</string>
   <string name="action_show_on_home">Toon op Home</string>
@@ -884,6 +887,7 @@
   <string name="error_load_tag_scenes">Kan scènes van label niet laden</string>
   <string name="error_load_this_image">Kan deze afbeelding niet laden</string>
   <string name="error_login">Inloggen mislukt</string>
+  <string name="error_mark_as_finished">Markeren als afgekeken mislukt</string>
   <string name="error_marker_not_created">Markering niet aangemaakt</string>
   <string name="error_move_file">Kan bestand niet verplaatsen</string>
   <string name="error_o_count_query_failed">O Count-query mislukt</string>
@@ -1888,6 +1892,7 @@
   <string name="remote_2">"Extern: "</string>
   <string name="remote_arg">Extern: %1$s</string>
   <string name="removed_arg">#%1$s verwijderd</string>
+  <string name="removed_from_last_played">Uit Laatst afgespeeld gehaald</string>
   <string name="removed_from_watchlist">Van kijklijst gehaald</string>
   <string name="reorder">Wijzig volgorde</string>
   <string name="request_timed_out">Time-out van verzoek</string>

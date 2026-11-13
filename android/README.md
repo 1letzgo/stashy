@@ -59,8 +59,9 @@ The debug build then starts connected (`ServerConfigManager.seedDebugServer`).
 | `data/FilterMapper.kt`, `FilterFields.kt`, `Filters.kt`, `Sorting.kt` | `FilterMapper`, `FilterFieldCatalog`, `FilterCriteriaDocument`, `*SortOption`, presets |
 | `data/CatalogPrefs.kt`, `CatalogRepositories.kt`, `SavedFilters.kt` | catalog facade over `TabManager` (sorts, default filters, card columns), list fetches, `SavedFiltersStore` (iOS `viewModel.savedFilters`, shared by catalogs, dashboard and Settings) |
 | `ui/NativeCards.kt` (`NativeCard`, `NativeMediaLabel`), `ui/components/` (`SceneCard`, `EntityCards.kt`) | `SceneCardView`, `PerformerCardView`, `StudioCardView`, `TagCardView`, `GalleryCardView`, `GroupCardView`, `ImageThumbnailCard`, `MarkerCardView` |
-| `ui/home/` | `HomeView` (dashboard) |
-| `ui/scene/` | `SceneDetailView`, `SceneDetail/` (`SceneAiSubtitles` = AI half of `ScenePlayerExtrasController`) |
+| `ui/home/` | `HomeView` (dashboard); the Last Played row has a line under each card (relative time + "···": Mark as Finished, Remove from Last Played) |
+| `data/LastPlayedHidden.kt` | local "Remove from Last Played" hide (`last_played_hidden_<serverID>`, JSON sceneId → epoch seconds, max 500; pure `LastPlayedHiddenLogic`, tested) + `SceneMarkAsFinished` |
+| `ui/scene/` | `SceneDetailView`, `SceneDetail/` (`SceneAiSubtitles` = AI half of `ScenePlayerExtrasController`); cover "Mark as Finished" beside "Start from beginning" and the play-count pill menu (Mark as Finished / Remove from Last Played) |
 | `ui/player/ai/` | `stashy/Subtitles/` (`LiveTranscriber`, `CaptionTranslator`, `TranscodeAudioSource`, pure `CaptionTimeline`), `SubtitleTargetLanguage`, `SceneTeleprompterMode` |
 | `ui/detail/` | Performer/Studio/Tag/Gallery/Group detail |
 | `ui/player/` (`StashPlayer`, `VideoSurface`, `ScenePlayerSurface`, `TimeBar`, `PreviewPlayer`/`PreviewPlayerPool`, `PlaybackService`, `PlayerWindow`) | `Playback/` (AetherEngine → Media3 ExoPlayer, see below), `SubtitleController`, `SceneScrubSprites` |

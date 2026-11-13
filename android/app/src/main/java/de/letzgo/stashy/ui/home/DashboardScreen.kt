@@ -84,6 +84,10 @@ import de.letzgo.stashy.ui.onNativeAccent
 import androidx.compose.material.icons.outlined.Layers
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.IconButton
+import de.letzgo.stashy.data.Scene
 import androidx.compose.ui.graphics.compositeOver
 import de.letzgo.stashy.ui.MainTab
 import de.letzgo.stashy.ui.Nav
@@ -246,10 +250,13 @@ private fun HomeRow(config: HomeRowConfig, isLarge: Boolean, isFirst: Boolean) {
     val w = homeCardWidth(config.type, isLarge)
     val h = homeCardHeight(config.type, isLarge)
     val showsHero = isLarge && isFirst && TabManager.showDashboardHeroBackground
+    // Last Played skips the scenes hidden locally (LastPlayedHidden), live.
+    val isLastPlayed = config.type == HomeRowType.LastPlayed
+    val scenes = if (isLastPlayed) state.scenes.filterNot { de.letzgo.stashy.data.LastPlayedHidden.isHidden(it.id, it.lastPlayedAt) }.take(10) else state.scenes
 
     Box {
         if (showsHero) {
-            val focused = state.scenes.getOrNull(focusedIndex) ?: state.scenes.firstOrNull()
+            val focused = scenes.getOrNull(focusedIndex) ?: scenes.firstOrNull()
             HeroBackdrop(focused?.thumbnailURL ?: state.performers.getOrNull(focusedIndex)?.imageURL, Modifier.matchParentSize())
         }
         Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
@@ -265,7 +272,7 @@ private fun HomeRow(config: HomeRowConfig, isLarge: Boolean, isFirst: Boolean) {
                         }
                     }
                 }
-                state.isEmpty -> Text(tr(R.string.empty_content_found), style = NativeType.bodyMedium, color = p.secondaryText, modifier = Modifier.padding(horizontal = RowMargin))
+                state.isEmpty || (isLastPlayed && scenes.isEmpty()) -> Text(tr(R.string.empty_content_found), style = NativeType.bodyMedium, color = p.secondaryText, modifier = Modifier.padding(horizontal = RowMargin))
                 else -> LazyRow(
                     state = listState, flingBehavior = rememberSnapFlingBehavior(listState),
                     contentPadding = PaddingValues(horizontal = RowMargin), horizontalArrangement = Arrangement.spacedBy(RowGap),
@@ -283,6 +290,12 @@ private fun HomeRow(config: HomeRowConfig, isLarge: Boolean, isFirst: Boolean) {
                         // iOS `HomeStudioCardView`: the Studios list's card at the row's width.
                         config.type.isStudioRow -> items(state.studios, key = { it.id }) { de.letzgo.stashy.ui.components.StudioCard(it, Modifier.width(w), onClick = { DetailLinks.studio(it) }) }
                         config.type.isGalleryRow -> items(state.galleries, key = { it.id }) { (if (isLarge) w else 125.dp).let { gw -> GalleryCard(it, Modifier.size(gw, 125.dp), aspectRatio = gw / 125.dp, shape = dashboardCardShape(isLarge), onClick = { DetailLinks.gallery(it) }) } }
+                        isLastPlayed -> items(scenes, key = { it.id }) { scene ->
+                            Column(Modifier.width(w), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                                DashboardSceneCard(scene, isLarge, w, h, onClick = { DetailLinks.scene(scene) })
+                                LastPlayedLine(scene, onHero = showsHero)
+                            }
+                        }
                         else -> items(state.scenes, key = { it.id }) { DashboardSceneCard(it, isLarge, w, h, onClick = { DetailLinks.scene(it) }) }
                     }
                 }
@@ -638,6 +651,52 @@ private fun ForgottenFavoritesRow(config: HomeRowConfig, isLarge: Boolean, isFir
                         }
                     }
                 }
+            }
+        }
+    }
+}
+
+/**
+ * Line under a Last Played card, like the For You reason line: clock + relative last-played
+ * time on the left, "···" menu on the right (Mark as Finished while there is a resume point,
+ * Remove from Last Played = local hide).
+ */
+@Composable
+private fun LastPlayedLine(scene: Scene, onHero: Boolean = false) {
+    val p = Theme.palette
+    val tint = if (onHero) Color.White.copy(alpha = 0.8f) else p.secondaryText
+    val relative = scene.lastPlayedAt?.let(de.letzgo.stashy.data.SceneStamps::parseUpdatedAt)?.let {
+        android.text.format.DateUtils.getRelativeTimeSpanString(it, System.currentTimeMillis(), android.text.format.DateUtils.MINUTE_IN_MILLIS).toString()
+    }.orEmpty()
+    var open by remember { mutableStateOf(false) }
+    Row(Modifier.fillMaxWidth().padding(horizontal = 2.dp), verticalAlignment = Alignment.CenterVertically) {
+        Icon(SF.clock, null, tint = nativeAccent(), modifier = Modifier.size(14.dp))
+        Text(
+            relative, style = NativeType.labelMedium, color = tint, maxLines = 1, overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.padding(start = 4.dp).weight(1f),
+        )
+        Box {
+            IconButton({ open = true }, Modifier.size(28.dp, 20.dp)) {
+                Icon(SF.ellipsis, null, tint = tint, modifier = Modifier.size(18.dp))
+            }
+            DropdownMenu(open, { open = false }, containerColor = p.secondaryBackground) {
+                val resume = scene.resumeTime ?: 0.0
+                if (resume > 0) DropdownMenuItem(
+                    text = { Text(tr(R.string.action_mark_as_finished), style = NativeType.bodyLarge, color = p.text) },
+                    leadingIcon = { Icon(SF.checkmarkCircle, null, tint = Appearance.tint) },
+                    onClick = {
+                        open = false
+                        de.letzgo.stashy.data.SceneMarkAsFinished.run(scene.id, resume) { de.letzgo.stashy.ui.tools.showToast(tr(R.string.error_mark_as_finished)) }
+                    },
+                )
+                DropdownMenuItem(
+                    text = { Text(tr(R.string.action_remove_from_last_played), style = NativeType.bodyLarge, color = p.text) },
+                    leadingIcon = { Icon(SF.clock, null, tint = Appearance.tint) },
+                    onClick = {
+                        open = false
+                        de.letzgo.stashy.data.LastPlayedHidden.hide(scene.id)
+                    },
+                )
             }
         }
     }

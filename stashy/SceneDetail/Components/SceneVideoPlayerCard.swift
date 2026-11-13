@@ -38,6 +38,8 @@ struct SceneVideoPlayerCard: View {
     @StateObject private var previewPlayer = AetherPreviewPlayer()
 
     var onSeek: (Double) -> Void
+    /// "Mark as Finished" on the cover, beside Resume and Start.
+    var onMarkFinished: () -> Void = {}
     var onStartPlayback: (Bool) -> Void
 
     var body: some View {
@@ -271,20 +273,38 @@ struct SceneVideoPlayerCard: View {
                 .shadow(color: .black.opacity(0.3), radius: 5)
             }
             
-            Button(action: { onStartPlayback(false) }) {
-                Text(tr("action_start_from_beginning"))
-                    .font(.caption)
-                    .fontWeight(.medium)
-                    .foregroundColor(Color.onAppTint)
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 6)
-                    .background(appearanceManager.tintColor)
-                    .clipShape(Capsule())
-                    .shadow(color: .black.opacity(0.2), radius: 3)
+            HStack(spacing: 8) {
+                Button(action: { onStartPlayback(false) }) {
+                    resumeSecondaryLabel(tr("action_start_from_beginning"), systemImage: nil)
+                }
+                Button(action: onMarkFinished) {
+                    resumeSecondaryLabel(tr("action_mark_as_finished"), systemImage: "checkmark")
+                }
             }
+            .padding(.horizontal, 8)
         }
         // These sit on a 16:9 cover and must not outgrow it.
         .dynamicTypeSize(...DynamicTypeSize.xxLarge)
+    }
+
+    private func resumeSecondaryLabel(_ title: String, systemImage: String?) -> some View {
+        HStack(spacing: 4) {
+            if let systemImage {
+                Image(systemName: systemImage)
+                    .font(.caption2.weight(.bold))
+            }
+            Text(title)
+                .font(.caption)
+                .fontWeight(.medium)
+                .lineLimit(1)
+                .minimumScaleFactor(0.8)
+        }
+        .foregroundColor(Color.onAppTint)
+        .padding(.horizontal, 12)
+        .padding(.vertical, 6)
+        .background(appearanceManager.tintColor)
+        .clipShape(Capsule())
+        .shadow(color: .black.opacity(0.2), radius: 3)
     }
 
     @ViewBuilder
@@ -455,6 +475,8 @@ struct SceneDetailMetadataCard: View {
 
     var onSeek: (Double) -> Void
     var onTitleUpdated: ((String?, String?) -> Void)?
+    var onMarkFinished: () -> Void = {}
+    @ObservedObject private var lastPlayedHidden = LastPlayedHiddenStore.shared
 
     private var hasSceneMarkers: Bool {
         !(activeScene.sceneMarkers?.isEmpty ?? true)
@@ -577,8 +599,51 @@ struct SceneDetailMetadataCard: View {
 
     private var countPills: some View {
         HStack(spacing: 8) {
-            infoPill(icon: "play.circle", text: "\(activeScene.playCount ?? 0)")
+            playCountPill
             oCounterButton
+        }
+    }
+
+    /// The play count; a tap opens what can be done about the scene's playback state:
+    /// "Mark as Finished" while it has a resume point and "Remove from Last Played" once it
+    /// was played. A plain pill when neither applies.
+    @ViewBuilder
+    private var playCountPill: some View {
+        let pill = infoPill(icon: "play.circle", text: "\(activeScene.playCount ?? 0)")
+        let canFinish = (activeScene.resumeTime ?? 0) > 0 && aetherEngine == nil
+        let wasPlayed = (activeScene.playCount ?? 0) > 0 || activeScene.lastPlayedAt != nil
+        if canFinish || wasPlayed {
+            Menu {
+                if canFinish {
+                    Button(action: onMarkFinished) {
+                        Label(tr("action_mark_as_finished"), systemImage: "checkmark.circle")
+                    }
+                }
+                if wasPlayed {
+                    if lastPlayedHidden.isHidden(activeScene) {
+                        Button {
+                            lastPlayedHidden.unhide(activeScene.id)
+                        } label: {
+                            Label(tr("action_show_in_last_played_again"), systemImage: "eye")
+                        }
+                    } else {
+                        Button {
+                            lastPlayedHidden.hide(activeScene.id)
+                            ToastManager.shared.show(tr("removed_from_last_played"), icon: "eye.slash")
+                        } label: {
+                            Label(tr("action_remove_from_last_played"), systemImage: "eye.slash")
+                        }
+                    }
+                }
+            } label: {
+                pill
+            }
+            .menuStyle(.button)
+            .buttonStyle(.plain)
+            .accessibilityLabel(tr("play_count"))
+            .accessibilityValue("\(activeScene.playCount ?? 0)")
+        } else {
+            pill
         }
     }
 

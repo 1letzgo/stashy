@@ -70,6 +70,15 @@ object SceneEditing {
         GraphQL.named("sceneSaveActivity", v)
     }
 
+    /** "Mark as Finished": resets the resume point, even when "Track activity" is off. Never adds a play. */
+    suspend fun clearResumeTime(sceneId: String) {
+        GraphQL.named("sceneSaveActivity", buildJsonObject {
+            put("id", JsonPrimitive(sceneId))
+            put("resume_time", JsonPrimitive(0))
+            put("playDuration", JsonPrimitive(0))
+        })
+    }
+
     private fun round2(v: Double) = Math.round(v * 100) / 100.0
 
     /** iOS: `addScenePlay` — returns the new count. */

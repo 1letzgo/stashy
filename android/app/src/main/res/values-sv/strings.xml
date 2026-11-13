@@ -136,6 +136,7 @@
   <string name="action_load_studios">Läs in studior</string>
   <string name="action_load_tags">Läs in taggar</string>
   <string name="action_manage_subscription">Hantera prenumeration</string>
+  <string name="action_mark_as_finished">Markera som klar</string>
   <string name="action_merge">Slå samman</string>
   <string name="action_merge_all">Slå samman alla</string>
   <string name="action_merge_failed_arg">Kunde inte slå samman: %1$s</string>
@@ -177,6 +178,7 @@
   <string name="action_remove_download">Ta bort nedladdning</string>
   <string name="action_remove_favorite">Ta bort favorit</string>
   <string name="action_remove_field">Ta bort fält</string>
+  <string name="action_remove_from_last_played">Ta bort från Senast spelad</string>
   <string name="action_remove_from_watchlist">Ta bort från bevakningslistan</string>
   <string name="action_remove_header">Ta bort header</string>
   <string name="action_remove_license">Ta bort licens</string>
@@ -243,6 +245,7 @@
   <string name="action_show_delete_button">Visa raderingsknapp</string>
   <string name="action_show_feeds_tab">Visa fliken Feeds</string>
   <string name="action_show_in_feeds">Visa i Feeds</string>
+  <string name="action_show_in_last_played_again">Visa i Senast spelad igen</string>
   <string name="action_show_less">Visa mindre</string>
   <string name="action_show_more">Visa mer</string>
   <string name="action_show_on_home">Visa på Hem</string>
@@ -884,6 +887,7 @@
   <string name="error_load_tag_scenes">Kunde inte läsa in taggens scener</string>
   <string name="error_load_this_image">Kunde inte läsa in den här bilden</string>
   <string name="error_login">Inloggningen misslyckades</string>
+  <string name="error_mark_as_finished">Kunde inte markera som klar</string>
   <string name="error_marker_not_created">Markören skapades inte</string>
   <string name="error_move_file">Kunde inte flytta filen</string>
   <string name="error_o_count_query_failed">O Count-frågan misslyckades</string>
@@ -1888,6 +1892,7 @@
   <string name="remote_2">"Fjärr: "</string>
   <string name="remote_arg">Fjärr: %1$s</string>
   <string name="removed_arg">Tog bort #%1$s</string>
+  <string name="removed_from_last_played">Borttagen från Senast spelad</string>
   <string name="removed_from_watchlist">Borttagen från bevakningslistan</string>
   <string name="reorder">Ändra ordning</string>
   <string name="request_timed_out">Tidsgränsen för begäran nåddes</string>
