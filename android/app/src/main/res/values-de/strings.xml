@@ -393,6 +393,8 @@
   <string name="arg_count_sources">%1$s Quellen</string>
   <string name="arg_count_studio">%1$s Studio</string>
   <string name="arg_count_studios">%1$s Studios</string>
+  <string name="arg_count_sub_studio">%1$s Unterstudio</string>
+  <string name="arg_count_sub_studios">%1$s Unterstudios</string>
   <string name="arg_count_tag">%1$s Tag</string>
   <string name="arg_count_tags">%1$s Tags</string>
   <string name="arg_count_weeks">%1$s Wochen</string>
@@ -429,6 +431,7 @@
   <string name="arg_of_arg_images">%1$s von %2$s Bildern</string>
   <string name="arg_of_arg_items">%1$s von %2$s Einträgen</string>
   <string name="arg_outside_month">%1$s, außerhalb des Monats</string>
+  <string name="arg_part_of">Teil von %1$s</string>
   <string name="arg_per_arg">%1$s/%2$s</string>
   <string name="arg_per_day">%1$s/Tag</string>
   <string name="arg_performer_times">%1$s× Darsteller</string>
@@ -1050,6 +1053,7 @@
   <string name="hero_autoplay">Hero-Autoplay</string>
   <string name="hero_background">Hero-Hintergrund</string>
   <string name="hidden">Ausgeblendet</string>
+  <string name="hide_sub_studios">Unterstudios ausblenden</string>
   <string name="high">Hoch</string>
   <string name="highest_rated">Am besten bewertet</string>
   <string name="hint_added_to_servers_job_queue">Zur Job-Warteschlange des Servers hinzugefügt.</string>
@@ -1438,6 +1442,7 @@
   <string name="includes_all">enthält alle</string>
   <string name="include_sub_folders">Unterordner einbeziehen</string>
   <string name="include_sub_groups">Untergruppen einbeziehen</string>
+  <string name="include_sub_studio_content">Inhalte der Unterstudios einbeziehen</string>
   <string name="include_sub_studios">Unterstudios einbeziehen</string>
   <string name="include_sub_tags">Unter-Tags einbeziehen</string>
   <string name="incomplete_setup">Unvollständige Einrichtung</string>

@@ -59,7 +59,7 @@ object DetailRepository {
      */
     fun sceneFilterFallback(query: CatalogQuery): CatalogQuery? {
         val scope = query.scope?.takeIf { it.isNotEmpty() } ?: return null
-        if (query.mode !in SCENE_FALLBACK_MODES || scope.containsKey("parents") || scope.containsKey("containing_groups")) return null
+        if (query.mode !in SCENE_FALLBACK_MODES || scope.containsKey("parents") || scope.containsKey("containing_groups") || scope.containsKey("scenes_filter")) return null
         return query.copy(scope = buildJsonObject { put("scenes_filter", scope) })
     }
 

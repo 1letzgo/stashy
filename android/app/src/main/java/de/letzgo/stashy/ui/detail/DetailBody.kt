@@ -33,6 +33,8 @@ import de.letzgo.stashy.data.Scene
 import de.letzgo.stashy.data.StashGroup
 import de.letzgo.stashy.data.StashImage
 import de.letzgo.stashy.data.Studio
+import de.letzgo.stashy.data.StudioCountsStore
+import de.letzgo.stashy.data.SubStudios
 import de.letzgo.stashy.data.Tag
 import de.letzgo.stashy.data.CatalogRepository
 import de.letzgo.stashy.data.SortOption
@@ -93,6 +95,11 @@ internal class LinkedCatalog(
     private val screenCount: (DetailTab) -> Int = { 0 },
     /** Sorts only this screen's scenes offer (a group's scene number). */
     private val sceneExtraSorts: List<SortOption> = emptyList(),
+    /**
+     * Studio page: every section but the sub-studios scopes on this studio, with the depth of
+     * "Include sub-studio content" read at query time (a switch change refetches the sections).
+     */
+    private val studioContentId: String? = null,
 ) {
     /** Per row of the Images section (iOS `CatalogCardColumnScope.images`, set in the images sheet). */
     val imageColumns: Int get() = CatalogPrefs.cardColumns(CatalogCardColumnScope.Images).raw
@@ -110,6 +117,9 @@ internal class LinkedCatalog(
             mode, scope,
             tabId = null,
             scope = s,
+            dynamicScope = studioContentId?.takeIf { mode != FilterMode.Studios }?.let { id ->
+                { SubStudios.studioScope(mode, id, StudioCountsStore.includeSubStudios) }
+            },
             initialSort = extraSorts.firstOrNull { it.raw == sortRaw }
                 ?: SortCatalog.option(mode, sortRaw) ?: SortCatalog.option(mode, SortCatalog.defaultRaw(mode)),
             extraSorts = extraSorts,

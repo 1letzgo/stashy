@@ -366,6 +366,7 @@ final class ScenesListFilterMemory: ObservableObject {
 }
 
 private struct ScenesViewContent: View {
+    @AppStorage(StudioCountsStore.includeSubStudiosKey) private var includesSubStudioContent = false
     @ObservedObject var appearanceManager = AppearanceManager.shared
     @ObservedObject var configManager = ServerConfigManager.shared
     @EnvironmentObject var coordinator: NavigationCoordinator
@@ -1449,6 +1450,10 @@ private struct ScenesViewContent: View {
         }
         .onChange(of: scope) { _, _ in
             didRunEmptyListSavedFilterFallback = false
+        }
+        // A studio's scenes follow "Include sub-studio content".
+        .onChange(of: includesSubStudioContent) { _, _ in
+            if case .studio = scope { performSearch() }
         }
         .onDisappear {
             filterMemory?.snapshot = filterMemorySnapshot

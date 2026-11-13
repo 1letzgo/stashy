@@ -622,6 +622,7 @@ struct CatalogFilterCriteriaBody: View {
     var onChange: () -> Void
 
     @State private var showsAdvanced: Bool?
+    @Environment(\.showsSubStudioContentOption) private var showsSubStudioContentOption
 
     private var sections: [QuickFilterSection] { QuickFilterCatalog.sections(for: document.mode) }
 
@@ -639,6 +640,9 @@ struct CatalogFilterCriteriaBody: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 20) {
+            if showsSubStudioContentOption {
+                SubStudioOptionsCard(showsHide: false)
+            }
             if !sections.isEmpty {
                 QuickFiltersCard(document: document, sections: sections, onChange: onChange)
             }

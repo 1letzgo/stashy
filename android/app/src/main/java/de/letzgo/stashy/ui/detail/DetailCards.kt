@@ -161,12 +161,17 @@ private fun CountLabel(icon: ImageVector, count: Int) {
 
 /** Logo block (2.2:1, studio header grey) + name row with the one count the list is sorted by (iOS `StudioCardView` / `TagCardView`). */
 @Composable
-private fun LogoCard(modifier: Modifier, onClick: (() -> Unit)?, name: String, count: BadgeCount?, logo: @Composable BoxScope.() -> Unit) {
+private fun LogoCard(modifier: Modifier, onClick: (() -> Unit)?, name: String, count: BadgeCount?, parentName: String? = null, logo: @Composable BoxScope.() -> Unit) {
     val p = Theme.palette
     NativeCard(modifier.fillMaxWidth(), onClick = onClick) { Column(Modifier.fillMaxWidth()) {
         Box(Modifier.fillMaxWidth().aspectRatio(2.2f).background(p.studioHeader).clip(RoundedCornerShape(0.dp)), content = logo)
         Row(Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-            Text(name, Modifier.weight(1f), style = NativeType.titleSmall, color = p.text, maxLines = scaledMaxLines(), overflow = TextOverflow.Ellipsis)
+            Column(Modifier.weight(1f)) {
+                Text(name, style = NativeType.titleSmall, color = p.text, maxLines = scaledMaxLines(), overflow = TextOverflow.Ellipsis)
+                if (!parentName.isNullOrEmpty()) {
+                    Text(tr(R.string.arg_part_of, parentName), style = NativeType.labelSmall, color = p.secondaryText, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                }
+            }
             count?.let { (badge, n) -> CountLabel(de.letzgo.stashy.ui.components.badgeIcon(badge), n) }
         }
     } }
@@ -176,8 +181,9 @@ private fun LogoCard(modifier: Modifier, onClick: (() -> Unit)?, name: String, c
 @Composable
 internal fun DetailStudioCard(studio: Studio, modifier: Modifier = Modifier, badge: CatalogCardBadge = CatalogCardBadge.Scenes, onClick: (() -> Unit)? = null) {
     val counts = de.letzgo.stashy.data.rememberStudioCounts(studio)
-    LogoCard(modifier, onClick, studio.name, studio.badgeCount(badge, counts)) {
+    LogoCard(modifier, onClick, studio.name, studio.badgeCount(badge, counts), studio.parentStudio?.name) {
         StudioLogo(studio, Modifier.fillMaxSize().padding(start = 14.dp, end = 14.dp, top = 12.dp))
+        de.letzgo.stashy.ui.components.StudioStatusPills(studio, Modifier.align(Alignment.TopStart).padding(8.dp))
     }
 }
 

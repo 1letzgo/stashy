@@ -2224,4 +2224,9 @@
     <string name="arg_count_criteria">%1$s criteria</string>
     <string name="arg_copy">%1$s copy</string>
     <string name="arg_bytes">%1$s bytes</string>
+    <string name="hide_sub_studios">Hide sub-studios</string>
+    <string name="include_sub_studio_content">Include sub-studio content</string>
+    <string name="arg_part_of">Part of %1$s</string>
+    <string name="arg_count_sub_studio">%1$s sub-studio</string>
+    <string name="arg_count_sub_studios">%1$s sub-studios</string>
 </resources>

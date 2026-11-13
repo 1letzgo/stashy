@@ -393,6 +393,8 @@
   <string name="arg_count_sources">%1$s origini</string>
   <string name="arg_count_studio">%1$s studio</string>
   <string name="arg_count_studios">%1$s studi</string>
+  <string name="arg_count_sub_studio">%1$s sotto-studio</string>
+  <string name="arg_count_sub_studios">%1$s sotto-studi</string>
   <string name="arg_count_tag">%1$s tag</string>
   <string name="arg_count_tags">%1$s tag</string>
   <string name="arg_count_weeks">%1$s settimane</string>
@@ -429,6 +431,7 @@
   <string name="arg_of_arg_images">%1$s di %2$s immagini</string>
   <string name="arg_of_arg_items">%1$s di %2$s elementi</string>
   <string name="arg_outside_month">%1$s, fuori dal mese</string>
+  <string name="arg_part_of">Parte di %1$s</string>
   <string name="arg_per_arg">%1$s/%2$s</string>
   <string name="arg_per_day">%1$s/giorno</string>
   <string name="arg_performer_times">%1$s× performer</string>
@@ -1050,6 +1053,7 @@
   <string name="hero_autoplay">Riproduzione automatica hero</string>
   <string name="hero_background">Sfondo hero</string>
   <string name="hidden">Nascosto</string>
+  <string name="hide_sub_studios">Nascondi sotto-studi</string>
   <string name="high">Alto</string>
   <string name="highest_rated">Più votate</string>
   <string name="hint_added_to_servers_job_queue">Aggiunto alla coda di attività del server.</string>
@@ -1438,6 +1442,7 @@
   <string name="includes_all">Include tutti</string>
   <string name="include_sub_folders">Includi sottocartelle</string>
   <string name="include_sub_groups">Includi sottogruppi</string>
+  <string name="include_sub_studio_content">Includi i contenuti dei sotto-studi</string>
   <string name="include_sub_studios">Includi sotto-studi</string>
   <string name="include_sub_tags">Includi sotto-tag</string>
   <string name="incomplete_setup">Configurazione incompleta</string>

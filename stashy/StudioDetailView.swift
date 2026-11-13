@@ -520,6 +520,16 @@ struct StudioDetailView: View {
         }
         .sceneLiveUpdates(using: viewModel)
         .task(id: studio.id) { studioCounts.request(studio.id, refresh: true) }
+        // Every filter sheet of this page offers "Include sub-studio content"; the Scenes list
+        // reloads itself, the other sections here.
+        .environment(\.showsSubStudioContentOption, true)
+        .onChange(of: includeSubStudios) { _, _ in
+            linkedGalleries.refetchGalleries(viewModel: viewModel, initial: true)
+            linkedPerformers.refetchPerformers(viewModel: viewModel, initial: true)
+            linkedTags.refetchTags(viewModel: viewModel, initial: true)
+            viewModel.fetchDetailGroups(studioId: studio.id)
+            linkedImages.refetchImages(viewModel: viewModel, initial: true)
+        }
         .sceneBulkDownloadDialog(
             isPresented: $showingSceneDownloadOptions,
             scope: .studio(id: studio.id),
@@ -851,17 +861,35 @@ struct StudioDetailView: View {
                 }
             },
             footer: {
-                if let linkURL {
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("URL")
-                            .font(.system(size: 11))
-                            .foregroundColor(.secondary)
-                            .textCase(.uppercase)
-                        Link(destination: linkURL) {
-                            Text(url)
-                                .font(.system(size: 11, weight: .bold))
+                let parent = studio.parentStudio
+                if linkURL != nil || parent != nil {
+                    VStack(alignment: .leading, spacing: 6) {
+                        // "Part of <parent>": the studio this one belongs to.
+                        if let parent {
+                            NavigationLink(destination: StudioDetailView(studio: Studio(id: parent.id, name: parent.name ?? ""))) {
+                                HStack(spacing: 4) {
+                                    Image(systemName: "building.2")
+                                    Text(tr("arg_part_of", parent.name ?? "")).lineLimit(1)
+                                    Image(systemName: "chevron.right").font(.system(size: 9, weight: .bold))
+                                }
+                                .font(.system(size: 12, weight: .semibold))
                                 .foregroundColor(appearanceManager.tintColor)
-                                .lineLimit(1)
+                            }
+                            .buttonStyle(.plain)
+                        }
+                        if let linkURL {
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text("URL")
+                                    .font(.system(size: 11))
+                                    .foregroundColor(.secondary)
+                                    .textCase(.uppercase)
+                                Link(destination: linkURL) {
+                                    Text(url)
+                                        .font(.system(size: 11, weight: .bold))
+                                        .foregroundColor(appearanceManager.tintColor)
+                                        .lineLimit(1)
+                                }
+                            }
                         }
                     }
                     .padding(.horizontal, 16)

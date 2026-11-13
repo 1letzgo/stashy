@@ -393,6 +393,8 @@
   <string name="arg_count_sources">%1$s bronnen</string>
   <string name="arg_count_studio">%1$s studio</string>
   <string name="arg_count_studios">%1$s studio\'s</string>
+  <string name="arg_count_sub_studio">%1$s substudio</string>
+  <string name="arg_count_sub_studios">%1$s substudio\'s</string>
   <string name="arg_count_tag">%1$s label</string>
   <string name="arg_count_tags">%1$s labels</string>
   <string name="arg_count_weeks">%1$s weken</string>
@@ -429,6 +431,7 @@
   <string name="arg_of_arg_images">%1$s van %2$s afbeeldingen</string>
   <string name="arg_of_arg_items">%1$s van %2$s items</string>
   <string name="arg_outside_month">%1$s, buiten de maand</string>
+  <string name="arg_part_of">Onderdeel van %1$s</string>
   <string name="arg_per_arg">%1$s/%2$s</string>
   <string name="arg_per_day">%1$s/dag</string>
   <string name="arg_performer_times">%1$s× performer</string>
@@ -1050,6 +1053,7 @@
   <string name="hero_autoplay">Hero automatisch afspelen</string>
   <string name="hero_background">Hero-achtergrond</string>
   <string name="hidden">Verborgen</string>
+  <string name="hide_sub_studios">Verberg substudio\'s</string>
   <string name="high">Hoog</string>
   <string name="highest_rated">Hoogst beoordeeld</string>
   <string name="hint_added_to_servers_job_queue">Toegevoegd aan de takenwachtrij van de server.</string>
@@ -1438,6 +1442,7 @@
   <string name="includes_all">Bevat alle</string>
   <string name="include_sub_folders">Inclusief submappen</string>
   <string name="include_sub_groups">Inclusief subgroepen</string>
+  <string name="include_sub_studio_content">Inclusief inhoud van substudio\'s</string>
   <string name="include_sub_studios">Inclusief substudio\'s</string>
   <string name="include_sub_tags">Inclusief sublabels</string>
   <string name="incomplete_setup">Onvolledige configuratie</string>

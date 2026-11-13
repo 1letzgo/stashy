@@ -479,17 +479,17 @@ object Downloads {
 
         val sceneFilter: JsonObject get() = when (this) {
             is Performer -> criterion("performers", id, depth = false)
-            is Studio -> criterion("studios", id, depth = true)
+            is Studio -> criterion("studios", id, depth = true, depthValue = StudioCountsStore.contentDepth)
             is Tag -> criterion("tags", id, depth = true)
             is Group -> criterion("groups", id, depth = false)
             is SavedFilter -> filter
         }
 
-        private fun criterion(key: String, id: String, depth: Boolean) = buildJsonObject {
+        private fun criterion(key: String, id: String, depth: Boolean, depthValue: Int = 0) = buildJsonObject {
             put(key, buildJsonObject {
                 put("value", JsonArray(listOf(JsonPrimitive(id))))
                 put("modifier", JsonPrimitive("INCLUDES"))
-                if (depth) put("depth", JsonPrimitive(0))
+                if (depth) put("depth", JsonPrimitive(depthValue))
             })
         }
     }

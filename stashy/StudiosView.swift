@@ -37,6 +37,7 @@ private struct StudiosViewContent: View {
 
     // Filter & sort sheet
     @State private var showFilterSortSheet = false
+    @AppStorage(StudioCountsStore.hideSubStudiosKey) private var hidesSubStudios = false
     @StateObject private var criteriaDocument = FilterCriteriaDocument(mode: .studios, pinsDefaults: true)
     @State private var catalogPresetRowSelection = ""
     @State private var localCatalogPresets: [StudioListLiveFilterPreset] = StudioListLiveFilterPresetStore.loadPresets()
@@ -64,7 +65,13 @@ private struct StudiosViewContent: View {
 
     /// Quick chips plus advanced criteria from the editor — what actually gets fetched.
     private var effectiveLiveFilter: [String: Any]? {
-        criteriaDocument.merged(with: isLiveFilterActive ? activeLiveFilterDict : [:])
+        var merged = criteriaDocument.merged(with: isLiveFilterActive ? activeLiveFilterDict : [:]) ?? [:]
+        // "Hide sub-studios": top-level studios only. A search still finds every studio, and a
+        // `parents` criterion of the user's own wins.
+        if hidesSubStudios, searchText.isEmpty, merged["parents"] == nil {
+            merged["parents"] = ["modifier": "IS_NULL"]
+        }
+        return merged.isEmpty ? nil : merged
     }
 
     private func applyLiveFilter() {
@@ -409,6 +416,7 @@ private struct StudiosViewContent: View {
     var body: some View {
         studiosCoreChrome
             .sheet(isPresented: $showFilterSortSheet, content: studiosFilterSortSheet)
+            .onChange(of: hidesSubStudios) { _, _ in applyLiveFilter() }
             .onChange(of: catalogPresetRowSelection) { _, newId in
                 handleCatalogPresetSelectionChange(newId)
             }
@@ -566,7 +574,8 @@ private struct StudiosViewContent: View {
                 }
                 showRenameCatalogPresetAlert = true
             },
-            onRequestDelete: { showDeleteCatalogPresetAlert = true }
+            onRequestDelete: { showDeleteCatalogPresetAlert = true },
+            showsSubStudioOptions: true
         )
         .presentationDragIndicator(.visible)
         .presentationBackground(Color.appBackground)
@@ -891,11 +900,28 @@ struct StudioRowView: View {
                     .foregroundColor(.primary)
                     .lineLimit(2)
                 
-                HStack(spacing: 4) {
-                    Image(systemName: "film")
-                        .font(.caption2)
-                    Text(tr("arg_count_scenes", studioCounts.display(for: studio, includeSubStudios: includeSubStudios).scenes))
+                if let parent = studio.parentStudio?.name, !parent.isEmpty {
+                    Text(tr("arg_part_of", parent))
                         .font(.caption)
+                        .foregroundColor(.secondary)
+                        .lineLimit(1)
+                }
+
+                HStack(spacing: 10) {
+                    HStack(spacing: 4) {
+                        Image(systemName: "film")
+                            .font(.caption2)
+                        Text(tr("arg_count_scenes", studioCounts.display(for: studio, includeSubStudios: includeSubStudios).scenes))
+                            .font(.caption)
+                    }
+                    if studio.subStudioCount > 0 {
+                        HStack(spacing: 4) {
+                            Image(systemName: "building.2")
+                                .font(.caption2)
+                            Text(tr(studio.subStudioCount == 1 ? "arg_count_sub_studio" : "arg_count_sub_studios", studio.subStudioCount))
+                                .font(.caption)
+                        }
+                    }
                 }
                 .foregroundColor(.appAccent)
             }
@@ -945,7 +971,8 @@ struct StudioCardView: View {
     /// Same build as the gallery and performer cards: one surface, one count as a glass pill top
     /// right (what the list is sorted by, scenes otherwise). A logo is never cropped, so it sits
     /// centred on the studio grey; it names the studio, so the name is printed over the bottom
-    /// edge only when there is no logo.
+    /// edge only when there is no logo. Where the studio stands: top left a favorite heart and
+    /// the number of its sub-studios, bottom left "Part of …" for a sub-studio.
     var body: some View {
         let counts = studioCounts.display(for: studio, includeSubStudios: includeSubStudios)
         let shown = shownCount(counts)
@@ -962,6 +989,8 @@ struct StudioCardView: View {
                 .accessibilityElement()
                 .accessibilityLabel(studio.name)
                 .accessibilityHidden(showsLogo != true)
+                // Without a logo the card is its name; the placeholder symbol would sit under it.
+                .opacity(showsLogo == false ? 0 : 1)
                 .padding(.horizontal, 24)
                 .padding(.top, 36)
                 .padding(.bottom, 36)
@@ -971,15 +1000,48 @@ struct StudioCardView: View {
                                      count: shown.count, spokenLabel: shown.badge.spokenCount(shown.count))
                     .padding(8)
             }
+            .overlay(alignment: .topLeading) {
+                HStack(spacing: 4) {
+                    if studio.favorite == true {
+                        Image(systemName: "heart.fill")
+                            .font(.system(size: 10, weight: .bold))
+                            .foregroundColor(.red)
+                            .padding(.horizontal, 7)
+                            .padding(.vertical, 5)
+                            .stashyGlass(shape: Capsule())
+                            .shadow(color: .black.opacity(0.2), radius: 2)
+                            .accessibilityLabel(tr("favourite"))
+                    }
+                    if studio.subStudioCount > 0 {
+                        CatalogCardCountPill(
+                            icon: "building.2.fill", count: studio.subStudioCount,
+                            spokenLabel: tr(studio.subStudioCount == 1 ? "arg_count_sub_studio" : "arg_count_sub_studios", studio.subStudioCount)
+                        )
+                    }
+                }
+                .padding(8)
+            }
             .overlay(alignment: .bottomLeading) {
-                if showsLogo == false {
-                    Text(studio.name)
-                        .font(.headline)
-                        .foregroundColor(.white)
-                        .lineLimit(1)
-                        .multilineTextAlignment(.leading)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding(12)
+                let parent = studio.parentStudio?.name ?? ""
+                if showsLogo == false || !parent.isEmpty {
+                    VStack(alignment: .leading, spacing: 1) {
+                        if showsLogo == false {
+                            Text(studio.name)
+                                .font(.headline)
+                                .foregroundColor(.white)
+                                .lineLimit(1)
+                        }
+                        if !parent.isEmpty {
+                            Text(tr("arg_part_of", parent))
+                                .font(.caption.weight(.medium))
+                                .foregroundColor(.white.opacity(0.75))
+                                .lineLimit(1)
+                        }
+                    }
+                    .multilineTextAlignment(.leading)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, showsLogo == false ? 12 : 9)
                 }
             }
 

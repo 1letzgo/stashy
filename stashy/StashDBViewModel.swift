@@ -4290,7 +4290,7 @@ class StashDBViewModel: ObservableObject {
 
         if let studio {
             AppLog.debug("🔍 mergeFilterWithCriteria: Forcing Studio \(studio.name) (\(studio.id))")
-            baseDict["studios"] = ["modifier": "INCLUDES", "value": [studio.id], "depth": 0]
+            baseDict["studios"] = ["modifier": "INCLUDES", "value": [studio.id], "depth": StudioCountsStore.contentDepth]
         }
 
         let jsonValue: StashJSONValue? = {
@@ -4435,7 +4435,8 @@ class StashDBViewModel: ObservableObject {
         let scope: [String: Any] = [
             "studios": [
                 "value": [studioId],
-                "modifier": "INCLUDES"
+                "modifier": "INCLUDES",
+                "depth": StudioCountsStore.contentDepth
             ]
         ]
         let effSaved = isInitialLoad ? filter : currentStudioGalleryFilter
@@ -4666,7 +4667,8 @@ class StashDBViewModel: ObservableObject {
             studioScope["tags"] = ["value": [tid], "modifier": "INCLUDES"]
         }
         if let psid = parentStudioId {
-            studioScope["parent_id"] = psid
+            // `parents` is the criterion; StudioFilterType has no `parent_id`.
+            studioScope["parents"] = ["value": [psid], "modifier": "INCLUDES"]
         }
         if let gid = groupId {
             studioScope["groups"] = ["value": [gid], "modifier": "INCLUDES"]
@@ -4737,7 +4739,8 @@ class StashDBViewModel: ObservableObject {
             tagScope["scenes_filter"] = ["performers": ["value": [pid], "modifier": "INCLUDES"]]
         }
         if let sid = studioId {
-            tagScope["studios"] = ["value": [sid], "modifier": "INCLUDES"]
+            // TagFilterType has no `studios`: the studio's tags are those of its scenes.
+            tagScope["scenes_filter"] = ["studios": ["value": [sid], "modifier": "INCLUDES", "depth": StudioCountsStore.contentDepth]]
         }
         if let gid = groupId {
             tagScope["groups"] = ["value": [gid], "modifier": "INCLUDES"]
@@ -4801,7 +4804,7 @@ class StashDBViewModel: ObservableObject {
             groupFilter["tags"] = ["value": [tid], "modifier": "INCLUDES"]
         }
         if let sid = studioId {
-            groupFilter["studios"] = ["value": [sid], "modifier": "INCLUDES"]
+            groupFilter["studios"] = ["value": [sid], "modifier": "INCLUDES", "depth": StudioCountsStore.contentDepth]
         }
         if let gid = groupId {
              groupFilter["id"] = ["value": [gid], "modifier": "NOT_EQUALS"] // Don't show self in sub-groups?
@@ -4867,7 +4870,7 @@ class StashDBViewModel: ObservableObject {
             performerScope["tags"] = ["value": [tid], "modifier": "INCLUDES"]
         }
         if let sid = studioId {
-            performerScope["studios"] = ["value": [sid], "modifier": "INCLUDES"]
+            performerScope["studios"] = ["value": [sid], "modifier": "INCLUDES", "depth": StudioCountsStore.contentDepth]
         }
         if let gid = groupId {
             performerScope["groups"] = ["value": [gid], "modifier": "INCLUDES"]
@@ -4928,7 +4931,7 @@ class StashDBViewModel: ObservableObject {
             imageScope["tags"] = ["value": [tid], "modifier": "INCLUDES"]
         }
         if let sid = studioId {
-            imageScope["studios"] = ["value": [sid], "modifier": "INCLUDES"]
+            imageScope["studios"] = ["value": [sid], "modifier": "INCLUDES", "depth": StudioCountsStore.contentDepth]
         }
         if let gid = groupId {
             imageScope["groups"] = ["value": [gid], "modifier": "INCLUDES"]
@@ -5069,7 +5072,8 @@ class StashDBViewModel: ObservableObject {
         
         sceneFilter["studios"] = [
             "modifier": "INCLUDES",
-            "value": [studioId]
+            "value": [studioId],
+            "depth": StudioCountsStore.contentDepth
         ]
         sceneFilter = sanitizeFilter(sceneFilter)
         
@@ -10583,9 +10587,20 @@ struct Studio: Codable, Identifiable, Equatable {
     /// Nur von Abfragen gefüllt, die sie anfordern (Merge-Tools) — sonst nil.
     var aliases: [String]?
     var stashIds: [StashID]?
+    /// The studio this one belongs to, and its direct sub-studios (ids only).
+    var parentStudio: StudioRef?
+    var childStudios: [StudioRef]?
+    var subStudioCount: Int { childStudios?.count ?? 0 }
+
+    struct StudioRef: Codable, Equatable {
+        let id: String
+        var name: String?
+    }
     
     enum CodingKeys: String, CodingKey {
         case id, name, url, details, favorite, rating100, aliases
+        case parentStudio = "parent_studio"
+        case childStudios = "child_studios"
         case stashIds = "stash_ids"
         case sceneCount = "scene_count"
         case performerCount = "performer_count"
@@ -11931,7 +11946,7 @@ class DownloadManager: NSObject, ObservableObject {
             case .performer(let id):
                 return ["performers": ["value": [id], "modifier": "INCLUDES"]]
             case .studio(let id):
-                return ["studios": ["value": [id], "modifier": "INCLUDES", "depth": 0]]
+                return ["studios": ["value": [id], "modifier": "INCLUDES", "depth": StudioCountsStore.contentDepth]]
             case .tag(let id):
                 return ["tags": ["value": [id], "modifier": "INCLUDES", "depth": 0]]
             case .group(let id):

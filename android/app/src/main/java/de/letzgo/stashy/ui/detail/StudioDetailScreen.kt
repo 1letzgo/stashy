@@ -5,7 +5,22 @@ import de.letzgo.stashy.tr
 import de.letzgo.stashy.data.Downloads
 import de.letzgo.stashy.ui.tools.downloads.SceneBulkDownloadDialog
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.size
+import androidx.compose.material3.Icon
+import androidx.compose.material3.Text
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import de.letzgo.stashy.data.IdName
+import de.letzgo.stashy.ui.filter.LocalShowsSubStudioContentOption
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.lazy.grid.LazyGridState
 import androidx.compose.runtime.Composable
@@ -19,7 +34,10 @@ import androidx.compose.ui.layout.ContentScale
 import de.letzgo.stashy.ui.SF
 import androidx.compose.ui.text.input.KeyboardType
 import de.letzgo.stashy.data.DetailRepository
+import de.letzgo.stashy.data.FilterMode
 import de.letzgo.stashy.data.Studio
+import de.letzgo.stashy.data.StudioCountsStore
+import de.letzgo.stashy.data.SubStudios
 import de.letzgo.stashy.ui.Nav
 import de.letzgo.stashy.ui.Screen
 import de.letzgo.stashy.ui.Theme
@@ -46,14 +64,15 @@ class StudioDetailScreen(val studioId: String, val preview: Studio? = null, priv
     private val catalog = LinkedCatalog(
         scope,
         order = listOf(DetailTab.Scenes, DetailTab.Galleries, DetailTab.Studios, DetailTab.Performers, DetailTab.Tags, DetailTab.Groups, DetailTab.Images),
-        sceneScope = DetailRepository.scope("studios", studioId),
-        galleryScope = DetailRepository.scope("studios", studioId),
+        sceneScope = SubStudios.studioScope(FilterMode.Scenes, studioId, false),
+        galleryScope = SubStudios.studioScope(FilterMode.Galleries, studioId, false),
         // iOS sends `parent_id`, which Stash's StudioFilterType does not know; `parents` is the real criterion.
         studioScope = DetailRepository.scope("parents", studioId),
-        performerScope = DetailRepository.scope("studios", studioId),
-        tagScope = DetailRepository.scope("studios", studioId),
-        groupScope = DetailRepository.scope("studios", studioId),
-        imageScope = DetailRepository.scope("studios", studioId),
+        performerScope = SubStudios.studioScope(FilterMode.Performers, studioId, false),
+        tagScope = SubStudios.studioScope(FilterMode.Tags, studioId, false),
+        groupScope = SubStudios.studioScope(FilterMode.Groups, studioId, false),
+        imageScope = SubStudios.studioScope(FilterMode.Images, studioId, false),
+        studioContentId = studioId,
         sceneContext = DetailViewContext.Studio,
         // iOS `StudioDetailView.imageGrid` stays a thumbnail grid even at 1/row.
         usesImageFeed = false,
@@ -99,6 +118,15 @@ class StudioDetailScreen(val studioId: String, val preview: Studio? = null, priv
     override fun Content() {
         LaunchedEffect(Unit) { if (!started) { started = true; load() } }
         AutoSwitchTab(catalog, tab) { tab = it }
+        // "Include sub-studio content" (any filter sheet of this page) reloads every section.
+        val includesContent = StudioCountsStore.includeSubStudios
+        var seenInclude by remember { mutableStateOf(includesContent) }
+        LaunchedEffect(includesContent) { if (includesContent != seenInclude) { seenInclude = includesContent; catalog.loadAll(force = true) } }
+        CompositionLocalProvider(LocalShowsSubStudioContentOption provides true) { Body() }
+    }
+
+    @Composable
+    private fun Body() {
         // Studio performers default to Name (A-Z) (iOS `initialSort: .nameAsc`).
         Box(Modifier.fillMaxSize().background(Theme.palette.background)) {
             DetailGrid(gridState, { w -> columnsFor(tab, w, if (catalog.usesImageFeed) catalog.imageColumns else 2) }, header = { studio?.let { Header(it) } }) {
@@ -149,8 +177,33 @@ class StudioDetailScreen(val studioId: String, val preview: Studio? = null, priv
             } ?: DetailHero(DetailHero.Style.Cover, null, p.studioHeader, tr(R.string.action_open_logo), null) { HeroPlaceholder(SF.building2) },
             collapsedItemCount = 4,
             titleAccessory = { color -> FeedsPill(color) { DetailFeedsLink.navigate(DetailFeedsLink.Target.Studio(s.id, s.name)) } },
-            footer = s.url?.takeIf { it.isNotEmpty() }?.let { link -> { HeaderLink(link) } },
+            footer = run {
+                val link = s.url?.takeIf { it.isNotEmpty() }
+                val parent = s.parentStudio
+                if (link == null && parent == null) null else {
+                    {
+                        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                            parent?.let { PartOfLink(it) }
+                            link?.let { HeaderLink(it) }
+                        }
+                    }
+                }
+            },
         )
+    }
+
+    /** "Part of <parent>" — opens the parent's studio page (like the group page's "In: …" link). */
+    @Composable
+    private fun PartOfLink(parent: IdName) {
+        val color = de.letzgo.stashy.ui.textAccent()
+        Row(
+            Modifier.clickable { Nav.push(StudioDetailScreen(parent.id, Studio(id = parent.id, name = parent.name ?: ""))) },
+            verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp),
+        ) {
+            Icon(SF.building2, null, Modifier.size(14.dp), tint = color)
+            Text(tr(R.string.arg_part_of, parent.name ?: ""), fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = color, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false))
+            Icon(de.letzgo.stashy.ui.SFS.chevronRight, null, Modifier.size(9.dp), tint = color)
+        }
     }
 
     /** iOS: `EditStudioSheet`. */

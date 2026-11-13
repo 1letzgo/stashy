@@ -62,9 +62,13 @@ data class Studio(
     val favorite: Boolean? = null,
     val rating100: Int? = null,
     @SerialName("parent_studio") val parentStudio: IdName? = null,
+    /** Direct sub-studios (ids only; `child_studios { id }` of the shared fragment). */
+    @SerialName("child_studios") val childStudios: List<IdName>? = null,
     @SerialName("created_at") val createdAt: String? = null,
     @SerialName("updated_at") val updatedAt: String? = null,
 ) {
+    val subStudioCount: Int get() = childStudios?.size ?: 0
+
     /** Stash returns `…/image?default=true` when the studio has no logo. */
     val hasImage: Boolean get() = imagePath != null && !imagePath.contains("default=true")
     val imageURL: String? get() = imagePath?.let { Net.signed(it) }

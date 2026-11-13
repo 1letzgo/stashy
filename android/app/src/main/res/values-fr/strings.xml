@@ -393,6 +393,8 @@
   <string name="arg_count_sources">%1$s sources</string>
   <string name="arg_count_studio">%1$s studio</string>
   <string name="arg_count_studios">%1$s studios</string>
+  <string name="arg_count_sub_studio">%1$s sous-studio</string>
+  <string name="arg_count_sub_studios">%1$s sous-studios</string>
   <string name="arg_count_tag">%1$s étiquette</string>
   <string name="arg_count_tags">%1$s étiquettes</string>
   <string name="arg_count_weeks">%1$s semaines</string>
@@ -429,6 +431,7 @@
   <string name="arg_of_arg_images">%1$s sur %2$s images</string>
   <string name="arg_of_arg_items">%1$s éléments sur %2$s</string>
   <string name="arg_outside_month">%1$s, hors du mois</string>
+  <string name="arg_part_of">Fait partie de %1$s</string>
   <string name="arg_per_arg">%1$s/%2$s</string>
   <string name="arg_per_day">%1$s/jour</string>
   <string name="arg_performer_times">%1$s× performeur</string>
@@ -1050,6 +1053,7 @@
   <string name="hero_autoplay">Lecture auto de la bannière</string>
   <string name="hero_background">Arrière-plan de la bannière</string>
   <string name="hidden">Masqué</string>
+  <string name="hide_sub_studios">Masquer les sous-studios</string>
   <string name="high">Élevée</string>
   <string name="highest_rated">Mieux notés</string>
   <string name="hint_added_to_servers_job_queue">Ajouté à la file de tâches du serveur.</string>
@@ -1438,6 +1442,7 @@
   <string name="includes_all">contient tous</string>
   <string name="include_sub_folders">Inclure les sous-dossiers</string>
   <string name="include_sub_groups">Inclure les sous-groupes</string>
+  <string name="include_sub_studio_content">Inclure le contenu des sous-studios</string>
   <string name="include_sub_studios">Inclure les sous-studios</string>
   <string name="include_sub_tags">Inclure les sous-étiquettes</string>
   <string name="incomplete_setup">Configuration incomplète</string>

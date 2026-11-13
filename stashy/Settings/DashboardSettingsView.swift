@@ -355,9 +355,12 @@ struct DashboardSettingsView: View {
                     .padding(.bottom, 4)
                 }
 
-                if tab.id == .studios, StashServerCapabilities.supports032 {
-                    settingRow(tr("counts_incl_sub_studios")) {
-                        StudioCountsSubStudiosToggle()
+                if tab.id == .studios {
+                    settingRow(tr("hide_sub_studios")) {
+                        StudioCountsSubStudiosToggle(hides: true)
+                    }
+                    settingRow(tr("include_sub_studio_content")) {
+                        StudioCountsSubStudiosToggle(hides: false)
                     }
                     .padding(.bottom, 4)
                 }
@@ -705,12 +708,26 @@ struct CatalogCardColumnsMenu: View {
     }
 }
 
+/// The two sub-studio switches (also in the Studios settings sheet, `SubStudioOptionsCard`).
 private struct StudioCountsSubStudiosToggle: View {
+    /// "Hide sub-studios" instead of "Include sub-studio content".
+    let hides: Bool
     @AppStorage(StudioCountsStore.includeSubStudiosKey) private var includeSubStudios = false
+    @AppStorage(StudioCountsStore.hideSubStudiosKey) private var hidesSubStudios = false
     @ObservedObject var appearanceManager = AppearanceManager.shared
 
     var body: some View {
-        Toggle("", isOn: $includeSubStudios)
+        Toggle("", isOn: Binding(
+            get: { hides ? hidesSubStudios : includeSubStudios },
+            set: { isOn in
+                if hides {
+                    hidesSubStudios = isOn
+                    if isOn { includeSubStudios = true }
+                } else {
+                    includeSubStudios = isOn
+                }
+            }
+        ))
             .labelsHidden()
             .tint(appearanceManager.tintColor)
     }

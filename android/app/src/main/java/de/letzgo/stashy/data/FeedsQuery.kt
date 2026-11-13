@@ -127,7 +127,7 @@ object FeedsQuery {
         }
         criteria.studio?.let {
             val studios = buildJsonObject {
-                put("modifier", JsonPrimitive("INCLUDES")); put("value", JsonArray(listOf(JsonPrimitive(it.id)))); put("depth", JsonPrimitive(0))
+                put("modifier", JsonPrimitive("INCLUDES")); put("value", JsonArray(listOf(JsonPrimitive(it.id)))); put("depth", JsonPrimitive(StudioCountsStore.contentDepth))
             }
             if (kind == FeedQueryKind.Markers) {
                 // SceneMarkerFilterType has no `studios` — it is a scene criterion there.

@@ -393,6 +393,8 @@
   <string name="arg_count_sources">%1$s kilder</string>
   <string name="arg_count_studio">%1$s studio</string>
   <string name="arg_count_studios">%1$s studioer</string>
+  <string name="arg_count_sub_studio">%1$s understudio</string>
+  <string name="arg_count_sub_studios">%1$s understudioer</string>
   <string name="arg_count_tag">%1$s tagg</string>
   <string name="arg_count_tags">%1$s tagger</string>
   <string name="arg_count_weeks">%1$s uker</string>
@@ -429,6 +431,7 @@
   <string name="arg_of_arg_images">%1$s av %2$s bilder</string>
   <string name="arg_of_arg_items">%1$s av %2$s elementer</string>
   <string name="arg_outside_month">%1$s, utenfor måneden</string>
+  <string name="arg_part_of">Del av %1$s</string>
   <string name="arg_per_arg">%1$s/%2$s</string>
   <string name="arg_per_day">%1$s/dag</string>
   <string name="arg_performer_times">%1$s× utøver</string>
@@ -1050,6 +1053,7 @@
   <string name="hero_autoplay">Autoavspilling i hero</string>
   <string name="hero_background">Hero-bakgrunn</string>
   <string name="hidden">Skjult</string>
+  <string name="hide_sub_studios">Skjul understudioer</string>
   <string name="high">Høy</string>
   <string name="highest_rated">Høyest vurdert</string>
   <string name="hint_added_to_servers_job_queue">Lagt til i serverens jobbkø.</string>
@@ -1438,6 +1442,7 @@
   <string name="includes_all">Inkluderer alle</string>
   <string name="include_sub_folders">Ta med undermapper</string>
   <string name="include_sub_groups">Inkluder undergrupper</string>
+  <string name="include_sub_studio_content">Inkluder innhold fra understudioer</string>
   <string name="include_sub_studios">Inkluder understudioer</string>
   <string name="include_sub_tags">Inkluder undertagger</string>
   <string name="incomplete_setup">Ufullstendig oppsett</string>

@@ -408,8 +408,9 @@ final class LibraryCleanupRepository {
 
 struct StudioCounts: Decodable, Equatable {
     let id: String
-    let o_count: Int
-    let o_count_all: Int
+    /// Stash 0.32+ only (`o_counter(depth:)`); nil on older servers.
+    let o_count: Int?
+    let o_count_all: Int?
     let scene_count_all: Int
     let performer_count_all: Int
     let gallery_count_all: Int
@@ -427,7 +428,16 @@ struct StudioDisplayCounts {
 /// `StudioFields` because older servers reject `o_counter(depth:)`.
 final class StudioCountsStore: ObservableObject {
     static let shared = StudioCountsStore()
+    /// "Include sub-studio content": a studio's page shows what its sub-studios hold, and the
+    /// cards count it. The key is older than the content switch, hence its name.
     static let includeSubStudiosKey = "studio_counts_include_sub_studios"
+    /// "Hide sub-studios": the Studios list shows top-level studios only.
+    static let hideSubStudiosKey = "studios_hide_sub_studios"
+
+    static var includesSubStudioContent: Bool { UserDefaults.standard.bool(forKey: includeSubStudiosKey) }
+    static var hidesSubStudios: Bool { UserDefaults.standard.bool(forKey: hideSubStudiosKey) }
+    /// `depth` of a `studios` criterion that scopes a list to one studio.
+    static var contentDepth: Int { includesSubStudioContent ? -1 : 0 }
     private static let batchSize = 100
 
     @Published private(set) var counts: [String: StudioCounts] = [:]
@@ -456,7 +466,7 @@ final class StudioCountsStore: ObservableObject {
 
     /// `refresh`: ask again even when known (a detail page opening).
     func request(_ id: String, refresh: Bool = false) {
-        guard StashServerCapabilities.supports032, refresh || counts[id] == nil else { return }
+        guard refresh || counts[id] == nil else { return }
         pending.insert(id)
         guard flushTask == nil else { return }
         flushTask = Task { @MainActor in
@@ -471,7 +481,8 @@ final class StudioCountsStore: ObservableObject {
             let ids = Array(pending.prefix(Self.batchSize))
             pending.subtract(ids)
             let response: Response? = try? await GraphQLClient.shared.execute(
-                query: GraphQLQueries.loadQuery(named: "findStudioCounts"),
+                // `o_counter(depth:)` is Stash 0.32+; the counts with depth are older.
+                query: GraphQLQueries.loadQuery(named: StashServerCapabilities.supports032 ? "findStudioCounts" : "findStudioCountsBasic"),
                 variables: ["ids": ids, "filter": ["per_page": ids.count]]
             )
             for studio in response?.data?.findStudios.studios ?? [] { counts[studio.id] = studio }

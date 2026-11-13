@@ -393,6 +393,8 @@
   <string name="arg_count_sources">%1$s orígenes</string>
   <string name="arg_count_studio">%1$s estudio</string>
   <string name="arg_count_studios">%1$s estudios</string>
+  <string name="arg_count_sub_studio">%1$s subestudio</string>
+  <string name="arg_count_sub_studios">%1$s subestudios</string>
   <string name="arg_count_tag">%1$s etiqueta</string>
   <string name="arg_count_tags">%1$s etiquetas</string>
   <string name="arg_count_weeks">%1$s semanas</string>
@@ -429,6 +431,7 @@
   <string name="arg_of_arg_images">%1$s de %2$s imágenes</string>
   <string name="arg_of_arg_items">%1$s de %2$s elementos</string>
   <string name="arg_outside_month">%1$s, fuera del mes</string>
+  <string name="arg_part_of">Parte de %1$s</string>
   <string name="arg_per_arg">%1$s/%2$s</string>
   <string name="arg_per_day">%1$s/día</string>
   <string name="arg_performer_times">%1$s× intérprete</string>
@@ -1050,6 +1053,7 @@
   <string name="hero_autoplay">Reproducción automática del destacado</string>
   <string name="hero_background">Fondo del destacado</string>
   <string name="hidden">Oculto</string>
+  <string name="hide_sub_studios">Ocultar subestudios</string>
   <string name="high">Alto</string>
   <string name="highest_rated">Mejor valorados</string>
   <string name="hint_added_to_servers_job_queue">Añadido a la cola de tareas del servidor.</string>
@@ -1438,6 +1442,7 @@
   <string name="includes_all">Incluye todos</string>
   <string name="include_sub_folders">Incluir subcarpetas</string>
   <string name="include_sub_groups">Incluir subgrupos</string>
+  <string name="include_sub_studio_content">Incluir contenido de subestudios</string>
   <string name="include_sub_studios">Incluir subestudios</string>
   <string name="include_sub_tags">Incluir subetiquetas</string>
   <string name="incomplete_setup">Configuración incompleta</string>

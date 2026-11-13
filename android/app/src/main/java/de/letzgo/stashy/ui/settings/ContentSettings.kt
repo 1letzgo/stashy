@@ -249,7 +249,10 @@ private fun CatalogTabCard(tab: TabConfig, handle: Modifier) {
         CatalogCardColumnScope.from(tab.id)?.let { scope -> CardSettingRow(tr(R.string.display)) { ColumnsMenu(scope) } }
         if (tab.id == AppTab.Images) CardSettingRow(tr(R.string.autoplay)) { SettingsSwitch(TabManager.imagesFeedVideoAutoplay) { TabManager.imagesFeedVideoAutoplay = it } }
         if (tab.id == AppTab.Scenes) CardSettingRow(tr(R.string.studio_logos)) { SettingsSwitch(TabManager.sceneCardsShowStudioLogo) { TabManager.sceneCardsShowStudioLogo = it } }
-        if (tab.id == AppTab.Studios && de.letzgo.stashy.data.ServerCapabilities.supports032) CardSettingRow(tr(R.string.counts_incl_sub_studios)) { SettingsSwitch(de.letzgo.stashy.data.StudioCountsStore.includeSubStudios) { de.letzgo.stashy.data.StudioCountsStore.includeSubStudios = it } }
+        if (tab.id == AppTab.Studios) {
+            CardSettingRow(tr(R.string.hide_sub_studios)) { SettingsSwitch(de.letzgo.stashy.data.StudioCountsStore.hideSubStudios) { de.letzgo.stashy.data.StudioCountsStore.hideSubStudios = it } }
+            CardSettingRow(tr(R.string.include_sub_studio_content)) { SettingsSwitch(de.letzgo.stashy.data.StudioCountsStore.includeSubStudios) { de.letzgo.stashy.data.StudioCountsStore.includeSubStudios = it } }
+        }
         tab.id.filterMode?.let { m -> sortNames(m) to defaultSortFallback(tab.id, m) }?.let { (options, fallback) ->
             CardSettingRow(tr(R.string.default_sort)) {
                 MenuValue(options, TabManager.getPersistentSortOption(tab.id) ?: fallback) { TabManager.setPersistentSortOption(tab.id, it) }

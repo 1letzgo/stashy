@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -83,13 +84,17 @@ fun StudiosCatalog() {
 
 @Composable
 fun StudiosList(c: CatalogController<Studio>, topPadding: androidx.compose.ui.unit.Dp = catalogTopPadding()) {
+    // "Hide sub-studios" is an app setting: the list refetches when it changes (not on first composition).
+    val hidesSubStudios = de.letzgo.stashy.data.StudioCountsStore.hideSubStudios
+    var seenHide by androidx.compose.runtime.remember { mutableStateOf(hidesSubStudios) }
+    LaunchedEffect(hidesSubStudios) { if (hidesSubStudios != seenHide) { seenHide = hidesSubStudios; c.refetch() } }
     CatalogScaffold(
         c, CatalogTexts(tr(R.string.loading_studios), SF.building2, tr(R.string.empty_studios_found), tr(R.string.action_load_studios)),
         CatalogSlots(), posterColumns, { it.id }, topPadding, gridKey = c.listResetToken,
     ) { _, studio ->
         StudioCard(studio, badge = CatalogCardBadge.forSort(c.sort), onClick = { Nav.push(StudioDetailScreen(studio.id, studio)) })
     }
-    CatalogFilterSortSheet(c)
+    CatalogFilterSortSheet(c) { de.letzgo.stashy.ui.filter.SubStudioOptionsCard(showsHide = true) }
 }
 
 /** iOS: `TagsView`. */

@@ -40,8 +40,11 @@ import de.letzgo.stashy.data.SavedFiltersStore
 import de.letzgo.stashy.data.ServerConfigManager
 import de.letzgo.stashy.data.SortCatalog
 import de.letzgo.stashy.data.SortOption
+import de.letzgo.stashy.data.StudioCountsStore
+import de.letzgo.stashy.data.SubStudios
 import de.letzgo.stashy.data.criteriaObjectFilter
 import de.letzgo.stashy.data.filterMode
+import de.letzgo.stashy.data.filterDict
 import de.letzgo.stashy.data.mergedObjectFilterForSave
 import de.letzgo.stashy.data.stashyMetadata
 import de.letzgo.stashy.ui.CatalogTab
@@ -90,6 +93,8 @@ class CatalogController<T>(
     val extraSorts: List<SortOption> = emptyList(),
     /** Where the Settings default filter comes from (Magazin keeps its own). */
     private val defaultFilterIdFor: (String) -> String? = CatalogPrefs::defaultFilterId,
+    /** A scope that changes while the screen lives (a studio's "Include sub-studio content"); replaces [scope] in the query. */
+    private val dynamicScope: (() -> JsonObject)? = null,
 ) {
     var sort by mutableStateOf(initialSort ?: CatalogPrefs.resolvedSort(mode))
         private set
@@ -190,7 +195,14 @@ class CatalogController<T>(
 
     fun query(): CatalogQuery {
         lastQueriedSearch = search
-        return CatalogQuery(mode, sort, search, fetchBaseFilter, criteria.merged(liveChips()), scope)
+        var live = criteria.merged(liveChips())
+        // "Hide sub-studios": the Studios list (not a studio's sub-studios tab) shows top-level
+        // studios only. An app setting, never part of the criteria document or a saved filter.
+        if (mode == FilterMode.Studios && scope == null) {
+            val own = JsonObject((fetchBaseFilter?.filterDict ?: JsonObject(emptyMap())) + (live ?: JsonObject(emptyMap())))
+            SubStudios.hideCriterion(StudioCountsStore.hideSubStudios, search, own)?.let { live = JsonObject((live ?: JsonObject(emptyMap())) + it) }
+        }
+        return CatalogQuery(mode, sort, search, fetchBaseFilter, live, dynamicScope?.invoke() ?: scope)
     }
 
     val serverFilters: List<SavedFilter> get() = SavedFiltersStore.forMode(mode)

@@ -393,6 +393,8 @@
   <string name="arg_count_sources">%1$s kaynak</string>
   <string name="arg_count_studio">%1$s stüdyo</string>
   <string name="arg_count_studios">%1$s stüdyo</string>
+  <string name="arg_count_sub_studio">%1$s alt stüdyo</string>
+  <string name="arg_count_sub_studios">%1$s alt stüdyo</string>
   <string name="arg_count_tag">%1$s etiket</string>
   <string name="arg_count_tags">%1$s etiket</string>
   <string name="arg_count_weeks">%1$s hafta</string>
@@ -429,6 +431,7 @@
   <string name="arg_of_arg_images">%1$s / %2$s resim</string>
   <string name="arg_of_arg_items">%2$s öğeden %1$s</string>
   <string name="arg_outside_month">%1$s, ay dışında</string>
+  <string name="arg_part_of">%1$s parçası</string>
   <string name="arg_per_arg">%1$s/%2$s</string>
   <string name="arg_per_day">%1$s/gün</string>
   <string name="arg_performer_times">%1$s× oyuncu</string>
@@ -1050,6 +1053,7 @@
   <string name="hero_autoplay">Banner Otomatik Oynatma</string>
   <string name="hero_background">Banner Arka Planı</string>
   <string name="hidden">Gizli</string>
+  <string name="hide_sub_studios">Alt stüdyoları gizle</string>
   <string name="high">Yüksek</string>
   <string name="highest_rated">En Yüksek Puanlı</string>
   <string name="hint_added_to_servers_job_queue">Sunucunun iş kuyruğuna eklendi.</string>
@@ -1438,6 +1442,7 @@
   <string name="includes_all">Tümünü içerir</string>
   <string name="include_sub_folders">Alt klasörleri dahil et</string>
   <string name="include_sub_groups">Alt grupları dahil et</string>
+  <string name="include_sub_studio_content">Alt stüdyoların içeriğini dahil et</string>
   <string name="include_sub_studios">Alt stüdyoları dahil et</string>
   <string name="include_sub_tags">Alt etiketleri dahil et</string>
   <string name="incomplete_setup">Eksik Kurulum</string>

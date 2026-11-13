@@ -3,6 +3,9 @@ package de.letzgo.stashy.ui.components
 import de.letzgo.stashy.R
 import de.letzgo.stashy.tr
 import de.letzgo.stashy.ui.scaledIconSize
+import de.letzgo.stashy.ui.NativeMediaLabelBox
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -134,12 +137,46 @@ fun StudioCard(studio: Studio, modifier: Modifier = Modifier, badge: CatalogCard
     NativeCard(modifier.fillMaxWidth(), onClick = onClick) { Column(Modifier.fillMaxWidth()) {
         Box(Modifier.fillMaxWidth().aspectRatio(16f / 9f).background(p.studioHeader), contentAlignment = Alignment.Center) {
             StudioLogo(studio, Modifier.fillMaxSize().padding(horizontal = 24.dp, vertical = 16.dp))
+            StudioStatusPills(studio, Modifier.align(Alignment.TopStart).padding(8.dp))
         }
-        Row(Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text(studio.name, Modifier.weight(1f), style = NativeType.titleSmall, color = p.text, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            CountLabel(badgeIcon(shown.first), shown.second)
-        }
+        StudioNameRow(studio.name, studio.parentStudio?.name, { CountLabel(badgeIcon(shown.first), shown.second) })
     } }
+}
+
+/**
+ * iOS (`StudioCardView`): top left a favorite heart when the studio is one, and next to it the
+ * number of its direct sub-studios (building icon + count, spoken as "N sub-studios").
+ */
+@Composable
+fun StudioStatusPills(studio: Studio, modifier: Modifier = Modifier) {
+    val subStudios = studio.subStudioCount
+    if (studio.favorite != true && subStudios == 0) return
+    Row(modifier, horizontalArrangement = Arrangement.spacedBy(4.dp), verticalAlignment = Alignment.CenterVertically) {
+        if (studio.favorite == true) {
+            NativeMediaLabelBox(Modifier.semantics { contentDescription = tr(R.string.favourite) }) {
+                Icon(SF.heartFill, null, tint = Color.Red, modifier = Modifier.size(scaledIconSize(14.dp)))
+            }
+        }
+        if (subStudios > 0) {
+            val spoken = tr(if (subStudios == 1) R.string.arg_count_sub_studio else R.string.arg_count_sub_studios, subStudios)
+            CardPill(SF.building2, "$subStudios", Modifier.semantics { contentDescription = spoken })
+        }
+    }
+}
+
+/** Studio card name row: the name, "Part of <parent>" under it for a sub-studio, [trailing] on the right. */
+@Composable
+fun StudioNameRow(name: String, parentName: String?, trailing: @Composable () -> Unit) {
+    val p = Theme.palette
+    Row(Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        Column(Modifier.weight(1f)) {
+            Text(name, style = NativeType.titleSmall, color = p.text, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            if (!parentName.isNullOrEmpty()) {
+                Text(tr(R.string.arg_part_of, parentName), style = NativeType.labelSmall, color = p.secondaryText, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            }
+        }
+        trailing()
+    }
 }
 
 /** iOS: `StudioImageView` — logo (PNG/JPG/SVG) fitted, else building icon + name. */

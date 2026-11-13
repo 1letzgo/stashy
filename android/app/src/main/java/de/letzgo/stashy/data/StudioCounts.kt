@@ -20,8 +20,9 @@ import kotlinx.serialization.json.JsonArray
 @Serializable
 data class StudioCounts(
     val id: String,
-    @SerialName("o_count") val oCount: Int = 0,
-    @SerialName("o_count_all") val oCountAll: Int = 0,
+    /** Stash 0.32+ only (`o_counter(depth:)`); null on older servers. */
+    @SerialName("o_count") val oCount: Int? = null,
+    @SerialName("o_count_all") val oCountAll: Int? = null,
     @SerialName("scene_count_all") val sceneCountAll: Int = 0,
     @SerialName("performer_count_all") val performerCountAll: Int = 0,
     @SerialName("gallery_count_all") val galleryCountAll: Int = 0,
@@ -32,12 +33,14 @@ data class StudioDisplayCounts(val scenes: Int?, val galleries: Int?, val perfor
 
 /**
  * iOS: `StudioCountsStore`. Loads the counts of all visible studios in one query instead of one
- * per card; a query of its own because older servers reject `o_counter(depth:)`.
+ * per card; a query of its own because older servers reject `o_counter(depth:)` (they get [BASIC_QUERY]).
  */
 object StudioCountsStore {
-    private const val INCLUDE_KEY = "studio_counts_include_sub_studios"
+    private const val INCLUDE_KEY = SubStudios.INCLUDE_KEY
     private const val BATCH_SIZE = 100
     private const val QUERY = "query FindStudioCounts(\$ids: [ID!], \$filter: FindFilterType) { findStudios(ids: \$ids, filter: \$filter) { studios { id o_count: o_counter(depth: 0) o_count_all: o_counter(depth: -1) scene_count_all: scene_count(depth: -1) performer_count_all: performer_count(depth: -1) gallery_count_all: gallery_count(depth: -1) } } }"
+    /** `scene_count(depth:)` & co. exist on older servers too; only `o_counter(depth:)` is 0.32+. */
+    private const val BASIC_QUERY = "query FindStudioCountsBasic(\$ids: [ID!], \$filter: FindFilterType) { findStudios(ids: \$ids, filter: \$filter) { studios { id scene_count_all: scene_count(depth: -1) performer_count_all: performer_count(depth: -1) gallery_count_all: gallery_count(depth: -1) } } }"
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private val counts = mutableStateMapOf<String, StudioCounts>()
@@ -49,6 +52,21 @@ object StudioCountsStore {
         get() = includeState ?: Prefs.bool(INCLUDE_KEY).also { includeState = it }
         set(value) { includeState = value; Prefs.setBool(INCLUDE_KEY, value) }
 
+    private var hideState by mutableStateOf<Boolean?>(null)
+    /** "Hide sub-studios": the Studios list shows top-level studios only. */
+    var hideSubStudios: Boolean
+        get() = hideState ?: Prefs.bool(SubStudios.HIDE_KEY).also { hideState = it }
+        set(value) {
+            hideState = value
+            Prefs.setBool(SubStudios.HIDE_KEY, value)
+            // A hidden sub-studio's scenes would be out of reach otherwise.
+            includeSubStudios = SubStudios.includeAfterHideChange(value, includeSubStudios)
+        }
+
+    /** `depth` of a `studios` criterion that scopes a list to one studio. */
+    /** 0 while the setting is unreadable (JVM tests run without [Prefs]). */
+    val contentDepth: Int get() = SubStudios.depth(runCatching { includeSubStudios }.getOrDefault(false))
+
     fun clear() {
         counts.clear()
         pending.clear()
@@ -56,7 +74,7 @@ object StudioCountsStore {
 
     /** [refresh]: ask again even when known (a detail page opening). */
     fun request(id: String, refresh: Boolean = false) {
-        if (!ServerCapabilities.supports032 || (!refresh && id in counts)) return
+        if (!refresh && id in counts) return
         pending += id
         if (flushJob != null) return
         flushJob = scope.launch {
@@ -65,7 +83,7 @@ object StudioCountsStore {
                 val ids = pending.take(BATCH_SIZE)
                 pending -= ids.toSet()
                 runCatching {
-                    val data = GraphQL.data(QUERY, vars("ids" to ids, "filter" to mapOf("per_page" to ids.size)))
+                    val data = GraphQL.data(if (ServerCapabilities.supports032) QUERY else BASIC_QUERY, vars("ids" to ids, "filter" to mapOf("per_page" to ids.size)))
                     val studios = data["findStudios"].obj?.get("studios") ?: JsonArray(emptyList())
                     GraphQL.decode(ListSerializer(StudioCounts.serializer()), studios).forEach { counts[it.id] = it }
                 }
@@ -101,6 +119,6 @@ fun Studio.badgeCount(badge: CatalogCardBadge, counts: StudioDisplayCounts): Bad
 
 @Composable
 fun rememberStudioCounts(studio: Studio, refresh: Boolean = false): StudioDisplayCounts {
-    LaunchedEffect(studio.id, ServerCapabilities.supports032) { StudioCountsStore.request(studio.id, refresh) }
+    LaunchedEffect(studio.id) { StudioCountsStore.request(studio.id, refresh) }
     return StudioCountsStore.display(studio)
 }

@@ -27,6 +27,45 @@ extension View {
     }
 }
 
+// MARK: - Sub-studio options
+
+private struct ShowsSubStudioContentOptionKey: EnvironmentKey {
+    static let defaultValue = false
+}
+
+extension EnvironmentValues {
+    /// Set by a studio's page: its filter sheets then offer "Include sub-studio content".
+    var showsSubStudioContentOption: Bool {
+        get { self[ShowsSubStudioContentOptionKey.self] }
+        set { self[ShowsSubStudioContentOptionKey.self] = newValue }
+    }
+}
+
+/// The sub-studio switches of the Studios settings sheet and of a studio's page. Both are app
+/// settings (`StudioCountsStore`), not filter criteria: the lists watch the keys and refetch.
+struct SubStudioOptionsCard: View {
+    /// "Hide sub-studios" belongs to the Studios list only.
+    var showsHide: Bool
+    @AppStorage(StudioCountsStore.hideSubStudiosKey) private var hidesSubStudios = false
+    @AppStorage(StudioCountsStore.includeSubStudiosKey) private var includesContent = false
+
+    var body: some View {
+        VStack(spacing: 8) {
+            if showsHide {
+                CatalogFilterSortToggleRow(label: tr("hide_sub_studios"), isOn: Binding(
+                    get: { hidesSubStudios },
+                    set: { isOn in
+                        hidesSubStudios = isOn
+                        // A hidden sub-studio's scenes would be out of reach otherwise.
+                        if isOn { includesContent = true }
+                    }
+                ))
+            }
+            CatalogFilterSortToggleRow(label: tr("include_sub_studio_content"), isOn: $includesContent)
+        }
+    }
+}
+
 /// Label + trailing toggle — same typography/chrome as Filter / Sort rows.
 struct CatalogFilterSortToggleRow: View {
     let label: String
@@ -1377,6 +1416,8 @@ struct StudiosCatalogFilterSortSheet: View {
     var onRequestSaveAs: () -> Void
     var onRequestRename: () -> Void
     var onRequestDelete: () -> Void
+    /// The Studios list itself: offers "Hide sub-studios" and "Include sub-studio content".
+    var showsSubStudioOptions: Bool = false
 
     @ObservedObject private var appearance = AppearanceManager.shared
     private var hasSelectedPreset: Bool { !selectedPresetRowId.isEmpty }
@@ -1397,6 +1438,9 @@ struct StudiosCatalogFilterSortSheet: View {
                     CatalogNameRegexSearchCard(document: criteriaDocument, onApply: onApply)
                     filterPickerCard
                     studioSortCard
+                    if showsSubStudioOptions {
+                        SubStudioOptionsCard(showsHide: true)
+                    }
                     CatalogFilterCriteriaBody(document: criteriaDocument, onChange: onApply)
                 }
                 .padding(.top, 8)

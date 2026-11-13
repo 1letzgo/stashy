@@ -2215,7 +2215,7 @@ struct ReelsViewBody: View {
             document.setCriterion(key: "tags", value: ["modifier": "INCLUDES", "value": selectedTags.map(\.id), "depth": 0])
         }
         if let studio = selectedStudio {
-            document.setCriterion(key: "studios", value: ["modifier": "INCLUDES", "value": [studio.id], "depth": 0])
+            document.setCriterion(key: "studios", value: ["modifier": "INCLUDES", "value": [studio.id], "depth": StudioCountsStore.contentDepth])
         }
     }
 

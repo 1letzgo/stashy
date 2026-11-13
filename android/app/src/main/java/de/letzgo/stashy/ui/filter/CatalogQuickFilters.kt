@@ -237,6 +237,11 @@ fun CatalogFilterCriteriaBody(document: CriteriaDocument, onChange: () -> Unit) 
     val expanded = showsAdvanced ?: (advancedOnly > 0)
     // iOS metrics: 20 between the quick sections and the "Advanced criteria" header.
     Column {
+        // A studio's page: "Include sub-studio content" tops the criteria area of every sheet.
+        if (LocalShowsSubStudioContentOption.current) {
+            SubStudioOptionsCard(showsHide = false)
+            Spacer(Modifier.height(16.dp))
+        }
         if (sections.isNotEmpty()) {
             QuickFiltersCard(document, sections, onChange)
             Spacer(Modifier.height(20.dp))
