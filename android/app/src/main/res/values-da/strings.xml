@@ -395,6 +395,8 @@
   <string name="arg_count_studios">%1$s studier</string>
   <string name="arg_count_sub_studio">%1$s understudie</string>
   <string name="arg_count_sub_studios">%1$s understudier</string>
+  <string name="arg_count_sub_tag">%1$s undertag</string>
+  <string name="arg_count_sub_tags">%1$s undertags</string>
   <string name="arg_count_tag">%1$s tag</string>
   <string name="arg_count_tags">%1$s tags</string>
   <string name="arg_count_weeks">%1$s uger</string>
@@ -432,6 +434,7 @@
   <string name="arg_of_arg_items">%1$s af %2$s elementer</string>
   <string name="arg_outside_month">%1$s, uden for måneden</string>
   <string name="arg_part_of">Del af %1$s</string>
+  <string name="arg_part_of_and_more">Del af %1$s +%2$s</string>
   <string name="arg_per_arg">%1$s/%2$s</string>
   <string name="arg_per_day">%1$s/dag</string>
   <string name="arg_performer_times">%1$s× kunstner</string>
@@ -1054,6 +1057,7 @@
   <string name="hero_background">Topbilledbaggrund</string>
   <string name="hidden">Skjult</string>
   <string name="hide_sub_studios">Skjul understudier</string>
+  <string name="hide_sub_tags">Skjul undertags</string>
   <string name="high">Høj</string>
   <string name="highest_rated">Højest bedømt</string>
   <string name="hint_added_to_servers_job_queue">Føjet til serverens jobkø.</string>
@@ -1444,6 +1448,7 @@
   <string name="include_sub_groups">Inkluder undergrupper</string>
   <string name="include_sub_studio_content">Inkluder understudiers indhold</string>
   <string name="include_sub_studios">Inkluder understudier</string>
+  <string name="include_sub_tag_content">Inkluder undertags\' indhold</string>
   <string name="include_sub_tags">Inkluder undertags</string>
   <string name="incomplete_setup">Ufuldstændig opsætning</string>
   <string name="increase">Forøg</string>
@@ -1760,6 +1765,7 @@
   <string name="parent_count">Antal overordnede</string>
   <string name="parents">Overordnede</string>
   <string name="parent_studio">Overordnet studie</string>
+  <string name="parent_tags">Overordnede tags</string>
   <string name="passcode">Adgangskode</string>
   <string name="passcodes_do_not_match">Adgangskoderne matcher ikke</string>
   <string name="password">Adgangskode</string>
@@ -2061,6 +2067,7 @@
   <string name="studio_updated">Studie opdateret</string>
   <string name="sub_group_count">Antal undergrupper</string>
   <string name="sub_groups">Undergrupper</string>
+  <string name="sub_tags">Undertags</string>
   <string name="subtitle_external">Ekstern</string>
   <string name="subtitle_forced">Tvungen</string>
   <string name="subtitle_preview">Forhåndsvisning af undertekster</string>

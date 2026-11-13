@@ -66,6 +66,42 @@ struct SubStudioOptionsCard: View {
     }
 }
 
+private struct ShowsSubTagContentOptionKey: EnvironmentKey {
+    static let defaultValue = false
+}
+
+extension EnvironmentValues {
+    /// Set by a tag's page: its filter sheets then offer "Include sub-tag content".
+    var showsSubTagContentOption: Bool {
+        get { self[ShowsSubTagContentOptionKey.self] }
+        set { self[ShowsSubTagContentOptionKey.self] = newValue }
+    }
+}
+
+/// The sub-tag switches of the Tags settings sheet and of a tag's page (`TagHierarchy`).
+struct SubTagOptionsCard: View {
+    /// "Hide sub-tags" belongs to the Tags list only.
+    var showsHide: Bool
+    @AppStorage(TagHierarchy.hideSubTagsKey) private var hidesSubTags = false
+    @AppStorage(TagHierarchy.includeSubTagContentKey) private var includesContent = false
+
+    var body: some View {
+        VStack(spacing: 8) {
+            if showsHide {
+                CatalogFilterSortToggleRow(label: tr("hide_sub_tags"), isOn: Binding(
+                    get: { hidesSubTags },
+                    set: { isOn in
+                        hidesSubTags = isOn
+                        // A hidden sub-tag's scenes would be out of reach otherwise.
+                        if isOn { includesContent = true }
+                    }
+                ))
+            }
+            CatalogFilterSortToggleRow(label: tr("include_sub_tag_content"), isOn: $includesContent)
+        }
+    }
+}
+
 /// Label + trailing toggle — same typography/chrome as Filter / Sort rows.
 struct CatalogFilterSortToggleRow: View {
     let label: String
@@ -1191,64 +1227,82 @@ struct PerformersCatalogFilterSortSheet: View {
         let unmappedMode = pickerValue.isUnmapped
         let orderDisabled = randomMode || unmappedMode || pickerValue.isSharedScenes
 
-        return HStack(alignment: .center, spacing: 12) {
-            Text(tr("action_sort"))
-                .font(.subheadline.weight(.semibold))
-                .foregroundColor(.secondary)
-                // Gives way to a long sort name instead of widening the sheet.
-                .frame(minWidth: 44, idealWidth: CatalogFilterSortSheetLayout.labelColumnWidth, maxWidth: CatalogFilterSortSheetLayout.labelColumnWidth, alignment: .leading)
-                .layoutPriority(1)
-            HStack(spacing: 6) {
-                CatalogFilterChip(title: tr("asc"), isActive: ascending && !orderDisabled) {
-                    guard let k = pickerValue.knownKind, !orderDisabled else { return }
-                    onSortChange(k.performerSortOption(ascending: true))
-                }
-                CatalogFilterChip(title: tr("desc"), isActive: !ascending && !orderDisabled) {
-                    guard let k = pickerValue.knownKind, !orderDisabled else { return }
-                    onSortChange(k.performerSortOption(ascending: false))
-                }
+        let label = Text(tr("action_sort"))
+            .font(.subheadline.weight(.semibold))
+            .foregroundColor(.secondary)
+            // Gives way to a long sort name instead of widening the sheet.
+            .frame(minWidth: 44, idealWidth: CatalogFilterSortSheetLayout.labelColumnWidth, maxWidth: CatalogFilterSortSheetLayout.labelColumnWidth, alignment: .leading)
+            .layoutPriority(1)
+        let chips = HStack(spacing: 6) {
+            CatalogFilterChip(title: tr("asc"), isActive: ascending && !orderDisabled) {
+                guard let k = pickerValue.knownKind, !orderDisabled else { return }
+                onSortChange(k.performerSortOption(ascending: true))
             }
-            .fixedSize(horizontal: true, vertical: false)
-            .opacity(orderDisabled ? 0.4 : 1)
-            .allowsHitTesting(!orderDisabled)
-            Spacer(minLength: 8)
-            Picker(tr("action_sort_type"), selection: Binding(
-                get: { currentSortPickerValue },
-                set: { newVal in
-                    switch newVal {
-                    case .known(let newKind):
-                        if newKind == .random {
-                            onSortChange(.random)
-                        } else if currentSortPickerValue.isSharedScenes {
-                            // Leaving the fixed "Shared scenes" order: names read A–Z, counts high first.
-                            onSortChange(newKind.performerSortOption(ascending: newKind == .name))
-                        } else if currentSortPickerValue.isRandom {
-                            onSortChange(newKind.performerSortOption(ascending: false))
-                        } else {
-                            onSortChange(newKind.performerSortOption(ascending: sortOption.direction == "ASC"))
-                        }
-                    case .sharedScenes:
-                        onSelectSharedScenesSort?()
-                    case .unmapped:
-                        break
+            CatalogFilterChip(title: tr("desc"), isActive: !ascending && !orderDisabled) {
+                guard let k = pickerValue.knownKind, !orderDisabled else { return }
+                onSortChange(k.performerSortOption(ascending: false))
+            }
+        }
+        .fixedSize(horizontal: true, vertical: false)
+        .opacity(orderDisabled ? 0.4 : 1)
+        .allowsHitTesting(!orderDisabled)
+        let picker = Picker(tr("action_sort_type"), selection: Binding(
+            get: { currentSortPickerValue },
+            set: { newVal in
+                switch newVal {
+                case .known(let newKind):
+                    if newKind == .random {
+                        onSortChange(.random)
+                    } else if currentSortPickerValue.isSharedScenes {
+                        // Leaving the fixed "Shared scenes" order: names read A–Z, counts high first.
+                        onSortChange(newKind.performerSortOption(ascending: newKind == .name))
+                    } else if currentSortPickerValue.isRandom {
+                        onSortChange(newKind.performerSortOption(ascending: false))
+                    } else {
+                        onSortChange(newKind.performerSortOption(ascending: sortOption.direction == "ASC"))
                     }
-                }
-            )) {
-                if sharedScenesSortSelected != nil {
-                    Text(tr("most_shared")).tag(PerformerCatalogSortPickerValue.sharedScenes)
-                }
-                if case .unmapped(let f) = pickerValue {
-                    Text(tr("other_arg", f)).tag(PerformerCatalogSortPickerValue.unmapped(sortField: f))
-                }
-                ForEach(PerformerCatalogSortFieldKind.allCases) { k in
-                    Text(k.menuLabel).tag(PerformerCatalogSortPickerValue.known(k))
+                case .sharedScenes:
+                    onSelectSharedScenesSort?()
+                case .unmapped:
+                    break
                 }
             }
-            .pickerStyle(.menu)
-            .labelsHidden()
-            .tint(appearance.tintColor)
-            // "Shared scenes" must not wrap to two lines and stretch the card.
-            .fixedSize()
+        )) {
+            if sharedScenesSortSelected != nil {
+                Text(tr("most_shared")).tag(PerformerCatalogSortPickerValue.sharedScenes)
+            }
+            if case .unmapped(let f) = pickerValue {
+                Text(tr("other_arg", f)).tag(PerformerCatalogSortPickerValue.unmapped(sortField: f))
+            }
+            ForEach(PerformerCatalogSortFieldKind.allCases) { k in
+                Text(k.menuLabel).tag(PerformerCatalogSortPickerValue.known(k))
+            }
+        }
+        .pickerStyle(.menu)
+        .labelsHidden()
+        .tint(appearance.tintColor)
+        // "Shared scenes" must not wrap to two lines and stretch the card.
+        .fixedSize()
+        // One row when it fits; a long sort name takes a second row instead of widening the
+        // whole sheet past the screen.
+        return ViewThatFits(in: .horizontal) {
+            HStack(alignment: .center, spacing: 12) {
+                label
+                chips
+                Spacer(minLength: 8)
+                picker
+            }
+            VStack(alignment: .leading, spacing: 6) {
+                HStack(alignment: .center, spacing: 12) {
+                    label
+                    chips
+                    Spacer(minLength: 0)
+                }
+                HStack {
+                    Spacer(minLength: 0)
+                    picker
+                }
+            }
         }
         .catalogFilterSortControlCardChrome()
     }
@@ -1270,6 +1324,8 @@ struct TagsCatalogFilterSortSheet: View {
     var onRequestSaveAs: () -> Void
     var onRequestRename: () -> Void
     var onRequestDelete: () -> Void
+    /// The Tags list itself: offers "Hide sub-tags" and "Include sub-tag content".
+    var showsSubTagOptions: Bool = false
 
     @ObservedObject private var appearance = AppearanceManager.shared
     private var hasSelectedPreset: Bool { !selectedPresetRowId.isEmpty }
@@ -1290,6 +1346,9 @@ struct TagsCatalogFilterSortSheet: View {
                     CatalogNameRegexSearchCard(document: criteriaDocument, onApply: onApply)
                     filterPickerCard
                     tagSortCard
+                    if showsSubTagOptions {
+                        SubTagOptionsCard(showsHide: true)
+                    }
                     CatalogFilterCriteriaBody(document: criteriaDocument, onChange: onApply)
                 }
                 .padding(.top, 8)
@@ -1346,55 +1405,73 @@ struct TagsCatalogFilterSortSheet: View {
         let pickerValue = TagCatalogSortPickerValue.from(sortOption)
         let ascending = sortOption.direction == "ASC"
         let orderDisabled = pickerValue.isRandom || pickerValue.isUnmapped
-        return HStack(alignment: .center, spacing: 12) {
-            Text(tr("action_sort"))
-                .font(.subheadline.weight(.semibold))
-                .foregroundColor(.secondary)
-                // Gives way to a long sort name instead of widening the sheet.
-                .frame(minWidth: 44, idealWidth: CatalogFilterSortSheetLayout.labelColumnWidth, maxWidth: CatalogFilterSortSheetLayout.labelColumnWidth, alignment: .leading)
-                .layoutPriority(1)
-            HStack(spacing: 6) {
-                CatalogFilterChip(title: tr("asc"), isActive: ascending && !orderDisabled) {
-                    guard let k = pickerValue.knownKind, !orderDisabled else { return }
-                    onSortChange(k.tagSortOption(ascending: true))
-                }
-                CatalogFilterChip(title: tr("desc"), isActive: !ascending && !orderDisabled) {
-                    guard let k = pickerValue.knownKind, !orderDisabled else { return }
-                    onSortChange(k.tagSortOption(ascending: false))
-                }
+        let label = Text(tr("action_sort"))
+            .font(.subheadline.weight(.semibold))
+            .foregroundColor(.secondary)
+            // Gives way to a long sort name instead of widening the sheet.
+            .frame(minWidth: 44, idealWidth: CatalogFilterSortSheetLayout.labelColumnWidth, maxWidth: CatalogFilterSortSheetLayout.labelColumnWidth, alignment: .leading)
+            .layoutPriority(1)
+        let chips = HStack(spacing: 6) {
+            CatalogFilterChip(title: tr("asc"), isActive: ascending && !orderDisabled) {
+                guard let k = pickerValue.knownKind, !orderDisabled else { return }
+                onSortChange(k.tagSortOption(ascending: true))
             }
-            .opacity(orderDisabled ? 0.4 : 1)
-            .allowsHitTesting(!orderDisabled)
-            Spacer(minLength: 8)
-            Picker(tr("action_sort_type"), selection: Binding(
-                get: { TagCatalogSortPickerValue.from(sortOption) },
-                set: { newVal in
-                    switch newVal {
-                    case .known(let newKind):
-                        if newKind == .random {
-                            onSortChange(.random)
-                        } else if TagCatalogSortPickerValue.from(sortOption).isRandom {
-                            onSortChange(newKind.tagSortOption(ascending: false))
-                        } else {
-                            onSortChange(newKind.tagSortOption(ascending: sortOption.direction == "ASC"))
-                        }
-                    case .unmapped:
-                        break
+            CatalogFilterChip(title: tr("desc"), isActive: !ascending && !orderDisabled) {
+                guard let k = pickerValue.knownKind, !orderDisabled else { return }
+                onSortChange(k.tagSortOption(ascending: false))
+            }
+        }
+        .opacity(orderDisabled ? 0.4 : 1)
+        .allowsHitTesting(!orderDisabled)
+        let picker = Picker(tr("action_sort_type"), selection: Binding(
+            get: { TagCatalogSortPickerValue.from(sortOption) },
+            set: { newVal in
+                switch newVal {
+                case .known(let newKind):
+                    if newKind == .random {
+                        onSortChange(.random)
+                    } else if TagCatalogSortPickerValue.from(sortOption).isRandom {
+                        onSortChange(newKind.tagSortOption(ascending: false))
+                    } else {
+                        onSortChange(newKind.tagSortOption(ascending: sortOption.direction == "ASC"))
                     }
-                }
-            )) {
-                if case .unmapped(let f) = pickerValue {
-                    Text(tr("other_arg", f)).tag(TagCatalogSortPickerValue.unmapped(sortField: f))
-                }
-                ForEach(TagCatalogSortFieldKind.allCases) { k in
-                    Text(k.menuLabel).tag(TagCatalogSortPickerValue.known(k))
+                case .unmapped:
+                    break
                 }
             }
-            .pickerStyle(.menu)
-            .labelsHidden()
-            .tint(appearance.tintColor)
-            // One line: a wrapped label ("Image count") stretched the card.
-            .fixedSize()
+        )) {
+            if case .unmapped(let f) = pickerValue {
+                Text(tr("other_arg", f)).tag(TagCatalogSortPickerValue.unmapped(sortField: f))
+            }
+            ForEach(TagCatalogSortFieldKind.allCases) { k in
+                Text(k.menuLabel).tag(TagCatalogSortPickerValue.known(k))
+            }
+        }
+        .pickerStyle(.menu)
+        .labelsHidden()
+        .tint(appearance.tintColor)
+        // One line: a wrapped label ("Image count") stretched the card.
+        .fixedSize()
+        // One row when it fits; a long sort name takes a second row instead of widening the
+        // whole sheet past the screen.
+        return ViewThatFits(in: .horizontal) {
+            HStack(alignment: .center, spacing: 12) {
+                label
+                chips
+                Spacer(minLength: 8)
+                picker
+            }
+            VStack(alignment: .leading, spacing: 6) {
+                HStack(alignment: .center, spacing: 12) {
+                    label
+                    chips
+                    Spacer(minLength: 0)
+                }
+                HStack {
+                    Spacer(minLength: 0)
+                    picker
+                }
+            }
         }
         .catalogFilterSortControlCardChrome()
     }
@@ -1733,55 +1810,73 @@ struct GalleriesCatalogFilterSortSheet: View {
         let pickerValue = GalleryCatalogSortPickerValue.from(sortOption)
         let ascending = sortOption.direction == "ASC"
         let orderDisabled = pickerValue.isRandom || pickerValue.isUnmapped
-        return HStack(alignment: .center, spacing: 12) {
-            Text(tr("action_sort"))
-                .font(.subheadline.weight(.semibold))
-                .foregroundColor(.secondary)
-                // Gives way to a long sort name instead of widening the sheet.
-                .frame(minWidth: 44, idealWidth: CatalogFilterSortSheetLayout.labelColumnWidth, maxWidth: CatalogFilterSortSheetLayout.labelColumnWidth, alignment: .leading)
-                .layoutPriority(1)
-            HStack(spacing: 6) {
-                CatalogFilterChip(title: tr("asc"), isActive: ascending && !orderDisabled) {
-                    guard let k = pickerValue.knownKind, !orderDisabled else { return }
-                    onSortChange(k.gallerySortOption(ascending: true))
-                }
-                CatalogFilterChip(title: tr("desc"), isActive: !ascending && !orderDisabled) {
-                    guard let k = pickerValue.knownKind, !orderDisabled else { return }
-                    onSortChange(k.gallerySortOption(ascending: false))
-                }
+        let label = Text(tr("action_sort"))
+            .font(.subheadline.weight(.semibold))
+            .foregroundColor(.secondary)
+            // Gives way to a long sort name instead of widening the sheet.
+            .frame(minWidth: 44, idealWidth: CatalogFilterSortSheetLayout.labelColumnWidth, maxWidth: CatalogFilterSortSheetLayout.labelColumnWidth, alignment: .leading)
+            .layoutPriority(1)
+        let chips = HStack(spacing: 6) {
+            CatalogFilterChip(title: tr("asc"), isActive: ascending && !orderDisabled) {
+                guard let k = pickerValue.knownKind, !orderDisabled else { return }
+                onSortChange(k.gallerySortOption(ascending: true))
             }
-            .opacity(orderDisabled ? 0.4 : 1)
-            .allowsHitTesting(!orderDisabled)
-            Spacer(minLength: 8)
-            Picker(tr("action_sort_type"), selection: Binding(
-                get: { GalleryCatalogSortPickerValue.from(sortOption) },
-                set: { newVal in
-                    switch newVal {
-                    case .known(let newKind):
-                        if newKind == .random {
-                            onSortChange(.random)
-                        } else if GalleryCatalogSortPickerValue.from(sortOption).isRandom {
-                            onSortChange(newKind.gallerySortOption(ascending: false))
-                        } else {
-                            onSortChange(newKind.gallerySortOption(ascending: sortOption.direction == "ASC"))
-                        }
-                    case .unmapped:
-                        break
+            CatalogFilterChip(title: tr("desc"), isActive: !ascending && !orderDisabled) {
+                guard let k = pickerValue.knownKind, !orderDisabled else { return }
+                onSortChange(k.gallerySortOption(ascending: false))
+            }
+        }
+        .opacity(orderDisabled ? 0.4 : 1)
+        .allowsHitTesting(!orderDisabled)
+        let picker = Picker(tr("action_sort_type"), selection: Binding(
+            get: { GalleryCatalogSortPickerValue.from(sortOption) },
+            set: { newVal in
+                switch newVal {
+                case .known(let newKind):
+                    if newKind == .random {
+                        onSortChange(.random)
+                    } else if GalleryCatalogSortPickerValue.from(sortOption).isRandom {
+                        onSortChange(newKind.gallerySortOption(ascending: false))
+                    } else {
+                        onSortChange(newKind.gallerySortOption(ascending: sortOption.direction == "ASC"))
                     }
-                }
-            )) {
-                if case .unmapped(let f) = pickerValue {
-                    Text(tr("other_arg", f)).tag(GalleryCatalogSortPickerValue.unmapped(sortField: f))
-                }
-                ForEach(GalleryCatalogSortFieldKind.allCases.filter { $0.gallerySortOption(ascending: false).isAvailableOnServer }) { k in
-                    Text(k.menuLabel).tag(GalleryCatalogSortPickerValue.known(k))
+                case .unmapped:
+                    break
                 }
             }
-            .pickerStyle(.menu)
-            .labelsHidden()
-            .tint(appearance.tintColor)
-            // One line: a wrapped label ("Image count") stretched the card.
-            .fixedSize()
+        )) {
+            if case .unmapped(let f) = pickerValue {
+                Text(tr("other_arg", f)).tag(GalleryCatalogSortPickerValue.unmapped(sortField: f))
+            }
+            ForEach(GalleryCatalogSortFieldKind.allCases.filter { $0.gallerySortOption(ascending: false).isAvailableOnServer }) { k in
+                Text(k.menuLabel).tag(GalleryCatalogSortPickerValue.known(k))
+            }
+        }
+        .pickerStyle(.menu)
+        .labelsHidden()
+        .tint(appearance.tintColor)
+        // One line: a wrapped label ("Image count") stretched the card.
+        .fixedSize()
+        // One row when it fits; a long sort name takes a second row instead of widening the
+        // whole sheet past the screen.
+        return ViewThatFits(in: .horizontal) {
+            HStack(alignment: .center, spacing: 12) {
+                label
+                chips
+                Spacer(minLength: 8)
+                picker
+            }
+            VStack(alignment: .leading, spacing: 6) {
+                HStack(alignment: .center, spacing: 12) {
+                    label
+                    chips
+                    Spacer(minLength: 0)
+                }
+                HStack {
+                    Spacer(minLength: 0)
+                    picker
+                }
+            }
         }
         .catalogFilterSortControlCardChrome()
     }
@@ -1998,55 +2093,73 @@ struct ImagesCatalogFilterSortSheet: View {
         let pickerValue = ImageCatalogSortPickerValue.from(sortOption)
         let ascending = sortOption.direction == "ASC"
         let orderDisabled = pickerValue.isRandom || pickerValue.isUnmapped
-        return HStack(alignment: .center, spacing: 12) {
-            Text(tr("action_sort"))
-                .font(.subheadline.weight(.semibold))
-                .foregroundColor(.secondary)
-                // Gives way to a long sort name instead of widening the sheet.
-                .frame(minWidth: 44, idealWidth: CatalogFilterSortSheetLayout.labelColumnWidth, maxWidth: CatalogFilterSortSheetLayout.labelColumnWidth, alignment: .leading)
-                .layoutPriority(1)
-            HStack(spacing: 6) {
-                CatalogFilterChip(title: tr("asc"), isActive: ascending && !orderDisabled) {
-                    guard let k = pickerValue.knownKind, !orderDisabled else { return }
-                    onSortChange(k.imageSortOption(ascending: true))
-                }
-                CatalogFilterChip(title: tr("desc"), isActive: !ascending && !orderDisabled) {
-                    guard let k = pickerValue.knownKind, !orderDisabled else { return }
-                    onSortChange(k.imageSortOption(ascending: false))
-                }
+        let label = Text(tr("action_sort"))
+            .font(.subheadline.weight(.semibold))
+            .foregroundColor(.secondary)
+            // Gives way to a long sort name instead of widening the sheet.
+            .frame(minWidth: 44, idealWidth: CatalogFilterSortSheetLayout.labelColumnWidth, maxWidth: CatalogFilterSortSheetLayout.labelColumnWidth, alignment: .leading)
+            .layoutPriority(1)
+        let chips = HStack(spacing: 6) {
+            CatalogFilterChip(title: tr("asc"), isActive: ascending && !orderDisabled) {
+                guard let k = pickerValue.knownKind, !orderDisabled else { return }
+                onSortChange(k.imageSortOption(ascending: true))
             }
-            .opacity(orderDisabled ? 0.4 : 1)
-            .allowsHitTesting(!orderDisabled)
-            Spacer(minLength: 8)
-            Picker(tr("action_sort_type"), selection: Binding(
-                get: { ImageCatalogSortPickerValue.from(sortOption) },
-                set: { newVal in
-                    switch newVal {
-                    case .known(let newKind):
-                        if newKind == .random {
-                            onSortChange(.random)
-                        } else if ImageCatalogSortPickerValue.from(sortOption).isRandom {
-                            onSortChange(newKind.imageSortOption(ascending: false))
-                        } else {
-                            onSortChange(newKind.imageSortOption(ascending: sortOption.direction == "ASC"))
-                        }
-                    case .unmapped:
-                        break
+            CatalogFilterChip(title: tr("desc"), isActive: !ascending && !orderDisabled) {
+                guard let k = pickerValue.knownKind, !orderDisabled else { return }
+                onSortChange(k.imageSortOption(ascending: false))
+            }
+        }
+        .opacity(orderDisabled ? 0.4 : 1)
+        .allowsHitTesting(!orderDisabled)
+        let picker = Picker(tr("action_sort_type"), selection: Binding(
+            get: { ImageCatalogSortPickerValue.from(sortOption) },
+            set: { newVal in
+                switch newVal {
+                case .known(let newKind):
+                    if newKind == .random {
+                        onSortChange(.random)
+                    } else if ImageCatalogSortPickerValue.from(sortOption).isRandom {
+                        onSortChange(newKind.imageSortOption(ascending: false))
+                    } else {
+                        onSortChange(newKind.imageSortOption(ascending: sortOption.direction == "ASC"))
                     }
-                }
-            )) {
-                if case .unmapped(let f) = pickerValue {
-                    Text(tr("other_arg", f)).tag(ImageCatalogSortPickerValue.unmapped(sortField: f))
-                }
-                ForEach(ImageCatalogSortFieldKind.allCases.filter { $0.imageSortOption(ascending: false).isAvailableOnServer }) { k in
-                    Text(k.menuLabel).tag(ImageCatalogSortPickerValue.known(k))
+                case .unmapped:
+                    break
                 }
             }
-            .pickerStyle(.menu)
-            .labelsHidden()
-            .tint(appearance.tintColor)
-            // One line: a wrapped label ("Image count") stretched the card.
-            .fixedSize()
+        )) {
+            if case .unmapped(let f) = pickerValue {
+                Text(tr("other_arg", f)).tag(ImageCatalogSortPickerValue.unmapped(sortField: f))
+            }
+            ForEach(ImageCatalogSortFieldKind.allCases.filter { $0.imageSortOption(ascending: false).isAvailableOnServer }) { k in
+                Text(k.menuLabel).tag(ImageCatalogSortPickerValue.known(k))
+            }
+        }
+        .pickerStyle(.menu)
+        .labelsHidden()
+        .tint(appearance.tintColor)
+        // One line: a wrapped label ("Image count") stretched the card.
+        .fixedSize()
+        // One row when it fits; a long sort name takes a second row instead of widening the
+        // whole sheet past the screen.
+        return ViewThatFits(in: .horizontal) {
+            HStack(alignment: .center, spacing: 12) {
+                label
+                chips
+                Spacer(minLength: 8)
+                picker
+            }
+            VStack(alignment: .leading, spacing: 6) {
+                HStack(alignment: .center, spacing: 12) {
+                    label
+                    chips
+                    Spacer(minLength: 0)
+                }
+                HStack {
+                    Spacer(minLength: 0)
+                    picker
+                }
+            }
         }
         .catalogFilterSortControlCardChrome()
     }
@@ -2383,48 +2496,66 @@ struct GroupsCatalogFilterSortSheet: View {
         let kind = GroupCatalogSortFieldKind.from(sortOption)
         let ascending = sortOption.direction == "ASC"
         let orderDisabled = kind == .random
-        return HStack(alignment: .center, spacing: 12) {
-            Text(tr("action_sort"))
-                .font(.subheadline.weight(.semibold))
-                .foregroundColor(.secondary)
-                // Gives way to a long sort name instead of widening the sheet.
-                .frame(minWidth: 44, idealWidth: CatalogFilterSortSheetLayout.labelColumnWidth, maxWidth: CatalogFilterSortSheetLayout.labelColumnWidth, alignment: .leading)
-                .layoutPriority(1)
-            HStack(spacing: 6) {
-                CatalogFilterChip(title: tr("asc"), isActive: ascending && !orderDisabled) {
-                    guard !orderDisabled else { return }
-                    onSortChange(kind.groupSortOption(ascending: true))
-                }
-                CatalogFilterChip(title: tr("desc"), isActive: !ascending && !orderDisabled) {
-                    guard !orderDisabled else { return }
-                    onSortChange(kind.groupSortOption(ascending: false))
+        let label = Text(tr("action_sort"))
+            .font(.subheadline.weight(.semibold))
+            .foregroundColor(.secondary)
+            // Gives way to a long sort name instead of widening the sheet.
+            .frame(minWidth: 44, idealWidth: CatalogFilterSortSheetLayout.labelColumnWidth, maxWidth: CatalogFilterSortSheetLayout.labelColumnWidth, alignment: .leading)
+            .layoutPriority(1)
+        let chips = HStack(spacing: 6) {
+            CatalogFilterChip(title: tr("asc"), isActive: ascending && !orderDisabled) {
+                guard !orderDisabled else { return }
+                onSortChange(kind.groupSortOption(ascending: true))
+            }
+            CatalogFilterChip(title: tr("desc"), isActive: !ascending && !orderDisabled) {
+                guard !orderDisabled else { return }
+                onSortChange(kind.groupSortOption(ascending: false))
+            }
+        }
+        .fixedSize(horizontal: true, vertical: false)
+        .opacity(orderDisabled ? 0.4 : 1)
+        .allowsHitTesting(!orderDisabled)
+        let picker = Picker(tr("action_sort_type"), selection: Binding(
+            get: { GroupCatalogSortFieldKind.from(sortOption) },
+            set: { newKind in
+                if newKind == .random {
+                    onSortChange(.random)
+                } else if GroupCatalogSortFieldKind.from(sortOption) == .random {
+                    onSortChange(newKind.groupSortOption(ascending: false))
+                } else {
+                    onSortChange(newKind.groupSortOption(ascending: sortOption.direction == "ASC"))
                 }
             }
-            .fixedSize(horizontal: true, vertical: false)
-            .opacity(orderDisabled ? 0.4 : 1)
-            .allowsHitTesting(!orderDisabled)
-            Spacer(minLength: 8)
-            Picker(tr("action_sort_type"), selection: Binding(
-                get: { GroupCatalogSortFieldKind.from(sortOption) },
-                set: { newKind in
-                    if newKind == .random {
-                        onSortChange(.random)
-                    } else if GroupCatalogSortFieldKind.from(sortOption) == .random {
-                        onSortChange(newKind.groupSortOption(ascending: false))
-                    } else {
-                        onSortChange(newKind.groupSortOption(ascending: sortOption.direction == "ASC"))
-                    }
+        )) {
+            ForEach(GroupCatalogSortFieldKind.allCases) { k in
+                Text(k.menuLabel).tag(k)
+            }
+        }
+        .pickerStyle(.menu)
+        .labelsHidden()
+        .tint(appearance.tintColor)
+        // One line: a wrapped label ("Image count") stretched the card.
+        .fixedSize()
+        // One row when it fits; a long sort name takes a second row instead of widening the
+        // whole sheet past the screen.
+        return ViewThatFits(in: .horizontal) {
+            HStack(alignment: .center, spacing: 12) {
+                label
+                chips
+                Spacer(minLength: 8)
+                picker
+            }
+            VStack(alignment: .leading, spacing: 6) {
+                HStack(alignment: .center, spacing: 12) {
+                    label
+                    chips
+                    Spacer(minLength: 0)
                 }
-            )) {
-                ForEach(GroupCatalogSortFieldKind.allCases) { k in
-                    Text(k.menuLabel).tag(k)
+                HStack {
+                    Spacer(minLength: 0)
+                    picker
                 }
             }
-            .pickerStyle(.menu)
-            .labelsHidden()
-            .tint(appearance.tintColor)
-            // One line: a wrapped label ("Image count") stretched the card.
-            .fixedSize()
         }
         .catalogFilterSortControlCardChrome()
     }

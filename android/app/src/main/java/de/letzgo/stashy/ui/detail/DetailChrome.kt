@@ -185,6 +185,8 @@ internal fun DetailTopBar(
     onFavorite: () -> Unit = {},
     onEdit: (() -> Unit)? = null,
     editLabel: String = tr(R.string.action_edit),
+    /** A page may name a section differently (a tag's Tags section is "Sub-Tags"). */
+    tabTitle: (DetailTab) -> String = { it.title },
 ) {
     val p = Theme.palette
     val breadcrumb = selected != null
@@ -208,7 +210,7 @@ internal fun DetailTopBar(
                     de.letzgo.stashy.ui.catalog.BreadcrumbSectionMenu(
                         current = selected,
                         items = if (selected in tabs) tabs else listOf(selected),
-                        title = { it.title },
+                        title = tabTitle,
                         icon = { it.icon },
                         onSelect = onSelect,
                     )

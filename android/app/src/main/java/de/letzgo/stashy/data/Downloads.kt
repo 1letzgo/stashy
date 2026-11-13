@@ -480,7 +480,7 @@ object Downloads {
         val sceneFilter: JsonObject get() = when (this) {
             is Performer -> criterion("performers", id, depth = false)
             is Studio -> criterion("studios", id, depth = true, depthValue = StudioCountsStore.contentDepth)
-            is Tag -> criterion("tags", id, depth = true)
+            is Tag -> criterion("tags", id, depth = true, depthValue = TagHierarchyStore.contentDepth)
             is Group -> criterion("groups", id, depth = false)
             is SavedFilter -> filter
         }

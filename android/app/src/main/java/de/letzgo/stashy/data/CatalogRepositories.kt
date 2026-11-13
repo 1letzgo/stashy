@@ -128,6 +128,23 @@ object CatalogRepository {
             @Suppress("UNCHECKED_CAST")
             return Page(obj["count"].stringOrNull?.toIntOrNull() ?: sorted.size, sorted as List<T>)
         }
+        // Tags: the counts over all sub-tags while "Include sub-tag content" is on; with the scene
+        // count sort (Tags list only) one page of every tag, sorted here.
+        if (query.mode == FilterMode.Tags) {
+            val include = TagHierarchyStore.includesContent
+            val sortsHere = query.scope == null && SubTags.sortsBySceneCountAll(query.sort.field, include)
+            if (sortsHere && page > 1) return Page(0, emptyList())
+            val variables = buildJsonObject {
+                put("filter", findFilter(query, page, if (sortsHere) -1 else perPage).json())
+                query.entityFilter()?.let { put(s.filterVar, it) }
+            }
+            val data = GraphQL.data(SubTags.withCountsAll(GraphQLQueries.load(s.document), include), variables)
+            val obj = data["findTags"].obj ?: throw GraphQLError.Query("Missing findTags")
+            val tags = GraphQL.decode(ListSerializer(Tag.serializer()), obj["tags"] ?: JsonArray(emptyList()))
+            val shown = if (sortsHere) SubTags.sortedBySceneCountAll(tags, query.sort.isAscending) else tags
+            @Suppress("UNCHECKED_CAST")
+            return Page(obj["count"].stringOrNull?.toIntOrNull() ?: shown.size, shown as List<T>)
+        }
         val document = s.document
         return findPage(document, document, s.listField, s.serializer, findFilter(query, page, perPage), s.filterVar, query.entityFilter())
     }

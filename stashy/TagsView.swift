@@ -59,6 +59,8 @@ private struct TagsViewContent: View {
 
     // Filter & sort sheet
     @State private var showFilterSortSheet = false
+    @AppStorage(TagHierarchy.hideSubTagsKey) private var hidesSubTags = false
+    @AppStorage(TagHierarchy.includeSubTagContentKey) private var includesSubTagContent = false
     @StateObject private var criteriaDocument = FilterCriteriaDocument(mode: .tags, pinsDefaults: true)
 
     @State private var catalogPresetRowSelection = ""
@@ -87,7 +89,13 @@ private struct TagsViewContent: View {
 
     /// Quick chips plus advanced criteria from the editor — what actually gets fetched.
     private var effectiveLiveFilter: [String: Any]? {
-        criteriaDocument.merged(with: isLiveFilterActive ? activeLiveFilterDict : [:])
+        var merged = criteriaDocument.merged(with: isLiveFilterActive ? activeLiveFilterDict : [:]) ?? [:]
+        // "Hide sub-tags": top-level tags only. A search still finds every tag, and a parent
+        // criterion of the user's own wins.
+        if hidesSubTags, searchText.isEmpty, merged["parents"] == nil, merged["parent_count"] == nil {
+            merged["parent_count"] = ["value": 0, "modifier": "EQUALS"]
+        }
+        return merged.isEmpty ? nil : merged
     }
 
     private func applyLiveFilter() {
@@ -365,6 +373,13 @@ private struct TagsViewContent: View {
     var body: some View {
         tagsCoreChrome
             .sheet(isPresented: $showFilterSortSheet, content: tagsFilterSortSheet)
+            .onChange(of: hidesSubTags) { _, _ in applyLiveFilter() }
+            // The cards count sub-tags in while the content switch is on.
+            .onChange(of: includesSubTagContent) { _, _ in applyLiveFilter() }
+            // A tag got or lost a parent: it joins or leaves the top level.
+            .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("TagParentsChanged"))) { _ in
+                applyLiveFilter()
+            }
             .onChange(of: catalogPresetRowSelection) { _, newId in
                 handleTagCatalogPresetSelectionChange(newId)
             }
@@ -520,7 +535,8 @@ private struct TagsViewContent: View {
                 }
                 showRenameCatalogPresetAlert = true
             },
-            onRequestDelete: { showDeleteCatalogPresetAlert = true }
+            onRequestDelete: { showDeleteCatalogPresetAlert = true },
+            showsSubTagOptions: true
         )
         .presentationDragIndicator(.visible)
         .presentationBackground(Color.appBackground)
@@ -713,20 +729,23 @@ struct TagCardView: View {
     /// What the list is sorted by; scenes for every sort that is not a count.
     var badge: CatalogCardBadge = .scenes
     @ObservedObject var appearanceManager = AppearanceManager.shared
+    @AppStorage(TagHierarchy.includeSubTagContentKey) private var includesSubTagContent = false
 
-    /// The badge's count, or the scene count when the tag does not carry that count.
+    /// The badge's count, or the scene count when the tag does not carry that count. With
+    /// "Include sub-tag content" the counts over all sub-tags, where the tag came with them.
     private var shownCount: (badge: CatalogCardBadge, count: Int) {
+        let all = includesSubTagContent
         let value: Int?
         switch badge {
-        case .scenes: value = tag.sceneCount
-        case .images: value = tag.imageCount
-        case .galleries: value = tag.galleryCount
-        case .performers, .performersAll: value = tag.performerCount
-        case .markers: value = tag.sceneMarkerCount
+        case .scenes: value = (all ? tag.sceneCountAll : nil) ?? tag.sceneCount
+        case .images: value = (all ? tag.imageCountAll : nil) ?? tag.imageCount
+        case .galleries: value = (all ? tag.galleryCountAll : nil) ?? tag.galleryCount
+        case .performers, .performersAll: value = (all ? tag.performerCountAll : nil) ?? tag.performerCount
+        case .markers: value = (all ? tag.sceneMarkerCountAll : nil) ?? tag.sceneMarkerCount
         case .oCount, .oCountAll, .rating: value = nil
         }
         if let value { return (badge, value) }
-        return (.scenes, tag.sceneCount ?? 0)
+        return (.scenes, (all ? tag.sceneCountAll : nil) ?? tag.sceneCount ?? 0)
     }
 
     private var hasCustomImage: Bool {
@@ -751,7 +770,8 @@ struct TagCardView: View {
                                 Image(systemName: "number")
                                     .font(.system(size: 34, weight: .bold))
                                     .foregroundColor(appearanceManager.tintColor)
-                                    .padding(.bottom, 16)
+                                    // Clear of the name, and of "Part of …" below it.
+                                    .padding(.bottom, tag.partOfText == nil ? 16 : 34)
                                     .accessibilityHidden(true)
                             )
                     }
@@ -769,14 +789,31 @@ struct TagCardView: View {
                                      count: shown.count, spokenLabel: shown.badge.spokenCount(shown.count))
                     .padding(8)
             }
+            .overlay(alignment: .topLeading) {
+                // Where the tag stands: the number of its direct sub-tags.
+                if let subTags = tag.childCount, subTags > 0 {
+                    CatalogCardCountPill(icon: "tag.fill", count: subTags,
+                                         spokenLabel: tr(subTags == 1 ? "arg_count_sub_tag" : "arg_count_sub_tags", subTags))
+                        .padding(8)
+                }
+            }
             .overlay(alignment: .bottomLeading) {
-                Text(tag.name)
-                    .font(.headline)
-                    .foregroundColor(.white)
-                    .lineLimit(1)
-                    .multilineTextAlignment(.leading)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(12)
+                VStack(alignment: .leading, spacing: 1) {
+                    Text(tag.name)
+                        .font(.headline)
+                        .foregroundColor(.white)
+                        .lineLimit(1)
+                    // "Part of …" for a sub-tag.
+                    if let partOf = tag.partOfText {
+                        Text(partOf)
+                            .font(.caption.weight(.medium))
+                            .foregroundColor(.white.opacity(0.75))
+                            .lineLimit(1)
+                    }
+                }
+                .multilineTextAlignment(.leading)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(12)
             }
             .background(Color.secondaryAppBackground)
             .clipShape(RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.card))
@@ -803,6 +840,7 @@ struct TagDetailView: View {
     @State private var isHeaderExpanded = false
     @State private var showingEditTagSheet = false
     @State private var showingTagImageFullscreen = false
+    @AppStorage(TagHierarchy.includeSubTagContentKey) private var includesSubTagContent = false
     @StateObject private var linkedStudios: DetailLinkedStudiosFilterModel
     @StateObject private var linkedGalleries: DetailLinkedGalleriesFilterModel
     /// Scenes tab filter / sort, kept here so it survives the tab remounting `ScenesView`.
@@ -824,12 +862,15 @@ struct TagDetailView: View {
         case studios = "Studios"
         case groups = "Groups"
         case images = "Images"
+        /// The tag's direct sub-tags.
+        case tags = "Tags"
 
         /// The name on screen; the raw value is data.
         var title: String {
             switch self {
             case .scenes: return tr("scenes")
             case .galleries: return tr("galleries")
+            case .tags: return tr("sub_tags")
             case .studios: return tr("studios")
             case .groups: return tr("groups")
             case .images: return tr("images")
@@ -843,6 +884,7 @@ struct TagDetailView: View {
             case .studios: return "building.2"
             case .groups: return "rectangle.stack.fill"
             case .images: return "photo"
+            case .tags: return "tag"
             }
         }
     }
@@ -921,6 +963,7 @@ struct TagDetailView: View {
         var tabs: [DetailTab] = []
         if effectiveScenes > 0 { tabs.append(.scenes) }
         if effectiveGalleries > 0 { tabs.append(.galleries) }
+        if viewModel.totalDetailTags > 0 { tabs.append(.tags) }
         if viewModel.totalDetailStudios > 0 { tabs.append(.studios) }
         if viewModel.totalDetailGroups > 0 { tabs.append(.groups) }
         if effectiveImages > 0 { tabs.append(.images) }
@@ -935,6 +978,7 @@ struct TagDetailView: View {
             case .studios: return viewModel.detailStudios.isEmpty
             case .groups: return viewModel.detailGroups.isEmpty
             case .images: return viewModel.detailImages.isEmpty
+            case .tags: return viewModel.detailTags.isEmpty
             }
         }()
         return CatalogFloatingChromeState(
@@ -1034,7 +1078,7 @@ struct TagDetailView: View {
                 CatalogQuickSortMenu(mode: .studios, sort: linkedStudios.selectedSortOption) {
                     linkedStudios.changeSortOption(to: $0, viewModel: viewModel)
                 }
-            case .scenes, .groups:
+            case .scenes, .groups, .tags:
                 EmptyView()
             }
             if let filter = sectionFilterSlot {
@@ -1056,7 +1100,7 @@ struct TagDetailView: View {
         case .galleries: return slot(active: linkedGalleries.catalogFilterSortFABActive) { linkedGalleries.showFilterSortSheet = true }
         case .studios: return slot(active: linkedStudios.catalogFilterSortFABActive) { linkedStudios.showFilterSortSheet = true }
         case .images: return slot(active: linkedImages.catalogFilterSortFABActive) { linkedImages.showFilterSortSheet = true }
-        case .groups: return nil
+        case .groups, .tags: return nil
         }
     }
 
@@ -1097,6 +1141,8 @@ struct TagDetailView: View {
                     } else {
                         InlineEmptyStateView(icon: "photo.on.rectangle", title: tr("empty_galleries_found"))
                     }
+                } else if selectedDetailTab == .tags {
+                    subTagGrid
                 } else if selectedDetailTab == .studios {
                     studioGrid
                 } else if selectedDetailTab == .groups {
@@ -1247,6 +1293,21 @@ struct TagDetailView: View {
             if !loading { autoSwitchAwayFromEmptyTagScenes() }
         }
         .sceneLiveUpdates(using: viewModel)
+        // Every filter sheet of this page offers "Include sub-tag content"; the Scenes list
+        // reloads itself, the other sections here.
+        .environment(\.showsSubTagContentOption, true)
+        .onChange(of: includesSubTagContent) { _, _ in
+            linkedGalleries.refetchGalleries(viewModel: viewModel, initial: true)
+            linkedStudios.refetchStudios(viewModel: viewModel, initial: true)
+            viewModel.fetchDetailGroups(tagId: selectedTag.id)
+            viewModel.fetchDetailTags(parentTagId: selectedTag.id)
+            linkedImages.refetchImages(viewModel: viewModel, initial: true)
+        }
+        // A tag moved in the hierarchy: this page's sub-tags (and what they hold) changed.
+        .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("TagParentsChanged"))) { note in
+            guard (note.userInfo?["tagId"] as? String) != selectedTag.id else { return }
+            viewModel.fetchDetailTags(parentTagId: selectedTag.id)
+        }
         .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("TagImageUpdated"))) { notification in
             guard let tagId = notification.userInfo?["tagId"] as? String,
                   tagId == selectedTag.id else { return }
@@ -1534,6 +1595,7 @@ struct TagDetailView: View {
         viewModel.fetchSavedFilters()
         linkedStudios.refetchStudios(viewModel: viewModel, initial: true)
         viewModel.fetchDetailGroups(tagId: selectedTag.id)
+        viewModel.fetchDetailTags(parentTagId: selectedTag.id)
         if viewModel.detailImages.isEmpty && !viewModel.isLoadingDetailImages {
             linkedImages.refetchImages(viewModel: viewModel, initial: true)
         }
@@ -1575,7 +1637,7 @@ struct TagDetailView: View {
                     }
                 }
             },
-            footer: { EmptyView() }
+            footer: { parentTagLinks }
         )
     }
 
@@ -1672,6 +1734,47 @@ struct TagDetailView: View {
         .measuresGridWidth($gridWidth)
     }
     
+    /// The tag's direct sub-tags, by name.
+    private var subTagGrid: some View {
+        LazyVGrid(columns: galleryColumns, spacing: 12) {
+            ForEach(viewModel.detailTags) { tag in
+                NavigationLink(destination: TagDetailView(selectedTag: tag)) {
+                    TagCardView(tag: tag)
+                }
+                .buttonStyle(.plain)
+            }
+            if viewModel.isLoadingDetailTags { ProgressView().padding() }
+            else if viewModel.hasMoreDetailTags {
+                Color.clear.onAppear { viewModel.fetchDetailTags(parentTagId: selectedTag.id, isInitialLoad: false) }
+            }
+        }
+    }
+
+    /// "Part of <parent>" links under the header, one per tag this one belongs to.
+    @ViewBuilder
+    private var parentTagLinks: some View {
+        if let parents = selectedTag.parents, !parents.isEmpty {
+            VStack(alignment: .leading, spacing: 6) {
+                ForEach(parents) { parent in
+                    NavigationLink(destination: TagDetailView(selectedTag: Tag(id: parent.id, name: parent.name ?? ""))) {
+                        HStack(spacing: 4) {
+                            Image(systemName: "tag")
+                            Text(tr("arg_part_of", parent.name ?? "")).lineLimit(1)
+                            Image(systemName: "chevron.right").font(.system(size: 9, weight: .bold))
+                        }
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundColor(appearanceManager.tintColor)
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+            .padding(.horizontal, 16)
+            .padding(.bottom, 10)
+            .padding(.trailing, 28)
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+    }
+
     private var groupGrid: some View {
         LazyVGrid(columns: columns, spacing: 12) {
             ForEach(viewModel.detailGroups) { group in
@@ -1721,12 +1824,36 @@ struct EditTagSheet: View {
     @State private var isSaving = false
     @State private var isDeleting = false
     @State private var showingDeleteConfirmation = false
+    /// The tags this one belongs to. Written as soon as they are picked, like a scene's tags.
+    @State private var parents: [Tag.TagRef] = []
+    @State private var showingParentPicker = false
 
     var body: some View {
         NavigationView {
             Form {
                 Section(tr("identity")) {
                     TextField(tr("name"), text: $name)
+                }
+                .listRowBackground(Color.secondaryAppBackground)
+
+                Section(tr("parent_tags")) {
+                    Button {
+                        showingParentPicker = true
+                    } label: {
+                        HStack {
+                            Image(systemName: "tag")
+                                .foregroundColor(appearanceManager.tintColor)
+                            Text(parents.isEmpty ? tr("none") : parents.map { $0.name ?? "" }.joined(separator: ", "))
+                                .foregroundColor(.primary)
+                                .lineLimit(2)
+                            Spacer()
+                            Image(systemName: "chevron.right")
+                                .font(.caption.weight(.semibold))
+                                .foregroundColor(.secondary)
+                        }
+                        .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
                 }
                 .listRowBackground(Color.secondaryAppBackground)
 
@@ -1798,6 +1925,15 @@ struct EditTagSheet: View {
                 name = tag.name
                 descriptionText = tag.description ?? ""
                 aliases = tag.aliases ?? []
+                parents = tag.parents ?? []
+            }
+            .sheet(isPresented: $showingParentPicker) {
+                ParentTagsPickerSheet(tagId: tag.id, current: parents, viewModel: viewModel) { picked in
+                    parents = picked
+                    var updated = tag
+                    updated.parents = picked
+                    onComplete(updated)
+                }
             }
             .alert(tr("action_delete_tag"), isPresented: $showingDeleteConfirmation) {
                 Button(tr("action_cancel"), role: .cancel) { }
@@ -1859,6 +1995,7 @@ struct EditTagSheet: View {
                     updated.name = trimmedName
                     updated.description = descriptionValue
                     if let aliasesValue { updated.aliases = aliasesValue }
+                    updated.parents = parents
                     onComplete(updated)
                     ToastManager.shared.show(tr("tag_updated"), icon: "checkmark.circle", style: .success)
                     dismiss()
@@ -1917,5 +2054,89 @@ struct TagImageView: View {
     }
 }
 
-#endif
 
+/// Picks the tags a tag belongs to: every tag by name, the tag itself left out, each with its
+/// number of sub-tags. Saves on its own, like the scene's tag picker.
+struct ParentTagsPickerSheet: View {
+    let tagId: String
+    let current: [Tag.TagRef]
+    @ObservedObject var viewModel: StashDBViewModel
+    var onComplete: ([Tag.TagRef]) -> Void
+
+    @Environment(\.stashyDismiss) private var dismiss
+    @ObservedObject private var appearanceManager = AppearanceManager.shared
+    @State private var allTags: [Tag] = []
+    @State private var isLoading = true
+    @State private var searchText = ""
+    @State private var selectedIds: Set<String> = []
+    @State private var isSaving = false
+
+    private var filtered: [Tag] {
+        let offered = allTags.filter { $0.id != tagId }
+        if searchText.isEmpty { return offered }
+        return offered.filter { $0.name.localizedCaseInsensitiveContains(searchText) }
+    }
+
+    var body: some View {
+        NavigationView {
+            Form {
+                Section(header: Text(tr("search_tags"))) {
+                    TextField(tr("placeholder_search"), text: $searchText)
+                    if isLoading {
+                        HStack { Spacer(); ProgressView(tr("loading")); Spacer() }.padding()
+                    } else {
+                        ForEach(filtered) { tag in
+                            HStack {
+                                Text(tag.name)
+                                Spacer()
+                                if let subTags = tag.childCount, subTags > 0 {
+                                    Text(tr(subTags == 1 ? "arg_count_sub_tag" : "arg_count_sub_tags", subTags))
+                                        .font(.caption).foregroundColor(.secondary)
+                                }
+                                if selectedIds.contains(tag.id) {
+                                    Image(systemName: "checkmark").foregroundColor(appearanceManager.tintColor)
+                                }
+                            }
+                            .contentShape(Rectangle())
+                            .onTapGesture {
+                                if selectedIds.contains(tag.id) { selectedIds.remove(tag.id) } else { selectedIds.insert(tag.id) }
+                            }
+                        }
+                    }
+                }
+                .listRowBackground(Color.secondaryAppBackground)
+            }
+            .applyAppBackground()
+            .scrollContentBackground(.hidden)
+            .stashyModalSheetChrome(tr("parent_tags"), onBack: { dismiss() }) {
+                StashyChromeTrailingTextButton(title: tr("action_save"), enabled: !isSaving && !isLoading, isBusy: isSaving) { save() }
+            }
+            .onAppear {
+                selectedIds = Set(current.map(\.id))
+                viewModel.fetchAllTagsByName { fetched in
+                    allTags = fetched
+                    isLoading = false
+                }
+            }
+        }
+    }
+
+    private func save() {
+        isSaving = true
+        // In the list's name order, so the row reads the same every time.
+        let picked = allTags.filter { selectedIds.contains($0.id) }.map { Tag.TagRef(id: $0.id, name: $0.name) }
+        viewModel.updateTagParents(tagId: tagId, parentIds: picked.map(\.id)) { success in
+            DispatchQueue.main.async {
+                isSaving = false
+                if success {
+                    onComplete(picked)
+                    dismiss()
+                } else {
+                    ToastManager.shared.show(tr("error_update_tags"), icon: "exclamationmark.triangle", style: .error)
+                }
+            }
+        }
+    }
+}
+
+#endif

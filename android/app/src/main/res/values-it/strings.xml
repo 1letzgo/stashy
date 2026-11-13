@@ -395,6 +395,8 @@
   <string name="arg_count_studios">%1$s studi</string>
   <string name="arg_count_sub_studio">%1$s sotto-studio</string>
   <string name="arg_count_sub_studios">%1$s sotto-studi</string>
+  <string name="arg_count_sub_tag">%1$s sotto-tag</string>
+  <string name="arg_count_sub_tags">%1$s sotto-tag</string>
   <string name="arg_count_tag">%1$s tag</string>
   <string name="arg_count_tags">%1$s tag</string>
   <string name="arg_count_weeks">%1$s settimane</string>
@@ -432,6 +434,7 @@
   <string name="arg_of_arg_items">%1$s di %2$s elementi</string>
   <string name="arg_outside_month">%1$s, fuori dal mese</string>
   <string name="arg_part_of">Parte di %1$s</string>
+  <string name="arg_part_of_and_more">Parte di %1$s +%2$s</string>
   <string name="arg_per_arg">%1$s/%2$s</string>
   <string name="arg_per_day">%1$s/giorno</string>
   <string name="arg_performer_times">%1$s× performer</string>
@@ -1054,6 +1057,7 @@
   <string name="hero_background">Sfondo hero</string>
   <string name="hidden">Nascosto</string>
   <string name="hide_sub_studios">Nascondi sotto-studi</string>
+  <string name="hide_sub_tags">Nascondi sotto-tag</string>
   <string name="high">Alto</string>
   <string name="highest_rated">Più votate</string>
   <string name="hint_added_to_servers_job_queue">Aggiunto alla coda di attività del server.</string>
@@ -1444,6 +1448,7 @@
   <string name="include_sub_groups">Includi sottogruppi</string>
   <string name="include_sub_studio_content">Includi i contenuti dei sotto-studi</string>
   <string name="include_sub_studios">Includi sotto-studi</string>
+  <string name="include_sub_tag_content">Includi i contenuti dei sotto-tag</string>
   <string name="include_sub_tags">Includi sotto-tag</string>
   <string name="incomplete_setup">Configurazione incompleta</string>
   <string name="increase">Aumenta</string>
@@ -1760,6 +1765,7 @@
   <string name="parent_count">Numero di genitori</string>
   <string name="parents">Genitori</string>
   <string name="parent_studio">Studio principale</string>
+  <string name="parent_tags">Tag principali</string>
   <string name="passcode">Codice</string>
   <string name="passcodes_do_not_match">I codici non corrispondono</string>
   <string name="password">Password</string>
@@ -2061,6 +2067,7 @@
   <string name="studio_updated">Studio aggiornato</string>
   <string name="sub_group_count">Numero di sottogruppi</string>
   <string name="sub_groups">Sottogruppi</string>
+  <string name="sub_tags">Sotto-tag</string>
   <string name="subtitle_external">Esterno</string>
   <string name="subtitle_forced">Forzato</string>
   <string name="subtitle_preview">Anteprima sottotitoli</string>

@@ -4285,7 +4285,7 @@ class StashDBViewModel: ObservableObject {
 
         if !tags.isEmpty {
             AppLog.debug("🔍 mergeFilterWithCriteria: Forcing Tags \(tags.map { $0.name })")
-            baseDict["tags"] = ["modifier": "INCLUDES", "value": tags.map(\.id), "depth": 0]
+            baseDict["tags"] = ["modifier": "INCLUDES", "value": tags.map(\.id), "depth": TagHierarchy.contentDepth]
         }
 
         if let studio {
@@ -4665,7 +4665,7 @@ class StashDBViewModel: ObservableObject {
             studioScope["scenes_filter"] = ["performers": ["value": [pid], "modifier": "INCLUDES"]]
         }
         if let tid = tagId {
-            studioScope["tags"] = ["value": [tid], "modifier": "INCLUDES"]
+            studioScope["tags"] = ["value": [tid], "modifier": "INCLUDES", "depth": TagHierarchy.contentDepth]
         }
         if let psid = parentStudioId {
             // `parents` is the criterion; StudioFilterType has no `parent_id`.
@@ -4718,6 +4718,7 @@ class StashDBViewModel: ObservableObject {
         performerId: String? = nil,
         studioId: String? = nil,
         groupId: String? = nil,
+        parentTagId: String? = nil,
         sortBy: TagSortOption = .nameAsc,
         isInitialLoad: Bool = true,
         filter: SavedFilter? = nil,
@@ -4734,9 +4735,13 @@ class StashDBViewModel: ObservableObject {
         }
         
         let page = isInitialLoad ? 1 : currentDetailTagPage + 1
-        let query = GraphQLQueries.queryWithFragments("findTags")
+        let query = GraphQLQueries.tagQuery("findTags")
         
         var tagScope: [String: Any] = [:]
+        if let parentId = parentTagId {
+            // The direct sub-tags of a tag (its "Sub-Tags" section).
+            tagScope["parents"] = ["value": [parentId], "modifier": "INCLUDES", "depth": 0]
+        }
         if let pid = performerId {
             // TagFilterType has no `performers`: the performer's tags are those of their scenes.
             tagScope["scenes_filter"] = ["performers": ["value": [pid], "modifier": "INCLUDES"]]
@@ -4804,7 +4809,7 @@ class StashDBViewModel: ObservableObject {
             groupFilter["performers"] = ["value": [pid], "modifier": "INCLUDES"]
         }
         if let tid = tagId {
-            groupFilter["tags"] = ["value": [tid], "modifier": "INCLUDES"]
+            groupFilter["tags"] = ["value": [tid], "modifier": "INCLUDES", "depth": TagHierarchy.contentDepth]
         }
         if let sid = studioId {
             groupFilter["studios"] = ["value": [sid], "modifier": "INCLUDES", "depth": StudioCountsStore.contentDepth]
@@ -4931,7 +4936,7 @@ class StashDBViewModel: ObservableObject {
             imageScope["performers"] = ["value": [pid], "modifier": "INCLUDES"]
         }
         if let tid = tagId {
-            imageScope["tags"] = ["value": [tid], "modifier": "INCLUDES"]
+            imageScope["tags"] = ["value": [tid], "modifier": "INCLUDES", "depth": TagHierarchy.contentDepth]
         }
         if let sid = studioId {
             imageScope["studios"] = ["value": [sid], "modifier": "INCLUDES", "depth": StudioCountsStore.contentDepth]
@@ -5277,7 +5282,7 @@ class StashDBViewModel: ObservableObject {
     }
     
     func fetchTag(tagId: String, completion: @escaping (Tag?) -> Void) {
-        let query = GraphQLQueries.queryWithFragments("findTag")
+        let query = GraphQLQueries.tagQuery("findTag")
         
         let variables: [String: Any] = ["id": tagId]
         
@@ -5500,18 +5505,22 @@ class StashDBViewModel: ObservableObject {
             ]
         }
         
+        // "Include sub-tag content" with the scene count sort: one page, sorted here.
+        let sortsBySceneCountAll = TagHierarchy.sortsBySceneCountAll(sortBy.sortField)
+        let ascending = sortBy.direction == "ASC"
+
         // Variables for GraphQL
         let variables: [String: Any] = [
             "filter": [
                 "page": page,
-                "per_page": tagsPerPage,
+                "per_page": sortsBySceneCountAll ? -1 : tagsPerPage,
                 "sort": sortBy.sortField == "random" ? randomSort(.tags) : sortBy.sortField,
                 "direction": sortBy.direction
             ],
             "tag_filter": sanitizeFilter(currentTagLiveFilter.isEmpty ? tagFilter : tagFilter.merging(currentTagLiveFilter) { _, new in new })
         ]
         
-        let query = GraphQLQueries.queryWithFragments("findTags")
+        let query = GraphQLQueries.tagQuery("findTags")
         
         guard let bodyData = try? JSONSerialization.data(withJSONObject: ["query": query, "variables": variables]),
               let bodyString = String(data: bodyData, encoding: .utf8) else {
@@ -5523,13 +5532,15 @@ class StashDBViewModel: ObservableObject {
                 DispatchQueue.main.async {
                     guard generation == self.tagsFetchGeneration else { return }
                     if isInitialLoad {
-                        self.tags = tagsResult.tags
+                        self.tags = sortsBySceneCountAll
+                            ? TagHierarchy.sortedBySceneCountAll(tagsResult.tags, ascending: ascending)
+                            : tagsResult.tags
                         self.totalTags = tagsResult.count
                     } else {
                         self.tags.append(contentsOf: tagsResult.tags)
                     }
                     
-                    self.hasMoreTags = tagsResult.tags.count == self.tagsPerPage
+                    self.hasMoreTags = !sortsBySceneCountAll && tagsResult.tags.count == self.tagsPerPage
                     
                     if isInitialLoad {
                         self.isLoadingTags = false
@@ -5904,7 +5915,8 @@ class StashDBViewModel: ObservableObject {
         
         sceneFilter["tags"] = [
             "modifier": "INCLUDES",
-            "value": [tagId]
+            "value": [tagId],
+            "depth": TagHierarchy.contentDepth
         ]
         sceneFilter = sanitizeFilter(sceneFilter)
         
@@ -5968,7 +5980,8 @@ class StashDBViewModel: ObservableObject {
         let scope: [String: Any] = [
             "tags": [
                 "value": [tagId],
-                "modifier": "INCLUDES"
+                "modifier": "INCLUDES",
+                "depth": TagHierarchy.contentDepth
             ]
         ]
         let effSaved = isInitialLoad ? filter : currentTagGalleryFilter
@@ -7739,6 +7752,35 @@ struct GenerateData: Codable {
 
     /// Updates tag metadata shown on the detail screen (edit mode).
     /// `aliases` nil leaves them untouched (a tag loaded without them must not lose its aliases).
+    /// Sets the tags a tag belongs to (empty = top level).
+    func updateTagParents(tagId: String, parentIds: [String], completion: @escaping (Bool) -> Void) {
+        let input: [String: Any] = ["id": tagId, "parent_ids": parentIds]
+        guard let bodyData = try? JSONSerialization.data(withJSONObject: ["query": GraphQLQueries.tagUpdateParentsMutation, "variables": ["input": input]]),
+              let bodyString = String(data: bodyData, encoding: .utf8) else {
+            completion(false)
+            return
+        }
+        performGraphQLQuery(query: bodyString) { (response: TagUpdateResponse?) in
+            let ok = response?.data?.tagUpdate != nil
+            // The tag moved in the hierarchy: the Tags list ("Hide sub-tags") and the sub-tag
+            // sections of open tag pages reload.
+            if ok { Self.postEntityUpdated("TagParentsChanged", key: "tagId", id: tagId) }
+            completion(ok)
+        }
+    }
+
+    /// Every tag in name order (the parent tag picker).
+    func fetchAllTagsByName(completion: @escaping ([Tag]) -> Void) {
+        let variables: [String: Any] = ["filter": ["per_page": -1, "sort": "name", "direction": "ASC"], "tag_filter": [:]]
+        guard let bodyData = try? JSONSerialization.data(withJSONObject: ["query": GraphQLQueries.queryWithFragments("findTags"), "variables": variables]),
+              let bodyString = String(data: bodyData, encoding: .utf8) else {
+            completion([]); return
+        }
+        performGraphQLQuery(query: bodyString) { (response: TagsResponse?) in
+            DispatchQueue.main.async { completion(response?.data?.findTags.tags ?? []) }
+        }
+    }
+
     func updateTagDetails(
         tagId: String,
         name: String,
@@ -10708,6 +10750,15 @@ struct FolderPickerResponse: Decodable {
     let data: DataField?
 }
 
+extension Tag {
+    /// A tag known by id and name only (a parent link); its page loads the rest. In an
+    /// extension, so the memberwise initializer stays.
+    init(id: String, name: String) {
+        self.init(id: id, name: name, description: nil, imagePath: nil, sceneCount: nil, imageCount: nil,
+                  galleryCount: nil, sceneMarkerCount: nil, performerCount: nil, favorite: nil, createdAt: nil, updatedAt: nil)
+    }
+}
+
 struct TagsData: Codable {
     let findTags: FindTagsResult
 }
@@ -10736,9 +10787,37 @@ struct Tag: Codable, Identifiable, Equatable {
     /// Nur von Abfragen gefüllt, die sie anfordern (Merge-Tools) — sonst nil.
     var aliases: [String]?
     var stashIds: [StashID]?
+    /// The tags this one belongs to (a tag can have several) and the number of its direct
+    /// sub-tags; only from `findTags` / `findTag`.
+    var parents: [TagRef]?
+    var childCount: Int?
+    /// Counts over all sub-tags; only while "Include sub-tag content" is on (`GraphQLQueries.tagQuery`).
+    var sceneCountAll: Int?
+    var imageCountAll: Int?
+    var galleryCountAll: Int?
+    var sceneMarkerCountAll: Int?
+    var performerCountAll: Int?
+
+    struct TagRef: Codable, Equatable, Identifiable {
+        let id: String
+        var name: String?
+    }
+
+    /// "Part of X" / "Part of X +2" for a sub-tag, nil for a top-level tag.
+    var partOfText: String? {
+        guard let parents, let first = parents.first else { return nil }
+        let name = first.name ?? ""
+        return parents.count == 1 ? tr("arg_part_of", name) : tr("arg_part_of_and_more", name, parents.count - 1)
+    }
     
     enum CodingKeys: String, CodingKey {
-        case id, name, favorite, description, aliases
+        case id, name, favorite, description, aliases, parents
+        case childCount = "child_count"
+        case sceneCountAll = "scene_count_all"
+        case imageCountAll = "image_count_all"
+        case galleryCountAll = "gallery_count_all"
+        case sceneMarkerCountAll = "scene_marker_count_all"
+        case performerCountAll = "performer_count_all"
         case stashIds = "stash_ids"
         case imagePath = "image_path"
         case sceneCount = "scene_count"
@@ -11999,7 +12078,7 @@ class DownloadManager: NSObject, ObservableObject {
             case .studio(let id):
                 return ["studios": ["value": [id], "modifier": "INCLUDES", "depth": StudioCountsStore.contentDepth]]
             case .tag(let id):
-                return ["tags": ["value": [id], "modifier": "INCLUDES", "depth": 0]]
+                return ["tags": ["value": [id], "modifier": "INCLUDES", "depth": TagHierarchy.contentDepth]]
             case .group(let id):
                 return ["groups": ["value": [id], "modifier": "INCLUDES"]]
             case .savedFilter(let sceneFilter):

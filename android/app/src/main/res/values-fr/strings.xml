@@ -395,6 +395,8 @@
   <string name="arg_count_studios">%1$s studios</string>
   <string name="arg_count_sub_studio">%1$s sous-studio</string>
   <string name="arg_count_sub_studios">%1$s sous-studios</string>
+  <string name="arg_count_sub_tag">%1$s sous-étiquette</string>
+  <string name="arg_count_sub_tags">%1$s sous-étiquettes</string>
   <string name="arg_count_tag">%1$s étiquette</string>
   <string name="arg_count_tags">%1$s étiquettes</string>
   <string name="arg_count_weeks">%1$s semaines</string>
@@ -432,6 +434,7 @@
   <string name="arg_of_arg_items">%1$s éléments sur %2$s</string>
   <string name="arg_outside_month">%1$s, hors du mois</string>
   <string name="arg_part_of">Fait partie de %1$s</string>
+  <string name="arg_part_of_and_more">Fait partie de %1$s +%2$s</string>
   <string name="arg_per_arg">%1$s/%2$s</string>
   <string name="arg_per_day">%1$s/jour</string>
   <string name="arg_performer_times">%1$s× performeur</string>
@@ -1054,6 +1057,7 @@
   <string name="hero_background">Arrière-plan de la bannière</string>
   <string name="hidden">Masqué</string>
   <string name="hide_sub_studios">Masquer les sous-studios</string>
+  <string name="hide_sub_tags">Masquer les sous-étiquettes</string>
   <string name="high">Élevée</string>
   <string name="highest_rated">Mieux notés</string>
   <string name="hint_added_to_servers_job_queue">Ajouté à la file de tâches du serveur.</string>
@@ -1444,6 +1448,7 @@
   <string name="include_sub_groups">Inclure les sous-groupes</string>
   <string name="include_sub_studio_content">Inclure le contenu des sous-studios</string>
   <string name="include_sub_studios">Inclure les sous-studios</string>
+  <string name="include_sub_tag_content">Inclure le contenu des sous-étiquettes</string>
   <string name="include_sub_tags">Inclure les sous-étiquettes</string>
   <string name="incomplete_setup">Configuration incomplète</string>
   <string name="increase">Augmenter</string>
@@ -1760,6 +1765,7 @@
   <string name="parent_count">Nombre de parents</string>
   <string name="parents">Parents</string>
   <string name="parent_studio">Studio parent</string>
+  <string name="parent_tags">Étiquettes parentes</string>
   <string name="passcode">Code</string>
   <string name="passcodes_do_not_match">Les codes ne correspondent pas</string>
   <string name="password">Mot de passe</string>
@@ -2061,6 +2067,7 @@
   <string name="studio_updated">Studio mis à jour</string>
   <string name="sub_group_count">Nombre de sous-groupes</string>
   <string name="sub_groups">Sous-groupes</string>
+  <string name="sub_tags">Sous-étiquettes</string>
   <string name="subtitle_external">Externe</string>
   <string name="subtitle_forced">Forcés</string>
   <string name="subtitle_preview">Aperçu des sous-titres</string>

@@ -2,5 +2,7 @@ query FindTag($id: ID!) {
   findTag(id: $id) {
     ...TagFields
     aliases
+    parents { id name }
+    child_count
   }
 }

@@ -395,6 +395,8 @@
   <string name="arg_count_studios">%1$s Studios</string>
   <string name="arg_count_sub_studio">%1$s Unterstudio</string>
   <string name="arg_count_sub_studios">%1$s Unterstudios</string>
+  <string name="arg_count_sub_tag">%1$s Unter-Tag</string>
+  <string name="arg_count_sub_tags">%1$s Unter-Tags</string>
   <string name="arg_count_tag">%1$s Tag</string>
   <string name="arg_count_tags">%1$s Tags</string>
   <string name="arg_count_weeks">%1$s Wochen</string>
@@ -432,6 +434,7 @@
   <string name="arg_of_arg_items">%1$s von %2$s Einträgen</string>
   <string name="arg_outside_month">%1$s, außerhalb des Monats</string>
   <string name="arg_part_of">Teil von %1$s</string>
+  <string name="arg_part_of_and_more">Teil von %1$s +%2$s</string>
   <string name="arg_per_arg">%1$s/%2$s</string>
   <string name="arg_per_day">%1$s/Tag</string>
   <string name="arg_performer_times">%1$s× Darsteller</string>
@@ -1054,6 +1057,7 @@
   <string name="hero_background">Hero-Hintergrund</string>
   <string name="hidden">Ausgeblendet</string>
   <string name="hide_sub_studios">Unterstudios ausblenden</string>
+  <string name="hide_sub_tags">Unter-Tags ausblenden</string>
   <string name="high">Hoch</string>
   <string name="highest_rated">Am besten bewertet</string>
   <string name="hint_added_to_servers_job_queue">Zur Job-Warteschlange des Servers hinzugefügt.</string>
@@ -1444,6 +1448,7 @@
   <string name="include_sub_groups">Untergruppen einbeziehen</string>
   <string name="include_sub_studio_content">Inhalte der Unterstudios einbeziehen</string>
   <string name="include_sub_studios">Unterstudios einbeziehen</string>
+  <string name="include_sub_tag_content">Inhalte der Unter-Tags einbeziehen</string>
   <string name="include_sub_tags">Unter-Tags einbeziehen</string>
   <string name="incomplete_setup">Unvollständige Einrichtung</string>
   <string name="increase">Erhöhen</string>
@@ -1760,6 +1765,7 @@
   <string name="parent_count">Anzahl Eltern</string>
   <string name="parents">Eltern</string>
   <string name="parent_studio">Übergeordnetes Studio</string>
+  <string name="parent_tags">Übergeordnete Tags</string>
   <string name="passcode">Code</string>
   <string name="passcodes_do_not_match">Die Codes stimmen nicht überein</string>
   <string name="password">Passwort</string>
@@ -2061,6 +2067,7 @@
   <string name="studio_updated">Studio aktualisiert</string>
   <string name="sub_group_count">Anzahl Untergruppen</string>
   <string name="sub_groups">Untergruppen</string>
+  <string name="sub_tags">Unter-Tags</string>
   <string name="subtitle_external">Extern</string>
   <string name="subtitle_forced">Erzwungen</string>
   <string name="subtitle_preview">Untertitelvorschau</string>

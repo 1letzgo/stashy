@@ -3,6 +3,7 @@ package de.letzgo.stashy.ui.components
 import de.letzgo.stashy.R
 import de.letzgo.stashy.tr
 import de.letzgo.stashy.ui.scaledIconSize
+import de.letzgo.stashy.data.partOfText
 import de.letzgo.stashy.ui.NativeMediaLabelBox
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -240,12 +241,26 @@ fun TagCard(tag: Tag, modifier: Modifier = Modifier, badge: CatalogCardBadge = C
             } else {
                 PlaceholderIcon(SF.number, Appearance.tint, 32)
             }
+            TagSubTagPill(tag, Modifier.align(Alignment.TopStart).padding(8.dp))
         }
         Row(Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text(tag.name, Modifier.weight(1f), style = NativeType.titleSmall, color = p.text, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Column(Modifier.weight(1f)) {
+                Text(tag.name, style = NativeType.titleSmall, color = p.text, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                // "Part of …" for a sub-tag.
+                tag.partOfText?.let { Text(it, style = NativeType.labelSmall, color = p.secondaryText, maxLines = 1, overflow = TextOverflow.Ellipsis) }
+            }
             tag.badgeCount(badge)?.let { (b, n) -> CountLabel(badgeIcon(b), n) }
         }
     } }
+}
+
+/** iOS (`TagCardView`): top left the number of the tag's direct sub-tags (tag icon + count, spoken as "N sub-tags"). */
+@Composable
+fun TagSubTagPill(tag: Tag, modifier: Modifier = Modifier) {
+    val subTags = tag.childCount ?: 0
+    if (subTags <= 0) return
+    val spoken = tr(if (subTags == 1) R.string.arg_count_sub_tag else R.string.arg_count_sub_tags, subTags)
+    CardPill(SF.tag, "$subTags", modifier.semantics { contentDescription = spoken })
 }
 
 /**

@@ -478,6 +478,28 @@ class GraphQLQueries {
         }
         """
 
+    /// `findTags` / `findTag`, with the counts over all sub-tags while "Include sub-tag
+    /// content" is on (`TagHierarchy`). The aliases stay out of `TagFields`: scenes use that
+    /// fragment for their tags.
+    static func tagQuery(_ name: String) -> String {
+        let query = queryWithFragments(name)
+        guard TagHierarchy.includesSubTagContent else { return query }
+        return query.replacingOccurrences(of: "...TagFields", with: """
+            ...TagFields
+                  scene_count_all: scene_count(depth: -1)
+                  image_count_all: image_count(depth: -1)
+                  gallery_count_all: gallery_count(depth: -1)
+                  scene_marker_count_all: scene_marker_count(depth: -1)
+                  performer_count_all: performer_count(depth: -1)
+            """)
+    }
+
+    static let tagUpdateParentsMutation = """
+        mutation TagUpdate($input: TagUpdateInput!) {
+            tagUpdate(input: $input) { id }
+        }
+        """
+
     static let tagUpdateDetailsMutation = """
         mutation TagUpdate($input: TagUpdateInput!) {
             tagUpdate(input: $input) { id name description aliases }

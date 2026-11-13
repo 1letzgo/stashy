@@ -395,6 +395,8 @@
   <string name="arg_count_studios">%1$s estudios</string>
   <string name="arg_count_sub_studio">%1$s subestudio</string>
   <string name="arg_count_sub_studios">%1$s subestudios</string>
+  <string name="arg_count_sub_tag">%1$s subetiqueta</string>
+  <string name="arg_count_sub_tags">%1$s subetiquetas</string>
   <string name="arg_count_tag">%1$s etiqueta</string>
   <string name="arg_count_tags">%1$s etiquetas</string>
   <string name="arg_count_weeks">%1$s semanas</string>
@@ -432,6 +434,7 @@
   <string name="arg_of_arg_items">%1$s de %2$s elementos</string>
   <string name="arg_outside_month">%1$s, fuera del mes</string>
   <string name="arg_part_of">Parte de %1$s</string>
+  <string name="arg_part_of_and_more">Parte de %1$s +%2$s</string>
   <string name="arg_per_arg">%1$s/%2$s</string>
   <string name="arg_per_day">%1$s/día</string>
   <string name="arg_performer_times">%1$s× intérprete</string>
@@ -1054,6 +1057,7 @@
   <string name="hero_background">Fondo del destacado</string>
   <string name="hidden">Oculto</string>
   <string name="hide_sub_studios">Ocultar subestudios</string>
+  <string name="hide_sub_tags">Ocultar subetiquetas</string>
   <string name="high">Alto</string>
   <string name="highest_rated">Mejor valorados</string>
   <string name="hint_added_to_servers_job_queue">Añadido a la cola de tareas del servidor.</string>
@@ -1444,6 +1448,7 @@
   <string name="include_sub_groups">Incluir subgrupos</string>
   <string name="include_sub_studio_content">Incluir contenido de subestudios</string>
   <string name="include_sub_studios">Incluir subestudios</string>
+  <string name="include_sub_tag_content">Incluir contenido de subetiquetas</string>
   <string name="include_sub_tags">Incluir subetiquetas</string>
   <string name="incomplete_setup">Configuración incompleta</string>
   <string name="increase">Aumentar</string>
@@ -1760,6 +1765,7 @@
   <string name="parent_count">Número de padres</string>
   <string name="parents">Padres</string>
   <string name="parent_studio">Estudio principal</string>
+  <string name="parent_tags">Etiquetas principales</string>
   <string name="passcode">Código</string>
   <string name="passcodes_do_not_match">Los códigos no coinciden</string>
   <string name="password">Contraseña</string>
@@ -2061,6 +2067,7 @@
   <string name="studio_updated">Estudio actualizado</string>
   <string name="sub_group_count">Número de subgrupos</string>
   <string name="sub_groups">Subgrupos</string>
+  <string name="sub_tags">Subetiquetas</string>
   <string name="subtitle_external">Externo</string>
   <string name="subtitle_forced">Forzado</string>
   <string name="subtitle_preview">Vista previa de subtítulos</string>

@@ -35,6 +35,8 @@ import de.letzgo.stashy.data.StashImage
 import de.letzgo.stashy.data.Studio
 import de.letzgo.stashy.data.StudioCountsStore
 import de.letzgo.stashy.data.SubStudios
+import de.letzgo.stashy.data.SubTags
+import de.letzgo.stashy.data.TagHierarchyStore
 import de.letzgo.stashy.data.Tag
 import de.letzgo.stashy.data.CatalogRepository
 import de.letzgo.stashy.data.SortOption
@@ -100,6 +102,13 @@ internal class LinkedCatalog(
      * "Include sub-studio content" read at query time (a switch change refetches the sections).
      */
     private val studioContentId: String? = null,
+    /**
+     * Tag page: every section but the sub-tags scopes on this tag, with the depth of
+     * "Include sub-tag content" read at query time (a switch change refetches the sections).
+     */
+    private val tagContentId: String? = null,
+    /** Sort the tag section starts with (a tag page lists its sub-tags by name). */
+    private val tagSortRaw: String = "sceneCountDesc",
 ) {
     /** Per row of the Images section (iOS `CatalogCardColumnScope.images`, set in the images sheet). */
     val imageColumns: Int get() = CatalogPrefs.cardColumns(CatalogCardColumnScope.Images).raw
@@ -119,6 +128,8 @@ internal class LinkedCatalog(
             scope = s,
             dynamicScope = studioContentId?.takeIf { mode != FilterMode.Studios }?.let { id ->
                 { SubStudios.studioScope(mode, id, StudioCountsStore.includeSubStudios) }
+            } ?: tagContentId?.takeIf { mode != FilterMode.Tags }?.let { id ->
+                { SubTags.tagScope(id, TagHierarchyStore.includeSubTagContent) }
             },
             initialSort = extraSorts.firstOrNull { it.raw == sortRaw }
                 ?: SortCatalog.option(mode, sortRaw) ?: SortCatalog.option(mode, SortCatalog.defaultRaw(mode)),
@@ -141,7 +152,7 @@ internal class LinkedCatalog(
     val galleryController = controller<Gallery>(FilterMode.Galleries, galleryScope, "dateDesc", 20)
     val studioController = controller<Studio>(FilterMode.Studios, studioScope, "nameAsc", 20)
     val performerController = controller<Performer>(FilterMode.Performers, performerScope, "nameAsc", 20)
-    val tagController = controller<Tag>(FilterMode.Tags, tagScope, "sceneCountDesc", 40)
+    val tagController = controller<Tag>(FilterMode.Tags, tagScope, tagSortRaw, 40)
     val groupController = controller<StashGroup>(FilterMode.Groups, groupScope, "nameAsc", 20)
 
     /** iOS `liveFilterMediaKind` of the Images section ("Type": Any / Image / Video). */

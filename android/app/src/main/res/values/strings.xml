@@ -2230,4 +2230,11 @@
     <string name="arg_count_sub_studio">%1$s sub-studio</string>
     <string name="arg_count_sub_studios">%1$s sub-studios</string>
     <string name="parent_studio">Parent Studio</string>
+    <string name="hide_sub_tags">Hide sub-tags</string>
+    <string name="include_sub_tag_content">Include sub-tag content</string>
+    <string name="sub_tags">Sub-Tags</string>
+    <string name="parent_tags">Parent Tags</string>
+    <string name="arg_part_of_and_more">Part of %1$s +%2$s</string>
+    <string name="arg_count_sub_tag">%1$s sub-tag</string>
+    <string name="arg_count_sub_tags">%1$s sub-tags</string>
 </resources>

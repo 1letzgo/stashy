@@ -183,6 +183,8 @@ fun EntityPickerSheet(
     serverSearch: (suspend (String) -> List<PickerEntry>)? = null,
     /** Every entry instead of the first 30 matches. */
     showsAll: Boolean = false,
+    /** False: no "Create <search>" row (a picker of existing entries only). */
+    allowsCreate: Boolean = true,
     avatars: Boolean = false,
     lockedIds: Set<String> = emptySet(),
     actionTitle: String = tr(R.string.action_save),
@@ -253,7 +255,7 @@ fun EntityPickerSheet(
                         }
                     }
                     if (!showsAll && filtered.size > 30) Text(tr(R.string.type_more_to_refine_menu), Modifier.padding(16.dp), style = NativeType.bodyMedium, color = p.secondaryText)
-                    if (search.isNotEmpty() && !anyMatch && !searching) {
+                    if (allowsCreate && search.isNotEmpty() && !anyMatch && !searching) {
                         FormRow(if (creating) null else ({
                             creating = true
                             val name = search
@@ -397,6 +399,28 @@ fun EditTagsSheet(scene: Scene, onDismiss: () -> Unit, onSaved: (List<Tag>) -> U
         createFailedText = tr(R.string.error_create_tag),
         save = { SceneEditing.updateTags(scene.id, it) }, saveFailedText = tr(R.string.error_update_tags),
         onSaved = { picked -> onSaved(picked.mapNotNull { byId[it.id] }) }, onDismiss = onDismiss,
+    )
+}
+
+/**
+ * iOS: `ParentTagsPickerSheet` — the tags a tag belongs to: every tag by name, [tagId] itself
+ * left out, each with its number of sub-tags. [save] writes at once; [onSaved] gets the picked
+ * tags (as loaded: id, name) in name order.
+ */
+@Composable
+fun EditParentTagsSheet(tagId: String, current: List<de.letzgo.stashy.data.IdName>, save: suspend (List<String>) -> Unit, onDismiss: () -> Unit, onSaved: (List<de.letzgo.stashy.data.IdName>) -> Unit) {
+    EntityPickerSheet(
+        tr(R.string.parent_tags), tr(R.string.search_tags), current.map { it.id }.toSet(), multiple = true,
+        showsAll = true, allowsCreate = false,
+        load = {
+            SceneEditing.allTagsByName().filter { it.id != tagId }.map { t ->
+                val n = t.childCount ?: 0
+                PickerEntry(t.id, t.name, if (n > 0) tr(if (n == 1) R.string.arg_count_sub_tag else R.string.arg_count_sub_tags, n) else null)
+            }
+        },
+        create = { error("not offered") }, createFailedText = tr(R.string.error_create_tag),
+        save = save, saveFailedText = tr(R.string.error_update_tags),
+        onSaved = { picked -> onSaved(picked.map { de.letzgo.stashy.data.IdName(it.id, it.name) }) }, onDismiss = onDismiss,
     )
 }
 

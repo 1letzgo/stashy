@@ -122,7 +122,7 @@ object FeedsQuery {
             target["tags"] = buildJsonObject {
                 put("modifier", JsonPrimitive("INCLUDES"))
                 put("value", JsonArray(criteria.tags.map { JsonPrimitive(it.id) }))
-                put("depth", JsonPrimitive(0))
+                put("depth", JsonPrimitive(TagHierarchyStore.contentDepth))
             }
         }
         criteria.studio?.let {

@@ -223,3 +223,33 @@ private struct TagsMergeResponse: Codable {
 
     let data: DataPart?
 }
+
+// MARK: - Sub-tags
+
+/// The two sub-tag settings, the counterpart of the sub-studio ones in `StudioCountsStore`.
+/// App settings, not filter criteria: the tag lists watch the keys and refetch.
+enum TagHierarchy {
+    /// "Hide sub-tags": the Tags list shows top-level tags only.
+    static let hideSubTagsKey = "tags_hide_sub_tags"
+    /// "Include sub-tag content": a tag's page shows what its sub-tags hold, the cards count it.
+    static let includeSubTagContentKey = "tags_include_sub_tag_content"
+
+    static var hidesSubTags: Bool { UserDefaults.standard.bool(forKey: hideSubTagsKey) }
+    static var includesSubTagContent: Bool { UserDefaults.standard.bool(forKey: includeSubTagContentKey) }
+    /// `depth` of a `tags` criterion that scopes a list to one tag.
+    static var contentDepth: Int { includesSubTagContent ? -1 : 0 }
+
+    /// Scene count sort while the content switch is on: Stash sorts by a tag's own scenes, so
+    /// the list is fetched whole and sorted here.
+    static func sortsBySceneCountAll(_ sortField: String) -> Bool {
+        sortField == "scenes_count" && includesSubTagContent
+    }
+
+    static func sortedBySceneCountAll(_ tags: [Tag], ascending: Bool) -> [Tag] {
+        tags.sorted { a, b in
+            let x = a.sceneCountAll ?? a.sceneCount ?? 0, y = b.sceneCountAll ?? b.sceneCount ?? 0
+            if x != y { return ascending ? x < y : x > y }
+            return a.name.localizedCaseInsensitiveCompare(b.name) == .orderedAscending
+        }
+    }
+}

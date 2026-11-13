@@ -3,6 +3,8 @@ query FindTags($filter: FindFilterType, $tag_filter: TagFilterType) {
     count
     tags {
       ...TagFields
+      parents { id name }
+      child_count
     }
   }
 }

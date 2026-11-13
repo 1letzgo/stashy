@@ -395,6 +395,8 @@
   <string name="arg_count_studios">%1$s studio\'s</string>
   <string name="arg_count_sub_studio">%1$s substudio</string>
   <string name="arg_count_sub_studios">%1$s substudio\'s</string>
+  <string name="arg_count_sub_tag">%1$s sublabel</string>
+  <string name="arg_count_sub_tags">%1$s sublabels</string>
   <string name="arg_count_tag">%1$s label</string>
   <string name="arg_count_tags">%1$s labels</string>
   <string name="arg_count_weeks">%1$s weken</string>
@@ -432,6 +434,7 @@
   <string name="arg_of_arg_items">%1$s van %2$s items</string>
   <string name="arg_outside_month">%1$s, buiten de maand</string>
   <string name="arg_part_of">Onderdeel van %1$s</string>
+  <string name="arg_part_of_and_more">Onderdeel van %1$s +%2$s</string>
   <string name="arg_per_arg">%1$s/%2$s</string>
   <string name="arg_per_day">%1$s/dag</string>
   <string name="arg_performer_times">%1$s× performer</string>
@@ -1054,6 +1057,7 @@
   <string name="hero_background">Hero-achtergrond</string>
   <string name="hidden">Verborgen</string>
   <string name="hide_sub_studios">Verberg substudio\'s</string>
+  <string name="hide_sub_tags">Verberg sublabels</string>
   <string name="high">Hoog</string>
   <string name="highest_rated">Hoogst beoordeeld</string>
   <string name="hint_added_to_servers_job_queue">Toegevoegd aan de takenwachtrij van de server.</string>
@@ -1444,6 +1448,7 @@
   <string name="include_sub_groups">Inclusief subgroepen</string>
   <string name="include_sub_studio_content">Inclusief inhoud van substudio\'s</string>
   <string name="include_sub_studios">Inclusief substudio\'s</string>
+  <string name="include_sub_tag_content">Inclusief inhoud van sublabels</string>
   <string name="include_sub_tags">Inclusief sublabels</string>
   <string name="incomplete_setup">Onvolledige configuratie</string>
   <string name="increase">Verhoog</string>
@@ -1760,6 +1765,7 @@
   <string name="parent_count">Aantal bovenliggende</string>
   <string name="parents">Bovenliggend</string>
   <string name="parent_studio">Bovenliggende studio</string>
+  <string name="parent_tags">Bovenliggende labels</string>
   <string name="passcode">Toegangscode</string>
   <string name="passcodes_do_not_match">Toegangscodes komen niet overeen</string>
   <string name="password">Wachtwoord</string>
@@ -2061,6 +2067,7 @@
   <string name="studio_updated">Studio bijgewerkt</string>
   <string name="sub_group_count">Aantal subgroepen</string>
   <string name="sub_groups">Subgroepen</string>
+  <string name="sub_tags">Sublabels</string>
   <string name="subtitle_external">Extern</string>
   <string name="subtitle_forced">Geforceerd</string>
   <string name="subtitle_preview">Voorvertoning ondertitel</string>

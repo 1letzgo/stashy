@@ -315,6 +315,10 @@ object SceneEditing {
     suspend fun allTags(sort: String = "scenes_count"): List<Tag> =
         findPage("findTags", "findTags", "tags", Tag.serializer(), FindFilter(1, 1000, sort = sort), "tag_filter", JsonObject(emptyMap())).items
 
+    /** Every tag in name order, with `parents` and `child_count` (the parent tag picker). */
+    suspend fun allTagsByName(): List<Tag> =
+        findPage("findTags", "findTags", "tags", Tag.serializer(), FindFilter(1, -1, sort = "name", direction = "ASC"), "tag_filter", JsonObject(emptyMap())).items
+
     /** iOS: `fetchAllPerformers`. */
     suspend fun allPerformers(): List<Performer> =
         findPage("findPerformers", "findPerformers", "performers", Performer.serializer(), FindFilter(1, 1000, sort = "scenes_count"), "performer_filter", JsonObject(emptyMap())).items

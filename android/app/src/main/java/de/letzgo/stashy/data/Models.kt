@@ -125,6 +125,16 @@ data class Tag(
     @SerialName("updated_at") val updatedAt: String? = null,
     /** Only `findTag` (detail) requests them; `null` = not loaded, never "no aliases". */
     val aliases: List<String>? = null,
+    /** The tags this one belongs to (a tag can have several) — only `findTags` / `findTag`. */
+    val parents: List<IdName>? = null,
+    /** Number of direct sub-tags — only `findTags` / `findTag`. */
+    @SerialName("child_count") val childCount: Int? = null,
+    /** Counts over all sub-tags; only while "Include sub-tag content" is on ([SubTags.withCountsAll]). */
+    @SerialName("scene_count_all") val sceneCountAll: Int? = null,
+    @SerialName("image_count_all") val imageCountAll: Int? = null,
+    @SerialName("gallery_count_all") val galleryCountAll: Int? = null,
+    @SerialName("scene_marker_count_all") val sceneMarkerCountAll: Int? = null,
+    @SerialName("performer_count_all") val performerCountAll: Int? = null,
 ) {
     val hasImage: Boolean get() = imagePath != null && !imagePath.contains("default=true")
     val imageURL: String? get() = imagePath?.let { Net.signed(it) }

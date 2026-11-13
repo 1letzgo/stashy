@@ -395,6 +395,8 @@
   <string name="arg_count_studios">%1$s 个工作室</string>
   <string name="arg_count_sub_studio">%1$s 个子工作室</string>
   <string name="arg_count_sub_studios">%1$s 个子工作室</string>
+  <string name="arg_count_sub_tag">%1$s 个子标签</string>
+  <string name="arg_count_sub_tags">%1$s 个子标签</string>
   <string name="arg_count_tag">%1$s 个标签</string>
   <string name="arg_count_tags">%1$s 个标签</string>
   <string name="arg_count_weeks">%1$s 周</string>
@@ -432,6 +434,7 @@
   <string name="arg_of_arg_items">%1$s / %2$s 项</string>
   <string name="arg_outside_month">%1$s，不在本月</string>
   <string name="arg_part_of">隶属于 %1$s</string>
+  <string name="arg_part_of_and_more">隶属于 %1$s +%2$s</string>
   <string name="arg_per_arg">%1$s/%2$s</string>
   <string name="arg_per_day">%1$s/天</string>
   <string name="arg_performer_times">%1$s× 演员</string>
@@ -1054,6 +1057,7 @@
   <string name="hero_background">头图背景</string>
   <string name="hidden">已隐藏</string>
   <string name="hide_sub_studios">隐藏子工作室</string>
+  <string name="hide_sub_tags">隐藏子标签</string>
   <string name="high">高</string>
   <string name="highest_rated">评分最高</string>
   <string name="hint_added_to_servers_job_queue">已添加到服务器的任务队列。</string>
@@ -1444,6 +1448,7 @@
   <string name="include_sub_groups">包含子集合</string>
   <string name="include_sub_studio_content">包含子工作室的内容</string>
   <string name="include_sub_studios">包含子工作室</string>
+  <string name="include_sub_tag_content">包含子标签的内容</string>
   <string name="include_sub_tags">包含子标签</string>
   <string name="incomplete_setup">设置不完整</string>
   <string name="increase">增加</string>
@@ -1760,6 +1765,7 @@
   <string name="parent_count">父项数量</string>
   <string name="parents">父项</string>
   <string name="parent_studio">上级工作室</string>
+  <string name="parent_tags">上级标签</string>
   <string name="passcode">密码</string>
   <string name="passcodes_do_not_match">密码不匹配</string>
   <string name="password">密码</string>
@@ -2061,6 +2067,7 @@
   <string name="studio_updated">工作室已更新</string>
   <string name="sub_group_count">子集合数量</string>
   <string name="sub_groups">子集合</string>
+  <string name="sub_tags">子标签</string>
   <string name="subtitle_external">外部</string>
   <string name="subtitle_forced">强制</string>
   <string name="subtitle_preview">字幕预览</string>

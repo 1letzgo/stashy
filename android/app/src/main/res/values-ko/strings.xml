@@ -395,6 +395,8 @@
   <string name="arg_count_studios">스튜디오 %1$s개</string>
   <string name="arg_count_sub_studio">하위 스튜디오 %1$s개</string>
   <string name="arg_count_sub_studios">하위 스튜디오 %1$s개</string>
+  <string name="arg_count_sub_tag">하위 태그 %1$s개</string>
+  <string name="arg_count_sub_tags">하위 태그 %1$s개</string>
   <string name="arg_count_tag">태그 %1$s개</string>
   <string name="arg_count_tags">태그 %1$s개</string>
   <string name="arg_count_weeks">%1$s주</string>
@@ -432,6 +434,7 @@
   <string name="arg_of_arg_items">%2$s개 중 %1$s개</string>
   <string name="arg_outside_month">%1$s, 해당 월 아님</string>
   <string name="arg_part_of">%1$s 소속</string>
+  <string name="arg_part_of_and_more">%1$s 소속 +%2$s</string>
   <string name="arg_per_arg">%1$s/%2$s</string>
   <string name="arg_per_day">%1$s/일</string>
   <string name="arg_performer_times">배우 %1$s×</string>
@@ -1054,6 +1057,7 @@
   <string name="hero_background">대표 배경</string>
   <string name="hidden">가려짐</string>
   <string name="hide_sub_studios">하위 스튜디오 숨기기</string>
+  <string name="hide_sub_tags">하위 태그 숨기기</string>
   <string name="high">높음</string>
   <string name="highest_rated">별점 높은 순</string>
   <string name="hint_added_to_servers_job_queue">서버의 작업 대기열에 추가되었습니다.</string>
@@ -1444,6 +1448,7 @@
   <string name="include_sub_groups">하위 그룹 포함</string>
   <string name="include_sub_studio_content">하위 스튜디오 콘텐츠 포함</string>
   <string name="include_sub_studios">하위 스튜디오 포함</string>
+  <string name="include_sub_tag_content">하위 태그 콘텐츠 포함</string>
   <string name="include_sub_tags">하위 태그 포함</string>
   <string name="incomplete_setup">설정 미완료</string>
   <string name="increase">늘리기</string>
@@ -1760,6 +1765,7 @@
   <string name="parent_count">상위 항목 수</string>
   <string name="parents">상위 항목</string>
   <string name="parent_studio">상위 스튜디오</string>
+  <string name="parent_tags">상위 태그</string>
   <string name="passcode">암호</string>
   <string name="passcodes_do_not_match">암호가 일치하지 않습니다</string>
   <string name="password">암호</string>
@@ -2061,6 +2067,7 @@
   <string name="studio_updated">스튜디오 업데이트됨</string>
   <string name="sub_group_count">하위 그룹 수</string>
   <string name="sub_groups">하위 그룹</string>
+  <string name="sub_tags">하위 태그</string>
   <string name="subtitle_external">외부</string>
   <string name="subtitle_forced">강제</string>
   <string name="subtitle_preview">자막 미리보기</string>

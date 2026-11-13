@@ -335,18 +335,22 @@ typealias BadgeCount = Pair<CatalogCardBadge, Int>
 private fun badgeOrScenes(badge: CatalogCardBadge, value: Int?, scenes: Int?): BadgeCount? =
     if (value != null) badge to value else scenes?.let { CatalogCardBadge.Scenes to it }
 
-fun Tag.badgeCount(badge: CatalogCardBadge): BadgeCount? = badgeOrScenes(
-    badge,
-    when (badge) {
-        CatalogCardBadge.Scenes -> sceneCount
-        CatalogCardBadge.Images -> imageCount
-        CatalogCardBadge.Galleries -> galleryCount
-        CatalogCardBadge.Performers, CatalogCardBadge.PerformersAll -> performerCount
-        CatalogCardBadge.Markers -> sceneMarkerCount
-        else -> null
-    },
-    sceneCount,
-)
+/** The counts over all sub-tags while "Include sub-tag content" is on and the tag came with them (iOS `TagCardView.shownCount`). */
+fun Tag.badgeCount(badge: CatalogCardBadge): BadgeCount? {
+    val all = TagHierarchyStore.includesContent
+    return badgeOrScenes(
+        badge,
+        when (badge) {
+            CatalogCardBadge.Scenes -> (if (all) sceneCountAll else null) ?: sceneCount
+            CatalogCardBadge.Images -> (if (all) imageCountAll else null) ?: imageCount
+            CatalogCardBadge.Galleries -> (if (all) galleryCountAll else null) ?: galleryCount
+            CatalogCardBadge.Performers, CatalogCardBadge.PerformersAll -> (if (all) performerCountAll else null) ?: performerCount
+            CatalogCardBadge.Markers -> (if (all) sceneMarkerCountAll else null) ?: sceneMarkerCount
+            else -> null
+        },
+        (if (all) sceneCountAll else null) ?: sceneCount,
+    )
+}
 
 fun StashGroup.badgeCount(badge: CatalogCardBadge): BadgeCount? = badgeOrScenes(
     badge,

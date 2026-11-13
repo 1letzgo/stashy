@@ -395,6 +395,8 @@
   <string name="arg_count_studios">%1$s 個工作室</string>
   <string name="arg_count_sub_studio">%1$s 個子工作室</string>
   <string name="arg_count_sub_studios">%1$s 個子工作室</string>
+  <string name="arg_count_sub_tag">%1$s 個子標籤</string>
+  <string name="arg_count_sub_tags">%1$s 個子標籤</string>
   <string name="arg_count_tag">%1$s 個標籤</string>
   <string name="arg_count_tags">%1$s 個標籤</string>
   <string name="arg_count_weeks">%1$s 週</string>
@@ -432,6 +434,7 @@
   <string name="arg_of_arg_items">%1$s / %2$s 項</string>
   <string name="arg_outside_month">%1$s，不在本月</string>
   <string name="arg_part_of">隸屬於 %1$s</string>
+  <string name="arg_part_of_and_more">隸屬於 %1$s +%2$s</string>
   <string name="arg_per_arg">%1$s/%2$s</string>
   <string name="arg_per_day">%1$s/天</string>
   <string name="arg_performer_times">%1$s× 演員</string>
@@ -1054,6 +1057,7 @@
   <string name="hero_background">主視覺背景</string>
   <string name="hidden">已隱藏</string>
   <string name="hide_sub_studios">隱藏子工作室</string>
+  <string name="hide_sub_tags">隱藏子標籤</string>
   <string name="high">高</string>
   <string name="highest_rated">評分最高</string>
   <string name="hint_added_to_servers_job_queue">已加入伺服器的工作佇列。</string>
@@ -1444,6 +1448,7 @@
   <string name="include_sub_groups">包含子群組</string>
   <string name="include_sub_studio_content">包含子工作室的內容</string>
   <string name="include_sub_studios">包含子工作室</string>
+  <string name="include_sub_tag_content">包含子標籤的內容</string>
   <string name="include_sub_tags">包含子標籤</string>
   <string name="incomplete_setup">設定未完成</string>
   <string name="increase">增加</string>
@@ -1760,6 +1765,7 @@
   <string name="parent_count">上層數量</string>
   <string name="parents">上層項目</string>
   <string name="parent_studio">上層工作室</string>
+  <string name="parent_tags">上層標籤</string>
   <string name="passcode">密碼</string>
   <string name="passcodes_do_not_match">密碼不相符</string>
   <string name="password">密碼</string>
@@ -2061,6 +2067,7 @@
   <string name="studio_updated">已更新工作室</string>
   <string name="sub_group_count">子群組數量</string>
   <string name="sub_groups">子群組</string>
+  <string name="sub_tags">子標籤</string>
   <string name="subtitle_external">外部</string>
   <string name="subtitle_forced">強制</string>
   <string name="subtitle_preview">字幕預覽</string>

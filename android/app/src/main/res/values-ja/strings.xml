@@ -395,6 +395,8 @@
   <string name="arg_count_studios">スタジオ%1$s件</string>
   <string name="arg_count_sub_studio">サブスタジオ %1$s 件</string>
   <string name="arg_count_sub_studios">サブスタジオ %1$s 件</string>
+  <string name="arg_count_sub_tag">サブタグ %1$s 件</string>
+  <string name="arg_count_sub_tags">サブタグ %1$s 件</string>
   <string name="arg_count_tag">タグ%1$s件</string>
   <string name="arg_count_tags">タグ%1$s件</string>
   <string name="arg_count_weeks">%1$s週間</string>
@@ -432,6 +434,7 @@
   <string name="arg_of_arg_items">%2$s件中%1$s件</string>
   <string name="arg_outside_month">%1$s、月の範囲外</string>
   <string name="arg_part_of">%1$s の一部</string>
+  <string name="arg_part_of_and_more">%1$s の一部 +%2$s</string>
   <string name="arg_per_arg">%1$s/%2$s</string>
   <string name="arg_per_day">%1$s/日</string>
   <string name="arg_performer_times">%1$s×出演者</string>
@@ -1054,6 +1057,7 @@
   <string name="hero_background">ヒーローの背景</string>
   <string name="hidden">非表示</string>
   <string name="hide_sub_studios">サブスタジオを非表示</string>
+  <string name="hide_sub_tags">サブタグを非表示</string>
   <string name="high">高</string>
   <string name="highest_rated">評価の高い順</string>
   <string name="hint_added_to_servers_job_queue">サーバーのジョブキューに追加しました。</string>
@@ -1444,6 +1448,7 @@
   <string name="include_sub_groups">サブグループを含む</string>
   <string name="include_sub_studio_content">サブスタジオのコンテンツを含む</string>
   <string name="include_sub_studios">サブスタジオを含む</string>
+  <string name="include_sub_tag_content">サブタグのコンテンツを含む</string>
   <string name="include_sub_tags">サブタグを含む</string>
   <string name="incomplete_setup">設定が不完全です</string>
   <string name="increase">増やす</string>
@@ -1760,6 +1765,7 @@
   <string name="parent_count">親の数</string>
   <string name="parents">親</string>
   <string name="parent_studio">親スタジオ</string>
+  <string name="parent_tags">親タグ</string>
   <string name="passcode">パスコード</string>
   <string name="passcodes_do_not_match">パスコードが一致しません</string>
   <string name="password">パスワード</string>
@@ -2061,6 +2067,7 @@
   <string name="studio_updated">スタジオを更新しました</string>
   <string name="sub_group_count">サブグループ数</string>
   <string name="sub_groups">サブグループ</string>
+  <string name="sub_tags">サブタグ</string>
   <string name="subtitle_external">外部</string>
   <string name="subtitle_forced">強制</string>
   <string name="subtitle_preview">字幕のプレビュー</string>

@@ -242,6 +242,11 @@ fun CatalogFilterCriteriaBody(document: CriteriaDocument, onChange: () -> Unit) 
             SubStudioOptionsCard(showsHide = false)
             Spacer(Modifier.height(16.dp))
         }
+        // A tag's page: "Include sub-tag content" tops the criteria area of every sheet.
+        if (LocalShowsSubTagContentOption.current) {
+            SubTagOptionsCard(showsHide = false)
+            Spacer(Modifier.height(16.dp))
+        }
         if (sections.isNotEmpty()) {
             QuickFiltersCard(document, sections, onChange)
             Spacer(Modifier.height(20.dp))

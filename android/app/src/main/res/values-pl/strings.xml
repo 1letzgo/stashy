@@ -395,6 +395,8 @@
   <string name="arg_count_studios">Studia: %1$s</string>
   <string name="arg_count_sub_studio">%1$s podstudio</string>
   <string name="arg_count_sub_studios">Podstudia: %1$s</string>
+  <string name="arg_count_sub_tag">%1$s podtag</string>
+  <string name="arg_count_sub_tags">Podtagi: %1$s</string>
   <string name="arg_count_tag">%1$s tag</string>
   <string name="arg_count_tags">Tagi: %1$s</string>
   <string name="arg_count_weeks">%1$s tyg.</string>
@@ -432,6 +434,7 @@
   <string name="arg_of_arg_items">%1$s z %2$s elementów</string>
   <string name="arg_outside_month">%1$s, poza miesiącem</string>
   <string name="arg_part_of">Część %1$s</string>
+  <string name="arg_part_of_and_more">Część %1$s +%2$s</string>
   <string name="arg_per_arg">%1$s/%2$s</string>
   <string name="arg_per_day">%1$s/dzień</string>
   <string name="arg_performer_times">%1$s× aktor</string>
@@ -1054,6 +1057,7 @@
   <string name="hero_background">Tło banera</string>
   <string name="hidden">Ukryte</string>
   <string name="hide_sub_studios">Ukryj podstudia</string>
+  <string name="hide_sub_tags">Ukryj podtagi</string>
   <string name="high">Wysoka</string>
   <string name="highest_rated">Najwyżej oceniane</string>
   <string name="hint_added_to_servers_job_queue">Dodano do kolejki zadań serwera.</string>
@@ -1444,6 +1448,7 @@
   <string name="include_sub_groups">Uwzględnij podgrupy</string>
   <string name="include_sub_studio_content">Uwzględnij zawartość podstudiów</string>
   <string name="include_sub_studios">Uwzględnij podstudia</string>
+  <string name="include_sub_tag_content">Uwzględnij zawartość podtagów</string>
   <string name="include_sub_tags">Uwzględnij podtagi</string>
   <string name="incomplete_setup">Niepełna konfiguracja</string>
   <string name="increase">Zwiększ</string>
@@ -1760,6 +1765,7 @@
   <string name="parent_count">Liczba nadrzędnych</string>
   <string name="parents">Nadrzędne</string>
   <string name="parent_studio">Studio nadrzędne</string>
+  <string name="parent_tags">Tagi nadrzędne</string>
   <string name="passcode">Kod</string>
   <string name="passcodes_do_not_match">Kody nie są zgodne</string>
   <string name="password">Hasło</string>
@@ -2061,6 +2067,7 @@
   <string name="studio_updated">Zaktualizowano studio</string>
   <string name="sub_group_count">Liczba podgrup</string>
   <string name="sub_groups">Podgrupy</string>
+  <string name="sub_tags">Podtagi</string>
   <string name="subtitle_external">Zewnętrzne</string>
   <string name="subtitle_forced">Wymuszone</string>
   <string name="subtitle_preview">Podgląd napisów</string>

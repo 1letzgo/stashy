@@ -395,6 +395,8 @@
   <string name="arg_count_studios">%1$s studioer</string>
   <string name="arg_count_sub_studio">%1$s understudio</string>
   <string name="arg_count_sub_studios">%1$s understudioer</string>
+  <string name="arg_count_sub_tag">%1$s undertagg</string>
+  <string name="arg_count_sub_tags">%1$s undertagger</string>
   <string name="arg_count_tag">%1$s tagg</string>
   <string name="arg_count_tags">%1$s tagger</string>
   <string name="arg_count_weeks">%1$s uker</string>
@@ -432,6 +434,7 @@
   <string name="arg_of_arg_items">%1$s av %2$s elementer</string>
   <string name="arg_outside_month">%1$s, utenfor måneden</string>
   <string name="arg_part_of">Del av %1$s</string>
+  <string name="arg_part_of_and_more">Del av %1$s +%2$s</string>
   <string name="arg_per_arg">%1$s/%2$s</string>
   <string name="arg_per_day">%1$s/dag</string>
   <string name="arg_performer_times">%1$s× utøver</string>
@@ -1054,6 +1057,7 @@
   <string name="hero_background">Hero-bakgrunn</string>
   <string name="hidden">Skjult</string>
   <string name="hide_sub_studios">Skjul understudioer</string>
+  <string name="hide_sub_tags">Skjul undertagger</string>
   <string name="high">Høy</string>
   <string name="highest_rated">Høyest vurdert</string>
   <string name="hint_added_to_servers_job_queue">Lagt til i serverens jobbkø.</string>
@@ -1444,6 +1448,7 @@
   <string name="include_sub_groups">Inkluder undergrupper</string>
   <string name="include_sub_studio_content">Inkluder innhold fra understudioer</string>
   <string name="include_sub_studios">Inkluder understudioer</string>
+  <string name="include_sub_tag_content">Inkluder innhold fra undertagger</string>
   <string name="include_sub_tags">Inkluder undertagger</string>
   <string name="incomplete_setup">Ufullstendig oppsett</string>
   <string name="increase">Øk</string>
@@ -1760,6 +1765,7 @@
   <string name="parent_count">Antall overordnede</string>
   <string name="parents">Overordnede</string>
   <string name="parent_studio">Overordnet studio</string>
+  <string name="parent_tags">Overordnede tagger</string>
   <string name="passcode">Kode</string>
   <string name="passcodes_do_not_match">Kodene samsvarer ikke</string>
   <string name="password">Passord</string>
@@ -2061,6 +2067,7 @@
   <string name="studio_updated">Studioet er oppdatert</string>
   <string name="sub_group_count">Antall undergrupper</string>
   <string name="sub_groups">Undergrupper</string>
+  <string name="sub_tags">Undertagger</string>
   <string name="subtitle_external">Ekstern</string>
   <string name="subtitle_forced">Tvunget</string>
   <string name="subtitle_preview">Forhåndsvisning av undertekst</string>

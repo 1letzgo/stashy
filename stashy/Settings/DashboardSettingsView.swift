@@ -365,6 +365,16 @@ struct DashboardSettingsView: View {
                     .padding(.bottom, 4)
                 }
 
+                if tab.id == .tags {
+                    settingRow(tr("hide_sub_tags")) {
+                        SubTagsToggle(hides: true)
+                    }
+                    settingRow(tr("include_sub_tag_content")) {
+                        SubTagsToggle(hides: false)
+                    }
+                    .padding(.bottom, 4)
+                }
+
                 settingRow(tr("default_sort")) {
                     CatalogDefaultSortMenu(tab: tab.id)
                 }
@@ -705,6 +715,31 @@ struct CatalogCardColumnsMenu: View {
                 .lineLimit(1)
                 .truncationMode(.tail)
         }
+    }
+}
+
+/// The two sub-tag switches (also in the Tags settings sheet, `SubTagOptionsCard`).
+private struct SubTagsToggle: View {
+    /// "Hide sub-tags" instead of "Include sub-tag content".
+    let hides: Bool
+    @AppStorage(TagHierarchy.includeSubTagContentKey) private var includesContent = false
+    @AppStorage(TagHierarchy.hideSubTagsKey) private var hidesSubTags = false
+    @ObservedObject var appearanceManager = AppearanceManager.shared
+
+    var body: some View {
+        Toggle("", isOn: Binding(
+            get: { hides ? hidesSubTags : includesContent },
+            set: { isOn in
+                if hides {
+                    hidesSubTags = isOn
+                    if isOn { includesContent = true }
+                } else {
+                    includesContent = isOn
+                }
+            }
+        ))
+            .labelsHidden()
+            .tint(appearanceManager.tintColor)
     }
 }
 

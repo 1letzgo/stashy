@@ -104,7 +104,7 @@ object DetailRepository {
     }
 
     suspend fun tag(id: String): Tag? {
-        val data = GraphQL.named("findTag", vars("id" to id))
+        val data = GraphQL.data(SubTags.withCountsAll(GraphQLQueries.load("findTag"), TagHierarchyStore.includesContent), vars("id" to id))
         return data["findTag"]?.takeIf { it !is JsonNull }?.let { GraphQL.decode(Tag.serializer(), it) }
     }
 
@@ -185,6 +185,14 @@ object DetailRepository {
         LibraryEvents.post(LibraryEvent.StudioPatched(id) { it.copy(parentStudio = parent) })
         LibraryEvents.post(LibraryEvent.StudioParentChanged(id))
     }
+
+    /** Sets the tags a tag belongs to (empty = top level); [tagParentsChanged] tells the lists. */
+    suspend fun setTagParents(id: String, parentIds: List<String>) = input(
+        "mutation TagUpdate(\$input: TagUpdateInput!) { tagUpdate(input: \$input) { id } }",
+        "tagUpdate", mapOf("id" to id, "parent_ids" to parentIds),
+    )
+
+    fun tagParentsChanged(id: String) { LibraryEvents.post(LibraryEvent.TagParentsChanged(id)) }
 
     /** [aliases] only goes into `TagUpdateInput` when non-null (a tag loaded without them keeps them). */
     suspend fun updateTag(id: String, name: String, description: String?, aliases: List<String>? = null) = input(

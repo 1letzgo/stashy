@@ -6,8 +6,24 @@ import de.letzgo.stashy.ui.tools.downloads.TagImagesDownloadDialog
 import de.letzgo.stashy.data.Downloads
 import de.letzgo.stashy.ui.tools.downloads.SceneBulkDownloadDialog
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.size
+import androidx.compose.material3.Text
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.sp
+import de.letzgo.stashy.data.FilterMode
+import de.letzgo.stashy.data.IdName
+import de.letzgo.stashy.data.LibraryEvent
+import de.letzgo.stashy.data.LibraryEvents
+import de.letzgo.stashy.data.SubTags
+import de.letzgo.stashy.data.TagHierarchyStore
+import de.letzgo.stashy.ui.filter.LocalShowsSubTagContentOption
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
@@ -50,7 +66,7 @@ import de.letzgo.stashy.ui.Theme
 import kotlinx.coroutines.launch
 
 /**
- * iOS: `TagDetailView` (TagsView.swift) — sections Scenes · Galleries · Studios · Groups ·
+ * iOS: `TagDetailView` (TagsView.swift) — sections Scenes · Galleries · Sub-Tags · Studios · Groups ·
  * Images, favorite, `EditTagSheet`.
  */
 class TagDetailScreen(val tagId: String, val preview: Tag? = null, private val filterPerformerId: String? = null) : Screen {
@@ -71,12 +87,17 @@ class TagDetailScreen(val tagId: String, val preview: Tag? = null, private val f
 
     private val catalog = LinkedCatalog(
         scope,
-        order = listOf(DetailTab.Scenes, DetailTab.Galleries, DetailTab.Studios, DetailTab.Groups, DetailTab.Images),
-        sceneScope = DetailRepository.scope("tags", tagId),
-        galleryScope = DetailRepository.scope("tags", tagId),
-        studioScope = DetailRepository.scope("tags", tagId),
-        groupScope = DetailRepository.scope("tags", tagId),
-        imageScope = DetailRepository.scope("tags", tagId),
+        order = listOf(DetailTab.Scenes, DetailTab.Galleries, DetailTab.Tags, DetailTab.Studios, DetailTab.Groups, DetailTab.Images),
+        // The depth of "Include sub-tag content" is read at query time (`tagContentId`).
+        sceneScope = SubTags.tagScope(tagId, false),
+        galleryScope = SubTags.tagScope(tagId, false),
+        studioScope = SubTags.tagScope(tagId, false),
+        groupScope = SubTags.tagScope(tagId, false),
+        imageScope = SubTags.tagScope(tagId, false),
+        // The direct sub-tags, by name.
+        tagScope = SubTags.subTagScope(tagId),
+        tagSortRaw = "nameAsc",
+        tagContentId = tagId,
         sceneContext = DetailViewContext.Tag,
         previewScenes = preview?.sceneCount ?: 0,
         previewGalleries = preview?.galleryCount ?: 0,
@@ -123,6 +144,23 @@ class TagDetailScreen(val tagId: String, val preview: Tag? = null, private val f
     override fun Content() {
         LaunchedEffect(Unit) { if (!started) { started = true; load() } }
         AutoSwitchTab(catalog, tab) { tab = it }
+        // "Include sub-tag content" (any filter sheet of this page) reloads every section and the tag's counts.
+        val includesContent = TagHierarchyStore.includeSubTagContent
+        var seenInclude by remember { mutableStateOf(includesContent) }
+        LaunchedEffect(includesContent) { if (includesContent != seenInclude) { seenInclude = includesContent; load() } }
+        // A tag moved in the hierarchy (another tag's parents): this page's header links may be stale.
+        LaunchedEffect(Unit) {
+            LibraryEvents.events.collect { event ->
+                if (event is LibraryEvent.TagParentsChanged && event.id != tagId) {
+                    runCatching { DetailRepository.tag(tagId) }.getOrNull()?.let { tag = it }
+                }
+            }
+        }
+        CompositionLocalProvider(LocalShowsSubTagContentOption provides true) { Body() }
+    }
+
+    @Composable
+    private fun Body() {
         Box(Modifier.fillMaxSize().background(Theme.palette.background)) {
             DetailGrid(gridState, { w -> columnsFor(tab, w, catalog.imageColumns) }, header = { tag?.let { Header(it) } }) {
                 linkedSection(catalog, tab, gridState)
@@ -139,6 +177,7 @@ class TagDetailScreen(val tagId: String, val preview: Tag? = null, private val f
                 settings = catalog.settingsSlot(tab), sort = catalog.controller(tab),
                 isFavorite = isFavorite, favoriteBusy = favoriteBusy, onFavorite = ::toggleFavorite,
                 onEdit = { editing = true }, editLabel = tr(R.string.action_edit_tag),
+                tabTitle = { if (it == DetailTab.Tags) tr(R.string.sub_tags) else it.title },
             )
         }
         LinkedSettingsSheets(catalog)
@@ -176,7 +215,26 @@ class TagDetailScreen(val tagId: String, val preview: Tag? = null, private val f
             } ?: DetailHero(DetailHero.Style.Cover, null, Color.Black, tr(R.string.action_open_image), null) { HeroPlaceholder(SF.number) },
             collapsedItemCount = 4,
             titleAccessory = { color -> FeedsPill(color) { DetailFeedsLink.navigate(DetailFeedsLink.Target.Tag(t.id, t.name)) } },
+            footer = t.parents?.takeIf { it.isNotEmpty() }?.let { parents ->
+                {
+                    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) { parents.forEach { PartOfLink(it) } }
+                }
+            },
         )
+    }
+
+    /** "Part of <parent>" — one line per parent, opens that tag's page. */
+    @Composable
+    private fun PartOfLink(parent: IdName) {
+        val color = de.letzgo.stashy.ui.textAccent()
+        Row(
+            Modifier.clickable { Nav.push(TagDetailScreen(parent.id, Tag(id = parent.id, name = parent.name ?: ""))) },
+            verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp),
+        ) {
+            Icon(SF.tag, null, Modifier.size(14.dp), tint = color)
+            Text(tr(R.string.arg_part_of, parent.name ?: ""), fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = color, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false))
+            Icon(de.letzgo.stashy.ui.SFS.chevronRight, null, Modifier.size(9.dp), tint = color)
+        }
     }
 
     /**
@@ -201,6 +259,21 @@ class TagDetailScreen(val tagId: String, val preview: Tag? = null, private val f
             aliases = EditParsing.addingAlias(aliases, newAlias, name.value)
             newAlias = ""
         }
+        // The parents are written as soon as they are picked, like a scene's tags.
+        var parents by remember(tag.id) { mutableStateOf(tag.parents.orEmpty()) }
+        var pickingParents by remember { mutableStateOf(false) }
+        if (pickingParents) {
+            de.letzgo.stashy.ui.scene.EditParentTagsSheet(
+                tagId = tag.id, current = parents,
+                save = { ids -> if (!DetailRepository.setTagParents(tag.id, ids)) error("tagUpdate failed") },
+                onDismiss = { pickingParents = false },
+                onSaved = { picked ->
+                    parents = picked
+                    DetailRepository.tagParentsChanged(tag.id)
+                    onSaved(tag.copy(parents = picked))
+                },
+            )
+        }
         EditEntitySheet(
             title = tr(R.string.action_edit_tag), sections = sections,
             deleteLabel = tr(R.string.action_delete_tag), deleteTitle = tr(R.string.action_delete_tag), entityName = tag.name,
@@ -211,7 +284,7 @@ class TagDetailScreen(val tagId: String, val preview: Tag? = null, private val f
                 val aliasesValue = if (loadedAliases == null) null else aliases
                 val ok = DetailRepository.updateTag(tag.id, name.trimmed, description.optional, aliasesValue)
                 if (ok) {
-                    onSaved(tag.copy(name = name.trimmed, description = description.optional, aliases = aliasesValue ?: tag.aliases))
+                    onSaved(tag.copy(name = name.trimmed, description = description.optional, aliases = aliasesValue ?: tag.aliases, parents = parents))
                     detailToast(tr(R.string.tag_updated))
                 } else detailToast(tr(R.string.error_update_tag))
                 ok
@@ -222,6 +295,15 @@ class TagDetailScreen(val tagId: String, val preview: Tag? = null, private val f
                 Nav.pop()
             },
             extraSections = {
+                Spacer(Modifier.height(20.dp))
+                NativeSectionHeader(tr(R.string.parent_tags))
+                NativeGroup {
+                    NativeListItem(
+                        parents.joinToString(", ") { it.name ?: "" }.ifEmpty { tr(R.string.none) },
+                        icon = SF.tag,
+                        onClick = { pickingParents = true },
+                    )
+                }
                 if (loadedAliases != null) {
                     Spacer(Modifier.height(20.dp))
                     NativeSectionHeader(tr(R.string.aliases))

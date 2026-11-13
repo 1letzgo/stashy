@@ -1,5 +1,7 @@
 package de.letzgo.stashy.ui.detail
 
+import de.letzgo.stashy.data.partOfText
+
 import de.letzgo.stashy.R
 import de.letzgo.stashy.tr
 import de.letzgo.stashy.ui.scaledMaxLines
@@ -161,15 +163,16 @@ private fun CountLabel(icon: ImageVector, count: Int) {
 
 /** Logo block (2.2:1, studio header grey) + name row with the one count the list is sorted by (iOS `StudioCardView` / `TagCardView`). */
 @Composable
-private fun LogoCard(modifier: Modifier, onClick: (() -> Unit)?, name: String, count: BadgeCount?, parentName: String? = null, logo: @Composable BoxScope.() -> Unit) {
+private fun LogoCard(modifier: Modifier, onClick: (() -> Unit)?, name: String, count: BadgeCount?, parentName: String? = null, caption: String? = null, logo: @Composable BoxScope.() -> Unit) {
     val p = Theme.palette
     NativeCard(modifier.fillMaxWidth(), onClick = onClick) { Column(Modifier.fillMaxWidth()) {
         Box(Modifier.fillMaxWidth().aspectRatio(2.2f).background(p.studioHeader).clip(RoundedCornerShape(0.dp)), content = logo)
         Row(Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
                 Text(name, style = NativeType.titleSmall, color = p.text, maxLines = scaledMaxLines(), overflow = TextOverflow.Ellipsis)
-                if (!parentName.isNullOrEmpty()) {
-                    Text(tr(R.string.arg_part_of, parentName), style = NativeType.labelSmall, color = p.secondaryText, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                val line = caption ?: parentName?.takeIf { it.isNotEmpty() }?.let { tr(R.string.arg_part_of, it) }
+                if (!line.isNullOrEmpty()) {
+                    Text(line, style = NativeType.labelSmall, color = p.secondaryText, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 }
             }
             count?.let { (badge, n) -> CountLabel(de.letzgo.stashy.ui.components.badgeIcon(badge), n) }
@@ -206,9 +209,10 @@ internal fun TagImage(tag: Tag, modifier: Modifier = Modifier) {
 /** iOS: `TagCardView`. */
 @Composable
 internal fun DetailTagCard(tag: Tag, modifier: Modifier = Modifier, badge: CatalogCardBadge = CatalogCardBadge.Scenes, onClick: (() -> Unit)? = null) {
-    LogoCard(modifier, onClick, tag.name, tag.badgeCount(badge)) {
+    LogoCard(modifier, onClick, tag.name, tag.badgeCount(badge), caption = tag.partOfText) {
         if (tag.hasImage) TagImage(tag, Modifier.fillMaxSize())
         else Icon(SF.number, null, tint = Appearance.tint, modifier = Modifier.align(Alignment.Center).size(32.dp))
+        de.letzgo.stashy.ui.components.TagSubTagPill(tag, Modifier.align(Alignment.TopStart).padding(8.dp))
     }
 }
 

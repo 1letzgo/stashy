@@ -115,13 +115,21 @@ fun TagsCatalog() {
 
 @Composable
 fun TagsList(c: CatalogController<Tag>, topPadding: androidx.compose.ui.unit.Dp = catalogTopPadding()) {
+    // "Hide sub-tags" / "Include sub-tag content" are app settings: the list refetches when
+    // they change (not on first composition); the cards' counts and the scene count order follow.
+    val hidesSubTags = de.letzgo.stashy.data.TagHierarchyStore.hideSubTags
+    var seenHide by androidx.compose.runtime.remember { mutableStateOf(hidesSubTags) }
+    LaunchedEffect(hidesSubTags) { if (hidesSubTags != seenHide) { seenHide = hidesSubTags; c.refetch() } }
+    val includesContent = de.letzgo.stashy.data.TagHierarchyStore.includeSubTagContent
+    var seenInclude by androidx.compose.runtime.remember { mutableStateOf(includesContent) }
+    LaunchedEffect(includesContent) { if (includesContent != seenInclude) { seenInclude = includesContent; c.refetch() } }
     CatalogScaffold(
         c, CatalogTexts(tr(R.string.loading_tags), SF.tag, tr(R.string.empty_tags_found), tr(R.string.action_load_tags)),
         CatalogSlots(), posterColumns, { it.id }, topPadding, gridKey = c.listResetToken,
     ) { _, tag ->
         TagCard(tag, badge = CatalogCardBadge.forSort(c.sort), onClick = { Nav.push(TagDetailScreen(tag.id, tag)) })
     }
-    CatalogFilterSortSheet(c)
+    CatalogFilterSortSheet(c) { de.letzgo.stashy.ui.filter.SubTagOptionsCard(showsHide = true) }
 }
 
 /** iOS: `GroupsView` (CatalogsView.swift) — sorting via the filter & sort sheet (sort menu, no local presets). */

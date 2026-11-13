@@ -5,6 +5,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.compositionLocalOf
 import de.letzgo.stashy.R
 import de.letzgo.stashy.data.StudioCountsStore
+import de.letzgo.stashy.data.TagHierarchyStore
 import de.letzgo.stashy.tr
 import de.letzgo.stashy.ui.NativeDivider
 
@@ -24,5 +25,23 @@ fun SubStudioOptionsCard(showsHide: Boolean) {
             NativeDivider()
         }
         ControlToggleRow(tr(R.string.include_sub_studio_content), StudioCountsStore.includeSubStudios) { StudioCountsStore.includeSubStudios = it }
+    }
+}
+
+/** Set by a tag's page: its filter sheets then offer "Include sub-tag content" (iOS `showsSubTagContentOption`). */
+val LocalShowsSubTagContentOption = compositionLocalOf { false }
+
+/**
+ * iOS: `SubTagOptionsCard` — the sub-tag switches of the Tags settings sheet ([showsHide]) and
+ * of a tag's page. App settings ([de.letzgo.stashy.data.TagHierarchyStore]), not filter criteria.
+ */
+@Composable
+fun SubTagOptionsCard(showsHide: Boolean) {
+    ControlGroup {
+        if (showsHide) {
+            ControlToggleRow(tr(R.string.hide_sub_tags), TagHierarchyStore.hideSubTags) { TagHierarchyStore.hideSubTags = it }
+            NativeDivider()
+        }
+        ControlToggleRow(tr(R.string.include_sub_tag_content), TagHierarchyStore.includeSubTagContent) { TagHierarchyStore.includeSubTagContent = it }
     }
 }

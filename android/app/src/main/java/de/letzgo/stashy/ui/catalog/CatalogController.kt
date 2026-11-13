@@ -42,6 +42,8 @@ import de.letzgo.stashy.data.SortCatalog
 import de.letzgo.stashy.data.SortOption
 import de.letzgo.stashy.data.StudioCountsStore
 import de.letzgo.stashy.data.SubStudios
+import de.letzgo.stashy.data.SubTags
+import de.letzgo.stashy.data.TagHierarchyStore
 import de.letzgo.stashy.data.criteriaObjectFilter
 import de.letzgo.stashy.data.filterMode
 import de.letzgo.stashy.data.filterDict
@@ -188,6 +190,13 @@ class CatalogController<T>(
                 if (event is LibraryEvent.StudioParentChanged) refresh()
             }
         }
+        // A tag moved in the hierarchy: it joins or leaves the top level ("Hide sub-tags") or a
+        // tag's sub-tag section, and the cards' "Part of …" and sub-tag counts change.
+        if (mode == FilterMode.Tags) coroutineScope.launch {
+            LibraryEvents.events.collect { event ->
+                if (event is LibraryEvent.TagParentsChanged) refresh()
+            }
+        }
         // iOS `PerformerImageUpdated` → `patchPerformerImageInLists`.
         if (mode == FilterMode.Performers) coroutineScope.launch {
             PerformerEvents.events.collect { event ->
@@ -208,6 +217,11 @@ class CatalogController<T>(
         if (mode == FilterMode.Studios && scope == null) {
             val own = JsonObject((fetchBaseFilter?.filterDict ?: JsonObject(emptyMap())) + (live ?: JsonObject(emptyMap())))
             SubStudios.hideCriterion(StudioCountsStore.hideSubStudios, search, own)?.let { live = JsonObject((live ?: JsonObject(emptyMap())) + it) }
+        }
+        // "Hide sub-tags": the Tags list (not a tag's sub-tag section) shows top-level tags only.
+        if (mode == FilterMode.Tags && scope == null) {
+            val own = JsonObject((fetchBaseFilter?.filterDict ?: JsonObject(emptyMap())) + (live ?: JsonObject(emptyMap())))
+            SubTags.hideCriterion(TagHierarchyStore.hideSubTags, search, own)?.let { live = JsonObject((live ?: JsonObject(emptyMap())) + it) }
         }
         return CatalogQuery(mode, sort, search, fetchBaseFilter, live, dynamicScope?.invoke() ?: scope)
     }

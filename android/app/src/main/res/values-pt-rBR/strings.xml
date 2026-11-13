@@ -395,6 +395,8 @@
   <string name="arg_count_studios">%1$s estúdios</string>
   <string name="arg_count_sub_studio">%1$s subestúdio</string>
   <string name="arg_count_sub_studios">%1$s subestúdios</string>
+  <string name="arg_count_sub_tag">%1$s subetiqueta</string>
+  <string name="arg_count_sub_tags">%1$s subetiquetas</string>
   <string name="arg_count_tag">%1$s etiqueta</string>
   <string name="arg_count_tags">%1$s etiquetas</string>
   <string name="arg_count_weeks">%1$s semanas</string>
@@ -432,6 +434,7 @@
   <string name="arg_of_arg_items">%1$s de %2$s itens</string>
   <string name="arg_outside_month">%1$s, fora do mês</string>
   <string name="arg_part_of">Parte de %1$s</string>
+  <string name="arg_part_of_and_more">Parte de %1$s +%2$s</string>
   <string name="arg_per_arg">%1$s/%2$s</string>
   <string name="arg_per_day">%1$s/dia</string>
   <string name="arg_performer_times">%1$s× artista</string>
@@ -1054,6 +1057,7 @@
   <string name="hero_background">Fundo do destaque</string>
   <string name="hidden">Oculto</string>
   <string name="hide_sub_studios">Ocultar subestúdios</string>
+  <string name="hide_sub_tags">Ocultar subetiquetas</string>
   <string name="high">Alto</string>
   <string name="highest_rated">Mais bem avaliados</string>
   <string name="hint_added_to_servers_job_queue">Adicionado à fila de tarefas do servidor.</string>
@@ -1444,6 +1448,7 @@
   <string name="include_sub_groups">Incluir subgrupos</string>
   <string name="include_sub_studio_content">Incluir conteúdo dos subestúdios</string>
   <string name="include_sub_studios">Incluir subestúdios</string>
+  <string name="include_sub_tag_content">Incluir conteúdo das subetiquetas</string>
   <string name="include_sub_tags">Incluir subetiquetas</string>
   <string name="incomplete_setup">Configuração incompleta</string>
   <string name="increase">Aumentar</string>
@@ -1760,6 +1765,7 @@
   <string name="parent_count">Número de pais</string>
   <string name="parents">Pais</string>
   <string name="parent_studio">Estúdio principal</string>
+  <string name="parent_tags">Etiquetas principais</string>
   <string name="passcode">Código</string>
   <string name="passcodes_do_not_match">Os códigos não coincidem</string>
   <string name="password">Senha</string>
@@ -2061,6 +2067,7 @@
   <string name="studio_updated">Estúdio atualizado</string>
   <string name="sub_group_count">Número de subgrupos</string>
   <string name="sub_groups">Subgrupos</string>
+  <string name="sub_tags">Subetiquetas</string>
   <string name="subtitle_external">Externa</string>
   <string name="subtitle_forced">Forçada</string>
   <string name="subtitle_preview">Pré-visualização da legenda</string>

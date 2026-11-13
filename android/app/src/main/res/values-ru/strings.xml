@@ -395,6 +395,8 @@
   <string name="arg_count_studios">Студии: %1$s</string>
   <string name="arg_count_sub_studio">%1$s дочерняя студия</string>
   <string name="arg_count_sub_studios">Дочерних студий: %1$s</string>
+  <string name="arg_count_sub_tag">%1$s вложенный тег</string>
+  <string name="arg_count_sub_tags">Вложенных тегов: %1$s</string>
   <string name="arg_count_tag">%1$s тег</string>
   <string name="arg_count_tags">Теги: %1$s</string>
   <string name="arg_count_weeks">%1$s нед.</string>
@@ -432,6 +434,7 @@
   <string name="arg_of_arg_items">%1$s из %2$s элементов</string>
   <string name="arg_outside_month">%1$s, вне месяца</string>
   <string name="arg_part_of">Входит в %1$s</string>
+  <string name="arg_part_of_and_more">Входит в %1$s +%2$s</string>
   <string name="arg_per_arg">%1$s/%2$s</string>
   <string name="arg_per_day">%1$s/день</string>
   <string name="arg_performer_times">%1$s× исполнитель</string>
@@ -1054,6 +1057,7 @@
   <string name="hero_background">Фон баннера</string>
   <string name="hidden">Скрыто</string>
   <string name="hide_sub_studios">Скрыть дочерние студии</string>
+  <string name="hide_sub_tags">Скрыть вложенные теги</string>
   <string name="high">Высокий</string>
   <string name="highest_rated">Высший рейтинг</string>
   <string name="hint_added_to_servers_job_queue">Добавлено в очередь задач сервера.</string>
@@ -1444,6 +1448,7 @@
   <string name="include_sub_groups">Включая подгруппы</string>
   <string name="include_sub_studio_content">Включая контент дочерних студий</string>
   <string name="include_sub_studios">Включая дочерние студии</string>
+  <string name="include_sub_tag_content">Включая контент вложенных тегов</string>
   <string name="include_sub_tags">Включая вложенные теги</string>
   <string name="incomplete_setup">Настройка не завершена</string>
   <string name="increase">Увеличить</string>
@@ -1760,6 +1765,7 @@
   <string name="parent_count">Число родительских</string>
   <string name="parents">Родительские</string>
   <string name="parent_studio">Родительская студия</string>
+  <string name="parent_tags">Родительские теги</string>
   <string name="passcode">Код-пароль</string>
   <string name="passcodes_do_not_match">Код-пароли не совпадают</string>
   <string name="password">Пароль</string>
@@ -2061,6 +2067,7 @@
   <string name="studio_updated">Студия обновлена</string>
   <string name="sub_group_count">Количество подгрупп</string>
   <string name="sub_groups">Подгруппы</string>
+  <string name="sub_tags">Вложенные теги</string>
   <string name="subtitle_external">Внешние</string>
   <string name="subtitle_forced">Принудительные</string>
   <string name="subtitle_preview">Предпросмотр субтитров</string>

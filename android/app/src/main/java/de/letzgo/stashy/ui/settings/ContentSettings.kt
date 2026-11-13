@@ -253,6 +253,10 @@ private fun CatalogTabCard(tab: TabConfig, handle: Modifier) {
             CardSettingRow(tr(R.string.hide_sub_studios)) { SettingsSwitch(de.letzgo.stashy.data.StudioCountsStore.hideSubStudios) { de.letzgo.stashy.data.StudioCountsStore.hideSubStudios = it } }
             CardSettingRow(tr(R.string.include_sub_studio_content)) { SettingsSwitch(de.letzgo.stashy.data.StudioCountsStore.includeSubStudios) { de.letzgo.stashy.data.StudioCountsStore.includeSubStudios = it } }
         }
+        if (tab.id == AppTab.Tags) {
+            CardSettingRow(tr(R.string.hide_sub_tags)) { SettingsSwitch(de.letzgo.stashy.data.TagHierarchyStore.hideSubTags) { de.letzgo.stashy.data.TagHierarchyStore.hideSubTags = it } }
+            CardSettingRow(tr(R.string.include_sub_tag_content)) { SettingsSwitch(de.letzgo.stashy.data.TagHierarchyStore.includeSubTagContent) { de.letzgo.stashy.data.TagHierarchyStore.includeSubTagContent = it } }
+        }
         tab.id.filterMode?.let { m -> sortNames(m) to defaultSortFallback(tab.id, m) }?.let { (options, fallback) ->
             CardSettingRow(tr(R.string.default_sort)) {
                 MenuValue(options, TabManager.getPersistentSortOption(tab.id) ?: fallback) { TabManager.setPersistentSortOption(tab.id, it) }
