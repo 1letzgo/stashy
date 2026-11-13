@@ -518,6 +518,13 @@ struct StudioDetailView: View {
                 withAnimation(DesignTokens.Animation.quick) { selectedDetailTab = .galleries }
             }
         }
+        // A studio that holds only sub-studios (no scenes, no galleries of its own): the shown
+        // section is not among the available ones, and with a single section the top row has
+        // no menu to leave it. Go to the first section that has something.
+        .onChange(of: availableTabs) { _, tabs in
+            guard !tabs.contains(selectedDetailTab), let first = tabs.first else { return }
+            withAnimation(DesignTokens.Animation.quick) { selectedDetailTab = first }
+        }
         .sceneLiveUpdates(using: viewModel)
         .task(id: studio.id) { studioCounts.request(studio.id, refresh: true) }
         // Every filter sheet of this page offers "Include sub-studio content"; the Scenes list

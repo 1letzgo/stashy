@@ -1293,6 +1293,11 @@ struct TagDetailView: View {
             if !loading { autoSwitchAwayFromEmptyTagScenes() }
         }
         .sceneLiveUpdates(using: viewModel)
+        // A tag that holds only sub-tags: go to the first section that has something.
+        .onChange(of: availableTabs) { _, tabs in
+            guard preferredInitialTab == nil, !tabs.contains(selectedDetailTab), let first = tabs.first else { return }
+            withAnimation(DesignTokens.Animation.quick) { selectedDetailTab = first }
+        }
         // Every filter sheet of this page offers "Include sub-tag content"; the Scenes list
         // reloads itself, the other sections here.
         .environment(\.showsSubTagContentOption, true)
