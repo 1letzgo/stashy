@@ -97,7 +97,8 @@ class MagazineReaderScreen(private val gallery: Gallery) : Screen {
     private var showsPagePicker by mutableStateOf(false)
     private var showsDetails by mutableStateOf(false)
     /** Tap a text to translate it (fullscreen page only). Stays on for the next comic. */
-    private var translatesText by mutableStateOf(Prefs.bool(MagazinePageTranslation.ENABLED_KEY))
+    /** Switched on in Settings › stashy+ › Magazin. */
+    private val translatesText get() = Prefs.bool(MagazinePageTranslation.ENABLED_KEY)
     private val translation = MagazinePageTranslation()
 
     private val chapters: List<MagazineChapter> get() = info.chapters.sortedBy { it.imageIndex }
@@ -380,7 +381,6 @@ class MagazineReaderScreen(private val gallery: Gallery) : Screen {
                 ) {
                     CircleIcon(SF.xmark, tr(R.string.action_close), background = true) { closeFullscreen() }
                     Spacer(Modifier.weight(1f))
-                    TranslateButton()
                     Row(
                         Modifier.clip(CircleShape).background(Color.Black.copy(alpha = 0.45f))
                             .clickable { showsPagePicker = true }.padding(horizontal = 12.dp, vertical = 8.dp),
@@ -398,28 +398,6 @@ class MagazineReaderScreen(private val gallery: Gallery) : Screen {
                     translation, current,
                     Modifier.align(if (onTop) Alignment.TopCenter else Alignment.BottomCenter)
                         .safeDrawingPadding().padding(start = 12.dp, end = 12.dp, bottom = 12.dp, top = 60.dp),
-                )
-            }
-        }
-    }
-
-    @Composable
-    private fun TranslateButton() {
-        val tint = MaterialTheme.colorScheme.primary
-        Box(
-            Modifier.size(48.dp).clickable {
-                translatesText = !translatesText
-                Prefs.setBool(MagazinePageTranslation.ENABLED_KEY, translatesText)
-            },
-            contentAlignment = Alignment.Center,
-        ) {
-            Box(
-                Modifier.size(40.dp).clip(CircleShape).background(if (translatesText) tint else Color.Black.copy(alpha = 0.45f)),
-                contentAlignment = Alignment.Center,
-            ) {
-                Icon(
-                    Icons.Outlined.Translate, tr(R.string.action_translate_text),
-                    tint = if (translatesText) MaterialTheme.colorScheme.onPrimary else Color.White,
                 )
             }
         }

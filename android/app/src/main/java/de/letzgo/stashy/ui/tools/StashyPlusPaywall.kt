@@ -207,15 +207,24 @@ fun LazyListScope.stashyPlusSettingsItems() {
                         de.letzgo.stashy.ui.settings.CardSettingRow(tr(R.string.default_filter)) { de.letzgo.stashy.ui.settings.MagazineDefaultFilterMenu() }
                     }
                     RowDivider()
-                    val language = de.letzgo.stashy.ui.tools.magazine.MagazineTranslationLanguage
-                    var code by remember { mutableStateOf(language.load()) }
-                    val options = remember { language.pickerOptions() }
-                    de.letzgo.stashy.ui.settings.SettingsPickerRow(
-                        tr(R.string.translation_language), options.map { it.first }, code,
-                        { id -> options.firstOrNull { it.first == id }?.second ?: id }, Icons.Outlined.Translate,
-                    ) {
-                        code = it
-                        language.persist(it)
+                    val enabledKey = de.letzgo.stashy.ui.tools.magazine.MagazinePageTranslation.ENABLED_KEY
+                    var translates by remember { mutableStateOf(de.letzgo.stashy.data.Prefs.bool(enabledKey)) }
+                    de.letzgo.stashy.ui.settings.SettingsToggleRow(tr(R.string.action_translate_text), translates, Icons.Outlined.Translate) {
+                        translates = it
+                        de.letzgo.stashy.data.Prefs.setBool(enabledKey, it)
+                    }
+                    if (translates) {
+                        RowDivider()
+                        val language = de.letzgo.stashy.ui.tools.magazine.MagazineTranslationLanguage
+                        var code by remember { mutableStateOf(language.load()) }
+                        val options = remember { language.pickerOptions() }
+                        de.letzgo.stashy.ui.settings.SettingsPickerRow(
+                            tr(R.string.translation_language), options.map { it.first }, code,
+                            { id -> options.firstOrNull { it.first == id }?.second ?: id }, Icons.Outlined.Translate,
+                        ) {
+                            code = it
+                            language.persist(it)
+                        }
                     }
                 }
             }

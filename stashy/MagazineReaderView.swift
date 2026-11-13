@@ -771,10 +771,9 @@ private struct MagazineFullscreenView: View {
 
     @State private var isZoomed = false
     @State private var showsChrome = true
-    /// Tap a text to translate it. Stays on for the next comic.
+    /// Tap a text to translate it. Switched on in Settings › stashy+ › Magazin.
     @AppStorage(MagazinePageTranslation.enabledKey) private var translatesText = false
     @StateObject private var translation = MagazinePageTranslation()
-    @ObservedObject private var appearance = AppearanceManager.shared
 
     private var currentImage: StashImage? { pages.indices.contains(page) ? pages[page] : nil }
 
@@ -826,8 +825,6 @@ private struct MagazineFullscreenView: View {
 
                     Spacer()
 
-                    translateButton
-
                     Button(action: onShowPagePicker) {
                         HStack(spacing: 3) {
                             Text("\(page + 1) / \(pages.count)")
@@ -873,26 +870,6 @@ private struct MagazineFullscreenView: View {
 }
 
 private extension MagazineFullscreenView {
-    var translateButton: some View {
-        Button {
-            HapticManager.light()
-            translatesText.toggle()
-        } label: {
-            Image(systemName: "translate")
-                .font(.body.weight(.semibold))
-                .foregroundStyle(translatesText ? Color.onAppTint : .white)
-                .frame(width: 44, height: 44)
-                .background(
-                    translatesText ? AnyShapeStyle(appearance.tintColor) : AnyShapeStyle(.black.opacity(0.45)),
-                    in: Circle()
-                )
-                .contentShape(Circle())
-        }
-        .buttonStyle(.plain)
-        .accessibilityLabel(tr("action_translate_text"))
-        .accessibilityAddTraits(translatesText ? .isSelected : [])
-    }
-
     func analyzeCurrentPage() {
         guard translatesText, let currentImage else { return }
         translation.analyze(currentImage)

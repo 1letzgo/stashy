@@ -90,6 +90,8 @@ struct SettingsView: View {
     @ObservedObject private var storeManager = StoreManager.shared
     @ObservedObject private var stashyPlus = StashyPlusManager.shared
     @AppStorage(MagazineMode.enabledKey) private var isMagazineEnabled = false
+    @AppStorage(MagazinePageTranslation.enabledKey) private var magazineTranslatesText = false
+    private var magazineRowCount: Int { isMagazineEnabled ? (magazineTranslatesText ? 4 : 3) : 1 }
 
     enum SettingsSection: String, CaseIterable, Identifiable {
         case main = "Settings"
@@ -313,7 +315,7 @@ struct SettingsView: View {
                     Label(tr("magazin_ereader"), systemImage: "magazine")
                 }
                 .tint(appearanceManager.tintColor)
-                .stashyGroupedBlockRow(index: 0, count: isMagazineEnabled ? 3 : 1)
+                .stashyGroupedBlockRow(index: 0, count: magazineRowCount)
 
                 if isMagazineEnabled {
                     HStack {
@@ -321,11 +323,19 @@ struct SettingsView: View {
                         Spacer()
                         MagazineDefaultFilterMenu(viewModel: viewModel)
                     }
-                    .stashyGroupedBlockRow(index: 1, count: 3)
+                    .stashyGroupedBlockRow(index: 1, count: magazineRowCount)
                     .task { viewModel.fetchSavedFilters() }
 
-                    MagazineTranslationLanguagePicker()
-                        .stashyGroupedBlockRow(index: 2, count: 3)
+                    Toggle(isOn: $magazineTranslatesText) {
+                        Label(tr("action_translate_text"), systemImage: "translate")
+                    }
+                    .tint(appearanceManager.tintColor)
+                    .stashyGroupedBlockRow(index: 2, count: magazineRowCount)
+
+                    if magazineTranslatesText {
+                        MagazineTranslationLanguagePicker()
+                            .stashyGroupedBlockRow(index: 3, count: magazineRowCount)
+                    }
                 }
                 stashyScrollingSectionFooter(StashyPlusFeatureCopy.magazine)
             }
