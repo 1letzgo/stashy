@@ -1244,7 +1244,9 @@ struct AetherSceneSurface: View {
                 Task { @MainActor in
                     let target = max(0, rewindPosition - step)
                     rewindPosition = target
-                    onSeek(target)
+                    // Straight to the engine: `onSeek` is the host's "jump here and play", and
+                    // playing between the steps ran forward against the rewind.
+                    await engine.seek(to: target)
                     if target <= 0 { setRewinding(false) }
                 }
             }
@@ -1253,7 +1255,12 @@ struct AetherSceneSurface: View {
         } else {
             rewindTimer?.invalidate()
             rewindTimer = nil
-            if wasPlayingBeforeRewind { engine.play() }
+            // The host hears about the new position once, at the end (activity, device sync),
+            // then playback resumes (not every host's seek does that itself).
+            if wasPlayingBeforeRewind {
+                onSeek(rewindPosition)
+                engine.play()
+            }
         }
         withAnimation(.easeInOut(duration: 0.15)) { isRewinding = active }
     }

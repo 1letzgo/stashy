@@ -133,6 +133,7 @@ fun ScenePlayerSurface(
     var rateBeforeFastForward by remember { mutableFloatStateOf(1f) }
     var rewindJob by remember { mutableStateOf<Job?>(null) }
     var wasPlayingBeforeRewind by remember { mutableStateOf(false) }
+    val rewindPosition = remember { doubleArrayOf(0.0) }
     var volumeLevel by remember { mutableFloatStateOf(systemVolume(context)) }
 
     val displayedTime = if (isScrubbing) scrubSeconds else player.currentTime
@@ -176,21 +177,27 @@ fun ScenePlayerSurface(
             haptics.performHapticFeedback(HapticFeedbackType.LongPress)
             wasPlayingBeforeRewind = player.playWhenReady
             player.pause()
-            var position = player.currentTime
+            rewindPosition[0] = player.currentTime
             val step = 0.25 * PlayerSettings.holdSpeedPlayer
             isRewinding = true
             rewindJob = scope.launch {
                 while (isActive) {
                     delay(250)
-                    position = maxOf(0.0, position - step)
-                    seek(position)
-                    if (position <= 0) break
+                    rewindPosition[0] = maxOf(0.0, rewindPosition[0] - step)
+                    // Straight to the player: the host's seek is "jump here and play", and
+                    // playing between the steps ran forward against the rewind.
+                    player.seek(rewindPosition[0])
+                    if (rewindPosition[0] <= 0) break
                 }
             }
             return
         }
         rewindJob?.cancel(); rewindJob = null
-        if (wasPlayingBeforeRewind) player.play()
+        // The host hears about the new position once, at the end (activity tracker).
+        if (wasPlayingBeforeRewind) {
+            seek(rewindPosition[0])
+            player.play()
+        }
         isRewinding = false
     }
 
