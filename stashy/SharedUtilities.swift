@@ -3919,9 +3919,6 @@ struct ImageBackdrop: View {
     let url: URL?
     /// Shown for "Black" and until the image's colour is known.
     var fallback: Color = .black
-    /// False holds the image request back (Feeds: until the clip's own video shows, so the
-    /// colour never competes with the start of playback).
-    var loads: Bool = true
 
     @AppStorage(ImageBackdropMode.key) private var modeRaw = ""
     @State private var matched: Color?
@@ -3935,16 +3932,15 @@ struct ImageBackdrop: View {
             case .match: matched ?? url.flatMap { ImageAverageColorStore.cached($0) } ?? fallback
             }
         }
-        .task(id: MatchKey(url: url, on: mode == .match, loads: loads)) {
+        .task(id: MatchKey(url: url, on: mode == .match)) {
             guard mode == .match, let url else { matched = nil; return }
             matched = ImageAverageColorStore.cached(url)
-            if matched == nil, loads { matched = await ImageAverageColorStore.color(for: url) }
+            if matched == nil { matched = await ImageAverageColorStore.color(for: url) }
         }
     }
 
     private struct MatchKey: Equatable {
         let url: URL?
         let on: Bool
-        let loads: Bool
     }
 }

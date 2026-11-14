@@ -6273,9 +6273,8 @@ extension ReelItemView {
         ZoomableScrollView(isZoomed: $isZoomed, onTap: handleMediaTap, onLongPress: handleLongPress, onDoubleTap: handleDoubleTap) {
             ZStack {
                 if let clipImage {
-                    // After the video's first frame: the small image is one more request, and
-                    // this row deliberately loads no still before its video.
-                    ImageBackdrop(url: clipImage.thumbnailURL, loads: item.isAnimated || playbackPresentationSize != nil)
+                    // Asked for with the row, so the colour is there before the video's first frame.
+                    ImageBackdrop(url: clipImage.thumbnailURL)
                 } else {
                     Color.black
                 }
@@ -6316,6 +6315,14 @@ extension ReelItemView {
                                 bottomContentInset: shouldFill ? bottomInset : 0,
                                 topAlignAspectFill: shouldFill
                             )
+                            // A clip's undecoded surface is black on the Background colour:
+                            // the colour covers it until the first frame (the surface stays
+                            // visible below, no opacity gating).
+                            .overlay {
+                                if let clipImage, playbackPresentationSize == nil {
+                                    ImageBackdrop(url: clipImage.thumbnailURL)
+                                }
+                            }
                             .fittedToAspectRatio(shouldFill ? nil : clipAspectRatio)
                             .allowsHitTesting(false)
                         }

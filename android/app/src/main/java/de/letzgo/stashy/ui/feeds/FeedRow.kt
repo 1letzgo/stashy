@@ -110,11 +110,8 @@ fun FeedRow(
     val isClip = item is FeedItem.ClipItem
     val fill = if (isClip) de.letzgo.stashy.data.ImageViewing.scaling.fills(!contentLandscape, devicePortrait)
     else feedShouldFill(FeedsConfig.fillHeight, devicePortrait, contentLandscape)
-    // The colour comes from the poster, one more request: only once the clip's own video shows,
-    // so it never competes with the start of playback.
-    val backdrop = de.letzgo.stashy.data.ImageViewing.backdropColor(
-        if (isClip && (videoSize != null || item.isAnimated)) item.posterURL else null,
-    )
+    // The colour comes from the poster, asked for with the row so it is there before the video.
+    val backdrop = de.letzgo.stashy.data.ImageViewing.backdropColor(if (isClip) item.posterURL else null)
     val inset = if (fill && isUIVisible) bottomInset else 0.dp
 
     var scale by remember(item.id, devicePortrait) { mutableFloatStateOf(1f) }
@@ -154,7 +151,11 @@ fun FeedRow(
                     .graphicsLayer { scaleX = scale; scaleY = scale; translationX = offset.x; translationY = offset.y },
             )
         } else if (player != null) {
-            Box(mediaModifier) { VideoSurface(player) }
+            Box(mediaModifier) {
+                VideoSurface(player)
+                // A clip's surface is black until its video shows: the Background colour covers it.
+                if (isClip && videoSize == null) Box(Modifier.fillMaxSize().background(backdrop))
+            }
         }
 
         // Gesture layer.
