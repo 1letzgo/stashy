@@ -55,6 +55,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -356,12 +357,14 @@ fun FeedsInfoOverlay(
     pausesAdvance: Boolean,
     onAddPerformers: (() -> Unit)? = null,
     onAddMarker: (() -> Unit)? = null,
+    /** False while a tap hid the chrome but the O Count and rating stay ("Keep Rating Visible"): the rest fades out, keeping its space. */
+    chrome: Boolean = true,
 ) {
     // Over video: text follows the system font scale up to OverlayMaxFontScale (1.3×) so the
     // overlay never covers most of the clip; containers below wrap their content.
     de.letzgo.stashy.ui.CappedFontScale { FeedsInfoOverlayContent(
         item, mode, isMuted, isPlaying, onPerformerFilter, onPerformerOpen, onTitle, onTag, onAddTags,
-        onRemoveTag, onOCounter, onRating, onToggleMute, onTogglePlay, pausesAdvance, onAddPerformers, onAddMarker,
+        onRemoveTag, onOCounter, onRating, onToggleMute, onTogglePlay, pausesAdvance, onAddPerformers, onAddMarker, chrome,
     ) }
 }
 
@@ -384,10 +387,11 @@ private fun FeedsInfoOverlayContent(
     pausesAdvance: Boolean,
     onAddPerformers: (() -> Unit)?,
     onAddMarker: (() -> Unit)?,
+    chrome: Boolean,
 ) {
     Column(Modifier.fillMaxWidth()) {
         Row(Modifier.fillMaxWidth().padding(horizontal = FeedsDock.edgePadding), verticalAlignment = Alignment.Bottom) {
-            Row(Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            Row(Modifier.weight(1f).chromePart(chrome), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 // All performers, like the Pics header (`ImageCatalogFeedHeader`): overlapping
                 // avatars (tap → performer detail) and the names joined by "&" (tap → filter).
                 // Both rows scroll horizontally when they overflow and start over per item.
@@ -412,11 +416,11 @@ private fun FeedsInfoOverlayContent(
             Spacer(Modifier.width(8.dp))
             Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 if (mode != ReelsModeType.Pics) FeedsRateChrome(item, onOCounter, onRating, onAddMarker)
-                ChromePillIconButton(if (isMuted) SF.speakerSlashFill else SF.speakerWave2Fill, if (isMuted) tr(R.string.unmute) else tr(R.string.mute), enabled = item.isVideo, onClick = onToggleMute)
+                Box(Modifier.chromePart(chrome)) { ChromePillIconButton(if (isMuted) SF.speakerSlashFill else SF.speakerWave2Fill, if (isMuted) tr(R.string.unmute) else tr(R.string.mute), enabled = item.isVideo, onClick = onToggleMute) }
                 // Videos play and pause from the time bar ([FeedsScrubber]); only an animated clip,
                 // which has no time bar, keeps a button here (iOS parity).
                 if (!item.isVideo && pausesAdvance) {
-                    ChromePillIconButton(if (isPlaying) SF.pauseFill else SF.playFill, if (isPlaying) tr(R.string.action_pause) else tr(R.string.action_play), onClick = onTogglePlay)
+                    Box(Modifier.chromePart(chrome)) { ChromePillIconButton(if (isPlaying) SF.pauseFill else SF.playFill, if (isPlaying) tr(R.string.action_pause) else tr(R.string.action_play), onClick = onTogglePlay) }
                 }
             }
         }
@@ -426,7 +430,7 @@ private fun FeedsInfoOverlayContent(
         // (stashy+) inline, so the row also exists for an untagged item. The 40 dp slot is kept
         // even without a row, so the overlay does not jump between clips.
         val showsRow = showsTagRow(item.tags)
-        Box(Modifier.padding(top = 8.dp - TagChips.touchInset).fillMaxWidth().heightIn(min = TagChips.rowHeight)) {
+        Box(Modifier.padding(top = 8.dp - TagChips.touchInset).fillMaxWidth().heightIn(min = TagChips.rowHeight).chromePart(chrome)) {
             if (showsRow) {
                 TagChipRow(
                     itemId = item.id,
@@ -578,4 +582,16 @@ fun formatTime(seconds: Double): String {
 /** Click without ripple (iOS `.buttonStyle(.plain)`). */
 fun Modifier.noIndicationClick(onClick: () -> Unit): Modifier = composed {
     clickable(interactionSource = remember { MutableInteractionSource() }, indication = null, onClick = onClick)
+}
+
+/**
+ * Fades a part out with the chrome but keeps its space: once faded it is not placed, so it takes
+ * no taps and everything else stays where it is ("Keep Rating Visible").
+ */
+fun Modifier.chromePart(visible: Boolean): Modifier = composed {
+    val a by androidx.compose.animation.core.animateFloatAsState(if (visible) 1f else 0f, androidx.compose.animation.core.tween(200), label = "chromePart")
+    alpha(a).layout { m, c ->
+        val pl = m.measure(c)
+        layout(pl.width, pl.height) { if (a > 0f) pl.place(0, 0) }
+    }
 }

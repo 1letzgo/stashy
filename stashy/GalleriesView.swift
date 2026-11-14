@@ -1019,6 +1019,11 @@ struct GalleryItemView: View {
         return false
     }
 
+    private var videoAspectRatio: CGFloat? {
+        guard let file = image.visual_files?.first, let w = file.width, let h = file.height, w > 0, h > 0 else { return nil }
+        return CGFloat(w) / CGFloat(h)
+    }
+
     /// By the Image Scaling setting; Automatic fills only when the content's orientation matches the space.
     private var shouldFill: Bool {
         ImageScalingMode.resolve(scalingRaw).fills(mediaIsPortrait: isPortrait, spaceIsPortrait: isTallerThanWide)
@@ -1071,6 +1076,10 @@ struct GalleryItemView: View {
                             videoGravity: shouldFill ? .resizeAspectFill : .resizeAspect,
                             bottomContentInset: bottomInset
                         )
+                        // Fitted: the (black) surface ends where the picture does, so the
+                        // Background setting shows around it.
+                        .fittedToAspectRatio(shouldFill ? nil : videoAspectRatio)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
                     } else {
                         if let url = image.thumbnailURL {
                             CustomAsyncImage(url: url) { loader in
@@ -1442,10 +1451,20 @@ struct GalleryItemView: View {
 }
 // MARK: - Full Screen Image View (Feeds-style vertical paging)
 
-private extension View {
+extension View {
     /// A part of the fullscreen chrome that a tap hides: it keeps its place, so what stays does not move.
     func fullScreenChromeHidden(_ hidden: Bool) -> some View {
         opacity(hidden ? 0 : 1).allowsHitTesting(!hidden)
+    }
+
+    /// Fits the view to `ratio` (width / height); nil leaves it as it is.
+    @ViewBuilder
+    func fittedToAspectRatio(_ ratio: CGFloat?) -> some View {
+        if let ratio {
+            aspectRatio(ratio, contentMode: .fit)
+        } else {
+            self
+        }
     }
 }
 

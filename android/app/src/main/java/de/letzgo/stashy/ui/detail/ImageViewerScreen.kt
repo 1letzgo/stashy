@@ -47,6 +47,8 @@ import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.wrapContentSize
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -403,7 +405,12 @@ class ImageViewerScreen(
     @Composable
     private fun VideoPage(image: StashImage, active: Boolean, fill: Boolean, onEnded: () -> Unit) {
         val context = LocalContext.current
-        Box(Modifier.fillMaxSize()) {
+        // The player is sized to the video's own aspect ratio when fitted, so the bars around it
+        // are the page's backdrop (Background setting), not the player's black letterbox.
+        val file = image.visualFiles?.firstOrNull()
+        val aspect = if ((file?.width ?: 0) > 0 && (file?.height ?: 0) > 0) file!!.width!!.toFloat() / file.height!! else null
+        val frame = if (!fill && aspect != null) Modifier.fillMaxSize().wrapContentSize().aspectRatio(aspect, matchHeightConstraintsFirst = false) else Modifier.fillMaxSize()
+        Box(frame) {
             SubcomposeAsyncImage(image.thumbnailURL, null, Modifier.fillMaxSize(), contentScale = if (fill) ContentScale.Crop else ContentScale.Fit)
             if (!active) return@Box
             val exo = remember(image.id) {

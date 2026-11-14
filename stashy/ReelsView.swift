@@ -329,6 +329,8 @@ enum ReelsSessionRAM {
 }
 
 struct ReelsViewBody: View {
+    /// Images' "Keep Rating Visible" also holds for Feeds › Clips (the same media).
+    @AppStorage("images_fullscreen_keep_rating") private var keepsClipRatingVisible = false
     @ObservedObject private var appearanceManager = AppearanceManager.shared
     @ObservedObject private var tabManager = TabManager.shared
     @ObservedObject private var configManager = ServerConfigManager.shared
@@ -3541,7 +3543,7 @@ struct ReelsViewBody: View {
                 }
             }
             // Scrubber / info overlay must stay interactive whenever the chrome is visible.
-            .allowsHitTesting(isUIVisible)
+            .allowsHitTesting(isUIVisible || (keepsClipRatingVisible && reelsMode == .clips))
         }
     }
 
@@ -5363,6 +5365,9 @@ struct ReelsViewBody: View {
     @ViewBuilder
     private func reelsInfoOverlay(currentItem: ReelItemData?) -> some View {
         let isVideo = currentItem.map { $0.videoURL != nil && !$0.isAnimated } ?? false
+        // A tap hides every part but, for clips with "Keep Rating Visible", the rate pills.
+        let hidesChrome = !isUIVisible
+        let hidesRate = hidesChrome && !(keepsClipRatingVisible && reelsMode == .clips)
         VStack(alignment: .leading, spacing: 0) {
             if let item = currentItem {
                 // Own row above the performer line — the circles used to sit inside it and
@@ -5379,6 +5384,7 @@ struct ReelsViewBody: View {
                                 .frame(maxWidth: .infinity, alignment: .leading)
                         }
                     }
+                    .fullScreenChromeHidden(hidesChrome)
                     Spacer(minLength: 8)
 
                     // O-Counter · Rating side by side on the trailing edge; mute sits in the
@@ -5386,6 +5392,7 @@ struct ReelsViewBody: View {
                     VStack(alignment: .trailing, spacing: 8) {
                         if reelsMode != .pics {
                             reelsRateChrome(currentItem: item)
+                                .fullScreenChromeHidden(hidesRate)
                         }
 
                         // Animated clips (GIF/WebP) have no player, but with continuous play on
@@ -5401,6 +5408,7 @@ struct ReelsViewBody: View {
                             ) {
                                 currentItemIsPlaying.toggle()
                             }
+                            .fullScreenChromeHidden(hidesChrome)
                         }
                     }
                 }
@@ -5485,11 +5493,11 @@ struct ReelsViewBody: View {
                 .frame(height: 24)
                 .padding(.top, 8)
                 .padding(.horizontal, StashyExpandingDock.edgePadding)
+                .fullScreenChromeHidden(hidesChrome)
             }
         }
         .padding(.bottom, 0)
         .colorScheme(.dark)
-        .opacity(isUIVisible ? 1 : 0)
         .animation(.easeInOut(duration: 0.2), value: isUIVisible)
         .allowsHitTesting(!isMenuOpen)
     }
@@ -5784,6 +5792,8 @@ private final class ReelItemVideoSurfaceReadiness: ObservableObject {
 }
 
 struct ReelItemView: View {
+    /// Clips are images: they follow Images' scaling instead of the Feeds fill switch.
+    @AppStorage(ImageScalingMode.key) private var imageScalingRaw = ""
     /// Verticals counts plays by its own rule (Settings › Playback › Feeds).
     var isVerticalsFeed: Bool = false
     let item: ReelsViewBody.ReelItemData
@@ -5898,7 +5908,29 @@ struct ReelItemView: View {
         }
     }
 
+    private var clipImage: StashImage? {
+        if case .clip(let image) = item { return image }
+        return nil
+    }
+
+    /// Width / height of a clip's picture, so a fitted video's surface ends where the picture
+    /// does and the Background setting shows around it (the surface itself is black).
+    private var clipAspectRatio: CGFloat? {
+        guard clipImage != nil else { return nil }
+        if let size = playbackPresentationSize, size.width > 1, size.height > 1 {
+            return size.width / size.height
+        }
+        if let file = clipImage?.visual_files?.first, let w = file.width, let h = file.height, w > 0, h > 0 {
+            return CGFloat(w) / CGFloat(h)
+        }
+        return nil
+    }
+
     private var shouldFill: Bool {
+        if clipImage != nil {
+            return ImageScalingMode.resolve(imageScalingRaw)
+                .fills(mediaIsPortrait: !effectiveContentIsLandscape, spaceIsPortrait: isTallerThanWide)
+        }
         // Only fill if the setting is enabled
         guard tabManager.reelsFillHeight else { return false }
 
@@ -6240,7 +6272,11 @@ extension ReelItemView {
         let bottomInset = immersiveBottomInset
         ZoomableScrollView(isZoomed: $isZoomed, onTap: handleMediaTap, onLongPress: handleLongPress, onDoubleTap: handleDoubleTap) {
             ZStack {
-                Color.black
+                if let clipImage {
+                    ImageBackdrop(url: clipImage.thumbnailURL)
+                } else {
+                    Color.black
+                }
                 Group {
                     if item.isAnimated {
                         CustomAsyncImage(url: item.videoURL) { loader in
@@ -6278,6 +6314,7 @@ extension ReelItemView {
                                 bottomContentInset: shouldFill ? bottomInset : 0,
                                 topAlignAspectFill: shouldFill
                             )
+                            .fittedToAspectRatio(shouldFill ? nil : clipAspectRatio)
                             .allowsHitTesting(false)
                         }
                     }

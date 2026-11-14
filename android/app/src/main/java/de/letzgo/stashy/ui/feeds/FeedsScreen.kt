@@ -222,6 +222,7 @@ fun FeedsScreen() {
                     model = model, mode = mode, items = items, pool = pool,
                     isUIVisible = isUIVisible, isZoomed = isZoomed, lifecycleActive = lifecycleActive,
                     tabBarOverlap = tabBarOverlap,
+                    shownTabBarOverlap = FeedsTabBarPolicy.overlayInset(true, barShown, tabBarHeight().value, navBottom.value).dp,
                     overlayOpen = overlayOpen,
                     onToggleUI = {
                         if (FeedsChromeAutoHide.tapReveals(chromeScrollHidden)) chromeScrollHidden = false
@@ -362,6 +363,8 @@ private fun FeedPager(
     isZoomed: Boolean,
     lifecycleActive: Boolean,
     tabBarOverlap: androidx.compose.ui.unit.Dp,
+    /** The overlap with the chrome shown: where a kept rating stays while the chrome is hidden. */
+    shownTabBarOverlap: androidx.compose.ui.unit.Dp,
     overlayOpen: Boolean,
     onToggleUI: () -> Unit,
     onDragStarted: () -> Unit,
@@ -542,7 +545,10 @@ private fun FeedPager(
         }
 
         // Bottom chrome: info overlay + scrubber right above the tab bar (iOS safeAreaInset bottom).
-        val overlayAlpha by animateFloatAsState(if (isUIVisible) 1f else 0f, tween(200), label = "overlay")
+        // Clips only: "Keep Rating Visible" keeps the overlay composed with the chrome hidden, so the
+        // O Count and rating stay in place; the rest of it fades out without moving them.
+        val keepsRating = activeItem is FeedItem.ClipItem && de.letzgo.stashy.data.ImageViewing.keepRating
+        val overlayAlpha by animateFloatAsState(if (isUIVisible || keepsRating) 1f else 0f, tween(200), label = "overlay")
         if (activeItem != null && overlayAlpha > 0.01f) {
             Column(Modifier.align(Alignment.BottomCenter).fillMaxWidth().alpha(overlayAlpha)) {
                 FeedsInfoOverlay(
@@ -550,6 +556,7 @@ private fun FeedPager(
                     mode = mode,
                     isMuted = pool.muted,
                     isPlaying = isPlaying,
+                    chrome = isUIVisible,
                     onPerformerFilter = { p -> model.filterByPerformer(IdName(p.id, p.name)) },
                     // iOS: Clips (and Pics) are image feeds — open the performer on Images.
                     onPerformerOpen = { p ->
@@ -593,7 +600,7 @@ private fun FeedPager(
                         markerDraft = FeedsMarkerDraft(activeItem.scene, if (position.isFinite()) maxOf(0.0, position) else maxOf(0.0, time))
                     }) else null,
                 )
-                if (!activeItem.isAnimated) {
+                if (!activeItem.isAnimated) Box(Modifier.fillMaxWidth().chromePart(isUIVisible)) {
                     // iOS `ReelsView` scrub preview: the scene's sprite sheet + VTT index, like the
                     // scene player. Scenes scrub in scene time; Markers' bar spans the segment
                     // (the player is clipped to it), so the still is read at the matching scene
@@ -621,7 +628,8 @@ private fun FeedPager(
                         },
                     )
                 }
-                Spacer(Modifier.height(tabBarOverlap))
+                // A kept rating stays where it was with the chrome shown: the bar's inset does not collapse.
+                Spacer(Modifier.height(if (keepsRating && !isUIVisible) shownTabBarOverlap else tabBarOverlap))
             }
         }
     }
