@@ -165,11 +165,15 @@ private fun PickerRow(isCurrent: Boolean, onClick: () -> Unit, content: @Composa
 /** iOS: `MagazineDetailsSheet` — what the open gallery is. */
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
-internal fun MagazineDetailsSheet(gallery: Gallery, tags: List<IdName>, pageCount: Int, chapterCount: Int, onDismiss: () -> Unit) {
+internal fun MagazineDetailsSheet(gallery: Gallery, tags: List<IdName>, pageCount: Int, chapterCount: Int, onEdit: (() -> Unit)? = null, onDismiss: () -> Unit) {
     val p = Theme.palette
     ModalBottomSheet(onDismissRequest = onDismiss, containerColor = p.background) {
         Column(Modifier.navigationBarsPadding()) {
-            NativeSheetTopBar(tr(R.string.details), onDismiss)
+            NativeSheetTopBar(tr(R.string.details), onDismiss, actions = {
+                if (onEdit != null) androidx.compose.material3.IconButton(onClick = onEdit) {
+                    Icon(SF.pencil, tr(R.string.action_edit_gallery), tint = Appearance.tint)
+                }
+            })
             Column(
                 Modifier.verticalScroll(rememberScrollState()).padding(start = 16.dp, end = 16.dp, top = 4.dp, bottom = 16.dp),
                 verticalArrangement = Arrangement.spacedBy(16.dp),

@@ -8909,6 +8909,19 @@ struct GenerateData: Codable {
         }
     }
 
+    func updateGalleryTags(galleryId: String, tagIds: [String], completion: @escaping (Bool) -> Void) {
+        let variables: [String: Any] = ["input": ["id": galleryId, "tag_ids": tagIds]]
+        guard let bodyData = try? JSONSerialization.data(withJSONObject: ["query": GraphQLQueries.galleryUpdatePerformersMutation, "variables": variables]),
+              let bodyString = String(data: bodyData, encoding: .utf8) else {
+            completion(false); return
+        }
+        performGraphQLQuery(query: bodyString) { (response: GalleryUpdateResponse?) in
+            let ok = response?.data?.galleryUpdate != nil
+            if ok { Self.postEntityUpdated("GalleryUpdated", key: "galleryId", id: galleryId) }
+            completion(ok)
+        }
+    }
+
     /// Updates gallery metadata shown on the opened-gallery screen (edit mode).
     func updateGalleryDetails(
         galleryId: String,
@@ -11003,9 +11016,11 @@ struct Gallery: Codable, Identifiable, Equatable {
     var studio: GalleryStudio?
     var performers: [GalleryPerformer]?
     var cover: GalleryCover?
+    /// nil = not fetched (a stub, or a gallery from a query without tags).
+    var tags: [Tag.TagRef]? = nil
 
     enum CodingKeys: String, CodingKey {
-        case id, title, date, details, imageCount = "image_count", rating100, organized, createdAt = "created_at", updatedAt = "updated_at", studio, performers, cover
+        case id, title, date, details, imageCount = "image_count", rating100, organized, createdAt = "created_at", updatedAt = "updated_at", studio, performers, cover, tags
     }
     var thumbnailURL: URL? {
         guard let config = ServerConfigManager.shared.loadConfig() else { return nil }

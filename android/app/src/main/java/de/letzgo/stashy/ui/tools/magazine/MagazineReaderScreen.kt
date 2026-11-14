@@ -72,6 +72,8 @@ import de.letzgo.stashy.ui.Nav
 import de.letzgo.stashy.ui.SF
 import de.letzgo.stashy.ui.Screen
 import de.letzgo.stashy.ui.detail.ZoomableBox
+import de.letzgo.stashy.ui.detail.EditGallerySheet
+import de.letzgo.stashy.ui.Appearance
 import kotlinx.coroutines.CancellationException
 
 /**
@@ -79,8 +81,10 @@ import kotlinx.coroutines.CancellationException
  * portrait), a tap opens one page fullscreen. Android has no system page curl: the outgoing page
  * swings away around its left edge and uncovers the next one, which already lies underneath.
  */
-class MagazineReaderScreen(private val gallery: Gallery) : Screen {
-    override val key = "magazine-${gallery.id}"
+class MagazineReaderScreen(initialGallery: Gallery) : Screen {
+    /** State: Edit Gallery changes studio / performers / tags / title while the reader is open. */
+    private var gallery by mutableStateOf(initialGallery)
+    override val key = "magazine-${initialGallery.id}"
     override val hidesTabBar = true
 
     private var pages by mutableStateOf<List<StashImage>>(emptyList())
@@ -96,6 +100,7 @@ class MagazineReaderScreen(private val gallery: Gallery) : Screen {
     private var info by mutableStateOf(MagazineReaderInfo(tags = gallery.tags.orEmpty()))
     private var showsPagePicker by mutableStateOf(false)
     private var showsDetails by mutableStateOf(false)
+    private var editingGallery by mutableStateOf(false)
     /** Tap a text to translate it (fullscreen page only). Stays on for the next comic. */
     /** Switched on in Settings › stashy+ › Magazin. */
     private val translatesText get() = Prefs.bool(MagazinePageTranslation.ENABLED_KEY)
@@ -188,7 +193,18 @@ class MagazineReaderScreen(private val gallery: Gallery) : Screen {
             MagazinePagePickerSheet(pages, chapters, currentPage, currentChapter?.id, ::jump) { showsPagePicker = false }
         }
         if (showsDetails) {
-            MagazineDetailsSheet(gallery, info.tags, pages.size, chapters.size) { showsDetails = false }
+            MagazineDetailsSheet(
+                gallery, info.tags, pages.size, chapters.size,
+                onEdit = if (Appearance.isEditModeEnabled) ({ editingGallery = true }) else null,
+            ) { showsDetails = false }
+        }
+        if (editingGallery) {
+            // Tags only count as known once they were loaded (the list's copy or the reader info), so Save never wipes unseen ones.
+            val forEdit = gallery.copy(tags = if (gallery.tags != null) info.tags else null)
+            EditGallerySheet(forEdit, { editingGallery = false }) { saved ->
+                gallery = saved
+                saved.tags?.let { info = info.copy(tags = it) }
+            }
         }
     }
 

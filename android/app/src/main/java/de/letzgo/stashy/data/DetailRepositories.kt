@@ -238,6 +238,14 @@ object DetailRepository {
         )
     }
 
+    /** `galleryUpdate(tag_ids:)` — replaces the gallery's tags. Throws on failure (picker shows the error). */
+    suspend fun updateGalleryTags(id: String, tagIds: List<String>) {
+        GraphQL.data(
+            "mutation GalleryUpdate(\$input: GalleryUpdateInput!) { galleryUpdate(input: \$input) { id } }",
+            vars("input" to mapOf("id" to id, "tag_ids" to tagIds)),
+        )
+    }
+
     /** `galleryUpdate(studio_id:)` — null clears the studio. Throws on failure. */
     suspend fun updateGalleryStudio(id: String, studioId: String?) {
         GraphQL.data(

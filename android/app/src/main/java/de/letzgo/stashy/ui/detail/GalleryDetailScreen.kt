@@ -48,6 +48,13 @@ import de.letzgo.stashy.ui.Screen
 import de.letzgo.stashy.ui.Theme
 import de.letzgo.stashy.ui.scene.EditPerformersSheet
 import de.letzgo.stashy.ui.scene.EditStudioSheet
+import de.letzgo.stashy.ui.scene.EditTagsSheet
+import de.letzgo.stashy.data.IdName
+import de.letzgo.stashy.ui.NativeGroup
+import de.letzgo.stashy.ui.NativeListItem
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.height
+import de.letzgo.stashy.ui.NativeSectionHeader
 import de.letzgo.stashy.ui.scene.ScenePerformersStudioCard
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -262,40 +269,6 @@ class GalleryDetailScreen(
         if (index >= 0) Nav.push(ImageViewerScreen(list.items, index, onLoadMore = { list.loadMore() }))
         else Nav.push(ImageViewerScreen(listOf(image), 0))
     }
-
-    /** iOS: `EditGallerySheet`. */
-    @Composable
-    private fun EditGallerySheet(gallery: Gallery, onDismiss: () -> Unit, onSaved: (Gallery) -> Unit) {
-        val sections = remember(gallery.id) {
-            listOf(
-                EditSection(tr(R.string.identity), listOf(
-                    EditField(tr(R.string.title), gallery.title ?: ""),
-                    EditField(tr(R.string.date_yyyy_mm_dd), gallery.date ?: "", KeyboardType.Ascii, isDate = true),
-                )),
-                EditSection(tr(R.string.details), listOf(EditField(tr(R.string.details), gallery.details ?: "", multiline = true))),
-            )
-        }
-        val (title, date) = sections[0].fields
-        val details = sections[1].fields[0]
-        EditEntitySheet(
-            title = tr(R.string.action_edit_gallery), sections = sections,
-            deleteLabel = tr(R.string.action_delete_gallery), deleteTitle = tr(R.string.action_delete_gallery), entityName = gallery.title ?: "",
-            onDismiss = onDismiss,
-            onSave = {
-                val ok = DetailRepository.updateGallery(gallery.id, title.trimmed, date.optional, details.optional)
-                if (ok) {
-                    onSaved(gallery.copy(title = title.trimmed, date = date.optional, details = details.optional))
-                    detailToast(tr(R.string.gallery_updated))
-                } else detailToast(tr(R.string.error_update_gallery))
-                ok
-            },
-            onDelete = {
-                DetailRepository.deleteGallery(gallery.id)
-                detailToast(tr(R.string.gallery_deleted))
-                Nav.pop()
-            },
-        )
-    }
 }
 
 /** [imageSection] in selection mode: per-image cards with the selection overlay (iOS `imageCell`). */
@@ -308,3 +281,89 @@ private fun LazyGridScope.selectableImageSection(list: PagedList<StashImage>, se
 }
 
 private fun photoOnRectangleIcon() = de.letzgo.stashy.ui.SF.photoOnRectangle
+
+/**
+ * iOS: `EditGallerySheet`. Studio, performers and tags are written as soon as they are picked
+ * (like Parent Studio) and reported through [onSaved]; the later Save of title / date / details
+ * builds on the current state, so it never drops them. Tags are offered once the gallery's tags
+ * are known, so saving never wipes unseen ones. Shared with the Magazin reader's details sheet.
+ */
+@Composable
+internal fun EditGallerySheet(gallery: Gallery, onDismiss: () -> Unit, onSaved: (Gallery) -> Unit) {
+    var current by remember(gallery.id) { mutableStateOf(gallery) }
+    fun update(next: Gallery) {
+        current = next
+        onSaved(next)
+    }
+    var pickingStudio by remember { mutableStateOf(false) }
+    var pickingPerformers by remember { mutableStateOf(false) }
+    var pickingTags by remember { mutableStateOf(false) }
+    val sections = remember(gallery.id) {
+        listOf(
+            EditSection(tr(R.string.identity), listOf(
+                EditField(tr(R.string.title), gallery.title ?: ""),
+                EditField(tr(R.string.date_yyyy_mm_dd), gallery.date ?: "", KeyboardType.Ascii, isDate = true),
+            )),
+            EditSection(tr(R.string.details), listOf(EditField(tr(R.string.details), gallery.details ?: "", multiline = true))),
+        )
+    }
+    val (title, date) = sections[0].fields
+    val details = sections[1].fields[0]
+    if (pickingStudio) EditStudioSheet(
+        current.studio?.id, { DetailRepository.updateGalleryStudio(gallery.id, it) },
+        { pickingStudio = false },
+    ) { picked -> update(current.copy(studio = picked)) }
+    if (pickingPerformers) EditPerformersSheet(
+        current.performers.orEmpty().map { it.id }.toSet(), { DetailRepository.updateGalleryPerformers(gallery.id, it) },
+        { pickingPerformers = false },
+    ) { picked -> update(current.copy(performers = picked)) }
+    if (pickingTags) current.tags?.let { tags ->
+        EditTagsSheet(
+            tags.map { it.id }.toSet(), { DetailRepository.updateGalleryTags(gallery.id, it) },
+            { pickingTags = false },
+        ) { picked -> update(current.copy(tags = picked.map { IdName(it.id, it.name) })) }
+    }
+    EditEntitySheet(
+        title = tr(R.string.action_edit_gallery), sections = sections,
+        deleteLabel = tr(R.string.action_delete_gallery), deleteTitle = tr(R.string.action_delete_gallery), entityName = gallery.title ?: "",
+        onDismiss = onDismiss,
+        onSave = {
+            val ok = DetailRepository.updateGallery(gallery.id, title.trimmed, date.optional, details.optional)
+            if (ok) {
+                onSaved(current.copy(title = title.trimmed, date = date.optional, details = details.optional))
+                detailToast(tr(R.string.gallery_updated))
+            } else detailToast(tr(R.string.error_update_gallery))
+            ok
+        },
+        onDelete = {
+            DetailRepository.deleteGallery(gallery.id)
+            detailToast(tr(R.string.gallery_deleted))
+            Nav.pop()
+        },
+        extraSections = {
+            Spacer(Modifier.height(20.dp))
+            NativeSectionHeader(tr(R.string.studio))
+            NativeGroup {
+                NativeListItem(current.studio?.name ?: tr(R.string.none), icon = SF.building2, onClick = { pickingStudio = true })
+            }
+            Spacer(Modifier.height(20.dp))
+            NativeSectionHeader(tr(R.string.performers))
+            NativeGroup {
+                NativeListItem(
+                    current.performers.orEmpty().joinToString(", ") { it.name }.ifEmpty { tr(R.string.none) },
+                    icon = SF.person2, onClick = { pickingPerformers = true },
+                )
+            }
+            current.tags?.let { tags ->
+                Spacer(Modifier.height(20.dp))
+                NativeSectionHeader(tr(R.string.tags))
+                NativeGroup {
+                    NativeListItem(
+                        tags.joinToString(", ") { it.name ?: it.title.orEmpty() }.ifEmpty { tr(R.string.none) },
+                        icon = SF.tag, onClick = { pickingTags = true },
+                    )
+                }
+            }
+        },
+    )
+}

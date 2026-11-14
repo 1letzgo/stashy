@@ -801,7 +801,7 @@ private struct ImagesViewBody: View {
     private func hydrateOpenedGalleryIfNeeded() async {
         // Stubs (`cover: nil`) and partial galleries from scene/other queries
         // (`performers` not fetched) both need the full GalleryFields set.
-        guard let current = gallery, current.cover == nil || current.performers == nil else { return }
+        guard let current = gallery, current.cover == nil || current.performers == nil || current.tags == nil else { return }
         let query = GraphQLQueries.queryWithFragments("findGalleries")
         let variables: [String: Any] = [
             "ids": [current.id],
@@ -2265,6 +2265,17 @@ struct EditGallerySheet: View {
     @State private var isSaving = false
     @State private var isDeleting = false
     @State private var showingDeleteConfirmation = false
+    /// Studio, performers and tags are written as soon as they are picked, like a scene's.
+    @State private var linked: Gallery?
+    @State private var activePicker: LinkPicker?
+
+    private enum LinkPicker: String, Identifiable {
+        case studio, performers, tags
+        var id: String { rawValue }
+    }
+
+    /// The gallery with the links picked in this sheet.
+    private var current: Gallery { linked ?? gallery }
 
     var body: some View {
         NavigationView {
@@ -2280,6 +2291,24 @@ struct EditGallerySheet: View {
                         .frame(minHeight: 120)
                 }
                 .listRowBackground(Color.secondaryAppBackground)
+
+                Section(tr("studio")) {
+                    linkRow("building.2", current.studio?.name, picker: .studio)
+                }
+                .listRowBackground(Color.secondaryAppBackground)
+
+                Section(tr("performers")) {
+                    linkRow("person.2", joined((current.performers ?? []).map(\.name)), picker: .performers)
+                }
+                .listRowBackground(Color.secondaryAppBackground)
+
+                // Unknown tags (a stub gallery) are not offered: saving would drop the ones not seen.
+                if let tags = current.tags {
+                    Section(tr("tags")) {
+                        linkRow("tag", joined(tags.compactMap(\.name)), picker: .tags)
+                    }
+                    .listRowBackground(Color.secondaryAppBackground)
+                }
 
                 Section {
                     Button(role: .destructive) {
@@ -2315,6 +2344,43 @@ struct EditGallerySheet: View {
                 date = gallery.date ?? ""
                 details = gallery.details ?? ""
             }
+            .sheet(item: $activePicker) { picker in
+                switch picker {
+                case .studio:
+                    AddStudioToSceneSheet(
+                        sceneId: gallery.id,
+                        currentStudio: current.studio?.toSceneStudio(),
+                        viewModel: viewModel,
+                        saveStudioId: { id, done in
+                            viewModel.updateGalleryStudio(galleryId: gallery.id, studioId: id, completion: done)
+                        }
+                    ) { picked in
+                        applyLink { $0.studio = picked.map { GalleryStudio(id: $0.id, name: $0.name, image_path: $0.imagePath, updated_at: $0.updatedAt) } }
+                    }
+                case .performers:
+                    AddPerformerToSceneSheet(
+                        sceneId: gallery.id,
+                        currentPerformers: (current.performers ?? []).map { $0.toScenePerformer() },
+                        viewModel: viewModel,
+                        savePerformerIds: { ids, done in
+                            viewModel.updateGalleryPerformers(galleryId: gallery.id, performerIds: ids, completion: done)
+                        }
+                    ) { picked in
+                        applyLink { $0.performers = picked.map { $0.toGalleryPerformer() } }
+                    }
+                case .tags:
+                    AddTagToSceneSheet(
+                        sceneId: gallery.id,
+                        currentTags: (current.tags ?? []).map { Tag(id: $0.id, name: $0.name ?? "") },
+                        viewModel: viewModel,
+                        saveTagIds: { ids, done in
+                            viewModel.updateGalleryTags(galleryId: gallery.id, tagIds: ids, completion: done)
+                        }
+                    ) { picked in
+                        applyLink { $0.tags = picked.map { Tag.TagRef(id: $0.id, name: $0.name) } }
+                    }
+                }
+            }
             .alert(tr("action_delete_gallery"), isPresented: $showingDeleteConfirmation) {
                 Button(tr("action_cancel"), role: .cancel) { }
                 Button(tr("action_delete"), role: .destructive) { performDelete() }
@@ -2348,6 +2414,39 @@ struct EditGallerySheet: View {
         return trimmed.isEmpty ? nil : trimmed
     }
 
+    private func joined(_ names: [String]) -> String? {
+        names.isEmpty ? nil : names.joined(separator: ", ")
+    }
+
+    /// One row per link: what is assigned (or "None"), a tap opens its picker.
+    private func linkRow(_ systemImage: String, _ value: String?, picker: LinkPicker) -> some View {
+        Button {
+            activePicker = picker
+        } label: {
+            HStack {
+                Image(systemName: systemImage)
+                    .foregroundColor(appearanceManager.tintColor)
+                Text(value ?? tr("none"))
+                    .foregroundColor(.primary)
+                    .multilineTextAlignment(.leading)
+                Spacer()
+                Image(systemName: "chevron.right")
+                    .font(.caption.weight(.semibold))
+                    .foregroundColor(.secondary)
+            }
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+    }
+
+    /// The pick is on the server already: the page behind shows it at once.
+    private func applyLink(_ change: (inout Gallery) -> Void) {
+        var updated = current
+        change(&updated)
+        linked = updated
+        onComplete(updated)
+    }
+
     private func save() {
         let trimmedTitle = title.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmedTitle.isEmpty else { return }
@@ -2362,7 +2461,7 @@ struct EditGallerySheet: View {
             DispatchQueue.main.async {
                 isSaving = false
                 if success {
-                    var updated = gallery
+                    var updated = current
                     updated.title = trimmedTitle
                     updated.date = optionalTrimmed(date)
                     updated.details = optionalTrimmed(details)

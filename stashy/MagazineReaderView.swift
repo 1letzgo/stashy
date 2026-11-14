@@ -57,7 +57,22 @@ struct MagazineReaderView: View {
     @State private var prefetchers: [URL: ImageLoader] = [:]
     /// Chapters and tags; a failure just leaves the reader without them.
     @State private var info = GalleryReaderInfo(chapters: [], tags: [])
+    /// The tags are known only once `info` came: Edit Gallery must not save over unseen ones.
+    @State private var didLoadInfo = false
     @State private var activeSheet: MagazineReaderSheet?
+    /// The gallery after an edit made from the details sheet.
+    @State private var edited: Gallery?
+    @StateObject private var editViewModel = StashDBViewModel()
+    @ObservedObject private var appearanceManager = AppearanceManager.shared
+
+    /// The gallery as shown: the opened one with what was edited here, and the tags once loaded.
+    private var shown: Gallery {
+        var result = edited ?? gallery
+        if result.tags == nil, didLoadInfo {
+            result.tags = info.tags.map { Tag.TagRef(id: $0.id, name: $0.name) }
+        }
+        return result
+    }
     #if os(macOS)
     @FocusState private var hasKeyboardFocus: Bool
     #endif
@@ -110,7 +125,15 @@ struct MagazineReaderView: View {
                     onSelect: jump(toPage:)
                 )
             case .details:
-                MagazineDetailsSheet(gallery: gallery, tags: info.tags, pageCount: pages.count, chapterCount: chapters.count)
+                MagazineDetailsSheet(
+                    gallery: shown,
+                    tags: (shown.tags ?? []).compactMap(\.name),
+                    pageCount: pages.count,
+                    chapterCount: chapters.count,
+                    onEdit: appearanceManager.isEditModeEnabled ? { activeSheet = .edit } : nil
+                )
+            case .edit:
+                EditGallerySheet(gallery: shown, viewModel: editViewModel, onDeleted: onClose) { edited = $0 }
             }
         }
         .task { await loadPages() }
@@ -191,7 +214,7 @@ struct MagazineReaderView: View {
             Button { activeSheet = .details } label: {
                 VStack(alignment: .leading, spacing: 1) {
                     HStack(spacing: 4) {
-                        Text(gallery.displayName)
+                        Text(shown.displayName)
                             .font(.subheadline.weight(.semibold))
                             .lineLimit(1)
                         Image(systemName: "info.circle")
@@ -327,6 +350,7 @@ struct MagazineReaderView: View {
     private func loadInfo() async {
         do {
             info = try await GalleryRepository().fetchReaderInfo(galleryId: gallery.id)
+            didLoadInfo = true
         } catch {
             AppLog.debug("Magazin: chapters and tags not loaded: \(error.localizedDescription)")
         }
@@ -403,7 +427,7 @@ struct MagazineReaderView: View {
 // MARK: - Sheets
 
 private enum MagazineReaderSheet: String, Identifiable {
-    case pagePicker, details
+    case pagePicker, details, edit
     var id: String { rawValue }
 }
 
@@ -597,9 +621,11 @@ private struct MagazinePagePickerSheet: View {
 /// What the open gallery is: the list's fields plus the tags, which the list does not keep.
 private struct MagazineDetailsSheet: View {
     let gallery: Gallery
-    let tags: [GalleryReaderInfo.Tag]
+    let tags: [String]
     let pageCount: Int
     let chapterCount: Int
+    /// Set with editing switched on: opens Edit Gallery in place of this sheet.
+    var onEdit: (() -> Void)? = nil
 
     @Environment(\.stashyDismiss) private var dismiss
 
@@ -627,8 +653,8 @@ private struct MagazineDetailsSheet: View {
                         section(tr("tags")) {
                             card {
                                 FlowLayout(spacing: 6) {
-                                    ForEach(tags) { tag in
-                                        Text(tag.name)
+                                    ForEach(tags, id: \.self) { tag in
+                                        Text(tag)
                                             .font(.caption)
                                             .padding(.horizontal, 10)
                                             .padding(.vertical, 5)
@@ -648,7 +674,11 @@ private struct MagazineDetailsSheet: View {
                 .padding(.bottom, 16)
             }
             .background(Color.appBackground.ignoresSafeArea())
-            .stashyModalSheetChrome(tr("details"), onBack: { dismiss() })
+            .stashyModalSheetChrome(tr("details"), onBack: { dismiss() }) {
+                if let onEdit {
+                    StashyChromeTrailingTextButton(title: tr("action_edit"), enabled: true, isBusy: false) { onEdit() }
+                }
+            }
         }
         .presentationDetents([.medium, .large])
         .presentationDragIndicator(.visible)

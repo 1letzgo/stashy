@@ -390,14 +390,19 @@ fun EditStudioSheet(
 }
 
 @Composable
-fun EditTagsSheet(scene: Scene, onDismiss: () -> Unit, onSaved: (List<Tag>) -> Unit) {
+fun EditTagsSheet(scene: Scene, onDismiss: () -> Unit, onSaved: (List<Tag>) -> Unit) =
+    EditTagsSheet(scene.tags.orEmpty().map { it.id }.toSet(), { SceneEditing.updateTags(scene.id, it) }, onDismiss, onSaved)
+
+/** Tag picker for any owner (scene, gallery): `save` writes the chosen ids. */
+@Composable
+fun EditTagsSheet(initialIds: Set<String>, save: suspend (List<String>) -> Unit, onDismiss: () -> Unit, onSaved: (List<Tag>) -> Unit) {
     val byId = remember { mutableMapOf<String, Tag>() }
     EntityPickerSheet(
-        tr(R.string.action_edit_tags), tr(R.string.search_tags), scene.tags.orEmpty().map { it.id }.toSet(), multiple = true,
+        tr(R.string.action_edit_tags), tr(R.string.search_tags), initialIds, multiple = true,
         load = { SceneEditing.allTags().onEach { byId[it.id] = it }.map { PickerEntry(it.id, it.name, count(it.sceneCount, "scenes")) } },
         create = { name -> SceneEditing.createTag(name).also { byId[it.id] = it }.let { PickerEntry(it.id, it.name, count(it.sceneCount, "scenes")) } },
         createFailedText = tr(R.string.error_create_tag),
-        save = { SceneEditing.updateTags(scene.id, it) }, saveFailedText = tr(R.string.error_update_tags),
+        save = save, saveFailedText = tr(R.string.error_update_tags),
         onSaved = { picked -> onSaved(picked.mapNotNull { byId[it.id] }) }, onDismiss = onDismiss,
     )
 }

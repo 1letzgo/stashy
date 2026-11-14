@@ -112,6 +112,8 @@ struct AddTagToSceneSheet: View {
     let sceneId: String
     let currentTags: [Tag]
     @ObservedObject var viewModel: StashDBViewModel
+    /// Set = the tags belong to something else than a scene (a gallery), written through this.
+    var saveTagIds: (([String], @escaping (Bool) -> Void) -> Void)? = nil
     var onComplete: ([Tag]) -> Void
 
     @Environment(\.stashyDismiss) var dismiss
@@ -227,7 +229,10 @@ struct AddTagToSceneSheet: View {
     private func save() {
         isSaving = true
         let ids = Array(selectedIds)
-        viewModel.updateSceneTags(sceneId: sceneId, tagIds: ids) { success in
+        let persist = saveTagIds ?? { ids, done in
+            viewModel.updateSceneTags(sceneId: sceneId, tagIds: ids, completion: done)
+        }
+        persist(ids) { success in
             DispatchQueue.main.async {
                 isSaving = false
                 if success {
