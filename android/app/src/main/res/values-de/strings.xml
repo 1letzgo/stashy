@@ -14,6 +14,7 @@
   <string name="action_add_marker">Marker hinzufügen</string>
   <string name="action_add_marker_button">Taste „Marker hinzufügen“</string>
   <string name="action_add_new_server">Neuen Server hinzufügen</string>
+  <string name="action_add_o">O hinzufügen</string>
   <string name="action_add_performer">Darsteller hinzufügen</string>
   <string name="action_add_performers">Darsteller hinzufügen</string>
   <string name="action_add_row">Zeile hinzufügen</string>
@@ -479,6 +480,7 @@
   <string name="auth_method">Anmeldemethode</string>
   <string name="auto_hide_tab_bar">Tab-Leiste automatisch ausblenden</string>
   <string name="auto_lock_on_background">Im Hintergrund sperren</string>
+  <string name="automatic">Automatisch</string>
   <string name="autoplay">Autoplay</string>
   <string name="auto_renews_cancel_anytime">Verlängert sich automatisch · jederzeit kündbar</string>
   <string name="auto_rotate_fullscreen">Vollbild automatisch drehen</string>
@@ -488,6 +490,7 @@
   <string name="back">Zurück</string>
   <string name="back_arg">%1$s zurück</string>
   <string name="back_cover">Rückseite</string>
+  <string name="background">Hintergrund</string>
   <string name="background_box">Hintergrundfeld</string>
   <string name="background_color">Hintergrundfarbe</string>
   <string name="back_to_normal">Zurück auf normal</string>
@@ -678,7 +681,7 @@
   <string name="default_sort">Standardsortierung</string>
   <string name="default_sorting">Standardsortierung</string>
   <string name="demo">Demo</string>
-  <string name="desc">Absteigend</string>
+  <string name="desc">Abst.</string>
   <string name="descending">Absteigend</string>
   <string name="description">Beschreibung</string>
   <string name="design">Design</string>
@@ -973,6 +976,7 @@
   <string name="finish">Fertig</string>
   <string name="finished">Abgeschlossen</string>
   <string name="first_marker">Erster Marker</string>
+  <string name="fit_images">Bilder einpassen</string>
   <string name="fit_to_screen">An Bildschirm anpassen</string>
   <string name="flame">Flamme</string>
   <string name="flow_arg">Flow: %1$s</string>
@@ -1431,6 +1435,7 @@
   <string name="image_perceptual_hashes">Perzeptuelle Bild-Hashes</string>
   <string name="image_performers_not_loaded">Darsteller des Bilds nicht geladen</string>
   <string name="images">Bilder</string>
+  <string name="image_scaling">Bildskalierung</string>
   <string name="images_filter">Bildfilter</string>
   <string name="images_sort">Bilder sortieren</string>
   <string name="image_thumbnails">Bild-Thumbnails</string>
@@ -1481,6 +1486,7 @@
   <string name="jane_doe">Jane Doe</string>
   <string name="job_arg">Job %1$s</string>
   <string name="jobs">Jobs</string>
+  <string name="keep_rating_visible">Bewertung sichtbar lassen</string>
   <string name="kind">Art</string>
   <string name="label_feed_arg">Feed, %1$s</string>
   <string name="landscape">Querformat</string>
@@ -1600,6 +1606,7 @@
   <string name="markers_filter">Markerfilter</string>
   <string name="match">Match</string>
   <string name="matches_regex">entspricht Regex</string>
+  <string name="match_image">Bildfarbe</string>
   <string name="match_mode">Match-Modus</string>
   <string name="match_mode_arg">Match-Modus, %1$s</string>
   <string name="max">Max</string>
@@ -1925,6 +1932,8 @@
   <string name="saved_filter">Gespeicherter Filter</string>
   <string name="saved_filters">Gespeicherte Filter</string>
   <string name="saving_ratings_arg_arg">Bewertungen werden gespeichert %1$s/%2$s</string>
+  <string name="scaling_fill">Füllen</string>
+  <string name="scaling_fit">Einpassen</string>
   <string name="scene">Szene</string>
   <string name="scene_count">Anzahl Szenen</string>
   <string name="scene_count_high_low">Anzahl Szenen (Hoch–Niedrig)</string>

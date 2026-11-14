@@ -3810,3 +3810,137 @@ enum SceneTitleNormalizer {
         return lines.joined(separator: "\n")
     }
 }
+
+// MARK: - Image viewing options
+
+/// How an image fills the space it is shown in: the fullscreen viewer on iOS / macOS, the
+/// viewer and the slideshow on Apple TV. Android: `ImageScalingMode` in `data/ImageViewing.kt`.
+enum ImageScalingMode: String, CaseIterable, Identifiable {
+    /// The whole image, with bars where the shapes differ.
+    case fit
+    /// Covers the space, cropping what does not fit.
+    case fill
+    /// Fills when image and space are both upright or both wide, fits otherwise.
+    case auto
+
+    static let key = "images_fullscreen_scaling"
+    /// The former switch: on = `auto`, off = `fit`.
+    static let legacyImmersiveKey = "images_fullscreen_immersive"
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .fit: return tr("scaling_fit")
+        case .fill: return tr("scaling_fill")
+        case .auto: return tr("automatic")
+        }
+    }
+
+    /// The stored mode; nothing stored takes the former Immersive switch (Apple TV: `fit`).
+    static func resolve(_ raw: String) -> ImageScalingMode {
+        if let mode = ImageScalingMode(rawValue: raw) { return mode }
+        #if os(tvOS)
+        return .fit
+        #else
+        if let immersive = UserDefaults.standard.object(forKey: legacyImmersiveKey) as? Bool, !immersive {
+            return .fit
+        }
+        return .auto
+        #endif
+    }
+
+    func fills(mediaIsPortrait: Bool, spaceIsPortrait: Bool) -> Bool {
+        switch self {
+        case .fit: return false
+        case .fill: return true
+        case .auto: return mediaIsPortrait == spaceIsPortrait
+        }
+    }
+}
+
+/// What shows around an image that does not cover its space.
+enum ImageBackdropMode: String, CaseIterable, Identifiable {
+    case black
+    /// The image's own average colour.
+    case match
+
+    static let key = "images_background"
+    /// Cards that show the whole image instead of a cropped one.
+    static let gridFitKey = "images_grid_fit"
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .black: return tr("black")
+        case .match: return tr("match_image")
+        }
+    }
+
+    static func resolve(_ raw: String) -> ImageBackdropMode { ImageBackdropMode(rawValue: raw) ?? .black }
+}
+
+/// Average colours of images, worked out once per URL from the cached (small) image.
+@MainActor
+enum ImageAverageColorStore {
+    private static var colors: [URL: Color] = [:]
+    private static var order: [URL] = []
+
+    static func cached(_ url: URL) -> Color? { colors[url] }
+
+    static func color(for url: URL) async -> Color? {
+        if let color = colors[url] { return color }
+        guard let image = await ImageLoader.uiImage(for: url), let cgImage = image.cgImage else { return nil }
+        let color = await Task.detached(priority: .utility) { average(of: cgImage) }.value
+        guard let color else { return nil }
+        colors[url] = color
+        order.append(url)
+        if order.count > 400 { colors[order.removeFirst()] = nil }
+        return color
+    }
+
+    /// The image drawn into one pixel.
+    nonisolated private static func average(of image: CGImage) -> Color? {
+        var pixel = [UInt8](repeating: 0, count: 4)
+        guard let context = CGContext(
+            data: &pixel, width: 1, height: 1, bitsPerComponent: 8, bytesPerRow: 4,
+            space: CGColorSpace(name: CGColorSpace.sRGB) ?? CGColorSpaceCreateDeviceRGB(),
+            bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
+        ) else { return nil }
+        context.interpolationQuality = .medium
+        context.draw(image, in: CGRect(x: 0, y: 0, width: 1, height: 1))
+        return Color(.sRGB, red: Double(pixel[0]) / 255, green: Double(pixel[1]) / 255, blue: Double(pixel[2]) / 255, opacity: 1)
+    }
+}
+
+/// The colour behind an image, by the Background setting. `url` is the image's small version.
+struct ImageBackdrop: View {
+    let url: URL?
+    /// Shown for "Black" and until the image's colour is known.
+    var fallback: Color = .black
+
+    @AppStorage(ImageBackdropMode.key) private var modeRaw = ""
+    @State private var matched: Color?
+
+    private var mode: ImageBackdropMode { ImageBackdropMode.resolve(modeRaw) }
+
+    var body: some View {
+        Group {
+            switch mode {
+            case .black: fallback
+            case .match: matched ?? url.flatMap { ImageAverageColorStore.cached($0) } ?? fallback
+            }
+        }
+        .task(id: MatchKey(url: url, on: mode == .match)) {
+            guard mode == .match, let url else { matched = nil; return }
+            matched = ImageAverageColorStore.cached(url)
+            if matched == nil { matched = await ImageAverageColorStore.color(for: url) }
+        }
+    }
+
+    private struct MatchKey: Equatable {
+        let url: URL?
+        let on: Bool
+    }
+}

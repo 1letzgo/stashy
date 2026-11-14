@@ -993,7 +993,7 @@ struct GalleryItemView: View {
     /// Continuous play: advance to next fullscreen item (own setting, not Feeds).
     var onAdvanceToNext: () -> Void = {}
 
-    @AppStorage("images_fullscreen_immersive") private var immersiveScaling = true
+    @AppStorage(ImageScalingMode.key) private var scalingRaw = ""
     @AppStorage("images_fullscreen_continuous") private var continuousPlay = false
     @AppStorage("images_fullscreen_continuous_duration") private var continuousDurationSeconds = 3
 
@@ -1019,14 +1019,9 @@ struct GalleryItemView: View {
         return false
     }
 
-    /// Match Feeds: fill only when immersive is on and content orientation matches the device.
+    /// By the Image Scaling setting; Automatic fills only when the content's orientation matches the space.
     private var shouldFill: Bool {
-        guard immersiveScaling else { return false }
-        if isTallerThanWide {
-            return isPortrait
-        } else {
-            return !isPortrait
-        }
+        ImageScalingMode.resolve(scalingRaw).fills(mediaIsPortrait: isPortrait, spaceIsPortrait: isTallerThanWide)
     }
 
     private var immersiveBottomInset: CGFloat {
@@ -1205,7 +1200,7 @@ struct GalleryItemView: View {
                 }
             }
         }
-        .background(Color.black)
+        .background(ImageBackdrop(url: image.thumbnailURL))
         .onAppear {
             if image.isVideo {
                 setupPlayer()
@@ -1447,6 +1442,13 @@ struct GalleryItemView: View {
 }
 // MARK: - Full Screen Image View (Feeds-style vertical paging)
 
+private extension View {
+    /// A part of the fullscreen chrome that a tap hides: it keeps its place, so what stays does not move.
+    func fullScreenChromeHidden(_ hidden: Bool) -> some View {
+        opacity(hidden ? 0 : 1).allowsHitTesting(!hidden)
+    }
+}
+
 struct FullScreenImageView: View {
     @Binding var images: [StashImage]
     let selectedImageId: String
@@ -1475,6 +1477,8 @@ struct FullScreenImageView: View {
     @State private var currentItemIsPlaying = true
     /// Same setting the item views read; here it decides whether pause applies to stills.
     @AppStorage("images_fullscreen_continuous") private var continuousPlay = false
+    /// O Count and rating stay when a tap hides the rest of the chrome.
+    @AppStorage("images_fullscreen_keep_rating") private var keepsRatingVisible = false
     @State private var scrubberState = ScrubberState()
     @ObservedObject private var timeBarAccessory = FeedsScrubberAccessory.images
     /// Triggers UIKit pop when `dismiss()` is a no-op under `safeAreaInset` chrome.
@@ -1538,7 +1542,6 @@ struct FullScreenImageView: View {
                             )
                             .scrollDisabled(isMediaZoomed)
                             .containerRelativeFrame([.horizontal, .vertical])
-                            .background(Color.black)
                             .id(image.id)
                             .onAppear {
                                 if image.id == images.last?.id {
@@ -1585,7 +1588,7 @@ struct FullScreenImageView: View {
                     feedsStyleInfoOverlay(currentImage: currentImage)
                     feedsStyleScrubberBar(currentImage: currentImage)
                 }
-                .allowsHitTesting(showUI)
+                .allowsHitTesting(showUI || keepsRatingVisible)
                 .zIndex(10)
             }
             .animation(.easeInOut(duration: 0.2), value: showUI)
@@ -1889,6 +1892,7 @@ struct FullScreenImageView: View {
                                 .frame(maxWidth: .infinity, alignment: .leading)
                         }
                     }
+                    .fullScreenChromeHidden(!showUI)
                     Spacer(minLength: 8)
 
                     // O-Counter · Rating side by side on the trailing edge, as in Feeds. Videos
@@ -1896,6 +1900,7 @@ struct FullScreenImageView: View {
                     // play button here only while continuous play can pause the auto-advance.
                     VStack(alignment: .trailing, spacing: 8) {
                         fullScreenRateChrome(image: image)
+                            .fullScreenChromeHidden(!showUI && !keepsRatingVisible)
 
                         if !isVideo && continuousPlay {
                             ChromePillIconButton(
@@ -1905,6 +1910,7 @@ struct FullScreenImageView: View {
                             ) {
                                 currentItemIsPlaying.toggle()
                             }
+                            .fullScreenChromeHidden(!showUI)
                         }
                     }
                 }
@@ -1979,6 +1985,7 @@ struct FullScreenImageView: View {
                 .frame(height: 24)
                 .padding(.top, 8)
                 .padding(.horizontal, StashyExpandingDock.edgePadding)
+                .fullScreenChromeHidden(!showUI)
             }
         }
         // Mit Tab-Bar-Slot: immer 8 pt bis zu dem, was darunter liegt (volle Zeitleiste bei
@@ -1987,7 +1994,6 @@ struct FullScreenImageView: View {
         // den Abstand; bei Fotos gibt es keine, also hier — wie das Bar-Padding in `IsolatedScrubberBar`.
         .padding(.bottom, FeedsScrubberAccessory.isAvailable ? 8 : (isVideo ? 0 : 8))
         .colorScheme(.dark)
-        .opacity(showUI ? 1 : 0)
         .animation(.easeInOut(duration: 0.2), value: showUI)
     }
 

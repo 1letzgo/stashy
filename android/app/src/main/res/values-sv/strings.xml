@@ -14,6 +14,7 @@
   <string name="action_add_marker">Lägg till markör</string>
   <string name="action_add_marker_button">Knappen Lägg till markör</string>
   <string name="action_add_new_server">Lägg till ny server</string>
+  <string name="action_add_o">Lägg till O</string>
   <string name="action_add_performer">Lägg till stjärna</string>
   <string name="action_add_performers">Lägg till stjärnor</string>
   <string name="action_add_row">Lägg till rad</string>
@@ -479,6 +480,7 @@
   <string name="auth_method">Autentiseringsmetod</string>
   <string name="auto_hide_tab_bar">Dölj flikfältet automatiskt</string>
   <string name="auto_lock_on_background">Lås automatiskt i bakgrunden</string>
+  <string name="automatic">Automatisk</string>
   <string name="autoplay">Autouppspelning</string>
   <string name="auto_renews_cancel_anytime">Förnyas automatiskt · avsluta när som helst</string>
   <string name="auto_rotate_fullscreen">Rotera helskärm automatiskt</string>
@@ -488,6 +490,7 @@
   <string name="back">Tillbaka</string>
   <string name="back_arg">Tillbaka %1$s</string>
   <string name="back_cover">Baksida</string>
+  <string name="background">Bakgrund</string>
   <string name="background_box">Bakgrundsruta</string>
   <string name="background_color">Bakgrundsfärg</string>
   <string name="back_to_normal">Tillbaka till normal</string>
@@ -973,6 +976,7 @@
   <string name="finish">Slutför</string>
   <string name="finished">Klar</string>
   <string name="first_marker">Första markören</string>
+  <string name="fit_images">Anpassa bilder</string>
   <string name="fit_to_screen">Anpassa till skärmen</string>
   <string name="flame">Låga</string>
   <string name="flow_arg">Flöde: %1$s</string>
@@ -1431,6 +1435,7 @@
   <string name="image_perceptual_hashes">Perceptuella hashar för bilder</string>
   <string name="image_performers_not_loaded">Bildens stjärnor har inte lästs in</string>
   <string name="images">Bilder</string>
+  <string name="image_scaling">Bildskalning</string>
   <string name="images_filter">Bildfilter</string>
   <string name="images_sort">Bildsortering</string>
   <string name="image_thumbnails">Miniatyrer för bilder</string>
@@ -1481,6 +1486,7 @@
   <string name="jane_doe">Jane Doe</string>
   <string name="job_arg">Jobb %1$s</string>
   <string name="jobs">Jobb</string>
+  <string name="keep_rating_visible">Behåll betyg synligt</string>
   <string name="kind">Typ</string>
   <string name="label_feed_arg">Flöde, %1$s</string>
   <string name="landscape">Liggande</string>
@@ -1600,6 +1606,7 @@
   <string name="markers_filter">Markörfilter</string>
   <string name="match">Match</string>
   <string name="matches_regex">Matchar regex</string>
+  <string name="match_image">Bildens färg</string>
   <string name="match_mode">Matchningsläge</string>
   <string name="match_mode_arg">Matchningsläge, %1$s</string>
   <string name="max">Max</string>
@@ -1925,6 +1932,8 @@
   <string name="saved_filter">Sparat filter</string>
   <string name="saved_filters">Sparade filter</string>
   <string name="saving_ratings_arg_arg">Sparar betyg %1$s/%2$s</string>
+  <string name="scaling_fill">Fyll</string>
+  <string name="scaling_fit">Anpassa</string>
   <string name="scene">Scen</string>
   <string name="scene_count">Antal scener</string>
   <string name="scene_count_high_low">Antal scener (hög–låg)</string>

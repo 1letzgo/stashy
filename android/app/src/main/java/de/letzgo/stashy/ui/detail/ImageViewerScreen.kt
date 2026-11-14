@@ -23,6 +23,12 @@ import android.content.Context
 import android.content.Intent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
+import androidx.compose.ui.composed
+import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.layout.layout
+import de.letzgo.stashy.data.ImageViewing
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
@@ -175,7 +181,6 @@ class ImageViewerScreen(
     /** iOS `@AppStorage` keys of the fullscreen viewer. */
     private val continuousPlay get() = Prefs.bool("images_fullscreen_continuous", false)
     private val continuousSeconds get() = Prefs.int("images_fullscreen_continuous_duration", 3).coerceAtLeast(1)
-    private val immersiveScaling get() = Prefs.bool("images_fullscreen_immersive", true)
 
     private val current: StashImage? get() = items.getOrNull(currentIndex)
 
@@ -250,9 +255,12 @@ class ImageViewerScreen(
                     Icon(SF.chevronRight2, "2×", tint = Color.White, modifier = Modifier.size(32.dp))
                 }
             }
-            AnimatedVisibility(showUI, Modifier.align(Alignment.BottomCenter), enter = fadeIn(), exit = fadeOut()) {
+            // "Keep Rating Visible": the overlay stays composed with the chrome hidden, so the
+            // O Count and rating pills keep their place; everything else fades out (BottomOverlay).
+            val keepRating = ImageViewing.keepRating
+            if (showUI || keepRating) Box(Modifier.align(Alignment.BottomCenter)) {
                 // Over the media: font scale capped at OverlayMaxFontScale (like Feeds).
-                current?.let { de.letzgo.stashy.ui.CappedFontScale { BottomOverlay(it) } }
+                current?.let { de.letzgo.stashy.ui.CappedFontScale { BottomOverlay(it, chrome = showUI) } }
             }
         }
 
@@ -326,30 +334,33 @@ class ImageViewerScreen(
         val animated = DetailFormatting.isAnimated(image)
         val portraitDevice = LocalConfiguration.current.let { it.screenHeightDp > it.screenWidthDp }
         val portraitImage = image.visualFiles?.firstOrNull()?.let { (it.height ?: 0) > (it.width ?: 0) } ?: false
-        // iOS `shouldFill`: immersive on and content orientation matches the device.
-        val fill = immersiveScaling && (portraitDevice == portraitImage)
+        // iOS `shouldFill`: the scaling mode (Fit / Fill / Automatic = orientation matches the device).
+        val fill = ImageViewing.scaling.fills(portraitImage, portraitDevice)
+        val backdrop = ImageViewing.backdropColor(image.thumbnailURL ?: image.imageURL)
         val isClip = image.isVideo && !animated
-        ZoomableBox(
-            onTap = { showUI = !showUI },
-            onZoomChange = { zoomed = it },
-            zoomEnabled = !isClip,
-            onHold = if (isClip) ({ holdFastForward(it) }) else null,
-            onDoubleTapAt = if (isClip) ({ x, w -> skipOnDoubleTap(x, w) }) else null,
-        ) {
-            if (image.isVideo && !animated) {
-                VideoPage(image, active, fill, onEnded)
-            } else {
-                SubcomposeAsyncImage(
-                    image.imageURL, image.title, Modifier.fillMaxSize(),
-                    contentScale = if (fill) ContentScale.Crop else ContentScale.Fit,
-                    loading = { Box(Modifier.fillMaxSize(), Alignment.Center) { CircularProgressIndicator(color = Color.White) } },
-                    error = {
-                        Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(12.dp, Alignment.CenterVertically), horizontalAlignment = Alignment.CenterHorizontally) {
-                            Icon(SF.exclamationTriangle, null, tint = Color.White, modifier = Modifier.size(40.dp))
-                            Text(tr(R.string.error_load_image), color = Color.White)
-                        }
-                    },
-                )
+        Box(Modifier.fillMaxSize().background(backdrop)) {
+            ZoomableBox(
+                onTap = { showUI = !showUI },
+                onZoomChange = { zoomed = it },
+                zoomEnabled = !isClip,
+                onHold = if (isClip) ({ holdFastForward(it) }) else null,
+                onDoubleTapAt = if (isClip) ({ x, w -> skipOnDoubleTap(x, w) }) else null,
+            ) {
+                if (image.isVideo && !animated) {
+                    VideoPage(image, active, fill, onEnded)
+                } else {
+                    SubcomposeAsyncImage(
+                        image.imageURL, image.title, Modifier.fillMaxSize(),
+                        contentScale = if (fill) ContentScale.Crop else ContentScale.Fit,
+                        loading = { Box(Modifier.fillMaxSize(), Alignment.Center) { CircularProgressIndicator(color = Color.White) } },
+                        error = {
+                            Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(12.dp, Alignment.CenterVertically), horizontalAlignment = Alignment.CenterHorizontally) {
+                                Icon(SF.exclamationTriangle, null, tint = Color.White, modifier = Modifier.size(40.dp))
+                                Text(tr(R.string.error_load_image), color = Color.White)
+                            }
+                        },
+                    )
+                }
             }
         }
     }
@@ -494,11 +505,19 @@ class ImageViewerScreen(
     }
 
     @Composable
-    private fun BottomOverlay(image: StashImage) {
+    private fun BottomOverlay(image: StashImage, chrome: Boolean) {
+        /** Fades a part out with the chrome but keeps its space (not placed, so no taps) — the pills stay where they are. */
+        fun Modifier.chromePart(): Modifier = composed {
+            val a by animateFloatAsState(if (chrome) 1f else 0f, tween(250), label = "chromePart")
+            alpha(a).layout { m, c ->
+                val pl = m.measure(c)
+                layout(pl.width, pl.height) { if (a > 0f) pl.place(0, 0) }
+            }
+        }
         val isVideo = image.isVideo && !DetailFormatting.isAnimated(image)
         Column(Modifier.fillMaxWidth().navigationBarsPadding().padding(bottom = if (isVideo) 0.dp else 8.dp)) {
             Row(Modifier.fillMaxWidth().padding(horizontal = Dock.edgePadding), verticalAlignment = Alignment.Bottom) {
-                Row(Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                Row(Modifier.weight(1f).chromePart(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                     image.performers?.firstOrNull()?.let { performer ->
                         PerformerAvatar(performer) { openPerformer(performer) }
                     }
@@ -534,16 +553,17 @@ class ImageViewerScreen(
                     OCounterButton(image)
                     RatingButton(image)
                     // Same buttons as the Feeds control stack ([FeedsInfoOverlay]).
+                    Column(Modifier.chromePart(), horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     ChromePillIconButton(if (isMuted) SF.speakerSlashFill else SF.speakerWave2Fill, if (isMuted) tr(R.string.unmute) else tr(R.string.mute), enabled = isVideo) {
                         isMuted = !isMuted; de.letzgo.stashy.ui.player.PlayerMute.remember(isMuted)
                     }
                     ChromePillIconButton(if (isPlaying) SF.pauseFill else SF.playFill, if (isPlaying) tr(R.string.action_pause) else tr(R.string.action_play), enabled = isVideo || continuousPlay) {
                         isPlaying = !isPlaying
                     }
+                    }
                 }
             }
-            TagRow(image)
-            if (isVideo) Scrubber()
+            Box(Modifier.chromePart()) { Column { TagRow(image); if (isVideo) Scrubber() } }
         }
     }
 

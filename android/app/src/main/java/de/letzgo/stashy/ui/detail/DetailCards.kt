@@ -85,14 +85,15 @@ private fun CardBox(modifier: Modifier, aspect: Float, onClick: (() -> Unit)?, c
 }
 
 @Composable
-private fun CardImage(url: String?, placeholder: ImageVector, alignment: Alignment = Alignment.Center) {
-    Box(Modifier.fillMaxSize().background(Color.Gray.copy(alpha = 0.2f)))
+private fun CardImage(url: String?, placeholder: ImageVector, alignment: Alignment = Alignment.Center, fit: Boolean = false) {
+    // `images_grid_fit`: the whole image, centered, over the image backdrop.
+    Box(Modifier.fillMaxSize().background(if (fit) de.letzgo.stashy.data.ImageViewing.backdropColor(url) else Color.Gray.copy(alpha = 0.2f)))
     if (url == null) {
         Box(Modifier.fillMaxSize(), Alignment.Center) { Icon(placeholder, null, tint = Theme.palette.secondaryText, modifier = Modifier.size(36.dp)) }
         return
     }
     SubcomposeAsyncImage(
-        url, null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop, alignment = alignment,
+        url, null, Modifier.fillMaxSize(), contentScale = if (fit) ContentScale.Fit else ContentScale.Crop, alignment = if (fit) Alignment.Center else alignment,
         loading = { Box(Modifier.fillMaxSize(), Alignment.Center) { CircularProgressIndicator(Modifier.size(20.dp), color = Theme.palette.secondaryText, strokeWidth = 2.dp) } },
         error = { Box(Modifier.fillMaxSize(), Alignment.Center) { Icon(placeholder, null, tint = Theme.palette.secondaryText, modifier = Modifier.size(36.dp)) } },
     )
@@ -259,7 +260,7 @@ internal fun DetailImageCard(image: StashImage, modifier: Modifier = Modifier, a
     val performer = image.performers?.firstOrNull()?.name
     val label = (if (prefersTitle) title ?: performer else performer ?: title) ?: tr(R.string.image)
     CardBox(modifier, aspect, onClick) {
-        CardImage(image.thumbnailURL, SF.photo)
+        CardImage(image.thumbnailURL, SF.photo, fit = de.letzgo.stashy.data.ImageViewing.gridFit)
         if (image.isVideo) {
             Box(Modifier.align(Alignment.Center).size(48.dp).clip(CircleShape).background(Color.Black.copy(alpha = 0.4f)), Alignment.Center) {
                 Icon(SF.playFill, null, tint = Color.White, modifier = Modifier.size(24.dp))

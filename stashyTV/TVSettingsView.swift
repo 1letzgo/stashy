@@ -17,6 +17,7 @@ private enum TVSettingsEntry: Hashable {
     case servers, appearance, security, stashyPlus
     case defaultSort, defaultFilters, visibleTabs
     case homeRows
+    case images
     case subtitles
     case dolbyVision
     case playCount
@@ -33,6 +34,7 @@ private enum TVSettingsEntry: Hashable {
         case .defaultFilters: return tr("default_filters")
         case .visibleTabs: return tr("visible_tabs")
         case .homeRows: return tr("home_rows")
+        case .images: return tr("images")
         case .subtitles: return tr("subtitles")
         case .dolbyVision: return tr("dolby_vision")
         case .playCount: return tr("count_as_played")
@@ -51,6 +53,7 @@ private enum TVSettingsEntry: Hashable {
         case .defaultFilters: return "line.3.horizontal.decrease.circle"
         case .visibleTabs: return "rectangle.3.group.fill"
         case .homeRows: return "rectangle.grid.1x2.fill"
+        case .images: return "photo.on.rectangle"
         case .subtitles: return "captions.bubble.fill"
         case .dolbyVision: return "sparkles.tv"
         case .playCount: return "play.circle"
@@ -77,6 +80,8 @@ private enum TVSettingsEntry: Hashable {
             return tr("hint_hide_sections_you_do_not")
         case .homeRows:
             return tr("hint_choose_which_rows_home_shows")
+        case .images:
+            return tr("image_scaling")
         case .subtitles:
             return tr("hint_turn_subtitles_on_automatically_choose")
         case .playCount:
@@ -144,6 +149,7 @@ struct TVSettingsView: View {
                 link(.defaultFilters)
                 link(.visibleTabs)
                 link(.homeRows)
+                link(.images)
             } header: {
                 Text(tr("content"))
             }
@@ -193,6 +199,7 @@ struct TVSettingsView: View {
         case .defaultFilters: TVDefaultFilterSettingsView()
         case .visibleTabs: TVTabVisibilitySettingsView()
         case .homeRows: TVHomeRowsSettingsView()
+        case .images: TVImagesSettingsView()
         case .subtitles: TVSubtitleSettingsView()
         case .maintenance: TVMaintenanceSettingsView()
         case .about: TVAboutSettingsView()
@@ -569,6 +576,45 @@ private struct TVAppearanceSettingsView: View {
             && abs(ag - bg) <= tolerance
             && abs(ab - bb) <= tolerance
             && abs(aa - ba) <= tolerance
+    }
+}
+
+// MARK: - Images
+
+private struct TVImagesSettingsView: View {
+    @ObservedObject private var appearanceManager = AppearanceManager.shared
+    @AppStorage(ImageScalingMode.key) private var scalingRaw = ""
+    @AppStorage(ImageBackdropMode.key) private var backdropRaw = ""
+    @AppStorage(ImageBackdropMode.gridFitKey) private var fitsImages = false
+
+    private var scaling: Binding<ImageScalingMode> {
+        Binding(get: { ImageScalingMode.resolve(scalingRaw) }, set: { scalingRaw = $0.rawValue })
+    }
+
+    private var backdrop: Binding<ImageBackdropMode> {
+        Binding(get: { ImageBackdropMode.resolve(backdropRaw) }, set: { backdropRaw = $0.rawValue })
+    }
+
+    var body: some View {
+        List {
+            Section {
+                TVSettingsPickerRow(
+                    title: tr("image_scaling"),
+                    options: ImageScalingMode.allCases.map { TVPickerOption($0, $0.title) },
+                    selection: scaling
+                )
+
+                TVSettingsPickerRow(
+                    title: tr("background"),
+                    options: ImageBackdropMode.allCases.map { TVPickerOption($0, $0.title) },
+                    selection: backdrop
+                )
+
+                Toggle(tr("fit_images"), isOn: $fitsImages)
+                    .tint(appearanceManager.tintColor)
+            }
+        }
+        .tvSettingsPage(tr("images"), description: tr("image_scaling"))
     }
 }
 

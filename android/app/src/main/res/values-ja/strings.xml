@@ -14,6 +14,7 @@
   <string name="action_add_marker">マーカーを追加</string>
   <string name="action_add_marker_button">「マーカーを追加」ボタン</string>
   <string name="action_add_new_server">新しいサーバーを追加</string>
+  <string name="action_add_o">Oを追加</string>
   <string name="action_add_performer">出演者を追加</string>
   <string name="action_add_performers">出演者を追加</string>
   <string name="action_add_row">行を追加</string>
@@ -479,6 +480,7 @@
   <string name="auth_method">認証方式</string>
   <string name="auto_hide_tab_bar">タブバーを自動的に隠す</string>
   <string name="auto_lock_on_background">バックグラウンドで自動ロック</string>
+  <string name="automatic">自動</string>
   <string name="autoplay">自動再生</string>
   <string name="auto_renews_cancel_anytime">自動更新 · いつでも解約可能</string>
   <string name="auto_rotate_fullscreen">フルスクリーンで自動回転</string>
@@ -488,6 +490,7 @@
   <string name="back">戻る</string>
   <string name="back_arg">%1$s戻る</string>
   <string name="back_cover">裏表紙</string>
+  <string name="background">背景</string>
   <string name="background_box">背景ボックス</string>
   <string name="background_color">背景色</string>
   <string name="back_to_normal">標準に戻す</string>
@@ -973,6 +976,7 @@
   <string name="finish">完了</string>
   <string name="finished">完了</string>
   <string name="first_marker">最初のマーカー</string>
+  <string name="fit_images">画像をフィット</string>
   <string name="fit_to_screen">画面に合わせる</string>
   <string name="flame">炎</string>
   <string name="flow_arg">Flow：%1$s</string>
@@ -1431,6 +1435,7 @@
   <string name="image_perceptual_hashes">画像の知覚ハッシュ</string>
   <string name="image_performers_not_loaded">画像の出演者が読み込まれていません</string>
   <string name="images">画像</string>
+  <string name="image_scaling">画像の拡大縮小</string>
   <string name="images_filter">画像フィルター</string>
   <string name="images_sort">画像の並べ替え</string>
   <string name="image_thumbnails">画像のサムネイル</string>
@@ -1481,6 +1486,7 @@
   <string name="jane_doe">Jane Doe</string>
   <string name="job_arg">ジョブ %1$s</string>
   <string name="jobs">ジョブ</string>
+  <string name="keep_rating_visible">評価を表示したままにする</string>
   <string name="kind">種類</string>
   <string name="label_feed_arg">フィード、%1$s</string>
   <string name="landscape">横向き</string>
@@ -1600,6 +1606,7 @@
   <string name="markers_filter">マーカーフィルター</string>
   <string name="match">Match</string>
   <string name="matches_regex">正規表現に一致</string>
+  <string name="match_image">画像の色</string>
   <string name="match_mode">Matchモード</string>
   <string name="match_mode_arg">Matchモード、%1$s</string>
   <string name="max">最大</string>
@@ -1925,6 +1932,8 @@
   <string name="saved_filter">保存済みフィルター</string>
   <string name="saved_filters">保存済みフィルター</string>
   <string name="saving_ratings_arg_arg">評価を保存中 %1$s/%2$s</string>
+  <string name="scaling_fill">フィル</string>
+  <string name="scaling_fit">フィット</string>
   <string name="scene">シーン</string>
   <string name="scene_count">シーン数</string>
   <string name="scene_count_high_low">シーン数（多い順）</string>

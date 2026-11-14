@@ -219,7 +219,13 @@ fun TvImageTile(image: StashImage, onClick: () -> Unit, modifier: Modifier = Mod
     Column(Modifier.width(size)) {
         TvCardButton(onClick, modifier) {
             Box(Modifier.size(size).clip(RoundedCornerShape(pt(10)))) {
-                TvImage(image.thumbnailURL, Modifier.fillMaxSize(), TvIcons.photo, iconSize = pt(32))
+                // `images_grid_fit`: the whole image over the image backdrop.
+                val gridFit = de.letzgo.stashy.data.ImageViewing.gridFit
+                TvImage(
+                    image.thumbnailURL, Modifier.fillMaxSize(), TvIcons.photo, iconSize = pt(32),
+                    placeholderColor = if (gridFit) de.letzgo.stashy.data.ImageViewing.backdropColor(image.thumbnailURL) else TvColors.placeholder,
+                    contentScale = if (gridFit) androidx.compose.ui.layout.ContentScale.Fit else androidx.compose.ui.layout.ContentScale.Crop,
+                )
                 image.performerPillText?.let {
                     TvPill(it, Modifier.align(Alignment.TopEnd).padding(pt(12)).widthIn(max = size - pt(24)), uppercase = true)
                 }

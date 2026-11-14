@@ -14,6 +14,7 @@
   <string name="action_add_marker">Добавить маркер</string>
   <string name="action_add_marker_button">Кнопка «Добавить маркер»</string>
   <string name="action_add_new_server">Добавить новый сервер</string>
+  <string name="action_add_o">Добавить O</string>
   <string name="action_add_performer">Добавить исполнителя</string>
   <string name="action_add_performers">Добавить исполнителей</string>
   <string name="action_add_row">Добавить ряд</string>
@@ -479,6 +480,7 @@
   <string name="auth_method">Метод аутентификации</string>
   <string name="auto_hide_tab_bar">Автоматически скрывать панель вкладок</string>
   <string name="auto_lock_on_background">Блокировать в фоне</string>
+  <string name="automatic">Авто</string>
   <string name="autoplay">Автовоспроизведение</string>
   <string name="auto_renews_cancel_anytime">Автопродление · отмена в любое время</string>
   <string name="auto_rotate_fullscreen">Автоповорот в полноэкранном режиме</string>
@@ -488,6 +490,7 @@
   <string name="back">Назад</string>
   <string name="back_arg">Назад на %1$s</string>
   <string name="back_cover">Задняя обложка</string>
+  <string name="background">Фон</string>
   <string name="background_box">Фоновая подложка</string>
   <string name="background_color">Цвет фона</string>
   <string name="back_to_normal">Вернуть обычный вид</string>
@@ -973,6 +976,7 @@
   <string name="finish">Завершить</string>
   <string name="finished">Завершено</string>
   <string name="first_marker">Первый маркер</string>
+  <string name="fit_images">Вписывать изображения</string>
   <string name="fit_to_screen">По размеру экрана</string>
   <string name="flame">Пламя</string>
   <string name="flow_arg">Поток: %1$s</string>
@@ -1431,6 +1435,7 @@
   <string name="image_perceptual_hashes">Перцептивные хеши изображений</string>
   <string name="image_performers_not_loaded">Исполнители изображения не загружены</string>
   <string name="images">Изображения</string>
+  <string name="image_scaling">Масштаб изображения</string>
   <string name="images_filter">Фильтр изображений</string>
   <string name="images_sort">Сортировка изображений</string>
   <string name="image_thumbnails">Миниатюры изображений</string>
@@ -1481,6 +1486,7 @@
   <string name="jane_doe">Jane Doe</string>
   <string name="job_arg">Задача %1$s</string>
   <string name="jobs">Задачи</string>
+  <string name="keep_rating_visible">Оставлять оценку видимой</string>
   <string name="kind">Тип</string>
   <string name="label_feed_arg">Лента, %1$s</string>
   <string name="landscape">Альбомная</string>
@@ -1600,6 +1606,7 @@
   <string name="markers_filter">Фильтр маркеров</string>
   <string name="match">Match</string>
   <string name="matches_regex">Соответствует регулярному выражению</string>
+  <string name="match_image">Цвет изображения</string>
   <string name="match_mode">Режим Match</string>
   <string name="match_mode_arg">Режим Match, %1$s</string>
   <string name="max">Макс.</string>
@@ -1925,6 +1932,8 @@
   <string name="saved_filter">Сохраненный фильтр</string>
   <string name="saved_filters">Сохраненные фильтры</string>
   <string name="saving_ratings_arg_arg">Сохранение рейтингов %1$s/%2$s</string>
+  <string name="scaling_fill">Заполнить</string>
+  <string name="scaling_fit">Вписать</string>
   <string name="scene">Сцена</string>
   <string name="scene_count">Количество сцен</string>
   <string name="scene_count_high_low">Количество сцен (по убыванию)</string>

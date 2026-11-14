@@ -14,6 +14,7 @@
   <string name="action_add_marker">添加标记</string>
   <string name="action_add_marker_button">“添加标记”按钮</string>
   <string name="action_add_new_server">添加新服务器</string>
+  <string name="action_add_o">添加 O</string>
   <string name="action_add_performer">添加演员</string>
   <string name="action_add_performers">添加演员</string>
   <string name="action_add_row">添加行</string>
@@ -479,6 +480,7 @@
   <string name="auth_method">认证方式</string>
   <string name="auto_hide_tab_bar">自动隐藏标签栏</string>
   <string name="auto_lock_on_background">进入后台时自动锁定</string>
+  <string name="automatic">自动</string>
   <string name="autoplay">自动播放</string>
   <string name="auto_renews_cancel_anytime">自动续订 · 可随时取消</string>
   <string name="auto_rotate_fullscreen">全屏时自动旋转</string>
@@ -488,6 +490,7 @@
   <string name="back">返回</string>
   <string name="back_arg">后退 %1$s</string>
   <string name="back_cover">封底</string>
+  <string name="background">背景</string>
   <string name="background_box">背景框</string>
   <string name="background_color">背景颜色</string>
   <string name="back_to_normal">恢复正常</string>
@@ -973,6 +976,7 @@
   <string name="finish">完成</string>
   <string name="finished">已完成</string>
   <string name="first_marker">第一个标记</string>
+  <string name="fit_images">适应图像</string>
   <string name="fit_to_screen">适合屏幕</string>
   <string name="flame">火焰</string>
   <string name="flow_arg">光流：%1$s</string>
@@ -1431,6 +1435,7 @@
   <string name="image_perceptual_hashes">图片感知哈希值</string>
   <string name="image_performers_not_loaded">图片的演员未载入</string>
   <string name="images">图片</string>
+  <string name="image_scaling">图像缩放</string>
   <string name="images_filter">图片过滤</string>
   <string name="images_sort">图片排序</string>
   <string name="image_thumbnails">图片缩略图</string>
@@ -1481,6 +1486,7 @@
   <string name="jane_doe">Jane Doe</string>
   <string name="job_arg">任务 %1$s</string>
   <string name="jobs">任务</string>
+  <string name="keep_rating_visible">保持评分可见</string>
   <string name="kind">类型</string>
   <string name="label_feed_arg">信息流，%1$s</string>
   <string name="landscape">横向</string>
@@ -1600,6 +1606,7 @@
   <string name="markers_filter">标记过滤</string>
   <string name="match">Match</string>
   <string name="matches_regex">匹配正则表达式</string>
+  <string name="match_image">图像颜色</string>
   <string name="match_mode">Match 模式</string>
   <string name="match_mode_arg">Match 模式，%1$s</string>
   <string name="max">最高</string>
@@ -1925,6 +1932,8 @@
   <string name="saved_filter">已存过滤器</string>
   <string name="saved_filters">已存过滤器</string>
   <string name="saving_ratings_arg_arg">正在存储评分 %1$s/%2$s</string>
+  <string name="scaling_fill">填充</string>
+  <string name="scaling_fit">适应</string>
   <string name="scene">短片</string>
   <string name="scene_count">短片数量</string>
   <string name="scene_count_high_low">短片数量（从高到低）</string>

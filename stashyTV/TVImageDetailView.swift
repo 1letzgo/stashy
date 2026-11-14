@@ -28,6 +28,11 @@ struct TVImageDetailView: View {
     @State private var loadFailed: Bool = false
     @State private var isLoading: Bool = true
     @State private var slideshow: TVSlideshowStart?
+    @State private var showingActions = false
+    /// Local rating / O Count edits by image id, kept so a refreshed list from the grid does not undo them.
+    @State private var ratingEdits: [String: Int?] = [:]
+    @State private var oEdits: [String: Int] = [:]
+    @AppStorage(ImageScalingMode.key) private var scalingRaw = ""
 
     var body: some View {
         ZStack {
@@ -66,6 +71,14 @@ struct TVImageDetailView: View {
             }
         }
         .focusable()
+        // Select: rating and O Count.
+        .onTapGesture {
+            guard images.indices.contains(currentIndex), slideshow == nil else { return }
+            showingActions = true
+        }
+        .confirmationDialog(tr("rating"), isPresented: $showingActions, titleVisibility: .visible) {
+            actionButtons
+        }
         .onExitCommand {
             dismiss()
         }
@@ -89,18 +102,7 @@ struct TVImageDetailView: View {
             slideshow = TVSlideshowStart(index: currentIndex)
         }
         .fullScreenCover(item: $slideshow) { start in
-            TVImageSlideshowView(
-                images: images,
-                startIndex: start.index,
-                onLoadMore: { requestMoreImages() },
-                hasMore: canLoadMore,
-                onFinish: { imageId in
-                    // Back in the viewer on the image the slideshow stopped at.
-                    if let index = images.firstIndex(where: { $0.id == imageId }) {
-                        currentIndex = index
-                    }
-                }
-            )
+            slideshowView(start: start)
         }
         .onAppear {
             loadImages()
@@ -124,19 +126,34 @@ struct TVImageDetailView: View {
     private var imageViewer: some View {
         if currentIndex < images.count {
             let image = images[currentIndex]
-            CustomAsyncImage(url: image.imageURL ?? image.thumbnailURL) { loader in
-                if let img = loader.image {
-                    img
-                        .resizable()
-                        .scaledToFit()
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
-                } else if loader.isLoading {
-                    ProgressView()
-                        .scaleEffect(1.5)
-                } else {
-                    Image(systemName: "photo")
-                        .font(.system(size: 64))
-                        .foregroundStyle(.secondary)
+            let fills = ImageScalingMode.resolve(scalingRaw).fills(
+                mediaIsPortrait: (image.pixelSize.map { $0.height > $0.width }) ?? false,
+                spaceIsPortrait: false
+            )
+            ZStack {
+                ImageBackdrop(url: image.thumbnailURL)
+                CustomAsyncImage(url: image.imageURL ?? image.thumbnailURL) { loader in
+                    if let img = loader.image {
+                        if fills {
+                            img
+                                .resizable()
+                                .scaledToFill()
+                                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                                .clipped()
+                        } else {
+                            img
+                                .resizable()
+                                .scaledToFit()
+                                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        }
+                    } else if loader.isLoading {
+                        ProgressView()
+                            .scaleEffect(1.5)
+                    } else {
+                        Image(systemName: "photo")
+                            .font(.system(size: 64))
+                            .foregroundStyle(.secondary)
+                    }
                 }
             }
             .ignoresSafeArea()
@@ -154,15 +171,94 @@ struct TVImageDetailView: View {
                 .padding(.top, 40)
 
                 Spacer()
-                if images.count > 1 {
-                    HStack(spacing: 24) {
+                HStack(spacing: 24) {
+                    if images.count > 1 {
                         Text("\(currentIndex + 1) / \(images.count)")
+                    }
+                    TVImageRatingInfo(rating100: image.rating100, oCount: image.o_counter ?? 0)
+                    if images.count > 1 {
                         Label(tr("slideshow"), systemImage: "playpause.fill")
                             .foregroundStyle(.tertiary)
                     }
-                    .font(.title3)
-                    .foregroundStyle(.secondary)
-                    .padding(.bottom, 40)
+                }
+                .font(.title3)
+                .foregroundStyle(.secondary)
+                .padding(.horizontal, 24)
+                .padding(.vertical, 10)
+                .background(Color.black.opacity(0.5), in: Capsule())
+                .padding(.bottom, 40)
+            }
+        }
+    }
+
+    private func slideshowView(start: TVSlideshowStart) -> some View {
+            return TVImageSlideshowView(
+                images: images,
+                startIndex: start.index,
+                onLoadMore: { requestMoreImages() },
+                hasMore: canLoadMore,
+                onFinish: { imageId in
+                    // Back in the viewer on the image the slideshow stopped at.
+                    if let index = images.firstIndex(where: { $0.id == imageId }) {
+                        currentIndex = index
+                    }
+                },
+                onImageChanged: { updated in
+                    ratingEdits[updated.id] = .some(updated.rating100)
+                    oEdits[updated.id] = updated.o_counter ?? 0
+                    if let index = images.firstIndex(where: { $0.id == updated.id }) {
+                        images[index] = updated
+                    }
+                }
+            )
+    }
+
+    @ViewBuilder
+    private var actionButtons: some View {
+        let current = images.indices.contains(currentIndex) ? TVEntityRating.stars(images[currentIndex].rating100) : 0
+        Button(tr("action_add_o")) { addO() }
+        ForEach((0...5).reversed(), id: \.self) { stars in
+            let label = stars == 0 ? tr("empty_rating") : String(repeating: "★", count: stars)
+            Button(stars == current ? "✓ \(label)" : label) {
+                setRating(stars == 0 ? nil : stars * 20)
+            }
+        }
+        Button(tr("action_cancel"), role: .cancel) {}
+    }
+
+    private func setRating(_ rating: Int?) {
+        guard images.indices.contains(currentIndex) else { return }
+        let imageId = images[currentIndex].id
+        let original = images[currentIndex].rating100
+        ratingEdits[imageId] = .some(rating)
+        images[currentIndex] = images[currentIndex].withRating(rating)
+        viewModel.updateImageRating(imageId: imageId, rating100: rating) { success in
+            guard !success else { return }
+            DispatchQueue.main.async {
+                ratingEdits[imageId] = .some(original)
+                if let index = images.firstIndex(where: { $0.id == imageId }) {
+                    images[index] = images[index].withRating(original)
+                }
+                AppLog.error("TV: error_save_rating")
+            }
+        }
+    }
+
+    private func addO() {
+        guard images.indices.contains(currentIndex) else { return }
+        let imageId = images[currentIndex].id
+        let original = images[currentIndex].o_counter ?? 0
+        oEdits[imageId] = original + 1
+        images[currentIndex] = images[currentIndex].withOCounter(original + 1)
+        viewModel.incrementImageOCounter(imageId: imageId) { returned in
+            DispatchQueue.main.async {
+                let value = returned ?? original
+                oEdits[imageId] = value
+                if let index = images.firstIndex(where: { $0.id == imageId }) {
+                    images[index] = images[index].withOCounter(value)
+                }
+                if returned == nil {
+                    AppLog.error("TV: error_update_o_count")
                 }
             }
         }
@@ -218,7 +314,12 @@ struct TVImageDetailView: View {
             return
         }
         let anchorId = images.indices.contains(currentIndex) ? images[currentIndex].id : imageId
-        images = viewable
+        images = viewable.map { image in
+            var image = image
+            if let rating = ratingEdits[image.id] { image = image.withRating(rating) }
+            if let o = oEdits[image.id] { image = image.withOCounter(o) }
+            return image
+        }
         isLoading = false
         loadFailed = false
         // Erst das aktuell gezeigte Bild suchen, **dann** erst das ursprünglich
@@ -265,6 +366,30 @@ struct TVImageDetailView: View {
             if hasMore { onLoadMore() }
         } else if viewModel.hasMoreGalleryImages {
             viewModel.fetchGalleryImages(galleryId: galleryId, isInitialLoad: false)
+        }
+    }
+}
+
+/// Current stars and O Count of an image, one line for the viewer and the slideshow.
+struct TVImageRatingInfo: View {
+    let rating100: Int?
+    let oCount: Int
+
+    var body: some View {
+        let stars = TVEntityRating.stars(rating100)
+        HStack(spacing: 20) {
+            HStack(spacing: 2) {
+                ForEach(1...5, id: \.self) { i in
+                    Image(systemName: i <= stars ? "star.fill" : "star")
+                        .foregroundStyle(i <= stars ? Color.yellow : Color.white.opacity(0.4))
+                }
+            }
+            .accessibilityLabel(tr("rating"))
+            HStack(spacing: 6) {
+                Image(systemName: oCount > 0 ? AppearanceManager.shared.oCounterIconFilled : AppearanceManager.shared.oCounterIcon)
+                Text("\(oCount)")
+            }
+            .accessibilityLabel(tr("o_count"))
         }
     }
 }

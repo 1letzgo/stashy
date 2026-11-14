@@ -14,6 +14,7 @@
   <string name="action_add_marker">Dodaj znacznik</string>
   <string name="action_add_marker_button">Przycisk „Dodaj znacznik”</string>
   <string name="action_add_new_server">Dodaj nowy serwer</string>
+  <string name="action_add_o">Dodaj O</string>
   <string name="action_add_performer">Dodaj aktora</string>
   <string name="action_add_performers">Dodaj aktorów</string>
   <string name="action_add_row">Dodaj wiersz</string>
@@ -479,6 +480,7 @@
   <string name="auth_method">Metoda uwierzytelniania</string>
   <string name="auto_hide_tab_bar">Automatycznie ukrywaj pasek kart</string>
   <string name="auto_lock_on_background">Blokuj automatycznie w tle</string>
+  <string name="automatic">Automatycznie</string>
   <string name="autoplay">Autoodtwarzanie</string>
   <string name="auto_renews_cancel_anytime">Odnawia się automatycznie · możesz anulować w każdej chwili</string>
   <string name="auto_rotate_fullscreen">Automatyczny obrót na pełnym ekranie</string>
@@ -488,6 +490,7 @@
   <string name="back">Wstecz</string>
   <string name="back_arg">Wstecz %1$s</string>
   <string name="back_cover">Tylna okładka</string>
+  <string name="background">Tło</string>
   <string name="background_box">Tło napisów</string>
   <string name="background_color">Kolor tła</string>
   <string name="back_to_normal">Przywróć normalnie</string>
@@ -973,6 +976,7 @@
   <string name="finish">Zakończ</string>
   <string name="finished">Zakończono</string>
   <string name="first_marker">Pierwszy znacznik</string>
+  <string name="fit_images">Dopasuj obrazy</string>
   <string name="fit_to_screen">Dopasuj do ekranu</string>
   <string name="flame">Płomień</string>
   <string name="flow_arg">Przepływ: %1$s</string>
@@ -1431,6 +1435,7 @@
   <string name="image_perceptual_hashes">Hasze percepcyjne obrazów</string>
   <string name="image_performers_not_loaded">Nie wczytano aktorów obrazu</string>
   <string name="images">Obrazy</string>
+  <string name="image_scaling">Skalowanie obrazu</string>
   <string name="images_filter">Filtr obrazów</string>
   <string name="images_sort">Sortowanie obrazów</string>
   <string name="image_thumbnails">Miniatury obrazów</string>
@@ -1481,6 +1486,7 @@
   <string name="jane_doe">Jane Doe</string>
   <string name="job_arg">Zadanie %1$s</string>
   <string name="jobs">Zadania</string>
+  <string name="keep_rating_visible">Zachowaj ocenę widoczną</string>
   <string name="kind">Rodzaj</string>
   <string name="label_feed_arg">Kanał, %1$s</string>
   <string name="landscape">Poziomo</string>
@@ -1600,6 +1606,7 @@
   <string name="markers_filter">Filtr znaczników</string>
   <string name="match">Match</string>
   <string name="matches_regex">Pasuje do wyrażenia regularnego</string>
+  <string name="match_image">Kolor obrazu</string>
   <string name="match_mode">Tryb Match</string>
   <string name="match_mode_arg">Tryb Match, %1$s</string>
   <string name="max">Maks.</string>
@@ -1925,6 +1932,8 @@
   <string name="saved_filter">Zapisany filtr</string>
   <string name="saved_filters">Zapisane filtry</string>
   <string name="saving_ratings_arg_arg">Zapisywanie ocen %1$s/%2$s</string>
+  <string name="scaling_fill">Wypełnij</string>
+  <string name="scaling_fit">Dopasuj</string>
   <string name="scene">Scena</string>
   <string name="scene_count">Liczba scen</string>
   <string name="scene_count_high_low">Liczba scen (malejąco)</string>

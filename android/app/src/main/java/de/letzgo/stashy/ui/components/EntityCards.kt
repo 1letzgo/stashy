@@ -342,10 +342,13 @@ val StashImage.oneColumnAspectRatio: Float get() = (aspectRatio ?: 1f).coerceIn(
 fun ImageCard(image: StashImage, modifier: Modifier = Modifier, aspectRatio: Float = 1f, onClick: (() -> Unit)? = null) {
     val p = Theme.palette
     NativeCard(modifier.fillMaxWidth().aspectRatio(aspectRatio), onClick = onClick) {
-        Box(Modifier.fillMaxSize().background(Color.Gray.copy(alpha = 0.1f)), contentAlignment = Alignment.Center) {
+        // `images_grid_fit`: the whole image, centered, over the image backdrop.
+        val fit = de.letzgo.stashy.data.ImageViewing.gridFit
+        val backdrop = if (fit) de.letzgo.stashy.data.ImageViewing.backdropColor(image.thumbnailURL) else Color.Gray.copy(alpha = 0.1f)
+        Box(Modifier.fillMaxSize().background(backdrop), contentAlignment = Alignment.Center) {
             var failed by remember(image.id) { mutableStateOf(image.thumbnailURL == null) }
             if (failed) PlaceholderIcon(SF.photo, size = 24)
-            AsyncImage(image.thumbnailURL, null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop, onError = { failed = true })
+            AsyncImage(image.thumbnailURL, null, Modifier.fillMaxSize(), contentScale = if (fit) ContentScale.Fit else ContentScale.Crop, onError = { failed = true })
             if (image.isVideo) Box(Modifier.clip(CircleShape).background(Color.Black.copy(alpha = 0.4f)).padding(12.dp)) {
                 Icon(SF.playFill, null, tint = Color.White, modifier = Modifier.size(24.dp))
             }

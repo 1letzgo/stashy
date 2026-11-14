@@ -14,6 +14,7 @@
   <string name="action_add_marker">Tilføj markør</string>
   <string name="action_add_marker_button">Knappen Tilføj markør</string>
   <string name="action_add_new_server">Tilføj ny server</string>
+  <string name="action_add_o">Tilføj O</string>
   <string name="action_add_performer">Tilføj kunstner</string>
   <string name="action_add_performers">Tilføj kunstnere</string>
   <string name="action_add_row">Tilføj række</string>
@@ -479,6 +480,7 @@
   <string name="auth_method">Godkendelsesmetode</string>
   <string name="auto_hide_tab_bar">Skjul fanelinje automatisk</string>
   <string name="auto_lock_on_background">Lås automatisk i baggrunden</string>
+  <string name="automatic">Automatisk</string>
   <string name="autoplay">Autoafspilning</string>
   <string name="auto_renews_cancel_anytime">Fornyes automatisk · kan opsiges når som helst</string>
   <string name="auto_rotate_fullscreen">Roter fuld skærm automatisk</string>
@@ -488,6 +490,7 @@
   <string name="back">Tilbage</string>
   <string name="back_arg">Tilbage %1$s</string>
   <string name="back_cover">Bagside</string>
+  <string name="background">Baggrund</string>
   <string name="background_box">Baggrundsboks</string>
   <string name="background_color">Baggrundsfarve</string>
   <string name="back_to_normal">Tilbage til normal</string>
@@ -973,6 +976,7 @@
   <string name="finish">Afslut</string>
   <string name="finished">Færdig</string>
   <string name="first_marker">Første markør</string>
+  <string name="fit_images">Tilpas billeder</string>
   <string name="fit_to_screen">Tilpas til skærmen</string>
   <string name="flame">Flamme</string>
   <string name="flow_arg">Flow: %1$s</string>
@@ -1431,6 +1435,7 @@
   <string name="image_perceptual_hashes">Perceptuelle billedhashes</string>
   <string name="image_performers_not_loaded">Billedets kunstnere er ikke indlæst</string>
   <string name="images">Billeder</string>
+  <string name="image_scaling">Billedskalering</string>
   <string name="images_filter">Billedfilter</string>
   <string name="images_sort">Sortering af billeder</string>
   <string name="image_thumbnails">Billedminiaturer</string>
@@ -1481,6 +1486,7 @@
   <string name="jane_doe">Jane Doe</string>
   <string name="job_arg">Job %1$s</string>
   <string name="jobs">Job</string>
+  <string name="keep_rating_visible">Behold bedømmelse synlig</string>
   <string name="kind">Type</string>
   <string name="label_feed_arg">Feed, %1$s</string>
   <string name="landscape">Liggende</string>
@@ -1600,6 +1606,7 @@
   <string name="markers_filter">Markørfilter</string>
   <string name="match">Match</string>
   <string name="matches_regex">Matcher regex</string>
+  <string name="match_image">Billedets farve</string>
   <string name="match_mode">Matchtilstand</string>
   <string name="match_mode_arg">Matchtilstand, %1$s</string>
   <string name="max">Maks.</string>
@@ -1925,6 +1932,8 @@
   <string name="saved_filter">Gemt filter</string>
   <string name="saved_filters">Gemte filtre</string>
   <string name="saving_ratings_arg_arg">Gemmer bedømmelser %1$s/%2$s</string>
+  <string name="scaling_fill">Udfyld</string>
+  <string name="scaling_fit">Tilpas</string>
   <string name="scene">Scene</string>
   <string name="scene_count">Antal scener</string>
   <string name="scene_count_high_low">Antal scener (høj–lav)</string>

@@ -14,6 +14,7 @@
   <string name="action_add_marker">新增標記</string>
   <string name="action_add_marker_button">「新增標記」按鈕</string>
   <string name="action_add_new_server">新增伺服器</string>
+  <string name="action_add_o">加入 O</string>
   <string name="action_add_performer">新增演員</string>
   <string name="action_add_performers">新增演員</string>
   <string name="action_add_row">新增列</string>
@@ -479,6 +480,7 @@
   <string name="auth_method">驗證方式</string>
   <string name="auto_hide_tab_bar">自動隱藏標籤列</string>
   <string name="auto_lock_on_background">進入背景時自動鎖定</string>
+  <string name="automatic">自動</string>
   <string name="autoplay">自動播放</string>
   <string name="auto_renews_cancel_anytime">自動續訂 · 可隨時取消</string>
   <string name="auto_rotate_fullscreen">全螢幕自動旋轉</string>
@@ -488,6 +490,7 @@
   <string name="back">返回</string>
   <string name="back_arg">倒退 %1$s</string>
   <string name="back_cover">封底</string>
+  <string name="background">背景</string>
   <string name="background_box">背景框</string>
   <string name="background_color">背景顏色</string>
   <string name="back_to_normal">恢復正常</string>
@@ -973,6 +976,7 @@
   <string name="finish">完成</string>
   <string name="finished">已完成</string>
   <string name="first_marker">第一個標記</string>
+  <string name="fit_images">符合影像</string>
   <string name="fit_to_screen">符合螢幕大小</string>
   <string name="flame">火焰</string>
   <string name="flow_arg">Flow：%1$s</string>
@@ -1431,6 +1435,7 @@
   <string name="image_perceptual_hashes">圖片感知雜湊</string>
   <string name="image_performers_not_loaded">未載入圖片的演員</string>
   <string name="images">圖片</string>
+  <string name="image_scaling">影像縮放</string>
   <string name="images_filter">圖片篩選條件</string>
   <string name="images_sort">圖片排序</string>
   <string name="image_thumbnails">圖片縮圖</string>
@@ -1481,6 +1486,7 @@
   <string name="jane_doe">Jane Doe</string>
   <string name="job_arg">工作 %1$s</string>
   <string name="jobs">工作</string>
+  <string name="keep_rating_visible">保持評分可見</string>
   <string name="kind">類型</string>
   <string name="label_feed_arg">動態，%1$s</string>
   <string name="landscape">橫向</string>
@@ -1600,6 +1606,7 @@
   <string name="markers_filter">標記篩選條件</string>
   <string name="match">Match</string>
   <string name="matches_regex">符合正規表示式</string>
+  <string name="match_image">影像顏色</string>
   <string name="match_mode">比對模式</string>
   <string name="match_mode_arg">比對模式，%1$s</string>
   <string name="max">最大</string>
@@ -1925,6 +1932,8 @@
   <string name="saved_filter">已儲存的篩選條件</string>
   <string name="saved_filters">已儲存的篩選條件</string>
   <string name="saving_ratings_arg_arg">正在儲存評分 %1$s/%2$s</string>
+  <string name="scaling_fill">填滿</string>
+  <string name="scaling_fit">符合</string>
   <string name="scene">短片</string>
   <string name="scene_count">短片數量</string>
   <string name="scene_count_high_low">短片數量（高到低）</string>

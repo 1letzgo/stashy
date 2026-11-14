@@ -14,6 +14,7 @@
   <string name="action_add_marker">마커 추가</string>
   <string name="action_add_marker_button">마커 추가 버튼</string>
   <string name="action_add_new_server">새 서버 추가</string>
+  <string name="action_add_o">O 추가</string>
   <string name="action_add_performer">배우 추가</string>
   <string name="action_add_performers">배우 추가</string>
   <string name="action_add_row">행 추가</string>
@@ -479,6 +480,7 @@
   <string name="auth_method">인증 방식</string>
   <string name="auto_hide_tab_bar">탭 막대 자동 숨기기</string>
   <string name="auto_lock_on_background">백그라운드 전환 시 자동 잠금</string>
+  <string name="automatic">자동</string>
   <string name="autoplay">자동 재생</string>
   <string name="auto_renews_cancel_anytime">자동 갱신 · 언제든지 해지 가능</string>
   <string name="auto_rotate_fullscreen">전체 화면 자동 회전</string>
@@ -488,6 +490,7 @@
   <string name="back">뒤로</string>
   <string name="back_arg">%1$s 뒤로</string>
   <string name="back_cover">뒷표지</string>
+  <string name="background">배경</string>
   <string name="background_box">배경 상자</string>
   <string name="background_color">배경 색상</string>
   <string name="back_to_normal">보통으로 되돌리기</string>
@@ -973,6 +976,7 @@
   <string name="finish">완료</string>
   <string name="finished">완료됨</string>
   <string name="first_marker">첫 번째 마커</string>
+  <string name="fit_images">이미지 맞춤</string>
   <string name="fit_to_screen">화면에 맞추기</string>
   <string name="flame">불꽃</string>
   <string name="flow_arg">Flow: %1$s</string>
@@ -1431,6 +1435,7 @@
   <string name="image_perceptual_hashes">이미지 지각 해시</string>
   <string name="image_performers_not_loaded">이미지 배우를 불러오지 않음</string>
   <string name="images">이미지</string>
+  <string name="image_scaling">이미지 크기 조정</string>
   <string name="images_filter">이미지 필터</string>
   <string name="images_sort">이미지 정렬</string>
   <string name="image_thumbnails">이미지 썸네일</string>
@@ -1481,6 +1486,7 @@
   <string name="jane_doe">Jane Doe</string>
   <string name="job_arg">작업 %1$s</string>
   <string name="jobs">작업</string>
+  <string name="keep_rating_visible">평점 계속 표시</string>
   <string name="kind">종류</string>
   <string name="label_feed_arg">피드, %1$s</string>
   <string name="landscape">가로</string>
@@ -1600,6 +1606,7 @@
   <string name="markers_filter">마커 필터</string>
   <string name="match">Match</string>
   <string name="matches_regex">정규식과 일치</string>
+  <string name="match_image">이미지 색상</string>
   <string name="match_mode">일치 모드</string>
   <string name="match_mode_arg">일치 모드, %1$s</string>
   <string name="max">최대</string>
@@ -1925,6 +1932,8 @@
   <string name="saved_filter">저장된 필터</string>
   <string name="saved_filters">저장된 필터</string>
   <string name="saving_ratings_arg_arg">별점 저장 중 %1$s/%2$s</string>
+  <string name="scaling_fill">채우기</string>
+  <string name="scaling_fit">맞춤</string>
   <string name="scene">영상</string>
   <string name="scene_count">영상 수</string>
   <string name="scene_count_high_low">영상 수(많은 순)</string>

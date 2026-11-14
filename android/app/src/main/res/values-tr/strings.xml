@@ -14,6 +14,7 @@
   <string name="action_add_marker">İşaretçi Ekle</string>
   <string name="action_add_marker_button">İşaretçi Ekle düğmesi</string>
   <string name="action_add_new_server">Yeni Sunucu Ekle</string>
+  <string name="action_add_o">O Ekle</string>
   <string name="action_add_performer">Oyuncu ekle</string>
   <string name="action_add_performers">Oyuncu Ekle</string>
   <string name="action_add_row">Satır Ekle</string>
@@ -479,6 +480,7 @@
   <string name="auth_method">Kimlik Doğrulama Yöntemi</string>
   <string name="auto_hide_tab_bar">Sekme çubuğunu otomatik gizle</string>
   <string name="auto_lock_on_background">Arka Planda Otomatik Kilitle</string>
+  <string name="automatic">Otomatik</string>
   <string name="autoplay">Otomatik oynat</string>
   <string name="auto_renews_cancel_anytime">Otomatik yenilenir · istediğin zaman iptal et</string>
   <string name="auto_rotate_fullscreen">Tam ekranda otomatik döndür</string>
@@ -488,6 +490,7 @@
   <string name="back">Geri</string>
   <string name="back_arg">Geri %1$s</string>
   <string name="back_cover">Arka kapak</string>
+  <string name="background">Arka Plan</string>
   <string name="background_box">Arka plan kutusu</string>
   <string name="background_color">Arka plan rengi</string>
   <string name="back_to_normal">Normale dön</string>
@@ -973,6 +976,7 @@
   <string name="finish">Bitir</string>
   <string name="finished">Bitti</string>
   <string name="first_marker">İlk İşaretçi</string>
+  <string name="fit_images">Görüntüleri Sığdır</string>
   <string name="fit_to_screen">Ekrana sığdır</string>
   <string name="flame">Alev</string>
   <string name="flow_arg">Akış: %1$s</string>
@@ -1431,6 +1435,7 @@
   <string name="image_perceptual_hashes">Resim algısal hash değerleri</string>
   <string name="image_performers_not_loaded">Resmin oyuncuları yüklenmedi</string>
   <string name="images">Resimler</string>
+  <string name="image_scaling">Görüntü Ölçekleme</string>
   <string name="images_filter">Resim filtresi</string>
   <string name="images_sort">Resim Sıralaması</string>
   <string name="image_thumbnails">Resim küçük resimleri</string>
@@ -1481,6 +1486,7 @@
   <string name="jane_doe">Jane Doe</string>
   <string name="job_arg">İş %1$s</string>
   <string name="jobs">İşler</string>
+  <string name="keep_rating_visible">Puanı Görünür Tut</string>
   <string name="kind">Tür</string>
   <string name="label_feed_arg">Akış, %1$s</string>
   <string name="landscape">Yatay</string>
@@ -1600,6 +1606,7 @@
   <string name="markers_filter">İşaretçi filtresi</string>
   <string name="match">Match</string>
   <string name="matches_regex">Regex ile eşleşir</string>
+  <string name="match_image">Görüntü Rengi</string>
   <string name="match_mode">Match modu</string>
   <string name="match_mode_arg">Match modu, %1$s</string>
   <string name="max">Maks.</string>
@@ -1925,6 +1932,8 @@
   <string name="saved_filter">Kayıtlı Filtre</string>
   <string name="saved_filters">Kayıtlı Filtreler</string>
   <string name="saving_ratings_arg_arg">Puanlar kaydediliyor %1$s/%2$s</string>
+  <string name="scaling_fill">Doldur</string>
+  <string name="scaling_fit">Sığdır</string>
   <string name="scene">Sahne</string>
   <string name="scene_count">Sahne Sayısı</string>
   <string name="scene_count_high_low">Sahne Sayısı (Yüksek-Düşük)</string>

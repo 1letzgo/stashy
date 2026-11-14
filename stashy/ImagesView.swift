@@ -1953,6 +1953,9 @@ struct ImageThumbnailCard: View {
     /// Show the whole media letterboxed instead of cropping it to the frame (a wide image in a
     /// set whose frame follows its tallest image).
     var fitsMedia: Bool = false
+    /// The "Fit Images" setting: every card shows the whole image over the Background setting.
+    @AppStorage(ImageBackdropMode.gridFitKey) private var fitsImages = false
+    private var fits: Bool { fitsMedia || fitsImages }
     /// Inside a gallery the performer already stands in the gallery's own card: the image's
     /// title comes first there, the performer only for an untitled image.
     var prefersTitle: Bool = false
@@ -1983,8 +1986,11 @@ struct ImageThumbnailCard: View {
         ZStack(alignment: .bottomLeading) {
             GeometryReader { geometry in
                 ZStack {
-                    if fitsMedia {
-                        Color.black
+                    if fits {
+                        ImageBackdrop(
+                            url: image.thumbnailURL,
+                            fallback: fitsMedia ? .black : Color.gray.opacity(DesignTokens.Opacity.placeholder)
+                        )
                     } else {
                         Color.gray.opacity(DesignTokens.Opacity.placeholder)
                     }
@@ -1996,11 +2002,11 @@ struct ImageThumbnailCard: View {
                             } else if let uiImage = loader.image {
                                 uiImage
                                     .resizable()
-                                    .aspectRatio(contentMode: fitsMedia ? .fit : .fill)
+                                    .aspectRatio(contentMode: fits ? .fit : .fill)
                                     .frame(
                                         width: geometry.size.width,
                                         height: geometry.size.height,
-                                        alignment: fitsMedia ? .center : mediaFillAlignment
+                                        alignment: fits ? .center : mediaFillAlignment
                                     )
                                     .clipped()
                             } else {
@@ -2013,8 +2019,8 @@ struct ImageThumbnailCard: View {
                     if isPreviewing {
                         AetherPreviewSurface(
                             player: previewPlayer,
-                            fill: !fitsMedia,
-                            alignment: fitsMedia ? .center : mediaFillAlignment
+                            fill: !fits,
+                            alignment: fits ? .center : mediaFillAlignment
                         )
                             .frame(
                                 width: geometry.size.width,

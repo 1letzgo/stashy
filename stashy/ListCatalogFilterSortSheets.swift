@@ -142,7 +142,10 @@ struct FeedsPlaybackSettingsCard: View {
 /// Images feed + fullscreen: autoplay (1/row) and fullscreen Immersive / Continuous (separate from Feeds).
 struct ImagesFeedAutoplaySettingsCard: View {
     @AppStorage("images_feed_video_autoplay") private var videoAutoplay = true
-    @AppStorage("images_fullscreen_immersive") private var fullscreenImmersive = true
+    @AppStorage(ImageScalingMode.key) private var scalingRaw = ""
+    @AppStorage(ImageBackdropMode.key) private var backdropRaw = ""
+    @AppStorage(ImageBackdropMode.gridFitKey) private var fitsImages = false
+    @AppStorage("images_fullscreen_keep_rating") private var keepsRatingVisible = false
     @AppStorage("images_fullscreen_continuous") private var fullscreenContinuous = false
     @AppStorage("images_fullscreen_continuous_duration") private var continuousDurationSeconds = 3
     @ObservedObject private var appearance = AppearanceManager.shared
@@ -152,8 +155,48 @@ struct ImagesFeedAutoplaySettingsCard: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
             CatalogFilterSortToggleRow(label: tr("autoplay"), isOn: $videoAutoplay)
-            CatalogFilterSortToggleRow(label: tr("immersive"), isOn: $fullscreenImmersive)
+            chipsCard(label: tr("image_scaling")) {
+                ForEach(ImageScalingMode.allCases) { mode in
+                    CatalogFilterChip(title: mode.title, isActive: ImageScalingMode.resolve(scalingRaw) == mode) {
+                        scalingRaw = mode.rawValue
+                    }
+                }
+            }
+            backgroundCard
+            CatalogFilterSortToggleRow(label: tr("fit_images"), isOn: $fitsImages)
+            CatalogFilterSortToggleRow(label: tr("keep_rating_visible"), isOn: $keepsRatingVisible)
             continuousCard
+        }
+    }
+
+    private func chipsRow<Chips: View>(label: String, @ViewBuilder chips: () -> Chips) -> some View {
+        HStack(alignment: .center, spacing: 12) {
+            Text(label)
+                .font(.subheadline.weight(.semibold))
+                .foregroundColor(.secondary)
+                .lineLimit(1)
+                .fixedSize()
+                .frame(minWidth: CatalogFilterSortSheetLayout.labelColumnWidth, alignment: .leading)
+            // The chips scroll instead of squeezing the label.
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 8) { chips() }
+            }
+        }
+    }
+
+    private func chipsCard<Chips: View>(label: String, @ViewBuilder chips: () -> Chips) -> some View {
+        chipsRow(label: label, chips: chips)
+            .catalogFilterSortControlCardChrome()
+    }
+
+    /// What shows around an image that does not cover its space (fullscreen and fitted cards).
+    private var backgroundCard: some View {
+        chipsCard(label: tr("background")) {
+            ForEach(ImageBackdropMode.allCases) { mode in
+                CatalogFilterChip(title: mode.title, isActive: ImageBackdropMode.resolve(backdropRaw) == mode) {
+                    backdropRaw = mode.rawValue
+                }
+            }
         }
     }
 
@@ -1286,10 +1329,10 @@ struct PerformersCatalogFilterSortSheet: View {
         // One row when it fits; a long sort name takes a second row instead of widening the
         // whole sheet past the screen.
         return ViewThatFits(in: .horizontal) {
-            HStack(alignment: .center, spacing: 12) {
+            HStack(alignment: .center, spacing: 8) {
                 label
                 chips
-                Spacer(minLength: 8)
+                Spacer(minLength: 0)
                 picker
             }
             VStack(alignment: .leading, spacing: 6) {
@@ -1455,10 +1498,10 @@ struct TagsCatalogFilterSortSheet: View {
         // One row when it fits; a long sort name takes a second row instead of widening the
         // whole sheet past the screen.
         return ViewThatFits(in: .horizontal) {
-            HStack(alignment: .center, spacing: 12) {
+            HStack(alignment: .center, spacing: 8) {
                 label
                 chips
-                Spacer(minLength: 8)
+                Spacer(minLength: 0)
                 picker
             }
             VStack(alignment: .leading, spacing: 6) {
@@ -1624,10 +1667,10 @@ struct StudiosCatalogFilterSortSheet: View {
         // One row when it fits; a long sort name ("Anzahl Szenen" beside "Absteigend") takes a
         // second row instead of widening the whole sheet past the screen.
         return ViewThatFits(in: .horizontal) {
-            HStack(alignment: .center, spacing: 12) {
+            HStack(alignment: .center, spacing: 8) {
                 label
                 chips
-                Spacer(minLength: 8)
+                Spacer(minLength: 0)
                 picker
             }
             VStack(alignment: .leading, spacing: 6) {
@@ -1860,10 +1903,10 @@ struct GalleriesCatalogFilterSortSheet: View {
         // One row when it fits; a long sort name takes a second row instead of widening the
         // whole sheet past the screen.
         return ViewThatFits(in: .horizontal) {
-            HStack(alignment: .center, spacing: 12) {
+            HStack(alignment: .center, spacing: 8) {
                 label
                 chips
-                Spacer(minLength: 8)
+                Spacer(minLength: 0)
                 picker
             }
             VStack(alignment: .leading, spacing: 6) {
@@ -2143,10 +2186,10 @@ struct ImagesCatalogFilterSortSheet: View {
         // One row when it fits; a long sort name takes a second row instead of widening the
         // whole sheet past the screen.
         return ViewThatFits(in: .horizontal) {
-            HStack(alignment: .center, spacing: 12) {
+            HStack(alignment: .center, spacing: 8) {
                 label
                 chips
-                Spacer(minLength: 8)
+                Spacer(minLength: 0)
                 picker
             }
             VStack(alignment: .leading, spacing: 6) {
@@ -2539,10 +2582,10 @@ struct GroupsCatalogFilterSortSheet: View {
         // One row when it fits; a long sort name takes a second row instead of widening the
         // whole sheet past the screen.
         return ViewThatFits(in: .horizontal) {
-            HStack(alignment: .center, spacing: 12) {
+            HStack(alignment: .center, spacing: 8) {
                 label
                 chips
-                Spacer(minLength: 8)
+                Spacer(minLength: 0)
                 picker
             }
             VStack(alignment: .leading, spacing: 6) {

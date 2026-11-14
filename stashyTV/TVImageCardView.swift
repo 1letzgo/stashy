@@ -11,6 +11,7 @@ struct TVImageCardView: View {
     let image: StashImage
     var width: CGFloat = 300
     var height: CGFloat = 300
+    @AppStorage(ImageBackdropMode.gridFitKey) private var fitsImages = false
 
     var body: some View {
         ZStack(alignment: .bottomTrailing) {
@@ -64,7 +65,14 @@ struct TVImageCardView: View {
         if let thumbnailURL = image.thumbnailURL {
             CustomAsyncImage(url: thumbnailURL) { loader in
                 if let img = loader.image {
-                    img.resizable().scaledToFill()
+                    if fitsImages {
+                        ZStack {
+                            ImageBackdrop(url: thumbnailURL, fallback: Color.gray.opacity(0.08))
+                            img.resizable().scaledToFit()
+                        }
+                    } else {
+                        img.resizable().scaledToFill()
+                    }
                 } else if loader.isLoading {
                     Rectangle()
                         .fill(Color.gray.opacity(0.08))

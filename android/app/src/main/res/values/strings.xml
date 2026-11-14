@@ -2237,4 +2237,13 @@
     <string name="arg_part_of_and_more">Part of %1$s +%2$s</string>
     <string name="arg_count_sub_tag">%1$s sub-tag</string>
     <string name="arg_count_sub_tags">%1$s sub-tags</string>
+    <string name="image_scaling">Image Scaling</string>
+    <string name="scaling_fit">Fit</string>
+    <string name="scaling_fill">Fill</string>
+    <string name="automatic">Automatic</string>
+    <string name="background">Background</string>
+    <string name="match_image">Match Image</string>
+    <string name="keep_rating_visible">Keep Rating Visible</string>
+    <string name="fit_images">Fit Images</string>
+    <string name="action_add_o">Add O</string>
 </resources>

@@ -14,6 +14,7 @@
   <string name="action_add_marker">Voeg markering toe</string>
   <string name="action_add_marker_button">Knop \'Voeg markering toe\'</string>
   <string name="action_add_new_server">Voeg nieuwe server toe</string>
+  <string name="action_add_o">O toevoegen</string>
   <string name="action_add_performer">Voeg performer toe</string>
   <string name="action_add_performers">Voeg performers toe</string>
   <string name="action_add_row">Voeg rij toe</string>
@@ -479,6 +480,7 @@
   <string name="auth_method">Verificatiemethode</string>
   <string name="auto_hide_tab_bar">Verberg tabbalk automatisch</string>
   <string name="auto_lock_on_background">Vergrendel automatisch op achtergrond</string>
+  <string name="automatic">Automatisch</string>
   <string name="autoplay">Automatisch afspelen</string>
   <string name="auto_renews_cancel_anytime">Wordt automatisch verlengd · altijd opzegbaar</string>
   <string name="auto_rotate_fullscreen">Draai automatisch naar schermvullend</string>
@@ -488,6 +490,7 @@
   <string name="back">Terug</string>
   <string name="back_arg">%1$s terug</string>
   <string name="back_cover">Achteromslag</string>
+  <string name="background">Achtergrond</string>
   <string name="background_box">Achtergrondvak</string>
   <string name="background_color">Achtergrondkleur</string>
   <string name="back_to_normal">Terug naar normaal</string>
@@ -973,6 +976,7 @@
   <string name="finish">Voltooi</string>
   <string name="finished">Voltooid</string>
   <string name="first_marker">Eerste markering</string>
+  <string name="fit_images">Afbeeldingen passend</string>
   <string name="fit_to_screen">Pas in scherm</string>
   <string name="flame">Vlam</string>
   <string name="flow_arg">Flow: %1$s</string>
@@ -1431,6 +1435,7 @@
   <string name="image_perceptual_hashes">Perceptuele hashes van afbeeldingen</string>
   <string name="image_performers_not_loaded">Performers van afbeelding niet geladen</string>
   <string name="images">Afbeeldingen</string>
+  <string name="image_scaling">Beeldschaling</string>
   <string name="images_filter">Afbeeldingsfilter</string>
   <string name="images_sort">Sortering afbeeldingen</string>
   <string name="image_thumbnails">Afbeeldingsminiaturen</string>
@@ -1481,6 +1486,7 @@
   <string name="jane_doe">Jane Doe</string>
   <string name="job_arg">Taak %1$s</string>
   <string name="jobs">Taken</string>
+  <string name="keep_rating_visible">Beoordeling zichtbaar houden</string>
   <string name="kind">Soort</string>
   <string name="label_feed_arg">Feed, %1$s</string>
   <string name="landscape">Liggend</string>
@@ -1600,6 +1606,7 @@
   <string name="markers_filter">Markeringsfilter</string>
   <string name="match">Match</string>
   <string name="matches_regex">Komt overeen met regex</string>
+  <string name="match_image">Kleur van beeld</string>
   <string name="match_mode">Overeenkomstmodus</string>
   <string name="match_mode_arg">Overeenkomstmodus, %1$s</string>
   <string name="max">Max.</string>
@@ -1925,6 +1932,8 @@
   <string name="saved_filter">Bewaard filter</string>
   <string name="saved_filters">Bewaarde filters</string>
   <string name="saving_ratings_arg_arg">Beoordelingen bewaren %1$s/%2$s</string>
+  <string name="scaling_fill">Vullen</string>
+  <string name="scaling_fit">Passend</string>
   <string name="scene">Scène</string>
   <string name="scene_count">Aantal scènes</string>
   <string name="scene_count_high_low">Aantal scènes (hoog-laag)</string>

@@ -358,7 +358,7 @@ fun ImageFeedPostCard(
                 LaunchedEffect(visibleIndex) { if (pager.currentPage != visibleIndex && !pager.isScrollInProgress) pager.animateScrollToPage(visibleIndex) }
                 HorizontalPager(pager, Modifier.fillMaxSize(), key = { images.getOrNull(it)?.id ?: it }) { page ->
                     val img = images[page]
-                    FeedHero(img, autoplay = previewsAllowed && img.id == visible.id && autoplayImageId == img.id, fit = img.oneColumnFeedAspectRatio > ratio + 0.01f) { onOpen(img) }
+                    FeedHero(img, autoplay = previewsAllowed && img.id == visible.id && autoplayImageId == img.id, fitRequested = img.oneColumnFeedAspectRatio > ratio + 0.01f) { onOpen(img) }
                 }
             } else {
                 FeedHero(visible, autoplay = previewsAllowed && autoplayImageId == visible.id) { onOpen(visible) }
@@ -400,7 +400,11 @@ fun ImageFeedPostCard(
 
 /** iOS: `ImageThumbnailCard(showsOverlayChrome: false, allowsVideoAutoplay:)` — top-cropped hero with muted autoplay. */
 @Composable
-private fun FeedHero(image: StashImage, autoplay: Boolean, fit: Boolean = false, onClick: () -> Unit) {
+private fun FeedHero(image: StashImage, autoplay: Boolean, fitRequested: Boolean = false, onClick: () -> Unit) {
+    // `images_grid_fit` shows the whole image over the backdrop colour in every case.
+    val gridFit = de.letzgo.stashy.data.ImageViewing.gridFit
+    val fit = fitRequested || gridFit
+    val backdrop = de.letzgo.stashy.data.ImageViewing.backdropColor(image.thumbnailURL)
     val preview = rememberPreviewPlayer()
     var previewing by remember(image.id) { mutableStateOf(false) }
     val allowed by rememberUpdatedState(autoplay)
@@ -415,7 +419,7 @@ private fun FeedHero(image: StashImage, autoplay: Boolean, fit: Boolean = false,
         delay(500)
         if (allowed) { preview.start(url); previewing = true }
     }
-    Box(Modifier.fillMaxSize().background(if (fit) Color.Black else Color.Gray.copy(alpha = 0.1f)).noRippleClickable(onClick), contentAlignment = Alignment.Center) {
+    Box(Modifier.fillMaxSize().background(if (gridFit) backdrop else if (fit) Color.Black else Color.Gray.copy(alpha = 0.1f)).noRippleClickable(onClick), contentAlignment = Alignment.Center) {
         SubcomposeAsyncImage(
             model = image.thumbnailURL, contentDescription = image.title,
             contentScale = if (fit) ContentScale.Fit else ContentScale.Crop, alignment = if (fit) Alignment.Center else Alignment.TopCenter,

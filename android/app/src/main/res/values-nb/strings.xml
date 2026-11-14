@@ -14,6 +14,7 @@
   <string name="action_add_marker">Legg til markør</string>
   <string name="action_add_marker_button">Knapp for å legge til markør</string>
   <string name="action_add_new_server">Legg til ny server</string>
+  <string name="action_add_o">Legg til O</string>
   <string name="action_add_performer">Legg til utøver</string>
   <string name="action_add_performers">Legg til utøvere</string>
   <string name="action_add_row">Legg til rad</string>
@@ -479,6 +480,7 @@
   <string name="auth_method">Autentiseringsmetode</string>
   <string name="auto_hide_tab_bar">Skjul fanelinjen automatisk</string>
   <string name="auto_lock_on_background">Lås automatisk i bakgrunnen</string>
+  <string name="automatic">Automatisk</string>
   <string name="autoplay">Autoavspilling</string>
   <string name="auto_renews_cancel_anytime">Fornyes automatisk · avslutt når som helst</string>
   <string name="auto_rotate_fullscreen">Roter fullskjerm automatisk</string>
@@ -488,6 +490,7 @@
   <string name="back">Tilbake</string>
   <string name="back_arg">Tilbake %1$s</string>
   <string name="back_cover">Bakside</string>
+  <string name="background">Bakgrunn</string>
   <string name="background_box">Bakgrunnsboks</string>
   <string name="background_color">Bakgrunnsfarge</string>
   <string name="back_to_normal">Tilbake til normal</string>
@@ -973,6 +976,7 @@
   <string name="finish">Fullfør</string>
   <string name="finished">Fullført</string>
   <string name="first_marker">Første markør</string>
+  <string name="fit_images">Tilpass bilder</string>
   <string name="fit_to_screen">Tilpass til skjermen</string>
   <string name="flame">Flamme</string>
   <string name="flow_arg">Flyt: %1$s</string>
@@ -1431,6 +1435,7 @@
   <string name="image_perceptual_hashes">Perseptuelle hasher for bilder</string>
   <string name="image_performers_not_loaded">Bildets utøvere er ikke lastet inn</string>
   <string name="images">Bilder</string>
+  <string name="image_scaling">Bildeskalering</string>
   <string name="images_filter">Bildefilter</string>
   <string name="images_sort">Bildesortering</string>
   <string name="image_thumbnails">Miniatyrbilder</string>
@@ -1481,6 +1486,7 @@
   <string name="jane_doe">Jane Doe</string>
   <string name="job_arg">Jobb %1$s</string>
   <string name="jobs">Jobber</string>
+  <string name="keep_rating_visible">Behold vurdering synlig</string>
   <string name="kind">Type</string>
   <string name="label_feed_arg">Feed, %1$s</string>
   <string name="landscape">Liggende</string>
@@ -1600,6 +1606,7 @@
   <string name="markers_filter">Markørfilter</string>
   <string name="match">Match</string>
   <string name="matches_regex">Samsvarer med regex</string>
+  <string name="match_image">Bildets farge</string>
   <string name="match_mode">Match-modus</string>
   <string name="match_mode_arg">Match-modus, %1$s</string>
   <string name="max">Maks</string>
@@ -1925,6 +1932,8 @@
   <string name="saved_filter">Lagret filter</string>
   <string name="saved_filters">Lagrede filtre</string>
   <string name="saving_ratings_arg_arg">Lagrer vurderinger %1$s/%2$s</string>
+  <string name="scaling_fill">Fyll</string>
+  <string name="scaling_fit">Tilpass</string>
   <string name="scene">Scene</string>
   <string name="scene_count">Antall scener</string>
   <string name="scene_count_high_low">Antall scener (høy–lav)</string>

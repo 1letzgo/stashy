@@ -5,7 +5,7 @@
 //  Full-screen image slideshow for galleries and image lists: auto-advance with a
 //  crossfade and a subtle Ken Burns drift, driven entirely by the Siri Remote.
 //
-//  Play/Pause pauses, Left/Right steps, Click cycles the interval, Menu exits.
+//  Play/Pause pauses, Left/Right steps, Click opens rating / O Count / interval, Menu exits.
 //  Stills only — the callers hand over the same GIF/video-free list as their grids.
 //
 
@@ -56,10 +56,17 @@ struct TVImageSlideshowView: View {
     var hasMore: Bool = false
     /// Reports where the slideshow stopped, so a viewer underneath can stay on that image.
     var onFinish: ((_ imageId: String) -> Void)? = nil
+    /// Reports an image after a rating or O Count change, so the viewer underneath shows it too.
+    var onImageChanged: ((_ image: StashImage) -> Void)? = nil
 
     @Environment(\.dismiss) private var dismiss
     @AppStorage(TVSlideshowSettings.intervalKey) private var interval: Double = TVSlideshowSettings.defaultInterval
 
+    @AppStorage(ImageScalingMode.key) private var scalingRaw = ""
+    @StateObject private var viewModel = StashDBViewModel()
+    /// Rating / O Count edits made here, laid over `images` (a `let` owned by the viewer or grid).
+    @State private var edits: [String: StashImage] = [:]
+    @State private var showingActions = false
     @State private var index = 0
     @State private var isPaused = false
     /// Key under which a running slideshow keeps the screensaver off (`IdleTimerCoordinator`).
@@ -80,7 +87,8 @@ struct TVImageSlideshowView: View {
     private static let preloadTimeout: Double = 8
 
     private var currentImage: StashImage? {
-        images.indices.contains(index) ? images[index] : nil
+        guard images.indices.contains(index) else { return nil }
+        return edits[images[index].id] ?? images[index]
     }
 
     var body: some View {
@@ -90,6 +98,11 @@ struct TVImageSlideshowView: View {
             if let image = currentImage, let loader = loaders[image.id] {
                 TVSlideshowSlide(
                     loader: loader,
+                    backdropURL: image.thumbnailURL,
+                    fills: ImageScalingMode.resolve(scalingRaw).fills(
+                        mediaIsPortrait: (image.pixelSize.map { $0.height > $0.width }) ?? false,
+                        spaceIsPortrait: false
+                    ),
                     driftDuration: interval + Self.fadeDuration,
                     variant: index,
                     isPaused: isPaused
@@ -116,7 +129,21 @@ struct TVImageSlideshowView: View {
         // commands land here and nothing else can take focus away.
         .focusable()
         .focused($isFocused)
-        .onTapGesture { cycleInterval() }
+        .onTapGesture { showingActions = true }
+        .confirmationDialog(tr("rating"), isPresented: $showingActions, titleVisibility: .visible) {
+            actionButtons
+        }
+        // The timer stands still while the dialog is open and continues after it if it was running.
+        .onChange(of: showingActions) { _, open in
+            if open {
+                advanceTask?.cancel()
+                advanceTask = nil
+            } else {
+                isFocused = true
+                if !isPaused { scheduleAdvance() }
+                revealHUD()
+            }
+        }
         .onMoveCommand { direction in
             switch direction {
             case .left: step(by: -1)
@@ -124,7 +151,7 @@ struct TVImageSlideshowView: View {
             default: revealHUD()
             }
         }
-        .onPlayPauseCommand { togglePause() }
+        .onPlayPauseCommand { if !showingActions { togglePause() } }
         .onExitCommand { close() }
         .interactiveDismissDisabled()
         .animation(.easeInOut(duration: 0.3), value: showHUD || isPaused)
@@ -149,9 +176,13 @@ struct TVImageSlideshowView: View {
                     .lineLimit(1)
                 Spacer()
                 if !images.isEmpty {
-                    Text("\(index + 1) / \(images.count)")
-                        .font(.title3.monospacedDigit())
-                        .foregroundStyle(.white.opacity(0.7))
+                    HStack(spacing: 28) {
+                        TVImageRatingInfo(rating100: currentImage?.rating100, oCount: currentImage?.o_counter ?? 0)
+                        Text("\(index + 1) / \(images.count)")
+                            .monospacedDigit()
+                    }
+                    .font(.title3)
+                    .foregroundStyle(.white.opacity(0.7))
                 }
             }
             .padding(.horizontal, 80)
@@ -239,6 +270,52 @@ struct TVImageSlideshowView: View {
             scheduleAdvance()
         }
         revealHUD()
+    }
+
+    @ViewBuilder
+    private var actionButtons: some View {
+        let current = TVEntityRating.stars(currentImage?.rating100)
+        Button(tr("action_add_o")) { addO() }
+        ForEach((0...5).reversed(), id: \.self) { stars in
+            let label = stars == 0 ? tr("empty_rating") : String(repeating: "★", count: stars)
+            Button(stars == current ? "✓ \(label)" : label) {
+                setRating(stars == 0 ? nil : stars * 20)
+            }
+        }
+        Button(tr("every_arg", TVSlideshowSettings.label(for: interval))) { cycleInterval() }
+        Button(tr("action_cancel"), role: .cancel) {}
+    }
+
+    private func setRating(_ rating: Int?) {
+        guard let image = currentImage else { return }
+        let original = image.rating100
+        commit(image.withRating(rating))
+        viewModel.updateImageRating(imageId: image.id, rating100: rating) { success in
+            guard !success else { return }
+            DispatchQueue.main.async {
+                if let latest = edits[image.id] { commit(latest.withRating(original)) }
+                AppLog.error("TV: error_save_rating")
+            }
+        }
+    }
+
+    private func addO() {
+        guard let image = currentImage else { return }
+        let original = image.o_counter ?? 0
+        commit(image.withOCounter(original + 1))
+        viewModel.incrementImageOCounter(imageId: image.id) { returned in
+            DispatchQueue.main.async {
+                if let latest = edits[image.id] { commit(latest.withOCounter(returned ?? original)) }
+                if returned == nil {
+                    AppLog.error("TV: error_update_o_count")
+                }
+            }
+        }
+    }
+
+    private func commit(_ image: StashImage) {
+        edits[image.id] = image
+        onImageChanged?(image)
     }
 
     private func cycleInterval() {
@@ -340,6 +417,8 @@ struct TVImageSlideshowView: View {
 
 private struct TVSlideshowSlide: View {
     @ObservedObject var loader: ImageLoader
+    let backdropURL: URL?
+    let fills: Bool
     /// Covers the time on screen plus the outgoing fade, so the drift never stops visibly.
     let driftDuration: Double
     let variant: Int
@@ -361,10 +440,9 @@ private struct TVSlideshowSlide: View {
 
     var body: some View {
         ZStack {
+            ImageBackdrop(url: backdropURL)
             if let image = loader.image {
-                image
-                    .resizable()
-                    .scaledToFit()
+                slideImage(image)
                     .scaleEffect(drifted ? 1.06 : 1.0, anchor: anchor)
                     .onAppear(perform: startDrift)
             } else if loader.isLoading {
@@ -378,6 +456,15 @@ private struct TVSlideshowSlide: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .clipped()
+    }
+
+    @ViewBuilder
+    private func slideImage(_ image: Image) -> some View {
+        if fills {
+            image.resizable().scaledToFill()
+        } else {
+            image.resizable().scaledToFit()
+        }
     }
 
     private func startDrift() {

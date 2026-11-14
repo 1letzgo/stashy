@@ -14,6 +14,7 @@
   <string name="action_add_marker">Añadir marcador</string>
   <string name="action_add_marker_button">Botón «Añadir marcador»</string>
   <string name="action_add_new_server">Añadir servidor nuevo</string>
+  <string name="action_add_o">Añadir O</string>
   <string name="action_add_performer">Añadir intérprete</string>
   <string name="action_add_performers">Añadir intérpretes</string>
   <string name="action_add_row">Añadir fila</string>
@@ -479,6 +480,7 @@
   <string name="auth_method">Método de autenticación</string>
   <string name="auto_hide_tab_bar">Ocultar barra de pestañas automáticamente</string>
   <string name="auto_lock_on_background">Bloquear al pasar a segundo plano</string>
+  <string name="automatic">Automático</string>
   <string name="autoplay">Reproducción automática</string>
   <string name="auto_renews_cancel_anytime">Renovación automática · cancela cuando quieras</string>
   <string name="auto_rotate_fullscreen">Girar automáticamente en pantalla completa</string>
@@ -488,6 +490,7 @@
   <string name="back">Atrás</string>
   <string name="back_arg">Retroceder %1$s</string>
   <string name="back_cover">Contraportada</string>
+  <string name="background">Fondo</string>
   <string name="background_box">Recuadro de fondo</string>
   <string name="background_color">Color de fondo</string>
   <string name="back_to_normal">Volver a lo normal</string>
@@ -973,6 +976,7 @@
   <string name="finish">Terminar</string>
   <string name="finished">Terminado</string>
   <string name="first_marker">Primer marcador</string>
+  <string name="fit_images">Ajustar imágenes</string>
   <string name="fit_to_screen">Ajustar a la pantalla</string>
   <string name="flame">Llama</string>
   <string name="flow_arg">Flujo: %1$s</string>
@@ -1431,6 +1435,7 @@
   <string name="image_perceptual_hashes">Hashes perceptuales de imágenes</string>
   <string name="image_performers_not_loaded">No se cargaron los intérpretes de la imagen</string>
   <string name="images">Imágenes</string>
+  <string name="image_scaling">Escala de imagen</string>
   <string name="images_filter">Filtro de imágenes</string>
   <string name="images_sort">Orden de imágenes</string>
   <string name="image_thumbnails">Miniaturas de imágenes</string>
@@ -1481,6 +1486,7 @@
   <string name="jane_doe">Jane Doe</string>
   <string name="job_arg">Tarea %1$s</string>
   <string name="jobs">Tareas</string>
+  <string name="keep_rating_visible">Mantener valoración visible</string>
   <string name="kind">Tipo</string>
   <string name="label_feed_arg">Feed, %1$s</string>
   <string name="landscape">Horizontal</string>
@@ -1600,6 +1606,7 @@
   <string name="markers_filter">Filtro de marcadores</string>
   <string name="match">Match</string>
   <string name="matches_regex">Coincide con regex</string>
+  <string name="match_image">Color de la imagen</string>
   <string name="match_mode">Modo de Match</string>
   <string name="match_mode_arg">Modo de Match, %1$s</string>
   <string name="max">Máx.</string>
@@ -1925,6 +1932,8 @@
   <string name="saved_filter">Filtro guardado</string>
   <string name="saved_filters">Filtros guardados</string>
   <string name="saving_ratings_arg_arg">Guardando valoraciones %1$s/%2$s</string>
+  <string name="scaling_fill">Rellenar</string>
+  <string name="scaling_fit">Ajustar</string>
   <string name="scene">Escena</string>
   <string name="scene_count">Número de escenas</string>
   <string name="scene_count_high_low">Número de escenas (mayor a menor)</string>
