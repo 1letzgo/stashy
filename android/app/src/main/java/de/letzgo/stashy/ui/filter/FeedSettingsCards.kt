@@ -42,6 +42,38 @@ private fun RowScope.ChipRow(content: @Composable RowScope.() -> Unit) {
 }
 
 /**
+ * iOS `ImageViewingOptionsCards`: Image Scaling, Background, Fit Images and Keep Rating Visible
+ * ([ImageViewing]) — the Images settings sheet, and without Fit Images Feeds › Clips.
+ * Rows for a [ControlGroup].
+ */
+@Composable
+fun ImageViewingOptionRows(showsGridFit: Boolean) {
+    ControlCard {
+        ControlLabel(tr(R.string.image_scaling))
+        ChipRow {
+            ImageScalingMode.entries.forEach { m ->
+                CatalogFilterChip(tr(m.titleRes), ImageViewing.scaling == m) { ImageViewing.scaling = m }
+            }
+        }
+    }
+    de.letzgo.stashy.ui.NativeDivider()
+    ControlCard {
+        ControlLabel(tr(R.string.background))
+        ChipRow {
+            ImageBackdropMode.entries.forEach { m ->
+                CatalogFilterChip(tr(m.titleRes), ImageViewing.backdrop == m) { ImageViewing.backdrop = m }
+            }
+        }
+    }
+    if (showsGridFit) {
+        de.letzgo.stashy.ui.NativeDivider()
+        ControlToggleRow(tr(R.string.fit_images), ImageViewing.gridFit) { ImageViewing.gridFit = it }
+    }
+    de.letzgo.stashy.ui.NativeDivider()
+    ControlToggleRow(tr(R.string.keep_rating_visible), ImageViewing.keepRating) { ImageViewing.keepRating = it }
+}
+
+/**
  * iOS: `ImagesFeedAutoplaySettingsCard` (Images / Feeds › Pics sheet): 1/row video Autoplay
  * (`images_feed_video_autoplay`), Image Scaling / Background / Fit Images / Keep Rating Visible ([ImageViewing]) and
  * Continuous with its still duration (`images_fullscreen_continuous`,
@@ -54,28 +86,7 @@ fun ImagesFeedAutoplaySettingsCard() {
     ControlGroup {
         ControlToggleRow(tr(R.string.autoplay), TabManager.imagesFeedVideoAutoplay) { TabManager.imagesFeedVideoAutoplay = it }
         de.letzgo.stashy.ui.NativeDivider()
-        de.letzgo.stashy.ui.NativeDivider()
-        ControlCard {
-            ControlLabel(tr(R.string.image_scaling))
-            ChipRow {
-                ImageScalingMode.entries.forEach { m ->
-                    CatalogFilterChip(tr(m.titleRes), ImageViewing.scaling == m) { ImageViewing.scaling = m }
-                }
-            }
-        }
-        de.letzgo.stashy.ui.NativeDivider()
-        ControlCard {
-            ControlLabel(tr(R.string.background))
-            ChipRow {
-                ImageBackdropMode.entries.forEach { m ->
-                    CatalogFilterChip(tr(m.titleRes), ImageViewing.backdrop == m) { ImageViewing.backdrop = m }
-                }
-            }
-        }
-        de.letzgo.stashy.ui.NativeDivider()
-        ControlToggleRow(tr(R.string.fit_images), ImageViewing.gridFit) { ImageViewing.gridFit = it }
-        de.letzgo.stashy.ui.NativeDivider()
-        ControlToggleRow(tr(R.string.keep_rating_visible), ImageViewing.keepRating) { ImageViewing.keepRating = it }
+        ImageViewingOptionRows(showsGridFit = true)
         de.letzgo.stashy.ui.NativeDivider()
         ControlToggleRow(tr(R.string.continuous), continuous) { continuous = it; Prefs.setBool("images_fullscreen_continuous", it) }
         if (continuous) de.letzgo.stashy.ui.NativeDivider()

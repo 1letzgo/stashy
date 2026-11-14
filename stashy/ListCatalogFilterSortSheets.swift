@@ -128,33 +128,36 @@ struct CatalogFilterSortToggleRow: View {
 
 /// Playback toggles for Feeds Filter & Sort sheets (moved out of Settings → Feeds).
 struct FeedsPlaybackSettingsCard: View {
+    /// Feeds › Clips shows images: Images' scaling, background and rating options stand in for
+    /// the Feeds "Immersive" switch, which clips do not follow.
+    var forClips: Bool = false
     @ObservedObject private var tabManager = TabManager.shared
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
-            CatalogFilterSortToggleRow(label: tr("immersive"), isOn: $tabManager.reelsFillHeight)
+            if forClips {
+                ImageViewingOptionsCards(showsGridFit: false)
+            } else {
+                CatalogFilterSortToggleRow(label: tr("immersive"), isOn: $tabManager.reelsFillHeight)
+            }
             CatalogFilterSortToggleRow(label: tr("continuous"), isOn: $tabManager.reelsContinuousPlay)
             // "Delete button" lives in Settings → Feeds (app UI, not a per-feed filter option).
         }
     }
 }
 
-/// Images feed + fullscreen: autoplay (1/row) and fullscreen Immersive / Continuous (separate from Feeds).
-struct ImagesFeedAutoplaySettingsCard: View {
-    @AppStorage("images_feed_video_autoplay") private var videoAutoplay = true
+/// Image Scaling, Background, Fit Images and Keep Rating Visible (`ImageScalingMode`,
+/// `ImageBackdropMode`): the Images settings sheet, and without Fit Images Feeds › Clips.
+struct ImageViewingOptionsCards: View {
+    /// "Fit Images" is about the cards of a grid; Feeds has none.
+    var showsGridFit: Bool
     @AppStorage(ImageScalingMode.key) private var scalingRaw = ""
     @AppStorage(ImageBackdropMode.key) private var backdropRaw = ""
     @AppStorage(ImageBackdropMode.gridFitKey) private var fitsImages = false
     @AppStorage("images_fullscreen_keep_rating") private var keepsRatingVisible = false
-    @AppStorage("images_fullscreen_continuous") private var fullscreenContinuous = false
-    @AppStorage("images_fullscreen_continuous_duration") private var continuousDurationSeconds = 3
-    @ObservedObject private var appearance = AppearanceManager.shared
-
-    private let durationOptions = [2, 3, 5, 8, 10]
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
-            CatalogFilterSortToggleRow(label: tr("autoplay"), isOn: $videoAutoplay)
             chipsCard(label: tr("image_scaling")) {
                 ForEach(ImageScalingMode.allCases) { mode in
                     CatalogFilterChip(title: mode.title, isActive: ImageScalingMode.resolve(scalingRaw) == mode) {
@@ -163,9 +166,10 @@ struct ImagesFeedAutoplaySettingsCard: View {
                 }
             }
             backgroundCard
-            CatalogFilterSortToggleRow(label: tr("fit_images"), isOn: $fitsImages)
+            if showsGridFit {
+                CatalogFilterSortToggleRow(label: tr("fit_images"), isOn: $fitsImages)
+            }
             CatalogFilterSortToggleRow(label: tr("keep_rating_visible"), isOn: $keepsRatingVisible)
-            continuousCard
         }
     }
 
@@ -197,6 +201,24 @@ struct ImagesFeedAutoplaySettingsCard: View {
                     backdropRaw = mode.rawValue
                 }
             }
+        }
+    }
+}
+
+/// Images feed + fullscreen: autoplay (1/row) and fullscreen Immersive / Continuous (separate from Feeds).
+struct ImagesFeedAutoplaySettingsCard: View {
+    @AppStorage("images_feed_video_autoplay") private var videoAutoplay = true
+    @AppStorage("images_fullscreen_continuous") private var fullscreenContinuous = false
+    @AppStorage("images_fullscreen_continuous_duration") private var continuousDurationSeconds = 3
+    @ObservedObject private var appearance = AppearanceManager.shared
+
+    private let durationOptions = [2, 3, 5, 8, 10]
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            CatalogFilterSortToggleRow(label: tr("autoplay"), isOn: $videoAutoplay)
+            ImageViewingOptionsCards(showsGridFit: true)
+            continuousCard
         }
     }
 
@@ -2069,7 +2091,8 @@ struct ImagesCatalogFilterSortSheet: View {
                         cardColumnsCard(cardColumnScope)
                     }
                     if showsFeedsPlaybackSettings {
-                        FeedsPlaybackSettingsCard()
+                        // The images sheet inside Feeds is the Clips mode.
+                        FeedsPlaybackSettingsCard(forClips: true)
                     }
                     if showsImagesFeedAutoplaySetting {
                         ImagesFeedAutoplaySettingsCard()

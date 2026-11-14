@@ -1457,14 +1457,33 @@ extension View {
         opacity(hidden ? 0 : 1).allowsHitTesting(!hidden)
     }
 
-    /// Fits the view to `ratio` (width / height); nil leaves it as it is.
-    @ViewBuilder
+    /// Fits the view to `ratio` (width / height); nil gives it the whole space. A layout, not
+    /// an `if`: the view keeps its identity when the ratio comes or goes. A branch rebuilt the
+    /// video surface the moment its first frame reported the picture's size.
     func fittedToAspectRatio(_ ratio: CGFloat?) -> some View {
-        if let ratio {
-            aspectRatio(ratio, contentMode: .fit)
-        } else {
-            self
-        }
+        AspectFitLayout(ratio: ratio) { self }
+    }
+}
+
+private struct AspectFitLayout: Layout {
+    var ratio: CGFloat?
+
+    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
+        fitted(in: proposal.replacingUnspecifiedDimensions())
+    }
+
+    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
+        subviews.first?.place(
+            at: CGPoint(x: bounds.midX, y: bounds.midY),
+            anchor: .center,
+            proposal: ProposedViewSize(fitted(in: bounds.size))
+        )
+    }
+
+    private func fitted(in size: CGSize) -> CGSize {
+        guard let ratio, ratio > 0, size.width > 0, size.height > 0 else { return size }
+        let width = min(size.width, size.height * ratio)
+        return CGSize(width: width, height: width / ratio)
     }
 }
 

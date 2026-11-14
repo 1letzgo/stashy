@@ -6273,7 +6273,9 @@ extension ReelItemView {
         ZoomableScrollView(isZoomed: $isZoomed, onTap: handleMediaTap, onLongPress: handleLongPress, onDoubleTap: handleDoubleTap) {
             ZStack {
                 if let clipImage {
-                    ImageBackdrop(url: clipImage.thumbnailURL)
+                    // After the video's first frame: the small image is one more request, and
+                    // this row deliberately loads no still before its video.
+                    ImageBackdrop(url: clipImage.thumbnailURL, loads: item.isAnimated || playbackPresentationSize != nil)
                 } else {
                     Color.black
                 }

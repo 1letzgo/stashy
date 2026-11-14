@@ -1435,7 +1435,7 @@
   <string name="image_perceptual_hashes">Perzeptuelle Bild-Hashes</string>
   <string name="image_performers_not_loaded">Darsteller des Bilds nicht geladen</string>
   <string name="images">Bilder</string>
-  <string name="image_scaling">Bildskalierung</string>
+  <string name="image_scaling">Skalierung</string>
   <string name="images_filter">Bildfilter</string>
   <string name="images_sort">Bilder sortieren</string>
   <string name="image_thumbnails">Bild-Thumbnails</string>

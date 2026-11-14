@@ -110,7 +110,11 @@ fun FeedRow(
     val isClip = item is FeedItem.ClipItem
     val fill = if (isClip) de.letzgo.stashy.data.ImageViewing.scaling.fills(!contentLandscape, devicePortrait)
     else feedShouldFill(FeedsConfig.fillHeight, devicePortrait, contentLandscape)
-    val backdrop = de.letzgo.stashy.data.ImageViewing.backdropColor(if (isClip) item.posterURL else null)
+    // The colour comes from the poster, one more request: only once the clip's own video shows,
+    // so it never competes with the start of playback.
+    val backdrop = de.letzgo.stashy.data.ImageViewing.backdropColor(
+        if (isClip && (videoSize != null || item.isAnimated)) item.posterURL else null,
+    )
     val inset = if (fill && isUIVisible) bottomInset else 0.dp
 
     var scale by remember(item.id, devicePortrait) { mutableFloatStateOf(1f) }

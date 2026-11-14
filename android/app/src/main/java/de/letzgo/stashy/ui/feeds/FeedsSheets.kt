@@ -146,7 +146,13 @@ fun FeedsFilterSortSheet(
                 }
                 // iOS `FeedsPlaybackSettingsCard`.
                 de.letzgo.stashy.ui.filter.ControlGroup {
-                    ControlToggleRow(tr(R.string.immersive), FeedsConfig.fillHeight) { FeedsConfig.updateFillHeight(it) }
+                    // Clips are images: Images' scaling, background and rating options stand in
+                    // for "Immersive", which clips do not follow.
+                    if (mode == ReelsModeType.Clips) {
+                        de.letzgo.stashy.ui.filter.ImageViewingOptionRows(showsGridFit = false)
+                    } else {
+                        ControlToggleRow(tr(R.string.immersive), FeedsConfig.fillHeight) { FeedsConfig.updateFillHeight(it) }
+                    }
                     de.letzgo.stashy.ui.NativeDivider()
                     ControlToggleRow(tr(R.string.continuous), FeedsConfig.continuousPlay) { FeedsConfig.updateContinuousPlay(it) }
                     // "Delete button" lives in Settings › Feeds (app UI, not a per-feed filter option).
