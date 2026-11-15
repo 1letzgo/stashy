@@ -171,7 +171,7 @@ extension Scene {
             resumeTime: resumeTime, playCount: count, oCounter: oCounter,
             rating100: rating100, createdAt: createdAt, updatedAt: updatedAt,
             paths: paths, sceneMarkers: sceneMarkers, interactive: interactive, stashIds: stashIds, captions: captions, customFields: customFields,
-            playDuration: playDuration, lastPlayedAt: stamp
+            playDuration: playDuration, lastPlayedAt: stamp, code: code
         )
     }
 }

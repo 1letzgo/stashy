@@ -10054,7 +10054,7 @@ struct Scene: Codable, Identifiable, Equatable {
             resumeTime: resumeTime, playCount: playCount, oCounter: oCounter,
             rating100: rating100, createdAt: createdAt, updatedAt: updatedAt,
             paths: paths, sceneMarkers: newMarkers, interactive: interactive, stashIds: stashIds, captions: captions, customFields: customFields,
-            playDuration: playDuration, lastPlayedAt: lastPlayedAt
+            playDuration: playDuration, lastPlayedAt: lastPlayedAt, code: code
         )
     }
 
