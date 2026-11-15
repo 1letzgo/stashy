@@ -13,8 +13,6 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.width
-import androidx.compose.runtime.movableContentOf
-import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
@@ -259,14 +257,14 @@ private fun SceneDetailContent(model: SceneDetailModel, openedFromMiniPlayer: Bo
                 // From the page's own container, never the device type (iOS `usesSideInfoColumn`).
                 val sideColumn = maxWidth > maxHeight && (maxWidth >= 900.dp || PHONE_LANDSCAPE_SIDE_COLUMN)
                 val pinned = model.isPlaybackStarted && player != null && !landscape && !sideColumn
-                // One instance of the player card: movable, so a switch between portrait, pinned and
-                // the side column moves it instead of recreating it (the player lives in the model).
-                val currentExtraMenuItems by rememberUpdatedState(extraMenuItems)
-                val playerCard = remember(model) {
-                    movableContentOf {
-                        Column(Modifier.fillMaxWidth().cardShadow().clip(RoundedCornerShape(Tokens.Radius.card)).background(p.secondaryBackground)) {
-                            SceneVideoPlayerCard(model, { currentExtraMenuItems() })
-                        }
+                // A plain card, rebuilt when it changes place (portrait, pinned, side column). It was
+                // `movableContentOf`, but moving it inside this BoxWithConstraints subcomposition (a
+                // rotation while playing: pinned → side column) crashed Compose with an
+                // IllegalStateException. Nothing is lost by the rebuild: the player lives in the
+                // model and `VideoSurface` hands the picture to the new TextureView.
+                val playerCard: @Composable () -> Unit = {
+                    Column(Modifier.fillMaxWidth().cardShadow().clip(RoundedCornerShape(Tokens.Radius.card)).background(p.secondaryBackground)) {
+                        SceneVideoPlayerCard(model, extraMenuItems)
                     }
                 }
                 // Settings › Design › Scene View: card order and visibility (applies live). In
