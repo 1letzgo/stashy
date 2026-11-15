@@ -1195,6 +1195,13 @@ extension View {
         self
     }
 
+    /// While `active` and this view is on screen, text fields started in it get no app-wide
+    /// Done bar (`KeyboardDoneAccessory`): for short screens where its 44 pt would cover content
+    /// (Add Marker in landscape). The fields need their own Return / Done key then.
+    func suppressesKeyboardDoneBar(_ active: Bool) -> some View {
+        modifier(KeyboardDoneBarSuppression(active: active))
+    }
+
     /// Closes the keyboard when the user taps anywhere in this subtree. Uses a *simultaneous*
     /// gesture so buttons and rows underneath keep working.
     func dismissesKeyboardOnTap() -> some View {
@@ -1325,6 +1332,25 @@ private struct OCounterRemovalMenu: ViewModifier {
 }
 // MARK: - App-wide keyboard Done bar
 
+/// Holds one `KeyboardDoneAccessory.suppressionCount` while active and on screen.
+private struct KeyboardDoneBarSuppression: ViewModifier {
+    let active: Bool
+    @State private var holds = false
+
+    func body(content: Content) -> some View {
+        content
+            .onAppear { update(active) }
+            .onChange(of: active) { _, newValue in update(newValue) }
+            .onDisappear { update(false) }
+    }
+
+    private func update(_ wanted: Bool) {
+        guard wanted != holds else { return }
+        holds = wanted
+        KeyboardDoneAccessory.shared.suppressionCount += wanted ? 1 : -1
+    }
+}
+
 /// Puts a "Done" bar above the keyboard for every `UITextField` / `UITextView` the moment it
 /// starts editing (SwiftUI `TextField`, `SecureField`, `TextEditor` are backed by these).
 /// Search fields are left alone — they have their own Search key and native look.
@@ -1334,6 +1360,7 @@ private struct OCounterRemovalMenu: ViewModifier {
 @MainActor
 final class KeyboardDoneAccessory: NSObject {
     static let shared = KeyboardDoneAccessory()
+    var suppressionCount = 0
     func install() {}
 }
 #else
@@ -1341,6 +1368,9 @@ final class KeyboardDoneAccessory: NSObject {
 final class KeyboardDoneAccessory: NSObject {
     static let shared = KeyboardDoneAccessory()
     private var installed = false
+    /// > 0 while a screen that can't spare the bar's 44 pt is shown (`suppressesKeyboardDoneBar`).
+    /// Its fields then rely on their own Return / Done key.
+    var suppressionCount = 0
 
     func install() {
         guard !installed else { return }
@@ -1353,6 +1383,18 @@ final class KeyboardDoneAccessory: NSObject {
     }
 
     @objc private func didBeginEditing(_ note: Notification) {
+        if suppressionCount > 0 {
+            // A field that got the bar earlier (before a rotation made the screen short)
+            // loses it again.
+            if let field = note.object as? UITextField, field.inputAccessoryView?.tag == Self.barTag {
+                field.inputAccessoryView = nil
+                field.reloadInputViews()
+            } else if let textView = note.object as? UITextView, textView.inputAccessoryView?.tag == Self.barTag {
+                textView.inputAccessoryView = nil
+                textView.reloadInputViews()
+            }
+            return
+        }
         if let field = note.object as? UITextField {
             guard !(field is UISearchTextField), needsBar(field.inputAccessoryView) else { return }
             field.inputAccessoryView = makeBar()
