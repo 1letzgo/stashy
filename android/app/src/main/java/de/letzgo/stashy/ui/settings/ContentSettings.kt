@@ -274,7 +274,7 @@ private fun CatalogTabCard(tab: TabConfig, handle: Modifier) {
                     DetailViewContext.Group -> sortNames(FilterMode.Scenes) + GroupSceneSort.options.map { it.raw to it.label }
                     else -> sortNames(FilterMode.Scenes)
                 }
-                MenuValue(options, TabManager.getPersistentDetailSortOption(ctx) ?: "dateDesc") { TabManager.setPersistentDetailSortOption(ctx, it) }
+                MenuValue(options, TabManager.getPersistentDetailSortOption(ctx) ?: ctx.defaultSortRaw) { TabManager.setPersistentDetailSortOption(ctx, it) }
             }
         }
         if (tab.id == AppTab.Galleries) CardSettingRow(tr(R.string.opened_gallery)) { ColumnsMenu(CatalogCardColumnScope.OpenedGallery) }

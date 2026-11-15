@@ -163,6 +163,14 @@ enum DetailViewContext: String, CaseIterable, Codable, Identifiable {
     case group = "group_detail"
     
     var id: String { rawValue }
+
+    /// Sort when none is stored: a group's scenes by their number in the group (as Stash does),
+    /// every other page newest first.
+    var defaultSceneSortRaw: String {
+        self == .group
+            ? StashDBViewModel.SceneSortOption.sceneNumberAsc.rawValue
+            : StashDBViewModel.SceneSortOption.dateDesc.rawValue
+    }
     
     var title: String {
         switch self {
@@ -1821,7 +1829,7 @@ class TabManager: ObservableObject {
                 }
             }
             
-            configs.append(DetailViewConfig(id: context, defaultSortOption: savedOption ?? "dateDesc"))
+            configs.append(DetailViewConfig(id: context, defaultSortOption: savedOption ?? context.defaultSceneSortRaw))
         }
         self.detailViews = configs
     }

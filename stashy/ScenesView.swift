@@ -15,6 +15,8 @@ typealias SceneLivePresetTag = ListLivePresetTag
 
 /// Maps to `SceneSortOption.sortField` for the live-filter sheet (dropdown + asc/desc).
 private enum SceneLiveSortFieldKind: String, CaseIterable, Identifiable {
+    /// A scene's number inside a group: only a group's scene list offers it, first like on Android.
+    case group_scene_number
     case date
     case production_date
     case created_at
@@ -27,8 +29,6 @@ private enum SceneLiveSortFieldKind: String, CaseIterable, Identifiable {
     case rating
     case random
     case for_you
-    /// A scene's number inside a group: only a group's scene list offers it.
-    case group_scene_number
 
     var id: String { rawValue }
 

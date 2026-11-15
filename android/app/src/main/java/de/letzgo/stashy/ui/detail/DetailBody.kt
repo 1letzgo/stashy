@@ -145,7 +145,11 @@ internal class LinkedCatalog(
     /** Scenes (iOS detail scene sort: `DetailViewsSortConfig_<context>`, session override on change). */
     val sceneController = controller<Scene>(
         FilterMode.Scenes, sceneScope,
-        sortRaw = sceneContext?.let { DetailViewConfig.sceneSort(it).raw } ?: DetailSort.Scene.DateDesc.raw,
+        // A list-specific sort (a group's "Scene Number") is not a `DetailSort.Scene`: keep it.
+        sortRaw = sceneContext?.let { ctx ->
+            DetailViewConfig.sortOption(ctx).takeIf { raw -> sceneExtraSorts.any { it.raw == raw } }
+                ?: DetailViewConfig.sceneSort(ctx).raw
+        } ?: DetailSort.Scene.DateDesc.raw,
         perPage = 20,
         persistSort = { s -> sceneContext?.let { DetailViewConfig.setSortOption(it, s.raw) } },
         extraSorts = sceneExtraSorts,

@@ -75,6 +75,9 @@ enum class DetailViewContext(val raw: String, @androidx.annotation.StringRes pri
 
     /** iOS `settingsRowTitle`. */
     val settingsRowTitle: String get() = if (this == Gallery) tr(R.string.images_sort) else tr(R.string.scenes_sort)
+
+    /** Sort when none is stored: a group's scenes by their number in the group (as Stash), else newest first. */
+    val defaultSortRaw: String get() = if (this == Group) de.letzgo.stashy.data.GroupSceneSort.Asc.raw else "dateDesc"
 }
 
 /**
@@ -89,7 +92,7 @@ object DetailViewConfig {
         "${KEY}_${context.raw}" + (serverId?.let { "_$it" } ?: "")
 
     fun persistentSortOption(context: DetailViewContext): String =
-        Prefs.string(Prefs.serverKey("${KEY}_${context.raw}")) ?: Prefs.string("${KEY}_${context.raw}") ?: "dateDesc"
+        Prefs.string(Prefs.serverKey("${KEY}_${context.raw}")) ?: Prefs.string("${KEY}_${context.raw}") ?: context.defaultSortRaw
 
     fun sortOption(context: DetailViewContext): String = session[context.raw] ?: persistentSortOption(context)
 

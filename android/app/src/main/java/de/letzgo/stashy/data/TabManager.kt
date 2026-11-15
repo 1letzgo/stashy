@@ -322,7 +322,7 @@ object TabManager {
             val k = "${DETAIL_SORT_KEY}_${ctx.raw}"
             var saved = Prefs.string(key(k))
             if (saved == null && hasServer) Prefs.string(k)?.let { saved = it; Prefs.setString(key(k), it) }
-            detailSorts[ctx] = saved ?: "dateDesc"
+            detailSorts[ctx] = saved ?: ctx.defaultSortRaw
         }
     }
 
