@@ -11,6 +11,10 @@ struct PasscodeEntryView: View {
     /// One Face ID / Touch ID prompt at a time — `onAppear` and the foreground transition
     /// can both fire for the same lock.
     @State private var isAuthenticating = false
+    #if os(macOS)
+    /// The Mac types the code: the screen holds keyboard focus while it is up.
+    @FocusState private var takesKeyboard: Bool
+    #endif
     
     private var isLockedOut: Bool {
         securityManager.lockoutRemainingSeconds > 0
@@ -98,11 +102,7 @@ struct PasscodeEntryView: View {
                     button(for: "0")
                         .frame(maxWidth: .infinity)
                     
-                    Button(action: {
-                        guard !passcode.isEmpty else { return }
-                        HapticManager.selection()
-                        passcode.removeLast()
-                    }) {
+                    Button(action: deleteLastDigit) {
                         Image(systemName: "delete.left")
                             .font(.title2)
                     }
@@ -129,6 +129,32 @@ struct PasscodeEntryView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .padding(.horizontal)
         .background(Color.appBackground.ignoresSafeArea())
+        #if os(macOS)
+        .focusable()
+        .focused($takesKeyboard)
+        .focusEffectDisabled()
+        .onKeyPress(phases: [.down, .repeat]) { press in
+            if press.key == .delete || press.key == .deleteForward {
+                deleteLastDigit()
+                return .handled
+            }
+            if press.key == .escape {
+                passcode = ""
+                return .handled
+            }
+            // Top row and number pad; anything else (⌘Q, ⌘H …) goes on to the menu.
+            guard press.modifiers.subtracting([.numericPad, .shift, .capsLock]).isEmpty,
+                  press.characters.count == 1,
+                  let digit = press.characters.first, ("0"..."9").contains(digit) else {
+                return .ignored
+            }
+            enterDigit(String(digit))
+            return .handled
+        }
+        .onReceive(NotificationCenter.default.publisher(for: NSWindow.didBecomeKeyNotification)) { _ in
+            takesKeyboard = true
+        }
+        #endif
         .onChange(of: passcode) { _, newValue in
             if newValue.count == 4 {
                 if securityManager.verifyPasscode(newValue) {
@@ -151,6 +177,10 @@ struct PasscodeEntryView: View {
         }
         .onAppear {
             securityManager.startLockoutTimerIfNeeded()
+            #if os(macOS)
+            // Out of a text field below: typed digits must not land in a search field.
+            DispatchQueue.main.async { takesKeyboard = true }
+            #endif
             // With auto-lock the view appears while the app is still in the background
             // (the lock fires in `sceneDidEnterBackground`); a prompt there is dropped by
             // the system. Only prompt now when the app is already active — otherwise the
@@ -182,12 +212,20 @@ struct PasscodeEntryView: View {
         }
     }
     
+    private func enterDigit(_ digit: String) {
+        guard !isLockedOut, passcode.count < 4 else { return }
+        HapticManager.light()
+        passcode.append(digit)
+    }
+
+    private func deleteLastDigit() {
+        guard !isLockedOut, !passcode.isEmpty else { return }
+        HapticManager.selection()
+        passcode.removeLast()
+    }
+
     private func button(for number: String) -> some View {
-        Button(action: {
-            guard !isLockedOut, passcode.count < 4 else { return }
-            HapticManager.light()
-            passcode.append(number)
-        }) {
+        Button(action: { enterDigit(number) }) {
             Text(number)
                 .font(.system(size: 34, weight: .regular, design: .rounded))
                 .monospacedDigit()

@@ -148,13 +148,8 @@ struct MainTabView: View {
                 ensureSelectedTabIsVisible()
             }
 
-            #if !os(iOS)
-            if securityManager.isAppLocked || Self.debugShowsLockScreen {
-                PasscodeEntryView()
-                    .transition(.move(edge: .bottom).combined(with: .opacity))
-                    .zIndex(100)
-            }
-            #endif
+            // macOS: the passcode screen sits at the window root (`MacAppLockOverlay` in
+            // StashyMacApp.swift), above the full-screen covers drawn over this view.
         }
         .animation(.snappy(duration: 0.3, extraBounce: 0), value: securityManager.isAppLocked)
         #if os(iOS)

@@ -419,6 +419,16 @@ final class AetherSceneEngine: ObservableObject {
             .sink { [weak self] _ in self?.resumeFromBackgroundIfNeeded() }
             .store(in: &cancellables)
         #endif
+        #if os(macOS)
+        // A Mac app keeps playing when hidden, so nothing above pauses there. Under the passcode
+        // screen nothing plays (a PiP window aside); the video goes on once the code is in.
+        SecurityManager.shared.$isAppLocked
+            .dropFirst()
+            .removeDuplicates()
+            .receive(on: RunLoop.main)
+            .sink { [weak self] locked in self?.handleAppLockChange(locked: locked) }
+            .store(in: &cancellables)
+        #endif
 
         engine.clock.$currentTime
             .receive(on: RunLoop.main)
@@ -937,6 +947,21 @@ final class AetherSceneEngine: ObservableObject {
     }
     #endif
 
+    #if os(macOS)
+    private var resumesAfterLock = false
+
+    private func handleAppLockChange(locked: Bool) {
+        if locked {
+            guard isPlaying, !engine.pictureInPictureActive else { return }
+            pause()
+            resumesAfterLock = true
+        } else if resumesAfterLock {
+            resumesAfterLock = false
+            play()
+        }
+    }
+    #endif
+
     /// Going to the background without a live Picture-in-Picture window pauses. The engine would
     /// otherwise keep playing audio in the background (background playback follows the PiP
     /// setting). Whether it was playing is remembered for the return.
@@ -1230,6 +1255,10 @@ final class AetherSceneEngine: ObservableObject {
 
     func setPictureInPictureActive(_ active: Bool) {
         engine.pictureInPictureActive = active
+        #if os(macOS)
+        // Auto-lock leaves a running PiP window alone (`lockIfAutoLockOnBackground`).
+        SecurityManager.shared.isPiPActive = active
+        #endif
         updateAudioSessionClaim()
     }
 
@@ -1237,6 +1266,10 @@ final class AetherSceneEngine: ObservableObject {
     func stop() {
         #if os(iOS)
         unlockResume = nil
+        #endif
+        #if os(macOS)
+        resumesAfterLock = false
+        if engine.pictureInPictureActive { SecurityManager.shared.isPiPActive = false }
         #endif
         audioOutputRestart?.cancel()
         audioOutputRestart = nil
