@@ -847,7 +847,9 @@ struct AetherSceneSurface: View {
             ?? UIApplication.shared.connectedScenes.compactMap({ $0 as? UIWindowScene }).first
         else { return }
         let target: UIInterfaceOrientationMask = Self.isWiderThanTall(scene) ? .portrait : .landscape
-        // `rotate` narrows the app's orientations until fullscreen closes; see there.
+        // `rotate` narrows the app's orientations until fullscreen closes; see there. A manual
+        // rotate is a choice: the auto-rotate's hand-back to the device no longer applies.
+        Self.stopFollowingDeviceAfterAutoRotate()
         Self.didRotateInFullscreen = true
         Self.rotate(scene, to: target)
         #endif
@@ -871,6 +873,7 @@ struct AetherSceneSurface: View {
     }
 
     private static func freeOrientationLock() {
+        stopFollowingDeviceAfterAutoRotate()
         didRotateInFullscreen = false
         AppDelegate.orientationLock = .all
         UIApplication.shared.connectedScenes
@@ -886,6 +889,42 @@ struct AetherSceneSurface: View {
             current.setNeedsUpdateOfSupportedInterfaceOrientations()
             controller = current.presentedViewController
         }
+    }
+
+    /// Observer of the device's orientation while an auto-rotate holds the interface in landscape.
+    private static var deviceOrientationObserver: NSObjectProtocol?
+
+    /// The auto-rotate's landscape lock is only a start: once the phone is physically turned to
+    /// landscape the device decides again, so turning it back upright brings the player upright
+    /// (before, the lock held until fullscreen closed and only the rotate button got out of it).
+    /// Freed only on an actual turn: freeing at once would snap a phone held upright straight
+    /// back to portrait. With the system's rotation lock on no turn arrives and landscape stays.
+    private static func followDeviceAfterAutoRotate() {
+        stopFollowingDeviceAfterAutoRotate()
+        UIDevice.current.beginGeneratingDeviceOrientationNotifications()
+        deviceOrientationObserver = NotificationCenter.default.addObserver(
+            forName: UIDevice.orientationDidChangeNotification, object: nil, queue: .main
+        ) { _ in
+            MainActor.assumeIsolated {
+                guard UIDevice.current.orientation.isLandscape,
+                      AppDelegate.orientationLock == .landscape else { return }
+                // From here the device decides, also when fullscreen closes: the flag off
+                // keeps `releaseOrientationOverride` from forcing portrait then.
+                stopFollowingDeviceAfterAutoRotate()
+                didRotateInFullscreen = false
+                AppDelegate.orientationLock = .all
+                UIApplication.shared.connectedScenes
+                    .compactMap { $0 as? UIWindowScene }
+                    .forEach { refreshSupportedOrientations(in: $0) }
+            }
+        }
+    }
+
+    private static func stopFollowingDeviceAfterAutoRotate() {
+        guard let observer = deviceOrientationObserver else { return }
+        NotificationCenter.default.removeObserver(observer)
+        deviceOrientationObserver = nil
+        UIDevice.current.endGeneratingDeviceOrientationNotifications()
     }
 
     /// Rotates the interface and keeps it there: the app's allowed orientations are narrowed to
@@ -930,6 +969,7 @@ struct AetherSceneSurface: View {
                   !Self.isWiderThanTall(scene) else { return }
             Self.didRotateInFullscreen = true
             Self.rotate(scene, to: .landscape)
+            Self.followDeviceAfterAutoRotate()
         }
         #endif
     }
@@ -937,6 +977,7 @@ struct AetherSceneSurface: View {
     /// Back to portrait on the phone once fullscreen goes away, if the button rotated it.
     static func releaseOrientationOverride() {
         #if os(iOS)
+        stopFollowingDeviceAfterAutoRotate()
         guard didRotateInFullscreen || AppDelegate.orientationLock != .all else { return }
         didRotateInFullscreen = false
         let scenes = UIApplication.shared.connectedScenes

@@ -167,7 +167,7 @@ private fun SceneDetailContent(model: SceneDetailModel, openedFromMiniPlayer: Bo
         if (model.isFullscreen) {
             PlayerWindow.setImmersive(true)
             val size = model.player?.videoSize ?: scene.files?.firstOrNull()?.let { (it.width ?: 0) to (it.height ?: 0) }
-            if (size != null && size.first > size.second) PlayerWindow.lockLandscape(true)
+            if (size != null && size.first > size.second) PlayerWindow.lockLandscape(true, followDeviceOnTurn = true)
         } else {
             PlayerWindow.setImmersive(false)
             PlayerWindow.releaseOrientation()
