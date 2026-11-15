@@ -1528,6 +1528,11 @@ struct AddMarkerSheet: View {
     /// (an iPhone in landscape, the iPhone Duo's outer display turned). Measured from the
     /// sheet's own height without the keyboard, never from the screen or the orientation.
     @State private var isCompactHeight = false
+    /// Search mode, apart from the focus itself: a touch on a result row can end the field's
+    /// focus before the finger lifts, and putting the time card back right then moved the row
+    /// away under the finger, so the tap never selected the tag. Ends on a pick, or a moment
+    /// after the focus is gone for another reason.
+    @State private var isTagSearchActive = false
 
     private static let tagSearchFieldID = "addMarkerTagSearch"
     private static let compactHeightLimit: CGFloat = 500
@@ -1535,7 +1540,18 @@ struct AddMarkerSheet: View {
     /// While the tag search is typed into on a short sheet, the time card steps aside so the
     /// field sits at the top and its results fill the room above the keyboard.
     private var tagSearchTakesSheet: Bool {
-        isCompactHeight && isTagSearchFocused
+        isCompactHeight && isTagSearchActive
+    }
+
+    private func pickTag(_ tag: Tag) {
+        // The tag is the marker's name, so a second tap simply renames it by picking another tag.
+        primaryTagId = tag.id
+        // On a short sheet the keyboard covers everything but a row or two; a pick ends the
+        // search and brings the times back. The touch is over here, so the layout may move.
+        if tagSearchTakesSheet {
+            isTagSearchFocused = false
+            isTagSearchActive = false
+        }
     }
 
     /// The marker is named after its primary tag — there is no separate name field.
@@ -1647,29 +1663,29 @@ struct AddMarkerSheet: View {
                                 .padding()
                         } else {
                             ForEach(filteredTags.prefix(20), id: \.id) { tag in
-                                HStack {
-                                    Text(tag.name)
-                                    if let count = tag.sceneCount {
+                                // A Button, not onTapGesture: inside a Form it gets the row's own
+                                // tap handling and fires on touch-up even while the keyboard is up.
+                                Button {
+                                    pickTag(tag)
+                                } label: {
+                                    HStack {
+                                        Text(tag.name)
+                                            .foregroundColor(.primary)
                                         Spacer()
-                                        Text("\(count)")
-                                            .font(.caption)
-                                            .foregroundColor(.secondary)
-                                    }
+                                        if let count = tag.sceneCount {
+                                            Text("\(count)")
+                                                .font(.caption)
+                                                .foregroundColor(.secondary)
+                                        }
 
-                                    if primaryTagId == tag.id {
-                                        Image(systemName: "checkmark")
-                                            .foregroundColor(appearanceManager.tintColor)
+                                        if primaryTagId == tag.id {
+                                            Image(systemName: "checkmark")
+                                                .foregroundColor(appearanceManager.tintColor)
+                                        }
                                     }
+                                    .contentShape(Rectangle())
                                 }
-                                .contentShape(Rectangle())
-                                .onTapGesture {
-                                    // The tag is the marker's name, so a second tap simply
-                                    // renames it by picking another tag.
-                                    primaryTagId = tag.id
-                                    // On a short sheet the keyboard covers everything but a row
-                                    // or two; a pick ends the search and brings the times back.
-                                    if tagSearchTakesSheet { isTagSearchFocused = false }
-                                }
+                                .buttonStyle(.plain)
                             }
 
                             if filteredTags.count > 20 {
@@ -1685,6 +1701,18 @@ struct AddMarkerSheet: View {
                     .listRowBackground(Color.secondaryAppBackground)
                 }
                 .scrollDismissesKeyboard(.interactively)
+                .onChange(of: isTagSearchFocused) { _, focused in
+                    if focused {
+                        isTagSearchActive = true
+                        return
+                    }
+                    // Lost without a pick (Done, keyboard swiped away, a touch on a row): wait
+                    // until that touch has ended before the time card comes back, so a row tap
+                    // still lands on the row it started on.
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                        if !isTagSearchFocused { isTagSearchActive = false }
+                    }
+                }
                 .onChange(of: tagSearchTakesSheet) { _, takesSheet in
                     guard takesSheet else { return }
                     // After the time card is gone: the field goes to the top, results below it.
