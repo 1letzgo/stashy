@@ -196,8 +196,10 @@ struct PlayerZoomedVideo<Content: View>: View {
     }
 }
 
-/// Pinch + pan on the surface's free area (the tap regions under the controls), plus the
-/// resets: new scene, fullscreen in or out, fill switched by the button.
+/// Pinch on the whole transport overlay, plus the resets: new scene, fullscreen in or out,
+/// fill switched by the button. On the overlay rather than the tap regions: while paused the
+/// controls are up and a finger landing on one of them (the play button sits right where a
+/// pinch starts) never reached a gesture on the tap regions below.
 struct PlayerPinchZoomGestures: ViewModifier {
     let model: PlayerZoomModel
     @ObservedObject var engine: AetherSceneEngine
@@ -216,8 +218,6 @@ struct PlayerPinchZoomGestures: ViewModifier {
                 model.gestureFrame = frame
             }
             .simultaneousGesture(pinch)
-            // Pan only while zoomed: unzoomed, the drag is left to the page's scroll view.
-            .simultaneousGesture(pan, including: model.isZoomed ? .all : .subviews)
             .onChange(of: engine.hasPresentedFrame) { _, presented in
                 // A new scene drops the picture first; a reload of the same item keeps it.
                 if !presented { model.reset(animated: false) }
@@ -266,10 +266,27 @@ struct PlayerPinchZoomGestures: ViewModifier {
             }
     }
 
+}
+
+/// One-finger pan while zoomed, on the free area only (the tap regions), so a drag on the time
+/// bar or the volume slider stays a scrub. Unzoomed it is off and the drag is left to the page.
+struct PlayerZoomPanGesture: ViewModifier {
+    let model: PlayerZoomModel
+    let engine: AetherSceneEngine
+    let fillsScreen: Bool
+
+    func body(content: Content) -> some View {
+        content
+            .simultaneousGesture(pan, including: model.isZoomed ? .all : .subviews)
+    }
+
     private var pan: some Gesture {
         DragGesture(minimumDistance: 8)
             .onChanged { value in
-                model.panChanged(translation: value.translation, pictureSize: currentPictureSize)
+                let picture = PlayerZoomModel.pictureSize(in: model.videoFrame.size,
+                                                          source: engine.sourceSize,
+                                                          fills: fillsScreen)
+                model.panChanged(translation: value.translation, pictureSize: picture)
             }
             .onEnded { _ in model.panEnded() }
     }
