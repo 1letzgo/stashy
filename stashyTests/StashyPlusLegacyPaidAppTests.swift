@@ -176,6 +176,63 @@ struct StashyPlusLegacyPaidAppTests {
         #expect(decision == .no)
     }
 
+    /// Apple TV: the version of the Universal Purchase's app transaction may be a tvOS build
+    /// (300+ since 3.0). A purchase date before the cutoff still proves the paid purchase.
+    @Test func tvOSFreemiumLookingBuildWithPaidEraDateIsUnlocked() {
+        let decision = StashyPlusManager.legacyPaidAppDecision(
+            environment: .production,
+            originalAppVersion: "316",
+            originalPurchaseDate: utcDate(2026, 3, 10),
+            firstFreemiumReleaseDate: cutoff,
+            dateOverridesFreemiumVersion: true
+        )
+        #expect(decision == .yes)
+    }
+
+    @Test func tvOSFreemiumBuildAfterCutoffStaysLocked() {
+        let decision = StashyPlusManager.legacyPaidAppDecision(
+            environment: .production,
+            originalAppVersion: "316",
+            originalPurchaseDate: utcDate(2026, 9, 10),
+            firstFreemiumReleaseDate: cutoff,
+            dateOverridesFreemiumVersion: true
+        )
+        #expect(decision == .no)
+    }
+
+    @Test func tvOSFreemiumBuildWithoutDateStaysLocked() {
+        let decision = StashyPlusManager.legacyPaidAppDecision(
+            environment: .production,
+            originalAppVersion: "316",
+            originalPurchaseDate: nil,
+            firstFreemiumReleaseDate: cutoff,
+            dateOverridesFreemiumVersion: true
+        )
+        #expect(decision == .no)
+    }
+
+    @Test func tvOSOverrideStillRequiresProduction() {
+        let decision = StashyPlusManager.legacyPaidAppDecision(
+            environment: .sandbox,
+            originalAppVersion: "316",
+            originalPurchaseDate: utcDate(2026, 3, 10),
+            firstFreemiumReleaseDate: cutoff,
+            dateOverridesFreemiumVersion: true
+        )
+        #expect(decision == .no)
+    }
+
+    /// iOS / macOS keep the version veto: a freemium build never unlocks there.
+    @Test func freemiumVersionVetoesEarlyDateByDefault() {
+        let decision = StashyPlusManager.legacyPaidAppDecision(
+            environment: .production,
+            originalAppVersion: "316",
+            originalPurchaseDate: utcDate(2026, 3, 10),
+            firstFreemiumReleaseDate: cutoff
+        )
+        #expect(decision == .no)
+    }
+
     private func utcDate(_ year: Int, _ month: Int, _ day: Int) -> Date {
         StashyPlusManager.utcDate(year: year, month: month, day: day)
     }

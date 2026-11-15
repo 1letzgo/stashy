@@ -26,6 +26,16 @@ struct TVApp: App {
         AetherPlaybackBootstrap.installOnce()
         #endif
 
+        // stashy+ must sync at launch, as on iOS (`StoreManager.shared` in App.swift): the store
+        // used to start only when the stashy+ settings page was opened, so a pre-3.0 buyer's
+        // paid-app grant, and a Lifetime or subscription bought on another device, never
+        // reached Discover, Similar Scenes or Up Next on Apple TV. Skipped on a local run from
+        // Xcode (unlocked anyway), where an Apple TV without an Apple Account showed the
+        // sign-in prompt; an App Store or TestFlight install always has an account.
+        if !StashyPlusManager.localUnlockActive {
+            _ = TVStashyPlusStore.shared
+        }
+
         // Audio-Session beim Start nur deklarieren, nicht aktivieren: der App-Start soll laufendes
         // System-Audio nicht unterbrechen. Aktiviert wird erst, wenn wirklich hörbar abgespielt wird
         // (`AudioSessionCoordinator`, bzw. AVKit/Engine pro Wiedergabe). `setCategory` blockiert;

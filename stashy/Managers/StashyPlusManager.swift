@@ -430,15 +430,27 @@ final class StashyPlusManager: ObservableObject {
     /// Universal Purchase — still ships build `1`, so a free download that starts on
     /// Apple TV would otherwise look like an early paid purchase. The version era is
     /// the fallback for the (practically nonexistent) case of a missing date.
+    ///
+    /// `dateOverridesFreemiumVersion`: on Apple TV the version is no reliable veto. With the
+    /// Universal Purchase the app transaction's version may name another platform's build or
+    /// the tvOS build of the first download there (tvOS builds are 300+ since 3.0), while the
+    /// purchase date still names the original purchase. So on tvOS a date before the cutoff
+    /// wins over a version that looks freemium. iOS and macOS keep the version veto.
     nonisolated static func legacyPaidAppDecision(
         environment: AppStore.Environment,
         originalAppVersion: String,
         originalPurchaseDate: Date?,
-        firstFreemiumReleaseDate: Date? = StashyPlusManager.firstFreemiumReleaseDate
+        firstFreemiumReleaseDate: Date? = StashyPlusManager.firstFreemiumReleaseDate,
+        dateOverridesFreemiumVersion: Bool = false
     ) -> LegacyPaidAppDecision {
         guard environment == .production else { return .no }
         let era = originalVersionEra(originalAppVersion)
-        if era == .freemium { return .no }
+        if era == .freemium {
+            guard dateOverridesFreemiumVersion,
+                  let cutoff = firstFreemiumReleaseDate,
+                  let purchased = originalPurchaseDate else { return .no }
+            return purchased < cutoff ? .yes : .no
+        }
         guard let cutoff = firstFreemiumReleaseDate,
               let purchased = originalPurchaseDate else {
             // No date to check against — trust the version only when it is unambiguous.

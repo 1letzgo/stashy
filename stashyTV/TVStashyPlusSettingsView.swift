@@ -20,10 +20,13 @@ final class TVStashyPlusStore: ObservableObject {
     @Published private(set) var lastProductError: String?
     @Published private(set) var purchasingProductID: String?
     @Published private(set) var isRestoringPurchases = false
+    /// Last seen `AppTransaction.environment` was sandbox / Xcode (TestFlight or a local run).
+    @Published private(set) var isAppTransactionSandbox = false
 
     var isPurchasing: Bool { purchasingProductID != nil }
 
     private var customerInfoListener: Task<Void, Never>?
+    private var legacyPaidRetryCount = 0
 
     private init() {
         StashyRevenueCat.configureIfNeeded()
@@ -83,10 +86,36 @@ final class TVStashyPlusStore: ObservableObject {
         return .purchased
     }
 
-    func restorePurchases() async {
+    /// What Restore found; the settings page shows it in an alert.
+    enum RestoreOutcome {
+        /// stashy+ is unlocked after the restore (from this or an earlier grant).
+        case unlocked
+        /// Nothing grants stashy+ on this Apple Account. `sandbox`: TestFlight / Xcode install,
+        /// where a paid App Store purchase cannot be proven.
+        case nothingFound(sandbox: Bool)
+        /// The user dismissed the App Store sign-in.
+        case cancelled
+        case failed(String)
+    }
+
+    /// Restore on Apple TV: `AppStore.sync()` first (it may ask for the Apple Account, which is
+    /// fine on an explicit tap), then RevenueCat, a fresh app transaction and a full re-check of
+    /// subscriptions, Lifetime and the paid app before 3.0.
+    func restorePurchases() async -> RestoreOutcome {
         isRestoringPurchases = true
         defer { isRestoringPurchases = false }
         StashyPlusManager.shared.clearDebugForceLock()
+
+        var syncError: String?
+        do {
+            try await AppStore.sync()
+        } catch StoreKitError.userCancelled {
+            await syncUnlockFromStore()
+            return StashyPlusManager.shared.isUnlocked ? .unlocked : .cancelled
+        } catch {
+            AppLog.debug("AppStore.sync failed on tvOS: \(error)")
+            syncError = error.localizedDescription
+        }
         await StashyRevenueCat.restore()
         do {
             _ = try await AppTransaction.refresh()
@@ -94,6 +123,10 @@ final class TVStashyPlusStore: ObservableObject {
             AppLog.debug("AppTransaction.refresh failed: \(error)")
         }
         await syncUnlockFromStore()
+
+        if StashyPlusManager.shared.isUnlocked { return .unlocked }
+        if let syncError { return .failed(syncError) }
+        return .nothingFound(sandbox: isAppTransactionSandbox)
     }
 
     func syncUnlockFromStore(customerInfo: CustomerInfo? = nil) async {
@@ -103,11 +136,24 @@ final class TVStashyPlusStore: ObservableObject {
         switch await Self.isLegacyPaidAppPurchaser() {
         case .yes:
             legacyPaidApp = true
+            legacyPaidRetryCount = 0
         case .no:
             legacyPaidApp = false
+            legacyPaidRetryCount = 0
         case .unknown:
+            // A StoreKit hiccup is no "not a paid buyer": keep what was stored and retry a
+            // few times, as on iOS. Without the retry one failed check at launch left a
+            // pre-3.0 buyer locked until the next foreground.
             legacyPaidApp = UserDefaults.standard.string(forKey: StashyPlusManager.sourceKey)
                 == StashyPlusSource.legacyPaidApp.rawValue
+            if legacyPaidRetryCount < 3 {
+                legacyPaidRetryCount += 1
+                let attempt = legacyPaidRetryCount
+                Task {
+                    try? await Task.sleep(nanoseconds: UInt64(attempt) * 5_000_000_000)
+                    await self.syncUnlockFromStore()
+                }
+            }
         }
 
         StashyPlusManager.shared.applyStoreEntitlements(
@@ -132,11 +178,18 @@ final class TVStashyPlusStore: ObservableObject {
     private static func isLegacyPaidAppPurchaser() async -> LegacyPaidAppResult {
         do {
             let appTransaction = try checkVerifiedStatic(await AppTransaction.shared)
+            let environment = appTransaction.environment
+            let original = appTransaction.originalAppVersion
+            let purchased = appTransaction.originalPurchaseDate
+            TVStashyPlusStore.shared.isAppTransactionSandbox =
+                environment == .sandbox || environment == .xcode
             let decision = StashyPlusManager.legacyPaidAppDecision(
-                environment: appTransaction.environment,
-                originalAppVersion: appTransaction.originalAppVersion,
-                originalPurchaseDate: appTransaction.originalPurchaseDate
+                environment: environment,
+                originalAppVersion: original,
+                originalPurchaseDate: purchased,
+                dateOverridesFreemiumVersion: true
             )
+            AppLog.debug("ℹ️ tvOS AppTransaction originalAppVersion=\(original) purchased=\(purchased) environment=\(environment) pre-3.0 paid=\(decision == .yes)")
             return decision == .yes ? .yes : .no
         } catch {
             AppLog.debug("AppTransaction check failed on tvOS: \(error)")
@@ -162,7 +215,16 @@ struct TVStashyPlusSettingsView: View {
     // schon beim Öffnen der Settings los; auf einem Apple TV ohne angemeldeten
     // Account poppte dort die Apple-Account-Anmeldung auf. `@StateObject`
     // wertet den Ausdruck erst beim ersten Rendern dieser Seite aus.
+    // Außerhalb eines lokalen Xcode-Laufs startet `TVApp.init` den Store ohnehin beim
+    // App-Start (Entitlements und Kauf vor 3.0 müssen sofort gelten).
     @StateObject private var store = TVStashyPlusStore.shared
+    /// Outcome of the last Restore, shown in an alert.
+    @State private var restoreAlert: RestoreAlert?
+
+    private struct RestoreAlert {
+        let title: String
+        let message: String
+    }
 
     var body: some View {
         List {
@@ -272,7 +334,10 @@ struct TVStashyPlusSettingsView: View {
 
                 Section {
                     Button {
-                        Task { await store.restorePurchases() }
+                        Task {
+                            let outcome = await store.restorePurchases()
+                            restoreAlert = alert(for: outcome)
+                        }
                     } label: {
                         HStack {
                             Text(tr("action_restore_purchases"))
@@ -287,10 +352,38 @@ struct TVStashyPlusSettingsView: View {
             }
         }
         .tvSettingsPage("stashy+")
+        .alert(
+            restoreAlert?.title ?? "",
+            isPresented: Binding(
+                get: { restoreAlert != nil },
+                set: { if !$0 { restoreAlert = nil } }
+            ),
+            presenting: restoreAlert
+        ) { _ in
+            Button(tr("ok")) { restoreAlert = nil }
+        } message: { alert in
+            Text(alert.message)
+        }
         .task {
             if store.products.isEmpty {
                 await store.fetchProducts()
             }
+        }
+    }
+
+    private func alert(for outcome: TVStashyPlusStore.RestoreOutcome) -> RestoreAlert? {
+        switch outcome {
+        case .unlocked:
+            return RestoreAlert(title: tr("purchases_restored"), message: stashyPlus.source.statusDetail)
+        case .nothingFound(let sandbox):
+            return RestoreAlert(
+                title: tr("action_restore_purchases"),
+                message: tr(sandbox ? "hint_this_install_is_still_testflight" : "hint_no_stashy_plus_subscription_or")
+            )
+        case .failed(let message):
+            return RestoreAlert(title: tr("action_restore_purchases"), message: message)
+        case .cancelled:
+            return nil
         }
     }
 
