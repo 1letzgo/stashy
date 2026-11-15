@@ -1464,13 +1464,36 @@ private struct ScenesViewContent: View {
         }
     }
 
+    @ViewBuilder
     private var emptyStateView: some View {
-        SharedEmptyStateView(
-            icon: "film",
-            title: tr("empty_scenes_found"),
-            buttonText: tr("action_load_scenes"),
-            onRetry: { performSearch() }
-        )
+        if case .studio(let studioId) = scope {
+            // A parent studio whose scenes sit in its sub-studios offers the switch here.
+            SubStudioContentEmptyState(
+                studioId: studioId,
+                icon: "film",
+                title: tr("empty_scenes_found"),
+                subtreeCount: \.scene_count_all,
+                fallbackButtonText: tr("action_load_scenes"),
+                onFallback: { performSearch() }
+            )
+        } else if case .tag(let tagId) = scope {
+            // Likewise a parent tag whose scenes carry only its sub-tags.
+            SubTagContentEmptyState(
+                tagId: tagId,
+                icon: "film",
+                title: tr("empty_scenes_found"),
+                subtreeCount: \.scene_count_all,
+                fallbackButtonText: tr("action_load_scenes"),
+                onFallback: { performSearch() }
+            )
+        } else {
+            SharedEmptyStateView(
+                icon: "film",
+                title: tr("empty_scenes_found"),
+                buttonText: tr("action_load_scenes"),
+                onRetry: { performSearch() }
+            )
+        }
     }
 
     @ViewBuilder

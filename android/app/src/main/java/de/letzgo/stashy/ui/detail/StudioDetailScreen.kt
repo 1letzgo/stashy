@@ -94,6 +94,8 @@ class StudioDetailScreen(val studioId: String, val preview: Studio? = null, priv
 
     private fun load() {
         catalog.loadAll(force = true)
+        // Counts with sub-studios: header, and the sections a parent studio keeps for them.
+        StudioCountsStore.request(studioId, refresh = true)
         scope.launch {
             runCatching { DetailRepository.studio(studioId) }.getOrNull()?.let {
                 studio = it

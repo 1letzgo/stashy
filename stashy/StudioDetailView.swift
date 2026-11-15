@@ -110,10 +110,15 @@ struct StudioDetailView: View {
         max(viewModel.totalStudioGalleries, studio.galleryCount ?? 0)
     }
     
+    /// Counts with sub-studios (`StudioCountsStore`), nil until the server answered.
+    private var subtreeCounts: StudioCounts? { studioCounts.counts[studio.id] }
+
     private var availableTabs: [DetailTab] {
         var tabs: [DetailTab] = []
-        if effectiveScenesCount > 0 { tabs.append(.scenes) }
-        if effectiveGalleriesCount > 0 { tabs.append(.galleries) }
+        // A parent studio whose scenes all sit in sub-studios keeps the section: it offers
+        // "Include sub-studio content" in its empty state and its settings sheet.
+        if effectiveScenesCount > 0 || (subtreeCounts?.scene_count_all ?? 0) > 0 { tabs.append(.scenes) }
+        if effectiveGalleriesCount > 0 || (subtreeCounts?.gallery_count_all ?? 0) > 0 { tabs.append(.galleries) }
         if viewModel.totalDetailStudios > 0 { tabs.append(.studios) }
         if viewModel.totalDetailPerformers > 0 { tabs.append(.performers) }
         if viewModel.totalDetailTags > 0 { tabs.append(.tags) }
@@ -284,7 +289,13 @@ struct StudioDetailView: View {
                     } else if viewModel.isLoadingStudioGalleries {
                         loadingView(message: tr("loading_galleries"))
                     } else {
-                        InlineEmptyStateView(icon: "photo.on.rectangle", title: tr("empty_galleries_found"))
+                        SubStudioContentEmptyState(
+                            studioId: studio.id,
+                            icon: "photo.on.rectangle",
+                            title: tr("empty_galleries_found"),
+                            fillsScreen: false,
+                            subtreeCount: \.gallery_count_all
+                        )
                     }
                 } else if selectedDetailTab == .studios {
                     studioGrid
@@ -304,6 +315,11 @@ struct StudioDetailView: View {
 
     var body: some View {
         studioDetailWithLinkedGalleriesAndImagesSheets
+            // Every filter sheet of this page offers "Include sub-studio content"; the Scenes list
+            // reloads itself, the other sections in `studioDetailCoreChrome`. Set here, outside
+            // the wrappers that attach the sheets: a sheet only sees the environment of the view
+            // it hangs on, and set inside, only the Scenes sheet had the switch.
+            .environment(\.showsSubStudioContentOption, true)
     }
 
     /// Aufgeteilt, damit der SwiftUI-Typinferenz-Compiler nicht an `body` scheitert.
@@ -527,9 +543,6 @@ struct StudioDetailView: View {
         }
         .sceneLiveUpdates(using: viewModel)
         .task(id: studio.id) { studioCounts.request(studio.id, refresh: true) }
-        // Every filter sheet of this page offers "Include sub-studio content"; the Scenes list
-        // reloads itself, the other sections here.
-        .environment(\.showsSubStudioContentOption, true)
         // A studio moved in the hierarchy: this page's sub-studios (and what they hold) changed.
         .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("StudioParentChanged"))) { note in
             guard (note.userInfo?["studioId"] as? String) != studio.id else { return }

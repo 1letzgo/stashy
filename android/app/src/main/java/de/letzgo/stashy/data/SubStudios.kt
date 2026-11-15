@@ -66,6 +66,16 @@ object SubStudios {
         return studios.sortedWith((if (ascending) byCount else byCount.reversed()).thenBy(String.CASE_INSENSITIVE_ORDER) { it.name })
     }
 
+    /**
+     * A studio page keeps a section (Scenes, Galleries) while the studio or its sub-studios
+     * hold something of it: a parent whose scenes all sit in sub-studios still offers the
+     * section, and with it "Include sub-studio content". [subtree] is null until known.
+     */
+    fun keepsSection(own: Int, subtree: Int?): Boolean = own > 0 || (subtree ?: 0) > 0
+
+    /** The empty state of such a section offers the switch as its button while it is off. */
+    fun offersIncludeButton(includeContent: Boolean, subtree: Int?): Boolean = !includeContent && (subtree ?: 0) > 0
+
     /** `findStudios` plus each studio's `scene_count_all` (`scene_count(depth: -1)`, also on Stash 0.31). */
     fun withSceneCountAll(document: String): String =
         document.replace("...StudioFields", "...StudioFields\n      scene_count_all: scene_count(depth: -1)")
