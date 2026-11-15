@@ -80,6 +80,10 @@ fun DashboardSceneCard(scene: Scene, isLarge: Boolean, width: Dp, height: Dp, mo
                 if (Downloads.isDownloaded(scene.id)) DownloadedMark(18)
             }
             Spacer(Modifier.weight(1f))
+            if (TabManager.sceneShowStudioCode) scene.studioCode?.let {
+                de.letzgo.stashy.ui.components.SceneStudioCodeBadge(it, large = isLarge)
+                Spacer(Modifier.height(3.dp))
+            }
             Text(
                 scene.displayTitle,
                 style = (if (isLarge) NativeType.titleMedium else NativeType.labelLarge).copy(shadow = titleShadow),

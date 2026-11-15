@@ -120,8 +120,10 @@ object SceneEditing {
         GraphQL.data(SceneQueries.sceneUpdateOrganized, input("id" to sceneId, "organized" to organized))
     }
 
-    suspend fun updateTitleAndDetails(sceneId: String, title: String?, details: String?) {
-        GraphQL.data(SceneQueries.sceneUpdateTitleDetails, input("id" to sceneId, "title" to title, "details" to details))
+    /** [code]: the new studio code (`""` clears it); null leaves it untouched. */
+    suspend fun updateTitleAndDetails(sceneId: String, title: String?, details: String?, code: String? = null) {
+        val fields = listOfNotNull("id" to sceneId, "title" to title, "details" to details, code?.let { "code" to it })
+        GraphQL.data(SceneQueries.sceneUpdateTitleDetails, input(*fields.toTypedArray()))
     }
 
     /** iOS: `SceneProductionDate.isValid` — Stash stores a partial date with its precision. */

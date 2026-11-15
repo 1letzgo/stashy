@@ -782,6 +782,13 @@ class TabManager: ObservableObject {
             UserDefaults.standard.set(sceneCardsShowStudioLogo, forKey: sceneCardsShowStudioLogoKey)
         }
     }
+    /// Scenes: show Stash's studio code (`OMG-013`) on cards, the scene page and the edit
+    /// sheet (Settings → Home Tabs → Scenes). Off by default; global, synced.
+    @Published var sceneShowStudioCode: Bool = false {
+        didSet {
+            UserDefaults.standard.set(sceneShowStudioCode, forKey: Self.sceneShowStudioCodeKey)
+        }
+    }
     @Published var dashboardHeroSize: DashboardHeroSize = .big {
         didSet {
             UserDefaults.standard.set(dashboardHeroSize.rawValue, forKey: dashboardHeroSizeKey)
@@ -855,6 +862,7 @@ class TabManager: ObservableObject {
     private let reelsShowsDeleteButtonKey = "ReelsShowsDeleteButton"
     private let dashboardHeroSizeKey = "DashboardHeroSize"
     private let sceneCardsShowStudioLogoKey = "SceneCardsShowStudioLogo"
+    static let sceneShowStudioCodeKey = "SceneShowStudioCode"
     private let useCompactStatisticsKey = "useCompactStatistics"
     private let showDashboardHeroBackgroundKey = "showDashboardHeroBackground"
     private let dashboardHeroAutoplayKey = "dashboardHeroAutoplay"
@@ -931,6 +939,7 @@ class TabManager: ObservableObject {
         loadSubtitleSettings()
         self.reelsShowsDeleteButton = UserDefaults.standard.bool(forKey: reelsShowsDeleteButtonKey)
         self.sceneCardsShowStudioLogo = UserDefaults.standard.object(forKey: sceneCardsShowStudioLogoKey) as? Bool ?? true
+        self.sceneShowStudioCode = UserDefaults.standard.bool(forKey: Self.sceneShowStudioCodeKey)
         if let heroSizeRaw = UserDefaults.standard.string(forKey: dashboardHeroSizeKey),
            let heroSize = DashboardHeroSize(rawValue: heroSizeRaw) {
             self.dashboardHeroSize = heroSize

@@ -109,8 +109,11 @@ private fun LoadingRow(text: String = tr(R.string.loading_ellipsis)) {
 
 /** iOS: `EditSceneTitleSheet` ("Edit Scene": Title + Description). */
 @Composable
-fun EditSceneTitleSheet(scene: Scene, onDismiss: () -> Unit, currentProductionDate: String? = null, onProductionDateSaved: (String?) -> Unit = {}, onSaved: (String?, String?) -> Unit) {
+fun EditSceneTitleSheet(scene: Scene, onDismiss: () -> Unit, currentProductionDate: String? = null, onProductionDateSaved: (String?) -> Unit = {}, onCodeSaved: (String) -> Unit = {}, onSaved: (String?, String?) -> Unit) {
     val showsProductionDate = de.letzgo.stashy.data.ServerCapabilities.supports032
+    // Studio code only with Show Studio Code on.
+    val showsCode = remember { de.letzgo.stashy.data.TabManager.sceneShowStudioCode }
+    var code by remember { mutableStateOf(scene.code.orEmpty()) }
     var productionDate by remember { mutableStateOf(currentProductionDate.orEmpty()) }
     var title by remember { mutableStateOf(scene.displayTitle) }
     var details by remember { mutableStateOf(scene.details.orEmpty()) }
@@ -124,9 +127,12 @@ fun EditSceneTitleSheet(scene: Scene, onDismiss: () -> Unit, currentProductionDa
         }
         saving = true
         val t = title.ifEmpty { null }; val d = details.ifEmpty { null }
+        // Written only when shown and changed; null leaves the code as it is.
+        val newCode = code.trim().takeIf { showsCode && it != scene.code.orEmpty().trim() }
         scope.launch {
             val saved = runCatching {
-                SceneEditing.updateTitleAndDetails(scene.id, t, d)
+                SceneEditing.updateTitleAndDetails(scene.id, t, d, newCode)
+                newCode?.let(onCodeSaved)
                 if (showsProductionDate && newDate != currentProductionDate.orEmpty()) {
                     SceneEditing.updateProductionDate(scene.id, newDate)
                     onProductionDateSaved(newDate.ifEmpty { null })
@@ -141,6 +147,9 @@ fun EditSceneTitleSheet(scene: Scene, onDismiss: () -> Unit, currentProductionDa
             if (SceneTitleNormalizer.normalized(title) != title) {
                 de.letzgo.stashy.ui.NativeTextButton(tr(R.string.normalize), Modifier.padding(start = 4.dp)) { title = SceneTitleNormalizer.normalized(title) }
             }
+        }
+        if (showsCode) FormSection(tr(R.string.scene_code)) {
+            FormTextField(code, { code = it }, tr(R.string.scene_code), Modifier.fillMaxWidth())
         }
         FormSection(tr(R.string.description)) {
             FormTextField(details, { details = it }, "", Modifier.fillMaxWidth().heightIn(min = 120.dp), singleLine = false)

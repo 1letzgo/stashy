@@ -1064,6 +1064,8 @@ struct SceneDetailView: View {
 
     /// Updates local Scene Detail state and notifies catalog lists (title, studio, tags, …).
     private func applyLocalSceneEdit(_ updated: Scene) {
+        // The copies built here leave the studio code out; keep the one the page has.
+        let updated = updated.code == nil ? updated.withCode(activeScene.code) : updated
         activeScene = updated
         updated.postListMetadataUpdated()
     }

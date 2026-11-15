@@ -334,7 +334,7 @@ private fun SceneDetailContent(model: SceneDetailModel, openedFromMiniPlayer: Bo
 
     // Sheets and alerts (iOS `SceneDetailAlertModifier`, `ScenePlayerExtrasSheetsModifier`).
     when (sheet) {
-        EditSheet.Title -> EditSceneTitleSheet(scene, { sheet = null }, productionDate, { productionDate = it }) { t, d -> model.applyEdit(model.scene.copy(title = t, details = d)) }
+        EditSheet.Title -> EditSceneTitleSheet(scene, { sheet = null }, productionDate, { productionDate = it }, { model.applyEdit(model.scene.copy(code = it)) }) { t, d -> model.applyEdit(model.scene.copy(title = t, details = d)) }
         EditSheet.Performers -> EditPerformersSheet(scene, { sheet = null }) { model.applyEdit(model.scene.copy(performers = it)) }
         EditSheet.Studio -> EditStudioSheet(scene, { sheet = null }) { model.applyEdit(model.scene.copy(studio = it)) }
         EditSheet.Groups -> EditGroupsSheet(scene, { sheet = null }) { model.applyEdit(model.scene.copy(groups = it)) }

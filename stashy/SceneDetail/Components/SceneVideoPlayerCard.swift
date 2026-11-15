@@ -470,6 +470,7 @@ struct SceneDetailMetadataCard: View {
 
     @ObservedObject var viewModel: StashDBViewModel
     @ObservedObject var appearanceManager = AppearanceManager.shared
+    @ObservedObject private var tabManager = TabManager.shared
     @State private var showingEditTitleSheet = false
     @State private var productionDate: String?
 
@@ -485,6 +486,9 @@ struct SceneDetailMetadataCard: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             VStack(alignment: .leading, spacing: 4) {
+                if tabManager.sceneShowStudioCode, let code = activeScene.studioCode {
+                    SceneStudioCodeCopyButton(code: code)
+                }
                 HStack(alignment: .top) {
                     Text(activeScene.displayTitle ?? tr("unknown_title"))
                         .font(.title2)
@@ -538,8 +542,10 @@ struct SceneDetailMetadataCard: View {
                 currentTitle: activeScene.displayTitle,
                 currentDetails: activeScene.details,
                 currentProductionDate: productionDate,
+                currentCode: tabManager.sceneShowStudioCode ? (activeScene.code ?? "") : nil,
                 viewModel: viewModel,
-                onProductionDateSaved: { productionDate = $0 }
+                onProductionDateSaved: { productionDate = $0 },
+                onCodeSaved: { activeScene = activeScene.withCode($0) }
             ) { newTitle, newDetails in
                 onTitleUpdated?(newTitle, newDetails)
             }
@@ -992,8 +998,11 @@ struct EditSceneTitleSheet: View {
     let currentTitle: String?
     let currentDetails: String?
     var currentProductionDate: String? = nil
+    /// The studio code, or `nil` to leave the field out (Show Studio Code is off).
+    var currentCode: String? = nil
     @ObservedObject var viewModel: StashDBViewModel
     var onProductionDateSaved: (String?) -> Void = { _ in }
+    var onCodeSaved: (String) -> Void = { _ in }
     var onComplete: (String?, String?) -> Void
 
     @Environment(\.stashyDismiss) var dismiss
@@ -1001,6 +1010,7 @@ struct EditSceneTitleSheet: View {
     @State private var title: String = ""
     @State private var details: String = ""
     @State private var productionDate: String = ""
+    @State private var code: String = ""
     @State private var isSaving = false
     private let showsProductionDate = StashServerCapabilities.supports032
 
@@ -1014,6 +1024,16 @@ struct EditSceneTitleSheet: View {
                     }
                 }
                 .listRowBackground(Color.secondaryAppBackground)
+
+                if currentCode != nil {
+                    Section(header: Text(tr("scene_code"))) {
+                        TextField(tr("scene_code"), text: $code)
+                            .font(.body.monospaced())
+                            .textInputAutocapitalization(.characters)
+                            .autocorrectionDisabled()
+                    }
+                    .listRowBackground(Color.secondaryAppBackground)
+                }
 
                 Section(header: Text(tr("description"))) {
                     TextEditor(text: $details)
@@ -1041,6 +1061,7 @@ struct EditSceneTitleSheet: View {
                 title = currentTitle ?? ""
                 details = currentDetails ?? ""
                 productionDate = currentProductionDate ?? ""
+                code = currentCode ?? ""
             }
         }
     }
@@ -1067,9 +1088,13 @@ struct EditSceneTitleSheet: View {
         isSaving = true
         let newTitle: String? = title.isEmpty ? nil : title
         let newDetails: String? = details.isEmpty ? nil : details
-        viewModel.updateSceneTitleAndDetails(sceneId: sceneId, title: newTitle, details: newDetails) { success in
+        let trimmedCode = code.trimmingCharacters(in: .whitespacesAndNewlines)
+        // Only written when the field is shown and changed; `nil` leaves the code as it is.
+        let newCode: String? = currentCode.flatMap { $0 == trimmedCode ? nil : trimmedCode }
+        viewModel.updateSceneTitleAndDetails(sceneId: sceneId, title: newTitle, details: newDetails, code: newCode) { success in
             Task { @MainActor in
                 var saved = success
+                if saved, let newCode { onCodeSaved(newCode) }
                 if saved, showsProductionDate, newDate != (currentProductionDate ?? "") {
                     saved = await SceneProductionDate.update(sceneId: sceneId, date: newDate)
                     if saved { onProductionDateSaved(newDate.isEmpty ? nil : newDate) }
@@ -1083,6 +1108,42 @@ struct EditSceneTitleSheet: View {
                 }
             }
         }
+    }
+}
+
+/// The scene page's studio code above the title: monospaced, a tap copies it.
+struct SceneStudioCodeCopyButton: View {
+    let code: String
+    @ObservedObject private var appearanceManager = AppearanceManager.shared
+
+    var body: some View {
+        Button {
+            #if os(macOS)
+            NSPasteboard.general.clearContents()
+            NSPasteboard.general.setString(code, forType: .string)
+            #else
+            UIPasteboard.general.string = code
+            #endif
+            HapticManager.light()
+            ToastManager.shared.show(tr("studio_code_copied"), icon: "doc.on.doc")
+        } label: {
+            HStack(spacing: 5) {
+                Text(code)
+                    .font(.subheadline.weight(.semibold).monospaced())
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+                Image(systemName: "doc.on.doc")
+                    .font(.caption.weight(.semibold))
+                    .accessibilityHidden(true)
+            }
+            .foregroundColor(appearanceManager.tintColor)
+            .padding(.horizontal, 8)
+            .padding(.vertical, 3)
+            .background(appearanceManager.tintColor.opacity(0.12), in: RoundedRectangle(cornerRadius: 6, style: .continuous))
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("\(tr("scene_code")): \(code)")
+        .accessibilityHint(tr("action_copy_studio_code"))
     }
 }
 

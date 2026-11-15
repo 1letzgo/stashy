@@ -51,6 +51,7 @@
     <string name="action_connect_device_first">Connect Device First</string>
     <string name="action_connect_to_server">Connect to Server</string>
     <string name="action_connect_to_stash">Connect to Stash</string>
+    <string name="action_copy_studio_code">Copy Studio Code</string>
     <string name="action_create_arg">Create \"%1$s\"</string>
     <string name="action_delete">Delete</string>
     <string name="action_delete_arg">Delete %1$s</string>
@@ -1743,6 +1744,7 @@
     <string name="saved_filters">Saved Filters</string>
     <string name="saving_ratings_arg_arg">Saving ratings %1$s/%2$s</string>
     <string name="scene">Scene</string>
+    <string name="scene_code">Studio Code</string>
     <string name="scene_count">Scene Count</string>
     <string name="scene_count_high_low">Scene Count (High-Low)</string>
     <string name="scene_count_low_high">Scene Count (Low-High)</string>
@@ -1870,6 +1872,7 @@
     <string name="stroke_length">Stroke Length</string>
     <string name="studio">Studio</string>
     <string name="studio_and_tags">Studio &amp; Tags</string>
+    <string name="studio_code_copied">Studio code copied</string>
     <string name="studio_count">Studio Count</string>
     <string name="studio_counts_include_sub_studios">Studio counts include sub-studios</string>
     <string name="studio_deleted">Studio deleted</string>

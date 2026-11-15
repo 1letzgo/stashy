@@ -182,6 +182,9 @@ object TabManager {
     var reelsShowsDeleteButton: Boolean get() = _reelsShowsDeleteButton.value; set(v) { _reelsShowsDeleteButton.value = v; Prefs.setBool("ReelsShowsDeleteButton", v) }
     private val _sceneCardsShowStudioLogo = bool("SceneCardsShowStudioLogo", true)
     var sceneCardsShowStudioLogo: Boolean get() = _sceneCardsShowStudioLogo.value; set(v) { _sceneCardsShowStudioLogo.value = v; Prefs.setBool("SceneCardsShowStudioLogo", v) }
+    /** iOS: `sceneShowStudioCode` — studio code on scene cards, the scene page and Edit Scene. Off by default. */
+    private val _sceneShowStudioCode = bool("SceneShowStudioCode", false)
+    var sceneShowStudioCode: Boolean get() = _sceneShowStudioCode.value; set(v) { _sceneShowStudioCode.value = v; Prefs.setBool("SceneShowStudioCode", v) }
     private val _useCompactStatistics = bool("useCompactStatistics", false)
     var useCompactStatistics: Boolean get() = _useCompactStatistics.value; set(v) { _useCompactStatistics.value = v; Prefs.setBool("useCompactStatistics", v) }
     private val _showDashboardHeroBackground = bool("showDashboardHeroBackground", true)
