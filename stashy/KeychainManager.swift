@@ -259,13 +259,12 @@ class KeychainManager {
         deleteAppPasscode()
         let payload = "v1:\(salt):\(hash)"
         guard let data = payload.data(using: .utf8) else { return false }
-        let query: [String: Any] = [
-            kSecClass as String: kSecClassGenericPassword,
-            kSecAttrService as String: service,
-            kSecAttrAccount as String: passcodeAccount,
-            kSecValueData as String: data,
-            kSecAttrAccessible as String: kSecAttrAccessibleWhenUnlockedThisDeviceOnly
-        ]
+        // `baseQuery`, like every read and delete: without `kSecUseDataProtectionKeychain` the
+        // Mac writes to the file-based keychain, which the reads never look at, so a code set
+        // on the Mac was gone at the next start and never asked for (iOS ignores the flag).
+        var query = baseQuery(account: passcodeAccount)
+        query[kSecValueData as String] = data
+        query[kSecAttrAccessible as String] = kSecAttrAccessibleWhenUnlockedThisDeviceOnly
         return SecItemAdd(query as CFDictionary, nil) == errSecSuccess
     }
     
@@ -297,6 +296,15 @@ class KeychainManager {
     func deleteAppPasscode() -> Bool {
         let a = deleteRaw(account: passcodeAccount)
         let b = deleteRaw(account: legacyPasscodeAccount)
+        #if os(macOS)
+        // A code saved by an older Mac build lies unreadable in the file-based keychain
+        // (no `kSecUseDataProtectionKeychain`); setting or removing a code clears it too.
+        SecItemDelete([
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: service,
+            kSecAttrAccount as String: passcodeAccount
+        ] as CFDictionary)
+        #endif
         return a || b
     }
     

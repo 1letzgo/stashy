@@ -384,6 +384,7 @@ private struct MacFullScreenCoverModifier<Cover: View>: ViewModifier {
 
 private struct MacFullScreenCoverHost: ViewModifier {
     @State private var isCoverShown = false
+    @ObservedObject private var security = SecurityManager.shared
 
     func body(content: Content) -> some View {
         content
@@ -400,7 +401,8 @@ private struct MacFullScreenCoverHost: ViewModifier {
                 if shown != isCoverShown { isCoverShown = shown }
             }
             // The title bar / toolbar would sit on top of the video; hide it while covered.
-            .toolbar(isCoverShown ? .hidden : .automatic, for: .windowToolbar)
+            // Same under the passcode screen: the toolbar shows titles and controls of the page.
+            .toolbar(isCoverShown || security.isAppLocked ? .hidden : .automatic, for: .windowToolbar)
             .animation(.easeInOut(duration: 0.2), value: isCoverShown)
     }
 }

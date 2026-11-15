@@ -83,6 +83,10 @@ struct PasscodeSetupView: View {
     @State private var step: Int = 1 // 1: initial, 2: confirm
     @State private var errorMessage: String?
     @State private var shakeTrigger: Bool = false
+    #if os(macOS)
+    /// The Mac types the code, as on the passcode screen.
+    @FocusState private var takesKeyboard: Bool
+    #endif
     
     var body: some View {
         NavigationStack {
@@ -121,13 +125,7 @@ struct PasscodeSetupView: View {
                     HStack(spacing: 40) {
                         Spacer().frame(width: 70, height: 70)
                         keypadButton(for: "0")
-                        Button(action: {
-                            if step == 1 {
-                                if !passcode.isEmpty { passcode.removeLast() }
-                            } else {
-                                if !confirmPasscode.isEmpty { confirmPasscode.removeLast() }
-                            }
-                        }) {
+                        Button(action: deleteLastDigit) {
                             Image(systemName: "delete.left")
                                 .font(.title)
                                 .frame(width: 70, height: 70)
@@ -142,6 +140,25 @@ struct PasscodeSetupView: View {
             .padding()
             .background(Color.appBackground.ignoresSafeArea())
             .stashyModalSheetChrome(tr("passcode"), onBack: { isPresented = false })
+            #if os(macOS)
+            .focusable()
+            .focused($takesKeyboard)
+            .focusEffectDisabled()
+            .onKeyPress(phases: [.down, .repeat]) { press in
+                if press.key == .delete || press.key == .deleteForward {
+                    deleteLastDigit()
+                    return .handled
+                }
+                guard press.modifiers.subtracting([.numericPad, .shift, .capsLock]).isEmpty,
+                      press.characters.count == 1,
+                      let digit = press.characters.first, ("0"..."9").contains(digit) else {
+                    return .ignored
+                }
+                enterDigit(String(digit))
+                return .handled
+            }
+            .onAppear { DispatchQueue.main.async { takesKeyboard = true } }
+            #endif
             .onChange(of: passcode) { _, newValue in
                 if step == 1 && newValue.count == 4 {
                     step = 2
@@ -167,14 +184,24 @@ struct PasscodeSetupView: View {
         }
     }
     
+    private func enterDigit(_ digit: String) {
+        if step == 1 {
+            if passcode.count < 4 { passcode.append(digit) }
+        } else {
+            if confirmPasscode.count < 4 { confirmPasscode.append(digit) }
+        }
+    }
+
+    private func deleteLastDigit() {
+        if step == 1 {
+            if !passcode.isEmpty { passcode.removeLast() }
+        } else {
+            if !confirmPasscode.isEmpty { confirmPasscode.removeLast() }
+        }
+    }
+
     private func keypadButton(for number: String) -> some View {
-        Button(action: {
-            if step == 1 {
-                if passcode.count < 4 { passcode.append(number) }
-            } else {
-                if confirmPasscode.count < 4 { confirmPasscode.append(number) }
-            }
-        }) {
+        Button(action: { enterDigit(number) }) {
             Text(number)
                 .font(.title)
                 .frame(width: 70, height: 70)

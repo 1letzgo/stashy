@@ -89,7 +89,10 @@ class SecurityManager: ObservableObject {
         guard passcode.count == 4, passcode.allSatisfy(\.isNumber) else { return }
         let salt = UUID().uuidString
         let hash = KeychainManager.sha256Hex(passcode + ":" + salt)
-        if KeychainManager.shared.saveAppPasscodeHash(salt: salt, hash: hash) {
+        // Read back before treating the PIN as set: a write the read path cannot see left the
+        // Mac with a lock it could never open (and none at all after a relaunch).
+        if KeychainManager.shared.saveAppPasscodeHash(salt: salt, hash: hash),
+           KeychainManager.shared.loadAppPasscodeRecord()?.hash == hash {
             // First PIN on this install and the user never touched the toggle: a PIN that
             // does not lock on background protects nothing. Existing choices stay as they are.
             if !isPasscodeSet, UserDefaults.standard.object(forKey: kAutoLockOnBackground) == nil {
@@ -180,8 +183,12 @@ class SecurityManager: ObservableObject {
         }
     }
     
+    /// One system prompt for the whole app: every window (Mac, iPad scenes) has its own
+    /// passcode screen, and each asks on appear.
+    private var isBiometricPromptShown = false
+
     func authenticateWithBiometrics(completion: @escaping (Bool) -> Void) {
-        guard isBiometricsEnabled else {
+        guard isBiometricsEnabled, !isBiometricPromptShown else {
             completion(false)
             return
         }
@@ -190,9 +197,11 @@ class SecurityManager: ObservableObject {
         var error: NSError?
         
         if context.canEvaluatePolicy(.deviceOwnerAuthenticationWithBiometrics, error: &error) {
+            isBiometricPromptShown = true
             let reason = tr("action_unlock_stashy_library")
             context.evaluatePolicy(.deviceOwnerAuthenticationWithBiometrics, localizedReason: reason) { success, authenticationError in
                 DispatchQueue.main.async {
+                    self.isBiometricPromptShown = false
                     if success {
                         self.unlock()
                     }
