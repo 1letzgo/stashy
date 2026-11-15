@@ -9,6 +9,7 @@
   <string name="action_add_condition">Добавить условие</string>
   <string name="action_add_custom_field">Добавить настраиваемое поле</string>
   <string name="action_add_favorite">Добавить в избранное</string>
+  <string name="action_add_group">Добавить группу</string>
   <string name="action_add_header">Добавить заголовок</string>
   <string name="action_add_marker">Добавить маркер</string>
   <string name="action_add_marker_button">Кнопка «Добавить маркер»</string>

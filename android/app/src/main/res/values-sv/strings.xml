@@ -9,6 +9,7 @@
   <string name="action_add_condition">Lägg till villkor</string>
   <string name="action_add_custom_field">Lägg till eget fält</string>
   <string name="action_add_favorite">Lägg till favorit</string>
+  <string name="action_add_group">Lägg till grupp</string>
   <string name="action_add_header">Lägg till header</string>
   <string name="action_add_marker">Lägg till markör</string>
   <string name="action_add_marker_button">Knappen Lägg till markör</string>

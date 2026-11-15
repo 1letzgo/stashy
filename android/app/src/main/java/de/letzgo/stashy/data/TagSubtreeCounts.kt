@@ -33,7 +33,7 @@ object TagSubtreeCountsStore {
     fun request(id: String) {
         scope.launch {
             runCatching {
-                val tag = GraphQL.data(QUERY, vars("id" to id))["findTag"] ?: return@runCatching
+                val tag = GraphQL.data(QUERY, vars("id" to id))["findTag"] ?: return@runCatching null
                 GraphQL.decode(TagSubtreeCounts.serializer(), tag)
             }.getOrNull()?.let { counts[it.id] = it }
         }

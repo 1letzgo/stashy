@@ -9,6 +9,7 @@
   <string name="action_add_condition">新增條件</string>
   <string name="action_add_custom_field">新增自訂欄位</string>
   <string name="action_add_favorite">加入最愛</string>
+  <string name="action_add_group">新增群組</string>
   <string name="action_add_header">新增標頭</string>
   <string name="action_add_marker">新增標記</string>
   <string name="action_add_marker_button">「新增標記」按鈕</string>

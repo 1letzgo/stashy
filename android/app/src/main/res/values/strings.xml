@@ -10,6 +10,7 @@
     <string name="action_add_condition">Add condition</string>
     <string name="action_add_custom_field">Add custom field</string>
     <string name="action_add_favorite">Add Favorite</string>
+    <string name="action_add_group">Add group</string>
     <string name="action_add_header">Add Header</string>
     <string name="action_add_marker">Add Marker</string>
     <string name="action_add_marker_button">Add Marker button</string>

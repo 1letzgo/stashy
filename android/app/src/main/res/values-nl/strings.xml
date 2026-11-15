@@ -9,6 +9,7 @@
   <string name="action_add_condition">Voeg voorwaarde toe</string>
   <string name="action_add_custom_field">Voeg aangepast veld toe</string>
   <string name="action_add_favorite">Voeg favoriet toe</string>
+  <string name="action_add_group">Voeg groep toe</string>
   <string name="action_add_header">Voeg header toe</string>
   <string name="action_add_marker">Voeg markering toe</string>
   <string name="action_add_marker_button">Knop \'Voeg markering toe\'</string>

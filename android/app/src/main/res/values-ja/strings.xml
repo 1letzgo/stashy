@@ -9,6 +9,7 @@
   <string name="action_add_condition">条件を追加</string>
   <string name="action_add_custom_field">カスタムフィールドを追加</string>
   <string name="action_add_favorite">お気に入りに追加</string>
+  <string name="action_add_group">グループを追加</string>
   <string name="action_add_header">ヘッダーを追加</string>
   <string name="action_add_marker">マーカーを追加</string>
   <string name="action_add_marker_button">「マーカーを追加」ボタン</string>

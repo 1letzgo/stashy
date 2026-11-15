@@ -9,6 +9,7 @@
   <string name="action_add_condition">Dodaj warunek</string>
   <string name="action_add_custom_field">Dodaj pole niestandardowe</string>
   <string name="action_add_favorite">Dodaj do ulubionych</string>
+  <string name="action_add_group">Dodaj grupę</string>
   <string name="action_add_header">Dodaj nagłówek</string>
   <string name="action_add_marker">Dodaj znacznik</string>
   <string name="action_add_marker_button">Przycisk „Dodaj znacznik”</string>

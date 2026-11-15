@@ -9,6 +9,7 @@
   <string name="action_add_condition">Koşul ekle</string>
   <string name="action_add_custom_field">Özel alan ekle</string>
   <string name="action_add_favorite">Favorilere Ekle</string>
+  <string name="action_add_group">Grup ekle</string>
   <string name="action_add_header">Başlık Ekle</string>
   <string name="action_add_marker">İşaretçi Ekle</string>
   <string name="action_add_marker_button">İşaretçi Ekle düğmesi</string>

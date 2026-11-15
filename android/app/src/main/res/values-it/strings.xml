@@ -9,6 +9,7 @@
   <string name="action_add_condition">Aggiungi condizione</string>
   <string name="action_add_custom_field">Aggiungi campo personalizzato</string>
   <string name="action_add_favorite">Aggiungi ai preferiti</string>
+  <string name="action_add_group">Aggiungi gruppo</string>
   <string name="action_add_header">Aggiungi header</string>
   <string name="action_add_marker">Aggiungi marcatore</string>
   <string name="action_add_marker_button">Pulsante \"Aggiungi marcatore\"</string>

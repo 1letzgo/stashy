@@ -9,6 +9,7 @@
   <string name="action_add_condition">Legg til betingelse</string>
   <string name="action_add_custom_field">Legg til egendefinert felt</string>
   <string name="action_add_favorite">Legg til favoritt</string>
+  <string name="action_add_group">Legg til gruppe</string>
   <string name="action_add_header">Legg til header</string>
   <string name="action_add_marker">Legg til markør</string>
   <string name="action_add_marker_button">Knapp for å legge til markør</string>
