@@ -4623,8 +4623,9 @@ class StashDBViewModel: ObservableObject {
             } else if let obj = saved.object_filter, let d = obj.value as? [String: Any] {
                 merged = sanitizeFilter(d)
             }
-            // A root OR would be ORed with the page scope set next to it.
-            merged = FilterCriteriaDocument.isolatingRootOr(merged)
+            // A root OR would be ORed with the page scope set next to it. Same as
+            // `FilterCriteriaDocument.isolatingRootOr`, inlined: that type is not in the tvOS target.
+            if merged["OR"] != nil { merged = ["AND": merged] }
         }
         for (k, v) in scope {
             merged[k] = v
