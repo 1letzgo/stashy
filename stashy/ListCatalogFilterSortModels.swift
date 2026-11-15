@@ -10,6 +10,36 @@ import Foundation
 
 #if !os(tvOS)
 
+// MARK: - Sort field names
+
+/// Readable name of a Stash sort field for the "Other (…)" row of a sort picker: a sort set on the
+/// server (a saved filter from Stash's web UI) that the sheet has no entry for. Never the raw field.
+enum StashSortFieldName {
+    private static let keys: [String: String] = [
+        "group_scene_number": "group_scene_number", "movie_scene_number": "group_scene_number",
+        "path": "path", "bitrate": "bitrate", "framerate": "framerate", "organized": "organized",
+        "interactive": "interactive", "interactive_speed": "interactive_speed", "code": "code",
+        "updated_at": "updated", "created_at": "created", "resume_time": "resume_time",
+        "tag_count": "tag_count", "performer_count": "performer_count", "file_count": "file_count",
+        "studio": "studio", "name": "name", "title": "title", "date": "date", "duration": "duration",
+        "scenes_count": "scene_count", "images_count": "image_count", "galleries_count": "gallery_count",
+        "scene_markers_count": "marker_count", "groups_count": "group_count", "birthdate": "birthday",
+        "career_length": "career_length", "height": "height", "weight": "weight",
+        "measurements": "measurements", "penis_length": "penis_length", "last_played_at": "last_played",
+        "rating": "rating", "rating100": "rating", "o_counter": "o_count", "play_count": "play_count",
+        "gender": "gender", "country": "country", "ethnicity": "ethnicity",
+        "hair_color": "hair_color", "eye_color": "eye_color",
+    ]
+
+    static func label(_ field: String) -> String {
+        if let key = keys[field.lowercased()] { return tr(key) }
+        // Unknown field: "file_mod_time" → "File mod time".
+        let words = field.replacingOccurrences(of: "_", with: " ").trimmingCharacters(in: .whitespaces)
+        guard let first = words.first else { return field }
+        return first.uppercased() + words.dropFirst()
+    }
+}
+
 // MARK: - O Count live chip (`o_counter` / `IntCriterionInput`)
 
 /// Tag encoding for live-filter `o_counter`, used by scene / image / performer chip rows and presets.

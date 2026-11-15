@@ -1755,6 +1755,7 @@
     <string name="scene_filter">Scene filter</string>
     <string name="scene_identified">Scene identified</string>
     <string name="scene_no">Scene No.</string>
+    <string name="group_scene_number">Scene Number</string>
     <string name="scene_no_ascending">Scene No. (Ascending)</string>
     <string name="scene_no_descending">Scene No. (Descending)</string>
     <string name="scene_scrubber_sprites">Scene scrubber sprites</string>
