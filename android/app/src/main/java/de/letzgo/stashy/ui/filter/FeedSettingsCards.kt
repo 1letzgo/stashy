@@ -47,12 +47,16 @@ private fun RowScope.ChipRow(content: @Composable RowScope.() -> Unit) {
  * Rows for a [ControlGroup].
  */
 @Composable
-fun ImageViewingOptionRows(showsGridFit: Boolean) {
+fun ImageViewingOptionRows(showsGridFit: Boolean, forClips: Boolean = false) {
+    // Feeds › Clips keeps its own three values, apart from Images.
+    val scaling = if (forClips) ImageViewing.clipsScaling else ImageViewing.scaling
+    val backdrop = if (forClips) ImageViewing.clipsBackdrop else ImageViewing.backdrop
+    val keepRating = if (forClips) ImageViewing.clipsKeepRating else ImageViewing.keepRating
     ControlCard {
         ControlLabel(tr(R.string.image_scaling))
         ChipRow {
             ImageScalingMode.entries.forEach { m ->
-                CatalogFilterChip(tr(m.titleRes), ImageViewing.scaling == m) { ImageViewing.scaling = m }
+                CatalogFilterChip(tr(m.titleRes), scaling == m) { if (forClips) ImageViewing.clipsScaling = m else ImageViewing.scaling = m }
             }
         }
     }
@@ -61,7 +65,7 @@ fun ImageViewingOptionRows(showsGridFit: Boolean) {
         ControlLabel(tr(R.string.background))
         ChipRow {
             ImageBackdropMode.entries.forEach { m ->
-                CatalogFilterChip(tr(m.titleRes), ImageViewing.backdrop == m) { ImageViewing.backdrop = m }
+                CatalogFilterChip(tr(m.titleRes), backdrop == m) { if (forClips) ImageViewing.clipsBackdrop = m else ImageViewing.backdrop = m }
             }
         }
     }
@@ -70,7 +74,7 @@ fun ImageViewingOptionRows(showsGridFit: Boolean) {
         ControlToggleRow(tr(R.string.fit_images), ImageViewing.gridFit) { ImageViewing.gridFit = it }
     }
     de.letzgo.stashy.ui.NativeDivider()
-    ControlToggleRow(tr(R.string.keep_rating_visible), ImageViewing.keepRating) { ImageViewing.keepRating = it }
+    ControlToggleRow(tr(R.string.keep_rating_visible), keepRating) { if (forClips) ImageViewing.clipsKeepRating = it else ImageViewing.keepRating = it }
 }
 
 /**

@@ -24,6 +24,8 @@ import java.util.concurrent.ConcurrentHashMap
  * `images_fullscreen_scaling` (fit | fill | auto, legacy `images_fullscreen_immersive`),
  * `images_background` (black | match),
  * `images_grid_fit` and `images_fullscreen_keep_rating`.
+ * Feeds › Clips has its own three: `feeds_clips_scaling` (nothing stored: the Feeds Immersive
+ * switch, on → auto, off → fit), `feeds_clips_background`, `feeds_clips_keep_rating`.
  */
 enum class ImageScalingMode(val raw: String, @StringRes val titleRes: Int) {
     Fit("fit", R.string.scaling_fit),
@@ -79,6 +81,22 @@ object ImageViewing {
         get() { revision; return Prefs.bool(KEEP_RATING_KEY, false) }
         set(v) { Prefs.setBool(KEEP_RATING_KEY, v); revision++ }
 
+    const val CLIPS_SCALING_KEY = "feeds_clips_scaling"
+    const val CLIPS_BACKGROUND_KEY = "feeds_clips_background"
+    const val CLIPS_KEEP_RATING_KEY = "feeds_clips_keep_rating"
+
+    var clipsScaling: ImageScalingMode
+        get() { revision; return ImageScalingMode.resolve(Prefs.string(CLIPS_SCALING_KEY), FeedsConfig.fillHeight) }
+        set(v) { Prefs.setString(CLIPS_SCALING_KEY, v.raw); revision++ }
+
+    var clipsBackdrop: ImageBackdropMode
+        get() { revision; return ImageBackdropMode.resolve(Prefs.string(CLIPS_BACKGROUND_KEY)) }
+        set(v) { Prefs.setString(CLIPS_BACKGROUND_KEY, v.raw); revision++ }
+
+    var clipsKeepRating: Boolean
+        get() { revision; return Prefs.bool(CLIPS_KEEP_RATING_KEY, false) }
+        set(v) { Prefs.setBool(CLIPS_KEEP_RATING_KEY, v); revision++ }
+
     private val averages = ConcurrentHashMap<String, Int>()
 
     /** The image's own average colour (1×1 scale of the small image), computed once per URL. */
@@ -93,8 +111,7 @@ object ImageViewing {
 
     /** The backdrop colour behind an image: black or its own average (until known: black). */
     @Composable
-    fun backdropColor(url: String?): Color {
-        val mode = backdrop
+    fun backdropColor(url: String?, mode: ImageBackdropMode = backdrop): Color {
         if (mode != ImageBackdropMode.Match || url == null) return Color.Black
         val context = LocalContext.current.applicationContext
         val color by produceState(averages[url]?.let { Color(it) } ?: Color.Black, url) {

@@ -547,7 +547,7 @@ private fun FeedPager(
         // Bottom chrome: info overlay + scrubber right above the tab bar (iOS safeAreaInset bottom).
         // Clips only: "Keep Rating Visible" keeps the overlay composed with the chrome hidden, so the
         // O Count and rating stay in place; the rest of it fades out without moving them.
-        val keepsRating = activeItem is FeedItem.ClipItem && de.letzgo.stashy.data.ImageViewing.keepRating
+        val keepsRating = activeItem is FeedItem.ClipItem && de.letzgo.stashy.data.ImageViewing.clipsKeepRating
         val overlayAlpha by animateFloatAsState(if (isUIVisible || keepsRating) 1f else 0f, tween(200), label = "overlay")
         if (activeItem != null && overlayAlpha > 0.01f) {
             Column(Modifier.align(Alignment.BottomCenter).fillMaxWidth().alpha(overlayAlpha)) {

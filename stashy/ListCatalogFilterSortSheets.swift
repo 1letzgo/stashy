@@ -136,7 +136,7 @@ struct FeedsPlaybackSettingsCard: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
             if forClips {
-                ImageViewingOptionsCards(showsGridFit: false)
+                ImageViewingOptionsCards(showsGridFit: false, forClips: true)
             } else {
                 CatalogFilterSortToggleRow(label: tr("immersive"), isOn: $tabManager.reelsFillHeight)
             }
@@ -151,16 +151,30 @@ struct FeedsPlaybackSettingsCard: View {
 struct ImageViewingOptionsCards: View {
     /// "Fit Images" is about the cards of a grid; Feeds has none.
     var showsGridFit: Bool
-    @AppStorage(ImageScalingMode.key) private var scalingRaw = ""
-    @AppStorage(ImageBackdropMode.key) private var backdropRaw = ""
+    /// Feeds › Clips keeps its own three values, apart from Images.
+    let forClips: Bool
+    @AppStorage private var scalingRaw: String
+    @AppStorage private var backdropRaw: String
     @AppStorage(ImageBackdropMode.gridFitKey) private var fitsImages = false
-    @AppStorage("images_fullscreen_keep_rating") private var keepsRatingVisible = false
+    @AppStorage private var keepsRatingVisible: Bool
+
+    init(showsGridFit: Bool, forClips: Bool = false) {
+        self.showsGridFit = showsGridFit
+        self.forClips = forClips
+        _scalingRaw = AppStorage(wrappedValue: "", forClips ? ImageScalingMode.clipsKey : ImageScalingMode.key)
+        _backdropRaw = AppStorage(wrappedValue: "", forClips ? ImageBackdropMode.clipsKey : ImageBackdropMode.key)
+        _keepsRatingVisible = AppStorage(wrappedValue: false, forClips ? ImageBackdropMode.clipsKeepRatingKey : ImageBackdropMode.keepRatingKey)
+    }
+
+    private var scaling: ImageScalingMode {
+        forClips ? ImageScalingMode.resolveClips(scalingRaw) : ImageScalingMode.resolve(scalingRaw)
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
             chipsCard(label: tr("image_scaling")) {
                 ForEach(ImageScalingMode.allCases) { mode in
-                    CatalogFilterChip(title: mode.title, isActive: ImageScalingMode.resolve(scalingRaw) == mode) {
+                    CatalogFilterChip(title: mode.title, isActive: scaling == mode) {
                         scalingRaw = mode.rawValue
                     }
                 }

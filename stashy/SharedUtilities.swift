@@ -3826,6 +3826,8 @@ enum ImageScalingMode: String, CaseIterable, Identifiable {
     static let key = "images_fullscreen_scaling"
     /// The former switch: on = `auto`, off = `fit`.
     static let legacyImmersiveKey = "images_fullscreen_immersive"
+    /// Feeds › Clips has its own value, apart from Images.
+    static let clipsKey = "feeds_clips_scaling"
 
     var id: String { rawValue }
 
@@ -3850,6 +3852,13 @@ enum ImageScalingMode: String, CaseIterable, Identifiable {
         #endif
     }
 
+    /// Feeds › Clips: the stored mode; nothing stored takes the Feeds Immersive switch.
+    static func resolveClips(_ raw: String) -> ImageScalingMode {
+        if let mode = ImageScalingMode(rawValue: raw) { return mode }
+        let immersive = UserDefaults.standard.object(forKey: "ReelsFillHeight") as? Bool ?? true
+        return immersive ? .auto : .fit
+    }
+
     func fills(mediaIsPortrait: Bool, spaceIsPortrait: Bool) -> Bool {
         switch self {
         case .fit: return false
@@ -3868,6 +3877,10 @@ enum ImageBackdropMode: String, CaseIterable, Identifiable {
     static let key = "images_background"
     /// Cards that show the whole image instead of a cropped one.
     static let gridFitKey = "images_grid_fit"
+    static let keepRatingKey = "images_fullscreen_keep_rating"
+    /// Feeds › Clips has its own values, apart from Images.
+    static let clipsKey = "feeds_clips_background"
+    static let clipsKeepRatingKey = "feeds_clips_keep_rating"
 
     var id: String { rawValue }
 
@@ -3920,8 +3933,15 @@ struct ImageBackdrop: View {
     /// Shown for "Black" and until the image's colour is known.
     var fallback: Color = .black
 
-    @AppStorage(ImageBackdropMode.key) private var modeRaw = ""
+    @AppStorage private var modeRaw: String
     @State private var matched: Color?
+
+    /// `key`: the Background setting to follow (Images, or Feeds › Clips' own).
+    init(url: URL?, fallback: Color = .black, key: String = ImageBackdropMode.key) {
+        self.url = url
+        self.fallback = fallback
+        _modeRaw = AppStorage(wrappedValue: "", key)
+    }
 
     private var mode: ImageBackdropMode { ImageBackdropMode.resolve(modeRaw) }
 

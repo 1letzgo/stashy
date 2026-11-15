@@ -105,13 +105,13 @@ fun FeedRow(
     val config = LocalConfiguration.current
     val devicePortrait = config.screenHeightDp > config.screenWidthDp
     val contentLandscape = videoSize?.let { it.width > it.height } ?: !item.isPortrait
-    // Clips are Stash images: they follow the image viewing options (Scaling, Background) of the
-    // fullscreen viewer; every other mode keeps the Feeds fill switch and a black page.
+    // Clips are Stash images: they have the image viewing options (Scaling, Background) with
+    // values of their own; every other mode keeps the Feeds fill switch and a black page.
     val isClip = item is FeedItem.ClipItem
-    val fill = if (isClip) de.letzgo.stashy.data.ImageViewing.scaling.fills(!contentLandscape, devicePortrait)
+    val fill = if (isClip) de.letzgo.stashy.data.ImageViewing.clipsScaling.fills(!contentLandscape, devicePortrait)
     else feedShouldFill(FeedsConfig.fillHeight, devicePortrait, contentLandscape)
     // The colour comes from the poster, asked for with the row so it is there before the video.
-    val backdrop = de.letzgo.stashy.data.ImageViewing.backdropColor(if (isClip) item.posterURL else null)
+    val backdrop = de.letzgo.stashy.data.ImageViewing.backdropColor(if (isClip) item.posterURL else null, de.letzgo.stashy.data.ImageViewing.clipsBackdrop)
     val inset = if (fill && isUIVisible) bottomInset else 0.dp
 
     var scale by remember(item.id, devicePortrait) { mutableFloatStateOf(1f) }

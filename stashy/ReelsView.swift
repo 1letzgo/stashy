@@ -330,7 +330,7 @@ enum ReelsSessionRAM {
 
 struct ReelsViewBody: View {
     /// Images' "Keep Rating Visible" also holds for Feeds › Clips (the same media).
-    @AppStorage("images_fullscreen_keep_rating") private var keepsClipRatingVisible = false
+    @AppStorage(ImageBackdropMode.clipsKeepRatingKey) private var keepsClipRatingVisible = false
     @ObservedObject private var appearanceManager = AppearanceManager.shared
     @ObservedObject private var tabManager = TabManager.shared
     @ObservedObject private var configManager = ServerConfigManager.shared
@@ -5793,7 +5793,7 @@ private final class ReelItemVideoSurfaceReadiness: ObservableObject {
 
 struct ReelItemView: View {
     /// Clips are images: they follow Images' scaling instead of the Feeds fill switch.
-    @AppStorage(ImageScalingMode.key) private var imageScalingRaw = ""
+    @AppStorage(ImageScalingMode.clipsKey) private var imageScalingRaw = ""
     /// Verticals counts plays by its own rule (Settings › Playback › Feeds).
     var isVerticalsFeed: Bool = false
     let item: ReelsViewBody.ReelItemData
@@ -5928,7 +5928,7 @@ struct ReelItemView: View {
 
     private var shouldFill: Bool {
         if clipImage != nil {
-            return ImageScalingMode.resolve(imageScalingRaw)
+            return ImageScalingMode.resolveClips(imageScalingRaw)
                 .fills(mediaIsPortrait: !effectiveContentIsLandscape, spaceIsPortrait: isTallerThanWide)
         }
         // Only fill if the setting is enabled
@@ -6274,7 +6274,7 @@ extension ReelItemView {
             ZStack {
                 if let clipImage {
                     // Asked for with the row, so the colour is there before the video's first frame.
-                    ImageBackdrop(url: clipImage.thumbnailURL)
+                    ImageBackdrop(url: clipImage.thumbnailURL, key: ImageBackdropMode.clipsKey)
                 } else {
                     Color.black
                 }
@@ -6320,7 +6320,7 @@ extension ReelItemView {
                             // visible below, no opacity gating).
                             .overlay {
                                 if let clipImage, playbackPresentationSize == nil {
-                                    ImageBackdrop(url: clipImage.thumbnailURL)
+                                    ImageBackdrop(url: clipImage.thumbnailURL, key: ImageBackdropMode.clipsKey)
                                 }
                             }
                             .fittedToAspectRatio(shouldFill ? nil : clipAspectRatio)

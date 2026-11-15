@@ -146,10 +146,10 @@ fun FeedsFilterSortSheet(
                 }
                 // iOS `FeedsPlaybackSettingsCard`.
                 de.letzgo.stashy.ui.filter.ControlGroup {
-                    // Clips are images: Images' scaling, background and rating options stand in
-                    // for "Immersive", which clips do not follow.
+                    // Clips are images: their own scaling, background and rating options stand
+                    // in for "Immersive", which clips do not follow.
                     if (mode == ReelsModeType.Clips) {
-                        de.letzgo.stashy.ui.filter.ImageViewingOptionRows(showsGridFit = false)
+                        de.letzgo.stashy.ui.filter.ImageViewingOptionRows(showsGridFit = false, forClips = true)
                     } else {
                         ControlToggleRow(tr(R.string.immersive), FeedsConfig.fillHeight) { FeedsConfig.updateFillHeight(it) }
                     }
