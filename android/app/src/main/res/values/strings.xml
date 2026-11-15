@@ -10,7 +10,6 @@
     <string name="action_add_condition">Add condition</string>
     <string name="action_add_custom_field">Add custom field</string>
     <string name="action_add_favorite">Add Favorite</string>
-    <string name="action_add_group">Add group</string>
     <string name="action_add_header">Add Header</string>
     <string name="action_add_marker">Add Marker</string>
     <string name="action_add_marker_button">Add Marker button</string>
@@ -175,7 +174,6 @@
     <string name="action_remove_all">Remove all</string>
     <string name="action_remove_all_arg">Remove all %1$s</string>
     <string name="action_remove_arg">Remove %1$s</string>
-    <string name="action_remove_arg_group">Remove %1$s group</string>
     <string name="action_remove_download">Remove download</string>
     <string name="action_remove_favorite">Remove favorite</string>
     <string name="action_remove_field">Remove field</string>
@@ -341,7 +339,6 @@
     <string name="all_galleries">All Galleries</string>
     <string name="all_languages">All Languages</string>
     <string name="all_matching_items">All matching items</string>
-    <string name="all_of">All of</string>
     <string name="all_scenes_already_downloaded">All scenes already downloaded</string>
     <string name="already_up_to_date">Already up to date</string>
     <string name="always_visible">Always Visible</string>
@@ -352,7 +349,6 @@
     <string name="any_age">Any age</string>
     <string name="any_length">Any length</string>
     <string name="any_media">Any media</string>
-    <string name="any_of">Any of</string>
     <string name="any_quality">Any quality</string>
     <string name="any_value">Any value</string>
     <string name="api_key">API key</string>
@@ -1005,8 +1001,6 @@
     <string name="hint_enter_valid_date_as_yyyy">Enter a valid date as YYYY-MM-DD</string>
     <string name="hint_enter_your_stash_api_key">Enter your Stash API key directly.</string>
     <string name="hint_enter_your_stash_server_details">Enter your Stash server details to get started.</string>
-    <string name="hint_every_condition_in_it_must">Every condition in it must match</string>
-    <string name="hint_excludes_everything_matching_conditions_below">Excludes everything matching the conditions below.</string>
     <string name="hint_favorites_are_your_most_played">Favorites are your most played scenes.</string>
     <string name="hint_favorites_are_your_most_played_scenes">Favorites are your most played scenes and those with the highest O Count.</string>
     <string name="hint_favorites_are_your_scenes_with">Favorites are your scenes with the highest O Count.</string>
@@ -1043,7 +1037,6 @@
     <string name="hint_keeps_servers_api_keys_and">Keeps servers, API keys and settings the same on your iPhone, iPad and Mac. Turn it on per device. The active server stays each device\'s own choice.</string>
     <string name="hint_language_scenes_subtitles_start_with">The language a scene\'s subtitles start with. \"Any\" takes the first ordinary track in the file.</string>
     <string name="hint_language_switch">stashy switches to %1$s and reloads.</string>
-    <string name="hint_leaves_out_what_group_matches">Leaves out what the group matches</string>
     <string name="hint_legend_run_performer_is_no">Legend run performer is no longer in this pool. Run reset.</string>
     <string name="hint_lets_you_create_edit_rename">Lets you create, edit, rename and delete the filters saved on your server, under Settings › Server.</string>
     <string name="hint_lgpl_3_0_with_app">LGPL-3.0, with an App Store / DRM exception</string>
@@ -1063,7 +1056,6 @@
     <string name="hint_love_spouse_2_4g_toys">Love Spouse 2.4g toys use BLE advertising. Ensure Bluetooth is enabled and the toy is in pairing/scan mode. Both toys in range will react simultaneously.</string>
     <string name="hint_match_and_rateme_are_part">Match and RateMe are part of stashy+.</string>
     <string name="hint_matches_performer_studio_and_tag">Matches performer, studio and tag names against file paths and adds them to scenes, images and galleries. Short names can match by mistake.</string>
-    <string name="hint_matches_when_at_least_one">Matches when at least one condition below is true.</string>
     <string name="hint_mini_player_arg_opens_player">Mini player: %1$s. Opens the player</string>
     <string name="hint_missing_from_store_offering_arg">Missing from the store offering: %1$s</string>
     <string name="hint_monthly_yearly_or_lifetime_bought">Monthly, Yearly, or Lifetime. Bought stashy+ before with this Google account, or reinstalled? Tap Restore Purchases.</string>
@@ -1205,8 +1197,6 @@
     <string name="hint_this_is_not_stashy_license">This is not a stashy license key.</string>
     <string name="hint_this_is_not_stashy_settings">This is not a stashy settings file.</string>
     <string name="hint_this_is_sample_studio_description">This is a sample studio description that might span multiple lines.</string>
-    <string name="hint_this_level_already_has_group">This level already has a group. Add the next one inside it.</string>
-    <string name="hint_this_level_or_group_must">This level or the group must match</string>
     <string name="hint_this_license_key_expired_on">This license key expired on %1$s.</string>
     <string name="hint_this_license_key_is_not">This license key is not valid.</string>
     <string name="hint_this_scene_language_is_not">This scene language is not supported by Apple’s SpeechTranscriber (e.g. Czech is not on the list).</string>
@@ -1517,7 +1507,6 @@
     <string name="no">No</string>
     <string name="non_binary">Non-Binary</string>
     <string name="none">None</string>
-    <string name="none_of">None of</string>
     <string name="normal">Normal</string>
     <string name="normalize">Normalize</string>
     <string name="not_between">Not between</string>
@@ -2246,4 +2235,8 @@
     <string name="keep_rating_visible">Keep Rating Visible</string>
     <string name="fit_images">Fit Images</string>
     <string name="action_add_o">Add O</string>
+    <string name="action_remove_group">Remove group</string>
+    <string name="label_advanced_group_from_server">Advanced group (from server)</string>
+    <string name="hint_group_or_semantics">Also matches what meets all conditions in this group, even when the conditions above do not.</string>
+    <string name="hint_group_not_semantics">Leaves out what meets all conditions in this group.</string>
 </resources>

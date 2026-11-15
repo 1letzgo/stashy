@@ -9,7 +9,6 @@
   <string name="action_add_condition">조건 추가</string>
   <string name="action_add_custom_field">사용자 지정 항목 추가</string>
   <string name="action_add_favorite">즐겨찾기에 추가</string>
-  <string name="action_add_group">그룹 추가</string>
   <string name="action_add_header">헤더 추가</string>
   <string name="action_add_marker">마커 추가</string>
   <string name="action_add_marker_button">마커 추가 버튼</string>
@@ -175,7 +174,6 @@
   <string name="action_remove_all">모두 제거</string>
   <string name="action_remove_all_arg">%1$s개 모두 제거</string>
   <string name="action_remove_arg">%1$s 제거</string>
-  <string name="action_remove_arg_group">%1$s 그룹 제거</string>
   <string name="action_remove_download">다운로드 제거</string>
   <string name="action_remove_favorite">즐겨찾기에서 제거</string>
   <string name="action_remove_field">항목 제거</string>
@@ -341,7 +339,6 @@
   <string name="all_galleries">모든 갤러리</string>
   <string name="all_languages">모든 언어</string>
   <string name="all_matching_items">일치하는 모든 항목</string>
-  <string name="all_of">모두 일치</string>
   <string name="all_scenes_already_downloaded">모든 영상이 이미 다운로드되었습니다</string>
   <string name="already_up_to_date">이미 최신 상태입니다</string>
   <string name="always_visible">항상 표시</string>
@@ -353,7 +350,6 @@
   <string name="any_age">모든 나이</string>
   <string name="any_length">모든 길이</string>
   <string name="any_media">모든 미디어</string>
-  <string name="any_of">하나라도 일치</string>
   <string name="any_quality">모든 화질</string>
   <string name="any_value">임의의 값</string>
   <string name="api_key">API 키</string>
@@ -1160,8 +1156,6 @@
   <string name="hint_enter_valid_date_as_yyyy">YYYY-MM-DD 형식으로 유효한 날짜를 입력하세요</string>
   <string name="hint_enter_your_stash_api_key">Stash API 키를 직접 입력하세요.</string>
   <string name="hint_enter_your_stash_server_details">시작하려면 Stash 서버 정보를 입력하세요.</string>
-  <string name="hint_every_condition_in_it_must">포함된 모든 조건이 일치해야 합니다</string>
-  <string name="hint_excludes_everything_matching_conditions_below">아래 조건과 일치하는 모든 항목을 제외합니다.</string>
   <string name="hint_favorites_are_your_most_played">즐겨찾기는 가장 많이 재생한 영상입니다.</string>
   <string name="hint_favorites_are_your_most_played_scenes">즐겨찾기는 가장 많이 재생한 영상과 O 카운트가 가장 높은 영상입니다.</string>
   <string name="hint_favorites_are_your_scenes_with">즐겨찾기는 O 카운트가 가장 높은 영상입니다.</string>
@@ -1198,7 +1192,6 @@
   <string name="hint_keeps_servers_api_keys_and">iPhone, iPad 및 Mac에서 서버, API 키 및 설정을 동일하게 유지합니다. 기기별로 켜세요. 활성 서버는 각 기기에서 따로 선택합니다.</string>
   <string name="hint_language_scenes_subtitles_start_with">영상 자막의 시작 언어입니다. \'모두\'를 선택하면 파일의 첫 번째 일반 트랙을 사용합니다.</string>
   <string name="hint_language_switch">stashy가 %1$s(으)로 전환되고 다시 로드됩니다.</string>
-  <string name="hint_leaves_out_what_group_matches">그룹과 일치하는 항목을 제외합니다</string>
   <string name="hint_legend_run_performer_is_no">Legend 진행 중인 배우가 더 이상 이 풀에 없습니다. 진행을 재설정하세요.</string>
   <string name="hint_lets_you_create_edit_rename">서버에 저장된 필터를 생성, 편집, 이름 변경 및 삭제할 수 있습니다. 설정 › 서버에 있습니다.</string>
   <string name="hint_lgpl_3_0_with_app">LGPL-3.0, App Store / DRM 예외 포함</string>
@@ -1218,7 +1211,6 @@
   <string name="hint_love_spouse_2_4g_toys">Love Spouse 2.4g 토이는 BLE 광고를 사용합니다. Bluetooth가 켜져 있고 토이가 페어링/스캔 모드인지 확인하세요. 범위 내의 토이 두 개가 동시에 반응합니다.</string>
   <string name="hint_match_and_rateme_are_part">Match 및 RateMe는 stashy+의 일부입니다.</string>
   <string name="hint_matches_performer_studio_and_tag">배우, 스튜디오 및 태그 이름을 파일 경로와 대조하여 영상, 이미지 및 갤러리에 추가합니다. 짧은 이름은 잘못 일치할 수 있습니다.</string>
-  <string name="hint_matches_when_at_least_one">아래 조건 중 하나 이상이 충족되면 일치합니다.</string>
   <string name="hint_mini_player_arg_opens_player">미니 플레이어: %1$s. 플레이어를 엽니다</string>
   <string name="hint_missing_from_store_offering_arg">스토어 상품에 없음: %1$s</string>
   <string name="hint_monthly_yearly_or_lifetime_bought">월간, 연간 또는 평생 이용권. 이전에 이 Google 계정으로 stashy+를 구입했거나 다시 설치했습니까? 구입 항목 복원을 탭하세요.</string>
@@ -1364,8 +1356,6 @@
   <string name="hint_this_is_not_stashy_license">stashy 라이선스 키가 아닙니다.</string>
   <string name="hint_this_is_not_stashy_settings">stashy 설정 파일이 아닙니다.</string>
   <string name="hint_this_is_sample_studio_description">여러 줄에 걸칠 수 있는 예시 스튜디오 설명입니다.</string>
-  <string name="hint_this_level_already_has_group">이 단계에는 이미 그룹이 있습니다. 다음 그룹은 그 안에 추가하세요.</string>
-  <string name="hint_this_level_or_group_must">이 단계 또는 그룹이 일치해야 합니다</string>
   <string name="hint_this_license_key_expired_on">이 라이선스 키는 %1$s에 만료되었습니다.</string>
   <string name="hint_this_license_key_is_not">이 라이선스 키는 유효하지 않습니다.</string>
   <string name="hint_this_scene_language_is_not">이 영상 언어는 Apple의 SpeechTranscriber에서 지원되지 않습니다(예: 체코어는 목록에 없음).</string>
@@ -1699,7 +1689,6 @@
   <string name="no">아니요</string>
   <string name="non_binary">논바이너리</string>
   <string name="none">없음</string>
-  <string name="none_of">모두 불일치</string>
   <string name="normal">보통</string>
   <string name="normalize">정규화</string>
   <string name="not_between">범위 밖</string>

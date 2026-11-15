@@ -556,7 +556,7 @@ private struct ScenesViewContent: View {
     /// A selected saved filter is loaded into `criteriaDocument`, so fetches pass `filter: nil` —
     /// otherwise the server filter would re-apply criteria the user just edited away.
     private var effectiveSceneLiveFilterForFetch: [String: Any] {
-        var dict = criteriaDocument.sanitizedObjectFilter
+        var dict = criteriaDocument.fetchFragment
         for (key, value) in activeLiveFilterDict {
             dict[key] = value
         }

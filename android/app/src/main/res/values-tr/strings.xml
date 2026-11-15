@@ -9,7 +9,6 @@
   <string name="action_add_condition">Koşul ekle</string>
   <string name="action_add_custom_field">Özel alan ekle</string>
   <string name="action_add_favorite">Favorilere Ekle</string>
-  <string name="action_add_group">Grup ekle</string>
   <string name="action_add_header">Başlık Ekle</string>
   <string name="action_add_marker">İşaretçi Ekle</string>
   <string name="action_add_marker_button">İşaretçi Ekle düğmesi</string>
@@ -175,7 +174,6 @@
   <string name="action_remove_all">Tümünü kaldır</string>
   <string name="action_remove_all_arg">Tümünü kaldır (%1$s)</string>
   <string name="action_remove_arg">Kaldır: %1$s</string>
-  <string name="action_remove_arg_group">%1$s grubunu kaldır</string>
   <string name="action_remove_download">İndirmeyi kaldır</string>
   <string name="action_remove_favorite">Favorilerden kaldır</string>
   <string name="action_remove_field">Alanı kaldır</string>
@@ -341,7 +339,6 @@
   <string name="all_galleries">Tüm Galeriler</string>
   <string name="all_languages">Tüm Diller</string>
   <string name="all_matching_items">Eşleşen tüm öğeler</string>
-  <string name="all_of">Tümü</string>
   <string name="all_scenes_already_downloaded">Tüm sahneler zaten indirildi</string>
   <string name="already_up_to_date">Zaten güncel</string>
   <string name="always_visible">Her Zaman Görünür</string>
@@ -353,7 +350,6 @@
   <string name="any_age">Herhangi bir yaş</string>
   <string name="any_length">Herhangi bir uzunluk</string>
   <string name="any_media">Herhangi bir medya</string>
-  <string name="any_of">Herhangi biri</string>
   <string name="any_quality">Herhangi bir kalite</string>
   <string name="any_value">Herhangi bir değer</string>
   <string name="api_key">API anahtarı</string>
@@ -1160,8 +1156,6 @@
   <string name="hint_enter_valid_date_as_yyyy">Geçerli bir tarihi YYYY-AA-GG biçiminde gir</string>
   <string name="hint_enter_your_stash_api_key">Stash API anahtarını doğrudan gir.</string>
   <string name="hint_enter_your_stash_server_details">Başlamak için Stash sunucu bilgilerini gir.</string>
-  <string name="hint_every_condition_in_it_must">İçindeki her koşul eşleşmeli</string>
-  <string name="hint_excludes_everything_matching_conditions_below">Aşağıdaki koşullarla eşleşen her şeyi hariç tutar.</string>
   <string name="hint_favorites_are_your_most_played">Favoriler en çok oynattığın sahnelerdir.</string>
   <string name="hint_favorites_are_your_most_played_scenes">Favoriler en çok oynattığın ve O Sayısı en yüksek sahnelerdir.</string>
   <string name="hint_favorites_are_your_scenes_with">Favoriler O Sayısı en yüksek sahnelerindir.</string>
@@ -1198,7 +1192,6 @@
   <string name="hint_keeps_servers_api_keys_and">Sunucuları, API anahtarlarını ve ayarları iPhone, iPad ve Mac\'inde aynı tutar. Her aygıtta ayrı aç. Etkin sunucu her aygıtın kendi seçimi olarak kalır.</string>
   <string name="hint_language_scenes_subtitles_start_with">Bir sahnenin altyazılarının başlayacağı dil. “Herhangi”, dosyadaki ilk normal izi alır.</string>
   <string name="hint_language_switch">stashy %1$s diline geçip yeniden yüklenecek.</string>
-  <string name="hint_leaves_out_what_group_matches">Grubun eşleştiklerini dışarıda bırakır</string>
   <string name="hint_legend_run_performer_is_no">Legend turundaki oyuncu artık bu havuzda değil. Turu sıfırla.</string>
   <string name="hint_lets_you_create_edit_rename">Sunucunda kayıtlı filtreleri Ayarlar › Sunucu altında oluşturmanı, düzenlemeni, yeniden adlandırmanı ve silmeni sağlar.</string>
   <string name="hint_lgpl_3_0_with_app">LGPL-3.0, App Store / DRM istisnasıyla</string>
@@ -1218,7 +1211,6 @@
   <string name="hint_love_spouse_2_4g_toys">Love Spouse 2.4g oyuncakları BLE yayını kullanır. Bluetooth\'un açık ve oyuncağın eşleme/tarama modunda olduğundan emin ol. Menzildeki tüm oyuncaklar aynı anda tepki verir.</string>
   <string name="hint_match_and_rateme_are_part">Match ve RateMe stashy+\'nın parçasıdır.</string>
   <string name="hint_matches_performer_studio_and_tag">Oyuncu, stüdyo ve etiket adlarını dosya yollarıyla eşleştirir ve bunları sahnelere, resimlere ve galerilere ekler. Kısa adlar yanlışlıkla eşleşebilir.</string>
-  <string name="hint_matches_when_at_least_one">Aşağıdaki koşullardan en az biri sağlandığında eşleşir.</string>
   <string name="hint_mini_player_arg_opens_player">Mini oynatıcı: %1$s. Oynatıcıyı açar</string>
   <string name="hint_missing_from_store_offering_arg">Mağaza teklifinde eksik: %1$s</string>
   <string name="hint_monthly_yearly_or_lifetime_bought">Aylık, Yıllık veya Ömür Boyu. stashy+\'yı daha önce bu Google hesabıyla mı aldın ya da yeniden mi yükledin? Satın Alınanları Geri Yükle\'ye dokun.</string>
@@ -1364,8 +1356,6 @@
   <string name="hint_this_is_not_stashy_license">Bu bir stashy lisans anahtarı değil.</string>
   <string name="hint_this_is_not_stashy_settings">Bu bir stashy ayarlar dosyası değil.</string>
   <string name="hint_this_is_sample_studio_description">Bu, birden çok satıra yayılabilecek örnek bir stüdyo açıklamasıdır.</string>
-  <string name="hint_this_level_already_has_group">Bu düzeyde zaten bir grup var. Sonrakini onun içine ekle.</string>
-  <string name="hint_this_level_or_group_must">Bu düzey veya grup eşleşmeli</string>
   <string name="hint_this_license_key_expired_on">Bu lisans anahtarının süresi %1$s tarihinde doldu.</string>
   <string name="hint_this_license_key_is_not">Bu lisans anahtarı geçerli değil.</string>
   <string name="hint_this_scene_language_is_not">Bu sahne dili Apple\'ın SpeechTranscriber\'ı tarafından desteklenmiyor (ör. Çekçe listede yok).</string>
@@ -1699,7 +1689,6 @@
   <string name="no">Hayır</string>
   <string name="non_binary">Non-binary</string>
   <string name="none">Hiçbiri</string>
-  <string name="none_of">Hiçbiri</string>
   <string name="normal">Normal</string>
   <string name="normalize">Normalleştir</string>
   <string name="not_between">Arasında değil</string>

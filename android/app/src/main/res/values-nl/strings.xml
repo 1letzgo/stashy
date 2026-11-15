@@ -9,7 +9,6 @@
   <string name="action_add_condition">Voeg voorwaarde toe</string>
   <string name="action_add_custom_field">Voeg aangepast veld toe</string>
   <string name="action_add_favorite">Voeg favoriet toe</string>
-  <string name="action_add_group">Voeg groep toe</string>
   <string name="action_add_header">Voeg header toe</string>
   <string name="action_add_marker">Voeg markering toe</string>
   <string name="action_add_marker_button">Knop \'Voeg markering toe\'</string>
@@ -175,7 +174,6 @@
   <string name="action_remove_all">Verwijder alles</string>
   <string name="action_remove_all_arg">Verwijder alle %1$s</string>
   <string name="action_remove_arg">Verwijder %1$s</string>
-  <string name="action_remove_arg_group">Verwijder groep %1$s</string>
   <string name="action_remove_download">Verwijder download</string>
   <string name="action_remove_favorite">Verwijder favoriet</string>
   <string name="action_remove_field">Verwijder veld</string>
@@ -341,7 +339,6 @@
   <string name="all_galleries">Alle galerijen</string>
   <string name="all_languages">Alle talen</string>
   <string name="all_matching_items">Alle overeenkomende items</string>
-  <string name="all_of">Alle van</string>
   <string name="all_scenes_already_downloaded">Alle scènes zijn al gedownload</string>
   <string name="already_up_to_date">Al bijgewerkt</string>
   <string name="always_visible">Altijd zichtbaar</string>
@@ -353,7 +350,6 @@
   <string name="any_age">Elke leeftijd</string>
   <string name="any_length">Elke lengte</string>
   <string name="any_media">Alle media</string>
-  <string name="any_of">Een van</string>
   <string name="any_quality">Elke kwaliteit</string>
   <string name="any_value">Elke waarde</string>
   <string name="api_key">API-sleutel</string>
@@ -1160,8 +1156,6 @@
   <string name="hint_enter_valid_date_as_yyyy">Voer een geldige datum in als JJJJ-MM-DD</string>
   <string name="hint_enter_your_stash_api_key">Voer je Stash-API-sleutel direct in.</string>
   <string name="hint_enter_your_stash_server_details">Voer de gegevens van je Stash-server in om te beginnen.</string>
-  <string name="hint_every_condition_in_it_must">Aan elke voorwaarde erin moet worden voldaan</string>
-  <string name="hint_excludes_everything_matching_conditions_below">Sluit alles uit wat aan de voorwaarden hieronder voldoet.</string>
   <string name="hint_favorites_are_your_most_played">Favorieten zijn je meest afgespeelde scènes.</string>
   <string name="hint_favorites_are_your_most_played_scenes">Favorieten zijn je meest afgespeelde scènes en die met de hoogste O-teller.</string>
   <string name="hint_favorites_are_your_scenes_with">Favorieten zijn je scènes met de hoogste O-teller.</string>
@@ -1198,7 +1192,6 @@
   <string name="hint_keeps_servers_api_keys_and">Houdt servers, API-sleutels en instellingen gelijk op je iPhone, iPad en Mac. Schakel het per apparaat in. De actieve server blijft een keuze per apparaat.</string>
   <string name="hint_language_scenes_subtitles_start_with">De taal waarmee de ondertiteling van een scène begint. \'Elke\' neemt het eerste gewone spoor in het bestand.</string>
   <string name="hint_language_switch">stashy schakelt over naar %1$s en wordt opnieuw geladen.</string>
-  <string name="hint_leaves_out_what_group_matches">Laat weg wat aan de groep voldoet</string>
   <string name="hint_legend_run_performer_is_no">De performer van de Legend-run zit niet meer in deze pool. Stel de run opnieuw in.</string>
   <string name="hint_lets_you_create_edit_rename">Hiermee kun je de filters die op je server zijn bewaard aanmaken, wijzigen, hernoemen en verwijderen, onder Instellingen › Server.</string>
   <string name="hint_lgpl_3_0_with_app">LGPL-3.0, met een uitzondering voor App Store / DRM</string>
@@ -1218,7 +1211,6 @@
   <string name="hint_love_spouse_2_4g_toys">Love Spouse 2.4G-speeltjes gebruiken BLE-advertising. Zorg dat Bluetooth aanstaat en het speeltje in koppel-/scanmodus staat. Alle speeltjes binnen bereik reageren tegelijk.</string>
   <string name="hint_match_and_rateme_are_part">Match en RateMe maken deel uit van stashy+.</string>
   <string name="hint_matches_performer_studio_and_tag">Vergelijkt namen van performers, studio\'s en labels met bestandspaden en voegt ze toe aan scènes, afbeeldingen en galerijen. Korte namen kunnen per ongeluk overeenkomen.</string>
-  <string name="hint_matches_when_at_least_one">Komt overeen als aan minstens één voorwaarde hieronder is voldaan.</string>
   <string name="hint_mini_player_arg_opens_player">Minispeler: %1$s. Opent de speler</string>
   <string name="hint_missing_from_store_offering_arg">Ontbreekt in het winkelaanbod: %1$s</string>
   <string name="hint_monthly_yearly_or_lifetime_bought">Maandelijks, jaarlijks of levenslang. Eerder stashy+ gekocht met dit Google-account of opnieuw geïnstalleerd? Tik op \'Herstel aankopen\'.</string>
@@ -1364,8 +1356,6 @@
   <string name="hint_this_is_not_stashy_license">Dit is geen stashy-licentiesleutel.</string>
   <string name="hint_this_is_not_stashy_settings">Dit is geen stashy-instellingenbestand.</string>
   <string name="hint_this_is_sample_studio_description">Dit is een voorbeeldbeschrijving van een studio die meerdere regels kan beslaan.</string>
-  <string name="hint_this_level_already_has_group">Dit niveau heeft al een groep. Voeg de volgende daarbinnen toe.</string>
-  <string name="hint_this_level_or_group_must">Aan dit niveau of de groep moet worden voldaan</string>
   <string name="hint_this_license_key_expired_on">Deze licentiesleutel is verlopen op %1$s.</string>
   <string name="hint_this_license_key_is_not">Deze licentiesleutel is niet geldig.</string>
   <string name="hint_this_scene_language_is_not">Deze scènetaal wordt niet ondersteund door SpeechTranscriber van Apple (Tsjechisch staat bijvoorbeeld niet op de lijst).</string>
@@ -1699,7 +1689,6 @@
   <string name="no">Nee</string>
   <string name="non_binary">Non-binair</string>
   <string name="none">Geen</string>
-  <string name="none_of">Geen van</string>
   <string name="normal">Normaal</string>
   <string name="normalize">Normaliseer</string>
   <string name="not_between">Niet tussen</string>

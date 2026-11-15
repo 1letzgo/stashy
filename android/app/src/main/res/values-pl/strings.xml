@@ -9,7 +9,6 @@
   <string name="action_add_condition">Dodaj warunek</string>
   <string name="action_add_custom_field">Dodaj pole niestandardowe</string>
   <string name="action_add_favorite">Dodaj do ulubionych</string>
-  <string name="action_add_group">Dodaj grupę</string>
   <string name="action_add_header">Dodaj nagłówek</string>
   <string name="action_add_marker">Dodaj znacznik</string>
   <string name="action_add_marker_button">Przycisk „Dodaj znacznik”</string>
@@ -175,7 +174,6 @@
   <string name="action_remove_all">Usuń wszystkie</string>
   <string name="action_remove_all_arg">Usuń wszystkie: %1$s</string>
   <string name="action_remove_arg">Usuń: %1$s</string>
-  <string name="action_remove_arg_group">Usuń grupę %1$s</string>
   <string name="action_remove_download">Usuń pobrany plik</string>
   <string name="action_remove_favorite">Usuń z ulubionych</string>
   <string name="action_remove_field">Usuń pole</string>
@@ -341,7 +339,6 @@
   <string name="all_galleries">Wszystkie galerie</string>
   <string name="all_languages">Wszystkie języki</string>
   <string name="all_matching_items">Wszystkie pasujące elementy</string>
-  <string name="all_of">Wszystkie z</string>
   <string name="all_scenes_already_downloaded">Wszystkie sceny są już pobrane</string>
   <string name="already_up_to_date">Wszystko aktualne</string>
   <string name="always_visible">Zawsze widoczne</string>
@@ -353,7 +350,6 @@
   <string name="any_age">Dowolny wiek</string>
   <string name="any_length">Dowolna długość</string>
   <string name="any_media">Dowolne media</string>
-  <string name="any_of">Którykolwiek z</string>
   <string name="any_quality">Dowolna jakość</string>
   <string name="any_value">Dowolna wartość</string>
   <string name="api_key">Klucz API</string>
@@ -1160,8 +1156,6 @@
   <string name="hint_enter_valid_date_as_yyyy">Wpisz prawidłową datę w formacie RRRR-MM-DD</string>
   <string name="hint_enter_your_stash_api_key">Wpisz bezpośrednio klucz API Stash.</string>
   <string name="hint_enter_your_stash_server_details">Wpisz dane serwera Stash, aby rozpocząć.</string>
-  <string name="hint_every_condition_in_it_must">Każdy warunek w niej musi być spełniony</string>
-  <string name="hint_excludes_everything_matching_conditions_below">Wyklucza wszystko, co pasuje do poniższych warunków.</string>
   <string name="hint_favorites_are_your_most_played">Ulubione to Twoje najczęściej odtwarzane sceny.</string>
   <string name="hint_favorites_are_your_most_played_scenes">Ulubione to Twoje najczęściej odtwarzane sceny oraz te z najwyższym licznikiem O.</string>
   <string name="hint_favorites_are_your_scenes_with">Ulubione to Twoje sceny z najwyższym licznikiem O.</string>
@@ -1198,7 +1192,6 @@
   <string name="hint_keeps_servers_api_keys_and">Utrzymuje te same serwery, klucze API i ustawienia na iPhonie, iPadzie i Macu. Włącz na każdym urządzeniu osobno. Aktywny serwer pozostaje wyborem każdego urządzenia.</string>
   <string name="hint_language_scenes_subtitles_start_with">Język, od którego zaczynają się napisy sceny. „Dowolny” wybiera pierwszą zwykłą ścieżkę w pliku.</string>
   <string name="hint_language_switch">stashy przełączy się na język %1$s i uruchomi się ponownie.</string>
-  <string name="hint_leaves_out_what_group_matches">Pomija to, co pasuje do grupy</string>
   <string name="hint_legend_run_performer_is_no">Aktora z rundy Legend nie ma już w tej puli. Zresetuj rundę.</string>
   <string name="hint_lets_you_create_edit_rename">Pozwala tworzyć, edytować, zmieniać nazwy i usuwać filtry zapisane na serwerze, w Ustawienia › Serwer.</string>
   <string name="hint_lgpl_3_0_with_app">LGPL-3.0 z wyjątkiem App Store / DRM</string>
@@ -1218,7 +1211,6 @@
   <string name="hint_love_spouse_2_4g_toys">Zabawki Love Spouse 2.4g używają rozgłaszania BLE. Upewnij się, że Bluetooth jest włączony, a zabawka jest w trybie parowania/skanowania. Obie zabawki w zasięgu zareagują jednocześnie.</string>
   <string name="hint_match_and_rateme_are_part">Match i RateMe są częścią stashy+.</string>
   <string name="hint_matches_performer_studio_and_tag">Dopasowuje nazwy aktorów, studiów i tagów do ścieżek plików i dodaje je do scen, obrazów i galerii. Krótkie nazwy mogą dopasować się przez pomyłkę.</string>
-  <string name="hint_matches_when_at_least_one">Pasuje, gdy co najmniej jeden z poniższych warunków jest spełniony.</string>
   <string name="hint_mini_player_arg_opens_player">Miniodtwarzacz: %1$s. Otwiera odtwarzacz</string>
   <string name="hint_missing_from_store_offering_arg">Brak w ofercie sklepu: %1$s</string>
   <string name="hint_monthly_yearly_or_lifetime_bought">Miesięcznie, rocznie lub dożywotnio. Kupiłeś już stashy+ na tym koncie Google lub zainstalowałeś ponownie? Stuknij Odtwórz zakupy.</string>
@@ -1364,8 +1356,6 @@
   <string name="hint_this_is_not_stashy_license">To nie jest klucz licencyjny stashy.</string>
   <string name="hint_this_is_not_stashy_settings">To nie jest plik ustawień stashy.</string>
   <string name="hint_this_is_sample_studio_description">To przykładowy opis studia, który może zajmować kilka wierszy.</string>
-  <string name="hint_this_level_already_has_group">Ten poziom ma już grupę. Dodaj kolejną wewnątrz niej.</string>
-  <string name="hint_this_level_or_group_must">Ten poziom lub grupa musi pasować</string>
   <string name="hint_this_license_key_expired_on">Ten klucz licencyjny wygasł %1$s.</string>
   <string name="hint_this_license_key_is_not">Ten klucz licencyjny jest nieprawidłowy.</string>
   <string name="hint_this_scene_language_is_not">Ten język sceny nie jest obsługiwany przez SpeechTranscriber firmy Apple (np. czeskiego nie ma na liście).</string>
@@ -1699,7 +1689,6 @@
   <string name="no">Nie</string>
   <string name="non_binary">Niebinarna</string>
   <string name="none">Brak</string>
-  <string name="none_of">Żaden z</string>
   <string name="normal">Normalnie</string>
   <string name="normalize">Normalizuj</string>
   <string name="not_between">Nie pomiędzy</string>

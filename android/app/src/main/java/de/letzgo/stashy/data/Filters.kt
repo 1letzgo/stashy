@@ -130,24 +130,12 @@ class CriteriaDocument(mode: FilterMode, objectFilter: JsonObject = JsonObject(e
         return GROUP_KEYS.filter { dict[it] != null }
     }
 
-    fun addGroup(group: String, path: List<String>) {
-        if (!isGroupKey(group) || node(path)[group] != null) return
-        setFilter(mutate(_objectFilter, path) { it[group] = JsonObject(emptyMap()) })
-    }
-
+    /**
+     * Removes a group and everything in it. The editor no longer creates groups ("Add group" is
+     * gone, see [isolatingRootOr]); it shows the ones a saved filter brings and lets them go.
+     */
     fun removeGroup(group: String, path: List<String>) {
         setFilter(mutate(_objectFilter, path) { it.remove(group) })
-    }
-
-    /** Retypes a group in place; no-op when the target type already exists at that level. */
-    fun changeGroupType(path: List<String>, from: String, to: String) {
-        if (from == to || !isGroupKey(to)) return
-        val parent = node(path)
-        val contents = parent[from] as? JsonObject ?: return
-        if (parent[to] != null) return
-        val root = mutate(_objectFilter, path) { n -> n.remove(from); n[to] = contents }
-        keyOrders.remove(orderKey(path + from))?.let { keyOrders[orderKey(path + to)] = it }
-        setFilter(root)
     }
 
     private fun noteInsertion(key: String, path: List<String>) {
@@ -158,7 +146,7 @@ class CriteriaDocument(mode: FilterMode, objectFilter: JsonObject = JsonObject(e
 
     /** Criteria as the base, chip criteria on top; `null` when nothing is active. */
     fun merged(chipFilter: JsonObject = JsonObject(emptyMap())): JsonObject? {
-        val dict = LinkedHashMap<String, JsonElement>(sanitizedObjectFilter)
+        val dict = LinkedHashMap<String, JsonElement>(fetchFragment)
         chipFilter.forEach { (k, v) -> dict[k] = v }
         return if (dict.isEmpty()) null else JsonObject(dict)
     }
@@ -166,9 +154,15 @@ class CriteriaDocument(mode: FilterMode, objectFilter: JsonObject = JsonObject(e
     /** `base` first, this document's criteria on top. */
     fun layered(base: JsonObject): JsonObject? {
         val dict = LinkedHashMap<String, JsonElement>(base)
-        sanitizedObjectFilter.forEach { (k, v) -> dict[k] = v }
+        fetchFragment.forEach { (k, v) -> dict[k] = v }
         return if (dict.isEmpty()) null else JsonObject(dict)
     }
+
+    /**
+     * The criteria as a fetch sends them next to other root criteria ([isolatingRootOr]).
+     * Saving keeps [sanitizedObjectFilter]: the filter's own shape stays untouched. iOS: `fetchFragment`.
+     */
+    val fetchFragment: JsonObject get() = isolatingRootOr(sanitizedObjectFilter)
 
     val activeCriterionCount: Int get() = sanitizedObjectFilter.size
     val isEmpty: Boolean get() = sanitizedObjectFilter.isEmpty()
@@ -176,6 +170,16 @@ class CriteriaDocument(mode: FilterMode, objectFilter: JsonObject = JsonObject(e
     companion object {
         val GROUP_KEYS = listOf("AND", "OR", "NOT")
         fun isGroupKey(key: String) = key in GROUP_KEYS
+
+        /**
+         * Stash reads a root `OR` as "every other root criterion **or** the group". The app puts
+         * its own criteria next to the document at the root (the page's studio / tag / performer
+         * scope, the Feeds handover, the name search, the sub-studio switch), so a root `OR` from a
+         * saved filter let through results that match none of them. Wrapped in `AND`, the document
+         * stays one unit, ANDed with the rest. iOS: `FilterCriteriaDocument.isolatingRootOr`.
+         */
+        fun isolatingRootOr(dict: JsonObject): JsonObject =
+            if (dict["OR"] == null) dict else JsonObject(mapOf("AND" to dict))
 
         private fun orderKey(path: List<String>) = path.joinToString("/")
 

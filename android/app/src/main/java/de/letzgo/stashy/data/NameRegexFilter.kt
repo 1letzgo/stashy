@@ -75,7 +75,8 @@ object NameRegexFilter {
 
     /** True when the alias group may take the root `AND` of [criteria] (free, or already the field's). */
     private fun aliasGroupFits(mode: FilterMode, criteria: JsonObject): Boolean =
-        searchesAliases(mode) && (ALIAS_GROUP_KEY !in criteria || aliasSearchPattern(mode, criteria) != null)
+        // Stash takes one AND / OR / NOT per level: any group of the criteria's own blocks it.
+        searchesAliases(mode) && (CriteriaDocument.GROUP_KEYS.none { it in criteria } || aliasSearchPattern(mode, criteria) != null)
 
     /**
      * Chip fragment for [mode]; empty when unsupported, blank or invalid. Usually `{ <key>: criterion }`;

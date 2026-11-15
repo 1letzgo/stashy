@@ -21,7 +21,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
-import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.foundation.layout.navigationBarsPadding
@@ -179,8 +178,10 @@ fun FilterCriteriaEditor(
     val p = Theme.palette
 
     val explanation = when (path.lastOrNull()) {
-        "OR" -> tr(R.string.hint_matches_when_at_least_one)
-        "NOT" -> tr(R.string.hint_excludes_everything_matching_conditions_below)
+        // Conditions on one level are always ANDed, also inside an OR group: OR joins the group
+        // with the level above, not its conditions with each other (the former "Any of" said so).
+        "OR" -> tr(R.string.hint_group_or_semantics)
+        "NOT" -> tr(R.string.hint_group_not_semantics)
         "AND" -> tr(R.string.hint_all_conditions_below_must_be)
         else -> tr(R.string.all_conditions_must_be_true)
     }
@@ -221,8 +222,6 @@ fun FilterCriteriaEditor(
             if (field.key !in stickyKeys) stickyKeys.add(field.key)
             if (field.key !in expandedKeys) expandedKeys.add(field.key)
         }
-        NativeDivider()
-        AddGroupBar(taken = groupKeys.isNotEmpty()) { group -> document.addGroup(group, path) }
         }
         NativeSectionFooter(explanation)
         groupKeys.forEach { group ->
@@ -278,79 +277,26 @@ private fun AddConditionBar(addable: List<FilterFieldDescriptor>, onAdd: (Filter
 }
 
 /**
- * Stash takes one AND, OR or NOT per level: once this level has one, further groups go inside
- * it. A new group is empty and sends nothing until a condition is added. iOS: `addGroupMenu`.
+ * One AND / OR / NOT group of a saved filter. The editor cannot create groups any more ("Add
+ * group" mislabelled Stash's semantics and could not express what users tried with it), but a
+ * filter that has one keeps it: shown, editable inside, removable. iOS: `groupCard(_:)`.
  */
-@Composable
-private fun AddGroupBar(taken: Boolean, onAdd: (String) -> Unit) {
-    val p = Theme.palette
-    var open by remember { mutableStateOf(false) }
-    Box(Modifier.fillMaxWidth()) {
-        NativeListItem(
-            tr(R.string.action_add_group), icon = SF.squareStack3dUp, iconTint = p.secondaryText,
-            enabled = !taken, onClick = { open = true },
-        )
-        Box(Modifier.align(Alignment.TopStart)) {
-            DropdownMenu(open, { open = false }, containerColor = p.secondaryBackground) {
-                CriteriaDocument.GROUP_KEYS.forEach { group ->
-                    DropdownMenuItem(
-                        text = {
-                            Column {
-                                Text(groupTitle(group), color = p.text)
-                                Text(groupHint(group), color = p.secondaryText, style = MaterialTheme.typography.bodySmall)
-                            }
-                        },
-                        onClick = { open = false; onAdd(group) },
-                    )
-                }
-            }
-        }
-    }
-}
-
-fun groupHint(group: String) = when (group) {
-    "AND" -> tr(R.string.hint_every_condition_in_it_must)
-    "OR" -> tr(R.string.hint_this_level_or_group_must)
-    "NOT" -> tr(R.string.hint_leaves_out_what_group_matches)
-    else -> ""
-}
-
-/** iOS: `groupTitle(_:)`. */
-fun groupTitle(group: String) = when (group) { "AND" -> tr(R.string.all_of); "OR" -> tr(R.string.any_of); "NOT" -> tr(R.string.none_of); else -> group }
-
 @Composable
 private fun GroupCard(document: CriteriaDocument, group: String, path: List<String>, onChange: () -> Unit, applyChange: () -> Unit) {
     val p = Theme.palette
-    var menu by remember { mutableStateOf(false) }
     val shape = NativeGroupShape
     Column(
         Modifier.fillMaxWidth().clip(shape).border(1.dp, p.separator, shape).padding(start = 8.dp, end = 8.dp, bottom = 8.dp),
     ) {
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-            Box {
-                // Section-header look (titleSmall, accent) with a Material dropdown arrow.
-                Row(
-                    Modifier.clip(RoundedCornerShape(8.dp)).clickable { menu = true }.padding(start = 8.dp, top = 12.dp, bottom = 12.dp, end = 4.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Text(groupTitle(group), style = NativeType.titleSmall, color = de.letzgo.stashy.ui.textAccent())
-                    Icon(androidx.compose.material.icons.Icons.Filled.ArrowDropDown, null, tint = nativeAccent(), modifier = Modifier.size(24.dp))
-                }
-                DropdownMenu(menu, { menu = false }, containerColor = p.secondaryBackground) {
-                    CriteriaDocument.GROUP_KEYS.forEach { candidate ->
-                        val enabled = candidate == group || candidate !in document.groupKeys(path)
-                        DropdownMenuItem(
-                            text = { Text(groupTitle(candidate), color = if (enabled) p.text else p.secondaryText) },
-                            trailingIcon = if (candidate == group) ({ Icon(SF.checkmark, null, tint = p.text) }) else null,
-                            enabled = enabled,
-                            onClick = { menu = false; document.changeGroupType(path, group, candidate); applyChange() },
-                        )
-                    }
-                }
-            }
+            Text(
+                tr(R.string.label_advanced_group_from_server), style = NativeType.titleSmall,
+                color = de.letzgo.stashy.ui.textAccent(),
+                modifier = Modifier.padding(start = 8.dp, top = 12.dp, bottom = 12.dp, end = 4.dp),
+            )
             Spacer(Modifier.weight(1f))
             androidx.compose.material3.IconButton(onClick = { document.removeGroup(group, path); applyChange() }) {
-                Icon(SF.xmark, tr(R.string.action_remove_arg_group, groupTitle(group)), tint = p.secondaryText)
+                Icon(SF.xmark, tr(R.string.action_remove_group), tint = p.secondaryText)
             }
         }
         FilterCriteriaEditor(document, onChange, embedsInCard = false, path = path + group)
