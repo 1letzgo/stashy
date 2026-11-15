@@ -197,6 +197,13 @@ class CatalogController<T>(
                 if (event is LibraryEvent.TagParentsChanged) refresh()
             }
         }
+        // A group got or lost containing groups: it joins or leaves a hierarchy filter's result,
+        // a group's sub-group section, and the parents' sub-group counts change.
+        if (mode == FilterMode.Groups) coroutineScope.launch {
+            LibraryEvents.events.collect { event ->
+                if (event is LibraryEvent.GroupHierarchyChanged) refresh()
+            }
+        }
         // iOS `PerformerImageUpdated` → `patchPerformerImageInLists`.
         if (mode == FilterMode.Performers) coroutineScope.launch {
             PerformerEvents.events.collect { event ->

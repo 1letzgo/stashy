@@ -13,7 +13,28 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import de.letzgo.stashy.data.ContainingGroupEntry
 import de.letzgo.stashy.data.GroupStub
+import de.letzgo.stashy.data.LibraryEvent
+import de.letzgo.stashy.data.LibraryEvents
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.ui.Alignment
+import de.letzgo.stashy.ui.NativeDivider
+import de.letzgo.stashy.ui.NativeGroup
+import de.letzgo.stashy.ui.NativeListItem
+import de.letzgo.stashy.ui.NativeSectionFooter
+import de.letzgo.stashy.ui.NativeSectionHeader
+import de.letzgo.stashy.ui.NativeTextField
+import de.letzgo.stashy.ui.SF
+import de.letzgo.stashy.ui.SFS
+import de.letzgo.stashy.ui.StashyColors
+import de.letzgo.stashy.ui.scene.EntityPickerSheet
+import de.letzgo.stashy.ui.scene.PickerEntry
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.lazy.grid.LazyGridState
@@ -78,6 +99,14 @@ class GroupDetailScreen(val groupId: String, val preview: StashGroup? = null) : 
     @Composable
     override fun Content() {
         LaunchedEffect(Unit) { if (!started) { started = true; load() } }
+        // Another group moved into or out of this one (or this one's parents changed elsewhere):
+        // header counts, "In: …" and the Groups section reload. The edited group itself takes
+        // the result from its sheet.
+        LaunchedEffect(Unit) {
+            LibraryEvents.events.collect { event ->
+                if (event is LibraryEvent.GroupHierarchyChanged && event.id != groupId) load()
+            }
+        }
         AutoSwitchTab(catalog, tab) { tab = it }
         Box(Modifier.fillMaxSize().background(Theme.palette.background)) {
             DetailGrid(gridState, { w -> columnsFor(tab, w, catalog.imageColumns) }, header = { group?.let { Header(it) } }) {
@@ -93,7 +122,7 @@ class GroupDetailScreen(val groupId: String, val preview: StashGroup? = null) : 
         }
         LinkedSettingsSheets(catalog)
         val g = group
-        if (editing && g != null) EditGroupSheet(g, { editing = false }) { group = it }
+        if (editing && g != null) EditGroupSheet(g, { editing = false }, onParentsSaved = { parents = it }) { group = it }
         if (showSceneDownloadOptions) {
             SceneBulkDownloadDialog(Downloads.SceneDownloadScope.Group(groupId), group?.name ?: "", group?.sceneCount) { showSceneDownloadOptions = false }
         }
@@ -154,9 +183,12 @@ class GroupDetailScreen(val groupId: String, val preview: StashGroup? = null) : 
         }
     }
 
-    /** iOS: `EditGroupSheet`. */
+    /**
+     * iOS: `EditGroupSheet`. "Containing Groups" (the groups this one sits in, each with an
+     * optional description) is sent only once it was loaded, so a failed load never clears it.
+     */
     @Composable
-    private fun EditGroupSheet(group: StashGroup, onDismiss: () -> Unit, onSaved: (StashGroup) -> Unit) {
+    private fun EditGroupSheet(group: StashGroup, onDismiss: () -> Unit, onParentsSaved: (List<GroupStub>) -> Unit, onSaved: (StashGroup) -> Unit) {
         val sections = remember(group.id) {
             listOf(
                 EditSection(tr(R.string.identity), listOf(
@@ -169,14 +201,58 @@ class GroupDetailScreen(val groupId: String, val preview: StashGroup? = null) : 
         }
         val (name, date, rating) = sections[0].fields
         val synopsis = sections[1].fields[0]
+        // Null until loaded; the descriptions are edited in place.
+        var loadedParents by remember(group.id) { mutableStateOf<List<ContainingGroupEntry>?>(null) }
+        var parentEntries by remember(group.id) { mutableStateOf<List<ContainingGroupEntry>>(emptyList()) }
+        // The group itself and everything below it may not contain it.
+        var excludedParentIds by remember(group.id) { mutableStateOf(setOf(group.id)) }
+        var pickingParents by remember { mutableStateOf(false) }
+        LaunchedEffect(group.id) {
+            runCatching { DetailRepository.containingGroupEntries(group.id) }
+                .onSuccess { loadedParents = it; parentEntries = it }
+                .onFailure { detailToast(tr(R.string.error_load_all_group_fields)) }
+        }
+        LaunchedEffect(group.id) {
+            // Unknown descendants: the server refuses a loop anyway, so the picker stays usable.
+            runCatching { DetailRepository.descendantGroupIds(group.id) }.onSuccess { excludedParentIds = it + group.id }
+        }
+        if (pickingParents) {
+            EntityPickerSheet(
+                tr(R.string.containing_groups), tr(R.string.search_groups), parentEntries.map { it.group.id }.toSet(), multiple = true,
+                showsAll = true, allowsCreate = false, actionTitle = tr(R.string.action_done),
+                load = {
+                    DetailRepository.allGroupsByName().filter { it.id !in excludedParentIds }.map { g ->
+                        val n = g.subGroupCount ?: 0
+                        PickerEntry(g.id, g.name, if (n > 0) tr(if (n == 1) R.string.arg_count_sub_group else R.string.arg_count_sub_groups, n) else null)
+                    }
+                },
+                create = { error("not offered") }, createFailedText = tr(R.string.error_create_group),
+                // Nothing is written here: the sheet's Save sends the list with the other fields.
+                save = {}, saveFailedText = tr(R.string.error_update_group),
+                onSaved = { picked ->
+                    // Kept entries keep their description; new ones follow in the picked order.
+                    val kept = parentEntries.filter { e -> picked.any { it.id == e.group.id } }
+                    val added = picked.filter { p -> kept.none { it.group.id == p.id } }.map { ContainingGroupEntry(GroupStub(it.id, it.name), null) }
+                    parentEntries = kept + added
+                },
+                onDismiss = { pickingParents = false },
+            )
+        }
         EditEntitySheet(
             title = tr(R.string.action_edit_group), sections = sections,
             deleteLabel = tr(R.string.action_delete_group), deleteTitle = tr(R.string.action_delete_group), entityName = group.name,
             onDismiss = onDismiss,
             onSave = {
                 val r = EditParsing.rating(rating.value)
-                val ok = DetailRepository.updateGroup(group.id, name.trimmed, date.optional, synopsis.optional, r)
+                val sentParents = if (loadedParents != null) parentEntries else null
+                val ok = DetailRepository.updateGroup(group.id, name.trimmed, date.optional, synopsis.optional, r, sentParents)
                 if (ok) {
+                    // Compared as sent (trimmed descriptions), so a stray space is no move.
+                    fun sig(list: List<ContainingGroupEntry>?) = list?.map { it.group.id to it.description?.trim().orEmpty() }
+                    if (sentParents != null && sig(sentParents) != sig(loadedParents)) {
+                        onParentsSaved(sentParents.map { it.group })
+                        DetailRepository.groupHierarchyChanged(group.id)
+                    }
                     onSaved(group.copy(name = name.trimmed, date = date.optional, synopsis = synopsis.optional, rating100 = r))
                     detailToast(tr(R.string.group_updated))
                 } else detailToast(tr(R.string.error_update_group))
@@ -186,6 +262,33 @@ class GroupDetailScreen(val groupId: String, val preview: StashGroup? = null) : 
                 DetailRepository.deleteGroup(group.id)
                 detailToast(tr(R.string.group_deleted))
                 Nav.pop()
+            },
+            extraSections = {
+                if (loadedParents != null) {
+                    Spacer(Modifier.height(20.dp))
+                    NativeSectionHeader(tr(R.string.containing_groups))
+                    NativeGroup {
+                        parentEntries.forEach { entry ->
+                            Column(Modifier.padding(horizontal = 4.dp, vertical = 4.dp)) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    NativeListItem(entry.group.name, Modifier.weight(1f), icon = SF.rectangleStack)
+                                    IconButton({ parentEntries = parentEntries.filter { it.group.id != entry.group.id } }) {
+                                        Icon(SFS.minusCircleFill, tr(R.string.action_remove_arg, entry.group.name), tint = StashyColors.systemRed)
+                                    }
+                                }
+                                NativeTextField(
+                                    entry.description.orEmpty(),
+                                    { text -> parentEntries = parentEntries.map { if (it.group.id == entry.group.id) it.copy(description = text) else it } },
+                                    tr(R.string.description),
+                                    autoCorrect = true,
+                                )
+                            }
+                            NativeDivider()
+                        }
+                        NativeListItem(tr(R.string.action_add_group), icon = SF.plusCircleFill, onClick = { pickingParents = true })
+                    }
+                    NativeSectionFooter(tr(R.string.hint_containing_groups))
+                }
             },
         )
     }

@@ -8820,7 +8820,10 @@ struct GenerateData: Codable {
     func fetchGroupEditFields(groupId: String, completion: @escaping (GroupEditFields?) -> Void) {
         let query = """
             query GroupEditFields($id: ID!) {
-                findGroup(id: $id) { aliases duration director urls studio { id name } tags { id name } }
+                findGroup(id: $id) {
+                    aliases duration director urls studio { id name } tags { id name }
+                    containing_groups { group { id name } description }
+                }
             }
             """
         let variables: [String: Any] = ["id": groupId]
@@ -8831,6 +8834,48 @@ struct GenerateData: Codable {
         }
         performGraphQLQuery(query: bodyString) { (response: GroupEditFieldsResponse?) in
             completion(response?.data?.findGroup)
+        }
+    }
+
+    /// Every group by name with its sub-group count, for the "Containing Groups" picker of the
+    /// group edit sheet. The shared filter picker list leaves out groups without scenes, and
+    /// folder-like parent groups often have none.
+    func fetchAllGroupsByName(completion: @escaping ([GroupPickerRow]) -> Void) {
+        let query = """
+            query GroupsByName {
+                findGroups(filter: { per_page: -1, sort: "name", direction: ASC }) { groups { id name sub_group_count } }
+            }
+            """
+        guard let bodyData = try? JSONSerialization.data(withJSONObject: ["query": query]),
+              let bodyString = String(data: bodyData, encoding: .utf8) else {
+            completion([])
+            return
+        }
+        performGraphQLQuery(query: bodyString) { (response: GroupPickerRowsResponse?) in
+            completion(response?.data?.findGroups.groups ?? [])
+        }
+    }
+
+    /// Ids of every group below `groupId` (sub-groups at any depth). A group may not sit in
+    /// itself or in one of its own descendants, so the containing-groups picker leaves them out.
+    /// Nil when the request failed.
+    func fetchGroupDescendantIds(groupId: String, completion: @escaping (Set<String>?) -> Void) {
+        let query = """
+            query GroupDescendants($group_filter: GroupFilterType) {
+                findGroups(filter: { per_page: -1 }, group_filter: $group_filter) { groups { id name } }
+            }
+            """
+        let variables: [String: Any] = [
+            "group_filter": ["containing_groups": ["value": [groupId], "modifier": "INCLUDES", "depth": -1]]
+        ]
+        guard let bodyData = try? JSONSerialization.data(withJSONObject: ["query": query, "variables": variables]),
+              let bodyString = String(data: bodyData, encoding: .utf8) else {
+            completion(nil)
+            return
+        }
+        performGraphQLQuery(query: bodyString) { (response: GroupPickerRowsResponse?) in
+            guard let groups = response?.data?.findGroups.groups else { return completion(nil) }
+            completion(Set(groups.map(\.id)))
         }
     }
 
@@ -10970,10 +11015,25 @@ struct GroupEditFields: Decodable {
     let urls: [String]?
     let studio: GroupStudio?
     let tags: [GroupStudio]?
+    /// The groups this one sits in, each with its optional description.
+    let containing_groups: [StashGroup.GroupRelation]?
 }
 
 struct GroupEditFieldsResponse: Decodable {
     struct Payload: Decodable { let findGroup: GroupEditFields? }
+    let data: Payload?
+}
+
+/// One group in the containing-groups picker (and the descendant lookup, which only needs ids).
+struct GroupPickerRow: Decodable, Identifiable, Equatable {
+    let id: String
+    let name: String
+    var sub_group_count: Int? = nil
+}
+
+struct GroupPickerRowsResponse: Decodable {
+    struct Groups: Decodable { let groups: [GroupPickerRow] }
+    struct Payload: Decodable { let findGroups: Groups }
     let data: Payload?
 }
 

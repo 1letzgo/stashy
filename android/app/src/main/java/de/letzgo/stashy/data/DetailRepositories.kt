@@ -40,14 +40,50 @@ object DetailRepository {
     }
 
     private const val CONTAINING_GROUPS_QUERY =
-        "query GroupParents(\$ids: [ID!]) { findGroups(ids: \$ids) { groups { id containing_groups { group { id name front_image_path updated_at } } } } }"
+        "query GroupParents(\$ids: [ID!]) { findGroups(ids: \$ids) { groups { id containing_groups { group { id name front_image_path updated_at } description } } } }"
 
     /** Parent groups of [id] (own query: the shared findGroups document stays untouched). */
-    suspend fun containingGroups(id: String): List<GroupStub> {
+    suspend fun containingGroups(id: String): List<GroupStub> = containingGroupEntries(id).map { it.group }
+
+    /** Parent groups of [id] with their descriptions (the edit sheet writes them back). */
+    suspend fun containingGroupEntries(id: String): List<ContainingGroupEntry> {
         val data = GraphQL.data(CONTAINING_GROUPS_QUERY, vars("ids" to listOf(id)))
         val groups = data["findGroups"].obj?.get("groups") as? JsonArray ?: return emptyList()
         val first = groups.firstOrNull() ?: return emptyList()
-        return GraphQL.decode(StashGroup.serializer(), first).containingGroups.orEmpty().map { it.group }
+        return GraphQL.decode(StashGroup.serializer(), first).containingGroups.orEmpty()
+    }
+
+    private const val GROUPS_BY_NAME_QUERY =
+        "query GroupsByName { findGroups(filter: { per_page: -1, sort: \"name\", direction: ASC }) { groups { id name sub_group_count } } }"
+
+    /**
+     * Every group by name with its sub-group count, for the containing-groups picker (iOS
+     * `fetchAllGroupsByName`). The scene editor's list is the same, but folder-like parents
+     * without scenes must be there too, and this one carries the sub-group count.
+     */
+    suspend fun allGroupsByName(): List<StashGroup> {
+        val data = GraphQL.data(GROUPS_BY_NAME_QUERY)
+        return GraphQL.decode(ListSerializer(StashGroup.serializer()), data["findGroups"].obj?.get("groups") ?: JsonArray(emptyList()))
+    }
+
+    private const val GROUP_DESCENDANTS_QUERY =
+        "query GroupDescendants(\$group_filter: GroupFilterType) { findGroups(filter: { per_page: -1 }, group_filter: \$group_filter) { groups { id } } }"
+
+    /**
+     * Ids of every group below [id] at any depth (iOS `fetchGroupDescendantIds`): a group may not
+     * sit in itself or one of its descendants, so the picker leaves them out.
+     */
+    suspend fun descendantGroupIds(id: String): Set<String> {
+        val filter = buildJsonObject {
+            put("containing_groups", buildJsonObject {
+                put("value", JsonArray(listOf(JsonPrimitive(id))))
+                put("modifier", JsonPrimitive("INCLUDES"))
+                put("depth", JsonPrimitive(-1))
+            })
+        }
+        val data = GraphQL.data(GROUP_DESCENDANTS_QUERY, vars("group_filter" to filter))
+        val groups = data["findGroups"].obj?.get("groups") as? JsonArray ?: return emptySet()
+        return groups.mapNotNull { (it as? JsonObject)?.get("id")?.jsonPrimitive?.contentOrNull }.toSet()
     }
 
     /**
@@ -204,10 +240,25 @@ object DetailRepository {
         },
     )
 
-    suspend fun updateGroup(id: String, name: String, date: String?, synopsis: String?, rating100: Int?) = input(
+    /**
+     * [containingGroups] only goes into `GroupUpdateInput` when non-null (a sheet that could not
+     * load them must not clear them); each entry is `group_id` plus its description (null when blank).
+     */
+    suspend fun updateGroup(
+        id: String, name: String, date: String?, synopsis: String?, rating100: Int?,
+        containingGroups: List<ContainingGroupEntry>? = null,
+    ) = input(
         "mutation GroupUpdate(\$input: GroupUpdateInput!) { groupUpdate(input: \$input) { id name date synopsis rating100 } }",
-        "groupUpdate", mapOf("id" to id, "name" to name, "date" to date, "synopsis" to synopsis, "rating100" to rating100),
+        "groupUpdate",
+        buildMap {
+            put("id", id); put("name", name); put("date", date); put("synopsis", synopsis); put("rating100", rating100)
+            if (containingGroups != null) put("containing_groups", containingGroups.map {
+                mapOf("group_id" to it.group.id, "description" to it.description?.trim()?.takeIf { d -> d.isNotEmpty() })
+            })
+        },
     )
+
+    fun groupHierarchyChanged(id: String) { LibraryEvents.post(LibraryEvent.GroupHierarchyChanged(id)) }
 
     suspend fun updateGallery(id: String, title: String, date: String?, details: String?) = input(
         "mutation GalleryUpdate(\$input: GalleryUpdateInput!) { galleryUpdate(input: \$input) { id title date details } }",

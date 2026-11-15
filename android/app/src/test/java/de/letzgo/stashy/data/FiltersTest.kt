@@ -231,6 +231,21 @@ class FiltersTest {
         assertNull(PickerKind.forCriterion("scenes", FilterMode.Galleries))
     }
 
+    @Test fun groupHierarchyCriteriaAreOfferedAndKeepDepth() {
+        assertEquals(CriterionKind.hierarchicalMulti, FilterFieldCatalog.field("containing_groups", FilterMode.Groups)!!.kind)
+        assertEquals(CriterionKind.hierarchicalMulti, FilterFieldCatalog.field("sub_groups", FilterMode.Groups)!!.kind)
+        assertEquals(CriterionKind.int, FilterFieldCatalog.field("containing_group_count", FilterMode.Groups)!!.kind)
+        assertEquals(CriterionKind.int, FilterFieldCatalog.field("sub_group_count", FilterMode.Groups)!!.kind)
+        assertEquals(CriterionKind.hierarchicalMulti, FilterFieldCatalog.field("groups", FilterMode.Scenes)!!.kind)
+        assertEquals(PickerKind.Groups, PickerKind.forCriterion("sub_groups", FilterMode.Groups))
+        // Web UI shape → HierarchicalMultiCriterionInput with its depth.
+        val ui = obj("""{"containing_groups":{"value":{"items":[{"id":"7","label":"Box"}],"excluded":[],"depth":-1},"modifier":"INCLUDES"}}""")
+        val out = FilterMapper.sanitize(ui)
+        assertEquals(listOf("7"), FilterMapper.idStrings(out["containing_groups"]!!.jsonObject["value"]))
+        assertEquals(JsonPrimitive(-1), out["containing_groups"]!!.jsonObject["depth"])
+        assertEquals(JsonPrimitive("INCLUDES"), out["containing_groups"]!!.jsonObject["modifier"])
+    }
+
     @Test fun tabConfigDecodesIosJsonAndColumns() {
         val ios = """[{"id":"performers","isVisible":true,"sortOrder":2,"sortOption":"oCountDesc","defaultFilterId":"5","defaultFilterName":"F"},{"id":"dashboard","isVisible":true,"sortOrder":0}]"""
         val tabs = CatalogPrefs.decodeTabs(ios)!!

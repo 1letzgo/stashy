@@ -133,6 +133,7 @@ object DashboardStore {
                 // The patch that came with it already updated the cards.
                 is LibraryEvent.StudioParentChanged -> null
                 is LibraryEvent.TagParentsChanged -> null
+                is LibraryEvent.GroupHierarchyChanged -> null
             }
             if (next != null) rows[type] = next
         }
