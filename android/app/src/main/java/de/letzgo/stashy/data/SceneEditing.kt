@@ -14,6 +14,37 @@ import kotlinx.serialization.json.intOrNull
 import kotlinx.serialization.json.jsonPrimitive
 
 /**
+ * iOS `TagCountContext`: what a tag picker edits, so which of a tag's counts each row shows and
+ * the list is ordered by (a performer's tags count performers, a gallery's galleries, …).
+ * iOS also has Groups for its group tag editing, which Android lacks (studios have none on either).
+ */
+enum class TagCountContext(
+    val sortField: String,
+    @androidx.annotation.StringRes private val one: Int,
+    @androidx.annotation.StringRes private val many: Int,
+) {
+    Scenes("scenes_count", R.string.arg_count_scene, R.string.arg_count_scenes),
+    Performers("performers_count", R.string.arg_count_performer, R.string.arg_count_performers),
+    Galleries("galleries_count", R.string.arg_count_gallery, R.string.arg_count_galleries),
+    Images("images_count", R.string.arg_count_image, R.string.arg_count_images),
+    Markers("scene_markers_count", R.string.arg_count_marker, R.string.arg_count_markers);
+
+    fun count(tag: Tag): Int? = when (this) {
+        Scenes -> tag.sceneCount
+        Performers -> tag.performerCount
+        Galleries -> tag.galleryCount
+        Images -> tag.imageCount
+        Markers -> tag.sceneMarkerCount
+    }
+
+    /** "3 performers", "1 gallery" … */
+    fun label(count: Int): String = tr(if (count == 1) one else many, count)
+
+    /** The row's text, null when the server did not send the count. */
+    fun label(tag: Tag): String? = count(tag)?.let(::label)
+}
+
+/**
  * Inline documents iOS keeps in `GraphQLQueries.swift` (the shared `.graphql` files cover the
  * rest: `sceneSaveActivity`, `sceneAddPlay`, `sceneIncrementO`, `metadataIdentify`, …).
  */
@@ -317,9 +348,9 @@ object SceneEditing {
 
     // MARK: - Pickers (edit sheets)
 
-    /** iOS: `fetchAllTags` — 1000 by scene count. */
-    suspend fun allTags(sort: String = "scenes_count"): List<Tag> =
-        findPage("findTags", "findTags", "tags", Tag.serializer(), FindFilter(1, 1000, sort = sort), "tag_filter", JsonObject(emptyMap())).items
+    /** iOS: `fetchAllTags(for:)` — the 1000 tags used most on the kind [context] edits. */
+    suspend fun allTags(context: TagCountContext): List<Tag> =
+        findPage("findTags", "findTags", "tags", Tag.serializer(), FindFilter(1, 1000, sort = context.sortField), "tag_filter", JsonObject(emptyMap())).items
 
     /** Every tag in name order, with `parents` and `child_count` (the parent tag picker). */
     suspend fun allTagsByName(): List<Tag> =

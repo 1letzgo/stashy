@@ -50,6 +50,7 @@ import de.letzgo.stashy.ui.components.PerformerCard
 import de.letzgo.stashy.ui.components.onLongPress
 import de.letzgo.stashy.ui.OverflowItem
 import de.letzgo.stashy.data.Tag
+import de.letzgo.stashy.data.TagCountContext
 import de.letzgo.stashy.ui.NativeGroup
 import de.letzgo.stashy.ui.NativeListItem
 import de.letzgo.stashy.ui.NativeSectionHeader
@@ -273,7 +274,7 @@ class PerformerDetailScreen(val performerId: String, val preview: Performer? = n
                 tags.map { it.id }.toSet(),
                 save = { ids -> check(DetailRepository.setPerformerTags(performerId, ids)) },
                 onDismiss = { editingTags = false },
-                countsPerformers = true,
+                countContext = TagCountContext.Performers,
                 onSaved = { tags = sortedTags(it) },
             )
         }
@@ -425,7 +426,7 @@ class PerformerDetailScreen(val performerId: String, val preview: Performer? = n
                 editedTags.map { it.id }.toSet(),
                 save = {},
                 onDismiss = { pickingTags = false },
-                countsPerformers = true,
+                countContext = TagCountContext.Performers,
                 onSaved = { editedTags = sortedTags(it) },
             )
         }

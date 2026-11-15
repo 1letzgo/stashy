@@ -16,7 +16,7 @@ final class FilterPickerOptionsStore: ObservableObject {
         case imageTags, imageStudios, galleryStudios
         /// Tag pickers scoped to the entity the criterion refers to — `performer_tags` lists the
         /// tags on performers, not the tags on scenes.
-        case performerTags, studioTags, galleryTags, markerTags, allTags
+        case performerTags, studioTags, galleryTags, markerTags, groupTags, allTags
         /// Folder criterion (scenes / images `folder`, galleries `parent_folder`), named by path.
         case folders
     }
@@ -66,7 +66,7 @@ final class FilterPickerOptionsStore: ObservableObject {
         func labelKind(_ raw: String) -> FilterMapper.LabelKind? {
             switch Kind(rawValue: raw) {
             case .studios, .imageStudios, .galleryStudios: return .studio
-            case .tags, .imageTags, .performerTags, .studioTags, .galleryTags, .markerTags, .allTags: return .tag
+            case .tags, .imageTags, .performerTags, .studioTags, .galleryTags, .markerTags, .groupTags, .allTags: return .tag
             case .groups: return .group
             case .performers: return .performer
             case .folders: return .folder
@@ -157,6 +157,7 @@ final class FilterPickerOptionsStore: ObservableObject {
             case .galleries: return .galleryTags
             case .images: return .imageTags
             case .sceneMarkers: return .markerTags
+            case .groups: return .groupTags
             default: return .tags
             }
         }
@@ -225,6 +226,10 @@ final class FilterPickerOptionsStore: ObservableObject {
             }
         case .markerTags:
             viewModel.fetchTagsForMarkerFilterPicker { list in
+                Task { @MainActor in finish(list.map { FilterEntityOption(id: $0.id, name: $0.name) }) }
+            }
+        case .groupTags:
+            viewModel.fetchTagsForGroupFilterPicker { list in
                 Task { @MainActor in finish(list.map { FilterEntityOption(id: $0.id, name: $0.name) }) }
             }
         case .allTags:

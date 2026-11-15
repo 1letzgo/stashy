@@ -2269,11 +2269,27 @@ struct EditGroupSheet: View {
                 }
             }
             .sheet(item: $picker) { kind in
-                GroupEntityPickerSheet(
-                    kind: kind,
-                    studio: $studio,
-                    tags: $tags
-                )
+                if kind == .tags {
+                    // The tag picker of every other edit: rows count groups and the tags on most
+                    // groups come first. Picked here, written with the group on Save.
+                    AddTagToSceneSheet(
+                        sceneId: group.id,
+                        currentTags: tags.map { Tag(id: $0.id, name: $0.name) },
+                        viewModel: viewModel,
+                        saveTagIds: { _, done in done(true) },
+                        countContext: .groups
+                    ) { picked in
+                        tags = picked
+                            .sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
+                            .map { FilterEntityOption(id: $0.id, name: $0.name) }
+                    }
+                } else {
+                    GroupEntityPickerSheet(
+                        kind: kind,
+                        studio: $studio,
+                        tags: $tags
+                    )
+                }
             }
             .sheet(isPresented: $showingContainingGroupsPicker) {
                 ContainingGroupsPickerSheet(

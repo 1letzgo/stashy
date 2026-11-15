@@ -66,8 +66,8 @@ import de.letzgo.stashy.ui.Theme
 import kotlinx.coroutines.launch
 
 /**
- * iOS: `TagDetailView` (TagsView.swift) — sections Scenes · Galleries · Sub-Tags · Studios · Groups ·
- * Images, favorite, `EditTagSheet`.
+ * iOS: `TagDetailView` (TagsView.swift) — sections Scenes · Galleries · Performers · Sub-Tags ·
+ * Studios · Groups · Images (the counted ones in the header's order), favorite, `EditTagSheet`.
  */
 class TagDetailScreen(val tagId: String, val preview: Tag? = null, private val filterPerformerId: String? = null) : Screen {
     override val key = "tag-$tagId" + (filterPerformerId?.let { "-p$it" } ?: "")
@@ -87,11 +87,13 @@ class TagDetailScreen(val tagId: String, val preview: Tag? = null, private val f
 
     private val catalog = LinkedCatalog(
         scope,
-        order = listOf(DetailTab.Scenes, DetailTab.Galleries, DetailTab.Tags, DetailTab.Studios, DetailTab.Groups, DetailTab.Images),
+        order = listOf(DetailTab.Scenes, DetailTab.Galleries, DetailTab.Performers, DetailTab.Tags, DetailTab.Studios, DetailTab.Groups, DetailTab.Images),
         // The depth of "Include sub-tag content" is read at query time (`tagContentId`).
         sceneScope = SubTags.tagScope(tagId, false),
         galleryScope = SubTags.tagScope(tagId, false),
         studioScope = SubTags.tagScope(tagId, false),
+        // The performers carrying the tag (`PerformerFilterType.tags`).
+        performerScope = SubTags.tagScope(tagId, false),
         groupScope = SubTags.tagScope(tagId, false),
         imageScope = SubTags.tagScope(tagId, false),
         // The direct sub-tags, by name.
@@ -111,6 +113,7 @@ class TagDetailScreen(val tagId: String, val preview: Tag? = null, private val f
             preview == null -> DetailTab.Scenes
             (preview.sceneCount ?: 0) > 0 -> DetailTab.Scenes
             (preview.galleryCount ?: 0) > 0 -> DetailTab.Galleries
+            (preview.performerCount ?: 0) > 0 -> DetailTab.Performers
             (preview.imageCount ?: 0) > 0 -> DetailTab.Images
             else -> DetailTab.Scenes
         },

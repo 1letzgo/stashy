@@ -1034,6 +1034,7 @@ struct SceneDetailView: View {
                 onTagsUpdated: { updated in
                     applyLocalSceneEdit(Scene(id: activeScene.id, title: activeScene.title, details: activeScene.details, director: activeScene.director, date: activeScene.date, duration: activeScene.duration, studio: activeScene.studio, performers: activeScene.performers, files: activeScene.files, tags: updated, galleries: activeScene.galleries, groups: activeScene.groups, organized: activeScene.organized, resumeTime: activeScene.resumeTime, playCount: activeScene.playCount, oCounter: activeScene.oCounter, rating100: activeScene.rating100, createdAt: activeScene.createdAt, updatedAt: activeScene.updatedAt, paths: activeScene.paths, sceneMarkers: activeScene.sceneMarkers, interactive: activeScene.interactive, stashIds: activeScene.stashIds, captions: activeScene.captions, customFields: activeScene.customFields))
                 },
+                countContext: .scenes,
                 viewModel: viewModel,
                 isTagsExpanded: $isTagsExpanded,
                 tagsTotalHeight: $tagsTotalHeight
@@ -1640,7 +1641,8 @@ struct AddMarkerSheet: View {
             }
             .onAppear {
                 isLoadingTags = true
-                viewModel.fetchAllTags { fetchedTags in
+                // The primary tag names a marker: the tags used on markers most come first.
+                viewModel.fetchAllTags(for: .markers) { fetchedTags in
                     DispatchQueue.main.async {
                         self.tags = fetchedTags
                         self.isLoadingTags = false
@@ -1738,8 +1740,8 @@ struct AddMarkerSheet: View {
                         Text(tag.name)
                             .foregroundColor(.primary)
                         Spacer()
-                        if let count = tag.sceneCount {
-                            Text("\(count)")
+                        if let label = TagCountContext.markers.label(for: tag) {
+                            Text(label)
                                 .font(.caption)
                                 .foregroundColor(.secondary)
                         }

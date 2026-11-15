@@ -221,14 +221,14 @@ object SavedFiltersRepository {
  * queries — "most used" entity lists for the criteria editor's multi-pickers.
  */
 enum class PickerKind {
-    Studios, Tags, Groups, Performers, ImageTags, ImageStudios, GalleryStudios, PerformerTags, StudioTags, GalleryTags, MarkerTags, AllTags,
+    Studios, Tags, Groups, Performers, ImageTags, ImageStudios, GalleryStudios, PerformerTags, StudioTags, GalleryTags, MarkerTags, GroupTags, AllTags,
     /** Folder criterion (scenes / images `folder`, galleries `parent_folder`), named by path. */
     Folders;
 
     /** Entity the picked ids name, for the saved filter's `{id, label}` pairs. */
     val labelKind: FilterMapper.LabelKind get() = when (this) {
         Studios, ImageStudios, GalleryStudios -> FilterMapper.LabelKind.Studio
-        Tags, ImageTags, PerformerTags, StudioTags, GalleryTags, MarkerTags, AllTags -> FilterMapper.LabelKind.Tag
+        Tags, ImageTags, PerformerTags, StudioTags, GalleryTags, MarkerTags, GroupTags, AllTags -> FilterMapper.LabelKind.Tag
         Groups -> FilterMapper.LabelKind.Group
         Performers -> FilterMapper.LabelKind.Performer
         Folders -> FilterMapper.LabelKind.Folder
@@ -252,6 +252,7 @@ enum class PickerKind {
                 FilterMode.Galleries -> GalleryTags
                 FilterMode.Images -> ImageTags
                 FilterMode.SceneMarkers -> MarkerTags
+                FilterMode.Groups -> GroupTags
                 else -> Tags
             }
             if ("studio" in k) return when (mode) {
@@ -293,6 +294,7 @@ object FilterPickerRepository {
         PickerKind.PerformerTags -> tags("performer_count", "performers_count")
         PickerKind.GalleryTags -> tags("gallery_count", "galleries_count")
         PickerKind.MarkerTags -> tags("marker_count", "scene_markers_count")
+        PickerKind.GroupTags -> tags("group_count", "groups_count")
         PickerKind.StudioTags -> tags("studio_count", "name", "ASC")
         PickerKind.AllTags -> tags(null, "name", "ASC")
         PickerKind.Groups -> names("findGroups", "groups", "group_filter", FindFilter(1, 1000, "scenes_count", "DESC"), countFilter("scene_count"))

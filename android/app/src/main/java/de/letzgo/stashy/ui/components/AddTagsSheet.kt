@@ -6,6 +6,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import de.letzgo.stashy.data.SceneEditing
 import de.letzgo.stashy.data.Tag
+import de.letzgo.stashy.data.TagCountContext
 import de.letzgo.stashy.data.tools.AITagSuggestions
 import de.letzgo.stashy.data.tools.AITagTarget
 import de.letzgo.stashy.ui.scene.EntityPickerSheet
@@ -23,14 +24,16 @@ fun AddTagsSheet(target: AITagTarget, onDismiss: () -> Unit, onComplete: (List<T
     val performerCounts = remember(target.id) { AITagSuggestions.performerTagCounts(target) }
     val currentIds = remember(target.id) { target.tags.map { it.id }.toSet() }
 
-    fun usage(tag: Tag): Int = when (target.kind) {
-        AITagTarget.Kind.Image -> tag.imageCount ?: 0
-        AITagTarget.Kind.Scene, AITagTarget.Kind.Marker -> tag.sceneCount ?: 0
+    // The kind of item being edited decides which count a row shows and sorts by.
+    val countContext = when (target.kind) {
+        AITagTarget.Kind.Image -> TagCountContext.Images
+        AITagTarget.Kind.Scene -> TagCountContext.Scenes
+        AITagTarget.Kind.Marker -> TagCountContext.Markers
     }
+    fun usage(tag: Tag): Int = countContext.count(tag) ?: 0
     fun usageLabel(tag: Tag): String {
         performerCounts[tag.id]?.takeIf { it > 0 }?.let { return tr(R.string.arg_performer_times, it) }
-        val n = usage(tag)
-        return if (target.kind == AITagTarget.Kind.Image) tr(R.string.arg_count_images, n) else tr(R.string.arg_count_scenes, n)
+        return countContext.label(usage(tag))
     }
     fun entry(tag: Tag) = PickerEntry(tag.id, tag.name, usageLabel(tag))
 
@@ -39,7 +42,7 @@ fun AddTagsSheet(target: AITagTarget, onDismiss: () -> Unit, onComplete: (List<T
         load = {
             // The statistics build already holds the whole tag list; reuse it like iOS.
             val fetched = AITagSuggestions.vocabulary.ifEmpty {
-                SceneEditing.allTags(if (target.kind == AITagTarget.Kind.Image) "images_count" else "scenes_count")
+                SceneEditing.allTags(countContext)
             }
             // Tags the item already carries may sit outside the fetched page.
             val merged = fetched + target.tags.filter { t -> fetched.none { it.id == t.id } }

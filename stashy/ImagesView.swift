@@ -2381,7 +2381,8 @@ struct EditGallerySheet: View {
                         viewModel: viewModel,
                         saveTagIds: { ids, done in
                             viewModel.updateGalleryTags(galleryId: gallery.id, tagIds: ids, completion: done)
-                        }
+                        },
+                        countContext: .galleries
                     ) { picked in
                         applyLink { $0.tags = picked.map { Tag.TagRef(id: $0.id, name: $0.name) } }
                     }

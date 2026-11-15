@@ -910,7 +910,8 @@ struct SetTagImageFromFrameSheet: View {
                 }
                 guard allTags.isEmpty else { return }
                 isLoadingTags = true
-                viewModel.fetchAllTags { fetched in
+                // A tag image from this scene's frame: ranked by scene use (`sortedByFrequency`).
+                viewModel.fetchAllTags(for: .scenes) { fetched in
                     DispatchQueue.main.async {
                         let ranked = Self.sortedByFrequency(fetched)
                         allTags = ranked

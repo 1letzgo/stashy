@@ -847,6 +847,8 @@ struct TagDetailView: View {
     @State private var showingSubTagOptionsSheet = false
     @StateObject private var linkedStudios: DetailLinkedStudiosFilterModel
     @StateObject private var linkedGalleries: DetailLinkedGalleriesFilterModel
+    /// The performers carrying this tag (`performers` with a `tags` criterion).
+    @StateObject private var linkedPerformers: DetailLinkedPerformersFilterModel
     /// Scenes tab filter / sort, kept here so it survives the tab remounting `ScenesView`.
     @StateObject private var scenesFilterMemory: ScenesListFilterMemory
     @StateObject private var linkedImages: DetailLinkedImagesFilterModel
@@ -863,6 +865,7 @@ struct TagDetailView: View {
     enum DetailTab: String, CaseIterable {
         case scenes = "Scenes"
         case galleries = "Galleries"
+        case performers = "Performers"
         case studios = "Studios"
         case groups = "Groups"
         case images = "Images"
@@ -874,6 +877,7 @@ struct TagDetailView: View {
             switch self {
             case .scenes: return tr("scenes")
             case .galleries: return tr("galleries")
+            case .performers: return tr("performers")
             case .tags: return tr("sub_tags")
             case .studios: return tr("studios")
             case .groups: return tr("groups")
@@ -885,6 +889,7 @@ struct TagDetailView: View {
             switch self {
             case .scenes: return "film"
             case .galleries: return "photo.stack"
+            case .performers: return "person.fill"
             case .studios: return "building.2"
             case .groups: return "rectangle.stack.fill"
             case .images: return "photo"
@@ -910,6 +915,8 @@ struct TagDetailView: View {
             resolvedTab = .scenes
         } else if gal > 0 {
             resolvedTab = .galleries
+        } else if (selectedTag.performerCount ?? 0) > 0 {
+            resolvedTab = .performers
         } else if img > 0 {
             resolvedTab = .images
         } else {
@@ -917,6 +924,7 @@ struct TagDetailView: View {
         }
         _selectedDetailTab = State(initialValue: resolvedTab)
         _linkedStudios = StateObject(wrappedValue: DetailLinkedStudiosFilterModel(scope: .tag(selectedTag.id)))
+        _linkedPerformers = StateObject(wrappedValue: DetailLinkedPerformersFilterModel(scope: .tag(selectedTag.id), initialSort: .nameAsc))
         let galleries = DetailLinkedGalleriesFilterModel(scope: .tag(selectedTag.id))
         let images = DetailLinkedImagesFilterModel(scope: .tag(selectedTag.id))
         if let filterPerformerId {
@@ -963,6 +971,10 @@ struct TagDetailView: View {
         max(viewModel.totalDetailImages, selectedTag.imageCount ?? 0)
     }
 
+    private var effectivePerformers: Int {
+        max(viewModel.totalDetailPerformers, selectedTag.performerCount ?? 0)
+    }
+
     /// Counts with sub-tags (`TagSubtreeCountsStore`), nil until the server answered.
     private var subtreeCounts: TagSubtreeCounts? { subtreeCountsStore.counts[selectedTag.id] }
 
@@ -972,6 +984,8 @@ struct TagDetailView: View {
         // "Include sub-tag content" in its empty state and its settings sheet.
         if effectiveScenes > 0 || (subtreeCounts?.scene_count_all ?? 0) > 0 { tabs.append(.scenes) }
         if effectiveGalleries > 0 || (subtreeCounts?.gallery_count_all ?? 0) > 0 { tabs.append(.galleries) }
+        // Menu order follows the header counts: Scenes · Galleries · Performers.
+        if effectivePerformers > 0 || (subtreeCounts?.performer_count_all ?? 0) > 0 { tabs.append(.performers) }
         if viewModel.totalDetailTags > 0 { tabs.append(.tags) }
         if viewModel.totalDetailStudios > 0 { tabs.append(.studios) }
         if viewModel.totalDetailGroups > 0 { tabs.append(.groups) }
@@ -984,6 +998,7 @@ struct TagDetailView: View {
             switch selectedDetailTab {
             case .scenes: return viewModel.tagScenes.isEmpty
             case .galleries: return viewModel.tagGalleries.isEmpty
+            case .performers: return viewModel.detailPerformers.isEmpty
             case .studios: return viewModel.detailStudios.isEmpty
             case .groups: return viewModel.detailGroups.isEmpty
             case .images: return viewModel.detailImages.isEmpty
@@ -1087,6 +1102,10 @@ struct TagDetailView: View {
                 CatalogQuickSortMenu(mode: .studios, sort: linkedStudios.selectedSortOption) {
                     linkedStudios.changeSortOption(to: $0, viewModel: viewModel)
                 }
+            case .performers:
+                CatalogQuickSortMenu(mode: .performers, sort: linkedPerformers.selectedSortOption) {
+                    linkedPerformers.changeSortOption(to: $0, viewModel: viewModel)
+                }
             case .scenes, .groups, .tags:
                 EmptyView()
             }
@@ -1108,6 +1127,7 @@ struct TagDetailView: View {
         case .scenes: return slot(active: tagSceneFilterActive) { tagLiveFilterSheetPresented = true }
         case .galleries: return slot(active: linkedGalleries.catalogFilterSortFABActive) { linkedGalleries.showFilterSortSheet = true }
         case .studios: return slot(active: linkedStudios.catalogFilterSortFABActive) { linkedStudios.showFilterSortSheet = true }
+        case .performers: return slot(active: linkedPerformers.catalogFilterSortFABActive) { linkedPerformers.showFilterSortSheet = true }
         case .images: return slot(active: linkedImages.catalogFilterSortFABActive) { linkedImages.showFilterSortSheet = true }
         // The sub-tags have no filter; their settings hold "Include sub-tag content", which
         // otherwise sits only in the sheets of sections a parent tag may not have.
@@ -1157,6 +1177,23 @@ struct TagDetailView: View {
                             title: tr("empty_galleries_found"),
                             fillsScreen: false,
                             subtreeCount: \.gallery_count_all
+                        )
+                    }
+                } else if selectedDetailTab == .performers {
+                    if !viewModel.detailPerformers.isEmpty {
+                        performerGrid
+                    } else if viewModel.isLoadingDetailPerformers {
+                        VStack {
+                            InlineSpinner()
+                            Text(tr("loading_more_performers")).font(.caption).foregroundColor(.secondary)
+                        }.padding(.top, 40)
+                    } else {
+                        SubTagContentEmptyState(
+                            tagId: selectedTag.id,
+                            icon: "person.2",
+                            title: tr("empty_performers_found"),
+                            fillsScreen: false,
+                            subtreeCount: \.performer_count_all
                         )
                     }
                 } else if selectedDetailTab == .tags {
@@ -1248,8 +1285,38 @@ struct TagDetailView: View {
             }
     }
 
-    private var tagDetailWithLinkedStudiosSheets: some View {
+    private var tagDetailWithLinkedPerformersSheets: some View {
         tagDetailCoreChrome
+            .sheet(isPresented: $linkedPerformers.showFilterSortSheet) {
+                tagDetailPerformersFilterSheet
+            }
+            .onChange(of: linkedPerformers.catalogPresetRowSelection) { _, newId in
+                linkedPerformers.handlePresetSelection(newId, viewModel: viewModel)
+            }
+            .alert(tr("action_save_as_new"), isPresented: $linkedPerformers.showSaveAsCatalogPresetAlert) {
+                TextField(tr("name"), text: $linkedPerformers.catalogPresetNameInput)
+                Button(tr("action_save")) { linkedPerformers.savePresetAs(name: linkedPerformers.catalogPresetNameInput, viewModel: viewModel) }
+                Button(tr("action_cancel"), role: .cancel) {}
+            } message: {
+                Text(tr("hint_save_current_sort_filter_and"))
+            }
+            .alert(tr("action_rename"), isPresented: $linkedPerformers.showRenameCatalogPresetAlert) {
+                TextField(tr("name"), text: $linkedPerformers.renameCatalogPresetInput)
+                Button(tr("action_save")) { linkedPerformers.renamePreset(to: linkedPerformers.renameCatalogPresetInput, viewModel: viewModel) }
+                Button(tr("action_cancel"), role: .cancel) {}
+            } message: {
+                Text(tr("hint_rename_this_preset_or_saved"))
+            }
+            .alert(tr("confirm_delete_filter"), isPresented: $linkedPerformers.showDeleteCatalogPresetAlert) {
+                Button(tr("action_delete"), role: .destructive) { linkedPerformers.deletePreset(viewModel: viewModel) }
+                Button(tr("action_cancel"), role: .cancel) {}
+            } message: {
+                Text(linkedPerformers.deletePresetConfirmationText(viewModel: viewModel))
+            }
+    }
+
+    private var tagDetailWithLinkedStudiosSheets: some View {
+        tagDetailWithLinkedPerformersSheets
             .sheet(isPresented: $linkedStudios.showFilterSortSheet) {
                 tagDetailStudiosFilterSheet
             }
@@ -1328,6 +1395,7 @@ struct TagDetailView: View {
         .onChange(of: includesSubTagContent) { _, _ in
             linkedGalleries.refetchGalleries(viewModel: viewModel, initial: true)
             linkedStudios.refetchStudios(viewModel: viewModel, initial: true)
+            linkedPerformers.refetchPerformers(viewModel: viewModel, initial: true)
             viewModel.fetchDetailGroups(tagId: selectedTag.id)
             viewModel.fetchDetailTags(parentTagId: selectedTag.id)
             linkedImages.refetchImages(viewModel: viewModel, initial: true)
@@ -1514,6 +1582,50 @@ struct TagDetailView: View {
     }
 
     @ViewBuilder
+    private var tagDetailPerformersFilterSheet: some View {
+        PerformersCatalogFilterSortSheet(
+            serverFilters: linkedPerformers.sortedServerPerformerFilters(viewModel: viewModel),
+            localPresets: linkedPerformers.localCatalogPresets,
+            selectedPresetRowId: $linkedPerformers.catalogPresetRowSelection,
+            criteriaDocument: linkedPerformers.criteriaDocument,
+            sortOption: linkedPerformers.selectedSortOption,
+            onSortChange: { linkedPerformers.changeSortOption(to: $0, viewModel: viewModel) },
+            onApply: { linkedPerformers.applyLiveFilter(viewModel: viewModel) },
+            onReset: {
+                linkedPerformers.catalogPresetRowSelection = ""
+                linkedPerformers.selectedFilter = nil
+                linkedPerformers.clearLiveChipsOnly()
+                linkedPerformers.criteriaDocument.clear()
+                linkedPerformers.applyLiveFilter(viewModel: viewModel)
+            },
+            onRequestSave: { linkedPerformers.savePresetOverwrite(viewModel: viewModel) },
+            onRequestSaveAs: {
+                linkedPerformers.catalogPresetNameInput = ""
+                linkedPerformers.showSaveAsCatalogPresetAlert = true
+            },
+            onRequestRename: {
+                if let sid = ListLivePresetTag.parseServerId(linkedPerformers.catalogPresetRowSelection),
+                   let n = viewModel.savedFilters[sid]?.name {
+                    linkedPerformers.renameCatalogPresetInput = n
+                } else if let ls = ListLivePresetTag.parseLocalUUIDString(linkedPerformers.catalogPresetRowSelection),
+                          let uuid = UUID(uuidString: ls),
+                          let p = linkedPerformers.localCatalogPresets.first(where: { $0.id == uuid }) {
+                    linkedPerformers.renameCatalogPresetInput = p.name
+                }
+                linkedPerformers.showRenameCatalogPresetAlert = true
+            },
+            onRequestDelete: { linkedPerformers.showDeleteCatalogPresetAlert = true }
+        )
+        .presentationDragIndicator(.visible)
+        .presentationBackground(Color.appBackground)
+        .onAppear {
+            ListLivePresetTag.migrateLegacySelection(&linkedPerformers.catalogPresetRowSelection)
+            linkedPerformers.refreshLocalPresets()
+            linkedPerformers.applyCatalogPresetSelectionFromSheetIfNeeded(viewModel: viewModel)
+        }
+    }
+
+    @ViewBuilder
     private var tagDetailGalleriesFilterSheet: some View {
         GalleriesCatalogFilterSortSheet(
             serverFilters: linkedGalleries.sortedServerGalleryFilters(viewModel: viewModel),
@@ -1624,6 +1736,7 @@ struct TagDetailView: View {
         // Fetch extended content
         viewModel.fetchSavedFilters()
         linkedStudios.refetchStudios(viewModel: viewModel, initial: true)
+        linkedPerformers.refetchPerformers(viewModel: viewModel, initial: true)
         viewModel.fetchDetailGroups(tagId: selectedTag.id)
         viewModel.fetchDetailTags(parentTagId: selectedTag.id)
         if viewModel.detailImages.isEmpty && !viewModel.isLoadingDetailImages {
@@ -1764,6 +1877,25 @@ struct TagDetailView: View {
         .measuresGridWidth($gridWidth)
     }
     
+    /// The performers carrying this tag; each card counts what the list is sorted by.
+    private var performerGrid: some View {
+        LazyVGrid(columns: galleryColumns, spacing: 12) {
+            ForEach(viewModel.detailPerformers) { performer in
+                NavigationLink(destination: PerformerDetailView(performer: performer)) {
+                    PerformerCardView(performer: performer, badgeType: .forSort(linkedPerformers.selectedSortOption))
+                }
+                .buttonStyle(.plain)
+            }
+            if viewModel.isLoadingDetailPerformers {
+                ProgressView().padding()
+            } else if viewModel.hasMoreDetailPerformers {
+                Color.clear.frame(height: 1).onAppear {
+                    linkedPerformers.refetchPerformers(viewModel: viewModel, initial: false)
+                }
+            }
+        }
+    }
+
     /// The tag's direct sub-tags, by name.
     private var subTagGrid: some View {
         LazyVGrid(columns: galleryColumns, spacing: 12) {

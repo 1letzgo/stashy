@@ -2161,6 +2161,8 @@
     <string name="arg_count_tags">%1$s tags</string>
     <string name="arg_count_studio">%1$s studio</string>
     <string name="arg_count_studios">%1$s studios</string>
+    <string name="arg_count_group">%1$s group</string>
+    <string name="arg_count_groups">%1$s groups</string>
     <string name="search_studios">Search Studios</string>
     <string name="confirm_merge_tags">Merge tags?</string>
     <string name="confirm_merge_studios">Merge studios?</string>

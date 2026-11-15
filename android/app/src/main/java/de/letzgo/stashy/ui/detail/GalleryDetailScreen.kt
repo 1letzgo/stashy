@@ -50,6 +50,7 @@ import de.letzgo.stashy.ui.scene.EditPerformersSheet
 import de.letzgo.stashy.ui.scene.EditStudioSheet
 import de.letzgo.stashy.ui.scene.EditTagsSheet
 import de.letzgo.stashy.data.IdName
+import de.letzgo.stashy.data.TagCountContext
 import de.letzgo.stashy.ui.NativeGroup
 import de.letzgo.stashy.ui.NativeListItem
 import androidx.compose.foundation.layout.Spacer
@@ -320,7 +321,7 @@ internal fun EditGallerySheet(gallery: Gallery, onDismiss: () -> Unit, onSaved: 
     if (pickingTags) current.tags?.let { tags ->
         EditTagsSheet(
             tags.map { it.id }.toSet(), { DetailRepository.updateGalleryTags(gallery.id, it) },
-            { pickingTags = false },
+            { pickingTags = false }, TagCountContext.Galleries,
         ) { picked -> update(current.copy(tags = picked.map { IdName(it.id, it.name) })) }
     }
     EditEntitySheet(

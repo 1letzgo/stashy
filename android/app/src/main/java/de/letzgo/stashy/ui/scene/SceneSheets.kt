@@ -59,6 +59,7 @@ import de.letzgo.stashy.data.SceneGroupEntry
 import de.letzgo.stashy.data.SceneTitleNormalizer
 import de.letzgo.stashy.data.Studio
 import de.letzgo.stashy.data.Tag
+import de.letzgo.stashy.data.TagCountContext
 import de.letzgo.stashy.ui.Appearance
 import de.letzgo.stashy.ui.IosTypography
 import de.letzgo.stashy.ui.NativeSearchField
@@ -403,29 +404,27 @@ fun EditStudioSheet(
 
 @Composable
 fun EditTagsSheet(scene: Scene, onDismiss: () -> Unit, onSaved: (List<Tag>) -> Unit) =
-    EditTagsSheet(scene.tags.orEmpty().map { it.id }.toSet(), { SceneEditing.updateTags(scene.id, it) }, onDismiss, onSaved = onSaved)
+    EditTagsSheet(scene.tags.orEmpty().map { it.id }.toSet(), { SceneEditing.updateTags(scene.id, it) }, onDismiss, TagCountContext.Scenes, onSaved = onSaved)
 
 /**
  * Tag picker for any owner (scene, gallery, performer): `save` writes the chosen ids.
- * [countsPerformers] (a performer's tags, iOS `countsPerformers`): each row shows the tag's
- * performer count and the list is ordered by it instead of by scenes.
+ * [countContext] (iOS `AddTagToSceneSheet.countContext`): each row shows the count of the kind
+ * being edited and the list is ordered by it.
  */
 @Composable
 fun EditTagsSheet(
     initialIds: Set<String>,
     save: suspend (List<String>) -> Unit,
     onDismiss: () -> Unit,
-    countsPerformers: Boolean = false,
+    countContext: TagCountContext,
     onSaved: (List<Tag>) -> Unit,
 ) {
     val byId = remember { mutableMapOf<String, Tag>() }
-    fun detail(t: Tag): String? =
-        if (countsPerformers) t.performerCount?.let { n -> tr(if (n == 1) R.string.arg_count_performer else R.string.arg_count_performers, n) }
-        else count(t.sceneCount, "scenes")
+    fun detail(t: Tag): String? = countContext.label(t)
     EntityPickerSheet(
         tr(R.string.action_edit_tags), tr(R.string.search_tags), initialIds, multiple = true,
         load = {
-            SceneEditing.allTags(if (countsPerformers) "performers_count" else "scenes_count")
+            SceneEditing.allTags(countContext)
                 .onEach { byId[it.id] = it }.map { PickerEntry(it.id, it.name, detail(it)) }
         },
         create = { name -> SceneEditing.createTag(name).also { byId[it.id] = it }.let { PickerEntry(it.id, it.name, detail(it)) } },
@@ -585,7 +584,8 @@ fun AddMarkerSheet(scene: Scene, seconds: Double, frame: android.graphics.Bitmap
     // the field. From the window's height (split screen included), not the orientation; the
     // layout never changes with the focus.
     val compactHeight = androidx.compose.ui.platform.LocalConfiguration.current.screenHeightDp < 500
-    LaunchedEffect(Unit) { tags = runCatching { SceneEditing.allTags() }.getOrDefault(emptyList()); loading = false }
+    // The primary tag names a marker: the tags used on markers most come first.
+    LaunchedEffect(Unit) { tags = runCatching { SceneEditing.allTags(TagCountContext.Markers) }.getOrDefault(emptyList()); loading = false }
     val title = tags.firstOrNull { it.id == primaryTagId }?.name.orEmpty()
     val base = if (search.isEmpty()) tags else tags.filter { it.name.lowercase().contains(search.lowercase()) }
     val filtered = base.filter { it.id in sceneTagIds } + base.filter { it.id !in sceneTagIds }
@@ -655,7 +655,7 @@ fun AddMarkerSheet(scene: Scene, seconds: Double, frame: android.graphics.Bitmap
                             }
                         }) {
                             Text(tag.name, Modifier.weight(1f), color = p.text)
-                            tag.sceneCount?.let { Text("$it", style = NativeType.bodyMedium, color = p.secondaryText) }
+                            TagCountContext.Markers.label(tag)?.let { Text(it, style = NativeType.bodyMedium, color = p.secondaryText) }
                             if (primaryTagId == tag.id) { Spacer(Modifier.width(8.dp)); Icon(PlayerIcons.check, null, tint = nativeAccent(), modifier = Modifier.size(24.dp)) }
                         }
                     }
@@ -725,7 +725,8 @@ fun SetTagImageFromFrameSheet(imageDataURL: String, sceneTags: List<Tag>, onDism
         }.getOrNull()
     }
     LaunchedEffect(Unit) {
-        val ranked = sortedByFrequency(runCatching { SceneEditing.allTags() }.getOrDefault(emptyList()))
+        // A tag image from this scene's frame: ranked by scene use (`sortedByFrequency`).
+        val ranked = sortedByFrequency(runCatching { SceneEditing.allTags(TagCountContext.Scenes) }.getOrDefault(emptyList()))
         allTags = ranked; loading = false
         if (selectedId == null) {
             val byId = ranked.associateBy { it.id }

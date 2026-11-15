@@ -980,7 +980,7 @@ struct PerformerDetailView: View {
                 saveTagIds: { [performerId = performer.id, viewModel] ids, done in
                     viewModel.updatePerformerTags(performerId: performerId, tagIds: ids, completion: done)
                 },
-                forPerformer: true,
+                countContext: .performers,
                 viewModel: viewModel,
                 isTagsExpanded: $isTagsExpanded,
                 tagsTotalHeight: $tagsTotalHeight
@@ -1568,7 +1568,7 @@ struct EditPerformerSheet: View {
                     currentTags: editedTags,
                     viewModel: viewModel,
                     saveTagIds: { _, done in done(true) },
-                    countsPerformers: true
+                    countContext: .performers
                 ) { picked in
                     editedTags = picked.sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
                 }

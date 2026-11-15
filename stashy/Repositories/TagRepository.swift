@@ -233,6 +233,7 @@ struct TagSubtreeCounts: Decodable, Equatable {
     let scene_count_all: Int
     let gallery_count_all: Int
     let image_count_all: Int
+    let performer_count_all: Int
 }
 
 /// The counts with sub-tags of the tag pages opened, so a parent tag without own scenes still

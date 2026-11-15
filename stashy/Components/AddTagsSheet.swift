@@ -43,13 +43,19 @@ struct AddTagsSheet: View {
         }
     }
 
+    /// The kind of item being edited decides which count a row shows and sorts by.
+    private var countContext: TagCountContext {
+        switch target.kind {
+        case .image: return .images
+        case .scene: return .scenes
+        case .marker: return .markers
+        }
+    }
+
     /// How often a tag is used on the kind of item being edited — the sort key, and
     /// what the row shows on the right.
     private func usage(of tag: Tag) -> Int {
-        switch target.kind {
-        case .image: return tag.imageCount ?? 0
-        case .scene, .marker: return tag.sceneCount ?? 0
-        }
+        countContext.count(of: tag) ?? 0
     }
 
     var body: some View {
@@ -121,8 +127,7 @@ struct AddTagsSheet: View {
                 }
 
                 isLoading = true
-                let sortField = target.kind == .image ? "images_count" : "scenes_count"
-                viewModel.fetchAllTags(sortField: sortField) { fetched in
+                viewModel.fetchAllTags(for: countContext) { fetched in
                     DispatchQueue.main.async {
                         apply(fetched: fetched)
                     }
@@ -179,11 +184,7 @@ struct AddTagsSheet: View {
         if let performerCount = performerCounts[tag.id], performerCount > 0 {
             return tr("arg_performer_times", performerCount)
         }
-        let count = usage(of: tag)
-        switch target.kind {
-        case .image: return tr("arg_count_images", count)
-        case .scene, .marker: return tr("arg_count_scenes", count)
-        }
+        return countContext.label(usage(of: tag))
     }
 
     private func save() {

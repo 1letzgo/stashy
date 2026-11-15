@@ -4878,7 +4878,8 @@ class StashDBViewModel: ObservableObject {
         
         var performerScope: [String: Any] = [:]
         if let tid = tagId {
-            performerScope["tags"] = ["value": [tid], "modifier": "INCLUDES"]
+            // A tag's page: with "Include sub-tag content" also the performers of its sub-tags.
+            performerScope["tags"] = ["value": [tid], "modifier": "INCLUDES", "depth": TagHierarchy.contentDepth]
         }
         if let sid = studioId {
             performerScope["studios"] = ["value": [sid], "modifier": "INCLUDES", "depth": StudioCountsStore.contentDepth]
@@ -8216,6 +8217,15 @@ struct GenerateData: Codable {
         )
     }
 
+    /// Tags that appear on at least one group, the most used first.
+    func fetchTagsForGroupFilterPicker(completion: @escaping ([Tag]) -> Void) {
+        fetchTagsForFilterPicker(
+            countField: "group_count",
+            sortField: "groups_count",
+            completion: completion
+        )
+    }
+
     /// Tags that appear on at least one studio. Sorted by name — `findTags` has no
     /// `studios_count` sort key, and `studio_count` is not in `TagFields`.
     func fetchTagsForStudioFilterPicker(completion: @escaping ([Tag]) -> Void) {
@@ -8282,7 +8292,7 @@ struct GenerateData: Codable {
         // Every tag picker searches the full tag list: the cached lists are per-entity "most used"
         // slices, and re-applying that filter here would hide exactly the long-tail hits the
         // search exists for.
-        case .tags, .imageTags, .performerTags, .studioTags, .galleryTags, .markerTags, .allTags:
+        case .tags, .imageTags, .performerTags, .studioTags, .galleryTags, .markerTags, .groupTags, .allTags:
             // Stash's `q` also matches tag aliases, so the hits need them for the local filter.
             run("findTagPickerOptions") { (r: TagsResponse) in
                 (r.data?.findTags.tags ?? []).map {
@@ -8578,16 +8588,19 @@ struct GenerateData: Codable {
         }
     }
 
-    /// `sortField` decides which usage the 1000-tag cut favours — pass `images_count`
-    /// when the picker is for an image, or a tag heavy on images but absent from scenes
-    /// falls outside the page.
-    func fetchAllTags(sortField: String = "scenes_count", completion: @escaping ([Tag]) -> Void) {
-        let query = GraphQLQueries.queryWithFragments("findTags")
-        
+    /// The tag picker's list: the 1000 tags used most on the kind being edited (`context`), with
+    /// that kind's count. The sort decides what the cut keeps — a tag heavy on images but absent
+    /// from scenes would fall outside a scene-sorted page. A server that rejects the group count
+    /// or sort gets the tags by name without a count instead of an empty picker.
+    func fetchAllTags(for context: TagCountContext, completion: @escaping ([Tag]) -> Void) {
+        var query = GraphQLQueries.queryWithFragments("findTags")
+        if let extra = context.extraCountField {
+            query = query.replacingOccurrences(of: "...TagFields", with: "...TagFields\n      \(extra)")
+        }
         let variables: [String: Any] = [
             "filter": [
                 "per_page": 1000,
-                "sort": sortField,
+                "sort": context.sortField,
                 "direction": "DESC"
             ],
             "tag_filter": [:]
@@ -8600,7 +8613,13 @@ struct GenerateData: Codable {
         }
         
         performGraphQLQuery(query: bodyString) { (response: TagsResponse?) in
-            completion(response?.data?.findTags.tags ?? [])
+            if let tags = response?.data?.findTags.tags {
+                completion(tags)
+            } else if context.extraCountField != nil {
+                self.fetchAllTagsByName { completion($0) }
+            } else {
+                completion([])
+            }
         }
     }
     
@@ -10945,6 +10964,8 @@ struct Tag: Codable, Identifiable, Equatable {
     var galleryCountAll: Int?
     var sceneMarkerCountAll: Int?
     var performerCountAll: Int?
+    /// Not in `TagFields`; only the group tag picker asks for it (`TagCountContext.groups`).
+    var groupCount: Int?
 
     struct TagRef: Codable, Equatable, Identifiable {
         let id: String
@@ -10973,6 +10994,7 @@ struct Tag: Codable, Identifiable, Equatable {
         case galleryCount = "gallery_count"
         case sceneMarkerCount = "scene_marker_count"
         case performerCount = "performer_count"
+        case groupCount = "group_count"
         case createdAt = "created_at"
         case updatedAt = "updated_at"
     }
@@ -10986,6 +11008,58 @@ struct Tag: Codable, Identifiable, Equatable {
         }
         return signedURL(URL(string: imageURLWithWidth(manualPath, 640)))
     }
+}
+
+/// What a tag picker edits, and so which of a tag's counts each row shows and the list is
+/// ordered by: picking tags for a performer counts performers, for a gallery galleries, …
+/// Studios have no tag editing in the app; Android has no group tag editing (Android
+/// `TagCountContext` in `SceneEditing.kt`).
+enum TagCountContext {
+    case scenes, performers, galleries, images, groups, markers
+
+    /// `findTags` sort key.
+    var sortField: String {
+        switch self {
+        case .scenes: return "scenes_count"
+        case .performers: return "performers_count"
+        case .galleries: return "galleries_count"
+        case .images: return "images_count"
+        case .groups: return "groups_count"
+        case .markers: return "scene_markers_count"
+        }
+    }
+
+    /// `group_count` stays out of `TagFields`; the group picker's query adds it.
+    var extraCountField: String? {
+        self == .groups ? "group_count" : nil
+    }
+
+    func count(of tag: Tag) -> Int? {
+        switch self {
+        case .scenes: return tag.sceneCount
+        case .performers: return tag.performerCount
+        case .galleries: return tag.galleryCount
+        case .images: return tag.imageCount
+        case .groups: return tag.groupCount
+        case .markers: return tag.sceneMarkerCount
+        }
+    }
+
+    /// "3 performers", "1 gallery" …
+    func label(_ count: Int) -> String {
+        let one = count == 1
+        switch self {
+        case .scenes: return tr(one ? "arg_count_scene" : "arg_count_scenes", count)
+        case .performers: return tr(one ? "arg_count_performer" : "arg_count_performers", count)
+        case .galleries: return tr(one ? "arg_count_gallery" : "arg_count_galleries", count)
+        case .images: return tr(one ? "arg_count_image" : "arg_count_images", count)
+        case .groups: return tr(one ? "arg_count_group" : "arg_count_groups", count)
+        case .markers: return tr(one ? "arg_count_marker" : "arg_count_markers", count)
+        }
+    }
+
+    /// The row's text, nil when the server did not send the count.
+    func label(for tag: Tag) -> String? { count(of: tag).map { label($0) } }
 }
 
 // MARK: - Group Models

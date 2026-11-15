@@ -266,6 +266,7 @@ internal class LinkedCatalog(
                 DetailTab.Scenes -> known.sceneCountAll
                 DetailTab.Galleries -> known.galleryCountAll
                 DetailTab.Images -> known.imageCountAll
+                DetailTab.Performers -> known.performerCountAll
                 else -> null
             }
         }
@@ -418,7 +419,8 @@ internal fun LazyGridScope.linkedSection(catalog: LinkedCatalog, tab: DetailTab,
             pagedSection(l, { it.id }) { _, s -> DetailStudioCard(s, badge = CatalogCardBadge.forSort(catalog.studioController!!.sort), onClick = { Nav.push(StudioDetailScreen(s.id, s, catalog.opensFilteredOnPerformerId)) }) }
         }
         DetailTab.Performers -> catalog.performers?.let { l ->
-            pagedSection(l, { it.id }, tr(R.string.loading_performers)) { _, p -> DetailPerformerCard(p, badgeType = PerformerBadgeType.forSort(catalog.performerController!!.sort), onClick = { Nav.push(PerformerDetailScreen(p.id, p)) }) }
+            // A tag page's empty Performers section offers "Include sub-tag content" when its sub-tags have some.
+            pagedSection(l, { it.id }, tr(R.string.loading_performers), SF.person2, tr(R.string.empty_performers_found), { catalog.includeSubContentAction(tab) }) { _, p -> DetailPerformerCard(p, badgeType = PerformerBadgeType.forSort(catalog.performerController!!.sort), onClick = { Nav.push(PerformerDetailScreen(p.id, p)) }) }
         }
         DetailTab.Tags -> catalog.tags?.let { l ->
             pagedSection(l, { it.id }) { _, t -> DetailTagCard(t, badge = CatalogCardBadge.forSort(catalog.tagController!!.sort), onClick = { Nav.push(TagDetailScreen(t.id, t, catalog.opensFilteredOnPerformerId)) }) }
