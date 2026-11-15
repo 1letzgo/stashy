@@ -202,6 +202,9 @@ enum class DetailViewContext(val raw: String, @androidx.annotation.StringRes pri
 
     val settingsRowTitle: String get() = if (this == Gallery) tr(R.string.images_sort) else tr(R.string.scenes_sort)
 
+    /** Sort when none is stored: a group's scenes by their number in the group (as Stash), else newest first. */
+    val defaultSortRaw: String get() = if (this == Group) GroupSceneSort.Asc.raw else "dateDesc"
+
     companion object {
         fun fromRaw(raw: String?): DetailViewContext? = entries.firstOrNull { it.raw == raw }
 

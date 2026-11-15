@@ -807,7 +807,7 @@ struct CatalogDetailSortMenu: View {
                 : StashDBViewModel.SceneSortOption.generalCases
             sortMenu(
                 cases.map { ($0.rawValue, $0.displayName) },
-                fallback: StashDBViewModel.SceneSortOption.dateDesc.rawValue
+                fallback: context.defaultSceneSortRaw
             )
         }
     }
