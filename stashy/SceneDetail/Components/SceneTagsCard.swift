@@ -8,6 +8,8 @@ struct SceneTagsCard: View {
     var onTagsUpdated: (([Tag]) -> Void)?
     /// Set = the tags belong to something else than a scene (a performer), written through this.
     var saveTagIds: (([String], @escaping (Bool) -> Void) -> Void)? = nil
+    /// The performer's own tags: the picker counts and orders tags by performers.
+    var forPerformer: Bool = false
     @ObservedObject var viewModel: StashDBViewModel
     @Binding var isTagsExpanded: Bool
     @Binding var tagsTotalHeight: CGFloat
@@ -103,7 +105,8 @@ struct SceneTagsCard: View {
                 sceneId: sceneId,
                 currentTags: tags ?? [],
                 viewModel: viewModel,
-                saveTagIds: saveTagIds
+                saveTagIds: saveTagIds,
+                countsPerformers: forPerformer
             ) { updated in
                 onTagsUpdated?(updated)
             }
@@ -117,6 +120,8 @@ struct AddTagToSceneSheet: View {
     @ObservedObject var viewModel: StashDBViewModel
     /// Set = the tags belong to something else than a scene (a gallery), written through this.
     var saveTagIds: (([String], @escaping (Bool) -> Void) -> Void)? = nil
+    /// Tags for a performer: each row shows its performer count and the list is ordered by it.
+    var countsPerformers: Bool = false
     var onComplete: ([Tag]) -> Void
 
     @Environment(\.stashyDismiss) var dismiss
@@ -152,7 +157,10 @@ struct AddTagToSceneSheet: View {
                         ForEach(pinned + Array(filtered.prefix(30))) { tag in
                             HStack {
                                 Text(tag.name)
-                                if let count = tag.sceneCount {
+                                if countsPerformers, let count = tag.performerCount {
+                                    Spacer()
+                                    Text(tr(count == 1 ? "arg_count_performer" : "arg_count_performers", count)).font(.caption).foregroundColor(.secondary)
+                                } else if !countsPerformers, let count = tag.sceneCount {
                                     Spacer()
                                     Text(tr(count == 1 ? "arg_count_scene" : "arg_count_scenes", count)).font(.caption).foregroundColor(.secondary)
                                 }
@@ -198,7 +206,7 @@ struct AddTagToSceneSheet: View {
             .onAppear {
                 selectedIds = Set(currentTags.map { $0.id })
                 isLoading = true
-                viewModel.fetchAllTags { fetched in
+                viewModel.fetchAllTags(sortField: countsPerformers ? "performers_count" : "scenes_count") { fetched in
                     DispatchQueue.main.async {
                         // Tags the scene already carries may sit outside the fetched page.
                         var merged = fetched

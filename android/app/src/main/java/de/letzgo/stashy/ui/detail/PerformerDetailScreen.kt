@@ -273,6 +273,7 @@ class PerformerDetailScreen(val performerId: String, val preview: Performer? = n
                 tags.map { it.id }.toSet(),
                 save = { ids -> check(DetailRepository.setPerformerTags(performerId, ids)) },
                 onDismiss = { editingTags = false },
+                countsPerformers = true,
                 onSaved = { tags = sortedTags(it) },
             )
         }
@@ -424,6 +425,7 @@ class PerformerDetailScreen(val performerId: String, val preview: Performer? = n
                 editedTags.map { it.id }.toSet(),
                 save = {},
                 onDismiss = { pickingTags = false },
+                countsPerformers = true,
                 onSaved = { editedTags = sortedTags(it) },
             )
         }

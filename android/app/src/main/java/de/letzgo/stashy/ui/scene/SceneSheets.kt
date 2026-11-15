@@ -403,16 +403,32 @@ fun EditStudioSheet(
 
 @Composable
 fun EditTagsSheet(scene: Scene, onDismiss: () -> Unit, onSaved: (List<Tag>) -> Unit) =
-    EditTagsSheet(scene.tags.orEmpty().map { it.id }.toSet(), { SceneEditing.updateTags(scene.id, it) }, onDismiss, onSaved)
+    EditTagsSheet(scene.tags.orEmpty().map { it.id }.toSet(), { SceneEditing.updateTags(scene.id, it) }, onDismiss, onSaved = onSaved)
 
-/** Tag picker for any owner (scene, gallery): `save` writes the chosen ids. */
+/**
+ * Tag picker for any owner (scene, gallery, performer): `save` writes the chosen ids.
+ * [countsPerformers] (a performer's tags, iOS `countsPerformers`): each row shows the tag's
+ * performer count and the list is ordered by it instead of by scenes.
+ */
 @Composable
-fun EditTagsSheet(initialIds: Set<String>, save: suspend (List<String>) -> Unit, onDismiss: () -> Unit, onSaved: (List<Tag>) -> Unit) {
+fun EditTagsSheet(
+    initialIds: Set<String>,
+    save: suspend (List<String>) -> Unit,
+    onDismiss: () -> Unit,
+    countsPerformers: Boolean = false,
+    onSaved: (List<Tag>) -> Unit,
+) {
     val byId = remember { mutableMapOf<String, Tag>() }
+    fun detail(t: Tag): String? =
+        if (countsPerformers) t.performerCount?.let { n -> tr(if (n == 1) R.string.arg_count_performer else R.string.arg_count_performers, n) }
+        else count(t.sceneCount, "scenes")
     EntityPickerSheet(
         tr(R.string.action_edit_tags), tr(R.string.search_tags), initialIds, multiple = true,
-        load = { SceneEditing.allTags().onEach { byId[it.id] = it }.map { PickerEntry(it.id, it.name, count(it.sceneCount, "scenes")) } },
-        create = { name -> SceneEditing.createTag(name).also { byId[it.id] = it }.let { PickerEntry(it.id, it.name, count(it.sceneCount, "scenes")) } },
+        load = {
+            SceneEditing.allTags(if (countsPerformers) "performers_count" else "scenes_count")
+                .onEach { byId[it.id] = it }.map { PickerEntry(it.id, it.name, detail(it)) }
+        },
+        create = { name -> SceneEditing.createTag(name).also { byId[it.id] = it }.let { PickerEntry(it.id, it.name, detail(it)) } },
         createFailedText = tr(R.string.error_create_tag),
         save = save, saveFailedText = tr(R.string.error_update_tags),
         onSaved = { picked -> onSaved(picked.mapNotNull { byId[it.id] }) }, onDismiss = onDismiss,
