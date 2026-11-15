@@ -36,6 +36,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
@@ -551,6 +552,17 @@ fun AddMarkerSheet(scene: Scene, seconds: Double, frame: android.graphics.Bitmap
     var endText by remember { mutableStateOf("") }
     var quick by remember { mutableStateOf<Int?>(null) }
     var creating by remember { mutableStateOf(false) }
+    var searchFocused by remember { mutableStateOf(false) }
+    val focusManager = androidx.compose.ui.platform.LocalFocusManager.current
+    val scrollState = rememberScrollState()
+    // iOS `isCompactHeight`: the window is too short for the time card, the search field and
+    // its results at once (a phone in landscape). From the window's height (split screen
+    // included), not the orientation.
+    val compactHeight = androidx.compose.ui.platform.LocalConfiguration.current.screenHeightDp < 500
+    // iOS `tagSearchTakesSheet`: while the tag search is typed into on a short sheet, the time
+    // card steps aside so the field sits at the top and its results fill the room above the IME.
+    val searchTakesSheet = compactHeight && searchFocused
+    LaunchedEffect(searchTakesSheet) { if (searchTakesSheet) scrollState.scrollTo(0) }
     LaunchedEffect(Unit) { tags = runCatching { SceneEditing.allTags() }.getOrDefault(emptyList()); loading = false }
     val title = tags.firstOrNull { it.id == primaryTagId }?.name.orEmpty()
     val base = if (search.isEmpty()) tags else tags.filter { it.name.lowercase().contains(search.lowercase()) }
@@ -576,8 +588,8 @@ fun AddMarkerSheet(scene: Scene, seconds: Double, frame: android.graphics.Bitmap
             }
         }
     }) {
-        Column(Modifier.verticalScroll(rememberScrollState())) {
-            FormSection(tr(R.string.marker_details)) {
+        Column(Modifier.verticalScroll(scrollState)) {
+            if (!searchTakesSheet) FormSection(tr(R.string.marker_details)) {
                 FormRow { Text(tr(R.string.action_start_time), Modifier.weight(1f), color = p.text); Text(PlaybackFormat.markerTime(seconds), color = p.secondaryText) }
                 NativeDivider()
                 Row(Modifier.fillMaxWidth().padding(start = 16.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -598,14 +610,21 @@ fun AddMarkerSheet(scene: Scene, seconds: Double, frame: android.graphics.Bitmap
                 }
             }
             FormSection(tr(R.string.primary_tag)) {
-                NativeSearchField(search, { search = it }, tr(R.string.placeholder_search_tags), Modifier.padding(8.dp))
+                NativeSearchField(
+                    search, { search = it }, tr(R.string.placeholder_search_tags),
+                    Modifier.padding(8.dp).onFocusChanged { searchFocused = it.hasFocus },
+                )
                 when {
                     loading -> LoadingRow(tr(R.string.loading_tags))
                     tags.isEmpty() -> Text(tr(R.string.empty_tags_found_on_server), Modifier.padding(16.dp), style = NativeType.bodyMedium, color = p.secondaryText)
                     else -> {
                         filtered.take(20).forEach { tag ->
                             NativeDivider()
-                            FormRow({ primaryTagId = tag.id }) {
+                            FormRow({
+                                primaryTagId = tag.id
+                                // On a short sheet the IME covers all but a row or two: a pick ends the search.
+                                if (searchTakesSheet) focusManager.clearFocus()
+                            }) {
                                 Text(tag.name, Modifier.weight(1f), color = p.text)
                                 tag.sceneCount?.let { Text("$it", style = NativeType.bodyMedium, color = p.secondaryText) }
                                 if (primaryTagId == tag.id) { Spacer(Modifier.width(8.dp)); Icon(PlayerIcons.check, null, tint = nativeAccent(), modifier = Modifier.size(24.dp)) }
