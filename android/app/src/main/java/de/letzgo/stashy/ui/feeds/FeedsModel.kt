@@ -889,6 +889,15 @@ object FeedsModel {
                 if (event is de.letzgo.stashy.data.SceneEvent.CoverUpdated) patchScene(event.sceneId) { event.applyTo(it) ?: it }
             }
         }
+        // iOS `SceneMarkerDeleted`: the marker's row leaves Feeds › Markers, its dot the Scenes time bar.
+        scope.launch {
+            de.letzgo.stashy.data.LibraryEvents.events.collect { event ->
+                if (event is de.letzgo.stashy.data.LibraryEvent.SceneMarkerDeleted) {
+                    lists.values.forEach { l -> l.items.removeAll { it is FeedItem.MarkerItem && it.marker.id == event.id } }
+                    event.sceneId?.let { FeedsMarkerTimes.remove(it, event.seconds) }
+                }
+            }
+        }
         scope.launch {
             de.letzgo.stashy.data.PerformerEvents.events.collect { event ->
                 val sceneIds = lists.values.flatMap { l -> l.items.mapNotNull { it.sceneForPerformerPatch() } }
@@ -1020,13 +1029,15 @@ object FeedsModel {
                 is FeedItem.SceneItem -> FeedsRepository.deleteSceneWithFiles(item.scene)
                 is FeedItem.PreviewItem -> FeedsRepository.deleteSceneWithFiles(item.scene)
                 is FeedItem.ClipItem -> FeedsRepository.deleteImage(item.image.id)
-                is FeedItem.MarkerItem -> false
+                // `SceneMarkerDeleted` drops it from the lists (see `init`).
+                is FeedItem.MarkerItem -> runCatching { de.letzgo.stashy.data.SceneEditing.deleteMarker(item.marker) }.isSuccess
             }
             val isImage = item is FeedItem.ClipItem
+            val isMarker = item is FeedItem.MarkerItem
             if (ok) {
-                lists.values.forEach { l -> l.items.removeAll { it.sceneID != null && it.sceneID == item.sceneID && item.sceneID != null || it.id == item.id } }
-                message = tr(if (isImage) R.string.image_deleted else R.string.scene_deleted)
-            } else message = tr(if (isImage) R.string.error_delete_image else R.string.error_delete_scene)
+                if (!isMarker) lists.values.forEach { l -> l.items.removeAll { it.sceneID != null && it.sceneID == item.sceneID && item.sceneID != null || it.id == item.id } }
+                message = tr(if (isImage) R.string.image_deleted else if (isMarker) R.string.marker_deleted else R.string.scene_deleted)
+            } else message = tr(if (isImage) R.string.error_delete_image else if (isMarker) R.string.error_delete_marker else R.string.error_delete_scene)
             onDone(ok)
         }
     }

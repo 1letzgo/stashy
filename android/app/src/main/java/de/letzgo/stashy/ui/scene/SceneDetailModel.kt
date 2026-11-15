@@ -264,6 +264,13 @@ class SceneDetailModel(
         event.applyTo(scene)?.let { scene = it }
     }
 
+    /** iOS `SceneMarkerDeleted`: a deleted marker leaves the strip and the time bar without a reload. */
+    fun applyLibraryEvent(event: de.letzgo.stashy.data.LibraryEvent) {
+        if (event !is de.letzgo.stashy.data.LibraryEvent.SceneMarkerDeleted) return
+        val markers = scene.sceneMarkers ?: return
+        if (markers.any { it.id == event.id }) scene = scene.copy(sceneMarkers = markers.filter { it.id != event.id })
+    }
+
     private fun refreshScrubSprites() {
         scrubSprites = SceneScrubSprites.create(scene.paths?.vtt, scene.paths?.sprite)
     }

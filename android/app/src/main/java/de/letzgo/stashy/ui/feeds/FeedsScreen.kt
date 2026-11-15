@@ -343,10 +343,11 @@ fun FeedsScreen() {
 
     deleteTarget?.let { item ->
         val isImage = item is FeedItem.ClipItem
+        val isMarker = item is FeedItem.MarkerItem
         AlertDialog(
             onDismissRequest = { deleteTarget = null },
-            title = { Text(if (isImage) tr(R.string.confirm_delete_image) else tr(R.string.confirm_delete_scene)) },
-            text = { Text(if (isImage) tr(R.string.hint_image_is_removed_from_server) else tr(R.string.hint_scene_and_its_files_are)) },
+            title = { Text(tr(if (isImage) R.string.confirm_delete_image else if (isMarker) R.string.confirm_delete_marker else R.string.confirm_delete_scene)) },
+            text = { Text(tr(if (isImage) R.string.hint_image_is_removed_from_server else if (isMarker) R.string.hint_marker_is_removed_scene_stays else R.string.hint_scene_and_its_files_are)) },
             confirmButton = { TextButton({ deleteTarget = null; model.delete(item) {} }) { Text(tr(R.string.action_delete), color = Color(0xFFFF453A)) } },
             dismissButton = { TextButton({ deleteTarget = null }) { Text(tr(R.string.action_cancel)) } },
         )
@@ -659,15 +660,25 @@ private data class FeedsMarkerDraft(val scene: Scene, val seconds: Double)
 internal object FeedsMarkerTimes {
     private val added = androidx.compose.runtime.mutableStateMapOf<String, List<Double>>()
 
+    private val removed = androidx.compose.runtime.mutableStateMapOf<String, List<Double>>()
+
     fun add(sceneId: String, seconds: Double) {
+        removed[sceneId]?.let { r -> removed[sceneId] = r.filter { kotlin.math.abs(it - seconds) >= 0.001 } }
         val current = added[sceneId].orEmpty()
         if (current.none { kotlin.math.abs(it - seconds) < 0.001 }) added[sceneId] = current + seconds
     }
 
-    /** All marker times of [scene], sorted: the feed query's plus the ones added here. */
+    /** A marker just deleted (iOS `FeedsMarkerTimes.remove`). */
+    fun remove(sceneId: String, seconds: Double) {
+        added[sceneId]?.let { a -> added[sceneId] = a.filter { kotlin.math.abs(it - seconds) >= 0.001 } }
+        removed[sceneId] = removed[sceneId].orEmpty() + seconds
+    }
+
+    /** All marker times of [scene], sorted: the feed query's plus the ones added here, minus the deleted ones. */
     fun seconds(scene: Scene): List<Double> {
         val base = scene.feedMarkerSeconds?.map { it.seconds } ?: scene.sceneMarkers.orEmpty().map { it.seconds }
-        return (base + added[scene.id].orEmpty()).distinct().sorted()
+        val gone = removed[scene.id].orEmpty()
+        return (base + added[scene.id].orEmpty()).distinct().filter { s -> gone.none { kotlin.math.abs(it - s) < 0.001 } }.sorted()
     }
 }
 

@@ -213,8 +213,8 @@ sealed class FeedItem {
     /** Previews/clips loop muted-style feeds; scenes and markers count plays (iOS `tracksPlaybackActivity`). */
     val countsPlays: Boolean get() = this is SceneItem || this is MarkerItem
 
-    /** iOS: `reelsItemSupportsDelete`. */
-    val supportsDelete: Boolean get() = this !is MarkerItem
+    /** Every item has the delete button; a marker deletes only itself, never its scene. */
+    val supportsDelete: Boolean get() = true
 }
 
 /**

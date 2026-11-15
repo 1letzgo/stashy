@@ -59,6 +59,7 @@
     <string name="action_delete_failed_arg">Delete failed: %1$s</string>
     <string name="action_delete_filter">Delete Filter</string>
     <string name="action_delete_gallery">Delete Gallery</string>
+    <string name="action_delete_marker">Delete Marker</string>
     <string name="action_delete_group">Delete Group</string>
     <string name="action_delete_performer">Delete Performer</string>
     <string name="action_delete_scene">Delete Scene</string>
@@ -480,6 +481,7 @@
     <string name="confirm_delete_filter">Delete filter?</string>
     <string name="confirm_delete_image">Delete image?</string>
     <string name="confirm_delete_job">Delete job?</string>
+    <string name="confirm_delete_marker">Delete marker?</string>
     <string name="confirm_delete_language_packs">Delete language packs?</string>
     <string name="confirm_delete_scene">Delete scene?</string>
     <string name="confirm_delete_template">Delete template?</string>
@@ -726,6 +728,7 @@
     <string name="error_decode_response_arg">Failed to decode response: %1$s</string>
     <string name="error_delete">Delete failed</string>
     <string name="error_delete_image">Failed to delete image</string>
+    <string name="error_delete_marker">Failed to delete marker</string>
     <string name="error_delete_saved_filter">Could not delete saved filter</string>
     <string name="error_delete_scene">Failed to delete scene</string>
     <string name="error_download">Download failed</string>
@@ -987,6 +990,7 @@
     <string name="hint_delete_arg_this_cannot_be">Delete \'%1$s\'? This cannot be undone.</string>
     <string name="hint_deletes_covers_previews_sprites_transcodes">Deletes covers, previews, sprites, transcodes, marker files and thumbnails that no longer belong to anything in the database.</string>
     <string name="hint_deletes_this_item_and_its">Deletes this item and its files after confirmation</string>
+    <string name="hint_marker_is_removed_scene_stays">The marker is removed from the server. The scene and its files stay.</string>
     <string name="hint_double_tap_jumps_to_markers">Double tap jumps to markers: in Feeds › Scenes a double tap on the left or right goes to the previous or next marker of a scene that has markers. Without a marker in that direction it skips seconds as usual.</string>
     <string name="hint_download_arg_speech_model_to">Download the %1$s speech model to enable live captions.</string>
     <string name="hint_download_is_managed_by_ios">The download is managed by iOS and can be several hundred megabytes.</string>
@@ -1426,6 +1430,7 @@
     <string name="marker_count_low_high">Marker Count (Low-High)</string>
     <string name="marker_created">Marker created</string>
     <string name="marker_details">Marker Details</string>
+    <string name="marker_deleted">Marker deleted</string>
     <string name="marker_length">Marker Length</string>
     <string name="marker_previews">Marker previews</string>
     <string name="marker_screenshots">Marker screenshots</string>

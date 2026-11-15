@@ -134,7 +134,9 @@ fun SceneVideoPlayerCard(model: SceneDetailModel, extraMenuItems: () -> List<Pla
                 }
             }
         }
-        MarkerStrip(scene.sceneMarkers.orEmpty(), playing = model.isPlaybackStarted && player != null, onSeek = model::seekTo)
+        var markerToDelete by remember { mutableStateOf<SceneMarker?>(null) }
+        MarkerStrip(scene.sceneMarkers.orEmpty(), playing = model.isPlaybackStarted && player != null, onSeek = model::seekTo, onDelete = { markerToDelete = it })
+        de.letzgo.stashy.ui.components.MarkerDeleteConfirm(markerToDelete, sceneId = scene.id) { markerToDelete = null }
     }
 }
 
@@ -248,9 +250,10 @@ private fun CoverInfoPill(text: String, icon: androidx.compose.ui.graphics.vecto
     }
 }
 
-/** iOS: `markerScrollView` — 80×45 thumbnails with the time, title below; tap seeks. */
+/** iOS: `markerScrollView` — 80×45 thumbnails with the time, title below; tap seeks, long press offers "Delete Marker". */
+@OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
 @Composable
-private fun MarkerStrip(markers: List<SceneMarker>, playing: Boolean, onSeek: (Double) -> Unit) {
+private fun MarkerStrip(markers: List<SceneMarker>, playing: Boolean, onSeek: (Double) -> Unit, onDelete: (SceneMarker) -> Unit) {
     if (markers.isEmpty()) return
     val p = Theme.palette
     LazyRow(
@@ -259,7 +262,16 @@ private fun MarkerStrip(markers: List<SceneMarker>, playing: Boolean, onSeek: (D
         horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         uniqueItems(markers.sortedBy { it.seconds }, { it.id }) { marker ->
-            Column(Modifier.width(80.dp).clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) { onSeek(marker.seconds) }, verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            var menuOpen by remember(marker.id) { mutableStateOf(false) }
+            Box {
+            de.letzgo.stashy.ui.components.MarkerDeleteMenu(menuOpen, onDismiss = { menuOpen = false }) { onDelete(marker) }
+            Column(
+                Modifier.width(80.dp).combinedClickable(
+                    interactionSource = remember { MutableInteractionSource() }, indication = null,
+                    onLongClick = { menuOpen = true },
+                ) { onSeek(marker.seconds) },
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
                 Box(Modifier.size(80.dp, 45.dp).clip(RoundedCornerShape(4.dp)).background(Color.Gray.copy(alpha = 0.2f))) {
                     val url = marker.screenshotURL
                     if (url != null) AsyncImage(url, null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
@@ -275,6 +287,7 @@ private fun MarkerStrip(markers: List<SceneMarker>, playing: Boolean, onSeek: (D
                     style = IosTypography.caption2.copy(fontWeight = FontWeight.Medium), color = p.text,
                     maxLines = 2, overflow = TextOverflow.Ellipsis,
                 )
+            }
             }
         }
     }

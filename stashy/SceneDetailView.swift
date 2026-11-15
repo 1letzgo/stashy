@@ -82,6 +82,8 @@ struct SceneDetailView: View {
     /// The transcode-fallback toast is shown once per screen, not once per rung.
     @State private var didAnnounceTranscodeFallback = false
     @State private var showingAddMarkerSheet = false
+    /// The marker whose Delete was picked in the marker strip's context menu (confirmation open).
+    @State private var markerToDelete: SceneMarker?
     /// Own flag for the fullscreen cover: a sheet must be presented from the cover's content,
     /// and sharing `showingAddMarkerSheet` would also fire the covered detail's sheet.
     @State private var showingFullscreenAddMarkerSheet = false
@@ -274,6 +276,7 @@ struct SceneDetailView: View {
                         capturedMarkerTime = aetherEngine?.currentTime ?? 0
                         showingAddMarkerSheet = true
                     },
+                    onDeleteMarker: { markerToDelete = $0 },
                     subtitleController: subtitleController,
                     transcriptionController: transcriptionController,
                     extrasController: extrasController,
@@ -475,6 +478,15 @@ struct SceneDetailView: View {
             ))
             .modifier(lifecycleModifier)
             .dismissOnAppLock { isFullscreen = false }
+            .markerDeleteAlert($markerToDelete, viewModel: viewModel, sceneId: activeScene.id)
+            // A marker of this scene deleted here or anywhere else: the strip and the time bar
+            // drop it without a reload.
+            .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("SceneMarkerDeleted"))) { note in
+                guard let markerId = note.userInfo?["markerId"] as? String,
+                      let markers = activeScene.sceneMarkers,
+                      markers.contains(where: { $0.id == markerId }) else { return }
+                activeScene = activeScene.withSceneMarkers(markers.filter { $0.id != markerId })
+            }
             // Deleted elsewhere (from its page opened out of Now Playing, Feeds, …): this copy of
             // the page has nothing left to show. The page that deleted it closes itself.
             .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("SceneDeleted"))) { note in

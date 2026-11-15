@@ -8,6 +8,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
@@ -121,6 +122,14 @@ private object SearchState {
                 val scenes = r.scenes.applying(event)
                 val markers = r.markers.map { m -> m.scene?.let { s -> event.applyTo(s)?.takeIf { it != s }?.let { m.copy(scene = it) } } ?: m }
                 if (scenes != null || markers != r.markers) results = r.copy(scenes = scenes ?: r.scenes, markers = markers)
+            }
+        }
+        // iOS `SceneMarkerDeleted`: a deleted marker leaves the hits.
+        scope.launch {
+            de.letzgo.stashy.data.LibraryEvents.events.collect { event ->
+                if (event is de.letzgo.stashy.data.LibraryEvent.SceneMarkerDeleted && results.markers.any { it.id == event.id }) {
+                    results = results.copy(markers = results.markers.filter { it.id != event.id })
+                }
             }
         }
         scope.launch {
@@ -350,11 +359,23 @@ private fun PillTile(url: String?, w: Int, h: Int, pillIcon: ImageVector, title:
     }
 }
 
-/** iOS `searchMarkerCard` — 160×90 thumb with timestamp, title and primary tag below. */
+/** iOS `searchMarkerCard` — 160×90 thumb with timestamp, title and primary tag below; long press offers "Delete Marker". */
+@OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
 @Composable
 private fun MarkerCard(marker: SceneMarker) {
     val p = Theme.palette
-    Column(Modifier.width(160.dp).noRippleClickable { DetailLinks.marker(marker) }, verticalArrangement = Arrangement.spacedBy(8.dp)) {
+    var menuOpen by androidx.compose.runtime.remember(marker.id) { mutableStateOf(false) }
+    var confirmDelete by androidx.compose.runtime.remember(marker.id) { mutableStateOf(false) }
+    de.letzgo.stashy.ui.components.MarkerDeleteConfirm(marker.takeIf { confirmDelete }) { confirmDelete = false }
+    Box {
+    de.letzgo.stashy.ui.components.MarkerDeleteMenu(menuOpen, onDismiss = { menuOpen = false }) { confirmDelete = true }
+    Column(
+        Modifier.width(160.dp).combinedClickable(
+            interactionSource = androidx.compose.runtime.remember { androidx.compose.foundation.interaction.MutableInteractionSource() }, indication = null,
+            onLongClick = { menuOpen = true },
+        ) { DetailLinks.marker(marker) },
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
         Box(Modifier.size(160.dp, 90.dp).clip(RoundedCornerShape(Tokens.Radius.card)).background(Color.Gray.copy(alpha = 0.2f)), contentAlignment = Alignment.Center) {
             Icon(SF.bookmarkFill, null, tint = p.secondaryText)
             AsyncImage(marker.screenshotURL, null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
@@ -368,5 +389,6 @@ private fun MarkerCard(marker: SceneMarker) {
                     modifier = Modifier.background(Appearance.tint.copy(alpha = 0.1f), RoundedCornerShape(4.dp)).padding(horizontal = 4.dp, vertical = 1.dp))
             }
         }
+    }
     }
 }

@@ -135,6 +135,7 @@ private fun SceneDetailContent(model: SceneDetailModel, openedFromMiniPlayer: Bo
     // iOS: `Timer.publish(every: 10)` → periodic activity sync.
     LaunchedEffect(model) { while (true) { delay(10_000); model.periodicSync() } }
     LaunchedEffect(model) { de.letzgo.stashy.data.PerformerEvents.events.collect { model.applyPerformerEvent(it) } }
+    LaunchedEffect(model) { de.letzgo.stashy.data.LibraryEvents.events.collect { model.applyLibraryEvent(it) } }
     // PiP window closed (not expanded back): stop like iOS ending PiP.
     LaunchedEffect(PlayerWindow.isInPictureInPicture) {
         if (!PlayerWindow.isInPictureInPicture) {
