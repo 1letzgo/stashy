@@ -206,10 +206,10 @@ fun AITagsSettingsView() {
                         RowDivider(16.dp)
                         val count = manager.dismissedTagCount
                         SettingsRow(
-                            tr(R.string.ignored_tags), icon = Icons.Outlined.ThumbDown, titleColor = tint,
-                            enabled = isUnlocked && count > 0, onClick = { manager.resetDismissals() },
+                            tr(R.string.ignored_tags), icon = Icons.Outlined.ThumbDown,
+                            enabled = isUnlocked, onClick = { Nav.push(IgnoredTagsScreen()) },
                         ) {
-                            Text(if (count == 0) tr(R.string.none) else "$count · ${tr(R.string.action_reset).lowercase()}", style = NativeType.bodyMedium, color = p.secondaryText)
+                            Text(if (count == 0) tr(R.string.none) else "$count", style = NativeType.bodyMedium, color = p.secondaryText)
                         }
                     }
                 }
