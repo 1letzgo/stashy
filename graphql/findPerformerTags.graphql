@@ -1,0 +1,6 @@
+query FindPerformerTags($id: ID!) {
+  findPerformer(id: $id) {
+    id
+    tags { id name image_path }
+  }
+}

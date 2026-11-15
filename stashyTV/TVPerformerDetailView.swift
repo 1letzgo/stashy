@@ -21,6 +21,8 @@ struct TVPerformerDetailView: View {
     @State private var showingRatingPicker = false
     /// Match rank "rank/total" in the Match pool (same line as iOS), nil when not ranked.
     @State private var battleLine: String?
+    /// The performer's own tags (`findPerformerTags`), a row like on the TV scene page.
+    @State private var performerTags: [Tag] = []
 
     var body: some View {
         TVGenericDetailView(
@@ -89,7 +91,7 @@ struct TVPerformerDetailView: View {
                     }
                 }
             },
-            additionalContent: { EmptyView() }
+            additionalContent: { tagsRow }
         )
         .tvRatingDialog(isPresented: $showingRatingPicker, current: performer?.rating100) { value in
             setRating(value)
@@ -97,10 +99,52 @@ struct TVPerformerDetailView: View {
         .task(id: performerId) {
             battleLine = await HotOrNotBattleDisplay.fetchRankSlashTotal(performerId: performerId)
         }
+        .task(id: performerId) {
+            performerTags = (try? await PerformerRepository().fetchPerformerTags(performerId: performerId)) ?? []
+        }
         .onAppear {
             guard !didLoad else { return }
             didLoad = true
             loadPerformerData()
+        }
+    }
+
+    // MARK: - Tags
+
+    /// Same look as `TVSceneDetailView.tagsSection`; left out while there are none.
+    @ViewBuilder
+    private var tagsRow: some View {
+        if !performerTags.isEmpty {
+            VStack(alignment: .leading, spacing: 16) {
+                HStack(spacing: 10) {
+                    Image(systemName: "tag.fill")
+                        .font(.title3)
+                        .foregroundColor(AppearanceManager.shared.tintColor)
+                    Text(tr("tags"))
+                        .font(.title3)
+                        .fontWeight(.bold)
+                        .foregroundColor(.white)
+                    Text("\(performerTags.count)")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 30) {
+                        ForEach(performerTags) { tag in
+                            TVNavButton(value: TVTagLink(id: tag.id, name: tag.name)) {
+                                Text(tag.name)
+                                    .font(.headline)
+                                    .padding(.horizontal, 24)
+                                    .padding(.vertical, 12)
+                            }
+                        }
+                    }
+                    .padding(.horizontal, 20)
+                    .padding(.vertical, 40)
+                }
+                .focusSection()
+            }
+            .padding(.horizontal, 60)
         }
     }
 

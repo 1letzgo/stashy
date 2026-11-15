@@ -6,6 +6,8 @@ struct SceneTagsCard: View {
     let sceneId: String
     let tags: [Tag]?
     var onTagsUpdated: (([Tag]) -> Void)?
+    /// Set = the tags belong to something else than a scene (a performer), written through this.
+    var saveTagIds: (([String], @escaping (Bool) -> Void) -> Void)? = nil
     @ObservedObject var viewModel: StashDBViewModel
     @Binding var isTagsExpanded: Bool
     @Binding var tagsTotalHeight: CGFloat
@@ -100,7 +102,8 @@ struct SceneTagsCard: View {
             AddTagToSceneSheet(
                 sceneId: sceneId,
                 currentTags: tags ?? [],
-                viewModel: viewModel
+                viewModel: viewModel,
+                saveTagIds: saveTagIds
             ) { updated in
                 onTagsUpdated?(updated)
             }

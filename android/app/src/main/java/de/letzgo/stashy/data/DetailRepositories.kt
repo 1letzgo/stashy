@@ -95,6 +95,22 @@ object DetailRepository {
         return load("details url")?.let { o -> PerformerProfile(o.string("details"), listOfNotNull(o.string("url"))) }
     }
 
+    /**
+     * iOS `PerformerRepository.fetchPerformerTags` — the performer's own tags (`findPerformerTags`),
+     * by name; kept out of the list fragment so performer lists stay light.
+     */
+    suspend fun performerTags(id: String): List<Tag> {
+        val node = GraphQL.named("findPerformerTags", vars("id" to id))["findPerformer"] as? JsonObject ?: return emptyList()
+        val tags = node["tags"] as? JsonArray ?: return emptyList()
+        return tags.map { GraphQL.decode(Tag.serializer(), it) }.sortedWith(compareBy(String.CASE_INSENSITIVE_ORDER) { it.name })
+    }
+
+    /** iOS `updatePerformerTags` — the pencil of the performer page's Tags card. */
+    suspend fun setPerformerTags(id: String, tagIds: List<String>) = input(
+        "mutation PerformerUpdate(\$input: PerformerUpdateInput!) { performerUpdate(input: \$input) { id } }",
+        "performerUpdate", mapOf("id" to id, "tag_ids" to tagIds),
+    )
+
     private fun JsonObject.string(key: String): String? =
         (this[key] as? JsonPrimitive)?.contentOrNull?.takeIf { it.isNotBlank() }
 
@@ -158,7 +174,7 @@ object DetailRepository {
             "weight" to edit.weight, "measurements" to edit.measurements, "fake_tits" to edit.fakeTits,
             "penis_length" to edit.penisLength, "career_length" to edit.careerLength, "tattoos" to edit.tattoos,
             "piercings" to edit.piercings, "alias_list" to edit.aliasList, "rating100" to edit.rating100,
-        ),
+        ) + (edit.tagIds?.let { mapOf("tag_ids" to it) } ?: emptyMap()),
     ) {
         LibraryEvents.post(LibraryEvent.PerformerPatched(id) {
             it.copy(
@@ -390,6 +406,8 @@ data class PerformerEdit(
     val piercings: String?,
     val aliasList: List<String>?,
     val rating100: Int?,
+    /** null leaves the performer's tags untouched (the key is not sent). */
+    val tagIds: List<String>? = null,
 )
 
 /** Performer `details` + `urls` for the detail header ([DetailRepository.performerProfile]). */

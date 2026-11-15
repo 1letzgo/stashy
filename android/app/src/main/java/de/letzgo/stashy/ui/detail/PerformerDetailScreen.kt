@@ -49,6 +49,17 @@ import de.letzgo.stashy.ui.filter.CatalogFilterSortSheet
 import de.letzgo.stashy.ui.components.PerformerCard
 import de.letzgo.stashy.ui.components.onLongPress
 import de.letzgo.stashy.ui.OverflowItem
+import de.letzgo.stashy.data.Tag
+import de.letzgo.stashy.ui.NativeGroup
+import de.letzgo.stashy.ui.NativeListItem
+import de.letzgo.stashy.ui.NativeSectionHeader
+import de.letzgo.stashy.ui.scene.EditTagsSheet
+import de.letzgo.stashy.ui.scene.SceneTagsCard
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.height
+import androidx.compose.ui.unit.dp
 
 /**
  * iOS: `PerformerDetailView` — custom chrome bar (Back · sections · Favorite · Edit), header
@@ -69,6 +80,10 @@ class PerformerDetailScreen(val performerId: String, val preview: Performer? = n
     /** `details` + `urls` (not in the list fragment), loaded with the performer. */
     private var profile by mutableStateOf<de.letzgo.stashy.data.PerformerProfile?>(null)
     private var expanded by mutableStateOf(false)
+    /** iOS `performerTags` — the performer's own tags, in a card under the header. */
+    private var tags by mutableStateOf<List<Tag>>(emptyList())
+    private var tagsExpanded by mutableStateOf(false)
+    private var editingTags by mutableStateOf(false)
     private var editing by mutableStateOf(false)
     /** iOS `showingSceneDownloadOptions` (`sceneBulkDownloadDialog`). */
     private var showSceneDownloadOptions by mutableStateOf(false)
@@ -145,6 +160,7 @@ class PerformerDetailScreen(val performerId: String, val preview: Performer? = n
             }
         }
         scope.launch { DetailRepository.performerProfile(performerId)?.let { profile = it } }
+        scope.launch { runCatching { DetailRepository.performerTags(performerId) }.getOrNull()?.let { tags = it } }
     }
 
     private fun loadCoPerformers(force: Boolean) {
@@ -251,21 +267,40 @@ class PerformerDetailScreen(val performerId: String, val preview: Performer? = n
 
         LinkedSettingsSheets(catalog)
         CatalogFilterSortSheet(coPerformers, extraSorts = CoPerformerSort.options)
-        if (editing && p != null) EditPerformerSheet(p, onDismiss = { editing = false }, onSaved = { performer = it })
+        if (editing && p != null) EditPerformerSheet(p, tags, onDismiss = { editing = false }, onSaved = { performer = it })
+        if (editingTags) {
+            EditTagsSheet(
+                tags.map { it.id }.toSet(),
+                save = { ids -> check(DetailRepository.setPerformerTags(performerId, ids)) },
+                onDismiss = { editingTags = false },
+                onSaved = { tags = sortedTags(it) },
+            )
+        }
         if (showSceneDownloadOptions) {
             SceneBulkDownloadDialog(Downloads.SceneDownloadScope.Performer(performerId), performer?.name ?: "", performer?.sceneCount) { showSceneDownloadOptions = false }
         }
     }
+
+    private fun sortedTags(list: List<Tag>) = list.sortedWith(compareBy(String.CASE_INSENSITIVE_ORDER) { it.name })
 
     /**
      * Header as a [DetailHeroCard] (like tag / studio / gallery): the portrait blurred as the band
      * backdrop with the facts on it, sharp in the circle on the band edge (top-biased crop so the
      * face shows; tap → fullscreen); name + disambiguation + Feeds pill below, then the
      * the details text. The image URL follows [Performer.imagePath], so an image changed via
-     * [de.letzgo.stashy.data.PerformerEvents] updates band and circle.
+     * [de.letzgo.stashy.data.PerformerEvents] updates band and circle. Below it, when the
+     * performer has tags, the scene page's Tags card.
      */
     @Composable
     private fun Header(p: Performer?) {
+        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            HeroCard(p)
+            if (tags.isNotEmpty()) SceneTagsCard(tags, tagsExpanded, { tagsExpanded = !tagsExpanded }, { editingTags = true })
+        }
+    }
+
+    @Composable
+    private fun HeroCard(p: Performer?) {
         val name = p?.name ?: ""
         val items = p?.let { DetailFormatting.performer(it, catalog.galleries?.totalCount ?: 0, battleLine) } ?: emptyList()
         val url = p?.let { performerThumbnailURL(it.id, it.imagePath) }
@@ -299,7 +334,10 @@ class PerformerDetailScreen(val performerId: String, val preview: Performer? = n
 
     /** iOS: `EditPerformerSheet`. */
     @Composable
-    private fun EditPerformerSheet(performer: Performer, onDismiss: () -> Unit, onSaved: (Performer) -> Unit) {
+    private fun EditPerformerSheet(performer: Performer, currentTags: List<Tag>, onDismiss: () -> Unit, onSaved: (Performer) -> Unit) {
+        // The picker only chooses; Save below writes them with the rest (unchanged = not sent).
+        var editedTags by remember(performer.id) { mutableStateOf(currentTags) }
+        var pickingTags by remember { mutableStateOf(false) }
         val fields = androidx.compose.runtime.remember(performer.id) {
             listOf(
                 EditSection(tr(R.string.identity), listOf(
@@ -349,6 +387,7 @@ class PerformerDetailScreen(val performerId: String, val preview: Performer? = n
                     piercings = f.getValue(tr(R.string.piercings)).optional,
                     aliasList = EditParsing.aliases(f.getValue(tr(R.string.aliases_comma_separated)).value),
                     rating100 = EditParsing.rating(f.getValue(tr(R.string.rating_0_100)).value),
+                    tagIds = editedTags.map { it.id }.takeIf { it.toSet() != currentTags.map { t -> t.id }.toSet() },
                 )
                 val ok = DetailRepository.updatePerformer(performer.id, edit)
                 if (ok) {
@@ -359,6 +398,7 @@ class PerformerDetailScreen(val performerId: String, val preview: Performer? = n
                         careerLength = edit.careerLength, tattoos = edit.tattoos, piercings = edit.piercings,
                         aliasList = edit.aliasList, rating100 = edit.rating100,
                     ))
+                    if (edit.tagIds != null) tags = sortedTags(editedTags)
                     detailToast(tr(R.string.performer_updated))
                 } else detailToast(tr(R.string.error_update_performer))
                 ok
@@ -368,6 +408,24 @@ class PerformerDetailScreen(val performerId: String, val preview: Performer? = n
                 detailToast(tr(R.string.performer_deleted))
                 Nav.pop()
             },
+            extraSections = {
+                Spacer(Modifier.height(20.dp))
+                NativeSectionHeader(tr(R.string.tags))
+                NativeGroup {
+                    NativeListItem(
+                        editedTags.joinToString(", ") { it.name }.ifEmpty { tr(R.string.none) },
+                        icon = SF.tag, onClick = { pickingTags = true },
+                    )
+                }
+            },
         )
+        if (pickingTags) {
+            EditTagsSheet(
+                editedTags.map { it.id }.toSet(),
+                save = {},
+                onDismiss = { pickingTags = false },
+                onSaved = { editedTags = sortedTags(it) },
+            )
+        }
     }
 }

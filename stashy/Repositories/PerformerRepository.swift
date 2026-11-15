@@ -72,6 +72,24 @@ class PerformerRepository: PerformerRepositoryProtocol {
         return (performers, total)
     }
 
+    // MARK: - Performer tags
+
+    /// The performer's own tags (not the tags of their scenes). Kept out of the shared list
+    /// fragment so performer lists stay light; the performer page asks for them separately.
+    func fetchPerformerTags(performerId: String) async throws -> [Tag] {
+        struct Response: Decodable {
+            struct DataNode: Decodable { let findPerformer: PerformerNode? }
+            struct PerformerNode: Decodable { let tags: [Tag]? }
+            let data: DataNode?
+        }
+        let response: Response = try await graphQLClient.execute(
+            query: GraphQLQueries.loadQuery(named: "findPerformerTags"),
+            variables: ["id": performerId]
+        )
+        return (response.data?.findPerformer?.tags ?? [])
+            .sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
+    }
+
     // MARK: - Appears With (co-performers)
 
     private static let coAppearancePageSize = 1000

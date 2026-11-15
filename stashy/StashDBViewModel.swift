@@ -8685,6 +8685,21 @@ struct GenerateData: Codable {
         }
     }
 
+    /// Replaces the performer's own tags (the pencil of the Tags card on the performer page).
+    func updatePerformerTags(performerId: String, tagIds: [String], completion: @escaping (Bool) -> Void) {
+        let variables: [String: Any] = ["input": ["id": performerId, "tag_ids": tagIds]]
+        guard let bodyData = try? JSONSerialization.data(withJSONObject: ["query": GraphQLQueries.performerUpdateTagsMutation, "variables": variables]),
+              let bodyString = String(data: bodyData, encoding: .utf8) else {
+            completion(false)
+            return
+        }
+        performGraphQLQuery(query: bodyString) { (response: PerformerUpdateResponse?) in
+            let ok = response?.data?.performerUpdate != nil
+            if ok { Self.postEntityUpdated("PerformerUpdated", key: "performerId", id: performerId) }
+            completion(ok)
+        }
+    }
+
     /// Updates performer metadata shown on the detail screen (edit mode).
     func updatePerformerDetails(
         performerId: String,
@@ -8704,6 +8719,8 @@ struct GenerateData: Codable {
         piercings: String?,
         aliasList: [String]?,
         rating100: Int?,
+        /// nil leaves the performer's tags untouched (the key is not sent).
+        tagIds: [String]? = nil,
         completion: @escaping (Bool) -> Void
     ) {
         let mutation = GraphQLQueries.performerUpdateDetailsMutation
@@ -8726,6 +8743,7 @@ struct GenerateData: Codable {
         input["piercings"] = piercings ?? NSNull()
         input["alias_list"] = aliasList ?? NSNull()
         input["rating100"] = rating100 ?? NSNull()
+        if let tagIds { input["tag_ids"] = tagIds }
 
         let variables: [String: Any] = ["input": input]
         guard let bodyData = try? JSONSerialization.data(withJSONObject: ["query": mutation, "variables": variables]),

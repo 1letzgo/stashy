@@ -26,6 +26,10 @@ struct PerformerDetailView: View {
     @State private var fullPerformer: Performer?
     /// All links of the performer (`urls`, older servers: `url`), listed in the expanded header.
     @State private var profileLinks: [String] = []
+    /// The performer's own tags (`findPerformerTags`), shown in a card under the header.
+    @State private var performerTags: [Tag] = []
+    @State private var isTagsExpanded = false
+    @State private var tagsTotalHeight: CGFloat = 0
     @State private var performerLiveFilterSheetPresented = false
     @State private var showingSceneDownloadOptions = false
     @State private var performerSceneFilterActive = false
@@ -610,6 +614,10 @@ struct PerformerDetailView: View {
             AppLog.debug("🔄 SceneDeleted - Refreshing performer metadata")
             loadPerformerMetadata()
         }
+        .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("PerformerUpdated"))) { notification in
+            guard notification.userInfo?["performerId"] as? String == performer.id else { return }
+            loadPerformerTags()
+        }
         .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("PerformerImageUpdated"))) { notification in
             guard let targetId = notification.userInfo?["performerId"] as? String,
                   let newPath = notification.userInfo?["newImagePath"] as? String else { return }
@@ -635,7 +643,13 @@ struct PerformerDetailView: View {
             sceneCount: displayPerformer.sceneCount,
         )
         .sheet(isPresented: $showingEditPerformerSheet) {
-            EditPerformerSheet(performer: displayPerformer, viewModel: viewModel, onDeleted: { dismiss() }) { updated in
+            EditPerformerSheet(
+                performer: displayPerformer,
+                tags: performerTags,
+                viewModel: viewModel,
+                onDeleted: { dismiss() },
+                onTagsChanged: { performerTags = Self.sortedTags($0) }
+            ) { updated in
                 applyEditedPerformer(updated)
             }
         }
@@ -935,6 +949,42 @@ struct PerformerDetailView: View {
              }
         }
         loadProfileLinks()
+        loadPerformerTags()
+    }
+
+    private func loadPerformerTags() {
+        let performerId = performer.id
+        Task {
+            do {
+                let tags = try await PerformerRepository().fetchPerformerTags(performerId: performerId)
+                guard performerId == performer.id else { return }
+                performerTags = tags
+            } catch {
+                AppLog.error("Performer tags: \(error.localizedDescription)")
+            }
+        }
+    }
+
+    private static func sortedTags(_ tags: [Tag]) -> [Tag] {
+        tags.sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
+    }
+
+    /// The performer's own tags in the scene page's card; left out while there are none.
+    @ViewBuilder
+    private var performerTagsCard: some View {
+        if !performerTags.isEmpty {
+            SceneTagsCard(
+                sceneId: performer.id,
+                tags: performerTags,
+                onTagsUpdated: { performerTags = Self.sortedTags($0) },
+                saveTagIds: { [performerId = performer.id, viewModel] ids, done in
+                    viewModel.updatePerformerTags(performerId: performerId, tagIds: ids, completion: done)
+                },
+                viewModel: viewModel,
+                isTagsExpanded: $isTagsExpanded,
+                tagsTotalHeight: $tagsTotalHeight
+            )
+        }
     }
 
     /// `urls` is not in the shared list fragment, so it comes with its own small query; servers
@@ -1194,6 +1244,13 @@ struct PerformerDetailView: View {
     /// face visible), name, Feeds pill and stats in the solid section. Two full rows of stats (8 at
     /// the grid's 4 columns) show collapsed, the rest behind the chevron pill. Favorite / Edit / image change stay in the nav bar.
     private func headerView(displayPerformer: Performer, battleLine: String?) -> some View {
+        VStack(spacing: 12) {
+            heroCard(displayPerformer: displayPerformer, battleLine: battleLine)
+            performerTagsCard
+        }
+    }
+
+    private func heroCard(displayPerformer: Performer, battleLine: String?) -> some View {
         let imageURL = displayPerformer.thumbnailURL
         return DetailHeroCard(
             title: displayPerformer.name,
@@ -1360,8 +1417,12 @@ private struct OptionalRefreshable: ViewModifier {
 
 struct EditPerformerSheet: View {
     let performer: Performer
+    /// The performer's own tags as the page shows them.
+    var tags: [Tag] = []
     @ObservedObject var viewModel: StashDBViewModel
     var onDeleted: (() -> Void)? = nil
+    /// Called with the saved tags when Save changed them.
+    var onTagsChanged: (([Tag]) -> Void)? = nil
     var onComplete: (Performer) -> Void
 
     @Environment(\.stashyDismiss) private var dismiss
@@ -1386,6 +1447,12 @@ struct EditPerformerSheet: View {
     @State private var isSaving = false
     @State private var isDeleting = false
     @State private var showingDeleteConfirmation = false
+    @State private var editedTags: [Tag] = []
+    @State private var showingTagPicker = false
+
+    private var tagsChanged: Bool {
+        Set(editedTags.map(\.id)) != Set(tags.map(\.id))
+    }
 
     var body: some View {
         NavigationView {
@@ -1413,6 +1480,43 @@ struct EditPerformerSheet: View {
                     TextField(tr("penis_length_cm"), text: $penisLengthText)
                         .keyboardType(.decimalPad)
                         .numericKeyboardDoneBar()
+                }
+                .listRowBackground(Color.secondaryAppBackground)
+
+                Section(tr("tags")) {
+                    if editedTags.isEmpty {
+                        Text(tr("empty_tags_assigned"))
+                            .foregroundColor(.secondary)
+                    } else {
+                        WrappedHStack(items: editedTags) { tag in
+                            HStack(spacing: 4) {
+                                Image(systemName: "tag.fill")
+                                    .font(.system(size: 10, weight: .bold))
+                                Text(tag.name)
+                                    .font(.system(size: 11, weight: .bold))
+                                Button {
+                                    editedTags.removeAll { $0.id == tag.id }
+                                } label: {
+                                    Image(systemName: "xmark")
+                                        .font(.system(size: 9, weight: .bold))
+                                }
+                                .buttonStyle(.plain)
+                                .accessibilityLabel(tr("action_remove"))
+                            }
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, 6)
+                            .background(Color.pillAccent.opacity(0.1))
+                            .foregroundColor(Color.pillAccent)
+                            .clipShape(Capsule())
+                        }
+                        .padding(.vertical, 4)
+                    }
+                    Button {
+                        showingTagPicker = true
+                    } label: {
+                        Label(tr("action_edit_tags"), systemImage: "tag")
+                            .foregroundColor(appearanceManager.tintColor)
+                    }
                 }
                 .listRowBackground(Color.secondaryAppBackground)
 
@@ -1456,6 +1560,17 @@ struct EditPerformerSheet: View {
                 ) { save() }
             }
             .onAppear { hydrate() }
+            .sheet(isPresented: $showingTagPicker) {
+                // The picker only chooses here; Save of this sheet writes them with the rest.
+                AddTagToSceneSheet(
+                    sceneId: performer.id,
+                    currentTags: editedTags,
+                    viewModel: viewModel,
+                    saveTagIds: { _, done in done(true) }
+                ) { picked in
+                    editedTags = picked.sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
+                }
+            }
             .alert(tr("action_delete_performer"), isPresented: $showingDeleteConfirmation) {
                 Button(tr("action_cancel"), role: .cancel) { }
                 Button(tr("action_delete"), role: .destructive) { performDelete() }
@@ -1501,6 +1616,7 @@ struct EditPerformerSheet: View {
         piercings = performer.piercings ?? ""
         aliasesText = (performer.aliasList ?? []).joined(separator: ", ")
         ratingText = performer.rating100.map(String.init) ?? ""
+        editedTags = tags
     }
 
     private func optionalTrimmed(_ value: String) -> String? {
@@ -1521,6 +1637,8 @@ struct EditPerformerSheet: View {
         let weight = Int(weightText.trimmingCharacters(in: .whitespacesAndNewlines))
         let penisLength = Double(penisLengthText.trimmingCharacters(in: .whitespacesAndNewlines).replacingOccurrences(of: ",", with: "."))
         let rating = Int(ratingText.trimmingCharacters(in: .whitespacesAndNewlines)).map { min(100, max(0, $0)) }
+        // Unchanged tags are not sent, so a save never touches them.
+        let changedTags = tagsChanged ? editedTags : nil
 
         isSaving = true
         viewModel.updatePerformerDetails(
@@ -1540,7 +1658,8 @@ struct EditPerformerSheet: View {
             tattoos: optionalTrimmed(tattoos),
             piercings: optionalTrimmed(piercings),
             aliasList: aliases.isEmpty ? nil : aliases,
-            rating100: rating
+            rating100: rating,
+            tagIds: changedTags?.map(\.id)
         ) { success in
             DispatchQueue.main.async {
                 isSaving = false
@@ -1562,6 +1681,7 @@ struct EditPerformerSheet: View {
                     updated.piercings = optionalTrimmed(piercings)
                     updated.aliasList = aliases.isEmpty ? nil : aliases
                     updated.rating100 = rating
+                    if let changedTags { onTagsChanged?(changedTags) }
                     onComplete(updated)
                     ToastManager.shared.show(tr("performer_updated"), icon: "checkmark.circle", style: .success)
                     dismiss()
