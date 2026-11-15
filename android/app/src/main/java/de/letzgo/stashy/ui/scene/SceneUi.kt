@@ -142,6 +142,8 @@ fun SceneModalSheet(
     actionEnabled: Boolean = true,
     actionBusy: Boolean = false,
     onAction: () -> Unit = {},
+    // false on a short window (phone in landscape): the handle's ~48 dp are needed for content.
+    showsDragHandle: Boolean = true,
     content: @Composable ColumnScope.() -> Unit,
 ) {
     val p = Theme.palette
@@ -149,6 +151,7 @@ fun SceneModalSheet(
         onDismissRequest = onDismiss,
         sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
         containerColor = p.background,
+        dragHandle = if (showsDragHandle) { { androidx.compose.material3.BottomSheetDefaults.DragHandle() } } else null,
     ) {
         // Material sheet top bar: close ✕ · title · trailing text action.
         de.letzgo.stashy.ui.NativeSheetTopBar(title, onClose = onDismiss) {

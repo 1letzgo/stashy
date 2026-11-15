@@ -13,6 +13,9 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
+import de.letzgo.stashy.ui.NativeGroup
+import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
@@ -560,7 +563,6 @@ fun AddMarkerSheet(scene: Scene, seconds: Double, frame: android.graphics.Bitmap
     var endText by remember { mutableStateOf("") }
     var quick by remember { mutableStateOf<Int?>(null) }
     var creating by remember { mutableStateOf(false) }
-    val focusManager = androidx.compose.ui.platform.LocalFocusManager.current
     // iOS `isCompactHeight`: the window is too short for the time card, the search field and
     // its results in one column (a phone in landscape: with the IME and the top bar not even
     // one result row fits below the field). Then the results get a column of their own beside
@@ -573,7 +575,7 @@ fun AddMarkerSheet(scene: Scene, seconds: Double, frame: android.graphics.Bitmap
     val filtered = base.filter { it.id in sceneTagIds } + base.filter { it.id !in sceneTagIds }
     fun quickEnd(d: Int) = PlaybackFormat.markerTime(seconds + d)
 
-    SceneModalSheet(tr(R.string.action_add_marker), onDismiss, actionTitle = tr(R.string.action_add), actionEnabled = primaryTagId.isNotEmpty() && title.isNotEmpty() && !creating, actionBusy = creating, onAction = {
+    SceneModalSheet(tr(R.string.action_add_marker), onDismiss, actionTitle = tr(R.string.action_add), actionEnabled = primaryTagId.isNotEmpty() && title.isNotEmpty() && !creating, actionBusy = creating, showsDragHandle = !compactHeight, onAction = {
         creating = true
         val end = PlaybackFormat.parseTime(endText)
         scope.launch {
@@ -592,6 +594,10 @@ fun AddMarkerSheet(scene: Scene, seconds: Double, frame: android.graphics.Bitmap
             }
         }
     }) {
+        // Read inside the sheet: ModalBottomSheet is a window of its own, and the focus manager
+        // of the screen below can't take the focus from the sheet's search field.
+        val focusManager = androidx.compose.ui.platform.LocalFocusManager.current
+        val keyboard = androidx.compose.ui.platform.LocalSoftwareKeyboardController.current
         val markerDetails: @Composable () -> Unit = {
             FormSection(tr(R.string.marker_details)) {
                 FormRow { Text(tr(R.string.action_start_time), Modifier.weight(1f), color = p.text); Text(PlaybackFormat.markerTime(seconds), color = p.secondaryText) }
@@ -627,7 +633,10 @@ fun AddMarkerSheet(scene: Scene, seconds: Double, frame: android.graphics.Bitmap
                         FormRow({
                             primaryTagId = tag.id
                             // On a short sheet the IME hides most of it: a pick ends the search.
-                            if (compactHeight) focusManager.clearFocus()
+                            if (compactHeight) {
+                                focusManager.clearFocus()
+                                keyboard?.hide()
+                            }
                         }) {
                             Text(tag.name, Modifier.weight(1f), color = p.text)
                             tag.sceneCount?.let { Text("$it", style = NativeType.bodyMedium, color = p.secondaryText) }
@@ -642,8 +651,10 @@ fun AddMarkerSheet(scene: Scene, seconds: Double, frame: android.graphics.Bitmap
         if (compactHeight) {
             // iOS: two Forms side by side — field, picked tag and times on the left, the results
             // alone on the right from the top bar down to the IME.
-            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                Column(Modifier.weight(1f).verticalScroll(rememberScrollState())) {
+            // The row takes the sheet's whole remaining height, so the columns end where the sheet
+            // ends instead of growing with their content past the IME.
+            Row(Modifier.fillMaxWidth().weight(1f), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                Column(Modifier.weight(1f).fillMaxHeight().verticalScroll(rememberScrollState())) {
                     FormSection(tr(R.string.primary_tag)) {
                         searchField()
                         tags.firstOrNull { it.id == primaryTagId }?.let { picked ->
@@ -657,8 +668,13 @@ fun AddMarkerSheet(scene: Scene, seconds: Double, frame: android.graphics.Bitmap
                     }
                     markerDetails()
                 }
-                Column(Modifier.weight(1f).verticalScroll(rememberScrollState())) {
-                    FormSection(null) { results() }
+                // Results only, flush with the top bar (no header, no section padding), and ending
+                // above the IME. The sheet pads its own content for the IME already, which consumes
+                // the inset, so this `imePadding` adds nothing then; it only counts if the IME
+                // overlays the sheet instead.
+                Column(Modifier.weight(1f).fillMaxHeight().imePadding().verticalScroll(rememberScrollState())) {
+                    NativeGroup { results() }
+                    Spacer(Modifier.height(8.dp))
                 }
             }
         } else {
