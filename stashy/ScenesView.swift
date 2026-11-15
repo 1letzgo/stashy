@@ -27,11 +27,14 @@ private enum SceneLiveSortFieldKind: String, CaseIterable, Identifiable {
     case rating
     case random
     case for_you
+    /// A scene's number inside a group: only a group's scene list offers it.
+    case group_scene_number
 
     var id: String { rawValue }
 
     var menuLabel: String {
         switch self {
+        case .group_scene_number: return tr("group_scene_number")
         case .date: return tr("date")
         case .production_date: return tr("production_date")
         case .created_at: return tr("created")
@@ -53,6 +56,7 @@ private enum SceneLiveSortFieldKind: String, CaseIterable, Identifiable {
     /// Listed in the dropdown: works on this server, For You only while it is on.
     var isOffered: Bool {
         if self == .for_you { return StashDBViewModel.SceneSortOption.isForYouAvailable }
+        if self == .group_scene_number { return false }
         return sceneSortOption(ascending: false).isAvailableOnServer
     }
 
@@ -75,6 +79,7 @@ private enum SceneLiveSortFieldKind: String, CaseIterable, Identifiable {
         case .rating: return ascending ? .ratingAsc : .ratingDesc
         case .random: return .random
         case .for_you: return .forYou
+        case .group_scene_number: return ascending ? .sceneNumberAsc : .sceneNumberDesc
         }
     }
 }
@@ -88,6 +93,7 @@ private enum SceneLiveSortPickerValue: Hashable {
     static func from(_ option: StashDBViewModel.SceneSortOption) -> SceneLiveSortPickerValue {
         if option == .forYou { return .known(.for_you) }
         if option.sortField == "random" { return .known(.random) }
+        if option.isGroupOnly { return .known(.group_scene_number) }
         if let k = SceneLiveSortFieldKind(rawValue: option.sortField) { return .known(k) }
         return .unmapped(sortField: option.sortField)
     }
@@ -95,7 +101,7 @@ private enum SceneLiveSortPickerValue: Hashable {
     var menuLabel: String {
         switch self {
         case .known(let k): return k.menuLabel
-        case .unmapped(let f): return tr("other_arg", f)
+        case .unmapped(let f): return tr("other_arg", StashSortFieldName.label(f))
         }
     }
 
@@ -915,7 +921,7 @@ private struct ScenesViewContent: View {
     // Safe sort change function
     /// A group's scenes can also sort by their number in the group.
     private var groupScopeSortFields: [CatalogQuickSortCatalog.Field] {
-        if case .group = scope { return [.init(field: "group_scene_number", label: tr("scene_no"))] }
+        if case .group = scope { return [.init(field: "group_scene_number", label: tr("group_scene_number"))] }
         return []
     }
 
@@ -1039,6 +1045,11 @@ private struct ScenesViewContent: View {
     /// only the filter chips.
     private var quickBar: some View {
         quickBar(part: homeMenu == nil && detailCrumb == nil ? .all : .chipsOnly)
+    }
+
+    private var isGroupScope: Bool {
+        if case .group = scope { return true }
+        return false
     }
 
     /// For You ranks the whole library: only the Scenes list itself offers it.
@@ -1214,6 +1225,7 @@ private struct ScenesViewContent: View {
                 sortOption: selectedSortOption,
                 onSortChange: { changeSortOption(to: $0) },
                 offersForYou: offersForYouSort,
+                offersGroupSceneNumber: isGroupScope,
                 onApply: { applyLiveFilter() },
                 onReset: { resetAllSceneFilters() },
                 onRequestSave: { saveLivePresetOverwrite() },
@@ -1775,6 +1787,8 @@ struct SceneLiveFilterSheet: View {
     var onSortChange: (StashDBViewModel.SceneSortOption) -> Void
     /// For You only in the Scenes list (and Feeds), not on a performer / studio / tag page.
     var offersForYou: Bool = true
+    /// "Scene Number" (Stash `group_scene_number`): only a group's scene list has that order.
+    var offersGroupSceneNumber: Bool = false
     var onApply: () -> Void
     var onReset: () -> Void
     var onRequestSave: () -> Void
@@ -1948,63 +1962,80 @@ struct SceneLiveFilterSheet: View {
         let unmappedMode = pickerValue.isUnmapped
         let orderControlsDisabled = randomMode || unmappedMode
 
-        return HStack(alignment: .center, spacing: 12) {
-            Text(tr("action_sort"))
-                .font(.subheadline.weight(.semibold))
-                .foregroundColor(.secondary)
-                // Gives way to a long sort name instead of widening the sheet.
-                .frame(minWidth: 44, idealWidth: Self.labelColumnWidth, maxWidth: Self.labelColumnWidth, alignment: .leading)
-                .layoutPriority(1)
+        let label = Text(tr("action_sort"))
+            .font(.subheadline.weight(.semibold))
+            .foregroundColor(.secondary)
+            // Gives way to a long sort name instead of widening the sheet.
+            .frame(minWidth: 44, idealWidth: Self.labelColumnWidth, maxWidth: Self.labelColumnWidth, alignment: .leading)
+            .layoutPriority(1)
 
-            HStack(spacing: 6) {
-                filterChip(tr("asc"), isActive: ascending && !orderControlsDisabled) {
-                    guard let k = pickerValue.knownKind, !orderControlsDisabled else { return }
-                    onSortChange(k.sceneSortOption(ascending: true))
-                }
-                .accessibilityLabel(tr("ascending"))
-
-                filterChip(tr("desc"), isActive: !ascending && !orderControlsDisabled) {
-                    guard let k = pickerValue.knownKind, !orderControlsDisabled else { return }
-                    onSortChange(k.sceneSortOption(ascending: false))
-                }
-                .accessibilityLabel(tr("descending"))
+        let chips = HStack(spacing: 6) {
+            filterChip(tr("asc"), isActive: ascending && !orderControlsDisabled) {
+                guard let k = pickerValue.knownKind, !orderControlsDisabled else { return }
+                onSortChange(k.sceneSortOption(ascending: true))
             }
-            .fixedSize(horizontal: true, vertical: false)
-            .opacity(orderControlsDisabled ? 0.4 : 1)
-            .allowsHitTesting(!orderControlsDisabled)
+            .accessibilityLabel(tr("ascending"))
 
-            Spacer(minLength: 8)
+            filterChip(tr("desc"), isActive: !ascending && !orderControlsDisabled) {
+                guard let k = pickerValue.knownKind, !orderControlsDisabled else { return }
+                onSortChange(k.sceneSortOption(ascending: false))
+            }
+            .accessibilityLabel(tr("descending"))
+        }
+        .fixedSize(horizontal: true, vertical: false)
+        .opacity(orderControlsDisabled ? 0.4 : 1)
+        .allowsHitTesting(!orderControlsDisabled)
 
-            Picker(tr("action_sort_type"), selection: Binding(
-                get: { SceneLiveSortPickerValue.from(sortOption) },
-                set: { newVal in
-                    switch newVal {
-                    case .known(let newKind):
-                        if newKind.hasFixedOrder {
-                            onSortChange(newKind.sceneSortOption(ascending: false))
-                        } else if SceneLiveSortPickerValue.from(sortOption).isRandom {
-                            onSortChange(newKind.sceneSortOption(ascending: false))
-                        } else {
-                            onSortChange(newKind.sceneSortOption(ascending: sortOption.direction == "ASC"))
-                        }
-                    case .unmapped:
-                        break
+        let picker = Picker(tr("action_sort_type"), selection: Binding(
+            get: { SceneLiveSortPickerValue.from(sortOption) },
+            set: { newVal in
+                switch newVal {
+                case .known(let newKind):
+                    if newKind.hasFixedOrder {
+                        onSortChange(newKind.sceneSortOption(ascending: false))
+                    } else if SceneLiveSortPickerValue.from(sortOption).isRandom {
+                        onSortChange(newKind.sceneSortOption(ascending: false))
+                    } else {
+                        onSortChange(newKind.sceneSortOption(ascending: sortOption.direction == "ASC"))
                     }
-                }
-            )) {
-                if case .unmapped(let f) = pickerValue {
-                    Text(tr("other_arg", f)).tag(SceneLiveSortPickerValue.unmapped(sortField: f))
-                }
-                ForEach(SceneLiveSortFieldKind.allCases.filter { ($0.isOffered && ($0 != .for_you || offersForYou)) || pickerValue == .known($0) }) { k in
-                    Text(k.menuLabel).tag(SceneLiveSortPickerValue.known(k))
+                case .unmapped:
+                    break
                 }
             }
-            .pickerStyle(.menu)
-            .labelsHidden()
-            .accessibilityLabel(tr("action_sort_field"))
-            .tint(appearance.tintColor)
-            // One line: a wrapped label ("Image count") stretched the card.
-            .fixedSize()
+        )) {
+            if case .unmapped(let f) = pickerValue {
+                Text(tr("other_arg", StashSortFieldName.label(f))).tag(SceneLiveSortPickerValue.unmapped(sortField: f))
+            }
+            ForEach(SceneLiveSortFieldKind.allCases.filter { ($0.isOffered && ($0 != .for_you || offersForYou)) || ($0 == .group_scene_number && offersGroupSceneNumber) || pickerValue == .known($0) }) { k in
+                Text(k.menuLabel).tag(SceneLiveSortPickerValue.known(k))
+            }
+        }
+        .pickerStyle(.menu)
+        .labelsHidden()
+        .accessibilityLabel(tr("action_sort_field"))
+        .tint(appearance.tintColor)
+        // One line: a wrapped label ("Image count") stretched the card.
+        .fixedSize()
+
+        // One row when it fits; a long sort name takes a second row instead of widening the sheet.
+        return ViewThatFits(in: .horizontal) {
+            HStack(alignment: .center, spacing: 12) {
+                label
+                chips
+                Spacer(minLength: 8)
+                picker
+            }
+            VStack(alignment: .leading, spacing: 6) {
+                HStack(alignment: .center, spacing: 12) {
+                    label
+                    chips
+                    Spacer(minLength: 0)
+                }
+                HStack {
+                    Spacer(minLength: 0)
+                    picker
+                }
+            }
         }
         .catalogFilterSortControlCardChrome()
     }

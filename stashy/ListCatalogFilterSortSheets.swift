@@ -17,13 +17,33 @@ enum CatalogFilterSortSheetLayout {
 extension View {
     /// Shared chrome for Filter / Sort control cards in catalog sheets.
     func catalogFilterSortControlCardChrome() -> some View {
-        self
+        // A fixed-size child (a sort picker with a long name) must not report more width than
+        // the card has: that widened the whole sheet past the screen.
+        CatalogProposedWidthClamp { self }
             .padding(.horizontal, 16)
             .padding(.vertical, 10)
             .frame(maxWidth: .infinity, minHeight: CatalogFilterSortSheetLayout.controlCardMinHeight, alignment: .center)
             .background(Color.secondaryAppBackground)
             .clipShape(RoundedRectangle(cornerRadius: 12))
             .padding(.horizontal, 16)
+    }
+}
+
+/// Reports at most the proposed width and places its content in it, so an oversized child is
+/// clipped by the card instead of pushing every row of the sheet sideways.
+struct CatalogProposedWidthClamp: Layout {
+    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
+        let sizes = subviews.map { $0.sizeThatFits(proposal) }
+        let size = CGSize(width: sizes.map(\.width).max() ?? 0, height: sizes.map(\.height).max() ?? 0)
+        guard let width = proposal.width, width.isFinite else { return size }
+        return CGSize(width: min(size.width, width), height: size.height)
+    }
+
+    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
+        for child in subviews {
+            child.place(at: CGPoint(x: bounds.minX, y: bounds.midY), anchor: .leading,
+                        proposal: ProposedViewSize(width: bounds.width, height: proposal.height))
+        }
     }
 }
 
@@ -1351,7 +1371,7 @@ struct PerformersCatalogFilterSortSheet: View {
                 Text(tr("most_shared")).tag(PerformerCatalogSortPickerValue.sharedScenes)
             }
             if case .unmapped(let f) = pickerValue {
-                Text(tr("other_arg", f)).tag(PerformerCatalogSortPickerValue.unmapped(sortField: f))
+                Text(tr("other_arg", StashSortFieldName.label(f))).tag(PerformerCatalogSortPickerValue.unmapped(sortField: f))
             }
             ForEach(PerformerCatalogSortFieldKind.allCases) { k in
                 Text(k.menuLabel).tag(PerformerCatalogSortPickerValue.known(k))
@@ -1520,7 +1540,7 @@ struct TagsCatalogFilterSortSheet: View {
             }
         )) {
             if case .unmapped(let f) = pickerValue {
-                Text(tr("other_arg", f)).tag(TagCatalogSortPickerValue.unmapped(sortField: f))
+                Text(tr("other_arg", StashSortFieldName.label(f))).tag(TagCatalogSortPickerValue.unmapped(sortField: f))
             }
             ForEach(TagCatalogSortFieldKind.allCases) { k in
                 Text(k.menuLabel).tag(TagCatalogSortPickerValue.known(k))
@@ -1689,7 +1709,7 @@ struct StudiosCatalogFilterSortSheet: View {
             }
         )) {
             if case .unmapped(let f) = pickerValue {
-                Text(tr("other_arg", f)).tag(StudioCatalogSortPickerValue.unmapped(sortField: f))
+                Text(tr("other_arg", StashSortFieldName.label(f))).tag(StudioCatalogSortPickerValue.unmapped(sortField: f))
             }
             ForEach(StudioCatalogSortFieldKind.allCases.filter { $0.studioSortOption(ascending: false).isAvailableOnServer }) { k in
                 Text(k.menuLabel).tag(StudioCatalogSortPickerValue.known(k))
@@ -1925,7 +1945,7 @@ struct GalleriesCatalogFilterSortSheet: View {
             }
         )) {
             if case .unmapped(let f) = pickerValue {
-                Text(tr("other_arg", f)).tag(GalleryCatalogSortPickerValue.unmapped(sortField: f))
+                Text(tr("other_arg", StashSortFieldName.label(f))).tag(GalleryCatalogSortPickerValue.unmapped(sortField: f))
             }
             ForEach(GalleryCatalogSortFieldKind.allCases.filter { $0.gallerySortOption(ascending: false).isAvailableOnServer }) { k in
                 Text(k.menuLabel).tag(GalleryCatalogSortPickerValue.known(k))
@@ -2209,7 +2229,7 @@ struct ImagesCatalogFilterSortSheet: View {
             }
         )) {
             if case .unmapped(let f) = pickerValue {
-                Text(tr("other_arg", f)).tag(ImageCatalogSortPickerValue.unmapped(sortField: f))
+                Text(tr("other_arg", StashSortFieldName.label(f))).tag(ImageCatalogSortPickerValue.unmapped(sortField: f))
             }
             ForEach(ImageCatalogSortFieldKind.allCases.filter { $0.imageSortOption(ascending: false).isAvailableOnServer }) { k in
                 Text(k.menuLabel).tag(ImageCatalogSortPickerValue.known(k))

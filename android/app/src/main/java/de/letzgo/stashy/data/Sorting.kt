@@ -33,6 +33,35 @@ object GroupSceneSort {
     val options = listOf(Asc, Desc)
 }
 
+/**
+ * iOS `StashSortFieldName`: readable name of a Stash sort field for the sheet's "Other (…)" entry
+ * (a sort set on the server that the picker does not list). Never the raw field.
+ */
+object StashSortFieldName {
+    private val keys = mapOf(
+        "group_scene_number" to R.string.group_scene_number, "movie_scene_number" to R.string.group_scene_number,
+        "path" to R.string.path, "bitrate" to R.string.bitrate, "framerate" to R.string.framerate, "organized" to R.string.organized,
+        "interactive" to R.string.interactive, "interactive_speed" to R.string.interactive_speed, "code" to R.string.code,
+        "updated_at" to R.string.updated, "created_at" to R.string.created, "resume_time" to R.string.resume_time,
+        "tag_count" to R.string.tag_count, "performer_count" to R.string.performer_count, "file_count" to R.string.file_count,
+        "studio" to R.string.studio, "name" to R.string.name, "title" to R.string.title, "date" to R.string.date, "duration" to R.string.duration,
+        "scenes_count" to R.string.scene_count, "images_count" to R.string.image_count, "galleries_count" to R.string.gallery_count,
+        "scene_markers_count" to R.string.marker_count, "groups_count" to R.string.group_count, "birthdate" to R.string.birthday,
+        "career_length" to R.string.career_length, "height" to R.string.height, "weight" to R.string.weight,
+        "measurements" to R.string.measurements, "penis_length" to R.string.penis_length, "last_played_at" to R.string.last_played,
+        "rating" to R.string.rating, "rating100" to R.string.rating, "o_counter" to R.string.o_count, "play_count" to R.string.play_count,
+        "gender" to R.string.gender, "country" to R.string.country, "ethnicity" to R.string.ethnicity,
+        "hair_color" to R.string.hair_color, "eye_color" to R.string.eye_color,
+    )
+
+    fun label(field: String): String {
+        keys[field.lowercase()]?.let { return tr(it) }
+        // Unknown field: "file_mod_time" → "File mod time".
+        val words = field.replace('_', ' ').trim()
+        return words.replaceFirstChar { it.uppercase() }.ifEmpty { field }
+    }
+}
+
 object SortCatalog {
     private fun o(raw: String, label: String, field: String, dir: String) = SortOption(raw, label, field, dir)
 
@@ -182,7 +211,10 @@ object SortCatalog {
      * [optionFor] / [optionAfterPickingField] take the same [extra] list.
      */
     fun fieldKinds(mode: FilterMode, extra: List<SortOption>): List<SortFieldKind> =
-        extra.distinctBy { it.field }.map { SortFieldKind(it.field, it.label.substringBefore(" (")) } + fieldKinds(mode)
+        extra.distinctBy { it.field }.map {
+            // "Scene Number", not the option's "Scene No. (Ascending)" cut at " (".
+            SortFieldKind(it.field, if (it.field == GroupSceneSort.FIELD) tr(R.string.group_scene_number) else it.label.substringBefore(" ("))
+        } + fieldKinds(mode)
 
     fun optionFor(mode: FilterMode, field: String, ascending: Boolean, extra: List<SortOption>): SortOption? =
         extra.firstOrNull { it.field == field && it.isAscending == ascending } ?: optionFor(mode, field, ascending)

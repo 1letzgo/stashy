@@ -57,6 +57,7 @@ import de.letzgo.stashy.data.CatalogPrefs
 import de.letzgo.stashy.data.FilterMode
 import de.letzgo.stashy.data.ListLivePresetTag
 import de.letzgo.stashy.data.SortCatalog
+import de.letzgo.stashy.data.StashSortFieldName
 import de.letzgo.stashy.data.SortOption
 import de.letzgo.stashy.ui.Appearance
 import de.letzgo.stashy.ui.IosTypography
@@ -262,7 +263,7 @@ fun SortCard(mode: FilterMode, sort: SortOption, extraSorts: List<SortOption> = 
         }
         Spacer(Modifier.weight(1f))
         val entries = buildList {
-            if (known == null) add(MenuEntry(sort.field, tr(R.string.other_arg, sort.field)))
+            if (known == null) add(MenuEntry(sort.field, tr(R.string.other_arg, StashSortFieldName.label(sort.field))))
             kinds.forEach { add(MenuEntry(it.field, it.menuLabel)) }
         }
         MenuPicker(sort.field, entries) { field ->
