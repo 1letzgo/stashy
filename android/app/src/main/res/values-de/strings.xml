@@ -1187,7 +1187,6 @@
   <string name="hint_how_much_each_part_steers">Wie stark jeder Teil die Auswahl beeinflusst.</string>
   <string name="hint_how_much_of_content_shows">Wie viel vom Inhalt durch Buttons, Pillen und Leisten scheint. Gilt für alle Glas-Elemente.</string>
   <string name="hint_how_much_of_content_shows_through">Wie viel vom Inhalt durch die Glas-Buttons, Pillen und Leisten über Videos und Bildern scheint.</string>
-  <string name="hint_icloud_storage_for_settings_is">Der iCloud-Speicher für Einstellungen ist voll. Einige Einstellungen werden nicht synchronisiert.</string>
   <string name="hint_identify_started_for_arg_scenes">Identifizieren für %1$s Szenen gestartet mit: %2$s</string>
   <string name="hint_identify_started_for_this_scene">Identifizieren für diese Szene gestartet mit: %1$s</string>
   <string name="hint_image_is_removed_from_server">Das Bild wird vom Server entfernt. Das kann nicht rückgängig gemacht werden.</string>

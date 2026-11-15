@@ -1032,7 +1032,8 @@
     <string name="hint_how_much_each_part_steers">How much each part steers the picks.</string>
     <string name="hint_how_much_of_content_shows">How much of the content shows through buttons, pills and bars. Applies to all glass chrome.</string>
     <string name="hint_how_much_of_content_shows_through">How much of the content shows through the glass buttons, pills and bars drawn over videos and images.</string>
-    <string name="hint_icloud_storage_for_settings_is">iCloud storage for settings is full. Some settings are not synced.</string>
+    <string name="hint_icloud_sync_limit_kept_arg">The settings sync limit set by Apple is reached. Settings kept on this device: %1$s</string>
+    <string name="hint_icloud_sync_limit_reached">The settings sync limit set by Apple is reached. Some settings stay on this device.</string>
     <string name="hint_identify_started_for_arg_scenes">Identify started for %1$s scenes using: %2$s</string>
     <string name="hint_identify_started_for_this_scene">Identify started for this scene using: %1$s</string>
     <string name="hint_image_is_removed_from_server">The image is removed from the server. This cannot be undone.</string>

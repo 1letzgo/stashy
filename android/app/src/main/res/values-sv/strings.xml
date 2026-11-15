@@ -1187,7 +1187,6 @@
   <string name="hint_how_much_each_part_steers">Hur mycket varje del styr urvalet.</string>
   <string name="hint_how_much_of_content_shows">Hur mycket av innehållet som syns genom knappar, etiketter och fält. Gäller allt glas i gränssnittet.</string>
   <string name="hint_how_much_of_content_shows_through">Hur mycket av innehållet som syns genom glasknappar, etiketter och fält som ritas över videor och bilder.</string>
-  <string name="hint_icloud_storage_for_settings_is">iCloud-lagringen för inställningar är full. Vissa inställningar synkas inte.</string>
   <string name="hint_identify_started_for_arg_scenes">Identifiering startad för %1$s scener med: %2$s</string>
   <string name="hint_identify_started_for_this_scene">Identifiering startad för den här scenen med: %1$s</string>
   <string name="hint_image_is_removed_from_server">Bilden tas bort från servern. Det går inte att ångra.</string>
