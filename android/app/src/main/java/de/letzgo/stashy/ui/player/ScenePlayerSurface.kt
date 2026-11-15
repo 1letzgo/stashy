@@ -17,7 +17,6 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.detectTapGestures
-import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -54,6 +53,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
@@ -128,6 +129,7 @@ fun ScenePlayerSurface(
     var scrubSeconds by remember { mutableStateOf(0.0) }
     var scrubImage by remember { mutableStateOf<ImageBitmap?>(null) }
     var fillsScreen by remember { mutableStateOf(false) }
+    val zoom = remember { PlayerZoomState(scope) }
     var isFastForwarding by remember { mutableStateOf(false) }
     var isRewinding by remember { mutableStateOf(false) }
     var rateBeforeFastForward by remember { mutableFloatStateOf(1f) }
@@ -264,7 +266,29 @@ fun ScenePlayerSurface(
             min(inset, maxOf(0f, (surfaceW.value - 520f) / 2)).dp
         } else 0.dp
 
-        VideoSurface(player, Modifier.fillMaxSize(), fill = fillsScreen, showsBitmapSubtitles = true)
+        // Pinch zoom (PlayerPinchZoom.kt): the transform sits on the video layer only, inside a
+        // clip, and is read in the draw phase.
+        val surfacePx = Size(constraints.maxWidth.toFloat(), constraints.maxHeight.toFloat())
+        zoom.surfaceSize = surfacePx
+        LaunchedEffect(surfacePx) { zoom.reset(animated = false) }
+        LaunchedEffect(isFullscreen) { zoom.reset(animated = false) }
+        LaunchedEffect(player.hasPresentedFrame) { if (!player.hasPresentedFrame) zoom.reset(animated = false) }
+        LaunchedEffect(fillsScreen) { if (!zoom.isPinching) zoom.reset() }
+        val zoomPictureSize by rememberUpdatedState { PlayerZoomState.pictureSize(surfacePx, player.videoSize, fillsScreen) }
+        val zoomPinchEnded by rememberUpdatedState {
+            val fillScale = if (allowsFill && !fillsScreen) {
+                val picture = PlayerZoomState.pictureSize(surfacePx, player.videoSize, false)
+                if (picture.width > 0 && picture.height > 0) maxOf(surfacePx.width / picture.width, surfacePx.height / picture.height) else null
+            } else null
+            when (zoom.endPinch(fills = allowsFill && fillsScreen, fillScale = fillScale)) {
+                PlayerZoomState.Outcome.SnapToFill -> { tick(); fillsScreen = true; reveal() }
+                PlayerZoomState.Outcome.BackToFit -> { tick(); fillsScreen = false; reveal() }
+                PlayerZoomState.Outcome.Free -> Unit
+            }
+        }
+        Box(Modifier.fillMaxSize().clipToBounds()) {
+            VideoSurface(player, Modifier.fillMaxSize().playerZoomTransform(zoom), fill = fillsScreen, showsBitmapSubtitles = true)
+        }
 
         if (!player.hasPresentedFrame) {
             Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -297,16 +321,15 @@ fun ScenePlayerSurface(
         if (!showsControls) return@BoxWithConstraints
 
         // Tap regions: thirds; outer ones take a double tap (±skip) and holding rewinds / fast-forwards.
+        // Over them: pinch zooms the picture, one finger pans it while zoomed. Fullscreen landscape:
+        // a pinch from fit that lands near the fill scale snaps to fill, closed while filled fits.
         Row(
-            Modifier.fillMaxSize().pointerInput(allowsFill) {
-                if (!allowsFill) return@pointerInput
-                detectTransformGestures { _, _, zoom, _ ->
-                    if (abs(zoom - 1f) > 0.1f) {
-                        val fills = zoom > 1f
-                        if (fills != fillsScreen) { fillsScreen = fills; reveal() }
-                    }
-                }
-            },
+            Modifier.fillMaxSize().playerPinchZoomGestures(
+                state = zoom,
+                pictureSize = { zoomPictureSize() },
+                onPinchBegan = { setFastForwarding(false); setRewinding(false) },
+                onPinchEnded = { zoomPinchEnded() },
+            ),
         ) {
             listOf(-1, 0, 1).forEach { region ->
                 Box(
