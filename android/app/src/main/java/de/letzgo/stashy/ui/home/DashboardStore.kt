@@ -133,6 +133,8 @@ object DashboardStore {
                 // The patch that came with it already updated the cards.
                 is LibraryEvent.StudioParentChanged -> null
                 is LibraryEvent.TagParentsChanged -> null
+                // Home rows show no markers.
+                is LibraryEvent.SceneMarkerDeleted -> null
             }
             if (next != null) rows[type] = next
         }
