@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.material.icons.outlined.ContentCopy
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
@@ -311,6 +312,29 @@ fun SceneMetadataCard(model: SceneDetailModel, productionDate: String?, onEditTi
     onToggleLastPlayedHidden = model::toggleLastPlayedHidden,
 )
 
+/** iOS: `SceneStudioCodeCopyButton` — the studio code above the title, monospaced; a tap copies it. */
+@Composable
+private fun SceneStudioCodeCopyButton(code: String) {
+    val tint = Appearance.tint
+    val clipboard = androidx.compose.ui.platform.LocalClipboardManager.current
+    val label = tr(R.string.scene_code) + ": " + code
+    val copyLabel = tr(R.string.action_copy_studio_code)
+    Row(
+        Modifier.clip(androidx.compose.foundation.shape.RoundedCornerShape(6.dp)).background(tint.copy(alpha = 0.12f))
+            .clickable(onClickLabel = copyLabel) {
+                clipboard.setText(androidx.compose.ui.text.AnnotatedString(code))
+                SceneToast.show(tr(R.string.studio_code_copied), androidx.compose.material.icons.Icons.Outlined.ContentCopy, SceneToast.Style.Success)
+            }
+            .semantics(mergeDescendants = true) { contentDescription = label }
+            .padding(horizontal = 8.dp, vertical = 3.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(5.dp),
+    ) {
+        Text(code, style = IosTypography.subheadline.copy(fontWeight = FontWeight.SemiBold, fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace), color = tint, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        Icon(androidx.compose.material.icons.Icons.Outlined.ContentCopy, null, tint = tint, modifier = Modifier.size(14.dp))
+    }
+}
+
 /**
  * The metadata card's content without a page model (also embedded in the mini player's Now
  * Playing view): title, expandable details, date · duration · plays · O-counter (tap +1,
@@ -336,6 +360,7 @@ fun SceneMetadataCardContent(
     val haptics = LocalHapticFeedback.current
     val hasMarkers = !scene.sceneMarkers.isNullOrEmpty()
     Column(Modifier.fillMaxWidth().padding(start = 12.dp, end = 12.dp, bottom = 12.dp, top = if (hasMarkers) 4.dp else 12.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        if (de.letzgo.stashy.data.TabManager.sceneShowStudioCode) scene.studioCode?.let { SceneStudioCodeCopyButton(it) }
         Row(verticalAlignment = Alignment.Top) {
             Text(scene.displayTitle, Modifier.weight(1f), style = IosTypography.title2.copy(fontWeight = FontWeight.Bold), color = p.text, maxLines = 2, overflow = TextOverflow.Ellipsis)
             if (Appearance.isEditModeEnabled && onEditTitle != null) EditCircleButton(onEditTitle)

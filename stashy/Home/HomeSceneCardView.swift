@@ -11,6 +11,7 @@ struct HomeSceneCardView: View {
     /// Hero Autoplay: this is the hero row's focused card, so its preview plays on its own.
     var autoplaysPreview: Bool = false
     @ObservedObject var appearanceManager = AppearanceManager.shared
+    @ObservedObject private var tabManager = TabManager.shared
 
     @StateObject private var previewPlayer = AetherPreviewPlayer()
     @State private var isPreviewing = false
@@ -115,15 +116,20 @@ struct HomeSceneCardView: View {
                 }
                 Spacer()
                 HStack(alignment: .bottom, spacing: 8) {
-                    Text(scene.displayTitle ?? tr("untitled_scene"))
-                        // Small cards match the Channels card titles (12pt bold); the hero row
-                        // keeps its larger type.
-                        .font(isLarge ? .subheadline : .system(size: 12, weight: .bold))
-                        .fontWeight(.bold)
-                        .foregroundColor(.white)
-                        .lineLimit(2)
-                        .frame(maxWidth: .infinity, alignment: .bottomLeading)
-                        .shadow(color: .black.opacity(0.8), radius: 2, x: 0, y: 1)
+                    VStack(alignment: .leading, spacing: 3) {
+                        if tabManager.sceneShowStudioCode, let code = scene.studioCode {
+                            SceneStudioCodeBadge(code: code, large: isLarge)
+                        }
+                        Text(scene.displayTitle ?? tr("untitled_scene"))
+                            // Small cards match the Channels card titles (12pt bold); the hero row
+                            // keeps its larger type.
+                            .font(isLarge ? .subheadline : .system(size: 12, weight: .bold))
+                            .fontWeight(.bold)
+                            .foregroundColor(.white)
+                            .lineLimit(2)
+                            .shadow(color: .black.opacity(0.8), radius: 2, x: 0, y: 1)
+                    }
+                    .frame(maxWidth: .infinity, alignment: .bottomLeading)
                     if isLarge {
                         heroPlayButtons
                     }

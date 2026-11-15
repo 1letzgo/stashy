@@ -352,6 +352,14 @@ struct DashboardSettingsView: View {
                         .labelsHidden()
                         .tint(appearanceManager.tintColor)
                     }
+                    settingRow(tr("scene_code")) {
+                        Toggle("", isOn: Binding(
+                            get: { tabManager.sceneShowStudioCode },
+                            set: { tabManager.sceneShowStudioCode = $0 }
+                        ))
+                        .labelsHidden()
+                        .tint(appearanceManager.tintColor)
+                    }
                     .padding(.bottom, 4)
                 }
 

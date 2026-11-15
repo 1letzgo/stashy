@@ -8497,11 +8497,13 @@ struct GenerateData: Codable {
         }
     }
 
-    func updateSceneTitleAndDetails(sceneId: String, title: String?, details: String?, completion: @escaping (Bool) -> Void) {
+    /// `code`: the new studio code (`""` clears it); `nil` leaves it untouched.
+    func updateSceneTitleAndDetails(sceneId: String, title: String?, details: String?, code: String? = nil, completion: @escaping (Bool) -> Void) {
         let mutation = GraphQLQueries.sceneUpdateTitleDetailsMutation
         var input: [String: Any] = ["id": sceneId]
         if let t = title { input["title"] = t } else { input["title"] = NSNull() }
         if let d = details { input["details"] = d } else { input["details"] = NSNull() }
+        if let code { input["code"] = code }
         let variables: [String: Any] = ["input": input]
         guard let bodyData = try? JSONSerialization.data(withJSONObject: ["query": mutation, "variables": variables]),
               let bodyString = String(data: bodyData, encoding: .utf8) else {
@@ -9694,6 +9696,8 @@ final class SceneUpdatedPayload {
 struct Scene: Codable, Identifiable, Equatable {
     let id: String
     let title: String?
+    /// Stash's "Studio Code" (e.g. `OMG-013`), shown only with `TabManager.sceneShowStudioCode`.
+    let code: String?
     let details: String?
     /// Free-text field in Stash — there is no director entity, so it is matched by name.
     let director: String?
@@ -9782,7 +9786,7 @@ struct Scene: Codable, Identifiable, Equatable {
     
     
     enum CodingKeys: String, CodingKey {
-        case id, title, details, director, date, duration, studio, performers, files, tags, galleries, groups, organized, rating100, paths, interactive, captions
+        case id, title, code, details, director, date, duration, studio, performers, files, tags, galleries, groups, organized, rating100, paths, interactive, captions
         case resumeTime = "resume_time"
         case playCount = "play_count"
         case playDuration = "play_duration"
@@ -9796,9 +9800,10 @@ struct Scene: Codable, Identifiable, Equatable {
     }
 
     // Explicit initializer for copy-constructors
-    init(id: String, title: String?, details: String?, director: String? = nil, date: String?, duration: Double?, studio: SceneStudio?, performers: [ScenePerformer], files: [SceneFile]?, tags: [Tag]?, galleries: [Gallery]?, groups: [SceneGroupEntry]? = nil, organized: Bool?, resumeTime: Double?, playCount: Int?, oCounter: Int?, rating100: Int?, createdAt: String?, updatedAt: String?, paths: ScenePaths?, sceneMarkers: [SceneMarker]?, interactive: Bool?, stashIds: [StashID]? = nil, captions: [VideoCaption]? = nil, customFields: [String: StashJSONValue]? = nil, playDuration: Double? = nil, lastPlayedAt: String? = nil) {
+    init(id: String, title: String?, details: String?, director: String? = nil, date: String?, duration: Double?, studio: SceneStudio?, performers: [ScenePerformer], files: [SceneFile]?, tags: [Tag]?, galleries: [Gallery]?, groups: [SceneGroupEntry]? = nil, organized: Bool?, resumeTime: Double?, playCount: Int?, oCounter: Int?, rating100: Int?, createdAt: String?, updatedAt: String?, paths: ScenePaths?, sceneMarkers: [SceneMarker]?, interactive: Bool?, stashIds: [StashID]? = nil, captions: [VideoCaption]? = nil, customFields: [String: StashJSONValue]? = nil, playDuration: Double? = nil, lastPlayedAt: String? = nil, code: String? = nil) {
         self.id = id
         self.title = title
+        self.code = code
         self.details = details
         self.director = director
         self.date = date
@@ -9831,6 +9836,7 @@ struct Scene: Codable, Identifiable, Equatable {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         id = try container.decode(String.self, forKey: .id)
         title = try container.decodeIfPresent(String.self, forKey: .title)
+        code = try container.decodeIfPresent(String.self, forKey: .code)
         details = try container.decodeIfPresent(String.self, forKey: .details)
         director = try container.decodeIfPresent(String.self, forKey: .director)
         date = try container.decodeIfPresent(String.self, forKey: .date)
@@ -10034,7 +10040,7 @@ struct Scene: Codable, Identifiable, Equatable {
             resumeTime: newResumeTime, playCount: playCount, oCounter: oCounter,
             rating100: rating100, createdAt: createdAt, updatedAt: updatedAt,
             paths: paths, sceneMarkers: sceneMarkers, interactive: interactive, stashIds: stashIds, captions: captions, customFields: customFields,
-            playDuration: playDuration, lastPlayedAt: lastPlayedAt
+            playDuration: playDuration, lastPlayedAt: lastPlayedAt, code: code
         )
     }
 
@@ -10060,7 +10066,7 @@ struct Scene: Codable, Identifiable, Equatable {
             resumeTime: resumeTime, playCount: playCount, oCounter: oCounter,
             rating100: rating100, createdAt: createdAt, updatedAt: updatedAt,
             paths: paths, sceneMarkers: sceneMarkers, interactive: interactive, stashIds: stashIds, captions: captions, customFields: customFields,
-            playDuration: playDuration, lastPlayedAt: lastPlayedAt
+            playDuration: playDuration, lastPlayedAt: lastPlayedAt, code: code
         )
     }
 
@@ -10073,7 +10079,7 @@ struct Scene: Codable, Identifiable, Equatable {
             resumeTime: resumeTime, playCount: playCount, oCounter: oCounter,
             rating100: rating100, createdAt: createdAt, updatedAt: updatedAt,
             paths: paths, sceneMarkers: sceneMarkers, interactive: interactive, stashIds: stashIds, captions: captions, customFields: customFields,
-            playDuration: playDuration, lastPlayedAt: lastPlayedAt
+            playDuration: playDuration, lastPlayedAt: lastPlayedAt, code: code
         )
     }
 
@@ -10086,7 +10092,7 @@ struct Scene: Codable, Identifiable, Equatable {
             resumeTime: resumeTime, playCount: playCount, oCounter: oCounter,
             rating100: newRating, createdAt: createdAt, updatedAt: updatedAt,
             paths: paths, sceneMarkers: sceneMarkers, interactive: interactive, stashIds: stashIds, captions: captions, customFields: customFields,
-            playDuration: playDuration, lastPlayedAt: lastPlayedAt
+            playDuration: playDuration, lastPlayedAt: lastPlayedAt, code: code
         )
     }
 
@@ -10099,7 +10105,7 @@ struct Scene: Codable, Identifiable, Equatable {
             resumeTime: resumeTime, playCount: newPlayCount, oCounter: oCounter,
             rating100: rating100, createdAt: createdAt, updatedAt: updatedAt,
             paths: paths, sceneMarkers: sceneMarkers, interactive: interactive, stashIds: stashIds, captions: captions, customFields: customFields,
-            playDuration: playDuration, lastPlayedAt: lastPlayedAt
+            playDuration: playDuration, lastPlayedAt: lastPlayedAt, code: code
         )
     }
 
@@ -10112,7 +10118,7 @@ struct Scene: Codable, Identifiable, Equatable {
             resumeTime: resumeTime, playCount: playCount, oCounter: newOCounter,
             rating100: rating100, createdAt: createdAt, updatedAt: updatedAt,
             paths: paths, sceneMarkers: sceneMarkers, interactive: interactive, stashIds: stashIds, captions: captions, customFields: customFields,
-            playDuration: playDuration, lastPlayedAt: lastPlayedAt
+            playDuration: playDuration, lastPlayedAt: lastPlayedAt, code: code
         )
     }
 
@@ -10166,7 +10172,8 @@ struct Scene: Codable, Identifiable, Equatable {
             captions: captions,
             customFields: customFields,
             playDuration: playDuration,
-            lastPlayedAt: lastPlayedAt
+            lastPlayedAt: lastPlayedAt,
+            code: other.code ?? code
         )
     }
 
@@ -10225,7 +10232,7 @@ struct Scene: Codable, Identifiable, Equatable {
             resumeTime: resumeTime, playCount: playCount, oCounter: oCounter,
             rating100: rating100, createdAt: createdAt, updatedAt: newUpdatedAt,
             paths: paths, sceneMarkers: sceneMarkers, interactive: interactive, stashIds: stashIds, captions: captions, customFields: customFields,
-            playDuration: playDuration, lastPlayedAt: lastPlayedAt
+            playDuration: playDuration, lastPlayedAt: lastPlayedAt, code: code
         )
     }
 
@@ -10238,7 +10245,26 @@ struct Scene: Codable, Identifiable, Equatable {
             resumeTime: resumeTime, playCount: playCount, oCounter: oCounter,
             rating100: rating100, createdAt: createdAt, updatedAt: updatedAt,
             paths: paths, sceneMarkers: sceneMarkers, interactive: interactive, stashIds: stashIds, captions: captions, customFields: newFields,
-            playDuration: playDuration, lastPlayedAt: lastPlayedAt
+            playDuration: playDuration, lastPlayedAt: lastPlayedAt, code: code
+        )
+    }
+
+    /// Studio code, trimmed; `nil` when empty.
+    var studioCode: String? {
+        guard let trimmed = code?.trimmingCharacters(in: .whitespacesAndNewlines), !trimmed.isEmpty else { return nil }
+        return trimmed
+    }
+
+    /// Creates a copy with a new studio code (`""` clears it).
+    func withCode(_ newCode: String?) -> Scene {
+        Scene(
+            id: id, title: title, details: details, director: director, date: date, duration: duration,
+            studio: studio, performers: performers, files: files, tags: tags,
+            galleries: galleries, groups: groups, organized: organized,
+            resumeTime: resumeTime, playCount: playCount, oCounter: oCounter,
+            rating100: rating100, createdAt: createdAt, updatedAt: updatedAt,
+            paths: paths, sceneMarkers: sceneMarkers, interactive: interactive, stashIds: stashIds, captions: captions, customFields: customFields,
+            playDuration: playDuration, lastPlayedAt: lastPlayedAt, code: newCode
         )
     }
 

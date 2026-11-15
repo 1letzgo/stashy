@@ -283,6 +283,8 @@ data class SceneGalleryStub(
 data class Scene(
     val id: String,
     val title: String? = null,
+    /** Stash's "Studio Code" (`OMG-013`); shown only with [de.letzgo.stashy.data.TabManager.sceneShowStudioCode]. */
+    val code: String? = null,
     val details: String? = null,
     val director: String? = null,
     val date: String? = null,
@@ -315,6 +317,9 @@ data class Scene(
     val displayTitle: String get() = title?.takeIf { it.isNotBlank() }
         ?: files?.firstOrNull()?.path?.substringAfterLast('/')?.substringBeforeLast('.')
         ?: tr(R.string.unknown_title)
+
+    /** iOS: `studioCode` — the code, trimmed; null when empty. */
+    val studioCode: String? get() = code?.trim()?.takeIf { it.isNotEmpty() }
 
     val isPortrait: Boolean get() = files?.firstOrNull()?.let { (it.height ?: 0) > (it.width ?: 0) } ?: false
 

@@ -13,6 +13,7 @@ struct SceneCardView: View {
     let scene: Scene
     var aspectRatio: CGFloat = 16.0 / 9.0
     @ObservedObject var appearanceManager = AppearanceManager.shared
+    @ObservedObject private var tabManager = TabManager.shared
     
     // Preview Video State
     @StateObject private var previewPlayer = AetherPreviewPlayer()
@@ -122,15 +123,20 @@ struct SceneCardView: View {
             // Bottom Content Overlay (Title)
             VStack(alignment: .leading, spacing: 4) {
                 HStack(alignment: .bottom, spacing: 8) {
-                    // Title
-                    Text(scene.displayTitle ?? tr("unknown_title"))
-                        .font(.headline)
-                        .fontWeight(.medium)
-                        // Sits on the thumbnail: larger sizes would bury the picture.
-                        .dynamicTypeSize(...DynamicTypeSize.accessibility1)
-                        .lineLimit(2)
-                        .foregroundColor(.white)
-                        .frame(maxWidth: .infinity, alignment: .leading)
+                    // Title, with the studio code above it when switched on
+                    VStack(alignment: .leading, spacing: 4) {
+                        if tabManager.sceneShowStudioCode, let code = scene.studioCode {
+                            SceneStudioCodeBadge(code: code)
+                        }
+                        Text(scene.displayTitle ?? tr("unknown_title"))
+                            .font(.headline)
+                            .fontWeight(.medium)
+                            // Sits on the thumbnail: larger sizes would bury the picture.
+                            .dynamicTypeSize(...DynamicTypeSize.accessibility1)
+                            .lineLimit(2)
+                            .foregroundColor(.white)
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
                     
                     // Duration - Bottom Right (Before Performers)
                     if let durationText = durationString {
@@ -223,4 +229,26 @@ struct SceneCardView: View {
         }
     }
 }
+
+/// Stash's studio code (`OMG-013`) on a scene card, above the title: monospaced on a dark plate,
+/// so it reads on any thumbnail. Shown only with `TabManager.sceneShowStudioCode`.
+struct SceneStudioCodeBadge: View {
+    let code: String
+    var large = false
+
+    var body: some View {
+        Text(code)
+            .font(.system(size: large ? 13 : 11, weight: .bold, design: .monospaced))
+            .foregroundColor(.white)
+            .lineLimit(1)
+            .truncationMode(.middle)
+            .padding(.horizontal, 6)
+            .padding(.vertical, 2)
+            .background(Color.black.opacity(0.55), in: RoundedRectangle(cornerRadius: 4, style: .continuous))
+            // Sits on the thumbnail, like the title.
+            .dynamicTypeSize(...DynamicTypeSize.xLarge)
+            .accessibilityLabel("\(tr("scene_code")): \(code)")
+    }
+}
+
 #endif

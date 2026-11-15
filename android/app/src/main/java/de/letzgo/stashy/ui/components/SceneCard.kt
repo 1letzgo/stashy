@@ -25,6 +25,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
 import de.letzgo.stashy.ui.player.ScenePreviewOnHold
 import de.letzgo.stashy.data.Downloads
@@ -77,11 +78,14 @@ fun SceneCard(
             verticalAlignment = Alignment.Bottom,
             horizontalArrangement = Arrangement.spacedBy(6.dp),
         ) {
-            Text(
-                scene.displayTitle, Modifier.weight(1f),
-                style = NativeType.titleMedium,
-                color = Color.White, maxLines = 2, overflow = TextOverflow.Ellipsis,
-            )
+            androidx.compose.foundation.layout.Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                if (de.letzgo.stashy.data.TabManager.sceneShowStudioCode) scene.studioCode?.let { SceneStudioCodeBadge(it) }
+                Text(
+                    scene.displayTitle,
+                    style = NativeType.titleMedium,
+                    color = Color.White, maxLines = 2, overflow = TextOverflow.Ellipsis,
+                )
+            }
             formatDuration(scene.sceneDuration)?.let { NativeMediaLabel(it, icon = SF.clock) }
             if (scene.performers.isNotEmpty()) NativeMediaLabel("${scene.performers.size}", icon = SF.person2)
         }
@@ -96,6 +100,21 @@ fun SceneCard(
             )
         }
     }
+}
+
+/**
+ * iOS: `SceneStudioCodeBadge` — the studio code above a scene card's title, monospaced on a
+ * dark plate so it reads on any thumbnail.
+ */
+@Composable
+fun SceneStudioCodeBadge(code: String, large: Boolean = false) {
+    Text(
+        code,
+        Modifier.clip(androidx.compose.foundation.shape.RoundedCornerShape(4.dp)).background(Color.Black.copy(alpha = 0.55f)).padding(horizontal = 6.dp, vertical = 2.dp),
+        color = Color.White, maxLines = 1, overflow = TextOverflow.Ellipsis,
+        fontSize = if (large) 13.sp else 11.sp, fontWeight = androidx.compose.ui.text.font.FontWeight.Bold,
+        fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
+    )
 }
 
 /** "Downloaded" mark on scene cards: green check in a small Material circle. */
