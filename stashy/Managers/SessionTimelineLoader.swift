@@ -245,6 +245,13 @@ final class SessionTimelineLoader: ObservableObject {
             Task { @MainActor in self?.scheduleLiveReload(refreshOHistory: false) }
         }
         NotificationCenter.default.addObserver(
+            forName: NSNotification.Name("SceneMarkerDeleted"),
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            Task { @MainActor in self?.scheduleLiveReload(refreshOHistory: false) }
+        }
+        NotificationCenter.default.addObserver(
             forName: NSNotification.Name("SceneOCounterUpdated"),
             object: nil,
             queue: .main

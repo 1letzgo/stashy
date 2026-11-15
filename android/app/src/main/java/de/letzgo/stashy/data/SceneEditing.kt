@@ -185,8 +185,12 @@ object SceneEditing {
         GraphQL.data(SceneQueries.sceneMarkerUpdate, vars("input" to fields))
     }
 
-    suspend fun deleteMarker(markerId: String) {
-        GraphQL.data(SceneQueries.sceneMarkerDestroy, vars("id" to markerId))
+    /** iOS: `deleteSceneMarker` — only the marker goes, the scene stays. Posts [LibraryEvent.SceneMarkerDeleted]. */
+    suspend fun deleteMarker(marker: SceneMarker, sceneId: String? = null) {
+        val data = GraphQL.data(SceneQueries.sceneMarkerDestroy, vars("id" to marker.id))
+        if (data["sceneMarkerDestroy"]?.toString() == "false") throw GraphQLError.Query(tr(R.string.error_delete_marker))
+        LibraryEvents.post(LibraryEvent.SceneMarkerDeleted(marker.id, sceneId ?: marker.scene?.id, marker.seconds))
+        LibraryEvents.post(LibraryEvent.StatsChanged)
     }
 
     /** iOS: `deleteSceneWithFiles` — `sceneDestroy`, then `deleteFiles` for every file id. */

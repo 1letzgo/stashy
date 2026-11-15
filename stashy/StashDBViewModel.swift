@@ -8965,7 +8965,8 @@ extension StashDBViewModel {
         ("StudioDeleted", "studioId"),
         ("TagDeleted", "tagId"),
         ("GroupDeleted", "groupId"),
-        ("GalleryDeleted", "galleryId")
+        ("GalleryDeleted", "galleryId"),
+        ("SceneMarkerDeleted", "markerId")
     ]
 
     private struct GallerySetCoverResponse: Decodable {
@@ -9093,6 +9094,11 @@ extension StashDBViewModel {
             for rowType in homeRowGalleries.keys {
                 homeRowGalleries[rowType]?.removeAll { $0.id == id }
             }
+        case "SceneMarkerDeleted":
+            if sceneMarkers.contains(where: { $0.id == id }) {
+                sceneMarkers.removeAll { $0.id == id }
+                totalSceneMarkers = max(0, totalSceneMarkers - 1)
+            }
         default:
             break
         }
@@ -9107,6 +9113,7 @@ extension StashDBViewModel {
         notificationName: String,
         userInfoKey: String,
         entityId: String,
+        extraUserInfo: [String: Any] = [:],
         completion: @escaping (Result<Void, Error>) -> Void
     ) {
         Task { @MainActor in
@@ -9135,7 +9142,7 @@ extension StashDBViewModel {
                 NotificationCenter.default.post(
                     name: NSNotification.Name(notificationName),
                     object: nil,
-                    userInfo: [userInfoKey: entityId]
+                    userInfo: extraUserInfo.merging([userInfoKey: entityId]) { _, new in new }
                 )
                 completion(.success(()))
             } catch {
@@ -9190,6 +9197,29 @@ extension StashDBViewModel {
             userInfoKey: "groupId",
             entityId: groupId,
             completion: completion
+        )
+    }
+
+    /// Deletes one scene marker (the scene and its files stay). On success `SceneMarkerDeleted`
+    /// (`markerId`, `sceneId`) goes out: marker lists and Feeds › Markers drop it (every view
+    /// model, `applyEntityDeletion`), an open scene page drops it from its strip and time bar.
+    func deleteSceneMarker(_ marker: SceneMarker, sceneId: String?, completion: @escaping (Result<Void, Error>) -> Void) {
+        let sceneId = sceneId ?? marker.scene?.id
+        performEntityDestroy(
+            mutation: GraphQLQueries.sceneMarkerDestroyMutation,
+            variables: ["id": marker.id],
+            resultField: "sceneMarkerDestroy",
+            notificationName: "SceneMarkerDeleted",
+            userInfoKey: "markerId",
+            entityId: marker.id,
+            extraUserInfo: sceneId.map { ["sceneId": $0] } ?? [:],
+            completion: { result in
+                // Feeds › Scenes draws its time-bar dots from this cache, not from the scene.
+                if case .success = result, let sceneId {
+                    FeedsMarkerTimes.remove(marker.seconds, for: sceneId)
+                }
+                completion(result)
+            }
         )
     }
 
@@ -9986,6 +10016,19 @@ struct Scene: Codable, Identifiable, Equatable {
             resumeTime: newResumeTime, playCount: playCount, oCounter: oCounter,
             rating100: rating100, createdAt: createdAt, updatedAt: updatedAt,
             paths: paths, sceneMarkers: sceneMarkers, interactive: interactive, stashIds: stashIds, captions: captions, customFields: customFields,
+            playDuration: playDuration, lastPlayedAt: lastPlayedAt
+        )
+    }
+
+    /// Creates a copy with a new marker list
+    func withSceneMarkers(_ newMarkers: [SceneMarker]?) -> Scene {
+        return Scene(
+            id: id, title: title, details: details, director: director, date: date, duration: duration,
+            studio: studio, performers: performers, files: files, tags: tags,
+            galleries: galleries, groups: groups, organized: organized,
+            resumeTime: resumeTime, playCount: playCount, oCounter: oCounter,
+            rating100: rating100, createdAt: createdAt, updatedAt: updatedAt,
+            paths: paths, sceneMarkers: newMarkers, interactive: interactive, stashIds: stashIds, captions: captions, customFields: customFields,
             playDuration: playDuration, lastPlayedAt: lastPlayedAt
         )
     }
@@ -14496,6 +14539,15 @@ nonisolated enum FeedsMarkerTimes {
         let known = times[sceneID] ?? []
         guard !known.contains(where: { abs($0 - seconds) < 0.001 }) else { return }
         times[sceneID] = (known + [seconds]).sorted()
+    }
+
+    /// A marker just deleted.
+    static func remove(_ seconds: Double, for sceneID: String) {
+        lock.lock(); defer { lock.unlock() }
+        guard let known = times[sceneID], let index = known.firstIndex(where: { abs($0 - seconds) < 0.001 }) else { return }
+        var updated = known
+        updated.remove(at: index)
+        times[sceneID] = updated
     }
 
     static func seconds(for sceneID: String) -> [Double] {

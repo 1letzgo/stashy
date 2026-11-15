@@ -21,6 +21,8 @@ sealed class LibraryEvent {
     data class PerformerDeleted(val id: String) : LibraryEvent()
     data class StudioDeleted(val id: String) : LibraryEvent()
     data class GalleryDeleted(val id: String) : LibraryEvent()
+    /** A scene marker was deleted (iOS `SceneMarkerDeleted`): marker lists, the scene page's strip and time bar and Feeds drop it. */
+    data class SceneMarkerDeleted(val id: String, val sceneId: String?, val seconds: Double) : LibraryEvent()
     /** Something was created or deleted, or an O count changed: the statistics are stale. */
     data object StatsChanged : LibraryEvent()
 }

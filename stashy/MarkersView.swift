@@ -25,6 +25,8 @@ private struct MarkersViewContent: View {
     @State private var presetNameInput = ""
     @State private var showRenamePresetAlert = false
     @State private var showDeletePresetAlert = false
+    /// The marker whose Delete was picked in a card's context menu (confirmation open).
+    @State private var markerToDelete: SceneMarker?
     @State private var studioPickerOptions: [Studio] = []
     @State private var studioPickerLoading = false
     @State private var tagPickerOptions: [Tag] = []
@@ -721,8 +723,10 @@ private struct MarkersViewContent: View {
                             MarkerCardView(marker: marker)
                         }
                         .buttonStyle(.plain)
+                        .contextMenu { MarkerDeleteMenuButton { markerToDelete = marker } }
                     } else {
                         MarkerCardView(marker: marker)
+                            .contextMenu { MarkerDeleteMenuButton { markerToDelete = marker } }
                     }
                 }
                 
@@ -744,6 +748,7 @@ private struct MarkersViewContent: View {
         }
         .collapsesCatalogChrome(enabled: !hideTitle)
         .refreshable { performSearch() }
+        .markerDeleteAlert($markerToDelete, viewModel: viewModel)
     }
 }
 
@@ -762,6 +767,47 @@ struct MarkersView: View {
     var body: some View {
         var content = MarkersViewContent(viewModel: catalogBrowserViewModel ?? ownedViewModel, hideTitle: hideTitle, filterMemory: filterMemory)
         return content
+    }
+}
+
+/// "Delete Marker" for a marker's context menu; the confirmation is `markerDeleteAlert`.
+struct MarkerDeleteMenuButton: View {
+    let action: () -> Void
+
+    var body: some View {
+        Button(role: .destructive, action: action) {
+            Label(tr("action_delete_marker"), systemImage: "trash")
+        }
+    }
+}
+
+extension View {
+    /// The confirmation for deleting `marker` (set it to ask). Deletes through
+    /// `StashDBViewModel.deleteSceneMarker`, whose `SceneMarkerDeleted` lets every list, the
+    /// scene page and Feeds drop the marker; `onDeleted` runs after that.
+    func markerDeleteAlert(_ marker: Binding<SceneMarker?>, viewModel: StashDBViewModel, sceneId: String? = nil, onDeleted: @escaping (SceneMarker) -> Void = { _ in }) -> some View {
+        alert(
+            tr("confirm_delete_marker"),
+            isPresented: Binding(get: { marker.wrappedValue != nil }, set: { if !$0 { marker.wrappedValue = nil } }),
+            presenting: marker.wrappedValue
+        ) { item in
+            Button(tr("action_delete"), role: .destructive) {
+                viewModel.deleteSceneMarker(item, sceneId: sceneId) { result in
+                    switch result {
+                    case .success:
+                        HapticManager.light()
+                        ToastManager.shared.show(tr("marker_deleted"), icon: "trash", style: .success)
+                        onDeleted(item)
+                    case .failure(let error):
+                        AppLog.error("Marker delete failed: \(error.localizedDescription)")
+                        ToastManager.shared.show(tr("error_delete_marker"), icon: "exclamationmark.triangle", style: .error)
+                    }
+                }
+            }
+            Button(tr("action_cancel"), role: .cancel) {}
+        } message: { _ in
+            Text(tr("hint_marker_is_removed_scene_stays"))
+        }
     }
 }
 

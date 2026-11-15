@@ -3139,6 +3139,7 @@ struct ReelsViewBody: View {
 
     private var reelsDeleteConfirmationTitle: String {
         if case .clip = reelsItemToDelete { return tr("confirm_delete_image") }
+        if case .marker = reelsItemToDelete { return tr("confirm_delete_marker") }
         return tr("confirm_delete_scene")
     }
 
@@ -3149,15 +3150,7 @@ struct ReelsViewBody: View {
         case .scene, .preview:
             return tr("hint_scene_and_its_files_are")
         case .marker:
-            return ""
-        }
-    }
-
-    /// Markers point at a scene shared with other markers; deleting from the marker feed is not offered.
-    private func reelsItemSupportsDelete(_ item: ReelItemData) -> Bool {
-        switch item {
-        case .scene, .preview, .clip: return true
-        case .marker: return false
+            return tr("hint_marker_is_removed_scene_stays")
         }
     }
 
@@ -3183,12 +3176,14 @@ struct ReelsViewBody: View {
 
         let finish: (Bool, String, @escaping () -> Void) -> Void = { success, label, prune in
             DispatchQueue.main.async {
+                let errorKey = ["image": "error_delete_image", "marker": "error_delete_marker"][label] ?? "error_delete_scene"
+                let doneKey = ["image": "image_deleted", "marker": "marker_deleted"][label] ?? "scene_deleted"
                 guard success else {
                     self.currentVisibleSceneId = item.id
-                    ToastManager.shared.show(tr(label == "image" ? "error_delete_image" : "error_delete_scene"), icon: "exclamationmark.triangle", style: .error)
+                    ToastManager.shared.show(tr(errorKey), icon: "exclamationmark.triangle", style: .error)
                     return
                 }
-                ToastManager.shared.show(tr(label == "image" ? "image_deleted" : "scene_deleted"), icon: "trash", style: .success)
+                ToastManager.shared.show(tr(doneKey), icon: "trash", style: .success)
                 prune()
                 if successorId == nil {
                     self.currentVisibleSceneId = nil
@@ -3210,8 +3205,15 @@ struct ReelsViewBody: View {
                     self.viewModel.clips.removeAll { $0.id == clip.id }
                 }
             }
-        case .marker:
-            break
+        case .marker(let marker):
+            // `SceneMarkerDeleted` already drops it from every view model's `sceneMarkers`.
+            viewModel.deleteSceneMarker(marker, sceneId: marker.scene?.id) { result in
+                if case .success = result {
+                    finish(true, "marker") { self.viewModel.sceneMarkers.removeAll { $0.id == marker.id } }
+                } else {
+                    finish(false, "marker") {}
+                }
+            }
         }
     }
 
@@ -4885,9 +4887,8 @@ struct ReelsViewBody: View {
                                           isPicsMode: reelsMode == .pics)
                         #endif
                         // Delete sits left of the settings, for the item on screen (not in Pics,
-                        // which deletes from its own image list; markers share their scene).
-                        if reelsMode != .pics, tabManager.reelsShowsDeleteButton,
-                           let currentItem, reelsItemSupportsDelete(currentItem) {
+                        // which deletes from its own image list). A marker deletes only itself.
+                        if reelsMode != .pics, tabManager.reelsShowsDeleteButton, let currentItem {
                             reelsDeletePill(for: currentItem)
                         }
                         reelsSortMenu

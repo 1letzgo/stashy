@@ -26,6 +26,8 @@ struct SceneVideoPlayerCard: View {
     @Binding var isMuted: Bool
     /// Add-marker flow (the detail view owns the sheet); nil hides the button.
     var onAddMarker: (() -> Void)? = nil
+    /// "Delete Marker" in a marker's context menu (the detail view owns the confirmation); nil hides it.
+    var onDeleteMarker: ((SceneMarker) -> Void)? = nil
 
     @ObservedObject var appearanceManager = AppearanceManager.shared
     @ObservedObject var subtitleController: SubtitleController
@@ -364,6 +366,11 @@ struct SceneVideoPlayerCard: View {
                             markerThumbnail(marker)
                         }
                         .buttonStyle(.plain)
+                        .contextMenu {
+                            if let onDeleteMarker {
+                                MarkerDeleteMenuButton { onDeleteMarker(marker) }
+                            }
+                        }
                     }
                 }
                 .padding(.horizontal, 12)

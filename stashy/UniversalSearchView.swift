@@ -29,6 +29,7 @@ struct UniversalSearchView: View {
     @State private var galleries: [Gallery] = []
     @State private var groups: [StashGroup] = []
     @State private var markers: [SceneMarker] = []
+    @State private var markerToDelete: SceneMarker?
     
     // Per-category result limits
     private let scenesLimit = 20
@@ -75,6 +76,11 @@ struct UniversalSearchView: View {
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
           }
+            .markerDeleteAlert($markerToDelete, viewModel: viewModel)
+            .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("SceneMarkerDeleted"))) { note in
+                guard let id = note.userInfo?["markerId"] as? String else { return }
+                markers.removeAll { $0.id == id }
+            }
             .applyAppBackground()
             // The section header of Home / Tools / Settings instead of a system title.
             .stashySectionChrome {
@@ -258,6 +264,7 @@ struct UniversalSearchView: View {
             }) { marker in
                 MarkerCardView(marker: marker)
                     .frame(width: landscapeCardWidth)
+                    .contextMenu { MarkerDeleteMenuButton { markerToDelete = marker } }
             }
         default:
             EmptyView()

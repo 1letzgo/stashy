@@ -377,9 +377,14 @@ val SceneMarker.thumbnailURL: String? get() = screenshotURL
  * bottom-left over a 60 pt gradient.
  */
 @Composable
-fun MarkerCard(marker: SceneMarker, modifier: Modifier = Modifier, onClick: (() -> Unit)? = null) {
+@OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
+fun MarkerCard(marker: SceneMarker, modifier: Modifier = Modifier, onLongClick: (() -> Unit)? = null, onClick: (() -> Unit)? = null) {
     val p = Theme.palette
-    NativeCard(modifier.fillMaxWidth().aspectRatio(16f / 9f), onClick = onClick) {
+    val cardModifier = modifier.fillMaxWidth().aspectRatio(16f / 9f)
+    NativeCard(
+        if (onLongClick != null) cardModifier.clip(de.letzgo.stashy.ui.NativeCardShape).combinedClickable(onLongClick = onLongClick, onClick = { onClick?.invoke() }) else cardModifier,
+        onClick = onClick.takeIf { onLongClick == null },
+    ) {
         Box(Modifier.fillMaxSize().background(p.studioHeader), contentAlignment = Alignment.Center) {
             var failed by remember(marker.id, marker.thumbnailURL) { mutableStateOf(marker.thumbnailURL == null) }
             if (failed) PlaceholderIcon(SF.bookmarkFill, Appearance.tint)

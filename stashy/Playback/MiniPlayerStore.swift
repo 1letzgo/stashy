@@ -1188,6 +1188,13 @@ private struct NowPlayingContent: View {
             loadDetailsIfNeeded()
             watchlist.checkAgainstServer()
         }
+        // A deleted marker leaves this time bar too.
+        .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("SceneMarkerDeleted"))) { note in
+            guard let markerId = note.userInfo?["markerId"] as? String,
+                  let markers = displayedScene.sceneMarkers,
+                  markers.contains(where: { $0.id == markerId }) else { return }
+            displayedScene = displayedScene.withSceneMarkers(markers.filter { $0.id != markerId })
+        }
     }
 
     private func sectionHeader<Trailing: View>(_ title: String, @ViewBuilder trailing: () -> Trailing) -> some View {

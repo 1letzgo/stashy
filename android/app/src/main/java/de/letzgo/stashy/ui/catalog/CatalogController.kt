@@ -32,6 +32,7 @@ import de.letzgo.stashy.data.Prefs
 import de.letzgo.stashy.data.RandomSeeds
 import de.letzgo.stashy.data.SavedFilter
 import de.letzgo.stashy.data.Scene
+import de.letzgo.stashy.data.SceneMarker
 import de.letzgo.stashy.data.SceneEvents
 import de.letzgo.stashy.data.Performer
 import de.letzgo.stashy.data.PerformerEvents
@@ -180,6 +181,15 @@ class CatalogController<T>(
                 if (event is LibraryEvent.GalleryPatched) {
                     @Suppress("UNCHECKED_CAST")
                     (list as PagedList<Gallery>).patch { if (it.id == event.id) event.patch(it) else it }
+                }
+            }
+        }
+        // iOS `SceneMarkerDeleted`: a deleted marker leaves the list without a refetch.
+        if (mode == FilterMode.SceneMarkers) coroutineScope.launch {
+            LibraryEvents.events.collect { event ->
+                if (event is LibraryEvent.SceneMarkerDeleted) {
+                    @Suppress("UNCHECKED_CAST")
+                    (list as PagedList<SceneMarker>).patch { if (it.id == event.id) null else it }
                 }
             }
         }

@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -149,14 +150,21 @@ fun GroupsCatalog() {
 @Composable
 fun MarkersCatalog() {
     val c = rememberCatalogController<SceneMarker>(FilterMode.SceneMarkers)
+    var markerToDelete by remember { mutableStateOf<SceneMarker?>(null) }
     CatalogScaffold(
         c, CatalogTexts(tr(R.string.loading_markers), SF.bookmarkFill, tr(R.string.empty_markers_found), tr(R.string.action_load_markers)),
         CatalogSlots(), posterColumns, { it.id }, gridKey = c.listResetToken,
     ) { _, marker ->
-        MarkerCard(marker, onClick = {
-            marker.scene?.let { scene -> Nav.push(SceneDetailScreen(scene.id, scene.copy(resumeTime = marker.seconds), autoPlay = true)) }
-        })
+        // iOS: the card's context menu with "Delete Marker".
+        var menuOpen by remember(marker.id) { mutableStateOf(false) }
+        Box {
+            MarkerCard(marker, onLongClick = { menuOpen = true }, onClick = {
+                marker.scene?.let { scene -> Nav.push(SceneDetailScreen(scene.id, scene.copy(resumeTime = marker.seconds), autoPlay = true)) }
+            })
+            de.letzgo.stashy.ui.components.MarkerDeleteMenu(menuOpen, onDismiss = { menuOpen = false }) { markerToDelete = marker }
+        }
     }
+    de.letzgo.stashy.ui.components.MarkerDeleteConfirm(markerToDelete) { markerToDelete = null }
     CatalogFilterSortSheet(c)
 }
 

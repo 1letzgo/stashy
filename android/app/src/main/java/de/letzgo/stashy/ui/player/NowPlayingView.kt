@@ -127,6 +127,8 @@ private fun NowPlayingContent(initial: Scene, onOpen: (de.letzgo.stashy.ui.Scree
     var confirmClear by remember { mutableStateOf(false) }
     // Scenes deleted elsewhere leave the lists (throttled to once a minute).
     LaunchedEffect(Unit) { WatchlistStore.checkAgainstServer() }
+    // A deleted marker leaves this time bar too.
+    LaunchedEffect(model) { de.letzgo.stashy.data.LibraryEvents.events.collect { model.applyLibraryEvent(it) } }
     if (confirmClear) AlertDialog(
         onDismissRequest = { confirmClear = false },
         title = { Text(tr(R.string.confirm_clear_watchlist)) },

@@ -334,6 +334,12 @@ class GraphQLQueries {
         }
         """
 
+    static let sceneMarkerDestroyMutation = """
+        mutation SceneMarkerDestroy($id: ID!) {
+          sceneMarkerDestroy(id: $id)
+        }
+        """
+
     static let sceneMarkerCreateMutation = """
         mutation SceneMarkerCreate($input: SceneMarkerCreateInput!) {
             sceneMarkerCreate(input: $input) {
