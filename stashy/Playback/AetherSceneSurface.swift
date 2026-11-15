@@ -496,23 +496,8 @@ struct AetherSceneSurface: View {
                 tapRegion(doubleTapSkip: nil, holdRewinds: false)
                 tapRegion(doubleTapSkip: tabManager.playerSkipSeconds, holdRewinds: false)
             }
-            // Pinch zooms the picture (up to 4×, one finger pans while zoomed). Fullscreen
-            // landscape: a pinch from fit that lands near the fill scale snaps to fill, a pinch
-            // closed while filled fits again — the two states the fill button switches.
-            .modifier(PlayerPinchZoomGestures(
-                model: zoom,
-                engine: engine,
-                fillsScreen: $fillsScreen,
-                allowsFill: allowsFillControls,
-                isFullscreen: isFullscreen,
-                onPinchBegan: {
-                    fastForwardArmTask?.cancel()
-                    fastForwardArmTask = nil
-                    setFastForwarding(false)
-                    setRewinding(false)
-                },
-                onFillChanged: { revealControls() }
-            ))
+            // One finger pans a zoomed picture (the pinch itself is on the whole overlay below).
+            .modifier(PlayerZoomPanGesture(model: zoom, engine: engine, fillsScreen: fillsScreen))
 
             // Opacity instead of structural insertion: a conditional `if` plus a transition
             // proved unreliable over the UIKit-hosted player view (the re-inserted controls
@@ -581,6 +566,24 @@ struct AetherSceneSurface: View {
             }
             .autoHiding(areControlsVisible)
         }
+        // Pinch zooms the picture (up to 4×). Fullscreen landscape: a pinch from fit that lands
+        // near the fill scale snaps to fill, a pinch closed while filled fits again — the two
+        // states the fill button switches. On the whole overlay, so it also starts over the
+        // controls (they are up while paused).
+        .modifier(PlayerPinchZoomGestures(
+            model: zoom,
+            engine: engine,
+            fillsScreen: $fillsScreen,
+            allowsFill: allowsFillControls,
+            isFullscreen: isFullscreen,
+            onPinchBegan: {
+                fastForwardArmTask?.cancel()
+                fastForwardArmTask = nil
+                setFastForwarding(false)
+                setRewinding(false)
+            },
+            onFillChanged: { revealControls() }
+        ))
     }
 
     // MARK: Top leading

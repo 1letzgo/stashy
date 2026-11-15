@@ -172,16 +172,21 @@ fun Modifier.playerZoomTransform(state: PlayerZoomState): Modifier = graphicsLay
 }
 
 /**
- * Pinch + one-finger pan (only while zoomed) on the surface's tap layer. Runs in the Initial pass
- * and consumes only what it uses: taps, double taps and the hold below stay untouched, a pinch or
- * a pan cancels them, and an unzoomed one-finger drag is left to the page's scroll.
+ * Pinch and / or one-finger pan (only while zoomed). Runs in the Initial pass and consumes only
+ * what it uses: taps, double taps and the hold stay untouched, a pinch or a pan cancels them, and
+ * an unzoomed one-finger drag is left to the page's scroll.
+ * The pinch goes on the surface itself (a parent of the controls, so it also starts over a
+ * control: they are up while paused, and a touch on one never reached a sibling below); the pan
+ * only on the tap layer, so a drag on the time bar or volume slider stays a scrub.
  */
 fun Modifier.playerPinchZoomGestures(
     state: PlayerZoomState,
     pictureSize: () -> Size,
-    onPinchBegan: () -> Unit,
-    onPinchEnded: () -> Unit,
-): Modifier = pointerInput(state) {
+    handlesPinch: Boolean = true,
+    handlesPan: Boolean = true,
+    onPinchBegan: () -> Unit = {},
+    onPinchEnded: () -> Unit = {},
+): Modifier = pointerInput(state, handlesPinch, handlesPan) {
     awaitEachGesture {
         awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
         var pinching = false
@@ -192,6 +197,7 @@ fun Modifier.playerPinchZoomGestures(
             val pressed = event.changes.count { it.pressed }
             if (pressed == 0) break
             if (pressed >= 2) {
+                if (!handlesPinch) { pinching = true; continue }
                 if (!pinching) {
                     pinching = true
                     state.beginPinch(pictureSize())
@@ -202,7 +208,7 @@ fun Modifier.playerPinchZoomGestures(
                     state.pinchBy(event.calculateZoom(), centroid, event.calculatePan())
                 }
                 event.changes.forEach { if (it.positionChanged()) it.consume() }
-            } else if (!pinching && state.isZoomed) {
+            } else if (handlesPan && !pinching && state.isZoomed) {
                 val pan = event.calculatePan()
                 if (!panning) {
                     panDistance += pan.getDistance()
@@ -214,6 +220,12 @@ fun Modifier.playerPinchZoomGestures(
                 }
             }
         }
-        if (pinching) onPinchEnded()
+        if (pinching && handlesPinch) onPinchEnded()
     }
+}
+
+/** Latest size / end callbacks for a pinch modifier set up above the values they read. */
+class PlayerZoomHandlers {
+    var pictureSize: () -> Size = { Size.Zero }
+    var onPinchEnded: () -> Unit = {}
 }

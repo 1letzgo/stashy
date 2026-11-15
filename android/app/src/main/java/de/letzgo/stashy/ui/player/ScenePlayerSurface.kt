@@ -130,6 +130,9 @@ fun ScenePlayerSurface(
     var scrubImage by remember { mutableStateOf<ImageBitmap?>(null) }
     var fillsScreen by remember { mutableStateOf(false) }
     val zoom = remember { PlayerZoomState(scope) }
+    // The surface-level pinch is set up before the size and fill values it needs exist; the body
+    // hands them over here on every composition.
+    val zoomHandlers = remember { PlayerZoomHandlers() }
     var isFastForwarding by remember { mutableStateOf(false) }
     var isRewinding by remember { mutableStateOf(false) }
     var rateBeforeFastForward by remember { mutableFloatStateOf(1f) }
@@ -237,7 +240,15 @@ fun ScenePlayerSurface(
 
     // Player chrome over video: text follows the font scale only up to OverlayMaxFontScale (1.3×).
     de.letzgo.stashy.ui.CappedFontScale {
-    BoxWithConstraints(modifier.background(Color.Black)) {
+    BoxWithConstraints(
+        modifier.background(Color.Black).playerPinchZoomGestures(
+            state = zoom,
+            pictureSize = { zoomHandlers.pictureSize() },
+            handlesPan = false,
+            onPinchBegan = { setFastForwarding(false); setRewinding(false) },
+            onPinchEnded = { zoomHandlers.onPinchEnded() },
+        ),
+    ) {
         val surfaceW = maxWidth
         val surfaceH = maxHeight
         val isLandscape = surfaceW > surfaceH
@@ -274,8 +285,8 @@ fun ScenePlayerSurface(
         LaunchedEffect(isFullscreen) { zoom.reset(animated = false) }
         LaunchedEffect(player.hasPresentedFrame) { if (!player.hasPresentedFrame) zoom.reset(animated = false) }
         LaunchedEffect(fillsScreen) { if (!zoom.isPinching) zoom.reset() }
-        val zoomPictureSize by rememberUpdatedState { PlayerZoomState.pictureSize(surfacePx, player.videoSize, fillsScreen) }
-        val zoomPinchEnded by rememberUpdatedState {
+        zoomHandlers.pictureSize = { PlayerZoomState.pictureSize(surfacePx, player.videoSize, fillsScreen) }
+        zoomHandlers.onPinchEnded = {
             val fillScale = if (allowsFill && !fillsScreen) {
                 val picture = PlayerZoomState.pictureSize(surfacePx, player.videoSize, false)
                 if (picture.width > 0 && picture.height > 0) maxOf(surfacePx.width / picture.width, surfacePx.height / picture.height) else null
@@ -324,12 +335,8 @@ fun ScenePlayerSurface(
         // Over them: pinch zooms the picture, one finger pans it while zoomed. Fullscreen landscape:
         // a pinch from fit that lands near the fill scale snaps to fill, closed while filled fits.
         Row(
-            Modifier.fillMaxSize().playerPinchZoomGestures(
-                state = zoom,
-                pictureSize = { zoomPictureSize() },
-                onPinchBegan = { setFastForwarding(false); setRewinding(false) },
-                onPinchEnded = { zoomPinchEnded() },
-            ),
+            // Pan only here; the pinch sits on the surface (BoxWithConstraints) above.
+            Modifier.fillMaxSize().playerPinchZoomGestures(state = zoom, pictureSize = { zoomHandlers.pictureSize() }, handlesPinch = false),
         ) {
             listOf(-1, 0, 1).forEach { region ->
                 Box(
