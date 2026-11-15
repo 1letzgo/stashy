@@ -855,6 +855,21 @@ object AITagSuggestions {
 
     val dismissedTagCount: Int get() = dismissals.count { it.value >= AITagStatsMath.DISMISS_STRIKES }
 
+    /** iOS `ignoredTagIds`: every ignored tag (Settings › Recommendations › Ignored Tags). */
+    val ignoredTagIds: List<String> get() = dismissals.filter { it.value >= AITagStatsMath.DISMISS_STRIKES }.keys.toList()
+
+    /** iOS `undismiss(tagId:)`: takes one tag off the ignore list; it can be suggested again at once. */
+    fun undismiss(tagId: String) {
+        if (tagId !in dismissals) return
+        dismissals = dismissals - tagId
+        if (dismissals.isEmpty()) Prefs.remove(KEY_DISMISSED)
+        else Prefs.setString(KEY_DISMISSED, AITagStatsMath.encodeDismissals(dismissals))
+        suggestionCache.clear()
+    }
+
+    /** iOS `knownTagName(_:)`: a tag's name from the last statistics build, null for one it never saw. */
+    fun knownTagName(tagId: String): String? = tagsById[tagId]?.name
+
     fun resetDismissals() {
         dismissals = emptyMap()
         Prefs.remove(KEY_DISMISSED)

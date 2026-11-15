@@ -277,7 +277,7 @@ final class AITagSuggestionManager: ObservableObject {
     /// Tags the user waved away. Ignoring one takes it out of the suggestions until it
     /// is accepted somewhere — the alternative is being wrong about the same tag on
     /// every single clip.
-    private var dismissals: [String: Int] = [:]
+    @Published private(set) var dismissals: [String: Int] = [:]
 
     private enum Keys {
         static let enabled = "ai_tags_enabled"
@@ -767,6 +767,28 @@ final class AITagSuggestionManager: ObservableObject {
 
     var dismissedTagCount: Int {
         dismissals.filter { $0.value >= Self.dismissStrikes }.count
+    }
+
+    /// Ids of every ignored tag (Settings › Recommendations › Ignored Tags).
+    var ignoredTagIds: [String] {
+        dismissals.filter { $0.value >= Self.dismissStrikes }.map(\.key)
+    }
+
+    /// Takes one tag off the ignore list; it can be suggested again at once.
+    func undismiss(tagId: String) {
+        guard dismissals[tagId] != nil else { return }
+        dismissals[tagId] = nil
+        if dismissals.isEmpty {
+            UserDefaults.standard.removeObject(forKey: Keys.dismissed)
+        } else {
+            UserDefaults.standard.set(dismissals, forKey: Keys.dismissed)
+        }
+        suggestionCache = [:]
+    }
+
+    /// A tag's name from the last statistics build, nil for a tag it never saw.
+    func knownTagName(_ tagId: String) -> String? {
+        tagsById[tagId]?.name
     }
 
     func resetDismissals() {

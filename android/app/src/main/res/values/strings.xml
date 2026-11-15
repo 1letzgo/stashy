@@ -198,6 +198,7 @@
     <string name="action_rename_filter">Rename Filter</string>
     <string name="action_replace">Replace</string>
     <string name="action_reset">Reset</string>
+    <string name="action_reset_all">Reset All</string>
     <string name="action_reset_icon">Reset Icon</string>
     <string name="action_reset_o_count_arg">Reset O Count (%1$s)</string>
     <string name="action_reset_position">Reset position</string>
@@ -496,6 +497,7 @@
     <string name="confirm_remove_license">Remove License?</string>
     <string name="confirm_replace_scene_cover">Replace Scene Cover?</string>
     <string name="confirm_reset_o_count">Reset O Count?</string>
+    <string name="confirm_reset_ignored_tags">Suggest all ignored tags again?</string>
     <string name="confirm_run_all_jobs">Run all jobs?</string>
     <string name="confirm_run_all_templates">Run all templates?</string>
     <string name="confirm_set_as_gallery_cover">Set as Gallery Cover?</string>
@@ -642,6 +644,7 @@
     <string name="empty_matching_galleries">No matching galleries</string>
     <string name="empty_matching_performer_galleries">No matching performer galleries</string>
     <string name="empty_metadata_assigned">No metadata assigned</string>
+    <string name="empty_no_ignored_tags">No ignored tags</string>
     <string name="empty_o">No O</string>
     <string name="empty_o_count">No O Count</string>
     <string name="empty_o_recorded">No O recorded</string>
@@ -1035,6 +1038,7 @@
     <string name="hint_icloud_storage_for_settings_is">iCloud storage for settings is full. Some settings are not synced.</string>
     <string name="hint_identify_started_for_arg_scenes">Identify started for %1$s scenes using: %2$s</string>
     <string name="hint_identify_started_for_this_scene">Identify started for this scene using: %1$s</string>
+    <string name="hint_ignored_tags">Tags you ignore in tag suggestions are no longer suggested. Remove one to have it suggested again.</string>
     <string name="hint_image_is_removed_from_server">The image is removed from the server. This cannot be undone.</string>
     <string name="hint_images_will_be_reloaded_from">Images will be reloaded from the server.</string>
     <string name="hint_imported_arg_server_s_and">Imported %1$s server(s) and %2$s setting(s). Restart stashy to apply every setting.</string>
@@ -1966,6 +1970,7 @@
     <string name="unknown_gallery">Unknown Gallery</string>
     <string name="unknown_marker">Unknown Marker</string>
     <string name="unknown_scene">Unknown Scene</string>
+    <string name="unknown_tag">Unknown Tag</string>
     <string name="unknown_title">Unknown Title</string>
     <string name="unknown_url">Unknown URL</string>
     <string name="unlocked_with_license_key">Unlocked with a license key.</string>
