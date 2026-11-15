@@ -548,6 +548,12 @@ class GraphQLQueries {
         }
         """
 
+    static let performerUpdateTagsMutation = """
+        mutation PerformerUpdate($input: PerformerUpdateInput!) {
+            performerUpdate(input: $input) { id }
+        }
+        """
+
     static let performerUpdateDetailsMutation = """
         mutation PerformerUpdate($input: PerformerUpdateInput!) {
             performerUpdate(input: $input) {
