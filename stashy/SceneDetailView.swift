@@ -1524,34 +1524,22 @@ struct AddMarkerSheet: View {
     /// Quick pick for the end time, in seconds after the start. nil once the field is typed in.
     @State private var quickDuration: Int?
     @FocusState private var isTagSearchFocused: Bool
-    /// The sheet is too short to show the time card, the search field and its results at once
-    /// (an iPhone in landscape, the iPhone Duo's outer display turned). Measured from the
-    /// sheet's own height without the keyboard, never from the screen or the orientation.
+    /// The sheet is too short for the time card, the search field and its results in one
+    /// column (an iPhone in landscape, the iPhone Duo's outer display turned): about 390 pt
+    /// minus the keyboard and the top bar leaves ~120 pt, not even one result row below the
+    /// field. Then the results get a column of their own beside the field, from the top bar
+    /// down to the keyboard. Measured from the sheet's own height without the keyboard, never
+    /// from the screen or the orientation; the layout never changes with the focus, so a row
+    /// tap can't land on a row that moved.
     @State private var isCompactHeight = false
-    /// Search mode, apart from the focus itself: a touch on a result row can end the field's
-    /// focus before the finger lifts, and putting the time card back right then moved the row
-    /// away under the finger, so the tap never selected the tag. Ends on a pick, or a moment
-    /// after the focus is gone for another reason.
-    @State private var isTagSearchActive = false
 
-    private static let tagSearchFieldID = "addMarkerTagSearch"
     private static let compactHeightLimit: CGFloat = 500
-
-    /// While the tag search is typed into on a short sheet, the time card steps aside so the
-    /// field sits at the top and its results fill the room above the keyboard.
-    private var tagSearchTakesSheet: Bool {
-        isCompactHeight && isTagSearchActive
-    }
 
     private func pickTag(_ tag: Tag) {
         // The tag is the marker's name, so a second tap simply renames it by picking another tag.
         primaryTagId = tag.id
-        // On a short sheet the keyboard covers everything but a row or two; a pick ends the
-        // search and brings the times back. The touch is over here, so the layout may move.
-        if tagSearchTakesSheet {
-            isTagSearchFocused = false
-            isTagSearchActive = false
-        }
+        // On a short sheet the keyboard hides most of the sheet: a pick ends the search.
+        if isCompactHeight { isTagSearchFocused = false }
     }
 
     /// The marker is named after its primary tag — there is no separate name field.
@@ -1584,145 +1572,52 @@ struct AddMarkerSheet: View {
 
     var body: some View {
         NavigationStack {
-            ScrollViewReader { proxy in
-                Form {
-                    if !tagSearchTakesSheet {
-                        Section(header: Text(tr("marker_details"))) {
-                            HStack {
-                                Text(tr("action_start_time"))
-                                Spacer()
-                                Text(formatTime(seconds))
-                                    .foregroundColor(.secondary)
-                            }
-
-                            HStack {
-                                Text(tr("end_time_optional"))
-                                Spacer()
-                                // No keyboard toolbar here: the SwiftUI `.keyboard` toolbar inside a
-                                // sheet over the fullscreen cover froze the app in landscape (layout
-                                // loop). The numbers-and-punctuation keyboard has its own Return key.
-                                TextField(tr("seconds_or_mm_ss"), text: $endTimeString)
-                                    .multilineTextAlignment(.trailing)
-                                    .keyboardType(.numbersAndPunctuation)
-                                    .submitLabel(.done)
-                                    .onChange(of: endTimeString) { _, newValue in
-                                        // Typing replaces a quick pick; the pick itself writes the
-                                        // same string, so only a different value clears it.
-                                        if let quickDuration, newValue != quickEndString(quickDuration) {
-                                            self.quickDuration = nil
-                                        }
-                                    }
-                            }
-
-                            // Quick picks: end the marker 30 / 60 / 90 s after its start.
-                            HStack(spacing: 8) {
-                                ForEach([30, 60, 90], id: \.self) { duration in
-                                    let isSelected = quickDuration == duration
-                                    Button {
-                                        if isSelected {
-                                            quickDuration = nil
-                                            endTimeString = ""
-                                        } else {
-                                            quickDuration = duration
-                                            endTimeString = quickEndString(duration)
-                                        }
-                                    } label: {
-                                        Text("+\(duration)s")
-                                            .font(.subheadline.weight(.semibold))
-                                            .foregroundColor(isSelected ? Color.onAppTint : .primary)
-                                            .frame(maxWidth: .infinity)
-                                            .padding(.vertical, 8)
-                                            .background(isSelected ? appearanceManager.tintColor : Color.appBackground)
-                                            .clipShape(Capsule())
-                                    }
-                                    .buttonStyle(.plain)
+            Group {
+                if isCompactHeight {
+                    HStack(alignment: .top, spacing: 0) {
+                        Form {
+                            Section(header: Text(tr("primary_tag"))) {
+                                tagSearchField
+                                if let picked = tags.first(where: { $0.id == primaryTagId }) {
+                                    Label(picked.name, systemImage: "checkmark")
+                                        .foregroundColor(appearanceManager.tintColor)
                                 }
                             }
+                            .listRowBackground(Color.secondaryAppBackground)
+
+                            markerDetailsSection
+                        }
+                        .frame(maxWidth: .infinity)
+
+                        // Results only: they start right below the top bar, so two or three rows
+                        // stay above the keyboard.
+                        Form {
+                            Section {
+                                tagResults
+                            }
+                            .listRowBackground(Color.secondaryAppBackground)
+                        }
+                        .contentMargins(.top, 8, for: .scrollContent)
+                        .scrollDismissesKeyboard(.interactively)
+                        .frame(maxWidth: .infinity)
+                    }
+                } else {
+                    Form {
+                        markerDetailsSection
+
+                        Section(header: Text(tr("primary_tag"))) {
+                            tagSearchField
+                            tagResults
                         }
                         .listRowBackground(Color.secondaryAppBackground)
-                    }
-
-                    Section(header: Text(tr("primary_tag"))) {
-                        TextField(tr("placeholder_search_tags"), text: $searchText)
-                            .focused($isTagSearchFocused)
-                            .submitLabel(.done)
-                            .autocorrectionDisabled()
-                            .textInputAutocapitalization(.never)
-                            .id(Self.tagSearchFieldID)
-
-                        if isLoadingTags {
-                            HStack {
-                                Spacer()
-                                ProgressView(tr("loading_tags"))
-                                Spacer()
-                            }
-                            .padding()
-                        } else if tags.isEmpty {
-                            Text(tr("empty_tags_found_on_server"))
-                                .foregroundColor(.secondary)
-                                .padding()
-                        } else {
-                            ForEach(filteredTags.prefix(20), id: \.id) { tag in
-                                // A Button, not onTapGesture: inside a Form it gets the row's own
-                                // tap handling and fires on touch-up even while the keyboard is up.
-                                Button {
-                                    pickTag(tag)
-                                } label: {
-                                    HStack {
-                                        Text(tag.name)
-                                            .foregroundColor(.primary)
-                                        Spacer()
-                                        if let count = tag.sceneCount {
-                                            Text("\(count)")
-                                                .font(.caption)
-                                                .foregroundColor(.secondary)
-                                        }
-
-                                        if primaryTagId == tag.id {
-                                            Image(systemName: "checkmark")
-                                                .foregroundColor(appearanceManager.tintColor)
-                                        }
-                                    }
-                                    .contentShape(Rectangle())
-                                }
-                                .buttonStyle(.plain)
-                            }
-
-                            if filteredTags.count > 20 {
-                                Text(tr("type_more_to_refine_search_menu"))
-                                    .font(.caption)
-                                    .foregroundColor(.secondary)
-                            } else if !searchText.isEmpty && filteredTags.isEmpty {
-                                Text(tr("empty_tags_match_arg", searchText))
-                                    .foregroundColor(.secondary)
-                            }
-                        }
-                    }
-                    .listRowBackground(Color.secondaryAppBackground)
-                }
-                .scrollDismissesKeyboard(.interactively)
-                .onChange(of: isTagSearchFocused) { _, focused in
-                    if focused {
-                        isTagSearchActive = true
-                        return
-                    }
-                    // Lost without a pick (Done, keyboard swiped away, a touch on a row): wait
-                    // until that touch has ended before the time card comes back, so a row tap
-                    // still lands on the row it started on.
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                        if !isTagSearchFocused { isTagSearchActive = false }
-                    }
-                }
-                .onChange(of: tagSearchTakesSheet) { _, takesSheet in
-                    guard takesSheet else { return }
-                    // After the time card is gone: the field goes to the top, results below it.
-                    DispatchQueue.main.async {
-                        proxy.scrollTo(Self.tagSearchFieldID, anchor: .top)
                     }
                 }
             }
             .applyAppBackground()
             .scrollContentBackground(.hidden)
+            // The app-wide Done bar (44 pt) would cover the top result row on a short sheet;
+            // both fields here have their own Done / Return key.
+            .suppressesKeyboardDoneBar(isCompactHeight)
             .stashyModalSheetChrome(tr("action_add_marker"), onBack: { dismiss() }) {
                 StashyChromeTrailingTextButton(
                     title: tr("action_add"),
@@ -1754,6 +1649,122 @@ struct AddMarkerSheet: View {
             }
         }
     }
+
+    private var markerDetailsSection: some View {
+        Section(header: Text(tr("marker_details"))) {
+            HStack {
+                Text(tr("action_start_time"))
+                Spacer()
+                Text(formatTime(seconds))
+                    .foregroundColor(.secondary)
+            }
+
+            HStack {
+                Text(tr("end_time_optional"))
+                Spacer()
+                // No keyboard toolbar here: the SwiftUI `.keyboard` toolbar inside a
+                // sheet over the fullscreen cover froze the app in landscape (layout
+                // loop). The numbers-and-punctuation keyboard has its own Return key.
+                TextField(tr("seconds_or_mm_ss"), text: $endTimeString)
+                    .multilineTextAlignment(.trailing)
+                    .keyboardType(.numbersAndPunctuation)
+                    .submitLabel(.done)
+                    .onChange(of: endTimeString) { _, newValue in
+                        // Typing replaces a quick pick; the pick itself writes the
+                        // same string, so only a different value clears it.
+                        if let quickDuration, newValue != quickEndString(quickDuration) {
+                            self.quickDuration = nil
+                        }
+                    }
+            }
+
+            // Quick picks: end the marker 30 / 60 / 90 s after its start.
+            HStack(spacing: 8) {
+                ForEach([30, 60, 90], id: \.self) { duration in
+                    let isSelected = quickDuration == duration
+                    Button {
+                        if isSelected {
+                            quickDuration = nil
+                            endTimeString = ""
+                        } else {
+                            quickDuration = duration
+                            endTimeString = quickEndString(duration)
+                        }
+                    } label: {
+                        Text("+\(duration)s")
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundColor(isSelected ? Color.onAppTint : .primary)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 8)
+                            .background(isSelected ? appearanceManager.tintColor : Color.appBackground)
+                            .clipShape(Capsule())
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+        }
+        .listRowBackground(Color.secondaryAppBackground)
+    }
+
+    private var tagSearchField: some View {
+        TextField(tr("placeholder_search_tags"), text: $searchText)
+            .focused($isTagSearchFocused)
+            .submitLabel(.done)
+            .autocorrectionDisabled()
+            .textInputAutocapitalization(.never)
+    }
+
+    @ViewBuilder
+    private var tagResults: some View {
+        if isLoadingTags {
+            HStack {
+                Spacer()
+                ProgressView(tr("loading_tags"))
+                Spacer()
+            }
+            .padding()
+        } else if tags.isEmpty {
+            Text(tr("empty_tags_found_on_server"))
+                .foregroundColor(.secondary)
+                .padding()
+        } else {
+            ForEach(filteredTags.prefix(20), id: \.id) { tag in
+                // A Button, not onTapGesture: inside a Form it gets the row's own
+                // tap handling and fires on touch-up even while the keyboard is up.
+                Button {
+                    pickTag(tag)
+                } label: {
+                    HStack {
+                        Text(tag.name)
+                            .foregroundColor(.primary)
+                        Spacer()
+                        if let count = tag.sceneCount {
+                            Text("\(count)")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        }
+
+                        if primaryTagId == tag.id {
+                            Image(systemName: "checkmark")
+                                .foregroundColor(appearanceManager.tintColor)
+                        }
+                    }
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+            }
+
+            if filteredTags.count > 20 {
+                Text(tr("type_more_to_refine_search_menu"))
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+            } else if !searchText.isEmpty && filteredTags.isEmpty {
+                Text(tr("empty_tags_match_arg", searchText))
+                    .foregroundColor(.secondary)
+            }
+        }
+    }
+
     
     private func createMarker() {
         isCreating = true

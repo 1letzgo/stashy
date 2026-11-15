@@ -36,7 +36,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
@@ -561,17 +560,13 @@ fun AddMarkerSheet(scene: Scene, seconds: Double, frame: android.graphics.Bitmap
     var endText by remember { mutableStateOf("") }
     var quick by remember { mutableStateOf<Int?>(null) }
     var creating by remember { mutableStateOf(false) }
-    var searchFocused by remember { mutableStateOf(false) }
     val focusManager = androidx.compose.ui.platform.LocalFocusManager.current
-    val scrollState = rememberScrollState()
     // iOS `isCompactHeight`: the window is too short for the time card, the search field and
-    // its results at once (a phone in landscape). From the window's height (split screen
-    // included), not the orientation.
+    // its results in one column (a phone in landscape: with the IME and the top bar not even
+    // one result row fits below the field). Then the results get a column of their own beside
+    // the field. From the window's height (split screen included), not the orientation; the
+    // layout never changes with the focus.
     val compactHeight = androidx.compose.ui.platform.LocalConfiguration.current.screenHeightDp < 500
-    // iOS `tagSearchTakesSheet`: while the tag search is typed into on a short sheet, the time
-    // card steps aside so the field sits at the top and its results fill the room above the IME.
-    val searchTakesSheet = compactHeight && searchFocused
-    LaunchedEffect(searchTakesSheet) { if (searchTakesSheet) scrollState.scrollTo(0) }
     LaunchedEffect(Unit) { tags = runCatching { SceneEditing.allTags() }.getOrDefault(emptyList()); loading = false }
     val title = tags.firstOrNull { it.id == primaryTagId }?.name.orEmpty()
     val base = if (search.isEmpty()) tags else tags.filter { it.name.lowercase().contains(search.lowercase()) }
@@ -597,8 +592,8 @@ fun AddMarkerSheet(scene: Scene, seconds: Double, frame: android.graphics.Bitmap
             }
         }
     }) {
-        Column(Modifier.verticalScroll(scrollState)) {
-            if (!searchTakesSheet) FormSection(tr(R.string.marker_details)) {
+        val markerDetails: @Composable () -> Unit = {
+            FormSection(tr(R.string.marker_details)) {
                 FormRow { Text(tr(R.string.action_start_time), Modifier.weight(1f), color = p.text); Text(PlaybackFormat.markerTime(seconds), color = p.secondaryText) }
                 NativeDivider()
                 Row(Modifier.fillMaxWidth().padding(start = 16.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -618,30 +613,60 @@ fun AddMarkerSheet(scene: Scene, seconds: Double, frame: android.graphics.Bitmap
                     }
                 }
             }
-            FormSection(tr(R.string.primary_tag)) {
-                NativeSearchField(
-                    search, { search = it }, tr(R.string.placeholder_search_tags),
-                    Modifier.padding(8.dp).onFocusChanged { searchFocused = it.hasFocus },
-                )
-                when {
-                    loading -> LoadingRow(tr(R.string.loading_tags))
-                    tags.isEmpty() -> Text(tr(R.string.empty_tags_found_on_server), Modifier.padding(16.dp), style = NativeType.bodyMedium, color = p.secondaryText)
-                    else -> {
-                        filtered.take(20).forEach { tag ->
+        }
+        val searchField: @Composable () -> Unit = {
+            NativeSearchField(search, { search = it }, tr(R.string.placeholder_search_tags), Modifier.padding(8.dp))
+        }
+        val results: @Composable () -> Unit = {
+            when {
+                loading -> LoadingRow(tr(R.string.loading_tags))
+                tags.isEmpty() -> Text(tr(R.string.empty_tags_found_on_server), Modifier.padding(16.dp), style = NativeType.bodyMedium, color = p.secondaryText)
+                else -> {
+                    filtered.take(20).forEachIndexed { index, tag ->
+                        if (index > 0 || !compactHeight) NativeDivider()
+                        FormRow({
+                            primaryTagId = tag.id
+                            // On a short sheet the IME hides most of it: a pick ends the search.
+                            if (compactHeight) focusManager.clearFocus()
+                        }) {
+                            Text(tag.name, Modifier.weight(1f), color = p.text)
+                            tag.sceneCount?.let { Text("$it", style = NativeType.bodyMedium, color = p.secondaryText) }
+                            if (primaryTagId == tag.id) { Spacer(Modifier.width(8.dp)); Icon(PlayerIcons.check, null, tint = nativeAccent(), modifier = Modifier.size(24.dp)) }
+                        }
+                    }
+                    if (filtered.size > 20) Text(tr(R.string.type_more_to_refine_search_menu), Modifier.padding(16.dp), style = NativeType.bodyMedium, color = p.secondaryText)
+                    else if (search.isNotEmpty() && filtered.isEmpty()) Text(tr(R.string.empty_tags_match_arg, search), Modifier.padding(16.dp), style = NativeType.bodyMedium, color = p.secondaryText)
+                }
+            }
+        }
+        if (compactHeight) {
+            // iOS: two Forms side by side — field, picked tag and times on the left, the results
+            // alone on the right from the top bar down to the IME.
+            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                Column(Modifier.weight(1f).verticalScroll(rememberScrollState())) {
+                    FormSection(tr(R.string.primary_tag)) {
+                        searchField()
+                        tags.firstOrNull { it.id == primaryTagId }?.let { picked ->
                             NativeDivider()
-                            FormRow({
-                                primaryTagId = tag.id
-                                // On a short sheet the IME covers all but a row or two: a pick ends the search.
-                                if (searchTakesSheet) focusManager.clearFocus()
-                            }) {
-                                Text(tag.name, Modifier.weight(1f), color = p.text)
-                                tag.sceneCount?.let { Text("$it", style = NativeType.bodyMedium, color = p.secondaryText) }
-                                if (primaryTagId == tag.id) { Spacer(Modifier.width(8.dp)); Icon(PlayerIcons.check, null, tint = nativeAccent(), modifier = Modifier.size(24.dp)) }
+                            FormRow {
+                                Icon(PlayerIcons.check, null, tint = nativeAccent(), modifier = Modifier.size(24.dp))
+                                Spacer(Modifier.width(8.dp))
+                                Text(picked.name, Modifier.weight(1f), color = p.text)
                             }
                         }
-                        if (filtered.size > 20) Text(tr(R.string.type_more_to_refine_search_menu), Modifier.padding(16.dp), style = NativeType.bodyMedium, color = p.secondaryText)
-                        else if (search.isNotEmpty() && filtered.isEmpty()) Text(tr(R.string.empty_tags_match_arg, search), Modifier.padding(16.dp), style = NativeType.bodyMedium, color = p.secondaryText)
                     }
+                    markerDetails()
+                }
+                Column(Modifier.weight(1f).verticalScroll(rememberScrollState())) {
+                    FormSection(null) { results() }
+                }
+            }
+        } else {
+            Column(Modifier.verticalScroll(rememberScrollState())) {
+                markerDetails()
+                FormSection(tr(R.string.primary_tag)) {
+                    searchField()
+                    results()
                 }
             }
         }
