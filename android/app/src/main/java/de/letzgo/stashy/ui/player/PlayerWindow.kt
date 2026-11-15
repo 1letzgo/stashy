@@ -3,7 +3,9 @@ package de.letzgo.stashy.ui.player
 import android.app.PictureInPictureParams
 import android.content.pm.ActivityInfo
 import android.os.Build
+import android.provider.Settings
 import android.util.Rational
+import android.view.OrientationEventListener
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
@@ -28,6 +30,7 @@ object PlayerWindow {
         private set
 
     private var didOverrideOrientation = false
+    private var deviceOrientationListener: OrientationEventListener? = null
 
     /** Hides / shows status and navigation bars (the iOS fullscreen cover hides the status bar). */
     fun setImmersive(on: Boolean) {
@@ -59,12 +62,47 @@ object PlayerWindow {
         }
     }
 
-    /** Landscape for landscape videos when fullscreen opens; portrait videos keep the device orientation. */
-    fun lockLandscape(landscape: Boolean) {
+    /**
+     * Landscape for landscape videos when fullscreen opens; portrait videos keep the device orientation.
+     * [followDeviceOnTurn] (the auto-rotate, iOS `followDeviceAfterAutoRotate`): the lock is only a
+     * start. Once the phone is physically turned to landscape the device decides again, so turning it
+     * back upright brings the player upright; before, the lock held until fullscreen closed and only
+     * the rotate button got out of it. Freed only on an actual turn (freeing at once would snap a
+     * phone held upright straight back) and only with the system's auto-rotate on.
+     */
+    fun lockLandscape(landscape: Boolean, followDeviceOnTurn: Boolean = false) {
         val activity = MainActivity.current ?: return
+        stopFollowingDevice()
         didOverrideOrientation = true
         activity.requestedOrientation = if (landscape) ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE else ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
+        if (landscape && followDeviceOnTurn) followDeviceOnLandscapeTurn(activity)
     }
+
+    private fun followDeviceOnLandscapeTurn(activity: MainActivity) {
+        val listener = object : OrientationEventListener(activity) {
+            override fun onOrientationChanged(degrees: Int) {
+                if (degrees == ORIENTATION_UNKNOWN) return
+                // A clear landscape hold, so the system's own rotation agrees once it is free.
+                if (degrees !in 70..110 && degrees !in 250..290) return
+                if (!isSystemAutoRotateOn(activity)) return
+                stopFollowingDevice()
+                if (MainActivity.current !== activity) return
+                didOverrideOrientation = false
+                activity.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
+            }
+        }
+        if (!listener.canDetectOrientation()) return
+        deviceOrientationListener = listener
+        listener.enable()
+    }
+
+    private fun stopFollowingDevice() {
+        deviceOrientationListener?.disable()
+        deviceOrientationListener = null
+    }
+
+    private fun isSystemAutoRotateOn(activity: MainActivity): Boolean =
+        Settings.System.getInt(activity.contentResolver, Settings.System.ACCELEROMETER_ROTATION, 0) == 1
 
     /** iOS rotate button: flips between portrait and landscape regardless of the rotation lock. */
     fun toggleOrientation() {
@@ -75,6 +113,7 @@ object PlayerWindow {
 
     /** iOS `releaseOrientationOverride` — back to the app's normal orientation when fullscreen closes. */
     fun releaseOrientation() {
+        stopFollowingDevice()
         if (!didOverrideOrientation) return
         didOverrideOrientation = false
         MainActivity.current?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
