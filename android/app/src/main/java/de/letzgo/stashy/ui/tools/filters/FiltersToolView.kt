@@ -78,7 +78,7 @@ private val AddButtonSize = 48.dp
 private val AddIconSize = 24.dp
 
 /**
- * iOS: `FiltersToolsView` — Settings › Server › stashy+ › Filters: every saved filter of the server grouped by mode,
+ * iOS: `FiltersToolsView` — Tools › Filters: every saved filter of the server grouped by mode,
  * with search, "+" (new filter per mode), edit (tap), rename and delete (long press; iOS also
  * offers them as swipe actions). Create/edit open [FiltersToolEditorSheet]; a newly created
  * filter reopens in the editor right after saving (iOS `pendingEditAfterCreate`).
