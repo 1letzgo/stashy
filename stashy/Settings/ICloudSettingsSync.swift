@@ -17,10 +17,8 @@ final class ICloudSettingsSync: ObservableObject {
     @Published private(set) var isEnabled = UserDefaults.standard.bool(forKey: KeychainManager.syncEnabledKey)
     @Published private(set) var problem: String?
 
-    /// iCloud key-value storage allows 1 MB, 1024 keys and 64 byte key names.
-    private static let maxTotalBytes = 900_000
-    private static let maxKeyCount = 1000
-    private static let maxEntryBytes = 64_000
+    /// iCloud key-value storage allows 1 MB and 1024 keys per app (`ICloudSettingsQuota`),
+    /// whatever the user's iCloud storage, and 64 byte key names.
     private static let settingPrefix = "s."
     private static let serverPrefix = "server."
     private static let deletedServer = "deleted"
@@ -30,6 +28,8 @@ final class ICloudSettingsSync: ObservableObject {
     private var observers: [NSObjectProtocol] = []
     private var reconcileScheduled = false
     private var lastSecretRefresh = Date.distantPast
+    /// iCloud reported `NSUbiquitousKeyValueStoreQuotaViolationChange`.
+    private var quotaReportedByICloud = false
 
     private init() {}
 
@@ -69,6 +69,7 @@ final class ICloudSettingsSync: ObservableObject {
         UserDefaults.standard.set(false, forKey: KeychainManager.syncEnabledKey)
         isEnabled = false
         problem = nil
+        quotaReportedByICloud = false
         keychain.clearSecretCaches()
         saveBase([:])
     }
@@ -86,8 +87,11 @@ final class ICloudSettingsSync: ObservableObject {
         }
         on(NSUbiquitousKeyValueStore.didChangeExternallyNotification, object: store) { sync, note in
             let reason = note.userInfo?[NSUbiquitousKeyValueStoreChangeReasonKey] as? Int
-            sync.problem = reason == NSUbiquitousKeyValueStoreQuotaViolationChange
-                ? tr("hint_icloud_storage_for_settings_is") : nil
+            if reason == NSUbiquitousKeyValueStoreQuotaViolationChange {
+                // iCloud refused a write. The next reconcile counts again and clears this once
+                // the store is back under the limit.
+                sync.quotaReportedByICloud = true
+            }
             sync.reconcile()
             sync.refreshSecrets()
         }
@@ -138,35 +142,36 @@ final class ICloudSettingsSync: ObservableObject {
             return
         }
         let local = localEntries()
-        let remote = store.dictionaryRepresentation.compactMapValues { $0 as? String }.filter { Self.isSyncKey($0.key) }
+        let stored = store.dictionaryRepresentation
+        var remote = stored.compactMapValues { $0 as? String }.filter { Self.isSyncKey($0.key) }
+        // Apple counts every entry of the store, also ones this code does not own.
+        var quota = ICloudSettingsQuota()
+        for (key, value) in stored {
+            switch value {
+            case let s as String: quota.record(key, ICloudSettingsQuota.size(key, s))
+            case let d as Data: quota.record(key, key.utf8.count + d.count)
+            default: quota.record(key, key.utf8.count + 8)
+            }
+        }
         let oldBase = loadBase()
         var base = oldBase
         var appliedSettings = false
         var appliedServers = false
-        var skippedForSpace = false
-        var usedBytes = remote.reduce(0) { $0 + $1.value.utf8.count }
-        var usedKeys = remote.count
-
-        func push(_ key: String, _ value: String) {
-            let size = value.utf8.count
-            let previous = remote[key]?.utf8.count
-            guard size <= Self.maxEntryBytes,
-                  usedBytes - (previous ?? 0) + size <= Self.maxTotalBytes,
-                  previous != nil || usedKeys < Self.maxKeyCount else {
-                skippedForSpace = true
-                return
-            }
-            usedBytes += size - (previous ?? 0)
-            if previous == nil { usedKeys += 1 }
-            store.set(value, forKey: key)
-            base[key] = KeychainManager.sha256Hex(value)
-        }
+        var pushes: [(key: String, value: String)] = []
+        var removals: [String] = []
+        let now = Date().timeIntervalSince1970
 
         for key in Set(local.keys).union(remote.keys).sorted() {
             let isServer = key.hasPrefix(Self.serverPrefix)
             let setting = isServer ? nil : remote[key].flatMap(Self.decodeSetting)
             if !isServer, remote[key] != nil, setting == nil { continue }
-            if let setting, !SettingsTransfer.isSyncable(setting.key) { continue }
+            if let setting, !SettingsTransfer.isSyncable(setting.key) {
+                // Written by an older version, or the key became device-local since: free its space.
+                // This device's own value stays.
+                removals.append(key)
+                base[key] = nil
+                continue
+            }
             let isDeletion = isServer ? remote[key] == Self.deletedServer : setting?.type == Self.deletedSettingType
 
             // `base` holds hashes, so compare the hashes throughout.
@@ -178,14 +183,31 @@ final class ICloudSettingsSync: ObservableObject {
             )
             switch action {
             case .none:
-                if let value = remote[key] { base[key] = KeychainManager.sha256Hex(value) }
+                guard let value = remote[key] else { break }
+                if let setting, isDeletion, local[key] == nil {
+                    switch ICloudDeletionMarker.state(deletedAt: Self.deletedAt(setting), now: now) {
+                    case .expired:
+                        // Every device has had 90 days to apply it.
+                        removals.append(key)
+                        base[key] = nil
+                        continue
+                    case .undated:
+                        if let marker = Self.deletionMarker(for: setting.key, at: now) {
+                            pushes.append((key, marker))
+                        }
+                        continue
+                    case .live:
+                        break
+                    }
+                }
+                base[key] = KeychainManager.sha256Hex(value)
             case .pushLocal:
-                if let value = local[key] { push(key, value) }
+                if let value = local[key] { pushes.append((key, value)) }
             case .pushLocalDeletion:
                 if isServer {
-                    push(key, Self.deletedServer)
-                } else if let setting, let marker = Self.encode(SettingsTransferFile.Setting(key: setting.key, type: Self.deletedSettingType, value: .null)) {
-                    push(key, marker)
+                    pushes.append((key, Self.deletedServer))
+                } else if let setting, let marker = Self.deletionMarker(for: setting.key, at: now) {
+                    pushes.append((key, marker))
                 }
             case .applyRemote:
                 guard let value = remote[key] else { break }
@@ -213,10 +235,35 @@ final class ICloudSettingsSync: ObservableObject {
             }
         }
 
-        if base != oldBase { saveBase(base) }
-        if skippedForSpace {
-            problem = tr("hint_icloud_storage_for_settings_is")
+        // Space first, then the pushes that fit, servers and small values first.
+        for key in removals {
+            store.removeObject(forKey: key)
+            remote[key] = nil
+            quota.remove(key)
         }
+        var keptLocal = 0
+        for (key, value) in ICloudSettingsQuota.pushOrder(pushes, isServer: { $0.hasPrefix(Self.serverPrefix) }) {
+            guard quota.take(key, value) else {
+                keptLocal += 1
+                continue
+            }
+            store.set(value, forKey: key)
+            remote[key] = value
+            base[key] = KeychainManager.sha256Hex(value)
+        }
+        // Hashes of entries gone from both sides only grow the file.
+        base = base.filter { local[$0.key] != nil || remote[$0.key] != nil }
+
+        if base != oldBase { saveBase(base) }
+        if keptLocal == 0, quota.isWithinLimits { quotaReportedByICloud = false }
+        if keptLocal > 0 {
+            problem = tr("hint_icloud_sync_limit_kept_arg", keptLocal)
+        } else if quotaReportedByICloud {
+            problem = tr("hint_icloud_sync_limit_reached")
+        } else {
+            problem = nil
+        }
+        AppLog.debug("iCloud settings: \(quota.usedKeys) keys, \(quota.usedBytes) bytes, \(removals.count) removed, \(keptLocal) kept on device")
         if appliedSettings {
             AppearanceManager.shared.reload()
             TabManager.shared.reloadSettings()
@@ -268,6 +315,17 @@ final class ICloudSettingsSync: ObservableObject {
 
     private static func isSyncKey(_ key: String) -> Bool {
         key.hasPrefix(settingPrefix) || key.hasPrefix(serverPrefix)
+    }
+
+    /// A setting's deletion marker, stamped with the time so it can leave the store later.
+    /// Older versions read any entry of type "deleted" as a marker, whatever its value.
+    private static func deletionMarker(for name: String, at time: Double) -> String? {
+        encode(SettingsTransferFile.Setting(key: name, type: deletedSettingType, value: .number(time.rounded())))
+    }
+
+    private static func deletedAt(_ marker: SettingsTransferFile.Setting) -> Double? {
+        if case .number(let time) = marker.value { return time }
+        return nil
     }
 
     private static func decodeSetting(_ value: String) -> SettingsTransferFile.Setting? {

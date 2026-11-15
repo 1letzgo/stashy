@@ -152,12 +152,16 @@ enum SettingsTransfer {
         return !excludedPrefixes.contains { key.hasPrefix($0) }
     }
 
-    /// State that belongs to one device or changes constantly: fine in a one-off file, wrong in
-    /// a live sync.
+    /// State that belongs to one device, changes constantly or grows with use: fine in a one-off
+    /// file, wrong in a live sync. iCloud key-value storage holds 1 MB for the whole app.
     private static let deviceLocalPrefixes = [
         "reels_last_visible_", "reels_session_", "reels_playback_checkpoint_", "reels_restart_from_top_",
         "stashy.magazine.progress_", "stashy.hotOrNot.bracket", "stashy_timeline_image_o_actions_",
         "download_sync_jobs_", "stashyDebug", "StashyWindowSize", "recommendations_last_picks_", "forgotten_favorites_last_picks_", "app_language",
+        // Whole `Scene` objects, 5–20 KB each: four watchlist entries passed the size of a setting.
+        "scene_watchlist_",
+        // Per-device history (CLAUDE.md: hidden "on the device"), up to 500 entries.
+        "last_played_hidden_",
     ]
 
     static func isSyncable(_ key: String) -> Bool {

@@ -1187,7 +1187,6 @@
   <string name="hint_how_much_each_part_steers">每个部分对推荐结果的影响程度。</string>
   <string name="hint_how_much_of_content_shows">内容透过按钮、胶囊和栏的程度。适用于所有玻璃效果界面。</string>
   <string name="hint_how_much_of_content_shows_through">内容透过覆盖在视频和图片上的玻璃按钮、胶囊和栏的程度。</string>
-  <string name="hint_icloud_storage_for_settings_is">用于设置的 iCloud 储存空间已满。部分设置未同步。</string>
   <string name="hint_identify_started_for_arg_scenes">已开始识别 %1$s 个短片，使用：%2$s</string>
   <string name="hint_identify_started_for_this_scene">已开始识别此短片，使用：%1$s</string>
   <string name="hint_image_is_removed_from_server">图片将从服务器上移除。此操作无法撤销。</string>
