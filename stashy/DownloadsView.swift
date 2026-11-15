@@ -1726,7 +1726,7 @@ struct DownloadedGalleryItemView: View {
     @ViewBuilder
     private var content: some View {
         if isAnimated, let data = try? Data(contentsOf: url) {
-            AnimatedWebView(data: data, fillMode: false)
+            AnimatedImageView(data: data, fillMode: false)
         } else if image.isVideo {
             if let engine {
                 AetherVideoSurface(engine: engine, videoGravity: .resizeAspect)

@@ -140,7 +140,7 @@ fun FeedRow(
             .graphicsLayer { scaleX = scale; scaleY = scale; translationX = offset.x; translationY = offset.y }
 
         if (item.isAnimated) {
-            // GIF / animated WebP clips: Coil's animated decoder (iOS `AnimatedWebView`).
+            // GIF / animated WebP clips: Coil's animated decoder (iOS `AnimatedImageView`).
             SubcomposeAsyncImage(
                 model = item.videoURL, contentDescription = item.title,
                 contentScale = if (fill) ContentScale.Crop else ContentScale.Fit,
