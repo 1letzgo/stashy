@@ -606,10 +606,11 @@ internal fun LoadingFooter(message: String? = null) {
 
 /** iOS: `InlineEmptyStateView(icon:title:)`. */
 @Composable
-internal fun InlineEmptyState(icon: ImageVector, title: String) {
+internal fun InlineEmptyState(icon: ImageVector, title: String, action: Pair<String, () -> Unit>? = null) {
     val p = Theme.palette
     Column(Modifier.fillMaxWidth().padding(top = 40.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(10.dp)) {
         Icon(icon, null, tint = p.secondaryText, modifier = Modifier.size(40.dp))
         Text(title, style = IosTypography.headline, color = p.secondaryText)
+        action?.let { (label, onClick) -> de.letzgo.stashy.ui.NativeButton(label, onClick = onClick) }
     }
 }

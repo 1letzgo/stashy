@@ -118,6 +118,8 @@ class TagDetailScreen(val tagId: String, val preview: Tag? = null, private val f
 
     private fun load() {
         catalog.loadAll(force = true)
+        // Counts with sub-tags: the sections a parent tag keeps for them.
+        de.letzgo.stashy.data.TagSubtreeCountsStore.request(tagId)
         scope.launch {
             runCatching { DetailRepository.tag(tagId) }.getOrNull()?.let {
                 tag = it

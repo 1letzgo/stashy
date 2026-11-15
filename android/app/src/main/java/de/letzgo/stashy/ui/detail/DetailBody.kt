@@ -37,6 +37,7 @@ import de.letzgo.stashy.data.StudioCountsStore
 import de.letzgo.stashy.data.SubStudios
 import de.letzgo.stashy.data.SubTags
 import de.letzgo.stashy.data.TagHierarchyStore
+import de.letzgo.stashy.data.TagSubtreeCountsStore
 import de.letzgo.stashy.data.Tag
 import de.letzgo.stashy.data.CatalogRepository
 import de.letzgo.stashy.data.SortOption
@@ -101,12 +102,12 @@ internal class LinkedCatalog(
      * Studio page: every section but the sub-studios scopes on this studio, with the depth of
      * "Include sub-studio content" read at query time (a switch change refetches the sections).
      */
-    private val studioContentId: String? = null,
+    val studioContentId: String? = null,
     /**
      * Tag page: every section but the sub-tags scopes on this tag, with the depth of
      * "Include sub-tag content" read at query time (a switch change refetches the sections).
      */
-    private val tagContentId: String? = null,
+    val tagContentId: String? = null,
     /** Sort the tag section starts with (a tag page lists its sub-tags by name). */
     private val tagSortRaw: String = "sceneCountDesc",
 ) {
@@ -241,8 +242,50 @@ internal class LinkedCatalog(
         isFiltered(tab),
     )
 
-    /** iOS `availableTabs`. */
-    val available: List<DetailTab> get() = order.filter { count(it) > 0 }
+    /**
+     * Studio / tag page: what the studio or tag and its sub-studios / sub-tags hold of [tab]
+     * (`scene_count(depth: -1)` & co. from [StudioCountsStore] / [TagSubtreeCountsStore]);
+     * null elsewhere, for other sections and until known.
+     */
+    fun subContentCount(tab: DetailTab): Int? {
+        studioContentId?.let { id ->
+            val known = StudioCountsStore.known(id) ?: return null
+            return when (tab) {
+                DetailTab.Scenes -> known.sceneCountAll
+                DetailTab.Galleries -> known.galleryCountAll
+                else -> null
+            }
+        }
+        tagContentId?.let { id ->
+            val known = TagSubtreeCountsStore.known(id) ?: return null
+            return when (tab) {
+                DetailTab.Scenes -> known.sceneCountAll
+                DetailTab.Galleries -> known.galleryCountAll
+                DetailTab.Images -> known.imageCountAll
+                else -> null
+            }
+        }
+        return null
+    }
+
+    /**
+     * iOS `availableTabs`. A studio / tag keeps the sections its sub-studios / sub-tags fill
+     * ([SubStudios.keepsSection]), so "Include sub-… content" stays reachable on a parent.
+     */
+    val available: List<DetailTab> get() = order.filter { SubStudios.keepsSection(count(it), subContentCount(it)) }
+
+    /**
+     * iOS `SubStudioContentEmptyState` / `SubTagContentEmptyState`: the empty [tab] of a parent
+     * studio or tag whose sub-studios / sub-tags hold something of it offers "Include sub-…
+     * content" (the page then reloads).
+     */
+    fun includeSubContentAction(tab: DetailTab): Pair<String, () -> Unit>? = when {
+        studioContentId != null && SubStudios.offersIncludeButton(StudioCountsStore.includeSubStudios, subContentCount(tab)) ->
+            tr(R.string.include_sub_studio_content) to { StudioCountsStore.includeSubStudios = true }
+        tagContentId != null && SubStudios.offersIncludeButton(TagHierarchyStore.includeSubTagContent, subContentCount(tab)) ->
+            tr(R.string.include_sub_tag_content) to { TagHierarchyStore.includeSubTagContent = true }
+        else -> null
+    }
 
     val isSettled: Boolean get() = controllers.all { it.list.loadedOnce && !it.list.isLoading }
 
@@ -333,13 +376,15 @@ internal fun <T> LazyGridScope.pagedSection(
     loadingMessage: String? = null,
     emptyIcon: ImageVector? = null,
     emptyTitle: String? = null,
+    /** Button of the empty state (a studio's "Include sub-studio content"), read when it shows. */
+    emptyAction: (() -> Pair<String, () -> Unit>?)? = null,
     item: @Composable (index: Int, T) -> Unit,
 ) {
     if (list.items.isEmpty()) {
         item(key = "state", span = { GridItemSpan(maxLineSpan) }) {
             when {
                 list.isLoading || !list.loadedOnce -> LoadingFooter(loadingMessage)
-                emptyIcon != null && emptyTitle != null -> InlineEmptyState(emptyIcon, emptyTitle)
+                emptyIcon != null && emptyTitle != null -> InlineEmptyState(emptyIcon, emptyTitle, emptyAction?.invoke())
                 else -> Box(Modifier)
             }
         }
@@ -356,12 +401,12 @@ internal fun <T> LazyGridScope.pagedSection(
 internal fun LazyGridScope.linkedSection(catalog: LinkedCatalog, tab: DetailTab, gridState: LazyGridState) {
     when (tab) {
         DetailTab.Scenes -> catalog.scenes?.let { l ->
-            pagedSection(l, { it.id }, null, SF.film, tr(R.string.empty_scenes_found)) { _, s ->
+            pagedSection(l, { it.id }, null, SF.film, tr(R.string.empty_scenes_found), { catalog.includeSubContentAction(tab) }) { _, s ->
                 SceneCard(s, onClick = { Nav.push(SceneDetailScreen(s.id, s)) })
             }
         }
         DetailTab.Galleries -> catalog.galleries?.let { l ->
-            pagedSection(l, { it.id }, tr(R.string.loading_galleries), SF.photoOnRectangle, tr(R.string.empty_galleries_found)) { _, g ->
+            pagedSection(l, { it.id }, tr(R.string.loading_galleries), SF.photoOnRectangle, tr(R.string.empty_galleries_found), { catalog.includeSubContentAction(tab) }) { _, g ->
                 DetailGalleryCard(g, onClick = { Nav.push(GalleryDetailScreen(g.id, g)) })
             }
         }

@@ -91,4 +91,18 @@ class SubStudiosTest {
         val out = SubStudios.withSceneCountAll("studios {\n      ...StudioFields\n    }")
         assertTrue(out.contains("...StudioFields\n      scene_count_all: scene_count(depth: -1)"))
     }
+
+    @Test fun parentWithOnlySubStudioContentKeepsSection() {
+        assertTrue(SubStudios.keepsSection(own = 0, subtree = 12))
+        assertTrue(SubStudios.keepsSection(own = 3, subtree = null))
+        assertFalse(SubStudios.keepsSection(own = 0, subtree = 0))
+        assertFalse(SubStudios.keepsSection(own = 0, subtree = null))
+    }
+
+    @Test fun emptyStateOffersSwitchOnlyWhileOffAndSubStudiosHoldContent() {
+        assertTrue(SubStudios.offersIncludeButton(includeContent = false, subtree = 5))
+        assertFalse(SubStudios.offersIncludeButton(includeContent = true, subtree = 5))
+        assertFalse(SubStudios.offersIncludeButton(includeContent = false, subtree = 0))
+        assertFalse(SubStudios.offersIncludeButton(includeContent = false, subtree = null))
+    }
 }

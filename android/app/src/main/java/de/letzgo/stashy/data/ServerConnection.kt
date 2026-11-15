@@ -118,6 +118,7 @@ object ServerCapabilities {
     /** Call on app start and on a server switch: the last known answer, then the server's own. */
     suspend fun refresh(config: ServerConfig?) {
         StudioCountsStore.clear()
+        TagSubtreeCountsStore.clear()
         supports032 = config != null && isAtLeast032(Prefs.string(VERSION_KEY_PREFIX + config.id))
         if (config == null) return
         val outcome = ServerConnection.probe(config.baseURL, config.apiKey, config.customHeaders)

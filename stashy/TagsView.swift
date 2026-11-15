@@ -841,6 +841,10 @@ struct TagDetailView: View {
     @State private var showingEditTagSheet = false
     @State private var showingTagImageFullscreen = false
     @AppStorage(TagHierarchy.includeSubTagContentKey) private var includesSubTagContent = false
+    /// Counts with sub-tags: a parent tag keeps the sections its sub-tags fill.
+    @ObservedObject private var subtreeCountsStore = TagSubtreeCountsStore.shared
+    /// The Sub-Tags section's settings (it has no filter of its own): "Include sub-tag content".
+    @State private var showingSubTagOptionsSheet = false
     @StateObject private var linkedStudios: DetailLinkedStudiosFilterModel
     @StateObject private var linkedGalleries: DetailLinkedGalleriesFilterModel
     /// Scenes tab filter / sort, kept here so it survives the tab remounting `ScenesView`.
@@ -959,14 +963,19 @@ struct TagDetailView: View {
         max(viewModel.totalDetailImages, selectedTag.imageCount ?? 0)
     }
 
+    /// Counts with sub-tags (`TagSubtreeCountsStore`), nil until the server answered.
+    private var subtreeCounts: TagSubtreeCounts? { subtreeCountsStore.counts[selectedTag.id] }
+
     private var availableTabs: [DetailTab] {
         var tabs: [DetailTab] = []
-        if effectiveScenes > 0 { tabs.append(.scenes) }
-        if effectiveGalleries > 0 { tabs.append(.galleries) }
+        // A parent tag whose scenes carry only its sub-tags keeps the section: it offers
+        // "Include sub-tag content" in its empty state and its settings sheet.
+        if effectiveScenes > 0 || (subtreeCounts?.scene_count_all ?? 0) > 0 { tabs.append(.scenes) }
+        if effectiveGalleries > 0 || (subtreeCounts?.gallery_count_all ?? 0) > 0 { tabs.append(.galleries) }
         if viewModel.totalDetailTags > 0 { tabs.append(.tags) }
         if viewModel.totalDetailStudios > 0 { tabs.append(.studios) }
         if viewModel.totalDetailGroups > 0 { tabs.append(.groups) }
-        if effectiveImages > 0 { tabs.append(.images) }
+        if effectiveImages > 0 || (subtreeCounts?.image_count_all ?? 0) > 0 { tabs.append(.images) }
         return tabs
     }
 
@@ -1100,7 +1109,10 @@ struct TagDetailView: View {
         case .galleries: return slot(active: linkedGalleries.catalogFilterSortFABActive) { linkedGalleries.showFilterSortSheet = true }
         case .studios: return slot(active: linkedStudios.catalogFilterSortFABActive) { linkedStudios.showFilterSortSheet = true }
         case .images: return slot(active: linkedImages.catalogFilterSortFABActive) { linkedImages.showFilterSortSheet = true }
-        case .groups, .tags: return nil
+        // The sub-tags have no filter; their settings hold "Include sub-tag content", which
+        // otherwise sits only in the sheets of sections a parent tag may not have.
+        case .tags: return slot(active: false) { showingSubTagOptionsSheet = true }
+        case .groups: return nil
         }
     }
 
@@ -1139,7 +1151,13 @@ struct TagDetailView: View {
                             Text(tr("loading_galleries")).font(.caption).foregroundColor(.secondary)
                         }.padding(.top, 40)
                     } else {
-                        InlineEmptyStateView(icon: "photo.on.rectangle", title: tr("empty_galleries_found"))
+                        SubTagContentEmptyState(
+                            tagId: selectedTag.id,
+                            icon: "photo.on.rectangle",
+                            title: tr("empty_galleries_found"),
+                            fillsScreen: false,
+                            subtreeCount: \.gallery_count_all
+                        )
                     }
                 } else if selectedDetailTab == .tags {
                     subTagGrid
@@ -1164,6 +1182,14 @@ struct TagDetailView: View {
 
     var body: some View {
         tagDetailWithLinkedGalleriesAndImagesSheets
+            .sheet(isPresented: $showingSubTagOptionsSheet) {
+                SubTagOptionsSheet()
+            }
+            // Every filter sheet of this page offers "Include sub-tag content"; the Scenes list
+            // reloads itself, the other sections in `tagDetailCoreChrome`. Set here, outside the
+            // wrappers that attach the sheets: a sheet only sees the environment of the view it
+            // hangs on, and set inside, only the Scenes sheet had the switch.
+            .environment(\.showsSubTagContentOption, true)
     }
 
     private var tagDetailWithLinkedGalleriesAndImagesSheets: some View {
@@ -1298,9 +1324,7 @@ struct TagDetailView: View {
             guard preferredInitialTab == nil, !tabs.contains(selectedDetailTab), let first = tabs.first else { return }
             withAnimation(DesignTokens.Animation.quick) { selectedDetailTab = first }
         }
-        // Every filter sheet of this page offers "Include sub-tag content"; the Scenes list
-        // reloads itself, the other sections here.
-        .environment(\.showsSubTagContentOption, true)
+        .task(id: selectedTag.id) { subtreeCountsStore.request(selectedTag.id) }
         .onChange(of: includesSubTagContent) { _, _ in
             linkedGalleries.refetchGalleries(viewModel: viewModel, initial: true)
             linkedStudios.refetchStudios(viewModel: viewModel, initial: true)
@@ -1312,6 +1336,7 @@ struct TagDetailView: View {
         .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("TagParentsChanged"))) { note in
             guard (note.userInfo?["tagId"] as? String) != selectedTag.id else { return }
             viewModel.fetchDetailTags(parentTagId: selectedTag.id)
+            subtreeCountsStore.request(selectedTag.id)
         }
         .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("TagImageUpdated"))) { notification in
             guard let tagId = notification.userInfo?["tagId"] as? String,

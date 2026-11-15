@@ -86,6 +86,108 @@ struct SubStudioOptionsCard: View {
     }
 }
 
+/// Empty state of a section on a studio's or tag's page. While the page's "Include sub-…
+/// content" switch is off and the sub-studios / sub-tags hold something of this kind, it offers
+/// the switch as its button: a parent without own scenes otherwise looks empty.
+struct SubContentEmptyState: View {
+    let icon: String
+    let title: String
+    var fillsScreen: Bool = true
+    /// Offer the switch (nil: the plain empty state).
+    let switchLabel: String?
+    let onSwitch: () -> Void
+    /// Button of the plain empty state ("Load scenes"), nil for none.
+    var fallbackButtonText: String? = nil
+    var onFallback: (() -> Void)? = nil
+
+    var body: some View {
+        if let switchLabel {
+            StatusPlaceholderView(
+                icon: icon,
+                title: title,
+                buttonText: switchLabel,
+                fillsScreen: fillsScreen,
+                onAction: {
+                    HapticManager.light()
+                    onSwitch()
+                }
+            )
+        } else {
+            StatusPlaceholderView(
+                icon: icon,
+                title: title,
+                buttonText: fallbackButtonText,
+                fillsScreen: fillsScreen,
+                onAction: onFallback
+            )
+        }
+    }
+}
+
+/// `SubContentEmptyState` of a studio's section ("Include sub-studio content").
+struct SubStudioContentEmptyState: View {
+    let studioId: String
+    let icon: String
+    let title: String
+    var fillsScreen: Bool = true
+    /// The count with sub-studios of this section's kind.
+    let subtreeCount: KeyPath<StudioCounts, Int>
+    var fallbackButtonText: String? = nil
+    var onFallback: (() -> Void)? = nil
+
+    @ObservedObject private var counts = StudioCountsStore.shared
+    @AppStorage(StudioCountsStore.includeSubStudiosKey) private var includesContent = false
+
+    private var offersSwitch: Bool {
+        guard !includesContent, let known = counts.counts[studioId] else { return false }
+        return known[keyPath: subtreeCount] > 0
+    }
+
+    var body: some View {
+        SubContentEmptyState(
+            icon: icon,
+            title: title,
+            fillsScreen: fillsScreen,
+            switchLabel: offersSwitch ? tr("include_sub_studio_content") : nil,
+            onSwitch: { includesContent = true },
+            fallbackButtonText: fallbackButtonText,
+            onFallback: onFallback
+        )
+    }
+}
+
+/// `SubContentEmptyState` of a tag's section ("Include sub-tag content").
+struct SubTagContentEmptyState: View {
+    let tagId: String
+    let icon: String
+    let title: String
+    var fillsScreen: Bool = true
+    /// The count with sub-tags of this section's kind.
+    let subtreeCount: KeyPath<TagSubtreeCounts, Int>
+    var fallbackButtonText: String? = nil
+    var onFallback: (() -> Void)? = nil
+
+    @ObservedObject private var counts = TagSubtreeCountsStore.shared
+    @AppStorage(TagHierarchy.includeSubTagContentKey) private var includesContent = false
+
+    private var offersSwitch: Bool {
+        guard !includesContent, let known = counts.counts[tagId] else { return false }
+        return known[keyPath: subtreeCount] > 0
+    }
+
+    var body: some View {
+        SubContentEmptyState(
+            icon: icon,
+            title: title,
+            fillsScreen: fillsScreen,
+            switchLabel: offersSwitch ? tr("include_sub_tag_content") : nil,
+            onSwitch: { includesContent = true },
+            fallbackButtonText: fallbackButtonText,
+            onFallback: onFallback
+        )
+    }
+}
+
 private struct ShowsSubTagContentOptionKey: EnvironmentKey {
     static let defaultValue = false
 }
@@ -119,6 +221,32 @@ struct SubTagOptionsCard: View {
             }
             CatalogFilterSortToggleRow(label: tr("include_sub_tag_content"), isOn: $includesContent)
         }
+    }
+}
+
+/// Settings of a tag page's Sub-Tags section: they have no filter of their own, so the sheet
+/// holds only "Include sub-tag content".
+struct SubTagOptionsSheet: View {
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        NavigationStack {
+            ScrollView {
+                SubTagOptionsCard(showsHide: false)
+                    .padding(.top, 8)
+            }
+            .background(Color.appBackground.ignoresSafeArea())
+            .navigationTitle(tr("settings"))
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .confirmationAction) {
+                    Button(tr("action_done")) { dismiss() }
+                }
+            }
+        }
+        .presentationDetents([.medium])
+        .presentationDragIndicator(.visible)
+        .presentationBackground(Color.appBackground)
     }
 }
 

@@ -6,6 +6,7 @@
 //
 
 import Foundation
+import Combine
 
 // MARK: - Tag Repository Protocol
 
@@ -225,6 +226,47 @@ private struct TagsMergeResponse: Codable {
 }
 
 // MARK: - Sub-tags
+
+/// What a tag and its sub-tags hold (`*_count(depth: -1)`), whatever the content switch says.
+struct TagSubtreeCounts: Decodable, Equatable {
+    let id: String
+    let scene_count_all: Int
+    let gallery_count_all: Int
+    let image_count_all: Int
+}
+
+/// The counts with sub-tags of the tag pages opened, so a parent tag without own scenes still
+/// offers its Scenes section and "Include sub-tag content" (the counterpart of `StudioCountsStore`).
+final class TagSubtreeCountsStore: ObservableObject {
+    static let shared = TagSubtreeCountsStore()
+
+    @Published private(set) var counts: [String: TagSubtreeCounts] = [:]
+    private var serverObserver: NSObjectProtocol?
+
+    private struct Response: Decodable {
+        struct DataContainer: Decodable { let findTag: TagSubtreeCounts? }
+        let data: DataContainer?
+    }
+
+    private init() {
+        serverObserver = NotificationCenter.default.addObserver(
+            forName: NSNotification.Name("ServerConfigChanged"), object: nil, queue: .main
+        ) { [weak self] _ in
+            Task { @MainActor in self?.counts = [:] }
+        }
+    }
+
+    /// Asks again every time: a tag page opening.
+    func request(_ id: String) {
+        Task { @MainActor in
+            let response: Response? = try? await GraphQLClient.shared.execute(
+                query: GraphQLQueries.loadQuery(named: "findTagCountsAll"),
+                variables: ["id": id]
+            )
+            if let known = response?.data?.findTag { counts[id] = known }
+        }
+    }
+}
 
 /// The two sub-tag settings, the counterpart of the sub-studio ones in `StudioCountsStore`.
 /// App settings, not filter criteria: the tag lists watch the keys and refetch.
