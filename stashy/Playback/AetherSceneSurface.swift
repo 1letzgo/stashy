@@ -63,6 +63,9 @@ struct AetherSceneSurface: View {
     #endif
     /// Fullscreen only: crop to fill the whole screen instead of letterboxing.
     @State private var fillsScreen = false
+    /// Pinch zoom of the picture (`PlayerPinchZoom.swift`). Never read in this body: only the
+    /// video wrapper and the gesture modifier observe it, so a pinch does not re-run the surface.
+    @State private var zoom = PlayerZoomModel()
     @State private var controlsHideToken = UUID()
     /// True while the UIKit "…" menu is on screen — the auto-hide timer rests until it goes.
     @State private var isOptionsMenuOpen = false
@@ -115,7 +118,9 @@ struct AetherSceneSurface: View {
             Color.black
                 .ignoresSafeArea()
 
-            AetherPlayerSurface(engine: engine.engine)
+            PlayerZoomedVideo(model: zoom) {
+                AetherPlayerSurface(engine: engine.engine)
+            }
                 .padding(.bottom, tabletopPictureInset)
                 .ignoresSafeArea()
 
@@ -491,11 +496,23 @@ struct AetherSceneSurface: View {
                 tapRegion(doubleTapSkip: nil, holdRewinds: false)
                 tapRegion(doubleTapSkip: tabManager.playerSkipSeconds, holdRewinds: false)
             }
-            // Fullscreen: pinch open fills the screen, pinch closed fits the picture — the
-            // same two states the fill button switches, on the gesture every photo app uses.
-            .modifier(AetherFillPinchGesture(isEnabled: allowsFillControls, fillsScreen: $fillsScreen) {
-                revealControls()
-            })
+            // Pinch zooms the picture (up to 4×, one finger pans while zoomed). Fullscreen
+            // landscape: a pinch from fit that lands near the fill scale snaps to fill, a pinch
+            // closed while filled fits again — the two states the fill button switches.
+            .modifier(PlayerPinchZoomGestures(
+                model: zoom,
+                engine: engine,
+                fillsScreen: $fillsScreen,
+                allowsFill: allowsFillControls,
+                isFullscreen: isFullscreen,
+                onPinchBegan: {
+                    fastForwardArmTask?.cancel()
+                    fastForwardArmTask = nil
+                    setFastForwarding(false)
+                    setRewinding(false)
+                },
+                onFillChanged: { revealControls() }
+            ))
 
             // Opacity instead of structural insertion: a conditional `if` plus a transition
             // proved unreliable over the UIKit-hosted player view (the re-inserted controls
@@ -1764,32 +1781,6 @@ private final class AetherPictureInPictureCoordinator: NSObject, ObservableObjec
         DispatchQueue.main.async {
             self.isActive = active
             self.onActiveChange?(active)
-        }
-    }
-}
-
-/// Pinch on the picture switches between fit and fill while fullscreen. Deliberately only the
-/// two states the fill button has: a free zoom would have to carry panning, and the engine
-/// renders the layer's gravity rather than a transform of it.
-private struct AetherFillPinchGesture: ViewModifier {
-    let isEnabled: Bool
-    @Binding var fillsScreen: Bool
-    let onChange: () -> Void
-
-    func body(content: Content) -> some View {
-        if isEnabled {
-            content.simultaneousGesture(
-                MagnifyGesture(minimumScaleDelta: 0.1)
-                    .onEnded { value in
-                        let fills = value.magnification > 1
-                        guard fills != fillsScreen else { return }
-                        HapticManager.light()
-                        fillsScreen = fills
-                        onChange()
-                    }
-            )
-        } else {
-            content
         }
     }
 }
