@@ -810,6 +810,11 @@ private struct GroupsViewContent: View {
             groupsCriteriaDocument.clear()
             performSearch()
         }
+        // A group got or lost containing groups: it joins or leaves a hierarchy filter's result,
+        // and the parents' sub-group counts change.
+        .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("GroupHierarchyChanged"))) { _ in
+            performSearch()
+        }
         .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("DefaultSortChanged"))) { notification in
             if let tabId = notification.userInfo?["tab"] as? String, tabId == AppTab.groups.rawValue {
                 let newSort = StashDBViewModel.GroupSortOption(rawValue: TabManager.shared.getPersistentSortOption(for: .groups) ?? "") ?? .nameAsc
@@ -1147,9 +1152,28 @@ struct GroupDetailView: View {
     private func loadSubGroupsIfNeeded() {
         guard !didLoadSubGroups, (selectedGroup.sub_group_count ?? 0) > 0 else { return }
         didLoadSubGroups = true
+        fetchSubGroups()
+    }
+
+    private func fetchSubGroups() {
         viewModel.fetchGroups(sortBy: .nameAsc, liveFilter: [
             "containing_groups": ["value": [selectedGroup.id], "modifier": "INCLUDES", "depth": 0]
         ])
+    }
+
+    /// Another group was moved into or out of this one (or its parents changed): the header
+    /// counts, the "In: …" line and the Groups section reload. A section that went empty
+    /// refetches too, so it does not keep the moved group.
+    private func reloadAfterHierarchyChange() {
+        let hadSubGroups = !viewModel.groups.isEmpty
+        viewModel.fetchGroup(groupId: selectedGroup.id) { updated in
+            guard let updated else { return }
+            selectedGroup = updated
+            if (updated.sub_group_count ?? 0) > 0 || hadSubGroups {
+                didLoadSubGroups = true
+                fetchSubGroups()
+            }
+        }
     }
 
     private var subGroupGrid: some View {
@@ -1570,6 +1594,12 @@ struct GroupDetailView: View {
             EditGroupSheet(group: selectedGroup, viewModel: viewModel, onDeleted: { dismiss() }) { updated in
                 selectedGroup = updated
             }
+        }
+        // The edited group itself takes the result through `onComplete`; every other open group
+        // page may have gained or lost it as a sub-group.
+        .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("GroupHierarchyChanged"))) { note in
+            guard (note.userInfo?["groupId"] as? String) != selectedGroup.id else { return }
+            reloadAfterHierarchyChange()
         }
         .onAppear {
             if viewModel.groupGalleries.isEmpty {
@@ -2083,6 +2113,12 @@ struct EditGroupSheet: View {
     @State private var urls: [String] = []
     @State private var studio: FilterEntityOption?
     @State private var tags: [FilterEntityOption] = []
+    /// The groups this one sits in (`containing_groups`), descriptions kept as loaded.
+    @State private var containingGroups: [ContainingGroupDraft] = []
+    @State private var loadedContainingGroups: [ContainingGroupDraft] = []
+    /// The group itself and every group below it: none of them may contain it.
+    @State private var excludedParentIds: Set<String> = []
+    @State private var showingContainingGroupsPicker = false
     /// The extra fields are written back only once they were loaded, so a failed load never
     /// wipes aliases, studio, tags … on save.
     @State private var extraFieldsLoaded = false
@@ -2153,6 +2189,8 @@ struct EditGroupSheet: View {
                 }
                 .listRowBackground(Color.secondaryAppBackground)
                 .disabled(!extraFieldsLoaded)
+
+                containingGroupsSection
 
                 Section("URLs") {
                     ForEach(urls.indices, id: \.self) { index in
@@ -2237,6 +2275,14 @@ struct EditGroupSheet: View {
                     tags: $tags
                 )
             }
+            .sheet(isPresented: $showingContainingGroupsPicker) {
+                ContainingGroupsPickerSheet(
+                    viewModel: viewModel,
+                    groupId: group.id,
+                    excludedIds: excludedParentIds,
+                    selection: $containingGroups
+                )
+            }
             .alert(tr("action_delete_group"), isPresented: $showingDeleteConfirmation) {
                 Button(tr("action_cancel"), role: .cancel) { }
                 Button(tr("action_delete"), role: .destructive) { performDelete() }
@@ -2247,6 +2293,43 @@ struct EditGroupSheet: View {
     }
 
     // MARK: Rows
+
+    /// "Containing Groups": the groups this one sits in, each with an optional description
+    /// (Stash's `GroupDescriptionInput`). Groups nest like folders.
+    private var containingGroupsSection: some View {
+        Section {
+            ForEach($containingGroups) { $entry in
+                VStack(alignment: .leading, spacing: 6) {
+                    HStack {
+                        Image(systemName: "rectangle.stack").foregroundStyle(.secondary)
+                        Text(entry.name).foregroundStyle(.primary).lineLimit(1)
+                        Spacer()
+                        Button {
+                            containingGroups.removeAll { $0.id == entry.id }
+                        } label: {
+                            Image(systemName: "minus.circle.fill").foregroundStyle(.red)
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel(tr("action_remove_arg", entry.name))
+                    }
+                    TextField(tr("description"), text: $entry.description)
+                        .font(.subheadline)
+                }
+                .padding(.vertical, 2)
+            }
+            Button {
+                showingContainingGroupsPicker = true
+            } label: {
+                Label(tr("action_add_group"), systemImage: "plus.circle.fill")
+            }
+        } header: {
+            Text(tr("containing_groups"))
+        } footer: {
+            Text(tr("hint_containing_groups"))
+        }
+        .listRowBackground(Color.secondaryAppBackground)
+        .disabled(!extraFieldsLoaded)
+    }
 
     private func pickerRow(title: String, value: String, action: @escaping () -> Void) -> some View {
         Button(action: action) {
@@ -2319,8 +2402,28 @@ struct EditGroupSheet: View {
                 urls = fields.urls ?? []
                 studio = fields.studio.map { FilterEntityOption(id: $0.id, name: $0.name) }
                 tags = (fields.tags ?? []).map { FilterEntityOption(id: $0.id, name: $0.name) }
+                let parents = (fields.containing_groups ?? []).map {
+                    ContainingGroupDraft(id: $0.group.id, name: $0.group.name, description: $0.description ?? "")
+                }
+                containingGroups = parents
+                loadedContainingGroups = parents
                 extraFieldsLoaded = true
             }
+        }
+        excludedParentIds = [group.id]
+        viewModel.fetchGroupDescendantIds(groupId: group.id) { ids in
+            DispatchQueue.main.async {
+                // Unknown descendants: the server refuses a loop anyway, so the picker stays usable.
+                if let ids { excludedParentIds = ids.union([group.id]) }
+            }
+        }
+    }
+
+    /// What `containing_groups` sends: id plus the description, nil when empty.
+    private func containingGroupsInput(_ entries: [ContainingGroupDraft]) -> [[String: Any]] {
+        entries.map { entry -> [String: Any] in
+            let description: Any = optionalTrimmed(entry.description) ?? NSNull()
+            return ["group_id": entry.id, "description": description]
         }
     }
 
@@ -2382,7 +2485,12 @@ struct EditGroupSheet: View {
             extra["studio_id"] = studio?.id ?? NSNull()
             extra["tag_ids"] = tags.map(\.id)
             extra["urls"] = urls.compactMap { optionalTrimmed($0) }
+            extra["containing_groups"] = containingGroupsInput(containingGroups)
         }
+        // Compared as sent (trimmed), so a stray space does not count as a move.
+        let hierarchyChanged = extraFieldsLoaded
+            && containingGroups.map { [$0.id, optionalTrimmed($0.description) ?? ""] }
+                != loadedContainingGroups.map { [$0.id, optionalTrimmed($0.description) ?? ""] }
         if let newFront { extra["front_image"] = newFront.dataURL }
         if let newBack {
             extra["back_image"] = newBack.dataURL
@@ -2406,6 +2514,11 @@ struct EditGroupSheet: View {
                 }
                 return
             }
+            // The group moved in the hierarchy: the Groups list and open group pages (their
+            // "In: …" line and Groups section) reload.
+            if hierarchyChanged {
+                StashDBViewModel.postEntityUpdated("GroupHierarchyChanged", key: "groupId", id: group.id)
+            }
             // Reload: the new `updated_at` refreshes the cover URLs, and a new back cover
             // only appears once `back_image_path` comes back set.
             viewModel.fetchGroup(groupId: group.id) { fresh in
@@ -2425,6 +2538,13 @@ struct EditGroupSheet: View {
             }
         }
     }
+}
+
+/// One containing group in the edit sheet; `description` is edited in place.
+struct ContainingGroupDraft: Identifiable, Equatable {
+    let id: String
+    let name: String
+    var description: String
 }
 
 /// A picked cover, re-encoded for Stash's `front_image` / `back_image`.
@@ -2571,4 +2691,103 @@ private struct GroupEntityPickerSheet: View {
         .buttonStyle(.plain)
     }
 }
+/// "Containing Groups" picker of the group edit sheet: every group by name (the shared filter
+/// list leaves out groups without scenes), minus the group itself and its descendants. Toggling
+/// edits `selection` in place; an entry that stays keeps its description.
+private struct ContainingGroupsPickerSheet: View {
+    @ObservedObject var viewModel: StashDBViewModel
+    let groupId: String
+    let excludedIds: Set<String>
+    @Binding var selection: [ContainingGroupDraft]
+
+    @Environment(\.stashyDismiss) private var dismiss
+    @ObservedObject private var appearanceManager = AppearanceManager.shared
+    @State private var query = ""
+    @State private var allGroups: [GroupPickerRow] = []
+    @State private var isLoading = true
+
+    private var options: [GroupPickerRow] {
+        let term = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        let chosen = Set(selection.map(\.id))
+        return allGroups.filter { row in
+            !excludedIds.contains(row.id) && row.id != groupId && !chosen.contains(row.id)
+                && (term.isEmpty || row.name.localizedCaseInsensitiveContains(term))
+        }
+    }
+
+    var body: some View {
+        NavigationView {
+            Form {
+                Section {
+                    TextField(tr("placeholder_search"), text: $query)
+                        .textInputAutocapitalization(.never)
+                        .autocorrectionDisabled()
+                }
+                .listRowBackground(Color.secondaryAppBackground)
+
+                if !selection.isEmpty {
+                    // Chosen groups lead, whatever the search says.
+                    Section(tr("selected")) {
+                        ForEach(selection) { entry in
+                            row(name: entry.name, detail: nil, selected: true) {
+                                selection.removeAll { $0.id == entry.id }
+                            }
+                        }
+                    }
+                    .listRowBackground(Color.secondaryAppBackground)
+                }
+
+                Section(tr("groups")) {
+                    if isLoading && allGroups.isEmpty {
+                        HStack { Spacer(); InlineSpinner(); Spacer() }
+                    } else {
+                        ForEach(options.prefix(300)) { option in
+                            row(name: option.name, detail: subGroupText(option.sub_group_count), selected: false) {
+                                selection.append(ContainingGroupDraft(id: option.id, name: option.name, description: ""))
+                            }
+                        }
+                    }
+                }
+                .listRowBackground(Color.secondaryAppBackground)
+            }
+            .applyAppBackground()
+            .scrollContentBackground(.hidden)
+            .stashyModalSheetChrome(tr("containing_groups"), onBack: { dismiss() }) {
+                StashyChromeTrailingTextButton(title: tr("action_done")) { dismiss() }
+            }
+            .onAppear {
+                guard allGroups.isEmpty else { return }
+                viewModel.fetchAllGroupsByName { rows in
+                    DispatchQueue.main.async {
+                        allGroups = rows
+                        isLoading = false
+                    }
+                }
+            }
+        }
+    }
+
+    private func subGroupText(_ count: Int?) -> String? {
+        guard let count, count > 0 else { return nil }
+        return tr(count == 1 ? "arg_count_sub_group" : "arg_count_sub_groups", count)
+    }
+
+    private func row(name: String, detail: String?, selected: Bool, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            HStack {
+                Text(name).foregroundStyle(.primary).lineLimit(1)
+                Spacer()
+                if let detail {
+                    Text(detail).font(.caption).foregroundStyle(.secondary)
+                }
+                if selected {
+                    Image(systemName: "checkmark").foregroundStyle(appearanceManager.tintColor)
+                }
+            }
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+    }
+}
+
 #endif

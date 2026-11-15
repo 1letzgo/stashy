@@ -135,6 +135,7 @@ object DashboardStore {
                 is LibraryEvent.TagParentsChanged -> null
                 // Home rows show no markers.
                 is LibraryEvent.SceneMarkerDeleted -> null
+                is LibraryEvent.GroupHierarchyChanged -> null
             }
             if (next != null) rows[type] = next
         }

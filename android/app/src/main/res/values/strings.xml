@@ -1101,6 +1101,7 @@
     <string name="hint_optional_used_instead_of_address">Optional. Used instead of the address above whenever it answers, for example on your home network. Falls back automatically.</string>
     <string name="hint_original_could_not_be_played">Original could not be played — using the server transcode</string>
     <string name="hint_other_names_for_this_tag">Other names for this tag. Swipe left to remove one.</string>
+    <string name="hint_containing_groups">The groups this group belongs to, each with an optional description. Groups nest like folders.</string>
     <string name="hint_payment_is_charged_to_your">Payment is charged to your Apple ID. Subscriptions renew automatically unless cancelled at least 24 hours before the period ends. Manage or cancel anytime in your App Store settings.</string>
     <string name="hint_payment_is_charged_to_your_google">Payment is charged to your Google Play account. Subscriptions renew automatically unless cancelled. Manage or cancel anytime in the Play Store.</string>
     <string name="hint_pick_accent_color_used_for">Pick the accent color used for focus highlights and icons throughout the app.</string>
@@ -2241,6 +2242,8 @@
     <string name="arg_part_of_and_more">Part of %1$s +%2$s</string>
     <string name="arg_count_sub_tag">%1$s sub-tag</string>
     <string name="arg_count_sub_tags">%1$s sub-tags</string>
+    <string name="arg_count_sub_group">%1$s sub-group</string>
+    <string name="arg_count_sub_groups">%1$s sub-groups</string>
     <string name="image_scaling">Image Scaling</string>
     <string name="scaling_fit">Fit</string>
     <string name="scaling_fill">Fill</string>

@@ -216,9 +216,9 @@ data class GroupStub(
 @Serializable
 data class SceneGroupEntry(val group: GroupStub, @SerialName("scene_index") val sceneIndex: Int? = null)
 
-/** One `containing_groups { group { id name } }` entry (the parent a group sits in). */
+/** One `containing_groups { group { id name } description }` entry (the parent a group sits in). */
 @Serializable
-data class ContainingGroupEntry(val group: GroupStub)
+data class ContainingGroupEntry(val group: GroupStub, val description: String? = null)
 
 @Serializable
 data class StashGroup(

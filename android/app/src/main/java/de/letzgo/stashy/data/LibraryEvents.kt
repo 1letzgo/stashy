@@ -17,6 +17,8 @@ sealed class LibraryEvent {
     data class StudioParentChanged(val id: String) : LibraryEvent()
     /** A tag got or lost parents: the Tags list and open tag pages' sub-tag sections reload (iOS `TagParentsChanged`). */
     data class TagParentsChanged(val id: String) : LibraryEvent()
+    /** A group got or lost containing groups: the Groups list and open group pages reload (iOS `GroupHierarchyChanged`). */
+    data class GroupHierarchyChanged(val id: String) : LibraryEvent()
     data class GalleryPatched(val id: String, val patch: (Gallery) -> Gallery) : LibraryEvent()
     data class PerformerDeleted(val id: String) : LibraryEvent()
     data class StudioDeleted(val id: String) : LibraryEvent()
