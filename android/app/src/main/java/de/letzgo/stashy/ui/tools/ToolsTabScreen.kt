@@ -60,7 +60,10 @@ import de.letzgo.stashy.ui.Appearance
 import de.letzgo.stashy.ui.cardShadow
 import de.letzgo.stashy.ui.noRippleClickable
 import de.letzgo.stashy.ui.tools.charts.ChartsToolView
+import de.letzgo.stashy.ui.tools.filters.FiltersToolView
 import de.letzgo.stashy.ui.tools.match.MatchToolView
+import de.letzgo.stashy.ui.tools.merge.StudioMergeToolView
+import de.letzgo.stashy.ui.tools.merge.TagMergeToolView
 import de.letzgo.stashy.ui.tools.rateme.RateMeToolView
 import de.letzgo.stashy.ui.tools.stats.OCountHeatmapToolView
 import de.letzgo.stashy.ui.tools.stats.OverviewToolView
@@ -76,6 +79,9 @@ enum class ToolsTab(private val titleText: UiText, val icon: ImageVector) {
     OCount(UiText(R.string.o_count), SF.calendar),
     Timeline(UiText(R.string.timeline), SF.calendarDayTimelineLeft),
     TopLists(UiText(R.string.charts), SF.listNumber),
+    Filters(UiText(R.string.filters), SF.line3HorizontalDecreaseCircle),
+    MergeTags(UiText(R.string.action_merge_tags), SF.arrowTriangleMerge),
+    MergeStudios(UiText(R.string.action_merge_studios), SF.building2),
     HotOrNot(UiText(R.string.match), SF.flameFill),
     RateMe(UiText("RateMe"), SF.starFill);
     /** Read on use: a constant must not freeze its text at class load. */
@@ -85,6 +91,7 @@ enum class ToolsTab(private val titleText: UiText, val icon: ImageVector) {
     val raw: String get() = when (this) {
         Overview -> "Overview"; OCount -> "O-Count"; Timeline -> "Timeline"
         TopLists -> "Charts"; HotOrNot -> "Match"; RateMe -> "RateMe"
+        Filters -> "Filters"; MergeTags -> "Merge Tags"; MergeStudios -> "Merge Studios"
     }
 
     companion object {
@@ -95,6 +102,7 @@ enum class ToolsTab(private val titleText: UiText, val icon: ImageVector) {
          * on the Dashboard row opens Now Playing); a stored "Watchlist" sub-tab lands on the grid.
          */
         val groups: List<Pair<String, List<ToolsTab>>> get() = listOf(
+            tr(R.string.library) to listOf(Filters, MergeTags, MergeStudios),
             tr(R.string.insights) to listOf(Overview, TopLists, OCount, Timeline),
             tr(R.string.discover) to listOf(HotOrNot, RateMe),
         ).filter { it.second.isNotEmpty() }
@@ -185,6 +193,9 @@ private fun ToolPage(tool: ToolsTab) {
             ToolsTab.OCount -> OCountHeatmapToolView()
             ToolsTab.Timeline -> SessionTimelineToolView()
             ToolsTab.TopLists -> ChartsToolView()
+            ToolsTab.Filters -> FiltersToolView()
+            ToolsTab.MergeTags -> TagMergeToolView()
+            ToolsTab.MergeStudios -> StudioMergeToolView()
             ToolsTab.HotOrNot -> MatchToolView()
             ToolsTab.RateMe -> RateMeToolView()
         }

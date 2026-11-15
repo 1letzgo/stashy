@@ -2,7 +2,7 @@
 //  MergeTools.swift
 //  stashy
 //
-//  Settings › Server › stashy+ → Merge Tags / Merge Studios: mehrere Einträge auf einen zusammenführen,
+//  Tools → Merge Tags / Merge Studios: mehrere Einträge auf einen zusammenführen,
 //  mit lokal gespeicherten Vorlagen (Ziel + Quellen) pro Server.
 //
 
@@ -1061,7 +1061,7 @@ private struct MergeSearchField: View {
 
 // MARK: - Studios
 
-/// Settings › Server › stashy+ → Merge Studios. Stash kennt kein `studiosMerge`; `StudioRepository.mergeStudios`
+/// Tools → Merge Studios. Stash kennt kein `studiosMerge`; `StudioRepository.mergeStudios`
 /// hängt Szenen, Galerien, Bilder, Gruppen und Kind-Studios per Bulk-Update um und
 /// löscht die Quellen danach.
 struct StudioMergeToolsView: View {

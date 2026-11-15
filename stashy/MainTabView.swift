@@ -338,6 +338,9 @@ struct ToolsView: View {
         case oCount = "O-Count"
         case timeline = "Timeline"
         case topLists = "Charts"
+        case filters = "Filters"
+        case mergeTags = "Merge Tags"
+        case mergeStudios = "Merge Studios"
         case hotOrNot = "Match"
         case rateMe = "RateMe"
 
@@ -348,6 +351,9 @@ struct ToolsView: View {
             case .oCount: return tr("o_count")
             case .timeline: return tr("timeline")
             case .topLists: return tr("charts")
+            case .filters: return tr("filters")
+            case .mergeTags: return tr("action_merge_tags")
+            case .mergeStudios: return tr("action_merge_studios")
             case .hotOrNot: return tr("match")
             case .rateMe: return "RateMe"
             }
@@ -359,6 +365,9 @@ struct ToolsView: View {
             case .oCount: return "calendar"
             case .timeline: return "calendar.day.timeline.left"
             case .topLists: return "list.number"
+            case .filters: return "line.3.horizontal.decrease.circle"
+            case .mergeTags: return "arrow.triangle.merge"
+            case .mergeStudios: return "building.2"
             case .hotOrNot: return "flame.fill"
             case .rateMe: return "star.fill"
             }
@@ -371,6 +380,7 @@ struct ToolsView: View {
     static var toolGroups: [(title: String, tools: [ToolsTab])] {
 [
         // Downloads and the watchlist are not tools any more: the Dashboard row opens them.
+        (tr("library"), [.filters, .mergeTags, .mergeStudios]),
         (tr("insights"), [.overview, .topLists, .oCount, .timeline]),
         (tr("discover"), [.hotOrNot, .rateMe])
     ]
@@ -461,6 +471,12 @@ struct ToolsView: View {
             SessionTimelineToolsView()
         case .topLists:
             TopListsToolsContainerView(viewModel: topListsViewModel)
+        case .filters:
+            FiltersToolsView()
+        case .mergeTags:
+            TagMergeToolsView()
+        case .mergeStudios:
+            StudioMergeToolsView()
         case .hotOrNot:
             HotOrNotToolsView()
         case .rateMe:
@@ -851,7 +867,6 @@ struct ToolsServerView: View {
 
     @ObservedObject private var configManager = ServerConfigManager.shared
     @ObservedObject private var appearanceManager = AppearanceManager.shared
-    @ObservedObject private var stashyPlus = StashyPlusManager.shared
     @StateObject private var viewModel = StashDBViewModel()
     
     @State private var alertTitle = ""
@@ -1029,25 +1044,6 @@ struct ToolsServerView: View {
                         }
                         taskRow(label: tr("action_remove_unused_studios"), icon: "building.2.crop.circle", taskId: "studios_unused", index: 2, count: 3) {
                             findUnused(.studios)
-                        }
-                    }
-
-                    // Admin-Werkzeuge (früher unter Tools), nur mit stashy+.
-                    if stashyPlus.isUnlocked {
-                        Section {
-                            stashyScrollingSectionHeader("stashy+")
-                            NavigationLink(destination: FiltersToolsView().stashySettingsDetailChrome(tr("filters"))) {
-                                Label(tr("filters"), systemImage: "line.3.horizontal.decrease.circle")
-                            }
-                            .stashyGroupedBlockRow(index: 0, count: 3)
-                            NavigationLink(destination: TagMergeToolsView().stashySettingsDetailChrome(tr("action_merge_tags"))) {
-                                Label(tr("action_merge_tags"), systemImage: "arrow.triangle.merge")
-                            }
-                            .stashyGroupedBlockRow(index: 1, count: 3)
-                            NavigationLink(destination: StudioMergeToolsView().stashySettingsDetailChrome(tr("action_merge_studios"))) {
-                                Label(tr("action_merge_studios"), systemImage: "building.2")
-                            }
-                            .stashyGroupedBlockRow(index: 2, count: 3)
                         }
                     }
 
