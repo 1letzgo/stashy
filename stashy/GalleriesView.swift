@@ -1046,7 +1046,7 @@ struct GalleryItemView: View {
                     GeometryReader { _ in
                         CustomAsyncImage(url: image.imageURL) { loader in
                             if let data = loader.imageData, isAnimatedData(data) {
-                                AnimatedWebView(data: data, fillMode: shouldFill, bottomInset: bottomInset)
+                                AnimatedImageView(data: data, fillMode: shouldFill, bottomInset: bottomInset)
                             } else if let img = loader.image {
                                 img
                                     .resizable()

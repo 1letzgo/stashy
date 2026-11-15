@@ -6282,7 +6282,7 @@ extension ReelItemView {
                     if item.isAnimated {
                         CustomAsyncImage(url: item.videoURL) { loader in
                             if let data = loader.imageData, isAnimatedData(data) {
-                                AnimatedWebView(data: data, fillMode: shouldFill, bottomInset: bottomInset)
+                                AnimatedImageView(data: data, fillMode: shouldFill, bottomInset: bottomInset)
                             } else if let img = loader.image {
                                 img
                                     .resizable()

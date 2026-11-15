@@ -7,6 +7,7 @@
 
 import Foundation
 import AVFoundation
+import ImageIO
 #if canImport(UIKit)
 import UIKit
 #endif
@@ -1765,120 +1766,215 @@ struct StandardLoadingView: View {
     }
 }
 
-#if os(macOS)
-/// macOS variant of `AnimatedWebView`: same HTML, AppKit host view.
-struct AnimatedWebView: NSViewRepresentable {
+/// Plays an animated GIF or WebP natively through ImageIO (`CGAnimateImageDataWithBlock`); a
+/// still one shows its only frame. Transparent around the picture, so the Background setting
+/// (`ImageBackdrop`) shows where the image does not cover its space — the former WKWebView page
+/// painted its own black body over it.
+/// `fillMode` covers the space and crops off the bottom, not both edges (matches the Pics feed);
+/// otherwise the whole image, centred. `topInset` / `bottomInset` are bands the picture keeps
+/// out of; the view's own bounds stay full-size.
+struct AnimatedImageView {
     let data: Data
     var fillMode: Bool = false
     var topInset: CGFloat = 0
     var bottomInset: CGFloat = 0
+}
 
-    func makeCoordinator() -> Coordinator { Coordinator() }
+#if os(macOS)
+extension AnimatedImageView: NSViewRepresentable {
+    func makeNSView(context: Context) -> AnimatedImageLayerView { AnimatedImageLayerView() }
 
-    final class Coordinator { var lastRenderKey: String? }
-
-    func makeNSView(context: Context) -> WKWebView {
-        let config = WKWebViewConfiguration()
-        config.mediaTypesRequiringUserActionForPlayback = []
-        let webView = WKWebView(frame: .zero, configuration: config)
-        webView.setValue(false, forKey: "drawsBackground")
-        return webView
+    func updateNSView(_ nsView: AnimatedImageLayerView, context: Context) {
+        nsView.update(data: data, fill: fillMode, top: max(0, topInset), bottom: max(0, bottomInset))
     }
 
-    func updateNSView(_ nsView: WKWebView, context: Context) {
-        let renderKey = "\(data.hashValue)|\(fillMode)|\(Int(topInset.rounded()))|\(Int(bottomInset.rounded()))"
-        guard context.coordinator.lastRenderKey != renderKey else { return }
-        context.coordinator.lastRenderKey = renderKey
-        nsView.loadHTMLString(animatedImageHTML(data: data, fillMode: fillMode, top: max(0, topInset), bottom: max(0, bottomInset)), baseURL: nil)
+    static func dismantleNSView(_ nsView: AnimatedImageLayerView, coordinator: ()) {
+        nsView.stopAnimating()
     }
 }
 #else
-/// A view that plays animated GIFs and WebP images using WKWebView for reliability and simple looping.
-struct AnimatedWebView: UIViewRepresentable {
-    let data: Data
-    var fillMode: Bool = false
-    /// Leaves a black band at the top (e.g. status-bar safe area). WebView bounds stay full-size.
-    var topInset: CGFloat = 0
-    /// Leaves a black band at the bottom (e.g. tab bar). WebView bounds stay full-size.
-    var bottomInset: CGFloat = 0
-    
-    func makeCoordinator() -> Coordinator {
-        Coordinator()
+extension AnimatedImageView: UIViewRepresentable {
+    func makeUIView(context: Context) -> AnimatedImageLayerView { AnimatedImageLayerView() }
+
+    func updateUIView(_ uiView: AnimatedImageLayerView, context: Context) {
+        uiView.update(data: data, fill: fillMode, top: max(0, topInset), bottom: max(0, bottomInset))
     }
-    
-    class Coordinator {
-        var lastRenderKey: String?
-    }
-    
-    func makeUIView(context: Context) -> WKWebView {
-        let config = WKWebViewConfiguration()
-        config.allowsInlineMediaPlayback = true
-        config.mediaTypesRequiringUserActionForPlayback = []
-        
-        let webView = WKWebView(frame: .zero, configuration: config)
-        webView.isOpaque = false
-        webView.backgroundColor = .clear
-        webView.scrollView.isScrollEnabled = false
-        webView.scrollView.contentInsetAdjustmentBehavior = .never
-        webView.isUserInteractionEnabled = false
-        return webView
-    }
-    
-    func updateUIView(_ uiView: WKWebView, context: Context) {
-        let top = max(0, topInset)
-        let bottom = max(0, bottomInset)
-        let renderKey = "\(data.hashValue)|\(fillMode)|\(Int(top.rounded()))|\(Int(bottom.rounded()))"
-        if context.coordinator.lastRenderKey == renderKey {
-            return
-        }
-        context.coordinator.lastRenderKey = renderKey
-        
-        uiView.loadHTMLString(animatedImageHTML(data: data, fillMode: fillMode, top: top, bottom: bottom), baseURL: nil)
+
+    static func dismantleUIView(_ uiView: AnimatedImageLayerView, coordinator: ()) {
+        uiView.stopAnimating()
     }
 }
 #endif
 
-private func animatedImageHTML(data: Data, fillMode: Bool, top: CGFloat, bottom: CGFloat) -> String {
-    // Determine MIME type
-    let mimeType = isWebP(data) ? "image/webp" : "image/gif"
-    
-    let base64 = data.base64EncodedString()
-    let objectFit = fillMode ? "cover" : "contain"
-    // Cover crops off the bottom, not both edges — matches the Pics feed.
-    let objectPosition = fillMode ? "center top" : "center center"
-    let verticalInset = top + bottom
-    
-    return """
-    <!DOCTYPE html>
-    <html>
-    <head>
-        <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-        <style>
-            * { margin: 0; padding: 0; box-sizing: border-box; }
-            html, body {
-                width: 100%;
-                height: 100%;
-                background-color: black;
-                display: flex;
-                justify-content: center;
-                align-items: flex-start;
-                overflow: hidden;
-                padding-top: \(top)px;
+#if os(macOS)
+typealias AnimatedImagePlatformView = NSView
+#else
+typealias AnimatedImagePlatformView = UIView
+#endif
+
+/// The host of `AnimatedImageView`: lays the frames out itself (fit / fill, insets) and runs the
+/// animation only while it is in a window.
+final class AnimatedImageLayerView: AnimatedImagePlatformView {
+    /// The area inside the insets; clips a filled picture.
+    private let clipLayer = CALayer()
+    private let imageLayer = CALayer()
+    private var data: Data?
+    private var frameCount = 0
+    private var pixelSize: CGSize = .zero
+    private var fill = false
+    private var top: CGFloat = 0
+    private var bottom: CGFloat = 0
+    /// Bumped to end a running animation: its block stops at the next frame.
+    private var generation = 0
+    private var isAnimating = false
+
+    init() {
+        super.init(frame: .zero)
+        #if os(macOS)
+        wantsLayer = true
+        #else
+        isUserInteractionEnabled = false
+        backgroundColor = .clear
+        isOpaque = false
+        #endif
+        clipLayer.masksToBounds = true
+        imageLayer.contentsGravity = .resize
+        clipLayer.addSublayer(imageLayer)
+        #if os(macOS)
+        layer?.addSublayer(clipLayer)
+        #else
+        layer.addSublayer(clipLayer)
+        #endif
+    }
+
+    required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
+
+    /// UIKit layers start top left; an AppKit backing layer does only when AppKit flipped it.
+    private var originIsTopLeft: Bool {
+        #if os(macOS)
+        return layer?.isGeometryFlipped ?? false
+        #else
+        return true
+        #endif
+    }
+
+    #if os(macOS)
+    /// Clicks go to the zoom / paging views around it.
+    override func hitTest(_ point: NSPoint) -> NSView? { nil }
+
+    override func layout() {
+        super.layout()
+        layoutImage()
+    }
+
+    override func viewDidMoveToWindow() {
+        super.viewDidMoveToWindow()
+        windowChanged()
+    }
+    #else
+    override func layoutSubviews() {
+        super.layoutSubviews()
+        layoutImage()
+    }
+
+    override func didMoveToWindow() {
+        super.didMoveToWindow()
+        windowChanged()
+    }
+    #endif
+
+    func update(data: Data, fill: Bool, top: CGFloat, bottom: CGFloat) {
+        let layoutChanged = fill != self.fill || top != self.top || bottom != self.bottom
+        self.fill = fill
+        self.top = top
+        self.bottom = bottom
+        if data != self.data {
+            self.data = data
+            load(data)
+        } else if layoutChanged {
+            layoutImage()
+        }
+    }
+
+    func stopAnimating() {
+        generation &+= 1
+        isAnimating = false
+    }
+
+    private func windowChanged() {
+        if window == nil {
+            stopAnimating()
+        } else {
+            startAnimatingIfNeeded()
+        }
+    }
+
+    /// Shows the first frame at once and starts the animation when there is more than one.
+    private func load(_ data: Data) {
+        stopAnimating()
+        frameCount = 0
+        pixelSize = .zero
+        if let source = CGImageSourceCreateWithData(data as CFData, nil),
+           let first = CGImageSourceCreateImageAtIndex(source, 0, nil) {
+            frameCount = CGImageSourceGetCount(source)
+            pixelSize = CGSize(width: first.width, height: first.height)
+            show(first)
+        } else {
+            show(nil)
+        }
+        layoutImage()
+        startAnimatingIfNeeded()
+    }
+
+    private func startAnimatingIfNeeded() {
+        guard !isAnimating, frameCount > 1, window != nil, let data else { return }
+        isAnimating = true
+        generation &+= 1
+        let current = generation
+        // The block runs on the main queue; it ends by itself once this view is gone or a
+        // newer animation (other data, back in a window) has started.
+        let status = CGAnimateImageDataWithBlock(data as CFData, nil) { [weak self] _, image, stop in
+            MainActor.assumeIsolated {
+                guard let self, self.generation == current else {
+                    stop.pointee = true
+                    return
+                }
+                self.show(image)
             }
-            img {
-                width: 100vw;
-                height: calc(100vh - \(verticalInset)px);
-                object-fit: \(objectFit);
-                object-position: \(objectPosition);
-                display: block;
-            }
-        </style>
-    </head>
-    <body>
-        <img src="data:\(mimeType);base64,\(base64)">
-    </body>
-    </html>
-    """
+        }
+        if status != 0 { isAnimating = false }
+    }
+
+    private func show(_ image: CGImage?) {
+        CATransaction.begin()
+        CATransaction.setDisableActions(true)
+        imageLayer.contents = image
+        CATransaction.commit()
+    }
+
+    private func layoutImage() {
+        let topLeft = originIsTopLeft
+        let area = CGRect(x: 0, y: topLeft ? top : bottom, width: bounds.width, height: max(0, bounds.height - top - bottom))
+        var imageFrame = CGRect(origin: .zero, size: area.size)
+        if pixelSize.width > 0, pixelSize.height > 0, area.width > 0, area.height > 0 {
+            let widthScale = area.width / pixelSize.width
+            let heightScale = area.height / pixelSize.height
+            let scale = fill ? max(widthScale, heightScale) : min(widthScale, heightScale)
+            let size = CGSize(width: pixelSize.width * scale, height: pixelSize.height * scale)
+            imageFrame = CGRect(
+                x: (area.width - size.width) / 2,
+                // Filled: the top edge stays, the bottom is cropped.
+                y: fill ? (topLeft ? 0 : area.height - size.height) : (area.height - size.height) / 2,
+                width: size.width,
+                height: size.height
+            )
+        }
+        CATransaction.begin()
+        CATransaction.setDisableActions(true)
+        clipLayer.frame = area
+        imageLayer.frame = imageFrame
+        CATransaction.commit()
+    }
 }
 
 
