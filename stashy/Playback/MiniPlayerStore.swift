@@ -987,6 +987,10 @@ private struct MiniPlayerProgressLine: View {
 /// keys, markers, subtitles, PiP, menus), the metadata card, credits and the watchlist.
 struct NowPlayingView: View {
     @ObservedObject private var player = MiniPlayerStore.shared
+    /// A phone on its side (same rule as the side-by-side layout below): the sheet covers the
+    /// whole screen there, and the grabber floated over the player as a stray bar. Swipe down
+    /// still minimizes; the grabber only shows where the sheet visibly sits below the top.
+    @State private var compactHeight = false
 
     var body: some View {
         Group {
@@ -999,8 +1003,13 @@ struct NowPlayingView: View {
                     .onAppear { player.showsNowPlaying = false }
             }
         }
+        // From the sheet's own size, never the orientation: an iPad or the iPhone Duo's inner
+        // display on its side keeps the grabber. Only the Bool is published, not every frame.
+        .onGeometryChange(for: Bool.self) { proxy in
+            proxy.size.width > proxy.size.height && proxy.size.height < 500
+        } action: { compactHeight = $0 }
         .presentationDetents([.large])
-        .presentationDragIndicator(.visible)
+        .presentationDragIndicator(compactHeight ? .hidden : .visible)
         .presentationBackground(Color.appBackground)
     }
 }

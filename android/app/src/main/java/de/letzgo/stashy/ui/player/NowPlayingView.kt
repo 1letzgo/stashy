@@ -97,10 +97,18 @@ fun NowPlayingSheet(onOpen: (de.letzgo.stashy.ui.Screen) -> Unit) {
     LaunchedEffect(scene == null) { if (scene == null) MiniPlayerStore.showsNowPlaying = false }
     if (scene == null) return
     val p = Theme.palette
+    // A phone on its side (wider than tall, under 500 dp high, from the window's size, not the
+    // orientation): the sheet fills the screen and the handle only took height from the player.
+    // Swipe down still minimizes; tablets and foldables keep the handle.
+    val window = androidx.compose.ui.platform.LocalConfiguration.current
+    val compactHeight = window.screenWidthDp > window.screenHeightDp && window.screenHeightDp < 500
+    val dragHandle: (@Composable () -> Unit)? =
+        if (compactHeight) null else { { androidx.compose.material3.BottomSheetDefaults.DragHandle() } }
     ModalBottomSheet(
         onDismissRequest = { MiniPlayerStore.showsNowPlaying = false },
         sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
         containerColor = p.background,
+        dragHandle = dragHandle,
     ) {
         androidx.compose.runtime.key(scene.id) { NowPlayingContent(scene, onOpen) }
     }
