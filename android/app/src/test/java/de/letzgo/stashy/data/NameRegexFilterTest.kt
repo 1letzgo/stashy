@@ -92,6 +92,18 @@ class NameRegexFilterTest {
         assertEquals(obj("""{"favorite":true}""" ).plusAll(obj(aliasGroup)), merged)
     }
 
+    @Test fun tagsChipFallsBackToNameWhenCriteriaHoldAnyGroup() {
+        // Stash allows one AND / OR / NOT per level: a saved filter's root OR or NOT blocks the alias AND.
+        val plain = obj("""{"name":{"value":"(?i)ann","modifier":"MATCHES_REGEX"}}""")
+        for (group in listOf("OR", "NOT")) {
+            val criteria = obj("""{"$group":{"favorite":true}}""")
+            assertEquals(plain, NameRegexFilter.chip(FilterMode.Tags, "ann", criteria))
+        }
+        // The fetch fragment of a root OR is an AND unit, which blocks it as well.
+        val doc = CriteriaDocument(FilterMode.Tags, obj("""{"favorite":true,"OR":{"favorite":false}}"""))
+        assertEquals(plain, NameRegexFilter.chip(FilterMode.Tags, "ann", doc.fetchFragment))
+    }
+
     @Test fun tagsAliasGroupReadsBack() {
         assertEquals("ann", NameRegexFilter.aliasSearchPattern(FilterMode.Tags, obj(aliasGroup)))
         val saved = obj("""{"favorite":true}""").plusAll(obj(aliasGroup))

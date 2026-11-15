@@ -9,7 +9,6 @@
   <string name="action_add_condition">Aggiungi condizione</string>
   <string name="action_add_custom_field">Aggiungi campo personalizzato</string>
   <string name="action_add_favorite">Aggiungi ai preferiti</string>
-  <string name="action_add_group">Aggiungi gruppo</string>
   <string name="action_add_header">Aggiungi header</string>
   <string name="action_add_marker">Aggiungi marcatore</string>
   <string name="action_add_marker_button">Pulsante \"Aggiungi marcatore\"</string>
@@ -175,7 +174,6 @@
   <string name="action_remove_all">Rimuovi tutto</string>
   <string name="action_remove_all_arg">Rimuovi tutti (%1$s)</string>
   <string name="action_remove_arg">Rimuovi %1$s</string>
-  <string name="action_remove_arg_group">Rimuovi gruppo %1$s</string>
   <string name="action_remove_download">Rimuovi download</string>
   <string name="action_remove_favorite">Rimuovi dai preferiti</string>
   <string name="action_remove_field">Rimuovi campo</string>
@@ -341,7 +339,6 @@
   <string name="all_galleries">Tutte le gallerie</string>
   <string name="all_languages">Tutte le lingue</string>
   <string name="all_matching_items">Tutti gli elementi corrispondenti</string>
-  <string name="all_of">Tutti</string>
   <string name="all_scenes_already_downloaded">Tutte le scene sono già scaricate</string>
   <string name="already_up_to_date">Già aggiornato</string>
   <string name="always_visible">Sempre visibile</string>
@@ -353,7 +350,6 @@
   <string name="any_age">Qualsiasi età</string>
   <string name="any_length">Qualsiasi durata</string>
   <string name="any_media">Qualsiasi media</string>
-  <string name="any_of">Uno qualsiasi</string>
   <string name="any_quality">Qualsiasi qualità</string>
   <string name="any_value">Qualsiasi valore</string>
   <string name="api_key">Chiave API</string>
@@ -1160,8 +1156,6 @@
   <string name="hint_enter_valid_date_as_yyyy">Inserisci una data valida come AAAA-MM-GG</string>
   <string name="hint_enter_your_stash_api_key">Inserisci direttamente la tua chiave API di Stash.</string>
   <string name="hint_enter_your_stash_server_details">Inserisci i dati del tuo server Stash per iniziare.</string>
-  <string name="hint_every_condition_in_it_must">Ogni condizione al suo interno deve corrispondere</string>
-  <string name="hint_excludes_everything_matching_conditions_below">Esclude tutto ciò che corrisponde alle condizioni qui sotto.</string>
   <string name="hint_favorites_are_your_most_played">I preferiti sono le scene che hai riprodotto di più.</string>
   <string name="hint_favorites_are_your_most_played_scenes">I preferiti sono le scene che hai riprodotto di più e quelle con il contatore O più alto.</string>
   <string name="hint_favorites_are_your_scenes_with">I preferiti sono le tue scene con il contatore O più alto.</string>
@@ -1197,7 +1191,6 @@
   <string name="hint_keeps_servers_api_keys_and">Mantiene uguali server, chiavi API e impostazioni su iPhone, iPad e Mac. Attivala su ogni dispositivo. Il server attivo resta una scelta di ciascun dispositivo.</string>
   <string name="hint_language_scenes_subtitles_start_with">La lingua con cui partono i sottotitoli di una scena. \"Qualsiasi\" prende la prima traccia normale del file.</string>
   <string name="hint_language_switch">stashy passerà a %1$s e verrà ricaricata.</string>
-  <string name="hint_leaves_out_what_group_matches">Esclude ciò che corrisponde al gruppo</string>
   <string name="hint_legend_run_performer_is_no">Il performer della partita Legend non è più in questo gruppo. Ripristina la partita.</string>
   <string name="hint_lets_you_create_edit_rename">Ti permette di creare, modificare, rinominare ed eliminare i filtri salvati sul server, in Impostazioni › Server.</string>
   <string name="hint_lgpl_3_0_with_app">LGPL-3.0, con un\'eccezione App Store / DRM</string>
@@ -1217,7 +1210,6 @@
   <string name="hint_love_spouse_2_4g_toys">I giocattoli Love Spouse 2.4g usano l\'advertising BLE. Assicurati che il Bluetooth sia attivo e che il giocattolo sia in modalità abbinamento/scansione. Tutti i giocattoli nel raggio d\'azione reagiranno contemporaneamente.</string>
   <string name="hint_match_and_rateme_are_part">Match e RateMe fanno parte di stashy+.</string>
   <string name="hint_matches_performer_studio_and_tag">Confronta i nomi di performer, studi e tag con i percorsi dei file e li aggiunge a scene, immagini e gallerie. I nomi brevi possono corrispondere per errore.</string>
-  <string name="hint_matches_when_at_least_one">Corrisponde quando almeno una delle condizioni qui sotto è vera.</string>
   <string name="hint_mini_player_arg_opens_player">Mini player: %1$s. Apre il player</string>
   <string name="hint_missing_from_store_offering_arg">Mancanti nell\'offerta dello store: %1$s</string>
   <string name="hint_monthly_yearly_or_lifetime_bought">Mensile, annuale o Lifetime. Hai già acquistato stashy+ con questo account Google o hai reinstallato l\'app? Tocca Ripristina acquisti.</string>
@@ -1363,8 +1355,6 @@
   <string name="hint_this_is_not_stashy_license">Questa non è una chiave di licenza stashy.</string>
   <string name="hint_this_is_not_stashy_settings">Questo non è un file di impostazioni stashy.</string>
   <string name="hint_this_is_sample_studio_description">Questa è una descrizione di esempio di uno studio che può occupare più righe.</string>
-  <string name="hint_this_level_already_has_group">Questo livello ha già un gruppo. Aggiungi il successivo al suo interno.</string>
-  <string name="hint_this_level_or_group_must">Questo livello o il gruppo deve corrispondere</string>
   <string name="hint_this_license_key_expired_on">Questa chiave di licenza è scaduta il %1$s.</string>
   <string name="hint_this_license_key_is_not">Questa chiave di licenza non è valida.</string>
   <string name="hint_this_scene_language_is_not">Questa lingua della scena non è supportata da SpeechTranscriber di Apple (ad es. il ceco non è nell\'elenco).</string>
@@ -1698,7 +1688,6 @@
   <string name="no">No</string>
   <string name="non_binary">Non binario</string>
   <string name="none">Nessuno</string>
-  <string name="none_of">Nessuno</string>
   <string name="normal">Normale</string>
   <string name="normalize">Normalizza</string>
   <string name="not_between">Non compreso tra</string>

@@ -9,7 +9,6 @@
   <string name="action_add_condition">Tilføj betingelse</string>
   <string name="action_add_custom_field">Tilføj brugerdefineret felt</string>
   <string name="action_add_favorite">Tilføj favorit</string>
-  <string name="action_add_group">Tilføj gruppe</string>
   <string name="action_add_header">Tilføj header</string>
   <string name="action_add_marker">Tilføj markør</string>
   <string name="action_add_marker_button">Knappen Tilføj markør</string>
@@ -175,7 +174,6 @@
   <string name="action_remove_all">Fjern alle</string>
   <string name="action_remove_all_arg">Fjern alle %1$s</string>
   <string name="action_remove_arg">Fjern %1$s</string>
-  <string name="action_remove_arg_group">Fjern gruppen %1$s</string>
   <string name="action_remove_download">Fjern download</string>
   <string name="action_remove_favorite">Fjern favorit</string>
   <string name="action_remove_field">Fjern felt</string>
@@ -341,7 +339,6 @@
   <string name="all_galleries">Alle gallerier</string>
   <string name="all_languages">Alle sprog</string>
   <string name="all_matching_items">Alle matchende elementer</string>
-  <string name="all_of">Alle af</string>
   <string name="all_scenes_already_downloaded">Alle scener er allerede downloadet</string>
   <string name="already_up_to_date">Allerede opdateret</string>
   <string name="always_visible">Altid synlig</string>
@@ -353,7 +350,6 @@
   <string name="any_age">Enhver alder</string>
   <string name="any_length">Enhver længde</string>
   <string name="any_media">Alle medier</string>
-  <string name="any_of">En af</string>
   <string name="any_quality">Enhver kvalitet</string>
   <string name="any_value">Enhver værdi</string>
   <string name="api_key">API-nøgle</string>
@@ -1160,8 +1156,6 @@
   <string name="hint_enter_valid_date_as_yyyy">Indtast en gyldig dato som ÅÅÅÅ-MM-DD</string>
   <string name="hint_enter_your_stash_api_key">Indtast din Stash-API-nøgle direkte.</string>
   <string name="hint_enter_your_stash_server_details">Indtast oplysninger om din Stash-server for at komme i gang.</string>
-  <string name="hint_every_condition_in_it_must">Alle betingelser i den skal matche</string>
-  <string name="hint_excludes_everything_matching_conditions_below">Udelukker alt, der matcher betingelserne nedenfor.</string>
   <string name="hint_favorites_are_your_most_played">Favoritter er dine mest afspillede scener.</string>
   <string name="hint_favorites_are_your_most_played_scenes">Favoritter er dine mest afspillede scener og dem med den højeste O-tæller.</string>
   <string name="hint_favorites_are_your_scenes_with">Favoritter er dine scener med den højeste O-tæller.</string>
@@ -1197,7 +1191,6 @@
   <string name="hint_keeps_servers_api_keys_and">Holder servere, API-nøgler og indstillinger ens på din iPhone, iPad og Mac. Slå det til på hver enhed. Den aktive server vælges stadig på hver enkelt enhed.</string>
   <string name="hint_language_scenes_subtitles_start_with">Det sprog, en scenes undertekster starter med. \"Enhver\" tager det første almindelige spor i filen.</string>
   <string name="hint_language_switch">stashy skifter til %1$s og genindlæses.</string>
-  <string name="hint_leaves_out_what_group_matches">Udelader det, gruppen matcher</string>
   <string name="hint_legend_run_performer_is_no">Kunstneren i Legend-runden er ikke længere i denne pulje. Nulstil runden.</string>
   <string name="hint_lets_you_create_edit_rename">Lader dig oprette, redigere, omdøbe og slette de filtre, der er gemt på din server, under Indstillinger › Server.</string>
   <string name="hint_lgpl_3_0_with_app">LGPL-3.0, med en undtagelse for App Store/DRM</string>
@@ -1217,7 +1210,6 @@
   <string name="hint_love_spouse_2_4g_toys">Love Spouse 2.4g-legetøj bruger BLE-annoncering. Sørg for, at Bluetooth er slået til, og at legetøjet er i parrings-/scanningstilstand. Alt legetøj inden for rækkevidde reagerer samtidigt.</string>
   <string name="hint_match_and_rateme_are_part">Match og RateMe er en del af stashy+.</string>
   <string name="hint_matches_performer_studio_and_tag">Matcher kunstner-, studie- og tagnavne med filstier og føjer dem til scener, billeder og gallerier. Korte navne kan matche ved en fejl.</string>
-  <string name="hint_matches_when_at_least_one">Matcher, når mindst én betingelse nedenfor er opfyldt.</string>
   <string name="hint_mini_player_arg_opens_player">Miniafspiller: %1$s. Åbner afspilleren</string>
   <string name="hint_missing_from_store_offering_arg">Mangler i butikkens udbud: %1$s</string>
   <string name="hint_monthly_yearly_or_lifetime_bought">Månedlig, årlig eller livstid. Har du købt stashy+ før med denne Google-konto eller geninstalleret? Tryk på Gendan køb.</string>
@@ -1363,8 +1355,6 @@
   <string name="hint_this_is_not_stashy_license">Dette er ikke en stashy-licensnøgle.</string>
   <string name="hint_this_is_not_stashy_settings">Dette er ikke en stashy-indstillingsfil.</string>
   <string name="hint_this_is_sample_studio_description">Dette er en eksempelbeskrivelse af et studie, der kan strække sig over flere linjer.</string>
-  <string name="hint_this_level_already_has_group">Dette niveau har allerede en gruppe. Tilføj den næste inde i den.</string>
-  <string name="hint_this_level_or_group_must">Dette niveau eller gruppen skal matche</string>
   <string name="hint_this_license_key_expired_on">Denne licensnøgle udløb den %1$s.</string>
   <string name="hint_this_license_key_is_not">Denne licensnøgle er ikke gyldig.</string>
   <string name="hint_this_scene_language_is_not">Dette scenesprog understøttes ikke af Apples SpeechTranscriber (f.eks. er tjekkisk ikke på listen).</string>
@@ -1698,7 +1688,6 @@
   <string name="no">Nej</string>
   <string name="non_binary">Nonbinær</string>
   <string name="none">Ingen</string>
-  <string name="none_of">Ingen af</string>
   <string name="normal">Normal</string>
   <string name="normalize">Normaliser</string>
   <string name="not_between">Ikke mellem</string>

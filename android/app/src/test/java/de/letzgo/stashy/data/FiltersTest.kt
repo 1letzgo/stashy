@@ -97,12 +97,32 @@ class FiltersTest {
         assertEquals("weight", keys.last())
     }
 
-    @Test fun documentGroupsChangeTypeKeepsContents() {
-        val doc = CriteriaDocument(FilterMode.Scenes, obj("""{"OR":{"organized":true}}"""))
-        doc.changeGroupType(emptyList(), "OR", "NOT")
-        assertNull(doc.objectFilter["OR"])
-        assertEquals(JsonPrimitive(true), doc.node(listOf("NOT"))["organized"])
+    @Test fun serverGroupsLoadAndRemoveWithoutLoss() {
+        // A saved filter with AND / OR / NOT keeps them: shown as groups, sent, removable.
+        val doc = CriteriaDocument(FilterMode.Scenes, obj("""{"organized":true,"NOT":{"tags":{"value":["11"],"modifier":"INCLUDES"}}}"""))
         assertEquals(listOf("NOT"), doc.groupKeys(emptyList()))
+        assertEquals(listOf("tags"), doc.criterionKeys(listOf("NOT")))
+        assertTrue(doc.sanitizedObjectFilter.containsKey("NOT"))
+        doc.removeGroup("NOT", emptyList())
+        assertTrue(doc.groupKeys(emptyList()).isEmpty())
+        assertEquals(JsonPrimitive(true), doc.objectFilter["organized"])
+    }
+
+    @Test fun rootOrIsWrappedForFetchButNotForSave() {
+        // Stash: {a, OR:{b}} = a OR b. Fetches put scope criteria beside the document at the root,
+        // so the document goes in as one AND unit; saving keeps the filter's own shape.
+        val json = """{"play_count":{"value":9,"modifier":"EQUALS"},"OR":{"play_count":{"value":10,"modifier":"EQUALS"}}}"""
+        val doc = CriteriaDocument(FilterMode.Scenes, obj(json))
+        assertEquals(obj(json), doc.sanitizedObjectFilter)
+        assertEquals(obj("""{"AND":$json}"""), doc.fetchFragment)
+        val scope = obj("""{"tags":{"value":["11"],"modifier":"INCLUDES"}}""")
+        val merged = doc.merged(scope)!!
+        assertEquals(setOf("AND", "tags"), merged.keys)
+        val layered = doc.layered(scope)!!
+        assertEquals(setOf("AND", "tags"), layered.keys)
+        // No root OR: unchanged.
+        val plain = CriteriaDocument(FilterMode.Scenes, obj("""{"organized":true,"NOT":{"organized":false}}"""))
+        assertEquals(plain.sanitizedObjectFilter, plain.fetchFragment)
     }
 
     @Test fun mergedForSaveRemovesChipKeysTheUserCleared() {

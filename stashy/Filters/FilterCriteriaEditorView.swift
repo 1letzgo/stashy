@@ -6,7 +6,7 @@ struct FilterCriteriaEditorView: View {
     @ObservedObject var document: FilterCriteriaDocument
     var onChange: () -> Void = {}
     var embedsInCard: Bool = true
-    /// Shown in the header row next to "Add group" (e.g. the filter mode). Root level only.
+    /// Shown in the header row above the conditions (e.g. the filter mode). Root level only.
     var levelTitle: String? = nil
     /// Chain of group keys from the root, e.g. `["OR", "NOT"]`. Empty = top level.
     var path: [String] = []
@@ -71,12 +71,13 @@ struct FilterCriteriaEditorView: View {
         }
     }
 
-    /// Explains what this level does. The old UI showed AND/OR/NOT as if they were fields,
-    /// which hid the fact that criteria on one level are always ANDed.
+    /// Explains what this level does, in Stash's own terms: conditions on one level are always
+    /// ANDed, also inside an `OR` group — `OR` joins the group with the level above, not the
+    /// group's conditions with each other. (The former "Any of" label promised the latter.)
     private var levelExplanation: String {
         switch path.last {
-        case "OR": return tr("hint_matches_when_at_least_one")
-        case "NOT": return tr("hint_excludes_everything_matching_conditions_below")
+        case "OR": return tr("hint_group_or_semantics")
+        case "NOT": return tr("hint_group_not_semantics")
         case "AND": return tr("hint_all_conditions_below_must_be")
         default: return tr("all_conditions_must_be_true")
         }
@@ -170,8 +171,6 @@ struct FilterCriteriaEditorView: View {
 
     private var addBar: some View {
         HStack(spacing: DesignTokens.Spacing.sm) {
-            addGroupMenu
-            Spacer(minLength: 0)
             Menu {
                 ForEach(addableFields) { field in
                     Button {
@@ -204,77 +203,19 @@ struct FilterCriteriaEditorView: View {
         .padding(.vertical, DesignTokens.Spacing.sm + 2)
     }
 
-    /// Stash takes one AND, OR or NOT per level: once this level has one, further groups go
-    /// inside it. A new group is empty and sends nothing until a condition is added to it.
-    private var addGroupMenu: some View {
-        let taken = !document.groupKeys(at: path).isEmpty
-        return Menu {
-            ForEach(FilterCriteriaDocument.groupKeys, id: \.self) { group in
-                Button {
-                    document.addGroup(group, at: path)
-                    HapticManager.selection()
-                } label: {
-                    Text(Self.groupTitle(group))
-                    Text(Self.groupHint(group))
-                }
-            }
-        } label: {
-            HStack(spacing: DesignTokens.Spacing.xs) {
-                Image(systemName: "square.stack.3d.up")
-                    .foregroundColor(taken ? .secondary : appearance.tintColor)
-                Text(tr("action_add_group"))
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundColor(taken ? .secondary : .primary)
-            }
-            .contentShape(Rectangle())
-        }
-        .disabled(taken)
-        .accessibilityHint(taken ? tr("hint_this_level_already_has_group") : "")
-    }
-
-    static func groupHint(_ group: String) -> String {
-        switch group {
-        case "AND": return tr("hint_every_condition_in_it_must")
-        case "OR": return tr("hint_this_level_or_group_must")
-        case "NOT": return tr("hint_leaves_out_what_group_matches")
-        default: return ""
-        }
-    }
-
-    /// One nested AND/OR/NOT group as its own card. Created with "Add group", or written by the
-    /// Stash web UI into a saved filter.
+    /// One nested AND/OR/NOT group of a saved filter as its own card. The editor cannot create
+    /// groups any more ("Add group" mislabelled Stash's semantics and could not express what users
+    /// tried with it), but a filter that has one keeps it: shown, editable inside, removable.
     @ViewBuilder
     private func groupCard(_ group: String) -> some View {
         VStack(alignment: .leading, spacing: DesignTokens.Spacing.xs) {
             HStack(spacing: DesignTokens.Spacing.xs) {
-                Menu {
-                    ForEach(FilterCriteriaDocument.groupKeys, id: \.self) { candidate in
-                        Button {
-                            document.changeGroupType(at: path, from: group, to: candidate)
-                            HapticManager.selection()
-                            applyChange()
-                        } label: {
-                            if candidate == group {
-                                Label(Self.groupTitle(candidate), systemImage: "checkmark")
-                            } else {
-                                Text(Self.groupTitle(candidate))
-                            }
-                        }
-                        // Merging into an existing group of that type would drop criteria.
-                        .disabled(candidate != group && document.groupKeys(at: path).contains(candidate))
-                    }
-                } label: {
-                    HStack(spacing: 4) {
-                        Text(Self.groupTitle(group).uppercased())
-                            .font(.caption.weight(.bold))
-                        Image(systemName: "chevron.up.chevron.down")
-                            .font(.system(size: 9, weight: .bold))
-                    }
+                Text(tr("label_advanced_group_from_server"))
+                    .font(.caption.weight(.bold))
                     .foregroundColor(Color.onAppTint)
                     .padding(.horizontal, 8)
                     .padding(.vertical, 4)
                     .background(Capsule().fill(appearance.tintColor))
-                }
 
                 Spacer(minLength: 0)
 
@@ -288,7 +229,7 @@ struct FilterCriteriaEditorView: View {
                         .foregroundColor(.secondary.opacity(0.55))
                 }
                 .buttonStyle(.plain)
-                .accessibilityLabel(tr("action_remove_arg_group", Self.groupTitle(group)))
+                .accessibilityLabel(tr("action_remove_group"))
             }
             .padding(.horizontal, DesignTokens.Spacing.sm)
             .padding(.top, DesignTokens.Spacing.sm)
@@ -308,15 +249,6 @@ struct FilterCriteriaEditorView: View {
             RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.card)
                 .stroke(appearance.tintColor.opacity(0.35), lineWidth: 1)
         )
-    }
-
-    static func groupTitle(_ group: String) -> String {
-        switch group {
-        case "AND": return tr("all_of")
-        case "OR": return tr("any_of")
-        case "NOT": return tr("none_of")
-        default: return group
-        }
     }
 
     // MARK: - Rows

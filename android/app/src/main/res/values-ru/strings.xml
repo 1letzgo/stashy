@@ -9,7 +9,6 @@
   <string name="action_add_condition">Добавить условие</string>
   <string name="action_add_custom_field">Добавить настраиваемое поле</string>
   <string name="action_add_favorite">Добавить в избранное</string>
-  <string name="action_add_group">Добавить группу</string>
   <string name="action_add_header">Добавить заголовок</string>
   <string name="action_add_marker">Добавить маркер</string>
   <string name="action_add_marker_button">Кнопка «Добавить маркер»</string>
@@ -175,7 +174,6 @@
   <string name="action_remove_all">Удалить все</string>
   <string name="action_remove_all_arg">Удалить все (%1$s)</string>
   <string name="action_remove_arg">Удалить: %1$s</string>
-  <string name="action_remove_arg_group">Удалить группу «%1$s»</string>
   <string name="action_remove_download">Удалить загрузку</string>
   <string name="action_remove_favorite">Удалить из избранного</string>
   <string name="action_remove_field">Удалить поле</string>
@@ -341,7 +339,6 @@
   <string name="all_galleries">Все галереи</string>
   <string name="all_languages">Все языки</string>
   <string name="all_matching_items">Все подходящие объекты</string>
-  <string name="all_of">Все из</string>
   <string name="all_scenes_already_downloaded">Все сцены уже загружены</string>
   <string name="already_up_to_date">Обновлений нет</string>
   <string name="always_visible">Всегда видно</string>
@@ -353,7 +350,6 @@
   <string name="any_age">Любой возраст</string>
   <string name="any_length">Любая длина</string>
   <string name="any_media">Любые медиа</string>
-  <string name="any_of">Любой из</string>
   <string name="any_quality">Любое качество</string>
   <string name="any_value">Любое значение</string>
   <string name="api_key">Ключ API</string>
@@ -1160,8 +1156,6 @@
   <string name="hint_enter_valid_date_as_yyyy">Введите корректную дату в формате ГГГГ-ММ-ДД</string>
   <string name="hint_enter_your_stash_api_key">Введите ключ API Stash напрямую.</string>
   <string name="hint_enter_your_stash_server_details">Для начала введите данные сервера Stash.</string>
-  <string name="hint_every_condition_in_it_must">Должно выполняться каждое условие в ней</string>
-  <string name="hint_excludes_everything_matching_conditions_below">Исключает все, что соответствует условиям ниже.</string>
   <string name="hint_favorites_are_your_most_played">Избранное — ваши самые просматриваемые сцены.</string>
   <string name="hint_favorites_are_your_most_played_scenes">Избранное — ваши самые просматриваемые сцены и сцены с наибольшим счетчиком O.</string>
   <string name="hint_favorites_are_your_scenes_with">Избранное — ваши сцены с наибольшим счетчиком O.</string>
@@ -1197,7 +1191,6 @@
   <string name="hint_keeps_servers_api_keys_and">Синхронизирует серверы, ключи API и настройки на iPhone, iPad и Mac. Включается на каждом устройстве отдельно. Активный сервер каждое устройство выбирает само.</string>
   <string name="hint_language_scenes_subtitles_start_with">Язык, с которого начинаются субтитры сцены. «Любой» — первая обычная дорожка в файле.</string>
   <string name="hint_language_switch">stashy переключится на %1$s и перезагрузится.</string>
-  <string name="hint_leaves_out_what_group_matches">Исключает то, что соответствует группе</string>
   <string name="hint_legend_run_performer_is_no">Исполнителя из забега Legend больше нет в этом пуле. Сбросьте забег.</string>
   <string name="hint_lets_you_create_edit_rename">Позволяет создавать, изменять, переименовывать и удалять фильтры, сохраненные на сервере, в меню «Настройки › Сервер».</string>
   <string name="hint_lgpl_3_0_with_app">LGPL-3.0 с исключением для App Store / DRM</string>
@@ -1217,7 +1210,6 @@
   <string name="hint_love_spouse_2_4g_toys">Игрушки Love Spouse 2.4g используют рекламные пакеты BLE. Убедитесь, что Bluetooth включен, а игрушка находится в режиме сопряжения/поиска. Все игрушки в радиусе действия будут реагировать одновременно.</string>
   <string name="hint_match_and_rateme_are_part">Match и RateMe входят в stashy+.</string>
   <string name="hint_matches_performer_studio_and_tag">Сопоставляет имена исполнителей, студий и тегов с путями файлов и добавляет их к сценам, изображениям и галереям. Короткие имена могут совпасть ошибочно.</string>
-  <string name="hint_matches_when_at_least_one">Совпадает, если выполняется хотя бы одно условие ниже.</string>
   <string name="hint_mini_player_arg_opens_player">Мини-плеер: %1$s. Открывает плеер</string>
   <string name="hint_missing_from_store_offering_arg">Отсутствует в предложении магазина: %1$s</string>
   <string name="hint_monthly_yearly_or_lifetime_bought">Месяц, год или навсегда. Уже покупали stashy+ с этим аккаунтом Google или переустановили приложение? Нажмите «Восстановить покупки».</string>
@@ -1363,8 +1355,6 @@
   <string name="hint_this_is_not_stashy_license">Это не лицензионный ключ stashy.</string>
   <string name="hint_this_is_not_stashy_settings">Это не файл настроек stashy.</string>
   <string name="hint_this_is_sample_studio_description">Это пример описания студии, которое может занимать несколько строк.</string>
-  <string name="hint_this_level_already_has_group">На этом уровне уже есть группа. Добавьте следующую внутрь нее.</string>
-  <string name="hint_this_level_or_group_must">Должен совпадать этот уровень или группа</string>
   <string name="hint_this_license_key_expired_on">Срок действия этого лицензионного ключа истек %1$s.</string>
   <string name="hint_this_license_key_is_not">Этот лицензионный ключ недействителен.</string>
   <string name="hint_this_scene_language_is_not">Язык этой сцены не поддерживается Apple SpeechTranscriber (например, чешского нет в списке).</string>
@@ -1698,7 +1688,6 @@
   <string name="no">Нет</string>
   <string name="non_binary">Небинарный</string>
   <string name="none">Нет</string>
-  <string name="none_of">Ни одно из</string>
   <string name="normal">Обычная</string>
   <string name="normalize">Нормализовать</string>
   <string name="not_between">Не между</string>

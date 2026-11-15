@@ -590,7 +590,7 @@ struct CatalogListQuickBar<Option: CatalogQuickSortable>: View {
             return quick
         }
         if FilterCriteriaDocument.isGroupKey(key) {
-            return FilterCriteriaEditorView.groupTitle(key)
+            return tr("label_advanced_group_from_server")
         }
         guard let field = FilterFieldCatalog.field(key: key, mode: mode) else {
             return key.replacingOccurrences(of: "_", with: " ").capitalized

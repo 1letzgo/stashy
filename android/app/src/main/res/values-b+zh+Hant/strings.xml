@@ -9,7 +9,6 @@
   <string name="action_add_condition">新增條件</string>
   <string name="action_add_custom_field">新增自訂欄位</string>
   <string name="action_add_favorite">加入最愛</string>
-  <string name="action_add_group">新增群組</string>
   <string name="action_add_header">新增標頭</string>
   <string name="action_add_marker">新增標記</string>
   <string name="action_add_marker_button">「新增標記」按鈕</string>
@@ -175,7 +174,6 @@
   <string name="action_remove_all">全部移除</string>
   <string name="action_remove_all_arg">移除全部%1$s</string>
   <string name="action_remove_arg">移除 %1$s</string>
-  <string name="action_remove_arg_group">移除 %1$s 群組</string>
   <string name="action_remove_download">移除下載項目</string>
   <string name="action_remove_favorite">從最愛移除</string>
   <string name="action_remove_field">移除欄位</string>
@@ -341,7 +339,6 @@
   <string name="all_galleries">所有圖庫</string>
   <string name="all_languages">所有語言</string>
   <string name="all_matching_items">所有符合的項目</string>
-  <string name="all_of">全部符合</string>
   <string name="all_scenes_already_downloaded">所有短片皆已下載</string>
   <string name="already_up_to_date">已是最新版本</string>
   <string name="always_visible">永遠顯示</string>
@@ -353,7 +350,6 @@
   <string name="any_age">任何年齡</string>
   <string name="any_length">任何長度</string>
   <string name="any_media">任何媒體</string>
-  <string name="any_of">符合任一</string>
   <string name="any_quality">任何畫質</string>
   <string name="any_value">任何值</string>
   <string name="api_key">API 金鑰</string>
@@ -1160,8 +1156,6 @@
   <string name="hint_enter_valid_date_as_yyyy">請以 YYYY-MM-DD 格式輸入有效日期</string>
   <string name="hint_enter_your_stash_api_key">直接輸入你的 Stash API 金鑰。</string>
   <string name="hint_enter_your_stash_server_details">輸入你的 Stash 伺服器資訊以開始使用。</string>
-  <string name="hint_every_condition_in_it_must">其中每個條件都必須符合</string>
-  <string name="hint_excludes_everything_matching_conditions_below">排除符合下方條件的所有項目。</string>
   <string name="hint_favorites_are_your_most_played">最愛是你播放次數最多的短片。</string>
   <string name="hint_favorites_are_your_most_played_scenes">最愛是你播放次數最多以及 O 計數最高的短片。</string>
   <string name="hint_favorites_are_your_scenes_with">最愛是你 O 計數最高的短片。</string>
@@ -1197,7 +1191,6 @@
   <string name="hint_keeps_servers_api_keys_and">讓 iPhone、iPad 和 Mac 上的伺服器、API 金鑰和設定保持一致。需在每部裝置上個別開啟。使用中的伺服器仍由各裝置自行選擇。</string>
   <string name="hint_language_scenes_subtitles_start_with">短片字幕預設使用的語言。「任意」會採用檔案中的第一個一般字幕軌。</string>
   <string name="hint_language_switch">stashy 將切換為%1$s並重新載入。</string>
-  <string name="hint_leaves_out_what_group_matches">排除該群組符合的項目</string>
   <string name="hint_legend_run_performer_is_no">Legend 回合的演員已不在此參賽名單中。請重置回合。</string>
   <string name="hint_lets_you_create_edit_rename">讓你在「設定 › 伺服器」中建立、編輯、重新命名和刪除伺服器上儲存的篩選條件。</string>
   <string name="hint_lgpl_3_0_with_app">LGPL-3.0，附 App Store／DRM 例外條款</string>
@@ -1217,7 +1210,6 @@
   <string name="hint_love_spouse_2_4g_toys">Love Spouse 2.4g 玩具使用 BLE 廣播。請確定藍牙已開啟，且玩具處於配對／掃描模式。範圍內的所有玩具會同時反應。</string>
   <string name="hint_match_and_rateme_are_part">Match 和 RateMe 是 stashy+ 的一部分。</string>
   <string name="hint_matches_performer_studio_and_tag">將演員、工作室和標籤名稱與檔案路徑比對，並加入短片、圖片和圖庫。較短的名稱可能會誤判。</string>
-  <string name="hint_matches_when_at_least_one">只要符合下方至少一個條件即算相符。</string>
   <string name="hint_mini_player_arg_opens_player">迷你播放器：%1$s。打開播放器</string>
   <string name="hint_missing_from_store_offering_arg">商店方案中缺少：%1$s</string>
   <string name="hint_monthly_yearly_or_lifetime_bought">月訂、年訂或終身版。之前曾以此 Google 帳號購買 stashy+，或重新安裝了 App？請點「恢復購買項目」。</string>
@@ -1363,8 +1355,6 @@
   <string name="hint_this_is_not_stashy_license">這不是 stashy 授權碼。</string>
   <string name="hint_this_is_not_stashy_settings">這不是 stashy 設定檔。</string>
   <string name="hint_this_is_sample_studio_description">這是一段範例工作室描述，可能會跨越多行。</string>
-  <string name="hint_this_level_already_has_group">此層級已有群組。請在其中加入下一個。</string>
-  <string name="hint_this_level_or_group_must">此層級或該群組須符合</string>
   <string name="hint_this_license_key_expired_on">此授權碼已於 %1$s 到期。</string>
   <string name="hint_this_license_key_is_not">此授權碼無效。</string>
   <string name="hint_this_scene_language_is_not">Apple 的 SpeechTranscriber 不支援此短片語言（例如捷克語不在清單中）。</string>
@@ -1698,7 +1688,6 @@
   <string name="no">否</string>
   <string name="non_binary">非二元</string>
   <string name="none">無</string>
-  <string name="none_of">皆不符合</string>
   <string name="normal">正常</string>
   <string name="normalize">正規化</string>
   <string name="not_between">不介於</string>

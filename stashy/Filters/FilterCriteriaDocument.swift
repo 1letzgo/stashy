@@ -111,7 +111,7 @@ final class FilterCriteriaDocument: ObservableObject {
     func setNameSearchPattern(_ pattern: String) {
         guard let key = nameSearchKey else { return }
         // Tags: name or alias, as long as the root `AND` is free (or already the field's).
-        if Self.searchesAliases(mode), aliasSearchPattern != nil || node(at: []).keys.contains("AND") == false {
+        if Self.searchesAliases(mode), aliasSearchPattern != nil || groupKeys(at: []).isEmpty {
             if aliasSearchPattern != nil { removeGroup("AND", at: []) }
             guard !pattern.isEmpty else { return }
             // A plain `name` regex from before the alias search would AND against it.
@@ -415,19 +415,11 @@ final class FilterCriteriaDocument: ObservableObject {
         setCriterion(key: field.key, value: value, at: path)
     }
 
-    /// Creates an empty group. No-op when that group already exists at `path`.
-    func addGroup(_ group: String, at path: [String]) {
-        guard Self.isGroupKey(group), node(at: path)[group] == nil else { return }
-        var root = objectFilter
-        if path.isEmpty {
-            root[group] = [String: Any]()
-        } else {
-            Self.mutate(&root, path: path) { $0[group] = [String: Any]() }
-        }
-        objectFilter = root
-    }
-
     /// Removes a group **and everything inside it**.
+    ///
+    /// The editor no longer creates groups ("Add group" is gone, see `isolatingRootOr`): it only
+    /// shows the ones a saved filter brings along and lets the user remove them. The search
+    /// field's own tag alias group is still written by `setNameSearchPattern`.
     func removeGroup(_ group: String, at path: [String]) {
         var root = objectFilter
         if path.isEmpty {
@@ -438,23 +430,26 @@ final class FilterCriteriaDocument: ObservableObject {
         objectFilter = root
     }
 
-    /// Retypes a group in place (AND ⇄ OR ⇄ NOT), keeping its contents.
-    /// No-op when the target type already exists at that path — merging two groups would
-    /// silently drop criteria.
-    func changeGroupType(at path: [String], from oldGroup: String, to newGroup: String) {
-        guard oldGroup != newGroup, Self.isGroupKey(newGroup) else { return }
-        let parent = node(at: path)
-        guard let contents = Self.stringKeyedDict(parent[oldGroup]), parent[newGroup] == nil else { return }
+    /// Internal: the empty group the search field's alias criteria go into.
+    private func addGroup(_ group: String, at path: [String]) {
+        guard Self.isGroupKey(group), node(at: path)[group] == nil else { return }
         var root = objectFilter
-        let apply: (inout [String: Any]) -> Void = { node in
-            node.removeValue(forKey: oldGroup)
-            node[newGroup] = contents
+        if path.isEmpty {
+            root[group] = [String: Any]()
+        } else {
+            Self.mutate(&root, path: path) { $0[group] = [String: Any]() }
         }
-        if path.isEmpty { apply(&root) } else { Self.mutate(&root, path: path, apply) }
-        // Display order lives under the old path — move it so the group keeps its layout.
-        let oldOrder = keyOrders.removeValue(forKey: Self.orderKey(path + [oldGroup]))
-        keyOrders[Self.orderKey(path + [newGroup])] = oldOrder
         objectFilter = root
+    }
+
+    /// Stash reads a root `OR` as "every other root criterion **or** the group". The app layers
+    /// its own criteria next to the document at the root — the page's studio / tag / performer
+    /// scope, chips, the clip path, the sub-studio switch — so a root `OR` from a saved filter
+    /// would let results through that match none of them (a tag page listing scenes without the
+    /// tag). Wrapped in `AND`, the document stays one unit with its own meaning, ANDed with the rest.
+    nonisolated static func isolatingRootOr(_ dict: [String: Any]) -> [String: Any] {
+        guard dict["OR"] != nil else { return dict }
+        return ["AND": dict]
     }
 
     /// Walks `path`, creating missing levels, and applies `body` to the node it lands on.
@@ -486,7 +481,7 @@ final class FilterCriteriaDocument: ObservableObject {
     /// its own key, so tapping a chip is never silently overruled by a criterion of the same name.
     /// Returns `nil` when nothing is active, matching the `liveFilter:` fetch parameter.
     func merged(with chipFilter: [String: Any]) -> [String: Any]? {
-        var dict = sanitizedObjectFilter
+        var dict = fetchFragment
         for (key, value) in chipFilter {
             dict[key] = value
         }
@@ -500,13 +495,19 @@ final class FilterCriteriaDocument: ObservableObject {
     /// the mirrored one, otherwise clearing it in the sheet would have no effect.
     func layered(over base: [String: Any]) -> [String: Any]? {
         var dict = base
-        for (key, value) in sanitizedObjectFilter {
+        for (key, value) in fetchFragment {
             dict[key] = value
         }
         return dict.isEmpty ? nil : dict
     }
 
     var isEmpty: Bool { sanitizedObjectFilter.isEmpty }
+
+    /// The criteria as a fetch sends them, next to other root criteria (see ``isolatingRootOr(_:)``).
+    /// Saving keeps using ``sanitizedObjectFilter``: the filter's own shape stays untouched.
+    var fetchFragment: [String: Any] {
+        Self.isolatingRootOr(sanitizedObjectFilter)
+    }
 
     func dictValue(forKey key: String) -> [String: Any] {
         Self.stringKeyedDict(objectFilter[key]) ?? [:]

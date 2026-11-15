@@ -9,7 +9,6 @@
   <string name="action_add_condition">条件を追加</string>
   <string name="action_add_custom_field">カスタムフィールドを追加</string>
   <string name="action_add_favorite">お気に入りに追加</string>
-  <string name="action_add_group">グループを追加</string>
   <string name="action_add_header">ヘッダーを追加</string>
   <string name="action_add_marker">マーカーを追加</string>
   <string name="action_add_marker_button">「マーカーを追加」ボタン</string>
@@ -175,7 +174,6 @@
   <string name="action_remove_all">すべて削除</string>
   <string name="action_remove_all_arg">%1$s件をすべて削除</string>
   <string name="action_remove_arg">%1$sを削除</string>
-  <string name="action_remove_arg_group">%1$sグループを削除</string>
   <string name="action_remove_download">ダウンロードを削除</string>
   <string name="action_remove_favorite">お気に入りから削除</string>
   <string name="action_remove_field">フィールドを削除</string>
@@ -341,7 +339,6 @@
   <string name="all_galleries">すべてのギャラリー</string>
   <string name="all_languages">すべての言語</string>
   <string name="all_matching_items">一致するすべての項目</string>
-  <string name="all_of">すべてに一致</string>
   <string name="all_scenes_already_downloaded">すべてのシーンはダウンロード済みです</string>
   <string name="already_up_to_date">すでに最新です</string>
   <string name="always_visible">常に表示</string>
@@ -353,7 +350,6 @@
   <string name="any_age">年齢指定なし</string>
   <string name="any_length">長さ指定なし</string>
   <string name="any_media">すべてのメディア</string>
-  <string name="any_of">いずれかに一致</string>
   <string name="any_quality">画質指定なし</string>
   <string name="any_value">任意の値</string>
   <string name="api_key">APIキー</string>
@@ -1160,8 +1156,6 @@
   <string name="hint_enter_valid_date_as_yyyy">有効な日付をYYYY-MM-DD形式で入力してください</string>
   <string name="hint_enter_your_stash_api_key">StashのAPIキーを直接入力してください。</string>
   <string name="hint_enter_your_stash_server_details">始めるには、Stashサーバーの情報を入力してください。</string>
-  <string name="hint_every_condition_in_it_must">含まれるすべての条件に一致する必要があります</string>
-  <string name="hint_excludes_everything_matching_conditions_below">以下の条件に一致するものをすべて除外します。</string>
   <string name="hint_favorites_are_your_most_played">お気に入りは、最も再生回数の多いシーンです。</string>
   <string name="hint_favorites_are_your_most_played_scenes">お気に入りは、最も再生回数の多いシーンとOカウントが最も高いシーンです。</string>
   <string name="hint_favorites_are_your_scenes_with">お気に入りは、Oカウントが最も高いシーンです。</string>
@@ -1197,7 +1191,6 @@
   <string name="hint_keeps_servers_api_keys_and">サーバー、APIキー、設定をiPhone、iPad、Macで同じに保ちます。デバイスごとにオンにしてください。使用中のサーバーは各デバイスで個別に選択されます。</string>
   <string name="hint_language_scenes_subtitles_start_with">シーンの字幕の初期言語です。「指定なし」ではファイル内の最初の通常トラックを使用します。</string>
   <string name="hint_language_switch">stashyを%1$sに切り替えて再読み込みします。</string>
-  <string name="hint_leaves_out_what_group_matches">グループに一致するものを除外</string>
   <string name="hint_legend_run_performer_is_no">Legendランの出演者がこのプールに存在しません。ランをリセットしてください。</string>
   <string name="hint_lets_you_create_edit_rename">サーバーに保存されたフィルターを作成、編集、名前変更、削除できます。設定 › サーバーから利用できます。</string>
   <string name="hint_lgpl_3_0_with_app">LGPL-3.0（App Store / DRM例外付き）</string>
@@ -1217,7 +1210,6 @@
   <string name="hint_love_spouse_2_4g_toys">Love Spouse 2.4gトイはBLEアドバタイズを使用します。Bluetoothがオンで、トイがペアリング/スキャンモードになっていることを確認してください。範囲内のすべてのトイが同時に反応します。</string>
   <string name="hint_match_and_rateme_are_part">MatchとRateMeはstashy+の機能です。</string>
   <string name="hint_matches_performer_studio_and_tag">出演者、スタジオ、タグの名前をファイルパスと照合し、シーン、画像、ギャラリーに追加します。短い名前は誤って一致することがあります。</string>
-  <string name="hint_matches_when_at_least_one">下の条件のうち少なくとも1つが真の場合に一致します。</string>
   <string name="hint_mini_player_arg_opens_player">ミニプレーヤー：%1$s。プレーヤーを開きます</string>
   <string name="hint_missing_from_store_offering_arg">ストアのオファリングにありません：%1$s</string>
   <string name="hint_monthly_yearly_or_lifetime_bought">月額、年額、または買い切り。このGoogleアカウントで以前stashy+を購入した場合や再インストールした場合は、「購入を復元」をタップしてください。</string>
@@ -1363,8 +1355,6 @@
   <string name="hint_this_is_not_stashy_license">stashyのライセンスキーではありません。</string>
   <string name="hint_this_is_not_stashy_settings">stashyの設定ファイルではありません。</string>
   <string name="hint_this_is_sample_studio_description">これは複数行にわたる可能性のあるスタジオ説明のサンプルです。</string>
-  <string name="hint_this_level_already_has_group">この階層にはすでにグループがあります。次のグループはその中に追加してください。</string>
-  <string name="hint_this_level_or_group_must">この階層またはグループのいずれかに一致</string>
   <string name="hint_this_license_key_expired_on">このライセンスキーは%1$sに期限切れになりました。</string>
   <string name="hint_this_license_key_is_not">このライセンスキーは無効です。</string>
   <string name="hint_this_scene_language_is_not">このシーンの言語はAppleのSpeechTranscriberでサポートされていません（例：チェコ語はリストにありません）。</string>
@@ -1698,7 +1688,6 @@
   <string name="no">いいえ</string>
   <string name="non_binary">ノンバイナリー</string>
   <string name="none">なし</string>
-  <string name="none_of">いずれにも該当しない</string>
   <string name="normal">標準</string>
   <string name="normalize">正規化</string>
   <string name="not_between">範囲外</string>

@@ -280,7 +280,7 @@ object QuickFilterCatalog {
      */
     fun chipLabel(key: String, value: JsonElement, mode: FilterMode, names: Map<String, String>): String {
         activeLabel(key, value, mode)?.let { return it }
-        if (CriteriaDocument.isGroupKey(key)) return when (key) { "AND" -> tr(R.string.all_of); "OR" -> tr(R.string.any_of); else -> tr(R.string.none_of) }
+        if (CriteriaDocument.isGroupKey(key)) return tr(R.string.label_advanced_group_from_server)
         val field = FilterFieldCatalog.field(key, mode) ?: return capitalizeWords(key.replace("_", " "))
         val dict = value as? JsonObject
         if ((field.kind == CriterionKind.hierarchicalMulti || field.kind == CriterionKind.multi) && dict != null) {

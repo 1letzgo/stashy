@@ -414,7 +414,9 @@ object FeedsModel {
         // iOS `fetchBaseFilter`: once the editor holds the filter's criteria, only they are sent.
         val base = if (advanced[m] != null) null else filters[m]
         // Verticals always sends portrait on top of whatever filter / criteria it has.
-        val adv = if (m == ReelsModeType.Verticals) JsonObject((advanced[m] ?: JsonObject(emptyMap())) + VERTICALS_PRESET) else advanced[m]
+        // A root OR of the criteria must not be ORed with the handover scope or the presets beside it.
+        val own = advanced[m]?.let(de.letzgo.stashy.data.CriteriaDocument::isolatingRootOr)
+        val adv = if (m == ReelsModeType.Verticals) JsonObject((own ?: JsonObject(emptyMap())) + VERTICALS_PRESET) else own
         val vars = FeedsQuery.variables(kind(m), page, per, sort(m), seed(m), base, adv, criteria)
         return when (m) {
             ReelsModeType.Scenes, ReelsModeType.Verticals -> FeedsRepository.feedScenes(vars).let { p -> p.items.map { FeedItem.SceneItem(it) } to (p.items.size == per) }

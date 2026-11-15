@@ -4623,6 +4623,8 @@ class StashDBViewModel: ObservableObject {
             } else if let obj = saved.object_filter, let d = obj.value as? [String: Any] {
                 merged = sanitizeFilter(d)
             }
+            // A root OR would be ORed with the page scope set next to it.
+            merged = FilterCriteriaDocument.isolatingRootOr(merged)
         }
         for (k, v) in scope {
             merged[k] = v
