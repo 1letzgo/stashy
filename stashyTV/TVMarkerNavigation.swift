@@ -4,8 +4,7 @@
 //
 //  Where a marker list starts and where Previous / Next Marker go. Shared by the player's
 //  marker row, its marker rail and the scene page's marker section, so all three agree.
-//  Previous allows more slack than the phone player (3 s instead of 1 s): on the TV the press
-//  comes later after a jump, and the playhead lags behind a seek.
+//  Android: `TvMarkerNav` in TvLogic.kt (same rules, unit-tested there).
 //
 
 import Foundation
@@ -19,24 +18,45 @@ enum TVMarkerNavigation {
         return starts.lastIndex { $0 <= time } ?? 0
     }
 
-    /// Within the first seconds of a marker Previous goes to the marker before it (so repeated
-    /// presses walk back); later it restarts the current marker.
+    /// The marker last jumped to (Previous / Next or a pick in the rail). Cleared by the player
+    /// on any manual seek.
+    struct Jump: Equatable {
+        let index: Int
+        let at: Date
+    }
+
+    /// Previous / Next as marker indexes. The row's labels and its actions both read this one
+    /// result, so they can never disagree.
+    struct Targets: Equatable {
+        let previous: Int?
+        let next: Int?
+    }
+
+    /// While the seek is in flight the engine still reports the old position.
+    static let seekInFlightSeconds: Double = 3
+    /// How far past the jumped-to marker's start the playhead may be and still count as "just
+    /// landed there": covers a keyframe landing several seconds late plus a few seconds of
+    /// watching. A keyframe may also land up to `earlyLandingSeconds` before the start.
+    static let landedWindowSeconds: Double = 15
+    static let earlyLandingSeconds: Double = 5
+    /// Without a fresh jump: within this many seconds after a marker's start Previous goes to
+    /// the marker before it, later it restarts the current one.
     static let previousRestartSlack: Double = 3
 
-    static func previous(starts: [Double], from time: Double) -> Double? {
-        starts.last { $0 < time - previousRestartSlack }
-    }
-
-    /// The time Previous / Next decide from. Right after a jump the engine still reports the
-    /// old position (or a keyframe before the target), so until it has landed at or just after
-    /// the target, the target counts. `jump` = target and time of the last marker jump.
-    static func referenceTime(playhead: Double, jump: (target: Double, at: Date)?, now: Date = Date()) -> Double {
-        guard let jump, now.timeIntervalSince(jump.at) < 8 else { return playhead }
-        let landed = playhead >= jump.target - 0.5 && playhead <= jump.target + 8
-        return landed ? playhead : jump.target
-    }
-
-    static func next(starts: [Double], from time: Double) -> Double? {
-        starts.first { $0 > time + 0.5 }
+    static func targets(starts: [Double], playhead: Double, jump: Jump?, now: Date = Date()) -> Targets {
+        if let jump, starts.indices.contains(jump.index) {
+            let start = starts[jump.index]
+            // The window ends early at the next marker: past it the user has watched into it.
+            let nextStart = jump.index + 1 < starts.count ? starts[jump.index + 1] : .greatestFiniteMagnitude
+            let windowEnd = min(start + landedWindowSeconds, nextStart)
+            let inFlight = now.timeIntervalSince(jump.at) < seekInFlightSeconds
+            let nearJumpedMarker = playhead >= start - earlyLandingSeconds && playhead < windowEnd
+            if inFlight || nearJumpedMarker {
+                return Targets(previous: jump.index > 0 ? jump.index - 1 : nil,
+                               next: jump.index + 1 < starts.count ? jump.index + 1 : nil)
+            }
+        }
+        return Targets(previous: starts.lastIndex { $0 < playhead - previousRestartSlack },
+                       next: starts.firstIndex { $0 > playhead + 0.5 })
     }
 }

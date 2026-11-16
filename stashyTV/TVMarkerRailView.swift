@@ -20,6 +20,7 @@ struct TVMarkerRailView: View {
 
     /// Injected by `TVAetherPlayerView`'s panel so a pick can dismiss it.
     @Environment(\.tvPlayerClosePanel) private var closePanel
+    @Environment(\.tvPlayerMarkerPicked) private var markerPicked
 
     private static let cardWidth: CGFloat = 300
     private static let cardHeight: CGFloat = 169   // 16:9
@@ -95,6 +96,7 @@ struct TVMarkerRailView: View {
         VStack(alignment: .leading, spacing: 10) {
             Button {
                 onSelect(marker)
+                markerPicked(marker.seconds)
                 closePanel()
             } label: {
                 ZStack(alignment: .bottomTrailing) {
