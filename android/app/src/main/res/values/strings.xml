@@ -86,6 +86,7 @@
     <string name="action_edit_configuration">Edit Configuration</string>
     <string name="action_edit_filter">Edit Filter</string>
     <string name="action_edit_galleries">Edit Galleries</string>
+    <string name="action_edit_scenes">Edit Scenes</string>
     <string name="action_edit_gallery">Edit Gallery</string>
     <string name="action_edit_group">Edit Group</string>
     <string name="action_edit_groups">Edit Groups</string>
@@ -642,6 +643,7 @@
     <string name="empty_matches">No matches</string>
     <string name="empty_matching_activity_for_selected_filters">No matching activity for the selected filters.</string>
     <string name="empty_matching_galleries">No matching galleries</string>
+    <string name="empty_matching_scenes">No matching scenes</string>
     <string name="empty_matching_performer_galleries">No matching performer galleries</string>
     <string name="empty_metadata_assigned">No metadata assigned</string>
     <string name="empty_no_ignored_tags">No ignored tags</string>
@@ -793,6 +795,7 @@
     <string name="error_update_check">Update check failed.</string>
     <string name="error_update_favorite">Failed to update favorite</string>
     <string name="error_update_galleries">Failed to update galleries</string>
+    <string name="error_update_scenes">Failed to update scenes</string>
     <string name="error_update_gallery">Failed to update gallery</string>
     <string name="error_update_gallery_cover">Failed to update gallery cover</string>
     <string name="error_update_group">Failed to update group</string>
@@ -1794,6 +1797,7 @@
     <string name="search_galleries">Search Galleries</string>
     <string name="search_groups">Search Groups</string>
     <string name="search_performers">Search Performers</string>
+    <string name="search_scenes">Search Scenes</string>
     <string name="search_studio">Search Studio</string>
     <string name="search_tags">Search Tags</string>
     <string name="search_to_find_arg">Search to find %1$s.</string>

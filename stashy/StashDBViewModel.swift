@@ -9009,6 +9009,29 @@ struct GenerateData: Codable {
         }
     }
 
+    /// Writes the scenes of a gallery (`scene_ids`). On success the gallery page and every open
+    /// scene page whose link changed reload (`GallerySceneLinksChanged`: `galleryId`, `sceneIds`).
+    func updateGalleryScenes(galleryId: String, sceneIds: [String], previousSceneIds: [String], completion: @escaping (Bool) -> Void) {
+        let variables: [String: Any] = ["input": ["id": galleryId, "scene_ids": sceneIds]]
+        guard let bodyData = try? JSONSerialization.data(withJSONObject: ["query": GraphQLQueries.galleryUpdatePerformersMutation, "variables": variables]),
+              let bodyString = String(data: bodyData, encoding: .utf8) else {
+            completion(false); return
+        }
+        let changed = Array(Set(sceneIds).symmetricDifference(previousSceneIds))
+        performGraphQLQuery(query: bodyString) { (response: GalleryUpdateResponse?) in
+            let ok = response?.data?.galleryUpdate != nil
+            if ok {
+                Self.postEntityUpdated("GalleryUpdated", key: "galleryId", id: galleryId)
+                DispatchQueue.main.async {
+                    NotificationCenter.default.post(
+                        name: NSNotification.Name("GallerySceneLinksChanged"), object: nil,
+                        userInfo: ["galleryId": galleryId, "sceneIds": changed])
+                }
+            }
+            completion(ok)
+        }
+    }
+
     /// Updates gallery metadata shown on the opened-gallery screen (edit mode).
     func updateGalleryDetails(
         galleryId: String,

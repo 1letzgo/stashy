@@ -20,6 +20,8 @@ sealed class LibraryEvent {
     /** A group got or lost containing groups: the Groups list and open group pages reload (iOS `GroupHierarchyChanged`). */
     data class GroupHierarchyChanged(val id: String) : LibraryEvent()
     data class GalleryPatched(val id: String, val patch: (Gallery) -> Gallery) : LibraryEvent()
+    /** A gallery's scenes were edited (iOS `GallerySceneLinksChanged`): the gallery page and the pages of [sceneIds] (added or removed) reload. */
+    data class GallerySceneLinksChanged(val galleryId: String, val sceneIds: Set<String>) : LibraryEvent()
     data class PerformerDeleted(val id: String) : LibraryEvent()
     data class StudioDeleted(val id: String) : LibraryEvent()
     data class GalleryDeleted(val id: String) : LibraryEvent()

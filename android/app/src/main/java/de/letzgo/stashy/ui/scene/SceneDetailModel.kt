@@ -264,8 +264,15 @@ class SceneDetailModel(
         event.applyTo(scene)?.let { scene = it }
     }
 
-    /** iOS `SceneMarkerDeleted`: a deleted marker leaves the strip and the time bar without a reload. */
+    /**
+     * iOS `SceneMarkerDeleted`: a deleted marker leaves the strip and the time bar without a reload.
+     * iOS `GallerySceneLinksChanged`: Edit Gallery added or removed this scene, so its Galleries card reloads.
+     */
     fun applyLibraryEvent(event: de.letzgo.stashy.data.LibraryEvent) {
+        if (event is de.letzgo.stashy.data.LibraryEvent.GallerySceneLinksChanged) {
+            if (scene.id in event.sceneIds) refreshDetails()
+            return
+        }
         if (event !is de.letzgo.stashy.data.LibraryEvent.SceneMarkerDeleted) return
         val markers = scene.sceneMarkers ?: return
         if (markers.any { it.id == event.id }) scene = scene.copy(sceneMarkers = markers.filter { it.id != event.id })

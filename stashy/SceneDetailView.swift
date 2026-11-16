@@ -487,6 +487,12 @@ struct SceneDetailView: View {
                       markers.contains(where: { $0.id == markerId }) else { return }
                 activeScene = activeScene.withSceneMarkers(markers.filter { $0.id != markerId })
             }
+            // Scenes of a gallery edited (Edit Gallery › Scenes): this scene was added or removed,
+            // so its Galleries card reloads.
+            .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("GallerySceneLinksChanged"))) { note in
+                guard !playerOnly, let ids = note.userInfo?["sceneIds"] as? [String], ids.contains(activeScene.id) else { return }
+                refreshSceneDetails()
+            }
             // Deleted elsewhere (from its page opened out of Now Playing, Feeds, …): this copy of
             // the page has nothing left to show. The page that deleted it closes itself.
             .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("SceneDeleted"))) { note in
