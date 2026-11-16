@@ -450,33 +450,22 @@ struct TVDetailHeader<Accessory: View, Actions: View>: View {
 
             accessory()
 
-            // Scrolls inside the text column instead of running into the backdrop; focus
-            // moves it. The bleed gives the lift and shadow room inside its clip.
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: TVDetailMetrics.rowGap) {
-                    actions()
-                    if showsDetailsButton {
-                        // Icon only: the row stays short enough for the column on every page.
-                        Button {
-                            showingDetails = true
-                        } label: {
-                            Image(systemName: "info.circle")
-                                .font(.headline)
-                                .padding(.horizontal, 24)
-                                .padding(.vertical, 8)
-                        }
-                        .accessibilityLabel(tr("details"))
+            // Scrolls inside the text column instead of running into the backdrop.
+            TVDetailScrollingRow {
+                actions()
+                if showsDetailsButton {
+                    // Icon only: the row stays short enough for the column on every page.
+                    Button {
+                        showingDetails = true
+                    } label: {
+                        Image(systemName: "info.circle")
+                            .font(.headline)
+                            .padding(.horizontal, 24)
+                            .padding(.vertical, 8)
                     }
+                    .accessibilityLabel(tr("details"))
                 }
-                // The catalog's control style for every button, growing from its leading
-                // edge: the first one stays on the text edge when focused.
-                .buttonStyle(TVDetailMetrics.controlStyle)
-                .padding(TVDetailMetrics.focusBleed)
             }
-            .padding(-TVDetailMetrics.focusBleed)
-            // Own section across the full width: Up from the grid and Down from the
-            // accessory row reach it from any column.
-            .tvFocusRow()
 
             if isLoading {
                 ProgressView()
@@ -636,6 +625,67 @@ struct TVDetailHeader<Accessory: View, Actions: View>: View {
             .focusable(false)
             .accessibilityHidden(true)
         }
+    }
+}
+
+// MARK: - Scrolling control row
+
+/// A header row of controls (the buttons, a performer's tag chips) that scrolls inside the
+/// text column. Focus scrolls it to a control past the column end; when focus leaves the
+/// row it scrolls back to its start (animated), so the row never stays shifted left of the
+/// text edge under a card or a dialog. The scroll view is clipped to its frame, which is
+/// the column plus the focus bleed on each side; content scrolled past either end fades out
+/// over that bleed instead of drawing beyond it. A full-width focus section: Up from the
+/// grid and Down from the row above reach it from any column.
+struct TVDetailScrollingRow<Content: View>: View {
+    @ViewBuilder let content: () -> Content
+
+    /// Whether a control of the row has focus, as last reported by the controls.
+    @State private var rowHasFocus = false
+
+    private static var startID: String { "TVDetailScrollingRow.start" }
+
+    var body: some View {
+        let bleed = TVDetailMetrics.focusBleed
+        ScrollViewReader { proxy in
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: TVDetailMetrics.rowGap) {
+                    content()
+                }
+                // The catalog's control style for every control, growing from its leading
+                // edge: the first one stays on the text edge when focused.
+                .buttonStyle(TVDetailMetrics.controlStyle)
+                // Room for the focus lift and shadow inside the clip; the negative padding
+                // below keeps the row on the text edge and the row gap.
+                .padding(bleed)
+                .id(Self.startID)
+            }
+            .onPreferenceChange(TVChromeFocusPreference.self) { hasFocus in
+                rowHasFocus = hasFocus
+                guard !hasFocus else { return }
+                // A moment later and only if focus is still outside: moving between two
+                // controls of the row can pass through an update with neither focused, and
+                // scrolling then would fight the focus engine's own scroll.
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
+                    guard !rowHasFocus else { return }
+                    withAnimation(.easeOut(duration: 0.25)) {
+                        proxy.scrollTo(Self.startID, anchor: .leading)
+                    }
+                }
+            }
+        }
+        .mask {
+            HStack(spacing: 0) {
+                LinearGradient(colors: [.clear, .black], startPoint: .leading, endPoint: .trailing)
+                    .frame(width: bleed)
+                Color.black
+                LinearGradient(colors: [.black, .clear], startPoint: .leading, endPoint: .trailing)
+                    .frame(width: bleed)
+            }
+        }
+        .clipped()
+        .padding(-bleed)
+        .tvFocusRow()
     }
 }
 

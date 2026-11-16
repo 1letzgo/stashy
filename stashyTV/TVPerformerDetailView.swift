@@ -294,23 +294,16 @@ struct TVPerformerTagChips: View {
 
     var body: some View {
         if !tags.isEmpty {
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: TVDetailMetrics.rowGap) {
-                    ForEach(tags) { tag in
-                        Button {
-                            path?.wrappedValue.append(TVTagLink(id: tag.id, name: tag.name))
-                        } label: {
-                            TVChromeButtonLabel(text: tag.name)
-                        }
+            // Scrolls back to the first chip when focus leaves the row.
+            TVDetailScrollingRow {
+                ForEach(tags) { tag in
+                    Button {
+                        path?.wrappedValue.append(TVTagLink(id: tag.id, name: tag.name))
+                    } label: {
+                        TVChromeButtonLabel(text: tag.name)
                     }
                 }
-                .buttonStyle(TVDetailMetrics.controlStyle)
-                // Room for the focus lift and shadow inside the scroll view's clip; the
-                // negative padding below keeps the row on the text edge and the row gap.
-                .padding(TVDetailMetrics.focusBleed)
             }
-            .padding(-TVDetailMetrics.focusBleed)
-            .tvFocusRow()
         }
     }
 }
