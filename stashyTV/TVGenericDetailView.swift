@@ -281,22 +281,22 @@ struct TVGenericDetailView<Item: TVDetailItem, Accessory: View>: View {
 /// - top inset 30 below the safe area (60): the title sits where the catalog pages put
 ///   their control row (`STVHeaderView`, vertical padding 30)
 /// - 24 between every header row: title, accessory, buttons, facts, description
-///   (`DesignTokens.Spacing.xl`, the catalog header's spacing between its controls)
+///   (the catalog header's `STVHeaderView` spacing between its controls)
 /// - 50 from the header to the first section (`TVDashboardView`, spacing between rows)
 /// - 18 from a section title to its cards (Home row title to cards)
 /// - 40 between two facts (`TVGridSpec.scenes.spacing`), 4 between a fact's label and
-///   value (`DesignTokens.Spacing.xxs`)
+///   value
 /// - buttons and tag chips: one size, `TVChromeButtonLabel` (headline, 24 × 8 padding) in
 ///   `TVChromeButtonStyle` scaled from the leading edge, so the row starts on the text edge
 ///   (80) focused or not
 /// - leading and trailing edge: the safe area (80), the same as every grid
 enum TVDetailMetrics {
     static let topInset: CGFloat = 30
-    static let rowGap: CGFloat = DesignTokens.Spacing.xl
+    static let rowGap: CGFloat = 24
     static let sectionGap: CGFloat = 50
     static let sectionTitleGap: CGFloat = 18
     static let factGap: CGFloat = 40
-    static let factLabelGap: CGFloat = DesignTokens.Spacing.xxs
+    static let factLabelGap: CGFloat = 4
     /// Room around a scrolling chip row for the focus lift and shadow; taken back with a
     /// negative padding so the row stays on the scale above.
     static let focusBleed: CGFloat = 24
@@ -420,7 +420,7 @@ struct TVDetailHeader<Accessory: View, Actions: View>: View {
 
             accessory()
 
-            HStack(spacing: DesignTokens.Spacing.xl) {
+            HStack(spacing: TVDetailMetrics.rowGap) {
                 actions()
                 if showsDetailsButton {
                     Button {

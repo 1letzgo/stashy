@@ -250,7 +250,7 @@ struct TVPerformerTagChips: View {
     var body: some View {
         if !tags.isEmpty {
             ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: DesignTokens.Spacing.xl) {
+                HStack(spacing: TVDetailMetrics.rowGap) {
                     ForEach(tags) { tag in
                         Button {
                             path?.wrappedValue.append(TVTagLink(id: tag.id, name: tag.name))
