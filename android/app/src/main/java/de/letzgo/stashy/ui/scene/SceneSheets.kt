@@ -562,6 +562,85 @@ fun EditGalleriesSheet(scene: Scene, onDismiss: () -> Unit, onSaved: (List<Scene
 }
 
 /**
+ * iOS: `AddSceneToGallerySheet` — the scenes of a gallery (`galleryUpdate(scene_ids:)`), the
+ * reverse of a scene's "Edit Galleries". Picked scenes are listed first ("Selected"); typing
+ * searches the server (title, path, studio code), otherwise the recently added scenes are offered.
+ */
+@Composable
+fun EditGalleryScenesSheet(galleryId: String, current: List<Scene>, onDismiss: () -> Unit, onSaved: (List<Scene>) -> Unit) {
+    val p = Theme.palette
+    val scope = rememberCoroutineScope()
+    val limit = 30
+    val selected = remember { mutableStateListOf<Scene>().apply { addAll(current) } }
+    var results by remember { mutableStateOf<List<Scene>>(emptyList()) }
+    var loading by remember { mutableStateOf(true) }
+    var search by remember { mutableStateOf("") }
+    var saving by remember { mutableStateOf(false) }
+    val query = search.trim()
+    LaunchedEffect(query) {
+        // Debounce: one request per pause in typing.
+        if (query.isNotEmpty()) kotlinx.coroutines.delay(300)
+        loading = true
+        results = runCatching {
+            if (query.isEmpty()) de.letzgo.stashy.data.ScenesRepository.find(de.letzgo.stashy.data.FindFilter(1, limit, "created_at", "DESC")).items
+            else de.letzgo.stashy.data.UniversalSearchRepository.scenes(query, limit)
+        }.getOrDefault(emptyList())
+        loading = false
+    }
+    val selectedIds = selected.map { it.id }.toSet()
+
+    @Composable
+    fun row(scene: Scene, divider: Boolean) {
+        val isSelected = scene.id in selectedIds
+        if (divider) NativeDivider()
+        FormRow({ if (isSelected) selected.removeAll { it.id == scene.id } else selected.add(scene) }) {
+            Box(Modifier.width(80.dp).height(45.dp).clip(RoundedCornerShape(6.dp)).background(Appearance.tint.copy(alpha = 0.12f)), contentAlignment = Alignment.Center) {
+                Icon(PlayerIcons.film, null, tint = Appearance.tint.copy(alpha = 0.5f), modifier = Modifier.size(18.dp))
+                scene.thumbnailURL?.let { AsyncImage(it, null, Modifier.width(80.dp).height(45.dp), contentScale = ContentScale.Crop) }
+            }
+            Column(Modifier.weight(1f).padding(horizontal = 12.dp)) {
+                Text(scene.displayTitle, color = p.text, maxLines = 2)
+                listOfNotNull(scene.studio?.name, scene.date).filter { it.isNotBlank() }.joinToString(" · ").takeIf { it.isNotEmpty() }?.let {
+                    Text(it, style = NativeType.bodyMedium, color = p.secondaryText, maxLines = 1)
+                }
+            }
+            Icon(if (isSelected) PlayerIcons.checkCircle else PlayerIcons.circle, null, tint = if (isSelected) Appearance.tint else p.secondaryText)
+        }
+    }
+
+    SceneModalSheet(tr(R.string.action_edit_scenes), onDismiss, actionTitle = tr(R.string.action_save), actionEnabled = !saving, actionBusy = saving, onAction = {
+        saving = true
+        val picked = selected.toList()
+        scope.launch {
+            if (runCatching { de.letzgo.stashy.data.DetailRepository.updateGalleryScenes(galleryId, picked.map { it.id }, current.map { it.id }) }.isSuccess) {
+                onSaved(picked); onDismiss()
+            } else { saving = false; SceneToast.show(tr(R.string.error_update_scenes), PlayerIcons.close, SceneToast.Style.Error) }
+        }
+    }) {
+        Column(Modifier.verticalScroll(rememberScrollState())) {
+            NativeSearchField(search, { search = it }, tr(R.string.search_scenes), Modifier.padding(top = 8.dp))
+            if (selected.isNotEmpty()) FormSection(tr(R.string.selected)) {
+                selected.toList().forEachIndexed { i, scene -> row(scene, i > 0) }
+            }
+            FormSection(if (query.isEmpty()) tr(R.string.recently_added) else tr(R.string.scenes)) {
+                val shown = results.filter { it.id !in selectedIds }
+                when {
+                    loading && results.isEmpty() -> LoadingRow()
+                    shown.isEmpty() -> Text(tr(R.string.empty_matching_scenes), Modifier.padding(16.dp), style = NativeType.bodyMedium, color = p.secondaryText)
+                    else -> {
+                        shown.forEachIndexed { i, scene -> row(scene, i > 0) }
+                        if (results.size >= limit) Text(
+                            tr(if (query.isEmpty()) R.string.type_to_search_menu else R.string.type_more_to_refine_menu),
+                            Modifier.padding(16.dp), style = NativeType.bodyMedium, color = p.secondaryText,
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+/**
  * iOS: `AddMarkerSheet` — start time, optional end time (seconds or MM:SS, quick picks
  * +30/+60/+90 s), primary tag (scene tags first, 20 shown). The marker is named after its tag.
  * After creating: refresh, then generate marker previews and screenshots (refresh again when done).

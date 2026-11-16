@@ -45,7 +45,7 @@ protocol SceneRepositoryProtocol {
     ) async throws -> (scenes: [Scene], total: Int)
     
     /// Fetches the scenes linked to a gallery
-    func fetchGalleryScenes(galleryId: String) async throws -> [Scene]
+    func fetchGalleryScenes(galleryId: String, perPage: Int) async throws -> [Scene]
 
     /// Fetches a single scene by ID
     func fetchSceneDetails(sceneId: String) async throws -> Scene?
@@ -209,11 +209,12 @@ class SceneRepository: SceneRepositoryProtocol {
     
     // MARK: - Fetch Gallery Scenes
 
-    func fetchGalleryScenes(galleryId: String) async throws -> [Scene] {
+    /// `perPage: -1` = every linked scene (the Edit Gallery sheet writes the whole list back).
+    func fetchGalleryScenes(galleryId: String, perPage: Int = 40) async throws -> [Scene] {
         let query = GraphQLQueries.queryWithFragments("findScenes")
 
         let variables: [String: Any] = [
-            "filter": ["page": 1, "per_page": 40, "sort": "date", "direction": "DESC"],
+            "filter": ["page": 1, "per_page": perPage, "sort": "date", "direction": "DESC"],
             "scene_filter": [
                 "galleries": ["value": [galleryId], "modifier": "INCLUDES"]
             ]

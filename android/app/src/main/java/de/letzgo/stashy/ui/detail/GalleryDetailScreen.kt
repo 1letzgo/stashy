@@ -49,6 +49,7 @@ import de.letzgo.stashy.ui.Theme
 import de.letzgo.stashy.ui.scene.EditPerformersSheet
 import de.letzgo.stashy.ui.scene.EditStudioSheet
 import de.letzgo.stashy.ui.scene.EditTagsSheet
+import de.letzgo.stashy.ui.scene.EditGalleryScenesSheet
 import de.letzgo.stashy.data.IdName
 import de.letzgo.stashy.data.TagCountContext
 import de.letzgo.stashy.ui.NativeGroup
@@ -129,6 +130,10 @@ class GalleryDetailScreen(
         scope.launch {
             de.letzgo.stashy.data.LibraryEvents.events.collect { event ->
                 if (event is de.letzgo.stashy.data.LibraryEvent.GalleryPatched && event.id == galleryId) gallery = gallery?.let(event.patch)
+                // Scenes picked in Edit Gallery: the Metadata card shows them at once.
+                if (event is de.letzgo.stashy.data.LibraryEvent.GallerySceneLinksChanged && event.galleryId == galleryId) {
+                    scope.launch { linkedScenes = runCatching { DetailRepository.galleryScenes(galleryId) }.getOrDefault(linkedScenes) }
+                }
             }
         }
         scope.launch { linkedScenes = runCatching { DetailRepository.galleryScenes(galleryId) }.getOrDefault(emptyList()) }
@@ -299,6 +304,15 @@ internal fun EditGallerySheet(gallery: Gallery, onDismiss: () -> Unit, onSaved: 
     var pickingStudio by remember { mutableStateOf(false) }
     var pickingPerformers by remember { mutableStateOf(false) }
     var pickingTags by remember { mutableStateOf(false) }
+    var pickingScenes by remember { mutableStateOf(false) }
+    /** The gallery's scenes; null while loading (saving before would drop unseen ones), hidden when the fetch failed. */
+    var scenes by remember(gallery.id) { mutableStateOf<List<Scene>?>(null) }
+    var scenesUnavailable by remember(gallery.id) { mutableStateOf(false) }
+    LaunchedEffect(gallery.id) {
+        runCatching { DetailRepository.galleryScenes(gallery.id, perPage = -1) }
+            .onSuccess { scenes = it }
+            .onFailure { scenesUnavailable = true }
+    }
     val sections = remember(gallery.id) {
         listOf(
             EditSection(tr(R.string.identity), listOf(
@@ -323,6 +337,9 @@ internal fun EditGallerySheet(gallery: Gallery, onDismiss: () -> Unit, onSaved: 
             tags.map { it.id }.toSet(), { DetailRepository.updateGalleryTags(gallery.id, it) },
             { pickingTags = false }, TagCountContext.Galleries,
         ) { picked -> update(current.copy(tags = picked.map { IdName(it.id, it.name) })) }
+    }
+    if (pickingScenes) scenes?.let { linked ->
+        EditGalleryScenesSheet(gallery.id, linked, { pickingScenes = false }) { picked -> scenes = picked }
     }
     EditEntitySheet(
         title = tr(R.string.action_edit_gallery), sections = sections,
@@ -362,6 +379,18 @@ internal fun EditGallerySheet(gallery: Gallery, onDismiss: () -> Unit, onSaved: 
                     NativeListItem(
                         tags.joinToString(", ") { it.name ?: it.title.orEmpty() }.ifEmpty { tr(R.string.none) },
                         icon = SF.tag, onClick = { pickingTags = true },
+                    )
+                }
+            }
+            if (!scenesUnavailable) {
+                Spacer(Modifier.height(20.dp))
+                NativeSectionHeader(tr(R.string.scenes))
+                NativeGroup {
+                    val linked = scenes
+                    if (linked == null) NativeListItem(tr(R.string.loading_ellipsis), icon = SF.film, enabled = false)
+                    else NativeListItem(
+                        linked.joinToString(", ") { it.displayTitle }.ifEmpty { tr(R.string.none) },
+                        icon = SF.film, onClick = { pickingScenes = true },
                     )
                 }
             }

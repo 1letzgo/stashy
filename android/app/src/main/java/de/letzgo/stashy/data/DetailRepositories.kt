@@ -167,10 +167,10 @@ object DetailRepository {
     suspend fun gallery(id: String): Gallery? =
         findPage("findGalleries", "findGalleries", "galleries", Gallery.serializer(), FindFilter(1, 1), extra = mapOf("ids" to listOf(id))).items.firstOrNull()
 
-    /** Scenes linked to a gallery (its Metadata card). */
-    suspend fun galleryScenes(id: String): List<Scene> =
+    /** Scenes linked to a gallery (its Metadata card); `perPage = -1` = all (Edit Gallery writes the whole list back). */
+    suspend fun galleryScenes(id: String, perPage: Int = 40): List<Scene> =
         findPage(
-            "findScenes", "findScenes", "scenes", Scene.serializer(), FindFilter(1, 40, "date", "DESC"), "scene_filter",
+            "findScenes", "findScenes", "scenes", Scene.serializer(), FindFilter(1, perPage, "date", "DESC"), "scene_filter",
             JsonObject(mapOf("galleries" to JsonObject(mapOf("value" to JsonArray(listOf(JsonPrimitive(id))), "modifier" to JsonPrimitive("INCLUDES"))))),
         ).items
 
@@ -311,6 +311,19 @@ object DetailRepository {
             "mutation GalleryUpdate(\$input: GalleryUpdateInput!) { galleryUpdate(input: \$input) { id } }",
             vars("input" to mapOf("id" to id, "tag_ids" to tagIds)),
         )
+    }
+
+    /**
+     * `galleryUpdate(scene_ids:)` — replaces the gallery's scenes. Throws on failure. On success the
+     * gallery page and every open page of a scene added or removed reload (iOS `GallerySceneLinksChanged`).
+     */
+    suspend fun updateGalleryScenes(id: String, sceneIds: List<String>, previousSceneIds: List<String>) {
+        GraphQL.data(
+            "mutation GalleryUpdate(\$input: GalleryUpdateInput!) { galleryUpdate(input: \$input) { id } }",
+            vars("input" to mapOf("id" to id, "scene_ids" to sceneIds)),
+        )
+        val changed = (sceneIds.toSet() union previousSceneIds.toSet()) - (sceneIds.toSet() intersect previousSceneIds.toSet())
+        LibraryEvents.post(LibraryEvent.GallerySceneLinksChanged(id, changed))
     }
 
     /** `galleryUpdate(studio_id:)` — null clears the studio. Throws on failure. */

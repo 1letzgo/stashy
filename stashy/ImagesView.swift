@@ -534,6 +534,14 @@ private struct ImagesViewBody: View {
             guard let id = gallery?.id else { return }
             galleryScenes = (try? await SceneRepository().fetchGalleryScenes(galleryId: id)) ?? []
         }
+        // Scenes picked in Edit Gallery: the Metadata card shows them at once.
+        .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("GallerySceneLinksChanged"))) { note in
+            guard let id = gallery?.id, note.userInfo?["galleryId"] as? String == id else { return }
+            Task {
+                let fetched = (try? await SceneRepository().fetchGalleryScenes(galleryId: id)) ?? []
+                if gallery?.id == id { galleryScenes = fetched }
+            }
+        }
         .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("DefaultFilterChanged"))) { notification in
             guard gallery == nil, !feedsEmbedded else { return }
             if let tabId = notification.userInfo?["tab"] as? String, tabId == AppTab.images.rawValue {
@@ -2271,12 +2279,15 @@ struct EditGallerySheet: View {
     @State private var isSaving = false
     @State private var isDeleting = false
     @State private var showingDeleteConfirmation = false
-    /// Studio, performers and tags are written as soon as they are picked, like a scene's.
+    /// Studio, performers, tags and scenes are written as soon as they are picked, like a scene's.
     @State private var linked: Gallery?
     @State private var activePicker: LinkPicker?
+    /// The gallery's scenes; nil until loaded (the row waits, saving would drop unseen ones).
+    @State private var scenes: [Scene]?
+    @State private var scenesUnavailable = false
 
     private enum LinkPicker: String, Identifiable {
-        case studio, performers, tags
+        case studio, performers, tags, scenes
         var id: String { rawValue }
     }
 
@@ -2316,6 +2327,17 @@ struct EditGallerySheet: View {
                     .listRowBackground(Color.secondaryAppBackground)
                 }
 
+                if !scenesUnavailable {
+                    Section(tr("scenes")) {
+                        if let scenes {
+                            linkRow("film", joined(scenes.map { $0.displayTitle ?? tr("untitled") }), picker: .scenes)
+                        } else {
+                            HStack { Spacer(); ProgressView(); Spacer() }
+                        }
+                    }
+                    .listRowBackground(Color.secondaryAppBackground)
+                }
+
                 Section {
                     Button(role: .destructive) {
                         showingDeleteConfirmation = true
@@ -2349,6 +2371,14 @@ struct EditGallerySheet: View {
                 title = gallery.title
                 date = gallery.date ?? ""
                 details = gallery.details ?? ""
+            }
+            .task(id: gallery.id) {
+                guard scenes == nil else { return }
+                do {
+                    scenes = try await SceneRepository().fetchGalleryScenes(galleryId: gallery.id, perPage: -1)
+                } catch {
+                    scenesUnavailable = true
+                }
             }
             .sheet(item: $activePicker) { picker in
                 switch picker {
@@ -2385,6 +2415,14 @@ struct EditGallerySheet: View {
                         countContext: .galleries
                     ) { picked in
                         applyLink { $0.tags = picked.map { Tag.TagRef(id: $0.id, name: $0.name) } }
+                    }
+                case .scenes:
+                    AddSceneToGallerySheet(
+                        galleryId: gallery.id,
+                        currentScenes: scenes ?? [],
+                        viewModel: viewModel
+                    ) { picked in
+                        scenes = picked
                     }
                 }
             }
@@ -2477,6 +2515,181 @@ struct EditGallerySheet: View {
                     dismiss()
                 } else {
                     ToastManager.shared.show(tr("error_update_gallery"), icon: "exclamationmark.triangle", style: .error)
+                }
+            }
+        }
+    }
+}
+// MARK: - Scenes of a Gallery
+
+/// Picks the scenes of a gallery (`GalleryUpdateInput.scene_ids`), the reverse of a scene's
+/// "Edit Galleries". Searches the server (title, path, studio code) instead of loading every
+/// scene; without a search it offers the recently added ones.
+struct AddSceneToGallerySheet: View {
+    let galleryId: String
+    let currentScenes: [Scene]
+    @ObservedObject var viewModel: StashDBViewModel
+    var onComplete: ([Scene]) -> Void
+
+    @Environment(\.stashyDismiss) private var dismiss
+    @ObservedObject private var appearanceManager = AppearanceManager.shared
+    @State private var selected: [Scene] = []
+    @State private var results: [Scene] = []
+    @State private var searchText = ""
+    @State private var isLoading = false
+    @State private var isSaving = false
+
+    private static let resultLimit = 30
+
+    private var trimmedQuery: String {
+        searchText.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    private var selectedIds: Set<String> { Set(selected.map(\.id)) }
+
+    var body: some View {
+        NavigationView {
+            Form {
+                Section(header: Text(tr("search_scenes"))) {
+                    TextField(tr("placeholder_search"), text: $searchText)
+                        .autocorrectionDisabled()
+                }
+                .listRowBackground(Color.secondaryAppBackground)
+
+                if !selected.isEmpty {
+                    Section(header: Text(tr("selected"))) {
+                        ForEach(selected) { scene in
+                            sceneRow(scene)
+                        }
+                    }
+                    .listRowBackground(Color.secondaryAppBackground)
+                }
+
+                Section(header: Text(trimmedQuery.isEmpty ? tr("recently_added") : tr("scenes"))) {
+                    let shown = results.filter { !selectedIds.contains($0.id) }
+                    if isLoading && results.isEmpty {
+                        HStack { Spacer(); ProgressView(); Spacer() }
+                    } else if shown.isEmpty {
+                        Text(tr("empty_matching_scenes"))
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    } else {
+                        ForEach(shown) { scene in
+                            sceneRow(scene)
+                        }
+                        if results.count >= Self.resultLimit {
+                            Text(tr(trimmedQuery.isEmpty ? "type_to_search_menu" : "type_more_to_refine_menu"))
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        }
+                    }
+                }
+                .listRowBackground(Color.secondaryAppBackground)
+            }
+            .applyAppBackground()
+            .scrollContentBackground(.hidden)
+            .stashyModalSheetChrome(tr("action_edit_scenes"), onBack: { dismiss() }) {
+                StashyChromeTrailingTextButton(title: tr("action_save"), enabled: !isSaving, isBusy: isSaving) { save() }
+            }
+            .onAppear {
+                if selected.isEmpty { selected = currentScenes }
+            }
+            .task(id: trimmedQuery) {
+                let query = trimmedQuery
+                if !query.isEmpty {
+                    // Debounce: one request per pause in typing.
+                    try? await Task.sleep(nanoseconds: 300_000_000)
+                    guard !Task.isCancelled else { return }
+                }
+                isLoading = true
+                let fetched = query.isEmpty
+                    ? await recentlyAddedScenes()
+                    : await viewModel.searchScenesAsync(query: query, limit: Self.resultLimit)
+                guard !Task.isCancelled else { return }
+                results = fetched
+                isLoading = false
+            }
+        }
+    }
+
+    private func sceneRow(_ scene: Scene) -> some View {
+        let isSelected = selectedIds.contains(scene.id)
+        return HStack(spacing: 12) {
+            ZStack {
+                RoundedRectangle(cornerRadius: 6)
+                    .fill(appearanceManager.tintColor.opacity(0.12))
+                CustomAsyncImage(url: scene.thumbnailURL) { loader in
+                    if let image = loader.image {
+                        image.resizable().aspectRatio(contentMode: .fill)
+                    } else {
+                        Image(systemName: "film")
+                            .font(.system(size: 16))
+                            .foregroundColor(appearanceManager.tintColor.opacity(0.5))
+                    }
+                }
+            }
+            .frame(width: 80, height: 45)
+            .clipShape(RoundedRectangle(cornerRadius: 6))
+            VStack(alignment: .leading, spacing: 2) {
+                Text(scene.displayTitle ?? tr("untitled"))
+                    .font(.body)
+                    .foregroundColor(.primary)
+                    .lineLimit(2)
+                let subtitle = [scene.studio?.name, scene.date].compactMap { value -> String? in
+                    guard let value, !value.isEmpty else { return nil }
+                    return value
+                }.joined(separator: " · ")
+                if !subtitle.isEmpty {
+                    Text(subtitle)
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                        .lineLimit(1)
+                }
+            }
+            Spacer()
+            Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
+                .foregroundColor(isSelected ? appearanceManager.tintColor : .secondary)
+        }
+        .contentShape(Rectangle())
+        .onTapGesture {
+            if isSelected {
+                selected.removeAll { $0.id == scene.id }
+            } else {
+                selected.append(scene)
+            }
+        }
+    }
+
+    private func recentlyAddedScenes() async -> [Scene] {
+        let variables: [String: Any] = [
+            "filter": ["page": 1, "per_page": Self.resultLimit, "sort": "created_at", "direction": "DESC"]
+        ]
+        do {
+            let response: AltScenesResponse = try await GraphQLClient.shared.execute(
+                query: GraphQLQueries.queryWithFragments("findScenes"),
+                variables: variables
+            )
+            return response.data?.findScenes?.scenes ?? []
+        } catch {
+            return []
+        }
+    }
+
+    private func save() {
+        isSaving = true
+        let picked = selected
+        viewModel.updateGalleryScenes(
+            galleryId: galleryId,
+            sceneIds: picked.map(\.id),
+            previousSceneIds: currentScenes.map(\.id)
+        ) { success in
+            DispatchQueue.main.async {
+                isSaving = false
+                if success {
+                    onComplete(picked)
+                    dismiss()
+                } else {
+                    ToastManager.shared.show(tr("error_update_scenes"), icon: "exclamationmark.triangle", style: .error)
                 }
             }
         }

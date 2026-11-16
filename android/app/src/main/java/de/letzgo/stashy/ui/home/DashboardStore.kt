@@ -136,6 +136,8 @@ object DashboardStore {
                 // Home rows show no markers.
                 is LibraryEvent.SceneMarkerDeleted -> null
                 is LibraryEvent.GroupHierarchyChanged -> null
+                // Gallery cards show no scenes.
+                is LibraryEvent.GallerySceneLinksChanged -> null
             }
             if (next != null) rows[type] = next
         }
