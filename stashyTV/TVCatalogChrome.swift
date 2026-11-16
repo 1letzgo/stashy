@@ -92,6 +92,17 @@ private struct TVChromeButtonBody: View {
             .shadow(color: .black.opacity(isFocused ? 0.35 : 0), radius: 14, y: 8)
             .opacity(isEnabled ? 1 : 0.5)
             .animation(.easeOut(duration: 0.15), value: isFocused)
+            // Lets a row of these controls know whether one of them has focus
+            // (`TVDetailScrollingRow` scrolls back to its start when focus leaves).
+            .preference(key: TVChromeFocusPreference.self, value: isFocused)
+    }
+}
+
+/// True while any `TVChromeButtonStyle` control below has focus.
+struct TVChromeFocusPreference: PreferenceKey {
+    static let defaultValue = false
+    static func reduce(value: inout Bool, nextValue: () -> Bool) {
+        value = value || nextValue()
     }
 }
 
