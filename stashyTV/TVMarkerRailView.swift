@@ -14,7 +14,7 @@ import SwiftUI
 struct TVMarkerRailView: View {
 
     let markers: [SceneMarker]
-    /// Live playhead — used to mark the marker whose range contains it.
+    /// Live playhead — marks the marker it is in when no player's current marker is injected.
     let currentTime: Double
     let onSelect: (SceneMarker) -> Void
 
@@ -29,27 +29,26 @@ struct TVMarkerRailView: View {
         markers.sorted { $0.seconds < $1.seconds }
     }
 
-    /// `seconds ≤ currentTime < next marker's seconds` — the last marker owns everything after it.
+    /// The player's current marker (see `TVPlayerCurrentMarker`); nil outside the player.
+    @Environment(\.tvPlayerCurrentMarker) private var playerCurrentMarker
+
+    /// The marker the playhead is in — in the player the same one Previous / Next count from,
+    /// including a marker just jumped to whose seek landed a few seconds off. Nil before every
+    /// marker.
     private var activeMarkerID: String? {
         let list = sorted
-        guard !list.isEmpty else { return nil }
-        var result: String?
-        for (index, marker) in list.enumerated() {
-            let upper = index + 1 < list.count ? list[index + 1].seconds : Double.greatestFiniteMagnitude
-            if currentTime >= marker.seconds && currentTime < upper {
-                result = marker.id
-                break
-            }
+        if let playerCurrentMarker {
+            guard let start = playerCurrentMarker.start else { return nil }
+            return list.first { abs($0.seconds - start) < 0.01 }?.id
         }
-        return result
+        guard let index = list.lastIndex(where: { $0.seconds <= currentTime }) else { return nil }
+        return list[index].id
     }
 
-    /// The card focus lands on when it enters the rail: the marker at or before the playhead
-    /// (the first one before every marker) — never simply the leftmost card.
+    /// The card focus lands on when it enters the rail and the one the rail keeps in view:
+    /// the current marker, the first one before every marker — never simply the leftmost card.
     private var entryMarkerID: String? {
-        let list = sorted
-        guard let index = TVMarkerNavigation.entryIndex(starts: list.map(\.seconds), time: currentTime) else { return nil }
-        return list[index].id
+        activeMarkerID ?? sorted.first?.id
     }
 
     @FocusState private var focusedMarkerID: String?
@@ -74,16 +73,28 @@ struct TVMarkerRailView: View {
                 }
                 .onAppear {
                     // Opens scrolled to the current marker, so its card exists (lazy stack)
-                    // and is the one in view when focus comes down into the rail. No anchor:
-                    // the row only scrolls as far as needed. `.leading` put the card on the
-                    // scroll view's edge, past the row's leading inset, and cut the first card.
-                    if let entry = entryMarkerID, entry != sorted.first?.id { proxy.scrollTo(entry) }
+                    // and is the one in view when focus comes down into the rail. Centered,
+                    // so its neighbours show; the first card needs no scroll (`.leading` once
+                    // put it on the scroll view's edge, past the row's inset, and cut it).
+                    if let entry = entryMarkerID, entry != sorted.first?.id {
+                        proxy.scrollTo(entry, anchor: .center)
+                    }
+                }
+                .onChange(of: entryMarkerID) { _, entry in
+                    // The current marker changed (Previous / Next, playback crossing a marker,
+                    // a scrub or skip): keep its card in view. Only while focus is outside the
+                    // rail — inside it the user is moving through cards and the rail must not
+                    // scroll under them; the highlight still updates.
+                    guard focusedMarkerID == nil, let entry else { return }
+                    withAnimation(.easeInOut(duration: 0.3)) {
+                        proxy.scrollTo(entry, anchor: .center)
+                    }
                 }
                 .onChange(of: focusedMarkerID) { old, new in
                     // Focus just came into the rail from another row: the focus engine picks
                     // the geometrically nearest card, so move it to the current marker.
                     guard old == nil, let new, let entry = entryMarkerID, new != entry else { return }
-                    proxy.scrollTo(entry)
+                    proxy.scrollTo(entry, anchor: .center)
                     focusedMarkerID = entry
                 }
             }

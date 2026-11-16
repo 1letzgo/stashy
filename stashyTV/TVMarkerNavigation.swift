@@ -43,18 +43,33 @@ enum TVMarkerNavigation {
     /// the marker before it, later it restarts the current one.
     static let previousRestartSlack: Double = 3
 
+    /// The jump still counts while its seek is in flight or the playhead is still near the
+    /// jumped-to marker. The window ends early at the next marker: past it the user has
+    /// watched into that one.
+    static func isJumpActive(starts: [Double], playhead: Double, jump: Jump?, now: Date = Date()) -> Bool {
+        guard let jump, starts.indices.contains(jump.index) else { return false }
+        let start = starts[jump.index]
+        let nextStart = jump.index + 1 < starts.count ? starts[jump.index + 1] : .greatestFiniteMagnitude
+        let windowEnd = min(start + landedWindowSeconds, nextStart)
+        let inFlight = now.timeIntervalSince(jump.at) < seekInFlightSeconds
+        let nearJumpedMarker = playhead >= start - earlyLandingSeconds && playhead < windowEnd
+        return inFlight || nearJumpedMarker
+    }
+
+    /// The current marker: the one just jumped to while that jump counts, otherwise the last
+    /// one starting at or before the playhead; nil before every marker. The rail highlights it
+    /// and scrolls to it, Previous / Next count from it — one source for all three.
+    static func currentIndex(starts: [Double], playhead: Double, jump: Jump?, now: Date = Date()) -> Int? {
+        if let jump, isJumpActive(starts: starts, playhead: playhead, jump: jump, now: now) {
+            return jump.index
+        }
+        return starts.lastIndex { $0 <= playhead }
+    }
+
     static func targets(starts: [Double], playhead: Double, jump: Jump?, now: Date = Date()) -> Targets {
-        if let jump, starts.indices.contains(jump.index) {
-            let start = starts[jump.index]
-            // The window ends early at the next marker: past it the user has watched into it.
-            let nextStart = jump.index + 1 < starts.count ? starts[jump.index + 1] : .greatestFiniteMagnitude
-            let windowEnd = min(start + landedWindowSeconds, nextStart)
-            let inFlight = now.timeIntervalSince(jump.at) < seekInFlightSeconds
-            let nearJumpedMarker = playhead >= start - earlyLandingSeconds && playhead < windowEnd
-            if inFlight || nearJumpedMarker {
-                return Targets(previous: jump.index > 0 ? jump.index - 1 : nil,
-                               next: jump.index + 1 < starts.count ? jump.index + 1 : nil)
-            }
+        if let jump, isJumpActive(starts: starts, playhead: playhead, jump: jump, now: now) {
+            return Targets(previous: jump.index > 0 ? jump.index - 1 : nil,
+                           next: jump.index + 1 < starts.count ? jump.index + 1 : nil)
         }
         return Targets(previous: starts.lastIndex { $0 < playhead - previousRestartSlack },
                        next: starts.firstIndex { $0 > playhead + 0.5 })

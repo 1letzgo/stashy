@@ -37,6 +37,11 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.staticCompositionLocalOf
+import androidx.compose.runtime.compositionLocalOf
+import androidx.compose.foundation.gestures.animateScrollBy
+import androidx.compose.foundation.gestures.scrollBy
+import androidx.compose.runtime.snapshotFlow
+import kotlinx.coroutines.flow.first
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -251,6 +256,13 @@ private enum class PanelTarget { Nav, Marker, Audio, Subtitles, Extra }
 
 /** iOS `tvPlayerMarkerPicked`: a rail pick counts as a marker jump for Previous / Next. */
 val LocalTvMarkerPicked = staticCompositionLocalOf<(Double) -> Unit> { {} }
+
+/** iOS `TVPlayerCurrentMarker`: the player's current marker ([TvMarkerNav.currentIndex], last-jump
+ *  rule included); [start] is null while the playhead lies before every marker. */
+data class TvCurrentMarker(val start: Double?)
+
+/** iOS `tvPlayerCurrentMarker`: null outside the player, where the rail follows its own `currentTime`. */
+val LocalTvCurrentMarker = compositionLocalOf<TvCurrentMarker?> { null }
 
 /**
  * iOS: `TVAetherPlayerView` / `TVAetherPlayerContent` — full-screen video with the Siri-Remote
@@ -597,7 +609,14 @@ private fun TvPlayerContent(
                         }
                     }
                 }
-                CompositionLocalProvider(LocalTvMarkerPicked provides { noteMarkerPicked(it) }) {
+                // The same current marker Previous / Next count from: the rail outlines it and keeps it in view.
+                val currentMarker = TvCurrentMarker(
+                    TvMarkerNav.currentIndex(markers, player.currentTime, lastJump, now())?.let { markers[it] },
+                )
+                CompositionLocalProvider(
+                    LocalTvMarkerPicked provides { noteMarkerPicked(it) },
+                    LocalTvCurrentMarker provides currentMarker,
+                ) {
                     panelExtra?.invoke({ closePanel() }, if (firstTarget == PanelTarget.Extra) panelEntry else null)
                 }
             }
@@ -722,17 +741,35 @@ fun TvPlayerError(message: String?, onDismiss: () -> Unit) {
 @Composable
 fun TvMarkerRail(markers: List<SceneMarker>, currentTime: Double, entry: FocusRequester?, onSelect: (SceneMarker) -> Unit, close: () -> Unit) {
     val sorted = remember(markers) { markers.sortedBy { it.seconds } }
-    val active = activeMarkerIndex(sorted.map { it.seconds }, currentTime)
+    // In the player: its current marker (a marker just jumped to counts even when the seek landed
+    // a few seconds off), so outline, scroll position and the Previous / Next labels agree.
+    val playerCurrent = LocalTvCurrentMarker.current
+    val active = if (playerCurrent != null) {
+        playerCurrent.start?.let { start -> sorted.indexOfFirst { kotlin.math.abs(it.seconds - start) < 0.01 }.takeIf { it >= 0 } }
+    } else {
+        activeMarkerIndex(sorted.map { it.seconds }, currentTime)
+    }
     // Read live: the playhead moves while the panel is open, and the station saw a value
     // fixed at first composition land on the first card.
-    val entryIndex = TvMarkerNav.entryIndex(sorted.map { it.seconds }, currentTime) ?: 0
+    val entryIndex = active ?: 0
     val entryCard = remember { FocusRequester() }
     val listState = rememberLazyListState(initialFirstVisibleItemIndex = entryIndex)
     val markerPicked = LocalTvMarkerPicked.current
+    var railFocused by remember { mutableStateOf(false) }
+    var didInitialScroll by remember { mutableStateOf(false) }
+    // The current marker changed (Previous / Next, playback crossing a marker, a scrub or skip)
+    // or the panel just opened: center its card. Only while focus is outside the rail — inside
+    // it the user is moving through cards and the row must not scroll under them; the outline
+    // still updates.
+    LaunchedEffect(entryIndex) {
+        if (railFocused) return@LaunchedEffect
+        listState.centerItem(entryIndex, animated = didInitialScroll)
+        didInitialScroll = true
+    }
     Column(verticalArrangement = Arrangement.spacedBy(pt(12))) {
         Text(tr(R.string.markers), style = TvType.caption.copy(fontSize = 11.sp, fontWeight = FontWeight.Bold), color = Color.White.copy(alpha = 0.6f))
         LazyRow(
-            Modifier.tvRowEntry(entryIndex, listState, entryCard),
+            Modifier.onFocusChanged { railFocused = it.hasFocus }.tvRowEntry(entryIndex, listState, entryCard),
             state = listState,
             horizontalArrangement = Arrangement.spacedBy(pt(30)),
             // Same leading inset as the scene page's marker row: with pt(10) the first card's focus
@@ -789,6 +826,20 @@ fun Modifier.tvRowEntry(entryIndex: Int?, listState: LazyListState, entry: Focus
             hadFocus = false
         }
     }
+}
+
+/**
+ * Scrolls item [index] to the middle of the row (clamped at both ends by the list). Waits for the
+ * first layout; an item off screen is first brought in without animation, then centered.
+ */
+suspend fun LazyListState.centerItem(index: Int, animated: Boolean) {
+    snapshotFlow { layoutInfo.visibleItemsInfo.isNotEmpty() }.first { it }
+    if (layoutInfo.visibleItemsInfo.none { it.index == index }) scrollToItem(index)
+    val info = layoutInfo.visibleItemsInfo.firstOrNull { it.index == index } ?: return
+    val viewportCenter = (layoutInfo.viewportStartOffset + layoutInfo.viewportEndOffset) / 2f
+    val delta = info.offset + info.size / 2f - viewportCenter
+    if (kotlin.math.abs(delta) < 1f) return
+    if (animated) animateScrollBy(delta) else scrollBy(delta)
 }
 
 /** Marker screenshot URL (signed). */

@@ -181,24 +181,37 @@ object TvMarkerNav {
     const val PREVIOUS_SLACK = 3.0
 
     /**
-     * iOS: `TVMarkerNavigation.targets`. While the playhead is still near the marker last jumped
-     * to (or the seek is in flight), Previous / Next count from that marker's index — the seek
-     * lands on a keyframe, often seconds after the start, so the playhead alone would make
-     * Previous restart the marker just reached. The window ends early at the next marker.
+     * iOS: `TVMarkerNavigation.isJumpActive`. The jump still counts while its seek is in flight
+     * or the playhead is still near the jumped-to marker — the seek lands on a keyframe, often
+     * seconds after the start. The window ends early at the next marker.
      */
+    fun isJumpActive(starts: List<Double>, playhead: Double, jump: Jump?, nowMs: Long): Boolean {
+        if (jump == null || jump.index !in starts.indices) return false
+        val start = starts[jump.index]
+        val nextStart = starts.getOrNull(jump.index + 1) ?: Double.MAX_VALUE
+        val windowEnd = minOf(start + LANDED_WINDOW, nextStart)
+        val inFlight = nowMs - jump.atMs < SEEK_IN_FLIGHT_MS
+        val nearJumped = playhead >= start - EARLY_LANDING && playhead < windowEnd
+        return inFlight || nearJumped
+    }
+
+    /**
+     * iOS: `TVMarkerNavigation.currentIndex`. The current marker: the one just jumped to while
+     * that jump counts, otherwise the last one starting at or before the playhead; null before
+     * every marker. The rail outlines it and scrolls to it, Previous / Next count from it.
+     */
+    fun currentIndex(starts: List<Double>, playhead: Double, jump: Jump?, nowMs: Long): Int? {
+        if (jump != null && isJumpActive(starts, playhead, jump, nowMs)) return jump.index
+        return starts.indexOfLast { it <= playhead }.takeIf { it >= 0 }
+    }
+
+    /** iOS: `TVMarkerNavigation.targets`. While the jump counts, Previous / Next go from its index. */
     fun targets(starts: List<Double>, playhead: Double, jump: Jump?, nowMs: Long): Targets {
-        if (jump != null && jump.index in starts.indices) {
-            val start = starts[jump.index]
-            val nextStart = starts.getOrNull(jump.index + 1) ?: Double.MAX_VALUE
-            val windowEnd = minOf(start + LANDED_WINDOW, nextStart)
-            val inFlight = nowMs - jump.atMs < SEEK_IN_FLIGHT_MS
-            val nearJumped = playhead >= start - EARLY_LANDING && playhead < windowEnd
-            if (inFlight || nearJumped) {
-                return Targets(
-                    previous = (jump.index - 1).takeIf { it >= 0 },
-                    next = (jump.index + 1).takeIf { it < starts.size },
-                )
-            }
+        if (jump != null && isJumpActive(starts, playhead, jump, nowMs)) {
+            return Targets(
+                previous = (jump.index - 1).takeIf { it >= 0 },
+                next = (jump.index + 1).takeIf { it < starts.size },
+            )
         }
         return Targets(
             previous = starts.indexOfLast { it < playhead - PREVIOUS_SLACK }.takeIf { it >= 0 },
