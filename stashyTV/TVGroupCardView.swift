@@ -9,11 +9,14 @@ import SwiftUI
 
 struct TVGroupCardView: View {
     let group: StashGroup
+    @Environment(\.isFocused) private var isFocused
 
     private var groupColor: Color {
         let hash = abs(group.name.hashValue)
         let hue = Double(hash % 360) / 360.0
-        return Color(hue: hue, saturation: 0.35, brightness: 0.3)
+        // Fokussiert heller: die Fläche ist deckend, die Aufhellung der `.card`-Plattform
+        // (bei Studio-Karten durch den transparenten Grund sichtbar) kommt hier nicht durch.
+        return Color(hue: hue, saturation: 0.35, brightness: isFocused ? 0.48 : 0.3)
     }
 
     var body: some View {
@@ -29,6 +32,9 @@ struct TVGroupCardView: View {
                 endPoint: .bottom
             )
             .clipShape(RoundedRectangle(cornerRadius: 10))
+            // Wie TVSceneCardView den Verlauf bei Fokus aufhellen, aber weniger: der Name
+            // unten bleibt auch auf hellen Tag-/Gruppenbildern lesbar.
+            .opacity(isFocused ? 0.55 : 1.0)
 
             if group.sceneCountDisplay > 0 {
                 Text("\(group.sceneCountDisplay)")
@@ -53,6 +59,7 @@ struct TVGroupCardView: View {
             }
         }
         .frame(width: 260, height: 390)
+        .animation(.easeOut(duration: 0.15), value: isFocused)
     }
 
     @ViewBuilder
@@ -78,7 +85,7 @@ struct TVGroupCardView: View {
             .overlay(
                 Image(systemName: "rectangle.stack.fill")
                     .font(.system(size: 32))
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(isFocused ? .primary : .secondary)
             )
     }
 }
