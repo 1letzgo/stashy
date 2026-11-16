@@ -87,6 +87,17 @@ private struct TVPlayerMarkerPickedKey: EnvironmentKey {
     static let defaultValue: (Double) -> Void = { _ in }
 }
 
+/// The player's current marker (`TVMarkerNavigation.currentIndex`, last-jump rule included),
+/// so the rail highlights and scrolls to the same marker the Previous / Next labels count from.
+struct TVPlayerCurrentMarker: Equatable {
+    /// Start of the current marker; nil while the playhead lies before every marker.
+    let start: Double?
+}
+
+private struct TVPlayerCurrentMarkerKey: EnvironmentKey {
+    static let defaultValue: TVPlayerCurrentMarker? = nil
+}
+
 extension EnvironmentValues {
     var tvPlayerClosePanel: () -> Void {
         get { self[TVPlayerClosePanelKey.self] }
@@ -96,6 +107,12 @@ extension EnvironmentValues {
     var tvPlayerMarkerPicked: (Double) -> Void {
         get { self[TVPlayerMarkerPickedKey.self] }
         set { self[TVPlayerMarkerPickedKey.self] = newValue }
+    }
+
+    /// nil outside the player: the rail then follows its own `currentTime`.
+    var tvPlayerCurrentMarker: TVPlayerCurrentMarker? {
+        get { self[TVPlayerCurrentMarkerKey.self] }
+        set { self[TVPlayerCurrentMarkerKey.self] = newValue }
     }
 }
 
@@ -681,6 +698,7 @@ private struct TVAetherPlayerContent<Panel: View>: View {
                     .prefersDefaultFocus(firstPanelTarget == nil, in: panelScope)
                     .environment(\.tvPlayerClosePanel, { closePanel() })
                     .environment(\.tvPlayerMarkerPicked, { noteMarkerPicked(seconds: $0) })
+                    .environment(\.tvPlayerCurrentMarker, currentMarker)
             }
             .padding(.horizontal, 60)
             .padding(.vertical, 40)
@@ -782,6 +800,15 @@ private struct TVAetherPlayerContent<Panel: View>: View {
             .opacity(next == nil ? 0.45 : 1)
         }
         .tvFocusRow()
+    }
+
+    /// Derselbe aktuelle Marker, von dem Previous / Next zählen — die Leiste markiert ihn
+    /// und scrollt zu ihm.
+    private var currentMarker: TVPlayerCurrentMarker {
+        let index = TVMarkerNavigation.currentIndex(starts: markerTimes,
+                                                    playhead: engine.currentTime,
+                                                    jump: lastMarkerJump)
+        return TVPlayerCurrentMarker(start: index.map { markerTimes[$0] })
     }
 
     private func markerJumpTitle(_ title: String, target index: Int?) -> String {

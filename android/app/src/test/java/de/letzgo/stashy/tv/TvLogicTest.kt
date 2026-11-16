@@ -175,6 +175,39 @@ class TvLogicTest {
         assertEquals(TvMarkerNav.Targets(1, 2), targets(200.0, jump, nowMs = 10_000))
     }
 
+    @Test fun currentMarkerIsTheOneTheRailFollows() {
+        fun current(playhead: Double, jump: TvMarkerNav.Jump? = null, nowMs: Long = 100_000) =
+            TvMarkerNav.currentIndex(qaStarts, playhead, jump, nowMs)
+        // No jump: the marker at or before the playhead; none before the first.
+        assertNull(current(30.0))
+        assertEquals(0, current(60.0))
+        assertEquals(2, current(400.0))
+        assertEquals(5, current(900.0))
+        // Next pressed to 6:50, seek still in flight (old position 5:20): already 6:50.
+        assertEquals(3, current(320.0, TvMarkerNav.Jump(3, atMs = 0), nowMs = 500))
+        // Keyframe landed 3 s early (6:47, still inside 5:18): the jumped marker, not 5:18.
+        assertEquals(3, current(407.0, TvMarkerNav.Jump(3, atMs = 0), nowMs = 5_000))
+        // Played on into 8:00: playback crossed a marker, the playhead rules again.
+        assertEquals(4, current(481.0, TvMarkerNav.Jump(3, atMs = 0), nowMs = 80_000))
+        // Next all the way to the last marker, then Previous back to the first: current always
+        // equals the jumped index, so the rail centers that card.
+        var jump: TvMarkerNav.Jump? = null
+        var playhead = 0.0
+        var now = 100_000L
+        while (true) {
+            val next = TvMarkerNav.targets(qaStarts, playhead, jump, now).next ?: break
+            jump = TvMarkerNav.Jump(next, now); now += 1500; playhead = qaStarts[next] + 2
+            assertEquals(next, current(playhead, jump, now))
+        }
+        assertEquals(5, jump!!.index)
+        while (true) {
+            val previous = TvMarkerNav.targets(qaStarts, playhead, jump, now).previous ?: break
+            jump = TvMarkerNav.Jump(previous, now); now += 1500; playhead = qaStarts[previous] + 4
+            assertEquals(previous, current(playhead, jump, now))
+        }
+        assertEquals(0, jump!!.index)
+    }
+
     // MARK: sorting
 
     @Test fun everyTvSortOptionExistsInTheSharedCatalog() {
