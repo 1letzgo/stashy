@@ -102,8 +102,6 @@ object FeedsConfig {
         private set
     var continuousPlay by mutableStateOf(Prefs.bool("ReelsContinuousPlay"))
         private set
-    var showsDeleteButton by mutableStateOf(Prefs.bool("ReelsShowsDeleteButton"))
-        private set
     /** iOS `FeedsAddMarkerButton`: "Add Marker" beside the rating in Feeds › Scenes (default off). */
     var showsAddMarkerButton by mutableStateOf(Prefs.bool("FeedsAddMarkerButton"))
         private set
@@ -113,7 +111,6 @@ object FeedsConfig {
 
     fun updateFillHeight(v: Boolean) { fillHeight = v; Prefs.setBool("ReelsFillHeight", v) }
     fun updateContinuousPlay(v: Boolean) { continuousPlay = v; Prefs.setBool("ReelsContinuousPlay", v) }
-    fun updateShowsDeleteButton(v: Boolean) { showsDeleteButton = v; Prefs.setBool("ReelsShowsDeleteButton", v) }
     fun updateShowsAddMarkerButton(v: Boolean) { showsAddMarkerButton = v; Prefs.setBool("FeedsAddMarkerButton", v) }
     fun updateDoubleTapJumpsToMarkers(v: Boolean) { doubleTapJumpsToMarkers = v; Prefs.setBool("FeedsDoubleTapMarkers", v) }
 

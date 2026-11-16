@@ -240,6 +240,10 @@ class EditModeSettingsScreen : Screen {
                 key = "edit",
                 footer = tr(R.string.hint_show_edit_buttons_on_scene),
             ) { SettingsToggleRow(tr(R.string.action_enable_editing), Appearance.isEditModeEnabled) { Appearance.updateEditMode(it) } }
+            settingsSection(
+                key = "delete",
+                footer = tr(R.string.hint_show_delete_button),
+            ) { SettingsToggleRow(tr(R.string.action_show_delete_button), de.letzgo.stashy.data.DeleteActions.isShown) { de.letzgo.stashy.data.DeleteActions.update(it) } }
         }
     }
 }

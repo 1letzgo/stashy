@@ -228,7 +228,8 @@ fun ImagesList(c: CatalogController<StashImage>, holder: ImageMediaKindHolder, c
         c, CatalogTexts(tr(R.string.loading_images), SF.photo, tr(R.string.empty_images_found), tr(R.string.action_reload)),
         // No Settings button: the quick bar's pinned settings button opens the sheet.
         CatalogSlots(
-            contextual = CatalogChromeSlot(SF.checkmarkCircle, false, tr(R.string.action_select_images)) { selection.begin() },
+            // Selection only exists to delete: no Select while Settings › Design › Editing hides Delete.
+            contextual = if (de.letzgo.stashy.data.DeleteActions.isShown) CatalogChromeSlot(SF.checkmarkCircle, false, tr(R.string.action_select_images)) { selection.begin() } else null,
             selection = CatalogSelectionChrome(
                 isActive = selection.isActive,
                 count = selection.state.count,

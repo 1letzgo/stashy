@@ -481,7 +481,8 @@ private fun RatingRow(model: RateMeViewModel, item: RateMeItem, onDelete: () -> 
                 color = p.text, maxLines = 1,
             )
         }
-        IconButton(
+        // Settings › Design › Editing › Show Delete Button.
+        if (de.letzgo.stashy.data.DeleteActions.isShown) IconButton(
             onClick = {
                 view.performRateMeHaptic(RateMeHaptic.Light)
                 onDelete()

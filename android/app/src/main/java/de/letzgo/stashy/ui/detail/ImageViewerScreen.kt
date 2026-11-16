@@ -499,7 +499,7 @@ class ImageViewerScreen(
                     enabled = !isDownloaded && !isDownloading,
                 ) { Downloads.downloadImage(image) }
             }
-            TopBarAction(SF.trash, tr(R.string.action_delete)) { confirmDelete = true }
+            if (de.letzgo.stashy.data.DeleteActions.isShown) TopBarAction(SF.trash, tr(R.string.action_delete)) { confirmDelete = true }
             if (!image?.galleries.isNullOrEmpty()) {
                 TopBarAction(SF.photoStack, tr(R.string.action_set_as_gallery_cover)) { galleryCoverTargets = image?.galleries.orEmpty() }
             }

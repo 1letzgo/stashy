@@ -275,7 +275,7 @@ fun FeedsScreen() {
                     selected = mode,
                     onSelect = { m -> pool.teardown(); isZoomed = false; model.selectMode(m) },
                     sort = feedsSortMenuState(model, mode) { pool.teardown() },
-                    onDelete = currentItem?.takeIf { FeedsConfig.showsDeleteButton && it.supportsDelete }?.let { item -> { deleteTarget = item } },
+                    onDelete = currentItem?.takeIf { de.letzgo.stashy.data.DeleteActions.isShown && it.supportsDelete }?.let { item -> { deleteTarget = item } },
                     onFilterSort = { if (mode == ReelsModeType.Pics) model.pics.isSheetPresented = true else showSheet = true },
                 )
                 val c = model.criteria

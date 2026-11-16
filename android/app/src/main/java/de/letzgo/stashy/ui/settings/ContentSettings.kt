@@ -316,11 +316,6 @@ class FeedsSettingsScreen : Screen {
                 settingsSection(header = tr(R.string.tab), key = "tab") {
                     SettingsToggleRow(tr(R.string.action_show_feeds_tab), TabManager.isVisible(AppTab.Reels), SF.playRectangleOnRectangle) { TabManager.toggle(AppTab.Reels) }
                 }
-                // App UI, not a per-feed filter option — moved here from the Feeds filter sheet
-                // (same `ReelsShowsDeleteButton` key, existing choices carry over).
-                settingsSection(header = tr(R.string.controls), key = "controls") {
-                    SettingsToggleRow(tr(R.string.action_show_delete_button), FeedsConfig.showsDeleteButton, SF.trash) { FeedsConfig.updateShowsDeleteButton(it) }
-                }
                 item(key = "modes") {
                     Column(Modifier.padding(bottom = 24.dp)) {
                         SectionHeaderText(tr(R.string.modes))

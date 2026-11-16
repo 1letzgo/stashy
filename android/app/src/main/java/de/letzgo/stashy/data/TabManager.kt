@@ -178,8 +178,6 @@ object TabManager {
     var downloadBatchSize: Int get() = _downloadBatchSize.value; set(v) { _downloadBatchSize.value = v; Prefs.setInt("download_batch_size", v) }
     private val _sceneDownloadBatchSize = mutableStateOf(Prefs.int("scene_download_batch_size", 5).let { if (it in downloadBatchSizeOptions) it else 5 })
     var sceneDownloadBatchSize: Int get() = _sceneDownloadBatchSize.value; set(v) { _sceneDownloadBatchSize.value = v; Prefs.setInt("scene_download_batch_size", v) }
-    private val _reelsShowsDeleteButton = bool("ReelsShowsDeleteButton", false)
-    var reelsShowsDeleteButton: Boolean get() = _reelsShowsDeleteButton.value; set(v) { _reelsShowsDeleteButton.value = v; Prefs.setBool("ReelsShowsDeleteButton", v) }
     private val _sceneCardsShowStudioLogo = bool("SceneCardsShowStudioLogo", true)
     var sceneCardsShowStudioLogo: Boolean get() = _sceneCardsShowStudioLogo.value; set(v) { _sceneCardsShowStudioLogo.value = v; Prefs.setBool("SceneCardsShowStudioLogo", v) }
     /** iOS: `sceneShowStudioCode` — studio code on scene cards, the scene page and Edit Scene. Off by default. */

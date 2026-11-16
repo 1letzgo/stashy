@@ -278,6 +278,7 @@ object SettingsTransfer {
     /** Lets the managers that cache settings pick up the new values (the rest after a restart). */
     private fun reloadAfterImport() {
         TabManager.reload()
+        DeleteActions.reload()
         WatchlistStore.reload(ServerConfigManager.activeConfig?.id)
         CatalogPrefs.resetSession()
     }

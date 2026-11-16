@@ -6,6 +6,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import de.letzgo.stashy.R
+import de.letzgo.stashy.data.DeleteActions
 import de.letzgo.stashy.data.SceneEditing
 import de.letzgo.stashy.data.SceneMarker
 import de.letzgo.stashy.tr
@@ -22,10 +23,16 @@ import kotlinx.coroutines.launch
 /** Outlives the dialog (and the card or row that opened it), so the delete always finishes. */
 private val markerDeleteScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
 
-/** iOS: `MarkerDeleteMenuButton` in a marker's `.contextMenu` — opened by a long press. */
+/**
+ * iOS: `MarkerDeleteMenuButton` in a marker's `.contextMenu` — opened by a long press. Never
+ * opens while Settings › Design › Editing hides Delete ([DeleteActions]).
+ */
 @Composable
 fun MarkerDeleteMenu(expanded: Boolean, onDismiss: () -> Unit, onDelete: () -> Unit) {
-    DropdownMenu(expanded = expanded, onDismissRequest = onDismiss, containerColor = Theme.palette.secondaryBackground) {
+    // A long press while hidden still sets the caller's flag: reset it, so the menu does not
+    // pop up later when the switch goes back on.
+    if (expanded && !DeleteActions.isShown) androidx.compose.runtime.LaunchedEffect(Unit) { onDismiss() }
+    DropdownMenu(expanded = expanded && DeleteActions.isShown, onDismissRequest = onDismiss, containerColor = Theme.palette.secondaryBackground) {
         DropdownMenuItem(
             text = { Text(tr(R.string.action_delete_marker), color = StashyColors.systemRed) },
             leadingIcon = { Icon(SF.trash, null, tint = StashyColors.systemRed) },

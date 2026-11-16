@@ -167,7 +167,8 @@ class GalleryDetailScreen(
                 // iOS `openedGalleryActions`: Edit (edit mode only) · Select · `galleryDownloadSlot`,
                 // all in the top bar, before filter & sort.
                 val edit = if (Appearance.isEditModeEnabled && gallery != null) ChromeSlot(SF.pencil, tr(R.string.action_edit_gallery)) { editing = true } else null
-                val select = ChromeSlot(SF.checkmarkCircle, tr(R.string.action_select_images)) { selection.begin() }
+                // Selection only exists to delete: none while Settings › Design › Editing hides Delete.
+                val select = if (de.letzgo.stashy.data.DeleteActions.isShown) ChromeSlot(SF.checkmarkCircle, tr(R.string.action_select_images)) { selection.begin() } else null
                 val download = gallery?.let { imageSetDownloadSlot(it.id, tr(R.string.action_download_gallery)) { showDownloadOptions = true } }
                 // iOS bf9d8830: Back · "Images", then the actions, the sort menu and the settings.
                 DetailTopBar(

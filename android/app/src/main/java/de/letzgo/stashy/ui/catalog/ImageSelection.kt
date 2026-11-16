@@ -118,6 +118,8 @@ class ImageSelectionController {
 /** The "Delete N images?" confirmation (iOS `.alert`). */
 @Composable
 fun ImageDeleteConfirmation(selection: ImageSelectionController, list: PagedList<StashImage>) {
+    // Delete hidden in Settings › Design › Editing while selecting: leave the selection.
+    if (selection.isActive && !de.letzgo.stashy.data.DeleteActions.isShown) androidx.compose.runtime.LaunchedEffect(Unit) { selection.end() }
     if (!selection.isConfirmingDelete) return
     NativeConfirmDialog(
         title = ImageDeleteOutcome.confirmTitle(selection.state.count),

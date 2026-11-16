@@ -391,8 +391,11 @@ private fun SceneDetailNavBar(model: SceneDetailModel, openedFromMiniPlayer: Boo
         }
         // iOS `sceneDownloadNavButton`: green check · progress ring · "Save scene" (stashy+ gate on tap).
         SceneDownloadNavButton(model.scene)
-        // iOS `sceneActionSlots`: Delete sits in the bar itself (opens the confirmation).
-        TopBarAction(PlayerIcons.trash, tr(R.string.action_delete_scene)) { model.showDeleteConfirmation = true }
+        // iOS `sceneActionSlots`: Delete sits in the bar itself (opens the confirmation), unless
+        // Settings › Design › Editing hides it.
+        if (de.letzgo.stashy.data.DeleteActions.isShown) {
+            TopBarAction(PlayerIcons.trash, tr(R.string.action_delete_scene)) { model.showDeleteConfirmation = true }
+        }
         if (Appearance.isEditModeEnabled) TopBarOverflowMenu { dismiss ->
             OverflowItem(tr(R.string.action_edit_title_and_details), de.letzgo.stashy.ui.SF.pencil, dismiss, onClick = onEditTitle)
         }

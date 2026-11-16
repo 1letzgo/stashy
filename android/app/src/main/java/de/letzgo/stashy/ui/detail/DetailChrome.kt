@@ -535,15 +535,18 @@ internal fun EditEntitySheet(
                     }
                 }
                 extraSections()
-                Spacer(Modifier.height(20.dp))
-                de.letzgo.stashy.ui.NativeGroup {
-                    de.letzgo.stashy.ui.NativeListItem(
-                        deleteLabel,
-                        icon = SF.trash, iconTint = StashyColors.systemRed, headlineColor = StashyColors.systemRed,
-                        enabled = !saving && !deleting,
-                        onClick = { confirmDelete = true },
-                        leading = if (deleting) ({ CircularProgressIndicator(Modifier.size(24.dp), color = StashyColors.systemRed, strokeWidth = 2.dp) }) else null,
-                    )
+                // Settings › Design › Editing › Show Delete Button.
+                if (de.letzgo.stashy.data.DeleteActions.isShown) {
+                    Spacer(Modifier.height(20.dp))
+                    de.letzgo.stashy.ui.NativeGroup {
+                        de.letzgo.stashy.ui.NativeListItem(
+                            deleteLabel,
+                            icon = SF.trash, iconTint = StashyColors.systemRed, headlineColor = StashyColors.systemRed,
+                            enabled = !saving && !deleting,
+                            onClick = { confirmDelete = true },
+                            leading = if (deleting) ({ CircularProgressIndicator(Modifier.size(24.dp), color = StashyColors.systemRed, strokeWidth = 2.dp) }) else null,
+                        )
+                    }
                 }
                 Spacer(Modifier.height(40.dp))
             }
