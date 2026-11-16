@@ -164,73 +164,78 @@ struct TVGalleryDetailView: View {
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 28) {
+            VStack(alignment: .leading, spacing: TVDetailMetrics.sectionGap) {
                 headerSection
 
-                if viewModel.isLoadingGalleryImages && viewModel.galleryImages.isEmpty {
-                    HStack {
-                        Spacer()
-                        ProgressView().scaleEffect(1.5)
-                        Spacer()
-                    }
-                    .padding(.vertical, 60)
-                    // Gegenstück zum `emptyFocus`-Anker im Leer-Zweig.
-                    .focusable()
-                } else if viewModel.galleryImages.isEmpty || displayImages.isEmpty {
-                    HStack {
-                        Spacer()
-                        VStack(spacing: 16) {
-                            Image(systemName: "photo")
-                                .font(.system(size: 48))
-                                .foregroundColor(.secondary)
-                            Text(viewModel.galleryImages.isEmpty
-                                  ? tr("empty_images_in_this_gallery")
-                                  : tr("empty_supported_images_in_this_gallery"))
-                                .font(.title3)
-                                .foregroundStyle(.secondary)
-                            if !viewModel.galleryImages.isEmpty && displayImages.isEmpty {
-                                Text(tr("hint_only_unsupported_or_animated_formats"))
-                                    .font(.body)
-                                    .foregroundStyle(.tertiary)
-                                    .multilineTextAlignment(.center)
-                                    .padding(.horizontal, 80)
-                            }
-                            // Focus anchor so Menu/Back hits tvExitDismissable instead of exiting the app.
-                            Button(tr("back")) { dismiss() }
-                                .focused($emptyFocus)
-                        }
-                        Spacer()
-                    }
-                    .padding(.vertical, 60)
-                    .onAppear { emptyFocus = true }
-                } else {
-                    LazyVGrid(columns: imageSpec.columns(for: contentWidth), alignment: .leading, spacing: imageSpec.spacing) {
-                        ForEach(displayImages) { image in
-                            VStack(alignment: .leading, spacing: 10) {
-                                Button {
-                                    presentedImage = TVImageLink(
-                                        id: image.id,
-                                        title: image.displayTitle ?? tr("untitled"),
-                                        galleryId: galleryId
-                                    )
-                                } label: {
-                                    TVImageCardView(image: image)
-                                }
-                                .buttonStyle(.card)
+                // Same section title and gap as the Scenes section of the other detail pages.
+                VStack(alignment: .leading, spacing: TVDetailMetrics.sectionTitleGap) {
+                    TVDetailSectionTitle(text: tr("images"))
 
-                                TVImageCardTitleView(image: image)
+                    if viewModel.isLoadingGalleryImages && viewModel.galleryImages.isEmpty {
+                        HStack {
+                            Spacer()
+                            ProgressView().scaleEffect(1.5)
+                            Spacer()
+                        }
+                        .padding(.vertical, 60)
+                        // Gegenstück zum `emptyFocus`-Anker im Leer-Zweig.
+                        .focusable()
+                    } else if viewModel.galleryImages.isEmpty || displayImages.isEmpty {
+                        HStack {
+                            Spacer()
+                            VStack(spacing: 16) {
+                                Image(systemName: "photo")
+                                    .font(.system(size: 48))
+                                    .foregroundColor(.secondary)
+                                Text(viewModel.galleryImages.isEmpty
+                                      ? tr("empty_images_in_this_gallery")
+                                      : tr("empty_supported_images_in_this_gallery"))
+                                    .font(.title3)
+                                    .foregroundStyle(.secondary)
+                                if !viewModel.galleryImages.isEmpty && displayImages.isEmpty {
+                                    Text(tr("hint_only_unsupported_or_animated_formats"))
+                                        .font(.body)
+                                        .foregroundStyle(.tertiary)
+                                        .multilineTextAlignment(.center)
+                                        .padding(.horizontal, 80)
+                                }
+                                // Focus anchor so Menu/Back hits tvExitDismissable instead of exiting the app.
+                                Button(tr("back")) { dismiss() }
+                                    .focused($emptyFocus)
                             }
-                            .frame(width: imageSpec.columnWidth)
-                            .onAppear {
-                                if image.id == displayImages.last?.id && viewModel.hasMoreGalleryImages {
-                                    viewModel.fetchGalleryImages(galleryId: galleryId, isInitialLoad: false)
+                            Spacer()
+                        }
+                        .padding(.vertical, 60)
+                        .onAppear { emptyFocus = true }
+                    } else {
+                        LazyVGrid(columns: imageSpec.columns(for: contentWidth), alignment: .leading, spacing: imageSpec.spacing) {
+                            ForEach(displayImages) { image in
+                                VStack(alignment: .leading, spacing: 10) {
+                                    Button {
+                                        presentedImage = TVImageLink(
+                                            id: image.id,
+                                            title: image.displayTitle ?? tr("untitled"),
+                                            galleryId: galleryId
+                                        )
+                                    } label: {
+                                        TVImageCardView(image: image)
+                                    }
+                                    .buttonStyle(.card)
+
+                                    TVImageCardTitleView(image: image)
+                                }
+                                .frame(width: imageSpec.columnWidth)
+                                .onAppear {
+                                    if image.id == displayImages.last?.id && viewModel.hasMoreGalleryImages {
+                                        viewModel.fetchGalleryImages(galleryId: galleryId, isInitialLoad: false)
+                                    }
                                 }
                             }
                         }
+                        // On the safe-area edge like the header and every other grid (the old
+                        // 60 pt put this page's content 60 pt further in than the rest).
+                        .padding(.horizontal, imageSpec.horizontalPadding)
                     }
-                    // On the safe-area edge like the header and every other grid (the old
-                    // 60 pt put this page's content 60 pt further in than the rest).
-                    .padding(.horizontal, imageSpec.horizontalPadding)
                 }
             }
             .padding(.bottom, 80)
@@ -292,7 +297,7 @@ struct TVGalleryDetailView: View {
                 Button {
                     slideshow = TVSlideshowStart(index: 0)
                 } label: {
-                    Label(tr("slideshow"), systemImage: "play.rectangle.on.rectangle")
+                    TVChromeButtonLabel(icon: "play.rectangle.on.rectangle", text: tr("slideshow"))
                 }
                 .disabled(displayImages.isEmpty)
             }

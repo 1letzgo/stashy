@@ -240,30 +240,31 @@ private extension Performer {
 // MARK: - Tag chips
 
 /// The performer's own tags (`findPerformerTags`) as one scrolling chip row in the header;
-/// left out while there are none. One line, no section title: the scenes stay on the first screen.
+/// left out while there are none. One line, no section title: the scenes stay on the first
+/// screen. Same control as the header's buttons (`TVChromeButtonLabel` in
+/// `TVChromeButtonStyle`), so both rows have one size.
 struct TVPerformerTagChips: View {
     let tags: [Tag]
+    @Environment(\.tvNavigationPath) private var path
 
     var body: some View {
         if !tags.isEmpty {
             ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 20) {
+                HStack(spacing: DesignTokens.Spacing.xl) {
                     ForEach(tags) { tag in
-                        TVNavButton(value: TVTagLink(id: tag.id, name: tag.name)) {
-                            Text(tag.name)
-                                .font(.callout)
-                                .lineLimit(1)
-                                .padding(.horizontal, 20)
-                                .padding(.vertical, 6)
+                        Button {
+                            path?.wrappedValue.append(TVTagLink(id: tag.id, name: tag.name))
+                        } label: {
+                            TVChromeButtonLabel(text: tag.name)
                         }
                     }
                 }
-                // Room for the card style's focus lift and shadow; the negative padding
-                // below keeps the first chip aligned with the title.
-                .padding(.horizontal, 16)
-                .padding(.vertical, 12)
+                .buttonStyle(TVChromeButtonStyle(scaleAnchor: .leading))
+                // Room for the focus lift and shadow inside the scroll view's clip; the
+                // negative padding below keeps the row on the text edge and the row gap.
+                .padding(TVDetailMetrics.focusBleed)
             }
-            .padding(.horizontal, -16)
+            .padding(-TVDetailMetrics.focusBleed)
             .tvFocusRow()
         }
     }

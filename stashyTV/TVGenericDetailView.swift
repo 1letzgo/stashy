@@ -26,8 +26,7 @@ enum TVDetailBackdrop {
 }
 
 /// Shared layout of the performer, studio, tag and group pages: the compact
-/// `TVDetailHeader` (title with the scene count, one row of buttons, the facts as one or two
-/// lines, an optional accessory such as the performer's tags, the image as backdrop) and the
+/// `TVDetailHeader` (title with the scene count, one row of buttons, the facts in one line, an optional accessory such as the performer's tags, the image as backdrop) and the
 /// scene grid right below — on 1920×1080 the first card row and the top of the second are
 /// visible without scrolling. This view keeps the opening focus logic; the gallery page uses
 /// the same header over its image grid.
@@ -119,7 +118,7 @@ struct TVGenericDetailView<Item: TVDetailItem, Accessory: View>: View {
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 28) {
+            VStack(alignment: .leading, spacing: TVDetailMetrics.sectionGap) {
                 TVDetailHeader(
                     title: item?.name ?? "",
                     titleLogo: titleLogo,
@@ -134,15 +133,8 @@ struct TVGenericDetailView<Item: TVDetailItem, Accessory: View>: View {
                 )
 
                 // Scenes Section
-                VStack(alignment: .leading, spacing: 16) {
-                    HStack(spacing: 12) {
-                        Image(systemName: "film.fill")
-                            .font(.headline)
-                            .foregroundColor(AppearanceManager.shared.tintColor)
-                        Text(tr("scenes"))
-                            .font(.headline)
-                            .foregroundColor(.white)
-                    }
+                VStack(alignment: .leading, spacing: TVDetailMetrics.sectionTitleGap) {
+                    TVDetailSectionTitle(text: tr("scenes"))
 
                     if isLoadingScenes && scenes.isEmpty {
                         HStack {
@@ -236,7 +228,7 @@ struct TVGenericDetailView<Item: TVDetailItem, Accessory: View>: View {
             Button {
                 playingChannel = channel
             } label: {
-                Label(tr("action_play_as_channel"), systemImage: "play.tv.fill")
+                TVChromeButtonLabel(icon: "play.tv.fill", text: tr("action_play_as_channel"))
             }
             .focused($headerFocus)
         } else if headerActions.isEmpty {
@@ -269,7 +261,7 @@ struct TVGenericDetailView<Item: TVDetailItem, Accessory: View>: View {
 
     private func headerActionButton(_ action: TVDetailHeaderAction) -> some View {
         Button(action: action.perform) {
-            Label(action.title, systemImage: action.icon)
+            TVChromeButtonLabel(icon: action.icon, text: action.title)
         }
     }
 
@@ -283,6 +275,46 @@ struct TVGenericDetailView<Item: TVDetailItem, Accessory: View>: View {
 
 // MARK: - Header
 
+/// One spacing scale for every detail page with `TVDetailHeader` (performer, studio, tag,
+/// group, gallery), in pt, taken from what the rest of the tvOS app already uses:
+///
+/// - top inset 30 below the safe area (60): the title sits where the catalog pages put
+///   their control row (`STVHeaderView`, vertical padding 30)
+/// - 24 between every header row: title, accessory, buttons, facts, description
+///   (`DesignTokens.Spacing.xl`, the catalog header's spacing between its controls)
+/// - 50 from the header to the first section (`TVDashboardView`, spacing between rows)
+/// - 18 from a section title to its cards (Home row title to cards)
+/// - 40 between two facts (`TVGridSpec.scenes.spacing`), 4 between a fact's label and
+///   value (`DesignTokens.Spacing.xxs`)
+/// - buttons and tag chips: one size, `TVChromeButtonLabel` (headline, 24 × 8 padding) in
+///   `TVChromeButtonStyle` scaled from the leading edge, so the row starts on the text edge
+///   (80) focused or not
+/// - leading and trailing edge: the safe area (80), the same as every grid
+enum TVDetailMetrics {
+    static let topInset: CGFloat = 30
+    static let rowGap: CGFloat = DesignTokens.Spacing.xl
+    static let sectionGap: CGFloat = 50
+    static let sectionTitleGap: CGFloat = 18
+    static let factGap: CGFloat = 40
+    static let factLabelGap: CGFloat = DesignTokens.Spacing.xxs
+    /// Room around a scrolling chip row for the focus lift and shadow; taken back with a
+    /// negative padding so the row stays on the scale above.
+    static let focusBleed: CGFloat = 24
+}
+
+/// A section title on a detail page, the same as a Home row title: no icon (an SF symbol's
+/// side bearing put it 5 pt off the card edge), headline, secondary white.
+struct TVDetailSectionTitle: View {
+    let text: String
+
+    var body: some View {
+        Text(text)
+            .font(.headline)
+            .fontWeight(.semibold)
+            .foregroundColor(.white.opacity(0.6))
+    }
+}
+
 /// The count beside the title: scenes on performer / studio / tag / group pages,
 /// images on a gallery.
 struct TVDetailCount {
@@ -294,8 +326,8 @@ struct TVDetailCount {
 /// group, gallery): title line with logo and count, an optional accessory row (a performer's
 /// tag chips), one row of buttons with "Details" at its end, the facts as one line of
 /// label/value pairs plus a two-line description, and the image as a backdrop on the
-/// trailing side. About a third of a 1920×1080 screen, so the content grid starts on the
-/// first screen.
+/// trailing side. About 40 % of a 1920×1080 screen, so the content grid starts on the first
+/// screen. Spacing: `TVDetailMetrics`.
 ///
 /// The buttons are the last focusable row (facts and description are text only): Down from
 /// them reaches the grid directly, and Up from any grid column lands on them through the
@@ -349,7 +381,7 @@ struct TVDetailHeader<Accessory: View, Actions: View>: View {
     // MARK: Metrics
 
     private static var maxFactLines: Int { 1 }
-    private static var factSpacing: CGFloat { 48 }
+    private static var factSpacing: CGFloat { TVDetailMetrics.factGap }
     /// A single fact never grows wider than this (long alias lists are cut, the sheet has them).
     private static var factMaxWidth: CGFloat { 420 }
     /// Overscan safe area of tvOS; the backdrop bleeds into it to the screen's top and
@@ -366,9 +398,13 @@ struct TVDetailHeader<Accessory: View, Actions: View>: View {
     private var backdropWidth: CGFloat { min(860, contentWidth * 0.45) }
     private var backdropHeight: CGFloat { 560 }
 
-    /// With a backdrop the text column ends where the image is still mostly faded out.
+    /// With a backdrop the text column ends where the image is still below ~15 % (the first
+    /// tenth of its fade), so no text, long names and long facts included, ever sits on the
+    /// bright part. The button row may run further: its controls bring their own fill.
     private var textColumnMaxWidth: CGFloat {
-        hasBackdrop ? max(700, contentWidth - 160 - backdropWidth * 0.75) : .infinity
+        guard hasBackdrop else { return .infinity }
+        let imageStart = contentWidth - 2 * Self.safeTrailing - backdropWidth
+        return max(700, imageStart + 0.1 * (backdropWidth + Self.safeTrailing))
     }
 
     private var trimmedDetails: String? {
@@ -379,22 +415,26 @@ struct TVDetailHeader<Accessory: View, Actions: View>: View {
     // MARK: Body
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
+        VStack(alignment: .leading, spacing: TVDetailMetrics.rowGap) {
             titleLine
 
             accessory()
 
-            HStack(spacing: 24) {
+            HStack(spacing: DesignTokens.Spacing.xl) {
                 actions()
                 if showsDetailsButton {
                     Button {
                         showingDetails = true
                     } label: {
-                        Label(tr("details"), systemImage: "info.circle")
+                        TVChromeButtonLabel(icon: "info.circle", text: tr("details"))
                     }
                 }
             }
-            .font(.callout)
+            // The catalog's control style for every button, growing from its leading edge:
+            // the first one stays on the text edge when focused.
+            .buttonStyle(TVChromeButtonStyle(scaleAnchor: .leading))
+            // Never squeezed by the text column; the buttons bring their own fill.
+            .fixedSize(horizontal: true, vertical: false)
             // Own section across the full width: Up from the grid and Down from the
             // accessory row reach it from any column.
             .tvFocusRow()
@@ -413,7 +453,7 @@ struct TVDetailHeader<Accessory: View, Actions: View>: View {
         }
         .frame(maxWidth: textColumnMaxWidth, alignment: .leading)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.top, 10)
+        .padding(.top, TVDetailMetrics.topInset)
         // Background, not a sibling: the image never changes the header's height, so the
         // grid starts at the same place with and without it, and it scrolls away with it.
         .background(alignment: .topTrailing) { backdropView }
@@ -473,7 +513,7 @@ struct TVDetailHeader<Accessory: View, Actions: View>: View {
     @ViewBuilder
     private var factsBlock: some View {
         if !facts.isEmpty {
-            VStack(alignment: .leading, spacing: 12) {
+            VStack(alignment: .leading, spacing: TVDetailMetrics.rowGap) {
                 if factsLineWidth > 0 {
                     let layout = factLayout
                     ForEach(Array(layout.lines.enumerated()), id: \.offset) { _, line in
@@ -527,7 +567,7 @@ struct TVDetailHeader<Accessory: View, Actions: View>: View {
             .id(url)
             // Top-aligned so faces stay in view; fills the width, the overflow below is cut.
             .frame(width: backdropWidth + Self.safeTrailing,
-                   height: backdropHeight + Self.safeTop,
+                   height: backdropHeight + Self.safeTop + TVDetailMetrics.topInset,
                    alignment: .top)
             .clipped()
             // Fades in from the text side and out towards the grid, into the theme
@@ -552,7 +592,7 @@ struct TVDetailHeader<Accessory: View, Actions: View>: View {
                 }
             }
             .opacity(0.9)
-            .offset(x: Self.safeTrailing, y: -Self.safeTop - 10)
+            .offset(x: Self.safeTrailing, y: -Self.safeTop - TVDetailMetrics.topInset)
             .allowsHitTesting(false)
             .focusable(false)
             .accessibilityHidden(true)
@@ -631,7 +671,7 @@ struct TVDetailFactView: View {
     let fact: TVDetailFact
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 4) {
+        VStack(alignment: .leading, spacing: TVDetailMetrics.factLabelGap) {
             Text(fact.label)
                 .font(.caption)
                 .foregroundStyle(.secondary)
