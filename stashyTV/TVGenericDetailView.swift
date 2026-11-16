@@ -303,18 +303,18 @@ struct TVDetailCount {
 /// stay with the page, which passes its buttons in `actions`.
 struct TVDetailHeader<Accessory: View, Actions: View>: View {
     let title: String
-    var titleLogo: AnyView? = nil
-    var count: TVDetailCount? = nil
-    var backdrop: TVDetailBackdrop = .none
-    var isLoading: Bool = false
-    var details: String? = nil
-    var facts: [TVDetailFact] = []
+    let titleLogo: AnyView?
+    let count: TVDetailCount?
+    let backdrop: TVDetailBackdrop
+    let isLoading: Bool
+    let details: String?
+    let facts: [TVDetailFact]
     /// Facts only the Details sheet shows.
-    var sheetFacts: [TVDetailFact] = []
+    let sheetFacts: [TVDetailFact]
     /// Inset of the text from the content edge; the backdrop still reaches the screen edge.
-    var horizontalInset: CGFloat = 0
-    @ViewBuilder let accessory: () -> Accessory
-    @ViewBuilder let actions: () -> Actions
+    let horizontalInset: CGFloat
+    let accessory: () -> Accessory
+    let actions: () -> Actions
 
     @Environment(\.tvContentWidth) private var contentWidth
     @State private var showingDetails = false
@@ -322,6 +322,33 @@ struct TVDetailHeader<Accessory: View, Actions: View>: View {
     /// into; the header packs them into at most `maxFactLines` lines from these.
     @State private var factWidths: [String: CGFloat] = [:]
     @State private var factsLineWidth: CGFloat = 0
+
+    /// Explicit: the private state above would make the memberwise init file-private.
+    init(
+        title: String,
+        titleLogo: AnyView? = nil,
+        count: TVDetailCount? = nil,
+        backdrop: TVDetailBackdrop = .none,
+        isLoading: Bool = false,
+        details: String? = nil,
+        facts: [TVDetailFact] = [],
+        sheetFacts: [TVDetailFact] = [],
+        horizontalInset: CGFloat = 0,
+        @ViewBuilder accessory: @escaping () -> Accessory,
+        @ViewBuilder actions: @escaping () -> Actions
+    ) {
+        self.title = title
+        self.titleLogo = titleLogo
+        self.count = count
+        self.backdrop = backdrop
+        self.isLoading = isLoading
+        self.details = details
+        self.facts = facts
+        self.sheetFacts = sheetFacts
+        self.horizontalInset = horizontalInset
+        self.accessory = accessory
+        self.actions = actions
+    }
 
     // MARK: Metrics
 
