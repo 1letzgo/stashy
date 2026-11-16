@@ -28,6 +28,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.requiredHeight
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -43,13 +44,12 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
-import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.composed
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
-import androidx.compose.ui.focus.focusRestorer
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -550,7 +550,7 @@ private fun TvPlayerContent(
                     }
                 }
                 if (markers.isNotEmpty()) {
-                    val reference = if (now() - lastJumpAt < 2000) lastJumpTarget else player.currentTime
+                    val reference = TvMarkerNav.referenceTime(player.currentTime, lastJumpTarget, lastJumpAt, now())
                     val previous = TvMarkerNav.previous(markers, reference)
                     val next = TvMarkerNav.next(markers, reference)
                     fun label(title: String, target: Double?) = if (target == null) title else "$title  ${TvFormat.time(target)}"
@@ -705,18 +705,18 @@ fun TvPlayerError(message: String?, onDismiss: () -> Unit) {
  * to the marker at or before the playhead, and focus coming into the rail lands there (not on
  * the leftmost card).
  */
-@OptIn(ExperimentalComposeUiApi::class)
 @Composable
 fun TvMarkerRail(markers: List<SceneMarker>, currentTime: Double, entry: FocusRequester?, onSelect: (SceneMarker) -> Unit, close: () -> Unit) {
     val sorted = remember(markers) { markers.sortedBy { it.seconds } }
     val active = activeMarkerIndex(sorted.map { it.seconds }, currentTime)
-    // Fixed when the rail appears (the panel builds it anew on every open).
-    val entryIndex = remember(sorted) { TvMarkerNav.entryIndex(sorted.map { it.seconds }, currentTime) ?: 0 }
+    // Read live: the playhead moves while the panel is open, and the station saw a value
+    // fixed at first composition land on the first card.
+    val entryIndex = TvMarkerNav.entryIndex(sorted.map { it.seconds }, currentTime) ?: 0
     val entryCard = remember { FocusRequester() }
     val listState = rememberLazyListState(initialFirstVisibleItemIndex = entryIndex)
     Column(verticalArrangement = Arrangement.spacedBy(pt(12))) {
         Text(tr(R.string.markers), style = TvType.caption.copy(fontSize = 11.sp, fontWeight = FontWeight.Bold), color = Color.White.copy(alpha = 0.6f))
-        LazyRow(Modifier.focusRestorer { entryCard }, state = listState, horizontalArrangement = Arrangement.spacedBy(pt(30)), contentPadding = PaddingValues(horizontal = pt(10), vertical = pt(24))) {
+        LazyRow(Modifier.tvRowEntry(entryIndex, listState, entryCard), state = listState, horizontalArrangement = Arrangement.spacedBy(pt(30)), contentPadding = PaddingValues(horizontal = pt(10), vertical = pt(24))) {
             uniqueItemsIndexed(sorted, { it.id }) { i, marker ->
                 val isActive = i == active
                 Column(Modifier.width(pt(300))) {
@@ -741,6 +741,30 @@ fun TvMarkerRail(markers: List<SceneMarker>, currentTime: Double, entry: FocusRe
                     )
                 }
             }
+        }
+    }
+}
+
+/**
+ * iOS: the `focusedMarkerID` redirect of `TVMarkerRailView` — when focus comes into the row
+ * from another row, the D-pad picks the geometrically nearest card (the leftmost one under the
+ * row above); move it to [entryIndex] instead, scrolling there first when it is off screen.
+ * (`focusRestorer`'s fallback did not do this on Compose 1.7: focus stayed on the nearest card.)
+ */
+fun Modifier.tvRowEntry(entryIndex: Int?, listState: LazyListState, entry: FocusRequester): Modifier = composed {
+    val scope = rememberCoroutineScope()
+    var hadFocus by remember { mutableStateOf(false) }
+    onFocusChanged { state ->
+        if (state.hasFocus && !hadFocus) {
+            hadFocus = true
+            val index = entryIndex ?: return@onFocusChanged
+            scope.launch {
+                val visible = listState.layoutInfo.visibleItemsInfo.any { it.index == index }
+                if (!visible) listState.scrollToItem(index)
+                runCatching { entry.requestFocus() }
+            }
+        } else if (!state.hasFocus) {
+            hadFocus = false
         }
     }
 }

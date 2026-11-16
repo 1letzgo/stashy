@@ -163,8 +163,22 @@ object TvMarkerNav {
         return starts.indexOfLast { it <= time }.takeIf { it >= 0 } ?: 0
     }
 
-    /** At least a second back, so a press right after a jump goes one further back. */
-    fun previous(starts: List<Double>, time: Double): Double? = starts.lastOrNull { it < time - 1 }
+    /** Within the first [PREVIOUS_SLACK] s of a marker Previous goes to the one before it (repeated
+     *  presses walk back); later it restarts the current marker. */
+    const val PREVIOUS_SLACK = 3.0
+
+    fun previous(starts: List<Double>, time: Double): Double? = starts.lastOrNull { it < time - PREVIOUS_SLACK }
+
+    /**
+     * The time Previous / Next decide from. Right after a jump the player still reports the old
+     * position (or a keyframe before the target), so until it has landed at or just after the
+     * target, the target counts. [jumpAtMs] 0 = no jump yet.
+     */
+    fun referenceTime(playhead: Double, jumpTarget: Double, jumpAtMs: Long, nowMs: Long): Double {
+        if (jumpAtMs == 0L || nowMs - jumpAtMs >= 8000) return playhead
+        val landed = playhead >= jumpTarget - 0.5 && playhead <= jumpTarget + 8
+        return if (landed) playhead else jumpTarget
+    }
 
     fun next(starts: List<Double>, time: Double): Double? = starts.firstOrNull { it > time + 0.5 }
 }

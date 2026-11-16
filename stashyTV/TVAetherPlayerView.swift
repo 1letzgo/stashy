@@ -767,12 +767,9 @@ private struct TVAetherPlayerContent<Panel: View>: View {
         .tvFocusRow()
     }
 
-    /// Der Playhead, oder das Ziel des letzten Sprungs, solange der Seek noch läuft.
+    /// Der Playhead, oder das Ziel des letzten Sprungs, solange der Seek noch nicht gelandet ist.
     private var markerReferenceTime: Double {
-        if let jump = lastMarkerJump, Date().timeIntervalSince(jump.at) < 2 {
-            return jump.target
-        }
-        return engine.currentTime
+        TVMarkerNavigation.referenceTime(playhead: engine.currentTime, jump: lastMarkerJump)
     }
 
     private func markerJumpTitle(_ title: String, target: Double?) -> String {

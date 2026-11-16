@@ -128,6 +128,9 @@ struct TVGenericDetailView<Item: TVDetailItem, Info: View, Content: View>: View 
                                 Label(tr("action_play_as_channel"), systemImage: "play.tv.fill")
                             }
                             .focused($headerFocus)
+                            // Same as the action row: Up from a group's "Back" cover button lies
+                            // right of this button and found no target without its own section.
+                            .tvFocusRow()
                         } else {
                             // Without the channel button the header has nothing focusable;
                             // this invisible anchor keeps the opening focus (and scroll) at

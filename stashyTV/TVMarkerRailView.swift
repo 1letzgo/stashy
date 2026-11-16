@@ -73,14 +73,16 @@ struct TVMarkerRailView: View {
                 }
                 .onAppear {
                     // Opens scrolled to the current marker, so its card exists (lazy stack)
-                    // and is the one in view when focus comes down into the rail.
-                    if let entry = entryMarkerID { proxy.scrollTo(entry, anchor: .leading) }
+                    // and is the one in view when focus comes down into the rail. No anchor:
+                    // the row only scrolls as far as needed. `.leading` put the card on the
+                    // scroll view's edge, past the row's leading inset, and cut the first card.
+                    if let entry = entryMarkerID, entry != sorted.first?.id { proxy.scrollTo(entry) }
                 }
                 .onChange(of: focusedMarkerID) { old, new in
                     // Focus just came into the rail from another row: the focus engine picks
                     // the geometrically nearest card, so move it to the current marker.
                     guard old == nil, let new, let entry = entryMarkerID, new != entry else { return }
-                    proxy.scrollTo(entry, anchor: .leading)
+                    proxy.scrollTo(entry)
                     focusedMarkerID = entry
                 }
             }
