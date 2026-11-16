@@ -9,8 +9,14 @@ struct TVStudioImageView: View {
     /// The studio's `image_path` when known. Stash answers a studio without a logo
     /// with a generic white camera (`…&default=true`); like iOS, show our own glyph then.
     var imagePath: String? = nil
+    /// Height of the logo in a title line (studio detail header). Set, the view shows the
+    /// logo at this height and its own width, and nothing at all while loading or when the
+    /// studio has none: no placeholder box next to the name.
+    var titleLogoHeight: CGFloat? = nil
 
     @State private var imageLoadState: ImageLoadState = .loading
+    /// Width ÷ height of the loaded logo, for the title-line size.
+    @State private var logoAspect: CGFloat = 1
 
     enum ImageLoadState {
         case loading
@@ -23,6 +29,35 @@ struct TVStudioImageView: View {
     private static let rasterMaxWidth: CGFloat = 1080
 
     var body: some View {
+        Group {
+            if let titleLogoHeight {
+                titleLogo(height: titleLogoHeight)
+            } else {
+                standardBody
+            }
+        }
+        .task(id: "\(studioId)|\(imagePath ?? "")") {
+            await loadImage()
+        }
+    }
+
+    @ViewBuilder
+    private func titleLogo(height: CGFloat) -> some View {
+        if case .success(let image) = imageLoadState {
+            image
+                .resizable()
+                .scaledToFit()
+                .frame(width: min(height * 4, height * logoAspect), height: height)
+                // The gap to the name belongs to the logo: without one there is no gap.
+                .padding(.trailing, 24)
+        } else {
+            // Zero-sized but present, so `.task` above still runs.
+            Color.clear.frame(width: 0, height: 0)
+        }
+    }
+
+    @ViewBuilder
+    private var standardBody: some View {
         Group {
             switch imageLoadState {
             case .loading:
@@ -43,9 +78,6 @@ struct TVStudioImageView: View {
             case .failure:
                 placeholderView
             }
-        }
-        .task(id: "\(studioId)|\(imagePath ?? "")") {
-            await loadImage()
         }
     }
 
@@ -70,6 +102,7 @@ struct TVStudioImageView: View {
             studioId: studioId, updatedAt: nil,
             height: Self.rasterHeight, maxWidth: Self.rasterMaxWidth
         ) {
+            if image.size.height > 0 { logoAspect = image.size.width / image.size.height }
             imageLoadState = .success(Image(uiImage: image))
         } else {
             imageLoadState = .failure

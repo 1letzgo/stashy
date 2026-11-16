@@ -177,40 +177,16 @@ struct TVGroupDetailView: View {
         TVGenericDetailView(
             item: item,
             isLoading: isLoadingGroup,
-            heroAspectRatio: 16/9,
-            placeholderSystemImage: "rectangle.stack.fill",
-            heroImageOverride: AnyView(groupHeroImage()),
+            backdrop: .image(backdropURL),
             channel: .group(id: groupId, name: item.name),
+            trailingActions: coverActions,
+            facts: headerFacts,
             scenes: viewModel.groupScenes,
             isLoadingScenes: viewModel.isLoadingGroupScenes,
             totalScenes: viewModel.totalGroupScenes,
             hasMoreScenes: viewModel.hasMoreGroupScenes,
             loadMoreScenes: { viewModel.loadMoreGroupScenes(groupId: groupId) },
-            infoGrid: { _ in
-                LazyVGrid(columns: TVGridSpec.infoColumns, alignment: .leading, spacing: 12) {
-                    if groupDetail != nil {
-                        Text(tr("cover")).font(.title3).foregroundStyle(.secondary)
-                        HStack(spacing: 14) {
-                            ForEach(CoverSide.allCases, id: \.self) { side in
-                                Button {
-                                    coverSide = side
-                                } label: {
-                                    Text(side.rawValue)
-                                        .font(.headline)
-                                        .padding(.horizontal, 18)
-                                        .padding(.vertical, 8)
-                                }
-                                .buttonStyle(.card)
-                            }
-                        }
-                    }
-                    if viewModel.totalGroupScenes > 0 {
-                        Text(tr("scenes")).font(.title3).foregroundStyle(.secondary)
-                        Text("\(viewModel.totalGroupScenes)").font(.title3).foregroundColor(.white)
-                    }
-                }
-            },
-            additionalContent: { EmptyView() }
+            headerAccessory: { EmptyView() }
         )
         .onAppear {
             if groupDetail == nil && !isLoadingGroup {
@@ -233,31 +209,53 @@ struct TVGroupDetailView: View {
         }
     }
 
-    @ViewBuilder
-    private func groupHeroImage() -> some View {
-        if let group = groupDetail {
-            let url = coverSide == .back ? groupBackImageURL(group) : groupFrontImageURL(group)
-            ZStack {
-                if let url {
-                    CustomAsyncImage(url: url) { loader in
-                        if let image = loader.image {
-                            image
-                                .resizable()
-                                .scaledToFit()
-                                .frame(maxWidth: .infinity, maxHeight: .infinity)
-                                .background(Color.black.opacity(0.12))
-                        } else {
-                            TVThemeFill()
-                                .overlay(ProgressView().scaleEffect(1.2))
-                        }
-                    }
-                } else {
-                    TVThemeFill()
-                }
-            }
-        } else {
-            EmptyView()
+    /// The cover shown as backdrop; only a real one (a group without a cover has none).
+    private var backdropURL: URL? {
+        guard let group = groupDetail else { return nil }
+        switch coverSide {
+        case .front: return Self.hasImage(group.front_image_path) ? groupFrontImageURL(group) : nil
+        case .back: return Self.hasImage(group.back_image_path) ? groupBackImageURL(group) : nil
         }
+    }
+
+    private static func hasImage(_ path: String?) -> Bool {
+        guard let path, !path.isEmpty else { return false }
+        return !path.contains("default=true")
+    }
+
+    /// Switches the backdrop between front and back cover; only when the group has both.
+    private var coverActions: [TVDetailHeaderAction] {
+        guard let group = groupDetail,
+              Self.hasImage(group.front_image_path), Self.hasImage(group.back_image_path) else { return [] }
+        let showsFront = coverSide == .front
+        return [
+            TVDetailHeaderAction(
+                id: "cover",
+                icon: "arrow.left.arrow.right",
+                title: showsFront ? tr("back_cover") : tr("front_cover"),
+                perform: { coverSide = showsFront ? .back : .front }
+            )
+        ]
+    }
+
+    /// Date and studio (the scene count is in the title line); only those with a value.
+    private var headerFacts: [TVDetailFact] {
+        guard let group = groupDetail else { return [] }
+        var facts: [TVDetailFact] = []
+        if let date = group.date, !date.isEmpty {
+            facts.append(TVDetailFact(id: "date", label: tr("date"), value: date))
+        }
+        if let studio = group.studio?.name, !studio.isEmpty {
+            facts.append(TVDetailFact(id: "studio", label: tr("studio"), value: studio))
+        }
+        if let rating = group.rating100 {
+            facts.append(TVDetailFact(id: "rating", label: tr("rating"), value: String(format: "%.1f", Double(rating) / 20.0),
+                                      icon: "star.fill", iconColor: .yellow))
+        }
+        if let subGroups = group.sub_group_count, subGroups > 0 {
+            facts.append(TVDetailFact(id: "sub_groups", label: tr("sub_groups"), value: "\(subGroups)"))
+        }
+        return facts
     }
 
     private func groupFrontImageURL(_ group: StashGroup) -> URL? {

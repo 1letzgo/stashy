@@ -156,23 +156,15 @@ struct TVTagDetailView: View {
         TVGenericDetailView(
             item: item,
             isLoading: isLoadingTag,
-            heroAspectRatio: 16/9,
-            placeholderSystemImage: "tag.fill",
+            backdrop: .image(backdropURL),
             channel: .tag(id: tagId, name: loadedTag?.name ?? tagName),
+            facts: headerFacts,
             scenes: viewModel.tagScenes,
             isLoadingScenes: viewModel.isLoadingTagScenes,
             totalScenes: viewModel.totalTagScenes,
             hasMoreScenes: viewModel.hasMoreTagScenes,
             loadMoreScenes: { viewModel.loadMoreTagScenes(tagId: tagId) },
-            infoGrid: { _ in
-                LazyVGrid(columns: TVGridSpec.infoColumns, alignment: .leading, spacing: 12) {
-                    if viewModel.totalTagScenes > 0 {
-                        Text(tr("scenes")).font(.title3).foregroundStyle(.secondary)
-                        Text("\(viewModel.totalTagScenes)").font(.title3).foregroundColor(.white)
-                    }
-                }
-            },
-            additionalContent: { EmptyView() }
+            headerAccessory: { EmptyView() }
         )
         .onAppear {
             if loadedTag == nil && !isLoadingTag {
@@ -189,6 +181,35 @@ struct TVTagDetailView: View {
                 viewModel.fetchTagScenes(tagId: tagId, isInitialLoad: true)
             }
         }
+    }
+}
+
+extension TVTagDetailView {
+    /// The tag's own image as backdrop; none for Stash's default tag image.
+    fileprivate var backdropURL: URL? {
+        guard let tag = loadedTag, let path = tag.imagePath, !path.isEmpty,
+              !path.contains("default=true") else { return nil }
+        return tag.thumbnailURL
+    }
+
+    /// The tag's other counts (the scene count is in the title line), only those above 0, and its aliases.
+    fileprivate var headerFacts: [TVDetailFact] {
+        guard let tag = loadedTag else { return [] }
+        let counts: [(id: String, label: String, value: Int?)] = [
+            ("performers", tr("performers"), tag.performerCount),
+            ("markers", tr("markers"), tag.sceneMarkerCount),
+            ("galleries", tr("galleries"), tag.galleryCount),
+            ("images", tr("images"), tag.imageCount)
+        ]
+        var facts: [TVDetailFact] = counts.compactMap { entry in
+            guard let value = entry.value, value > 0 else { return nil }
+            return TVDetailFact(id: entry.id, label: entry.label, value: "\(value)")
+        }
+        let aliases = (tag.aliases ?? []).filter { !$0.isEmpty }
+        if !aliases.isEmpty {
+            facts.append(TVDetailFact(id: "aliases", label: tr("aliases"), value: aliases.joined(separator: ", ")))
+        }
+        return facts
     }
 }
 

@@ -28,70 +28,17 @@ struct TVPerformerDetailView: View {
         TVGenericDetailView(
             item: performer,
             isLoading: isLoadingPerformer,
-            heroAspectRatio: 2/3,
-            placeholderSystemImage: "person.fill",
+            backdrop: .image(performer.flatMap(Self.backdropURL)),
             channel: .performer(id: performerId, name: performer?.name ?? performerName),
             headerActions: headerActions,
+            facts: performer.map { Self.headerFacts(for: $0, battleLine: battleLine) } ?? [],
+            sheetFacts: performer.map { Self.sheetFacts(for: $0) } ?? [],
             scenes: viewModel.performerScenes,
             isLoadingScenes: viewModel.isLoadingPerformerScenes,
             totalScenes: viewModel.totalPerformerScenes,
             hasMoreScenes: viewModel.hasMorePerformerScenes,
             loadMoreScenes: { viewModel.loadMorePerformerScenes(performerId: performerId) },
-            infoGrid: { performer in
-                LazyVGrid(columns: TVGridSpec.infoColumns, alignment: .leading, spacing: 12) {
-                    if let gender = performer.gender, !gender.isEmpty {
-                        Text(tr("gender")).font(.title3).foregroundStyle(.secondary)
-                        Text(gender.capitalized).font(.title3).foregroundColor(.white)
-                    }
-
-                    if let country = performer.country, !country.isEmpty {
-                        Text(tr("country")).font(.title3).foregroundStyle(.secondary)
-                        Text(country).font(.title3).foregroundColor(.white)
-                    }
-
-                    if let ethnicity = performer.ethnicity, !ethnicity.isEmpty {
-                        Text(tr("ethnicity")).font(.title3).foregroundStyle(.secondary)
-                        Text(ethnicity.capitalized).font(.title3).foregroundColor(.white)
-                    }
-
-                    if let birthdate = performer.birthdate, !birthdate.isEmpty {
-                        Text(tr("birthdate")).font(.title3).foregroundStyle(.secondary)
-                        Text(birthdate).font(.title3).foregroundColor(.white)
-                    }
-
-                    Text(tr("scenes")).font(.title3).foregroundStyle(.secondary)
-                    Text("\(performer.sceneCount)").font(.title3).foregroundColor(.white)
-
-                    if let rating = performer.rating100 {
-                        Text(tr("rating")).font(.title3).foregroundStyle(.secondary)
-                        HStack(spacing: 5) {
-                            Image(systemName: "star.fill").foregroundColor(.yellow)
-                            Text(String(format: "%.1f", Double(rating) / 20.0)).font(.title3).foregroundColor(.white)
-                        }
-                    }
-
-                    // Summed over the performer's scenes by Stash — read-only, the
-                    // counter itself lives on the scenes.
-                    if let oCounter = performer.oCounter, oCounter > 0 {
-                        Text(tr("o_count")).font(.title3).foregroundStyle(.secondary)
-                        HStack(spacing: 5) {
-                            Image(systemName: "heart.circle").foregroundColor(AppearanceManager.shared.tintColor)
-                            Text("\(oCounter)").font(.title3).foregroundColor(.white)
-                        }
-                    }
-
-                    if performer.favorite == true {
-                        Text(tr("favourite")).font(.title3).foregroundStyle(.secondary)
-                        Image(systemName: "heart.fill").foregroundColor(.red).font(.title3)
-                    }
-
-                    if let battleLine {
-                        Text(tr("battle")).font(.title3).foregroundStyle(.secondary)
-                        Text(battleLine).font(.title3).foregroundColor(.white)
-                    }
-                }
-            },
-            additionalContent: { tagsRow }
+            headerAccessory: { TVPerformerTagChips(tags: performerTags) }
         )
         .tvRatingDialog(isPresented: $showingRatingPicker, current: performer?.rating100) { value in
             setRating(value)
@@ -109,43 +56,104 @@ struct TVPerformerDetailView: View {
         }
     }
 
-    // MARK: - Tags
+    // MARK: - Facts
 
-    /// Same look as `TVSceneDetailView.tagsSection`; left out while there are none.
-    @ViewBuilder
-    private var tagsRow: some View {
-        if !performerTags.isEmpty {
-            VStack(alignment: .leading, spacing: 16) {
-                HStack(spacing: 10) {
-                    Image(systemName: "tag.fill")
-                        .font(.title3)
-                        .foregroundColor(AppearanceManager.shared.tintColor)
-                    Text(tr("tags"))
-                        .font(.title3)
-                        .fontWeight(.bold)
-                        .foregroundColor(.white)
-                    Text("\(performerTags.count)")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                }
-                ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: 30) {
-                        ForEach(performerTags) { tag in
-                            TVNavButton(value: TVTagLink(id: tag.id, name: tag.name)) {
-                                Text(tag.name)
-                                    .font(.headline)
-                                    .padding(.horizontal, 24)
-                                    .padding(.vertical, 12)
-                            }
-                        }
-                    }
-                    .padding(.horizontal, 20)
-                    .padding(.vertical, 40)
-                }
-                .focusSection()
-            }
-            .padding(.horizontal, 60)
+    /// The performer's own image; none for Stash's generic silhouette (`…default=true`).
+    static func backdropURL(_ performer: Performer) -> URL? {
+        if performer.imagePath?.contains("default=true") == true { return nil }
+        return performer.thumbnailURL
+    }
+
+    /// The header line, most telling first; what does not fit in two lines goes to the
+    /// Details sheet. Only facts with a value.
+    static func headerFacts(for performer: Performer, battleLine: String?) -> [TVDetailFact] {
+        var facts: [TVDetailFact] = []
+        if let gender = performer.gender, !gender.isEmpty {
+            facts.append(TVDetailFact(id: "gender", label: tr("gender"), value: gender.capitalized))
         }
+        if let birthdate = performer.birthdate, !birthdate.isEmpty {
+            facts.append(TVDetailFact(id: "born", label: tr("born"), value: birthdate))
+            if let age = age(fromBirthdate: birthdate) {
+                facts.append(TVDetailFact(id: "age", label: tr("age"), value: "\(age)"))
+            }
+        }
+        if let country = performer.country, !country.isEmpty {
+            facts.append(TVDetailFact(id: "country", label: tr("country"), value: country))
+        }
+        if let ethnicity = performer.ethnicity, !ethnicity.isEmpty {
+            facts.append(TVDetailFact(id: "ethnicity", label: tr("ethnicity"), value: ethnicity.capitalized))
+        }
+        if let height = performer.height, height > 0 {
+            facts.append(TVDetailFact(id: "height", label: tr("height"), value: "\(height) cm"))
+        }
+        if let measurements = performer.measurements, !measurements.isEmpty {
+            facts.append(TVDetailFact(id: "measurements", label: tr("measurements"), value: measurements))
+        }
+        let aliases = (performer.aliasList ?? []).filter { !$0.isEmpty }
+        if !aliases.isEmpty {
+            facts.append(TVDetailFact(id: "aliases", label: tr("aliases"), value: aliases.joined(separator: ", ")))
+        }
+        // Summed over the performer's scenes by Stash — read-only, the
+        // counter itself lives on the scenes.
+        if let oCounter = performer.oCounter, oCounter > 0 {
+            facts.append(TVDetailFact(id: "o_count", label: tr("o_count"), value: "\(oCounter)",
+                                      icon: "heart.circle", iconColor: AppearanceManager.shared.tintColor))
+        }
+        if let rating = performer.rating100 {
+            facts.append(TVDetailFact(id: "rating", label: tr("rating"), value: String(format: "%.1f", Double(rating) / 20.0),
+                                      icon: "star.fill", iconColor: .yellow))
+        }
+        if let battleLine {
+            facts.append(TVDetailFact(id: "battle", label: tr("battle"), value: battleLine))
+        }
+        return facts
+    }
+
+    /// Facts only the Details sheet lists.
+    static func sheetFacts(for performer: Performer) -> [TVDetailFact] {
+        var facts: [TVDetailFact] = []
+        if let disambiguation = performer.disambiguation, !disambiguation.isEmpty {
+            facts.append(TVDetailFact(id: "disambiguation", label: tr("disambiguation"), value: disambiguation))
+        }
+        facts.append(TVDetailFact(id: "scenes", label: tr("scenes"), value: "\(performer.sceneCount)"))
+        if let weight = performer.weight, weight > 0 {
+            facts.append(TVDetailFact(id: "weight", label: tr("weight"), value: "\(weight) kg"))
+        }
+        if let fakeTits = performer.fakeTits, !fakeTits.isEmpty {
+            facts.append(TVDetailFact(id: "fake_tits", label: tr("fake_tits"), value: fakeTits))
+        }
+        if let penisLength = performer.penis_length, penisLength > 0 {
+            facts.append(TVDetailFact(id: "penis_length", label: tr("penis_length_cm"),
+                                      value: String(format: "%g", penisLength)))
+        }
+        if let career = performer.careerLength, !career.isEmpty {
+            facts.append(TVDetailFact(id: "career", label: tr("career_length"), value: career))
+        }
+        if let tattoos = performer.tattoos, !tattoos.isEmpty {
+            facts.append(TVDetailFact(id: "tattoos", label: tr("tattoos"), value: tattoos))
+        }
+        if let piercings = performer.piercings, !piercings.isEmpty {
+            facts.append(TVDetailFact(id: "piercings", label: tr("piercings"), value: piercings))
+        }
+        if performer.favorite == true {
+            facts.append(TVDetailFact(id: "favorite", label: tr("favourite"), value: "",
+                                      icon: "heart.fill", iconColor: .red))
+        }
+        return facts
+    }
+
+    /// Whole years from a Stash date (`yyyy-MM-dd`, sometimes only `yyyy`); nil when unparsable.
+    static func age(fromBirthdate birthdate: String, now: Date = Date()) -> Int? {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.timeZone = TimeZone(identifier: "UTC")
+        formatter.dateFormat = "yyyy-MM-dd"
+        guard let date = formatter.date(from: String(birthdate.prefix(10))) else { return nil }
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(identifier: "UTC") ?? .current
+        guard let years = calendar.dateComponents([.year], from: date, to: now).year,
+              years >= 0, years < 130 else { return nil }
+        return years
     }
 
     // MARK: - Actions
@@ -229,7 +237,74 @@ private extension Performer {
     }
 }
 
-#Preview {
+// MARK: - Tag chips
+
+/// The performer's own tags (`findPerformerTags`) as one scrolling chip row in the header;
+/// left out while there are none. One line, no section title: the scenes stay on the first screen.
+struct TVPerformerTagChips: View {
+    let tags: [Tag]
+
+    var body: some View {
+        if !tags.isEmpty {
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 20) {
+                    ForEach(tags) { tag in
+                        TVNavButton(value: TVTagLink(id: tag.id, name: tag.name)) {
+                            Text(tag.name)
+                                .font(.callout)
+                                .lineLimit(1)
+                                .padding(.horizontal, 20)
+                                .padding(.vertical, 6)
+                        }
+                    }
+                }
+                // Room for the card style's focus lift and shadow; the negative padding
+                // below keeps the first chip aligned with the title.
+                .padding(.horizontal, 16)
+                .padding(.vertical, 12)
+            }
+            .padding(.horizontal, -16)
+            .tvFocusRow()
+        }
+    }
+}
+
+#Preview("Performer header") {
+    let performer = Performer(
+        id: "1", name: "Example Performer", disambiguation: "EU", birthdate: "1994-03-12",
+        country: "Germany", imagePath: nil, sceneCount: 128, imageCount: 40, galleryCount: 6,
+        gender: "FEMALE", ethnicity: "caucasian", height: 168, weight: 54, measurements: "34B-24-35",
+        fakeTits: "No", penis_length: nil, careerLength: "2015 -", tattoos: "Left shoulder",
+        piercings: "Navel", aliasList: ["Example Alias", "Another Name"], favorite: true,
+        rating100: 80, createdAt: nil, updatedAt: nil, oCounter: 12
+    )
+    let sceneJSON = (1...8).map {
+        #"{"id":"\#($0)","title":"Sample scene \#($0)","date":"2024-0\#(($0 % 9) + 1)-14","performers":[]}"#
+    }.joined(separator: ",")
+    let scenes = (try? JSONDecoder().decode([Scene].self, from: Data("[\(sceneJSON)]".utf8))) ?? []
+    let tags = (try? JSONDecoder().decode([Tag].self, from: Data(#"[{"id":"1","name":"Blonde"},{"id":"2","name":"Outdoor"},{"id":"3","name":"Interview"}]"#.utf8))) ?? []
+    return NavigationStack {
+        TVGenericDetailView(
+            item: performer,
+            isLoading: false,
+            channel: .performer(id: performer.id, name: performer.name),
+            headerActions: [
+                TVDetailHeaderAction(id: "favorite", icon: "heart.fill", title: tr("favourite"), perform: {}),
+                TVDetailHeaderAction(id: "rating", icon: "star.fill", title: TVEntityRating.buttonTitle(80), perform: {})
+            ],
+            facts: TVPerformerDetailView.headerFacts(for: performer, battleLine: "3/120"),
+            sheetFacts: TVPerformerDetailView.sheetFacts(for: performer),
+            scenes: scenes,
+            isLoadingScenes: false,
+            totalScenes: performer.sceneCount,
+            hasMoreScenes: false,
+            loadMoreScenes: {},
+            headerAccessory: { TVPerformerTagChips(tags: tags) }
+        )
+    }
+}
+
+#Preview("Performer (server)") {
     NavigationStack {
         TVPerformerDetailView(performerId: "1", performerName: tr("example_performer"))
     }

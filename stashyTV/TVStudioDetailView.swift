@@ -27,64 +27,25 @@ struct TVStudioDetailView: View {
         TVGenericDetailView(
             item: studio,
             isLoading: isLoadingStudio,
-            heroAspectRatio: 16/9,
-            placeholderSystemImage: "building.2.fill",
-            heroImageOverride: AnyView(
-                TVStudioImageView(studioId: studioId, studioName: studioName, contentMode: .fit, imagePath: studio?.imagePath)
+            // A logo is no backdrop: small, in the title line, no placeholder without one.
+            titleLogo: AnyView(
+                TVStudioImageView(studioId: studioId, studioName: studioName, imagePath: studio?.imagePath,
+                                  titleLogoHeight: 72)
             ),
             channel: .studio(id: studioId, name: studio?.name ?? studioName),
             headerActions: headerActions,
+            facts: studio.map(headerFacts) ?? [],
+            sheetFacts: studio.map(sheetFacts) ?? [],
             scenes: viewModel.studioScenes,
             isLoadingScenes: viewModel.isLoadingStudioScenes,
             totalScenes: viewModel.totalStudioScenes,
             hasMoreScenes: viewModel.hasMoreStudioScenes,
             loadMoreScenes: { viewModel.loadMoreStudioScenes(studioId: studioId) },
-            infoGrid: { studio in
-                let counts = studioCounts.display(for: studio, includeSubStudios: includeSubStudios)
-                LazyVGrid(columns: TVGridSpec.infoColumns, alignment: .leading, spacing: 12) {
-                    Text(tr("scenes")).font(.title3).foregroundStyle(.secondary)
-                    Text("\(counts.scenes)").font(.title3).foregroundColor(.white)
-
-                    if let oCount = counts.oCount, oCount > 0 {
-                        Text(tr("o_count")).font(.title3).foregroundStyle(.secondary)
-                        Text("\(oCount)").font(.title3).foregroundColor(.white)
-                    }
-
-                    if let performerCount = counts.performers, performerCount > 0 {
-                        Text(tr("performers")).font(.title3).foregroundStyle(.secondary)
-                        Text("\(performerCount)").font(.title3).foregroundColor(.white)
-                    }
-
-                    if let galleryCount = counts.galleries, galleryCount > 0 {
-                        Text(tr("galleries")).font(.title3).foregroundStyle(.secondary)
-                        Text("\(galleryCount)").font(.title3).foregroundColor(.white)
-                    }
-
-                    if let rating = studio.rating100 {
-                        Text(tr("rating")).font(.title3).foregroundStyle(.secondary)
-                        HStack(spacing: 5) {
-                            Image(systemName: "star.fill").foregroundColor(.yellow)
-                            Text(String(format: "%.1f", Double(rating) / 20.0)).font(.title3).foregroundColor(.white)
-                        }
-                    }
-
-                    if studio.favorite == true {
-                        Text(tr("favourite")).font(.title3).foregroundStyle(.secondary)
-                        Image(systemName: "heart.fill").foregroundColor(.red).font(.title3)
-                    }
-
-                    if let url = studio.url, !url.isEmpty {
-                        Text("URL").font(.title3).foregroundStyle(.secondary)
-                        Text(url)
-                            .font(.callout)
-                            .foregroundColor(AppearanceManager.shared.tintColor)
-                            .lineLimit(1)
-                    }
-                }
-                .task(id: studio.id) { studioCounts.request(studio.id, refresh: true) }
-            },
-            additionalContent: { EmptyView() }
+            headerAccessory: { EmptyView() }
         )
+        .task(id: studio?.id) {
+            if let id = studio?.id { studioCounts.request(id, refresh: true) }
+        }
         .tvRatingDialog(isPresented: $showingRatingPicker, current: studio?.rating100) { value in
             setRating(value)
         }
@@ -93,6 +54,42 @@ struct TVStudioDetailView: View {
             didLoad = true
             loadStudioData()
         }
+    }
+
+    // MARK: - Facts
+
+    private func headerFacts(_ studio: Studio) -> [TVDetailFact] {
+        let counts = studioCounts.display(for: studio, includeSubStudios: includeSubStudios)
+        var facts: [TVDetailFact] = []
+        if let oCount = counts.oCount, oCount > 0 {
+            facts.append(TVDetailFact(id: "o_count", label: tr("o_count"), value: "\(oCount)",
+                                      icon: "heart.circle", iconColor: AppearanceManager.shared.tintColor))
+        }
+        if let performerCount = counts.performers, performerCount > 0 {
+            facts.append(TVDetailFact(id: "performers", label: tr("performers"), value: "\(performerCount)"))
+        }
+        if let galleryCount = counts.galleries, galleryCount > 0 {
+            facts.append(TVDetailFact(id: "galleries", label: tr("galleries"), value: "\(galleryCount)"))
+        }
+        if let rating = studio.rating100 {
+            facts.append(TVDetailFact(id: "rating", label: tr("rating"), value: String(format: "%.1f", Double(rating) / 20.0),
+                                      icon: "star.fill", iconColor: .yellow))
+        }
+        if let url = studio.url, !url.isEmpty {
+            facts.append(TVDetailFact(id: "url", label: "URL", value: url))
+        }
+        return facts
+    }
+
+    /// Facts only the Details sheet lists (the scene count is in the title line).
+    private func sheetFacts(_ studio: Studio) -> [TVDetailFact] {
+        let counts = studioCounts.display(for: studio, includeSubStudios: includeSubStudios)
+        var facts = [TVDetailFact(id: "scenes", label: tr("scenes"), value: "\(counts.scenes)")]
+        if studio.favorite == true {
+            facts.append(TVDetailFact(id: "favorite", label: tr("favourite"), value: "",
+                                      icon: "heart.fill", iconColor: .red))
+        }
+        return facts
     }
 
     // MARK: - Actions
