@@ -81,10 +81,21 @@ private struct TVPlayerClosePanelKey: EnvironmentKey {
     static let defaultValue: () -> Void = {}
 }
 
+/// A marker picked in the rail: the player remembers it as the last jump, so Previous / Next
+/// count from it (see `TVMarkerNavigation.targets`).
+private struct TVPlayerMarkerPickedKey: EnvironmentKey {
+    static let defaultValue: (Double) -> Void = { _ in }
+}
+
 extension EnvironmentValues {
     var tvPlayerClosePanel: () -> Void {
         get { self[TVPlayerClosePanelKey.self] }
         set { self[TVPlayerClosePanelKey.self] = newValue }
+    }
+
+    var tvPlayerMarkerPicked: (Double) -> Void {
+        get { self[TVPlayerMarkerPickedKey.self] }
+        set { self[TVPlayerMarkerPickedKey.self] = newValue }
     }
 }
 
@@ -190,9 +201,11 @@ private struct TVAetherPlayerContent<Panel: View>: View {
     /// Mirror of `engine.rate`: the engine does not publish its speed, so the speed row
     /// and the transport badge would not redraw after a pick without it.
     @State private var playbackRate: Float = 1
-    /// Ziel des letzten Marker-Sprungs: `engine.currentTime` hinkt dem Seek hinterher, und
-    /// schnell wiederholtes „Nächster Marker“ würde sonst zweimal denselben Marker treffen.
-    @State private var lastMarkerJump: (target: Double, at: Date)?
+    /// Der zuletzt angesprungene Marker (Index in `markerTimes`). Solange der Playhead noch
+    /// dort steht, gehen Previous / Next von diesem Index aus und nicht vom Playhead — der
+    /// landet nach einem Seek auf einem Keyframe oft Sekunden hinter dem Markerstart.
+    /// Jeder manuelle Seek löscht ihn.
+    @State private var lastMarkerJump: TVMarkerNavigation.Jump?
 
     private static var autoHideDelay: Double { 4 }
     /// Same choices as the phone player's speed menu.
@@ -667,6 +680,7 @@ private struct TVAetherPlayerContent<Panel: View>: View {
                     // nehmen, denn `@FocusState` erreicht fremden Inhalt nicht.
                     .prefersDefaultFocus(firstPanelTarget == nil, in: panelScope)
                     .environment(\.tvPlayerClosePanel, { closePanel() })
+                    .environment(\.tvPlayerMarkerPicked, { noteMarkerPicked(seconds: $0) })
             }
             .padding(.horizontal, 60)
             .padding(.vertical, 40)
@@ -748,9 +762,12 @@ private struct TVAetherPlayerContent<Panel: View>: View {
     /// Previous / Next Marker. Springt, ohne das Panel zu schließen: der Fokus bleibt auf
     /// dem Button, jedes weitere Select springt einen Marker weiter.
     private var markerJumpRow: some View {
-        let reference = markerReferenceTime
-        let previous = TVMarkerNavigation.previous(starts: markerTimes, from: reference)
-        let next = TVMarkerNavigation.next(starts: markerTimes, from: reference)
+        // Ein Ergebnis für Beschriftung und Aktion — sie können nicht auseinanderlaufen.
+        let targets = TVMarkerNavigation.targets(starts: markerTimes,
+                                                 playhead: engine.currentTime,
+                                                 jump: lastMarkerJump)
+        let previous = targets.previous
+        let next = targets.next
         return HStack(spacing: 24) {
             panelButton(title: markerJumpTitle(tr("previous_marker"), target: previous),
                         icon: "backward.end.fill") {
@@ -767,25 +784,28 @@ private struct TVAetherPlayerContent<Panel: View>: View {
         .tvFocusRow()
     }
 
-    /// Der Playhead, oder das Ziel des letzten Sprungs, solange der Seek noch nicht gelandet ist.
-    private var markerReferenceTime: Double {
-        TVMarkerNavigation.referenceTime(playhead: engine.currentTime, jump: lastMarkerJump)
-    }
-
-    private func markerJumpTitle(_ title: String, target: Double?) -> String {
-        guard let target else { return title }
-        return "\(title)  \(timeLabel(target))"
+    private func markerJumpTitle(_ title: String, target index: Int?) -> String {
+        guard let index, markerTimes.indices.contains(index) else { return title }
+        return "\(title)  \(timeLabel(markerTimes[index]))"
     }
 
     /// Kein `disabled`: ein deaktivierter Button gibt den Fokus ab, und der Fokus spränge
-    /// mitten in der Sprungfolge in eine andere Reihe.
-    private func jumpToMarker(_ target: Double?) {
-        guard let target else { return }
-        lastMarkerJump = (target, Date())
+    /// mitten in der Sprungfolge in eine andere Reihe. Die Aktion nimmt genau den Index,
+    /// den die Beschriftung zeigt.
+    private func jumpToMarker(_ index: Int?) {
+        guard let index, markerTimes.indices.contains(index) else { return }
+        let target = markerTimes[index]
+        lastMarkerJump = TVMarkerNavigation.Jump(index: index, at: Date())
         Task {
             await engine.seek(to: target)
             engine.play()
         }
+    }
+
+    /// Ein Marker aus der Leiste (`TVMarkerRailView`) zählt als Sprung wie Previous / Next.
+    private func noteMarkerPicked(seconds: Double) {
+        guard let index = markerTimes.firstIndex(where: { abs($0 - seconds) < 0.01 }) else { return }
+        lastMarkerJump = TVMarkerNavigation.Jump(index: index, at: Date())
     }
 
     /// 0.5×–2× like the phone player's speed menu, capped at what the route plays natively.
@@ -917,6 +937,7 @@ private struct TVAetherPlayerContent<Panel: View>: View {
     }
 
     private func step(by delta: Double) {
+        lastMarkerJump = nil
         reveal()
         let duration = engine.duration
         let upperBound = duration.isFinite && duration > 0 ? duration - 0.5 : Double.greatestFiniteMagnitude
@@ -946,6 +967,7 @@ private struct TVAetherPlayerContent<Panel: View>: View {
     /// preview, which commits on Select or after 1 s idle like every other scrub.
     private func beginHoldSeek(_ direction: Int) {
         guard !isPanelOpen else { return }
+        lastMarkerJump = nil
         holdSeekTask?.cancel()
         scrubCommitWork?.cancel()
         if !isScrubbing {
@@ -981,6 +1003,7 @@ private struct TVAetherPlayerContent<Panel: View>: View {
 
     private func beginPanScrub() {
         guard !isPanelOpen else { return }
+        lastMarkerJump = nil
         isPanning = true
         lastPanAt = Date()
         scrubCommitWork?.cancel()

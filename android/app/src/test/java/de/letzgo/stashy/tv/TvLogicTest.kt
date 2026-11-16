@@ -121,31 +121,58 @@ class TvLogicTest {
         assertNull(TvMarkerNav.entryIndex(emptyList(), 1.0))
     }
 
-    @Test fun previousAndNextMarkerFollowThePhonePlayer() {
-        val starts = listOf(10.0, 60.0, 120.0)
-        assertEquals(60.0, TvMarkerNav.next(starts, 10.0)!!, 0.0)
-        assertEquals(10.0, TvMarkerNav.next(starts, 0.0)!!, 0.0)
-        assertNull(TvMarkerNav.next(starts, 120.0))
-        // Right after a jump to 60 s (or up to 3 s into it), Previous goes one further back.
-        assertEquals(10.0, TvMarkerNav.previous(starts, 60.0)!!, 0.0)
-        assertEquals(10.0, TvMarkerNav.previous(starts, 62.5)!!, 0.0)
-        // Well into a marker, Previous restarts it.
-        assertEquals(60.0, TvMarkerNav.previous(starts, 75.0)!!, 0.0)
-        assertNull(TvMarkerNav.previous(starts, 12.0))
+    // Markers as in the station's scene: 1:00, 3:00, 5:18, 6:50, 8:00, 9:30.
+    private val qaStarts = listOf(60.0, 180.0, 318.0, 410.0, 480.0, 570.0)
+
+    private fun targets(playhead: Double, jump: TvMarkerNav.Jump? = null, nowMs: Long = 100_000) =
+        TvMarkerNav.targets(qaStarts, playhead, jump, nowMs)
+
+    @Test fun markerTargetsWithoutAJumpFollowThePlayhead() {
+        // Before the first marker: no previous, next is the first.
+        assertEquals(TvMarkerNav.Targets(null, 0), targets(10.0))
+        // Well into 6:50 after normal playback: Previous restarts it, Next is 8:00.
+        assertEquals(TvMarkerNav.Targets(3, 4), targets(440.0))
+        // 2 s into 6:50 without a jump: Previous goes one back.
+        assertEquals(TvMarkerNav.Targets(2, 4), targets(412.0))
+        // After the last marker: no next.
+        assertEquals(TvMarkerNav.Targets(5, null), targets(600.0))
     }
 
-    @Test fun markerJumpsDecideFromTheTargetUntilTheSeekLands() {
-        // Seek in flight: the player still reports the old position 300 s.
-        assertEquals(60.0, TvMarkerNav.referenceTime(300.0, 60.0, 1_000, 1_500), 0.0)
-        // Landed on a keyframe 2 s early: still the target.
-        assertEquals(60.0, TvMarkerNav.referenceTime(58.0, 60.0, 1_000, 2_000), 0.0)
-        // Landed and playing: the playhead.
-        assertEquals(61.5, TvMarkerNav.referenceTime(61.5, 60.0, 1_000, 2_500), 0.0)
-        // No jump, or long ago: the playhead.
-        assertEquals(300.0, TvMarkerNav.referenceTime(300.0, 0.0, 0, 5_000), 0.0)
-        assertEquals(300.0, TvMarkerNav.referenceTime(300.0, 60.0, 1_000, 20_000), 0.0)
-        // Walking back: jump to 60 → reference 60 → Previous 10.
-        assertEquals(10.0, TvMarkerNav.previous(listOf(10.0, 60.0, 120.0), TvMarkerNav.referenceTime(300.0, 60.0, 1_000, 1_200))!!, 0.0)
+    @Test fun markerTargetsCountFromTheMarkerJustReachedDespiteKeyframeOvershoot() {
+        // Next jumped to 6:50 (index 3); the seek landed on a keyframe 4 s late and played 1.5 s.
+        val jump = TvMarkerNav.Jump(3, atMs = 100_000)
+        assertEquals(TvMarkerNav.Targets(2, 4), targets(415.5, jump, nowMs = 106_000))
+        // Seek still in flight: the player reports the old position (1:10) — still index 3.
+        assertEquals(TvMarkerNav.Targets(2, 4), targets(70.0, jump, nowMs = 100_500))
+        // Landed a keyframe early (6:47): still index 3.
+        assertEquals(TvMarkerNav.Targets(2, 4), targets(407.0, jump, nowMs = 104_000))
+    }
+
+    @Test fun repeatedPreviousWalksBack() {
+        var jump = TvMarkerNav.Jump(3, atMs = 0)
+        var now = 0L
+        var playhead = 414.0 // 6:50 + overshoot
+        val visited = mutableListOf<Int>()
+        repeat(3) {
+            now += 1500
+            val previous = TvMarkerNav.targets(qaStarts, playhead, jump, now).previous!!
+            visited += previous
+            jump = TvMarkerNav.Jump(previous, now)
+            playhead = qaStarts[previous] + 4 // lands 4 s late
+        }
+        assertEquals(listOf(2, 1, 0), visited)
+        // At the first marker: no previous.
+        assertNull(TvMarkerNav.targets(qaStarts, playhead, jump, now + 1500).previous)
+    }
+
+    @Test fun watchingOnOrSeekingEndsTheJumpWindow() {
+        val jump = TvMarkerNav.Jump(3, atMs = 0)
+        // 20 s watched past 6:50: Previous restarts 6:50.
+        assertEquals(TvMarkerNav.Targets(3, 4), targets(430.0, jump, nowMs = 25_000))
+        // Played on into 8:00: counts from the playhead, not the old jump.
+        assertEquals(TvMarkerNav.Targets(3, 5), targets(481.0, jump, nowMs = 12_000))
+        // A manual seek elsewhere (far from 6:50) after the seek landed: the playhead rules.
+        assertEquals(TvMarkerNav.Targets(1, 2), targets(200.0, jump, nowMs = 10_000))
     }
 
     // MARK: sorting
