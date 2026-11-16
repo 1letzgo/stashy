@@ -457,7 +457,7 @@ private struct TVAetherPlayerContent<Panel: View>: View {
                     if !subtitle.isEmpty {
                         Text(subtitle)
                             .font(.system(size: 24))
-                            .foregroundStyle(.white.opacity(0.65))
+                            .foregroundStyle(.white.opacity(0.82))
                             .lineLimit(1)
                     }
                     Spacer()
@@ -486,7 +486,10 @@ private struct TVAetherPlayerContent<Panel: View>: View {
                     // NaN-safe: `max(.nan, 0.001)` is NaN, and a NaN width crashes Core Animation.
                     let progress = PlaybackFraction.cgFloat(displayedTime, in: engine.duration)
                     ZStack(alignment: .leading) {
-                        Capsule().fill(Color.white.opacity(0.25))
+                        // Über hellem Bild verschwand ein Weiß-25%-Track fast ganz:
+                        // dunkle Unterlage plus helleres Weiß hebt sich auf jedem Bild ab.
+                        Capsule().fill(Color.black.opacity(0.35))
+                        Capsule().fill(Color.white.opacity(0.4))
                         Capsule()
                             .fill(isScrubbing ? Color.white : AppearanceManager.shared.tintColor)
                             .frame(width: geo.size.width * progress)
@@ -508,21 +511,35 @@ private struct TVAetherPlayerContent<Panel: View>: View {
                             Label(("▼ " + tr("options")), systemImage: "chevron.down")
                         }
                         .font(.system(size: 20))
-                        .foregroundStyle(.white.opacity(0.5))
+                        .foregroundStyle(.white.opacity(0.7))
                     }
                     Spacer()
                     Text(timeLabel(engine.duration))
                 }
                 .font(.system(size: 24, weight: .medium))
-                .foregroundStyle(.white.opacity(0.85))
+                .foregroundStyle(.white.opacity(0.9))
             }
+            // Leichter Schatten als Reserve für Text auf sehr hellen Stellen.
+            .shadow(color: .black.opacity(0.45), radius: 6, x: 0, y: 1)
             .padding(.horizontal, 80)
             .padding(.bottom, 70)
             .padding(.top, 40)
             .background(
-                LinearGradient(colors: [.clear, .black.opacity(0.8)],
-                               startPoint: .top,
-                               endPoint: .bottom)
+                // Der Verlauf beginnt deutlich über dem Titel und ist auf Titelhöhe
+                // schon dunkel genug; vorher stand die Titelzeile über hellem Bild
+                // (Himmel) auf kaum 40 % Schwarz. Nach oben läuft er weich aus,
+                // damit nicht mehr vom Bild abgedunkelt wird als nötig.
+                LinearGradient(
+                    stops: [
+                        .init(color: .clear, location: 0),
+                        .init(color: .black.opacity(0.35), location: 0.3),
+                        .init(color: .black.opacity(0.7), location: 0.55),
+                        .init(color: .black.opacity(0.85), location: 1)
+                    ],
+                    startPoint: .top,
+                    endPoint: .bottom
+                )
+                .padding(.top, -160)
             )
         }
         .ignoresSafeArea()
