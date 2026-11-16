@@ -1460,6 +1460,38 @@ enum StashJSONValue: Codable, Equatable {
 
 import SwiftUI
 
+// MARK: - Delete actions
+
+/// Settings › Design › Editing › "Show Delete Button": one switch for every Delete of library
+/// content (scenes, images, galleries, markers, performers, studios, tags, groups), on pages,
+/// in menus, context menus, selection bars and Feeds. Off hides them, not just disables them.
+/// Not covered: downloads, servers, saved filters / presets, caches, server maintenance tasks.
+/// Same key on Android (`DeleteActions`).
+enum DeleteActions {
+    static let key = "ShowsDeleteButton"
+    /// The former Feeds-only switch (default off, so only stored once someone flipped it).
+    private static let legacyFeedsKey = "ReelsShowsDeleteButton"
+
+    /// For code outside a view; views use `@DeleteActionsShown`.
+    static var isShown: Bool { UserDefaults.standard.object(forKey: key) as? Bool ?? true }
+
+    /// Once: starts from the old Feeds value when the user ever set it, otherwise on.
+    /// After that the old key is never read again.
+    static func migrateLegacyFeedsSetting() {
+        let defaults = UserDefaults.standard
+        guard defaults.object(forKey: key) == nil else { return }
+        defaults.set(defaults.object(forKey: legacyFeedsKey) as? Bool ?? true, forKey: key)
+    }
+}
+
+/// `@DeleteActionsShown private var showsDelete` — live, so a view on screen follows the switch.
+@propertyWrapper
+struct DeleteActionsShown: DynamicProperty {
+    @AppStorage(DeleteActions.key) private var value = true
+    init() {}
+    var wrappedValue: Bool { value }
+}
+
 #if !os(tvOS)
 private struct StashyGroupedBlockBackground: View {
     let index: Int

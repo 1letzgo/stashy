@@ -778,12 +778,6 @@ class TabManager: ObservableObject {
             UserDefaults.standard.set(isMiniPlayerEnabled, forKey: isMiniPlayerEnabledKey)
         }
     }
-    /// Feeds overlay: optional delete button between Rating and Mute.
-    @Published var reelsShowsDeleteButton: Bool = false {
-        didSet {
-            UserDefaults.standard.set(reelsShowsDeleteButton, forKey: reelsShowsDeleteButtonKey)
-        }
-    }
     /// Scene cards: studio logo instead of the studio name (Settings → Dashboard → Scenes).
     @Published var sceneCardsShowStudioLogo: Bool = true {
         didSet {
@@ -867,7 +861,6 @@ class TabManager: ObservableObject {
     private let subtitleTextColorKey = "subtitle_text_color"
     private let subtitleBackgroundColorKey = "subtitle_background_color"
     private let subtitleBoxEnabledKey = "subtitle_box_enabled"
-    private let reelsShowsDeleteButtonKey = "ReelsShowsDeleteButton"
     private let dashboardHeroSizeKey = "DashboardHeroSize"
     private let sceneCardsShowStudioLogoKey = "SceneCardsShowStudioLogo"
     static let sceneShowStudioCodeKey = "SceneShowStudioCode"
@@ -945,7 +938,6 @@ class TabManager: ObservableObject {
         let storedVerticalsThreshold = UserDefaults.standard.object(forKey: playCountVerticalsSecondsKey) as? Double ?? self.playCountFeedsSeconds
         self.playCountVerticalsSeconds = Self.playCountThresholdOptions.contains(storedVerticalsThreshold) ? storedVerticalsThreshold : 30
         loadSubtitleSettings()
-        self.reelsShowsDeleteButton = UserDefaults.standard.bool(forKey: reelsShowsDeleteButtonKey)
         self.sceneCardsShowStudioLogo = UserDefaults.standard.object(forKey: sceneCardsShowStudioLogoKey) as? Bool ?? true
         self.sceneShowStudioCode = UserDefaults.standard.bool(forKey: Self.sceneShowStudioCodeKey)
         if let heroSizeRaw = UserDefaults.standard.string(forKey: dashboardHeroSizeKey),

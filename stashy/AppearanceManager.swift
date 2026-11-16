@@ -119,6 +119,7 @@ class AppearanceManager: ObservableObject {
         self.preferredTheme = AppTheme(rawValue: savedTheme) ?? .darkBlue
         let editKeyExists = UserDefaults.standard.object(forKey: "kEditModeEnabled") != nil
         self.isEditModeEnabled = editKeyExists ? UserDefaults.standard.bool(forKey: "kEditModeEnabled") : true
+        DeleteActions.migrateLegacyFeedsSetting()
 
         self.loadColor()
     }

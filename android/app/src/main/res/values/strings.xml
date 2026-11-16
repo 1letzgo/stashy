@@ -521,7 +521,6 @@
     <string name="continue_watching">Continue Watching</string>
     <string name="continuous">Continuous</string>
     <string name="continuous_play">Continuous Play</string>
-    <string name="controls">Controls</string>
     <string name="count_as_played">Count As Played</string>
     <string name="count_as_played_scenes">Count as played · Scenes</string>
     <string name="count_as_played_verticals">Count as played · Verticals</string>
@@ -1165,6 +1164,7 @@
     <string name="hint_servers_api_keys_and_settings">Servers, API keys and settings stay on this device either way.</string>
     <string name="hint_servers_settings_default_filters_dashboard">Servers, settings, default filters, dashboard and tabs as one JSON file — imports on iPhone, iPad, Mac and Android.</string>
     <string name="hint_settings_already_in_icloud_replace">Settings already in iCloud replace the ones on this device. API keys are end-to-end encrypted through iCloud Keychain, which must be on for them to sync.</string>
+    <string name="hint_show_delete_button">Delete buttons and menu entries for scenes, images, galleries, markers, performers, studios, tags and groups, Feeds included. Downloads, servers and saved filters always keep theirs.</string>
     <string name="hint_show_edit_buttons_on_scene">Show edit buttons on scene detail cards (performers, studio, groups, galleries, tags, title, description) and on performer / studio / tag / group / gallery detail.</string>
     <string name="hint_shows_all_arg_matching_search">Shows all %1$s matching the search</string>
     <string name="hint_shows_o_counts_of_your">Shows the O Counts of your scenes and images as a month calendar in Tools.</string>

@@ -1497,6 +1497,8 @@ struct FullScreenImageView: View {
     @Environment(\.stashyDismiss) var dismiss
     @State private var isMediaZoomed = false
     @State private var showingDeleteConfirmation = false
+    /// Settings › Design › Editing › Show Delete Button.
+    @DeleteActionsShown private var showsDeleteActions
     @State private var isMuted: Bool = ScenePlayerMute.initialValue()
     @State private var currentVisibleId: String?
     @State private var showUI = true
@@ -2215,16 +2217,18 @@ struct FullScreenImageView: View {
                     .accessibilityLabel(tr("action_set_as_gallery_cover"))
                 }
 
-                Button {
-                    showingDeleteConfirmation = true
-                } label: {
-                    Image(systemName: "trash")
-                        .font(.system(size: StashyExpandingDock.iconSize, weight: .semibold))
-                        .foregroundColor(.white.opacity(StashyExpandingDock.inactiveIconOpacity))
-                        .modifier(StashyChromePillStyle(height: chromePillHeight, iconOnly: true))
+                if showsDeleteActions {
+                    Button {
+                        showingDeleteConfirmation = true
+                    } label: {
+                        Image(systemName: "trash")
+                            .font(.system(size: StashyExpandingDock.iconSize, weight: .semibold))
+                            .foregroundColor(.white.opacity(StashyExpandingDock.inactiveIconOpacity))
+                            .modifier(StashyChromePillStyle(height: chromePillHeight, iconOnly: true))
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel(tr("action_delete"))
                 }
-                .buttonStyle(.plain)
-                .accessibilityLabel(tr("action_delete"))
             }
             .frame(height: chromePillHeight)
             .padding(.horizontal, StashyExpandingDock.edgePadding)

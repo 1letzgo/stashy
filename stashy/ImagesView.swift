@@ -143,6 +143,8 @@ private struct ImagesViewBody: View {
 
     // Multi-Select State
     @State private var isSelectionMode = false
+    /// Selection only exists to delete images, so Select goes with Settings › Design › Editing.
+    @DeleteActionsShown private var showsDeleteActions
     /// iOS 18 search drawer toggle for the native chrome path.
     @State private var isSearchVisible = false
     @State private var selectedImageIds: Set<String> = []
@@ -432,6 +434,11 @@ private struct ImagesViewBody: View {
                 floatingDeleteBar
             }
         }
+        .onChange(of: showsDeleteActions) { _, shown in
+            guard !shown, isSelectionMode else { return }
+            isSelectionMode = false
+            selectedImageIds.removeAll()
+        }
         .alert(tr("confirm_delete_arg_images", selectedImageIds.count), isPresented: $showDeleteConfirmation) {
             Button(tr("action_cancel"), role: .cancel) { }
             Button(tr("action_delete"), role: .destructive) {
@@ -685,14 +692,15 @@ private struct ImagesViewBody: View {
                 showingEditGallerySheet = true
             })
         }
-        actions.append(selectImagesSlot)
+        if let selectImagesSlot { actions.append(selectImagesSlot) }
         if let gallery { actions.append(galleryDownloadSlot(gallery)) }
         return actions
     }
 
-    /// Enters selection mode; the floating bar then shows Done.
-    private var selectImagesSlot: CatalogChromeSlot {
-        CatalogChromeSlot(
+    /// Enters selection mode; the floating bar then shows Done. None while Delete is hidden.
+    private var selectImagesSlot: CatalogChromeSlot? {
+        guard showsDeleteActions else { return nil }
+        return CatalogChromeSlot(
             systemImage: "checkmark.circle",
             accessibilityLabel: tr("action_select_images"),
             action: {
@@ -998,7 +1006,7 @@ private struct ImagesViewBody: View {
     private func quickBar(part: CatalogQuickBarPart) -> some View {
         CatalogListQuickBar(
             mode: .images,
-            trailingActions: part == .sortMenu ? (gallery != nil ? openedGalleryActions : [selectImagesSlot]) : [],
+            trailingActions: part == .sortMenu ? (gallery != nil ? openedGalleryActions : [selectImagesSlot].compactMap { $0 }) : [],
             sort: imageListFilters.selectedSortOption,
             onSort: { changeSortOption(to: $0) },
             document: imageListFilters.criteriaDocument,
@@ -2279,6 +2287,8 @@ struct EditGallerySheet: View {
     @State private var isSaving = false
     @State private var isDeleting = false
     @State private var showingDeleteConfirmation = false
+    /// Settings › Design › Editing › Show Delete Button.
+    @DeleteActionsShown private var showsDeleteActions
     /// Studio, performers, tags and scenes are written as soon as they are picked, like a scene's.
     @State private var linked: Gallery?
     @State private var activePicker: LinkPicker?
@@ -2338,25 +2348,27 @@ struct EditGallerySheet: View {
                     .listRowBackground(Color.secondaryAppBackground)
                 }
 
-                Section {
-                    Button(role: .destructive) {
-                        showingDeleteConfirmation = true
-                    } label: {
-                        HStack {
-                            Spacer()
-                            if isDeleting {
-                                InlineSpinner(tint: .red)
-                            } else {
-                                Label(tr("action_delete_gallery"), systemImage: "trash")
-                                    .foregroundStyle(.red)
+                if showsDeleteActions {
+                    Section {
+                        Button(role: .destructive) {
+                            showingDeleteConfirmation = true
+                        } label: {
+                            HStack {
+                                Spacer()
+                                if isDeleting {
+                                    InlineSpinner(tint: .red)
+                                } else {
+                                    Label(tr("action_delete_gallery"), systemImage: "trash")
+                                        .foregroundStyle(.red)
+                                }
+                                Spacer()
                             }
-                            Spacer()
+                            .frame(maxWidth: .infinity)
                         }
-                        .frame(maxWidth: .infinity)
+                        .disabled(isSaving || isDeleting)
                     }
-                    .disabled(isSaving || isDeleting)
+                    .listRowBackground(Color.secondaryAppBackground)
                 }
-                .listRowBackground(Color.secondaryAppBackground)
             }
             .applyAppBackground()
             .scrollContentBackground(.hidden)

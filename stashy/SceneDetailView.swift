@@ -51,6 +51,8 @@ struct SceneDetailView: View {
     /// The one player. Non-nil from the first `startPlayback` until teardown.
     @State private var aetherEngine: AetherSceneEngine?
     @State private var showDeleteWithFilesConfirmation = false
+    /// Settings › Design › Editing › Show Delete Button.
+    @DeleteActionsShown private var showsDeleteActions
     @State private var isDeleting = false
     @State private var isIdentifying = false
     @Environment(\.stashyDismiss) var dismiss
@@ -158,9 +160,11 @@ struct SceneDetailView: View {
             })
         }
         // Rarely used, so it lives in the top bar instead of as a big card under the scene.
-        actions.append(CatalogChromeSlot(systemImage: "trash", accessibilityLabel: tr("action_delete_scene")) {
-            showDeleteWithFilesConfirmation = true
-        })
+        if showsDeleteActions {
+            actions.append(CatalogChromeSlot(systemImage: "trash", accessibilityLabel: tr("action_delete_scene")) {
+                showDeleteWithFilesConfirmation = true
+            })
+        }
         return actions
     }
 

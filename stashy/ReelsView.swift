@@ -359,6 +359,8 @@ struct ReelsViewBody: View {
     @State private var isMuted = ScenePlayerMute.initialValue()
     @State private var currentVisibleSceneId: String?
     @State private var showDeleteConfirmation = false
+    /// Settings › Design › Editing (formerly a Feeds switch of its own).
+    @DeleteActionsShown private var showsDeleteActions
     /// Item behind the optional overlay delete button (scene / preview with files, or clip image).
     @State private var reelsItemToDelete: ReelItemData?
     @State private var reelsMode: ReelsMode = Self.sessionRestoredReelsMode()
@@ -4888,7 +4890,7 @@ struct ReelsViewBody: View {
                         #endif
                         // Delete sits left of the settings, for the item on screen (not in Pics,
                         // which deletes from its own image list). A marker deletes only itself.
-                        if reelsMode != .pics, tabManager.reelsShowsDeleteButton, let currentItem {
+                        if reelsMode != .pics, showsDeleteActions, let currentItem {
                             reelsDeletePill(for: currentItem)
                         }
                         reelsSortMenu

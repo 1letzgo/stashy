@@ -1986,6 +1986,8 @@ struct EditTagSheet: View {
     @State private var isSaving = false
     @State private var isDeleting = false
     @State private var showingDeleteConfirmation = false
+    /// Settings › Design › Editing › Show Delete Button.
+    @DeleteActionsShown private var showsDeleteActions
     /// The tags this one belongs to. Written as soon as they are picked, like a scene's tags.
     @State private var parents: [Tag.TagRef] = []
     @State private var showingParentPicker = false
@@ -2054,25 +2056,27 @@ struct EditTagSheet: View {
                     .listRowBackground(Color.secondaryAppBackground)
                 }
 
-                Section {
-                    Button(role: .destructive) {
-                        showingDeleteConfirmation = true
-                    } label: {
-                        HStack {
-                            Spacer()
-                            if isDeleting {
-                                InlineSpinner(tint: .red)
-                            } else {
-                                Label(tr("action_delete_tag"), systemImage: "trash")
-                                    .foregroundStyle(.red)
+                if showsDeleteActions {
+                    Section {
+                        Button(role: .destructive) {
+                            showingDeleteConfirmation = true
+                        } label: {
+                            HStack {
+                                Spacer()
+                                if isDeleting {
+                                    InlineSpinner(tint: .red)
+                                } else {
+                                    Label(tr("action_delete_tag"), systemImage: "trash")
+                                        .foregroundStyle(.red)
+                                }
+                                Spacer()
                             }
-                            Spacer()
+                            .frame(maxWidth: .infinity)
                         }
-                        .frame(maxWidth: .infinity)
+                        .disabled(isSaving || isDeleting)
                     }
-                    .disabled(isSaving || isDeleting)
+                    .listRowBackground(Color.secondaryAppBackground)
                 }
-                .listRowBackground(Color.secondaryAppBackground)
             }
             .applyAppBackground()
             .scrollContentBackground(.hidden)

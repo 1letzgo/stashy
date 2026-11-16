@@ -771,12 +771,16 @@ struct MarkersView: View {
 }
 
 /// "Delete Marker" for a marker's context menu; the confirmation is `markerDeleteAlert`.
+/// Nothing while Settings › Design › Editing hides Delete (an empty context menu never opens).
 struct MarkerDeleteMenuButton: View {
     let action: () -> Void
+    @DeleteActionsShown private var showsDelete
 
     var body: some View {
-        Button(role: .destructive, action: action) {
-            Label(tr("action_delete_marker"), systemImage: "trash")
+        if showsDelete {
+            Button(role: .destructive, action: action) {
+                Label(tr("action_delete_marker"), systemImage: "trash")
+            }
         }
     }
 }

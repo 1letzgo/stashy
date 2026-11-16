@@ -847,6 +847,8 @@ struct RateMeToolsView: View {
     /// Avoids reloading when returning from `NavigationLink` (Watch Scene): `.task` restarts after disappear/reappear.
     @State private var didRunInitialRateMeLoad = false
     @State private var showDeleteConfirmation = false
+    /// Settings › Design › Editing › Show Delete Button.
+    @DeleteActionsShown private var showsDeleteActions
     @State private var themePicker: ThemePickerKind?
     @Environment(\.toolsBreadcrumb) private var toolsBreadcrumb
 
@@ -1135,20 +1137,22 @@ struct RateMeToolsView: View {
             .disabled(model.isSubmitting || model.isIncrementingO || model.isDeleting)
             .accessibilityLabel(tr("hint_o_count_arg_tap_to_increment", item.oCounter))
 
-            Button {
-                HapticManager.light()
-                showDeleteConfirmation = true
-            } label: {
-                Image(systemName: "trash")
-                    .font(.body.weight(.semibold))
-                    .foregroundStyle(.red)
-                    .frame(width: 44, height: 44)
-                    .contentShape(Rectangle())
+            if showsDeleteActions {
+                Button {
+                    HapticManager.light()
+                    showDeleteConfirmation = true
+                } label: {
+                    Image(systemName: "trash")
+                        .font(.body.weight(.semibold))
+                        .foregroundStyle(.red)
+                        .frame(width: 44, height: 44)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .disabled(model.isSubmitting || model.isDeleting || model.isLoading)
+                .accessibilityLabel(tr("action_delete"))
+                .accessibilityHint(tr("hint_deletes_this_item_and_its"))
             }
-            .buttonStyle(.plain)
-            .disabled(model.isSubmitting || model.isDeleting || model.isLoading)
-            .accessibilityLabel(tr("action_delete"))
-            .accessibilityHint(tr("hint_deletes_this_item_and_its"))
         }
     }
 
