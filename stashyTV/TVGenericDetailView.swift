@@ -662,7 +662,6 @@ enum TVDetailFactPacking {
         return result
     }
 }
-}
 
 /// Label small and secondary, the value below it in regular weight.
 /// Sized by its parent: the header measures it at its natural width and then gives it
