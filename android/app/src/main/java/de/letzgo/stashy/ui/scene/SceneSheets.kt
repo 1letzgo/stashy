@@ -747,8 +747,9 @@ fun AddMarkerSheet(scene: Scene, seconds: Double, frame: android.graphics.Bitmap
             // iOS: two Forms side by side — field, picked tag and times on the left, the results
             // alone on the right from the top bar down to the IME.
             // The row takes the sheet's whole remaining height, so the columns end where the sheet
-            // ends instead of growing with their content past the IME.
-            Row(Modifier.fillMaxWidth().weight(1f), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            // ends instead of growing with their content past the IME. The gap between the columns
+            // is the sheet's own 16 dp side padding, so both cards keep the same distance all round.
+            Row(Modifier.fillMaxWidth().weight(1f), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
                 Column(Modifier.weight(1f).fillMaxHeight().verticalScroll(rememberScrollState())) {
                     FormSection(tr(R.string.primary_tag)) {
                         searchField()

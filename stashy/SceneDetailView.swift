@@ -1585,7 +1585,11 @@ struct AddMarkerSheet: View {
         NavigationStack {
             Group {
                 if isCompactHeight {
-                    HStack(alignment: .top, spacing: 0) {
+                    // An inset-grouped Form takes its side margin from the safe area / screen
+                    // edge it touches; the two inner edges touch neither and get none, so with
+                    // no spacing the cards of both columns met in the middle. The gap is the
+                    // same 20 pt the cards keep to the safe area on the outer sides.
+                    HStack(alignment: .top, spacing: DesignTokens.Spacing.lg) {
                         Form {
                             Section(header: Text(tr("primary_tag"))) {
                                 tagSearchField
