@@ -49,6 +49,8 @@ struct TVGenericDetailView<Item: TVDetailItem, Accessory: View>: View {
     let facts: [TVDetailFact]
     /// Facts only the Details sheet shows.
     let sheetFacts: [TVDetailFact]
+    /// Description only the Details sheet shows (a performer's).
+    let sheetDetails: String?
 
     @State private var playingChannel: TVChannel?
     @ObservedObject private var stashyPlus = StashyPlusManager.shared
@@ -90,6 +92,7 @@ struct TVGenericDetailView<Item: TVDetailItem, Accessory: View>: View {
         trailingActions: [TVDetailHeaderAction] = [],
         facts: [TVDetailFact],
         sheetFacts: [TVDetailFact] = [],
+        sheetDetails: String? = nil,
         scenes: [Scene],
         isLoadingScenes: Bool,
         totalScenes: Int,
@@ -106,6 +109,7 @@ struct TVGenericDetailView<Item: TVDetailItem, Accessory: View>: View {
         self.trailingActions = trailingActions
         self.facts = facts
         self.sheetFacts = sheetFacts
+        self.sheetDetails = sheetDetails
         self.scenes = scenes
         self.isLoadingScenes = isLoadingScenes
         self.totalScenes = totalScenes
@@ -126,6 +130,7 @@ struct TVGenericDetailView<Item: TVDetailItem, Accessory: View>: View {
                     backdrop: backdrop,
                     isLoading: isLoading,
                     details: item?.details,
+                    sheetDetails: sheetDetails,
                     facts: facts,
                     sheetFacts: sheetFacts,
                     accessory: headerAccessory,
@@ -197,6 +202,10 @@ struct TVGenericDetailView<Item: TVDetailItem, Accessory: View>: View {
                         .padding(.horizontal, sceneSpec.horizontalPadding)
                     }
                 }
+                // A focus section across the full width: Down from any header button reaches
+                // the first card row, also from a button with no card under it (Details on
+                // the right, a page with one or two scenes).
+                .tvFocusRow()
                 .padding(.bottom, 80)
             }
         }
@@ -287,8 +296,12 @@ struct TVGenericDetailView<Item: TVDetailItem, Accessory: View>: View {
 /// - 40 between two facts (`TVGridSpec.scenes.spacing`), 4 between a fact's label and
 ///   value
 /// - buttons and tag chips: one size, `TVChromeButtonLabel` (headline, 24 × 8 padding) in
-///   `TVChromeButtonStyle` scaled from the leading edge, so the row starts on the text edge
-///   (80) focused or not
+///   `TVChromeButtonStyle` lifted 3 % from the leading edge, so the row starts on the text
+///   edge (80) focused or not and a lifted control keeps half the gap to its neighbour
+/// - the button row and the chip row scroll inside the text column, so neither ever
+///   reaches the backdrop
+/// - these are layout gaps; the visible ink gaps are a few pt larger because text line
+///   boxes carry their ascender / descender room (not compensated, the rhythm is the same)
 /// - leading and trailing edge: the safe area (80), the same as every grid
 enum TVDetailMetrics {
     static let topInset: CGFloat = 30
@@ -300,6 +313,14 @@ enum TVDetailMetrics {
     /// Room around a scrolling chip row for the focus lift and shadow; taken back with a
     /// negative padding so the row stays on the scale above.
     static let focusBleed: CGFloat = 24
+    /// Focus lift of header buttons and chips, from their leading edge: 3 % of the widest
+    /// label ("Play as Channel", ~385 pt) is ~12 pt, half the 24 pt gap to the neighbour.
+    static let focusScale: CGFloat = 1.03
+
+    /// The style of every header button and chip.
+    static var controlStyle: TVChromeButtonStyle {
+        TVChromeButtonStyle(scaleAnchor: .leading, focusScale: focusScale)
+    }
 }
 
 /// A section title on a detail page, the same as a Home row title: no icon (an SF symbol's
@@ -340,6 +361,9 @@ struct TVDetailHeader<Accessory: View, Actions: View>: View {
     let backdrop: TVDetailBackdrop
     let isLoading: Bool
     let details: String?
+    /// Description shown only in the Details sheet (a performer's, loaded apart from the
+    /// page data); the header's two lines show `details`.
+    let sheetDetails: String?
     let facts: [TVDetailFact]
     /// Facts only the Details sheet shows.
     let sheetFacts: [TVDetailFact]
@@ -361,6 +385,7 @@ struct TVDetailHeader<Accessory: View, Actions: View>: View {
         backdrop: TVDetailBackdrop = .none,
         isLoading: Bool = false,
         details: String? = nil,
+        sheetDetails: String? = nil,
         facts: [TVDetailFact] = [],
         sheetFacts: [TVDetailFact] = [],
         @ViewBuilder accessory: @escaping () -> Accessory,
@@ -372,6 +397,7 @@ struct TVDetailHeader<Accessory: View, Actions: View>: View {
         self.backdrop = backdrop
         self.isLoading = isLoading
         self.details = details
+        self.sheetDetails = sheetDetails
         self.facts = facts
         self.sheetFacts = sheetFacts
         self.accessory = accessory
@@ -407,8 +433,12 @@ struct TVDetailHeader<Accessory: View, Actions: View>: View {
         return max(700, imageStart + 0.1 * (backdropWidth + Self.safeTrailing))
     }
 
-    private var trimmedDetails: String? {
-        guard let text = details?.trimmingCharacters(in: .whitespacesAndNewlines), !text.isEmpty else { return nil }
+    private var trimmedDetails: String? { Self.trimmed(details) }
+
+    private var sheetDescription: String? { trimmedDetails ?? Self.trimmed(sheetDetails) }
+
+    private static func trimmed(_ text: String?) -> String? {
+        guard let text = text?.trimmingCharacters(in: .whitespacesAndNewlines), !text.isEmpty else { return nil }
         return text
     }
 
@@ -420,21 +450,30 @@ struct TVDetailHeader<Accessory: View, Actions: View>: View {
 
             accessory()
 
-            HStack(spacing: TVDetailMetrics.rowGap) {
-                actions()
-                if showsDetailsButton {
-                    Button {
-                        showingDetails = true
-                    } label: {
-                        TVChromeButtonLabel(icon: "info.circle", text: tr("details"))
+            // Scrolls inside the text column instead of running into the backdrop; focus
+            // moves it. The bleed gives the lift and shadow room inside its clip.
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: TVDetailMetrics.rowGap) {
+                    actions()
+                    if showsDetailsButton {
+                        // Icon only: the row stays short enough for the column on every page.
+                        Button {
+                            showingDetails = true
+                        } label: {
+                            Image(systemName: "info.circle")
+                                .font(.headline)
+                                .padding(.horizontal, 24)
+                                .padding(.vertical, 8)
+                        }
+                        .accessibilityLabel(tr("details"))
                     }
                 }
+                // The catalog's control style for every button, growing from its leading
+                // edge: the first one stays on the text edge when focused.
+                .buttonStyle(TVDetailMetrics.controlStyle)
+                .padding(TVDetailMetrics.focusBleed)
             }
-            // The catalog's control style for every button, growing from its leading edge:
-            // the first one stays on the text edge when focused.
-            .buttonStyle(TVChromeButtonStyle(scaleAnchor: .leading))
-            // Never squeezed by the text column; the buttons bring their own fill.
-            .fixedSize(horizontal: true, vertical: false)
+            .padding(-TVDetailMetrics.focusBleed)
             // Own section across the full width: Up from the grid and Down from the
             // accessory row reach it from any column.
             .tvFocusRow()
@@ -461,7 +500,7 @@ struct TVDetailHeader<Accessory: View, Actions: View>: View {
         // buttons and the column do not overlap horizontally.
         .focusSection()
         .sheet(isPresented: $showingDetails) {
-            TVDetailInfoSheet(title: title, details: trimmedDetails, facts: facts + sheetFacts)
+            TVDetailInfoSheet(title: title, details: sheetDescription, facts: facts + sheetFacts)
         }
     }
 
@@ -507,7 +546,7 @@ struct TVDetailHeader<Accessory: View, Actions: View>: View {
     }
 
     private var showsDetailsButton: Bool {
-        !isLoading && (trimmedDetails != nil || !sheetFacts.isEmpty || factLayout.hiddenCount > 0)
+        !isLoading && (sheetDescription != nil || !sheetFacts.isEmpty || factLayout.hiddenCount > 0)
     }
 
     @ViewBuilder

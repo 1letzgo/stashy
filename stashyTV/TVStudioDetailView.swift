@@ -82,6 +82,11 @@ struct TVStudioDetailView: View {
     private func sheetFacts(_ studio: Studio) -> [TVDetailFact] {
         let counts = studioCounts.display(for: studio, includeSubStudios: includeSubStudios)
         var facts = [TVDetailFact(id: "scenes", label: tr("scenes"), value: "\(counts.scenes)")]
+        // The header's Rating button shows it too; the sheet lists everything.
+        if let rating = studio.rating100 {
+            facts.append(TVDetailFact(id: "rating", label: tr("rating"), value: String(format: "%.1f", Double(rating) / 20.0),
+                                      icon: "star.fill", iconColor: .yellow))
+        }
         if studio.favorite == true {
             facts.append(TVDetailFact(id: "favorite", label: tr("favourite"), value: "",
                                       icon: "heart.fill", iconColor: .red))

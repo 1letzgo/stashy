@@ -237,6 +237,8 @@ struct TVGalleryDetailView: View {
                         .padding(.horizontal, imageSpec.horizontalPadding)
                     }
                 }
+                // Full-width focus section: Down from any header button reaches the grid.
+                .tvFocusRow()
             }
             .padding(.bottom, 80)
         }

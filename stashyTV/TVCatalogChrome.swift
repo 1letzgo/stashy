@@ -65,15 +65,19 @@ struct TVChromeButtonStyle: ButtonStyle {
     /// Where the focus lift grows from. `.leading` keeps a row's first button on the text
     /// edge (detail headers); the catalog chrome keeps `.center`.
     var scaleAnchor: UnitPoint = .center
+    /// Size of the focus lift. Detail headers use less: grown from the leading edge, the
+    /// default 6 % of a wide button ate the whole gap to its neighbour.
+    var focusScale: CGFloat = 1.06
 
     func makeBody(configuration: Configuration) -> some View {
-        TVChromeButtonBody(configuration: configuration, scaleAnchor: scaleAnchor)
+        TVChromeButtonBody(configuration: configuration, scaleAnchor: scaleAnchor, focusScale: focusScale)
     }
 }
 
 private struct TVChromeButtonBody: View {
     let configuration: ButtonStyle.Configuration
     let scaleAnchor: UnitPoint
+    let focusScale: CGFloat
     @Environment(\.isFocused) private var isFocused
     @Environment(\.isEnabled) private var isEnabled
 
@@ -84,7 +88,7 @@ private struct TVChromeButtonBody: View {
                 RoundedRectangle(cornerRadius: 14, style: .continuous)
                     .fill(isFocused ? Color.white : Color.white.opacity(0.14))
             )
-            .scaleEffect(configuration.isPressed ? 0.98 : (isFocused ? 1.06 : 1), anchor: scaleAnchor)
+            .scaleEffect(configuration.isPressed ? 0.98 : (isFocused ? focusScale : 1), anchor: scaleAnchor)
             .shadow(color: .black.opacity(isFocused ? 0.35 : 0), radius: 14, y: 8)
             .opacity(isEnabled ? 1 : 0.5)
             .animation(.easeOut(duration: 0.15), value: isFocused)
