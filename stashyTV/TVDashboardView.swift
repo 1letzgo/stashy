@@ -62,7 +62,7 @@ struct TVDashboardView: View {
                 .safeAreaInset(edge: .bottom) { Color.clear.frame(height: 60).focusable(false) }
             }
         }
-        .background(TVThemeFill())
+        .background(TVThemeFill().ignoresSafeArea())
         // A channel opens Feeds (Scenes, the channel's filter and sort), as on iOS.
         .tvChannelFeedCover($playingChannel) {
             // Fortschritte aus den Feeds nachholen, die während der Wiedergabe

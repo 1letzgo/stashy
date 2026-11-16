@@ -233,7 +233,7 @@ struct TVGalleryDetailView: View {
             }
             .padding(.bottom, 80)
         }
-        .background(TVThemeFill())
+        .background(TVThemeFill().ignoresSafeArea())
         .dismissOnAppLock {
             presentedImage = nil
             slideshow = nil

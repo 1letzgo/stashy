@@ -63,7 +63,7 @@ struct TVRateMeView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         // Land on the middle star, not on the pickers in the header.
         .defaultFocus($focusedStar, 3)
-        .background(TVThemeFill())
+        .background(TVThemeFill().ignoresSafeArea())
         .onAppear {
             guard !didRunInitialLoad else { return }
             didRunInitialLoad = true

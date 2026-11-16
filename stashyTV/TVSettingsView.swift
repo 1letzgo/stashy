@@ -122,7 +122,7 @@ struct TVSettingsView: View {
                 .padding(.top, 60)
         }
         .padding(.trailing, 80)
-        .background(TVThemeFill())
+        .background(TVThemeFill().ignoresSafeArea())
         .onChange(of: focusedEntry) { _, entry in
             if let entry { detailEntry = entry }
         }
@@ -131,7 +131,28 @@ struct TVSettingsView: View {
                 .tvExitDismissable()
                 .environment(\.tvNavigationPath, navigationPath)
         }
+        #if DEBUG
+        // Simulator layout checks: `-stashyDebugTVSettingsPage appearance` (with
+        // `-stashyDebugTVTab settings`) pushes that settings page once.
+        .task {
+            guard !Self.debugPageOpened,
+                  let raw = UserDefaults.standard.string(forKey: "stashyDebugTVSettingsPage") else { return }
+            let pages: [String: TVSettingsEntry] = [
+                "servers": .servers, "appearance": .appearance, "security": .security, "stashyPlus": .stashyPlus,
+                "defaultSort": .defaultSort, "defaultFilters": .defaultFilters, "visibleTabs": .visibleTabs,
+                "homeRows": .homeRows, "images": .images, "subtitles": .subtitles, "dolbyVision": .dolbyVision,
+                "playCount": .playCount, "maintenance": .maintenance, "about": .about,
+            ]
+            guard let entry = pages[raw] else { return }
+            Self.debugPageOpened = true
+            navigationPath?.wrappedValue.append(entry)
+        }
+        #endif
     }
+
+    #if DEBUG
+    @MainActor private static var debugPageOpened = false
+    #endif
 
     private var entryList: some View {
         List {
@@ -321,7 +342,7 @@ struct TVSettingsPageChrome: ViewModifier {
         .padding(.leading, 60)
         .padding(.trailing, 80)
         .padding(.top, 60)
-        .background(TVThemeFill())
+        .background(TVThemeFill().ignoresSafeArea())
         // tvOS zeichnet `navigationTitle` mittig und ausgegraut über den Inhalt.
         // Neben der linksbündigen Überschrift stünde der Titel doppelt da, also
         // leer setzen — dasselbe macht `TVSceneDetailView`.
@@ -961,7 +982,7 @@ private struct TVSubtitleLanguagePickerView: View {
             .tvSettingsPage(tr("preferred_language"),
                             description: tr("hint_language_scenes_subtitles_start_with"))
         }
-        .background(TVThemeFill())
+        .background(TVThemeFill().ignoresSafeArea())
     }
 
     private func row(_ option: (id: String, label: String)) -> some View {

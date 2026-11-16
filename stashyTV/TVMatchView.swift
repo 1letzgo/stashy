@@ -59,7 +59,7 @@ struct TVMatchView: View {
         }
         .safeAreaInset(edge: .bottom) { Color.clear.frame(height: 60).focusable(false) }
         .defaultFocus($focusedCard, true)
-        .background(TVThemeFill())
+        .background(TVThemeFill().ignoresSafeArea())
         .onAppear {
             guard !didRunInitialLoad else {
                 // Back on Match after a saved final: start the next tournament.

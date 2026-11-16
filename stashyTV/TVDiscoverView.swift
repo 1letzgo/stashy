@@ -68,7 +68,7 @@ struct TVDiscoverView: View {
             .padding(.top, 24)
             .frame(maxWidth: .infinity, alignment: .leading)
         }
-        .background(TVThemeFill())
+        .background(TVThemeFill().ignoresSafeArea())
         .navigationDestination(for: TVDiscoverToolLink.self) { link in
             TVDiscoverToolDestination(tool: link.tool)
                 .tvExitDismissable()
