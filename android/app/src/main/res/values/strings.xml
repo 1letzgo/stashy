@@ -1440,6 +1440,7 @@
     <string name="match">Match</string>
     <string name="match_mode">Match mode</string>
     <string name="match_mode_arg">Match mode, %1$s</string>
+    <string name="match_rank">Match Rank</string>
     <string name="matches_regex">Matches regex</string>
     <string name="max">Max</string>
     <string name="max_intensity">Max Intensity</string>

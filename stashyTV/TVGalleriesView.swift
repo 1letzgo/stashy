@@ -228,7 +228,9 @@ struct TVGalleryDetailView: View {
                             }
                         }
                     }
-                    .padding(.horizontal, 60)
+                    // On the safe-area edge like the header and every other grid (the old
+                    // 60 pt put this page's content 60 pt further in than the rest).
+                    .padding(.horizontal, imageSpec.horizontalPadding)
                 }
             }
             .padding(.bottom, 80)
@@ -276,22 +278,23 @@ struct TVGalleryDetailView: View {
     private var headerSection: some View {
         TVDetailHeader(
             title: gallery?.displayName ?? galleryTitle,
-            count: gallery?.imageCount.map { TVDetailCount(value: $0, icon: "photo.on.rectangle") },
+            // Shown from 0 on: a gallery's count is known once it has loaded (the scene pages
+            // wait for > 0 because their count is 0 while loading).
+            count: gallery.map { TVDetailCount(value: $0.imageCount ?? 0, icon: "photo.on.rectangle") },
             backdrop: .image(gallery?.thumbnailURL),
             isLoading: isLoadingGallery,
             details: gallery?.details,
             facts: headerFacts,
-            // Same inset as the image grid below.
-            horizontalInset: 60,
             accessory: { EmptyView() },
             actions: {
-                if !displayImages.isEmpty {
-                    Button {
-                        slideshow = TVSlideshowStart(index: 0)
-                    } label: {
-                        Label(tr("slideshow"), systemImage: "play.rectangle.on.rectangle")
-                    }
+                // Always in the row so the page has the same control row as the others;
+                // disabled (and not focusable) while there is nothing to show.
+                Button {
+                    slideshow = TVSlideshowStart(index: 0)
+                } label: {
+                    Label(tr("slideshow"), systemImage: "play.rectangle.on.rectangle")
                 }
+                .disabled(displayImages.isEmpty)
             }
         )
     }

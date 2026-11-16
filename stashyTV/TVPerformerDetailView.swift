@@ -31,8 +31,8 @@ struct TVPerformerDetailView: View {
             backdrop: .image(performer.flatMap(Self.backdropURL)),
             channel: .performer(id: performerId, name: performer?.name ?? performerName),
             headerActions: headerActions,
-            facts: performer.map { Self.headerFacts(for: $0, battleLine: battleLine) } ?? [],
-            sheetFacts: performer.map { Self.sheetFacts(for: $0) } ?? [],
+            facts: performer.map { Self.headerFacts(for: $0) } ?? [],
+            sheetFacts: performer.map { Self.sheetFacts(for: $0, matchRank: battleLine) } ?? [],
             scenes: viewModel.performerScenes,
             isLoadingScenes: viewModel.isLoadingPerformerScenes,
             totalScenes: viewModel.totalPerformerScenes,
@@ -64,9 +64,9 @@ struct TVPerformerDetailView: View {
         return performer.thumbnailURL
     }
 
-    /// The header line, most telling first; what does not fit in two lines goes to the
+    /// The header line, most telling first; what does not fit in the line goes to the
     /// Details sheet. Only facts with a value.
-    static func headerFacts(for performer: Performer, battleLine: String?) -> [TVDetailFact] {
+    static func headerFacts(for performer: Performer) -> [TVDetailFact] {
         var facts: [TVDetailFact] = []
         if let gender = performer.gender, !gender.isEmpty {
             facts.append(TVDetailFact(id: "gender", label: tr("gender"), value: gender.capitalized))
@@ -89,29 +89,29 @@ struct TVPerformerDetailView: View {
         if let measurements = performer.measurements, !measurements.isEmpty {
             facts.append(TVDetailFact(id: "measurements", label: tr("measurements"), value: measurements))
         }
-        let aliases = (performer.aliasList ?? []).filter { !$0.isEmpty }
-        if !aliases.isEmpty {
-            facts.append(TVDetailFact(id: "aliases", label: tr("aliases"), value: aliases.joined(separator: ", ")))
-        }
         // Summed over the performer's scenes by Stash — read-only, the
         // counter itself lives on the scenes.
         if let oCounter = performer.oCounter, oCounter > 0 {
             facts.append(TVDetailFact(id: "o_count", label: tr("o_count"), value: "\(oCounter)",
                                       icon: "heart.circle", iconColor: AppearanceManager.shared.tintColor))
         }
-        if let rating = performer.rating100 {
-            facts.append(TVDetailFact(id: "rating", label: tr("rating"), value: String(format: "%.1f", Double(rating) / 20.0),
-                                      icon: "star.fill", iconColor: .yellow))
-        }
-        if let battleLine {
-            facts.append(TVDetailFact(id: "battle", label: tr("battle"), value: battleLine))
+        // Last: the longest value. Cut with an ellipsis when the line is nearly full,
+        // behind Details when it is full. No rating fact: the Rating button shows it.
+        let aliases = (performer.aliasList ?? []).filter { !$0.isEmpty }
+        if !aliases.isEmpty {
+            facts.append(TVDetailFact(id: "aliases", label: tr("aliases"), value: aliases.joined(separator: ", ")))
         }
         return facts
     }
 
-    /// Facts only the Details sheet lists.
-    static func sheetFacts(for performer: Performer) -> [TVDetailFact] {
+    /// Facts only the Details sheet lists. `matchRank` is the performer's place in the Match
+    /// tool's leaderboard ("rank/total" of its pool, `HotOrNotBattleDisplay`), nil when the
+    /// performer is not in that pool; it means nothing without the tool, so it stays here.
+    static func sheetFacts(for performer: Performer, matchRank: String?) -> [TVDetailFact] {
         var facts: [TVDetailFact] = []
+        if let matchRank {
+            facts.append(TVDetailFact(id: "match_rank", label: tr("match_rank"), value: matchRank))
+        }
         if let disambiguation = performer.disambiguation, !disambiguation.isEmpty {
             facts.append(TVDetailFact(id: "disambiguation", label: tr("disambiguation"), value: disambiguation))
         }
@@ -292,8 +292,8 @@ struct TVPerformerTagChips: View {
                 TVDetailHeaderAction(id: "favorite", icon: "heart.fill", title: tr("favourite"), perform: {}),
                 TVDetailHeaderAction(id: "rating", icon: "star.fill", title: TVEntityRating.buttonTitle(80), perform: {})
             ],
-            facts: TVPerformerDetailView.headerFacts(for: performer, battleLine: "3/120"),
-            sheetFacts: TVPerformerDetailView.sheetFacts(for: performer),
+            facts: TVPerformerDetailView.headerFacts(for: performer),
+            sheetFacts: TVPerformerDetailView.sheetFacts(for: performer, matchRank: "3/120"),
             scenes: scenes,
             isLoadingScenes: false,
             totalScenes: performer.sceneCount,

@@ -9,7 +9,7 @@ struct TVDetailHeaderAction: Identifiable {
 }
 
 /// One fact of a detail page: a small label over its value ("Born" / "1990-04-02").
-/// The header shows as many as fit in two lines, the Details sheet shows all of them.
+/// The header shows as many as fit in one line, the Details sheet shows all of them.
 struct TVDetailFact: Identifiable {
     let id: String
     let label: String
@@ -45,7 +45,7 @@ struct TVGenericDetailView<Item: TVDetailItem, Accessory: View>: View {
     /// Buttons that may appear once the item has loaded (a group's cover switch). They
     /// come after `headerActions` and are never the focus anchor.
     let trailingActions: [TVDetailHeaderAction]
-    /// Facts in the header line, in order of importance; what does not fit in two lines
+    /// Facts in the header line, in order of importance; what does not fit in the line
     /// moves to the Details sheet.
     let facts: [TVDetailFact]
     /// Facts only the Details sheet shows.
@@ -292,8 +292,8 @@ struct TVDetailCount {
 
 /// The compact header of every tvOS detail page of this shape (performer, studio, tag,
 /// group, gallery): title line with logo and count, an optional accessory row (a performer's
-/// tag chips), one row of buttons with "Details" at its end, the facts as at most two lines
-/// of label/value pairs plus a two-line description, and the image as a backdrop on the
+/// tag chips), one row of buttons with "Details" at its end, the facts as one line of
+/// label/value pairs plus a two-line description, and the image as a backdrop on the
 /// trailing side. About a third of a 1920×1080 screen, so the content grid starts on the
 /// first screen.
 ///
@@ -311,8 +311,6 @@ struct TVDetailHeader<Accessory: View, Actions: View>: View {
     let facts: [TVDetailFact]
     /// Facts only the Details sheet shows.
     let sheetFacts: [TVDetailFact]
-    /// Inset of the text from the content edge; the backdrop still reaches the screen edge.
-    let horizontalInset: CGFloat
     let accessory: () -> Accessory
     let actions: () -> Actions
 
@@ -333,7 +331,6 @@ struct TVDetailHeader<Accessory: View, Actions: View>: View {
         details: String? = nil,
         facts: [TVDetailFact] = [],
         sheetFacts: [TVDetailFact] = [],
-        horizontalInset: CGFloat = 0,
         @ViewBuilder accessory: @escaping () -> Accessory,
         @ViewBuilder actions: @escaping () -> Actions
     ) {
@@ -345,14 +342,13 @@ struct TVDetailHeader<Accessory: View, Actions: View>: View {
         self.details = details
         self.facts = facts
         self.sheetFacts = sheetFacts
-        self.horizontalInset = horizontalInset
         self.accessory = accessory
         self.actions = actions
     }
 
     // MARK: Metrics
 
-    private static var maxFactLines: Int { 2 }
+    private static var maxFactLines: Int { 1 }
     private static var factSpacing: CGFloat { 48 }
     /// A single fact never grows wider than this (long alias lists are cut, the sheet has them).
     private static var factMaxWidth: CGFloat { 420 }
@@ -372,7 +368,7 @@ struct TVDetailHeader<Accessory: View, Actions: View>: View {
 
     /// With a backdrop the text column ends where the image is still mostly faded out.
     private var textColumnMaxWidth: CGFloat {
-        hasBackdrop ? max(700, contentWidth - 160 - backdropWidth * 0.75 - horizontalInset) : .infinity
+        hasBackdrop ? max(700, contentWidth - 160 - backdropWidth * 0.75) : .infinity
     }
 
     private var trimmedDetails: String? {
@@ -417,7 +413,6 @@ struct TVDetailHeader<Accessory: View, Actions: View>: View {
         }
         .frame(maxWidth: textColumnMaxWidth, alignment: .leading)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.horizontal, horizontalInset)
         .padding(.top, 10)
         // Background, not a sibling: the image never changes the header's height, so the
         // grid starts at the same place with and without it, and it scrolls away with it.
@@ -445,7 +440,7 @@ struct TVDetailHeader<Accessory: View, Actions: View>: View {
                     .minimumScaleFactor(0.7)
             }
             .layoutPriority(1)
-            if let count, count.value > 0 {
+            if let count {
                 Label {
                     Text(verbatim: "\(count.value)")
                 } icon: {
@@ -461,7 +456,7 @@ struct TVDetailHeader<Accessory: View, Actions: View>: View {
 
     // MARK: Facts
 
-    private var factLayout: (lines: [[TVDetailFact]], hiddenCount: Int) {
+    private var factLayout: TVDetailFactPacking.Result {
         TVDetailFactPacking.pack(
             facts,
             widths: factWidths,
@@ -480,11 +475,13 @@ struct TVDetailHeader<Accessory: View, Actions: View>: View {
         if !facts.isEmpty {
             VStack(alignment: .leading, spacing: 12) {
                 if factsLineWidth > 0 {
-                    ForEach(Array(factLayout.lines.enumerated()), id: \.offset) { _, line in
+                    let layout = factLayout
+                    ForEach(Array(layout.lines.enumerated()), id: \.offset) { _, line in
                         HStack(alignment: .top, spacing: Self.factSpacing) {
                             ForEach(line) { fact in
                                 TVDetailFactView(fact: fact)
-                                    .frame(width: factWidths[fact.id], alignment: .leading)
+                                    .frame(width: layout.widthOverrides[fact.id] ?? factWidths[fact.id],
+                                           alignment: .leading)
                             }
                         }
                     }
@@ -566,37 +563,65 @@ struct TVDetailHeader<Accessory: View, Actions: View>: View {
 // MARK: - Fact packing
 
 enum TVDetailFactPacking {
-    /// Fills lines from the left in order; once a fact does not fit into the last line,
-    /// it and every later fact are hidden (order is importance, nothing jumps ahead).
+    struct Result {
+        var lines: [[TVDetailFact]] = []
+        /// Facts left out at the end; the Details sheet lists them.
+        var hiddenCount: Int = 0
+        /// Narrower widths for facts cut with an ellipsis to fill the last line.
+        var widthOverrides: [String: CGFloat] = [:]
+    }
+
+    /// Fills lines from the left in order (order is importance, nothing jumps ahead). The
+    /// fact that no longer fits into the last line is cut to the rest of the line when at
+    /// least `minTruncatedWidth` is left; it and every later fact go to the Details sheet
+    /// otherwise (the sheet always has the full value).
     static func pack(
         _ facts: [TVDetailFact],
         widths: [String: CGFloat],
         lineWidth: CGFloat,
         spacing: CGFloat,
-        maxLines: Int
-    ) -> (lines: [[TVDetailFact]], hiddenCount: Int) {
-        guard lineWidth > 0 else { return ([], 0) }
-        var lines: [[TVDetailFact]] = []
+        maxLines: Int,
+        minTruncatedWidth: CGFloat = 240
+    ) -> Result {
+        guard lineWidth > 0, maxLines > 0 else { return Result() }
+        var result = Result()
         var current: [TVDetailFact] = []
         var used: CGFloat = 0
         for (index, fact) in facts.enumerated() {
             let width = widths[fact.id] ?? 0
             let needed = current.isEmpty ? width : used + spacing + width
-            if needed <= lineWidth || current.isEmpty && width > lineWidth {
+            if needed <= lineWidth {
                 current.append(fact)
                 used = needed
                 continue
             }
-            lines.append(current)
-            if lines.count == maxLines {
-                return (lines, facts.count - index)
+            let isLastLine = result.lines.count == maxLines - 1
+            let rest = current.isEmpty ? lineWidth : lineWidth - used - spacing
+            if isLastLine || current.isEmpty {
+                // Cut this fact to what is left of the line (a single over-wide fact always).
+                if rest >= minTruncatedWidth || current.isEmpty {
+                    current.append(fact)
+                    result.widthOverrides[fact.id] = max(0, rest)
+                    used = lineWidth
+                    if isLastLine {
+                        result.lines.append(current)
+                        result.hiddenCount = facts.count - index - 1
+                        return result
+                    }
+                    continue
+                }
+                result.lines.append(current)
+                result.hiddenCount = facts.count - index
+                return result
             }
+            result.lines.append(current)
             current = [fact]
             used = width
         }
-        if !current.isEmpty { lines.append(current) }
-        return (lines, 0)
+        if !current.isEmpty { result.lines.append(current) }
+        return result
     }
+}
 }
 
 /// Label small and secondary, the value below it in regular weight.

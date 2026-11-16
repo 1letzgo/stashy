@@ -71,10 +71,7 @@ struct TVStudioDetailView: View {
         if let galleryCount = counts.galleries, galleryCount > 0 {
             facts.append(TVDetailFact(id: "galleries", label: tr("galleries"), value: "\(galleryCount)"))
         }
-        if let rating = studio.rating100 {
-            facts.append(TVDetailFact(id: "rating", label: tr("rating"), value: String(format: "%.1f", Double(rating) / 20.0),
-                                      icon: "star.fill", iconColor: .yellow))
-        }
+        // No rating fact: the Rating button shows it.
         if let url = studio.url, !url.isEmpty {
             facts.append(TVDetailFact(id: "url", label: "URL", value: url))
         }
