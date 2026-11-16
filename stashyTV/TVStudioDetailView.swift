@@ -30,7 +30,7 @@ struct TVStudioDetailView: View {
             heroAspectRatio: 16/9,
             placeholderSystemImage: "building.2.fill",
             heroImageOverride: AnyView(
-                TVStudioImageView(studioId: studioId, studioName: studioName, contentMode: .fit)
+                TVStudioImageView(studioId: studioId, studioName: studioName, contentMode: .fit, imagePath: studio?.imagePath)
             ),
             channel: .studio(id: studioId, name: studio?.name ?? studioName),
             headerActions: headerActions,

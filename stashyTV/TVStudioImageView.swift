@@ -6,6 +6,9 @@ struct TVStudioImageView: View {
     let studioId: String
     let studioName: String
     var contentMode: ContentMode = .fit
+    /// The studio's `image_path` when known. Stash answers a studio without a logo
+    /// with a generic white camera (`…&default=true`); like iOS, show our own glyph then.
+    var imagePath: String? = nil
 
     @State private var imageLoadState: ImageLoadState = .loading
 
@@ -41,7 +44,7 @@ struct TVStudioImageView: View {
                 placeholderView
             }
         }
-        .task(id: studioId) {
+        .task(id: "\(studioId)|\(imagePath ?? "")") {
             await loadImage()
         }
     }
@@ -57,6 +60,10 @@ struct TVStudioImageView: View {
     }
 
     private func loadImage() async {
+        if imagePath?.contains("default=true") == true {
+            imageLoadState = .failure
+            return
+        }
         // No `updated_at` at the tvOS call sites; the cache is server-scoped with a
         // 30-day TTL and clears from Settings, which is enough for a studio logo.
         if let image = await StudioLogoStore.shared.image(

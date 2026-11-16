@@ -641,7 +641,7 @@ struct TVSceneDetailView: View {
             TVNavButton(value: TVStudioLink(id: studio.id, name: studio.name)) {
                 VStack(alignment: .leading, spacing: 12) {
                     ZStack {
-                        TVStudioImageView(studioId: studio.id, studioName: studio.name, contentMode: .fit)
+                        TVStudioImageView(studioId: studio.id, studioName: studio.name, contentMode: .fit, imagePath: studio.imagePath)
                             .padding(25)
                     }
                     .frame(width: 320, height: 180)

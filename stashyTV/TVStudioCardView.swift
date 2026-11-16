@@ -75,7 +75,7 @@ struct TVStudioCardView: View {
             Rectangle()
                 .fill(Color.gray.opacity(0.08))
 
-            TVStudioImageView(studioId: studio.id, studioName: studio.name, contentMode: .fit)
+            TVStudioImageView(studioId: studio.id, studioName: studio.name, contentMode: .fit, imagePath: studio.imagePath)
                 .padding(24)
         }
     }
