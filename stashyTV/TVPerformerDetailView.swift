@@ -23,6 +23,9 @@ struct TVPerformerDetailView: View {
     @State private var battleLine: String?
     /// The performer's own tags (`findPerformerTags`), a row like on the TV scene page.
     @State private var performerTags: [Tag] = []
+    /// Description and links for the Details sheet; not in `PerformerFields`, so they come
+    /// with their own small query (`PerformerProfileExtras`).
+    @State private var profileExtras = PerformerProfileExtras()
 
     var body: some View {
         TVGenericDetailView(
@@ -32,7 +35,8 @@ struct TVPerformerDetailView: View {
             channel: .performer(id: performerId, name: performer?.name ?? performerName),
             headerActions: headerActions,
             facts: performer.map { Self.headerFacts(for: $0) } ?? [],
-            sheetFacts: performer.map { Self.sheetFacts(for: $0, matchRank: battleLine) } ?? [],
+            sheetFacts: performer.map { Self.sheetFacts(for: $0, matchRank: battleLine, links: profileExtras.links) } ?? [],
+            sheetDetails: profileExtras.details,
             scenes: viewModel.performerScenes,
             isLoadingScenes: viewModel.isLoadingPerformerScenes,
             totalScenes: viewModel.totalPerformerScenes,
@@ -48,6 +52,9 @@ struct TVPerformerDetailView: View {
         }
         .task(id: performerId) {
             performerTags = (try? await PerformerRepository().fetchPerformerTags(performerId: performerId)) ?? []
+        }
+        .task(id: performerId) {
+            profileExtras = await PerformerProfileExtras.load(performerId: performerId)
         }
         .onAppear {
             guard !didLoad else { return }
@@ -107,8 +114,13 @@ struct TVPerformerDetailView: View {
     /// Facts only the Details sheet lists. `matchRank` is the performer's place in the Match
     /// tool's leaderboard ("rank/total" of its pool, `HotOrNotBattleDisplay`), nil when the
     /// performer is not in that pool; it means nothing without the tool, so it stays here.
-    static func sheetFacts(for performer: Performer, matchRank: String?) -> [TVDetailFact] {
+    static func sheetFacts(for performer: Performer, matchRank: String?, links: [String] = []) -> [TVDetailFact] {
         var facts: [TVDetailFact] = []
+        // The header's Rating button shows it too; the sheet lists everything.
+        if let rating = performer.rating100 {
+            facts.append(TVDetailFact(id: "rating", label: tr("rating"), value: String(format: "%.1f", Double(rating) / 20.0),
+                                      icon: "star.fill", iconColor: .yellow))
+        }
         if let matchRank {
             facts.append(TVDetailFact(id: "match_rank", label: tr("match_rank"), value: matchRank))
         }
@@ -138,6 +150,9 @@ struct TVPerformerDetailView: View {
         if performer.favorite == true {
             facts.append(TVDetailFact(id: "favorite", label: tr("favourite"), value: "",
                                       icon: "heart.fill", iconColor: .red))
+        }
+        if !links.isEmpty {
+            facts.append(TVDetailFact(id: "links", label: tr("links"), value: links.joined(separator: "\n")))
         }
         return facts
     }
@@ -237,6 +252,36 @@ private extension Performer {
     }
 }
 
+// MARK: - Profile extras
+
+/// A performer's description and links, which the shared `PerformerFields` fragment does not
+/// carry. Same small query as the iOS performer page (`loadProfileLinks`): `urls`, falling
+/// back to the singular `url` on servers without it.
+struct PerformerProfileExtras: Equatable {
+    var details: String?
+    var links: [String] = []
+
+    static func load(performerId: String) async -> PerformerProfileExtras {
+        func fetch(_ linkField: String) async -> PerformerProfileExtras? {
+            let query = "query PerformerProfileExtras($id: ID!) { findPerformer(id: $id) { details \(linkField) } }"
+            guard let data = try? await GraphQLClient.shared.executeRaw(query: query, variables: ["id": performerId]),
+                  let root = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+                  let dataDict = root["data"] as? [String: Any],
+                  let node = dataDict["findPerformer"] as? [String: Any] else { return nil }
+            var raw: [String] = []
+            if let list = node["urls"] as? [String] { raw = list }
+            else if let single = node["url"] as? String { raw = [single] }
+            var seen = Set<String>()
+            let links = raw
+                .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+                .filter { !$0.isEmpty && seen.insert($0).inserted }
+            return PerformerProfileExtras(details: node["details"] as? String, links: links)
+        }
+        if let extras = await fetch("urls") { return extras }
+        return await fetch("url") ?? PerformerProfileExtras()
+    }
+}
+
 // MARK: - Tag chips
 
 /// The performer's own tags (`findPerformerTags`) as one scrolling chip row in the header;
@@ -259,7 +304,7 @@ struct TVPerformerTagChips: View {
                         }
                     }
                 }
-                .buttonStyle(TVChromeButtonStyle(scaleAnchor: .leading))
+                .buttonStyle(TVDetailMetrics.controlStyle)
                 // Room for the focus lift and shadow inside the scroll view's clip; the
                 // negative padding below keeps the row on the text edge and the row gap.
                 .padding(TVDetailMetrics.focusBleed)
@@ -294,7 +339,9 @@ struct TVPerformerTagChips: View {
                 TVDetailHeaderAction(id: "rating", icon: "star.fill", title: TVEntityRating.buttonTitle(80), perform: {})
             ],
             facts: TVPerformerDetailView.headerFacts(for: performer),
-            sheetFacts: TVPerformerDetailView.sheetFacts(for: performer, matchRank: "3/120"),
+            sheetFacts: TVPerformerDetailView.sheetFacts(for: performer, matchRank: "3/120",
+                                                         links: ["https://example.com/performer"]),
+            sheetDetails: "A short sample description for the Details sheet.",
             scenes: scenes,
             isLoadingScenes: false,
             totalScenes: performer.sceneCount,
