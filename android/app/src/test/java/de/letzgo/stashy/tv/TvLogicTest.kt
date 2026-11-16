@@ -126,11 +126,26 @@ class TvLogicTest {
         assertEquals(60.0, TvMarkerNav.next(starts, 10.0)!!, 0.0)
         assertEquals(10.0, TvMarkerNav.next(starts, 0.0)!!, 0.0)
         assertNull(TvMarkerNav.next(starts, 120.0))
-        // Right after a jump to 60 s, Previous goes one further back.
+        // Right after a jump to 60 s (or up to 3 s into it), Previous goes one further back.
         assertEquals(10.0, TvMarkerNav.previous(starts, 60.0)!!, 0.0)
+        assertEquals(10.0, TvMarkerNav.previous(starts, 62.5)!!, 0.0)
         // Well into a marker, Previous restarts it.
         assertEquals(60.0, TvMarkerNav.previous(starts, 75.0)!!, 0.0)
-        assertNull(TvMarkerNav.previous(starts, 10.5))
+        assertNull(TvMarkerNav.previous(starts, 12.0))
+    }
+
+    @Test fun markerJumpsDecideFromTheTargetUntilTheSeekLands() {
+        // Seek in flight: the player still reports the old position 300 s.
+        assertEquals(60.0, TvMarkerNav.referenceTime(300.0, 60.0, 1_000, 1_500), 0.0)
+        // Landed on a keyframe 2 s early: still the target.
+        assertEquals(60.0, TvMarkerNav.referenceTime(58.0, 60.0, 1_000, 2_000), 0.0)
+        // Landed and playing: the playhead.
+        assertEquals(61.5, TvMarkerNav.referenceTime(61.5, 60.0, 1_000, 2_500), 0.0)
+        // No jump, or long ago: the playhead.
+        assertEquals(300.0, TvMarkerNav.referenceTime(300.0, 0.0, 0, 5_000), 0.0)
+        assertEquals(300.0, TvMarkerNav.referenceTime(300.0, 60.0, 1_000, 20_000), 0.0)
+        // Walking back: jump to 60 → reference 60 → Previous 10.
+        assertEquals(10.0, TvMarkerNav.previous(listOf(10.0, 60.0, 120.0), TvMarkerNav.referenceTime(300.0, 60.0, 1_000, 1_200))!!, 0.0)
     }
 
     // MARK: sorting

@@ -268,7 +268,8 @@ class TvSceneDetailRoute(private val sceneId: String, initial: Scene? = null) : 
         Column(verticalArrangement = Arrangement.spacedBy(pt(16))) {
             TvSectionHeading(TvIcons.bookmark, tr(R.string.markers), markers.size)
             LazyRow(
-                Modifier.focusRestorer { if (entryIndex != null) entryCard else FocusRequester.Default },
+                // Without a resume point: the row's own focus memory, as before.
+                if (entryIndex != null) Modifier.tvRowEntry(entryIndex, listState, entryCard) else Modifier.focusRestorer(),
                 state = listState,
                 horizontalArrangement = Arrangement.spacedBy(pt(24)),
                 contentPadding = PaddingValues(horizontal = pt(20), vertical = pt(30)),
