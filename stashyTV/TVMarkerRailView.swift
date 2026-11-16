@@ -43,21 +43,46 @@ struct TVMarkerRailView: View {
         return result
     }
 
+    /// The card focus lands on when it enters the rail: the marker at or before the playhead
+    /// (the first one before every marker) — never simply the leftmost card.
+    private var entryMarkerID: String? {
+        let list = sorted
+        guard let index = TVMarkerNavigation.entryIndex(starts: list.map(\.seconds), time: currentTime) else { return nil }
+        return list[index].id
+    }
+
+    @FocusState private var focusedMarkerID: String?
+
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             Text(tr("markers"))
                 .font(.system(size: 22, weight: .bold))
                 .foregroundStyle(.white.opacity(0.6))
 
-            ScrollView(.horizontal, showsIndicators: false) {
-                // Lazy for the same reason as the channel's Up Next rail: it opens over playback.
-                LazyHStack(alignment: .top, spacing: 30) {
-                    ForEach(sorted) { marker in
-                        card(for: marker, isActive: marker.id == activeMarkerID)
+            ScrollViewReader { proxy in
+                ScrollView(.horizontal, showsIndicators: false) {
+                    // Lazy for the same reason as the channel's Up Next rail: it opens over playback.
+                    LazyHStack(alignment: .top, spacing: 30) {
+                        ForEach(sorted) { marker in
+                            card(for: marker, isActive: marker.id == activeMarkerID)
+                                .id(marker.id)
+                        }
                     }
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 24)
                 }
-                .padding(.horizontal, 10)
-                .padding(.vertical, 24)
+                .onAppear {
+                    // Opens scrolled to the current marker, so its card exists (lazy stack)
+                    // and is the one in view when focus comes down into the rail.
+                    if let entry = entryMarkerID { proxy.scrollTo(entry, anchor: .leading) }
+                }
+                .onChange(of: focusedMarkerID) { old, new in
+                    // Focus just came into the rail from another row: the focus engine picks
+                    // the geometrically nearest card, so move it to the current marker.
+                    guard old == nil, let new, let entry = entryMarkerID, new != entry else { return }
+                    proxy.scrollTo(entry, anchor: .leading)
+                    focusedMarkerID = entry
+                }
             }
         }
         .focusSection()
@@ -89,6 +114,7 @@ struct TVMarkerRailView: View {
                 )
             }
             .buttonStyle(.card)
+            .focused($focusedMarkerID, equals: marker.id)
 
             Text(displayTitle(for: marker))
                 .font(.system(size: 22, weight: .medium))

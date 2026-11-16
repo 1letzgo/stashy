@@ -21,6 +21,8 @@ struct TVSceneDetailView: View {
     @State private var isLoadingDetail = true
     @State private var showingRatingPicker = false
     @FocusState private var focusedHeroAction: HeroAction?
+    /// Focused marker card; lets the section start on the marker of the resume point.
+    @FocusState private var focusedMarkerID: String?
 
     private enum HeroAction: Hashable {
         case play
@@ -142,6 +144,7 @@ struct TVSceneDetailView: View {
                     // Failsafe — save progress falls fullScreenCover ohne `onDismiss` weggeht.
                     playerModel.saveProgress()
                 },
+                markerTimes: (playing?.sceneMarkers ?? []).map(\.seconds),
                 panelExtra: {
                     // Statt „Up Next“ (Channel) zeigt die Einzelszene ihre Marker.
                     // `currentTime` wird bei jedem Rebuild des Panels frisch gelesen —
@@ -537,9 +540,20 @@ struct TVSceneDetailView: View {
         VStack(alignment: .leading, spacing: 16) {
             sectionHeading(icon: "bookmark.fill", title: tr("markers"), count: markers.count)
 
+            let sortedMarkers = markers.sorted { $0.seconds < $1.seconds }
+            // With a resume point the row starts on the marker playing there (the last one at
+            // or before it), not on the first marker — deep into a scene that was many clicks.
+            let entryID: String? = {
+                guard let resume = scene.resumeTime, resume > 0, resume.isFinite,
+                      let index = TVMarkerNavigation.entryIndex(starts: sortedMarkers.map(\.seconds), time: resume)
+                else { return nil }
+                return sortedMarkers[index].id
+            }()
+
+            ScrollViewReader { proxy in
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 24) {
-                    ForEach(markers.sorted { $0.seconds < $1.seconds }) { marker in
+                    ForEach(sortedMarkers) { marker in
                         VStack(alignment: .leading, spacing: 8) {
                             Button {
                                 startPlayback(for: scene, at: marker.seconds)
@@ -584,6 +598,7 @@ struct TVSceneDetailView: View {
                                 }
                             }
                             .buttonStyle(.card)
+                            .focused($focusedMarkerID, equals: marker.id)
                             
                             Text(marker.title ?? tr("untitled_marker"))
                                 .font(.callout)
@@ -592,10 +607,22 @@ struct TVSceneDetailView: View {
                                 .lineLimit(1)
                                 .frame(width: 260, alignment: .leading)
                         }
+                        .id(marker.id)
                     }
                 }
                 .padding(.horizontal, 20)
                 .padding(.vertical, 30)
+            }
+            .onAppear {
+                if let entryID { proxy.scrollTo(entryID, anchor: .leading) }
+            }
+            .onChange(of: focusedMarkerID) { old, new in
+                // Focus came down (or up) into the row: go to the resume marker instead of
+                // whichever card happens to lie under the previous row's button.
+                guard old == nil, let new, let entryID, new != entryID else { return }
+                proxy.scrollTo(entryID, anchor: .leading)
+                focusedMarkerID = entryID
+            }
             }
         }
     }

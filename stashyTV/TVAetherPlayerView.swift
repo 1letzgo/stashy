@@ -26,6 +26,9 @@ struct TVAetherPlayerView<Panel: View>: View {
     var canGoNext: Bool = false
     var onPrevious: (() -> Void)? = nil
     var onNext: (() -> Void)? = nil
+    /// Marker starts of the playing scene (seconds). Non-empty adds ticks on the time bar and
+    /// a Previous / Next Marker row as the panel's first row.
+    var markerTimes: [Double] = []
     /// Extra content for the "down" panel — the channel's Up Next rail.
     @ViewBuilder var panelExtra: () -> Panel
 
@@ -47,6 +50,7 @@ struct TVAetherPlayerView<Panel: View>: View {
                     canGoNext: canGoNext,
                     onPrevious: onPrevious,
                     onNext: onNext,
+                    markerTimes: markerTimes.filter(\.isFinite).sorted(),
                     panelExtra: panelExtra,
                     onExit: exit
                 )
@@ -92,6 +96,7 @@ extension TVAetherPlayerView {
          posterURL: URL? = nil,
          onExit: (() -> Void)? = nil,
          onDisappear: (() -> Void)? = nil,
+         markerTimes: [Double] = [],
          @ViewBuilder panelExtra: @escaping () -> Panel) {
         self.init(model: model,
                   title: title,
@@ -101,6 +106,7 @@ extension TVAetherPlayerView {
                   canGoNext: false,
                   onPrevious: nil,
                   onNext: nil,
+                  markerTimes: markerTimes,
                   panelExtra: panelExtra,
                   onExit: onExit,
                   onDisappear: onDisappear)
@@ -141,6 +147,8 @@ private struct TVAetherPlayerContent<Panel: View>: View {
     let canGoNext: Bool
     let onPrevious: (() -> Void)?
     let onNext: (() -> Void)?
+    /// Sorted, finite marker starts (seconds).
+    let markerTimes: [Double]
     @ViewBuilder var panelExtra: () -> Panel
     let onExit: () -> Void
 
@@ -182,6 +190,9 @@ private struct TVAetherPlayerContent<Panel: View>: View {
     /// Mirror of `engine.rate`: the engine does not publish its speed, so the speed row
     /// and the transport badge would not redraw after a pick without it.
     @State private var playbackRate: Float = 1
+    /// Ziel des letzten Marker-Sprungs: `engine.currentTime` hinkt dem Seek hinterher, und
+    /// schnell wiederholtes „Nächster Marker“ würde sonst zweimal denselben Marker treffen.
+    @State private var lastMarkerJump: (target: Double, at: Date)?
 
     private static var autoHideDelay: Double { 4 }
     /// Same choices as the phone player's speed menu.
@@ -328,6 +339,8 @@ private struct TVAetherPlayerContent<Panel: View>: View {
     /// `prefersDefaultFocus`.
     private var firstPanelTarget: PanelFocusTarget? {
         if canGoPrevious || canGoNext { return .nav }
+        // Marker-Szenen öffnen auf „Nächster Marker“: Down, Select springt.
+        if !markerTimes.isEmpty { return .marker }
         if !engine.audioTracks.isEmpty { return .audio }
         if !engine.subtitleTracks.isEmpty { return .subtitles }
         // Speed is always there, so the panel never opens without a focus target.
@@ -494,13 +507,31 @@ private struct TVAetherPlayerContent<Panel: View>: View {
                             .fill(isScrubbing ? Color.white : AppearanceManager.shared.tintColor)
                             .frame(width: geo.size.width * progress)
                     }
+                    // Marker-Striche (wie die Punkte der iOS-Feeds), höher als die Leiste,
+                    // damit sie auch über dem gefüllten Teil zu sehen sind. Als Overlay,
+                    // sonst würde die Leiste mit den Strichen mitwachsen und verrutschen.
+                    .overlay(alignment: .leading) {
+                        ZStack(alignment: .leading) {
+                            if engine.duration.isFinite, engine.duration > 0 {
+                                ForEach(Array(markerTimes.enumerated()), id: \.offset) { _, seconds in
+                                    let fraction = PlaybackFraction.cgFloat(seconds, in: engine.duration)
+                                    RoundedRectangle(cornerRadius: 1.5, style: .continuous)
+                                        .fill(Color.white.opacity(0.95))
+                                        .frame(width: 4, height: 18)
+                                        .shadow(color: .black.opacity(0.6), radius: 2)
+                                        .offset(x: max(0, geo.size.width * fraction - 2))
+                                }
+                            }
+                        }
+                    }
                 }
                 .frame(height: 8)
 
                 HStack {
                     Text(timeLabel(displayedTime))
                     Spacer()
-                    if canGoPrevious || canGoNext {
+                    // Mit Markern zeigt der Hinweis, dass Down die Marker-Sprünge öffnet.
+                    if canGoPrevious || canGoNext || !markerTimes.isEmpty {
                         HStack(spacing: 20) {
                             if canGoPrevious {
                                 Label(tr("hold_prev"), systemImage: "backward.end.fill")
@@ -508,7 +539,11 @@ private struct TVAetherPlayerContent<Panel: View>: View {
                             if canGoNext {
                                 Label(tr("hold_next"), systemImage: "forward.end.fill")
                             }
-                            Label(("▼ " + tr("options")), systemImage: "chevron.down")
+                            if canGoPrevious || canGoNext {
+                                Label(("▼ " + tr("options")), systemImage: "chevron.down")
+                            } else {
+                                Label(("▼ " + tr("markers")), systemImage: "chevron.down")
+                            }
                         }
                         .font(.system(size: 20))
                         .foregroundStyle(.white.opacity(0.7))
@@ -593,6 +628,10 @@ private struct TVAetherPlayerContent<Panel: View>: View {
                     .focusSection()
                 }
 
+                if !markerTimes.isEmpty {
+                    markerJumpRow
+                }
+
                 if !engine.audioTracks.isEmpty {
                     trackRow(heading: "Audio",
                              tracks: engine.audioTracks,
@@ -641,7 +680,7 @@ private struct TVAetherPlayerContent<Panel: View>: View {
     /// Fokus-Anker des Panels. `nil` als `equals`-Wert gibt es bei `@FocusState` nicht,
     /// also wird der Modifier nur auf dem Einstiegs-Button gesetzt.
     fileprivate enum PanelFocusTarget: Hashable {
-        case nav, audio, subtitles, speed
+        case nav, marker, audio, subtitles, speed
         /// Unsichtbare Zeile über der obersten Reihe: landet der Fokus dort, hat der
         /// Nutzer „nach oben" aus dem Panel gedrückt — das Panel geht zu.
         case closer
@@ -702,6 +741,52 @@ private struct TVAetherPlayerContent<Panel: View>: View {
             }
         }
         .focusSection()
+    }
+
+    /// Previous / Next Marker. Springt, ohne das Panel zu schließen: der Fokus bleibt auf
+    /// dem Button, jedes weitere Select springt einen Marker weiter.
+    private var markerJumpRow: some View {
+        let reference = markerReferenceTime
+        let previous = TVMarkerNavigation.previous(starts: markerTimes, from: reference)
+        let next = TVMarkerNavigation.next(starts: markerTimes, from: reference)
+        return HStack(spacing: 24) {
+            panelButton(title: markerJumpTitle(tr("previous_marker"), target: previous),
+                        icon: "backward.end.fill") {
+                jumpToMarker(previous)
+            }
+            .opacity(previous == nil ? 0.45 : 1)
+            panelButton(title: markerJumpTitle(tr("next_marker"), target: next),
+                        icon: "forward.end.fill",
+                        focusTarget: firstPanelTarget == .marker ? .marker : nil) {
+                jumpToMarker(next)
+            }
+            .opacity(next == nil ? 0.45 : 1)
+        }
+        .focusSection()
+    }
+
+    /// Der Playhead, oder das Ziel des letzten Sprungs, solange der Seek noch läuft.
+    private var markerReferenceTime: Double {
+        if let jump = lastMarkerJump, Date().timeIntervalSince(jump.at) < 2 {
+            return jump.target
+        }
+        return engine.currentTime
+    }
+
+    private func markerJumpTitle(_ title: String, target: Double?) -> String {
+        guard let target else { return title }
+        return "\(title)  \(timeLabel(target))"
+    }
+
+    /// Kein `disabled`: ein deaktivierter Button gibt den Fokus ab, und der Fokus spränge
+    /// mitten in der Sprungfolge in eine andere Reihe.
+    private func jumpToMarker(_ target: Double?) {
+        guard let target else { return }
+        lastMarkerJump = (target, Date())
+        Task {
+            await engine.seek(to: target)
+            engine.play()
+        }
     }
 
     /// 0.5×–2× like the phone player's speed menu, capped at what the route plays natively.
