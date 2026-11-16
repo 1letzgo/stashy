@@ -345,6 +345,9 @@ struct TVGalleryDetailView: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.horizontal, 60)
         .padding(.top, 40)
+        // Up from any image column reaches the Slideshow button, not only from the
+        // column right under it.
+        .focusSection()
     }
 
     private func loadGalleryData() {

@@ -124,6 +124,7 @@ struct TVMarkersView: View {
                 subtitle: playingScene?.studio?.name ?? "",
                 posterURL: playingScene?.thumbnailURL,
                 onDisappear: { playerModel.saveProgress() },
+                markerTimes: (playingScene?.sceneMarkers ?? []).map(\.seconds),
                 panelExtra: {
                     // Same rail as in scene detail: jump between this scene's markers.
                     let markers = playingScene?.sceneMarkers ?? []

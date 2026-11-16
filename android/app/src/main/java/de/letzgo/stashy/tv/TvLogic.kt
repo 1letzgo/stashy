@@ -152,6 +152,23 @@ fun activeMarkerIndex(starts: List<Double>, currentTime: Double): Int? {
     return null
 }
 
+/**
+ * iOS: `TVMarkerNavigation` — where a marker list starts and where Previous / Next marker go,
+ * shared by the player's marker row, its rail and the scene page's marker row. [starts] sorted.
+ */
+object TvMarkerNav {
+    /** The last marker starting at or before [time]; the first one while [time] lies before all. */
+    fun entryIndex(starts: List<Double>, time: Double): Int? {
+        if (starts.isEmpty()) return null
+        return starts.indexOfLast { it <= time }.takeIf { it >= 0 } ?: 0
+    }
+
+    /** At least a second back, so a press right after a jump goes one further back. */
+    fun previous(starts: List<Double>, time: Double): Double? = starts.lastOrNull { it < time - 1 }
+
+    fun next(starts: List<Double>, time: Double): Double? = starts.firstOrNull { it > time + 0.5 }
+}
+
 /** iOS: the per-catalog sort pickers of `TVScenesView`, `TVPerformersView` … (order and labels). */
 object TvSortLabels {
     val scenes get() = listOf(
