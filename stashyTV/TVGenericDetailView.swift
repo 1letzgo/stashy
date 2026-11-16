@@ -25,11 +25,12 @@ enum TVDetailBackdrop {
     case image(URL?)
 }
 
-/// Shared layout of the performer, studio, tag and group pages: a compact header (title
-/// with the scene count, one row of buttons, the facts as one or two lines of label/value
-/// pairs, an optional accessory such as the performer's tags) with the image as a backdrop
-/// on the trailing side, and the scene grid right below — on 1920×1080 the first card row
-/// and the top of the second are visible without scrolling.
+/// Shared layout of the performer, studio, tag and group pages: the compact
+/// `TVDetailHeader` (title with the scene count, one row of buttons, the facts as one or two
+/// lines, an optional accessory such as the performer's tags, the image as backdrop) and the
+/// scene grid right below — on 1920×1080 the first card row and the top of the second are
+/// visible without scrolling. This view keeps the opening focus logic; the gallery page uses
+/// the same header over its image grid.
 struct TVGenericDetailView<Item: TVDetailItem, Accessory: View>: View {
     let item: Item?
     let isLoading: Bool
@@ -51,7 +52,6 @@ struct TVGenericDetailView<Item: TVDetailItem, Accessory: View>: View {
     let sheetFacts: [TVDetailFact]
 
     @State private var playingChannel: TVChannel?
-    @State private var showingDetails = false
     @ObservedObject private var stashyPlus = StashyPlusManager.shared
     @FocusState private var emptyFocus: Bool
     /// Start focus in the header. Without it tvOS put the first scene card in focus and
@@ -64,10 +64,6 @@ struct TVGenericDetailView<Item: TVDetailItem, Accessory: View>: View {
     /// Set once focus has left the header; from then on loading never pulls focus back.
     @State private var headerFocusReleased = false
     @Environment(\.tvContentWidth) private var contentWidth
-    /// Measured widths of the facts (each at its natural size) and of the line they go
-    /// into; the header packs them into at most `maxFactLines` lines from these.
-    @State private var factWidths: [String: CGFloat] = [:]
-    @State private var factsLineWidth: CGFloat = 0
 
     private var sceneSpec: TVGridSpec { .scenes }
     @Environment(\.dismiss) private var dismiss
@@ -119,42 +115,23 @@ struct TVGenericDetailView<Item: TVDetailItem, Accessory: View>: View {
         self.headerAccessory = headerAccessory
     }
 
-    // MARK: - Metrics
-
-    private static var maxFactLines: Int { 2 }
-    private static var factSpacing: CGFloat { 48 }
-    /// A single fact never grows wider than this (long alias lists are cut, the sheet has them).
-    private static var factMaxWidth: CGFloat { 420 }
-    /// Overscan safe area of tvOS; the backdrop bleeds into it to the screen's top and
-    /// trailing edge so it never shows as a framed box.
-    private static var safeTop: CGFloat { 60 }
-    private static var safeTrailing: CGFloat { 80 }
-
-    private var hasBackdrop: Bool {
-        if case .image(let url) = backdrop, url != nil { return true }
-        return false
-    }
-
-    /// Visible width of the backdrop inside the content area (it bleeds `safeTrailing` further).
-    private var backdropWidth: CGFloat { min(860, contentWidth * 0.45) }
-    private var backdropHeight: CGFloat { 560 }
-
-    /// With a backdrop the text column ends where the image is still mostly faded out.
-    private var textColumnMaxWidth: CGFloat {
-        hasBackdrop ? max(700, contentWidth - 160 - backdropWidth * 0.75) : .infinity
-    }
-
-    private var details: String? {
-        guard let text = item?.details?.trimmingCharacters(in: .whitespacesAndNewlines), !text.isEmpty else { return nil }
-        return text
-    }
-
     // MARK: - Body
 
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 28) {
-                header
+                TVDetailHeader(
+                    title: item?.name ?? "",
+                    titleLogo: titleLogo,
+                    count: totalScenes > 0 ? TVDetailCount(value: totalScenes, icon: "film") : nil,
+                    backdrop: backdrop,
+                    isLoading: isLoading,
+                    details: item?.details,
+                    facts: facts,
+                    sheetFacts: sheetFacts,
+                    accessory: headerAccessory,
+                    actions: { actionButtons }
+                )
 
                 // Scenes Section
                 VStack(alignment: .leading, spacing: 16) {
@@ -248,128 +225,46 @@ struct TVGenericDetailView<Item: TVDetailItem, Accessory: View>: View {
         .onChange(of: scenes.isEmpty) { _, _ in claimHeaderFocusIfUntouched() }
         // A channel opens Feeds (Scenes of this performer / studio / tag / group), as on iOS.
         .tvChannelFeedCover($playingChannel)
-        .sheet(isPresented: $showingDetails) {
-            TVDetailInfoSheet(
-                title: item?.name ?? "",
-                details: details,
-                facts: facts + sheetFacts
-            )
-        }
     }
 
-    // MARK: - Header
+    // MARK: - Header buttons
 
-    /// Title, accessory (a performer's tag chips), buttons, facts. The buttons are the last
-    /// focusable row (facts and description are text only), so Down from them reaches the
-    /// scene grid directly and Up from any grid column lands on them through the header's
-    /// focus section. The tag chips sit above them for that reason.
-    private var header: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            titleLine
-
-            headerAccessory()
-
-            actionRow
-
-            if isLoading {
-                ProgressView()
-            } else {
-                factsBlock
-                if let details {
-                    Text(details)
-                        .font(.callout)
-                        .foregroundStyle(.secondary)
-                        .lineLimit(2)
-                }
+    /// The page's buttons; `TVDetailHeader` lays them out in its row and adds Details.
+    @ViewBuilder
+    private var actionButtons: some View {
+        if showsChannelButton {
+            Button {
+                playingChannel = channel
+            } label: {
+                Label(tr("action_play_as_channel"), systemImage: "play.tv.fill")
             }
+            .focused($headerFocus)
+        } else if headerActions.isEmpty {
+            // Without the channel button and without actions the header has nothing
+            // focusable from the first frame; this invisible anchor keeps the opening
+            // focus (and scroll) at the top. It is its own view on purpose:
+            // `.focusable(false)` on the header container disabled focus for the whole
+            // subtree, so Up from the scene grid could never land on the channel button.
+            Color.clear
+                .frame(width: 1, height: 1)
+                .focusable()
+                .focusEffectDisabled()
+                .focused($headerAnchorFocus)
+                .accessibilityHidden(true)
         }
-        .frame(maxWidth: textColumnMaxWidth, alignment: .leading)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.top, 10)
-        // Background, not a sibling: the image never changes the header's height, so the
-        // grid starts at the same place with and without it, and it scrolls away with it.
-        .background(alignment: .topTrailing) { backdropView }
-        // One focus region: Up from any grid column lands on the button row even where the
-        // buttons and the column do not overlap horizontally.
-        .focusSection()
-    }
-
-    private var titleLine: some View {
-        HStack(alignment: .center, spacing: 24) {
-            // Spacing 0: a logo brings its own gap, so a studio without one has none.
-            HStack(alignment: .center, spacing: 0) {
-                if let titleLogo {
-                    titleLogo
-                }
-                Text(item?.name ?? "")
-                    .font(.title2)
-                    .fontWeight(.bold)
-                    .foregroundColor(.white)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.7)
-            }
-            .layoutPriority(1)
-            if totalScenes > 0 {
-                Label {
-                    Text(verbatim: "\(totalScenes)")
-                } icon: {
-                    Image(systemName: "film")
-                }
-                .font(.headline)
-                .foregroundStyle(.secondary)
-                .lineLimit(1)
-                .fixedSize()
-            }
-        }
-    }
-
-    private var actionRow: some View {
-        HStack(spacing: 24) {
-            if showsChannelButton {
-                Button {
-                    playingChannel = channel
-                } label: {
-                    Label(tr("action_play_as_channel"), systemImage: "play.tv.fill")
-                }
-                .focused($headerFocus)
-            } else if headerActions.isEmpty {
-                // Without the channel button and without actions the header has nothing
-                // focusable from the first frame; this invisible anchor keeps the opening
-                // focus (and scroll) at the top. It is its own view on purpose:
-                // `.focusable(false)` on the header container disabled focus for the whole
-                // subtree, so Up from the scene grid could never land on the channel button.
-                Color.clear
-                    .frame(width: 1, height: 1)
-                    .focusable()
-                    .focusEffectDisabled()
+        ForEach(Array(headerActions.enumerated()), id: \.element.id) { index, action in
+            // Without the channel button the first action is the header's
+            // focus anchor, so the page opens on something visible.
+            if index == 0 && !showsChannelButton {
+                headerActionButton(action)
                     .focused($headerAnchorFocus)
-                    .accessibilityHidden(true)
-            }
-            ForEach(Array(headerActions.enumerated()), id: \.element.id) { index, action in
-                // Without the channel button the first action is the header's
-                // focus anchor, so the page opens on something visible.
-                if index == 0 && !showsChannelButton {
-                    headerActionButton(action)
-                        .focused($headerAnchorFocus)
-                } else {
-                    headerActionButton(action)
-                }
-            }
-            ForEach(trailingActions) { action in
+            } else {
                 headerActionButton(action)
             }
-            if showsDetailsButton {
-                Button {
-                    showingDetails = true
-                } label: {
-                    Label(tr("details"), systemImage: "info.circle")
-                }
-            }
         }
-        .font(.callout)
-        // Own section across the full width: Up from the grid and Down from the tag row
-        // reach it from any column.
-        .tvFocusRow()
+        ForEach(trailingActions) { action in
+            headerActionButton(action)
+        }
     }
 
     private func headerActionButton(_ action: TVDetailHeaderAction) -> some View {
@@ -384,8 +279,160 @@ struct TVGenericDetailView<Item: TVDetailItem, Accessory: View>: View {
             if showsChannelButton { headerFocus = true } else { headerAnchorFocus = true }
         }
     }
+}
 
-    // MARK: - Facts
+// MARK: - Header
+
+/// The count beside the title: scenes on performer / studio / tag / group pages,
+/// images on a gallery.
+struct TVDetailCount {
+    let value: Int
+    let icon: String
+}
+
+/// The compact header of every tvOS detail page of this shape (performer, studio, tag,
+/// group, gallery): title line with logo and count, an optional accessory row (a performer's
+/// tag chips), one row of buttons with "Details" at its end, the facts as at most two lines
+/// of label/value pairs plus a two-line description, and the image as a backdrop on the
+/// trailing side. About a third of a 1920×1080 screen, so the content grid starts on the
+/// first screen.
+///
+/// The buttons are the last focusable row (facts and description are text only): Down from
+/// them reaches the grid directly, and Up from any grid column lands on them through the
+/// header's focus section. The accessory sits above them for that reason. Focus anchors
+/// stay with the page, which passes its buttons in `actions`.
+struct TVDetailHeader<Accessory: View, Actions: View>: View {
+    let title: String
+    var titleLogo: AnyView? = nil
+    var count: TVDetailCount? = nil
+    var backdrop: TVDetailBackdrop = .none
+    var isLoading: Bool = false
+    var details: String? = nil
+    var facts: [TVDetailFact] = []
+    /// Facts only the Details sheet shows.
+    var sheetFacts: [TVDetailFact] = []
+    /// Inset of the text from the content edge; the backdrop still reaches the screen edge.
+    var horizontalInset: CGFloat = 0
+    @ViewBuilder let accessory: () -> Accessory
+    @ViewBuilder let actions: () -> Actions
+
+    @Environment(\.tvContentWidth) private var contentWidth
+    @State private var showingDetails = false
+    /// Measured widths of the facts (each at its natural size) and of the line they go
+    /// into; the header packs them into at most `maxFactLines` lines from these.
+    @State private var factWidths: [String: CGFloat] = [:]
+    @State private var factsLineWidth: CGFloat = 0
+
+    // MARK: Metrics
+
+    private static var maxFactLines: Int { 2 }
+    private static var factSpacing: CGFloat { 48 }
+    /// A single fact never grows wider than this (long alias lists are cut, the sheet has them).
+    private static var factMaxWidth: CGFloat { 420 }
+    /// Overscan safe area of tvOS; the backdrop bleeds into it to the screen's top and
+    /// trailing edge so it never shows as a framed box.
+    private static var safeTop: CGFloat { 60 }
+    private static var safeTrailing: CGFloat { 80 }
+
+    private var hasBackdrop: Bool {
+        if case .image(let url) = backdrop, url != nil { return true }
+        return false
+    }
+
+    /// Visible width of the backdrop inside the content area (it bleeds `safeTrailing` further).
+    private var backdropWidth: CGFloat { min(860, contentWidth * 0.45) }
+    private var backdropHeight: CGFloat { 560 }
+
+    /// With a backdrop the text column ends where the image is still mostly faded out.
+    private var textColumnMaxWidth: CGFloat {
+        hasBackdrop ? max(700, contentWidth - 160 - backdropWidth * 0.75 - horizontalInset) : .infinity
+    }
+
+    private var trimmedDetails: String? {
+        guard let text = details?.trimmingCharacters(in: .whitespacesAndNewlines), !text.isEmpty else { return nil }
+        return text
+    }
+
+    // MARK: Body
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            titleLine
+
+            accessory()
+
+            HStack(spacing: 24) {
+                actions()
+                if showsDetailsButton {
+                    Button {
+                        showingDetails = true
+                    } label: {
+                        Label(tr("details"), systemImage: "info.circle")
+                    }
+                }
+            }
+            .font(.callout)
+            // Own section across the full width: Up from the grid and Down from the
+            // accessory row reach it from any column.
+            .tvFocusRow()
+
+            if isLoading {
+                ProgressView()
+            } else {
+                factsBlock
+                if let trimmedDetails {
+                    Text(trimmedDetails)
+                        .font(.callout)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(2)
+                }
+            }
+        }
+        .frame(maxWidth: textColumnMaxWidth, alignment: .leading)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.horizontal, horizontalInset)
+        .padding(.top, 10)
+        // Background, not a sibling: the image never changes the header's height, so the
+        // grid starts at the same place with and without it, and it scrolls away with it.
+        .background(alignment: .topTrailing) { backdropView }
+        // One focus region: Up from any grid column lands on the button row even where the
+        // buttons and the column do not overlap horizontally.
+        .focusSection()
+        .sheet(isPresented: $showingDetails) {
+            TVDetailInfoSheet(title: title, details: trimmedDetails, facts: facts + sheetFacts)
+        }
+    }
+
+    private var titleLine: some View {
+        HStack(alignment: .center, spacing: 24) {
+            // Spacing 0: a logo brings its own gap, so a studio without one has none.
+            HStack(alignment: .center, spacing: 0) {
+                if let titleLogo {
+                    titleLogo
+                }
+                Text(title)
+                    .font(.title2)
+                    .fontWeight(.bold)
+                    .foregroundColor(.white)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.7)
+            }
+            .layoutPriority(1)
+            if let count, count.value > 0 {
+                Label {
+                    Text(verbatim: "\(count.value)")
+                } icon: {
+                    Image(systemName: count.icon)
+                }
+                .font(.headline)
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
+                .fixedSize()
+            }
+        }
+    }
+
+    // MARK: Facts
 
     private var factLayout: (lines: [[TVDetailFact]], hiddenCount: Int) {
         TVDetailFactPacking.pack(
@@ -398,7 +445,7 @@ struct TVGenericDetailView<Item: TVDetailItem, Accessory: View>: View {
     }
 
     private var showsDetailsButton: Bool {
-        !isLoading && (details != nil || !sheetFacts.isEmpty || factLayout.hiddenCount > 0)
+        !isLoading && (trimmedDetails != nil || !sheetFacts.isEmpty || factLayout.hiddenCount > 0)
     }
 
     @ViewBuilder
@@ -439,7 +486,7 @@ struct TVGenericDetailView<Item: TVDetailItem, Accessory: View>: View {
         }
     }
 
-    // MARK: - Backdrop
+    // MARK: Backdrop
 
     @ViewBuilder
     private var backdropView: some View {

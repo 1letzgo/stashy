@@ -164,7 +164,7 @@ struct TVGalleryDetailView: View {
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 40) {
+            VStack(alignment: .leading, spacing: 28) {
                 headerSection
 
                 if viewModel.isLoadingGalleryImages && viewModel.galleryImages.isEmpty {
@@ -270,84 +270,50 @@ struct TVGalleryDetailView: View {
         }
     }
 
-    @ViewBuilder
+    /// Same compact header as the performer / studio / tag / group pages: title with the
+    /// image count, the Slideshow button, date / studio / performers / rating in one line,
+    /// the cover as backdrop, so the image grid starts on the first screen.
     private var headerSection: some View {
-        HStack(alignment: .top, spacing: 50) {
-            if let thumbnailURL = gallery?.thumbnailURL {
-                CustomAsyncImage(url: thumbnailURL) { loader in
-                    if let image = loader.image {
-                        image.resizable().scaledToFill()
-                    } else {
-                        Rectangle()
-                            .fill(Color.gray.opacity(0.08))
-                            .overlay(ProgressView())
-                    }
-                }
-                .frame(width: 400, height: 225)
-                .clipped()
-                .clipShape(RoundedRectangle(cornerRadius: 14))
-            } else {
-                Rectangle()
-                    .fill(Color.gray.opacity(0.08))
-                    .overlay(
-                        Image(systemName: "photo.stack")
-                            .font(.system(size: 56))
-                            .foregroundColor(.secondary)
-                    )
-                    .frame(width: 400, height: 225)
-                    .clipShape(RoundedRectangle(cornerRadius: 14))
-            }
-
-            VStack(alignment: .leading, spacing: 16) {
-                Text(gallery?.displayName ?? galleryTitle)
-                    .font(.largeTitle)
-                    .fontWeight(.bold)
-                    .foregroundColor(.white)
-
-                if isLoadingGallery {
-                    ProgressView().scaleEffect(1.2)
-                } else if let gallery = gallery {
-                    VStack(alignment: .leading, spacing: 14) {
-                        if let details = gallery.details, !details.isEmpty {
-                            Text(details)
-                                .font(.body)
-                                .foregroundStyle(.secondary)
-                                .lineLimit(6)
-                        }
-
-                        Divider()
-                            .background(Color.secondary)
-
-                        LazyVGrid(columns: TVGridSpec.infoColumns, alignment: .leading, spacing: 12) {
-                            if let count = gallery.imageCount {
-                                Text(tr("images")).font(.title3).foregroundStyle(.secondary)
-                                Text("\(count)").font(.title3).foregroundColor(.white)
-                            }
-                            if let date = gallery.date, !date.isEmpty {
-                                Text(tr("date")).font(.title3).foregroundStyle(.secondary)
-                                Text(date).font(.title3).foregroundColor(.white)
-                            }
-                            if let studio = gallery.studio {
-                                Text(tr("studio")).font(.title3).foregroundStyle(.secondary)
-                                Text(studio.name).font(.title3).foregroundColor(.white)
-                            }
-                        }
-                    }
-                }
-
+        TVDetailHeader(
+            title: gallery?.displayName ?? galleryTitle,
+            count: gallery?.imageCount.map { TVDetailCount(value: $0, icon: "photo.on.rectangle") },
+            backdrop: .image(gallery?.thumbnailURL),
+            isLoading: isLoadingGallery,
+            details: gallery?.details,
+            facts: headerFacts,
+            // Same inset as the image grid below.
+            horizontalInset: 60,
+            accessory: { EmptyView() },
+            actions: {
                 if !displayImages.isEmpty {
-                    TVSlideshowButton { slideshow = TVSlideshowStart(index: 0) }
-                        .padding(.top, 8)
+                    Button {
+                        slideshow = TVSlideshowStart(index: 0)
+                    } label: {
+                        Label(tr("slideshow"), systemImage: "play.rectangle.on.rectangle")
+                    }
                 }
             }
-            .frame(maxWidth: .infinity, alignment: .leading)
+        )
+    }
+
+    private var headerFacts: [TVDetailFact] {
+        guard let gallery else { return [] }
+        var facts: [TVDetailFact] = []
+        if let date = gallery.date, !date.isEmpty {
+            facts.append(TVDetailFact(id: "date", label: tr("date"), value: date))
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.horizontal, 60)
-        .padding(.top, 40)
-        // Up from any image column reaches the Slideshow button, not only from the
-        // column right under it.
-        .focusSection()
+        if let studio = gallery.studio, !studio.name.isEmpty {
+            facts.append(TVDetailFact(id: "studio", label: tr("studio"), value: studio.name))
+        }
+        let performers = (gallery.performers ?? []).map(\.name).filter { !$0.isEmpty }
+        if !performers.isEmpty {
+            facts.append(TVDetailFact(id: "performers", label: tr("performers"), value: performers.joined(separator: ", ")))
+        }
+        if let rating = gallery.rating100 {
+            facts.append(TVDetailFact(id: "rating", label: tr("rating"), value: String(format: "%.1f", Double(rating) / 20.0),
+                                      icon: "star.fill", iconColor: .yellow))
+        }
+        return facts
     }
 
     private func loadGalleryData() {
