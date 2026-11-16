@@ -4,7 +4,8 @@
 //
 //  Where a marker list starts and where Previous / Next Marker go. Shared by the player's
 //  marker row, its marker rail and the scene page's marker section, so all three agree.
-//  Same rules as the phone player (`AetherSceneSurface.previousMarkerSeconds` / `next…`).
+//  Previous allows more slack than the phone player (3 s instead of 1 s): on the TV the press
+//  comes later after a jump, and the playhead lags behind a seek.
 //
 
 import Foundation
@@ -18,10 +19,21 @@ enum TVMarkerNavigation {
         return starts.lastIndex { $0 <= time } ?? 0
     }
 
-    /// Previous = the last marker starting at least a second before `time`, so a press right
-    /// after a jump goes one further back instead of restarting the same marker.
+    /// Within the first seconds of a marker Previous goes to the marker before it (so repeated
+    /// presses walk back); later it restarts the current marker.
+    static let previousRestartSlack: Double = 3
+
     static func previous(starts: [Double], from time: Double) -> Double? {
-        starts.last { $0 < time - 1 }
+        starts.last { $0 < time - previousRestartSlack }
+    }
+
+    /// The time Previous / Next decide from. Right after a jump the engine still reports the
+    /// old position (or a keyframe before the target), so until it has landed at or just after
+    /// the target, the target counts. `jump` = target and time of the last marker jump.
+    static func referenceTime(playhead: Double, jump: (target: Double, at: Date)?, now: Date = Date()) -> Double {
+        guard let jump, now.timeIntervalSince(jump.at) < 8 else { return playhead }
+        let landed = playhead >= jump.target - 0.5 && playhead <= jump.target + 8
+        return landed ? playhead : jump.target
     }
 
     static func next(starts: [Double], from time: Double) -> Double? {

@@ -618,13 +618,15 @@ struct TVSceneDetailView: View {
                 .padding(.vertical, 30)
             }
             .onAppear {
-                if let entryID { proxy.scrollTo(entryID, anchor: .leading) }
+                // No anchor: scroll only as far as needed (`.leading` stripped the row's
+                // leading inset and cut the first card); the first marker needs no scroll.
+                if let entryID, entryID != sortedMarkers.first?.id { proxy.scrollTo(entryID) }
             }
             .onChange(of: focusedMarkerID) { old, new in
                 // Focus came down (or up) into the row: go to the resume marker instead of
                 // whichever card happens to lie under the previous row's button.
                 guard old == nil, let new, let entryID, new != entryID else { return }
-                proxy.scrollTo(entryID, anchor: .leading)
+                proxy.scrollTo(entryID)
                 focusedMarkerID = entryID
             }
             }
