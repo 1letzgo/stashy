@@ -625,7 +625,9 @@ private struct TVAetherPlayerContent<Panel: View>: View {
                             }
                         }
                     }
-                    .focusSection()
+                    // Volle Breite: „Hoch“ aus der rechten Hälfte der Spuren-Reihen fand
+                    // über den zwei Buttons sonst kein Ziel.
+                    .tvFocusRow()
                 }
 
                 if !markerTimes.isEmpty {
@@ -762,7 +764,7 @@ private struct TVAetherPlayerContent<Panel: View>: View {
             }
             .opacity(next == nil ? 0.45 : 1)
         }
-        .focusSection()
+        .tvFocusRow()
     }
 
     /// Der Playhead, oder das Ziel des letzten Sprungs, solange der Seek noch läuft.

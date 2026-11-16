@@ -551,6 +551,9 @@ private struct TVAppearanceSettingsView: View {
                         }
                         .padding(.vertical, 8)
                     }
+                    // Themes and accent colours differ in count: Up/Down from the outer
+                    // swatches had no target in the other row.
+                    .focusSection()
                 }
             }
 
@@ -575,6 +578,9 @@ private struct TVAppearanceSettingsView: View {
                         }
                         .padding(.vertical, 8)
                     }
+                    // Themes and accent colours differ in count: Up/Down from the outer
+                    // swatches had no target in the other row.
+                    .focusSection()
                 }
             }
         }

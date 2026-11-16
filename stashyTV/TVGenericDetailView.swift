@@ -118,6 +118,9 @@ struct TVGenericDetailView<Item: TVDetailItem, Info: View, Content: View>: View 
                                     }
                                 }
                             }
+                            // Own section inside the header: Up from controls further down in
+                            // the header (a group's Cover buttons) reaches it from any column.
+                            .tvFocusRow()
                         } else if let channel, stashyPlus.isUnlocked {
                             Button {
                                 playingChannel = channel

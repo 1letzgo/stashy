@@ -92,8 +92,9 @@ struct TVSceneDetailView: View {
 
                         // Studio
                         if let studio = scene.studio {
+                            // Full width: the single card is narrower than the rows around it.
                             studioSection(studio: studio)
-                                .focusSection()
+                                .tvFocusRow()
                         }
 
                         // Similar Scenes (stashy+, hides itself when locked or empty)
@@ -446,6 +447,9 @@ struct TVSceneDetailView: View {
                     Button(tr("action_cancel"), role: .cancel) {}
                 }
             }
+            // Up from a marker / tag / performer card right of the last hero button had no
+            // target: the row only spans its buttons. Full-width section → Up always lands here.
+            .tvFocusRow()
             .padding(.top, 16)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
