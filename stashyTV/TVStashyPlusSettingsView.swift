@@ -229,18 +229,25 @@ struct TVStashyPlusSettingsView: View {
     var body: some View {
         List {
             Section {
-                HStack(spacing: 20) {
-                    Image(systemName: stashyPlus.isUnlocked ? "checkmark.seal.fill" : "lock.fill")
-                        .font(.title2)
-                        .foregroundColor(stashyPlus.isUnlocked ? .green : appearanceManager.tintColor)
-                        .frame(width: 44)
+                // Jede Zeile ist ein Fokusziel (siehe `infoRow`). Vorher waren Status und
+                // Features reiner Text; die ersten Buttons (Pläne, Restore) lagen unter dem
+                // Bildschirmrand. Eine tvOS-`List` legt Zellen außerhalb des Bildes gar nicht
+                // erst an, also fand die Fokus-Engine beim Öffnen nichts: kein Fokus, die
+                // Fernbedienung scrollte nicht, der Kaufbereich blieb abgeschnitten.
+                infoRow {
+                    HStack(spacing: 20) {
+                        Image(systemName: stashyPlus.isUnlocked ? "checkmark.seal.fill" : "lock.fill")
+                            .font(.title2)
+                            .foregroundColor(stashyPlus.isUnlocked ? .green : appearanceManager.tintColor)
+                            .frame(width: 44)
 
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text(stashyPlus.source.statusTitle)
-                            .font(.headline)
-                        Text(stashyPlus.source.statusDetail)
-                            .font(.subheadline)
-                            .foregroundStyle(.secondary)
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text(stashyPlus.source.statusTitle)
+                                .font(.headline)
+                            Text(stashyPlus.source.statusDetail)
+                                .font(.subheadline)
+                                .foregroundStyle(.secondary)
+                        }
                     }
                 }
 
@@ -259,15 +266,6 @@ struct TVStashyPlusSettingsView: View {
                     text: tr("channels"),
                     detail: tr("hint_plays_scenes_back_to_back")
                 )
-                    // Wer stashy+ bereits besitzt, bekommt weder Kauf- noch
-                    // Restore-Button; während eines Kaufs oder Restores sind sie
-                    // alle deaktiviert. In beiden Fällen ist diese Zeile das
-                    // einzige fokussierbare Element und damit der Weg zurück.
-                    .focusable(
-                        !stashyPlus.shouldOfferPurchases
-                            || store.isPurchasing
-                            || store.isRestoringPurchases
-                    )
                 featureRow(
                     icon: "sparkles.rectangle.stack",
                     text: tr("similar_scenes_and_up_next"),
@@ -280,12 +278,13 @@ struct TVStashyPlusSettingsView: View {
             if stashyPlus.shouldOfferPurchases {
                 Section {
                     if store.isLoadingProducts && store.products.isEmpty {
-                        HStack {
-                            Spacer()
-                            ProgressView()
-                            Spacer()
+                        infoRow {
+                            HStack {
+                                Spacer()
+                                ProgressView()
+                                Spacer()
+                            }
                         }
-                        .focusable(false)
                     } else {
                         ForEach(store.products, id: \.id) { product in
                             Button {
@@ -320,10 +319,11 @@ struct TVStashyPlusSettingsView: View {
                         }
 
                         if let error = store.lastProductError {
-                            Text(error)
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                                .focusable(false)
+                            infoRow {
+                                Text(error)
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
                         }
                     }
                 } header: {
@@ -387,19 +387,30 @@ struct TVStashyPlusSettingsView: View {
         }
     }
 
-    private func featureRow(icon: String, text: String, detail: String) -> some View {
-        HStack(spacing: 20) {
-            Image(systemName: icon)
-                .font(.title3)
-                .foregroundColor(appearanceManager.tintColor)
-                .frame(width: 44)
+    /// Read-only row that still takes focus, with the system's list highlight, so the remote
+    /// can walk the page from top to bottom in every state (locked, unlocked, loading,
+    /// store unavailable, purchase or restore running). Selecting it does nothing.
+    private func infoRow<Content: View>(@ViewBuilder _ content: () -> Content) -> some View {
+        Button {} label: {
+            content()
+        }
+    }
 
-            VStack(alignment: .leading, spacing: 4) {
-                Text(text)
-                    .font(.body)
-                Text(detail)
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
+    private func featureRow(icon: String, text: String, detail: String) -> some View {
+        infoRow {
+            HStack(spacing: 20) {
+                Image(systemName: icon)
+                    .font(.title3)
+                    .foregroundColor(appearanceManager.tintColor)
+                    .frame(width: 44)
+
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(text)
+                        .font(.body)
+                    Text(detail)
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                }
             }
         }
     }
