@@ -7,6 +7,9 @@ Auth: service account key at ~/Library/Application Support/stashy-signing/play-p
   play_publish.py tracks                               list tracks and their releases
   play_publish.py upload <aab> [--track internal] [--notes "…"] [--draft] [--no-review]
   play_publish.py assign <versionCode> [--track …]     put an already uploaded bundle on another track
+  play_publish.py listings                             languages of the store listing and their text lengths
+  --notes-file <json>   release notes per Play language ({"en-US": "…", "de-DE": "…"}), instead of --notes
+  --draft               on a track with a live release keeps that release and adds this one as draft
 """
 import argparse, glob, json, os, sys, time, urllib.error, urllib.parse, urllib.request
 
@@ -75,6 +78,18 @@ def tracks(edit):
             print("   ", r.get("status"), r.get("name", ""), r.get("versionCodes", []))
 
 
+def listings(edit):
+    for l in call("GET", f"{API}/edits/{edit}/listings").get("listings", []):
+        print(l["language"], "title", len(l.get("title", "")), "short", len(l.get("shortDescription", "")),
+              "full", len(l.get("fullDescription", "")))
+        imgs = []
+        for kind in ("phoneScreenshots", "sevenInchScreenshots", "tenInchScreenshots", "tvScreenshots",
+                     "featureGraphic", "icon", "tvBanner"):
+            n = len(call("GET", f"{API}/edits/{edit}/listings/{l['language']}/{kind}").get("images", []))
+            imgs.append(f"{kind}={n}")
+        print("   ", " ".join(imgs))
+
+
 def upload(edit, args):
     size = os.path.getsize(args.aab) / 1e6
     print(f"uploading {args.aab} ({size:.1f} MB)…", flush=True)
@@ -88,10 +103,22 @@ def upload(edit, args):
 
 def release_to_track(edit, code, args):
     release = {"versionCodes": [code], "status": "draft" if args.draft else "completed"}
-    if args.notes:
+    if args.notes_file:
+        with open(args.notes_file) as f:
+            notes = json.load(f)
+        long = {k: len(v) for k, v in notes.items() if len(v) > 500}
+        if long:
+            sys.exit(f"release notes over 500 characters: {long}")
+        release["releaseNotes"] = [{"language": k, "text": v} for k, v in notes.items()]
+    elif args.notes:
         release["releaseNotes"] = [{"language": "en-US", "text": args.notes}]
+    releases = [release]
+    if args.draft:
+        # A draft must not take the track's live release away: keep every release that is not a draft.
+        current = call("GET", f"{API}/edits/{edit}/tracks/{args.track}").get("releases", [])
+        releases += [r for r in current if r.get("status") != "draft"]
     call("PUT", f"{API}/edits/{edit}/tracks/{args.track}",
-         {"track": args.track, "releases": [release]})
+         {"track": args.track, "releases": releases})
     q = "?changesNotSentForReview=true" if args.no_review else ""
     call("POST", f"{API}/edits/{edit}:commit{q}")
     print(f"committed {code} → {args.track} ({release['status']})")
@@ -101,11 +128,13 @@ def main():
     p = argparse.ArgumentParser()
     sub = p.add_subparsers(dest="cmd", required=True)
     sub.add_parser("tracks")
+    sub.add_parser("listings")
     for name in ("upload", "assign"):
         u = sub.add_parser(name)
         u.add_argument("aab" if name == "upload" else "version_code")
         u.add_argument("--track", default="internal")
         u.add_argument("--notes")
+        u.add_argument("--notes-file")
         u.add_argument("--draft", action="store_true", help="create the release as draft (no rollout)")
         u.add_argument("--no-review", action="store_true",
                        help="commit without sending to review (needed when Play asks for it)")
@@ -116,6 +145,9 @@ def main():
     edit = call("POST", f"{API}/edits", {})["id"]
     if args.cmd == "tracks":
         tracks(edit)
+        call("DELETE", f"{API}/edits/{edit}")
+    elif args.cmd == "listings":
+        listings(edit)
         call("DELETE", f"{API}/edits/{edit}")
     elif args.cmd == "assign":
         release_to_track(edit, args.version_code, args)
