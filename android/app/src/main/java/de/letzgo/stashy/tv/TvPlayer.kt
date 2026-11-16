@@ -35,6 +35,8 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -247,6 +249,9 @@ class TvPlaybackModel {
 
 private enum class PanelTarget { Nav, Marker, Audio, Subtitles, Extra }
 
+/** iOS `tvPlayerMarkerPicked`: a rail pick counts as a marker jump for Previous / Next. */
+val LocalTvMarkerPicked = staticCompositionLocalOf<(Double) -> Unit> { {} }
+
 /**
  * iOS: `TVAetherPlayerView` / `TVAetherPlayerContent` — full-screen video with the Siri-Remote
  * transport translated to the D-pad: Select / Play-Pause toggles, Left/Right seek (presses
@@ -317,10 +322,9 @@ private fun TvPlayerContent(
     val holdUp = remember { TvHoldTracker() }
     val holdDown = remember { TvHoldTracker() }
     val channelMode = canGoPrevious || canGoNext
-    // Target of the last marker jump: `currentTime` lags behind the seek, and quickly repeated
-    // "Next marker" would otherwise hit the same marker twice.
-    var lastJumpTarget by remember { mutableStateOf(0.0) }
-    var lastJumpAt by remember { mutableLongStateOf(0L) }
+    // The marker last jumped to; Previous / Next count from it while the playhead is still there
+    // (see `TvMarkerNav.targets`). Any manual seek clears it.
+    var lastJump by remember { mutableStateOf<TvMarkerNav.Jump?>(null) }
 
     fun reveal() { showTransport = true; hideToken++ }
     fun now() = System.currentTimeMillis()
@@ -347,6 +351,7 @@ private fun TvPlayerContent(
     }
 
     fun step(delta: Double) {
+        lastJump = null
         reveal()
         val duration = player.duration
         val upper = if (duration.isFinite() && duration > 0) duration - 0.5 else Double.MAX_VALUE
@@ -364,6 +369,7 @@ private fun TvPlayerContent(
     }
 
     fun skip(delta: Double) {
+        lastJump = null
         cancelScrub()
         val duration = player.duration
         val upper = if (duration.isFinite() && duration > 0) duration - 0.5 else Double.MAX_VALUE
@@ -386,12 +392,17 @@ private fun TvPlayerContent(
     fun closePanel() { panelOpen = false }
 
     /** Jumps without closing the panel: focus stays on the button, every Select jumps once more. */
-    fun jumpToMarker(target: Double?) {
-        if (target == null) return
-        lastJumpTarget = target
-        lastJumpAt = now()
+    /** Takes exactly the index the label shows. */
+    fun jumpToMarker(index: Int?) {
+        val target = index?.let { markers.getOrNull(it) } ?: return
+        lastJump = TvMarkerNav.Jump(index, now())
         model.seek(target)
         player.play()
+    }
+
+    fun noteMarkerPicked(seconds: Double) {
+        val index = markers.indexOfFirst { kotlin.math.abs(it - seconds) < 0.01 }.takeIf { it >= 0 } ?: return
+        lastJump = TvMarkerNav.Jump(index, now())
     }
 
     fun holdSwitch(action: () -> Unit) {
@@ -550,10 +561,11 @@ private fun TvPlayerContent(
                     }
                 }
                 if (markers.isNotEmpty()) {
-                    val reference = TvMarkerNav.referenceTime(player.currentTime, lastJumpTarget, lastJumpAt, now())
-                    val previous = TvMarkerNav.previous(markers, reference)
-                    val next = TvMarkerNav.next(markers, reference)
-                    fun label(title: String, target: Double?) = if (target == null) title else "$title  ${TvFormat.time(target)}"
+                    // One result for labels and actions, so they can never disagree.
+                    val targets = TvMarkerNav.targets(markers, player.currentTime, lastJump, now())
+                    val previous = targets.previous
+                    val next = targets.next
+                    fun label(title: String, index: Int?) = markers.getOrNull(index ?: -1)?.let { "$title  ${TvFormat.time(it)}" } ?: title
                     // No disabled state: a disabled button drops focus mid-sequence.
                     Row(horizontalArrangement = Arrangement.spacedBy(pt(24))) {
                         PanelButton(label(tr(R.string.previous_marker), previous), TvIcons.backwardEnd, Modifier.alpha(if (previous == null) 0.45f else 1f)) { jumpToMarker(previous) }
@@ -585,7 +597,9 @@ private fun TvPlayerContent(
                         }
                     }
                 }
-                panelExtra?.invoke({ closePanel() }, if (firstTarget == PanelTarget.Extra) panelEntry else null)
+                CompositionLocalProvider(LocalTvMarkerPicked provides { noteMarkerPicked(it) }) {
+                    panelExtra?.invoke({ closePanel() }, if (firstTarget == PanelTarget.Extra) panelEntry else null)
+                }
             }
         }
     }
@@ -714,14 +728,22 @@ fun TvMarkerRail(markers: List<SceneMarker>, currentTime: Double, entry: FocusRe
     val entryIndex = TvMarkerNav.entryIndex(sorted.map { it.seconds }, currentTime) ?: 0
     val entryCard = remember { FocusRequester() }
     val listState = rememberLazyListState(initialFirstVisibleItemIndex = entryIndex)
+    val markerPicked = LocalTvMarkerPicked.current
     Column(verticalArrangement = Arrangement.spacedBy(pt(12))) {
         Text(tr(R.string.markers), style = TvType.caption.copy(fontSize = 11.sp, fontWeight = FontWeight.Bold), color = Color.White.copy(alpha = 0.6f))
-        LazyRow(Modifier.tvRowEntry(entryIndex, listState, entryCard), state = listState, horizontalArrangement = Arrangement.spacedBy(pt(30)), contentPadding = PaddingValues(horizontal = pt(10), vertical = pt(24))) {
+        LazyRow(
+            Modifier.tvRowEntry(entryIndex, listState, entryCard),
+            state = listState,
+            horizontalArrangement = Arrangement.spacedBy(pt(30)),
+            // Same leading inset as the scene page's marker row: with pt(10) the first card's focus
+            // scale (and a scrolled row) was cut at the left edge.
+            contentPadding = PaddingValues(horizontal = pt(20), vertical = pt(24)),
+        ) {
             uniqueItemsIndexed(sorted, { it.id }) { i, marker ->
                 val isActive = i == active
                 Column(Modifier.width(pt(300))) {
                     val entryModifier = if (i == entryIndex) Modifier.focusRequester(entryCard).then(if (entry != null) Modifier.focusRequester(entry) else Modifier) else Modifier
-                    TvCardButton({ onSelect(marker); close() }, entryModifier, radius = pt(8)) {
+                    TvCardButton({ onSelect(marker); markerPicked(marker.seconds); close() }, entryModifier, radius = pt(8)) {
                         Box(
                             Modifier.width(pt(300)).height(pt(169)).clip(RoundedCornerShape(pt(8)))
                                 .then(if (isActive) Modifier.border(2.dp, TvColors.tint.copy(alpha = 0.9f), RoundedCornerShape(pt(8))) else Modifier),

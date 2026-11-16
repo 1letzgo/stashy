@@ -163,24 +163,48 @@ object TvMarkerNav {
         return starts.indexOfLast { it <= time }.takeIf { it >= 0 } ?: 0
     }
 
-    /** Within the first [PREVIOUS_SLACK] s of a marker Previous goes to the one before it (repeated
-     *  presses walk back); later it restarts the current marker. */
+    /** The marker last jumped to (Previous / Next or a rail pick); the player clears it on any manual seek. */
+    data class Jump(val index: Int, val atMs: Long)
+
+    /** Previous / Next as marker indexes; the row's labels and actions both read this one result. */
+    data class Targets(val previous: Int?, val next: Int?)
+
+    /** While the seek is in flight the player still reports the old position. */
+    const val SEEK_IN_FLIGHT_MS = 3000L
+    /** How far past the jumped-to marker's start the playhead still counts as "just landed": a
+     *  keyframe landing several seconds late plus a few seconds of watching. */
+    const val LANDED_WINDOW = 15.0
+    /** A keyframe may also land this far before the start. */
+    const val EARLY_LANDING = 5.0
+    /** Without a fresh jump: within this many seconds of a marker's start Previous goes to the one
+     *  before it, later it restarts the current marker. */
     const val PREVIOUS_SLACK = 3.0
 
-    fun previous(starts: List<Double>, time: Double): Double? = starts.lastOrNull { it < time - PREVIOUS_SLACK }
-
     /**
-     * The time Previous / Next decide from. Right after a jump the player still reports the old
-     * position (or a keyframe before the target), so until it has landed at or just after the
-     * target, the target counts. [jumpAtMs] 0 = no jump yet.
+     * iOS: `TVMarkerNavigation.targets`. While the playhead is still near the marker last jumped
+     * to (or the seek is in flight), Previous / Next count from that marker's index — the seek
+     * lands on a keyframe, often seconds after the start, so the playhead alone would make
+     * Previous restart the marker just reached. The window ends early at the next marker.
      */
-    fun referenceTime(playhead: Double, jumpTarget: Double, jumpAtMs: Long, nowMs: Long): Double {
-        if (jumpAtMs == 0L || nowMs - jumpAtMs >= 8000) return playhead
-        val landed = playhead >= jumpTarget - 0.5 && playhead <= jumpTarget + 8
-        return if (landed) playhead else jumpTarget
+    fun targets(starts: List<Double>, playhead: Double, jump: Jump?, nowMs: Long): Targets {
+        if (jump != null && jump.index in starts.indices) {
+            val start = starts[jump.index]
+            val nextStart = starts.getOrNull(jump.index + 1) ?: Double.MAX_VALUE
+            val windowEnd = minOf(start + LANDED_WINDOW, nextStart)
+            val inFlight = nowMs - jump.atMs < SEEK_IN_FLIGHT_MS
+            val nearJumped = playhead >= start - EARLY_LANDING && playhead < windowEnd
+            if (inFlight || nearJumped) {
+                return Targets(
+                    previous = (jump.index - 1).takeIf { it >= 0 },
+                    next = (jump.index + 1).takeIf { it < starts.size },
+                )
+            }
+        }
+        return Targets(
+            previous = starts.indexOfLast { it < playhead - PREVIOUS_SLACK }.takeIf { it >= 0 },
+            next = starts.indexOfFirst { it > playhead + 0.5 }.takeIf { it >= 0 },
+        )
     }
-
-    fun next(starts: List<Double>, time: Double): Double? = starts.firstOrNull { it > time + 0.5 }
 }
 
 /** iOS: the per-catalog sort pickers of `TVScenesView`, `TVPerformersView` … (order and labels). */
