@@ -3,6 +3,7 @@ package de.letzgo.stashy.tv
 import de.letzgo.stashy.R
 import de.letzgo.stashy.tr
 import de.letzgo.stashy.ui.uniqueItems
+import de.letzgo.stashy.ui.uniqueItemsIndexed
 import android.view.KeyEvent as AndroidKeyEvent
 import androidx.compose.foundation.background
 import androidx.compose.foundation.focusable
@@ -22,6 +23,7 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
@@ -256,13 +258,26 @@ class TvSceneDetailRoute(private val sceneId: String, initial: Scene? = null) : 
     @OptIn(ExperimentalComposeUiApi::class)
     @Composable
     private fun MarkersRow(markers: List<SceneMarker>) {
+        val sorted = remember(markers) { markers.sortedBy { it.seconds } }
+        // With a resume point the row starts on the marker playing there (the last one at or
+        // before it), not on the first marker (iOS: `TVSceneDetailView.markersSection`).
+        val resume = scene?.resumeTime?.takeIf { it > 0 && it.isFinite() }
+        val entryIndex = remember(sorted, resume) { resume?.let { TvMarkerNav.entryIndex(sorted.map { m -> m.seconds }, it) } }
+        val entryCard = remember { FocusRequester() }
+        val listState = rememberLazyListState(initialFirstVisibleItemIndex = entryIndex ?: 0)
         Column(verticalArrangement = Arrangement.spacedBy(pt(16))) {
             TvSectionHeading(TvIcons.bookmark, tr(R.string.markers), markers.size)
-            LazyRow(Modifier.focusRestorer(), horizontalArrangement = Arrangement.spacedBy(pt(24)), contentPadding = PaddingValues(horizontal = pt(20), vertical = pt(30))) {
-                uniqueItems(markers.sortedBy { it.seconds }, { it.id }) { marker ->
+            LazyRow(
+                Modifier.focusRestorer { if (entryIndex != null) entryCard else FocusRequester.Default },
+                state = listState,
+                horizontalArrangement = Arrangement.spacedBy(pt(24)),
+                contentPadding = PaddingValues(horizontal = pt(20), vertical = pt(30)),
+            ) {
+                uniqueItemsIndexed(sorted, { it.id }) { i, marker ->
                     var focused by remember { mutableStateOf(false) }
                     Column(Modifier.width(pt(260))) {
-                        TvCardButton({ startPlayback(marker.seconds) }, Modifier.onFocusChanged { focused = it.isFocused }.tvFocusMemory(focus, "m.${marker.id}")) {
+                        val entryModifier = if (i == entryIndex) Modifier.focusRequester(entryCard) else Modifier
+                        TvCardButton({ startPlayback(marker.seconds) }, entryModifier.onFocusChanged { focused = it.isFocused }.tvFocusMemory(focus, "m.${marker.id}")) {
                             Box(Modifier.width(pt(260)).height(pt(146)).clip(RoundedCornerShape(pt(10)))) {
                                 TvImage(markerThumbnail(marker), Modifier.fillMaxSize(), TvIcons.bookmarkOutline)
                                 TvFocusPreview(Net.signed(marker.preview), focused)

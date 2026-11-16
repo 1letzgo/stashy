@@ -112,6 +112,27 @@ class TvLogicTest {
         assertNull(activeMarkerIndex(emptyList(), 1.0))
     }
 
+    @Test fun markerListsOpenOnTheMarkerAtOrBeforeThePlayhead() {
+        val starts = listOf(10.0, 60.0, 120.0)
+        assertEquals(0, TvMarkerNav.entryIndex(starts, 0.0))
+        assertEquals(0, TvMarkerNav.entryIndex(starts, 10.0))
+        assertEquals(1, TvMarkerNav.entryIndex(starts, 90.0))
+        assertEquals(2, TvMarkerNav.entryIndex(starts, 5000.0))
+        assertNull(TvMarkerNav.entryIndex(emptyList(), 1.0))
+    }
+
+    @Test fun previousAndNextMarkerFollowThePhonePlayer() {
+        val starts = listOf(10.0, 60.0, 120.0)
+        assertEquals(60.0, TvMarkerNav.next(starts, 10.0)!!, 0.0)
+        assertEquals(10.0, TvMarkerNav.next(starts, 0.0)!!, 0.0)
+        assertNull(TvMarkerNav.next(starts, 120.0))
+        // Right after a jump to 60 s, Previous goes one further back.
+        assertEquals(10.0, TvMarkerNav.previous(starts, 60.0)!!, 0.0)
+        // Well into a marker, Previous restarts it.
+        assertEquals(60.0, TvMarkerNav.previous(starts, 75.0)!!, 0.0)
+        assertNull(TvMarkerNav.previous(starts, 10.5))
+    }
+
     // MARK: sorting
 
     @Test fun everyTvSortOptionExistsInTheSharedCatalog() {

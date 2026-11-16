@@ -25,10 +25,12 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.requiredHeight
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
@@ -41,11 +43,13 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.focusRestorer
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -241,7 +245,7 @@ class TvPlaybackModel {
 
 // MARK: - Player screen
 
-private enum class PanelTarget { Nav, Audio, Subtitles, Extra }
+private enum class PanelTarget { Nav, Marker, Audio, Subtitles, Extra }
 
 /**
  * iOS: `TVAetherPlayerView` / `TVAetherPlayerContent` — full-screen video with the Siri-Remote
@@ -263,9 +267,12 @@ fun TvPlayerScreen(
     canGoNext: Boolean = false,
     onPrevious: () -> Unit = {},
     onNext: () -> Unit = {},
+    /** Marker starts (s): ticks on the time bar and a Previous / Next marker row first in the panel. */
+    markerTimes: List<Double> = emptyList(),
     panelExtra: (@Composable (close: () -> Unit, entry: FocusRequester?) -> Unit)? = null,
 ) {
     val player = model.player
+    val markers = remember(markerTimes) { markerTimes.filter { it.isFinite() }.sorted() }
     Box(Modifier.fillMaxSize().background(Color.Black)) {
         // iOS `TVPlayerErrorView(error: model.error)`: the reason, not just "unable to play".
         // A player whose every source failed before showing a frame lands here too (the
@@ -274,7 +281,7 @@ fun TvPlayerScreen(
         if (player == null || fatal != null) {
             TvPlayerError(fatal, onExit)
         } else {
-            TvPlayerContent(model, player, title, subtitle, posterURL, onExit, canGoPrevious, canGoNext, onPrevious, onNext, panelExtra)
+            TvPlayerContent(model, player, title, subtitle, posterURL, onExit, canGoPrevious, canGoNext, onPrevious, onNext, markers, panelExtra)
         }
     }
 }
@@ -291,6 +298,7 @@ private fun TvPlayerContent(
     canGoNext: Boolean,
     onPrevious: () -> Unit,
     onNext: () -> Unit,
+    markers: List<Double>,
     panelExtra: (@Composable (close: () -> Unit, entry: FocusRequester?) -> Unit)?,
 ) {
     val scope = rememberCoroutineScope()
@@ -309,6 +317,10 @@ private fun TvPlayerContent(
     val holdUp = remember { TvHoldTracker() }
     val holdDown = remember { TvHoldTracker() }
     val channelMode = canGoPrevious || canGoNext
+    // Target of the last marker jump: `currentTime` lags behind the seek, and quickly repeated
+    // "Next marker" would otherwise hit the same marker twice.
+    var lastJumpTarget by remember { mutableStateOf(0.0) }
+    var lastJumpAt by remember { mutableLongStateOf(0L) }
 
     fun reveal() { showTransport = true; hideToken++ }
     fun now() = System.currentTimeMillis()
@@ -373,6 +385,15 @@ private fun TvPlayerContent(
 
     fun closePanel() { panelOpen = false }
 
+    /** Jumps without closing the panel: focus stays on the button, every Select jumps once more. */
+    fun jumpToMarker(target: Double?) {
+        if (target == null) return
+        lastJumpTarget = target
+        lastJumpAt = now()
+        model.seek(target)
+        player.play()
+    }
+
     fun holdSwitch(action: () -> Unit) {
         lastHoldAt = now()
         cancelScrub()
@@ -407,6 +428,8 @@ private fun TvPlayerContent(
     val hasNav = channelMode
     val firstTarget = when {
         hasNav -> PanelTarget.Nav
+        // Scenes with markers open on "Next marker": Down, Select jumps.
+        markers.isNotEmpty() -> PanelTarget.Marker
         player.audioTracks.isNotEmpty() -> PanelTarget.Audio
         player.subtitleTracks.isNotEmpty() -> PanelTarget.Subtitles
         else -> PanelTarget.Extra
@@ -454,7 +477,7 @@ private fun TvPlayerContent(
         }
 
         AnimatedVisibility(showTransport && !panelOpen, Modifier.align(Alignment.BottomCenter), enter = fadeIn(), exit = fadeOut()) {
-            TransportOverlay(model, player, title, subtitle, scrubbing, scrubTarget, channelMode, canGoPrevious, canGoNext)
+            TransportOverlay(model, player, title, subtitle, scrubbing, scrubTarget, channelMode, canGoPrevious, canGoNext, markers)
         }
 
         // The remote layer only exists while the panel is closed, so it never sits over the
@@ -526,6 +549,20 @@ private fun TvPlayerContent(
                         if (canGoNext) PanelButton(tr(R.string.next), TvIcons.forwardEnd, if (!canGoPrevious) Modifier.focusRequester(panelEntry) else Modifier) { closePanel(); onNext() }
                     }
                 }
+                if (markers.isNotEmpty()) {
+                    val reference = if (now() - lastJumpAt < 2000) lastJumpTarget else player.currentTime
+                    val previous = TvMarkerNav.previous(markers, reference)
+                    val next = TvMarkerNav.next(markers, reference)
+                    fun label(title: String, target: Double?) = if (target == null) title else "$title  ${TvFormat.time(target)}"
+                    // No disabled state: a disabled button drops focus mid-sequence.
+                    Row(horizontalArrangement = Arrangement.spacedBy(pt(24))) {
+                        PanelButton(label(tr(R.string.previous_marker), previous), TvIcons.backwardEnd, Modifier.alpha(if (previous == null) 0.45f else 1f)) { jumpToMarker(previous) }
+                        PanelButton(
+                            label(tr(R.string.next_marker), next), TvIcons.forwardEnd,
+                            (if (firstTarget == PanelTarget.Marker) Modifier.focusRequester(panelEntry) else Modifier).alpha(if (next == null) 0.45f else 1f),
+                        ) { jumpToMarker(next) }
+                    }
+                }
                 if (player.audioTracks.isNotEmpty()) {
                     TrackRow(tr(R.string.audio), firstTarget == PanelTarget.Audio, panelEntry) {
                         itemsIndexed(player.audioTracks) { i, track ->
@@ -581,6 +618,7 @@ private fun TransportOverlay(
     channelMode: Boolean,
     canGoPrevious: Boolean,
     canGoNext: Boolean,
+    markers: List<Double>,
 ) {
     val displayed = if (scrubbing) scrubTarget else player.currentTime
     Column(
@@ -611,18 +649,32 @@ private fun TransportOverlay(
         }
         val duration = player.duration.coerceAtLeast(0.001)
         val progress = (displayed / duration).coerceIn(0.0, 1.0).toFloat()
-        Box(Modifier.fillMaxWidth().height(pt(8)).clip(CircleShape).background(Color.White.copy(alpha = 0.25f))) {
-            Box(Modifier.fillMaxHeight().fillMaxWidth(progress).clip(CircleShape).background(if (scrubbing) Color.White else TvColors.tint))
+        Box(Modifier.fillMaxWidth().height(pt(8))) {
+            Box(Modifier.fillMaxSize().clip(CircleShape).background(Color.White.copy(alpha = 0.25f))) {
+                Box(Modifier.fillMaxHeight().fillMaxWidth(progress).clip(CircleShape).background(if (scrubbing) Color.White else TvColors.tint))
+            }
+            // Marker ticks (iOS Feeds shows dots), taller than the bar so they stay visible over
+            // the filled part; `requiredHeight` overflows without growing the bar.
+            if (player.duration > 0) {
+                markers.forEach { seconds ->
+                    val fraction = (seconds / player.duration).coerceIn(0.0, 1.0).toFloat()
+                    Box(Modifier.fillMaxWidth(fraction).fillMaxHeight()) {
+                        Box(Modifier.align(Alignment.CenterEnd).width(pt(4)).requiredHeight(pt(18)).clip(RoundedCornerShape(pt(2))).background(Color.White.copy(alpha = 0.95f)))
+                    }
+                }
+            }
         }
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text(TvFormat.time(displayed), style = TvType.body.copy(fontSize = 12.sp, fontWeight = FontWeight.Medium), color = Color.White.copy(alpha = 0.85f))
             Spacer(Modifier.weight(1f))
-            if (channelMode) {
+            if (channelMode || markers.isNotEmpty()) {
                 Row(horizontalArrangement = Arrangement.spacedBy(pt(20))) {
                     val hint = TvType.caption.copy(fontSize = 10.sp)
                     if (canGoPrevious) Text(("⏮ " + tr(R.string.hold_prev)), style = hint, color = Color.White.copy(alpha = 0.5f))
                     if (canGoNext) Text(("⏭ " + tr(R.string.hold_next)), style = hint, color = Color.White.copy(alpha = 0.5f))
-                    Text(("▼ " + tr(R.string.options)), style = hint, color = Color.White.copy(alpha = 0.5f))
+                    // With markers Down opens the marker jumps.
+                    if (channelMode) Text(("▼ " + tr(R.string.options)), style = hint, color = Color.White.copy(alpha = 0.5f))
+                    else Text(("▼ " + tr(R.string.markers)), style = hint, color = Color.White.copy(alpha = 0.5f))
                 }
                 Spacer(Modifier.weight(1f))
             }
@@ -649,19 +701,27 @@ fun TvPlayerError(message: String?, onDismiss: () -> Unit) {
 
 /**
  * iOS: `TVMarkerRailView` — the scene's markers in the player's down panel; the marker that
- * holds the playhead is outlined, selecting one seeks there and closes the panel.
+ * holds the playhead is outlined, selecting one seeks there and closes the panel. Opens scrolled
+ * to the marker at or before the playhead, and focus coming into the rail lands there (not on
+ * the leftmost card).
  */
+@OptIn(ExperimentalComposeUiApi::class)
 @Composable
 fun TvMarkerRail(markers: List<SceneMarker>, currentTime: Double, entry: FocusRequester?, onSelect: (SceneMarker) -> Unit, close: () -> Unit) {
     val sorted = remember(markers) { markers.sortedBy { it.seconds } }
     val active = activeMarkerIndex(sorted.map { it.seconds }, currentTime)
+    // Fixed when the rail appears (the panel builds it anew on every open).
+    val entryIndex = remember(sorted) { TvMarkerNav.entryIndex(sorted.map { it.seconds }, currentTime) ?: 0 }
+    val entryCard = remember { FocusRequester() }
+    val listState = rememberLazyListState(initialFirstVisibleItemIndex = entryIndex)
     Column(verticalArrangement = Arrangement.spacedBy(pt(12))) {
         Text(tr(R.string.markers), style = TvType.caption.copy(fontSize = 11.sp, fontWeight = FontWeight.Bold), color = Color.White.copy(alpha = 0.6f))
-        LazyRow(horizontalArrangement = Arrangement.spacedBy(pt(30)), contentPadding = PaddingValues(horizontal = pt(10), vertical = pt(24))) {
+        LazyRow(Modifier.focusRestorer { entryCard }, state = listState, horizontalArrangement = Arrangement.spacedBy(pt(30)), contentPadding = PaddingValues(horizontal = pt(10), vertical = pt(24))) {
             uniqueItemsIndexed(sorted, { it.id }) { i, marker ->
                 val isActive = i == active
                 Column(Modifier.width(pt(300))) {
-                    TvCardButton({ onSelect(marker); close() }, if (i == 0 && entry != null) Modifier.focusRequester(entry) else Modifier, radius = pt(8)) {
+                    val entryModifier = if (i == entryIndex) Modifier.focusRequester(entryCard).then(if (entry != null) Modifier.focusRequester(entry) else Modifier) else Modifier
+                    TvCardButton({ onSelect(marker); close() }, entryModifier, radius = pt(8)) {
                         Box(
                             Modifier.width(pt(300)).height(pt(169)).clip(RoundedCornerShape(pt(8)))
                                 .then(if (isActive) Modifier.border(2.dp, TvColors.tint.copy(alpha = 0.9f), RoundedCornerShape(pt(8))) else Modifier),
@@ -705,6 +765,7 @@ class TvScenePlayerRoute(private val model: TvPlaybackModel, private val scenePr
             subtitle = scene?.studio?.name.orEmpty(),
             posterURL = scene?.thumbnailURL,
             onExit = { model.suspend(); TvNav.pop() },
+            markerTimes = scene?.sceneMarkers.orEmpty().map { it.seconds },
             panelExtra = scene?.sceneMarkers?.takeIf { it.isNotEmpty() }?.let { markers ->
                 { close, entry ->
                     TvMarkerRail(markers, model.player?.currentTime ?: 0.0, entry, { m -> model.seek(m.seconds); model.player?.play() }, close)
