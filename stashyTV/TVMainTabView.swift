@@ -49,6 +49,28 @@ struct TVMainTabView: View {
             _navigationStore = State(initialValue: store)
             _selectedTab = State(initialValue: .studios)
         }
+        // `-stashyDebugTVOpen "<scene|performer|tag|group|gallery>|<id>|<name>"` pushes that
+        // detail page onto its tab's stack (layout checks without remote input).
+        if let raw = UserDefaults.standard.string(forKey: "stashyDebugTVOpen"), !raw.isEmpty {
+            let parts = raw.split(separator: "|", maxSplits: 2).map(String.init)
+            if parts.count >= 2 {
+                let name = parts.count > 2 ? parts[2] : ""
+                let store = TVNavigationStore()
+                let target: TVRootTab?
+                switch parts[0] {
+                case "scene": target = .scenes; store.binding(for: .scenes).wrappedValue.append(TVSceneLink(sceneId: parts[1]))
+                case "performer": target = .performers; store.binding(for: .performers).wrappedValue.append(TVPerformerLink(id: parts[1], name: name))
+                case "tag": target = .tags; store.binding(for: .tags).wrappedValue.append(TVTagLink(id: parts[1], name: name))
+                case "group": target = .groups; store.binding(for: .groups).wrappedValue.append(TVGroupLink(id: parts[1], name: name))
+                case "gallery": target = .galleries; store.binding(for: .galleries).wrappedValue.append(TVGalleryLink(id: parts[1], title: name))
+                default: target = nil
+                }
+                if let target {
+                    _navigationStore = State(initialValue: store)
+                    _selectedTab = State(initialValue: target)
+                }
+            }
+        }
         #endif
     }
 
