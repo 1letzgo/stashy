@@ -57,6 +57,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.media3.exoplayer.ExoPlayer
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
+import kotlinx.coroutines.launch
 import coil3.compose.SubcomposeAsyncImage
 import de.letzgo.stashy.data.FeedsConfig
 import de.letzgo.stashy.ui.SF
@@ -81,8 +84,10 @@ fun feedMediaSize(containerW: Float, containerH: Float, aspect: Float, fill: Boo
  * iOS: `ReelItemView` media layer + gestures (`ZoomableScrollView`): one feed page.
  *
  * - tap toggles the chrome (ignored in the top 120 / bottom 160 pt like iOS),
- * - double tap on the outer thirds skips by `playerSkipSeconds`, in the middle zooms,
- * - long press holds fast forward at `hold_speed_feeds`,
+ * - double tap on a video skips by `feedsSkipSeconds`: left half back, right half forward
+ *   (zoomed: zooms back out; animated clips: zooms),
+ * - long press on the right half holds fast forward at `hold_speed_feeds`, on the left half
+ *   rewinds at the same speed ([FeedsHoldRewind], like the scene player's left third),
  * - pinch zooms (the pager stops paging while zoomed).
  */
 @Composable
@@ -99,6 +104,8 @@ fun FeedRow(
     onToggleUI: () -> Unit,
     onSkip: (Double) -> Unit,
     onFastForward: (Boolean) -> Unit,
+    /** Hold on the left half: `true` starts the rewind and answers whether it started. */
+    onRewind: (Boolean) -> Boolean,
     onZoomChanged: (Boolean) -> Unit,
     onPlay: () -> Unit,
 ) {
@@ -117,16 +124,18 @@ fun FeedRow(
     var scale by remember(item.id, devicePortrait) { mutableFloatStateOf(1f) }
     var offset by remember(item.id, devicePortrait) { mutableStateOf(Offset.Zero) }
     var fastForwarding by remember(item.id) { mutableStateOf(false) }
+    var rewinding by remember(item.id) { mutableStateOf(false) }
     val zoomCallback by rememberUpdatedState(onZoomChanged)
     val playingNow by rememberUpdatedState(isPlaying)
     val toggleUI by rememberUpdatedState(onToggleUI)
     val skipBy by rememberUpdatedState(onSkip)
     val fastForward by rememberUpdatedState(onFastForward)
+    val rewind by rememberUpdatedState(onRewind)
     LaunchedEffect(isActive) { if (!isActive) { scale = 1f; offset = Offset.Zero } }
     LaunchedEffect(scale > 1f) { if (isActive) zoomCallback(scale > 1f) }
 
     val density = LocalDensity.current
-    val skip = FeedsConfig.playerSkipSeconds.toDouble()
+    val skip = FeedsConfig.feedsSkipSeconds.toDouble()
 
     BoxWithConstraints(Modifier.fillMaxSize().background(if (isClip) backdrop else Color.Black).clipToBounds()) {
         val w = constraints.maxWidth.toFloat()
@@ -192,17 +201,21 @@ fun FeedRow(
                             toggleUI()
                         },
                         onDoubleTap = { pos ->
-                            val third = size.width / 3f
+                            // iOS: a zoomed picture zooms back out first; a video skips by half.
                             when {
-                                item.isVideo && pos.x < third -> skipBy(-skip)
-                                item.isVideo && pos.x > size.width - third -> skipBy(skip)
-                                else -> if (scale > 1f) { scale = 1f; offset = Offset.Zero } else scale = 2f
+                                scale > 1f -> { scale = 1f; offset = Offset.Zero }
+                                item.isVideo -> skipBy(if (pos.x < size.width / 2f) -skip else skip)
+                                else -> scale = 2f
                             }
                         },
-                        onLongPress = {
-                            if (item.isVideo && playingNow) {
-                                fastForwarding = true
-                                fastForward(true)
+                        onLongPress = { pos ->
+                            if (item.isVideo) {
+                                if (pos.x < size.width / 2f) {
+                                    if (rewind(true)) rewinding = true
+                                } else if (playingNow) {
+                                    fastForwarding = true
+                                    fastForward(true)
+                                }
                             }
                         },
                         onPress = {
@@ -210,6 +223,10 @@ fun FeedRow(
                             if (fastForwarding) {
                                 fastForwarding = false
                                 fastForward(false)
+                            }
+                            if (rewinding) {
+                                rewinding = false
+                                rewind(false)
                             }
                         },
                     )
@@ -228,13 +245,13 @@ fun FeedRow(
         }
 
         // iOS `fastForwardOverlay`: below the chip row (top 200).
-        AnimatedVisibility(fastForwarding, Modifier.align(Alignment.TopCenter).padding(top = 200.dp), enter = fadeIn(), exit = fadeOut()) {
+        AnimatedVisibility(fastForwarding || rewinding, Modifier.align(Alignment.TopCenter).padding(top = 200.dp), enter = fadeIn(), exit = fadeOut()) {
             Row(
                 Modifier.stashyGlass(RoundedCornerShape(50)).padding(horizontal = 22.dp, vertical = 14.dp),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(6.dp),
             ) {
-                Icon(SF.chevronRight2, null, tint = Color.White, modifier = Modifier.size(32.dp))
+                Icon(if (rewinding) de.letzgo.stashy.ui.player.PlayerIcons.fastRewind else SF.chevronRight2, null, tint = Color.White, modifier = Modifier.size(32.dp))
                 Text(holdSpeedLabel(FeedsConfig.holdSpeedFeeds), color = Color.White, fontSize = 20.sp, fontWeight = FontWeight.Bold)
             }
         }
@@ -249,6 +266,38 @@ fun FeedRow(
                 }
             }
         }
+    }
+}
+
+/**
+ * iOS `ReelItemView.setRewinding` (the scene player's `setRewinding`): the player does not run
+ * backwards, so it pauses and the position steps back 0.25 s × the Feeds hold speed every
+ * 0.25 s (plain seeks, no play in between). Marker rows are clipped media, so 0 is their start.
+ */
+class FeedsHoldRewind(private val scope: kotlinx.coroutines.CoroutineScope) {
+    private var job: kotlinx.coroutines.Job? = null
+
+    fun start(player: ExoPlayer, speed: Float): Boolean {
+        if (job != null) return false
+        if (player.duration == androidx.media3.common.C.TIME_UNSET || player.currentPosition <= 0) return false
+        player.playWhenReady = false
+        var position = player.currentPosition / 1000.0
+        val step = 0.25 * speed
+        job = scope.launch {
+            while (isActive) {
+                delay(250)
+                position = maxOf(0.0, position - step)
+                player.seekTo((position * 1000).toLong())
+                if (position <= 0) break
+            }
+        }
+        return true
+    }
+
+    /** Ends the hold; the caller resumes playback (only on the row still shown). */
+    fun stop() {
+        job?.cancel()
+        job = null
     }
 }
 

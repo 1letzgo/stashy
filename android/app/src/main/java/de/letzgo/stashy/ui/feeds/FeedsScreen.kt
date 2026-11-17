@@ -374,6 +374,7 @@ private fun FeedPager(
     onAddPerformers: (FeedItem) -> Unit,
 ) {
     val scope = rememberCoroutineScope()
+    val holdRewind = remember { FeedsHoldRewind(scope) }
     val list = model.list(mode)
     val startIndex = remember(mode) { model.currentIds[mode]?.let { id -> items.indexOfFirst { it.id == id } }?.coerceAtLeast(0) ?: 0 }
     val pagerState = rememberPagerState(initialPage = startIndex) { items.size }
@@ -540,6 +541,17 @@ private fun FeedPager(
                     }
                 },
                 onFastForward = { on -> pool.setRate(item.id, if (on) FeedsConfig.holdSpeedFeeds else 1f) },
+                onRewind = { on ->
+                    if (on) {
+                        pool.player(item.id)?.let { holdRewind.start(it, FeedsConfig.holdSpeedFeeds) } ?: false
+                    } else {
+                        holdRewind.stop()
+                        // Back to the play state Feeds is in, on the row still shown only
+                        // (a page swipe also ends the hold).
+                        if (item.id == activeId) pool.setPlaying(item.id, playingNow)
+                        true
+                    }
+                },
                 onZoomChanged = onZoom,
                 onPlay = { model.isPlaying = true },
             )

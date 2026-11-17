@@ -71,6 +71,9 @@ fun LazyListScope.playbackSections() {
         // Feeds › Markers: length of a marker without an end time.
         SettingsPickerRow(tr(R.string.marker_length), TabManager.feedsMarkerLengthOptions, TabManager.feedsMarkerDefaultSeconds, { "${it.toInt()} s" }, SFS.goforward10) { TabManager.feedsMarkerDefaultSeconds = it }
         SettingsDivider()
+        // Feeds' own interval; follows the player's until one is picked here.
+        SettingsPickerRow(tr(R.string.action_skip_interval), TabManager.playerSkipOptions, TabManager.feedsSkipSeconds, { TabManager.playerSkipLabel(it) }, SFS.goforward) { TabManager.feedsSkipSeconds = it }
+        SettingsDivider()
         SettingsPickerRow(tr(R.string.hold_to_speed_up), TabManager.holdSpeedOptions, TabManager.holdSpeedFeeds, TabConfigLogic::holdSpeedLabel, SFS.forwardFrameFill) { TabManager.holdSpeedFeeds = it }
         SettingsDivider()
         val verticals = de.letzgo.stashy.data.ReelsModeType.Verticals in TabManager.enabledReelsModes

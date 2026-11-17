@@ -100,6 +100,9 @@ enum ReelsTabBarLayout {
 /// and one-shot checks that don't need an invalidation.
 final class LiveSizeBox {
     var size: CGSize = .zero
+    /// Left edge in the global (window) space: Feeds' tap locations arrive in window
+    /// coordinates, so the left / right half is measured from here.
+    var minX: CGFloat = 0
     /// Bumped per resize so a delayed follow-up only runs for the latest one.
     var generation = 0
 }
@@ -5859,6 +5862,12 @@ struct ReelItemView: View {
     /// Steps the playhead forward while held when the Feeds hold speed exceeds the engine's
     /// native cap (2× for video).
     @State private var fastForwardBoostTimer: Timer?
+    /// Hold on the left half: like `AetherSceneSurface.setRewinding` — paused, the playhead
+    /// steps back every 0.25 s at the Feeds hold speed, playback resumes on release.
+    @State private var isRewinding = false
+    @State private var rewindTimer: Timer?
+    @State private var rewindPosition: Double = 0
+    @State private var wasPlayingBeforeRewind = false
     /// Brings back chrome that faded out while swiping; true when it was hidden (the tap is then spent on that).
     var revealScrollHiddenChrome: () -> Bool = { false }
     var onInteraction: () -> Void
@@ -5971,6 +5980,10 @@ struct ReelItemView: View {
                     mediaSizeBox.size = size
                     let tall = size.height > size.width
                     if tall != isTallerThanWide { isTallerThanWide = tall }
+                }
+                // Only the x edge: the global frame's y runs with every paging frame.
+                .onGeometryChange(for: CGFloat.self) { $0.frame(in: .global).minX } action: { minX in
+                    mediaSizeBox.minX = minX
                 }
             playbackErrorOverlay
             fastForwardOverlay
@@ -6273,7 +6286,7 @@ extension ReelItemView {
     @ViewBuilder
     private var mediaLayer: some View {
         let bottomInset = immersiveBottomInset
-        ZoomableScrollView(isZoomed: $isZoomed, onTap: handleMediaTap, onLongPress: handleLongPress, onDoubleTap: handleDoubleTap) {
+        ZoomableScrollView(isZoomed: $isZoomed, onTap: handleMediaTap, onLongPressAt: handleLongPress, onDoubleTap: handleDoubleTap) {
             ZStack {
                 if let clipImage {
                     // Asked for with the row, so the colour is there before the video's first frame.
@@ -6358,20 +6371,19 @@ extension ReelItemView {
         onInteraction()
     }
 
-    /// Double tap on the outer thirds of a video skips by the Settings › Playback interval
-    /// (like the scene player); the middle third keeps zooming.
+    /// True when a window-space location lies on the left half of this row's media.
+    private func isOnLeftHalf(_ location: CGPoint) -> Bool {
+        location.x - mediaSizeBox.minX < mediaSizeBox.size.width / 2
+    }
+
+    /// Double tap on a video skips by Settings › Playback › Feeds › "Skip interval": the left
+    /// half back, the right half forward (the hold below splits the same way). Animated
+    /// clips keep the double-tap zoom; a zoomed picture zooms back out first.
     private func handleDoubleTap(at location: CGPoint) -> Bool {
-        guard !item.isAnimated, item.videoURL != nil, let aether = aetherEngine else { return false }
-        let width = mediaSizeBox.size.width
-        let third = width / 3
-        let delta: Double
-        if location.x < third {
-            delta = -TabManager.shared.playerSkipSeconds
-        } else if location.x > width - third {
-            delta = TabManager.shared.playerSkipSeconds
-        } else {
-            return false
-        }
+        guard !item.isAnimated, item.videoURL != nil, let aether = aetherEngine,
+              mediaSizeBox.size.width > 0 else { return false }
+        let seconds = TabManager.shared.feedsSkipSeconds
+        let delta = isOnLeftHalf(location) ? -seconds : seconds
         HapticManager.light()
         let duration = aether.duration
         // Settings › Feeds "Double tap jumps to markers": a whole scene with markers goes to
@@ -6421,10 +6433,15 @@ extension ReelItemView {
         fastForwardBoostTimer = timer
     }
 
-    private func handleLongPress(_ isPressed: Bool) {
+    /// Hold on the right half runs the Feeds hold speed forward, on the left half backwards.
+    private func handleLongPress(_ isPressed: Bool, at location: CGPoint) {
         guard !item.isAnimated, let aether = aetherEngine else { return }
 
-        if isPressed {
+        if isPressed, mediaSizeBox.size.width > 0, isOnLeftHalf(location) {
+            setRewinding(true, on: aether)
+        } else if !isPressed, isRewinding {
+            setRewinding(false, on: aether)
+        } else if isPressed {
             // Like `AetherSceneSurface.setFastForwarding`: on a paused row the boost timer
             // still stepped the playhead, so a hold visibly scrubbed a row shown as paused.
             guard aether.isPlaying else { return }
@@ -6449,6 +6466,53 @@ extension ReelItemView {
         onInteraction()
     }
 
+    /// Like `AetherSceneSurface.setRewinding`: the engine does not play backwards, so it pauses
+    /// and the playhead steps back 0.25 s × the Feeds hold speed four times a second (straight
+    /// seeks, no play in between); on release the previous play state comes back. Marker rows
+    /// stop at their segment start.
+    private func setRewinding(_ active: Bool, on aether: AetherSceneEngine) {
+        guard active != isRewinding else { return }
+        if active {
+            guard aether.hasFirstFrame, aether.currentTime > 0 else { return }
+            HapticManager.selection()
+            wasPlayingBeforeRewind = aether.isPlaying
+            aether.pause()
+            rewindPosition = aether.currentTime
+            let lowerBound = effectivePlaybackSegment?.start ?? 0
+            let step = 0.25 * TabManager.shared.holdSpeedFeeds
+            let timer = Timer(timeInterval: 0.25, repeats: true) { [weak aether] _ in
+                Task { @MainActor in
+                    // `cleanupPlayer` stops a hold whose row goes away.
+                    guard let aether, isRewinding else { return }
+                    let target = max(lowerBound, rewindPosition - step)
+                    rewindPosition = target
+                    await aether.seek(to: target)
+                    if target <= lowerBound { stopRewinding(resume: true, on: aether) }
+                }
+            }
+            RunLoop.main.add(timer, forMode: .common)
+            rewindTimer = timer
+            withAnimation { isRewinding = true }
+        } else {
+            stopRewinding(resume: true, on: aether)
+        }
+        onInteraction()
+    }
+
+    private func stopRewinding(resume: Bool, on aether: AetherSceneEngine?) {
+        rewindTimer?.invalidate()
+        rewindTimer = nil
+        guard isRewinding else { return }
+        if resume, wasPlayingBeforeRewind, let aether {
+            Task {
+                await aether.seek(to: rewindPosition)
+                aetherPlayIfAllowed()
+            }
+        }
+        wasPlayingBeforeRewind = false
+        withAnimation { isRewinding = false }
+    }
+
     /// The engine gave up on this row — say so instead of leaving a black cell.
     @ViewBuilder
     private var playbackErrorOverlay: some View {
@@ -6469,10 +6533,10 @@ extension ReelItemView {
 
     @ViewBuilder
     private var fastForwardOverlay: some View {
-        if isFastForwarding {
+        if isFastForwarding || isRewinding {
             VStack {
                 HStack(spacing: 6) {
-                    Image(systemName: "chevron.right.2")
+                    Image(systemName: isRewinding ? "chevron.left.2" : "chevron.right.2")
                         .font(.system(size: 32, weight: .black))
                     // The configured Feeds hold speed, so 3× reads as 3× while it runs.
                     Text(TabManager.holdSpeedLabel(TabManager.shared.holdSpeedFeeds))
@@ -6908,6 +6972,7 @@ extension ReelItemView {
     /// Tears the row's engine down and resets everything derived from it.
     func cleanupPlayer() {
         shutdownScrubPreview()
+        stopRewinding(resume: false, on: nil)
         playerSetupGeneration &+= 1
         syncPlaybackActivityPosition()
         playbackActivityTracker.stop()
