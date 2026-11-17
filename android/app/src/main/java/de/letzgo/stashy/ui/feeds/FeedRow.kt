@@ -131,6 +131,10 @@ fun FeedRow(
     val skipBy by rememberUpdatedState(onSkip)
     val fastForward by rememberUpdatedState(onFastForward)
     val rewind by rememberUpdatedState(onRewind)
+    val play by rememberUpdatedState(onPlay)
+    // iOS `showsCenterPlayButton`: on a paused row the whole page is the play button.
+    val showsPlayButton = item.isVideo && !isPlaying && isUIVisible && !isScrolling && isActive
+    val playButtonShown by rememberUpdatedState(showsPlayButton)
     LaunchedEffect(isActive) { if (!isActive) { scale = 1f; offset = Offset.Zero } }
     LaunchedEffect(scale > 1f) { if (isActive) zoomCallback(scale > 1f) }
 
@@ -196,6 +200,7 @@ fun FeedRow(
                     val bottomZone = 160.dp.toPx()
                     detectTapGestures(
                         onTap = { pos ->
+                            if (playButtonShown) { play(); return@detectTapGestures }
                             if (pos.y in 0f..topZone) return@detectTapGestures
                             if (pos.y > size.height - bottomZone) return@detectTapGestures
                             toggleUI()
@@ -258,8 +263,10 @@ fun FeedRow(
 
         // iOS `playButtonOverlay` (`CenterPlayButton`): a bare 60 pt `play.fill`, white 70 % with
         // a soft shadow, no circle; the whole page is the tap target.
-        if (item.isVideo && !isPlaying && isUIVisible && !isScrolling && isActive) {
-            Box(Modifier.fillMaxSize().noIndicationClick(onPlay), contentAlignment = Alignment.Center) {
+        // Drawn only: its tap is the gesture layer's `onTap`. As a clickable it took every touch
+        // of a paused row, so holding the left half could not rewind it.
+        if (showsPlayButton) {
+            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 Box(contentAlignment = Alignment.Center) {
                     Icon(SF.playFill, null, tint = Color.Black.copy(alpha = 0.25f), modifier = Modifier.size(84.dp).blur(10.dp))
                     Icon(SF.playFill, tr(R.string.action_play), tint = Color.White.copy(alpha = 0.7f), modifier = Modifier.size(84.dp))
@@ -281,12 +288,14 @@ class FeedsHoldRewind(private val scope: kotlinx.coroutines.CoroutineScope) {
         if (job != null) return false
         if (player.duration == androidx.media3.common.C.TIME_UNSET || player.currentPosition <= 0) return false
         player.playWhenReady = false
-        var position = player.currentPosition / 1000.0
-        val step = 0.25 * speed
+        // Each tick goes to start − elapsed × speed, so the rate holds however long a seek takes.
+        val startPosition = player.currentPosition / 1000.0
+        val startedAt = android.os.SystemClock.elapsedRealtime()
         job = scope.launch {
             while (isActive) {
                 delay(250)
-                position = maxOf(0.0, position - step)
+                val elapsed = (android.os.SystemClock.elapsedRealtime() - startedAt) / 1000.0
+                val position = maxOf(0.0, startPosition - elapsed * speed)
                 player.seekTo((position * 1000).toLong())
                 if (position <= 0) break
             }

@@ -5867,6 +5867,9 @@ struct ReelItemView: View {
     @State private var isRewinding = false
     @State private var rewindTimer: Timer?
     @State private var rewindPosition: Double = 0
+    /// Where and when the hold began: each tick seeks to start − elapsed × speed, so the rate
+    /// holds however long a seek or a late timer tick takes.
+    @State private var rewindStart: (position: Double, date: Date) = (0, Date())
     @State private var wasPlayingBeforeRewind = false
     /// Brings back chrome that faded out while swiping; true when it was hidden (the tap is then spent on that).
     var revealScrollHiddenChrome: () -> Bool = { false }
@@ -6355,6 +6358,12 @@ extension ReelItemView {
     }
 
     private func handleMediaTap(at location: CGPoint) {
+        // A paused row: the whole page is the play button (`playButtonOverlay` only draws it
+        // and takes no touches, so a hold and a double tap reach this scroll view too).
+        if showsCenterPlayButton {
+            startPlaybackFromCenterButton()
+            return
+        }
         let screenHeight = mediaSizeBox.size.height
         // Ignore taps in the top chrome and bottom info/scrubber area
         if location.y > 0 && location.y < 120 { return }
@@ -6478,13 +6487,15 @@ extension ReelItemView {
             wasPlayingBeforeRewind = aether.isPlaying
             aether.pause()
             rewindPosition = aether.currentTime
+            rewindStart = (aether.currentTime, Date())
             let lowerBound = effectivePlaybackSegment?.start ?? 0
-            let step = 0.25 * TabManager.shared.holdSpeedFeeds
+            let speed = TabManager.shared.holdSpeedFeeds
             let timer = Timer(timeInterval: 0.25, repeats: true) { [weak aether] _ in
                 Task { @MainActor in
                     // `cleanupPlayer` stops a hold whose row goes away.
                     guard let aether, isRewinding else { return }
-                    let target = max(lowerBound, rewindPosition - step)
+                    let elapsed = Date().timeIntervalSince(rewindStart.date)
+                    let target = max(lowerBound, rewindStart.position - elapsed * speed)
                     rewindPosition = target
                     await aether.seek(to: target)
                     if target <= lowerBound { stopRewinding(resume: true, on: aether) }
@@ -6555,14 +6566,23 @@ extension ReelItemView {
         }
     }
 
+    private var showsCenterPlayButton: Bool {
+        !item.isAnimated && !isPlaying && isUIVisible && !isUserScrolling
+    }
+
+    private func startPlaybackFromCenterButton() {
+        isPlaying = true
+        if !isRotating { aetherPlayIfAllowed() }
+        onInteraction()
+    }
+
+    /// Drawn only: its tap is `handleMediaTap`. As a full-page tap target it swallowed every
+    /// touch of a paused row, so holding the left half could not rewind it.
     @ViewBuilder
     private var playButtonOverlay: some View {
-        if !item.isAnimated && !isPlaying && isUIVisible && !isUserScrolling {
-            CenterPlayButton {
-                isPlaying = true
-                if !isRotating { aetherPlayIfAllowed() }
-                onInteraction()
-            }
+        if showsCenterPlayButton {
+            CenterPlayButton(action: startPlaybackFromCenterButton)
+                .allowsHitTesting(false)
         }
     }
 
