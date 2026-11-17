@@ -1559,7 +1559,7 @@
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_ENTITLEMENTS = stashy.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 517;
+				CURRENT_PROJECT_VERSION = 518;
 				DEVELOPMENT_TEAM = 699G2QY959;
 				ENABLE_PREVIEWS = YES;
 				INFOPLIST_FILE = stashy/Info.plist;
@@ -1570,7 +1570,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 4.0;
+				MARKETING_VERSION = 4.1;
 				PRODUCT_BUNDLE_IDENTIFIER = de.letzgo.stashy;
 				PRODUCT_NAME = "$(TARGET_NAME:c99extidentifier)";
 				PROVISIONING_PROFILE_SPECIFIER = "";
@@ -1590,7 +1590,7 @@
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_ENTITLEMENTS = stashy.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 517;
+				CURRENT_PROJECT_VERSION = 518;
 				DEVELOPMENT_TEAM = 699G2QY959;
 				ENABLE_PREVIEWS = YES;
 				INFOPLIST_FILE = stashy/Info.plist;
@@ -1601,7 +1601,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 4.0;
+				MARKETING_VERSION = 4.1;
 				PRODUCT_BUNDLE_IDENTIFIER = de.letzgo.stashy;
 				PRODUCT_NAME = "$(TARGET_NAME:c99extidentifier)";
 				PROVISIONING_PROFILE_SPECIFIER = "";
@@ -1704,7 +1704,7 @@
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 438;
+				CURRENT_PROJECT_VERSION = 439;
 				DEVELOPMENT_TEAM = 699G2QY959;
 				ENABLE_HARDENED_RUNTIME = YES;
 				ENABLE_PREVIEWS = YES;
@@ -1715,7 +1715,7 @@
 					"@executable_path/../Frameworks",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 26.0;
-				MARKETING_VERSION = 4.0;
+				MARKETING_VERSION = 4.1;
 				PRODUCT_BUNDLE_IDENTIFIER = de.letzgo.stashy;
 				PRODUCT_NAME = stashy;
 				PROVISIONING_PROFILE_SPECIFIER = "";
@@ -1735,7 +1735,7 @@
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 438;
+				CURRENT_PROJECT_VERSION = 439;
 				DEVELOPMENT_TEAM = 699G2QY959;
 				ENABLE_HARDENED_RUNTIME = YES;
 				ENABLE_PREVIEWS = YES;
@@ -1746,7 +1746,7 @@
 					"@executable_path/../Frameworks",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 26.0;
-				MARKETING_VERSION = 4.0;
+				MARKETING_VERSION = 4.1;
 				PRODUCT_BUNDLE_IDENTIFIER = de.letzgo.stashy;
 				PRODUCT_NAME = stashy;
 				PROVISIONING_PROFILE_SPECIFIER = "";
