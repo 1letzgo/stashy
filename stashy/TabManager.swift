@@ -538,7 +538,7 @@ class TabManager: ObservableObject {
             UserDefaults.standard.set(reelsContinuousPlay, forKey: reelsContinuousPlayKey)
         }
     }
-    /// Feeds › Scenes: a double tap on the outer thirds jumps to the previous / next marker
+    /// Feeds › Scenes: a double tap on the left / right half jumps to the previous / next marker
     /// of a scene that has markers, instead of skipping seconds (Settings › Feeds).
     @Published var feedsDoubleTapMarkers: Bool = false {
         didSet {
@@ -559,6 +559,18 @@ class TabManager: ObservableObject {
         }
     }
     static let playerSkipOptions: [Double] = [5, 10, 15, 30, 60, 180, 300]
+
+    /// Feeds' own skip interval (Settings › Playback › Feeds › "Skip interval"): a double tap
+    /// on the left / right half of a Feeds video. Nothing stored = the player's interval,
+    /// so it follows that one until the user picks a value here.
+    @Published private var feedsSkipSecondsStored: Double? = nil
+    var feedsSkipSeconds: Double {
+        get { feedsSkipSecondsStored ?? playerSkipSeconds }
+        set {
+            feedsSkipSecondsStored = newValue
+            UserDefaults.standard.set(newValue, forKey: feedsSkipSecondsKey)
+        }
+    }
 
     /// "10 s", "3 min" — the picker's wording.
     static func playerSkipLabel(_ seconds: Double) -> String {
@@ -842,6 +854,7 @@ class TabManager: ObservableObject {
     private let isPiPEnabledKey = "isPiPEnabled"
     private let isMiniPlayerEnabledKey = "isMiniPlayerEnabled"
     private let playerSkipSecondsKey = "playerSkipSeconds"
+    private let feedsSkipSecondsKey = "feedsSkipSeconds"
     private let showsPlayerSkipButtonsKey = "showsPlayerSkipButtons"
     private let hidesPlayerAirPlayButtonKey = "hidesPlayerAirPlayButton"
     private let playerAutoZoomKey = "playerAutoZoom"
@@ -912,6 +925,8 @@ class TabManager: ObservableObject {
         self.isMiniPlayerEnabled = UserDefaults.standard.object(forKey: isMiniPlayerEnabledKey) as? Bool ?? true
         let storedSkip = UserDefaults.standard.object(forKey: playerSkipSecondsKey) as? Double ?? 10
         self.playerSkipSeconds = Self.playerSkipOptions.contains(storedSkip) ? storedSkip : 10
+        self.feedsSkipSecondsStored = (UserDefaults.standard.object(forKey: feedsSkipSecondsKey) as? Double)
+            .flatMap { Self.playerSkipOptions.contains($0) ? $0 : nil }
         self.showsPlayerSkipButtons = UserDefaults.standard.object(forKey: showsPlayerSkipButtonsKey) as? Bool ?? true
         self.hidesPlayerAirPlayButton = UserDefaults.standard.bool(forKey: hidesPlayerAirPlayButtonKey)
         self.playerAutoZoom = UserDefaults.standard.object(forKey: playerAutoZoomKey) as? Bool ?? false

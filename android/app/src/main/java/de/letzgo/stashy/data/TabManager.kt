@@ -138,6 +138,12 @@ object TabManager {
     var isMiniPlayerEnabled: Boolean get() = _isMiniPlayerEnabled.value; set(v) { _isMiniPlayerEnabled.value = v; Prefs.setBool("isMiniPlayerEnabled", v) }
     private val _playerSkipSeconds = dbl("playerSkipSeconds", 10.0, playerSkipOptions)
     var playerSkipSeconds: Double get() = _playerSkipSeconds.value; set(v) { _playerSkipSeconds.value = v; Prefs.setFloat("playerSkipSeconds", v.toFloat()) }
+    /** iOS `feedsSkipSeconds`: Feeds' own skip interval (double tap left / right half). Nothing
+     *  stored = the player's interval, followed until the user picks one. */
+    private val _feedsSkipSecondsStored = mutableStateOf(
+        if (Prefs.has("feedsSkipSeconds")) Prefs.float("feedsSkipSeconds").toDouble().takeIf { v -> playerSkipOptions.any { it == v } } else null
+    )
+    var feedsSkipSeconds: Double get() = _feedsSkipSecondsStored.value ?: playerSkipSeconds; set(v) { _feedsSkipSecondsStored.value = v; Prefs.setFloat("feedsSkipSeconds", v.toFloat()) }
     private val _showsPlayerSkipButtons = bool("showsPlayerSkipButtons", true)
     var showsPlayerSkipButtons: Boolean get() = _showsPlayerSkipButtons.value; set(v) { _showsPlayerSkipButtons.value = v; Prefs.setBool("showsPlayerSkipButtons", v) }
     /** Settings › Playback › Player › "Start muted without headphones" (read by `PlayerMute`). */

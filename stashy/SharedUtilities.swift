@@ -2020,19 +2020,28 @@ struct ZoomableScrollView<Content: View>: View {
     private var content: Content
     private var onTap: ((CGPoint) -> Void)?
     private var onLongPress: ((Bool) -> Void)?
+    /// `onLongPress` with the pointer's global location (where the press began).
+    private var onLongPressAt: ((Bool, CGPoint) -> Void)?
     private var onDoubleTap: ((CGPoint) -> Bool)?
     private var onContentTap: ((CGPoint, CGSize, CGFloat) -> Bool)?
     @Binding var isZoomed: Bool
 
+    /// Last pointer position (global): a long press reports no location of its own.
+    @State private var pointerLocation: CGPoint = .zero
+    /// `pressing` fires on mouse-down: `onLongPressAt` hears of a press only once it was held
+    /// 0.6 s (like the iOS recognizer), so a plain click never starts a hold.
+    @State private var longPressArm: DispatchWorkItem?
+    @State private var longPressReported: CGPoint?
     @State private var scale: CGFloat = 1
     @State private var baseScale: CGFloat = 1
     @State private var offset: CGSize = .zero
     @State private var baseOffset: CGSize = .zero
 
-    init(isZoomed: Binding<Bool> = .constant(false), onTap: ((CGPoint) -> Void)? = nil, onLongPress: ((Bool) -> Void)? = nil, onDoubleTap: ((CGPoint) -> Bool)? = nil, onContentTap: ((CGPoint, CGSize, CGFloat) -> Bool)? = nil, @ViewBuilder content: () -> Content) {
+    init(isZoomed: Binding<Bool> = .constant(false), onTap: ((CGPoint) -> Void)? = nil, onLongPress: ((Bool) -> Void)? = nil, onLongPressAt: ((Bool, CGPoint) -> Void)? = nil, onDoubleTap: ((CGPoint) -> Bool)? = nil, onContentTap: ((CGPoint, CGSize, CGFloat) -> Bool)? = nil, @ViewBuilder content: () -> Content) {
         self._isZoomed = isZoomed
         self.onTap = onTap
         self.onLongPress = onLongPress
+        self.onLongPressAt = onLongPressAt
         self.onDoubleTap = onDoubleTap
         self.onContentTap = onContentTap
         self.content = content()
@@ -2080,12 +2089,34 @@ struct ZoomableScrollView<Content: View>: View {
                 .onLongPressGesture(minimumDuration: 0.6) {
                 } onPressingChanged: { pressing in
                     onLongPress?(pressing)
+                    reportLocatedLongPress(pressing)
+                }
+                .onContinuousHover(coordinateSpace: .global) { phase in
+                    if case .active(let location) = phase { pointerLocation = location }
                 }
                 .clipped()
         }
         .onChange(of: isZoomed) { _, zoomed in
             // Parent clears `isZoomed` on page/mode change — reset like the iOS scroll view.
             if !zoomed, scale != 1 { setScale(1); baseScale = 1 }
+        }
+    }
+
+    private func reportLocatedLongPress(_ pressing: Bool) {
+        guard let onLongPressAt else { return }
+        longPressArm?.cancel()
+        longPressArm = nil
+        if pressing {
+            let location = pointerLocation
+            let arm = DispatchWorkItem {
+                longPressReported = location
+                onLongPressAt(true, location)
+            }
+            longPressArm = arm
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.6, execute: arm)
+        } else if let location = longPressReported {
+            longPressReported = nil
+            onLongPressAt(false, location)
         }
     }
 
@@ -2105,6 +2136,8 @@ struct ZoomableScrollView<Content: View>: UIViewRepresentable {
     private var content: Content
     private var onTap: ((CGPoint) -> Void)?
     private var onLongPress: ((Bool) -> Void)?
+    /// `onLongPress` with the window location where the press began.
+    private var onLongPressAt: ((Bool, CGPoint) -> Void)?
     /// Called with the window location first; returning `true` claims the double tap
     /// (e.g. skip), `false` lets it zoom as usual.
     private var onDoubleTap: ((CGPoint) -> Bool)?
@@ -2114,10 +2147,11 @@ struct ZoomableScrollView<Content: View>: UIViewRepresentable {
     private var onContentTap: ((CGPoint, CGSize, CGFloat) -> Bool)?
     @Binding var isZoomed: Bool
     
-    init(isZoomed: Binding<Bool> = .constant(false), onTap: ((CGPoint) -> Void)? = nil, onLongPress: ((Bool) -> Void)? = nil, onDoubleTap: ((CGPoint) -> Bool)? = nil, onContentTap: ((CGPoint, CGSize, CGFloat) -> Bool)? = nil, @ViewBuilder content: () -> Content) {
+    init(isZoomed: Binding<Bool> = .constant(false), onTap: ((CGPoint) -> Void)? = nil, onLongPress: ((Bool) -> Void)? = nil, onLongPressAt: ((Bool, CGPoint) -> Void)? = nil, onDoubleTap: ((CGPoint) -> Bool)? = nil, onContentTap: ((CGPoint, CGSize, CGFloat) -> Bool)? = nil, @ViewBuilder content: () -> Content) {
         self._isZoomed = isZoomed
         self.onTap = onTap
         self.onLongPress = onLongPress
+        self.onLongPressAt = onLongPressAt
         self.onDoubleTap = onDoubleTap
         self.onContentTap = onContentTap
         self.content = content()
@@ -2171,6 +2205,7 @@ struct ZoomableScrollView<Content: View>: UIViewRepresentable {
         context.coordinator.hostingController.rootView = content
         context.coordinator.onTap = onTap
         context.coordinator.onLongPress = onLongPress
+        context.coordinator.onLongPressAt = onLongPressAt
         context.coordinator.onDoubleTap = onDoubleTap
         context.coordinator.onContentTap = onContentTap
         context.coordinator.isZoomed = $isZoomed
@@ -2181,7 +2216,9 @@ struct ZoomableScrollView<Content: View>: UIViewRepresentable {
     }
     
     func makeCoordinator() -> Coordinator {
-        Coordinator(hostingController: UIHostingController(rootView: content), isZoomed: $isZoomed, onTap: onTap, onLongPress: onLongPress, onDoubleTap: onDoubleTap)
+        let coordinator = Coordinator(hostingController: UIHostingController(rootView: content), isZoomed: $isZoomed, onTap: onTap, onLongPress: onLongPress, onDoubleTap: onDoubleTap)
+        coordinator.onLongPressAt = onLongPressAt
+        return coordinator
     }
     
     class Coordinator: NSObject, UIScrollViewDelegate {
@@ -2189,6 +2226,9 @@ struct ZoomableScrollView<Content: View>: UIViewRepresentable {
         var isZoomed: Binding<Bool>
         var onTap: ((CGPoint) -> Void)?
         var onLongPress: ((Bool) -> Void)?
+        var onLongPressAt: ((Bool, CGPoint) -> Void)?
+        /// Where the running long press began (window coordinates), reported again on its end.
+        private var longPressStart: CGPoint = .zero
         var onDoubleTap: ((CGPoint) -> Bool)?
         var onContentTap: ((CGPoint, CGSize, CGFloat) -> Bool)?
         
@@ -2237,9 +2277,12 @@ struct ZoomableScrollView<Content: View>: UIViewRepresentable {
         @objc func handleLongPress(_ gesture: UILongPressGestureRecognizer) {
             switch gesture.state {
             case .began:
+                longPressStart = gesture.location(in: gesture.view?.window)
                 onLongPress?(true)
+                onLongPressAt?(true, longPressStart)
             case .ended, .cancelled, .failed:
                 onLongPress?(false)
+                onLongPressAt?(false, longPressStart)
             default:
                 break
             }
