@@ -22,9 +22,10 @@ import de.letzgo.stashy.data.vars
 import de.letzgo.stashy.tr
 import de.letzgo.stashy.ui.player.MiniPlayerStore
 import de.letzgo.stashy.ui.scene.SceneDetailScreen
+import de.letzgo.stashy.ui.settings.ActiveServerStatus
 import de.letzgo.stashy.ui.settings.connectServer
 import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.delay
+import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.coroutines.flow.first
 
 /**
@@ -43,29 +44,46 @@ object DeepLinkRouter {
     /** Returns false when [uri] is no `stashy:` link. */
     fun handle(uri: String?): Boolean = when (val result = DeepLink.parse(uri)) {
         is DeepLink.Result.Failed -> {
+            log("rejected $uri")
             if (result.error != DeepLink.Error.WrongScheme) showError(tr(R.string.error_link_invalid))
             result.error != DeepLink.Error.WrongScheme
         }
-        is DeepLink.Result.Ok -> { pending = Pending(result.link); true }
+        is DeepLink.Result.Ok -> { log("queued $uri"); pending = Pending(result.link); true }
     }
 
+    /**
+     * Runs the waiting link: after the unlock and once the activity is resumed (a cold start
+     * composes the shell before that). The link stays queued when this run is cancelled (the
+     * shell left composition, a newer link); it is dropped only once it ran, opened or failed.
+     */
     @Composable
     fun Effect() {
         val current = pending ?: return
+        val lifecycle = androidx.lifecycle.compose.LocalLifecycleOwner.current.lifecycle
         LaunchedEffect(current.token) {
             // Never past the lock: wait for the passcode / biometrics.
             snapshotFlow { SecurityManager.isAppLocked }.first { !it }
+            lifecycle.currentStateFlow.first { it.isAtLeast(androidx.lifecycle.Lifecycle.State.RESUMED) }
+            log("running")
+            var finished = false
             try {
                 open(current.link)
+                finished = true
             } catch (e: CancellationException) {
+                log("cancelled, stays queued")
                 throw e
             } catch (e: Exception) {
                 android.util.Log.w("StashyDeepLink", "open failed", e)
                 showError(tr(R.string.error_link_open_failed))
+                finished = true
             } finally {
-                if (pending?.token == current.token) pending = null
+                if (finished && pending?.token == current.token) pending = null
             }
         }
+    }
+
+    private fun log(message: String) {
+        if (de.letzgo.stashy.BuildConfig.DEBUG) android.util.Log.d("StashyDeepLink", message)
     }
 
     private suspend fun open(link: DeepLink) {
@@ -76,13 +94,18 @@ object DeepLinkRouter {
             val match = candidates.firstOrNull { matches(wanted, it) }
                 ?: return showError(tr(R.string.error_link_unknown_server_arg, wanted))
             if (match.id != active.id) {
-                // The normal switch: activate, reset status and every stack. Requests wait for the
-                // address probe (`ServerEndpointSelector.settle()`); the shell's per-server effects
-                // (mini player restore, capabilities) get a moment to run first.
+                // The normal switch: activate, reset status and every stack.
+                log("switching server")
                 connectServer(match)
-                delay(600)
             }
         }
+        // A real answer from the server (connected or not), not a fixed delay: on a cold start or
+        // right after a switch the connection is still being made. Already known: returns at once.
+        val connected = withTimeoutOrNull(15_000) {
+            ActiveServerStatus.test()
+            ActiveServerStatus.isConnected
+        }
+        log("server connected=$connected")
 
         val scene: Scene
         val start: Double?

@@ -16,7 +16,12 @@ class MainActivity : FragmentActivity() {
         // TV devices get the Android TV surface (iOS: the separate stashyTV app).
         if (de.letzgo.stashy.tv.TvActivity.isTelevision(this)) {
             super.onCreate(savedInstanceState)
-            startActivity(android.content.Intent(this, de.letzgo.stashy.tv.TvActivity::class.java).putExtras(intent))
+            // Reuse a running TvActivity (a `stashy://` link or a second launch would otherwise
+            // stack another one on top: CLEAR_TOP brings it forward, SINGLE_TOP keeps the instance).
+            startActivity(
+                android.content.Intent(this, de.letzgo.stashy.tv.TvActivity::class.java).putExtras(intent)
+                    .addFlags(android.content.Intent.FLAG_ACTIVITY_CLEAR_TOP or android.content.Intent.FLAG_ACTIVITY_SINGLE_TOP),
+            )
             finish()
             return
         }
@@ -31,8 +36,10 @@ class MainActivity : FragmentActivity() {
         if (android.os.Build.VERSION.SDK_INT >= 33) setRecentsScreenshotEnabled(false)
         // Screen stays on while a video plays (ui/player/ScreenAwake.kt).
         de.letzgo.stashy.ui.player.ScreenAwake.bind(this)
-        // Cold start from a `stashy://` link; not again when the activity is recreated (rotation).
-        if (savedInstanceState == null) handleDeepLink(intent)
+        // Cold start from a `stashy://` link. Not again for the same intent: a recreated activity
+        // (rotation) still carries it (marked handled), one restored after process death has
+        // its link in the saved state.
+        handleDeepLink(intent, savedInstanceState)
         setContent {
             StashyTheme {
                 de.letzgo.stashy.ui.SystemBarAppearance()
@@ -45,12 +52,25 @@ class MainActivity : FragmentActivity() {
     override fun onNewIntent(intent: android.content.Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
-        handleDeepLink(intent)
+        handleDeepLink(intent, null)
     }
 
-    private fun handleDeepLink(intent: android.content.Intent?) {
+    /** The link this activity handled (saved, so a restore after process death does not replay it). */
+    private var handledLink: String? = null
+
+    private fun handleDeepLink(intent: android.content.Intent?, savedState: Bundle?) {
         if (intent?.action != android.content.Intent.ACTION_VIEW) return
-        de.letzgo.stashy.ui.DeepLinkRouter.handle(intent.dataString)
+        val data = intent.dataString ?: return
+        if (intent.getBooleanExtra(EXTRA_LINK_HANDLED, false)) return
+        if (savedState?.getString(KEY_HANDLED_LINK) == data) return
+        intent.putExtra(EXTRA_LINK_HANDLED, true)
+        handledLink = data
+        de.letzgo.stashy.ui.DeepLinkRouter.handle(data)
+    }
+
+    override fun onSaveInstanceState(outState: Bundle) {
+        super.onSaveInstanceState(outState)
+        handledLink?.let { outState.putString(KEY_HANDLED_LINK, it) }
     }
 
     override fun onResume() {
@@ -72,6 +92,9 @@ class MainActivity : FragmentActivity() {
     }
 
     companion object {
+        private const val EXTRA_LINK_HANDLED = "de.letzgo.stashy.LINK_HANDLED"
+        private const val KEY_HANDLED_LINK = "stashy_handled_link"
+
         /** For APIs that need an Activity (billing flow, PiP, biometric prompt). */
         var current: MainActivity? = null
             private set

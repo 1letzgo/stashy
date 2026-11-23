@@ -96,8 +96,11 @@ Sizes are tvOS points halved (`pt()`: 1920 pt ≙ 960 dp). Pure logic lives in `
   the catalog root consumes the request (`CatalogController.applyRequest`).
 - External links (`stashy://scene/<id>[?t=<s>]`, `stashy://marker/<id>[?t=<s>]`, optional
   `&server=<name or URL>`; iOS/macOS the same): a VIEW intent filter on `MainActivity`
-  (`singleTask`, cold start in `onCreate`, running app in `onNewIntent`; the TV path forwards no
-  data). `DeepLink.parse` reads the URL, `DeepLinkRouter` holds one waiting link and runs it from
+  (`singleTask`, cold start in `onCreate` whatever the saved state, each intent handled once,
+  running app in `onNewIntent`; the TV path forwards no data and reuses a running `TvActivity`).
+  The router runs a link once the app is unlocked, the activity resumed and the server has
+  answered (`ActiveServerStatus.test()`); a cancelled run keeps the link queued. Debug builds log
+  each step under the tag `StashyDeepLink`. `DeepLink.parse` reads the URL, `DeepLinkRouter` holds one waiting link and runs it from
   `AppShell` once the app is unlocked: a `server` naming another configured server switches via
   `connectServer`, then the scene / marker is fetched and `DeepLink.route` decides (tested): the
   scene's page on top (`Nav.top`) stays and only seeks for a start time (`applyLinkStart`);
