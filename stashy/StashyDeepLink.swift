@@ -129,6 +129,49 @@ private extension Character {
     var isASCIIDigit: Bool { isASCII && isNumber }
 }
 
+// MARK: - What a link does (pure)
+
+/// The rule for consecutive links (Android: `DeepLink.route`):
+/// - The scene's page is the one in front: it stays (no new page, Back unchanged). A start time
+///   seeks there and plays; no start time changes nothing.
+/// - Otherwise one fresh page opens on the Home root (no second page of the scene, no stale
+///   pages). A start time plays from there, over any resume point, earlier link or running
+///   engine of the scene; without one the page shows its cover (or carries on with the mini
+///   player's video of that scene, without a seek).
+/// Every link's start time is used once (`SceneDetailView.takeLinkStart`).
+enum StashyLinkRoute: Equatable {
+    case inPlace(start: Double?)
+    case open(autoPlay: Bool, startAt: Double?)
+
+    static func decide(sceneId: String, start: Double?, frontSceneId: String?) -> StashyLinkRoute {
+        if let frontSceneId, frontSceneId == sceneId { return .inPlace(start: start) }
+        return .open(autoPlay: start != nil, startAt: start)
+    }
+}
+
+/// The scene pages on screen, the one in front last. `SceneDetailView` registers on appear and
+/// leaves on its real disappear (not when its own fullscreen player covers it); the mini
+/// player's Now Playing (player only) never registers.
+@MainActor
+enum ScenePageRegistry {
+    struct Page: Equatable { let token: UUID; let sceneId: String }
+    private(set) static var pages: [Page] = []
+
+    static func register(_ token: UUID, sceneId: String) {
+        pages.removeAll { $0.token == token }
+        pages.append(Page(token: token, sceneId: sceneId))
+    }
+
+    static func unregister(_ token: UUID) { pages.removeAll { $0.token == token } }
+
+    static var front: Page? { pages.last }
+}
+
+extension Notification.Name {
+    /// userInfo: `token` (UUID of the page in front), `start` (seconds).
+    static let stashyLinkStartInPlace = Notification.Name("StashyLinkStartInPlace")
+}
+
 // MARK: - Router
 
 /// Runs `stashy://` links: waits for the app lock and the server, switches server when the link
@@ -283,8 +326,8 @@ final class StashyDeepLinkRouter {
     // MARK: Opening
 
     private func open(_ link: StashyDeepLink) async {
-        let scene: Scene
-        let autoPlay: Bool
+        var scene: Scene
+        let start: Double?
         do {
             switch link.target {
             case .scene(let id):
@@ -292,22 +335,16 @@ final class StashyDeepLinkRouter {
                     showError(tr("error_link_scene_not_found"))
                     return
                 }
-                if let time = link.time {
-                    scene = found.withResumeTime(StashyDeepLink.clamp(time, toDuration: found.sceneDuration))
-                    autoPlay = true
-                } else {
-                    scene = found
-                    autoPlay = false
-                }
+                scene = found
+                start = link.time.map { StashyDeepLink.clamp($0, toDuration: found.sceneDuration) }
             case .marker(let id):
                 guard let marker = try await Self.fetchMarker(id: id),
                       let found = try await SceneRepository().fetchSceneDetails(sceneId: marker.sceneId) else {
                     showError(tr("error_link_marker_not_found"))
                     return
                 }
-                let start = link.time ?? marker.seconds
-                scene = found.withResumeTime(StashyDeepLink.clamp(start, toDuration: found.sceneDuration))
-                autoPlay = true
+                scene = found
+                start = StashyDeepLink.clamp(link.time ?? marker.seconds, toDuration: found.sceneDuration)
             }
         } catch {
             guard !Task.isCancelled else { return }
@@ -320,13 +357,27 @@ final class StashyDeepLinkRouter {
             AppLog.error("[DeepLink] no NavigationCoordinator attached")
             return
         }
-        prepareForPush()
-        // Let a dismissed cover / sheet finish before the stack is rebuilt underneath.
-        try? await Task.sleep(nanoseconds: 350_000_000)
-        guard !Task.isCancelled else { return }
-        // The start goes in explicitly as well: the page may take over the running engine of the
-        // same scene (the page it replaces hands it to the mini player), which keeps its own position.
-        coordinator.openScene(scene, autoPlay: autoPlay, startAt: autoPlay ? scene.resumeTime : nil)
+        switch StashyLinkRoute.decide(sceneId: scene.id, start: start, frontSceneId: ScenePageRegistry.front?.sceneId) {
+        case .inPlace(let start):
+            // The page stays, with whatever it has open (its fullscreen player too); only Now
+            // Playing, which would cover it, closes.
+            MiniPlayerStore.shared.showsNowPlaying = false
+            guard let start, let page = ScenePageRegistry.front else { return }
+            AppLog.debug("[DeepLink] scene \(scene.id) is in front: start at \(start) in place")
+            NotificationCenter.default.post(
+                name: .stashyLinkStartInPlace, object: nil,
+                userInfo: ["token": page.token, "start": start]
+            )
+        case .open(let autoPlay, let startAt):
+            prepareForPush()
+            // Let a dismissed cover / sheet finish before the stack is rebuilt underneath.
+            try? await Task.sleep(nanoseconds: 350_000_000)
+            guard !Task.isCancelled else { return }
+            if let startAt { scene = scene.withResumeTime(startAt) }
+            // The start also goes in explicitly: the page may take over a running engine of this
+            // scene from the mini player, which keeps its own position otherwise.
+            coordinator.openScene(scene, autoPlay: autoPlay, startAt: startAt)
+        }
     }
 
     /// The page opens in the Home tab's stack. Whatever is presented above the tabs (Now

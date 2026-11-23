@@ -115,8 +115,10 @@ class SceneDetailModel(
      * the page takes over the same scene's player from the mini player, which otherwise keeps
      * its position. Used once.
      */
-    private var forcedStart: Double? = null,
+    forcedStart: Double? = null,
 ) {
+    private val linkStart = de.letzgo.stashy.data.OnceStart(forcedStart)
+
     /**
      * iOS `playsInNowPlaying`. Experiment: Play always plays on this page, also with the mini
      * player on; the video moves to the bar only when the page is left. `true` sends Play to
@@ -213,7 +215,18 @@ class SceneDetailModel(
         if (autoPlay) scope.launch { delay(300); if (!isPlaybackStarted) startPlayback(true, forcedStart = consumeForcedStart()) }
     }
 
-    private fun consumeForcedStart(): Double? = forcedStart?.takeIf { autoPlay }.also { forcedStart = null }
+    private fun consumeForcedStart(): Double? = linkStart.take()?.takeIf { autoPlay }
+
+    /**
+     * A `stashy://` link with a time to this scene while its page is on top (`DeepLink.Route.InPlace`):
+     * seek and play there, or start there. Replaces whatever start was still pending.
+     */
+    fun applyLinkStart(seconds: Double) {
+        linkStart.take()
+        resumeOnReturn = null
+        scene = scene.copy(resumeTime = seconds)
+        if (isPlaybackStarted && player != null) seekTo(seconds) else startPlayback(true, forcedStart = seconds)
+    }
 
     /** iOS: `handleOnDisappear` + `finishDisappearTeardown`. */
     fun onDisappear() {

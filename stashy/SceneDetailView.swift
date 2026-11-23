@@ -65,6 +65,11 @@ struct SceneDetailView: View {
     @Environment(\.stashySceneDetailInColumn) private var isInColumn
     /// Taken back from a paused mini player: keep it paused instead of autoplaying.
     @State private var adoptedPaused = false
+    /// This page in `ScenePageRegistry` (external links act on the scene page in front).
+    @State private var pageToken = UUID()
+    /// `autoPlayStartAt` is used once: coming back to the page (from a pushed page, another tab,
+    /// the mini player) never jumps to the link's time again.
+    @State private var linkStartConsumed = false
     @EnvironmentObject var coordinator: NavigationCoordinator
 
     @State private var isHeaderExpanded = false
@@ -511,6 +516,13 @@ struct SceneDetailView: View {
                 aetherEngine = nil
                 dismiss()
             }
+            // A `stashy://` link with a time to this scene while this page is in front: it stays
+            // and plays from there (`StashyLinkRoute.inPlace`).
+            .onReceive(NotificationCenter.default.publisher(for: .stashyLinkStartInPlace)) { note in
+                guard !playerOnly, let token = note.userInfo?["token"] as? UUID, token == pageToken,
+                      let start = note.userInfo?["start"] as? Double else { return }
+                applyLinkStart(start)
+            }
             .fullScreenCover(isPresented: $isFullscreen) {
                 fullscreenPlayer
             }
@@ -719,6 +731,8 @@ struct SceneDetailView: View {
     private func handleOnAppear() {
         AppLog.debug("🔍 Scene Detail: ID=\(activeScene.id), PlayCount=\(activeScene.playCount ?? -1)")
         isFullscreen = false
+        // The scene page in front, for `stashy://` links (Now Playing's player-only page is none).
+        if !playerOnly { ScenePageRegistry.register(pageToken, sceneId: activeScene.id) }
         
         // Reset all SYNC states only on very first appear - WE WANT MANUAL ACTIVATION
         if !hasInitializedDevices {
@@ -755,7 +769,8 @@ struct SceneDetailView: View {
         // Now Playing: the bar keeps it.
         if !isPlaybackStarted, miniPlayerShowsThisScene, !playsInNowPlaying {
             resumeOnReturn = nil
-            startPlayback(resume: false)
+            // A link's start time still wins over the bar's position (once).
+            startPlayback(resume: false, forcedStart: takeLinkStart())
             return
         }
 
@@ -774,7 +789,29 @@ struct SceneDetailView: View {
 
         // Removed automatic setupScene to enforce manual activation unless explicitly requested via autoPlay
         if autoPlay {
-            scheduleStart(resume: !autoPlayFromStart, forcedStart: autoPlayStartAt)
+            scheduleStart(resume: !autoPlayFromStart, forcedStart: takeLinkStart())
+        }
+    }
+
+    /// The link's start time, the first time it is asked for; nil afterwards and without one.
+    private func takeLinkStart() -> Double? {
+        guard autoPlay, !linkStartConsumed, let start = autoPlayStartAt else { return nil }
+        linkStartConsumed = true
+        return start
+    }
+
+    /// A link with a time to this page while it is in front: seek and play there, or start
+    /// there. It replaces whatever start this page still had pending.
+    private func applyLinkStart(_ start: Double) {
+        pendingStart.item?.cancel()
+        pendingStart.item = nil
+        linkStartConsumed = true
+        resumeOnReturn = nil
+        activeScene = activeScene.withResumeTime(start)
+        if isPlaybackStarted, aetherEngine != nil {
+            seekTo(start)
+        } else {
+            startPlayback(resume: true, forcedStart: start)
         }
     }
 
@@ -814,6 +851,7 @@ struct SceneDetailView: View {
         pendingStart.item?.cancel()
         pendingStart.item = nil
         if isDeleting {
+            ScenePageRegistry.unregister(pageToken)
             // The scene is gone: nothing to resume or hand to the mini player.
             aetherEngine?.stop()
             aetherEngine = nil
@@ -831,6 +869,8 @@ struct SceneDetailView: View {
     }
 
     private func finishDisappearTeardown() {
+        // Its own fullscreen player only covers the page; it is still the one in front.
+        if !isFullscreen || isDeleting { ScenePageRegistry.unregister(pageToken) }
         if isDeleting { return }
 
         // Always persist resume/play duration, including when this view only

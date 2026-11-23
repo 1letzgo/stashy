@@ -85,33 +85,35 @@ object DeepLinkRouter {
         }
 
         val scene: Scene
-        val autoPlay: Boolean
+        val start: Double?
         when (val target = link.target) {
             is DeepLink.Target.Scene -> {
-                val found = ScenesRepository.scene(target.id) ?: return showError(tr(R.string.error_link_scene_not_found))
-                if (link.time != null) {
-                    scene = found.copy(resumeTime = DeepLink.clamp(link.time, found.sceneDuration))
-                    autoPlay = true
-                } else {
-                    scene = found
-                    autoPlay = false
-                }
+                scene = ScenesRepository.scene(target.id) ?: return showError(tr(R.string.error_link_scene_not_found))
+                start = link.time?.let { DeepLink.clamp(it, scene.sceneDuration) }
             }
             is DeepLink.Target.Marker -> {
                 val marker = fetchMarker(target.id) ?: return showError(tr(R.string.error_link_marker_not_found))
-                val found = ScenesRepository.scene(marker.second) ?: return showError(tr(R.string.error_link_marker_not_found))
-                scene = found.copy(resumeTime = DeepLink.clamp(link.time ?: marker.first, found.sceneDuration))
-                autoPlay = true
+                scene = ScenesRepository.scene(marker.second) ?: return showError(tr(R.string.error_link_marker_not_found))
+                start = DeepLink.clamp(link.time ?: marker.first, scene.sceneDuration)
             }
         }
 
-        // Whatever covers the tabs closes first. The page may take over the same scene's player
-        // (the page it replaces hands it to the mini player): the start goes in explicitly.
-        // Own screen key: a page of this scene may still be leaving the stack.
+        // Now Playing would cover either result.
         MiniPlayerStore.showsNowPlaying = false
-        Nav.tab = MainTab.Home
-        Nav.popToRoot(MainTab.Home)
-        Nav.push(SceneDetailScreen(scene.id, scene, autoPlay = autoPlay, fromLink = true, startAt = if (autoPlay) scene.resumeTime else null))
+        val front = Nav.top as? SceneDetailScreen
+        when (val route = DeepLink.route(scene.id, start, front?.sceneId)) {
+            // The scene's page is on top: it stays (Back unchanged); a time seeks there.
+            is DeepLink.Route.InPlace -> route.start?.let { front?.applyLinkStart(it) }
+            is DeepLink.Route.Open -> {
+                // One fresh page on the Home root, with its own screen key (a page of this scene
+                // may still be leaving the stack). The start also goes in explicitly: the page may
+                // take over a running player of this scene from the mini player.
+                Nav.tab = MainTab.Home
+                Nav.popToRoot(MainTab.Home)
+                val shown = route.startAt?.let { scene.copy(resumeTime = it) } ?: scene
+                Nav.push(SceneDetailScreen(scene.id, shown, autoPlay = route.autoPlay, fromLink = true, startAt = route.startAt))
+            }
+        }
     }
 
     private fun matches(value: String, config: ServerConfig): Boolean =

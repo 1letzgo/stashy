@@ -32,6 +32,20 @@ data class DeepLink(
         data class Failed(val error: Error) : Result
     }
 
+    /**
+     * What a link does (iOS `StashyLinkRoute`), the rule for consecutive links:
+     * - The scene's page is the one on top ([InPlace]): it stays (no new page, Back unchanged).
+     *   A start time seeks there and plays; no start time changes nothing.
+     * - Otherwise one fresh page opens on the Home root ([Open]). A start time plays from there,
+     *   over any resume point, earlier link or running player of the scene; without one the page
+     *   shows its cover (or carries on with the mini player's video of that scene, no seek).
+     * Every link's start time is used once ([OnceStart]).
+     */
+    sealed interface Route {
+        data class InPlace(val start: Double?) : Route
+        data class Open(val autoPlay: Boolean, val startAt: Double?) : Route
+    }
+
     companion object {
         const val SCHEME = "stashy"
 
@@ -70,6 +84,10 @@ data class DeepLink(
             if (raw.isNullOrEmpty() || !raw.all { it in '0'..'9' || it == '.' }) return null
             return raw.toDoubleOrNull()?.takeIf { it.isFinite() && it >= 0 }
         }
+
+        fun route(sceneId: String, start: Double?, frontSceneId: String?): Route =
+            if (frontSceneId != null && frontSceneId == sceneId) Route.InPlace(start)
+            else Route.Open(autoPlay = start != null, startAt = start)
 
         /** Never past the scene's end (one second before it, so the player does not open on the last frame). */
         fun clamp(seconds: Double, duration: Double?): Double {
@@ -112,4 +130,9 @@ data class DeepLink(
             return AddressKey(scheme, rest)
         }
     }
+}
+
+/** A link's start time, handed out once: coming back to the page never jumps to it again. */
+class OnceStart(private var value: Double?) {
+    fun take(): Double? = value.also { value = null }
 }

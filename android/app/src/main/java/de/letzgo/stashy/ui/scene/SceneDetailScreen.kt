@@ -105,6 +105,9 @@ class SceneDetailScreen(
     override val hidesTabBar: Boolean get() = model.isFullscreen || PlayerWindow.isInPictureInPicture
 
     @Composable override fun Content() = SceneDetailContent(model, openedFromMiniPlayer)
+
+    /** A `stashy://` link with a time to this scene while this page is on top (ui/DeepLinkRouter.kt). */
+    fun applyLinkStart(seconds: Double) = model.applyLinkStart(seconds)
 }
 
 /** Experiment (iOS `phoneLandscapeSideColumn`): a phone in landscape gets the player-left / cards-right layout too. */

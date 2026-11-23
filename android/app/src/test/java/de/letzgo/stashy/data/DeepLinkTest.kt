@@ -108,4 +108,37 @@ class DeepLinkTest {
         assertTrue(DeepLink.serverMatches("https://host.example.com/stash/", "x", addresses))
         assertFalse(DeepLink.serverMatches("https://host.example.com", "x", addresses))
     }
+
+    // Consecutive links: previous link / page in front × new link (the player state does not
+    // change the route; the page applies the start whether it is not started, playing or paused).
+
+    @Test fun nothingInFrontOpensAPage() {
+        assertEquals(DeepLink.Route.Open(autoPlay = true, startAt = 60.0), DeepLink.route("1", 60.0, null))
+        assertEquals(DeepLink.Route.Open(autoPlay = false, startAt = null), DeepLink.route("1", null, null))
+    }
+
+    @Test fun sameSceneInFrontStaysAndSeeksOnlyWithATime() {
+        // scene/1?t=… or scene/1 (or marker on 1) before, now scene/1?t=60.5 or marker/1(?t=30)
+        assertEquals(DeepLink.Route.InPlace(60.5), DeepLink.route("1", 60.5, "1"))
+        assertEquals(DeepLink.Route.InPlace(30.0), DeepLink.route("1", 30.0, "1"))
+        assertEquals(DeepLink.Route.InPlace(319.0), DeepLink.route("1", 319.0, "1"))
+        // scene/1 without t while scene 1 is on top: nothing changes.
+        assertEquals(DeepLink.Route.InPlace(null), DeepLink.route("1", null, "1"))
+    }
+
+    @Test fun otherSceneInFrontOpensOneFreshPage() {
+        // scene/2 on top, now scene/1(?t) or marker on 1
+        assertEquals(DeepLink.Route.Open(autoPlay = true, startAt = 319.0), DeepLink.route("1", 319.0, "2"))
+        assertEquals(DeepLink.Route.Open(autoPlay = false, startAt = null), DeepLink.route("1", null, "2"))
+        // scene/1 on top, now scene/2
+        assertEquals(DeepLink.Route.Open(autoPlay = false, startAt = null), DeepLink.route("2", null, "1"))
+        assertEquals(DeepLink.Route.Open(autoPlay = true, startAt = 0.0), DeepLink.route("2", 0.0, "1"))
+    }
+
+    @Test fun startTimeIsUsedOnce() {
+        val start = OnceStart(42.5)
+        assertEquals(42.5, start.take()!!, 0.0)
+        assertNull(start.take())
+        assertNull(OnceStart(null).take())
+    }
 }
