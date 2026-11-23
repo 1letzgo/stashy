@@ -124,6 +124,46 @@ object AppLockPolicy {
      * library first) and stays after unlocking until its fade-out has run.
      */
     fun showsLockWindow(visibleNow: Boolean, locked: Boolean): Boolean = visibleNow || locked
+
+    /**
+     * FLAG_SECURE on the app's windows: whenever the app locks on leaving, Recents (every API
+     * level) and screenshots show nothing of the library. Dialogs and sheets inherit the flag
+     * (Compose `SecureFlagPolicy.Inherit`), so an open sheet can't show in Recents either.
+     * Without a PIN or with auto-lock off nothing changes.
+     */
+    fun securesWindows(passcodeSet: Boolean, autoLockOnBackground: Boolean): Boolean = passcodeSet && autoLockOnBackground
+}
+
+/**
+ * Size of the passcode screen, from the room its window has (insets already taken off), in dp.
+ * Portrait: header above the keypad, 70 dp keys as on iOS. Wider than high (landscape phone,
+ * split screen): header beside the keypad. Keys shrink until all four rows fit; only below
+ * [MIN_KEY] does the screen have to scroll.
+ */
+object PasscodeLayout {
+    const val MAX_KEY = 70f
+    const val MIN_KEY = 36f
+    /** Icon, title, a message line and the dots, without the space above. */
+    const val HEADER = 150f
+    /** Header ↔ keypad and keypad ↔ bottom edge in portrait. */
+    const val PORTRAIT_GAPS = 54f
+    const val PORTRAIT_MAX_WIDTH = 320f
+    /** A keypad row is three keys and two gaps of 0.3 key each. */
+    const val WIDTH_PER_KEY = 3.6f
+
+    data class Spec(val sideBySide: Boolean, val keySize: Float, val rowGap: Float, val topSpace: Float, val scrolls: Boolean) {
+        val keypadHeight: Float get() = 4 * keySize + 3 * rowGap
+    }
+
+    fun spec(width: Float, height: Float): Spec {
+        val side = width > height
+        val topSpace = if (side) 0f else if (height >= 640f) 80f else 24f
+        val widthBudget = if (side) width / 2 - 16f else minOf(width, PORTRAIT_MAX_WIDTH)
+        val heightBudget = if (side) height - 32f else height - topSpace - HEADER - PORTRAIT_GAPS
+        val rowGap = if (heightBudget >= 4 * MAX_KEY + 3 * 12f) 12f else 8f
+        val key = minOf(MAX_KEY, widthBudget / WIDTH_PER_KEY, (heightBudget - 3 * rowGap) / 4)
+        return Spec(side, maxOf(key, MIN_KEY), rowGap, topSpace, scrolls = key < MIN_KEY)
+    }
 }
 
 /** [SecurityStore] on [Prefs] (UserDefaults keys) and [Secrets] (PIN hash). */

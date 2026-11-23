@@ -35,4 +35,11 @@ class AppLockPolicyTest {
         assertTrue(AppLockPolicy.showsLockWindow(visibleNow = true, locked = false))
         assertFalse(AppLockPolicy.showsLockWindow(visibleNow = false, locked = false))
     }
+
+    @Test fun windowsAreSecureOnlyWhileTheAppLocksOnLeaving() {
+        assertTrue(AppLockPolicy.securesWindows(passcodeSet = true, autoLockOnBackground = true))
+        assertFalse(AppLockPolicy.securesWindows(passcodeSet = true, autoLockOnBackground = false))
+        assertFalse(AppLockPolicy.securesWindows(passcodeSet = false, autoLockOnBackground = true))
+        assertFalse(AppLockPolicy.securesWindows(passcodeSet = false, autoLockOnBackground = false))
+    }
 }
