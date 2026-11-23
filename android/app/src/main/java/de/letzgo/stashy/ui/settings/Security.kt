@@ -46,6 +46,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
@@ -66,7 +67,6 @@ import androidx.core.view.ViewCompat
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.compose.foundation.layout.union
-import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.IntOffset
@@ -159,14 +159,27 @@ private fun LockScreenWindow(lockState: MutableTransitionState<Boolean>) {
                 }
             }
         }
-        // The app window's safe area, mapped onto this window (see [lockSafePadding]).
+        // The safe area (bars, cutout) mapped onto this window (see [lockSafePadding]). Recomputed
+        // on every layout of either window: after closing PiP the app window first still has the
+        // PiP rectangle and only later its full size, while this window stays the same.
         var safePx by remember { mutableStateOf<SafePx?>(null) }
         val appSafeArea = safePx?.let { WindowInsets(it.left, it.top, it.right, it.bottom) }
-        Box(Modifier.fillMaxSize().onGloballyPositioned {
-            // Compared as plain pixels, so a layout pass with unchanged insets writes nothing.
-            val px = activity?.let { lockSafePadding(it, dialogView) }
-            if (px != safePx) safePx = px
-        }) {
+        DisposableEffect(activity, dialogView) {
+            val update = {
+                val px = activity?.let { lockSafePadding(it, dialogView) }
+                if (px != safePx) safePx = px
+            }
+            val appDecor = activity?.window?.decorView
+            val listener = android.view.ViewTreeObserver.OnGlobalLayoutListener { update() }
+            dialogView.viewTreeObserver.addOnGlobalLayoutListener(listener)
+            appDecor?.viewTreeObserver?.addOnGlobalLayoutListener(listener)
+            update()
+            onDispose {
+                dialogView.viewTreeObserver.takeIf { it.isAlive }?.removeOnGlobalLayoutListener(listener)
+                appDecor?.viewTreeObserver?.takeIf { it.isAlive }?.removeOnGlobalLayoutListener(listener)
+            }
+        }
+        Box(Modifier.fillMaxSize()) {
             AnimatedVisibility(
                 visibleState = lockState,
                 enter = EnterTransition.None,
@@ -179,20 +192,37 @@ private fun LockScreenWindow(lockState: MutableTransitionState<Boolean>) {
 private data class SafePx(val left: Int, val top: Int, val right: Int, val bottom: Int)
 
 /**
- * Bars, gesture area and cutout as padding for the lock window, taken from the app window (which
- * gets them right) and its position on screen relative to the lock window. In a Compose Dialog
- * window with `decorFitsSystemWindows = false` the bottom inset arrived as nothing in portrait and
- * the 0 / delete row lay half under the gesture bar. Null until both windows are laid out.
+ * Bars, gesture area and cutout as padding for the lock window, in its own pixels. In a Compose
+ * Dialog window with `decorFitsSystemWindows = false` the bottom inset did not arrive in portrait
+ * (0 / delete half under the gesture bar), so the safe area comes from outside the lock window:
+ * API 30+: the display's own bounds and insets (`maximumWindowMetrics`), independent of where
+ * the app window is — after closing PiP it still had the PiP rectangle, and mapping that put the
+ * keypad inside it. Older: the app window's insets, only while it covers about the lock window
+ * ([AppLockPolicy.appWindowMatchesLock]). Null = the lock window's own insets only.
  */
 private fun lockSafePadding(activity: android.app.Activity, lockView: android.view.View): SafePx? {
-    val decor = activity.window?.decorView ?: return null
-    if (!decor.isAttachedToWindow || lockView.height == 0) return null
-    val insets = ViewCompat.getRootWindowInsets(decor)
-        ?.getInsets(WindowInsetsCompat.Type.systemBars() or WindowInsetsCompat.Type.displayCutout()) ?: return null
-    val app = IntArray(2).also(decor::getLocationOnScreen)
+    if (lockView.width == 0 || lockView.height == 0 || !lockView.isAttachedToWindow) return null
     val lock = IntArray(2).also(lockView::getLocationOnScreen)
-    val (left, right) = de.letzgo.stashy.data.AppLockPolicy.safePadding(lock[0], lockView.width, app[0] + insets.left, app[0] + decor.width - insets.right)
-    val (top, bottom) = de.letzgo.stashy.data.AppLockPolicy.safePadding(lock[1], lockView.height, app[1] + insets.top, app[1] + decor.height - insets.bottom)
+    val safe: android.graphics.Rect = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+        val metrics = activity.windowManager.maximumWindowMetrics
+        val ins = metrics.windowInsets.getInsetsIgnoringVisibility(
+            android.view.WindowInsets.Type.systemBars() or android.view.WindowInsets.Type.displayCutout(),
+        )
+        val b = metrics.bounds
+        android.graphics.Rect(b.left + ins.left, b.top + ins.top, b.right - ins.right, b.bottom - ins.bottom)
+    } else {
+        val decor = activity.window?.decorView ?: return null
+        if (!decor.isAttachedToWindow) return null
+        if (!de.letzgo.stashy.data.AppLockPolicy.appWindowMatchesLock(
+                activity.isInPictureInPictureMode, decor.width, decor.height, lockView.width, lockView.height,
+            )) return null
+        val ins = ViewCompat.getRootWindowInsets(decor)
+            ?.getInsets(WindowInsetsCompat.Type.systemBars() or WindowInsetsCompat.Type.displayCutout()) ?: return null
+        val app = IntArray(2).also(decor::getLocationOnScreen)
+        android.graphics.Rect(app[0] + ins.left, app[1] + ins.top, app[0] + decor.width - ins.right, app[1] + decor.height - ins.bottom)
+    }
+    val (left, right) = de.letzgo.stashy.data.AppLockPolicy.safePadding(lock[0], lockView.width, safe.left, safe.right)
+    val (top, bottom) = de.letzgo.stashy.data.AppLockPolicy.safePadding(lock[1], lockView.height, safe.top, safe.bottom)
     return SafePx(left, top, right, bottom)
 }
 

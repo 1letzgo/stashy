@@ -57,4 +57,26 @@ class AppLockPolicyTest {
     @Test fun safePaddingIsNeverNegative() {
         assertEquals(0 to 0, AppLockPolicy.safePadding(windowStart = 200, windowSize = 1000, safeStart = 100, safeEnd = 2000))
     }
+
+    @Test fun pipRectangleSafeAreaIsClampedNotLaidOutInto() {
+        // QA: content started at the PiP's x 440 / y 1494 px on a 1080 × 2400 lock window.
+        val (left, right) = AppLockPolicy.safePadding(windowStart = 0, windowSize = 1080, safeStart = 440, safeEnd = 1080)
+        val (top, bottom) = AppLockPolicy.safePadding(windowStart = 0, windowSize = 2400, safeStart = 1494, safeEnd = 2400)
+        assertTrue(left + right <= 1080 / 4)
+        assertTrue(top + bottom <= 2400 / 4)
+    }
+
+    @Test fun clampKeepsRealBarsAndScalesAbsurdOnes() {
+        assertEquals(128 to 63, AppLockPolicy.clampPadding(128, 63, 2400))
+        assertEquals(400 to 200, AppLockPolicy.clampPadding(800, 400, 2400))
+        assertEquals(0 to 0, AppLockPolicy.clampPadding(0, 0, 0))
+    }
+
+    @Test fun appWindowSafeAreaOnlyWhileItCoversTheLockWindow() {
+        assertTrue(AppLockPolicy.appWindowMatchesLock(appInPip = false, appWidth = 1080, appHeight = 2400, lockWidth = 1080, lockHeight = 2400))
+        // In PiP, or still PiP-sized right after closing it.
+        assertFalse(AppLockPolicy.appWindowMatchesLock(appInPip = true, appWidth = 1080, appHeight = 2400, lockWidth = 1080, lockHeight = 2400))
+        assertFalse(AppLockPolicy.appWindowMatchesLock(appInPip = false, appWidth = 640, appHeight = 360, lockWidth = 1080, lockHeight = 2400))
+        assertFalse(AppLockPolicy.appWindowMatchesLock(appInPip = false, appWidth = 1080, appHeight = 2400, lockWidth = 0, lockHeight = 0))
+    }
 }

@@ -140,7 +140,32 @@ object AppLockPolicy {
      * [safeStart] … [safeEnd]; the lock window covers [windowStart] … windowStart + [windowSize].
      */
     fun safePadding(windowStart: Int, windowSize: Int, safeStart: Int, safeEnd: Int): Pair<Int, Int> =
-        maxOf(0, safeStart - windowStart) to maxOf(0, windowStart + windowSize - safeEnd)
+        clampPadding(maxOf(0, safeStart - windowStart), maxOf(0, windowStart + windowSize - safeEnd), windowSize)
+
+    /** Bars and cutout never take more than this share of the lock window along one axis. */
+    const val MAX_PADDING_SHARE = 0.25f
+
+    /**
+     * Caps start + end padding at [MAX_PADDING_SHARE] of [size], keeping their ratio, so a wrong
+     * safe area (e.g. one from a PiP-sized window) can never squeeze the keypad.
+     */
+    fun clampPadding(start: Int, end: Int, size: Int): Pair<Int, Int> {
+        val total = start + end
+        val max = (size * MAX_PADDING_SHARE).toInt()
+        if (total <= max || total <= 0) return start to end
+        val scaledStart = (start.toLong() * max / total).toInt()
+        return scaledStart to (max - scaledStart)
+    }
+
+    /**
+     * Below API 30 the safe area comes from the app window, which is only valid while that
+     * window covers about what the lock window covers. In PiP, or right after closing it, the
+     * app window still has the PiP rectangle (QA: the keypad laid out inside it) — then the lock
+     * window keeps its own insets.
+     */
+    fun appWindowMatchesLock(appInPip: Boolean, appWidth: Int, appHeight: Int, lockWidth: Int, lockHeight: Int): Boolean =
+        !appInPip && lockWidth > 0 && lockHeight > 0 &&
+            appWidth >= lockWidth * 9 / 10 && appHeight >= lockHeight * 9 / 10
 }
 
 /**
