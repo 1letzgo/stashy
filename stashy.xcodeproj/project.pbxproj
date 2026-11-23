@@ -181,6 +181,8 @@
 		DF22BB322F1831C7007C2090 /* AppearanceManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = DF22BB312F1831C7007C2090 /* AppearanceManager.swift */; };
 		DF22BB342F1831C7007C2090 /* AppearanceSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DF22BB332F1831C7007C2090 /* AppearanceSettingsView.swift */; };
 		DF22BB362F1832AD007C2090 /* NavigationCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = DF22BB352F1832AD007C2090 /* NavigationCoordinator.swift */; };
+		DEE9111C0000000000000002 /* StashyDeepLink.swift in Sources */ = {isa = PBXBuildFile; fileRef = DEE9111C0000000000000001 /* StashyDeepLink.swift */; };
+		DEE9111C0000000000000003 /* StashyDeepLink.swift in Sources */ = {isa = PBXBuildFile; fileRef = DEE9111C0000000000000001 /* StashyDeepLink.swift */; };
 		DF22BB3A2F1832E8007C2090 /* PerformersView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DF22BB392F1832E8007C2090 /* PerformersView.swift */; };
 		DF4A022C2F1E8B6900E5EAFB /* ImagesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DF4A022B2F1E8B6800E5EAFB /* ImagesView.swift */; };
 		DF675E622F2A46A2004CA019 /* HomeRowView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DF675E5D2F2A46A1004CA019 /* HomeRowView.swift */; };
@@ -502,6 +504,7 @@
 		DF22BB312F1831C7007C2090 /* AppearanceManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppearanceManager.swift; sourceTree = "<group>"; };
 		DF22BB332F1831C7007C2090 /* AppearanceSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppearanceSettingsView.swift; sourceTree = "<group>"; };
 		DF22BB352F1832AD007C2090 /* NavigationCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NavigationCoordinator.swift; sourceTree = "<group>"; };
+		DEE9111C0000000000000001 /* StashyDeepLink.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StashyDeepLink.swift; sourceTree = "<group>"; };
 		DF22BB392F1832E8007C2090 /* PerformersView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PerformersView.swift; sourceTree = "<group>"; };
 		DF4A022B2F1E8B6800E5EAFB /* ImagesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImagesView.swift; sourceTree = "<group>"; };
 		DF675E5D2F2A46A1004CA019 /* HomeRowView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeRowView.swift; sourceTree = "<group>"; };
@@ -661,6 +664,7 @@
 				DFSM000022F2NEWFILE002 /* KeychainManager.swift */,
 				08FB7798FE84155DC02AAC07 /* MainTabView.swift */,
 				DF22BB352F1832AD007C2090 /* NavigationCoordinator.swift */,
+				DEE9111C0000000000000001 /* StashyDeepLink.swift */,
 				DF4A022B2F1E8B6800E5EAFB /* ImagesView.swift */,
 				LIMG000022345678901234AB /* LinkedImagesCatalogGrid.swift */,
 				A1IMGDS022345678901234AB /* StashImageDateSort.swift */,
@@ -1117,6 +1121,7 @@
 				DF675E652F2A46A2004CA019 /* HomeSceneCardView.swift in Sources */,
 				08FB779DFE84155DC02AAC07 /* ServerConfig.swift in Sources */,
 				DF22BB362F1832AD007C2090 /* NavigationCoordinator.swift in Sources */,
+				DEE9111C0000000000000002 /* StashyDeepLink.swift in Sources */,
 				DF22BB272F167CDC007C2090 /* ImageCacheManager.swift in Sources */,
 				08FB77A1FE84155DC02AAC07 /* StashDBViewModel.swift in Sources */,
 				37D092D62F8980B400DB7A08 /* MarkersView.swift in Sources */,
@@ -1347,6 +1352,7 @@
 				MAC000000000000000000038 /* HomeSceneCardView.swift in Sources */,
 				MAC000000000000000000039 /* ServerConfig.swift in Sources */,
 				MAC00000000000000000003A /* NavigationCoordinator.swift in Sources */,
+				DEE9111C0000000000000003 /* StashyDeepLink.swift in Sources */,
 				MAC00000000000000000003B /* ImageCacheManager.swift in Sources */,
 				MAC00000000000000000003C /* StashDBViewModel.swift in Sources */,
 				MAC00000000000000000003D /* MarkersView.swift in Sources */,

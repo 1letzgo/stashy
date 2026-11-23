@@ -16,7 +16,9 @@ class NavigationCoordinator: ObservableObject {
     @Published var selectedTab: AppTab = .studios
     var performerToOpen: Performer?
     @Published var studioToOpen: Studio?
-    
+    /// Scene page pushed at the root of the Home stack (`stashy://` links, `StashyDeepLinkRouter`).
+    @Published var sceneToOpen: SceneToOpen?
+
     // Reels Selection
     @Published var reelsPerformer: ScenePerformer?
     @Published var reelsTags: [Tag] = []
@@ -151,6 +153,19 @@ class NavigationCoordinator: ObservableObject {
         catalogueSubTab = CatalogsView.CatalogsTab.studios.rawValue
         
         // Switch to Catalogue tab
+        selectedTab = .catalogue
+    }
+
+    /// Opens a scene page from outside any tab (external `stashy://` links). Same as
+    /// `openStudio`: a fresh Home stack with the page pushed on it. `autoPlay` starts playback
+    /// at once from the scene's resume point, which the caller sets to the wanted start, like
+    /// Feeds' title link (`titleLinkScene(livePosition:)`).
+    func openScene(_ scene: Scene, autoPlay: Bool) {
+        catalogueTabID = UUID()
+        // The page goes straight onto the root: with a dashboard, a library view open at the
+        // same time would be a second push racing this one (`libraryPushedBinding`).
+        catalogueSubTab = CatalogsView.CatalogsTab.dashboard.rawValue
+        sceneToOpen = SceneToOpen(scene: scene, autoPlay: autoPlay)
         selectedTab = .catalogue
     }
 
@@ -324,11 +339,23 @@ class NavigationCoordinator: ObservableObject {
         noDefaultFilter = false
         performerToOpen = nil
         studioToOpen = nil
+        sceneToOpen = nil
         clearReelsDeepLink()
         
         // Force navigation to Home (Dashboard) sub-tab
         self.catalogueSubTab = CatalogsView.CatalogsTab.dashboard.rawValue
         self.selectedTab = .catalogue
+    }
+}
+
+/// A scene page to push from outside (`NavigationCoordinator.openScene`).
+struct SceneToOpen: Equatable {
+    let scene: Scene
+    let autoPlay: Bool
+
+    static func == (lhs: SceneToOpen, rhs: SceneToOpen) -> Bool {
+        lhs.scene.id == rhs.scene.id && lhs.autoPlay == rhs.autoPlay
+            && lhs.scene.resumeTime == rhs.scene.resumeTime
     }
 }
 

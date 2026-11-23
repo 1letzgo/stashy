@@ -31,12 +31,26 @@ class MainActivity : FragmentActivity() {
         if (android.os.Build.VERSION.SDK_INT >= 33) setRecentsScreenshotEnabled(false)
         // Screen stays on while a video plays (ui/player/ScreenAwake.kt).
         de.letzgo.stashy.ui.player.ScreenAwake.bind(this)
+        // Cold start from a `stashy://` link; not again when the activity is recreated (rotation).
+        if (savedInstanceState == null) handleDeepLink(intent)
         setContent {
             StashyTheme {
                 de.letzgo.stashy.ui.SystemBarAppearance()
                 de.letzgo.stashy.ui.settings.AppLockGate { AppShell() }
             }
         }
+    }
+
+    /** `stashy://` link while the app runs (singleTask: the one existing activity gets it). */
+    override fun onNewIntent(intent: android.content.Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        handleDeepLink(intent)
+    }
+
+    private fun handleDeepLink(intent: android.content.Intent?) {
+        if (intent?.action != android.content.Intent.ACTION_VIEW) return
+        de.letzgo.stashy.ui.DeepLinkRouter.handle(intent.dataString)
     }
 
     override fun onResume() {

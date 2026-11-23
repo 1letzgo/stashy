@@ -225,6 +225,21 @@ struct CatalogsView: View {
     }
 
     var body: some View {
+        catalogBody
+            // External `stashy://` links (`NavigationCoordinator.openScene`): the scene page sits
+            // on the stack's root, whichever view is open, so it works without the dashboard too.
+            .navigationDestination(isPresented: Binding(
+                get: { coordinator.sceneToOpen != nil },
+                set: { if !$0 { coordinator.sceneToOpen = nil } }
+            )) {
+                if let target = coordinator.sceneToOpen {
+                    SceneDetailView(scene: target.scene, autoPlay: target.autoPlay)
+                }
+            }
+    }
+
+    @ViewBuilder
+    private var catalogBody: some View {
         if pushesLibraryViews {
             catalogRoot(for: .dashboard)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)

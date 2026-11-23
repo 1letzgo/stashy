@@ -53,6 +53,7 @@ The debug build then starts connected (`ServerConfigManager.seedDebugServer`).
 | `ui/Icons.kt` (`SF.*`) | SF Symbols — add mappings there |
 | `ui/Nav.kt` (`Nav`, `Screen`, `MainTab`, `CatalogTab`) | `TabManager`, `NavigationCoordinator` |
 | `ui/AppShell.kt` | `MainTabView` (floating glass tab bar + search circle) |
+| `data/DeepLink.kt` (parser, tested), `ui/DeepLinkRouter.kt` | `StashyDeepLink`, `StashyDeepLinkRouter` (`StashyDeepLink.swift`) |
 | `ui/Paging.kt` (`PagedList`) | infinite-scroll pattern of the list views |
 | `ui/catalog/` (`CatalogController`, `CatalogScaffold`, `CatalogTopActions`, `CatalogFilterFab`) | `CatalogsView`, `ScenesView`, `PerformersView` …, `CatalogChrome`, `FloatingCatalogBar` |
 | `ui/filter/` (`CatalogFilterSortSheet`, `FilterCriteriaEditor`, `FilterPickerOptionsStore`) | `ListCatalogFilterSortSheets`, `Filters/FilterCriteriaEditorView`, `FilterPickerOptionsStore` |
@@ -93,6 +94,13 @@ Sizes are tvOS points halved (`pt()`: 1920 pt ≙ 960 dp). Pure logic lives in `
 
 - Catalog deep links (dashboard "›" headers, stats tiles, Search "Show All"): `Nav.openCatalog(tab, sort, search, noDefaultFilter)`;
   the catalog root consumes the request (`CatalogController.applyRequest`).
+- External links (`stashy://scene/<id>[?t=<s>]`, `stashy://marker/<id>[?t=<s>]`, optional
+  `&server=<name or URL>`; iOS/macOS the same): a VIEW intent filter on `MainActivity`
+  (`singleTask`, cold start in `onCreate`, running app in `onNewIntent`; the TV path forwards no
+  data). `DeepLink.parse` reads the URL, `DeepLinkRouter` holds one waiting link and runs it from
+  `AppShell` once the app is unlocked: a `server` naming another configured server switches via
+  `connectServer`, then the scene / marker is fetched and `SceneDetailScreen(id, scene.copy(resumeTime = t), autoPlay)`
+  is pushed on Home (no `t` = page only). Errors are toasts. Not gated by stashy+.
 - Navigation: push a `Screen` implementation (`Nav.push(SceneDetailScreen(id))`); each tab has
   its own back stack; `hidesTabBar = true` for full-screen content.
 - Pushed screens (Android look, Material 3): `NativeTopBar(title)` instead of the iOS Back pill

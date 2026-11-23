@@ -121,6 +121,8 @@ val LocalTabBarVisible = compositionLocalOf { true }
 @Composable
 fun AppShell() {
     val p = Theme.palette
+    // `stashy://` links: a waiting one runs here once the app is unlocked (DeepLinkRouter).
+    DeepLinkRouter.Effect()
     // iOS `ServerConfigChanged`: a switch (or removing the server) ends the mini player.
     val activeServerId = ServerConfigManager.activeConfig?.id
     LaunchedEffect(activeServerId) { de.letzgo.stashy.data.ServerCapabilities.refresh(ServerConfigManager.activeConfig) }

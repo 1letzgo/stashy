@@ -37,6 +37,21 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
         languageObserver = AppLanguageStore.shared.$revision.dropFirst().sink { [weak self] _ in
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) { self?.reloadForLanguageChange() }
         }
+
+        // `stashy://` links. The router exists from launch so it sees the server become ready;
+        // a link that started the app waits there for the server and the app lock.
+        StashyDeepLinkRouter.shared.coordinator = navigationCoordinator
+        for context in connectionOptions.urlContexts {
+            StashyDeepLinkRouter.shared.handle(context.url)
+        }
+    }
+
+    /// A `stashy://` link while the app is running (or in the background).
+    func scene(_ scene: UIScene, openURLContexts URLContexts: Set<UIOpenURLContext>) {
+        StashyDeepLinkRouter.shared.coordinator = navigationCoordinator
+        for context in URLContexts {
+            StashyDeepLinkRouter.shared.handle(context.url)
+        }
     }
 
     private var languageObserver: AnyCancellable?

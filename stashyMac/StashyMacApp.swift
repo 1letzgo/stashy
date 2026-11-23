@@ -25,6 +25,8 @@ struct StashyMacApp: App {
         // Reads the passcode now: with one set the app is locked before the first frame.
         _ = SecurityManager.shared
         MacAppLockMonitor.shared.start()
+        // Exists from launch so it sees the server become ready before a link arrives.
+        _ = StashyDeepLinkRouter.shared
     }
 
     var body: some SwiftUI.Scene {
@@ -39,6 +41,14 @@ struct StashyMacApp: App {
                 .macIOSLikeControlStyles()
                 .frame(minWidth: 900, minHeight: 600)
                 .onAppear(perform: Self.applyLaunchWindowSize)
+                // `stashy://` links (cold start and running). The router queues them until the
+                // server is ready and the app is unlocked.
+                .onOpenURL { url in
+                    StashyDeepLinkRouter.shared.coordinator = navigationCoordinator
+                    StashyDeepLinkRouter.shared.handle(url)
+                }
+                // A link goes to an open window instead of opening a new one each time.
+                .handlesExternalEvents(preferring: ["*"], allowing: ["*"])
         }
         .windowToolbarStyle(.unified)
         .commands {

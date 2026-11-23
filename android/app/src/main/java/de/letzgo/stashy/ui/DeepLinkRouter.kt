@@ -1,0 +1,133 @@
+package de.letzgo.stashy.ui
+
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
+import de.letzgo.stashy.R
+import de.letzgo.stashy.data.DeepLink
+import de.letzgo.stashy.data.GraphQL
+import de.letzgo.stashy.data.Scene
+import de.letzgo.stashy.data.ScenesRepository
+import de.letzgo.stashy.data.SecurityManager
+import de.letzgo.stashy.data.ServerConfig
+import de.letzgo.stashy.data.ServerConfigManager
+import de.letzgo.stashy.data.arr
+import de.letzgo.stashy.data.obj
+import de.letzgo.stashy.data.stringOrNull
+import de.letzgo.stashy.data.vars
+import de.letzgo.stashy.tr
+import de.letzgo.stashy.ui.player.MiniPlayerStore
+import de.letzgo.stashy.ui.scene.SceneDetailScreen
+import de.letzgo.stashy.ui.settings.connectServer
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.first
+
+/**
+ * iOS: `StashyDeepLinkRouter` — runs `stashy://` links (parsing: `data/DeepLink.kt`). The
+ * activity hands every VIEW intent to [handle]; [Effect] inside `AppShell` runs the waiting link
+ * once the app is unlocked, switches server through the normal path ([connectServer]) when the
+ * link names another one, fetches the scene / marker and pushes its page on Home, the same way
+ * Feeds' title link hands a start position to the page (`resumeTime` + `autoPlay`).
+ * One link waits at a time; a newer one replaces it. Phone only (TV forwards no data).
+ */
+object DeepLinkRouter {
+    private data class Pending(val link: DeepLink, val token: Long = System.nanoTime())
+
+    private var pending by mutableStateOf<Pending?>(null)
+
+    /** Returns false when [uri] is no `stashy:` link. */
+    fun handle(uri: String?): Boolean = when (val result = DeepLink.parse(uri)) {
+        is DeepLink.Result.Failed -> {
+            if (result.error != DeepLink.Error.WrongScheme) showError(tr(R.string.error_link_invalid))
+            result.error != DeepLink.Error.WrongScheme
+        }
+        is DeepLink.Result.Ok -> { pending = Pending(result.link); true }
+    }
+
+    @Composable
+    fun Effect() {
+        val current = pending ?: return
+        LaunchedEffect(current.token) {
+            // Never past the lock: wait for the passcode / biometrics.
+            snapshotFlow { SecurityManager.isAppLocked }.first { !it }
+            try {
+                open(current.link)
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                android.util.Log.w("StashyDeepLink", "open failed", e)
+                showError(tr(R.string.error_link_open_failed))
+            } finally {
+                if (pending?.token == current.token) pending = null
+            }
+        }
+    }
+
+    private suspend fun open(link: DeepLink) {
+        val active = ServerConfigManager.activeConfig ?: return showError(tr(R.string.error_link_no_server))
+        link.server?.let { wanted ->
+            // The active server wins a tie (two servers with the same name).
+            val candidates = listOf(active) + ServerConfigManager.savedServers.filter { it.id != active.id }
+            val match = candidates.firstOrNull { matches(wanted, it) }
+                ?: return showError(tr(R.string.error_link_unknown_server_arg, wanted))
+            if (match.id != active.id) {
+                // The normal switch: activate, reset status and every stack. Requests wait for the
+                // address probe (`ServerEndpointSelector.settle()`); the shell's per-server effects
+                // (mini player restore, capabilities) get a moment to run first.
+                connectServer(match)
+                delay(600)
+            }
+        }
+
+        val scene: Scene
+        val autoPlay: Boolean
+        when (val target = link.target) {
+            is DeepLink.Target.Scene -> {
+                val found = ScenesRepository.scene(target.id) ?: return showError(tr(R.string.error_link_scene_not_found))
+                if (link.time != null) {
+                    scene = found.copy(resumeTime = DeepLink.clamp(link.time, found.sceneDuration))
+                    autoPlay = true
+                } else {
+                    scene = found
+                    autoPlay = false
+                }
+            }
+            is DeepLink.Target.Marker -> {
+                val marker = fetchMarker(target.id) ?: return showError(tr(R.string.error_link_marker_not_found))
+                val found = ScenesRepository.scene(marker.second) ?: return showError(tr(R.string.error_link_marker_not_found))
+                scene = found.copy(resumeTime = DeepLink.clamp(link.time ?: marker.first, found.sceneDuration))
+                autoPlay = true
+            }
+        }
+
+        // Whatever covers the tabs closes first. The page adopts a mini player that plays the
+        // same scene (and keeps its position): a link with a time must start there instead.
+        MiniPlayerStore.showsNowPlaying = false
+        if (autoPlay && MiniPlayerStore.session?.scene?.id == scene.id) MiniPlayerStore.close(forget = false)
+        Nav.tab = MainTab.Home
+        Nav.popToRoot(MainTab.Home)
+        Nav.push(SceneDetailScreen(scene.id, scene, autoPlay = autoPlay))
+    }
+
+    private fun matches(value: String, config: ServerConfig): Boolean =
+        DeepLink.serverMatches(value, config.name, listOfNotNull(config.externalBaseURL, config.localURL?.takeIf { it.isNotBlank() }))
+
+    /** Marker id → (seconds, scene id). */
+    private suspend fun fetchMarker(id: String): Pair<Double, String>? {
+        val data = GraphQL.data(
+            "query FindSceneMarkerById(\$ids: [ID!]) { findSceneMarkers(ids: \$ids) { scene_markers { id seconds scene { id } } } }",
+            vars("ids" to listOf(id)),
+        )
+        val marker = data["findSceneMarkers"].obj?.get("scene_markers").arr
+            ?.mapNotNull { it.obj }?.firstOrNull { it["id"].stringOrNull == id } ?: return null
+        val seconds = marker["seconds"].stringOrNull?.toDoubleOrNull() ?: return null
+        val sceneId = marker["scene"].obj?.get("id").stringOrNull ?: return null
+        return seconds to sceneId
+    }
+
+    private fun showError(message: String) = de.letzgo.stashy.ui.tools.showToast(message, long = true)
+}

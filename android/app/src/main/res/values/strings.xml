@@ -742,6 +742,12 @@
     <string name="error_import">Import failed.</string>
     <string name="error_install_speech_model">Could not install speech model</string>
     <string name="error_language_pack_download">Language pack download failed</string>
+    <string name="error_link_invalid">This stashy link is not valid</string>
+    <string name="error_link_marker_not_found">Marker not found</string>
+    <string name="error_link_no_server">Set up a server first to open stashy links</string>
+    <string name="error_link_open_failed">The link could not be opened</string>
+    <string name="error_link_scene_not_found">Scene not found</string>
+    <string name="error_link_unknown_server_arg">No server matches “%1$s”</string>
     <string name="error_load_all_group_fields">Couldn\'t load all group fields</string>
     <string name="error_load_clips">Could not load clips</string>
     <string name="error_load_filters_arg">Failed to load filters: %1$s</string>
