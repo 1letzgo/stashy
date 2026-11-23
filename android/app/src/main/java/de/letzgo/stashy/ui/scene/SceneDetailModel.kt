@@ -110,6 +110,12 @@ class SceneDetailModel(
     val playerOnly: Boolean = false,
     /** Reopened from the mini player ("Details"): plays here like before. */
     private val openedFromMiniPlayer: Boolean = false,
+    /**
+     * iOS `autoPlayStartAt`: with [autoPlay], start exactly here (`stashy://` links), also when
+     * the page takes over the same scene's player from the mini player, which otherwise keeps
+     * its position. Used once.
+     */
+    private var forcedStart: Double? = null,
 ) {
     /**
      * iOS `playsInNowPlaying`. Experiment: Play always plays on this page, also with the mini
@@ -195,7 +201,7 @@ class SceneDetailModel(
         // in the page with the same player — no cover, no reload, no seek.
         if (!isPlaybackStarted && MiniPlayerStore.showsScene(s.id) && !playsInNowPlaying) {
             resumeOnReturn = null
-            startPlayback(false)
+            startPlayback(false, forcedStart = consumeForcedStart())
             return
         }
         resumeOnReturn?.let { (wasPlaying, position) ->
@@ -204,8 +210,10 @@ class SceneDetailModel(
             if (wasPlaying) scope.launch { delay(300); if (!isPlaybackStarted) startPlayback(true) }
             return
         }
-        if (autoPlay) scope.launch { delay(300); if (!isPlaybackStarted) startPlayback(true) }
+        if (autoPlay) scope.launch { delay(300); if (!isPlaybackStarted) startPlayback(true, forcedStart = consumeForcedStart()) }
     }
+
+    private fun consumeForcedStart(): Double? = forcedStart?.takeIf { autoPlay }.also { forcedStart = null }
 
     /** iOS: `handleOnDisappear` + `finishDisappearTeardown`. */
     fun onDisappear() {
@@ -285,9 +293,9 @@ class SceneDetailModel(
     // MARK: Playback
 
     /** iOS: `startPlayback(resume:)`. */
-    fun startPlayback(resume: Boolean, startAt: Double? = null) {
+    fun startPlayback(resume: Boolean, startAt: Double? = null, forcedStart: Double? = null) {
         if (playsInNowPlaying) {
-            MiniPlayerStore.openNowPlaying(scene, startAt ?: if (resume) null else 0.0)
+            MiniPlayerStore.openNowPlaying(scene, forcedStart ?: startAt ?: if (resume) null else 0.0)
             return
         }
         // Plays on this page (Now Playing's Details, its embedded player): listed right away,
@@ -297,7 +305,8 @@ class SceneDetailModel(
         // The mini player still runs this scene: take its player back instead of reloading.
         val wasPlayingInBar = MiniPlayerStore.session?.takeIf { it.scene.id == scene.id }?.player?.let { it.playWhenReady && !it.didEnd } ?: true
         val adopted = takeFromMiniPlayer()
-        val resumeTarget = scene.resumeTime?.takeIf { resume && !adopted && it > 0 }
+        // An explicit start (external link) wins over the adopted player's position.
+        val resumeTarget = forcedStart ?: scene.resumeTime?.takeIf { resume && !adopted && it > 0 }
         val existing = player
         if (existing == null) {
             val p = StashPlayer(Prefs.appContext, StashPlayer.Role.Main)
@@ -317,7 +326,7 @@ class SceneDetailModel(
         }
         isPlaybackStarted = true
         // Now Playing took a paused player from the bar: it stays paused.
-        if (!(playerOnly && adopted && !wasPlayingInBar)) player?.play()
+        if (forcedStart != null || !(playerOnly && adopted && !wasPlayingInBar)) player?.play()
         configureTracker()
         tracker.start()
         playCredit.thresholdSeconds = playCountThreshold

@@ -233,7 +233,7 @@ struct CatalogsView: View {
                 set: { if !$0 { coordinator.sceneToOpen = nil } }
             )) {
                 if let target = coordinator.sceneToOpen {
-                    SceneDetailView(scene: target.scene, autoPlay: target.autoPlay)
+                    SceneDetailView(scene: target.scene, autoPlay: target.autoPlay, autoPlayStartAt: target.startAt)
                 }
             }
     }

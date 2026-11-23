@@ -89,10 +89,19 @@ class SceneDetailScreen(
     autoPlay: Boolean = false,
     /** Reopened from the mini player (iOS full-screen cover with a minimize chevron). */
     private val openedFromMiniPlayer: Boolean = false,
+    /** Opened by a `stashy://` link (ui/DeepLinkRouter.kt). */
+    fromLink: Boolean = false,
+    /** With [autoPlay]: exact start, also over a running player of this scene (iOS `autoPlayStartAt`). */
+    startAt: Double? = null,
 ) : Screen {
-    // Own key when reopened from the bar: the same scene's page may already sit lower in the stack.
-    override val key = if (openedFromMiniPlayer) "scene-$sceneId-mini-${System.nanoTime()}" else "scene-$sceneId"
-    private val model = SceneDetailModel(preview ?: Scene(id = sceneId), autoPlay, openedFromMiniPlayer = openedFromMiniPlayer)
+    // Own key when reopened from the bar or opened by a link: the same scene's page may already
+    // sit in the stack, or still be leaving it (its exit transition composes it with the same key).
+    override val key = when {
+        openedFromMiniPlayer -> "scene-$sceneId-mini-${System.nanoTime()}"
+        fromLink -> "scene-$sceneId-link-${System.nanoTime()}"
+        else -> "scene-$sceneId"
+    }
+    private val model = SceneDetailModel(preview ?: Scene(id = sceneId), autoPlay, openedFromMiniPlayer = openedFromMiniPlayer, forcedStart = startAt)
     override val hidesTabBar: Boolean get() = model.isFullscreen || PlayerWindow.isInPictureInPicture
 
     @Composable override fun Content() = SceneDetailContent(model, openedFromMiniPlayer)

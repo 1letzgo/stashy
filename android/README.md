@@ -100,7 +100,7 @@ Sizes are tvOS points halved (`pt()`: 1920 pt ≙ 960 dp). Pure logic lives in `
   data). `DeepLink.parse` reads the URL, `DeepLinkRouter` holds one waiting link and runs it from
   `AppShell` once the app is unlocked: a `server` naming another configured server switches via
   `connectServer`, then the scene / marker is fetched and `SceneDetailScreen(id, scene.copy(resumeTime = t), autoPlay)`
-  is pushed on Home (no `t` = page only). Errors are toasts. Not gated by stashy+.
+  is pushed on Home with `fromLink = true` (own screen key: the replaced page of the same scene is still leaving the stack) and `startAt` (wins over a player taken from the mini player). No `t` = page only. Errors are toasts. Not gated by stashy+.
 - Navigation: push a `Screen` implementation (`Nav.push(SceneDetailScreen(id))`); each tab has
   its own back stack; `hidesTabBar = true` for full-screen content.
 - Pushed screens (Android look, Material 3): `NativeTopBar(title)` instead of the iOS Back pill

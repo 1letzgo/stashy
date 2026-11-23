@@ -41,11 +41,15 @@ struct SceneDetailView: View {
     let autoPlay: Bool
     /// With `autoPlay`: start at the beginning instead of the saved position (Home hero's Play).
     let autoPlayFromStart: Bool
-    
-    init(scene: Scene, autoPlay: Bool = false, autoPlayFromStart: Bool = false) {
+    /// With `autoPlay`: start exactly here (`stashy://` links), also when the page takes over a
+    /// running engine of the same scene from the mini player, which otherwise keeps its position.
+    let autoPlayStartAt: Double?
+
+    init(scene: Scene, autoPlay: Bool = false, autoPlayFromStart: Bool = false, autoPlayStartAt: Double? = nil) {
         self.scene = scene
         self.autoPlay = autoPlay
         self.autoPlayFromStart = autoPlayFromStart
+        self.autoPlayStartAt = autoPlayStartAt
         _activeScene = State(initialValue: scene)
     }
     /// The one player. Non-nil from the first `startPlayback` until teardown.
@@ -770,7 +774,7 @@ struct SceneDetailView: View {
 
         // Removed automatic setupScene to enforce manual activation unless explicitly requested via autoPlay
         if autoPlay {
-            scheduleStart(resume: !autoPlayFromStart)
+            scheduleStart(resume: !autoPlayFromStart, forcedStart: autoPlayStartAt)
         }
     }
 
@@ -796,11 +800,11 @@ struct SceneDetailView: View {
         aetherEngine?.pause()
     }
 
-    private func scheduleStart(resume: Bool) {
+    private func scheduleStart(resume: Bool, forcedStart: Double? = nil) {
         pendingStart.item?.cancel()
         let item = DispatchWorkItem { [pendingStart] in
             pendingStart.item = nil
-            if !isPlaybackStarted { startPlayback(resume: resume) }
+            if !isPlaybackStarted { startPlayback(resume: resume, forcedStart: forcedStart) }
         }
         pendingStart.item = item
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.3, execute: item)
@@ -1113,10 +1117,10 @@ struct SceneDetailView: View {
         }
     }
 
-    private func startPlayback(resume: Bool, startAt: Double? = nil) {
+    private func startPlayback(resume: Bool, startAt: Double? = nil, forcedStart: Double? = nil) {
         #if !os(tvOS)
         if playsInNowPlaying {
-            MiniPlayerStore.shared.openNowPlaying(activeScene, startAt: startAt ?? (resume ? nil : 0))
+            MiniPlayerStore.shared.openNowPlaying(activeScene, startAt: forcedStart ?? startAt ?? (resume ? nil : 0))
             return
         }
         // Plays on this page (Now Playing's Details, its embedded player): listed right away,
@@ -1128,9 +1132,13 @@ struct SceneDetailView: View {
         // The mini player still runs this scene: take its engine back instead of reloading.
         let adoptedFromMiniPlayer = takeEngineFromMiniPlayer()
         let resumeTarget: Double? = {
+            // An explicit start (external link) wins over the adopted engine's position.
+            if let forcedStart { return forcedStart }
             guard resume, !adoptedFromMiniPlayer, let time = activeScene.resumeTime, time > 0 else { return nil }
             return time
         }()
+        // …and plays, even when the mini player held it paused.
+        if forcedStart != nil { adoptedPaused = false }
 
         if aetherEngine == nil {
             let engine: AetherSceneEngine

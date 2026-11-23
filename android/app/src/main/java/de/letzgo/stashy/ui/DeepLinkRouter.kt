@@ -9,6 +9,7 @@ import androidx.compose.runtime.snapshotFlow
 import de.letzgo.stashy.R
 import de.letzgo.stashy.data.DeepLink
 import de.letzgo.stashy.data.GraphQL
+import de.letzgo.stashy.data.GraphQLError
 import de.letzgo.stashy.data.Scene
 import de.letzgo.stashy.data.ScenesRepository
 import de.letzgo.stashy.data.SecurityManager
@@ -104,13 +105,13 @@ object DeepLinkRouter {
             }
         }
 
-        // Whatever covers the tabs closes first. The page adopts a mini player that plays the
-        // same scene (and keeps its position): a link with a time must start there instead.
+        // Whatever covers the tabs closes first. The page may take over the same scene's player
+        // (the page it replaces hands it to the mini player): the start goes in explicitly.
+        // Own screen key: a page of this scene may still be leaving the stack.
         MiniPlayerStore.showsNowPlaying = false
-        if (autoPlay && MiniPlayerStore.session?.scene?.id == scene.id) MiniPlayerStore.close(forget = false)
         Nav.tab = MainTab.Home
         Nav.popToRoot(MainTab.Home)
-        Nav.push(SceneDetailScreen(scene.id, scene, autoPlay = autoPlay))
+        Nav.push(SceneDetailScreen(scene.id, scene, autoPlay = autoPlay, fromLink = true, startAt = if (autoPlay) scene.resumeTime else null))
     }
 
     private fun matches(value: String, config: ServerConfig): Boolean =
@@ -118,10 +119,17 @@ object DeepLinkRouter {
 
     /** Marker id → (seconds, scene id). */
     private suspend fun fetchMarker(id: String): Pair<Double, String>? {
-        val data = GraphQL.data(
-            "query FindSceneMarkerById(\$ids: [ID!]) { findSceneMarkers(ids: \$ids) { scene_markers { id seconds scene { id } } } }",
-            vars("ids" to listOf(id)),
-        )
+        val data = try {
+            GraphQL.data(
+                "query FindSceneMarkerById(\$ids: [ID!]) { findSceneMarkers(ids: \$ids) { scene_markers { id seconds scene { id } } } }",
+                vars("ids" to listOf(id)),
+            )
+        } catch (e: GraphQLError.Query) {
+            // Stash answers an unknown id in `ids` with an error (no rows), not an empty list. A
+            // server that does not know `ids` here says "Unknown argument": that stays a failure.
+            if (e.serverMessages.any { "Unknown argument" in it || "Cannot query field" in it }) throw e
+            return null
+        }
         val marker = data["findSceneMarkers"].obj?.get("scene_markers").arr
             ?.mapNotNull { it.obj }?.firstOrNull { it["id"].stringOrNull == id } ?: return null
         val seconds = marker["seconds"].stringOrNull?.toDoubleOrNull() ?: return null

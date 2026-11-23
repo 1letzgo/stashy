@@ -160,12 +160,12 @@ class NavigationCoordinator: ObservableObject {
     /// `openStudio`: a fresh Home stack with the page pushed on it. `autoPlay` starts playback
     /// at once from the scene's resume point, which the caller sets to the wanted start, like
     /// Feeds' title link (`titleLinkScene(livePosition:)`).
-    func openScene(_ scene: Scene, autoPlay: Bool) {
+    func openScene(_ scene: Scene, autoPlay: Bool, startAt: Double? = nil) {
         catalogueTabID = UUID()
         // The page goes straight onto the root: with a dashboard, a library view open at the
         // same time would be a second push racing this one (`libraryPushedBinding`).
         catalogueSubTab = CatalogsView.CatalogsTab.dashboard.rawValue
-        sceneToOpen = SceneToOpen(scene: scene, autoPlay: autoPlay)
+        sceneToOpen = SceneToOpen(scene: scene, autoPlay: autoPlay, startAt: startAt)
         selectedTab = .catalogue
     }
 
@@ -352,10 +352,12 @@ class NavigationCoordinator: ObservableObject {
 struct SceneToOpen: Equatable {
     let scene: Scene
     let autoPlay: Bool
+    /// Exact start (`SceneDetailView.autoPlayStartAt`); nil = the scene's resume point.
+    var startAt: Double? = nil
 
     static func == (lhs: SceneToOpen, rhs: SceneToOpen) -> Bool {
         lhs.scene.id == rhs.scene.id && lhs.autoPlay == rhs.autoPlay
-            && lhs.scene.resumeTime == rhs.scene.resumeTime
+            && lhs.scene.resumeTime == rhs.scene.resumeTime && lhs.startAt == rhs.startAt
     }
 }
 

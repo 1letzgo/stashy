@@ -227,15 +227,22 @@ final class StashyDeepLinkRouter {
                 // The normal switch path: `ServerConfigChanged` resets lists and stacks, the view
                 // models initialise again and post `stashServerInitializationFinished`.
                 manager.saveConfig(match)
-                armReadyFallback()
+                // The new server's requests must not run into the reset's `cancelAllRequests`.
+                readyFallback?.cancel()
+                readyFallback = nil
+                armReadyFallback(after: 10)
                 return
             }
         }
 
         guard serverReady else {
-            armReadyFallback()
+            AppLog.debug("[DeepLink] waiting for the server to be ready")
+            // No switch: the fetch only needs the address (GraphQL requests wait for its probe),
+            // so the dashboard's whole start-up (filters, statistics) is not worth waiting long for.
+            armReadyFallback(after: awaitsSwitch ? 10 : 3)
             return
         }
+        AppLog.debug("[DeepLink] opening")
         readyFallback?.cancel()
         readyFallback = nil
         pending = nil
@@ -251,13 +258,15 @@ final class StashyDeepLinkRouter {
         }
     }
 
-    /// The start-up sequence runs from the dashboard; if it never reports (no dashboard on
-    /// screen, a stalled request) the link still runs after a while and fails on its own fetch.
-    private func armReadyFallback() {
+    /// The start-up sequence runs from the dashboard (saved filters, then statistics) and can take
+    /// a while; if it never reports (no dashboard on screen, a stalled request) the link runs
+    /// anyway after `seconds` and fails on its own fetch if the server is not there.
+    private func armReadyFallback(after seconds: Double) {
         guard readyFallback == nil else { return }
         readyFallback = Task { [weak self] in
-            try? await Task.sleep(nanoseconds: 10_000_000_000)
+            try? await Task.sleep(nanoseconds: UInt64(seconds * 1_000_000_000))
             guard !Task.isCancelled, let self else { return }
+            AppLog.debug("[DeepLink] no ready signal after \(seconds) s, opening anyway")
             self.readyFallback = nil
             self.serverReady = true
             self.awaitsSwitch = false
@@ -306,26 +315,27 @@ final class StashyDeepLinkRouter {
             showError(tr("error_link_open_failed"))
             return
         }
-        guard !Task.isCancelled, let coordinator else { return }
-        prepareForPush(sceneId: scene.id, startsAtTime: autoPlay)
+        guard !Task.isCancelled else { return }
+        guard let coordinator else {
+            AppLog.error("[DeepLink] no NavigationCoordinator attached")
+            return
+        }
+        prepareForPush()
         // Let a dismissed cover / sheet finish before the stack is rebuilt underneath.
         try? await Task.sleep(nanoseconds: 350_000_000)
         guard !Task.isCancelled else { return }
-        coordinator.openScene(scene, autoPlay: autoPlay)
+        // The start goes in explicitly as well: the page may take over the running engine of the
+        // same scene (the page it replaces hands it to the mini player), which keeps its own position.
+        coordinator.openScene(scene, autoPlay: autoPlay, startAt: autoPlay ? scene.resumeTime : nil)
     }
 
     /// The page opens in the Home tab's stack. Whatever is presented above the tabs (Now
     /// Playing, the mini player's scene cover, a sheet, the fullscreen player) is closed first,
     /// or the new page would open hidden underneath it.
-    private func prepareForPush(sceneId: String, startsAtTime: Bool) {
+    private func prepareForPush() {
         let mini = MiniPlayerStore.shared
         mini.showsNowPlaying = false
         mini.expandedScene = nil
-        // The page adopts a mini player that plays the same scene and keeps its position;
-        // a link with a time must start there instead.
-        if startsAtTime, mini.session?.scene.id == sceneId {
-            mini.close(forget: false)
-        }
         #if os(iOS)
         for case let windowScene as UIWindowScene in UIApplication.shared.connectedScenes {
             // Only the app's own window: the lock screen (`LockScreenWindow`, above `.alert`)
@@ -368,10 +378,22 @@ final class StashyDeepLinkRouter {
           findSceneMarkers(ids: $ids) { scene_markers { id seconds scene { id } } }
         }
         """
-        let response: Response = try await GraphQLClient.shared.execute(query: query, variables: ["ids": [id]])
+        let response: Response
+        do {
+            response = try await GraphQLClient.shared.execute(query: query, variables: ["ids": [id]])
+        } catch GraphQLNetworkError.graphQLError(let message) where !isSchemaMessage(message) {
+            // Stash answers an unknown id in `ids` with an error (no rows), not an empty list.
+            // A server that does not know `ids` here says "Unknown argument": that stays a failure.
+            AppLog.debug("[DeepLink] marker \(id): \(message)")
+            return nil
+        }
         guard let marker = response.data?.findSceneMarkers.scene_markers.first(where: { $0.id == id }),
               let sceneId = marker.scene?.id else { return nil }
         return MarkerRef(seconds: marker.seconds, sceneId: sceneId)
+    }
+
+    private static func isSchemaMessage(_ message: String) -> Bool {
+        message.contains("Unknown argument") || message.contains("Cannot query field")
     }
 
     private func showError(_ message: String) {
