@@ -21,6 +21,8 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.WindowInsetsSides
+import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.width
@@ -36,7 +38,6 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -243,12 +244,26 @@ fun PasscodeEntryView() {
         modifier = modifier,
     )
 
-    // Laid out from the window's own room after bars and cutouts (a landscape phone has ~360 dp
-    // of height: the portrait column cut the keypad off below 6, and the window can't scroll).
-    BoxWithConstraints(
+    PasscodePad(
         Modifier.fillMaxSize().background(p.background).clickable(MutableInteractionSource(), null) {}
             .windowInsetsPadding(WindowInsets.safeDrawing).padding(horizontal = 16.dp),
-    ) {
+        header = { header() },
+        keypad = { spec, modifier -> keypad(spec, modifier) },
+    )
+}
+
+/**
+ * Header (title, dots) and keypad, laid out from the room [modifier] leaves after bars and
+ * cutouts ([PasscodeLayout]): a landscape phone has ~360 dp of height, and the portrait column
+ * cut the keypad off below 6 with nothing to scroll. Lock screen and Set Passcode share it.
+ */
+@Composable
+private fun PasscodePad(
+    modifier: Modifier,
+    header: @Composable () -> Unit,
+    keypad: @Composable (PasscodeLayout.Spec, Modifier) -> Unit,
+) {
+    BoxWithConstraints(modifier) {
         val spec = PasscodeLayout.spec(maxWidth.value, maxHeight.value)
         val scroll = if (spec.scrolls) Modifier.verticalScroll(rememberScrollState()) else Modifier
         if (spec.sideBySide) {
@@ -273,6 +288,7 @@ fun PasscodeEntryView() {
                     header()
                     Spacer(Modifier.height(24.dp))
                 }
+                // 320 dp at most in portrait, as on iOS.
                 keypad(spec, Modifier.widthIn(max = PasscodeLayout.PORTRAIT_MAX_WIDTH.dp).fillMaxWidth().padding(bottom = 30.dp))
             }
         }
@@ -374,19 +390,31 @@ class PasscodeSetupScreen : Screen {
             }
         }
         SettingsDetailScaffold(tr(R.string.passcode)) { top ->
-            Column(Modifier.fillMaxSize().padding(top = top + 16.dp, bottom = 16.dp).navigationBarsPadding(), horizontalAlignment = Alignment.CenterHorizontally) {
-                Text(if (step == 1) tr(R.string.action_set_passcode) else tr(R.string.confirm_passcode), style = NativeType.headlineSmall, color = p.text)
-                error?.let { Text(it, style = NativeType.bodySmall, color = Color(0xFFFF453A), modifier = Modifier.padding(top = 12.dp)) }
-                PasscodeDots(if (step == 1) passcode.length else confirm.length, shake, Modifier.padding(top = 40.dp))
-                Spacer(Modifier.height(40.dp))
-                Keypad(
-                    enabled = true,
-                    onDigit = { d -> if (step == 1) { if (passcode.length < 4) passcode += d } else if (confirm.length < 4) confirm += d },
-                    onDelete = { if (step == 1) passcode = passcode.dropLast(1) else confirm = confirm.dropLast(1) },
-                    leftKey = null,
-                )
-                Spacer(Modifier.weight(1f))
-            }
+            // Same sizing as the lock screen: fixed spacers above a 70 dp keypad cut 0 / delete
+            // off in landscape.
+            PasscodePad(
+                Modifier.fillMaxSize().padding(top = top)
+                    .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal + WindowInsetsSides.Bottom))
+                    .padding(horizontal = 16.dp),
+                header = {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text(if (step == 1) tr(R.string.action_set_passcode) else tr(R.string.confirm_passcode), style = NativeType.headlineSmall, color = p.text, textAlign = TextAlign.Center)
+                        error?.let { Text(it, style = NativeType.bodySmall, color = Color(0xFFFF453A), textAlign = TextAlign.Center, modifier = Modifier.padding(top = 12.dp)) }
+                        PasscodeDots(if (step == 1) passcode.length else confirm.length, shake, Modifier.padding(top = 20.dp))
+                    }
+                },
+                keypad = { spec, modifier ->
+                    Keypad(
+                        keySize = spec.keySize.dp,
+                        rowGap = spec.rowGap.dp,
+                        enabled = true,
+                        onDigit = { d -> if (step == 1) { if (passcode.length < 4) passcode += d } else if (confirm.length < 4) confirm += d },
+                        onDelete = { if (step == 1) passcode = passcode.dropLast(1) else confirm = confirm.dropLast(1) },
+                        leftKey = null,
+                        modifier = modifier,
+                    )
+                },
+            )
         }
     }
 }
