@@ -110,6 +110,22 @@ class PasscodeVault(private val store: SecurityStore, private val now: () -> Dou
     }
 }
 
+/** Pure lock decisions of [SecurityManager] and the lock window (unit-tested). */
+object AppLockPolicy {
+    /**
+     * iOS `lockIfAutoLockOnBackground`: the app left the foreground. A configuration change
+     * (rotation, dark mode) is no leaving; a running picture-in-picture window keeps it unlocked.
+     */
+    fun locksOnBackground(passcodeSet: Boolean, autoLockOnBackground: Boolean, pipActive: Boolean, changingConfigurations: Boolean): Boolean =
+        passcodeSet && autoLockOnBackground && !pipActive && !changingConfigurations
+
+    /**
+     * The lock window is there at once when the lock goes up (no slide-in that would show the
+     * library first) and stays after unlocking until its fade-out has run.
+     */
+    fun showsLockWindow(visibleNow: Boolean, locked: Boolean): Boolean = visibleNow || locked
+}
+
 /** [SecurityStore] on [Prefs] (UserDefaults keys) and [Secrets] (PIN hash). */
 private object PrefsSecurityStore : SecurityStore {
     override fun secret(key: String) = Secrets.get(key)
@@ -211,8 +227,8 @@ object SecurityManager {
     }
 
     /** iOS `sceneDidEnterBackground`: auto-lock unless picture-in-picture is playing. */
-    fun onAppBackgrounded() {
-        if (autoLockOnBackground && !isPiPActive) lock()
+    fun onAppBackgrounded(changingConfigurations: Boolean = false) {
+        if (AppLockPolicy.locksOnBackground(isPasscodeSet, autoLockOnBackground, isPiPActive, changingConfigurations)) lock()
     }
 
     /** True when the device has enrolled biometrics (Face / fingerprint). */

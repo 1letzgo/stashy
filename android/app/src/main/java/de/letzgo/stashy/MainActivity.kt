@@ -49,7 +49,7 @@ class MainActivity : FragmentActivity() {
     /** iOS `sceneDidEnterBackground` → auto-lock (SecurityManager rules). */
     override fun onStop() {
         super.onStop()
-        if (!isChangingConfigurations) de.letzgo.stashy.data.SecurityManager.onAppBackgrounded()
+        de.letzgo.stashy.data.SecurityManager.onAppBackgrounded(changingConfigurations = isChangingConfigurations)
     }
 
     override fun onDestroy() {

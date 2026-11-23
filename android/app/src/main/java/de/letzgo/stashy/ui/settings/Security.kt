@@ -3,11 +3,16 @@ package de.letzgo.stashy.ui.settings
 import de.letzgo.stashy.R
 import de.letzgo.stashy.tr
 import androidx.activity.compose.BackHandler
+import android.content.Context
+import android.content.ContextWrapper
+import android.os.Build
+import android.view.ViewGroup
+import android.view.WindowManager
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.core.MutableTransitionState
 import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
-import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -31,6 +36,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -41,6 +47,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
+import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
+import androidx.compose.ui.window.DialogWindowProvider
+import androidx.core.view.WindowCompat
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.IntOffset
@@ -63,33 +74,100 @@ import kotlinx.coroutines.delay
 import kotlin.math.roundToInt
 
 /**
- * Wraps the app shell: shows [PasscodeEntryView] over it while [SecurityManager.isAppLocked]
- * (iOS `MainTabView` ZStack overlay, slide-up + fade), and reloads the per-server configs when
- * the active server changes (iOS `ServerConfigChanged` → `TabManager.loadAllConfigs`).
+ * Wraps the app shell: puts [PasscodeEntryView] over it while [SecurityManager.isAppLocked]
+ * (iOS `LockScreenWindow`), and reloads the per-server configs when the active server changes
+ * (iOS `ServerConfigChanged` → `TabManager.loadAllConfigs`).
+ *
+ * The passcode screen lives in a window of its own, like iOS. As an overlay inside the app
+ * window it lost to every Compose `Dialog` / `ModalBottomSheet`, which are windows above the
+ * app's: the fullscreen player, the image viewer or an open sheet stayed on screen, usable, over
+ * the lock after Home and back — the app looked as if it had not locked at all. The lock window
+ * is added when the lock goes up, so it lies above every window that was open then.
+ *
+ * It appears without an animation: recomposition is paused while the activity is stopped, so the
+ * lock is first drawn on the way back, and a slide-in showed the library until it had arrived.
+ * An opaque cover in the app window is drawn in that same first frame, before the lock window
+ * has its first frame. Unlocking still fades the lock away.
  */
 @Composable
 fun AppLockGate(content: @Composable () -> Unit) {
     LaunchedEffect(ServerConfigManager.activeConfig?.id) { TabManager.ensureLoaded() }
+    val locked = SecurityManager.isAppLocked
+    val lockState = remember { MutableTransitionState(locked) }
+    lockState.targetState = locked
     Box(Modifier.fillMaxSize()) {
         content()
+        if (locked) {
+            Box(
+                Modifier.fillMaxSize().background(Theme.palette.background)
+                    .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) {},
+            )
+        }
+        if (de.letzgo.stashy.data.AppLockPolicy.showsLockWindow(lockState.currentState, lockState.targetState)) LockScreenWindow(lockState)
+    }
+}
+
+@Composable
+private fun LockScreenWindow(lockState: MutableTransitionState<Boolean>) {
+    val activity = LocalContext.current.findFragmentActivity()
+    Dialog(
+        onDismissRequest = { activity?.moveTaskToBack(true) },
+        properties = DialogProperties(
+            dismissOnClickOutside = false,
+            usePlatformDefaultWidth = false,
+            decorFitsSystemWindows = false,
+        ),
+    ) {
+        val dialogView = LocalView.current
+        SideEffect {
+            (dialogView.parent as? DialogWindowProvider)?.window?.let { w ->
+                w.setLayout(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT)
+                w.setDimAmount(0f)
+                w.clearFlags(WindowManager.LayoutParams.FLAG_DIM_BEHIND)
+                // No window animation on leaving (the fade-out above runs instead). The cover in the
+                // app window already hides the library while this window comes up.
+                w.setWindowAnimations(0)
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                    w.attributes = w.attributes.apply {
+                        layoutInDisplayCutoutMode = WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES
+                    }
+                }
+                // A window of its own does not inherit the app's bar icons (iOS: color scheme).
+                activity?.window?.let { app ->
+                    val from = WindowCompat.getInsetsController(app, app.decorView)
+                    WindowCompat.getInsetsController(w, w.decorView).apply {
+                        isAppearanceLightStatusBars = from.isAppearanceLightStatusBars
+                        isAppearanceLightNavigationBars = from.isAppearanceLightNavigationBars
+                    }
+                }
+            }
+        }
         AnimatedVisibility(
-            SecurityManager.isAppLocked,
-            enter = slideInVertically { it } + fadeIn(), exit = slideOutVertically { it } + fadeOut(),
+            visibleState = lockState,
+            enter = EnterTransition.None,
+            exit = slideOutVertically { it / 12 } + fadeOut(),
         ) { PasscodeEntryView() }
     }
+}
+
+/** A Compose `Dialog`'s context is a wrapper around the activity. */
+private tailrec fun Context.findFragmentActivity(): FragmentActivity? = when (this) {
+    is FragmentActivity -> this
+    is ContextWrapper -> baseContext.findFragmentActivity()
+    else -> null
 }
 
 /** iOS: `PasscodeEntryView` — lock screen with 4 dots, keypad, biometrics and lockout. */
 @Composable
 fun PasscodeEntryView() {
     val p = Theme.palette
-    val context = LocalContext.current
+    val activity = LocalContext.current.findFragmentActivity()
     var passcode by remember { mutableStateOf("") }
     var error by remember { mutableStateOf<String?>(null) }
     var shake by remember { mutableIntStateOf(0) }
     var authenticating by remember { mutableStateOf(false) }
     val lockedOut = SecurityManager.lockoutRemainingSeconds > 0
-    BackHandler { (context as? android.app.Activity)?.moveTaskToBack(true) }
+    BackHandler { activity?.moveTaskToBack(true) }
 
     val lifecycle = LocalLifecycleOwner.current.lifecycle
 
@@ -97,7 +175,7 @@ fun PasscodeEntryView() {
     // is in the background never shows and never calls back — `authenticating` then stayed
     // true and every later return got the passcode keypad instead of biometrics.
     fun promptBiometrics() {
-        val activity = context as? FragmentActivity ?: return
+        val activity = activity ?: return
         if (!lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED)) return
         if (!SecurityManager.isBiometricsEnabled || lockedOut || authenticating || !SecurityManager.isAppLocked) return
         authenticating = true
