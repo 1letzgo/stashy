@@ -79,4 +79,21 @@ class AppLockPolicyTest {
         assertFalse(AppLockPolicy.appWindowMatchesLock(appInPip = false, appWidth = 640, appHeight = 360, lockWidth = 1080, lockHeight = 2400))
         assertFalse(AppLockPolicy.appWindowMatchesLock(appInPip = false, appWidth = 1080, appHeight = 2400, lockWidth = 0, lockHeight = 0))
     }
+
+    @Test fun splitScreenTopHalfLockWindowBelowTheStatusBarGetsNoPadding() {
+        // QA: app window [0,0]–[1080,1187], lock window [0,136]–[1080,1187], status bar 136 px,
+        // navigation bar 63 px at the bottom of a 2400 px display.
+        // API 30+: display safe area 136 … 2337 mapped onto the lock window.
+        assertEquals(0 to 0, AppLockPolicy.safePadding(windowStart = 136, windowSize = 1051, safeStart = 136, safeEnd = 2337))
+        // API 26–29: app window's safe area 136 … 1187 (no bar at the divider).
+        assertTrue(AppLockPolicy.appWindowMatchesLock(appInPip = false, appWidth = 1080, appHeight = 1187, lockWidth = 1080, lockHeight = 1051))
+        assertEquals(0 to 0, AppLockPolicy.safePadding(windowStart = 136, windowSize = 1051, safeStart = 136, safeEnd = 1187))
+        // Horizontally nothing to pad.
+        assertEquals(0 to 0, AppLockPolicy.safePadding(windowStart = 0, windowSize = 1080, safeStart = 0, safeEnd = 1080))
+    }
+
+    @Test fun splitScreenBottomHalfPadsOnlyTheNavigationBar() {
+        // Lock window [0,1213]–[1080,2400] over the 63 px navigation bar.
+        assertEquals(0 to 63, AppLockPolicy.safePadding(windowStart = 1213, windowSize = 1187, safeStart = 136, safeEnd = 2337))
+    }
 }

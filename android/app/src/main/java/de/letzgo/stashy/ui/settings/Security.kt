@@ -66,7 +66,6 @@ import androidx.compose.ui.window.DialogWindowProvider
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
-import androidx.compose.foundation.layout.union
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.IntOffset
@@ -311,8 +310,10 @@ fun PasscodeEntryView(appSafeArea: WindowInsets? = null) {
 
     PasscodePad(
         Modifier.fillMaxSize().background(p.background).clickable(MutableInteractionSource(), null) {}
-            // Per side the larger of this window's own insets and the app window's safe area.
-            .windowInsetsPadding(appSafeArea?.let { WindowInsets.safeDrawing.union(it) } ?: WindowInsets.safeDrawing)
+            // The mapped safe area alone when known: this window's own insets are not reliable
+            // (split screen, top half: the lock window starts below the status bar, yet reported
+            // the status bar as its top inset, and the union pushed the 0 row past the divider).
+            .windowInsetsPadding(appSafeArea ?: WindowInsets.safeDrawing)
             .padding(horizontal = 16.dp),
         header = { header() },
         keypad = { spec, modifier -> keypad(spec, modifier) },
