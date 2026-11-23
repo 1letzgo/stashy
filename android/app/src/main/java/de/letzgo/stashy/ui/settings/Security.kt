@@ -62,7 +62,11 @@ import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.compose.ui.window.DialogWindowProvider
+import androidx.core.view.ViewCompat
 import androidx.core.view.WindowCompat
+import androidx.core.view.WindowInsetsCompat
+import androidx.compose.foundation.layout.union
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.IntOffset
@@ -133,6 +137,8 @@ private fun LockScreenWindow(lockState: MutableTransitionState<Boolean>) {
         SideEffect {
             (dialogView.parent as? DialogWindowProvider)?.window?.let { w ->
                 w.setLayout(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT)
+                // Behind the bars like the app window, never shifted below the status bar.
+                WindowCompat.setDecorFitsSystemWindows(w, false)
                 w.setDimAmount(0f)
                 w.clearFlags(WindowManager.LayoutParams.FLAG_DIM_BEHIND)
                 // No window animation on leaving (the fade-out above runs instead). The cover in the
@@ -153,12 +159,41 @@ private fun LockScreenWindow(lockState: MutableTransitionState<Boolean>) {
                 }
             }
         }
-        AnimatedVisibility(
-            visibleState = lockState,
-            enter = EnterTransition.None,
-            exit = slideOutVertically { it / 12 } + fadeOut(),
-        ) { PasscodeEntryView() }
+        // The app window's safe area, mapped onto this window (see [lockSafePadding]).
+        var safePx by remember { mutableStateOf<SafePx?>(null) }
+        val appSafeArea = safePx?.let { WindowInsets(it.left, it.top, it.right, it.bottom) }
+        Box(Modifier.fillMaxSize().onGloballyPositioned {
+            // Compared as plain pixels, so a layout pass with unchanged insets writes nothing.
+            val px = activity?.let { lockSafePadding(it, dialogView) }
+            if (px != safePx) safePx = px
+        }) {
+            AnimatedVisibility(
+                visibleState = lockState,
+                enter = EnterTransition.None,
+                exit = slideOutVertically { it / 12 } + fadeOut(),
+            ) { PasscodeEntryView(appSafeArea) }
+        }
     }
+}
+
+private data class SafePx(val left: Int, val top: Int, val right: Int, val bottom: Int)
+
+/**
+ * Bars, gesture area and cutout as padding for the lock window, taken from the app window (which
+ * gets them right) and its position on screen relative to the lock window. In a Compose Dialog
+ * window with `decorFitsSystemWindows = false` the bottom inset arrived as nothing in portrait and
+ * the 0 / delete row lay half under the gesture bar. Null until both windows are laid out.
+ */
+private fun lockSafePadding(activity: android.app.Activity, lockView: android.view.View): SafePx? {
+    val decor = activity.window?.decorView ?: return null
+    if (!decor.isAttachedToWindow || lockView.height == 0) return null
+    val insets = ViewCompat.getRootWindowInsets(decor)
+        ?.getInsets(WindowInsetsCompat.Type.systemBars() or WindowInsetsCompat.Type.displayCutout()) ?: return null
+    val app = IntArray(2).also(decor::getLocationOnScreen)
+    val lock = IntArray(2).also(lockView::getLocationOnScreen)
+    val (left, right) = de.letzgo.stashy.data.AppLockPolicy.safePadding(lock[0], lockView.width, app[0] + insets.left, app[0] + decor.width - insets.right)
+    val (top, bottom) = de.letzgo.stashy.data.AppLockPolicy.safePadding(lock[1], lockView.height, app[1] + insets.top, app[1] + decor.height - insets.bottom)
+    return SafePx(left, top, right, bottom)
 }
 
 /** A Compose `Dialog`'s context is a wrapper around the activity. */
@@ -170,7 +205,7 @@ private tailrec fun Context.findFragmentActivity(): FragmentActivity? = when (th
 
 /** iOS: `PasscodeEntryView` — lock screen with 4 dots, keypad, biometrics and lockout. */
 @Composable
-fun PasscodeEntryView() {
+fun PasscodeEntryView(appSafeArea: WindowInsets? = null) {
     val p = Theme.palette
     val activity = LocalContext.current.findFragmentActivity()
     var passcode by remember { mutableStateOf("") }
@@ -246,7 +281,9 @@ fun PasscodeEntryView() {
 
     PasscodePad(
         Modifier.fillMaxSize().background(p.background).clickable(MutableInteractionSource(), null) {}
-            .windowInsetsPadding(WindowInsets.safeDrawing).padding(horizontal = 16.dp),
+            // Per side the larger of this window's own insets and the app window's safe area.
+            .windowInsetsPadding(appSafeArea?.let { WindowInsets.safeDrawing.union(it) } ?: WindowInsets.safeDrawing)
+            .padding(horizontal = 16.dp),
         header = { header() },
         keypad = { spec, modifier -> keypad(spec, modifier) },
     )

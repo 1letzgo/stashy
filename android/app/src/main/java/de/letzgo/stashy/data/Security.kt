@@ -132,6 +132,15 @@ object AppLockPolicy {
      * Without a PIN or with auto-lock off nothing changes.
      */
     fun securesWindows(passcodeSet: Boolean, autoLockOnBackground: Boolean): Boolean = passcodeSet && autoLockOnBackground
+
+    /**
+     * Padding (start, end) along one axis that keeps the lock window's content inside the app's
+     * safe area. The lock window's own insets/frame are not reliable (portrait: the 0 row sat
+     * under the gesture bar), so the safe area comes from the app window, in screen pixels:
+     * [safeStart] … [safeEnd]; the lock window covers [windowStart] … windowStart + [windowSize].
+     */
+    fun safePadding(windowStart: Int, windowSize: Int, safeStart: Int, safeEnd: Int): Pair<Int, Int> =
+        maxOf(0, safeStart - windowStart) to maxOf(0, windowStart + windowSize - safeEnd)
 }
 
 /**

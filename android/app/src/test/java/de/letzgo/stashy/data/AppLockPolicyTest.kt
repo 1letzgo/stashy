@@ -1,5 +1,6 @@
 package de.letzgo.stashy.data
 
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -41,5 +42,19 @@ class AppLockPolicyTest {
         assertFalse(AppLockPolicy.securesWindows(passcodeSet = true, autoLockOnBackground = false))
         assertFalse(AppLockPolicy.securesWindows(passcodeSet = false, autoLockOnBackground = true))
         assertFalse(AppLockPolicy.securesWindows(passcodeSet = false, autoLockOnBackground = false))
+    }
+
+    @Test fun safePaddingKeepsTheLockAboveTheGestureBar() {
+        // 2400 px screen, status bar 128 px, gesture bar 63 px; lock window over the whole screen.
+        assertEquals(128 to 63, AppLockPolicy.safePadding(windowStart = 0, windowSize = 2400, safeStart = 128, safeEnd = 2400 - 63))
+    }
+
+    @Test fun safePaddingFollowsAShiftedLockWindow() {
+        // Lock window placed below the status bar but still 2400 px tall: no top padding, the overhang at the bottom is added.
+        assertEquals(0 to 128 + 63, AppLockPolicy.safePadding(windowStart = 128, windowSize = 2400, safeStart = 128, safeEnd = 2337))
+    }
+
+    @Test fun safePaddingIsNeverNegative() {
+        assertEquals(0 to 0, AppLockPolicy.safePadding(windowStart = 200, windowSize = 1000, safeStart = 100, safeEnd = 2000))
     }
 }
