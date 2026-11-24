@@ -76,6 +76,16 @@ private val PLAY_PAUSE_WIDTH = 28.dp
 private val PLAY_PAUSE_TUCK = 4.dp
 
 /** iOS: `AetherTimeBar.markerLabelWindow` — the scrub preview names a marker up to 60 s after its start. */
+/**
+ * Left edge of a marker dot on a track [trackWidth] wide, kept inside the track; null when the
+ * track is narrower than one dot. A PiP-sized or closing window measures the bar at 0 width, and
+ * `coerceIn(0, trackWidth - dot)` threw there ("Cannot coerce value to an empty range").
+ */
+internal fun markerDotX(trackWidth: Float, fraction: Float, dot: Float): Float? {
+    if (trackWidth < dot || dot <= 0f) return null
+    return (trackWidth * fraction.coerceIn(0f, 1f) - dot / 2).coerceIn(0f, trackWidth - dot)
+}
+
 internal fun markerAt(markers: List<TimeBarMarker>, time: Double): TimeBarMarker? {
     val last = markers.sortedBy { it.seconds }.lastOrNull { it.seconds <= time } ?: return null
     return if (time - last.seconds <= 60) last else null
@@ -161,7 +171,7 @@ fun TimeBar(
                             val trackW = maxWidth
                             val dot = if (isCompact) 6.dp else 8.dp
                             markers.filter { it.seconds in 0.0..dur }.forEach { m ->
-                                val x = (trackW * (m.seconds / dur).toFloat() - dot / 2).coerceIn(0.dp, trackW - dot)
+                                val x = markerDotX(trackW.value, (m.seconds / dur).toFloat(), dot.value)?.dp ?: return@forEach
                                 Box(
                                     Modifier.offset(x = x).size(dot).shadow(1.dp, CircleShape).clip(CircleShape)
                                         .background(Color.White).border(1.dp, tint, CircleShape),

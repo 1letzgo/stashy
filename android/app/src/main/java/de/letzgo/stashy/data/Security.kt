@@ -110,6 +110,90 @@ class PasscodeVault(private val store: SecurityStore, private val now: () -> Dou
     }
 }
 
+/** Pure lock decisions of [SecurityManager] and the lock window (unit-tested). */
+object AppLockPolicy {
+    /**
+     * iOS `lockIfAutoLockOnBackground`: the app left the foreground. A configuration change
+     * (rotation, dark mode) is no leaving; a running picture-in-picture window keeps it unlocked.
+     */
+    fun locksOnBackground(passcodeSet: Boolean, autoLockOnBackground: Boolean, pipActive: Boolean, changingConfigurations: Boolean): Boolean =
+        passcodeSet && autoLockOnBackground && !pipActive && !changingConfigurations
+
+    /**
+     * The lock window is there at once when the lock goes up (no slide-in that would show the
+     * library first) and stays after unlocking until its fade-out has run.
+     */
+    fun showsLockWindow(visibleNow: Boolean, locked: Boolean): Boolean = visibleNow || locked
+
+    /**
+     * FLAG_SECURE on the app's windows: whenever the app locks on leaving, Recents (every API
+     * level) and screenshots show nothing of the library. Dialogs and sheets inherit the flag
+     * (Compose `SecureFlagPolicy.Inherit`), so an open sheet can't show in Recents either.
+     * Without a PIN or with auto-lock off nothing changes.
+     */
+    fun securesWindows(passcodeSet: Boolean, autoLockOnBackground: Boolean): Boolean = passcodeSet && autoLockOnBackground
+
+    /**
+     * Padding (in px) that keeps the lock window's content inside what is really visible of it:
+     * the lock window's rectangle on screen intersected with each of [visibleAreas] (its visible
+     * display frame, the activity's window bounds, the display's safe area — all on-screen).
+     * Insets alone were wrong in split screen (top half: 0 / delete under the divider, taps lost)
+     * and after PiP (the stale PiP rectangle), so no single source is trusted: a source that
+     * would leave less than [minWidth] × [minHeight] (a stale PiP rectangle) is skipped.
+     */
+    fun lockPadding(lock: PxRect, visibleAreas: List<PxRect>, minWidth: Int, minHeight: Int): PxInsets {
+        var visible = lock
+        for (area in visibleAreas) {
+            val next = visible.intersect(area)
+            if (next.width >= minWidth && next.height >= minHeight) visible = next
+        }
+        return PxInsets(visible.left - lock.left, visible.top - lock.top, lock.right - visible.right, lock.bottom - visible.bottom)
+    }
+}
+
+/** A rectangle in screen pixels. */
+data class PxRect(val left: Int, val top: Int, val right: Int, val bottom: Int) {
+    val width: Int get() = right - left
+    val height: Int get() = bottom - top
+    fun intersect(o: PxRect) = PxRect(maxOf(left, o.left), maxOf(top, o.top), minOf(right, o.right), minOf(bottom, o.bottom))
+    override fun toString() = "[$left,$top][$right,$bottom]"
+}
+
+/** Padding per side in pixels. */
+data class PxInsets(val left: Int, val top: Int, val right: Int, val bottom: Int)
+
+/**
+ * Size of the passcode screen, from the room its window has (insets already taken off), in dp.
+ * Portrait: header above the keypad, 70 dp keys as on iOS. Wider than high (landscape phone,
+ * split screen): header beside the keypad. Keys shrink until all four rows fit. The screen can
+ * always scroll as a safety net; below [MIN_KEY] it has to.
+ */
+object PasscodeLayout {
+    const val MAX_KEY = 70f
+    const val MIN_KEY = 36f
+    /** Icon, title, a message line and the dots, without the space above. */
+    const val HEADER = 150f
+    /** Header ↔ keypad and keypad ↔ bottom edge in portrait. */
+    const val PORTRAIT_GAPS = 54f
+    const val PORTRAIT_MAX_WIDTH = 320f
+    /** A keypad row is three keys and two gaps of 0.3 key each. */
+    const val WIDTH_PER_KEY = 3.6f
+
+    data class Spec(val sideBySide: Boolean, val keySize: Float, val rowGap: Float, val topSpace: Float, val scrolls: Boolean) {
+        val keypadHeight: Float get() = 4 * keySize + 3 * rowGap
+    }
+
+    fun spec(width: Float, height: Float): Spec {
+        val side = width > height
+        val topSpace = if (side) 0f else if (height >= 640f) 80f else 24f
+        val widthBudget = if (side) width / 2 - 16f else minOf(width, PORTRAIT_MAX_WIDTH)
+        val heightBudget = if (side) height - 32f else height - topSpace - HEADER - PORTRAIT_GAPS
+        val rowGap = if (heightBudget >= 4 * MAX_KEY + 3 * 12f) 12f else 8f
+        val key = minOf(MAX_KEY, widthBudget / WIDTH_PER_KEY, (heightBudget - 3 * rowGap) / 4)
+        return Spec(side, maxOf(key, MIN_KEY), rowGap, topSpace, scrolls = key < MIN_KEY)
+    }
+}
+
 /** [SecurityStore] on [Prefs] (UserDefaults keys) and [Secrets] (PIN hash). */
 private object PrefsSecurityStore : SecurityStore {
     override fun secret(key: String) = Secrets.get(key)
@@ -211,8 +295,8 @@ object SecurityManager {
     }
 
     /** iOS `sceneDidEnterBackground`: auto-lock unless picture-in-picture is playing. */
-    fun onAppBackgrounded() {
-        if (autoLockOnBackground && !isPiPActive) lock()
+    fun onAppBackgrounded(changingConfigurations: Boolean = false) {
+        if (AppLockPolicy.locksOnBackground(isPasscodeSet, autoLockOnBackground, isPiPActive, changingConfigurations)) lock()
     }
 
     /** True when the device has enrolled biometrics (Face / fingerprint). */

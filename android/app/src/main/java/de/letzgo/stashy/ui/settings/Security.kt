@@ -3,34 +3,55 @@ package de.letzgo.stashy.ui.settings
 import de.letzgo.stashy.R
 import de.letzgo.stashy.tr
 import androidx.activity.compose.BackHandler
+import android.content.Context
+import android.content.ContextWrapper
+import android.os.Build
+import android.view.ViewGroup
+import android.view.WindowManager
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.core.MutableTransitionState
 import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
-import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.WindowInsetsSides
+import androidx.compose.foundation.layout.only
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.safeDrawing
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.sp
+import de.letzgo.stashy.data.AppLockPolicy
+import de.letzgo.stashy.data.PasscodeLayout
+import de.letzgo.stashy.data.PxInsets
+import de.letzgo.stashy.data.PxRect
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -41,6 +62,13 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
+import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
+import androidx.compose.ui.window.DialogWindowProvider
+import androidx.core.view.ViewCompat
+import androidx.core.view.WindowCompat
+import androidx.core.view.WindowInsetsCompat
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.IntOffset
@@ -63,33 +91,172 @@ import kotlinx.coroutines.delay
 import kotlin.math.roundToInt
 
 /**
- * Wraps the app shell: shows [PasscodeEntryView] over it while [SecurityManager.isAppLocked]
- * (iOS `MainTabView` ZStack overlay, slide-up + fade), and reloads the per-server configs when
- * the active server changes (iOS `ServerConfigChanged` → `TabManager.loadAllConfigs`).
+ * Wraps the app shell: puts [PasscodeEntryView] over it while [SecurityManager.isAppLocked]
+ * (iOS `LockScreenWindow`), and reloads the per-server configs when the active server changes
+ * (iOS `ServerConfigChanged` → `TabManager.loadAllConfigs`).
+ *
+ * The passcode screen lives in a window of its own, like iOS. As an overlay inside the app
+ * window it lost to every Compose `Dialog` / `ModalBottomSheet`, which are windows above the
+ * app's: the fullscreen player, the image viewer or an open sheet stayed on screen, usable, over
+ * the lock after Home and back — the app looked as if it had not locked at all. The lock window
+ * is added when the lock goes up, so it lies above every window that was open then.
+ *
+ * It appears without an animation: recomposition is paused while the activity is stopped, so the
+ * lock is first drawn on the way back, and a slide-in showed the library until it had arrived.
+ * An opaque cover in the app window is drawn in that same first frame, before the lock window
+ * has its first frame. Unlocking still fades the lock away.
  */
 @Composable
 fun AppLockGate(content: @Composable () -> Unit) {
     LaunchedEffect(ServerConfigManager.activeConfig?.id) { TabManager.ensureLoaded() }
+    val locked = SecurityManager.isAppLocked
+    val lockState = remember { MutableTransitionState(locked) }
+    lockState.targetState = locked
     Box(Modifier.fillMaxSize()) {
         content()
-        AnimatedVisibility(
-            SecurityManager.isAppLocked,
-            enter = slideInVertically { it } + fadeIn(), exit = slideOutVertically { it } + fadeOut(),
-        ) { PasscodeEntryView() }
+        if (locked) {
+            Box(
+                Modifier.fillMaxSize().background(Theme.palette.background)
+                    .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) {},
+            )
+        }
+        if (de.letzgo.stashy.data.AppLockPolicy.showsLockWindow(lockState.currentState, lockState.targetState)) LockScreenWindow(lockState)
     }
+}
+
+@Composable
+private fun LockScreenWindow(lockState: MutableTransitionState<Boolean>) {
+    val activity = LocalContext.current.findFragmentActivity()
+    Dialog(
+        onDismissRequest = { activity?.moveTaskToBack(true) },
+        properties = DialogProperties(
+            dismissOnClickOutside = false,
+            usePlatformDefaultWidth = false,
+            decorFitsSystemWindows = false,
+        ),
+    ) {
+        val dialogView = LocalView.current
+        SideEffect {
+            (dialogView.parent as? DialogWindowProvider)?.window?.let { w ->
+                w.setLayout(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT)
+                // Behind the bars like the app window, never shifted below the status bar.
+                WindowCompat.setDecorFitsSystemWindows(w, false)
+                w.setDimAmount(0f)
+                w.clearFlags(WindowManager.LayoutParams.FLAG_DIM_BEHIND)
+                // No window animation on leaving (the fade-out above runs instead). The cover in the
+                // app window already hides the library while this window comes up.
+                w.setWindowAnimations(0)
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                    w.attributes = w.attributes.apply {
+                        layoutInDisplayCutoutMode = WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES
+                    }
+                }
+                // A window of its own does not inherit the app's bar icons (iOS: color scheme).
+                activity?.window?.let { app ->
+                    val from = WindowCompat.getInsetsController(app, app.decorView)
+                    WindowCompat.getInsetsController(w, w.decorView).apply {
+                        isAppearanceLightStatusBars = from.isAppearanceLightStatusBars
+                        isAppearanceLightNavigationBars = from.isAppearanceLightNavigationBars
+                    }
+                }
+            }
+        }
+        // What is really visible of this window (see [lockSafePadding]). Recomputed on every
+        // layout of either window: after closing PiP the app window first still has the PiP
+        // rectangle and only later its full size, while this window stays the same.
+        var safePx by remember { mutableStateOf<PxInsets?>(null) }
+        val appSafeArea = safePx?.let { WindowInsets(it.left, it.top, it.right, it.bottom) }
+        DisposableEffect(activity, dialogView) {
+            val update = {
+                val px = activity?.let { lockSafePadding(it, dialogView) }
+                if (px != safePx) safePx = px
+            }
+            val appDecor = activity?.window?.decorView
+            val listener = android.view.ViewTreeObserver.OnGlobalLayoutListener { update() }
+            dialogView.viewTreeObserver.addOnGlobalLayoutListener(listener)
+            appDecor?.viewTreeObserver?.addOnGlobalLayoutListener(listener)
+            update()
+            onDispose {
+                dialogView.viewTreeObserver.takeIf { it.isAlive }?.removeOnGlobalLayoutListener(listener)
+                appDecor?.viewTreeObserver?.takeIf { it.isAlive }?.removeOnGlobalLayoutListener(listener)
+            }
+        }
+        Box(Modifier.fillMaxSize()) {
+            AnimatedVisibility(
+                visibleState = lockState,
+                enter = EnterTransition.None,
+                exit = slideOutVertically { it / 12 } + fadeOut(),
+            ) { PasscodeEntryView(appSafeArea) }
+        }
+    }
+}
+
+/**
+ * Padding for the lock window, in its own pixels, from what is really visible of it on screen
+ * ([AppLockPolicy.lockPadding]): its rectangle intersected with its visible display frame (bars
+ * and, in split screen, the divider excluded), the activity's current window bounds (not in PiP)
+ * and, outside multi-window on API 30+, the display's safe area (system bars + cutout, ignoring
+ * visibility). Insets alone failed twice: in split screen's top half the keys ran under the
+ * divider, and after PiP the stale PiP rectangle squeezed them. A source that would leave less
+ * than 200 × 200 dp is skipped; the content can scroll anyway. Logs one [LockLayout] line.
+ */
+private fun lockSafePadding(activity: android.app.Activity, lockView: android.view.View): PxInsets? {
+    if (lockView.width == 0 || lockView.height == 0 || !lockView.isAttachedToWindow) return null
+    val at = IntArray(2).also(lockView::getLocationOnScreen)
+    val lock = PxRect(at[0], at[1], at[0] + lockView.width, at[1] + lockView.height)
+    val frame = android.graphics.Rect().also(lockView.rootView::getWindowVisibleDisplayFrame)
+        .let { PxRect(it.left, it.top, it.right, it.bottom) }
+    val inPip = activity.isInPictureInPictureMode
+    val multiWindow = activity.isInMultiWindowMode
+    val app: PxRect? = if (inPip) null else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+        activity.windowManager.currentWindowMetrics.bounds.let { PxRect(it.left, it.top, it.right, it.bottom) }
+    } else {
+        activity.window?.decorView?.takeIf { it.isAttachedToWindow }?.let { decor ->
+            val p = IntArray(2).also(decor::getLocationOnScreen)
+            PxRect(p[0], p[1], p[0] + decor.width, p[1] + decor.height)
+        }
+    }
+    val displaySafe: PxRect? = if (!multiWindow && Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+        val metrics = activity.windowManager.maximumWindowMetrics
+        val ins = metrics.windowInsets.getInsetsIgnoringVisibility(
+            android.view.WindowInsets.Type.systemBars() or android.view.WindowInsets.Type.displayCutout(),
+        )
+        val b = metrics.bounds
+        PxRect(b.left + ins.left, b.top + ins.top, b.right - ins.right, b.bottom - ins.bottom)
+    } else null
+    val min = (200 * lockView.resources.displayMetrics.density).toInt()
+    val padding = AppLockPolicy.lockPadding(lock, listOfNotNull(frame, app, displaySafe), min, min)
+    if (de.letzgo.stashy.BuildConfig.DEBUG) {
+        val root = ViewCompat.getRootWindowInsets(lockView)
+        android.util.Log.d(
+            "StashyLockLayout",
+            "[LockLayout] app=$app lock=$lock frame=$frame displaySafe=$displaySafe " +
+                "lockInsets(systemBars=${root?.getInsets(WindowInsetsCompat.Type.systemBars())}, " +
+                "cutout=${root?.getInsets(WindowInsetsCompat.Type.displayCutout())}) " +
+                "multiWindow=$multiWindow pip=$inPip padding=$padding",
+        )
+    }
+    return padding
+}
+
+/** A Compose `Dialog`'s context is a wrapper around the activity. */
+private tailrec fun Context.findFragmentActivity(): FragmentActivity? = when (this) {
+    is FragmentActivity -> this
+    is ContextWrapper -> baseContext.findFragmentActivity()
+    else -> null
 }
 
 /** iOS: `PasscodeEntryView` — lock screen with 4 dots, keypad, biometrics and lockout. */
 @Composable
-fun PasscodeEntryView() {
+fun PasscodeEntryView(appSafeArea: WindowInsets? = null) {
     val p = Theme.palette
-    val context = LocalContext.current
+    val activity = LocalContext.current.findFragmentActivity()
     var passcode by remember { mutableStateOf("") }
     var error by remember { mutableStateOf<String?>(null) }
     var shake by remember { mutableIntStateOf(0) }
     var authenticating by remember { mutableStateOf(false) }
     val lockedOut = SecurityManager.lockoutRemainingSeconds > 0
-    BackHandler { (context as? android.app.Activity)?.moveTaskToBack(true) }
+    BackHandler { activity?.moveTaskToBack(true) }
 
     val lifecycle = LocalLifecycleOwner.current.lifecycle
 
@@ -97,7 +264,7 @@ fun PasscodeEntryView() {
     // is in the background never shows and never calls back — `authenticating` then stayed
     // true and every later return got the passcode keypad instead of biometrics.
     fun promptBiometrics() {
-        val activity = context as? FragmentActivity ?: return
+        val activity = activity ?: return
         if (!lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED)) return
         if (!SecurityManager.isBiometricsEnabled || lockedOut || authenticating || !SecurityManager.isAppLocked) return
         authenticating = true
@@ -135,28 +302,87 @@ fun PasscodeEntryView() {
         }
     }
 
-    Column(
-        Modifier.fillMaxSize().background(p.background).clickable(MutableInteractionSource(), null) {}
-            .statusBarsPadding().navigationBarsPadding().padding(horizontal = 16.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-    ) {
-        Spacer(Modifier.height(80.dp))
+    val message = if (lockedOut) tr(R.string.hint_too_many_attempts_try_again, SecurityManager.lockoutRemainingSeconds) else error
+    @Composable fun header() = Column(horizontalAlignment = Alignment.CenterHorizontally) {
         Icon(SFS.lockFill, null, tint = Appearance.tint, modifier = Modifier.size(40.dp))
         Spacer(Modifier.height(12.dp))
-        Text(tr(R.string.enter_passcode), style = NativeType.headlineSmall, color = p.text)
-        val message = if (lockedOut) tr(R.string.hint_too_many_attempts_try_again, SecurityManager.lockoutRemainingSeconds) else error
+        Text(tr(R.string.enter_passcode), style = NativeType.headlineSmall, color = p.text, textAlign = TextAlign.Center)
         if (message != null) Text(message, style = NativeType.bodySmall, color = Color(0xFFFF453A), textAlign = TextAlign.Center, modifier = Modifier.padding(top = 12.dp))
         PasscodeDots(passcode.length, shake, Modifier.padding(top = 20.dp))
-        Spacer(Modifier.weight(1f))
-        Keypad(
-            enabled = !lockedOut,
-            onDigit = { if (passcode.length < 4) passcode += it },
-            onDelete = { passcode = passcode.dropLast(1) },
-            leftKey = if (SecurityManager.isBiometricsEnabled && !lockedOut) {
-                { Icon(SFS.touchid, tr(R.string.biometrics), tint = p.text, modifier = Modifier.size(30.dp).clickable { promptBiometrics() }) }
-            } else null,
-            modifier = Modifier.padding(bottom = 30.dp),
-        )
+    }
+    @Composable fun keypad(spec: PasscodeLayout.Spec, modifier: Modifier) = Keypad(
+        keySize = spec.keySize.dp,
+        rowGap = spec.rowGap.dp,
+        enabled = !lockedOut,
+        onDigit = { if (passcode.length < 4) passcode += it },
+        onDelete = { passcode = passcode.dropLast(1) },
+        leftKey = if (SecurityManager.isBiometricsEnabled && !lockedOut) {
+            { Icon(SFS.touchid, tr(R.string.biometrics), tint = p.text, modifier = Modifier.size(30.dp).clickable { promptBiometrics() }) }
+        } else null,
+        modifier = modifier,
+    )
+
+    PasscodePad(
+        Modifier.fillMaxSize().background(p.background).clickable(MutableInteractionSource(), null) {}
+            // The mapped safe area alone when known: this window's own insets are not reliable
+            // (split screen, top half: the lock window starts below the status bar, yet reported
+            // the status bar as its top inset, and the union pushed the 0 row past the divider).
+            .windowInsetsPadding(appSafeArea ?: WindowInsets.safeDrawing)
+            .padding(horizontal = 16.dp),
+        header = { header() },
+        keypad = { spec, modifier -> keypad(spec, modifier) },
+        logsLayout = true,
+    )
+}
+
+/**
+ * Header (title, dots) and keypad, laid out from the room [modifier] leaves after bars and
+ * cutouts ([PasscodeLayout]): a landscape phone has ~360 dp of height, and the portrait column
+ * cut the keypad off below 6. Always scrollable as a safety net. Lock screen and Set Passcode share it.
+ */
+@Composable
+private fun PasscodePad(
+    modifier: Modifier,
+    header: @Composable () -> Unit,
+    keypad: @Composable (PasscodeLayout.Spec, Modifier) -> Unit,
+    logsLayout: Boolean = false,
+) {
+    BoxWithConstraints(modifier) {
+        val spec = PasscodeLayout.spec(maxWidth.value, maxHeight.value)
+        if (logsLayout && de.letzgo.stashy.BuildConfig.DEBUG) {
+            val w = constraints.maxWidth
+            val h = constraints.maxHeight
+            LaunchedEffect(spec, w, h) { android.util.Log.d("StashyLockLayout", "[LockLayout] room=${w}x${h}px spec=$spec") }
+        }
+        // Always scrollable: if a measurement is ever off, 0 / delete can still be reached. With
+        // the room right the content fills exactly one screen and nothing moves.
+        val scroll = Modifier.verticalScroll(rememberScrollState())
+        if (spec.sideBySide) {
+            Row(
+                Modifier.fillMaxSize().then(scroll).heightIn(min = maxHeight),
+                horizontalArrangement = Arrangement.SpaceEvenly,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Box(Modifier.weight(1f), contentAlignment = Alignment.Center) { header() }
+                Box(Modifier.weight(1f).padding(vertical = 16.dp), contentAlignment = Alignment.Center) {
+                    keypad(spec, Modifier.width((spec.keySize * PasscodeLayout.WIDTH_PER_KEY).dp))
+                }
+            }
+        } else {
+            Column(
+                Modifier.fillMaxWidth().then(scroll).heightIn(min = maxHeight),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.SpaceBetween,
+            ) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Spacer(Modifier.height(spec.topSpace.dp))
+                    header()
+                    Spacer(Modifier.height(24.dp))
+                }
+                // 320 dp at most in portrait, as on iOS.
+                keypad(spec, Modifier.widthIn(max = PasscodeLayout.PORTRAIT_MAX_WIDTH.dp).fillMaxWidth().padding(bottom = 30.dp))
+            }
+        }
     }
 }
 
@@ -175,22 +401,23 @@ private fun PasscodeDots(count: Int, shake: Int, modifier: Modifier = Modifier) 
     }
 }
 
-/** iOS keypad: 3×3 digits, then [left] · 0 · delete; 70pt round keys, max 320pt wide. */
+/** iOS keypad: 3×3 digits, then [left] · 0 · delete; round keys of [keySize] (70 dp as on iOS, smaller when the window is low). */
 @Composable
-private fun Keypad(enabled: Boolean, onDigit: (String) -> Unit, onDelete: () -> Unit, leftKey: (@Composable () -> Unit)?, modifier: Modifier = Modifier) {
+private fun Keypad(keySize: Dp, rowGap: Dp, enabled: Boolean, onDigit: (String) -> Unit, onDelete: () -> Unit, leftKey: (@Composable () -> Unit)?, modifier: Modifier = Modifier) {
     val p = Theme.palette
-    @Composable fun key(label: String, modifier: Modifier) = Box(modifier.height(70.dp), contentAlignment = Alignment.Center) {
+    val digitStyle = NativeType.headlineMedium.copy(fontWeight = FontWeight.Medium, fontSize = (keySize.value * 0.4f).sp)
+    @Composable fun key(label: String, modifier: Modifier) = Box(modifier.height(keySize), contentAlignment = Alignment.Center) {
         Box(
-            Modifier.size(70.dp).background(p.secondaryText.copy(alpha = 0.1f), CircleShape).clickable(enabled = enabled) { onDigit(label) },
+            Modifier.size(keySize).background(p.secondaryText.copy(alpha = 0.1f), CircleShape).clickable(enabled = enabled) { onDigit(label) },
             contentAlignment = Alignment.Center,
-        ) { Text(label, style = NativeType.headlineMedium.copy(fontWeight = FontWeight.Medium), color = p.text) }
+        ) { Text(label, style = digitStyle, color = p.text) }
     }
-    Column(modifier.widthIn(max = 320.dp).fillMaxWidth().let { if (enabled) it else it.then(Modifier) }, verticalArrangement = Arrangement.spacedBy(12.dp)) {
+    Column(modifier, verticalArrangement = Arrangement.spacedBy(rowGap)) {
         for (row in 0 until 3) Row(Modifier.fillMaxWidth()) { for (col in 1..3) key("${row * 3 + col}", Modifier.weight(1f)) }
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-            Box(Modifier.weight(1f).height(70.dp), contentAlignment = Alignment.Center) { leftKey?.invoke() }
+            Box(Modifier.weight(1f).height(keySize), contentAlignment = Alignment.Center) { leftKey?.invoke() }
             key("0", Modifier.weight(1f))
-            Box(Modifier.weight(1f).height(70.dp).clickable(enabled = enabled) { onDelete() }, contentAlignment = Alignment.Center) {
+            Box(Modifier.weight(1f).height(keySize).clickable(enabled = enabled) { onDelete() }, contentAlignment = Alignment.Center) {
                 Icon(SFS.deleteLeft, tr(R.string.action_delete), tint = p.text.copy(alpha = if (enabled) 1f else 0.4f), modifier = Modifier.size(28.dp))
             }
         }
@@ -254,19 +481,31 @@ class PasscodeSetupScreen : Screen {
             }
         }
         SettingsDetailScaffold(tr(R.string.passcode)) { top ->
-            Column(Modifier.fillMaxSize().padding(top = top + 16.dp, bottom = 16.dp).navigationBarsPadding(), horizontalAlignment = Alignment.CenterHorizontally) {
-                Text(if (step == 1) tr(R.string.action_set_passcode) else tr(R.string.confirm_passcode), style = NativeType.headlineSmall, color = p.text)
-                error?.let { Text(it, style = NativeType.bodySmall, color = Color(0xFFFF453A), modifier = Modifier.padding(top = 12.dp)) }
-                PasscodeDots(if (step == 1) passcode.length else confirm.length, shake, Modifier.padding(top = 40.dp))
-                Spacer(Modifier.height(40.dp))
-                Keypad(
-                    enabled = true,
-                    onDigit = { d -> if (step == 1) { if (passcode.length < 4) passcode += d } else if (confirm.length < 4) confirm += d },
-                    onDelete = { if (step == 1) passcode = passcode.dropLast(1) else confirm = confirm.dropLast(1) },
-                    leftKey = null,
-                )
-                Spacer(Modifier.weight(1f))
-            }
+            // Same sizing as the lock screen: fixed spacers above a 70 dp keypad cut 0 / delete
+            // off in landscape.
+            PasscodePad(
+                Modifier.fillMaxSize().padding(top = top)
+                    .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal + WindowInsetsSides.Bottom))
+                    .padding(horizontal = 16.dp),
+                header = {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text(if (step == 1) tr(R.string.action_set_passcode) else tr(R.string.confirm_passcode), style = NativeType.headlineSmall, color = p.text, textAlign = TextAlign.Center)
+                        error?.let { Text(it, style = NativeType.bodySmall, color = Color(0xFFFF453A), textAlign = TextAlign.Center, modifier = Modifier.padding(top = 12.dp)) }
+                        PasscodeDots(if (step == 1) passcode.length else confirm.length, shake, Modifier.padding(top = 20.dp))
+                    }
+                },
+                keypad = { spec, modifier ->
+                    Keypad(
+                        keySize = spec.keySize.dp,
+                        rowGap = spec.rowGap.dp,
+                        enabled = true,
+                        onDigit = { d -> if (step == 1) { if (passcode.length < 4) passcode += d } else if (confirm.length < 4) confirm += d },
+                        onDelete = { if (step == 1) passcode = passcode.dropLast(1) else confirm = confirm.dropLast(1) },
+                        leftKey = null,
+                        modifier = modifier,
+                    )
+                },
+            )
         }
     }
 }
