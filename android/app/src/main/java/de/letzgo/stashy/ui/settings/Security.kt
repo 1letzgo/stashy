@@ -31,7 +31,10 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.sp
+import de.letzgo.stashy.data.AppLockPolicy
 import de.letzgo.stashy.data.PasscodeLayout
+import de.letzgo.stashy.data.PxInsets
+import de.letzgo.stashy.data.PxRect
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -158,10 +161,10 @@ private fun LockScreenWindow(lockState: MutableTransitionState<Boolean>) {
                 }
             }
         }
-        // The safe area (bars, cutout) mapped onto this window (see [lockSafePadding]). Recomputed
-        // on every layout of either window: after closing PiP the app window first still has the
-        // PiP rectangle and only later its full size, while this window stays the same.
-        var safePx by remember { mutableStateOf<SafePx?>(null) }
+        // What is really visible of this window (see [lockSafePadding]). Recomputed on every
+        // layout of either window: after closing PiP the app window first still has the PiP
+        // rectangle and only later its full size, while this window stays the same.
+        var safePx by remember { mutableStateOf<PxInsets?>(null) }
         val appSafeArea = safePx?.let { WindowInsets(it.left, it.top, it.right, it.bottom) }
         DisposableEffect(activity, dialogView) {
             val update = {
@@ -188,41 +191,52 @@ private fun LockScreenWindow(lockState: MutableTransitionState<Boolean>) {
     }
 }
 
-private data class SafePx(val left: Int, val top: Int, val right: Int, val bottom: Int)
-
 /**
- * Bars, gesture area and cutout as padding for the lock window, in its own pixels. In a Compose
- * Dialog window with `decorFitsSystemWindows = false` the bottom inset did not arrive in portrait
- * (0 / delete half under the gesture bar), so the safe area comes from outside the lock window:
- * API 30+: the display's own bounds and insets (`maximumWindowMetrics`), independent of where
- * the app window is — after closing PiP it still had the PiP rectangle, and mapping that put the
- * keypad inside it. Older: the app window's insets, only while it covers about the lock window
- * ([AppLockPolicy.appWindowMatchesLock]). Null = the lock window's own insets only.
+ * Padding for the lock window, in its own pixels, from what is really visible of it on screen
+ * ([AppLockPolicy.lockPadding]): its rectangle intersected with its visible display frame (bars
+ * and, in split screen, the divider excluded), the activity's current window bounds (not in PiP)
+ * and, outside multi-window on API 30+, the display's safe area (system bars + cutout, ignoring
+ * visibility). Insets alone failed twice: in split screen's top half the keys ran under the
+ * divider, and after PiP the stale PiP rectangle squeezed them. A source that would leave less
+ * than 200 × 200 dp is skipped; the content can scroll anyway. Logs one [LockLayout] line.
  */
-private fun lockSafePadding(activity: android.app.Activity, lockView: android.view.View): SafePx? {
+private fun lockSafePadding(activity: android.app.Activity, lockView: android.view.View): PxInsets? {
     if (lockView.width == 0 || lockView.height == 0 || !lockView.isAttachedToWindow) return null
-    val lock = IntArray(2).also(lockView::getLocationOnScreen)
-    val safe: android.graphics.Rect = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+    val at = IntArray(2).also(lockView::getLocationOnScreen)
+    val lock = PxRect(at[0], at[1], at[0] + lockView.width, at[1] + lockView.height)
+    val frame = android.graphics.Rect().also(lockView.rootView::getWindowVisibleDisplayFrame)
+        .let { PxRect(it.left, it.top, it.right, it.bottom) }
+    val inPip = activity.isInPictureInPictureMode
+    val multiWindow = activity.isInMultiWindowMode
+    val app: PxRect? = if (inPip) null else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+        activity.windowManager.currentWindowMetrics.bounds.let { PxRect(it.left, it.top, it.right, it.bottom) }
+    } else {
+        activity.window?.decorView?.takeIf { it.isAttachedToWindow }?.let { decor ->
+            val p = IntArray(2).also(decor::getLocationOnScreen)
+            PxRect(p[0], p[1], p[0] + decor.width, p[1] + decor.height)
+        }
+    }
+    val displaySafe: PxRect? = if (!multiWindow && Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
         val metrics = activity.windowManager.maximumWindowMetrics
         val ins = metrics.windowInsets.getInsetsIgnoringVisibility(
             android.view.WindowInsets.Type.systemBars() or android.view.WindowInsets.Type.displayCutout(),
         )
         val b = metrics.bounds
-        android.graphics.Rect(b.left + ins.left, b.top + ins.top, b.right - ins.right, b.bottom - ins.bottom)
-    } else {
-        val decor = activity.window?.decorView ?: return null
-        if (!decor.isAttachedToWindow) return null
-        if (!de.letzgo.stashy.data.AppLockPolicy.appWindowMatchesLock(
-                activity.isInPictureInPictureMode, decor.width, decor.height, lockView.width, lockView.height,
-            )) return null
-        val ins = ViewCompat.getRootWindowInsets(decor)
-            ?.getInsets(WindowInsetsCompat.Type.systemBars() or WindowInsetsCompat.Type.displayCutout()) ?: return null
-        val app = IntArray(2).also(decor::getLocationOnScreen)
-        android.graphics.Rect(app[0] + ins.left, app[1] + ins.top, app[0] + decor.width - ins.right, app[1] + decor.height - ins.bottom)
+        PxRect(b.left + ins.left, b.top + ins.top, b.right - ins.right, b.bottom - ins.bottom)
+    } else null
+    val min = (200 * lockView.resources.displayMetrics.density).toInt()
+    val padding = AppLockPolicy.lockPadding(lock, listOfNotNull(frame, app, displaySafe), min, min)
+    if (de.letzgo.stashy.BuildConfig.DEBUG) {
+        val root = ViewCompat.getRootWindowInsets(lockView)
+        android.util.Log.d(
+            "StashyLockLayout",
+            "[LockLayout] app=$app lock=$lock frame=$frame displaySafe=$displaySafe " +
+                "lockInsets(systemBars=${root?.getInsets(WindowInsetsCompat.Type.systemBars())}, " +
+                "cutout=${root?.getInsets(WindowInsetsCompat.Type.displayCutout())}) " +
+                "multiWindow=$multiWindow pip=$inPip padding=$padding",
+        )
     }
-    val (left, right) = de.letzgo.stashy.data.AppLockPolicy.safePadding(lock[0], lockView.width, safe.left, safe.right)
-    val (top, bottom) = de.letzgo.stashy.data.AppLockPolicy.safePadding(lock[1], lockView.height, safe.top, safe.bottom)
-    return SafePx(left, top, right, bottom)
+    return padding
 }
 
 /** A Compose `Dialog`'s context is a wrapper around the activity. */
@@ -317,23 +331,32 @@ fun PasscodeEntryView(appSafeArea: WindowInsets? = null) {
             .padding(horizontal = 16.dp),
         header = { header() },
         keypad = { spec, modifier -> keypad(spec, modifier) },
+        logsLayout = true,
     )
 }
 
 /**
  * Header (title, dots) and keypad, laid out from the room [modifier] leaves after bars and
  * cutouts ([PasscodeLayout]): a landscape phone has ~360 dp of height, and the portrait column
- * cut the keypad off below 6 with nothing to scroll. Lock screen and Set Passcode share it.
+ * cut the keypad off below 6. Always scrollable as a safety net. Lock screen and Set Passcode share it.
  */
 @Composable
 private fun PasscodePad(
     modifier: Modifier,
     header: @Composable () -> Unit,
     keypad: @Composable (PasscodeLayout.Spec, Modifier) -> Unit,
+    logsLayout: Boolean = false,
 ) {
     BoxWithConstraints(modifier) {
         val spec = PasscodeLayout.spec(maxWidth.value, maxHeight.value)
-        val scroll = if (spec.scrolls) Modifier.verticalScroll(rememberScrollState()) else Modifier
+        if (logsLayout && de.letzgo.stashy.BuildConfig.DEBUG) {
+            val w = constraints.maxWidth
+            val h = constraints.maxHeight
+            LaunchedEffect(spec, w, h) { android.util.Log.d("StashyLockLayout", "[LockLayout] room=${w}x${h}px spec=$spec") }
+        }
+        // Always scrollable: if a measurement is ever off, 0 / delete can still be reached. With
+        // the room right the content fills exactly one screen and nothing moves.
+        val scroll = Modifier.verticalScroll(rememberScrollState())
         if (spec.sideBySide) {
             Row(
                 Modifier.fillMaxSize().then(scroll).heightIn(min = maxHeight),

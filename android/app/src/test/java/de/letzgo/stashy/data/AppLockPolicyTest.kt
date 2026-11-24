@@ -44,56 +44,52 @@ class AppLockPolicyTest {
         assertFalse(AppLockPolicy.securesWindows(passcodeSet = false, autoLockOnBackground = false))
     }
 
-    @Test fun safePaddingKeepsTheLockAboveTheGestureBar() {
-        // 2400 px screen, status bar 128 px, gesture bar 63 px; lock window over the whole screen.
-        assertEquals(128 to 63, AppLockPolicy.safePadding(windowStart = 0, windowSize = 2400, safeStart = 128, safeEnd = 2400 - 63))
+    // Emulator: 1080 × 2400 px, density 2.625, status bar 136 px, gesture bar 63 px.
+    private val min = (200 * 2.625f).toInt()
+    private val displaySafe = PxRect(0, 136, 1080, 2337)
+
+    @Test fun fullScreenPortraitPadsStatusAndGestureBar() {
+        val lock = PxRect(0, 0, 1080, 2400)
+        val frame = PxRect(0, 136, 1080, 2337)
+        assertEquals(PxInsets(0, 136, 0, 63), AppLockPolicy.lockPadding(lock, listOf(frame, lock, displaySafe), min, min))
     }
 
-    @Test fun safePaddingFollowsAShiftedLockWindow() {
-        // Lock window placed below the status bar but still 2400 px tall: no top padding, the overhang at the bottom is added.
-        assertEquals(0 to 128 + 63, AppLockPolicy.safePadding(windowStart = 128, windowSize = 2400, safeStart = 128, safeEnd = 2337))
+    @Test fun splitScreenTopHalfStopsAtTheDivider() {
+        // QA round 4/5: lock window reported [0,136]–[1080,1187] or display-tall; app window
+        // [0,0]–[1080,1187] or [0,136]–[1080,1187]. Whatever the windows say, the keys end at 1187.
+        for (lock in listOf(PxRect(0, 136, 1080, 1187), PxRect(0, 0, 1080, 2400), PxRect(0, 136, 1080, 2400))) {
+            for (app in listOf(PxRect(0, 0, 1080, 1187), PxRect(0, 136, 1080, 1187))) {
+                val frame = PxRect(0, 136, 1080, 1187)
+                val pad = AppLockPolicy.lockPadding(lock, listOf(frame, app), min, min)
+                assertEquals("lock=$lock app=$app", 1187, lock.bottom - pad.bottom)
+                assertEquals("lock=$lock app=$app", 136, lock.top + pad.top)
+            }
+        }
     }
 
-    @Test fun safePaddingIsNeverNegative() {
-        assertEquals(0 to 0, AppLockPolicy.safePadding(windowStart = 200, windowSize = 1000, safeStart = 100, safeEnd = 2000))
+    @Test fun splitScreenBottomHalfPadsTheGestureBar() {
+        val lock = PxRect(0, 1213, 1080, 2400)
+        val frame = PxRect(0, 1213, 1080, 2337)
+        assertEquals(PxInsets(0, 0, 0, 63), AppLockPolicy.lockPadding(lock, listOf(frame, PxRect(0, 1213, 1080, 2400)), min, min))
     }
 
-    @Test fun pipRectangleSafeAreaIsClampedNotLaidOutInto() {
-        // QA: content started at the PiP's x 440 / y 1494 px on a 1080 × 2400 lock window.
-        val (left, right) = AppLockPolicy.safePadding(windowStart = 0, windowSize = 1080, safeStart = 440, safeEnd = 1080)
-        val (top, bottom) = AppLockPolicy.safePadding(windowStart = 0, windowSize = 2400, safeStart = 1494, safeEnd = 2400)
-        assertTrue(left + right <= 1080 / 4)
-        assertTrue(top + bottom <= 2400 / 4)
+    @Test fun stalePipRectangleIsIgnored() {
+        // QA round 3: app window still at the PiP's [440,1494]–[1040,1832] after closing PiP.
+        val lock = PxRect(0, 0, 1080, 2400)
+        val frame = PxRect(0, 136, 1080, 2337)
+        val pad = AppLockPolicy.lockPadding(lock, listOf(frame, PxRect(440, 1494, 1040, 1832), displaySafe), min, min)
+        assertEquals(PxInsets(0, 136, 0, 63), pad)
     }
 
-    @Test fun clampKeepsRealBarsAndScalesAbsurdOnes() {
-        assertEquals(128 to 63, AppLockPolicy.clampPadding(128, 63, 2400))
-        assertEquals(400 to 200, AppLockPolicy.clampPadding(800, 400, 2400))
-        assertEquals(0 to 0, AppLockPolicy.clampPadding(0, 0, 0))
+    @Test fun noOverlapLeavesTheWindowAlone() {
+        val lock = PxRect(0, 0, 1080, 2400)
+        assertEquals(PxInsets(0, 0, 0, 0), AppLockPolicy.lockPadding(lock, listOf(PxRect(2000, 0, 3000, 100)), min, min))
+        assertEquals(PxInsets(0, 0, 0, 0), AppLockPolicy.lockPadding(lock, emptyList(), min, min))
     }
 
-    @Test fun appWindowSafeAreaOnlyWhileItCoversTheLockWindow() {
-        assertTrue(AppLockPolicy.appWindowMatchesLock(appInPip = false, appWidth = 1080, appHeight = 2400, lockWidth = 1080, lockHeight = 2400))
-        // In PiP, or still PiP-sized right after closing it.
-        assertFalse(AppLockPolicy.appWindowMatchesLock(appInPip = true, appWidth = 1080, appHeight = 2400, lockWidth = 1080, lockHeight = 2400))
-        assertFalse(AppLockPolicy.appWindowMatchesLock(appInPip = false, appWidth = 640, appHeight = 360, lockWidth = 1080, lockHeight = 2400))
-        assertFalse(AppLockPolicy.appWindowMatchesLock(appInPip = false, appWidth = 1080, appHeight = 2400, lockWidth = 0, lockHeight = 0))
-    }
-
-    @Test fun splitScreenTopHalfLockWindowBelowTheStatusBarGetsNoPadding() {
-        // QA: app window [0,0]–[1080,1187], lock window [0,136]–[1080,1187], status bar 136 px,
-        // navigation bar 63 px at the bottom of a 2400 px display.
-        // API 30+: display safe area 136 … 2337 mapped onto the lock window.
-        assertEquals(0 to 0, AppLockPolicy.safePadding(windowStart = 136, windowSize = 1051, safeStart = 136, safeEnd = 2337))
-        // API 26–29: app window's safe area 136 … 1187 (no bar at the divider).
-        assertTrue(AppLockPolicy.appWindowMatchesLock(appInPip = false, appWidth = 1080, appHeight = 1187, lockWidth = 1080, lockHeight = 1051))
-        assertEquals(0 to 0, AppLockPolicy.safePadding(windowStart = 136, windowSize = 1051, safeStart = 136, safeEnd = 1187))
-        // Horizontally nothing to pad.
-        assertEquals(0 to 0, AppLockPolicy.safePadding(windowStart = 0, windowSize = 1080, safeStart = 0, safeEnd = 1080))
-    }
-
-    @Test fun splitScreenBottomHalfPadsOnlyTheNavigationBar() {
-        // Lock window [0,1213]–[1080,2400] over the 63 px navigation bar.
-        assertEquals(0 to 63, AppLockPolicy.safePadding(windowStart = 1213, windowSize = 1187, safeStart = 136, safeEnd = 2337))
+    @Test fun landscapeCutoutSideIsPadded() {
+        val lock = PxRect(0, 0, 2400, 1080)
+        val frame = PxRect(136, 0, 2337, 1080)
+        assertEquals(PxInsets(136, 0, 63, 0), AppLockPolicy.lockPadding(lock, listOf(frame), min, min))
     }
 }

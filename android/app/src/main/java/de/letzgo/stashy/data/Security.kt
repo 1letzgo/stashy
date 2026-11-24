@@ -134,45 +134,39 @@ object AppLockPolicy {
     fun securesWindows(passcodeSet: Boolean, autoLockOnBackground: Boolean): Boolean = passcodeSet && autoLockOnBackground
 
     /**
-     * Padding (start, end) along one axis that keeps the lock window's content inside the app's
-     * safe area. The lock window's own insets/frame are not reliable (portrait: the 0 row sat
-     * under the gesture bar), so the safe area comes from the app window, in screen pixels:
-     * [safeStart] … [safeEnd]; the lock window covers [windowStart] … windowStart + [windowSize].
+     * Padding (in px) that keeps the lock window's content inside what is really visible of it:
+     * the lock window's rectangle on screen intersected with each of [visibleAreas] (its visible
+     * display frame, the activity's window bounds, the display's safe area — all on-screen).
+     * Insets alone were wrong in split screen (top half: 0 / delete under the divider, taps lost)
+     * and after PiP (the stale PiP rectangle), so no single source is trusted: a source that
+     * would leave less than [minWidth] × [minHeight] (a stale PiP rectangle) is skipped.
      */
-    fun safePadding(windowStart: Int, windowSize: Int, safeStart: Int, safeEnd: Int): Pair<Int, Int> =
-        clampPadding(maxOf(0, safeStart - windowStart), maxOf(0, windowStart + windowSize - safeEnd), windowSize)
-
-    /** Bars and cutout never take more than this share of the lock window along one axis. */
-    const val MAX_PADDING_SHARE = 0.25f
-
-    /**
-     * Caps start + end padding at [MAX_PADDING_SHARE] of [size], keeping their ratio, so a wrong
-     * safe area (e.g. one from a PiP-sized window) can never squeeze the keypad.
-     */
-    fun clampPadding(start: Int, end: Int, size: Int): Pair<Int, Int> {
-        val total = start + end
-        val max = (size * MAX_PADDING_SHARE).toInt()
-        if (total <= max || total <= 0) return start to end
-        val scaledStart = (start.toLong() * max / total).toInt()
-        return scaledStart to (max - scaledStart)
+    fun lockPadding(lock: PxRect, visibleAreas: List<PxRect>, minWidth: Int, minHeight: Int): PxInsets {
+        var visible = lock
+        for (area in visibleAreas) {
+            val next = visible.intersect(area)
+            if (next.width >= minWidth && next.height >= minHeight) visible = next
+        }
+        return PxInsets(visible.left - lock.left, visible.top - lock.top, lock.right - visible.right, lock.bottom - visible.bottom)
     }
-
-    /**
-     * Below API 30 the safe area comes from the app window, which is only valid while that
-     * window covers about what the lock window covers. In PiP, or right after closing it, the
-     * app window still has the PiP rectangle (QA: the keypad laid out inside it) — then the lock
-     * window keeps its own insets.
-     */
-    fun appWindowMatchesLock(appInPip: Boolean, appWidth: Int, appHeight: Int, lockWidth: Int, lockHeight: Int): Boolean =
-        !appInPip && lockWidth > 0 && lockHeight > 0 &&
-            appWidth >= lockWidth * 9 / 10 && appHeight >= lockHeight * 9 / 10
 }
+
+/** A rectangle in screen pixels. */
+data class PxRect(val left: Int, val top: Int, val right: Int, val bottom: Int) {
+    val width: Int get() = right - left
+    val height: Int get() = bottom - top
+    fun intersect(o: PxRect) = PxRect(maxOf(left, o.left), maxOf(top, o.top), minOf(right, o.right), minOf(bottom, o.bottom))
+    override fun toString() = "[$left,$top][$right,$bottom]"
+}
+
+/** Padding per side in pixels. */
+data class PxInsets(val left: Int, val top: Int, val right: Int, val bottom: Int)
 
 /**
  * Size of the passcode screen, from the room its window has (insets already taken off), in dp.
  * Portrait: header above the keypad, 70 dp keys as on iOS. Wider than high (landscape phone,
- * split screen): header beside the keypad. Keys shrink until all four rows fit; only below
- * [MIN_KEY] does the screen have to scroll.
+ * split screen): header beside the keypad. Keys shrink until all four rows fit. The screen can
+ * always scroll as a safety net; below [MIN_KEY] it has to.
  */
 object PasscodeLayout {
     const val MAX_KEY = 70f
