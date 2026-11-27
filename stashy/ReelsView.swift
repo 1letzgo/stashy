@@ -451,6 +451,10 @@ struct ReelsViewBody: View {
     @State private var isInitialized = false
     /// Came back to the foreground under the passcode screen: resume once it is unlocked.
     @State private var resumesAfterUnlock = false
+    /// macOS, "Keep playing in background": the feed was playing when its window left the screen
+    /// (minimized, hidden, Mac asleep / locked) and goes on once the window is back. Only what
+    /// this flag paused is resumed, so a feed that kept playing is never resumed a second time.
+    @State private var resumesWhenWindowReturns = false
     /// Set once a remount is announced: this instance is about to be replaced and must not
     /// resume or restart playback in the meantime.
     @State private var isBeingReplaced = false
@@ -2884,6 +2888,7 @@ struct ReelsViewBody: View {
                         reelsResumePlaybackAfterReturn()
                     }
                 } else if oldTab == .reels {
+                    resumesWhenWindowReturns = false
                     reelsStopPlaybackAndAccessories()
                 }
             }
@@ -2891,6 +2896,12 @@ struct ReelsViewBody: View {
                 // iOS pauses playback on backgrounding but never tells SwiftUI, so
                 // `currentItemIsPlaying` would stay `true` over a paused player. Pausing here
                 // keeps the play button and the player in the same state.
+                // macOS: this is `NSApplication.willResignActiveNotification`, which fires on every
+                // click into another app's window. With "Keep playing in background" the feed
+                // plays on; `macWindowPresence` below pauses it once the window leaves the screen.
+                #if os(macOS)
+                if tabManager.feedsKeepPlayingInBackground { return }
+                #endif
                 guard coordinator.selectedTab == .reels, reelsMode != .pics else { return }
                 reelsPausePlaybackForLocalTeardown()
             }
@@ -2898,6 +2909,12 @@ struct ReelsViewBody: View {
                 // Same path the tab switch uses — re-arms the audio session, restores the
                 // checkpoint and plays on. Back from the background the feed continues where it
                 // was, like after a tab switch.
+                // macOS with "Keep playing in background": nothing paused on resign-active, so
+                // nothing resumes here (it would restart a playing feed from its checkpoint, or
+                // play one the user paused); `macWindowPresence` resumes what it paused.
+                #if os(macOS)
+                if tabManager.feedsKeepPlayingInBackground { return }
+                #endif
                 guard coordinator.selectedTab == .reels else { return }
                 guard isInitialized else { return }
                 // Under the passcode screen the feed waits; it plays on once the app is unlocked.
@@ -2907,6 +2924,28 @@ struct ReelsViewBody: View {
                 }
                 reelsResumePlaybackAfterReturn()
             }
+            #if os(macOS)
+            .macWindowPresence(
+                onLeave: {
+                    guard tabManager.feedsKeepPlayingInBackground else { return }
+                    guard coordinator.selectedTab == .reels, reelsMode != .pics, !isBeingReplaced else { return }
+                    // Hide then sleep: the second event finds the feed paused and keeps the flag.
+                    guard currentItemIsPlaying, !resumesWhenWindowReturns else { return }
+                    resumesWhenWindowReturns = true
+                    reelsPausePlaybackForLocalTeardown()
+                },
+                onReturn: {
+                    guard resumesWhenWindowReturns else { return }
+                    resumesWhenWindowReturns = false
+                    guard coordinator.selectedTab == .reels, isInitialized else { return }
+                    // Under the passcode screen the feed waits; it plays on once the app is unlocked.
+                    if SecurityManager.shared.isAppLocked {
+                        resumesAfterUnlock = true
+                        return
+                    }
+                    reelsResumePlaybackAfterReturn()
+                })
+            #endif
             .onReceive(SecurityManager.shared.$isAppLocked.dropFirst().removeDuplicates()) { locked in
                 guard !locked, resumesAfterUnlock else { return }
                 resumesAfterUnlock = false

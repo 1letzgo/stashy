@@ -545,6 +545,14 @@ class TabManager: ObservableObject {
             UserDefaults.standard.set(feedsDoubleTapMarkers, forKey: feedsDoubleTapMarkersKey)
         }
     }
+    /// macOS only: Feeds go on playing when the stashy window stops being the active one (another
+    /// app or window in front, e.g. on a second display). Minimized, closed, hidden or a sleeping /
+    /// locked Mac still pause. Off = Feeds pause on every app deactivation (Settings › Feeds).
+    @Published var feedsKeepPlayingInBackground: Bool = false {
+        didSet {
+            UserDefaults.standard.set(feedsKeepPlayingInBackground, forKey: feedsKeepPlayingInBackgroundKey)
+        }
+    }
     /// Feeds › Scenes: an "Add Marker" button beside the rating (Settings › Feeds).
     @Published var feedsAddMarkerButton: Bool = false {
         didSet {
@@ -851,6 +859,7 @@ class TabManager: ObservableObject {
     private let reelsContinuousPlayKey = "ReelsContinuousPlay"
     private let feedsAddMarkerButtonKey = "FeedsAddMarkerButton"
     private let feedsDoubleTapMarkersKey = "FeedsDoubleTapMarkers"
+    private let feedsKeepPlayingInBackgroundKey = "FeedsKeepPlayingInBackground"
     private let isPiPEnabledKey = "isPiPEnabled"
     private let isMiniPlayerEnabledKey = "isMiniPlayerEnabled"
     private let playerSkipSecondsKey = "playerSkipSeconds"
@@ -921,6 +930,7 @@ class TabManager: ObservableObject {
         self.reelsContinuousPlay = UserDefaults.standard.bool(forKey: reelsContinuousPlayKey)
         self.feedsAddMarkerButton = UserDefaults.standard.bool(forKey: feedsAddMarkerButtonKey)
         self.feedsDoubleTapMarkers = UserDefaults.standard.bool(forKey: feedsDoubleTapMarkersKey)
+        self.feedsKeepPlayingInBackground = UserDefaults.standard.bool(forKey: feedsKeepPlayingInBackgroundKey)
         self.isPiPEnabled = UserDefaults.standard.object(forKey: isPiPEnabledKey) as? Bool ?? true
         self.isMiniPlayerEnabled = UserDefaults.standard.object(forKey: isMiniPlayerEnabledKey) as? Bool ?? true
         let storedSkip = UserDefaults.standard.object(forKey: playerSkipSecondsKey) as? Double ?? 10
