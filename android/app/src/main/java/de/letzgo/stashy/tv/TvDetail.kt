@@ -127,7 +127,7 @@ fun TvGenericDetail(
                     Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(pt(16))) {
                         Text(name, style = TvType.largeTitle, color = Color.White, maxLines = 2, overflow = TextOverflow.Ellipsis)
                         if (showsChannel) {
-                            TvButton({ TvNav.push(TvChannelPlayerRoute(channel!!)) }, Modifier.focusRequester(headerFocus).tvFocusMemory(memory, "channel")) {
+                            TvButton({ TvNav.push(TvChannelFeedRoute(channel!!)) }, Modifier.focusRequester(headerFocus).tvFocusMemory(memory, "channel")) {
                                 Icon(TvIcons.playTv, null, Modifier.size(pt(30)))
                                 Text(tr(R.string.action_play_as_channel), style = TvType.headline)
                             }

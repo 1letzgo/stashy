@@ -110,10 +110,28 @@ class TvPlaybackModel {
         private val NO_STREAM = tr(R.string.hint_server_has_no_playable_file)
 
         /** Pauses every TV player (app left via Home / another app in front). */
-        fun pauseAll() = live.toList().forEach { it.player?.pause() }
+        fun pauseAll() = live.toList().forEach { m ->
+            val p = m.player ?: return@forEach
+            // iOS engine `pauseForBackground…`: whether it played is remembered for the return.
+            m.resumesOnReturn = p.playWhenReady
+            p.pause()
+        }
+
+        /**
+         * Back from Home (TvActivity.onStart), iOS `resumeFromBackgroundIfNeeded`: a video this stop
+         * paused plays on; one the user had paused stays paused. Under the PIN lock the player was
+         * closed (TvNav.dismissFullScreen), so nothing plays behind the lock screen.
+         */
+        fun resumeAll() = live.toList().forEach { m ->
+            val resume = m.resumesOnReturn
+            m.resumesOnReturn = false
+            if (resume && !TvSecurity.isAppLocked) m.player?.play()
+        }
     }
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
+    /** [pauseAll] paused a playing video: [resumeAll] plays it on. */
+    private var resumesOnReturn = false
     var player by mutableStateOf<StashPlayer?>(null); private set
     val hasPlayer: Boolean get() = player != null
     var scene by mutableStateOf<Scene?>(null); private set
@@ -872,83 +890,4 @@ class TvScenePlayerRoute(private val model: TvPlaybackModel, private val scenePr
     }
 
     override fun onRemoved() = model.clear()
-}
-
-/** iOS: `TVChannelPlayerView` — continuous playback with Prev/Next and the Up Next rail. */
-class TvChannelPlayerRoute(channel: TvChannel) : TvRoute {
-    private val session = TvChannelSession(channel)
-    private var started = false
-    override val key = "channel.${channel.id}.${System.nanoTime()}"
-    override val fullScreen = true
-    override val focus = TvFocusMemory()
-
-    @Composable
-    override fun Content() {
-        LaunchedEffect(Unit) { if (!started) { started = true; session.start() } }
-        val close = { session.stop(); TvNav.pop(); Unit }
-        Box(Modifier.fillMaxSize().background(Color.Black)) {
-            val error = session.errorMessage
-            when {
-                error != null -> {
-                    val focus = remember { FocusRequester() }
-                    BackHandler { close() }
-                    Column(Modifier.align(Alignment.Center), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(pt(24))) {
-                        Icon(TvIcons.filmOutline, null, Modifier.size(pt(64)), tint = TvColors.secondary)
-                        Text(error, style = TvType.title2.copy(fontWeight = FontWeight.Normal), color = TvColors.secondary)
-                        TvButton(close, Modifier.focusRequester(focus)) { Text(tr(R.string.action_close), style = TvType.title3) }
-                    }
-                    TvRequestFocus(focus, "player.close")
-                }
-                session.player.hasPlayer || session.player.error != null -> {
-                    val scene = session.currentScene
-                    val label = session.indexLabel
-                    TvPlayerScreen(
-                        model = session.player,
-                        title = scene?.displayTitle ?: tr(R.string.untitled),
-                        subtitle = if (label.isEmpty()) session.channel.title else "${session.channel.title} · $label",
-                        posterURL = scene?.thumbnailURL,
-                        onExit = close,
-                        canGoPrevious = session.canGoPrevious,
-                        canGoNext = session.canGoNext,
-                        onPrevious = { session.playPrevious() },
-                        onNext = { session.playNext() },
-                        panelExtra = { closePanel, entry -> TvUpNextRail(session, entry, closePanel) },
-                    )
-                }
-                else -> {
-                    BackHandler { close() }
-                    Box(Modifier.align(Alignment.Center)) { TvSpinner(pt(72)) }
-                    // Focus anchor so Back reaches the handler while loading.
-                    Box(Modifier.size(1.dp).focusable())
-                }
-            }
-        }
-    }
-
-    override fun onRemoved() = session.teardown()
-}
-
-/** iOS: `TVChannelUpNextView` — what the channel plays next; selecting jumps there. */
-@Composable
-private fun TvUpNextRail(session: TvChannelSession, entry: FocusRequester?, close: () -> Unit) {
-    val start = session.currentIndex + 1
-    Box(Modifier.height(pt(360))) {
-        if (start >= session.scenes.size) {
-            LaunchedEffect(Unit) { session.loadMoreForBrowsing() }
-            Text(tr(R.string.end_of_channel), Modifier.align(Alignment.Center), style = TvType.title3, color = TvColors.secondary)
-        } else {
-            val entries = session.scenes.subList(start, session.scenes.size).toList()
-            LazyRow(horizontalArrangement = Arrangement.spacedBy(pt(30)), contentPadding = PaddingValues(horizontal = pt(50), vertical = pt(30))) {
-                itemsIndexed(entries, key = { i, s -> "${start + i}-${s.id}" }) { i, scene ->
-                    val index = start + i
-                    LaunchedEffect(index) { if (index >= session.scenes.size - 3) session.loadMoreForBrowsing() }
-                    TvSceneTile(
-                        scene, { session.play(index, fromUpNext = true); close() },
-                        if (i == 0 && entry != null) Modifier.focusRequester(entry) else Modifier,
-                        width = pt(340), height = pt(191), showsFocusPreview = false,
-                    )
-                }
-            }
-        }
-    }
 }

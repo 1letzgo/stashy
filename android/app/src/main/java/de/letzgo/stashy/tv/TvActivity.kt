@@ -39,6 +39,10 @@ class TvActivity : FragmentActivity() {
         super.onStart()
         if (wasBackgrounded) {
             wasBackgrounded = false
+            // What Home paused plays on (feed and regular player alike, like tvOS); a video the
+            // user had paused stays paused, and nothing plays under the PIN lock.
+            TvPlaybackModel.resumeAll()
+            TvFeedSession.resumeAll()
             TvRoots.onForeground()
         }
     }
@@ -48,6 +52,7 @@ class TvActivity : FragmentActivity() {
         if (isChangingConfigurations) return
         // TV: no background playback — Home stops the audio (iOS tvOS pauses on background too).
         TvPlaybackModel.pauseAll()
+        TvFeedSession.pauseAll()
         wasBackgrounded = true
         // Only a real background locks (tvOS: `.background`, not `.inactive`).
         TvSecurity.lock()

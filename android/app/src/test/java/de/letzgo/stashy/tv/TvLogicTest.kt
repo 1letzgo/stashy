@@ -306,5 +306,28 @@ class TvLogicTest {
         val query = channel.query()
         assertEquals(filter, query.base)
         assertEquals(obj("""{"rating100":{"value":80,"modifier":"GREATER_THAN"}}"""), query.entityFilter())
+        // Feeds starts from the same filter and sort (iOS `feedStart`).
+        val start = channel.feedStart
+        assertEquals(filter, start.filter)
+        assertNull(start.scope)
+        assertEquals("createdAtDesc", start.sortRaw)
+        assertEquals("Favs", start.title)
+    }
+
+    @Test fun entityChannelHandsItsCriterionToFeeds() {
+        val start = TvChannel.performer("7", "Ann").feedStart
+        assertEquals("channel.performers.7", start.id)
+        assertNull(start.filter)
+        assertEquals(obj("""{"performers":{"modifier":"INCLUDES","value":["7"]}}"""), start.scope)
+        assertEquals("dateDesc", start.sortRaw)
+        assertNull(TvChannel.recentlyAdded.feedStart.scope)
+        assertEquals("createdAtDesc", TvChannel.recentlyAdded.feedStart.sortRaw)
+    }
+
+    @Test fun hiddenFeedsFallsBackToHome() {
+        val s = TvStacks<String>(TvRootTab.fixed)
+        assertEquals(TvRootTab.Home, s.validated(TvRootTab.Feeds, TvRootTab.fixed))
+        assertEquals(TvRootTab.Feeds, s.validated(TvRootTab.Feeds, TvRootTab.fixed + TvRootTab.Feeds))
+        assertFalse(TvRootTab.Feeds.isLibrary)
     }
 }

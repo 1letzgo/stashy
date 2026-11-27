@@ -79,20 +79,26 @@ object TvRoots {
     private var dashboardModel: TvDashboardModel? = null
     private var searchModel: TvSearchModel? = null
     private var settingsModel: TvSettingsModel? = null
+    private var feedsSession: TvFeedSession? = null
+    /** Focus of the Feeds root (mode cards, settings rows). */
+    val feedsFocus = TvFocusMemory()
     private val catalogs = HashMap<TvRootTab, TvCatalogModel<*>>()
 
     fun ensure(server: String?) {
         if (server == serverId) return
         serverId = server
-        dashboardModel?.dispose(); searchModel?.dispose()
+        dashboardModel?.dispose(); searchModel?.dispose(); feedsSession?.dispose()
         catalogs.values.forEach { it.dispose() }
-        dashboardModel = null; searchModel = null; settingsModel = null
+        dashboardModel = null; searchModel = null; settingsModel = null; feedsSession = null
+        feedsFocus.lastKey = null
         catalogs.clear()
     }
 
     val dashboard: TvDashboardModel get() = dashboardModel ?: TvDashboardModel().also { dashboardModel = it }
     val search: TvSearchModel get() = searchModel ?: TvSearchModel().also { searchModel = it }
     val settings: TvSettingsModel get() = settingsModel ?: TvSettingsModel().also { settingsModel = it }
+    /** iOS: the `@StateObject TVFeedSession` of `TVFeedsView` — lives as long as the tab (per server). */
+    val feeds: TvFeedSession get() = feedsSession ?: TvFeedSession().also { feedsSession = it }
 
     @Suppress("UNCHECKED_CAST")
     fun <T> catalog(tab: TvRootTab, mode: FilterMode, key: (T) -> String): TvCatalogModel<T> =
@@ -102,6 +108,7 @@ object TvRoots {
         TvRootTab.Home -> dashboard.focus
         TvRootTab.Search -> search.focus
         TvRootTab.Settings -> settings.focus
+        TvRootTab.Feeds -> feedsFocus
         else -> catalogs[tab]?.focus
     }
 
@@ -169,7 +176,7 @@ private fun TvAuthAlert() {
 }
 
 /**
- * iOS: `TVMainTabView` — a sidebar (Search, Home, "Library" section with the visible catalogs,
+ * iOS: `TVMainTabView` — a sidebar (Search, Home, Feeds, "Library" section with the visible catalogs,
  * Settings) with one back stack per entry. The sidebar collapses to icons while the content has
  * focus and expands over the content when focus moves into it. Back on a tab root moves focus to
  * the sidebar; Back in the sidebar leaves the app.
@@ -185,7 +192,8 @@ private fun TvMainShell() {
     val requesters = remember { TvRootTab.entries.associateWith { FocusRequester() } }
     val inputModeManager = androidx.compose.ui.platform.LocalInputModeManager.current
 
-    LaunchedEffect(TabManager.tabs) { TvNav.validate(TvRootTab.fixed + visibleLibrary.map { it.tab }) }
+    val showsFeeds = TabManager.isVisible(AppTab.Reels)
+    LaunchedEffect(TabManager.tabs) { TvNav.validate(TvRootTab.fixed + visibleLibrary.map { it.tab } + listOfNotNull(TvRootTab.Feeds.takeIf { showsFeeds })) }
     LaunchedEffect(TvNav.sidebarFocusRequest) {
         if (TvNav.sidebarFocusRequest > 0) {
             // The items become focusable on the next frame: retry until the selected one has focus.
@@ -234,7 +242,7 @@ private fun TvMainShell() {
             }
         }
         if (!fullScreen) {
-            Sidebar(selected, visibleLibrary, sidebarFocused, TvNav.sidebarEnabled, requesters) { focused ->
+            Sidebar(selected, showsFeeds, visibleLibrary, sidebarFocused, TvNav.sidebarEnabled, requesters) { focused ->
                 if (focused == sidebarFocused) return@Sidebar
                 sidebarFocused = focused
                 TvNav.sidebarFocused = focused
@@ -252,6 +260,7 @@ private fun RootContent(tab: TvRootTab) {
         TvRootTab.Home -> TvDashboard(TvRoots.dashboard)
         TvRootTab.Search -> TvSearch(TvRoots.search)
         TvRootTab.Settings -> TvSettings(TvRoots.settings)
+        TvRootTab.Feeds -> TvFeeds(TvRoots.feeds, TvRoots.feedsFocus)
         TvRootTab.Scenes -> TvScenesGrid(TvRoots.catalog<Scene>(tab, FilterMode.Scenes) { it.id })
         TvRootTab.Performers -> TvPerformersGrid(TvRoots.catalog<Performer>(tab, FilterMode.Performers) { it.id })
         TvRootTab.Studios -> TvStudiosGrid(TvRoots.catalog<Studio>(tab, FilterMode.Studios) { it.id })
@@ -266,6 +275,7 @@ private fun RootContent(tab: TvRootTab) {
 @Composable
 private fun Sidebar(
     selected: TvRootTab,
+    showsFeeds: Boolean,
     library: List<SidebarItem>,
     expanded: Boolean,
     focusable: Boolean,
@@ -295,6 +305,8 @@ private fun Sidebar(
                 Column(verticalArrangement = Arrangement.spacedBy(pt(8))) {
                     SidebarRow(TvRootTab.Search, TvIcons.search, selected, expanded, focusable, requesters)
                     SidebarRow(TvRootTab.Home, TvIcons.home, selected, expanded, focusable, requesters)
+                    // tvOS: Feeds directly under Home, hideable (Settings › Visible Tabs).
+                    if (showsFeeds) SidebarRow(TvRootTab.Feeds, TvIcons.feeds, selected, expanded, focusable, requesters)
                     if (library.isNotEmpty()) {
                         if (expanded) Text(tr(R.string.library), Modifier.padding(start = pt(20), top = pt(24), bottom = pt(6)), style = TvType.caption.copy(fontWeight = FontWeight.SemiBold), color = TvColors.secondary)
                         else Spacer(Modifier.height(pt(24)))
