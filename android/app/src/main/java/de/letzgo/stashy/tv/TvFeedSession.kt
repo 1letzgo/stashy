@@ -124,7 +124,10 @@ class TvFeedSession {
         private val live = java.util.Collections.newSetFromMap(java.util.WeakHashMap<TvFeedSession, Boolean>())
 
         /** App left via Home: no feed keeps playing in the background (TvActivity.onStop). */
-        fun pauseAll() = live.toList().forEach { it.player?.pause() }
+        fun pauseAll() = live.toList().forEach { it.pauseForBackground() }
+
+        /** Back from Home (TvActivity.onStart): a feed this stop paused plays on. */
+        fun resumeAll() = live.toList().forEach { it.resumeFromBackground() }
     }
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
@@ -168,6 +171,12 @@ class TvFeedSession {
     private val startPositions = HashMap<String, Double>()
     private val unplayable = HashSet<String>()
     private var isActive = false
+    /** The app is in the background (Home): nothing starts playing until it is back. */
+    private var isBackgrounded = false
+    /** The background stop paused a playing feed: it plays on when the app returns. */
+    private var resumesOnReturn = false
+    /** The last item ended under continuous play while the next page was still coming. */
+    private var awaitingNextPage = false
 
     // Per-item playback state
     private val tracker = PlaybackActivityTracker(scope)
@@ -238,7 +247,30 @@ class TvFeedSession {
         live.remove(this)
     }
 
+    /**
+     * iOS: the engine's `pauseForBackground…` / `resumeFromBackgroundIfNeeded` — whether the feed
+     * played (or was about to: a new item loading) is remembered; a feed the user had paused stays paused.
+     */
+    private fun pauseForBackground() {
+        isBackgrounded = true
+        val p = player ?: run { resumesOnReturn = false; return }
+        resumesOnReturn = p.playWhenReady
+        p.pause()
+    }
+
+    private fun resumeFromBackground() {
+        isBackgrounded = false
+        val resume = resumesOnReturn
+        resumesOnReturn = false
+        // Back under the PIN lock the pager was closed (TvNav.dismissFullScreen) and the player released.
+        if (!isActive || TvSecurity.isAppLocked) return
+        // The page the last item waited for arrived while the app was away.
+        if (awaitingNextPage && !list().isFetching) { settleAwaitingPage(); return }
+        if (resume) player?.play()
+    }
+
     private fun releasePlayer() {
+        awaitingNextPage = false
         tracker.reset()
         generation++
         errorWatch?.cancel(); errorWatch = null
@@ -361,11 +393,12 @@ class TvFeedSession {
             } catch (e: CancellationException) {
                 throw e
             } catch (_: Exception) {
-                l.hasMore = false
+                // A failed page (network blip) does not end paging: the next item change, or the
+                // last item's end, asks again. A page that adds nothing does end it (above).
             } finally {
                 if (l.token == token) l.isFetching = false
             }
-            if (m == mode) refresh()
+            if (m == mode) { refresh(); settleAwaitingPage() }
         }
     }
 
@@ -572,6 +605,7 @@ class TvFeedSession {
 
     private fun playCurrent() {
         if (!isActive) return
+        awaitingNextPage = false
         loadMoreIfNeeded()
         val item = currentItem ?: return
         rememberPosition()
@@ -658,9 +692,27 @@ class TvFeedSession {
 
     private fun onReachedEnd() { if (!isSwitching) atEnd() }
 
-    private fun atEnd() = when (TvFeedLogic.endAction(TabManager.reelsContinuousPlay, canGoNext)) {
-        TvFeedLogic.EndAction.Next -> next()
-        TvFeedLogic.EndAction.Loop -> loopToStart()
+    private fun atEnd() {
+        val l = list()
+        when (TvFeedLogic.endAction(TabManager.reelsContinuousPlay, canGoNext, morePages = l.isFetching || (l.hasMore && l.page > 0))) {
+            TvFeedLogic.EndAction.Next -> next()
+            TvFeedLogic.EndAction.Loop -> loopToStart()
+            TvFeedLogic.EndAction.AwaitPage -> {
+                // The last loaded item ended and the next page is on its way (or not asked for
+                // yet): hold here and move on as soon as it lands instead of replaying this item.
+                awaitingNextPage = true
+                player?.pause()
+                loadMoreIfNeeded()
+                if (!l.isFetching) settleAwaitingPage()
+            }
+        }
+    }
+
+    /** The page the last item waited for is in (or failed / brought nothing): move on, or loop. */
+    private fun settleAwaitingPage() {
+        if (!awaitingNextPage || isBackgrounded || !isActive) return
+        awaitingNextPage = false
+        if (canGoNext) next() else loopToStart()
     }
 
     private fun loopToStart() {

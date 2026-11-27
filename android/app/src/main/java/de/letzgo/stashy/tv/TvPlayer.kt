@@ -110,10 +110,28 @@ class TvPlaybackModel {
         private val NO_STREAM = tr(R.string.hint_server_has_no_playable_file)
 
         /** Pauses every TV player (app left via Home / another app in front). */
-        fun pauseAll() = live.toList().forEach { it.player?.pause() }
+        fun pauseAll() = live.toList().forEach { m ->
+            val p = m.player ?: return@forEach
+            // iOS engine `pauseForBackground…`: whether it played is remembered for the return.
+            m.resumesOnReturn = p.playWhenReady
+            p.pause()
+        }
+
+        /**
+         * Back from Home (TvActivity.onStart), iOS `resumeFromBackgroundIfNeeded`: a video this stop
+         * paused plays on; one the user had paused stays paused. Under the PIN lock the player was
+         * closed (TvNav.dismissFullScreen), so nothing plays behind the lock screen.
+         */
+        fun resumeAll() = live.toList().forEach { m ->
+            val resume = m.resumesOnReturn
+            m.resumesOnReturn = false
+            if (resume && !TvSecurity.isAppLocked) m.player?.play()
+        }
     }
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
+    /** [pauseAll] paused a playing video: [resumeAll] plays it on. */
+    private var resumesOnReturn = false
     var player by mutableStateOf<StashPlayer?>(null); private set
     val hasPlayer: Boolean get() = player != null
     var scene by mutableStateOf<Scene?>(null); private set

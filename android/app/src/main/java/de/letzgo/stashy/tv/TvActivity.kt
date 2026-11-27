@@ -39,6 +39,10 @@ class TvActivity : FragmentActivity() {
         super.onStart()
         if (wasBackgrounded) {
             wasBackgrounded = false
+            // What Home paused plays on (feed and regular player alike, like tvOS); a video the
+            // user had paused stays paused, and nothing plays under the PIN lock.
+            TvPlaybackModel.resumeAll()
+            TvFeedSession.resumeAll()
             TvRoots.onForeground()
         }
     }

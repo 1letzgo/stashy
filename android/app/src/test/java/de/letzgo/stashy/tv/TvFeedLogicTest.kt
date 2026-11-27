@@ -91,6 +91,15 @@ class TvFeedLogicTest {
         assertEquals(TvFeedLogic.EndAction.Loop, TvFeedLogic.endAction(continuousPlay = false, canGoNext = true))
     }
 
+    @Test fun lastItemWaitsForTheNextPageUnderContinuousPlay() {
+        assertEquals(TvFeedLogic.EndAction.AwaitPage, TvFeedLogic.endAction(continuousPlay = true, canGoNext = false, morePages = true))
+        // The list is complete: the last item loops (tvOS too; no wrap to the first item).
+        assertEquals(TvFeedLogic.EndAction.Loop, TvFeedLogic.endAction(continuousPlay = true, canGoNext = false, morePages = false))
+        assertEquals(TvFeedLogic.EndAction.Next, TvFeedLogic.endAction(continuousPlay = true, canGoNext = true, morePages = true))
+        // Without continuous play a page coming changes nothing.
+        assertEquals(TvFeedLogic.EndAction.Loop, TvFeedLogic.endAction(continuousPlay = false, canGoNext = false, morePages = true))
+    }
+
     @Test fun playerLoopsOnlyForPlainRowsFromZero() {
         assertTrue(TvFeedLogic.playerLoops(hasSegment = false, start = 0.0, continuousPlay = false))
         assertFalse(TvFeedLogic.playerLoops(hasSegment = true, start = 0.0, continuousPlay = false))

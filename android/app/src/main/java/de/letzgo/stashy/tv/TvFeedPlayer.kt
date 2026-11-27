@@ -59,6 +59,8 @@ import de.letzgo.stashy.data.Scene
 import de.letzgo.stashy.ui.feeds.FeedItem
 import de.letzgo.stashy.ui.player.StashPlayer
 import de.letzgo.stashy.ui.player.VideoSurface
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LifecycleEventEffect
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
@@ -83,6 +85,10 @@ fun TvFeedPlayer(session: TvFeedSession, onNavigate: (TvFeedDestination) -> Unit
     val feedbackJob = remember { arrayOfNulls<Job>(1) }
     var holdJob by remember { mutableStateOf<Job?>(null) }
     var holdTarget by remember { mutableDoubleStateOf(0.0) }
+    /** The item a scan runs on: an item change (continuous play at the end) ends the scan. */
+    val holdItemId = remember { arrayOfNulls<String>(1) }
+    /** Started on a ◀ / ▶ key-down: still down after [TvFeedLogic.HOLD_THRESHOLD_MS] = a hold. */
+    val pendingHold = remember { arrayOfNulls<Job>(1) }
     /** ◀ / ▶ / Select key-down times: a tap acts on release, a held ◀ / ▶ seeks on. */
     val downAt = remember { HashMap<Int, Long>() }
     var closing by remember { mutableStateOf(false) }
@@ -107,13 +113,16 @@ fun TvFeedPlayer(session: TvFeedSession, onNavigate: (TvFeedDestination) -> Unit
 
     fun beginHold(direction: Int) {
         val p = session.player ?: return
+        val itemId = session.currentItem?.id ?: return
         holdJob?.cancel()
+        holdItemId[0] = itemId
         holdTarget = p.currentTime
         feedbackJob[0]?.cancel()
         holdJob = scope.launch {
             var elapsed = 0.0
             while (isActive) {
                 delay((TvFeedLogic.HOLD_TICK * 1000).toLong())
+                if (session.currentItem?.id != itemId) break
                 val range = session.seekRange ?: break
                 val current = session.player ?: break
                 elapsed += TvFeedLogic.HOLD_TICK
@@ -121,15 +130,27 @@ fun TvFeedPlayer(session: TvFeedSession, onNavigate: (TvFeedDestination) -> Unit
                 seekFeedback = "${if (direction < 0) "◀◀" else "▶▶"}  ${TvFormat.time(holdTarget)} / ${TvFormat.time(current.duration)}"
                 session.seekTo(holdTarget)
             }
+            // Ended on its own (item changed, player gone): the next key-up must not seek.
+            if (isActive) { holdJob = null; holdItemId[0] = null; clearFeedbackLater() }
         }
     }
 
+    /** Release of a held ◀ / ▶: the scan stops where it is (on the item it ran on only). */
     fun endHold() {
+        pendingHold[0]?.cancel(); pendingHold[0] = null
         val job = holdJob ?: return
         job.cancel()
         holdJob = null
-        session.seekTo(holdTarget)
+        if (session.currentItem?.id == holdItemId[0]) session.seekTo(holdTarget)
+        holdItemId[0] = null
         clearFeedbackLater()
+    }
+
+    // Home while a key is held: its key-up never comes, so the scan ends here (else it would seek
+    // on in the background and still run on return).
+    LifecycleEventEffect(Lifecycle.Event.ON_STOP) {
+        endHold()
+        downAt.clear()
     }
 
     fun openOverlay() {
@@ -208,12 +229,19 @@ fun TvFeedPlayer(session: TvFeedSession, onNavigate: (TvFeedDestination) -> Unit
                     when (event.type) {
                         KeyEventType.KeyDown -> {
                             when {
+                                // Tap vs hold by time, not by key repeats: a remote that sends no
+                                // repeats (some HDMI-CEC / Bluetooth ones) still scans when held.
+                                // Repeats (repeatCount > 0) are swallowed; the key-up decides.
                                 TvFeedLogic.isHoldSeekKey(code) -> {
                                     if (native.repeatCount == 0) {
                                         downAt[code] = now()
-                                    } else if (holdJob == null && session.player != null) {
-                                        val start = downAt[code]
-                                        if (start != null && now() - start >= TvFeedLogic.HOLD_THRESHOLD_MS) beginHold(if (key == TvFeedLogic.Key.SeekBack) -1 else 1)
+                                        pendingHold[0]?.cancel()
+                                        val direction = if (key == TvFeedLogic.Key.SeekBack) -1 else 1
+                                        pendingHold[0] = scope.launch {
+                                            delay(TvFeedLogic.HOLD_THRESHOLD_MS)
+                                            pendingHold[0] = null
+                                            if (downAt.containsKey(code) && holdJob == null && !overlayOpen) beginHold(direction)
+                                        }
                                     }
                                 }
                                 key == TvFeedLogic.Key.OpenOverlay -> {
@@ -237,6 +265,7 @@ fun TvFeedPlayer(session: TvFeedSession, onNavigate: (TvFeedDestination) -> Unit
                             val wasDown = downAt.remove(code) != null
                             when {
                                 TvFeedLogic.isHoldSeekKey(code) -> {
+                                    pendingHold[0]?.cancel(); pendingHold[0] = null
                                     if (holdJob != null) endHold() else if (wasDown) step(if (key == TvFeedLogic.Key.SeekBack) -1 else 1)
                                 }
                                 // Opens on release, so the click's own key-up never reaches an overlay button.

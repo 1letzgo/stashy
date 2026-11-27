@@ -96,6 +96,10 @@ when the pager closes or the full player takes over — no preloading, Fire TV s
 hardware decoder), `TvFeedPlayer` (`TVFeedPlayerView`: ▲/▼ page, ◀/▶ 10 s, hold ◀/▶ scans, Select =
 overlay with Play / Scene Details / O Count / rating / mute / performers / studio / modes /
 Reshuffle). Channels push `TvChannelFeedRoute` (Scenes with the channel's filter and sort).
+Home pauses every TV player and feed (`TvActivity.onStop`); coming back plays on what that stop
+paused (`resumeAll`, like the tvOS engine), not what the user had paused, nothing under the PIN lock.
+With Continuous Play the last loaded feed item waits for the next page instead of looping
+(`TvFeedLogic.EndAction.AwaitPage`); a hold on ◀/▶ is told from a tap by time, not key repeats.
 Sizes are tvOS points halved (`pt()`: 1920 pt ≙ 960 dp). Pure logic lives in `TvLogic.kt` and
 `TvFeedLogic.kt` (tested).
 

@@ -62,11 +62,19 @@ object TvFeedLogic {
     fun needsMore(index: Int, count: Int): Boolean = index >= count - 4
 
     /** What a finished item (or a marker's segment end) does. */
-    enum class EndAction { Next, Loop }
+    enum class EndAction { Next, Loop, AwaitPage }
 
-    /** iOS `handleReachedEnd`: continuous play moves on while there is a next item, otherwise loop. */
-    fun endAction(continuousPlay: Boolean, canGoNext: Boolean): EndAction =
-        if (continuousPlay && canGoNext) EndAction.Next else EndAction.Loop
+    /**
+     * iOS `handleReachedEnd`: continuous play moves on while there is a next item, otherwise loop.
+     * Beyond tvOS (which replays the last loaded item while its next page is still loading): with
+     * [morePages] the last item waits for that page and the feed moves on when it lands.
+     */
+    fun endAction(continuousPlay: Boolean, canGoNext: Boolean, morePages: Boolean = false): EndAction = when {
+        !continuousPlay -> EndAction.Loop
+        canGoNext -> EndAction.Next
+        morePages -> EndAction.AwaitPage
+        else -> EndAction.Loop
+    }
 
     /**
      * iOS `engine.loopsAtEnd`: the player loops on its own only for rows that start at 0 and have
