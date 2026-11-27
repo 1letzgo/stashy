@@ -101,7 +101,7 @@ fun TvFeedPlayer(session: TvFeedSession, onNavigate: (TvFeedDestination) -> Unit
 
     fun step(direction: Int) {
         if (overlayOpen) return
-        session.seek(by = direction * TvFeedLogic.SEEK_STEP)
+        session.seekBy(direction * TvFeedLogic.SEEK_STEP)
         flash(TvFeedLogic.stepLabel(direction))
     }
 
@@ -119,7 +119,7 @@ fun TvFeedPlayer(session: TvFeedSession, onNavigate: (TvFeedDestination) -> Unit
                 elapsed += TvFeedLogic.HOLD_TICK
                 holdTarget = TvFeedLogic.clamp(holdTarget + direction * TvFeedLogic.holdSeekSpeed(elapsed) * TvFeedLogic.HOLD_TICK, range)
                 seekFeedback = "${if (direction < 0) "◀◀" else "▶▶"}  ${TvFormat.time(holdTarget)} / ${TvFormat.time(current.duration)}"
-                session.seek(to = holdTarget)
+                session.seekTo(holdTarget)
             }
         }
     }
@@ -128,7 +128,7 @@ fun TvFeedPlayer(session: TvFeedSession, onNavigate: (TvFeedDestination) -> Unit
         val job = holdJob ?: return
         job.cancel()
         holdJob = null
-        session.seek(to = holdTarget)
+        session.seekTo(holdTarget)
         clearFeedbackLater()
     }
 
@@ -209,13 +209,16 @@ fun TvFeedPlayer(session: TvFeedSession, onNavigate: (TvFeedDestination) -> Unit
                         KeyEventType.KeyDown -> {
                             when {
                                 TvFeedLogic.isHoldSeekKey(code) -> {
-                                    if (native.repeatCount == 0) downAt[code] = now()
-                                    else if (holdJob == null && session.player != null) {
+                                    if (native.repeatCount == 0) {
+                                        downAt[code] = now()
+                                    } else if (holdJob == null && session.player != null) {
                                         val start = downAt[code]
                                         if (start != null && now() - start >= TvFeedLogic.HOLD_THRESHOLD_MS) beginHold(if (key == TvFeedLogic.Key.SeekBack) -1 else 1)
                                     }
                                 }
-                                key == TvFeedLogic.Key.OpenOverlay -> if (native.repeatCount == 0) downAt[code] = now()
+                                key == TvFeedLogic.Key.OpenOverlay -> {
+                                    if (native.repeatCount == 0) downAt[code] = now()
+                                }
                                 native.repeatCount > 0 && (key == TvFeedLogic.Key.Previous || key == TvFeedLogic.Key.Next) -> Unit
                                 else -> when (key) {
                                     TvFeedLogic.Key.Previous -> session.previous()
@@ -233,9 +236,13 @@ fun TvFeedPlayer(session: TvFeedSession, onNavigate: (TvFeedDestination) -> Unit
                         KeyEventType.KeyUp -> {
                             val wasDown = downAt.remove(code) != null
                             when {
-                                TvFeedLogic.isHoldSeekKey(code) -> if (holdJob != null) endHold() else if (wasDown) step(if (key == TvFeedLogic.Key.SeekBack) -1 else 1)
+                                TvFeedLogic.isHoldSeekKey(code) -> {
+                                    if (holdJob != null) endHold() else if (wasDown) step(if (key == TvFeedLogic.Key.SeekBack) -1 else 1)
+                                }
                                 // Opens on release, so the click's own key-up never reaches an overlay button.
-                                key == TvFeedLogic.Key.OpenOverlay -> if (wasDown) openOverlay()
+                                key == TvFeedLogic.Key.OpenOverlay -> {
+                                    if (wasDown) openOverlay()
+                                }
                             }
                             true
                         }

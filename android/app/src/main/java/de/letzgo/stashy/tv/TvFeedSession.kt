@@ -453,12 +453,12 @@ class TvFeedSession {
         return TvFeedLogic.seekRange(seg?.start, seg?.end, p.duration)
     }
 
-    fun seek(by: Double) { player?.let { seek(to = it.currentTime + by) } }
+    fun seekBy(delta: Double) { player?.let { seekTo(it.currentTime + delta) } }
 
-    fun seek(to: Double) {
+    fun seekTo(time: Double) {
         val p = player ?: return
         val range = seekRange ?: return
-        val target = TvFeedLogic.clamp(to, range)
+        val target = TvFeedLogic.clamp(time, range)
         segmentEndHandled = false
         credit.noteSeek()
         tracker.noteSeek(target)
