@@ -834,6 +834,7 @@
     <string name="feed">Feed</string>
     <string name="feed_settings">Feed Settings</string>
     <string name="feeds">Feeds</string>
+    <string name="feeds_keep_playing_in_background_mac">Keep playing in background</string>
     <string name="female">Female</string>
     <string name="field">Field</string>
     <string name="file_count">File Count</string>
@@ -1001,6 +1002,7 @@
     <string name="hint_deletes_this_item_and_its">Deletes this item and its files after confirmation</string>
     <string name="hint_marker_is_removed_scene_stays">The marker is removed from the server. The scene and its files stay.</string>
     <string name="hint_double_tap_jumps_to_markers">Double tap jumps to markers: in Feeds › Scenes a double tap on the left or right goes to the previous or next marker of a scene that has markers. Without a marker in that direction it skips seconds as usual.</string>
+    <string name="hint_feeds_keep_playing_in_background_mac">Keep playing in background: Feeds keep playing when you switch to another app or window, for example on a second display. They still pause when the window is minimized or closed, the app is hidden, or the Mac sleeps or locks.</string>
     <string name="hint_download_arg_speech_model_to">Download the %1$s speech model to enable live captions.</string>
     <string name="hint_download_is_managed_by_ios">The download is managed by iOS and can be several hundred megabytes.</string>
     <string name="hint_downloaded_file_is_not_valid">The downloaded file is not a valid app package.</string>

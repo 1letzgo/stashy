@@ -185,6 +185,16 @@ struct PlaybackSettingsSection: View {
             .tint(appearanceManager.tintColor)
             .stashyGroupedBlockRow(index: verticalsAvailable ? 7 : 6, count: verticalsAvailable ? 8 : 7)
             stashyScrollingSectionFooter(tr("hint_double_tap_jumps_to_markers"))
+
+            #if os(macOS)
+            // Another app or window in front (second display) leaves Feeds playing.
+            Toggle(isOn: $tabManager.feedsKeepPlayingInBackground) {
+                Label(tr("feeds_keep_playing_in_background_mac"), systemImage: "macwindow.on.rectangle")
+            }
+            .tint(appearanceManager.tintColor)
+            .stashyGroupedBlockRow(index: 0, count: 1)
+            stashyScrollingSectionFooter(tr("hint_feeds_keep_playing_in_background_mac"))
+            #endif
         }
     }
 
