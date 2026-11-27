@@ -30,6 +30,7 @@ import androidx.compose.material.icons.filled.*
 import androidx.compose.material.icons.outlined.*
 import androidx.compose.material.icons.automirrored.filled.Backspace
 import androidx.compose.material.icons.automirrored.filled.VolumeUp
+import androidx.compose.material.icons.automirrored.filled.VolumeOff
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -128,6 +129,12 @@ object TvIcons {
     val stackFilm = Icons.Filled.VideoLibrary
     val magnifier = Icons.Filled.Search
     val clear = Icons.Filled.Cancel
+    /** Feeds (SF `play.rectangle.on.rectangle`) and its modes (iOS `ReelsModeType.icon`). */
+    val feeds = Icons.Filled.Subscriptions
+    val feedClips = Icons.Filled.PhotoLibrary
+    val feedPreviews = Icons.Filled.Slideshow
+    val shuffle = Icons.Filled.Shuffle
+    val speakerSlash = Icons.AutoMirrored.Filled.VolumeOff
 }
 
 // MARK: - Focus memory

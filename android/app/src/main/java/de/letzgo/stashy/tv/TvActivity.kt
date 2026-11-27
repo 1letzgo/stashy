@@ -48,6 +48,7 @@ class TvActivity : FragmentActivity() {
         if (isChangingConfigurations) return
         // TV: no background playback — Home stops the audio (iOS tvOS pauses on background too).
         TvPlaybackModel.pauseAll()
+        TvFeedSession.pauseAll()
         wasBackgrounded = true
         // Only a real background locks (tvOS: `.background`, not `.inactive`).
         TvSecurity.lock()

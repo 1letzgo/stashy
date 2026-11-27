@@ -970,6 +970,7 @@
     <string name="hint_backup_is_in_servers_backup">The backup is in the server\'s backup folder.</string>
     <string name="hint_browse_pause_click_speed_menu">◀ ▶ Browse · ⏯ Pause · Click: Speed · Menu: Exit</string>
     <string name="hint_browse_seek_hold_to_scan">▲ ▼ Browse   ◀ ▶ Seek (hold to scan)   Swipe to scrub   Click for info</string>
+    <string name="hint_browse_seek_select_for_info">▲ ▼ Browse   ◀ ▶ Seek (hold to scan)   Select for info</string>
     <string name="hint_changes_stashy_app_icon_on">Changes the stashy app icon on iPhone and iPad. The Mac app keeps its own icon.</string>
     <string name="hint_changes_stashy_app_icon_to">Changes the stashy app icon to the color you pick.</string>
     <string name="hint_choose_appearance_of_app">Choose the appearance of the app.</string>

@@ -199,7 +199,7 @@ fun TvDashboard(model: TvDashboardModel) {
                     LazyRow(Modifier.focusRestorer(), horizontalArrangement = Arrangement.spacedBy(pt(30)), contentPadding = PaddingValues(horizontal = pt(50), vertical = pt(20))) {
                         items(channels, key = { it.id }) { channel ->
                             Column(Modifier.width(pt(400))) {
-                                TvChannelCard(channel, model.channelPreviews[channel.id].orEmpty(), { TvNav.push(TvChannelPlayerRoute(channel)) },
+                                TvChannelCard(channel, model.channelPreviews[channel.id].orEmpty(), { TvNav.push(TvChannelFeedRoute(channel)) },
                                     Modifier.tvFocusMemory(model.focus, channel.id), width = pt(410), height = pt(230))
                                 Text(channel.subtitle, Modifier.padding(top = pt(10)), style = TvType.caption, color = TvColors.secondary, maxLines = 1)
                             }

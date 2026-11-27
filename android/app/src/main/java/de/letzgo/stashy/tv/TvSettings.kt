@@ -520,6 +520,7 @@ private fun DefaultFiltersPage() {
 private fun VisibleTabsPage() {
     val first = remember { FocusRequester() }
     val rows = listOf(
+        Triple(AppTab.Reels, tr(R.string.feeds), TvIcons.feeds),
         Triple(AppTab.Scenes, tr(R.string.scenes), TvIcons.film), Triple(AppTab.Performers, tr(R.string.performers), TvIcons.person3), Triple(AppTab.Studios, tr(R.string.studios), TvIcons.building),
         Triple(AppTab.Tags, tr(R.string.tags), TvIcons.tag), Triple(AppTab.Groups, tr(R.string.groups), TvIcons.stack), Triple(AppTab.Galleries, tr(R.string.galleries), TvIcons.photoStack),
         Triple(AppTab.Images, tr(R.string.images), TvIcons.photo),

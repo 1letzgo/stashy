@@ -81,14 +81,23 @@ The debug build then starts connected (`ServerConfigManager.seedDebugServer`).
 
 Same APK, own entry: `tv/TvActivity` (Leanback launcher; `MainActivity` forwards to it when
 `UiModeManager` reports a television). Mirrors `stashyTV` file by file with Compose for TV
-(`androidx.tv:tv-material`): `TvMain` = `TVMainTabView` (sidebar Search · Home · Library · Settings,
-one back stack per entry in `TvNav`, Back on a tab root focuses the sidebar), `TvDashboard`,
+(`androidx.tv:tv-material`): `TvMain` = `TVMainTabView` (sidebar Search · Home · Feeds · Library ·
+Settings, one back stack per entry in `TvNav`, Back on a tab root focuses the sidebar), `TvDashboard`,
 `TvCatalogs` (`TVCatalogGrid` + the seven catalogs, tvOS sort labels in `TvSortLabels`),
 `TvDetail` / `TvSceneDetail`, `TvImageViewer`, `TvSearch`, `TvSettings` (two-column pages,
 same keys as tvOS incl. `tv_pin_*`), `TvServerSetup`, `TvPlayer` (`TVAetherPlayerView` on the
 shared `StashPlayer`: D-pad seek with 10/30/60 s acceleration and sprite scrub, Down = options
-panel with audio/subtitles/markers, channels with Up Next and hold ▲/▼), `TvChannel` (stashy+).
-Sizes are tvOS points halved (`pt()`: 1920 pt ≙ 960 dp). Pure logic lives in `TvLogic.kt` (tested).
+panel with audio/subtitles/markers), `TvChannel` (stashy+; a starting point for Feeds, no player of
+its own), Feeds = `TvFeeds` (`TVFeedsView`: mode cards Scenes / Markers / Clips / Previews in the
+Settings › Feeds order, the Feeds settings below them, same `TabManager` keys as iOS; shown while
+`AppTab.Reels` is visible, not gated by stashy+), `TvFeedSession` (`TVFeedSession`: pages from the
+phone's `FeedsQuery` / `FeedsRepository`, **one** `StashPlayer` handed from item to item and released
+when the pager closes or the full player takes over — no preloading, Fire TV sticks often have one
+hardware decoder), `TvFeedPlayer` (`TVFeedPlayerView`: ▲/▼ page, ◀/▶ 10 s, hold ◀/▶ scans, Select =
+overlay with Play / Scene Details / O Count / rating / mute / performers / studio / modes /
+Reshuffle). Channels push `TvChannelFeedRoute` (Scenes with the channel's filter and sort).
+Sizes are tvOS points halved (`pt()`: 1920 pt ≙ 960 dp). Pure logic lives in `TvLogic.kt` and
+`TvFeedLogic.kt` (tested).
 
 ## Conventions
 
